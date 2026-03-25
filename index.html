@@ -735,20 +735,20 @@ tbody tr:nth-child(9){animation-delay:.18s}tbody tr:nth-child(10){animation-dela
     <hr class="blog-hr"/>
     <h2>How Frontier Models Perform in the Wild</h2>
 
-    <p>WildClawBench makes one thing clear: frontier models each have distinct strengths. <strong>Claude Opus 4.6</strong> leads overall, with its edge most visible on long, multi-step workflows — particularly coding-style tasks that demand codebase understanding and reliable tool use rather than just plausible snippets. But top performance comes at top cost.</p>
+    <p>WildClawBench makes one thing clear: each frontier model has its own distinct strengths. <strong>Claude Opus 4.6</strong> takes the overall lead. Its edge is most apparent in complex workflows involving multiple steps, specifically in coding tasks that demand reliable tool use and codebase understanding rather than just plausible output. However, this top tier performance comes at the highest cost.</p>
 
-    <p><strong>GPT-5.4</strong>, at a quarter of the price, trails close behind across nearly every metric, and is especially strong in Creative Synthesis. For price-performance, <strong>Step 3.5 Flash</strong> stands out as the cheapest usable option, making it a practical choice for deployment at scale. <strong>MiMo V2 Pro</strong> is also worth noting — not benchmark-leading, but strong enough to show newer model families are becoming serious contenders in real agent settings.</p>
+    <p>At a quarter of that price, <strong>GPT-5.4</strong> follows closely behind across nearly every metric and shines particularly bright in Creative Synthesis. Additionally, while <strong>MiMo V2 Pro</strong> does not top the leaderboards, it remains a noteworthy competitor — its solid performance proves that newer model families are rapidly becoming serious players in practical agent environments. Finally, when considering cost effectiveness, <strong>MiniMax M2.7</strong> stands out as the cheapest usable option, making it highly practical for broad deployment.</p>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;margin:32px 0;border:1px solid var(--g);border-radius:var(--r);overflow:hidden">
       <div style="padding:22px 24px;background:var(--surf);border-right:1px solid var(--g)">
         <div style="font-family:var(--fm);font-size:8px;letter-spacing:2.5px;text-transform:uppercase;color:var(--ink4);margin-bottom:10px">Best Overall</div>
         <div style="font-family:var(--fd);font-size:26px;font-weight:700;font-style:italic;color:var(--scarlet);line-height:1.1">Claude Opus 4.6</div>
-        <div style="font-family:var(--fm);font-size:11px;color:var(--ink3);margin-top:6px">51.1% · Excels at long multi-step coding workflows</div>
+        <div style="font-family:var(--fm);font-size:11px;color:var(--ink3);margin-top:6px">51.1% · Excels at complex multi-step coding workflows</div>
       </div>
       <div style="padding:22px 24px;background:var(--surf)">
         <div style="font-family:var(--fm);font-size:8px;letter-spacing:2.5px;text-transform:uppercase;color:var(--ink4);margin-bottom:10px">Best Value</div>
-        <div style="font-family:var(--fd);font-size:26px;font-weight:700;font-style:italic;color:var(--forest);line-height:1.1">Step 3.5 Flash</div>
-        <div style="font-family:var(--fm);font-size:11px;color:var(--ink3);margin-top:6px">27.7% · $6.63 total — cheapest usable agent</div>
+        <div style="font-family:var(--fd);font-size:26px;font-weight:700;font-style:italic;color:var(--forest);line-height:1.1">MiniMax M2.7</div>
+        <div style="font-family:var(--fm);font-size:11px;color:var(--ink3);margin-top:6px">33.0% · $7.47 total — cheapest usable agent</div>
       </div>
     </div>
 
@@ -761,7 +761,7 @@ tbody tr:nth-child(9){animation-delay:.18s}tbody tr:nth-child(10){animation-dela
 
     <div class="blog-callout" style="border-left-color:var(--scarlet)">
       <div class="blog-callout-label" style="color:var(--scarlet)">Submit Your Lobster</div>
-      <div class="blog-callout-body">Send your lobster's results to <strong style="color:var(--scarlet)">wildclawbench@proton.me</strong> and see how it stacks up! Submission details can be found in our repo.</div>
+      <div class="blog-callout-body">Send your lobster's results to <strong style="color:var(--scarlet)"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="addac4c1c9cec1ccdacfc8c3cec5eddddfc2d9c2c383c0c8">[email&#160;protected]</a></strong> and see how it stacks up! Submission details can be found in our repo.</div>
     </div>
 
     <!-- ═══ Section 4: What Makes It Different ═══ -->
@@ -842,7 +842,7 @@ tbody tr:nth-child(9){animation-delay:.18s}tbody tr:nth-child(10){animation-dela
       <li><strong>Long-Horizon Tasks & Context Management</strong> — As workflows stretch into hours or thousands of tool calls, context degradation becomes a fatal bottleneck. We need the community to explore better harnesses, memory architectures, and context scaling techniques to help models maximize their reasoning capabilities over extended periods.</li>
       <li><strong>Multimodal Capabilities</strong> — Currently, most flagship models deployed as agents are strictly pure language models. This inherently restricts their potential when navigating visual interfaces, analyzing charts, or understanding complex spatial layouts. Integrating native vision and robust multimodal grounding is the necessary next leap for agentic AI.</li>
     </ul>
-
+    
     <hr class="blog-hr"/>
     <h2>Acknowledgements</h2>
     <p>WildClawBench builds on the excellent open-source agent ecosystem:</p>
@@ -866,7 +866,7 @@ tbody tr:nth-child(9){animation-delay:.18s}tbody tr:nth-child(10){animation-dela
 </div><!-- /pg-wrap blog -->
 </div><!-- /pv-blog -->
 
-<script>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 /* ═══════════════════════════════════════════════════════
    SPA ROUTING
 ═══════════════════════════════════════════════════════ */
@@ -1437,6 +1437,12 @@ function renderRate(){document.getElementById('tb-r').innerHTML=sortBy(mSt.rate.
 function renderTime(){document.getElementById('tb-t').innerHTML=sortBy(mSt.time.k,mSt.time.d).map((m,i)=>mkRow(m,i+1,'elapsed','bf-t','bv-t',v=>(v/60).toFixed(0)+'min',v=>Math.max(5,v/mxT*100),m=>`<td><span class="bv bv-r">${m.successRate.toFixed(1)}<small style="color:var(--ink4)">%</small></span></td><td><span class="bv bv-c">$${m.cost.toFixed(2)}</span></td>`)).join('');}
 function renderCost(){document.getElementById('tb-c').innerHTML=sortBy(mSt.cost.k,mSt.cost.d).map((m,i)=>mkRow(m,i+1,'cost','bf-c','bv-c',v=>m.cost===0?'N/A':'$'+v.toFixed(2),v=>m.cost===0?0:Math.max(5,(1-v/mxC)*100),m=>`<td><span class="bv bv-r">${m.successRate.toFixed(1)}<small style="color:var(--ink4)">%</small></span></td><td><span class="bv bv-t">${(m.elapsed/60).toFixed(0)}<small style="color:var(--ink4)">min</small></span></td>`)).join('');}
 function renderAllM(){renderRate();renderTime();renderCost();}
+function handleHash(){
+  const hash = location.hash.replace('#','') || 'home';
+  nav(hash);
+}
+window.addEventListener('hashchange', handleHash);
+handleHash();
 document.querySelectorAll('.mt').forEach(btn=>btn.addEventListener('click',()=>{
   const m=btn.dataset.m;
   document.querySelectorAll('.mt').forEach(b=>b.classList.remove('on'));
@@ -2435,8 +2441,4 @@ setTimeout(()=>{
 
 <!-- GLOBAL FIXED FOOTER -->
 <div id="global-footer">
-  <span>© 2026 WildClawBench — Open Evaluation Suite</span>
-  <div class="ft-links"><a href="https://github.com/InternLM/WildClawBench">GitHub</a><a href="https://huggingface.co/datasets/internlm/WildClawBench">Dataset</a></div>
-</div>
-</body>
-</html>
+  <span>© 2026 Wild
