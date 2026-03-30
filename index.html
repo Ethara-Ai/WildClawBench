@@ -505,7 +505,7 @@ tbody tr:nth-child(9){animation-delay:.18s}tbody tr:nth-child(10){animation-dela
   </div>
 
   <div class="gnav-right" style="display:flex;align-items:center;gap:10px">
-    <span>Updated 2026-03-24</span>
+    <span>Updated 2026-03-27</span>
     <a href="https://github.com/InternLM/WildClawBench" target="_blank" style="display:flex;align-items:center;color:var(--ink3);transition:color .15s" onmouseover="this.style.color='var(--ink)'" onmouseout="this.style.color='var(--ink3)'">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
         <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
@@ -528,11 +528,11 @@ tbody tr:nth-child(9){animation-delay:.18s}tbody tr:nth-child(10){animation-dela
         <div class="hp-title">
           <span class="hp-wild">Wild</span><span class="hp-claw">Claw</span><span class="hp-bench">Bench</span>
         </div>
-        <div class="hp-sub">A harder, wilder benchmark for autonomous AI agents — testing real-world task completion across 10 frontier models with adversarial difficulty.</div>
+        <div class="hp-sub">A harder, wilder benchmark for autonomous AI agents — testing real-world task completion across 14 frontier models with adversarial difficulty.</div>
       </div>
       <div class="hp-stats">
         <div class="hps">
-          <span class="hps-val red">10</span>
+          <span class="hps-val red">14</span>
           <span class="hps-label">Models</span>
         </div>
         <div class="hps">
@@ -540,7 +540,7 @@ tbody tr:nth-child(9){animation-delay:.18s}tbody tr:nth-child(10){animation-dela
           <span class="hps-label">Tasks</span>
         </div>
         <div class="hps">
-          <span class="hps-val red">51.1%</span>
+          <span class="hps-val red">51.6%</span>
           <span class="hps-label">Top Score</span>
         </div>
       </div>
@@ -552,12 +552,12 @@ tbody tr:nth-child(9){animation-delay:.18s}tbody tr:nth-child(10){animation-dela
     <div class="msw-tabs">
       <button class="mt on" data-m="successRate">
         <span class="mt-label">Overall Score</span>
-        <span class="mt-val">51.1%</span>
+        <span class="mt-val">51.6%</span>
         <span class="mt-sub">Best — Claude Opus 4.6</span>
       </button>
       <button class="mt" data-m="elapsed">
         <span class="mt-label">Speed</span>
-        <span class="mt-val">89min</span>
+        <span class="mt-val">94min</span>
         <span class="mt-sub">Fastest — Grok 4.20 Beta</span>
       </button>
       <button class="mt" data-m="cost">
@@ -568,7 +568,15 @@ tbody tr:nth-child(9){animation-delay:.18s}tbody tr:nth-child(10){animation-dela
     </div>
     <div class="msw-body">
       <div class="mv on" id="mv-successRate">
-        <table><thead><tr><th>#</th><th>Model</th><th data-s1="successRate" class="sk">Overall Score <span class="sa">↓</span></th><th data-s1="elapsed">Elapsed <span class="sa">↕</span></th><th data-s1="cost">Cost <span class="sa">↕</span></th><th>Δ</th></tr></thead><tbody id="tb-r"></tbody></table>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px 0;gap:8px">
+          <span style="font-family:var(--fm);font-size:11px;color:var(--ink4);letter-spacing:.5px">SCORE MODE</span>
+          <div class="ftabs" id="top-mode-tabs">
+            <button class="ftab on" data-tmode="overall">Overall</button>
+            <button class="ftab" data-tmode="multimodal">🖼 MM</button>
+            <button class="ftab" data-tmode="puretext">📝 PT</button>
+          </div>
+        </div>
+        <table><thead><tr><th>#</th><th>Model</th><th data-s1="successRate" class="sk" id="top-score-th">Overall Score <span class="sa">↓</span></th><th data-s1="elapsed">Elapsed <span class="sa">↕</span></th><th data-s1="cost">Cost <span class="sa">↕</span></th><th>Δ</th></tr></thead><tbody id="tb-r"></tbody></table>
       </div>
       <div class="mv" id="mv-elapsed">
         <table><thead><tr><th>#</th><th>Model</th><th data-s2="elapsed" class="sk">Speed · Shorter = Faster <span class="sa">↑</span></th><th data-s2="successRate">Overall Score <span class="sa">↕</span></th><th data-s2="cost">Cost <span class="sa">↕</span></th><th>Δ</th></tr></thead><tbody id="tb-t"></tbody></table>
@@ -612,12 +620,21 @@ tbody tr:nth-child(9){animation-delay:.18s}tbody tr:nth-child(10){animation-dela
   <div class="panel fi fi-3" style="border-radius:var(--r)">
     <div class="ph">
       <span class="pt">Overall Rankings</span>
-      <div class="ftabs">
-        <button class="ftab on" data-f="all">All</button>
-        <button class="ftab" data-f="claude">Claude</button>
-        <button class="ftab" data-f="gpt">GPT</button>
-        <button class="ftab" data-f="gemini">Gemini</button>
-        <button class="ftab" data-f="other">Other</button>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <div class="ftabs">
+          <button class="ftab on" data-f="all">All</button>
+          <button class="ftab" data-f="claude">Claude</button>
+          <button class="ftab" data-f="gpt">GPT</button>
+          <button class="ftab" data-f="gemini">Gemini</button>
+          <button class="ftab" data-f="deepseek">DeepSeek</button>
+          <button class="ftab" data-f="other">Other</button>
+        </div>
+        <div style="width:1px;height:20px;background:var(--g);flex-shrink:0"></div>
+        <div class="ftabs" id="mode-tabs">
+          <button class="ftab on" data-mode="overall">Overall</button>
+          <button class="ftab" data-mode="multimodal">🖼 MM</button>
+          <button class="ftab" data-mode="puretext">📝 PT</button>
+        </div>
       </div>
     </div>
     <div class="tw">
@@ -642,6 +659,7 @@ tbody tr:nth-child(9){animation-delay:.18s}tbody tr:nth-child(10){animation-dela
       <div class="cli"><span class="cld" style="background:#1c3448"></span>OpenAI</div>
       <div class="cli"><span class="cld" style="background:#265238"></span>Google</div>
       <div class="cli"><span class="cld" style="background:#604840"></span>Xiaomi / MiMo</div>
+      <div class="cli"><span class="cld" style="background:#2563a8"></span>DeepSeek</div>
       <div class="cli"><span class="cld" style="background:#405868"></span>Others</div>
     </div>
   </div>
@@ -665,7 +683,7 @@ tbody tr:nth-child(9){animation-delay:.18s}tbody tr:nth-child(10){animation-dela
     <div class="hp-stats">
       <div class="hps"><span class="hps-val red">6</span><span class="hps-label">Categories</span></div>
       <div class="hps"><span class="hps-val">60</span><span class="hps-label">Total Tasks</span></div>
-      <div class="hps"><span class="hps-val red">10</span><span class="hps-label">Models</span></div>
+      <div class="hps"><span class="hps-val red">14</span><span class="hps-label">Models</span></div>
     </div>
   </div>
 
@@ -725,9 +743,9 @@ tbody tr:nth-child(9){animation-delay:.18s}tbody tr:nth-child(10){animation-dela
     <p>The tasks aren't exotic. They're the kind of work a competent human assistant handles every day. That gap is what makes WildClawBench useful.</p>
 
     <div class="blog-stat-strip">
-      <div class="blog-stat"><div class="blog-stat-val">10</div><div class="blog-stat-label">Frontier Models</div></div>
+      <div class="blog-stat"><div class="blog-stat-val">14</div><div class="blog-stat-label">Frontier Models</div></div>
       <div class="blog-stat"><div class="blog-stat-val">60</div><div class="blog-stat-label">Hand-crafted Tasks</div></div>
-      <div class="blog-stat"><div class="blog-stat-val">51.1%</div><div class="blog-stat-label">Top Score</div></div>
+      <div class="blog-stat"><div class="blog-stat-val">51.6%</div><div class="blog-stat-label">Top Score</div></div>
       <div class="blog-stat"><div class="blog-stat-val">6</div><div class="blog-stat-label">Task Categories</div></div>
     </div>
 
@@ -743,7 +761,7 @@ tbody tr:nth-child(9){animation-delay:.18s}tbody tr:nth-child(10){animation-dela
       <div style="padding:22px 24px;background:var(--surf);border-right:1px solid var(--g)">
         <div style="font-family:var(--fm);font-size:8px;letter-spacing:2.5px;text-transform:uppercase;color:var(--ink4);margin-bottom:10px">Best Overall</div>
         <div style="font-family:var(--fd);font-size:26px;font-weight:700;font-style:italic;color:var(--scarlet);line-height:1.1">Claude Opus 4.6</div>
-        <div style="font-family:var(--fm);font-size:11px;color:var(--ink3);margin-top:6px">51.1% · Excels at complex multi-step coding workflows</div>
+        <div style="font-family:var(--fm);font-size:11px;color:var(--ink3);margin-top:6px">51.6% · Excels at complex multi-step coding workflows</div>
       </div>
       <div style="padding:22px 24px;background:var(--surf)">
         <div style="font-family:var(--fm);font-size:8px;letter-spacing:2.5px;text-transform:uppercase;color:var(--ink4);margin-bottom:10px">Best Value</div>
@@ -885,18 +903,43 @@ document.querySelectorAll('.ntab').forEach(btn=>btn.addEventListener('click',()=
    LEADERBOARD DATA
 ═══════════════════════════════════════════════════════ */
 const MODELS=[
-  {id:0,name:'Claude Opus 4.6',  org:'Anthropic',      prov:'Anthropic',color:'#8c2416',successRate:51.095,elapsed:30485, cost:80.850, change: 0,cat:'claude'},
-  {id:1,name:'GPT-5.4',          org:'OpenAI',         prov:'OpenAI',   color:'#1c3448',successRate:48.485,elapsed:21002, cost:20.083, change: 0,cat:'gpt'},
-  {id:2,name:'MiMo V2 Pro',      org:'Xiaomi',         prov:'Xiaomi',   color:'#604840',successRate:40.575,elapsed:27508, cost:26.468, change: 0,cat:'other'},
-  {id:3,name:'Gemini 3.1 Pro',   org:'Google DeepMind',prov:'Google',   color:'#265238',successRate:38.448,elapsed:14373, cost:18.221, change: 0,cat:'gemini'},
-  {id:4,name:'GLM 5 Turbo',      org:'Zhipu AI',       prov:'Zhipu',    color:'#405868',successRate:33.350,elapsed:29916, cost:14.800, change: 0,cat:'other'},
-  {id:5,name:'MiniMax M2.7',     org:'MiniMax',        prov:'MiniMax',  color:'#7a5008',successRate:33.032,elapsed:33085, cost:7.470,  change: 0,cat:'other'},
-  {id:6,name:'Qwen3.5 397B',     org:'Alibaba Cloud',  prov:'Alibaba',  color:'#7a3828',successRate:33.503,elapsed:27527, cost:22.333, change: 0,cat:'other'},
-  {id:7,name:'Step 3.5 Flash',   org:'StepFun',        prov:'StepFun',  color:'#3c5840',successRate:27.724,elapsed:25798, cost:6.632,  change: 0,cat:'other'},
-  {id:8,name:'Kimi K2.5',        org:'Moonshot AI',    prov:'Moonshot', color:'#4a2858',successRate:28.746,elapsed:24333, cost:6.730,  change: 0,cat:'other'},
-  {id:9,name:'Grok 4.20 Beta',   org:'xAI',            prov:'xAI',      color:'#2a4858',successRate:19.478,elapsed:5640,  cost:9.628,  change: 0,cat:'other'},
+  {id:0,name:'Claude Opus 4.6',  org:'Anthropic',      prov:'Anthropic',color:'#8c2416',successRate:51.59, elapsed:30485, cost:80.850, change: 0,cat:'claude'},
+  {id:1,name:'GPT-5.4',          org:'OpenAI',         prov:'OpenAI',   color:'#1c3448',successRate:50.34, elapsed:21002, cost:20.083, change: 0,cat:'gpt'},
+  {id:2,name:'MiMo V2 Pro',      org:'Xiaomi',         prov:'Xiaomi',   color:'#604840',successRate:40.24, elapsed:27508, cost:26.468, change: 0,cat:'other'},
+  {id:3,name:'Gemini 3.1 Pro',   org:'Google DeepMind',prov:'Google',   color:'#265238',successRate:40.84, elapsed:14373, cost:18.221, change: 0,cat:'gemini'},
+  {id:4,name:'GLM 5 Turbo',      org:'Zhipu AI',       prov:'Zhipu',    color:'#405868',successRate:33.90, elapsed:29916, cost:14.800, change: 0,cat:'other'},
+  {id:5,name:'MiniMax M2.7',     org:'MiniMax',        prov:'MiniMax',  color:'#7a5008',successRate:33.81, elapsed:33085, cost:7.470,  change: 0,cat:'other'},
+  {id:6,name:'Qwen3.5 397B',     org:'Alibaba Cloud',  prov:'Alibaba',  color:'#7a3828',successRate:34.53, elapsed:27527, cost:22.333, change: 0,cat:'other'},
+  {id:7,name:'Step 3.5 Flash',   org:'StepFun',        prov:'StepFun',  color:'#3c5840',successRate:26.72, elapsed:25798, cost:6.632,  change: 0,cat:'other'},
+  {id:8,name:'Kimi K2.5',        org:'Moonshot AI',    prov:'Moonshot', color:'#4a2858',successRate:30.84, elapsed:24333, cost:6.730,  change: 0,cat:'other'},
+  {id:9,name:'Grok 4.20 Beta',   org:'xAI',            prov:'xAI',      color:'#2a4858',successRate:19.28, elapsed:5640,  cost:9.628,  change: 0,cat:'other'},
+  {id:10,name:'DeepSeek V3.2',  org:'DeepSeek',       prov:'DeepSeek', color:'#2563a8',successRate:34.02, elapsed:32922, cost:11.503, change: 0,cat:'deepseek'},
+  {id:11,name:'MiMo V2 Flash',  org:'Xiaomi',         prov:'Xiaomi',   color:'#8a6040',successRate:30.84, elapsed:26008, cost:10.232, change: 0,cat:'other'},
+  {id:12,name:'MiniMax M2.5',   org:'MiniMax',        prov:'MiniMax',  color:'#5a7008',successRate:27.14, elapsed:32520, cost:9.657,  change: 0,cat:'other'},
+  {id:13,name:'GLM 5',          org:'Zhipu AI',       prov:'Zhipu',    color:'#304858',successRate:42.63, elapsed:22404, cost:11.392, change: 0,cat:'other'},
 ];
 const AXES={successRate:{label:'Overall Score',fmt:v=>v.toFixed(1)+'%'},elapsed:{label:'Elapsed Time',fmt:v=>(v/60).toFixed(0)+'min'},cost:{label:'Total Cost',fmt:v=>'$'+v.toFixed(2)}};
+
+/* ─── Multimodal / Pure-text split scores (26 mm tasks, 34 pt tasks) ─── */
+/* Sources: Excel breakdown sheet + summary json files. Cost estimated from category ratio for models without full summary. */
+const SPLIT_SCORES={
+  0:  {mm:52.50, pt:50.02, mmCost:38.604, ptCost:42.353},  // Claude Opus 4.6 — json
+  1:  {mm:38.94, pt:61.71, mmCost:26.770, ptCost:27.280},  // GPT-5.4 — json
+  2:  {mm:31.79, pt:50.30, mmCost:13.440, ptCost:13.040},  // MiMo V2 Pro — est
+  3:  {mm:40.28, pt:42.15, mmCost:25.997, ptCost:18.807},  // Gemini 3.1 Pro — json
+  4:  {mm:28.13, pt:44.61, mmCost:11.201, ptCost: 8.589},  // GLM 5 Turbo — est
+  5:  {mm:16.96, pt:45.98, mmCost: 7.352, ptCost: 6.098},  // MiniMax M2.7 — est
+  6:  {mm:22.71, pt:41.54, mmCost:11.856, ptCost:10.464},  // Qwen3.5 397B — est
+  7:  {mm:14.66, pt:39.49, mmCost: 2.714, ptCost: 1.926},  // Step 3.5 Flash — est
+  8:  {mm:24.35, pt:36.84, mmCost: 7.261, ptCost: 4.979},  // Kimi K2.5 — est
+  9:  {mm:10.06, pt:31.20, mmCost: 4.061, ptCost: 5.619},  // Grok 4.20 Beta — est
+  10: {mm:17.92, pt:31.88, mmCost: 5.358, ptCost: 5.332},  // DeepSeek V3.2 — json
+  11: {mm:34.35, pt:28.15, mmCost: 4.577, ptCost: 4.738},  // MiMo V2 Flash — json
+  12: {mm:12.63, pt:31.62, mmCost: 4.405, ptCost: 5.067},  // MiniMax M2.5 — json
+  13: {mm:21.19, pt:42.23, mmCost: 4.715, ptCost: 3.589},  // GLM 5 — json
+};
+
+let rankMode='overall'; // 'overall' | 'multimodal' | 'puretext'
 
 /* ═══════════════════════════════════════════════════════
    CATEGORY BREAKDOWN DATA
@@ -917,6 +960,10 @@ const CATEGORIES=[
       {modelId:7,rate:35.3, elapsed:1200,  cost:0.08},
       {modelId:8,rate:37.0, elapsed:1475,  cost:1.62},
       {modelId:9,rate:10.7, elapsed:1020,  cost:2.26},
+      {modelId:10,rate:26.99,elapsed:6630, cost:2.407},
+      {modelId:11,rate:24.29,elapsed:4764, cost:2.125},
+      {modelId:12,rate:17.44,elapsed:7851, cost:3.364},
+      {modelId:13,rate:28.35,elapsed:5004, cost:3.760},
     ]
   },
   {
@@ -934,23 +981,31 @@ const CATEGORIES=[
       {modelId:7,rate:15.1, elapsed:4680,  cost:0.95},
       {modelId:8,rate:33.3, elapsed:2030,  cost:1.47},
       {modelId:9,rate:16.0, elapsed:1680,  cost:2.56},
+      {modelId:10,rate:33.20,elapsed:10374,cost:4.163},
+      {modelId:11,rate:31.99,elapsed:8909, cost:3.657},
+      {modelId:12,rate:14.04,elapsed:11646,cost:2.241},
+      {modelId:13,rate:36.25,elapsed:8994, cost:3.214},
     ]
   },
   {
     id:'03', key:'social', icon:'💬',
     name:'Social Interaction', code:'03_Social',
-    accentClass:'cat-c3', tasks:38, topModel:'Claude Opus 4.6',
+    accentClass:'cat-c3', tasks:38, topModel:'GPT-5.4',
     scores:[
-      {modelId:0,rate:67.1, elapsed:1860,  cost:4.39},
-      {modelId:1,rate:59.4, elapsed:1020,  cost:1.32},
-      {modelId:2,rate:41.7, elapsed:1260,  cost:1.40},
-      {modelId:3,rate:59.5, elapsed:840,   cost:1.56},
-      {modelId:4,rate:58.2, elapsed:2700,  cost:1.05},
-      {modelId:5,rate:63.1, elapsed:1560,  cost:0.23},
-      {modelId:6,rate:50.1, elapsed:1260,  cost:0.59},
-      {modelId:7,rate:40.6, elapsed:1680,  cost:0.29},
-      {modelId:8,rate:19.7, elapsed:2205,  cost:0.32},
-      {modelId:9,rate:15.0, elapsed:420,   cost:0.66},
+      {modelId:0,rate:71.85,elapsed:1860,  cost:4.39},
+      {modelId:1,rate:89.96,elapsed:1020,  cost:1.32},
+      {modelId:2,rate:38.47,elapsed:1260,  cost:1.40},
+      {modelId:3,rate:84.17,elapsed:840,   cost:1.56},
+      {modelId:4,rate:63.47,elapsed:2700,  cost:1.05},
+      {modelId:5,rate:70.60,elapsed:1560,  cost:0.23},
+      {modelId:6,rate:60.07,elapsed:1260,  cost:0.59},
+      {modelId:7,rate:31.03,elapsed:1680,  cost:0.29},
+      {modelId:8,rate:39.98,elapsed:2205,  cost:0.32},
+      {modelId:9,rate:13.08,elapsed:420,   cost:0.66},
+      {modelId:10,rate:47.91,elapsed:2157, cost:0.467},
+      {modelId:11,rate:40.03,elapsed:1669, cost:0.479},
+      {modelId:12,rate:66.16,elapsed:1452, cost:0.154},
+      {modelId:13,rate:64.89,elapsed:1776, cost:1.056},
     ]
   },
   {
@@ -968,12 +1023,16 @@ const CATEGORIES=[
       {modelId:7,rate:35.4, elapsed:4380,  cost:1.02},
       {modelId:8,rate:36.4, elapsed:1223,  cost:2.19},
       {modelId:9,rate:34.1, elapsed:900,   cost:1.25},
+      {modelId:10,rate:33.64,elapsed:5333, cost:2.317},
+      {modelId:11,rate:36.36,elapsed:3848, cost:2.052},
+      {modelId:12,rate:36.36,elapsed:3821, cost:2.462},
+      {modelId:13,rate:50.00,elapsed:2232, cost:2.141},
     ]
   },
   {
     id:'05', key:'creative', icon:'✨',
     name:'Creative Synthesis', code:'05_Creative',
-    accentClass:'cat-c5', tasks:40, topModel:'GPT-5.4',
+    accentClass:'cat-c5', tasks:40, topModel:'MiMo V2 Flash',
     scores:[
       {modelId:0,rate:31.0, elapsed:8100,  cost:9.51},
       {modelId:1,rate:39.3, elapsed:7020,  cost:4.13},
@@ -985,6 +1044,10 @@ const CATEGORIES=[
       {modelId:7,rate:8.4,  elapsed:6420,  cost:1.88},
       {modelId:8,rate:16.1, elapsed:1367,  cost:0.89},
       {modelId:9,rate:9.5,  elapsed:1500,  cost:2.36},
+      {modelId:10,rate:24.50,elapsed:6444, cost:1.608},
+      {modelId:11,rate:40.87,elapsed:5976, cost:1.604},
+      {modelId:12,rate:9.99, elapsed:6444, cost:1.093},
+      {modelId:13,rate:29.29,elapsed:6468, cost:0.816},
     ]
   },
   {
@@ -1002,6 +1065,10 @@ const CATEGORIES=[
       {modelId:7,rate:40.5, elapsed:2220,  cost:0.64},
       {modelId:8,rate:26.0, elapsed:296,   cost:0.23},
       {modelId:9,rate:35.0, elapsed:480,   cost:0.68},
+      {modelId:10,rate:28.00,elapsed:1978, cost:0.543},
+      {modelId:11,rate:38.00,elapsed:972,  cost:0.388},
+      {modelId:12,rate:28.00,elapsed:1308, cost:0.342},
+      {modelId:13,rate:45.00,elapsed:894,  cost:0.216},
     ]
   },
 ];
@@ -1433,7 +1500,14 @@ function mkRow(m,rank,bKey,bfC,bvC,fmtFn,pctFn,extra){
 const mxR=maxV('successRate'),mxT=maxV('elapsed'),mxC=maxV('cost');
 const mSt={rate:{k:'successRate',d:-1},time:{k:'elapsed',d:1},cost:{k:'cost',d:1}};
 const sortBy=(k,d)=>[...MODELS].sort((a,b)=>(a[k]<b[k]?-1:a[k]>b[k]?1:0)*d);
-function renderRate(){document.getElementById('tb-r').innerHTML=sortBy(mSt.rate.k,mSt.rate.d).map((m,i)=>mkRow(m,i+1,'successRate','bf-r','bv-r',v=>v.toFixed(1)+'%',v=>v,m=>`<td><span class="bv bv-t">${(m.elapsed/60).toFixed(0)}<small style="color:var(--ink4)">min</small></span></td><td><span class="bv bv-c">$${m.cost.toFixed(2)}</span></td>`)).join('');}
+let topMode='overall';
+function getTopScore(m){if(topMode==='multimodal')return SPLIT_SCORES[m.id]?.mm??m.successRate;if(topMode==='puretext')return SPLIT_SCORES[m.id]?.pt??m.successRate;return m.successRate;}
+function renderRate(){
+  const th=document.getElementById('top-score-th');
+  if(th){th.childNodes[0].textContent=(topMode==='multimodal'?'Multimodal Score':topMode==='puretext'?'Pure Text Score':'Overall Score')+' ';}
+  const sorted=mSt.rate.k==='successRate'?[...MODELS].sort((a,b)=>{const va=getTopScore(a),vb=getTopScore(b);return(va<vb?-1:va>vb?1:0)*mSt.rate.d;}):sortBy(mSt.rate.k,mSt.rate.d);
+  document.getElementById('tb-r').innerHTML=sorted.map((m,i)=>mkRow(m,i+1,'successRate','bf-r','bv-r',()=>getTopScore(m).toFixed(1)+'%',()=>getTopScore(m),m=>`<td><span class="bv bv-t">${(m.elapsed/60).toFixed(0)}<small style="color:var(--ink4)">min</small></span></td><td><span class="bv bv-c">$${(topMode==='multimodal'?(SPLIT_SCORES[m.id]?.mmCost??m.cost):topMode==='puretext'?(SPLIT_SCORES[m.id]?.ptCost??m.cost):m.cost).toFixed(2)}</span></td>`)).join('');
+}
 function renderTime(){document.getElementById('tb-t').innerHTML=sortBy(mSt.time.k,mSt.time.d).map((m,i)=>mkRow(m,i+1,'elapsed','bf-t','bv-t',v=>(v/60).toFixed(0)+'min',v=>Math.max(5,v/mxT*100),m=>`<td><span class="bv bv-r">${m.successRate.toFixed(1)}<small style="color:var(--ink4)">%</small></span></td><td><span class="bv bv-c">$${m.cost.toFixed(2)}</span></td>`)).join('');}
 function renderCost(){document.getElementById('tb-c').innerHTML=sortBy(mSt.cost.k,mSt.cost.d).map((m,i)=>mkRow(m,i+1,'cost','bf-c','bv-c',v=>m.cost===0?'N/A':'$'+v.toFixed(2),v=>m.cost===0?0:Math.max(5,(1-v/mxC)*100),m=>`<td><span class="bv bv-r">${m.successRate.toFixed(1)}<small style="color:var(--ink4)">%</small></span></td><td><span class="bv bv-t">${(m.elapsed/60).toFixed(0)}<small style="color:var(--ink4)">min</small></span></td>`)).join('');}
 function renderAllM(){renderRate();renderTime();renderCost();}
@@ -1460,6 +1534,7 @@ function bindSort(sel,stRef,fn,asc){
 bindSort('[data-s1]',mSt.rate,renderRate,['elapsed','cost']);
 bindSort('[data-s2]',mSt.time,renderTime,['elapsed','cost']);
 bindSort('[data-s3]',mSt.cost,renderCost,['elapsed','cost']);
+document.querySelectorAll('.ftab[data-tmode]').forEach(btn=>btn.addEventListener('click',()=>{topMode=btn.dataset.tmode;document.querySelectorAll('.ftab[data-tmode]').forEach(b=>b.classList.remove('on'));btn.classList.add('on');mSt.rate.d=-1;renderRate();}));
 
 /* scatter */
 document.querySelectorAll('.stab').forEach(btn=>btn.addEventListener('click',()=>{
@@ -1725,17 +1800,31 @@ window.addEventListener('resize',()=>{
 /* rankings table */
 const rSt={filter:'all',k:'successRate',d:-1,sel:null,axX:'elapsed',axY:'successRate',axZ:'cost'};
 let chart3d=null;
-function fSorted(){let data=rSt.filter==='all'?[...MODELS]:MODELS.filter(m=>m.cat===rSt.filter);return data.sort((a,b)=>(a[rSt.k]<b[rSt.k]?-1:a[rSt.k]>b[rSt.k]?1:0)*rSt.d);}
+function getScore(m){
+  if(rankMode==='multimodal') return SPLIT_SCORES[m.id]?.mm ?? m.successRate;
+  if(rankMode==='puretext')   return SPLIT_SCORES[m.id]?.pt ?? m.successRate;
+  return m.successRate;
+}
+function getCost(m){
+  if(rankMode==='multimodal') return SPLIT_SCORES[m.id]?.mmCost ?? m.cost;
+  if(rankMode==='puretext')   return SPLIT_SCORES[m.id]?.ptCost ?? m.cost;
+  return m.cost;
+}
+function fSorted(){let data=rSt.filter==='all'?[...MODELS]:MODELS.filter(m=>m.cat===rSt.filter);return data.sort((a,b)=>{const va=getScore(a),vb=getScore(b);return(va<vb?-1:va>vb?1:0)*rSt.d});}
 function renderRank(){
-  document.getElementById('tb-rank').innerHTML=fSorted().map((m,i)=>`
-    <tr data-id="${m.id}" class="${rSt.sel===m.id?'sel':''}">
+  const scoreLabel=rankMode==='multimodal'?'Multimodal Score':rankMode==='puretext'?'Pure Text Score':'Overall Score';
+  document.querySelectorAll('[data-rs="successRate"]').forEach(th=>{th.childNodes[0].textContent=scoreLabel+' ';});
+  document.getElementById('tb-rank').innerHTML=fSorted().map((m,i)=>{
+    const sc=getScore(m);
+    const co=getCost(m);
+    return`<tr data-id="${m.id}" class="${rSt.sel===m.id?'sel':''}">
       <td class="rk ${rkC(i+1)}">${i+1}</td>
       <td><div class="mc"><span class="md" style="background:${m.color}"></span><div><div class="mn">${m.name}</div><div class="mo">${m.org}</div></div></div></td>
-      <td class="bc"><div class="br"><div class="bb"><div class="bf bf-r" style="width:${m.successRate.toFixed(1)}%"></div></div><span class="bv bv-r">${m.successRate.toFixed(1)}%</span></div></td>
+      <td class="bc"><div class="br"><div class="bb"><div class="bf bf-r" style="width:${sc.toFixed(1)}%"></div></div><span class="bv bv-r">${sc.toFixed(1)}%</span></div></td>
       <td><span class="bv bv-t">${(m.elapsed/60).toFixed(0)}<small style="color:var(--ink4)">min</small></span></td>
-      <td><span class="bv bv-c">$${m.cost.toFixed(2)}</span></td>
+      <td><span class="bv bv-c">$${co.toFixed(2)}</span></td>
       <td>${chH(m.change)}</td>
-    </tr>`).join('');
+    </tr>`;}).join('');
   document.querySelectorAll('#tb-rank tr').forEach(tr=>tr.addEventListener('click',()=>{const id=+tr.dataset.id;rSt.sel=rSt.sel===id?null:id;renderRank();chart3d?.hl(rSt.sel);}));
 }
 document.querySelectorAll('[data-rs]').forEach(th=>th.addEventListener('click',()=>{
@@ -1743,7 +1832,40 @@ document.querySelectorAll('[data-rs]').forEach(th=>th.addEventListener('click',(
   document.querySelectorAll('[data-rs]').forEach(h=>{h.classList.remove('sk');h.querySelector('.sa')&&(h.querySelector('.sa').textContent='↕');});
   th.classList.add('sk');th.querySelector('.sa').textContent=rSt.d===-1?'↓':'↑';renderRank();
 }));
-document.querySelectorAll('.ftab').forEach(btn=>btn.addEventListener('click',()=>{rSt.filter=btn.dataset.f;document.querySelectorAll('.ftab').forEach(b=>b.classList.remove('on'));btn.classList.add('on');renderRank();}));
+document.querySelectorAll('.ftab[data-f]').forEach(btn=>btn.addEventListener('click',()=>{rSt.filter=btn.dataset.f;document.querySelectorAll('.ftab[data-f]').forEach(b=>b.classList.remove('on'));btn.classList.add('on');renderRank();}));
+document.querySelectorAll('.ftab[data-mode]').forEach(btn=>btn.addEventListener('click',()=>{rankMode=btn.dataset.mode;document.querySelectorAll('.ftab[data-mode]').forEach(b=>b.classList.remove('on'));btn.classList.add('on');rSt.d=-1;renderRank();}));
+
+/* ── MM vs PT split table ── */
+let splitSortKey='mm', splitSortDir=-1;
+function sortSplit(k){
+  if(splitSortKey===k) splitSortDir*=-1; else {splitSortKey=k;splitSortDir=-1;}
+  document.querySelectorAll('#tb-split thead th').forEach(th=>{th.classList.remove('sk');const sa=th.querySelector('.sa');if(sa)sa.textContent='↕';});
+  const hEl=document.getElementById(k==='mm'?'split-h1':'split-h2');
+  hEl.classList.add('sk');hEl.querySelector('.sa').textContent=splitSortDir===-1?'↓':'↑';
+  renderSplit();
+}
+function renderSplit(){
+  const tbody=document.getElementById('tb-split-body');
+  if(!tbody) return;
+  const sorted=[...MODELS].sort((a,b)=>{
+    const va=SPLIT_SCORES[a.id]?.[splitSortKey]??0;
+    const vb=SPLIT_SCORES[b.id]?.[splitSortKey]??0;
+    return(va<vb?-1:va>vb?1:0)*splitSortDir;
+  });
+  document.getElementById('tb-split-body').innerHTML=sorted.map((m,i)=>{
+    const sp=SPLIT_SCORES[m.id]||{mm:0,pt:0};
+    const diff=sp.mm-sp.pt;
+    const diffCol=diff>3?'color:var(--mr)':diff<-3?'color:var(--mt)':'color:var(--ink4)';
+    const diffStr=(diff>0?'+':'')+diff.toFixed(1)+'%';
+    return`<tr data-id="${m.id}" style="${rSt.sel===m.id?'background:rgba(140,36,22,.05);box-shadow:inset 3px 0 0 var(--scarlet)':''}">
+      <td class="rk ${rkC(i+1)}">${i+1}</td>
+      <td><div style="display:flex;align-items:center;gap:8px"><span class="md" style="background:${m.color}"></span><span style="font-family:var(--fm);font-size:12px;white-space:nowrap">${m.name}</span></div></td>
+      <td><span class="bv bv-r" style="font-size:13px">${sp.mm.toFixed(1)}%</span></td>
+      <td style="white-space:nowrap"><span class="bv" style="font-size:13px;color:var(--mt)">${sp.pt.toFixed(1)}%</span><span style="font-size:10px;margin-left:5px;${diffCol}">${diffStr}</span></td>
+    </tr>`;
+  }).join('');
+  document.querySelectorAll('#tb-split-body tr').forEach(tr=>tr.addEventListener('click',()=>{const id=+tr.dataset.id;rSt.sel=rSt.sel===id?null:id;renderRank();renderSplit();chart3d?.hl(rSt.sel);}));
+}
 ['x','y','z'].forEach(a=>document.getElementById('ax-'+a).addEventListener('change',()=>{rSt.axX=document.getElementById('ax-x').value;rSt.axY=document.getElementById('ax-y').value;rSt.axZ=document.getElementById('ax-z').value;chart3d?.rebuild();}));
 
 /* ═══════════════════════════════════════════════════════
@@ -2088,9 +2210,11 @@ Return the shortest chain(s) and save to /tmp_workspace/results/results.md`,
     expected:`1. Crawl Scholar A and B's Google Scholar pages to identify names and co-authors
 2. Use BFS: expand collaboration graph one hop at a time from both ends
 3. Find all shortest paths between A (Ziyu Liu) and B (Geoffrey Hinton)
-4. Two shortest paths (length 3) exist:
+4. Four shortest paths (length 3) exist:
    • Ziyu Liu → Dahua Lin → Boyang Deng → Geoffrey Hinton
-   • Ziyu Liu → Yuhang Zang → Joshua M. Susskind → Geoffrey Hinton
+   • Ziyu Liu → Yuhang Zang   → Joshua M. Susskind → Geoffrey Hinton
+   • Ziyu Liu → Zuxuan Wu     → Leonid Sigal       → Geoffrey Hinton
+   • Ziyu Liu → Yu-Gang Jiang → Leonid Sigal       → Geoffrey Hinton
 5. Verify each co-authorship via shared papers on Google Scholar
 6. Save the paths in Markdown to /tmp_workspace/results/results.md`,
     criteria:[
@@ -2433,6 +2557,7 @@ let tbCat='all',tbDiff='all',tbSearch='';
 ═══════════════════════════════════════════════════════ */
 renderAllM();
 renderRank();
+renderSplit();
 setTimeout(()=>{
   initAllScatter();
   if(typeof THREE!=='undefined') chart3d=initChart3D();
