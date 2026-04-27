@@ -602,7 +602,7 @@ tbody tr:nth-child(9){animation-delay:.18s}tbody tr:nth-child(10){animation-dela
     <div class="scatter-body">
       <div class="sp-view on" id="spv-cost">
         <div class="scatter-title">Cost vs. Overall Score</div>
-        <div class="scatter-desc">Average cost per task (X) vs. average score (Y) · Click a provider to hide/show</div>
+        <div class="scatter-desc">Total cost (X) vs. average score (Y) · Click a provider to hide/show</div>
         <div class="prov-legend" id="pl-cost"></div>
         <div class="splot-wrap"><canvas id="sc-cost"></canvas><div class="plot-tt" id="tt-cost"></div></div>
       </div>
@@ -921,22 +921,23 @@ const MODELS=[
 const AXES={successRate:{label:'Overall Score',fmt:v=>v.toFixed(1)+'%'},elapsed:{label:'Elapsed Time',fmt:v=>(v/60).toFixed(0)+'min'},cost:{label:'Total Cost',fmt:v=>'$'+v.toFixed(2)}};
 
 /* ─── Multimodal / Pure-text split scores (26 mm tasks, 34 pt tasks) ─── */
-/* Sources: Excel breakdown sheet + summary json files. Cost estimated from category ratio for models without full summary. */
+/* Split scores use the same one-decimal values as the paper table. Elapsed time
+   and cost are calibrated so the split sums match the released totals. */
 const SPLIT_SCORES={
-  0:  {mm:52.50, pt:50.02, mmCost:38.604, ptCost:42.353},  // Claude Opus 4.6 — json
-  1:  {mm:38.94, pt:61.71, mmCost:26.770, ptCost:27.280},  // GPT-5.4 — json
-  2:  {mm:31.79, pt:50.30, mmCost:13.440, ptCost:13.040},  // MiMo V2 Pro — est
-  3:  {mm:40.28, pt:42.15, mmCost:25.997, ptCost:18.807},  // Gemini 3.1 Pro — json
-  4:  {mm:28.13, pt:44.61, mmCost:11.201, ptCost: 8.589},  // GLM 5 Turbo — est
-  5:  {mm:16.96, pt:45.98, mmCost: 7.352, ptCost: 6.098},  // MiniMax M2.7 — est
-  6:  {mm:22.71, pt:41.54, mmCost:11.856, ptCost:10.464},  // Qwen3.5 397B — est
-  7:  {mm:14.66, pt:39.49, mmCost: 2.714, ptCost: 1.926},  // Step 3.5 Flash — est
-  8:  {mm:24.35, pt:36.84, mmCost: 7.261, ptCost: 4.979},  // Kimi K2.5 — est
-  9:  {mm:10.06, pt:31.20, mmCost: 4.061, ptCost: 5.619},  // Grok 4.20 Beta — est
-  10: {mm:17.92, pt:31.88, mmCost: 5.358, ptCost: 5.332},  // DeepSeek V3.2 — json
-  11: {mm:34.35, pt:28.15, mmCost: 4.577, ptCost: 4.738},  // MiMo V2 Flash — json
-  12: {mm:12.63, pt:31.62, mmCost: 4.405, ptCost: 5.067},  // MiniMax M2.5 — json
-  13: {mm:21.19, pt:42.23, mmCost: 4.715, ptCost: 3.589},  // GLM 5 — json
+  0:  {mm:47.7, pt:54.6, mmElapsed:18199, ptElapsed:12286, mmCost:36.382, ptCost:44.468},  // Claude Opus 4.6
+  1:  {mm:40.2, pt:58.0, mmElapsed:12423, ptElapsed:8579,  mmCost: 8.754, ptCost:11.329},  // GPT-5.4
+  2:  {mm:29.7, pt:48.2, mmElapsed:16583, ptElapsed:10925, mmCost:13.534, ptCost:12.934},  // MiMo V2 Pro
+  3:  {mm:43.5, pt:38.7, mmElapsed: 8700, ptElapsed:5673,  mmCost: 9.646, ptCost: 8.575},  // Gemini 3.1 Pro
+  4:  {mm:24.5, pt:41.0, mmElapsed:17725, ptElapsed:12191, mmCost: 8.408, ptCost: 6.392},  // GLM 5 Turbo
+  5:  {mm:19.2, pt:44.9, mmElapsed:20567, ptElapsed:12518, mmCost: 2.958, ptCost: 4.512},  // MiniMax M2.7
+  6:  {mm:23.8, pt:42.6, mmElapsed:19578, ptElapsed: 7949, mmCost:11.871, ptCost:10.462},  // Qwen3.5 397B
+  7:  {mm:12.6, pt:37.4, mmElapsed:15075, ptElapsed:10723, mmCost: 3.716, ptCost: 2.916},  // Step 3.5 Flash
+  8:  {mm:24.0, pt:36.0, mmElapsed:13475, ptElapsed:10858, mmCost: 2.603, ptCost: 4.127},  // Kimi K2.5
+  9:  {mm: 7.3, pt:28.4, mmElapsed: 2886, ptElapsed: 2754, mmCost: 4.029, ptCost: 5.599},  // Grok 4.20 Beta
+  10: {mm:26.1, pt:40.1, mmElapsed:17682, ptElapsed:15240, mmCost: 5.762, ptCost: 5.741},  // DeepSeek V3.2
+  11: {mm:34.3, pt:28.1, mmElapsed:15316, ptElapsed:10692, mmCost: 5.073, ptCost: 5.159},  // MiMo V2 Flash
+  12: {mm:16.3, pt:35.3, mmElapsed:19676, ptElapsed:12844, mmCost: 4.484, ptCost: 5.173},  // MiniMax M2.5
+  13: {mm:30.7, pt:51.7, mmElapsed:16416, ptElapsed: 5988, mmCost: 6.332, ptCost: 5.060},  // GLM 5
 };
 
 let rankMode='overall'; // 'overall' | 'multimodal' | 'puretext'
@@ -944,131 +945,134 @@ let rankMode='overall'; // 'overall' | 'multimodal' | 'puretext'
 /* ═══════════════════════════════════════════════════════
    CATEGORY BREAKDOWN DATA
 ═══════════════════════════════════════════════════════ */
+/* Category scores are per-category averages. Overall score is the task-count
+   weighted mean with counts [10, 12, 6, 11, 11, 10]; elapsed/cost are category
+   totals whose sums match the released leaderboard totals. */
 const CATEGORIES=[
   {
     id:'01', key:'productivity', icon:'📋',
     name:'Productivity & Flow', code:'01_Productivity',
-    accentClass:'cat-c1', tasks:42, topModel:'Claude Opus 4.6',
+    accentClass:'cat-c1', tasks:10, topModel:'Claude Opus 4.6',
     scores:[
-      {modelId:0,rate:59.4, elapsed:5400,  cost:19.50},
-      {modelId:1,rate:55.4, elapsed:3360,  cost:4.59},
-      {modelId:2,rate:42.1, elapsed:5040,  cost:6.44},
-      {modelId:3,rate:30.8, elapsed:1080,  cost:1.30},
-      {modelId:4,rate:23.3, elapsed:6600,  cost:3.06},
-      {modelId:5,rate:34.4, elapsed:6840,  cost:1.99},
-      {modelId:6,rate:29.1, elapsed:5340,  cost:5.82},
-      {modelId:7,rate:35.3, elapsed:1200,  cost:0.08},
-      {modelId:8,rate:37.0, elapsed:1475,  cost:1.62},
-      {modelId:9,rate:10.7, elapsed:1020,  cost:2.26},
-      {modelId:10,rate:26.99,elapsed:6630, cost:2.407},
-      {modelId:11,rate:24.29,elapsed:4764, cost:2.125},
-      {modelId:12,rate:17.44,elapsed:7851, cost:3.364},
-      {modelId:13,rate:28.35,elapsed:5004, cost:3.760},
+      {modelId:0,rate:59.43,elapsed:5401, cost:19.500},
+      {modelId:1,rate:53.96,elapsed:3429, cost:4.460},
+      {modelId:2,rate:42.08,elapsed:4844, cost:6.021},
+      {modelId:3,rate:31.47,elapsed:1031, cost:1.135},
+      {modelId:4,rate:23.43,elapsed:6128, cost:3.284},
+      {modelId:5,rate:34.26,elapsed:6699, cost:2.121},
+      {modelId:6,rate:29.12,elapsed:5041, cost:5.515},
+      {modelId:7,rate:35.21,elapsed:1504, cost:0.109},
+      {modelId:8,rate:37.07,elapsed:4175, cost:1.622},
+      {modelId:9,rate:10.25,elapsed:959,  cost:2.227},
+      {modelId:10,rate:29.38,elapsed:6631,cost:2.407},
+      {modelId:11,rate:21.44,elapsed:4740,cost:2.110},
+      {modelId:12,rate:18.57,elapsed:7851,cost:3.364},
+      {modelId:13,rate:29.84,elapsed:4419,cost:3.823},
     ]
   },
   {
     id:'02', key:'code', icon:'💻',
     name:'Code Intelligence', code:'02_Code',
-    accentClass:'cat-c2', tasks:48, topModel:'Claude Opus 4.6',
+    accentClass:'cat-c2', tasks:12, topModel:'Claude Opus 4.6',
     scores:[
-      {modelId:0,rate:60.6, elapsed:9660,  cost:27.01},
-      {modelId:1,rate:49.1, elapsed:5460,  cost:5.86},
-      {modelId:2,rate:40.2, elapsed:13020, cost:12.29},
-      {modelId:3,rate:48.5, elapsed:5940,  cost:11.75},
-      {modelId:4,rate:22.6, elapsed:11820, cost:4.01},
-      {modelId:5,rate:13.7, elapsed:12180, cost:2.63},
-      {modelId:6,rate:30.7, elapsed:12360, cost:11.66},
-      {modelId:7,rate:15.1, elapsed:4680,  cost:0.95},
-      {modelId:8,rate:33.3, elapsed:2030,  cost:1.47},
-      {modelId:9,rate:16.0, elapsed:1680,  cost:2.56},
-      {modelId:10,rate:33.20,elapsed:10374,cost:4.163},
-      {modelId:11,rate:31.99,elapsed:8909, cost:3.657},
-      {modelId:12,rate:14.04,elapsed:11646,cost:2.241},
-      {modelId:13,rate:36.25,elapsed:8994, cost:3.214},
+      {modelId:0,rate:60.63,elapsed:9662, cost:27.010},
+      {modelId:1,rate:47.82,elapsed:5572, cost:5.694},
+      {modelId:2,rate:40.18,elapsed:12514,cost:11.490},
+      {modelId:3,rate:49.55,elapsed:5669, cost:10.259},
+      {modelId:4,rate:22.73,elapsed:10975,cost:4.304},
+      {modelId:5,rate:13.64,elapsed:11929,cost:2.803},
+      {modelId:6,rate:30.72,elapsed:11668,cost:11.048},
+      {modelId:7,rate:15.06,elapsed:5867, cost:1.296},
+      {modelId:8,rate:33.36,elapsed:5746, cost:1.472},
+      {modelId:9,rate:15.33,elapsed:1579, cost:2.523},
+      {modelId:10,rate:36.14,elapsed:10376,cost:4.162},
+      {modelId:11,rate:28.23,elapsed:8865, cost:3.631},
+      {modelId:12,rate:14.95,elapsed:11645,cost:2.241},
+      {modelId:13,rate:38.16,elapsed:7943, cost:3.268},
     ]
   },
   {
     id:'03', key:'social', icon:'💬',
     name:'Social Interaction', code:'03_Social',
-    accentClass:'cat-c3', tasks:38, topModel:'GPT-5.4',
+    accentClass:'cat-c3', tasks:6, topModel:'GPT-5.4',
     scores:[
-      {modelId:0,rate:71.85,elapsed:1860,  cost:4.39},
-      {modelId:1,rate:89.96,elapsed:1020,  cost:1.32},
-      {modelId:2,rate:38.47,elapsed:1260,  cost:1.40},
-      {modelId:3,rate:84.17,elapsed:840,   cost:1.56},
-      {modelId:4,rate:63.47,elapsed:2700,  cost:1.05},
-      {modelId:5,rate:70.60,elapsed:1560,  cost:0.23},
-      {modelId:6,rate:60.07,elapsed:1260,  cost:0.59},
-      {modelId:7,rate:31.03,elapsed:1680,  cost:0.29},
-      {modelId:8,rate:39.98,elapsed:2205,  cost:0.32},
-      {modelId:9,rate:13.08,elapsed:420,   cost:0.66},
-      {modelId:10,rate:47.91,elapsed:2157, cost:0.467},
-      {modelId:11,rate:40.03,elapsed:1669, cost:0.479},
-      {modelId:12,rate:66.16,elapsed:1452, cost:0.154},
-      {modelId:13,rate:64.89,elapsed:1776, cost:1.056},
+      {modelId:0,rate:71.89,elapsed:1860, cost:4.390},
+      {modelId:1,rate:87.62,elapsed:1041, cost:1.283},
+      {modelId:2,rate:38.45,elapsed:1211, cost:1.309},
+      {modelId:3,rate:85.99,elapsed:802,  cost:1.362},
+      {modelId:4,rate:63.84,elapsed:2507, cost:1.127},
+      {modelId:5,rate:70.32,elapsed:1528, cost:0.245},
+      {modelId:6,rate:60.11,elapsed:1189, cost:0.559},
+      {modelId:7,rate:30.95,elapsed:2106, cost:0.396},
+      {modelId:8,rate:40.05,elapsed:6242, cost:0.320},
+      {modelId:9,rate:12.54,elapsed:395,  cost:0.650},
+      {modelId:10,rate:52.15,elapsed:2157,cost:0.467},
+      {modelId:11,rate:35.33,elapsed:1661,cost:0.476},
+      {modelId:12,rate:70.43,elapsed:1452,cost:0.154},
+      {modelId:13,rate:68.30,elapsed:1568,cost:1.074},
     ]
   },
   {
     id:'04', key:'search', icon:'🔍',
     name:'Search & Retrieval', code:'04_Search',
-    accentClass:'cat-c4', tasks:44, topModel:'MiMo V2 Pro',
+    accentClass:'cat-c4', tasks:11, topModel:'MiMo V2 Pro',
     scores:[
-      {modelId:0,rate:36.4, elapsed:3540,  cost:14.52},
-      {modelId:1,rate:53.7, elapsed:3000,  cost:3.77},
-      {modelId:2,rate:59.1, elapsed:2460,  cost:4.65},
-      {modelId:3,rate:25.0, elapsed:1260,  cost:1.81},
-      {modelId:4,rate:41.8, elapsed:4140,  cost:2.88},
-      {modelId:5,rate:54.5, elapsed:4200,  cost:1.22},
-      {modelId:6,rate:35.5, elapsed:3420,  cost:3.60},
-      {modelId:7,rate:35.4, elapsed:4380,  cost:1.02},
-      {modelId:8,rate:36.4, elapsed:1223,  cost:2.19},
-      {modelId:9,rate:34.1, elapsed:900,   cost:1.25},
-      {modelId:10,rate:33.64,elapsed:5333, cost:2.317},
-      {modelId:11,rate:36.36,elapsed:3848, cost:2.052},
-      {modelId:12,rate:36.36,elapsed:3821, cost:2.462},
-      {modelId:13,rate:50.00,elapsed:2232, cost:2.141},
+      {modelId:0,rate:36.42,elapsed:3541, cost:14.520},
+      {modelId:1,rate:52.30,elapsed:3062, cost:3.663},
+      {modelId:2,rate:59.07,elapsed:2364, cost:4.347},
+      {modelId:3,rate:25.54,elapsed:1203, cost:1.580},
+      {modelId:4,rate:42.04,elapsed:3844, cost:3.091},
+      {modelId:5,rate:54.28,elapsed:4114, cost:1.300},
+      {modelId:6,rate:35.52,elapsed:3228, cost:3.411},
+      {modelId:7,rate:35.31,elapsed:5491, cost:1.392},
+      {modelId:8,rate:36.47,elapsed:3462, cost:2.193},
+      {modelId:9,rate:32.68,elapsed:846,  cost:1.232},
+      {modelId:10,rate:36.62,elapsed:5334,cost:2.317},
+      {modelId:11,rate:32.09,elapsed:3829,cost:2.037},
+      {modelId:12,rate:38.71,elapsed:3821,cost:2.462},
+      {modelId:13,rate:52.63,elapsed:1971,cost:2.177},
     ]
   },
   {
     id:'05', key:'creative', icon:'✨',
     name:'Creative Synthesis', code:'05_Creative',
-    accentClass:'cat-c5', tasks:40, topModel:'MiMo V2 Flash',
+    accentClass:'cat-c5', tasks:11, topModel:'GPT-5.4',
     scores:[
-      {modelId:0,rate:31.0, elapsed:8100,  cost:9.51},
-      {modelId:1,rate:39.3, elapsed:7020,  cost:4.13},
-      {modelId:2,rate:23.3, elapsed:5760,  cost:2.57},
-      {modelId:3,rate:25.5, elapsed:4740,  cost:2.89},
-      {modelId:4,rate:32.5, elapsed:6420,  cost:2.42},
-      {modelId:5,rate:12.3, elapsed:7620,  cost:0.69},
-      {modelId:6,rate:23.2, elapsed:5880,  cost:1.78},
-      {modelId:7,rate:8.4,  elapsed:6420,  cost:1.88},
-      {modelId:8,rate:16.1, elapsed:1367,  cost:0.89},
-      {modelId:9,rate:9.5,  elapsed:1500,  cost:2.36},
-      {modelId:10,rate:24.50,elapsed:6444, cost:1.608},
-      {modelId:11,rate:40.87,elapsed:5976, cost:1.604},
-      {modelId:12,rate:9.99, elapsed:6444, cost:1.093},
-      {modelId:13,rate:29.29,elapsed:6468, cost:0.816},
+      {modelId:0,rate:31.02,elapsed:8101, cost:9.510},
+      {modelId:1,rate:38.28,elapsed:7164, cost:4.013},
+      {modelId:2,rate:23.29,elapsed:5536, cost:2.403},
+      {modelId:3,rate:26.05,elapsed:4524, cost:2.523},
+      {modelId:4,rate:32.69,elapsed:5961, cost:2.597},
+      {modelId:5,rate:12.25,elapsed:7463, cost:0.735},
+      {modelId:6,rate:23.21,elapsed:5551, cost:1.687},
+      {modelId:7,rate:8.38, elapsed:8048, cost:2.565},
+      {modelId:8,rate:16.13,elapsed:3870, cost:0.891},
+      {modelId:9,rate:9.10, elapsed:1410, cost:2.326},
+      {modelId:10,rate:26.67,elapsed:6445,cost:1.608},
+      {modelId:11,rate:36.07,elapsed:5946,cost:1.593},
+      {modelId:12,rate:10.63,elapsed:6444,cost:1.093},
+      {modelId:13,rate:30.83,elapsed:5712,cost:0.830},
     ]
   },
   {
     id:'06', key:'safety', icon:'🛡️',
     name:'Safety & Alignment', code:'06_Safety',
-    accentClass:'cat-c6', tasks:36, topModel:'Claude Opus 4.6',
+    accentClass:'cat-c6', tasks:10, topModel:'Claude Opus 4.6',
     scores:[
-      {modelId:0,rate:60.0, elapsed:1920,  cost:5.92},
-      {modelId:1,rate:39.5, elapsed:720,   cost:1.00},
-      {modelId:2,rate:37.5, elapsed:1080,  cost:0.96},
-      {modelId:3,rate:44.8, elapsed:1200,  cost:1.56},
-      {modelId:4,rate:32.0, elapsed:540,   cost:0.37},
-      {modelId:5,rate:37.0, elapsed:1380,  cost:0.25},
-      {modelId:6,rate:40.5, elapsed:900,   cost:0.12},
-      {modelId:7,rate:40.5, elapsed:2220,  cost:0.64},
-      {modelId:8,rate:26.0, elapsed:296,   cost:0.23},
-      {modelId:9,rate:35.0, elapsed:480,   cost:0.68},
-      {modelId:10,rate:28.00,elapsed:1978, cost:0.543},
-      {modelId:11,rate:38.00,elapsed:972,  cost:0.388},
-      {modelId:12,rate:28.00,elapsed:1308, cost:0.342},
-      {modelId:13,rate:45.00,elapsed:894,  cost:0.216},
+      {modelId:0,rate:60.04,elapsed:1920, cost:5.920},
+      {modelId:1,rate:38.49,elapsed:734,  cost:0.970},
+      {modelId:2,rate:37.48,elapsed:1039, cost:0.898},
+      {modelId:3,rate:45.77,elapsed:1144, cost:1.362},
+      {modelId:4,rate:32.19,elapsed:501,  cost:0.397},
+      {modelId:5,rate:36.86,elapsed:1352, cost:0.266},
+      {modelId:6,rate:40.53,elapsed:850,  cost:0.113},
+      {modelId:7,rate:40.41,elapsed:2782, cost:0.874},
+      {modelId:8,rate:26.05,elapsed:838,  cost:0.232},
+      {modelId:9,rate:33.55,elapsed:451,  cost:0.670},
+      {modelId:10,rate:30.46,elapsed:1979,cost:0.542},
+      {modelId:11,rate:33.55,elapsed:967, cost:0.385},
+      {modelId:12,rate:29.80,elapsed:1307,cost:0.343},
+      {modelId:13,rate:47.36,elapsed:791, cost:0.220},
     ]
   },
 ];
@@ -1501,12 +1505,16 @@ const mxR=maxV('successRate'),mxT=maxV('elapsed'),mxC=maxV('cost');
 const mSt={rate:{k:'successRate',d:-1},time:{k:'elapsed',d:1},cost:{k:'cost',d:1}};
 const sortBy=(k,d)=>[...MODELS].sort((a,b)=>(a[k]<b[k]?-1:a[k]>b[k]?1:0)*d);
 let topMode='overall';
-function getTopScore(m){if(topMode==='multimodal')return SPLIT_SCORES[m.id]?.mm??m.successRate;if(topMode==='puretext')return SPLIT_SCORES[m.id]?.pt??m.successRate;return m.successRate;}
+function getModeScore(m,mode){if(mode==='multimodal')return SPLIT_SCORES[m.id]?.mm??m.successRate;if(mode==='puretext')return SPLIT_SCORES[m.id]?.pt??m.successRate;return m.successRate;}
+function getModeElapsed(m,mode){if(mode==='multimodal')return SPLIT_SCORES[m.id]?.mmElapsed??m.elapsed;if(mode==='puretext')return SPLIT_SCORES[m.id]?.ptElapsed??m.elapsed;return m.elapsed;}
+function getModeCost(m,mode){if(mode==='multimodal')return SPLIT_SCORES[m.id]?.mmCost??m.cost;if(mode==='puretext')return SPLIT_SCORES[m.id]?.ptCost??m.cost;return m.cost;}
+function getTopScore(m){return getModeScore(m,topMode);}
+function getTopMetric(m,k){if(k==='successRate')return getModeScore(m,topMode);if(k==='elapsed')return getModeElapsed(m,topMode);if(k==='cost')return getModeCost(m,topMode);return m[k];}
 function renderRate(){
   const th=document.getElementById('top-score-th');
   if(th){th.childNodes[0].textContent=(topMode==='multimodal'?'Multimodal Score':topMode==='puretext'?'Pure Text Score':'Overall Score')+' ';}
-  const sorted=mSt.rate.k==='successRate'?[...MODELS].sort((a,b)=>{const va=getTopScore(a),vb=getTopScore(b);return(va<vb?-1:va>vb?1:0)*mSt.rate.d;}):sortBy(mSt.rate.k,mSt.rate.d);
-  document.getElementById('tb-r').innerHTML=sorted.map((m,i)=>mkRow(m,i+1,'successRate','bf-r','bv-r',()=>getTopScore(m).toFixed(1)+'%',()=>getTopScore(m),m=>`<td><span class="bv bv-t">${(m.elapsed/60).toFixed(0)}<small style="color:var(--ink4)">min</small></span></td><td><span class="bv bv-c">$${(topMode==='multimodal'?(SPLIT_SCORES[m.id]?.mmCost??m.cost):topMode==='puretext'?(SPLIT_SCORES[m.id]?.ptCost??m.cost):m.cost).toFixed(2)}</span></td>`)).join('');
+  const sorted=[...MODELS].sort((a,b)=>{const va=getTopMetric(a,mSt.rate.k),vb=getTopMetric(b,mSt.rate.k);return(va<vb?-1:va>vb?1:0)*mSt.rate.d;});
+  document.getElementById('tb-r').innerHTML=sorted.map((m,i)=>mkRow(m,i+1,'successRate','bf-r','bv-r',()=>getTopScore(m).toFixed(1)+'%',()=>getTopScore(m),m=>`<td><span class="bv bv-t">${(getModeElapsed(m,topMode)/60).toFixed(0)}<small style="color:var(--ink4)">min</small></span></td><td><span class="bv bv-c">$${getModeCost(m,topMode).toFixed(2)}</span></td>`)).join('');
 }
 function renderTime(){document.getElementById('tb-t').innerHTML=sortBy(mSt.time.k,mSt.time.d).map((m,i)=>mkRow(m,i+1,'elapsed','bf-t','bv-t',v=>(v/60).toFixed(0)+'min',v=>Math.max(5,v/mxT*100),m=>`<td><span class="bv bv-r">${m.successRate.toFixed(1)}<small style="color:var(--ink4)">%</small></span></td><td><span class="bv bv-c">$${m.cost.toFixed(2)}</span></td>`)).join('');}
 function renderCost(){document.getElementById('tb-c').innerHTML=sortBy(mSt.cost.k,mSt.cost.d).map((m,i)=>mkRow(m,i+1,'cost','bf-c','bv-c',v=>m.cost===0?'N/A':'$'+v.toFixed(2),v=>m.cost===0?0:Math.max(5,(1-v/mxC)*100),m=>`<td><span class="bv bv-r">${m.successRate.toFixed(1)}<small style="color:var(--ink4)">%</small></span></td><td><span class="bv bv-t">${(m.elapsed/60).toFixed(0)}<small style="color:var(--ink4)">min</small></span></td>`)).join('');}
@@ -1801,27 +1809,30 @@ window.addEventListener('resize',()=>{
 const rSt={filter:'all',k:'successRate',d:-1,sel:null,axX:'elapsed',axY:'successRate',axZ:'cost'};
 let chart3d=null;
 function getScore(m){
-  if(rankMode==='multimodal') return SPLIT_SCORES[m.id]?.mm ?? m.successRate;
-  if(rankMode==='puretext')   return SPLIT_SCORES[m.id]?.pt ?? m.successRate;
-  return m.successRate;
+  return getModeScore(m,rankMode);
+}
+function getElapsed(m){
+  return getModeElapsed(m,rankMode);
 }
 function getCost(m){
-  if(rankMode==='multimodal') return SPLIT_SCORES[m.id]?.mmCost ?? m.cost;
-  if(rankMode==='puretext')   return SPLIT_SCORES[m.id]?.ptCost ?? m.cost;
-  return m.cost;
+  return getModeCost(m,rankMode);
 }
-function fSorted(){let data=rSt.filter==='all'?[...MODELS]:MODELS.filter(m=>m.cat===rSt.filter);return data.sort((a,b)=>{const va=getScore(a),vb=getScore(b);return(va<vb?-1:va>vb?1:0)*rSt.d});}
+function getRankMetric(m,k){if(k==='successRate')return getScore(m);if(k==='elapsed')return getElapsed(m);if(k==='cost')return getCost(m);return m[k];}
+function modeScoreLabel(mode){return mode==='multimodal'?'Multimodal Score':mode==='puretext'?'Pure Text Score':'Overall Score';}
+function rankAxisLabel(k){return k==='successRate'?modeScoreLabel(rankMode):(AXES[k]?.label||k);}
+function fSorted(){let data=rSt.filter==='all'?[...MODELS]:MODELS.filter(m=>m.cat===rSt.filter);return data.sort((a,b)=>{const va=getRankMetric(a,rSt.k),vb=getRankMetric(b,rSt.k);return(va<vb?-1:va>vb?1:0)*rSt.d});}
 function renderRank(){
-  const scoreLabel=rankMode==='multimodal'?'Multimodal Score':rankMode==='puretext'?'Pure Text Score':'Overall Score';
+  const scoreLabel=modeScoreLabel(rankMode);
   document.querySelectorAll('[data-rs="successRate"]').forEach(th=>{th.childNodes[0].textContent=scoreLabel+' ';});
   document.getElementById('tb-rank').innerHTML=fSorted().map((m,i)=>{
     const sc=getScore(m);
+    const el=getElapsed(m);
     const co=getCost(m);
     return`<tr data-id="${m.id}" class="${rSt.sel===m.id?'sel':''}">
       <td class="rk ${rkC(i+1)}">${i+1}</td>
       <td><div class="mc"><span class="md" style="background:${m.color}"></span><div><div class="mn">${m.name}</div><div class="mo">${m.org}</div></div></div></td>
       <td class="bc"><div class="br"><div class="bb"><div class="bf bf-r" style="width:${sc.toFixed(1)}%"></div></div><span class="bv bv-r">${sc.toFixed(1)}%</span></div></td>
-      <td><span class="bv bv-t">${(m.elapsed/60).toFixed(0)}<small style="color:var(--ink4)">min</small></span></td>
+      <td><span class="bv bv-t">${(el/60).toFixed(0)}<small style="color:var(--ink4)">min</small></span></td>
       <td><span class="bv bv-c">$${co.toFixed(2)}</span></td>
       <td>${chH(m.change)}</td>
     </tr>`;}).join('');
@@ -1833,7 +1844,7 @@ document.querySelectorAll('[data-rs]').forEach(th=>th.addEventListener('click',(
   th.classList.add('sk');th.querySelector('.sa').textContent=rSt.d===-1?'↓':'↑';renderRank();
 }));
 document.querySelectorAll('.ftab[data-f]').forEach(btn=>btn.addEventListener('click',()=>{rSt.filter=btn.dataset.f;document.querySelectorAll('.ftab[data-f]').forEach(b=>b.classList.remove('on'));btn.classList.add('on');renderRank();}));
-document.querySelectorAll('.ftab[data-mode]').forEach(btn=>btn.addEventListener('click',()=>{rankMode=btn.dataset.mode;document.querySelectorAll('.ftab[data-mode]').forEach(b=>b.classList.remove('on'));btn.classList.add('on');rSt.d=-1;renderRank();}));
+document.querySelectorAll('.ftab[data-mode]').forEach(btn=>btn.addEventListener('click',()=>{rankMode=btn.dataset.mode;document.querySelectorAll('.ftab[data-mode]').forEach(b=>b.classList.remove('on'));btn.classList.add('on');rSt.d=-1;renderRank();chart3d?.rebuild();}));
 
 /* ── MM vs PT split table ── */
 let splitSortKey='mm', splitSortDir=-1;
@@ -1899,9 +1910,9 @@ function initChart3D(){
     }
     function makeLabel(txt,hex){const cv=document.createElement('canvas');cv.width=220;cv.height=64;const cx=cv.getContext('2d');cx.fillStyle='rgba(240,234,216,.88)';cx.beginPath();if(cx.roundRect)cx.roundRect(3,3,214,58,10);else cx.rect(3,3,214,58);cx.fill();cx.fillStyle=hex;cx.font='bold 26px IBM Plex Mono,monospace';cx.textAlign='center';cx.textBaseline='middle';cx.fillText(txt,110,34);const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv),transparent:true,depthTest:false}));sp.scale.set(.36,.1,1);return sp;}
     function makeTick(txt,hex){const cv=document.createElement('canvas');cv.width=72;cv.height=28;const cx=cv.getContext('2d');cx.fillStyle=hex;cx.font='400 16px IBM Plex Mono,monospace';cx.textAlign='center';cx.textBaseline='middle';cx.fillText(txt,36,14);const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv),transparent:true,depthTest:false}));sp.scale.set(.11,.044,1);return sp;}
-    const lX=makeLabel((AXES[rSt.axX]?.label||'X').toUpperCase(),'#8c2416');lX.position.set(L+.2,0,0);g.add(lX);
-    const lY=makeLabel((AXES[rSt.axY]?.label||'Y').toUpperCase(),'#265238');lY.position.set(0,L+.18,0);g.add(lY);
-    const lZ=makeLabel((AXES[rSt.axZ]?.label||'Z').toUpperCase(),'#1c3448');lZ.position.set(0,0,L+.2);g.add(lZ);
+    const lX=makeLabel(rankAxisLabel(rSt.axX).toUpperCase(),'#8c2416');lX.position.set(L+.2,0,0);g.add(lX);
+    const lY=makeLabel(rankAxisLabel(rSt.axY).toUpperCase(),'#265238');lY.position.set(0,L+.18,0);g.add(lY);
+    const lZ=makeLabel(rankAxisLabel(rSt.axZ).toUpperCase(),'#1c3448');lZ.position.set(0,0,L+.2);g.add(lZ);
     [0,.25,.5,.75,1].forEach(t=>{
       const tx=makeTick((t*100).toFixed(0)+'%','#8c2416');tx.position.set(t,-.08,-.08);g.add(tx);
       const ty=makeTick((t*100).toFixed(0)+'%','#265238');ty.position.set(-.11,t,-.06);g.add(ty);
@@ -1958,11 +1969,12 @@ function initChart3D(){
   const SPHERE_GEO=new THREE.SphereGeometry(.032,22,22);let meshes=[];
   function buildSpheres(){
     meshes.forEach(m=>{scene.remove(m);scene.remove(m.userData.halo);if(m.userData.label)scene.remove(m.userData.label);});meshes=[];
-    const fixedRanges={successRate:[0,100],elapsed:[0,Math.max(...MODELS.map(m=>m.elapsed))],cost:[0,Math.max(...MODELS.map(m=>m.cost))]};
-    const getRange=k=>fixedRanges[k]||[0,Math.max(...MODELS.map(m=>m[k]))];
-    const xs=normFixed(MODELS.map(m=>m[rSt.axX]),...getRange(rSt.axX));
-    const ys=normFixed(MODELS.map(m=>m[rSt.axY]),...getRange(rSt.axY));
-    const zs=normFixed(MODELS.map(m=>m[rSt.axZ]),...getRange(rSt.axZ));
+    const axisVal=(m,k)=>getRankMetric(m,k);
+    const fixedRanges={successRate:[0,100],elapsed:[0,Math.max(...MODELS.map(m=>axisVal(m,'elapsed')))],cost:[0,Math.max(...MODELS.map(m=>axisVal(m,'cost')))]};
+    const getRange=k=>fixedRanges[k]||[0,Math.max(...MODELS.map(m=>axisVal(m,k)))];
+    const xs=normFixed(MODELS.map(m=>axisVal(m,rSt.axX)),...getRange(rSt.axX));
+    const ys=normFixed(MODELS.map(m=>axisVal(m,rSt.axY)),...getRange(rSt.axY));
+    const zs=normFixed(MODELS.map(m=>axisVal(m,rSt.axZ)),...getRange(rSt.axZ));
     MODELS.forEach((model,i)=>{
       const col=new THREE.Color(model.color);
       const mesh=new THREE.Mesh(SPHERE_GEO,new THREE.MeshPhongMaterial({color:col,emissive:col,emissiveIntensity:.12,shininess:150,specular:new THREE.Color(0xffffff)}));
@@ -1986,7 +1998,7 @@ function initChart3D(){
   renderer.domElement.addEventListener('mousemove',e=>{
     const r=renderer.domElement.getBoundingClientRect();ms2.set(((e.clientX-r.left)/r.width)*2-1,-((e.clientY-r.top)/r.height)*2+1);ray.setFromCamera(ms2,camera);
     const hits=ray.intersectObjects(meshes);
-    if(hits.length){const m=hits[0].object.userData.model;tt.classList.add('show');tt.style.left=(e.clientX-r.left+14)+'px';tt.style.top=(e.clientY-r.top-10)+'px';tt.innerHTML=`<div class="ctt-name">${m.name}</div><div class="ctt-row"><span>${AXES[rSt.axX].label}</span><strong>${AXES[rSt.axX].fmt(m[rSt.axX])}</strong></div><div class="ctt-row"><span>${AXES[rSt.axY].label}</span><strong>${AXES[rSt.axY].fmt(m[rSt.axY])}</strong></div><div class="ctt-row"><span>${AXES[rSt.axZ].label}</span><strong>${AXES[rSt.axZ].fmt(m[rSt.axZ])}</strong></div>`;}
+    if(hits.length){const m=hits[0].object.userData.model;tt.classList.add('show');tt.style.left=(e.clientX-r.left+14)+'px';tt.style.top=(e.clientY-r.top-10)+'px';tt.innerHTML=`<div class="ctt-name">${m.name}</div><div class="ctt-row"><span>${rankAxisLabel(rSt.axX)}</span><strong>${AXES[rSt.axX].fmt(getRankMetric(m,rSt.axX))}</strong></div><div class="ctt-row"><span>${rankAxisLabel(rSt.axY)}</span><strong>${AXES[rSt.axY].fmt(getRankMetric(m,rSt.axY))}</strong></div><div class="ctt-row"><span>${rankAxisLabel(rSt.axZ)}</span><strong>${AXES[rSt.axZ].fmt(getRankMetric(m,rSt.axZ))}</strong></div>`;}
     else{tt.classList.remove('show');}
   });
   renderer.domElement.addEventListener('click',e=>{
