@@ -595,12 +595,9 @@ tbody tr:nth-child(9){animation-delay:.18s}tbody tr:nth-child(10){animation-dela
   <!-- harness comparison (static) -->
   <div class="sect fi fi-2"><h2>Harness Comparison</h2></div>
   <div class="panel fi fi-2" style="border-radius:var(--r);margin-bottom:8px">
-    <div class="ph">
-      <span class="pt">Same 60 Tasks · Four Harnesses</span>
-    </div>
     <div class="tw" style="padding:0">
       <p style="padding:14px 24px;color:var(--ink3);font-size:12px;line-height:1.7;border-bottom:1px solid var(--g);margin:0">
-        Per-task averages (minutes / USD) with the same timeout adjustment as the OpenClaw leaderboard. <strong>Bold</strong> = best harness for that model.</p>
+        Per-task averages (minutes / USD). <strong>Bold</strong> = best harness for that model.</p>
       <table style="font-size:13px">
         <thead>
           <tr>
@@ -648,7 +645,6 @@ tbody tr:nth-child(9){animation-delay:.18s}tbody tr:nth-child(10){animation-dela
           </tr>
         </tbody>
       </table>
-      <p style="padding:12px 24px;color:var(--ink4);font-size:10px;letter-spacing:.4px;margin:0;border-top:1px solid var(--g)">Subset of evaluated models · see GitHub README for methodology.</p>
     </div>
   </div>
 
@@ -989,6 +985,8 @@ const AXES={successRate:{label:'Overall Score',fmt:v=>v.toFixed(1)+'%'},elapsed:
 /* Split scores use the same one-decimal values as the paper table. Elapsed time
    and cost are calibrated so the split sums match the released totals. */
 const SPLIT_SCORES={
+  0:  {mm:58.5, pt:65.0, mmElapsed:12611, ptElapsed: 7069, mmCost:43.414, ptCost:33.986},
+  1:  {mm:63.0, pt:54.5, mmElapsed:10319, ptElapsed: 5401, mmCost:17.096, ptCost:20.704},
   2:  {mm:47.7, pt:54.6, mmElapsed:18199, ptElapsed:12286, mmCost:36.382, ptCost:44.468},
   3:  {mm:40.2, pt:58.0, mmElapsed:12423, ptElapsed:8579,  mmCost: 8.754, ptCost:11.329},
   9:  {mm:29.7, pt:48.2, mmElapsed:16583, ptElapsed:10925, mmCost:13.534, ptCost:12.934},
@@ -1003,6 +1001,9 @@ const SPLIT_SCORES={
   15: {mm:34.3, pt:28.1, mmElapsed:15316, ptElapsed:10692, mmCost: 5.073, ptCost: 5.159},
   16: {mm:16.3, pt:35.3, mmElapsed:19676, ptElapsed:12844, mmCost: 4.484, ptCost: 5.173},
   7:  {mm:30.7, pt:51.7, mmElapsed:16416, ptElapsed: 5988, mmCost: 6.332, ptCost: 5.060},
+  4:  {mm:40.7, pt:53.9, mmElapsed:18941, ptElapsed:11959, mmCost:15.379, ptCost:19.421},
+  5:  {mm:33.6, pt:51.4, mmElapsed:22223, ptElapsed:14077, mmCost: 5.049, ptCost: 6.951},
+  6:  {mm:36.2, pt:48.1, mmElapsed:16361, ptElapsed:10699, mmCost: 4.430, ptCost: 8.170},
 };
 
 let rankMode='overall'; // 'overall' | 'multimodal' | 'puretext'
