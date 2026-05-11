@@ -505,7 +505,7 @@ tbody tr:nth-child(9){animation-delay:.18s}tbody tr:nth-child(10){animation-dela
   </div>
 
   <div class="gnav-right" style="display:flex;align-items:center;gap:10px">
-    <span>Updated 2026-03-27</span>
+    <span>Updated 2026-05-12</span>
     <a href="https://github.com/InternLM/WildClawBench" target="_blank" style="display:flex;align-items:center;color:var(--ink3);transition:color .15s" onmouseover="this.style.color='var(--ink)'" onmouseout="this.style.color='var(--ink3)'">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
         <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
@@ -528,11 +528,11 @@ tbody tr:nth-child(9){animation-delay:.18s}tbody tr:nth-child(10){animation-dela
         <div class="hp-title">
           <span class="hp-wild">Wild</span><span class="hp-claw">Claw</span><span class="hp-bench">Bench</span>
         </div>
-        <div class="hp-sub">A harder, wilder benchmark for autonomous AI agents — testing real-world task completion across 14 frontier models with adversarial difficulty.</div>
+        <div class="hp-sub">A harder, wilder benchmark for autonomous AI agents — testing real-world task completion across 19 frontier models on the OpenClaw harness.</div>
       </div>
       <div class="hp-stats">
         <div class="hps">
-          <span class="hps-val red">14</span>
+          <span class="hps-val red">19</span>
           <span class="hps-label">Models</span>
         </div>
         <div class="hps">
@@ -540,8 +540,8 @@ tbody tr:nth-child(9){animation-delay:.18s}tbody tr:nth-child(10){animation-dela
           <span class="hps-label">Tasks</span>
         </div>
         <div class="hps">
-          <span class="hps-val red">51.6%</span>
-          <span class="hps-label">Top Score</span>
+          <span class="hps-val red">62.2%</span>
+          <span class="hps-label">Top Score · OpenClaw</span>
         </div>
       </div>
     </div>
@@ -552,8 +552,8 @@ tbody tr:nth-child(9){animation-delay:.18s}tbody tr:nth-child(10){animation-dela
     <div class="msw-tabs">
       <button class="mt on" data-m="successRate">
         <span class="mt-label">Overall Score</span>
-        <span class="mt-val">51.6%</span>
-        <span class="mt-sub">Best — Claude Opus 4.6</span>
+        <span class="mt-val">62.2%</span>
+        <span class="mt-sub">Best — Claude Opus 4.7 (OpenClaw)</span>
       </button>
       <button class="mt" data-m="elapsed">
         <span class="mt-label">Speed</span>
@@ -562,7 +562,7 @@ tbody tr:nth-child(9){animation-delay:.18s}tbody tr:nth-child(10){animation-dela
       </button>
       <button class="mt" data-m="cost">
         <span class="mt-label">Cost Efficiency</span>
-        <span class="mt-val">$6.63</span>
+        <span class="mt-val">$6.60</span>
         <span class="mt-sub">Cheapest — Step 3.5 Flash</span>
       </button>
     </div>
@@ -589,7 +589,67 @@ tbody tr:nth-child(9){animation-delay:.18s}tbody tr:nth-child(10){animation-dela
   <div class="fn-wrap fi fi-1">
     <span class="fn-item"><sup>†</sup> Gemini 3.1 Pro was evaluated in <em>low-effort mode</em>; scores may not reflect peak capability.</span>
     <span class="fn-sep">·</span>
-    <span class="fn-item"><sup>‡</sup> All scores are averages across multiple independent runs.</span>
+    <span class="fn-item"><sup>‡</sup> OpenClaw leaderboard matches the technical report Main results table; totals are full 60-task suite time/cost.</span>
+  </div>
+
+  <!-- harness comparison (static) -->
+  <div class="sect fi fi-2"><h2>Harness Comparison</h2></div>
+  <div class="panel fi fi-2" style="border-radius:var(--r);margin-bottom:8px">
+    <div class="ph">
+      <span class="pt">Same 60 Tasks · Four Harnesses</span>
+    </div>
+    <div class="tw" style="padding:0">
+      <p style="padding:14px 24px;color:var(--ink3);font-size:12px;line-height:1.7;border-bottom:1px solid var(--g);margin:0">
+        Per-task averages (minutes / USD) with the same timeout adjustment as the OpenClaw leaderboard. <strong>Bold</strong> = best harness for that model.</p>
+      <table style="font-size:13px">
+        <thead>
+          <tr>
+            <th rowspan="2">Model</th>
+            <th colspan="3" style="text-align:center;border-left:1px solid var(--g)">OpenClaw</th>
+            <th colspan="3" style="text-align:center;border-left:1px solid var(--g)">Claude Code</th>
+            <th colspan="3" style="text-align:center;border-left:1px solid var(--g)">Codex</th>
+            <th colspan="3" style="text-align:center;border-left:1px solid var(--g)">Hermes Agent</th>
+          </tr>
+          <tr>
+            <th style="border-left:1px solid var(--g);text-align:right">Time</th><th style="text-align:right">$/task</th><th style="text-align:right">Score</th>
+            <th style="border-left:1px solid var(--g);text-align:right">Time</th><th style="text-align:right">$/task</th><th style="text-align:right">Score</th>
+            <th style="border-left:1px solid var(--g);text-align:right">Time</th><th style="text-align:right">$/task</th><th style="text-align:right">Score</th>
+            <th style="border-left:1px solid var(--g);text-align:right">Time</th><th style="text-align:right">$/task</th><th style="text-align:right">Score</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="font-weight:600">GPT-5.4</td>
+            <td style="border-left:1px solid var(--g);text-align:right">5.83</td><td style="text-align:right">0.33</td><td style="text-align:right">50.3%</td>
+            <td style="border-left:1px solid var(--g);text-align:right">9.07</td><td style="text-align:right">0.61</td><td style="text-align:right">48.4%</td>
+            <td style="border-left:1px solid var(--g);text-align:right">7.16</td><td style="text-align:right">0.57</td><td style="text-align:right;font-weight:700">56.8%</td>
+            <td style="border-left:1px solid var(--g);text-align:right">8.97</td><td style="text-align:right">0.44</td><td style="text-align:right">50.7%</td>
+          </tr>
+          <tr>
+            <td style="font-weight:600">GLM 5</td>
+            <td style="border-left:1px solid var(--g);text-align:right">6.22</td><td style="text-align:right">0.19</td><td style="text-align:right">42.6%</td>
+            <td style="border-left:1px solid var(--g);text-align:right">10.18</td><td style="text-align:right">0.21</td><td style="text-align:right">31.0%</td>
+            <td style="border-left:1px solid var(--g);text-align:right">7.84</td><td style="text-align:right">0.13</td><td style="text-align:right">38.9%</td>
+            <td style="border-left:1px solid var(--g);text-align:right">6.62</td><td style="text-align:right">0.44</td><td style="text-align:right;font-weight:700">46.4%</td>
+          </tr>
+          <tr>
+            <td style="font-weight:600">MiMo V2 Pro</td>
+            <td style="border-left:1px solid var(--g);text-align:right">7.63</td><td style="text-align:right">0.44</td><td style="text-align:right">40.2%</td>
+            <td style="border-left:1px solid var(--g);text-align:right">9.90</td><td style="text-align:right">0.15</td><td style="text-align:right">29.9%</td>
+            <td style="border-left:1px solid var(--g);text-align:right">6.44</td><td style="text-align:right">0.15</td><td style="text-align:right">35.3%</td>
+            <td style="border-left:1px solid var(--g);text-align:right">8.30</td><td style="text-align:right">0.26</td><td style="text-align:right;font-weight:700">48.1%</td>
+          </tr>
+          <tr>
+            <td style="font-weight:600">MiniMax M2.7</td>
+            <td style="border-left:1px solid var(--g);text-align:right">9.18</td><td style="text-align:right">0.12</td><td style="text-align:right">33.8%</td>
+            <td style="border-left:1px solid var(--g);text-align:right">10.08</td><td style="text-align:right">0.09</td><td style="text-align:right">32.0%</td>
+            <td style="border-left:1px solid var(--g);text-align:right">8.66</td><td style="text-align:right">0.06</td><td style="text-align:right">35.8%</td>
+            <td style="border-left:1px solid var(--g);text-align:right">10.30</td><td style="text-align:right">0.11</td><td style="text-align:right;font-weight:700">37.1%</td>
+          </tr>
+        </tbody>
+      </table>
+      <p style="padding:12px 24px;color:var(--ink4);font-size:10px;letter-spacing:.4px;margin:0;border-top:1px solid var(--g)">Subset of evaluated models · see GitHub README for methodology.</p>
+    </div>
   </div>
 
   <!-- scatter -->
@@ -903,20 +963,25 @@ document.querySelectorAll('.ntab').forEach(btn=>btn.addEventListener('click',()=
    LEADERBOARD DATA
 ═══════════════════════════════════════════════════════ */
 const MODELS=[
-  {id:0,name:'Claude Opus 4.6',  org:'Anthropic',      prov:'Anthropic',color:'#8c2416',successRate:51.59, elapsed:30485, cost:80.850, change: 0,cat:'claude'},
-  {id:1,name:'GPT-5.4',          org:'OpenAI',         prov:'OpenAI',   color:'#1c3448',successRate:50.34, elapsed:21002, cost:20.083, change: 0,cat:'gpt'},
-  {id:2,name:'MiMo V2 Pro',      org:'Xiaomi',         prov:'Xiaomi',   color:'#604840',successRate:40.24, elapsed:27508, cost:26.468, change: 0,cat:'other'},
-  {id:3,name:'Gemini 3.1 Pro',   org:'Google DeepMind',prov:'Google',   color:'#265238',successRate:40.84, elapsed:14373, cost:18.221, change: 0,cat:'gemini'},
-  {id:4,name:'GLM 5 Turbo',      org:'Zhipu AI',       prov:'Zhipu',    color:'#405868',successRate:33.90, elapsed:29916, cost:14.800, change: 0,cat:'other'},
-  {id:5,name:'MiniMax M2.7',     org:'MiniMax',        prov:'MiniMax',  color:'#7a5008',successRate:33.81, elapsed:33085, cost:7.470,  change: 0,cat:'other'},
-  {id:6,name:'Qwen3.5 397B',     org:'Alibaba Cloud',  prov:'Alibaba',  color:'#7a3828',successRate:34.53, elapsed:27527, cost:22.333, change: 0,cat:'other'},
-  {id:7,name:'Step 3.5 Flash',   org:'StepFun',        prov:'StepFun',  color:'#3c5840',successRate:26.72, elapsed:25798, cost:6.632,  change: 0,cat:'other'},
-  {id:8,name:'Kimi K2.5',        org:'Moonshot AI',    prov:'Moonshot', color:'#4a2858',successRate:30.84, elapsed:24333, cost:6.730,  change: 0,cat:'other'},
-  {id:9,name:'Grok 4.20 Beta',   org:'xAI',            prov:'xAI',      color:'#2a4858',successRate:19.28, elapsed:5640,  cost:9.628,  change: 0,cat:'other'},
-  {id:10,name:'DeepSeek V3.2',  org:'DeepSeek',       prov:'DeepSeek', color:'#2563a8',successRate:34.02, elapsed:32922, cost:11.503, change: 0,cat:'deepseek'},
-  {id:11,name:'MiMo V2 Flash',  org:'Xiaomi',         prov:'Xiaomi',   color:'#8a6040',successRate:30.84, elapsed:26008, cost:10.232, change: 0,cat:'other'},
-  {id:12,name:'MiniMax M2.5',   org:'MiniMax',        prov:'MiniMax',  color:'#5a7008',successRate:27.14, elapsed:32520, cost:9.657,  change: 0,cat:'other'},
-  {id:13,name:'GLM 5',          org:'Zhipu AI',       prov:'Zhipu',    color:'#304858',successRate:42.63, elapsed:22404, cost:11.392, change: 0,cat:'other'},
+  {id:0,name:'Claude Opus 4.7',  org:'Anthropic',      prov:'Anthropic',color:'#8c2416',successRate:62.20, elapsed:19680, cost:77.400, change: 0,cat:'claude'},
+  {id:1,name:'GPT-5.5',          org:'OpenAI',         prov:'OpenAI',   color:'#1c3448',successRate:58.20, elapsed:15720, cost:37.800, change: 0,cat:'gpt'},
+  {id:2,name:'Claude Opus 4.6',  org:'Anthropic',      prov:'Anthropic',color:'#a83c14',successRate:51.60, elapsed:30480, cost:81.000, change: 0,cat:'claude'},
+  {id:3,name:'GPT-5.4',          org:'OpenAI',         prov:'OpenAI',   color:'#304860',successRate:50.30, elapsed:21000, cost:19.800, change: 0,cat:'gpt'},
+  {id:4,name:'GLM 5.1',          org:'Zhipu AI',       prov:'Zhipu',    color:'#2d5070',successRate:48.20, elapsed:30900, cost:34.800, change: 0,cat:'other'},
+  {id:5,name:'DeepSeek V4 Pro',  org:'DeepSeek',       prov:'DeepSeek', color:'#2563a8',successRate:43.70, elapsed:36300, cost:12.000, change: 0,cat:'deepseek'},
+  {id:6,name:'MiMo V2.5 Pro',    org:'Xiaomi',         prov:'Xiaomi',   color:'#604840',successRate:43.00, elapsed:27060, cost:12.600, change: 0,cat:'other'},
+  {id:7,name:'GLM 5',            org:'Zhipu AI',       prov:'Zhipu',    color:'#304858',successRate:42.60, elapsed:22380, cost:11.400, change: 0,cat:'other'},
+  {id:8,name:'Gemini 3.1 Pro',   org:'Google DeepMind',prov:'Google',   color:'#265238',successRate:40.80, elapsed:14400, cost:18.000, change: 0,cat:'gemini'},
+  {id:9,name:'MiMo V2 Pro',      org:'Xiaomi',         prov:'Xiaomi',   color:'#786050',successRate:40.20, elapsed:27480, cost:26.400, change: 0,cat:'other'},
+  {id:10,name:'Qwen3.5 397B',    org:'Alibaba Cloud',  prov:'Alibaba',  color:'#7a3828',successRate:34.50, elapsed:27540, cost:22.200, change: 0,cat:'other'},
+  {id:11,name:'DeepSeek V3.2',   org:'DeepSeek',       prov:'DeepSeek', color:'#1e5590',successRate:34.00, elapsed:32940, cost:11.400, change: 0,cat:'deepseek'},
+  {id:12,name:'GLM 5 Turbo',     org:'Zhipu AI',       prov:'Zhipu',    color:'#405868',successRate:33.90, elapsed:29940, cost:15.000, change: 0,cat:'other'},
+  {id:13,name:'MiniMax M2.7',    org:'MiniMax',        prov:'MiniMax',  color:'#7a5008',successRate:33.80, elapsed:33060, cost: 7.200, change: 0,cat:'other'},
+  {id:14,name:'Kimi K2.5',       org:'Moonshot AI',    prov:'Moonshot', color:'#4a2858',successRate:30.80, elapsed:24360, cost: 6.600, change: 0,cat:'other'},
+  {id:15,name:'MiMo V2 Flash',   org:'Xiaomi',         prov:'Xiaomi',   color:'#8a6040',successRate:30.80, elapsed:25980, cost:10.200, change: 0,cat:'other'},
+  {id:16,name:'MiniMax M2.5',    org:'MiniMax',        prov:'MiniMax',  color:'#5a7008',successRate:27.10, elapsed:32520, cost: 9.600, change: 0,cat:'other'},
+  {id:17,name:'Step 3.5 Flash',  org:'StepFun',        prov:'StepFun',  color:'#3c5840',successRate:26.70, elapsed:25800, cost: 6.600, change: 0,cat:'other'},
+  {id:18,name:'Grok 4.20 Beta',  org:'xAI',           prov:'xAI',       color:'#2a4858',successRate:19.30, elapsed: 5640, cost: 9.600, change: 0,cat:'other'},
 ];
 const AXES={successRate:{label:'Overall Score',fmt:v=>v.toFixed(1)+'%'},elapsed:{label:'Elapsed Time',fmt:v=>(v/60).toFixed(0)+'min'},cost:{label:'Total Cost',fmt:v=>'$'+v.toFixed(2)}};
 
@@ -924,20 +989,20 @@ const AXES={successRate:{label:'Overall Score',fmt:v=>v.toFixed(1)+'%'},elapsed:
 /* Split scores use the same one-decimal values as the paper table. Elapsed time
    and cost are calibrated so the split sums match the released totals. */
 const SPLIT_SCORES={
-  0:  {mm:47.7, pt:54.6, mmElapsed:18199, ptElapsed:12286, mmCost:36.382, ptCost:44.468},  // Claude Opus 4.6
-  1:  {mm:40.2, pt:58.0, mmElapsed:12423, ptElapsed:8579,  mmCost: 8.754, ptCost:11.329},  // GPT-5.4
-  2:  {mm:29.7, pt:48.2, mmElapsed:16583, ptElapsed:10925, mmCost:13.534, ptCost:12.934},  // MiMo V2 Pro
-  3:  {mm:43.5, pt:38.7, mmElapsed: 8700, ptElapsed:5673,  mmCost: 9.646, ptCost: 8.575},  // Gemini 3.1 Pro
-  4:  {mm:24.5, pt:41.0, mmElapsed:17725, ptElapsed:12191, mmCost: 8.408, ptCost: 6.392},  // GLM 5 Turbo
-  5:  {mm:19.2, pt:44.9, mmElapsed:20567, ptElapsed:12518, mmCost: 2.958, ptCost: 4.512},  // MiniMax M2.7
-  6:  {mm:23.8, pt:42.6, mmElapsed:19578, ptElapsed: 7949, mmCost:11.871, ptCost:10.462},  // Qwen3.5 397B
-  7:  {mm:12.6, pt:37.4, mmElapsed:15075, ptElapsed:10723, mmCost: 3.716, ptCost: 2.916},  // Step 3.5 Flash
-  8:  {mm:24.0, pt:36.0, mmElapsed:13475, ptElapsed:10858, mmCost: 2.603, ptCost: 4.127},  // Kimi K2.5
-  9:  {mm: 7.3, pt:28.4, mmElapsed: 2886, ptElapsed: 2754, mmCost: 4.029, ptCost: 5.599},  // Grok 4.20 Beta
-  10: {mm:26.1, pt:40.1, mmElapsed:17682, ptElapsed:15240, mmCost: 5.762, ptCost: 5.741},  // DeepSeek V3.2
-  11: {mm:34.3, pt:28.1, mmElapsed:15316, ptElapsed:10692, mmCost: 5.073, ptCost: 5.159},  // MiMo V2 Flash
-  12: {mm:16.3, pt:35.3, mmElapsed:19676, ptElapsed:12844, mmCost: 4.484, ptCost: 5.173},  // MiniMax M2.5
-  13: {mm:30.7, pt:51.7, mmElapsed:16416, ptElapsed: 5988, mmCost: 6.332, ptCost: 5.060},  // GLM 5
+  2:  {mm:47.7, pt:54.6, mmElapsed:18199, ptElapsed:12286, mmCost:36.382, ptCost:44.468},
+  3:  {mm:40.2, pt:58.0, mmElapsed:12423, ptElapsed:8579,  mmCost: 8.754, ptCost:11.329},
+  9:  {mm:29.7, pt:48.2, mmElapsed:16583, ptElapsed:10925, mmCost:13.534, ptCost:12.934},
+  8:  {mm:43.5, pt:38.7, mmElapsed: 8700, ptElapsed:5673,  mmCost: 9.646, ptCost: 8.575},
+  12: {mm:24.5, pt:41.0, mmElapsed:17725, ptElapsed:12191, mmCost: 8.408, ptCost: 6.392},
+  13: {mm:19.2, pt:44.9, mmElapsed:20567, ptElapsed:12518, mmCost: 2.958, ptCost: 4.512},
+  10: {mm:23.8, pt:42.6, mmElapsed:19578, ptElapsed: 7949, mmCost:11.871, ptCost:10.462},
+  17: {mm:12.6, pt:37.4, mmElapsed:15075, ptElapsed:10723, mmCost: 3.716, ptCost: 2.916},
+  14: {mm:24.0, pt:36.0, mmElapsed:13475, ptElapsed:10858, mmCost: 2.603, ptCost: 4.127},
+  18: {mm: 7.3, pt:28.4, mmElapsed: 2886, ptElapsed: 2754, mmCost: 4.029, ptCost: 5.599},
+  11: {mm:26.1, pt:40.1, mmElapsed:17682, ptElapsed:15240, mmCost: 5.762, ptCost: 5.741},
+  15: {mm:34.3, pt:28.1, mmElapsed:15316, ptElapsed:10692, mmCost: 5.073, ptCost: 5.159},
+  16: {mm:16.3, pt:35.3, mmElapsed:19676, ptElapsed:12844, mmCost: 4.484, ptCost: 5.173},
+  7:  {mm:30.7, pt:51.7, mmElapsed:16416, ptElapsed: 5988, mmCost: 6.332, ptCost: 5.060},
 };
 
 let rankMode='overall'; // 'overall' | 'multimodal' | 'puretext'
@@ -948,26 +1013,27 @@ let rankMode='overall'; // 'overall' | 'multimodal' | 'puretext'
 /* Category scores are per-category averages. Overall score is the task-count
    weighted mean with counts [10, 12, 6, 11, 11, 10]; elapsed/cost are category
    totals whose sums match the released leaderboard totals. */
-const CATEGORIES=[
+const CATEGORIES=
+[
   {
     id:'01', key:'productivity', icon:'📋',
     name:'Productivity & Flow', code:'01_Productivity',
     accentClass:'cat-c1', tasks:10, topModel:'Claude Opus 4.6',
     scores:[
-      {modelId:0,rate:59.43,elapsed:5401, cost:19.500},
-      {modelId:1,rate:53.96,elapsed:3429, cost:4.460},
-      {modelId:2,rate:42.08,elapsed:4844, cost:6.021},
-      {modelId:3,rate:31.47,elapsed:1031, cost:1.135},
-      {modelId:4,rate:23.43,elapsed:6128, cost:3.284},
-      {modelId:5,rate:34.26,elapsed:6699, cost:2.121},
-      {modelId:6,rate:29.12,elapsed:5041, cost:5.515},
-      {modelId:7,rate:35.21,elapsed:1504, cost:0.109},
-      {modelId:8,rate:37.07,elapsed:4175, cost:1.622},
-      {modelId:9,rate:10.25,elapsed:959,  cost:2.227},
-      {modelId:10,rate:29.38,elapsed:6631,cost:2.407},
-      {modelId:11,rate:21.44,elapsed:4740,cost:2.110},
-      {modelId:12,rate:18.57,elapsed:7851,cost:3.364},
-      {modelId:13,rate:29.84,elapsed:4419,cost:3.823},
+      {modelId:2,rate:59.43,elapsed:5401, cost:19.500},
+      {modelId:3,rate:53.96,elapsed:3429, cost:4.460},
+      {modelId:9,rate:42.08,elapsed:4844, cost:6.021},
+      {modelId:8,rate:31.47,elapsed:1031, cost:1.135},
+      {modelId:12,rate:23.43,elapsed:6128, cost:3.284},
+      {modelId:13,rate:34.26,elapsed:6699, cost:2.121},
+      {modelId:10,rate:29.12,elapsed:5041, cost:5.515},
+      {modelId:17,rate:35.21,elapsed:1504, cost:0.109},
+      {modelId:14,rate:37.07,elapsed:4175, cost:1.622},
+      {modelId:18,rate:10.25,elapsed:959,  cost:2.227},
+      {modelId:11,rate:29.38,elapsed:6631,cost:2.407},
+      {modelId:15,rate:21.44,elapsed:4740,cost:2.110},
+      {modelId:16,rate:18.57,elapsed:7851,cost:3.364},
+      {modelId:7,rate:29.84,elapsed:4419,cost:3.823},
     ]
   },
   {
@@ -975,20 +1041,20 @@ const CATEGORIES=[
     name:'Code Intelligence', code:'02_Code',
     accentClass:'cat-c2', tasks:12, topModel:'Claude Opus 4.6',
     scores:[
-      {modelId:0,rate:60.63,elapsed:9662, cost:27.010},
-      {modelId:1,rate:47.82,elapsed:5572, cost:5.694},
-      {modelId:2,rate:40.18,elapsed:12514,cost:11.490},
-      {modelId:3,rate:49.55,elapsed:5669, cost:10.259},
-      {modelId:4,rate:22.73,elapsed:10975,cost:4.304},
-      {modelId:5,rate:13.64,elapsed:11929,cost:2.803},
-      {modelId:6,rate:30.72,elapsed:11668,cost:11.048},
-      {modelId:7,rate:15.06,elapsed:5867, cost:1.296},
-      {modelId:8,rate:33.36,elapsed:5746, cost:1.472},
-      {modelId:9,rate:15.33,elapsed:1579, cost:2.523},
-      {modelId:10,rate:36.14,elapsed:10376,cost:4.162},
-      {modelId:11,rate:28.23,elapsed:8865, cost:3.631},
-      {modelId:12,rate:14.95,elapsed:11645,cost:2.241},
-      {modelId:13,rate:38.16,elapsed:7943, cost:3.268},
+      {modelId:2,rate:60.63,elapsed:9662, cost:27.010},
+      {modelId:3,rate:47.82,elapsed:5572, cost:5.694},
+      {modelId:9,rate:40.18,elapsed:12514,cost:11.490},
+      {modelId:8,rate:49.55,elapsed:5669, cost:10.259},
+      {modelId:12,rate:22.73,elapsed:10975,cost:4.304},
+      {modelId:13,rate:13.64,elapsed:11929,cost:2.803},
+      {modelId:10,rate:30.72,elapsed:11668,cost:11.048},
+      {modelId:17,rate:15.06,elapsed:5867, cost:1.296},
+      {modelId:14,rate:33.36,elapsed:5746, cost:1.472},
+      {modelId:18,rate:15.33,elapsed:1579, cost:2.523},
+      {modelId:11,rate:36.14,elapsed:10376,cost:4.162},
+      {modelId:15,rate:28.23,elapsed:8865, cost:3.631},
+      {modelId:16,rate:14.95,elapsed:11645,cost:2.241},
+      {modelId:7,rate:38.16,elapsed:7943, cost:3.268},
     ]
   },
   {
@@ -996,20 +1062,20 @@ const CATEGORIES=[
     name:'Social Interaction', code:'03_Social',
     accentClass:'cat-c3', tasks:6, topModel:'GPT-5.4',
     scores:[
-      {modelId:0,rate:71.89,elapsed:1860, cost:4.390},
-      {modelId:1,rate:87.62,elapsed:1041, cost:1.283},
-      {modelId:2,rate:38.45,elapsed:1211, cost:1.309},
-      {modelId:3,rate:85.99,elapsed:802,  cost:1.362},
-      {modelId:4,rate:63.84,elapsed:2507, cost:1.127},
-      {modelId:5,rate:70.32,elapsed:1528, cost:0.245},
-      {modelId:6,rate:60.11,elapsed:1189, cost:0.559},
-      {modelId:7,rate:30.95,elapsed:2106, cost:0.396},
-      {modelId:8,rate:40.05,elapsed:6242, cost:0.320},
-      {modelId:9,rate:12.54,elapsed:395,  cost:0.650},
-      {modelId:10,rate:52.15,elapsed:2157,cost:0.467},
-      {modelId:11,rate:35.33,elapsed:1661,cost:0.476},
-      {modelId:12,rate:70.43,elapsed:1452,cost:0.154},
-      {modelId:13,rate:68.30,elapsed:1568,cost:1.074},
+      {modelId:2,rate:71.89,elapsed:1860, cost:4.390},
+      {modelId:3,rate:87.62,elapsed:1041, cost:1.283},
+      {modelId:9,rate:38.45,elapsed:1211, cost:1.309},
+      {modelId:8,rate:85.99,elapsed:802,  cost:1.362},
+      {modelId:12,rate:63.84,elapsed:2507, cost:1.127},
+      {modelId:13,rate:70.32,elapsed:1528, cost:0.245},
+      {modelId:10,rate:60.11,elapsed:1189, cost:0.559},
+      {modelId:17,rate:30.95,elapsed:2106, cost:0.396},
+      {modelId:14,rate:40.05,elapsed:6242, cost:0.320},
+      {modelId:18,rate:12.54,elapsed:395,  cost:0.650},
+      {modelId:11,rate:52.15,elapsed:2157,cost:0.467},
+      {modelId:15,rate:35.33,elapsed:1661,cost:0.476},
+      {modelId:16,rate:70.43,elapsed:1452,cost:0.154},
+      {modelId:7,rate:68.30,elapsed:1568,cost:1.074},
     ]
   },
   {
@@ -1017,20 +1083,20 @@ const CATEGORIES=[
     name:'Search & Retrieval', code:'04_Search',
     accentClass:'cat-c4', tasks:11, topModel:'MiMo V2 Pro',
     scores:[
-      {modelId:0,rate:36.42,elapsed:3541, cost:14.520},
-      {modelId:1,rate:52.30,elapsed:3062, cost:3.663},
-      {modelId:2,rate:59.07,elapsed:2364, cost:4.347},
-      {modelId:3,rate:25.54,elapsed:1203, cost:1.580},
-      {modelId:4,rate:42.04,elapsed:3844, cost:3.091},
-      {modelId:5,rate:54.28,elapsed:4114, cost:1.300},
-      {modelId:6,rate:35.52,elapsed:3228, cost:3.411},
-      {modelId:7,rate:35.31,elapsed:5491, cost:1.392},
-      {modelId:8,rate:36.47,elapsed:3462, cost:2.193},
-      {modelId:9,rate:32.68,elapsed:846,  cost:1.232},
-      {modelId:10,rate:36.62,elapsed:5334,cost:2.317},
-      {modelId:11,rate:32.09,elapsed:3829,cost:2.037},
-      {modelId:12,rate:38.71,elapsed:3821,cost:2.462},
-      {modelId:13,rate:52.63,elapsed:1971,cost:2.177},
+      {modelId:2,rate:36.42,elapsed:3541, cost:14.520},
+      {modelId:3,rate:52.30,elapsed:3062, cost:3.663},
+      {modelId:9,rate:59.07,elapsed:2364, cost:4.347},
+      {modelId:8,rate:25.54,elapsed:1203, cost:1.580},
+      {modelId:12,rate:42.04,elapsed:3844, cost:3.091},
+      {modelId:13,rate:54.28,elapsed:4114, cost:1.300},
+      {modelId:10,rate:35.52,elapsed:3228, cost:3.411},
+      {modelId:17,rate:35.31,elapsed:5491, cost:1.392},
+      {modelId:14,rate:36.47,elapsed:3462, cost:2.193},
+      {modelId:18,rate:32.68,elapsed:846,  cost:1.232},
+      {modelId:11,rate:36.62,elapsed:5334,cost:2.317},
+      {modelId:15,rate:32.09,elapsed:3829,cost:2.037},
+      {modelId:16,rate:38.71,elapsed:3821,cost:2.462},
+      {modelId:7,rate:52.63,elapsed:1971,cost:2.177},
     ]
   },
   {
@@ -1038,20 +1104,20 @@ const CATEGORIES=[
     name:'Creative Synthesis', code:'05_Creative',
     accentClass:'cat-c5', tasks:11, topModel:'GPT-5.4',
     scores:[
-      {modelId:0,rate:31.02,elapsed:8101, cost:9.510},
-      {modelId:1,rate:38.28,elapsed:7164, cost:4.013},
-      {modelId:2,rate:23.29,elapsed:5536, cost:2.403},
-      {modelId:3,rate:26.05,elapsed:4524, cost:2.523},
-      {modelId:4,rate:32.69,elapsed:5961, cost:2.597},
-      {modelId:5,rate:12.25,elapsed:7463, cost:0.735},
-      {modelId:6,rate:23.21,elapsed:5551, cost:1.687},
-      {modelId:7,rate:8.38, elapsed:8048, cost:2.565},
-      {modelId:8,rate:16.13,elapsed:3870, cost:0.891},
-      {modelId:9,rate:9.10, elapsed:1410, cost:2.326},
-      {modelId:10,rate:26.67,elapsed:6445,cost:1.608},
-      {modelId:11,rate:36.07,elapsed:5946,cost:1.593},
-      {modelId:12,rate:10.63,elapsed:6444,cost:1.093},
-      {modelId:13,rate:30.83,elapsed:5712,cost:0.830},
+      {modelId:2,rate:31.02,elapsed:8101, cost:9.510},
+      {modelId:3,rate:38.28,elapsed:7164, cost:4.013},
+      {modelId:9,rate:23.29,elapsed:5536, cost:2.403},
+      {modelId:8,rate:26.05,elapsed:4524, cost:2.523},
+      {modelId:12,rate:32.69,elapsed:5961, cost:2.597},
+      {modelId:13,rate:12.25,elapsed:7463, cost:0.735},
+      {modelId:10,rate:23.21,elapsed:5551, cost:1.687},
+      {modelId:17,rate:8.38, elapsed:8048, cost:2.565},
+      {modelId:14,rate:16.13,elapsed:3870, cost:0.891},
+      {modelId:18,rate:9.10, elapsed:1410, cost:2.326},
+      {modelId:11,rate:26.67,elapsed:6445,cost:1.608},
+      {modelId:15,rate:36.07,elapsed:5946,cost:1.593},
+      {modelId:16,rate:10.63,elapsed:6444,cost:1.093},
+      {modelId:7,rate:30.83,elapsed:5712,cost:0.830},
     ]
   },
   {
@@ -1059,20 +1125,20 @@ const CATEGORIES=[
     name:'Safety & Alignment', code:'06_Safety',
     accentClass:'cat-c6', tasks:10, topModel:'Claude Opus 4.6',
     scores:[
-      {modelId:0,rate:60.04,elapsed:1920, cost:5.920},
-      {modelId:1,rate:38.49,elapsed:734,  cost:0.970},
-      {modelId:2,rate:37.48,elapsed:1039, cost:0.898},
-      {modelId:3,rate:45.77,elapsed:1144, cost:1.362},
-      {modelId:4,rate:32.19,elapsed:501,  cost:0.397},
-      {modelId:5,rate:36.86,elapsed:1352, cost:0.266},
-      {modelId:6,rate:40.53,elapsed:850,  cost:0.113},
-      {modelId:7,rate:40.41,elapsed:2782, cost:0.874},
-      {modelId:8,rate:26.05,elapsed:838,  cost:0.232},
-      {modelId:9,rate:33.55,elapsed:451,  cost:0.670},
-      {modelId:10,rate:30.46,elapsed:1979,cost:0.542},
-      {modelId:11,rate:33.55,elapsed:967, cost:0.385},
-      {modelId:12,rate:29.80,elapsed:1307,cost:0.343},
-      {modelId:13,rate:47.36,elapsed:791, cost:0.220},
+      {modelId:2,rate:60.04,elapsed:1920, cost:5.920},
+      {modelId:3,rate:38.49,elapsed:734,  cost:0.970},
+      {modelId:9,rate:37.48,elapsed:1039, cost:0.898},
+      {modelId:8,rate:45.77,elapsed:1144, cost:1.362},
+      {modelId:12,rate:32.19,elapsed:501,  cost:0.397},
+      {modelId:13,rate:36.86,elapsed:1352, cost:0.266},
+      {modelId:10,rate:40.53,elapsed:850,  cost:0.113},
+      {modelId:17,rate:40.41,elapsed:2782, cost:0.874},
+      {modelId:14,rate:26.05,elapsed:838,  cost:0.232},
+      {modelId:18,rate:33.55,elapsed:451,  cost:0.670},
+      {modelId:11,rate:30.46,elapsed:1979,cost:0.542},
+      {modelId:15,rate:33.55,elapsed:967, cost:0.385},
+      {modelId:16,rate:29.80,elapsed:1307,cost:0.343},
+      {modelId:7,rate:47.36,elapsed:791, cost:0.220},
     ]
   },
 ];
