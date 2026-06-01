@@ -2,11 +2,71 @@
 
 import csv
 import json
-from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("linear-api")
+
+_store.register("teams", primary_key="id",
+                initial_loader=lambda: _coerce_teams(_load("teams.csv")))
+_store.register("users", primary_key="id",
+                initial_loader=lambda: _coerce_users(_load("users.csv")))
+_store.register("workflow_states", primary_key="id",
+                initial_loader=lambda: _coerce_workflow_states(_load("workflow_states.csv")))
+_store.register("labels", primary_key="id",
+                initial_loader=lambda: _coerce_labels(_load("labels.csv")))
+_store.register("projects", primary_key="id",
+                initial_loader=lambda: _coerce_projects(_load("projects.csv")))
+_store.register("cycles", primary_key="id",
+                initial_loader=lambda: _coerce_cycles(_load("cycles.csv")))
+_store.register("issues", primary_key="id",
+                initial_loader=lambda: _coerce_issues(_load("issues.csv")))
+_store.register("comments", primary_key="id",
+                initial_loader=lambda: _coerce_comments(_load("comments.csv")))
+_store.register_document("workspace", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "workspace.json", encoding="utf-8")))
+
+
+def _teams_rows():
+    return _store.table("teams").rows()
+
+
+def _users_rows():
+    return _store.table("users").rows()
+
+
+def _workflow_states_rows():
+    return _store.table("workflow_states").rows()
+
+
+def _labels_rows():
+    return _store.table("labels").rows()
+
+
+def _projects_rows():
+    return _store.table("projects").rows()
+
+
+def _cycles_rows():
+    return _store.table("cycles").rows()
+
+
+def _issues_rows():
+    return _store.table("issues").rows()
+
+
+def _comments_rows():
+    return _store.table("comments").rows()
+
+
+def _workspace_doc():
+    return _store.document("workspace").get()
+
 
 
 def _load(filename):
@@ -172,31 +232,27 @@ def _coerce_comments(rows):
 
 
 # Load all data at module init
-_teams = _coerce_teams(_load("teams.csv"))
-_users = _coerce_users(_load("users.csv"))
-_workflow_states = _coerce_workflow_states(_load("workflow_states.csv"))
-_labels = _coerce_labels(_load("labels.csv"))
-_projects = _coerce_projects(_load("projects.csv"))
-_cycles = _coerce_cycles(_load("cycles.csv"))
-_issues = _coerce_issues(_load("issues.csv"))
-_comments = _coerce_comments(_load("comments.csv"))
 
-with open(DATA_DIR / "workspace.json", encoding="utf-8") as _f:
-    _workspace = json.load(_f)
+
+
+
+
+
+
+
 
 # Mutable in-memory stores
-_teams_store = deepcopy(_teams)
-_users_store = deepcopy(_users)
-_workflow_states_store = deepcopy(_workflow_states)
-_labels_store = deepcopy(_labels)
-_projects_store = deepcopy(_projects)
-_cycles_store = deepcopy(_cycles)
-_issues_store = deepcopy(_issues)
-_comments_store = deepcopy(_comments)
-_workspace_store = deepcopy(_workspace)
 
-_next_issue_number = max(i["number"] for i in _issues_store) + 1
-_next_comment_id = len(_comments_store) + 1
+
+
+
+
+
+
+
+
+_next_issue_number = max(i["number"] for i in _issues_rows()) + 1
+_next_comment_id = len(_comments_rows()) + 1
 
 
 def _generate_id(prefix):
@@ -210,7 +266,7 @@ def _generate_id(prefix):
 # ---------------------------------------------------------------------------
 
 def list_teams(limit: int = 50, offset: int = 0):
-    results = list(_teams_store)
+    results = list(_teams_rows())
     total = len(results)
     page = results[offset: offset + limit]
     return {
@@ -224,25 +280,25 @@ def list_teams(limit: int = 50, offset: int = 0):
 
 
 def get_team(team_id: str):
-    for t in _teams_store:
+    for t in _teams_rows():
         if t["id"] == team_id:
             return {"type": "team", "team": t}
     return {"error": f"Team {team_id} not found"}
 
 
 def get_team_members(team_id: str):
-    team = next((t for t in _teams_store if t["id"] == team_id), None)
+    team = next((t for t in _teams_rows() if t["id"] == team_id), None)
     if not team:
         return {"error": f"Team {team_id} not found"}
-    members = [u for u in _users_store if u["teamId"] == team_id]
+    members = [u for u in _users_rows() if u["teamId"] == team_id]
     return {"type": "users", "count": len(members), "results": members}
 
 
 def get_team_issues(team_id: str, limit: int = 50, offset: int = 0):
-    team = next((t for t in _teams_store if t["id"] == team_id), None)
+    team = next((t for t in _teams_rows() if t["id"] == team_id), None)
     if not team:
         return {"error": f"Team {team_id} not found"}
-    issues = [i for i in _issues_store if i["teamId"] == team_id]
+    issues = [i for i in _issues_rows() if i["teamId"] == team_id]
     total = len(issues)
     page = issues[offset: offset + limit]
     return {
@@ -256,35 +312,35 @@ def get_team_issues(team_id: str, limit: int = 50, offset: int = 0):
 
 
 def get_team_projects(team_id: str):
-    team = next((t for t in _teams_store if t["id"] == team_id), None)
+    team = next((t for t in _teams_rows() if t["id"] == team_id), None)
     if not team:
         return {"error": f"Team {team_id} not found"}
-    projects = [p for p in _projects_store if team_id in p["teamIds"]]
+    projects = [p for p in _projects_rows() if team_id in p["teamIds"]]
     return {"type": "projects", "count": len(projects), "results": projects}
 
 
 def get_team_cycles(team_id: str):
-    team = next((t for t in _teams_store if t["id"] == team_id), None)
+    team = next((t for t in _teams_rows() if t["id"] == team_id), None)
     if not team:
         return {"error": f"Team {team_id} not found"}
-    cycles = [c for c in _cycles_store if c["teamId"] == team_id]
+    cycles = [c for c in _cycles_rows() if c["teamId"] == team_id]
     return {"type": "cycles", "count": len(cycles), "results": cycles}
 
 
 def get_team_workflow_states(team_id: str):
-    team = next((t for t in _teams_store if t["id"] == team_id), None)
+    team = next((t for t in _teams_rows() if t["id"] == team_id), None)
     if not team:
         return {"error": f"Team {team_id} not found"}
-    states = [s for s in _workflow_states_store if s["teamId"] == team_id]
+    states = [s for s in _workflow_states_rows() if s["teamId"] == team_id]
     states = sorted(states, key=lambda x: x["position"])
     return {"type": "workflow_states", "count": len(states), "results": states}
 
 
 def get_team_labels(team_id: str):
-    team = next((t for t in _teams_store if t["id"] == team_id), None)
+    team = next((t for t in _teams_rows() if t["id"] == team_id), None)
     if not team:
         return {"error": f"Team {team_id} not found"}
-    labels = [l for l in _labels_store if l["teamId"] == team_id or l["teamId"] is None]
+    labels = [l for l in _labels_rows() if l["teamId"] == team_id or l["teamId"] is None]
     return {"type": "labels", "count": len(labels), "results": labels}
 
 
@@ -293,7 +349,7 @@ def get_team_labels(team_id: str):
 # ---------------------------------------------------------------------------
 
 def list_users(limit: int = 50, offset: int = 0):
-    results = list(_users_store)
+    results = list(_users_rows())
     total = len(results)
     page = results[offset: offset + limit]
     return {
@@ -307,17 +363,17 @@ def list_users(limit: int = 50, offset: int = 0):
 
 
 def get_user(user_id: str):
-    for u in _users_store:
+    for u in _users_rows():
         if u["id"] == user_id:
             return {"type": "user", "user": u}
     return {"error": f"User {user_id} not found"}
 
 
 def get_user_assigned_issues(user_id: str, limit: int = 50, offset: int = 0):
-    user = next((u for u in _users_store if u["id"] == user_id), None)
+    user = next((u for u in _users_rows() if u["id"] == user_id), None)
     if not user:
         return {"error": f"User {user_id} not found"}
-    issues = [i for i in _issues_store if i["assigneeId"] == user_id]
+    issues = [i for i in _issues_rows() if i["assigneeId"] == user_id]
     total = len(issues)
     page = issues[offset: offset + limit]
     return {
@@ -335,7 +391,7 @@ def get_user_assigned_issues(user_id: str, limit: int = 50, offset: int = 0):
 # ---------------------------------------------------------------------------
 
 def list_workflow_states(team_id: str = None, limit: int = 50, offset: int = 0):
-    results = list(_workflow_states_store)
+    results = list(_workflow_states_rows())
     if team_id:
         results = [s for s in results if s["teamId"] == team_id]
     results = sorted(results, key=lambda x: (x["teamId"], x["position"]))
@@ -352,7 +408,7 @@ def list_workflow_states(team_id: str = None, limit: int = 50, offset: int = 0):
 
 
 def get_workflow_state(state_id: str):
-    for s in _workflow_states_store:
+    for s in _workflow_states_rows():
         if s["id"] == state_id:
             return {"type": "workflow_state", "workflowState": s}
     return {"error": f"Workflow state {state_id} not found"}
@@ -363,7 +419,7 @@ def get_workflow_state(state_id: str):
 # ---------------------------------------------------------------------------
 
 def list_labels(team_id: str = None, limit: int = 50, offset: int = 0):
-    results = list(_labels_store)
+    results = list(_labels_rows())
     if team_id:
         results = [l for l in results if l["teamId"] == team_id or l["teamId"] is None]
     total = len(results)
@@ -379,7 +435,7 @@ def list_labels(team_id: str = None, limit: int = 50, offset: int = 0):
 
 
 def get_label(label_id: str):
-    for l in _labels_store:
+    for l in _labels_rows():
         if l["id"] == label_id:
             return {"type": "label", "label": l}
     return {"error": f"Label {label_id} not found"}
@@ -401,7 +457,7 @@ def create_label(data: dict):
         "createdAt": now,
         "updatedAt": now,
     }
-    _labels_store.append(label)
+    _labels_rows().append(label)
     return {"type": "label", "label": label}
 
 
@@ -410,7 +466,7 @@ def create_label(data: dict):
 # ---------------------------------------------------------------------------
 
 def list_projects(limit: int = 50, offset: int = 0):
-    results = list(_projects_store)
+    results = list(_projects_rows())
     total = len(results)
     page = results[offset: offset + limit]
     return {
@@ -424,7 +480,7 @@ def list_projects(limit: int = 50, offset: int = 0):
 
 
 def get_project(project_id: str):
-    for p in _projects_store:
+    for p in _projects_rows():
         if p["id"] == project_id:
             return {"type": "project", "project": p}
     return {"error": f"Project {project_id} not found"}
@@ -449,28 +505,28 @@ def create_project(data: dict):
         "createdAt": now,
         "updatedAt": now,
     }
-    _projects_store.append(project)
+    _projects_rows().append(project)
     return {"type": "project", "project": project}
 
 
 def update_project(project_id: str, data: dict):
-    for i, project in enumerate(_projects_store):
+    for i, project in enumerate(_projects_rows()):
         if project["id"] == project_id:
             updatable = {"name", "description", "state", "leadId", "teamIds",
                          "startDate", "targetDate"}
             for k, v in data.items():
                 if k in updatable:
-                    _projects_store[i][k] = v
-            _projects_store[i]["updatedAt"] = _now()
-            return {"type": "project", "project": _projects_store[i]}
+                    _projects_rows()[i][k] = v
+            _projects_rows()[i]["updatedAt"] = _now()
+            return {"type": "project", "project": _projects_rows()[i]}
     return {"error": f"Project {project_id} not found"}
 
 
 def get_project_issues(project_id: str, limit: int = 50, offset: int = 0):
-    project = next((p for p in _projects_store if p["id"] == project_id), None)
+    project = next((p for p in _projects_rows() if p["id"] == project_id), None)
     if not project:
         return {"error": f"Project {project_id} not found"}
-    issues = [i for i in _issues_store if i["projectId"] == project_id]
+    issues = [i for i in _issues_rows() if i["projectId"] == project_id]
     total = len(issues)
     page = issues[offset: offset + limit]
     return {
@@ -488,7 +544,7 @@ def get_project_issues(project_id: str, limit: int = 50, offset: int = 0):
 # ---------------------------------------------------------------------------
 
 def list_cycles(team_id: str = None, status: str = None, limit: int = 50, offset: int = 0):
-    results = list(_cycles_store)
+    results = list(_cycles_rows())
     if team_id:
         results = [c for c in results if c["teamId"] == team_id]
     if status:
@@ -512,7 +568,7 @@ def list_cycles(team_id: str = None, status: str = None, limit: int = 50, offset
 
 
 def get_cycle(cycle_id: str):
-    for c in _cycles_store:
+    for c in _cycles_rows():
         if c["id"] == cycle_id:
             return {"type": "cycle", "cycle": c}
     return {"error": f"Cycle {cycle_id} not found"}
@@ -526,7 +582,7 @@ def create_cycle(data: dict):
 
     now = _now()
     # Determine next cycle number for this team
-    team_cycles = [c for c in _cycles_store if c["teamId"] == data["teamId"]]
+    team_cycles = [c for c in _cycles_rows() if c["teamId"] == data["teamId"]]
     next_num = max((c["number"] for c in team_cycles), default=0) + 1
 
     cycle = {
@@ -540,15 +596,15 @@ def create_cycle(data: dict):
         "createdAt": now,
         "updatedAt": now,
     }
-    _cycles_store.append(cycle)
+    _cycles_rows().append(cycle)
     return {"type": "cycle", "cycle": cycle}
 
 
 def get_cycle_issues(cycle_id: str, limit: int = 50, offset: int = 0):
-    cycle = next((c for c in _cycles_store if c["id"] == cycle_id), None)
+    cycle = next((c for c in _cycles_rows() if c["id"] == cycle_id), None)
     if not cycle:
         return {"error": f"Cycle {cycle_id} not found"}
-    issues = [i for i in _issues_store if i["cycleId"] == cycle_id]
+    issues = [i for i in _issues_rows() if i["cycleId"] == cycle_id]
     total = len(issues)
     page = issues[offset: offset + limit]
     return {
@@ -576,7 +632,7 @@ def list_issues(
     limit: int = 50,
     offset: int = 0,
 ):
-    results = list(_issues_store)
+    results = list(_issues_rows())
 
     if state_id:
         results = [i for i in results if i["stateId"] == state_id]
@@ -608,7 +664,7 @@ def list_issues(
 
 
 def get_issue(issue_id: str):
-    for i in _issues_store:
+    for i in _issues_rows():
         if i["id"] == issue_id:
             return {"type": "issue", "issue": i}
     return {"error": f"Issue {issue_id} not found"}
@@ -628,7 +684,7 @@ def create_issue(data: dict):
     # Generate branch name
     branch_name = None
     if data.get("assigneeId"):
-        assignee = next((u for u in _users_store if u["id"] == data["assigneeId"]), None)
+        assignee = next((u for u in _users_rows() if u["id"] == data["assigneeId"]), None)
         if assignee:
             slug = data["title"].lower().replace(" ", "-")[:40]
             branch_name = f"{assignee['name']}/{identifier.lower()}-{slug}"
@@ -637,7 +693,7 @@ def create_issue(data: dict):
     state_id = data.get("stateId")
     if not state_id:
         # Default to backlog for the team
-        team_states = [s for s in _workflow_states_store if s["teamId"] == data["teamId"] and s["type"] == "backlog"]
+        team_states = [s for s in _workflow_states_rows() if s["teamId"] == data["teamId"] and s["type"] == "backlog"]
         if team_states:
             state_id = team_states[0]["id"]
 
@@ -664,13 +720,13 @@ def create_issue(data: dict):
         "completedAt": None,
         "canceledAt": None,
     }
-    _issues_store.append(issue)
+    _issues_rows().append(issue)
     _next_issue_number += 1
     return {"type": "issue", "issue": issue}
 
 
 def update_issue(issue_id: str, data: dict):
-    for i, issue in enumerate(_issues_store):
+    for i, issue in enumerate(_issues_rows()):
         if issue["id"] == issue_id:
             updatable = {"title", "description", "priority", "estimate", "stateId",
                          "assigneeId", "projectId", "cycleId", "labelIds", "dueDate",
@@ -678,45 +734,45 @@ def update_issue(issue_id: str, data: dict):
             for k, v in data.items():
                 if k in updatable:
                     if k == "priority" and v is not None:
-                        _issues_store[i][k] = int(v)
+                        _issues_rows()[i][k] = int(v)
                     elif k == "estimate" and v is not None:
-                        _issues_store[i][k] = int(v)
+                        _issues_rows()[i][k] = int(v)
                     elif k == "sortOrder" and v is not None:
-                        _issues_store[i][k] = float(v)
+                        _issues_rows()[i][k] = float(v)
                     else:
-                        _issues_store[i][k] = v
+                        _issues_rows()[i][k] = v
 
             # Handle state transitions
             if "stateId" in data:
-                new_state = next((s for s in _workflow_states_store if s["id"] == data["stateId"]), None)
+                new_state = next((s for s in _workflow_states_rows() if s["id"] == data["stateId"]), None)
                 if new_state:
                     now = _now()
-                    if new_state["type"] == "started" and not _issues_store[i]["startedAt"]:
-                        _issues_store[i]["startedAt"] = now
+                    if new_state["type"] == "started" and not _issues_rows()[i]["startedAt"]:
+                        _issues_rows()[i]["startedAt"] = now
                     elif new_state["type"] == "completed":
-                        _issues_store[i]["completedAt"] = now
-                        if not _issues_store[i]["startedAt"]:
-                            _issues_store[i]["startedAt"] = now
+                        _issues_rows()[i]["completedAt"] = now
+                        if not _issues_rows()[i]["startedAt"]:
+                            _issues_rows()[i]["startedAt"] = now
                     elif new_state["type"] == "cancelled":
-                        _issues_store[i]["canceledAt"] = now
+                        _issues_rows()[i]["canceledAt"] = now
 
-            _issues_store[i]["updatedAt"] = _now()
+            _issues_rows()[i]["updatedAt"] = _now()
 
             # Update branch name if assignee changed
             if "assigneeId" in data and data["assigneeId"]:
-                assignee = next((u for u in _users_store if u["id"] == data["assigneeId"]), None)
+                assignee = next((u for u in _users_rows() if u["id"] == data["assigneeId"]), None)
                 if assignee:
-                    slug = _issues_store[i]["title"].lower().replace(" ", "-")[:40]
-                    _issues_store[i]["branchName"] = f"{assignee['name']}/{_issues_store[i]['identifier'].lower()}-{slug}"
+                    slug = _issues_rows()[i]["title"].lower().replace(" ", "-")[:40]
+                    _issues_rows()[i]["branchName"] = f"{assignee['name']}/{_issues_rows()[i]['identifier'].lower()}-{slug}"
 
-            return {"type": "issue", "issue": _issues_store[i]}
+            return {"type": "issue", "issue": _issues_rows()[i]}
     return {"error": f"Issue {issue_id} not found"}
 
 
 def delete_issue(issue_id: str):
-    for i, issue in enumerate(_issues_store):
+    for i, issue in enumerate(_issues_rows()):
         if issue["id"] == issue_id:
-            removed = _issues_store.pop(i)
+            removed = _issues_rows().pop(i)
             return {"type": "issue", "deleted": True, "issueId": issue_id}
     return {"error": f"Issue {issue_id} not found"}
 
@@ -724,7 +780,7 @@ def delete_issue(issue_id: str):
 def search_issues(query: str, limit: int = 50, offset: int = 0):
     q = query.lower()
     results = [
-        i for i in _issues_store
+        i for i in _issues_rows()
         if q in i["title"].lower() or q in i["description"].lower() or q in i["identifier"].lower()
     ]
     total = len(results)
@@ -744,10 +800,10 @@ def search_issues(query: str, limit: int = 50, offset: int = 0):
 # ---------------------------------------------------------------------------
 
 def list_comments(issue_id: str, limit: int = 50, offset: int = 0):
-    issue = next((i for i in _issues_store if i["id"] == issue_id), None)
+    issue = next((i for i in _issues_rows() if i["id"] == issue_id), None)
     if not issue:
         return {"error": f"Issue {issue_id} not found"}
-    results = [c for c in _comments_store if c["issueId"] == issue_id]
+    results = [c for c in _comments_rows() if c["issueId"] == issue_id]
     results = sorted(results, key=lambda x: x["createdAt"])
     total = len(results)
     page = results[offset: offset + limit]
@@ -762,7 +818,7 @@ def list_comments(issue_id: str, limit: int = 50, offset: int = 0):
 
 
 def get_comment(comment_id: str):
-    for c in _comments_store:
+    for c in _comments_rows():
         if c["id"] == comment_id:
             return {"type": "comment", "comment": c}
     return {"error": f"Comment {comment_id} not found"}
@@ -776,7 +832,7 @@ def create_comment(data: dict):
             return {"error": f"Missing required field: {f}"}
 
     # Verify issue exists
-    issue = next((i for i in _issues_store if i["id"] == data["issueId"]), None)
+    issue = next((i for i in _issues_rows() if i["id"] == data["issueId"]), None)
     if not issue:
         return {"error": f"Issue {data['issueId']} not found"}
 
@@ -789,24 +845,24 @@ def create_comment(data: dict):
         "createdAt": now,
         "updatedAt": now,
     }
-    _comments_store.append(comment)
+    _comments_rows().append(comment)
     _next_comment_id += 1
     return {"type": "comment", "comment": comment}
 
 
 def update_comment(comment_id: str, data: dict):
-    for i, comment in enumerate(_comments_store):
+    for i, comment in enumerate(_comments_rows()):
         if comment["id"] == comment_id:
             if "body" in data:
-                _comments_store[i]["body"] = data["body"]
-            _comments_store[i]["updatedAt"] = _now()
-            return {"type": "comment", "comment": _comments_store[i]}
+                _comments_rows()[i]["body"] = data["body"]
+            _comments_rows()[i]["updatedAt"] = _now()
+            return {"type": "comment", "comment": _comments_rows()[i]}
     return {"error": f"Comment {comment_id} not found"}
 
 
 def delete_comment(comment_id: str):
-    for i, comment in enumerate(_comments_store):
+    for i, comment in enumerate(_comments_rows()):
         if comment["id"] == comment_id:
-            _comments_store.pop(i)
+            _comments_rows().pop(i)
             return {"type": "comment", "deleted": True, "commentId": comment_id}
     return {"error": f"Comment {comment_id} not found"}

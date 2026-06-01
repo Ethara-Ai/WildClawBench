@@ -8,10 +8,70 @@ import csv
 import json
 import time
 import uuid
-from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("stripe-api")
+
+_store.register("customers", primary_key="id",
+                initial_loader=lambda: _coerce_customers(_load("customers.csv")))
+_store.register("products", primary_key="id",
+                initial_loader=lambda: _coerce_products(_load("products.csv")))
+_store.register("prices", primary_key="id",
+                initial_loader=lambda: _coerce_prices(_load("prices.csv")))
+_store.register("charges", primary_key="id",
+                initial_loader=lambda: _coerce_charges(_load("charges.csv")))
+_store.register("invoices", primary_key="id",
+                initial_loader=lambda: _coerce_invoices(_load("invoices.csv")))
+_store.register("subscriptions", primary_key="id",
+                initial_loader=lambda: _coerce_subscriptions(_load("subscriptions.csv")))
+_store.register_document("balance", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "balance.json", encoding="utf-8")))
+_store.register("payment_intents", primary_key="payment_intent_id",
+                initial_loader=lambda: [])
+_store.register("refunds", primary_key="refund_id",
+                initial_loader=lambda: [])
+
+
+def _customers_rows():
+    return _store.table("customers").rows()
+
+
+def _products_rows():
+    return _store.table("products").rows()
+
+
+def _prices_rows():
+    return _store.table("prices").rows()
+
+
+def _charges_rows():
+    return _store.table("charges").rows()
+
+
+def _invoices_rows():
+    return _store.table("invoices").rows()
+
+
+def _subscriptions_rows():
+    return _store.table("subscriptions").rows()
+
+
+def _balance_doc():
+    return _store.document("balance").get()
+
+
+def _payment_intents_rows():
+    return _store.table("payment_intents").rows()
+
+
+def _refunds_rows():
+    return _store.table("refunds").rows()
+
 
 
 def _load(filename):
@@ -102,28 +162,13 @@ def _coerce_subscriptions(rows):
              "created": _to_int(r["created"])} for r in rows]
 
 
-_customers = _coerce_customers(_load("customers.csv"))
-_products = _coerce_products(_load("products.csv"))
-_prices = _coerce_prices(_load("prices.csv"))
-_charges = _coerce_charges(_load("charges.csv"))
-_invoices = _coerce_invoices(_load("invoices.csv"))
-_subscriptions = _coerce_subscriptions(_load("subscriptions.csv"))
-
-with open(DATA_DIR / "balance.json", encoding="utf-8") as _f:
-    _balance = json.load(_f)
-
-_customers_store = deepcopy(_customers)
-_products_store = deepcopy(_products)
-_prices_store = deepcopy(_prices)
-_charges_store = deepcopy(_charges)
-_invoices_store = deepcopy(_invoices)
-_subscriptions_store = deepcopy(_subscriptions)
-_payment_intents_store = []
-_refunds_store = []
-_balance_store = deepcopy(_balance)
 
 
-# ---------------------------------------------------------------------------
+
+
+
+
+
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -144,14 +189,14 @@ def _find(store, obj_id):
 # ---------------------------------------------------------------------------
 
 def list_customers(limit=10, email=None):
-    results = list(_customers_store)
+    results = list(_customers_rows())
     if email:
         results = [c for c in results if c["email"] == email]
     return _list_envelope(results[:limit], "/v1/customers")
 
 
 def get_customer(customer_id):
-    c = _find(_customers_store, customer_id)
+    c = _find(_customers_rows(), customer_id)
     return c if c else {"error": f"No such customer: {customer_id}"}
 
 
@@ -168,7 +213,7 @@ def create_customer(name=None, email=None, description=None, currency="usd", pho
         "phone": phone or "",
         "created": _now(),
     }
-    _customers_store.append(customer)
+    _customers_rows().append(customer)
     return customer
 
 
@@ -177,11 +222,11 @@ def create_customer(name=None, email=None, description=None, currency="usd", pho
 # ---------------------------------------------------------------------------
 
 def list_products(limit=10):
-    return _list_envelope(list(_products_store)[:limit], "/v1/products")
+    return _list_envelope(list(_products_rows())[:limit], "/v1/products")
 
 
 def list_prices(limit=10, product=None):
-    results = list(_prices_store)
+    results = list(_prices_rows())
     if product:
         results = [p for p in results if p["product"] == product]
     return _list_envelope(results[:limit], "/v1/prices")
@@ -195,7 +240,7 @@ def create_payment_intent(amount, currency="usd", customer=None, description=Non
                           confirm=False):
     if amount is None or amount <= 0:
         return {"error": "amount must be a positive integer (cents)"}
-    if customer and not _find(_customers_store, customer):
+    if customer and not _find(_customers_rows(), customer):
         return {"error": f"No such customer: {customer}"}
     pi = {
         "id": _new_id("pi"),
@@ -211,12 +256,12 @@ def create_payment_intent(amount, currency="usd", customer=None, description=Non
     if confirm:
         charge = _record_charge(amount, currency, customer, description, pi["id"], "succeeded")
         pi["latest_charge"] = charge["id"]
-    _payment_intents_store.append(pi)
+    _payment_intents_rows().append(pi)
     return pi
 
 
 def get_payment_intent(pi_id):
-    pi = _find(_payment_intents_store, pi_id)
+    pi = _find(_payment_intents_rows(), pi_id)
     return pi if pi else {"error": f"No such payment_intent: {pi_id}"}
 
 
@@ -235,26 +280,26 @@ def _record_charge(amount, currency, customer, description, payment_intent, stat
         "payment_intent": payment_intent,
         "created": _now(),
     }
-    _charges_store.append(charge)
+    _charges_rows().append(charge)
     return charge
 
 
 def list_charges(limit=10, customer=None):
-    results = list(_charges_store)
+    results = list(_charges_rows())
     if customer:
         results = [c for c in results if c["customer"] == customer]
     return _list_envelope(results[:limit], "/v1/charges")
 
 
 def get_charge(charge_id):
-    c = _find(_charges_store, charge_id)
+    c = _find(_charges_rows(), charge_id)
     return c if c else {"error": f"No such charge: {charge_id}"}
 
 
 def create_charge(amount, currency="usd", customer=None, description=None):
     if amount is None or amount <= 0:
         return {"error": "amount must be a positive integer (cents)"}
-    if customer and not _find(_customers_store, customer):
+    if customer and not _find(_customers_rows(), customer):
         return {"error": f"No such customer: {customer}"}
     return _record_charge(amount, currency, customer, description, None, "succeeded")
 
@@ -262,7 +307,7 @@ def create_charge(amount, currency="usd", customer=None, description=None):
 def create_refund(charge=None, amount=None, reason=None):
     if not charge:
         return {"error": "charge is required"}
-    ch = _find(_charges_store, charge)
+    ch = _find(_charges_rows(), charge)
     if not ch:
         return {"error": f"No such charge: {charge}"}
     refundable = ch["amount"] - ch["amount_refunded"]
@@ -281,7 +326,7 @@ def create_refund(charge=None, amount=None, reason=None):
     }
     ch["amount_refunded"] += refund_amount
     ch["refunded"] = ch["amount_refunded"] >= ch["amount"]
-    _refunds_store.append(refund)
+    _refunds_rows().append(refund)
     return refund
 
 
@@ -290,7 +335,7 @@ def create_refund(charge=None, amount=None, reason=None):
 # ---------------------------------------------------------------------------
 
 def list_invoices(limit=10, customer=None, status=None):
-    results = list(_invoices_store)
+    results = list(_invoices_rows())
     if customer:
         results = [i for i in results if i["customer"] == customer]
     if status:
@@ -299,14 +344,14 @@ def list_invoices(limit=10, customer=None, status=None):
 
 
 def get_invoice(invoice_id):
-    inv = _find(_invoices_store, invoice_id)
+    inv = _find(_invoices_rows(), invoice_id)
     return inv if inv else {"error": f"No such invoice: {invoice_id}"}
 
 
 def create_invoice(customer=None, amount_due=None, currency="usd", subscription=None):
-    if not customer or not _find(_customers_store, customer):
+    if not customer or not _find(_customers_rows(), customer):
         return {"error": f"No such customer: {customer}"}
-    seq = len(_invoices_store) + 1
+    seq = len(_invoices_rows()) + 1
     invoice = {
         "id": _new_id("in"),
         "object": "invoice",
@@ -321,7 +366,7 @@ def create_invoice(customer=None, amount_due=None, currency="usd", subscription=
         "created": _now(),
         "due_date": None,
     }
-    _invoices_store.append(invoice)
+    _invoices_rows().append(invoice)
     return invoice
 
 
@@ -330,7 +375,7 @@ def create_invoice(customer=None, amount_due=None, currency="usd", subscription=
 # ---------------------------------------------------------------------------
 
 def list_subscriptions(limit=10, customer=None, status=None):
-    results = list(_subscriptions_store)
+    results = list(_subscriptions_rows())
     if customer:
         results = [s for s in results if s["customer"] == customer]
     if status:
@@ -339,14 +384,14 @@ def list_subscriptions(limit=10, customer=None, status=None):
 
 
 def get_subscription(sub_id):
-    s = _find(_subscriptions_store, sub_id)
+    s = _find(_subscriptions_rows(), sub_id)
     return s if s else {"error": f"No such subscription: {sub_id}"}
 
 
 def create_subscription(customer=None, price=None, quantity=1):
-    if not customer or not _find(_customers_store, customer):
+    if not customer or not _find(_customers_rows(), customer):
         return {"error": f"No such customer: {customer}"}
-    if not price or not _find(_prices_store, price):
+    if not price or not _find(_prices_rows(), price):
         return {"error": f"No such price: {price}"}
     now = _now()
     sub = {
@@ -361,7 +406,7 @@ def create_subscription(customer=None, price=None, quantity=1):
         "cancel_at_period_end": False,
         "created": now,
     }
-    _subscriptions_store.append(sub)
+    _subscriptions_rows().append(sub)
     return sub
 
 
@@ -370,4 +415,4 @@ def create_subscription(customer=None, price=None, quantity=1):
 # ---------------------------------------------------------------------------
 
 def get_balance():
-    return _balance_store
+    return _balance_doc()

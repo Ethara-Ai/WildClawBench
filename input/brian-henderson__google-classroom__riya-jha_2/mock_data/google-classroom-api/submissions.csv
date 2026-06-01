@@ -1,0 +1,13 @@
+courseId,courseWorkId,id,userId,state,assignedGrade,draftGrade,late,creationTime,updateTime,alternateLink
+PH206_S26,cw_PH206_101,sub_ph206_0101,student_ph206_001,RETURNED,48,48,false,2026-01-28T18:00:00Z,2026-02-05T10:00:00Z,https://classroom.google.com/c/PH206_S26/a/cw_PH206_101/submissions/sub_ph206_0101
+PH206_S26,cw_PH206_101,sub_ph206_0102,student_ph206_002,RETURNED,42,42,false,2026-02-02T22:14:00Z,2026-02-05T10:00:00Z,https://classroom.google.com/c/PH206_S26/a/cw_PH206_101/submissions/sub_ph206_0102
+PH206_S26,cw_PH206_101,sub_ph206_0103,student_ph206_003,RETURNED,45,45,false,2026-02-03T20:30:00Z,2026-02-05T10:00:00Z,https://classroom.google.com/c/PH206_S26/a/cw_PH206_101/submissions/sub_ph206_0103
+PH206_S26,cw_PH206_104,sub_ph206_0401,student_ph206_001,RETURNED,92,92,false,2026-03-10T20:30:00Z,2026-03-13T17:00:00Z,https://classroom.google.com/c/PH206_S26/a/cw_PH206_104/submissions/sub_ph206_0401
+PH206_S26,cw_PH206_104,sub_ph206_0402,student_ph206_004,RETURNED,78,78,false,2026-03-10T20:30:00Z,2026-03-13T17:00:00Z,https://classroom.google.com/c/PH206_S26/a/cw_PH206_104/submissions/sub_ph206_0402
+PH206_S26,cw_PH206_104,sub_ph206_0403,student_ph206_007,RETURNED,85,85,false,2026-03-10T20:30:00Z,2026-03-13T17:00:00Z,https://classroom.google.com/c/PH206_S26/a/cw_PH206_104/submissions/sub_ph206_0403
+PH206_S26,cw_PH206_106,sub_ph206_0601,student_ph206_001,RETURNED,72,72,false,2026-04-13T18:00:00Z,2026-04-20T14:00:00Z,https://classroom.google.com/c/PH206_S26/a/cw_PH206_106/submissions/sub_ph206_0601
+PH206_S26,cw_PH206_106,sub_ph206_0602,student_ph206_004,RETURNED,68,68,false,2026-04-14T23:45:00Z,2026-04-20T14:00:00Z,https://classroom.google.com/c/PH206_S26/a/cw_PH206_106/submissions/sub_ph206_0602
+PH206_S26,cw_PH206_106,sub_ph206_0603,student_ph206_008,RETURNED,65,65,true,2026-04-15T08:12:00Z,2026-04-20T14:00:00Z,https://classroom.google.com/c/PH206_S26/a/cw_PH206_106/submissions/sub_ph206_0603
+PH206_S26,cw_PH206_107,sub_ph206_0701,student_ph206_001,CREATED,,,false,2026-05-22T19:00:00Z,2026-05-22T19:00:00Z,https://classroom.google.com/c/PH206_S26/a/cw_PH206_107/submissions/sub_ph206_0701
+PH206_S26,cw_PH206_107,sub_ph206_0702,student_ph206_010,CREATED,,,false,2026-05-22T20:15:00Z,2026-05-22T20:15:00Z,https://classroom.google.com/c/PH206_S26/a/cw_PH206_107/submissions/sub_ph206_0702
+PH206_S26,cw_PH206_107,sub_ph206_0703,student_ph206_015,CREATED,,,false,2026-05-22T21:42:00Z,2026-05-22T21:42:00Z,https://classroom.google.com/c/PH206_S26/a/cw_PH206_107/submissions/sub_ph206_0703

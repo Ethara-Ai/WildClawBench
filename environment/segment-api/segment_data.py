@@ -7,11 +7,36 @@ container restart.
 
 import csv
 import secrets
-from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("segment-api")
+
+_store.register("events", primary_key="messageId",
+                initial_loader=lambda: _coerce_events(_load("events.csv")))
+_store.register("sources", primary_key="id",
+                initial_loader=lambda: _coerce_sources(_load("sources.csv")))
+_store.register("destinations", primary_key="id",
+                initial_loader=lambda: _coerce_destinations(_load("destinations.csv")))
+
+
+def _events_rows():
+    return _store.table("events").rows()
+
+
+def _sources_rows():
+    return _store.table("sources").rows()
+
+
+def _destinations_rows():
+    return _store.table("destinations").rows()
+
 
 
 def _load(filename):
@@ -79,13 +104,10 @@ def _coerce_destinations(rows):
     return out
 
 
-_events = _coerce_events(_load("events.csv"))
-_sources = _coerce_sources(_load("sources.csv"))
-_destinations = _coerce_destinations(_load("destinations.csv"))
 
-_events_store = deepcopy(_events)
-_sources_store = deepcopy(_sources)
-_destinations_store = deepcopy(_destinations)
+
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -111,7 +133,7 @@ def _ingest(event_type, payload):
     }
     if event_type == "page" and payload.get("name"):
         entry["properties"].setdefault("name", payload["name"])
-    _events_store.append(entry)
+    _events_rows().append(entry)
     return entry
 
 
@@ -146,7 +168,7 @@ def batch(payload):
 # ---------------------------------------------------------------------------
 
 def list_events(event_type=None, user_id=None):
-    events = list(_events_store)
+    events = list(_events_rows())
     if event_type:
         events = [e for e in events if e["type"] == event_type]
     if user_id:
@@ -155,8 +177,8 @@ def list_events(event_type=None, user_id=None):
 
 
 def list_sources():
-    return {"sources": list(_sources_store), "count": len(_sources_store)}
+    return {"sources": list(_sources_rows()), "count": len(_sources_rows())}
 
 
 def list_destinations():
-    return {"destinations": list(_destinations_store), "count": len(_destinations_store)}
+    return {"destinations": list(_destinations_rows()), "count": len(_destinations_rows())}

@@ -6,10 +6,41 @@ list responses in the ``{"_embedded": {...}, "page": {...}}`` shape.
 """
 
 import csv
-from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("ticketmaster-api")
+
+_store.register("classifications", primary_key="id",
+                initial_loader=lambda: _coerce_classifications(_load("classifications.csv")))
+_store.register("venues", primary_key="id",
+                initial_loader=lambda: _coerce_venues(_load("venues.csv")))
+_store.register("attractions", primary_key="id",
+                initial_loader=lambda: _coerce_attractions(_load("attractions.csv")))
+_store.register("events", primary_key="id",
+                initial_loader=lambda: _coerce_events(_load("events.csv")))
+
+
+def _classifications_rows():
+    return _store.table("classifications").rows()
+
+
+def _venues_rows():
+    return _store.table("venues").rows()
+
+
+def _attractions_rows():
+    return _store.table("attractions").rows()
+
+
+def _events_rows():
+    return _store.table("events").rows()
+
 
 
 def _load(filename):
@@ -72,15 +103,12 @@ def _coerce_events(rows):
     return out
 
 
-_classifications = _coerce_classifications(_load("classifications.csv"))
-_venues = _coerce_venues(_load("venues.csv"))
-_attractions = _coerce_attractions(_load("attractions.csv"))
-_events = _coerce_events(_load("events.csv"))
 
-_classifications_store = deepcopy(_classifications)
-_venues_store = deepcopy(_venues)
-_attractions_store = deepcopy(_attractions)
-_events_store = deepcopy(_events)
+
+
+
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -92,7 +120,7 @@ def _find(store, obj_id):
 
 
 def _classification_obj(classification_id):
-    c = _find(_classifications_store, classification_id)
+    c = _find(_classifications_rows(), classification_id)
     if not c:
         return None
     return {
@@ -103,7 +131,7 @@ def _classification_obj(classification_id):
 
 
 def _venue_obj(venue_id):
-    v = _find(_venues_store, venue_id)
+    v = _find(_venues_rows(), venue_id)
     if not v:
         return None
     return {
@@ -119,7 +147,7 @@ def _venue_obj(venue_id):
 
 
 def _attraction_obj(attraction_id):
-    a = _find(_attractions_store, attraction_id)
+    a = _find(_attractions_rows(), attraction_id)
     if not a:
         return None
     return {
@@ -164,17 +192,17 @@ def _event_obj(e):
 
 def search_events(keyword=None, city=None, classification_name=None,
                   start_datetime=None):
-    results = list(_events_store)
+    results = list(_events_rows())
     if keyword:
         kw = keyword.lower()
         results = [e for e in results if kw in e["name"].lower()]
     if city:
         cl = city.lower()
-        venue_ids = {v["id"] for v in _venues_store if v["city"].lower() == cl}
+        venue_ids = {v["id"] for v in _venues_rows() if v["city"].lower() == cl}
         results = [e for e in results if e["venue_id"] in venue_ids]
     if classification_name:
         cn = classification_name.lower()
-        cls_ids = {c["id"] for c in _classifications_store
+        cls_ids = {c["id"] for c in _classifications_rows()
                    if cn in (c["segment"].lower(), c["genre"].lower(), c["subgenre"].lower())}
         results = [e for e in results if e["classification_id"] in cls_ids]
     if start_datetime:
@@ -183,7 +211,7 @@ def search_events(keyword=None, city=None, classification_name=None,
 
 
 def get_event(event_id):
-    e = _find(_events_store, event_id)
+    e = _find(_events_rows(), event_id)
     if not e:
         return {"error": f"Event {event_id} not found"}
     return _event_obj(e)
@@ -194,7 +222,7 @@ def get_event(event_id):
 # ---------------------------------------------------------------------------
 
 def search_venues(keyword=None):
-    results = list(_venues_store)
+    results = list(_venues_rows())
     if keyword:
         kw = keyword.lower()
         results = [v for v in results if kw in v["name"].lower() or kw in v["city"].lower()]
@@ -213,7 +241,7 @@ def get_venue(venue_id):
 # ---------------------------------------------------------------------------
 
 def search_attractions(keyword=None):
-    results = list(_attractions_store)
+    results = list(_attractions_rows())
     if keyword:
         kw = keyword.lower()
         results = [a for a in results if kw in a["name"].lower()]
@@ -233,7 +261,7 @@ def get_attraction(attraction_id):
 
 def list_classifications():
     out = []
-    for c in _classifications_store:
+    for c in _classifications_rows():
         out.append({
             "id": c["id"],
             "segment": {

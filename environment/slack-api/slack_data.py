@@ -7,10 +7,46 @@ import csv
 import json
 import time
 import uuid
-from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("slack-api")
+
+_store.register("users", primary_key="id",
+                initial_loader=lambda: _coerce_users(_load("users.csv")))
+_store.register("channels", primary_key="id",
+                initial_loader=lambda: _coerce_channels(_load("channels.csv")))
+_store.register("messages", primary_key="ts",
+                initial_loader=lambda: _coerce_messages(_load("messages.csv")))
+_store.register("channel_members", primary_key="channel_id",
+                initial_loader=lambda: _load("channel_members.csv"))
+_store.register_document("team", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "team.json", encoding="utf-8")))
+
+
+def _users_rows():
+    return _store.table("users").rows()
+
+
+def _channels_rows():
+    return _store.table("channels").rows()
+
+
+def _messages_rows():
+    return _store.table("messages").rows()
+
+
+def _channel_members_rows():
+    return _store.table("channel_members").rows()
+
+
+def _team_doc():
+    return _store.document("team").get()
+
 
 
 def _load(filename):
@@ -73,19 +109,9 @@ def _parse_reactions(s):
     return result
 
 
-_users = _coerce_users(_load("users.csv"))
-_channels = _coerce_channels(_load("channels.csv"))
-_messages = _coerce_messages(_load("messages.csv"))
-_channel_members = _load("channel_members.csv")
 
-with open(DATA_DIR / "team.json", encoding="utf-8") as _f:
-    _team = json.load(_f)
 
-_users_store = deepcopy(_users)
-_channels_store = deepcopy(_channels)
-_messages_store = deepcopy(_messages)
-_channel_members_store = deepcopy(_channel_members)
-_team_store = deepcopy(_team)
+
 
 
 def _next_ts():
@@ -107,18 +133,18 @@ def _err(error):
 
 def auth_test():
     # Authenticate as the first admin
-    admin = next((u for u in _users_store if u["is_admin"]), _users_store[0])
+    admin = next((u for u in _users_rows() if u["is_admin"]), _users_rows()[0])
     return _ok({
-        "url": f"https://{_team_store['domain']}.slack.com/",
-        "team": _team_store["name"],
+        "url": f"https://{_team_doc()['domain']}.slack.com/",
+        "team": _team_doc()["name"],
         "user": admin["name"],
-        "team_id": _team_store["id"],
+        "team_id": _team_doc()["id"],
         "user_id": admin["id"],
     })
 
 
 def team_info():
-    return _ok({"team": _team_store})
+    return _ok({"team": _team_doc()})
 
 
 # ---------------------------------------------------------------------------
@@ -126,21 +152,21 @@ def team_info():
 # ---------------------------------------------------------------------------
 
 def users_list():
-    return _ok({"members": _users_store})
+    return _ok({"members": _users_rows()})
 
 
 def users_info(user_id):
-    for u in _users_store:
+    for u in _users_rows():
         if u["id"] == user_id:
             return _ok({"user": u})
     return _err("user_not_found")
 
 
 def users_set_presence(user_id, presence):
-    for i, u in enumerate(_users_store):
+    for i, u in enumerate(_users_rows()):
         if u["id"] == user_id:
-            _users_store[i]["presence"] = "away" if presence == "away" else "auto"
-            return _ok({"presence": _users_store[i]["presence"]})
+            _users_rows()[i]["presence"] = "away" if presence == "away" else "auto"
+            return _ok({"presence": _users_rows()[i]["presence"]})
     return _err("user_not_found")
 
 
@@ -151,7 +177,7 @@ def users_set_presence(user_id, presence):
 def conversations_list(types="public_channel,private_channel", exclude_archived=True):
     type_set = {t.strip() for t in types.split(",")}
     results = []
-    for c in _channels_store:
+    for c in _channels_rows():
         if exclude_archived and c["is_archived"]:
             continue
         if c["is_private"] and "private_channel" not in type_set:
@@ -163,14 +189,14 @@ def conversations_list(types="public_channel,private_channel", exclude_archived=
 
 
 def conversations_info(channel_id):
-    for c in _channels_store:
+    for c in _channels_rows():
         if c["id"] == channel_id:
             return _ok({"channel": c})
     return _err("channel_not_found")
 
 
 def conversations_create(name, is_private=False, user_id="U01AMELIA"):
-    if any(c["name"] == name for c in _channels_store):
+    if any(c["name"] == name for c in _channels_rows()):
         return _err("name_taken")
     channel = {
         "id": ("G" if is_private else "C") + "01" + uuid.uuid4().hex[:8].upper(),
@@ -183,44 +209,44 @@ def conversations_create(name, is_private=False, user_id="U01AMELIA"):
         "created": int(time.time()),
         "num_members": 1,
     }
-    _channels_store.append(channel)
-    _channel_members_store.append({"channel_id": channel["id"], "user_id": user_id})
+    _channels_rows().append(channel)
+    _channel_members_rows().append({"channel_id": channel["id"], "user_id": user_id})
     return _ok({"channel": channel})
 
 
 def conversations_archive(channel_id):
-    for i, c in enumerate(_channels_store):
+    for i, c in enumerate(_channels_rows()):
         if c["id"] == channel_id:
-            _channels_store[i]["is_archived"] = True
+            _channels_rows()[i]["is_archived"] = True
             return _ok({})
     return _err("channel_not_found")
 
 
 def conversations_members(channel_id):
-    members = [m["user_id"] for m in _channel_members_store if m["channel_id"] == channel_id]
-    if not members and not any(c["id"] == channel_id for c in _channels_store):
+    members = [m["user_id"] for m in _channel_members_rows() if m["channel_id"] == channel_id]
+    if not members and not any(c["id"] == channel_id for c in _channels_rows()):
         return _err("channel_not_found")
     return _ok({"members": members})
 
 
 def conversations_invite(channel_id, user_id):
-    if not any(c["id"] == channel_id for c in _channels_store):
+    if not any(c["id"] == channel_id for c in _channels_rows()):
         return _err("channel_not_found")
-    if not any(u["id"] == user_id for u in _users_store):
+    if not any(u["id"] == user_id for u in _users_rows()):
         return _err("user_not_found")
-    if any(m["channel_id"] == channel_id and m["user_id"] == user_id for m in _channel_members_store):
+    if any(m["channel_id"] == channel_id and m["user_id"] == user_id for m in _channel_members_rows()):
         return _err("already_in_channel")
-    _channel_members_store.append({"channel_id": channel_id, "user_id": user_id})
-    for i, c in enumerate(_channels_store):
+    _channel_members_rows().append({"channel_id": channel_id, "user_id": user_id})
+    for i, c in enumerate(_channels_rows()):
         if c["id"] == channel_id:
-            _channels_store[i]["num_members"] += 1
-    return _ok({"channel": next(c for c in _channels_store if c["id"] == channel_id)})
+            _channels_rows()[i]["num_members"] += 1
+    return _ok({"channel": next(c for c in _channels_rows() if c["id"] == channel_id)})
 
 
 def conversations_history(channel_id, limit=20, oldest=None, latest=None):
-    if not any(c["id"] == channel_id for c in _channels_store):
+    if not any(c["id"] == channel_id for c in _channels_rows()):
         return _err("channel_not_found")
-    msgs = [m for m in _messages_store if m["channel_id"] == channel_id and m["thread_ts"] is None]
+    msgs = [m for m in _messages_rows() if m["channel_id"] == channel_id and m["thread_ts"] is None]
     if oldest:
         msgs = [m for m in msgs if float(m["ts"]) >= float(oldest)]
     if latest:
@@ -230,11 +256,11 @@ def conversations_history(channel_id, limit=20, oldest=None, latest=None):
 
 
 def conversations_replies(channel_id, ts):
-    parent = next((m for m in _messages_store
+    parent = next((m for m in _messages_rows()
                    if m["channel_id"] == channel_id and m["ts"] == ts), None)
     if not parent:
         return _err("thread_not_found")
-    replies = [m for m in _messages_store
+    replies = [m for m in _messages_rows()
                if m["channel_id"] == channel_id and m["thread_ts"] == ts]
     replies.sort(key=lambda m: float(m["ts"]))
     return _ok({"messages": [parent] + replies})
@@ -245,7 +271,7 @@ def conversations_replies(channel_id, ts):
 # ---------------------------------------------------------------------------
 
 def chat_post_message(channel_id, user_id, text, thread_ts=None):
-    if not any(c["id"] == channel_id for c in _channels_store):
+    if not any(c["id"] == channel_id for c in _channels_rows()):
         return _err("channel_not_found")
     ts = _next_ts()
     msg = {
@@ -257,26 +283,26 @@ def chat_post_message(channel_id, user_id, text, thread_ts=None):
         "reply_count": 0,
         "reactions": [],
     }
-    _messages_store.append(msg)
+    _messages_rows().append(msg)
     if thread_ts:
-        for i, m in enumerate(_messages_store):
+        for i, m in enumerate(_messages_rows()):
             if m["channel_id"] == channel_id and m["ts"] == thread_ts:
-                _messages_store[i]["reply_count"] += 1
+                _messages_rows()[i]["reply_count"] += 1
     return _ok({"channel": channel_id, "ts": ts, "message": msg})
 
 
 def chat_update(channel_id, ts, text):
-    for i, m in enumerate(_messages_store):
+    for i, m in enumerate(_messages_rows()):
         if m["channel_id"] == channel_id and m["ts"] == ts:
-            _messages_store[i]["text"] = text
+            _messages_rows()[i]["text"] = text
             return _ok({"channel": channel_id, "ts": ts, "text": text})
     return _err("message_not_found")
 
 
 def chat_delete(channel_id, ts):
-    for i, m in enumerate(_messages_store):
+    for i, m in enumerate(_messages_rows()):
         if m["channel_id"] == channel_id and m["ts"] == ts:
-            _messages_store.pop(i)
+            _messages_rows().pop(i)
             return _ok({"channel": channel_id, "ts": ts})
     return _err("message_not_found")
 
@@ -286,7 +312,7 @@ def chat_delete(channel_id, ts):
 # ---------------------------------------------------------------------------
 
 def reactions_add(channel_id, ts, name, user_id):
-    for i, m in enumerate(_messages_store):
+    for i, m in enumerate(_messages_rows()):
         if m["channel_id"] == channel_id and m["ts"] == ts:
             for r in m["reactions"]:
                 if r["name"] == name:
@@ -305,5 +331,5 @@ def reactions_add(channel_id, ts, name, user_id):
 
 def search_messages(query):
     q = query.lower()
-    matches = [m for m in _messages_store if q in m["text"].lower()]
+    matches = [m for m in _messages_rows() if q in m["text"].lower()]
     return _ok({"messages": {"total": len(matches), "matches": matches}})

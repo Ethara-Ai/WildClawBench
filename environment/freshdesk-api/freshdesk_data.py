@@ -7,11 +7,36 @@ process memory and reset on container restart.
 """
 
 import csv
-from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("freshdesk-api")
+
+_store.register("tickets", primary_key="id",
+                initial_loader=lambda: _coerce_tickets(_load("tickets.csv")))
+_store.register("contacts", primary_key="id",
+                initial_loader=lambda: _coerce_contacts(_load("contacts.csv")))
+_store.register("agents", primary_key="id",
+                initial_loader=lambda: _coerce_agents(_load("agents.csv")))
+
+
+def _tickets_rows():
+    return _store.table("tickets").rows()
+
+
+def _contacts_rows():
+    return _store.table("contacts").rows()
+
+
+def _agents_rows():
+    return _store.table("agents").rows()
+
 
 
 def _load(filename):
@@ -85,13 +110,10 @@ def _coerce_agents(rows):
     return out
 
 
-_tickets = _coerce_tickets(_load("tickets.csv"))
-_contacts = _coerce_contacts(_load("contacts.csv"))
-_agents = _coerce_agents(_load("agents.csv"))
 
-_tickets_store = deepcopy(_tickets)
-_contacts_store = deepcopy(_contacts)
-_agents_store = deepcopy(_agents)
+
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -103,7 +125,7 @@ def _now_iso():
 
 
 def _next_ticket_id():
-    return max((t["id"] for t in _tickets_store), default=70000) + 1
+    return max((t["id"] for t in _tickets_rows()), default=70000) + 1
 
 
 # ---------------------------------------------------------------------------
@@ -111,7 +133,7 @@ def _next_ticket_id():
 # ---------------------------------------------------------------------------
 
 def list_tickets(status=None, priority=None, requester_id=None):
-    tickets = list(_tickets_store)
+    tickets = list(_tickets_rows())
     if status is not None:
         tickets = [t for t in tickets if t["status"] == int(status)]
     if priority is not None:
@@ -122,7 +144,7 @@ def list_tickets(status=None, priority=None, requester_id=None):
 
 
 def get_ticket(ticket_id):
-    t = next((x for x in _tickets_store if x["id"] == int(ticket_id)), None)
+    t = next((x for x in _tickets_rows() if x["id"] == int(ticket_id)), None)
     if not t:
         return {"error": "ticket not found", "message": f"Ticket {ticket_id} not found"}
     return t
@@ -143,23 +165,23 @@ def create_ticket(payload):
         "created_at": now,
         "updated_at": now,
     }
-    _tickets_store.append(ticket)
+    _tickets_rows().append(ticket)
     return ticket
 
 
 def update_ticket(ticket_id, payload):
-    for i, t in enumerate(_tickets_store):
+    for i, t in enumerate(_tickets_rows()):
         if t["id"] == int(ticket_id):
             for field in ("subject", "description", "type"):
                 if field in payload and payload[field] is not None:
-                    _tickets_store[i][field] = payload[field]
+                    _tickets_rows()[i][field] = payload[field]
             for field in ("status", "priority", "responder_id", "requester_id"):
                 if field in payload and payload[field] is not None:
-                    _tickets_store[i][field] = int(payload[field])
+                    _tickets_rows()[i][field] = int(payload[field])
             if "tags" in payload and payload["tags"] is not None:
-                _tickets_store[i]["tags"] = payload["tags"]
-            _tickets_store[i]["updated_at"] = _now_iso()
-            return _tickets_store[i]
+                _tickets_rows()[i]["tags"] = payload["tags"]
+            _tickets_rows()[i]["updated_at"] = _now_iso()
+            return _tickets_rows()[i]
     return {"error": "ticket not found", "message": f"Ticket {ticket_id} not found"}
 
 
@@ -168,8 +190,8 @@ def update_ticket(ticket_id, payload):
 # ---------------------------------------------------------------------------
 
 def list_contacts():
-    return list(_contacts_store)
+    return list(_contacts_rows())
 
 
 def list_agents():
-    return list(_agents_store)
+    return list(_agents_rows())

@@ -746,9 +746,10 @@ def run_single_task(
     # mock container and point the agent at THAT instead of the shared baseline.
     # Tasks without overlays keep the shared stack URLs unchanged (no-op here).
     task_mock_container: str | None = None
+    drift_info: dict = {}
     if enable_mock_stack and network and task.get("mock_overlays"):
         env_dir_for_mocks = config.environment_dir if config is not None else None
-        task_mock_env, task_mock_container = _start_task_mock_stack(
+        task_mock_env, task_mock_container, drift_info = _start_task_mock_stack(
             task, network, env_dir_for_mocks,
         )
         if task_mock_env:
@@ -768,6 +769,13 @@ def run_single_task(
     lobster_prefix = f"{lobster['name']}_" if lobster else ""
     suffix = f"{lobster_prefix}{short_model}_{timestamp}_{run_id}"
     task_id = f"{short_task_id}_{lobster_prefix}{short_model}_{timestamp}_{run_id}"
+    # Docker container names must match [a-zA-Z0-9][a-zA-Z0-9_.-]*; task ids
+    # built from on-disk directory names can contain spaces or other invalid
+    # chars (e.g. macOS ' 2' duplicate suffix). Coerce here so `docker run
+    # --name` cannot fail downstream and silently zero the score.
+    task_id = re.sub(r"[^a-zA-Z0-9_.-]", "_", task_id)
+    if not task_id or not re.match(r"[a-zA-Z0-9]", task_id[0]):
+        task_id = f"t_{task_id}"
 
     # kensei layout: out/<task_id>/trajectories/<model>/run_<n>/
     model_type = _model_type(model)
@@ -782,6 +790,7 @@ def run_single_task(
     gateway_proc = None
     agent_proc = None
     elapsed_time = float(timeout_seconds)
+    drift_director = _start_drift_director(task, drift_info, output_dir) if drift_info else None
 
     try:
         execution = backend.run_task(
@@ -850,7 +859,13 @@ def run_single_task(
         except Exception as exc:
             logger.warning("[%s] Failed to collect task output: %s", task_id, exc)
 
-        if execute_tests and task.get("test_code"):
+        startup_failed = isinstance(result.get("error"), str) and "Container startup failed" in result["error"]
+        if startup_failed:
+            logger.error(
+                "[%s] Agent container never started; skipping test execution to avoid grading an empty workspace. Error: %s",
+                task_id, result["error"],
+            )
+        if execute_tests and task.get("test_code") and not startup_failed:
             try:
                 from src.utils.test_executor import execute_tests as _exec_tests
                 ws = output_dir / "task_output" / "workspace_full"
@@ -926,6 +941,14 @@ def run_single_task(
 
         remove_container(task_id)
         logger.info("[%s] Container cleaned up", task_id)
+
+        if drift_director is not None:
+            try:
+                drift_director.stop()
+                drift_director.join(timeout=5.0)
+                logger.info("[%s] Drift director stopped", task_id)
+            except Exception as exc:
+                logger.warning("[%s] Drift director shutdown failed: %s", task_id, exc)
 
         if task_mock_container:
             try:
@@ -1037,13 +1060,17 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list):
     return True, litellm_yaml, network, sidecar, mock_env_dict, str(usage_log_path)
 
 
-def _start_task_mock_stack(task: dict, network: str, environment_dir) -> tuple[dict, str | None]:
+def _start_task_mock_stack(task: dict, network: str, environment_dir) -> tuple[dict, str | None, dict]:
     """Start a per-task mock-stack container with this task's mock_data CSVs
     bind-mounted read-only over the baked-in baseline, and return
-    ({ENV_VAR: http://<container>:<port>}, container_name).
+    ({ENV_VAR: http://<container>:<port>}, container_name, drift_info).
 
-    Returns ({}, None) when the task ships no overlays or startup fails — the
-    caller then falls back to the shared batch stack (current behavior).
+    drift_info is {} when the task has no drift.yaml; otherwise it carries
+    the per-API host-side URLs the DriftDirector uses to reach /admin/* via
+    127.0.0.1:<published-port>, plus the admin token (if any).
+
+    Returns ({}, None, {}) when the task ships no overlays or startup fails —
+    the caller then falls back to the shared batch stack (current behavior).
 
     The mock IMAGE is assumed already built by the batch-level
     build_mock_image_if_needed(); here we only spin a lightweight container.
@@ -1052,10 +1079,17 @@ def _start_task_mock_stack(task: dict, network: str, environment_dir) -> tuple[d
     """
     overlays = task.get("mock_overlays") or {}
     if not overlays or not network or not environment_dir:
-        return {}, None
+        if task.get("drift_script_path"):
+            logger.error(
+                "[%s] drift.yaml requires per-task mock stack but task ships no overlays / "
+                "mock-stack disabled; refusing to start director",
+                task.get("task_id"),
+            )
+        return {}, None, {}
 
     from src.utils.mock_stack import (
         start_mock_stack, wait_for_ports_healthy, stop_mock_stack,
+        get_published_ports, get_network_gateway,
     )
 
     # Resolve the services this task actually overlays, and the ENV->URL map.
@@ -1065,31 +1099,113 @@ def _start_task_mock_stack(task: dict, network: str, environment_dir) -> tuple[d
         services = discover_services(environment_dir)
     except Exception as exc:
         logger.error("[%s] per-task mock service discovery failed: %s", task.get("task_id"), exc)
-        return {}, None
+        return {}, None, {}
     overlaid_ports = [int(s["port"]) for s in services
                       if s.get("name") in overlays and s.get("port")]
     env_dict_template = {s["env_var_name"]: int(s["port"]) for s in services
                          if s.get("env_var_name") and s.get("port")}
+    api_name_by_port: dict[int, str] = {
+        int(s["port"]): s["name"]
+        for s in services if s.get("port") and s.get("name")
+    }
+
+    # Configure admin plane + port-publishing only when the task ships a drift
+    # script. Quiescent runs keep the existing zero-port-exposure surface.
+    drift_path = task.get("drift_script_path")
+    admin_env: dict[str, str] | None = None
+    publish_ports: list[int] | None = None
+    admin_token: str | None = None
+    if drift_path:
+        gateway = get_network_gateway(network) or "127.0.0.1"
+        admin_token = uuid.uuid4().hex
+        admin_env = {
+            "MOCK_ADMIN_ENABLED": "1",
+            "MOCK_ADMIN_ALLOWLIST": gateway,
+            "MOCK_ADMIN_TOKEN": admin_token,
+        }
+        publish_ports = list(overlaid_ports)
 
     safe_id = re.sub(r"[^a-zA-Z0-9._-]", "_", task.get("task_id", "task"))[:40]
     container = f"mocks-task-{safe_id}-{uuid.uuid4().hex[:6]}".lower()
     try:
-        start_mock_stack(container, network, overlays=overlays)
+        start_mock_stack(
+            container, network,
+            overlays=overlays,
+            admin_env=admin_env,
+            publish_ports=publish_ports,
+        )
     except Exception as exc:
         logger.error("[%s] per-task mock stack failed to start: %s", task.get("task_id"), exc)
-        return {}, None
+        return {}, None, {}
 
     # Wait only for the overlaid API(s) to answer /health inside the container.
     if not wait_for_ports_healthy(container, overlaid_ports, timeout=180.0):
         logger.error("[%s] per-task mock stack %s: overlaid ports %s not healthy; tearing down",
                      task.get("task_id"), container, overlaid_ports)
         stop_mock_stack(container)
-        return {}, None
+        return {}, None, {}
 
     env_dict = {ev: f"http://{container}:{port}" for ev, port in env_dict_template.items()}
     logger.info("[%s] per-task mock stack %s ready (%d overlay APIs, ports %s, %d URLs)",
                 task.get("task_id"), container, len(overlays), overlaid_ports, len(env_dict))
-    return env_dict, container
+
+    drift_info: dict = {}
+    if drift_path:
+        host_ports = get_published_ports(container, overlaid_ports)
+        host_api_to_url: dict[str, str] = {}
+        for internal_port, host_port in host_ports.items():
+            api_name = api_name_by_port.get(internal_port)
+            if api_name:
+                host_api_to_url[api_name] = f"http://127.0.0.1:{host_port}"
+        if host_api_to_url:
+            drift_info = {
+                "script_path": drift_path,
+                "host_api_to_url": host_api_to_url,
+                "admin_token": admin_token,
+            }
+            logger.info("[%s] drift director will target %d APIs via 127.0.0.1",
+                        task.get("task_id"), len(host_api_to_url))
+        else:
+            logger.error("[%s] drift requested but no host ports resolved; director disabled",
+                         task.get("task_id"))
+
+    return env_dict, container, drift_info
+
+
+def _start_drift_director(task: dict, drift_info: dict, output_dir):
+    """Spin up the host-side DriftDirector thread for this task.
+
+    Returns the started thread, or None if drift_info is empty / setup fails.
+    The director writes drift_timeline.jsonl directly into output_dir; the
+    audit polling reaches each mock API via 127.0.0.1:<published-port>.
+    """
+    script_path = drift_info.get("script_path")
+    host_api_to_url = drift_info.get("host_api_to_url") or {}
+    if not script_path or not host_api_to_url:
+        return None
+    try:
+        from src.utils.drift_director import (
+            DriftScript, DriftDirector, build_targets_from_env,
+        )
+        script = DriftScript.load(script_path)
+        targets = build_targets_from_env(
+            host_api_to_url, admin_token=drift_info.get("admin_token"),
+        )
+        timeline_path = output_dir / "drift_timeline.jsonl"
+        director = DriftDirector(
+            script=script,
+            targets=targets,
+            workspace_dir=output_dir,
+            timeline_path=timeline_path,
+            gateway_log_path=output_dir / "gateway.log",
+        )
+        director.start()
+        logger.info("[%s] Drift director started (%d targets, script=%s)",
+                    task.get("task_id"), len(targets), script_path)
+        return director
+    except Exception as exc:
+        logger.error("[%s] Drift director failed to start: %s", task.get("task_id"), exc)
+        return None
 
 
 def main() -> None:

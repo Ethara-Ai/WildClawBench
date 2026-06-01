@@ -106,13 +106,13 @@ def load_task(path: str | Path) -> dict:
         for candidate in ("task.yaml", "task.yml", "task.md"):
             f = p / candidate
             if f.is_file():
-                return load_task(f)
+                return _attach_drift_script(load_task(f), p)
         if (p / "prompt.txt").is_file() and (p / "rubric.json").is_file():
-            return _load_native_task(p)
+            return _attach_drift_script(_load_native_task(p), p)
         raise FileNotFoundError(f"No task file found in {p}")
     suffix = p.suffix.lower()
     if suffix in (".yaml", ".yml"):
-        return _load_yaml_task(p)
+        return _attach_drift_script(_load_yaml_task(p), p.parent)
     if suffix == ".md":
         base = parse_task_md(p)
         # Augment the md dict with the uniform superset used by the kensei flow.
@@ -124,8 +124,21 @@ def load_task(path: str | Path) -> dict:
         base.setdefault("gt_dir", str(p.parent / "gt") if (p.parent / "gt").is_dir() else "")
         base.setdefault("attachments", [])
         base.setdefault("format", "md")
-        return base
+        return _attach_drift_script(base, p.parent)
     raise ValueError(f"Unsupported task file format: {p.suffix}")
+
+
+def _attach_drift_script(task: dict, task_dir: Path) -> dict:
+    # Surface drift.yaml / drift.yml on the task dict so run_batch can start
+    # a DriftDirector. Sets to None (not absent) when no script is present so
+    # downstream code can use a single key check.
+    for candidate in ("drift.yaml", "drift.yml"):
+        f = task_dir / candidate
+        if f.is_file():
+            task["drift_script_path"] = str(f.resolve())
+            return task
+    task["drift_script_path"] = None
+    return task
 
 
 def _derive_taxonomy_for_native_task(

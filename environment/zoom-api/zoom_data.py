@@ -3,11 +3,41 @@
 import csv
 import json
 import random
-from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("zoom-api")
+
+_store.register("meetings", primary_key="id",
+                initial_loader=lambda: _coerce_meetings(_load("meetings.csv")))
+_store.register("recordings", primary_key="id",
+                initial_loader=lambda: _coerce_recordings(_load("recordings.csv")))
+_store.register("registrants", primary_key="id",
+                initial_loader=lambda: _coerce_registrants(_load("registrants.csv")))
+_store.register_document("user", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "user.json", encoding="utf-8")))
+
+
+def _meetings_rows():
+    return _store.table("meetings").rows()
+
+
+def _recordings_rows():
+    return _store.table("recordings").rows()
+
+
+def _registrants_rows():
+    return _store.table("registrants").rows()
+
+
+def _user_doc():
+    return _store.document("user").get()
+
 
 
 def _load(filename):
@@ -65,17 +95,8 @@ def _coerce_registrants(rows):
     return out
 
 
-_meetings = _coerce_meetings(_load("meetings.csv"))
-_recordings = _coerce_recordings(_load("recordings.csv"))
-_registrants = _coerce_registrants(_load("registrants.csv"))
 
-with open(DATA_DIR / "user.json", encoding="utf-8") as _f:
-    _user = json.load(_f)
 
-_meetings_store = deepcopy(_meetings)
-_recordings_store = deepcopy(_recordings)
-_registrants_store = deepcopy(_registrants)
-_user_store = deepcopy(_user)
 
 
 # ---------------------------------------------------------------------------
@@ -83,7 +104,7 @@ _user_store = deepcopy(_user)
 # ---------------------------------------------------------------------------
 
 def _new_meeting_id():
-    existing = {m["id"] for m in _meetings_store}
+    existing = {m["id"] for m in _meetings_rows()}
     while True:
         mid = random.randint(80000000000, 89999999999)
         if mid not in existing:
@@ -111,7 +132,7 @@ def _serialize_meeting(m):
 # ---------------------------------------------------------------------------
 
 def get_me():
-    return _user_store
+    return _user_doc()
 
 
 # ---------------------------------------------------------------------------
@@ -119,10 +140,10 @@ def get_me():
 # ---------------------------------------------------------------------------
 
 def list_meetings(user_id, meeting_type="scheduled", page_size=30):
-    if user_id != "me" and user_id != _user_store["id"]:
+    if user_id != "me" and user_id != _user_doc()["id"]:
         return {"error": f"User {user_id} not found"}
-    host = _user_store["id"]
-    meetings = [m for m in _meetings_store if m["host_id"] == host]
+    host = _user_doc()["id"]
+    meetings = [m for m in _meetings_rows() if m["host_id"] == host]
     if meeting_type == "scheduled":
         meetings = [m for m in meetings if m["status"] == "waiting"]
     elif meeting_type == "previous_meetings":
@@ -138,7 +159,7 @@ def list_meetings(user_id, meeting_type="scheduled", page_size=30):
 
 
 def get_meeting(meeting_id):
-    for m in _meetings_store:
+    for m in _meetings_rows():
         if m["id"] == meeting_id:
             return _serialize_meeting(m)
     return {"error": f"Meeting {meeting_id} not found", "code": 3001}
@@ -146,12 +167,12 @@ def get_meeting(meeting_id):
 
 def create_meeting(user_id, topic, start_time=None, duration=60, timezone="UTC",
                    agenda="", meeting_type=2):
-    if user_id != "me" and user_id != _user_store["id"]:
+    if user_id != "me" and user_id != _user_doc()["id"]:
         return {"error": f"User {user_id} not found"}
     mid = _new_meeting_id()
     meeting = {
         "id": mid,
-        "host_id": _user_store["id"],
+        "host_id": _user_doc()["id"],
         "topic": topic,
         "type": meeting_type,
         "status": "waiting",
@@ -162,32 +183,32 @@ def create_meeting(user_id, topic, start_time=None, duration=60, timezone="UTC",
         "join_url": f"https://zoom.us/j/{mid}",
         "created_at": _now(),
     }
-    _meetings_store.append(meeting)
+    _meetings_rows().append(meeting)
     return _serialize_meeting(meeting)
 
 
 def update_meeting(meeting_id, topic=None, start_time=None, duration=None,
                    agenda=None, timezone=None):
-    for i, m in enumerate(_meetings_store):
+    for i, m in enumerate(_meetings_rows()):
         if m["id"] == meeting_id:
             if topic is not None:
-                _meetings_store[i]["topic"] = topic
+                _meetings_rows()[i]["topic"] = topic
             if start_time is not None:
-                _meetings_store[i]["start_time"] = start_time
+                _meetings_rows()[i]["start_time"] = start_time
             if duration is not None:
-                _meetings_store[i]["duration"] = duration
+                _meetings_rows()[i]["duration"] = duration
             if agenda is not None:
-                _meetings_store[i]["agenda"] = agenda
+                _meetings_rows()[i]["agenda"] = agenda
             if timezone is not None:
-                _meetings_store[i]["timezone"] = timezone
-            return _serialize_meeting(_meetings_store[i])
+                _meetings_rows()[i]["timezone"] = timezone
+            return _serialize_meeting(_meetings_rows()[i])
     return {"error": f"Meeting {meeting_id} not found", "code": 3001}
 
 
 def delete_meeting(meeting_id):
-    for i, m in enumerate(_meetings_store):
+    for i, m in enumerate(_meetings_rows()):
         if m["id"] == meeting_id:
-            _meetings_store.pop(i)
+            _meetings_rows().pop(i)
             return {"deleted": True, "id": meeting_id}
     return {"error": f"Meeting {meeting_id} not found", "code": 3001}
 
@@ -197,10 +218,10 @@ def delete_meeting(meeting_id):
 # ---------------------------------------------------------------------------
 
 def get_recordings(meeting_id):
-    meeting = next((m for m in _meetings_store if m["id"] == meeting_id), None)
+    meeting = next((m for m in _meetings_rows() if m["id"] == meeting_id), None)
     if not meeting:
         return {"error": f"Meeting {meeting_id} not found", "code": 3001}
-    files = [r for r in _recordings_store if r["meeting_id"] == meeting_id]
+    files = [r for r in _recordings_rows() if r["meeting_id"] == meeting_id]
     if not files:
         return {"error": f"No recordings for meeting {meeting_id}", "code": 3301}
     total = sum(f["file_size"] for f in files)
@@ -222,9 +243,9 @@ def get_recordings(meeting_id):
 # ---------------------------------------------------------------------------
 
 def list_registrants(meeting_id, status="approved"):
-    if not any(m["id"] == meeting_id for m in _meetings_store):
+    if not any(m["id"] == meeting_id for m in _meetings_rows()):
         return {"error": f"Meeting {meeting_id} not found", "code": 3001}
-    regs = [r for r in _registrants_store if r["meeting_id"] == meeting_id]
+    regs = [r for r in _registrants_rows() if r["meeting_id"] == meeting_id]
     if status:
         regs = [r for r in regs if r["status"] == status]
     return {

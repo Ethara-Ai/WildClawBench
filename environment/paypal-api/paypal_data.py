@@ -7,11 +7,48 @@ where value is a string decimal. Statuses follow PayPal conventions
 
 import csv
 import uuid
-from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("paypal-api")
+
+_store.register("orders", primary_key="id",
+                initial_loader=lambda: _coerce_orders(_load("orders.csv")))
+_store.register("captures", primary_key="id",
+                initial_loader=lambda: _coerce_captures(_load("captures.csv")))
+_store.register("invoices", primary_key="id",
+                initial_loader=lambda: _coerce_invoices(_load("invoices.csv")))
+_store.register("payouts", primary_key="payout_batch_id",
+                initial_loader=lambda: [{**r, 'payout_batch_id': r['batch_header']['payout_batch_id']} for r in _coerce_payouts(_load("payouts.csv"))])
+_store.register("refunds", primary_key="id",
+                initial_loader=lambda: _coerce_refunds(_load("refunds.csv")))
+
+
+def _orders_rows():
+    return _store.table("orders").rows()
+
+
+def _captures_rows():
+    return _store.table("captures").rows()
+
+
+def _invoices_rows():
+    return _store.table("invoices").rows()
+
+
+def _payouts_rows():
+    return _store.table("payouts").rows()
+
+
+def _refunds_rows():
+    return _store.table("refunds").rows()
+
 
 
 def _load(filename):
@@ -118,17 +155,14 @@ def _coerce_refunds(rows):
     return out
 
 
-_orders = _coerce_orders(_load("orders.csv"))
-_captures = _coerce_captures(_load("captures.csv"))
-_invoices = _coerce_invoices(_load("invoices.csv"))
-_payouts = _coerce_payouts(_load("payouts.csv"))
-_refunds = _coerce_refunds(_load("refunds.csv"))
 
-_orders_store = deepcopy(_orders)
-_captures_store = deepcopy(_captures)
-_invoices_store = deepcopy(_invoices)
-_payouts_store = deepcopy(_payouts)
-_refunds_store = deepcopy(_refunds)
+
+
+
+
+
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -164,17 +198,17 @@ def create_order(intent="CAPTURE", amount_value="0.00", currency_code="USD",
         }],
         "create_time": _now(),
     }
-    _orders_store.append(order)
+    _orders_rows().append(order)
     return order
 
 
 def get_order(order_id):
-    o = _find(_orders_store, order_id)
+    o = _find(_orders_rows(), order_id)
     return o if o else {"error": f"Order {order_id} not found"}
 
 
 def capture_order(order_id):
-    order = _find(_orders_store, order_id)
+    order = _find(_orders_rows(), order_id)
     if not order:
         return {"error": f"Order {order_id} not found"}
     if order["status"] == "COMPLETED":
@@ -190,7 +224,7 @@ def capture_order(order_id):
         "final_capture": True,
         "create_time": _now(),
     }
-    _captures_store.append(capture)
+    _captures_rows().append(capture)
     order["status"] = "COMPLETED"
     return {
         "id": order_id,
@@ -206,7 +240,7 @@ def capture_order(order_id):
 # ---------------------------------------------------------------------------
 
 def create_refund(capture_id, amount_value=None, currency_code="USD", note_to_payer=None):
-    capture = _find(_captures_store, capture_id)
+    capture = _find(_captures_rows(), capture_id)
     if not capture:
         return {"error": f"Capture {capture_id} not found"}
     if amount_value is None:
@@ -221,12 +255,12 @@ def create_refund(capture_id, amount_value=None, currency_code="USD", note_to_pa
         "note_to_payer": note_to_payer or "",
         "create_time": _now(),
     }
-    _refunds_store.append(refund)
+    _refunds_rows().append(refund)
     return refund
 
 
 def get_refund(refund_id):
-    r = _find(_refunds_store, refund_id)
+    r = _find(_refunds_rows(), refund_id)
     return r if r else {"error": f"Refund {refund_id} not found"}
 
 
@@ -235,7 +269,7 @@ def get_refund(refund_id):
 # ---------------------------------------------------------------------------
 
 def list_invoices(status=None, page_size=20):
-    results = list(_invoices_store)
+    results = list(_invoices_rows())
     if status:
         results = [i for i in results if i["status"] == status.upper()]
     return {
@@ -247,7 +281,7 @@ def list_invoices(status=None, page_size=20):
 
 def create_invoice(invoice_number=None, recipient_email=None, amount_value="0.00",
                    currency_code="USD", due_date=None, note=None):
-    seq = len(_invoices_store) + 1
+    seq = len(_invoices_rows()) + 1
     invoice = {
         "id": _new_id("INV2"),
         "detail": {
@@ -260,7 +294,7 @@ def create_invoice(invoice_number=None, recipient_email=None, amount_value="0.00
         "amount": _money(amount_value, currency_code),
         "due_date": due_date,
     }
-    _invoices_store.append(invoice)
+    _invoices_rows().append(invoice)
     return invoice
 
 
@@ -283,5 +317,5 @@ def create_payout(sender_batch_id=None, amount_value="0.00", currency_code="USD"
         "recipient_email": recipient_email or "",
         "create_time": _now(),
     }
-    _payouts_store.append(payout)
+    _payouts_rows().append(payout)
     return payout

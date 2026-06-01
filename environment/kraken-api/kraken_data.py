@@ -8,10 +8,15 @@ Every response is wrapped in Kraken's standard envelope:
 """
 
 import csv
-from copy import deepcopy
+import sys
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("kraken-api")
 
 
 def _load(filename):
@@ -91,17 +96,23 @@ def _coerce_balances(rows):
     return [{"asset": r["asset"], "balance": r["balance"]} for r in rows]
 
 
-_tickers = _coerce_tickers(_load("tickers.csv"))
-_ohlc = _coerce_ohlc(_load("ohlc.csv"))
-_pairs = _coerce_pairs(_load("pairs.csv"))
-_assets = _coerce_assets(_load("assets.csv"))
-_balances = _coerce_balances(_load("balances.csv"))
+_store.register("tickers", primary_key="pair",
+                initial_loader=lambda: _coerce_tickers(_load("tickers.csv")))
+_store.register("ohlc", primary_key="_pk",
+                initial_loader=lambda: [
+                    {**row, "_pk": f"{row['pair']}@{row['time']}"}
+                    for row in _coerce_ohlc(_load("ohlc.csv"))
+                ])
+_store.register("pairs", primary_key="pair",
+                initial_loader=lambda: _coerce_pairs(_load("pairs.csv")))
+_store.register("assets", primary_key="asset",
+                initial_loader=lambda: _coerce_assets(_load("assets.csv")))
+_store.register("balances", primary_key="asset",
+                initial_loader=lambda: _coerce_balances(_load("balances.csv")))
 
-_tickers_store = deepcopy(_tickers)
-_ohlc_store = deepcopy(_ohlc)
-_pairs_store = deepcopy(_pairs)
-_assets_store = deepcopy(_assets)
-_balances_store = deepcopy(_balances)
+
+def _rows(table):
+    return _store.table(table).rows()
 
 
 # ---------------------------------------------------------------------------
@@ -117,7 +128,7 @@ def _resolve_pair(pair):
     if not pair:
         return None
     p = pair.strip().upper()
-    for t in _tickers_store:
+    for t in _rows("tickers"):
         if t["pair"].upper() == p or t["altname"].upper() == p:
             return t["pair"]
     return None
@@ -130,13 +141,13 @@ def _resolve_pair(pair):
 def get_ticker(pair=None):
     requested = [p.strip() for p in pair.split(",")] if pair else None
     if not requested:
-        requested = [t["altname"] for t in _tickers_store]
+        requested = [t["altname"] for t in _rows("tickers")]
     result = {}
     for req in requested:
         canonical = _resolve_pair(req)
         if not canonical:
             return {"error": f"Unknown asset pair: {req}"}
-        t = next(t for t in _tickers_store if t["pair"] == canonical)
+        t = next(t for t in _rows("tickers") if t["pair"] == canonical)
         result[canonical] = {
             "a": [t["ask"], "1", "1.000"],
             "b": [t["bid"], "1", "1.000"],
@@ -157,7 +168,7 @@ def get_ohlc(pair=None, interval=60):
     canonical = _resolve_pair(pair)
     if not canonical:
         return {"error": f"Unknown asset pair: {pair}"}
-    candles = [c for c in _ohlc_store if c["pair"] == canonical]
+    candles = [c for c in _rows("ohlc") if c["pair"] == canonical]
     candles = sorted(candles, key=lambda c: c["time"])
     rows = [
         [c["time"], c["open"], c["high"], c["low"], c["close"],
@@ -174,11 +185,11 @@ def get_ohlc(pair=None, interval=60):
 # ---------------------------------------------------------------------------
 
 def get_asset_pairs(pair=None):
-    pairs = _pairs_store
+    pairs = _rows("pairs")
     if pair:
         requested = {p.strip().upper() for p in pair.split(",")}
         pairs = [
-            p for p in _pairs_store
+            p for p in _rows("pairs")
             if p["pair"].upper() in requested or p["altname"].upper() in requested
         ]
         if not pairs:
@@ -205,11 +216,11 @@ def get_asset_pairs(pair=None):
 # ---------------------------------------------------------------------------
 
 def get_assets(asset=None):
-    assets = _assets_store
+    assets = _rows("assets")
     if asset:
         requested = {a.strip().upper() for a in asset.split(",")}
         assets = [
-            a for a in _assets_store
+            a for a in _rows("assets")
             if a["asset"].upper() in requested or a["altname"].upper() in requested
         ]
         if not assets:
@@ -230,5 +241,5 @@ def get_assets(asset=None):
 # ---------------------------------------------------------------------------
 
 def get_balance():
-    result = {b["asset"]: b["balance"] for b in _balances_store}
+    result = {b["asset"]: b["balance"] for b in _rows("balances")}
     return _envelope(result)

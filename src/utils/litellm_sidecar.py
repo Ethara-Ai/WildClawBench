@@ -119,21 +119,42 @@ def build_litellm_config_yaml(
     )
 
 
-def create_network(name: str) -> None:
+def create_network(name: str, internal: bool = True) -> None:
+    # internal=True creates an --internal bridge with no NAT to the host's
+    # default route, so containers attached to ONLY this network cannot
+    # reach the public internet. Agent containers MUST attach to an
+    # internal-only bridge to keep them sandboxed. The LiteLLM sidecar
+    # needs Bedrock/OpenAI access, so it's dual-homed (this internal
+    # bridge + the default bridge) via connect_default_bridge() below.
     r = subprocess.run(
         ["docker", "network", "inspect", name],
         capture_output=True,
     )
     if r.returncode == 0:
         return
+    cmd = ["docker", "network", "create"]
+    if internal:
+        cmd.append("--internal")
+    cmd.append(name)
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError(f"Failed to create network {name}: {r.stderr}")
+    logger.info("Network %s created (internal=%s)", name, internal)
+
+
+def connect_default_bridge(container_name: str) -> None:
+    # Attach a second NIC on the default bridge so this container can reach
+    # the public internet (needed for the LiteLLM sidecar to talk to
+    # Bedrock/OpenAI). Idempotent: ignores the 'already exists' error.
     r = subprocess.run(
-        ["docker", "network", "create", name],
+        ["docker", "network", "connect", "bridge", container_name],
         capture_output=True,
         text=True,
     )
-    if r.returncode != 0:
-        raise RuntimeError(f"Failed to create network {name}: {r.stderr}")
-    logger.info("Network %s created", name)
+    if r.returncode != 0 and "already exists" not in (r.stderr or ""):
+        raise RuntimeError(
+            f"Failed to attach {container_name} to default bridge: {r.stderr}"
+        )
 
 
 def remove_network(name: str) -> None:
@@ -188,6 +209,8 @@ def start_litellm(
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:
         raise RuntimeError(f"LiteLLM container start failed:\n{r.stderr}")
+    connect_default_bridge(container_name)
+    logger.info("[%s] LiteLLM sidecar dual-homed (internal + default bridge)", container_name)
 
 
 def wait_for_litellm_healthy(container_name: str, port: int = LITELLM_INTERNAL_PORT,

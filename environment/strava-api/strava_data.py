@@ -6,11 +6,41 @@ and athlete stats.
 
 import csv
 import json
-from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("strava-api")
+
+_store.register("activities", primary_key="id",
+                initial_loader=lambda: _coerce_activities(_load("activities.csv")))
+_store.register("segments", primary_key="id",
+                initial_loader=lambda: _coerce_segments(_load("segments.csv")))
+_store.register("kudoers", primary_key="activity_id",
+                initial_loader=lambda: _coerce_kudoers(_load("kudoers.csv")))
+_store.register_document("athlete", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "athlete.json", encoding="utf-8")))
+
+
+def _activities_rows():
+    return _store.table("activities").rows()
+
+
+def _segments_rows():
+    return _store.table("segments").rows()
+
+
+def _kudoers_rows():
+    return _store.table("kudoers").rows()
+
+
+def _athlete_doc():
+    return _store.document("athlete").get()
+
 
 
 def _load(filename):
@@ -81,17 +111,8 @@ def _coerce_kudoers(rows):
     return out
 
 
-_activities = _coerce_activities(_load("activities.csv"))
-_segments = _coerce_segments(_load("segments.csv"))
-_kudoers = _coerce_kudoers(_load("kudoers.csv"))
 
-with open(DATA_DIR / "athlete.json", encoding="utf-8") as _f:
-    _athlete = json.load(_f)
 
-_activities_store = deepcopy(_activities)
-_segments_store = deepcopy(_segments)
-_kudoers_store = deepcopy(_kudoers)
-_athlete_store = deepcopy(_athlete)
 
 
 # ---------------------------------------------------------------------------
@@ -99,7 +120,7 @@ _athlete_store = deepcopy(_athlete)
 # ---------------------------------------------------------------------------
 
 def get_athlete():
-    return _athlete_store
+    return _athlete_doc()
 
 
 # ---------------------------------------------------------------------------
@@ -107,7 +128,7 @@ def get_athlete():
 # ---------------------------------------------------------------------------
 
 def list_activities(before=None, after=None, page=1, per_page=30):
-    acts = list(_activities_store)
+    acts = list(_activities_rows())
     if before is not None:
         acts = [a for a in acts if _epoch(a["start_date"]) <= float(before)]
     if after is not None:
@@ -120,32 +141,32 @@ def list_activities(before=None, after=None, page=1, per_page=30):
 
 
 def get_activity(activity_id):
-    a = next((x for x in _activities_store if x["id"] == activity_id), None)
+    a = next((x for x in _activities_rows() if x["id"] == activity_id), None)
     if not a:
         return {"error": f"Activity {activity_id} not found", "errors": [{"resource": "Activity", "code": "not_found"}]}
     out = dict(a)
-    out["athlete"] = {"id": _athlete_store["id"]}
+    out["athlete"] = {"id": _athlete_doc()["id"]}
     return out
 
 
 def update_activity(activity_id, name=None, type=None):
-    for i, a in enumerate(_activities_store):
+    for i, a in enumerate(_activities_rows()):
         if a["id"] == activity_id:
             if name is not None:
-                _activities_store[i]["name"] = name
+                _activities_rows()[i]["name"] = name
             if type is not None:
-                _activities_store[i]["type"] = type
-                _activities_store[i]["sport_type"] = type
+                _activities_rows()[i]["type"] = type
+                _activities_rows()[i]["sport_type"] = type
             return get_activity(activity_id)
     return {"error": f"Activity {activity_id} not found", "errors": [{"resource": "Activity", "code": "not_found"}]}
 
 
 def activity_kudos(activity_id):
-    if not any(a["id"] == activity_id for a in _activities_store):
+    if not any(a["id"] == activity_id for a in _activities_rows()):
         return {"error": f"Activity {activity_id} not found", "errors": [{"resource": "Activity", "code": "not_found"}]}
     return [
         {"firstname": k["firstname"], "lastname": k["lastname"]}
-        for k in _kudoers_store if k["activity_id"] == activity_id
+        for k in _kudoers_rows() if k["activity_id"] == activity_id
     ]
 
 
@@ -154,7 +175,7 @@ def activity_kudos(activity_id):
 # ---------------------------------------------------------------------------
 
 def get_segment(segment_id):
-    s = next((x for x in _segments_store if x["id"] == segment_id), None)
+    s = next((x for x in _segments_rows() if x["id"] == segment_id), None)
     if not s:
         return {"error": f"Segment {segment_id} not found", "errors": [{"resource": "Segment", "code": "not_found"}]}
     return s
@@ -165,11 +186,11 @@ def get_segment(segment_id):
 # ---------------------------------------------------------------------------
 
 def athlete_stats(athlete_id):
-    if athlete_id != _athlete_store["id"]:
+    if athlete_id != _athlete_doc()["id"]:
         return {"error": f"Athlete {athlete_id} not found", "errors": [{"resource": "Athlete", "code": "not_found"}]}
 
     def _totals(act_type):
-        acts = [a for a in _activities_store if a["type"] == act_type]
+        acts = [a for a in _activities_rows() if a["type"] == act_type]
         return {
             "count": len(acts),
             "distance": round(sum(a["distance"] for a in acts), 1),

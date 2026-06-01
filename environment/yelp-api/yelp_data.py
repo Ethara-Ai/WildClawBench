@@ -1,10 +1,35 @@
 """Data access module for the Yelp Fusion API mock service."""
 
 import csv
-from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("yelp-api")
+
+_store.register("businesses", primary_key="id",
+                initial_loader=lambda: _coerce_businesses(_load("businesses.csv")))
+_store.register("reviews", primary_key="id",
+                initial_loader=lambda: _coerce_reviews(_load("reviews.csv")))
+_store.register("categories", primary_key="alias",
+                initial_loader=lambda: _coerce_categories(_load("categories.csv")))
+
+
+def _businesses_rows():
+    return _store.table("businesses").rows()
+
+
+def _reviews_rows():
+    return _store.table("reviews").rows()
+
+
+def _categories_rows():
+    return _store.table("categories").rows()
+
 
 # price symbol -> integer level for sort/compare
 _PRICE_LEVEL = {"$": 1, "$$": 2, "$$$": 3, "$$$$": 4}
@@ -66,13 +91,10 @@ def _coerce_categories(rows):
     return [{"alias": r["alias"], "title": r["title"], "parent_aliases": [r["parent"]]} for r in rows]
 
 
-_businesses = _coerce_businesses(_load("businesses.csv"))
-_reviews = _coerce_reviews(_load("reviews.csv"))
-_categories = _coerce_categories(_load("categories.csv"))
 
-_businesses_store = deepcopy(_businesses)
-_reviews_store = deepcopy(_reviews)
-_categories_store = deepcopy(_categories)
+
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -81,7 +103,7 @@ _categories_store = deepcopy(_categories)
 
 def search_businesses(term=None, location=None, categories=None, price=None,
                       sort_by="best_match", limit=20, offset=0):
-    results = list(_businesses_store)
+    results = list(_businesses_rows())
     if term:
         t = term.lower()
         results = [b for b in results
@@ -119,16 +141,16 @@ def search_businesses(term=None, location=None, categories=None, price=None,
 
 
 def get_business(business_id):
-    for b in _businesses_store:
+    for b in _businesses_rows():
         if b["id"] == business_id or b["alias"] == business_id:
             return b
     return {"error": f"Business {business_id} not found"}
 
 
 def get_business_reviews(business_id):
-    if not any(b["id"] == business_id or b["alias"] == business_id for b in _businesses_store):
+    if not any(b["id"] == business_id or b["alias"] == business_id for b in _businesses_rows()):
         return {"error": f"Business {business_id} not found"}
-    reviews = [r for r in _reviews_store if r["business_id"] == business_id]
+    reviews = [r for r in _reviews_rows() if r["business_id"] == business_id]
     return {"total": len(reviews), "reviews": reviews,
             "possible_languages": ["en"]}
 
@@ -138,4 +160,4 @@ def get_business_reviews(business_id):
 # ---------------------------------------------------------------------------
 
 def list_categories():
-    return {"categories": _categories_store}
+    return {"categories": _categories_rows()}

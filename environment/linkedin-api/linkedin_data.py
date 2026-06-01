@@ -3,11 +3,47 @@
 import csv
 import json
 import uuid
-from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("linkedin-api")
+
+_store.register("posts", primary_key="id",
+                initial_loader=lambda: _coerce_posts(_load("posts.csv")))
+_store.register("organizations", primary_key="id",
+                initial_loader=lambda: _coerce_orgs(_load("organizations.csv")))
+_store.register("jobs", primary_key="id",
+                initial_loader=lambda: _coerce_jobs(_load("jobs.csv")))
+_store.register("connections", primary_key="id",
+                initial_loader=lambda: _load("connections.csv"))
+_store.register_document("profile", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "profile.json", encoding="utf-8")))
+
+
+def _posts_rows():
+    return _store.table("posts").rows()
+
+
+def _organizations_rows():
+    return _store.table("organizations").rows()
+
+
+def _jobs_rows():
+    return _store.table("jobs").rows()
+
+
+def _connections_rows():
+    return _store.table("connections").rows()
+
+
+def _profile_doc():
+    return _store.document("profile").get()
+
 
 
 def _load(filename):
@@ -61,19 +97,6 @@ def _coerce_jobs(rows):
     return out
 
 
-_connections = _load("connections.csv")
-_posts = _coerce_posts(_load("posts.csv"))
-_organizations = _coerce_orgs(_load("organizations.csv"))
-_jobs = _coerce_jobs(_load("jobs.csv"))
-
-with open(DATA_DIR / "profile.json", encoding="utf-8") as _f:
-    _profile = json.load(_f)
-
-_connections_store = deepcopy(_connections)
-_posts_store = deepcopy(_posts)
-_organizations_store = deepcopy(_organizations)
-_jobs_store = deepcopy(_jobs)
-_profile_store = deepcopy(_profile)
 
 
 def _new_id():
@@ -85,14 +108,14 @@ def _new_id():
 # ---------------------------------------------------------------------------
 
 def get_me():
-    return _profile_store
+    return _profile_doc()
 
 
 def list_connections(start=0, count=50):
-    sliced = _connections_store[start: start + count]
+    sliced = _connections_rows()[start: start + count]
     return {
         "elements": sliced,
-        "paging": {"start": start, "count": count, "total": len(_connections_store)},
+        "paging": {"start": start, "count": count, "total": len(_connections_rows())},
     }
 
 
@@ -101,7 +124,7 @@ def list_connections(start=0, count=50):
 # ---------------------------------------------------------------------------
 
 def list_posts(author_id=None, start=0, count=50):
-    posts = list(_posts_store)
+    posts = list(_posts_rows())
     if author_id:
         posts = [p for p in posts if p["author_id"] == author_id]
     posts.sort(key=lambda p: p["created_at"], reverse=True)
@@ -113,14 +136,14 @@ def list_posts(author_id=None, start=0, count=50):
 
 
 def get_post(post_id):
-    for p in _posts_store:
+    for p in _posts_rows():
         if p["id"] == post_id:
             return p
     return {"error": f"Post {post_id} not found"}
 
 
 def create_post(commentary, author_id=None, visibility="PUBLIC"):
-    author_id = author_id or _profile_store["id"]
+    author_id = author_id or _profile_doc()["id"]
     post = {
         "id": _new_id(),
         "author_id": author_id,
@@ -129,7 +152,7 @@ def create_post(commentary, author_id=None, visibility="PUBLIC"):
         "created_at": _now(),
         "socialDetail": {"likeCount": 0, "commentCount": 0, "shareCount": 0},
     }
-    _posts_store.append(post)
+    _posts_rows().append(post)
     return post
 
 
@@ -138,7 +161,7 @@ def create_post(commentary, author_id=None, visibility="PUBLIC"):
 # ---------------------------------------------------------------------------
 
 def get_organization(org_id):
-    for o in _organizations_store:
+    for o in _organizations_rows():
         if o["id"] == org_id:
             return o
     return {"error": f"Organization {org_id} not found"}
@@ -149,7 +172,7 @@ def get_organization(org_id):
 # ---------------------------------------------------------------------------
 
 def search_jobs(keywords=None, location=None, start=0, count=50):
-    jobs = list(_jobs_store)
+    jobs = list(_jobs_rows())
     if keywords:
         q = keywords.lower()
         jobs = [j for j in jobs
@@ -168,7 +191,7 @@ def search_jobs(keywords=None, location=None, start=0, count=50):
 
 
 def get_job(job_id):
-    for j in _jobs_store:
+    for j in _jobs_rows():
         if j["id"] == job_id:
             return j
     return {"error": f"Job {job_id} not found"}

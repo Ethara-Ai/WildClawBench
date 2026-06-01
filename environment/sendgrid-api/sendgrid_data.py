@@ -2,11 +2,48 @@
 
 import csv
 import uuid
-from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("sendgrid-api")
+
+_store.register("templates", primary_key="id",
+                initial_loader=lambda: _coerce_templates(_load("templates.csv")))
+_store.register("lists", primary_key="id",
+                initial_loader=lambda: _coerce_lists(_load("lists.csv")))
+_store.register("contacts", primary_key="id",
+                initial_loader=lambda: _coerce_contacts(_load("contacts.csv")))
+_store.register("sent_log", primary_key="message_id",
+                initial_loader=lambda: _coerce_sent_log(_load("sent_log.csv")))
+_store.register("stats", primary_key="date",
+                initial_loader=lambda: _coerce_stats(_load("stats.csv")))
+
+
+def _templates_rows():
+    return _store.table("templates").rows()
+
+
+def _lists_rows():
+    return _store.table("lists").rows()
+
+
+def _contacts_rows():
+    return _store.table("contacts").rows()
+
+
+def _sent_log_rows():
+    return _store.table("sent_log").rows()
+
+
+def _stats_rows():
+    return _store.table("stats").rows()
+
 
 
 def _load(filename):
@@ -92,17 +129,14 @@ def _coerce_stats(rows):
     return out
 
 
-_templates = _coerce_templates(_load("templates.csv"))
-_lists = _coerce_lists(_load("lists.csv"))
-_contacts = _coerce_contacts(_load("contacts.csv"))
-_sent_log = _coerce_sent_log(_load("sent_log.csv"))
-_stats = _coerce_stats(_load("stats.csv"))
 
-_templates_store = deepcopy(_templates)
-_lists_store = deepcopy(_lists)
-_contacts_store = deepcopy(_contacts)
-_sent_log_store = deepcopy(_sent_log)
-_stats_store = deepcopy(_stats)
+
+
+
+
+
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -149,13 +183,13 @@ def send_mail(personalizations, from_email, subject=None, content=None, template
         return {"errors": [{"message": "personalizations is required"}], "status": 400}
     if not from_email:
         return {"errors": [{"message": "from.email is required"}], "status": 400}
-    if template_id and not any(t["id"] == template_id for t in _templates_store):
+    if template_id and not any(t["id"] == template_id for t in _templates_rows()):
         return {"errors": [{"message": f"template {template_id} not found"}], "status": 400}
 
     created = []
     eff_subject = subject
     if template_id:
-        tmpl = next((t for t in _templates_store if t["id"] == template_id), None)
+        tmpl = next((t for t in _templates_rows() if t["id"] == template_id), None)
         if tmpl and not eff_subject:
             eff_subject = tmpl["subject"]
     for p in personalizations:
@@ -171,7 +205,7 @@ def send_mail(personalizations, from_email, subject=None, content=None, template
                 "clicks": 0,
                 "sent_at": _now(),
             }
-            _sent_log_store.append(entry)
+            _sent_log_rows().append(entry)
             created.append(entry["message_id"])
     return {"accepted": len(created), "message_ids": created, "status": "queued"}
 
@@ -181,14 +215,14 @@ def send_mail(personalizations, from_email, subject=None, content=None, template
 # ---------------------------------------------------------------------------
 
 def list_templates(generation=None):
-    results = list(_templates_store)
+    results = list(_templates_rows())
     if generation:
         results = [t for t in results if t["generation"] == generation]
     return {"result": [_serialize_template(t) for t in results]}
 
 
 def get_template(template_id):
-    for t in _templates_store:
+    for t in _templates_rows():
         if t["id"] == template_id:
             return _serialize_template(t)
     return {"error": f"Template {template_id} not found"}
@@ -204,7 +238,7 @@ def create_template(name, generation="dynamic", subject="", html_content=""):
         "active": True,
         "updated_at": _now(),
     }
-    _templates_store.append(tmpl)
+    _templates_rows().append(tmpl)
     return _serialize_template(tmpl)
 
 
@@ -213,12 +247,12 @@ def create_template(name, generation="dynamic", subject="", html_content=""):
 # ---------------------------------------------------------------------------
 
 def list_contacts(email=None):
-    results = list(_contacts_store)
+    results = list(_contacts_rows())
     if email:
         results = [c for c in results if c["email"] == email]
     return {
         "result": [_serialize_contact(c) for c in results],
-        "contact_count": len(_contacts_store),
+        "contact_count": len(_contacts_rows()),
     }
 
 
@@ -229,7 +263,7 @@ def upsert_contacts(contacts, list_ids=None):
         email = c.get("email")
         if not email:
             continue
-        existing = next((x for x in _contacts_store if x["email"] == email), None)
+        existing = next((x for x in _contacts_rows() if x["email"] == email), None)
         if existing:
             existing["first_name"] = c.get("first_name", existing["first_name"])
             existing["last_name"] = c.get("last_name", existing["last_name"])
@@ -250,7 +284,7 @@ def upsert_contacts(contacts, list_ids=None):
                 "created_at": _now(),
                 "updated_at": _now(),
             }
-            _contacts_store.append(new_c)
+            _contacts_rows().append(new_c)
             upserted.append(new_c["id"])
     return {"job_id": _new_id("job"), "upserted": len(upserted), "contact_ids": upserted}
 
@@ -260,7 +294,7 @@ def upsert_contacts(contacts, list_ids=None):
 # ---------------------------------------------------------------------------
 
 def list_lists():
-    return {"result": list(_lists_store)}
+    return {"result": list(_lists_rows())}
 
 
 # ---------------------------------------------------------------------------
@@ -268,7 +302,7 @@ def list_lists():
 # ---------------------------------------------------------------------------
 
 def get_stats(start_date=None, end_date=None):
-    rows = list(_stats_store)
+    rows = list(_stats_rows())
     if start_date:
         rows = [r for r in rows if r["date"] >= start_date]
     if end_date:

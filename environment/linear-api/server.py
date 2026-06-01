@@ -8,14 +8,17 @@ from typing import Optional, List
 import linear_data
 try:
     from tracking_middleware import install_tracker
+    from admin_plane import install_admin_plane
 except ModuleNotFoundError:  # standalone run without the shared module on sys.path
     def install_tracker(app):  # no-op fallback: audit endpoints disabled
         return None
 
+    def install_admin_plane(app, store=None, one_shot_registry=None):
+        return None
+
 app = FastAPI(title="Linear API (Mock)", version="2024.01")
 install_tracker(app)
-
-
+install_admin_plane(app, store=linear_data._store)
 @app.get("/health")
 def health():
     return {"status": "ok"}

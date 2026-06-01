@@ -3,11 +3,47 @@
 import csv
 import json
 import uuid
-from copy import deepcopy
 from datetime import datetime, timedelta
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("instacart-api")
+
+_store.register("retailers", primary_key="retailer_id",
+                initial_loader=lambda: _coerce_retailers(_load("retailers.csv")))
+_store.register("products", primary_key="product_id",
+                initial_loader=lambda: _coerce_products(_load("products.csv")))
+_store.register("orders", primary_key="order_id",
+                initial_loader=lambda: _coerce_orders(_load("orders.csv")))
+_store.register("order_items", primary_key="order_id",
+                initial_loader=lambda: _coerce_order_items(_load("order_items.csv")))
+_store.register_document("user", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "user.json", encoding="utf-8")))
+
+
+def _retailers_rows():
+    return _store.table("retailers").rows()
+
+
+def _products_rows():
+    return _store.table("products").rows()
+
+
+def _orders_rows():
+    return _store.table("orders").rows()
+
+
+def _order_items_rows():
+    return _store.table("order_items").rows()
+
+
+def _user_doc():
+    return _store.document("user").get()
+
 
 
 def _load(filename):
@@ -76,19 +112,11 @@ def _coerce_order_items(rows):
     return out
 
 
-_retailers = _coerce_retailers(_load("retailers.csv"))
-_products = _coerce_products(_load("products.csv"))
-_orders = _coerce_orders(_load("orders.csv"))
-_order_items = _coerce_order_items(_load("order_items.csv"))
 
-with open(DATA_DIR / "user.json", encoding="utf-8") as _f:
-    _user = json.load(_f)
 
-_retailers_store = deepcopy(_retailers)
-_products_store = deepcopy(_products)
-_orders_store = deepcopy(_orders)
-_order_items_store = deepcopy(_order_items)
-_user_store = deepcopy(_user)
+
+
+
 _carts = {}  # cart_id -> {retailer_id, user_id, items: [{product_id, quantity}]}
 
 
@@ -101,7 +129,7 @@ def _new_id(prefix):
 # ---------------------------------------------------------------------------
 
 def get_user():
-    return _user_store
+    return _user_doc()
 
 
 # ---------------------------------------------------------------------------
@@ -110,12 +138,12 @@ def get_user():
 
 def list_retailers(zip_code=None):
     if not zip_code:
-        return _retailers_store
-    return [r for r in _retailers_store if zip_code in r["delivers_to_zips"]]
+        return _retailers_rows()
+    return [r for r in _retailers_rows() if zip_code in r["delivers_to_zips"]]
 
 
 def get_retailer(retailer_id):
-    for r in _retailers_store:
+    for r in _retailers_rows():
         if r["retailer_id"] == retailer_id:
             return r
     return {"error": f"Retailer {retailer_id} not found"}
@@ -127,7 +155,7 @@ def get_retailer(retailer_id):
 
 def search_products(retailer_id=None, query=None, category=None, in_stock_only=True,
                     limit=25, offset=0):
-    results = list(_products_store)
+    results = list(_products_rows())
     if retailer_id:
         results = [p for p in results if p["retailer_id"] == retailer_id]
     if query:
@@ -143,7 +171,7 @@ def search_products(retailer_id=None, query=None, category=None, in_stock_only=T
 
 
 def get_product(product_id):
-    for p in _products_store:
+    for p in _products_rows():
         if p["product_id"] == product_id:
             return p
     return {"error": f"Product {product_id} not found"}
@@ -158,7 +186,7 @@ def _get_cart(cart_id):
 
 
 def create_cart(user_id, retailer_id):
-    if not any(r["retailer_id"] == retailer_id for r in _retailers_store):
+    if not any(r["retailer_id"] == retailer_id for r in _retailers_rows()):
         return {"error": f"Retailer {retailer_id} not found"}
     cart_id = _new_id("cart")
     _carts[cart_id] = {
@@ -175,11 +203,11 @@ def _cart_with_totals(cart_id):
     cart = _get_cart(cart_id)
     if not cart:
         return {"error": f"Cart {cart_id} not found"}
-    retailer = next(r for r in _retailers_store if r["retailer_id"] == cart["retailer_id"])
+    retailer = next(r for r in _retailers_rows() if r["retailer_id"] == cart["retailer_id"])
     subtotal = 0.0
     detailed_items = []
     for it in cart["items"]:
-        product = next((p for p in _products_store if p["product_id"] == it["product_id"]), None)
+        product = next((p for p in _products_rows() if p["product_id"] == it["product_id"]), None)
         if not product:
             continue
         unit_price = product["sale_price"] or product["price"]
@@ -214,7 +242,7 @@ def add_to_cart(cart_id, product_id, quantity):
     cart = _get_cart(cart_id)
     if not cart:
         return {"error": f"Cart {cart_id} not found"}
-    product = next((p for p in _products_store if p["product_id"] == product_id), None)
+    product = next((p for p in _products_rows() if p["product_id"] == product_id), None)
     if not product:
         return {"error": f"Product {product_id} not found"}
     if product["retailer_id"] != cart["retailer_id"]:
@@ -268,9 +296,9 @@ def checkout(cart_id, tip=0.0, delivery_window_start=None, delivery_window_end=N
         "delivery_window_end": delivery_window_end,
         "shopper_id": "",
     }
-    _orders_store.append(order)
+    _orders_rows().append(order)
     for it in cart_full["items"]:
-        _order_items_store.append({
+        _order_items_rows().append({
             "order_id": order_id,
             "product_id": it["product_id"],
             "quantity": it["quantity"],
@@ -287,7 +315,7 @@ def checkout(cart_id, tip=0.0, delivery_window_start=None, delivery_window_end=N
 # ---------------------------------------------------------------------------
 
 def list_orders(user_id=None, status=None):
-    results = list(_orders_store)
+    results = list(_orders_rows())
     if user_id:
         results = [o for o in results if o["user_id"] == user_id]
     if status:
@@ -297,18 +325,18 @@ def list_orders(user_id=None, status=None):
 
 
 def get_order(order_id):
-    for o in _orders_store:
+    for o in _orders_rows():
         if o["order_id"] == order_id:
-            items = [i for i in _order_items_store if i["order_id"] == order_id]
+            items = [i for i in _order_items_rows() if i["order_id"] == order_id]
             return {**o, "items": items}
     return {"error": f"Order {order_id} not found"}
 
 
 def cancel_order(order_id):
-    for i, o in enumerate(_orders_store):
+    for i, o in enumerate(_orders_rows()):
         if o["order_id"] == order_id:
             if o["status"] in {"DELIVERED", "CANCELLED"}:
                 return {"error": f"Order {order_id} cannot be cancelled (status: {o['status']})"}
-            _orders_store[i]["status"] = "CANCELLED"
-            return _orders_store[i]
+            _orders_rows()[i]["status"] = "CANCELLED"
+            return _orders_rows()[i]
     return {"error": f"Order {order_id} not found"}

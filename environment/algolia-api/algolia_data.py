@@ -7,10 +7,15 @@ across string fields and a simple ``attr:value`` equality filter syntax.
 
 import csv
 import uuid
-from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store
+
+_store = get_store("algolia-api")
 
 
 def _load(filename):
@@ -37,7 +42,6 @@ def _to_float(v, default=None):
 
 
 def _maybe_number(v):
-    """Cast a CSV string to int/float when it looks numeric, else leave it."""
     if v is None or v == "":
         return v
     try:
@@ -46,10 +50,6 @@ def _maybe_number(v):
     except (TypeError, ValueError):
         return v
 
-
-# ---------------------------------------------------------------------------
-# Load + coerce
-# ---------------------------------------------------------------------------
 
 _NUMERIC_FIELDS = {"price"}
 _BOOL_FIELDS = {"in_stock"}
@@ -69,20 +69,34 @@ def _coerce_record(row):
 
 _indices_meta = [dict(r) for r in _load("indices.csv")]
 
-_records_store = {}
-for meta in _indices_meta:
-    rows = _load(meta["records_csv"])
-    _records_store[meta["name"]] = deepcopy([_coerce_record(r) for r in rows])
 
-_indices_store = []
-for meta in _indices_meta:
-    _indices_store.append({
-        "name": meta["name"],
-        "entries": _to_int(meta["entries"]),
-        "dataSize": _to_int(meta["data_size"]),
-        "createdAt": meta["created_at"],
-        "updatedAt": meta["updated_at"],
-    })
+def _records_table_name(index: str) -> str:
+    return f"records__{index}"
+
+
+_store.register(
+    "indices",
+    primary_key="name",
+    initial_loader=lambda: [
+        {
+            "name": m["name"],
+            "entries": _to_int(m["entries"]),
+            "dataSize": _to_int(m["data_size"]),
+            "createdAt": m["created_at"],
+            "updatedAt": m["updated_at"],
+        }
+        for m in _indices_meta
+    ],
+)
+
+# one mutable Table per algolia index, PK = objectID (camelCase, idiosyncratic)
+for _meta in _indices_meta:
+    _store.register(
+        _records_table_name(_meta["name"]),
+        primary_key="objectID",
+        initial_loader=(lambda csv_name=_meta["records_csv"]:
+                        [_coerce_record(r) for r in _load(csv_name)]),
+    )
 
 
 def _coerce_settings(row):
@@ -94,19 +108,39 @@ def _coerce_settings(row):
     }
 
 
-_settings_store = {r["index"]: _coerce_settings(r) for r in _load("settings.csv")}
+# settings stored as a Table keyed by "index" column (each row is per-index settings)
+_store.register(
+    "settings",
+    primary_key="index",
+    initial_loader=lambda: [
+        {"index": r["index"], **_coerce_settings(r)} for r in _load("settings.csv")
+    ],
+)
 
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 def _new_object_id():
     return uuid.uuid4().hex[:16]
 
 
 def _index_exists(index):
-    return index in _records_store
+    return _store.table("indices").get(index) is not None
+
+
+def _ensure_index(index):
+    """Algolia auto-creates an index on first write -- register the records table dynamically if absent."""
+    if _index_exists(index):
+        return
+    _store.table("indices").upsert({
+        "name": index, "entries": 0, "dataSize": 0,
+        "createdAt": "", "updatedAt": "",
+    })
+    tname = _records_table_name(index)
+    if tname not in _store.list_tables():
+        _store.register(tname, primary_key="objectID", initial_loader=lambda: [])
+
+
+def _records(index):
+    return _store.table(_records_table_name(index)).rows()
 
 
 def _matches_query(record, query):
@@ -138,33 +172,28 @@ def _matches_filters(record, filters):
     return True
 
 
-# ---------------------------------------------------------------------------
-# Indices
-# ---------------------------------------------------------------------------
-
 def list_indexes():
-    return {"items": deepcopy(_indices_store), "nbPages": 1}
+    return {"items": _store.table("indices").rows(), "nbPages": 1}
 
 
 def get_settings(index):
     if not _index_exists(index):
         return {"error": f"Index {index} not found"}
-    return deepcopy(_settings_store.get(index, {
+    s = _store.table("settings").get(index)
+    if s:
+        return {k: v for k, v in s.items() if k != "index"}
+    return {
         "searchableAttributes": [],
         "attributesForFaceting": [],
         "hitsPerPage": 20,
         "ranking": [],
-    }))
+    }
 
-
-# ---------------------------------------------------------------------------
-# Query
-# ---------------------------------------------------------------------------
 
 def query_index(index, query=None, filters=None, hits_per_page=20, page=0):
     if not _index_exists(index):
         return {"error": f"Index {index} not found"}
-    records = _records_store[index]
+    records = _records(index)
     hits = [r for r in records if _matches_query(r, query) and _matches_filters(r, filters)]
     nb_hits = len(hits)
     try:
@@ -177,7 +206,7 @@ def query_index(index, query=None, filters=None, hits_per_page=20, page=0):
         page = 0
     nb_pages = (nb_hits + hits_per_page - 1) // hits_per_page if nb_hits else 0
     start = page * hits_per_page
-    page_hits = [deepcopy(r) for r in hits[start: start + hits_per_page]]
+    page_hits = hits[start: start + hits_per_page]
     return {
         "hits": page_hits,
         "nbHits": nb_hits,
@@ -189,55 +218,46 @@ def query_index(index, query=None, filters=None, hits_per_page=20, page=0):
     }
 
 
-# ---------------------------------------------------------------------------
-# Records
-# ---------------------------------------------------------------------------
-
 def get_object(index, object_id):
     if not _index_exists(index):
         return {"error": f"Index {index} not found"}
-    for r in _records_store[index]:
-        if r.get("objectID") == object_id:
-            return deepcopy(r)
+    r = _store.table(_records_table_name(index)).get(object_id)
+    if r:
+        return r
     return {"error": f"Object {object_id} not found in index {index}"}
 
 
 def add_object(index, body):
-    if not _index_exists(index):
-        # Algolia auto-creates an index on first write.
-        _records_store[index] = []
-        _indices_store.append({
-            "name": index, "entries": 0, "dataSize": 0,
-            "createdAt": "", "updatedAt": "",
-        })
+    _ensure_index(index)
     record = dict(body or {})
     object_id = record.get("objectID") or _new_object_id()
     record["objectID"] = object_id
-    _records_store[index].append(record)
-    return {"objectID": object_id, "createdAt": "", "taskID": _to_int(uuid.uuid4().int % 1000000)}
+    _store.table(_records_table_name(index)).upsert(record)
+    return {"objectID": object_id, "createdAt": "",
+            "taskID": _to_int(uuid.uuid4().int % 1000000)}
 
 
 def update_object(index, object_id, body):
     if not _index_exists(index):
         return {"error": f"Index {index} not found"}
-    for r in _records_store[index]:
-        if r.get("objectID") == object_id:
-            r.update(body or {})
-            r["objectID"] = object_id
-            return {"objectID": object_id, "updatedAt": "", "taskID": _to_int(uuid.uuid4().int % 1000000)}
-    # PUT semantics: create if missing.
-    record = dict(body or {})
-    record["objectID"] = object_id
-    _records_store[index].append(record)
-    return {"objectID": object_id, "updatedAt": "", "taskID": _to_int(uuid.uuid4().int % 1000000)}
+    tbl = _store.table(_records_table_name(index))
+    cur = tbl.get(object_id)
+    if cur:
+        merged = {**cur, **(body or {}), "objectID": object_id}
+        tbl.upsert(merged)
+    else:
+        record = dict(body or {})
+        record["objectID"] = object_id
+        tbl.upsert(record)
+    return {"objectID": object_id, "updatedAt": "",
+            "taskID": _to_int(uuid.uuid4().int % 1000000)}
 
 
 def delete_object(index, object_id):
     if not _index_exists(index):
         return {"error": f"Index {index} not found"}
-    bucket = _records_store[index]
-    for i, r in enumerate(bucket):
-        if r.get("objectID") == object_id:
-            bucket.pop(i)
-            return {"objectID": object_id, "deletedAt": "", "taskID": _to_int(uuid.uuid4().int % 1000000)}
+    tbl = _store.table(_records_table_name(index))
+    if tbl.delete(object_id):
+        return {"objectID": object_id, "deletedAt": "",
+                "taskID": _to_int(uuid.uuid4().int % 1000000)}
     return {"error": f"Object {object_id} not found in index {index}"}

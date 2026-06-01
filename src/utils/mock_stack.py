@@ -164,7 +164,9 @@ def build_mock_image_if_needed(env_dir: Path, image: str = MOCK_IMAGE,
 
 def start_mock_stack(container_name: str, network: str,
                      image: str = MOCK_IMAGE,
-                     overlays: dict | None = None) -> None:
+                     overlays: dict | None = None,
+                     admin_env: dict[str, str] | None = None,
+                     publish_ports: list[int] | None = None) -> None:
     subprocess.run(["docker", "rm", "-f", container_name], capture_output=True)
     mount_args: list[str] = []
     for api_name, files in (overlays or {}).items():
@@ -175,17 +177,78 @@ def start_mock_stack(container_name: str, network: str,
             mount_args += ["-v", f"{host_path}:{container_path}:ro"]
             logger.info("[%s] overlay %s/%s -> %s",
                         container_name, api_name, filename, host_path)
+    env_args: list[str] = []
+    for k, v in (admin_env or {}).items():
+        env_args += ["-e", f"{k}={v}"]
+    if admin_env:
+        # Avoid logging token values; allowlist/enabled are safe.
+        safe_keys = sorted(k for k in admin_env if k != "MOCK_ADMIN_TOKEN")
+        logger.info("[%s] admin plane enabled (vars: %s)", container_name, safe_keys)
+    publish_args: list[str] = []
+    for port in publish_ports or []:
+        # Bind to 127.0.0.1 only -- the host-side DriftDirector connects via
+        # localhost; we must not expose the admin plane on the host's public
+        # interfaces.
+        publish_args += ["-p", f"127.0.0.1::{int(port)}"]
     cmd = [
         "docker", "run", "-d",
         "--name", container_name,
         "--network", network,
         *mount_args,
+        *env_args,
+        *publish_args,
         image,
     ]
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:
         raise RuntimeError(f"mock-stack start failed:\n{r.stderr}")
     logger.info("[%s] mock-stack container started", container_name)
+
+
+def get_published_ports(container_name: str, internal_ports: list[int]) -> dict[int, int]:
+    """Resolve internal->host port mapping for a running container.
+
+    Used by the DriftDirector to find each API's localhost port after the
+    container is up. Returns {internal_port: host_port}. Ports not yet
+    published (or never mapped) are omitted from the result.
+    """
+    out: dict[int, int] = {}
+    for p in internal_ports:
+        r = subprocess.run(
+            ["docker", "port", container_name, str(p)],
+            capture_output=True, text=True,
+        )
+        if r.returncode != 0:
+            continue
+        for line in (r.stdout or "").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            host_part = line.rsplit(":", 1)[-1]
+            try:
+                out[int(p)] = int(host_part)
+                break
+            except ValueError:
+                continue
+    return out
+
+
+def get_network_gateway(network: str) -> str | None:
+    """Return the docker bridge gateway IP for `network`, or None on failure.
+
+    The host appears to containers on `network` under this IP. We pass it as
+    MOCK_ADMIN_ALLOWLIST so the admin plane only accepts inbound requests from
+    the harness host (which is where the DriftDirector runs).
+    """
+    r = subprocess.run(
+        ["docker", "network", "inspect", network,
+         "--format", "{{range .IPAM.Config}}{{.Gateway}} {{end}}"],
+        capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        return None
+    gws = (r.stdout or "").strip().split()
+    return gws[0] if gws else None
 
 
 def wait_for_mock_stack_healthy(container_name: str, timeout: float = 120.0) -> bool:

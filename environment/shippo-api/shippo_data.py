@@ -2,11 +2,54 @@
 
 import csv
 import uuid
-from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("shippo-api")
+
+_store.register("addresses", primary_key="object_id",
+                initial_loader=lambda: _coerce_addresses(_load("addresses.csv")))
+_store.register("parcels", primary_key="object_id",
+                initial_loader=lambda: _coerce_parcels(_load("parcels.csv")))
+_store.register("shipments", primary_key="object_id",
+                initial_loader=lambda: _coerce_shipments(_load("shipments.csv")))
+_store.register("rates", primary_key="object_id",
+                initial_loader=lambda: _coerce_rates(_load("rates.csv")))
+_store.register("transactions", primary_key="object_id",
+                initial_loader=lambda: _coerce_transactions(_load("transactions.csv")))
+_store.register("tracking", primary_key="carrier",
+                initial_loader=lambda: _coerce_tracking(_load("tracking.csv")))
+
+
+def _addresses_rows():
+    return _store.table("addresses").rows()
+
+
+def _parcels_rows():
+    return _store.table("parcels").rows()
+
+
+def _shipments_rows():
+    return _store.table("shipments").rows()
+
+
+def _rates_rows():
+    return _store.table("rates").rows()
+
+
+def _transactions_rows():
+    return _store.table("transactions").rows()
+
+
+def _tracking_rows():
+    return _store.table("tracking").rows()
+
 
 
 def _load(filename):
@@ -74,19 +117,16 @@ def _coerce_tracking(rows):
     return [{**r} for r in rows]
 
 
-_addresses = _coerce_addresses(_load("addresses.csv"))
-_parcels = _coerce_parcels(_load("parcels.csv"))
-_shipments = _coerce_shipments(_load("shipments.csv"))
-_rates = _coerce_rates(_load("rates.csv"))
-_transactions = _coerce_transactions(_load("transactions.csv"))
-_tracking = _coerce_tracking(_load("tracking.csv"))
 
-_addresses_store = deepcopy(_addresses)
-_parcels_store = deepcopy(_parcels)
-_shipments_store = deepcopy(_shipments)
-_rates_store = deepcopy(_rates)
-_transactions_store = deepcopy(_transactions)
-_tracking_store = deepcopy(_tracking)
+
+
+
+
+
+
+
+
+
 
 
 def _new_id(prefix):
@@ -114,14 +154,14 @@ def _rate_obj(r):
 
 
 def _shipment_obj(s):
-    rates = [_rate_obj(r) for r in _rates_store if r["shipment"] == s["object_id"]]
+    rates = [_rate_obj(r) for r in _rates_rows() if r["shipment"] == s["object_id"]]
     return {
         "object_id": s["object_id"],
         "status": s["status"],
         "object_created": s["created_time"],
         "address_from": _find_address(s["address_from"]),
         "address_to": _find_address(s["address_to"]),
-        "parcels": [_parcel_obj(p) for p in _parcels_store if p["object_id"] == s["parcel"]],
+        "parcels": [_parcel_obj(p) for p in _parcels_rows() if p["object_id"] == s["parcel"]],
         "rates": rates,
     }
 
@@ -131,7 +171,7 @@ def _parcel_obj(p):
 
 
 def _find_address(object_id):
-    for a in _addresses_store:
+    for a in _addresses_rows():
         if a["object_id"] == object_id:
             return _address_obj(a)
     return None
@@ -157,7 +197,7 @@ def create_address(payload):
         "is_residential": bool(payload.get("is_residential", False)),
         "validated": True,
     }
-    _addresses_store.append(addr)
+    _addresses_rows().append(addr)
     return _address_obj(addr)
 
 
@@ -207,10 +247,10 @@ def create_shipment(payload):
         "status": "SUCCESS",
         "created_time": _now(),
     }
-    _shipments_store.append(shipment)
+    _shipments_rows().append(shipment)
     # Generate rates across carriers for the new shipment.
     for provider, token, name, amount, days in _DEFAULT_RATE_TEMPLATES:
-        _rates_store.append({
+        _rates_rows().append({
             "object_id": _new_id("rate"),
             "shipment": shipment["object_id"],
             "provider": provider,
@@ -234,21 +274,21 @@ def create_parcel(payload):
         "mass_unit": payload.get("mass_unit", "lb"),
         "template": payload.get("template") or None,
     }
-    _parcels_store.append(parcel)
+    _parcels_rows().append(parcel)
     return _parcel_obj(parcel)
 
 
 def get_shipment(object_id):
-    for s in _shipments_store:
+    for s in _shipments_rows():
         if s["object_id"] == object_id:
             return _shipment_obj(s)
     return {"error": f"shipment {object_id} not found"}
 
 
 def list_shipment_rates(object_id):
-    if not any(s["object_id"] == object_id for s in _shipments_store):
+    if not any(s["object_id"] == object_id for s in _shipments_rows()):
         return {"error": f"shipment {object_id} not found"}
-    rates = [_rate_obj(r) for r in _rates_store if r["shipment"] == object_id]
+    rates = [_rate_obj(r) for r in _rates_rows() if r["shipment"] == object_id]
     return {"count": len(rates), "results": rates}
 
 
@@ -267,7 +307,7 @@ def _gen_tracking_number(provider):
 
 def create_transaction(payload):
     rate_id = payload.get("rate")
-    rate = next((r for r in _rates_store if r["object_id"] == rate_id), None)
+    rate = next((r for r in _rates_rows() if r["object_id"] == rate_id), None)
     if rate is None:
         return {"error": f"rate {rate_id} not found"}
     tracking_number = _gen_tracking_number(rate["provider"])
@@ -282,8 +322,8 @@ def create_transaction(payload):
         "label_url": f"https://shippo-delivery.s3.amazonaws.com/labels/{tracking_number}.pdf",
         "created_time": _now(),
     }
-    _transactions_store.append(txn)
-    _tracking_store.append({
+    _transactions_rows().append(txn)
+    _tracking_rows().append({
         "carrier": rate["provider"],
         "tracking_number": tracking_number,
         "status": "PRE_TRANSIT",
@@ -296,7 +336,7 @@ def create_transaction(payload):
 
 
 def get_transaction(object_id):
-    for t in _transactions_store:
+    for t in _transactions_rows():
         if t["object_id"] == object_id:
             return dict(t)
     return {"error": f"transaction {object_id} not found"}
@@ -307,7 +347,7 @@ def get_transaction(object_id):
 # ---------------------------------------------------------------------------
 
 def get_tracking(carrier, tracking_number):
-    history = [t for t in _tracking_store
+    history = [t for t in _tracking_rows()
                if t["carrier"].lower() == carrier.lower()
                and t["tracking_number"] == tracking_number]
     if not history:

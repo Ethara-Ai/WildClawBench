@@ -6,10 +6,34 @@ sharing/list_shared_links.
 """
 
 import csv
-from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("dropbox-api")
+
+_store.register_document("account", initial_loader=lambda: _coerce_account(_load("account.csv")))
+_store.register("files", primary_key="id",
+                initial_loader=lambda: _coerce_files(_load("files.csv")))
+_store.register("shared_links", primary_key="id",
+                initial_loader=lambda: _coerce_shared_links(_load("shared_links.csv")))
+
+
+def _account_doc():
+    return _store.document("account").get()
+
+
+def _files_rows():
+    return _store.table("files").rows()
+
+
+def _shared_links_rows():
+    return _store.table("shared_links").rows()
+
 
 
 def _load(filename):
@@ -83,13 +107,10 @@ def _coerce_shared_links(rows):
     return out
 
 
-_account = _coerce_account(_load("account.csv"))
-_files = _coerce_files(_load("files.csv"))
-_shared_links = _coerce_shared_links(_load("shared_links.csv"))
 
-_account_store = deepcopy(_account)
-_files_store = deepcopy(_files)
-_shared_links_store = deepcopy(_shared_links)
+
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -148,7 +169,7 @@ def _norm_path(path):
 # ---------------------------------------------------------------------------
 
 def get_current_account():
-    return deepcopy(_account_store)
+    return deepcopy(_account_doc())
 
 
 # ---------------------------------------------------------------------------
@@ -158,7 +179,7 @@ def get_current_account():
 def list_folder(path="", recursive=False):
     parent = _norm_path(path)
     entries = []
-    for f in _files_store:
+    for f in _files_rows():
         child = f["path_lower"]
         if child == parent:
             continue
@@ -185,7 +206,7 @@ def get_metadata(path=None):
     if not path:
         return {"error_summary": "path/not_found/", "error": {".tag": "path"}}
     target = _norm_path(path)
-    for f in _files_store:
+    for f in _files_rows():
         if f["path_lower"] == target or f["id"] == path:
             return _serialize_entry(f)
     return {
@@ -202,7 +223,7 @@ def search_v2(query=None, path=""):
     q = (query or "").lower()
     scope = _norm_path(path)
     matches = []
-    for f in _files_store:
+    for f in _files_rows():
         if scope and not (f["path_lower"] == scope or f["path_lower"].startswith(scope + "/")):
             continue
         if q and q not in f["name"].lower():
@@ -225,7 +246,7 @@ def search_v2(query=None, path=""):
 # ---------------------------------------------------------------------------
 
 def list_shared_links(path=None):
-    links = _shared_links_store
+    links = _shared_links_rows()
     if path:
         target = _norm_path(path)
         links = [s for s in links if s["path_lower"] == target]

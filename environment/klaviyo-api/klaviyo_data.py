@@ -10,10 +10,35 @@ import csv
 import secrets
 import string
 import time
-from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("klaviyo-api")
+
+_store.register("profiles", primary_key="id",
+                initial_loader=lambda: _coerce_profiles(_load("profiles.csv")))
+_store.register("lists", primary_key="id",
+                initial_loader=lambda: _coerce_lists(_load("lists.csv")))
+_store.register("campaigns", primary_key="id",
+                initial_loader=lambda: _coerce_campaigns(_load("campaigns.csv")))
+
+
+def _profiles_rows():
+    return _store.table("profiles").rows()
+
+
+def _lists_rows():
+    return _store.table("lists").rows()
+
+
+def _campaigns_rows():
+    return _store.table("campaigns").rows()
+
 
 
 def _load(filename):
@@ -84,13 +109,10 @@ def _coerce_campaigns(rows):
     return out
 
 
-_profiles = _coerce_profiles(_load("profiles.csv"))
-_lists = _coerce_lists(_load("lists.csv"))
-_campaigns = _coerce_campaigns(_load("campaigns.csv"))
 
-_profiles_store = deepcopy(_profiles)
-_lists_store = deepcopy(_lists)
-_campaigns_store = deepcopy(_campaigns)
+
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -158,14 +180,14 @@ def _serialize_campaign(c):
 # ---------------------------------------------------------------------------
 
 def list_profiles(email=None):
-    profiles = list(_profiles_store)
+    profiles = list(_profiles_rows())
     if email:
         profiles = [p for p in profiles if p["email"].lower() == email.lower()]
     return {"data": [_serialize_profile(p) for p in profiles]}
 
 
 def get_profile(profile_id):
-    for p in _profiles_store:
+    for p in _profiles_rows():
         if p["id"] == profile_id:
             return {"data": _serialize_profile(p)}
     return {"error": "profile not found", "message": f"Profile {profile_id} not found"}
@@ -180,7 +202,7 @@ def create_profile(email, first_name="", last_name="", phone_number="",
                    organization="", title="", city="", region="", country=""):
     if not email:
         return {"error": "invalid request", "message": "attributes.email is required"}
-    if any(p["email"].lower() == email.lower() for p in _profiles_store):
+    if any(p["email"].lower() == email.lower() for p in _profiles_rows()):
         return {"error": "duplicate profile", "message": f"Profile with email {email} already exists"}
     now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     profile = {
@@ -197,7 +219,7 @@ def create_profile(email, first_name="", last_name="", phone_number="",
         "created": now,
         "updated": now,
     }
-    _profiles_store.append(profile)
+    _profiles_rows().append(profile)
     return {"data": _serialize_profile(profile)}
 
 
@@ -206,7 +228,7 @@ def create_profile(email, first_name="", last_name="", phone_number="",
 # ---------------------------------------------------------------------------
 
 def list_lists():
-    return {"data": [_serialize_list(l) for l in _lists_store]}
+    return {"data": [_serialize_list(l) for l in _lists_rows()]}
 
 
 # ---------------------------------------------------------------------------
@@ -214,7 +236,7 @@ def list_lists():
 # ---------------------------------------------------------------------------
 
 def list_campaigns(status=None, channel=None):
-    campaigns = list(_campaigns_store)
+    campaigns = list(_campaigns_rows())
     if status:
         campaigns = [c for c in campaigns if c["status"].lower() == status.lower()]
     if channel:

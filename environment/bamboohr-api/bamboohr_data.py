@@ -8,11 +8,41 @@ memory and reset on container restart.
 import csv
 import json
 import uuid
-from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("bamboohr-api")
+
+_store.register("employees", primary_key="id",
+                initial_loader=lambda: _coerce_employees(_load("employees.csv")))
+_store.register("time_off", primary_key="id",
+                initial_loader=lambda: _coerce_time_off(_load("time_off_requests.csv")))
+_store.register("whos_out", primary_key="id",
+                initial_loader=lambda: _coerce_whos_out(_load("whos_out.csv")))
+_store.register_document("company", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "company.json", encoding="utf-8")))
+
+
+def _employees_rows():
+    return _store.table("employees").rows()
+
+
+def _time_off_rows():
+    return _store.table("time_off").rows()
+
+
+def _whos_out_rows():
+    return _store.table("whos_out").rows()
+
+
+def _company_doc():
+    return _store.document("company").get()
+
 
 VALID_TIME_OFF_STATUS = {"requested", "approved", "denied", "canceled"}
 
@@ -61,17 +91,8 @@ def _coerce_whos_out(rows):
     return [dict(r) for r in rows]
 
 
-_employees = _coerce_employees(_load("employees.csv"))
-_time_off = _coerce_time_off(_load("time_off_requests.csv"))
-_whos_out = _coerce_whos_out(_load("whos_out.csv"))
 
-with open(DATA_DIR / "company.json", encoding="utf-8") as _f:
-    _company = json.load(_f)
 
-_employees_store = deepcopy(_employees)
-_time_off_store = deepcopy(_time_off)
-_whos_out_store = deepcopy(_whos_out)
-_company_store = deepcopy(_company)
 
 
 # ---------------------------------------------------------------------------
@@ -93,12 +114,12 @@ def _find(store, obj_id):
 def employees_directory():
     fields = ["id", "firstName", "lastName", "workEmail", "department",
               "jobTitle", "location", "hireDate", "status", "supervisorId"]
-    employees = [{k: e.get(k) for k in fields} for e in _employees_store]
+    employees = [{k: e.get(k) for k in fields} for e in _employees_rows()]
     return {"employees": employees}
 
 
 def get_employee(employee_id):
-    e = _find(_employees_store, employee_id)
+    e = _find(_employees_rows(), employee_id)
     if not e:
         return {"error": f"Employee {employee_id} not found"}
     return e
@@ -120,7 +141,7 @@ def create_employee(firstName, lastName, workEmail=None, department=None,
         "status": "Active",
         "supervisorId": supervisorId or None,
     }
-    _employees_store.append(emp)
+    _employees_rows().append(emp)
     return emp
 
 
@@ -129,7 +150,7 @@ def create_employee(firstName, lastName, workEmail=None, department=None,
 # ---------------------------------------------------------------------------
 
 def list_time_off_requests(status=None, employee_id=None):
-    results = list(_time_off_store)
+    results = list(_time_off_rows())
     if status:
         results = [r for r in results if r["status"] == status]
     if employee_id:
@@ -139,7 +160,7 @@ def list_time_off_requests(status=None, employee_id=None):
 
 def create_time_off_request(employeeId, type, start, end, amount=1,
                             unit="days", notes=None):
-    if not _find(_employees_store, employeeId):
+    if not _find(_employees_rows(), employeeId):
         return {"error": f"Employee {employeeId} not found"}
     req = {
         "id": _new_id("tor"),
@@ -153,12 +174,12 @@ def create_time_off_request(employeeId, type, start, end, amount=1,
         "notes": notes or "",
         "created": _now_date(),
     }
-    _time_off_store.append(req)
+    _time_off_rows().append(req)
     return req
 
 
 def update_time_off_status(request_id, status):
-    req = _find(_time_off_store, request_id)
+    req = _find(_time_off_rows(), request_id)
     if not req:
         return {"error": f"Time-off request {request_id} not found"}
     if status not in VALID_TIME_OFF_STATUS:
@@ -168,7 +189,7 @@ def update_time_off_status(request_id, status):
 
 
 def whos_out(start=None, end=None):
-    results = list(_whos_out_store)
+    results = list(_whos_out_rows())
     if start:
         results = [r for r in results if r["end"] >= start]
     if end:
@@ -184,7 +205,7 @@ def get_report(report_id):
     """Synthesize a simple report. report_id 1 = headcount by department."""
     if str(report_id) == "1":
         by_dept = {}
-        for e in _employees_store:
+        for e in _employees_rows():
             if e.get("status") == "Active":
                 by_dept[e["department"]] = by_dept.get(e["department"], 0) + 1
         rows = [{"department": d, "headcount": c} for d, c in sorted(by_dept.items())]
@@ -198,4 +219,4 @@ def get_report(report_id):
 
 
 def get_company():
-    return _company_store
+    return _company_doc()

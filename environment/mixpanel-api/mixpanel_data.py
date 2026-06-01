@@ -7,11 +7,35 @@ funnels, segmentation, and engage (user profiles).
 import csv
 import uuid
 from collections import defaultdict
-from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("mixpanel-api")
+
+_store.register("events", primary_key="event_id",
+                initial_loader=lambda: _coerce_events(_load("events.csv")))
+_store.register_document("funnels", initial_loader=lambda: _coerce_funnels(_load("funnels.csv")))
+_store.register("profiles", primary_key="distinct_id",
+                initial_loader=lambda: _coerce_profiles(_load("profiles.csv")))
+
+
+def _events_rows():
+    return _store.table("events").rows()
+
+
+def _funnels_doc():
+    return _store.document("funnels").get()
+
+
+def _profiles_rows():
+    return _store.table("profiles").rows()
+
 
 
 def _load(filename):
@@ -78,13 +102,10 @@ def _coerce_profiles(rows):
     return out
 
 
-_events = _coerce_events(_load("events.csv"))
-_funnels = _coerce_funnels(_load("funnels.csv"))
-_profiles = _coerce_profiles(_load("profiles.csv"))
 
-_events_store = deepcopy(_events)
-_funnels_store = deepcopy(_funnels)
-_profiles_store = deepcopy(_profiles)
+
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -119,7 +140,7 @@ def track(event, distinct_id, time=None, properties=None):
         "time": time or _now(),
         "properties": dict(properties or {}),
     }
-    _events_store.append(record)
+    _events_rows().append(record)
     return {"status": 1, "event_id": record["event_id"]}
 
 
@@ -131,13 +152,13 @@ def events_counts(event=None, from_date=None, to_date=None):
     wanted = set()
     if event:
         wanted = {e.strip() for e in event.split(",") if e.strip()}
-    series = sorted({_day(e["time"]) for e in _events_store
+    series = sorted({_day(e["time"]) for e in _events_rows()
                      if _in_range(e["time"], from_date, to_date)})
-    names = wanted or {e["event"] for e in _events_store}
+    names = wanted or {e["event"] for e in _events_rows()}
     values = {}
     for name in names:
         per_day = {d: 0 for d in series}
-        for e in _events_store:
+        for e in _events_rows():
             if e["event"] != name:
                 continue
             if not _in_range(e["time"], from_date, to_date):
@@ -157,12 +178,12 @@ def events_counts(event=None, from_date=None, to_date=None):
 def funnels_list():
     return [
         {"funnel_id": int(f["funnel_id"]), "name": f["name"]}
-        for f in sorted(_funnels_store.values(), key=lambda x: x["funnel_id"])
+        for f in sorted(_funnels_doc().values(), key=lambda x: x["funnel_id"])
     ]
 
 
 def funnel(funnel_id):
-    f = _funnels_store.get(str(funnel_id))
+    f = _funnels_doc().get(str(funnel_id))
     if not f:
         return {"error": f"Funnel {funnel_id} not found"}
     steps = f["steps"]
@@ -200,10 +221,10 @@ def segmentation(event=None, from_date=None, to_date=None, on=None):
     if not event:
         return {"error": "event is required"}
     prop = (on or "").strip() or None
-    series = sorted({_day(e["time"]) for e in _events_store
+    series = sorted({_day(e["time"]) for e in _events_rows()
                      if e["event"] == event and _in_range(e["time"], from_date, to_date)})
     values = defaultdict(lambda: {d: 0 for d in series})
-    for e in _events_store:
+    for e in _events_rows():
         if e["event"] != event:
             continue
         if not _in_range(e["time"], from_date, to_date):
@@ -218,7 +239,7 @@ def segmentation(event=None, from_date=None, to_date=None, on=None):
 # ---------------------------------------------------------------------------
 
 def engage(distinct_id=None, where=None, page_size=50):
-    results = list(_profiles_store)
+    results = list(_profiles_rows())
     if distinct_id:
         results = [p for p in results if p["distinct_id"] == distinct_id]
     if where:

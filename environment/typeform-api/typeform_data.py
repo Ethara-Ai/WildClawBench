@@ -2,11 +2,42 @@
 
 import csv
 import uuid
-from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("typeform-api")
+
+_store.register("forms", primary_key="form_id",
+                initial_loader=lambda: _coerce_forms(_load("forms.csv")))
+_store.register("fields", primary_key="field_id",
+                initial_loader=lambda: _coerce_fields(_load("fields.csv")))
+_store.register("responses", primary_key="response_id",
+                initial_loader=lambda: _coerce_responses(_load("responses.csv")))
+_store.register("answers", primary_key="response_id",
+                initial_loader=lambda: _coerce_answers(_load("answers.csv")))
+
+
+def _forms_rows():
+    return _store.table("forms").rows()
+
+
+def _fields_rows():
+    return _store.table("fields").rows()
+
+
+def _responses_rows():
+    return _store.table("responses").rows()
+
+
+def _answers_rows():
+    return _store.table("answers").rows()
+
 
 
 def _load(filename):
@@ -61,15 +92,12 @@ def _coerce_answers(rows):
     return [{**r} for r in rows]
 
 
-_forms = _coerce_forms(_load("forms.csv"))
-_fields = _coerce_fields(_load("fields.csv"))
-_responses = _coerce_responses(_load("responses.csv"))
-_answers = _coerce_answers(_load("answers.csv"))
 
-_forms_store = deepcopy(_forms)
-_fields_store = deepcopy(_fields)
-_responses_store = deepcopy(_responses)
-_answers_store = deepcopy(_answers)
+
+
+
+
+
 
 
 def _new_id(prefix):
@@ -94,7 +122,7 @@ def _field_obj(f):
 
 
 def _form_obj(form):
-    fields = sorted([f for f in _fields_store if f["form_id"] == form["form_id"]],
+    fields = sorted([f for f in _fields_rows() if f["form_id"] == form["form_id"]],
                     key=lambda f: f["order"])
     return {
         "id": form["form_id"],
@@ -137,7 +165,7 @@ def _answer_obj(a):
 
 
 def _response_obj(r):
-    answers = [_answer_obj(a) for a in _answers_store if a["response_id"] == r["response_id"]]
+    answers = [_answer_obj(a) for a in _answers_rows() if a["response_id"] == r["response_id"]]
     return {
         "response_id": r["response_id"],
         "landed_at": r["landed_time"],
@@ -147,7 +175,7 @@ def _response_obj(r):
 
 
 def _find_form(form_id):
-    return next((f for f in _forms_store if f["form_id"] == form_id), None)
+    return next((f for f in _forms_rows() if f["form_id"] == form_id), None)
 
 
 # ---------------------------------------------------------------------------
@@ -160,7 +188,7 @@ def list_forms():
         "title": f["title"],
         "last_updated_at": f["last_updated_time"],
         "_links": {"display": f"https://orbitlabs.typeform.com/to/{f['form_id']}"},
-    } for f in _forms_store]
+    } for f in _forms_rows()]
     return {
         "total_items": len(items),
         "page_count": 1,
@@ -188,9 +216,9 @@ def create_form(payload):
         "created_time": now,
         "last_updated_time": now,
     }
-    _forms_store.append(form)
+    _forms_rows().append(form)
     for i, f in enumerate(payload.get("fields", []), start=1):
-        _fields_store.append({
+        _fields_rows().append({
             "field_id": _new_id("fld"),
             "form_id": form_id,
             "title": f.get("title", ""),
@@ -222,11 +250,11 @@ def delete_form(form_id):
     form = _find_form(form_id)
     if form is None:
         return {"error": f"form {form_id} not found"}
-    _forms_store.remove(form)
-    response_ids = [r["response_id"] for r in _responses_store if r["form_id"] == form_id]
-    _fields_store[:] = [f for f in _fields_store if f["form_id"] != form_id]
-    _responses_store[:] = [r for r in _responses_store if r["form_id"] != form_id]
-    _answers_store[:] = [a for a in _answers_store if a["response_id"] not in response_ids]
+    _forms_rows().remove(form)
+    response_ids = [r["response_id"] for r in _responses_rows() if r["form_id"] == form_id]
+    _fields_rows()[:] = [f for f in _fields_rows() if f["form_id"] != form_id]
+    _responses_rows()[:] = [r for r in _responses_rows() if r["form_id"] != form_id]
+    _answers_rows()[:] = [a for a in _answers_rows() if a["response_id"] not in response_ids]
     return {"deleted": True, "id": form_id}
 
 
@@ -237,7 +265,7 @@ def delete_form(form_id):
 def list_responses(form_id, completed=None):
     if _find_form(form_id) is None:
         return {"error": f"form {form_id} not found"}
-    resp = [r for r in _responses_store if r["form_id"] == form_id]
+    resp = [r for r in _responses_rows() if r["form_id"] == form_id]
     if completed is not None:
         resp = [r for r in resp if r["completed"] == completed]
     return {
@@ -255,14 +283,14 @@ def insights_summary(form_id):
     form = _find_form(form_id)
     if form is None:
         return {"error": f"form {form_id} not found"}
-    resp = [r for r in _responses_store if r["form_id"] == form_id]
+    resp = [r for r in _responses_rows() if r["form_id"] == form_id]
     total = len(resp)
     completed = len([r for r in resp if r["completed"]])
-    fields = sorted([f for f in _fields_store if f["form_id"] == form_id],
+    fields = sorted([f for f in _fields_rows() if f["form_id"] == form_id],
                     key=lambda f: f["order"])
     field_summaries = []
     for f in fields:
-        answers = [a for a in _answers_store if a["field_id"] == f["field_id"]]
+        answers = [a for a in _answers_rows() if a["field_id"] == f["field_id"]]
         summary = {
             "field": {"id": f["field_id"], "title": f["title"], "type": f["field_type"]},
             "answer_count": len(answers),

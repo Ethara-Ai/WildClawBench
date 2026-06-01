@@ -5,10 +5,35 @@ customers. Returns bare arrays/objects like the real API.
 """
 
 import csv
-from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("woocommerce-api")
+
+_store.register("products", primary_key="id",
+                initial_loader=lambda: _coerce_products(_load("products.csv")))
+_store.register("customers", primary_key="id",
+                initial_loader=lambda: _coerce_customers(_load("customers.csv")))
+_store.register("orders", primary_key="id",
+                initial_loader=lambda: _coerce_orders(_load("orders.csv")))
+
+
+def _products_rows():
+    return _store.table("products").rows()
+
+
+def _customers_rows():
+    return _store.table("customers").rows()
+
+
+def _orders_rows():
+    return _store.table("orders").rows()
+
 
 
 def _load(filename):
@@ -102,13 +127,10 @@ def _coerce_orders(rows):
     return out
 
 
-_products = _coerce_products(_load("products.csv"))
-_customers = _coerce_customers(_load("customers.csv"))
-_orders = _coerce_orders(_load("orders.csv"))
 
-_products_store = deepcopy(_products)
-_customers_store = deepcopy(_customers)
-_orders_store = deepcopy(_orders)
+
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -177,7 +199,7 @@ def _serialize_order(o):
 # ---------------------------------------------------------------------------
 
 def list_products(search=None, sku=None, status=None, page=1, per_page=10):
-    items = _products_store
+    items = _products_rows()
     if search:
         items = [p for p in items if search.lower() in p["name"].lower()]
     if sku:
@@ -190,7 +212,7 @@ def list_products(search=None, sku=None, status=None, page=1, per_page=10):
 
 
 def get_product(product_id):
-    p = next((x for x in _products_store if x["id"] == int(product_id)), None)
+    p = next((x for x in _products_rows() if x["id"] == int(product_id)), None)
     if not p:
         return {"error": "woocommerce_rest_product_invalid_id", "status": 404,
                 "message": f"Invalid product ID: {product_id}"}
@@ -202,7 +224,7 @@ def get_product(product_id):
 # ---------------------------------------------------------------------------
 
 def list_orders(customer=None, status=None, page=1, per_page=10):
-    items = _orders_store
+    items = _orders_rows()
     if customer is not None:
         items = [o for o in items if o["customer_id"] == int(customer)]
     if status:
@@ -213,7 +235,7 @@ def list_orders(customer=None, status=None, page=1, per_page=10):
 
 
 def get_order(order_id):
-    o = next((x for x in _orders_store if x["id"] == int(order_id)), None)
+    o = next((x for x in _orders_rows() if x["id"] == int(order_id)), None)
     if not o:
         return {"error": "woocommerce_rest_shop_order_invalid_id", "status": 404,
                 "message": f"Invalid order ID: {order_id}"}
@@ -225,10 +247,10 @@ def create_order(customer_id=0, status="pending", currency="USD",
                  billing=None, line_items=None):
     billing = billing or {}
     line_items = line_items or []
-    next_id = max((o["id"] for o in _orders_store), default=400) + 1
+    next_id = max((o["id"] for o in _orders_rows()), default=400) + 1
     subtotal = 0.0
     for line in line_items:
-        prod = next((p for p in _products_store
+        prod = next((p for p in _products_rows()
                      if p["id"] == int(line.get("product_id", 0))), None)
         qty = int(line.get("quantity", 1))
         price = prod["price"] if prod else 0.0
@@ -250,7 +272,7 @@ def create_order(customer_id=0, status="pending", currency="USD",
         "billing_email": billing.get("email", ""),
         "date_created": "2026-05-28T00:00:00",
     }
-    _orders_store.append(order)
+    _orders_rows().append(order)
     return _serialize_order(order)
 
 
@@ -259,7 +281,7 @@ def create_order(customer_id=0, status="pending", currency="USD",
 # ---------------------------------------------------------------------------
 
 def list_customers(search=None, email=None, page=1, per_page=10):
-    items = _customers_store
+    items = _customers_rows()
     if email:
         items = [c for c in items if email.lower() in c["email"].lower()]
     if search:

@@ -8,11 +8,47 @@ process memory and reset on container restart.
 import csv
 import json
 import uuid
-from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("gusto-api")
+
+_store.register("employees", primary_key="id",
+                initial_loader=lambda: _coerce_employees(_load("employees.csv")))
+_store.register("compensations", primary_key="id",
+                initial_loader=lambda: _coerce_compensations(_load("compensations.csv")))
+_store.register("payrolls", primary_key="id",
+                initial_loader=lambda: _coerce_payrolls(_load("payrolls.csv")))
+_store.register("contractors", primary_key="id",
+                initial_loader=lambda: _coerce_contractors(_load("contractors.csv")))
+_store.register_document("company", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "company.json", encoding="utf-8")))
+
+
+def _employees_rows():
+    return _store.table("employees").rows()
+
+
+def _compensations_rows():
+    return _store.table("compensations").rows()
+
+
+def _payrolls_rows():
+    return _store.table("payrolls").rows()
+
+
+def _contractors_rows():
+    return _store.table("contractors").rows()
+
+
+def _company_doc():
+    return _store.document("company").get()
+
 
 
 def _load(filename):
@@ -91,20 +127,6 @@ def _coerce_contractors(rows):
 
 
 _company = None
-with open(DATA_DIR / "company.json", encoding="utf-8") as _f:
-    _company = json.load(_f)
-
-_employees = _coerce_employees(_load("employees.csv"))
-_compensations = _coerce_compensations(_load("compensations.csv"))
-_payrolls = _coerce_payrolls(_load("payrolls.csv"))
-_contractors = _coerce_contractors(_load("contractors.csv"))
-
-_company_store = deepcopy(_company)
-_employees_store = deepcopy(_employees)
-_compensations_store = deepcopy(_compensations)
-_payrolls_store = deepcopy(_payrolls)
-_contractors_store = deepcopy(_contractors)
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -119,7 +141,7 @@ def _find(store, obj_id):
 
 
 def _comp_for(employee_id):
-    return next((c for c in _compensations_store if c["employee_id"] == employee_id), None)
+    return next((c for c in _compensations_rows() if c["employee_id"] == employee_id), None)
 
 
 # ---------------------------------------------------------------------------
@@ -127,9 +149,9 @@ def _comp_for(employee_id):
 # ---------------------------------------------------------------------------
 
 def get_company(company_id):
-    if company_id != _company_store["id"]:
+    if company_id != _company_doc()["id"]:
         return {"error": f"Company {company_id} not found"}
-    return _company_store
+    return _company_doc()
 
 
 # ---------------------------------------------------------------------------
@@ -137,10 +159,10 @@ def get_company(company_id):
 # ---------------------------------------------------------------------------
 
 def list_company_employees(company_id):
-    if company_id != _company_store["id"]:
+    if company_id != _company_doc()["id"]:
         return {"error": f"Company {company_id} not found"}
     out = []
-    for e in _employees_store:
+    for e in _employees_rows():
         if e["company_id"] != company_id:
             continue
         rec = dict(e)
@@ -150,7 +172,7 @@ def list_company_employees(company_id):
 
 
 def get_employee(employee_id):
-    e = _find(_employees_store, employee_id)
+    e = _find(_employees_rows(), employee_id)
     if not e:
         return {"error": f"Employee {employee_id} not found"}
     rec = dict(e)
@@ -163,23 +185,23 @@ def get_employee(employee_id):
 # ---------------------------------------------------------------------------
 
 def list_company_payrolls(company_id, processed=None):
-    if company_id != _company_store["id"]:
+    if company_id != _company_doc()["id"]:
         return {"error": f"Company {company_id} not found"}
-    results = [p for p in _payrolls_store if p["company_id"] == company_id]
+    results = [p for p in _payrolls_rows() if p["company_id"] == company_id]
     if processed is not None:
         results = [p for p in results if p["processed"] == processed]
     return results
 
 
 def get_payroll(payroll_id):
-    p = _find(_payrolls_store, payroll_id)
+    p = _find(_payrolls_rows(), payroll_id)
     if not p:
         return {"error": f"Payroll {payroll_id} not found"}
     return p
 
 
 def create_payroll(company_id, pay_period_start, pay_period_end, check_date=None):
-    if company_id != _company_store["id"]:
+    if company_id != _company_doc()["id"]:
         return {"error": f"Company {company_id} not found"}
     if not pay_period_start or not pay_period_end:
         return {"error": "pay_period_start and pay_period_end are required"}
@@ -192,22 +214,22 @@ def create_payroll(company_id, pay_period_start, pay_period_end, check_date=None
         "processed": False,
         "gross_pay": 0.0,
         "net_pay": 0.0,
-        "employee_count": len([e for e in _employees_store
+        "employee_count": len([e for e in _employees_rows()
                                if e["company_id"] == company_id and not e["terminated"]]),
     }
-    _payrolls_store.append(p)
+    _payrolls_rows().append(p)
     return p
 
 
 def submit_payroll(payroll_id):
-    p = _find(_payrolls_store, payroll_id)
+    p = _find(_payrolls_rows(), payroll_id)
     if not p:
         return {"error": f"Payroll {payroll_id} not found"}
     if p["processed"]:
         return {"error": f"Payroll {payroll_id} already processed"}
     # Compute gross from semimonthly slice of annual / hourly comp.
     gross = 0.0
-    for e in _employees_store:
+    for e in _employees_rows():
         if e["company_id"] != p["company_id"] or e["terminated"]:
             continue
         comp = _comp_for(e["id"]) or {}
@@ -231,6 +253,6 @@ def submit_payroll(payroll_id):
 # ---------------------------------------------------------------------------
 
 def list_company_contractors(company_id):
-    if company_id != _company_store["id"]:
+    if company_id != _company_doc()["id"]:
         return {"error": f"Company {company_id} not found"}
-    return [c for c in _contractors_store if c["company_id"] == company_id]
+    return [c for c in _contractors_rows() if c["company_id"] == company_id]

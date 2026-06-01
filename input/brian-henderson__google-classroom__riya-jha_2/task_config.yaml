@@ -1,0 +1,90 @@
+# ============================================================
+# KenseiForge Task Configuration
+# ============================================================
+
+# --- Identity ---
+id: brian_henderson_google_classroom_01
+name: Lecture Slide Discrepancy Analysis via Google Classroom
+
+# --- Difficulty ---
+difficulty: hard
+
+# --- Category & Taxonomy ---
+category: education
+subcategory: academic_content_review
+
+# Taxonomy must be one of:
+#   - Visual Learning
+#   - Commerce & Product
+#   - Creative & Media
+#   - Operations & QA
+#   - Health & Wellness
+#   - Property & Space
+taxonomy: "Visual Learning"
+
+# --- Tags ---
+tags:
+  - google-classroom
+  - document-analysis
+  - pdf-comparison
+  - lecture-slides
+  - biostatistics
+  - multimodal
+
+# --- APIs & Skills ---
+mock_apis:
+  - google-classroom-api
+
+required_skills:
+  - google-classroom-api-connector
+  - bash
+  - image-view
+
+distractor_skills:
+  - instagram-api-connector
+  - linear-api-connector
+  - quickbooks-api-connector
+  - myfitnesspal-api-connector
+
+# --- Multimodal ---
+modality_tags:
+  - image_analysis
+  - document_reading
+  - text_analysis
+
+dependency_tags:
+  - requires_visual_analysis
+  - requires_document_reading
+  - requires_cross_modal_reasoning
+
+# --- Dimensions ---
+dimensions:
+  complex: High
+  long_horizon: High
+  objective: High
+  multimodal: High
+  cross_modal_cross_api: High
+  asset_complexity: High
+
+# --- Multimodal Assets ---
+multimodal_assets:
+  - filename: Lec11_KM-Henderson.pdf
+    mime_type: application/pdf
+    role: primary
+    description: Current Classroom draft of Lecture 11 slides on Kaplan-Meier estimation; agent must identify this as the active draft via Classroom API
+  - filename: Lec11_KM-Henderson (1).pdf
+    mime_type: application/pdf
+    role: primary
+    description: Older duplicate draft of Lecture 11 slides downloaded separately; serves as distractor requiring API verification to distinguish from current draft
+  - filename: kleinbaum_klein_p48.jpg
+    mime_type: image/jpeg
+    role: reference
+    description: Photograph of Kleinbaum and Klein textbook page 48 covering the non-informative censoring assumption
+  - filename: kleinbaum_klein_p55.jpg
+    mime_type: image/jpeg
+    role: reference
+    description: Photograph of Kleinbaum and Klein textbook page 55 covering censored subject contributions to KM estimator
+  - filename: reyes_pinecrest_guest_lecture_transcript.txt
+    mime_type: text/plain
+    role: reference
+    description: Transcript of Dr. Elena Reyes Pinecrest guest lecture on KM censoring assumptions; source for lecture_quote values in the output CSV

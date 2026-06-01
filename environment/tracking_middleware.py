@@ -32,6 +32,8 @@ class RequestTracker(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         if request.url.path.startswith("/audit"):
             return await call_next(request)
+        if request.url.path.startswith("/admin"):
+            return await call_next(request)
         if request.url.path == "/health":
             return await call_next(request)
 

@@ -5,10 +5,47 @@ people/credits, genres, search, popular, and trending.
 """
 
 import csv
-from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("tmdb-api")
+
+_store.register("genres", primary_key="id",
+                initial_loader=lambda: _coerce_genres(_load("genres.csv")))
+_store.register("movies", primary_key="id",
+                initial_loader=lambda: _coerce_movies(_load("movies.csv")))
+_store.register("people", primary_key="id",
+                initial_loader=lambda: _coerce_people(_load("people.csv")))
+_store.register("credits", primary_key="movie_id",
+                initial_loader=lambda: _coerce_credits(_load("credits.csv")))
+_store.register("tv", primary_key="id",
+                initial_loader=lambda: _coerce_tv(_load("tv.csv")))
+
+
+def _genres_rows():
+    return _store.table("genres").rows()
+
+
+def _movies_rows():
+    return _store.table("movies").rows()
+
+
+def _people_rows():
+    return _store.table("people").rows()
+
+
+def _credits_rows():
+    return _store.table("credits").rows()
+
+
+def _tv_rows():
+    return _store.table("tv").rows()
+
 
 
 def _load(filename):
@@ -95,19 +132,17 @@ def _coerce_tv(rows):
     return out
 
 
-_genres = _coerce_genres(_load("genres.csv"))
-_movies = _coerce_movies(_load("movies.csv"))
-_people = _coerce_people(_load("people.csv"))
-_credits = _coerce_credits(_load("credits.csv"))
-_tv = _coerce_tv(_load("tv.csv"))
 
-_genres_store = deepcopy(_genres)
-_movies_store = deepcopy(_movies)
-_people_store = deepcopy(_people)
-_credits_store = deepcopy(_credits)
-_tv_store = deepcopy(_tv)
 
-_people_by_id = {p["id"]: p for p in _people_store}
+
+
+
+
+
+
+
+
+_people_by_id = {p["id"]: p for p in _people_rows()}
 
 
 # ---------------------------------------------------------------------------
@@ -133,7 +168,7 @@ def _page(results, page=1, page_size=20):
 
 def search_movie(query, page=1):
     q = (query or "").lower()
-    matches = [m for m in _movies_store if q in m["title"].lower()]
+    matches = [m for m in _movies_rows() if q in m["title"].lower()]
     matches.sort(key=lambda m: m["popularity"], reverse=True)
     return _page(matches, page=page)
 
@@ -143,20 +178,20 @@ def search_movie(query, page=1):
 # ---------------------------------------------------------------------------
 
 def get_movie(movie_id):
-    m = next((x for x in _movies_store if x["id"] == movie_id), None)
+    m = next((x for x in _movies_rows() if x["id"] == movie_id), None)
     if not m:
         return {"success": False, "status_code": 34, "status_message": "The resource you requested could not be found.", "error": f"movie {movie_id} not found"}
-    genre_lookup = {g["id"]: g["name"] for g in _genres_store}
+    genre_lookup = {g["id"]: g["name"] for g in _genres_rows()}
     out = dict(m)
     out["genres"] = [{"id": gid, "name": genre_lookup.get(gid, "Unknown")} for gid in m["genre_ids"]]
     return out
 
 
 def movie_credits(movie_id):
-    if not any(x["id"] == movie_id for x in _movies_store):
+    if not any(x["id"] == movie_id for x in _movies_rows()):
         return {"success": False, "status_code": 34, "error": f"movie {movie_id} not found"}
     cast, crew = [], []
-    for c in _credits_store:
+    for c in _credits_rows():
         if c["movie_id"] != movie_id:
             continue
         person = _people_by_id.get(c["person_id"], {})
@@ -175,7 +210,7 @@ def movie_credits(movie_id):
 
 
 def movie_popular(page=1):
-    movies = sorted(_movies_store, key=lambda m: m["popularity"], reverse=True)
+    movies = sorted(_movies_rows(), key=lambda m: m["popularity"], reverse=True)
     return _page(movies, page=page)
 
 
@@ -184,10 +219,10 @@ def movie_popular(page=1):
 # ---------------------------------------------------------------------------
 
 def get_tv(tv_id):
-    t = next((x for x in _tv_store if x["id"] == tv_id), None)
+    t = next((x for x in _tv_rows() if x["id"] == tv_id), None)
     if not t:
         return {"success": False, "status_code": 34, "error": f"tv {tv_id} not found"}
-    genre_lookup = {g["id"]: g["name"] for g in _genres_store}
+    genre_lookup = {g["id"]: g["name"] for g in _genres_rows()}
     out = dict(t)
     out["genres"] = [{"id": gid, "name": genre_lookup.get(gid, "Unknown")} for gid in t["genre_ids"]]
     return out
@@ -198,7 +233,7 @@ def get_tv(tv_id):
 # ---------------------------------------------------------------------------
 
 def genre_movie_list():
-    return {"genres": _genres_store}
+    return {"genres": _genres_rows()}
 
 
 # ---------------------------------------------------------------------------
@@ -206,6 +241,6 @@ def genre_movie_list():
 # ---------------------------------------------------------------------------
 
 def trending_all_week(page=1):
-    combined = list(_movies_store) + list(_tv_store)
+    combined = list(_movies_rows()) + list(_tv_rows())
     combined.sort(key=lambda x: x["popularity"], reverse=True)
     return _page(combined, page=page)
