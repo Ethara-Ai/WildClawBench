@@ -15,7 +15,7 @@
     {"name": "get employee", "request": {"method": "GET", "url": "{{baseUrl}}/api/gateway.php/{{company}}/v1/employees/emp-102"}},
     {"name": "create employee", "request": {"method": "POST", "url": "{{baseUrl}}/api/gateway.php/{{company}}/v1/employees",
       "header": [{"key": "Content-Type", "value": "application/json"}],
-      "body": {"mode": "raw", "raw": "{\"firstName\": \"Aisha\", \"lastName\": \"Khan\", \"workEmail\": \"aisha.khan@orbitlabs.com\", \"department\": \"Engineering\", \"jobTitle\": \"Software Engineer\", \"location\": \"Remote\", \"supervisorId\": \"emp-102\"}"}}},
+      "body": {"mode": "raw", "raw": "{\"firstName\": \"Aisha\", \"lastName\": \"Khan\", \"workEmail\": \"aisha.khan@orbit-labs.com\", \"department\": \"Engineering\", \"jobTitle\": \"Software Engineer\", \"location\": \"Remote\", \"supervisorId\": \"emp-102\"}"}}},
     {"name": "list time off requests", "request": {"method": "GET", "url": "{{baseUrl}}/api/gateway.php/{{company}}/v1/time_off/requests?status=requested"}},
     {"name": "create time off request", "request": {"method": "POST", "url": "{{baseUrl}}/api/gateway.php/{{company}}/v1/time_off/requests",
       "header": [{"key": "Content-Type", "value": "application/json"}],
