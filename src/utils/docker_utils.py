@@ -21,6 +21,26 @@ BRAVE_API_KEY = os.environ.get("BRAVE_API_KEY", "")
 def remove_container(name: str) -> None:
     subprocess.run(["docker", "rm", "-f", name], capture_output=True)
 
+
+def require_image_present(image: str) -> None:
+    # Strict precheck for images that must already exist locally (the agent
+    # image is loaded from the HuggingFace tar via `docker load`; we never
+    # pull-on-run). Any miss raises so the harness fails fast at startup
+    # instead of silently letting `docker run` try and fail mid-task with
+    # `manifest unknown`.
+    r = subprocess.run(
+        ["docker", "image", "inspect", image],
+        capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        raise RuntimeError(
+            f"Required Docker image not present locally: {image}\n"
+            f"Load it first (e.g. `docker load -i Images/wildclawbench-ubuntu_v1.3.tar`)\n"
+            f"or set DOCKER_IMAGE to a tag that exists. docker inspect said:\n"
+            f"{(r.stderr or '').strip()}"
+        )
+    logger.info("Agent image %s present", image)
+
 def start_container(task_id: str, workspace_path: str, extra_env: str = "",
                     tmp_path: str = "", lobster_env: list[str] | None = None,
                     extra_env_dict: dict[str, str] | None = None,
@@ -471,6 +491,50 @@ def close_proc_log(proc: subprocess.Popen) -> None:
         log_file.close()
 
 
+_ROOT_DELIVERABLE_EXTENSIONS = (
+    ".csv", ".tsv", ".json", ".yaml", ".yml", ".md", ".txt", ".jsonl",
+    ".html", ".xml", ".pdf", ".png", ".jpg", ".jpeg", ".svg",
+    ".py", ".js", ".ts", ".sql", ".sh",
+)
+
+
+def _sweep_root_deliverables_to_workspace(task_id: str) -> None:
+    sweep_cmd = "python3 - <<'PY'\n" + "\n".join([
+        "import os, shutil",
+        f"exts = {_ROOT_DELIVERABLE_EXTENSIONS!r}",
+        f"workspace = {TMP_WORKSPACE!r}",
+        "os.makedirs(workspace, exist_ok=True)",
+        "moved = []",
+        "skipped = {'AGENT.md','AGENTS.md','MEMORY.md','SOUL.md','USER.md',",
+        "           'IDENTITY.md','HEARTBEAT.md','TOOLS.md','API_DOCUMENTATION.md'}",
+        "for name in os.listdir('/root'):",
+        "    src = os.path.join('/root', name)",
+        "    if not os.path.isfile(src):",
+        "        continue",
+        "    if name.startswith('.') or name in skipped:",
+        "        continue",
+        "    if not name.lower().endswith(exts):",
+        "        continue",
+        "    dst = os.path.join(workspace, name)",
+        "    if os.path.exists(dst):",
+        "        continue",
+        "    try:",
+        "        shutil.copy2(src, dst)",
+        "        moved.append(name)",
+        "    except OSError:",
+        "        pass",
+        "if moved: print('swept:', ','.join(moved))",
+        "PY",
+    ])
+    r = subprocess.run(
+        ["docker", "exec", task_id, "/bin/bash", "-c", sweep_cmd],
+        capture_output=True,
+        text=True,
+    )
+    if r.returncode == 0 and r.stdout.strip().startswith("swept:"):
+        logger.info("[%s] Recovered /root deliverables: %s", task_id, r.stdout.strip())
+
+
 def collect_output_from_container(
     task_id: str,
     output_dir: Path,
@@ -480,6 +544,10 @@ def collect_output_from_container(
     """Collect task output files from the container to output_dir/task_output/.
 
     Collection strategy:
+      0. Sweep deliverable-shaped files an agent left at /root/ (top-level)
+         into /tmp_workspace/. Agents frequently default to /root as cwd and
+         write KM_diff.csv etc. there instead of /root/workspace; without
+         this rescue the grader sees an empty workspace.
       1. All files under /tmp/openclaw/ (agent session logs, etc.)
       2. Task output files under /tmp_workspace/results/
       3. The full /tmp_workspace/ tree (into workspace_full/) so deliverables an
@@ -491,6 +559,8 @@ def collect_output_from_container(
     task_output_dir.mkdir(parents=True, exist_ok=True)
 
     _copy_dir_from_container(task_id, "/tmp/openclaw/.", str(task_output_dir))
+
+    _sweep_root_deliverables_to_workspace(task_id)
 
     workspace_out = task_output_dir / "workspace"
     workspace_out.mkdir(parents=True, exist_ok=True)

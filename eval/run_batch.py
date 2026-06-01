@@ -41,12 +41,13 @@ from src.utils.grading import (
 )
 from src.utils.config import Config
 from src.utils.task_parser import load_task
-from src.utils.docker_utils import discover_services
+from src.utils.docker_utils import discover_services, require_image_present, DOCKER_IMAGE
 from src.utils.skills_inference import infer_required_apis
 from src.utils.testgen import generate_task_tests
 from src.utils.litellm_sidecar import (
     build_litellm_config_yaml,
     create_network,
+    pull_litellm_image,
     remove_network,
     start_litellm,
     stop_litellm,
@@ -998,9 +999,12 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list):
         enable_usage_callback=True,
     )
     if not litellm_yaml:
-        logger.error("LiteLLM requested but no Bedrock/OpenAI creds resolved; using OpenRouter")
-        return False, "", "", "", {}, ""
+        raise RuntimeError(
+            "LiteLLM requested but no Bedrock/OpenAI creds resolved. "
+            "Strict mode: refusing to silently downgrade to OpenRouter."
+        )
 
+    pull_litellm_image()
     create_network(network)
     cleanups.append(lambda: remove_network(network))
     config.work_dir.mkdir(parents=True, exist_ok=True)
@@ -1031,8 +1035,10 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list):
     )
     cleanups.append(lambda: stop_litellm(sidecar))
     if not wait_for_litellm_healthy(sidecar, timeout=90.0):
-        logger.error("LiteLLM sidecar %s not healthy; using OpenRouter", sidecar)
-        return False, "", "", "", {}, ""
+        raise RuntimeError(
+            f"LiteLLM sidecar {sidecar} did not become healthy within 90s. "
+            f"Strict mode: refusing to continue with a dead sidecar."
+        )
     logger.info("LiteLLM sidecar %s ready on network %s", sidecar, network)
 
     mock_env_dict: dict[str, str] = {}
@@ -1041,21 +1047,25 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list):
             build_mock_image_if_needed, start_mock_stack,
             wait_for_mock_stack_healthy, stop_mock_stack,
         )
-        if build_mock_image_if_needed(
+        if not build_mock_image_if_needed(
             config.environment_dir, force=getattr(args, "rebuild_mocks", False),
         ):
-            mock_container = f"mocks-{batch_id}"
-            start_mock_stack(mock_container, network)
-            cleanups.append(lambda: stop_mock_stack(mock_container))
-            if wait_for_mock_stack_healthy(mock_container, timeout=180.0):
-                for svc in discover_services(config.environment_dir):
-                    if svc.get("env_var_name"):
-                        mock_env_dict[svc["env_var_name"]] = f"http://{mock_container}:{svc['port']}"
-                logger.info("Mock stack %s ready (%d service URLs)", mock_container, len(mock_env_dict))
-            else:
-                logger.error("Mock stack %s not healthy; continuing without mock URLs", mock_container)
-        else:
-            logger.error("Mock image build failed; continuing without mock stack")
+            raise RuntimeError(
+                "Mock image build failed. Strict mode: refusing to continue "
+                "without the mock stack when --mock-stack was requested."
+            )
+        mock_container = f"mocks-{batch_id}"
+        start_mock_stack(mock_container, network)
+        cleanups.append(lambda: stop_mock_stack(mock_container))
+        if not wait_for_mock_stack_healthy(mock_container, timeout=180.0):
+            raise RuntimeError(
+                f"Mock stack {mock_container} did not become healthy within 180s. "
+                f"Strict mode: refusing to continue with a dead mock stack."
+            )
+        for svc in discover_services(config.environment_dir):
+            if svc.get("env_var_name"):
+                mock_env_dict[svc["env_var_name"]] = f"http://{mock_container}:{svc['port']}"
+        logger.info("Mock stack %s ready (%d service URLs)", mock_container, len(mock_env_dict))
 
     return True, litellm_yaml, network, sidecar, mock_env_dict, str(usage_log_path)
 
@@ -1219,6 +1229,8 @@ def main() -> None:
         config.bedrock_inference_arn = args.bedrock_arn
     if getattr(args, "aws_region", None):
         config.bedrock_region = args.aws_region
+
+    require_image_present(DOCKER_IMAGE)
 
     cleanups: list = []
     use_litellm = False

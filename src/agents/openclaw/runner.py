@@ -294,6 +294,14 @@ defaults.pop("models", None)
 {set_thinking_line}d["browser"] = {{"enabled": False}}
 tools = d.setdefault("tools", {{}})
 tools["deny"] = ["browser", "duckduckgo"]
+# Without tools.exec.host=sandbox openclaw refuses every exec because the
+# default routes through the gateway process (the harness host). The agent
+# then can only read files and call mock APIs over HTTP, not run code at
+# all. Observed failure: 'exec host not allowed (requested gateway;
+# configure tools.exec.host=sandbox to allow).' — see gateway.log on runs
+# without this line. Same applies to OpenRouter mode below.
+exec_cfg = tools.setdefault("exec", {{}})
+exec_cfg["host"] = "sandbox"
 web = tools.setdefault("web", {{}})
 web["search"] = {{"enabled": False}}
 web["fetch"] = {{"enabled": False}}
@@ -314,6 +322,10 @@ defaults.setdefault("models", {{}})[{json.dumps(normalized)}] = {{}}
 d["browser"] = {{"enabled": False}}
 tools = d.setdefault("tools", {{}})
 tools["deny"] = ["browser", "duckduckgo"]
+# Mirror the LiteLLM branch: route exec through the sandbox container, not
+# the gateway host. Required for the agent to run code at all.
+exec_cfg = tools.setdefault("exec", {{}})
+exec_cfg["host"] = "sandbox"
 web = tools.setdefault("web", {{}})
 web["search"] = {{"enabled": False}}
 web["fetch"] = {{"enabled": False}}
@@ -435,11 +447,23 @@ p.write_text(json.dumps(d, indent=2))
             )
 
     def _index_memory(self, task_id: str) -> None:
+        # openclaw's memory tool searches /root/memory/<YYYY-MM-DD>.md for
+        # today's and yesterday's notes on every session bootstrap. Without
+        # these files the agent surfaces ENOENT errors (see gateway.log:
+        # 'read failed: ENOENT ... /root/memory/<date>.md') and the persona
+        # bootstrap silently falls back to a generic LLM with the prompt
+        # only. Seed both with MEMORY.md so the daily-memory layer resolves.
         cmd = (
             "mkdir -p /root/memory && "
             "for f in /root/MEMORY.md /root/SOUL.md /root/AGENT.md /root/AGENTS.md; do "
             '  [ -f "$f" ] && cp "$f" /root/memory/ || true; '
             "done && "
+            "if [ -f /root/MEMORY.md ]; then "
+            '  today=$(date -u +%Y-%m-%d); '
+            '  yesterday=$(date -u -d "yesterday" +%Y-%m-%d 2>/dev/null || date -u -v-1d +%Y-%m-%d); '
+            '  cp /root/MEMORY.md "/root/memory/${today}.md"; '
+            '  cp /root/MEMORY.md "/root/memory/${yesterday}.md"; '
+            "fi && "
             "openclaw memory index --force 2>&1 | tail -3"
         )
         result = subprocess.run(

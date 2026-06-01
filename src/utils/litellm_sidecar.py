@@ -119,6 +119,22 @@ def build_litellm_config_yaml(
     )
 
 
+def pull_litellm_image(image: str = LITELLM_IMAGE) -> None:
+    # `:main-stable` is a moving registry tag; we explicitly pull at batch
+    # startup so registry/network failures surface here instead of inside the
+    # first `docker run` and being misattributed to a task error.
+    logger.info("Pulling LiteLLM image %s", image)
+    r = subprocess.run(
+        ["docker", "pull", image],
+        capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        raise RuntimeError(
+            f"Failed to pull LiteLLM image {image}: {(r.stderr or '').strip()}"
+        )
+    logger.info("LiteLLM image %s ready", image)
+
+
 def create_network(name: str, internal: bool = True) -> None:
     # internal=True creates an --internal bridge with no NAT to the host's
     # default route, so containers attached to ONLY this network cannot
