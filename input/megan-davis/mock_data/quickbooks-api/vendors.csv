@@ -1,4 +1,0 @@
-Id,DisplayName,CompanyName,PrimaryEmailAddr,PrimaryPhone,BillAddr_Line1,BillAddr_City,BillAddr_CountrySubDivisionCode,BillAddr_PostalCode,Balance,Active,AcctNum,Vendor1099
-1001,Motor City BBQ Society,Motor City BBQ Society LLC,,(313) 555-0181,,,,,0.00,true,MCBBQ-2026,false
-1002,SupplyHouse Wholesale,SupplyHouse Inc.,,(800) 555-0163,,,,,2184.20,true,SH-DPL-2024,false
-1003,Marathon Gas,Marathon Petroleum,,(313) 555-0144,,,,,0.00,true,,false

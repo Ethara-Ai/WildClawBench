@@ -1,0 +1,13 @@
+Date,Engine Hours,Maintenance Category,Repair/Service,Parts Replaced,Vendor,Cost ($),Downtime (hrs),Notes
+2025-04-18,5035,Engine,Oil and Filter Change,Oil Filter,Midcoast Diesel,140,2,Scheduled maintenance
+2025-05-27,5180,Fuel System,Fuel Filter Replacement,Primary Filter,Self,35,1,Preventive replacement
+2025-07-11,5365,Drive Belt,Alternator Belt Replacement,Belt,Rockland Marine,45,1,Belt cracking observed
+2025-08-29,5510,Cooling System,Cooling Flush,Coolant,Midcoast Diesel,80,2,Routine service completed
+2025-10-14,5680,Electrical,Battery Terminal Cleaning,None,Self,0,1,Corrosion removed
+2025-11-22,5825,Engine,Oil and Filter Change,Oil Filter,Midcoast Diesel,145,2,Scheduled maintenance
+2025-12-09,5905,Engine Inspection,Annual Haul-Out Inspection,None,Rockland Marine,225,8,Minor overheating concern noted during inspection
+2026-01-18,5980,Cooling System,Thermostat Replacement,Thermostat,Rockland Marine,95,2,Temperature fluctuations reported
+2026-02-06,6035,Fuel System,Fuel Filter Replacement,Primary Filter,Self,40,1,Dirty fuel suspected
+2026-03-04,6145,Cooling System,Raw Water Impeller Replacement,Impeller Kit,Rockland Marine,110,2,Seasonal maintenance completed
+2026-03-19,6180,Steering,Hydraulic Fluid Top-off,Hydraulic Fluid,Harbor Supply,38,0.5,Slight steering stiffness reported
+2026-03-28,6200,Electrical,Alternator Test,None,Midcoast Diesel,60,1,Charging system normal

@@ -42,7 +42,7 @@ from src.utils.grading import (
 from src.utils.config import Config
 from src.utils.task_parser import load_task
 from src.utils.docker_utils import discover_services, require_image_present, DOCKER_IMAGE
-from src.utils.skills_inference import infer_required_apis
+from src.utils.skills_inference import infer_required_apis, compute_distractor_skills
 from src.utils.testgen import generate_task_tests
 from src.utils.litellm_sidecar import (
     build_litellm_config_yaml,
@@ -327,6 +327,21 @@ def _augment_task_with_mocks(task: dict, config, mock_env_dict: dict | None) -> 
     task["env_dir"] = env_dir
     task["required_apis"] = sorted(required)
     task["mock_overlays"] = overlays
+    # Distractor APIs are exposed to the agent the same way required APIs are
+    # (connector skill docs + URL env var), so the agent must actively choose
+    # between plausible-but-unneeded surfaces. This is the design intent of
+    # distractor_skills in task.toml (b46); before 2026-06-02 only the harbor
+    # bundle + testgen saw them, so the live agent could not actually be
+    # tempted by them. The selection is deterministic per task_id, so reruns
+    # of the same task see the same distractor set.
+    try:
+        task["distractor_apis"] = list(compute_distractor_skills(
+            sorted(required),
+            task.get("task_id") or task.get("task_id_ori") or "",
+            environment_dir=config.environment_dir,
+        ))
+    except Exception:
+        task["distractor_apis"] = []
     # Expose the shared mock-stack URLs to the task (the full service map; the
     # extra entries are inert env vars for APIs this task doesn't call).
     if mock_env_dict:

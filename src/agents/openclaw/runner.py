@@ -140,10 +140,19 @@ class OpenClawAgent(BaseAgent):
                 spec.task.get("skills", ""),
                 spec.task.get("skills_path", ""),
             )
+            # Inject both required AND distractor connector skills so the
+            # agent sees plausible-but-unneeded API surfaces alongside the
+            # ones it actually needs. Without this, distractors only existed
+            # in task.toml + testgen negative-weight tests, so the agent could
+            # not realistically be tempted by them at runtime. The two lists
+            # are deduplicated; if a distractor was already required (catalog
+            # overlap edge case) the connector is only copied once.
+            _required = spec.task.get("required_apis", []) or []
+            _distractors = spec.task.get("distractor_apis", []) or []
             inject_api_connectors(
                 spec.task_id,
                 spec.task.get("env_dir", ""),
-                spec.task.get("required_apis", []) or [],
+                list(dict.fromkeys(list(_required) + list(_distractors))),
             )
 
             run_warmup(spec.task_id, spec.task.get("warmup", ""))

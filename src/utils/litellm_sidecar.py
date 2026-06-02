@@ -102,6 +102,15 @@ def build_litellm_config_yaml(
         '  callbacks: ["litellm_usage_callback.proxy_handler_instance"]\n'
         if enable_usage_callback else ""
     )
+    # `cache_control_injection_points` makes LiteLLM auto-tag the agent's
+    # system prompt with Anthropic's ephemeral cache_control marker on every
+    # passthrough call. Anthropic-on-Bedrock honors this and trims cached
+    # input tokens to ~10% of fresh price. Without this, openclaw's outbound
+    # body has no cache hint and every call re-bills the full system prompt
+    # (which is large for openclaw: persona + skills + workspace listing).
+    # `location: message` + `role: system` is the documented shape (LiteLLM
+    # docs/docs/proxy/prompt_caching.md). 5-minute TTL applies; same task
+    # within a session and same persona across re-runs both benefit.
     return (
         "model_list:\n"
         + "\n".join(model_blocks)
@@ -111,9 +120,12 @@ def build_litellm_config_yaml(
         "  modify_params: true\n"
         "  telemetry: false\n"
         "  num_retries: 1\n"
-"  request_timeout: 900\n"
-"  stream_timeout: 300\n"
+        "  request_timeout: 900\n"
+        "  stream_timeout: 300\n"
         "  reasoning_auto_summary: true\n"
+        "  cache_control_injection_points:\n"
+        "    - location: message\n"
+        "      role: system\n"
         + callback_line
         + "general_settings:\n"
         "  master_key: os.environ/LITELLM_MASTER_KEY\n"

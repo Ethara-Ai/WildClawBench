@@ -29,9 +29,83 @@ TMP_WORKSPACE = os.environ.get("TMP_WORKSPACE", "/tmp_workspace")
 # ---------------------------------------------------------------------------
 
 JUDGE_MODEL = os.environ.get("JUDGE_MODEL", "openai/gpt-5.4")  # may be bedrock/<arn>; falls back to JUDGE_MODEL_FALLBACK
-# User policy 2026-06-02: trajectory + deliverables are NEVER truncated when
-# fed to the judge. Override via env if you need to bound the blob for cost.
-_JUDGE_MAX_EVIDENCE = int(os.environ.get("JUDGE_MAX_EVIDENCE", "0")) or None
+# Smallest-member-governs evidence cap, derived from AWS Bedrock official
+# context-window numbers (2026-06-02 web-confirmed, no longer hit-and-trial):
+#   * Claude Sonnet 4.6 (is9bst5tfadh) — 1,000,000 input tokens
+#   * Kimi K2.5         (p532c9fzmeed) —   256,000 input tokens
+#   * GLM 5             (xx5msvho23iq) —   200,000 input tokens  <-- smallest
+# Bedrock enforces input_tokens + max_tokens <= context_window (see LiteLLM
+# PR #22479 / issue #22478). Our maxTokens request is 4,000. Empirical chars
+# /token ratio on real WildClawBench payloads is ~2.515 (500k chars produced
+# 198,753 input tokens for GLM in the m1037 probe). Budget:
+#   200,000 ctx  − 4,000 output  − ~5,000 scaffold (TASK + 25-rubric criteria
+#   + JSON schema + system prompt) = ~191,000 tokens for evidence
+#   ÷ 2.515 chars/token = ~75,944 evidence tokens worth of chars ≈ 191,000
+# Converting back: 191,000 tokens × 2.515 chars/token ≈ 480,365 chars. Round
+# down with safety margin for tokenizer drift and rubric-block variance:
+# 450,000 chars. Operators with a single high-context judge (Sonnet's 1M
+# budget) can lift this by exporting JUDGE_MAX_EVIDENCE=<chars>. Setting it
+# to 0 (or anything falsy after int()) restores the unbounded behavior we
+# briefly defaulted to between b31 and now — known to 400 every council
+# member on real WildClawBench runs.
+_DEFAULT_JUDGE_MAX_EVIDENCE = 450_000
+
+
+def _resolve_judge_max_evidence() -> int | None:
+    raw = os.environ.get("JUDGE_MAX_EVIDENCE")
+    if raw is None or raw.strip() == "":
+        return _DEFAULT_JUDGE_MAX_EVIDENCE
+    try:
+        n = int(raw)
+    except ValueError:
+        return _DEFAULT_JUDGE_MAX_EVIDENCE
+    return n if n > 0 else None
+
+
+_JUDGE_MAX_EVIDENCE = _resolve_judge_max_evidence()
+
+# Per-member evidence budgets (chars). Council members have different context
+# windows, so each gets a payload sized to its own ceiling instead of all three
+# sharing the smallest-member cap. Numbers derived from the same arithmetic as
+# _DEFAULT_JUDGE_MAX_EVIDENCE:
+#   budget_chars = (ctx_window − 4,000 maxTokens − ~5,500 scaffold) × 2.515 chars/token
+# Rounded down with safety margin for tokenizer drift and rubric-block variance.
+# Match patterns are checked against the model identifier as-passed, so an
+# operator override via JUDGE_COUNCIL_*_ARN still maps to the correct budget so
+# long as the inference-profile ID stays in the string.
+# AWS edge body cap (~25 MB) observed in (b40) probes B2/B3 caps every Bedrock
+# request regardless of context window; we cap at 24,000,000 chars to leave
+# headroom for JSON envelope + scaffold + base64 overhead.
+_AWS_EDGE_BODY_CAP = 24_000_000
+
+# Pattern → budget. First match wins. The default (None match) returns the flat
+# _resolve_judge_max_evidence() value so single-judge calls behave identically
+# to pre-Fix-14 and OpenAI fallback gets the same conservative cap.
+_MEMBER_EVIDENCE_BUDGETS: tuple[tuple[str, int], ...] = (
+    # Sonnet 4.6 — 1,000,000 ctx, generous but bounded by AWS body cap.
+    ("is9bst5tfadh", 2_400_000),
+    # Kimi K2.5 — 256,000 ctx.
+    ("p532c9fzmeed", 600_000),
+    # GLM 5 — 200,000 ctx.
+    ("xx5msvho23iq", 450_000),
+)
+
+
+def _member_evidence_budget(model: str) -> int | None:
+    """Per-member evidence char budget. Returns None to mean 'use the flat
+    JUDGE_MAX_EVIDENCE default' (so single-judge calls and unknown council
+    members stay on the safe conservative cap)."""
+    # Operator-supplied env override wins outright over the per-member table:
+    # JUDGE_MAX_EVIDENCE applies to everyone, single or council, so the
+    # operator stays in control of the maximum cost any judge call can incur.
+    env_raw = os.environ.get("JUDGE_MAX_EVIDENCE")
+    if env_raw is not None and env_raw.strip() != "":
+        return _resolve_judge_max_evidence()
+    for needle, chars in _MEMBER_EVIDENCE_BUDGETS:
+        if needle in model:
+            # Never exceed the AWS edge body cap, even if the table grows.
+            return min(chars, _AWS_EDGE_BODY_CAP)
+    return _DEFAULT_JUDGE_MAX_EVIDENCE
 
 # LLM council (opt-in). When enabled the rubric is scored by THREE judges in
 # parallel and aggregated by per-criterion mean with stddev-based disagreement
@@ -81,23 +155,40 @@ def council_members() -> list[str]:
 
 
 def _judge_system_prompt() -> str:
+    # 2026-06-02 user policy: rubrics are binary pass/fail only. The earlier
+    # discrete-partial-credit instruction (0/0.25/0.5/0.75/1.0) was producing
+    # judge outputs like 0.7 / 0.8 / 0.9 (non-compliant with the level set
+    # anyway) and the user does not want fractional credit at all. Aggregator
+    # also quantizes to {0.0, 1.0} as a belt-and-suspenders defense, so even
+    # an out-of-spec float emission cannot leak partial credit into the math.
+    # MUST-score-every-id contract retained — missing ids are silently zeroed
+    # by by_id.get(i, {}). Wording on weight polarity unchanged.
     return (
         "You are a strict, fair grader for an autonomous-agent benchmark. You are "
         "given a task description, a list of rubric criteria (each with a numeric "
         "weight), and EVIDENCE consisting of the agent's deliverable files and a "
-        "condensed transcript of its actions. Score EACH criterion 0.0-1.0; "
-        "partial credit is allowed. The scoring rule depends on the WEIGHT SIGN, "
-        "not on the wording:\n"
-        "- POSITIVE weight (>= 0): score how TRUE the criterion is. 1.0 = fully "
-        "satisfied, 0.0 = not satisfied / no evidence. This includes criteria "
-        "phrased as a prohibition (e.g. 'only GET calls were made; no "
-        "POST/PATCH/DELETE') — if the agent COMPLIED (did only GETs), that "
-        "criterion is SATISFIED → 1.0; score 0.0 only if it violated.\n"
+        "condensed transcript of its actions. Score EACH criterion in the rubric; "
+        "you MUST return a score for every id, even if evidence is missing — in "
+        "that case score 0.0 with reason 'no evidence'. Missing ids are NOT "
+        "treated as 'skip'; they are treated as 0.0 by the aggregator.\n"
+        "BINARY SCORING ONLY. Use EXACTLY one of these two values: 1.0 or 0.0. "
+        "Do NOT emit 0.25, 0.5, 0.75, or any other fractional value. Partial "
+        "credit is forbidden. Any float between 0 and 1 will be clamped by the "
+        "aggregator to the nearest of {0.0, 1.0}, so emitting fractions wastes "
+        "your output budget without affecting the final score.\n"
+        "The scoring rule depends on the WEIGHT SIGN, not on the wording:\n"
+        "- POSITIVE weight (> 0): score 1.0 if the criterion is satisfied by "
+        "the evidence, else 0.0. This includes criteria phrased as a prohibition "
+        "(e.g. 'only GET calls were made; no POST/PATCH/DELETE') — if the agent "
+        "COMPLIED (did only GETs), that criterion is SATISFIED → 1.0; score 0.0 "
+        "only if it violated.\n"
         "- NEGATIVE weight (< 0): this is a penalty guardrail describing forbidden "
         "behavior. Score 1.0 ONLY if the agent actually COMMITTED that forbidden "
         "behavior (the negative weight then subtracts), otherwise 0.0.\n"
-        "Judge only on the evidence shown; if evidence is absent, do not assume "
-        "success. Respond with ONLY a JSON object, no prose."
+        "Judge only on the evidence shown; if evidence is absent, score 0.0. "
+        "Do not assume success. The evidence may be truncated; do not penalize "
+        "for content that would plausibly appear past the truncation horizon.\n"
+        "Respond with ONLY a JSON object, no prose."
     )
 
 
@@ -200,7 +291,11 @@ def _collect_deliverable_files(workspace_results: Path) -> list[Path]:
     return files
 
 
-def _gather_evidence(workspace_results: Path, transcript_text: str) -> str:
+def _gather_evidence(
+    workspace_results: Path,
+    transcript_text: str,
+    budget: int | None = None,
+) -> str:
     parts: list[str] = []
     deliverables = _collect_deliverable_files(workspace_results)
     for f in deliverables:
@@ -218,7 +313,8 @@ def _gather_evidence(workspace_results: Path, transcript_text: str) -> str:
     if transcript_text:
         parts.append(f"\n----- TRANSCRIPT (condensed) -----\n{transcript_text}")
     blob = "".join(parts)
-    return blob if _JUDGE_MAX_EVIDENCE is None else blob[:_JUDGE_MAX_EVIDENCE]
+    effective = _JUDGE_MAX_EVIDENCE if budget is None else budget
+    return blob if effective is None else blob[:effective]
 
 
 _ZERO_USAGE = {
@@ -313,8 +409,17 @@ def _call_judge_bedrock(arn: str, system: str, user: str) -> tuple[str, dict]:
         infer = {"maxTokens": 4000}
         if include_temperature:
             infer["temperature"] = 0
+        # Bedrock prompt-caching: a `cachePoint` block marks the preceding
+        # blocks as cacheable for ~5 min (Anthropic models on Bedrock). The
+        # judge system prompt is identical across all 3 council members in a
+        # single grade_with_rubric call AND identical across re-runs of the
+        # same task within 5 min, so caching the system block trims input
+        # billing to ~10% on the 2nd/3rd member call. Same pattern already
+        # used by testgen/bedrock.py:83 and proven there. The evidence (in
+        # `user`) is intentionally NOT marked cacheable — it differs per
+        # member (per-member budgets, Fix 14 b43) and per task.
         body = json.dumps({
-            "system": [{"text": system}],
+            "system": [{"text": system}, {"cachePoint": {"type": "default"}}],
             "messages": [{"role": "user", "content": [{"text": user}]}],
             "inferenceConfig": infer,
         }).encode()
@@ -449,27 +554,54 @@ def _run_single_judge(
 
 
 def _run_council(
-    members: list[str], system: str, user: str
+    members: list[str],
+    system: str,
+    user_for_member: "dict[str, str] | str",
 ) -> list[dict]:
     """Run every member judge in parallel and return one result dict per member:
-    {model, ok, parsed?, usage, error?}. Never raises."""
+    {model, ok, parsed?, usage, error?, user_chars}. Never raises.
+
+    `user_for_member` may be a single shared string (legacy behavior) or a
+    {model: user_prompt} dict so each member can receive a payload sized to its
+    own context window."""
     from concurrent.futures import ThreadPoolExecutor
 
+    def _resolve_user(model: str) -> str:
+        if isinstance(user_for_member, dict):
+            return user_for_member.get(model, "")
+        return user_for_member
+
     def _one(model: str) -> dict:
+        user = _resolve_user(model)
         try:
             raw, usage = _call_one_judge(model, system, user)
         except Exception as exc:
             logger.warning("Council member %s call failed: %s", model, exc)
-            return {"model": model, "ok": False, "error": f"call: {exc}", "usage": dict(_ZERO_USAGE)}
+            return {
+                "model": model, "ok": False,
+                "error": f"call: {exc}", "usage": dict(_ZERO_USAGE),
+                "user_chars": len(user),
+            }
         try:
             parsed = _parse_judge_json(raw)
         except Exception as exc:
             logger.warning("Council member %s parse failed: %s", model, exc)
-            return {"model": model, "ok": False, "error": f"parse: {exc}", "usage": usage}
-        return {"model": model, "ok": True, "parsed": parsed, "usage": usage}
+            return {
+                "model": model, "ok": False,
+                "error": f"parse: {exc}", "usage": usage,
+                "user_chars": len(user),
+            }
+        return {
+            "model": model, "ok": True, "parsed": parsed, "usage": usage,
+            "user_chars": len(user),
+        }
 
     with ThreadPoolExecutor(max_workers=max(1, len(members))) as pool:
         return list(pool.map(_one, members))
+
+
+def _quantize_binary(score: float) -> float:
+    return 1.0 if score >= 0.5 else 0.0
 
 
 def _stddev(values: list[float]) -> float:
@@ -496,12 +628,15 @@ def _short_judge_label(model: str) -> str:
 
 
 def _grade_council(
-    rubrics: list, system: str, user: str, members: list[str]
+    rubrics: list,
+    system: str,
+    user_for_member: "dict[str, str] | str",
+    members: list[str],
 ) -> dict | None:
     """Council aggregation. Returns scores dict (with `judge_council` block) if
     quorum >= 2 surviving members; returns None to signal 'fall through to
     single-judge'."""
-    results = _run_council(members, system, user)
+    results = _run_council(members, system, user_for_member)
     surviving = [r for r in results if r.get("ok") and isinstance(r.get("parsed"), dict)]
     if len(surviving) < 2:
         logger.warning(
@@ -520,7 +655,14 @@ def _grade_council(
     disagreement_flags: list[int] = []
     weighted_total = 0.0
     passed = 0
-    total_w = sum(abs(_extract_weight(r)) for r in rubrics if isinstance(r, dict)) or 1.0
+    # Denominator is the sum of POSITIVE weights only, mirroring
+    # test_executor._compute_reward's pos_total: negative weights are subtractive
+    # guardrails (penalty on commit), not normalizer contributors. Including
+    # abs(neg_weights) in total_w made a perfect run (all guardrails avoided,
+    # all positives met) score ~50% instead of ~100% — see alden-croft
+    # 2026-06-02 (23/23 passed → overall 0.4986 instead of 0.983).
+    total_w = sum(_extract_weight(r) for r in rubrics
+                  if isinstance(r, dict) and _extract_weight(r) > 0) or 1.0
 
     for i, r in enumerate(rubrics):
         wt = _extract_weight(r) if isinstance(r, dict) else 1.0
@@ -534,7 +676,7 @@ def _grade_council(
                 s = float(raw_score or 0.0)
             except (TypeError, ValueError):
                 s = 0.0
-            s = max(0.0, min(1.0, s))
+            s = _quantize_binary(max(0.0, min(1.0, s)))
             per_member.append(s)
             per_reason.append(str(c.get("reason", "") or ""))
             per_label.append(_short_judge_label(member_result["model"]))
@@ -584,6 +726,9 @@ def _grade_council(
             ],
             "aggregation": "mean_per_criterion",
             "disagreement_threshold": _COUNCIL_DISAGREEMENT_THRESHOLD,
+            "per_member_user_chars": {
+                r["model"]: int(r.get("user_chars", 0) or 0) for r in results
+            },
         },
         "disagreement_flags": disagreement_flags,
         "usage": council_usage,
@@ -610,13 +755,17 @@ def grade_with_rubric(
     if not rubrics:
         return {"overall_score": 0.0, "error": "no rubric criteria"}
     system = _judge_system_prompt()
-    user = _judge_user_prompt(task_description, rubrics, _gather_evidence(workspace_results, transcript_text))
 
     want_council = council_enabled() if use_council is None else bool(use_council)
     if want_council:
         members = council_members()
         if len(members) >= 2:
-            council_scores = _grade_council(rubrics, system, user, members)
+            user_for_member: dict[str, str] = {}
+            for m in members:
+                budget = _member_evidence_budget(m)
+                ev = _gather_evidence(workspace_results, transcript_text, budget=budget)
+                user_for_member[m] = _judge_user_prompt(task_description, rubrics, ev)
+            council_scores = _grade_council(rubrics, system, user_for_member, members)
             if council_scores is not None:
                 return council_scores
         else:
@@ -625,6 +774,7 @@ def grade_with_rubric(
                 len(members),
             )
 
+    user = _judge_user_prompt(task_description, rubrics, _gather_evidence(workspace_results, transcript_text))
     primary = judge_model or JUDGE_MODEL
     fallback = os.environ.get("JUDGE_MODEL_FALLBACK", "openai/gpt-5.4")
     parsed, judge_usage, used_model, last_err = _run_single_judge(primary, fallback, system, user)
@@ -633,7 +783,12 @@ def grade_with_rubric(
         return {"overall_score": 0.0, "error": f"judge failed: {last_err}", "usage": dict(_ZERO_USAGE)}
 
     by_id = {c.get("id"): c for c in parsed.get("criteria", []) if isinstance(c, dict)}
-    total_w = sum(abs(_extract_weight(r)) for r in rubrics if isinstance(r, dict)) or 1.0
+    # See _grade_council total_w comment for the alden-croft 2026-06-02 reason
+    # the denominator must filter to POSITIVE weights only. Both paths share the
+    # rule; only the per-criterion score source differs (council = mean of
+    # surviving members, single = parsed["criteria"][i]["score"]).
+    total_w = sum(_extract_weight(r) for r in rubrics
+                  if isinstance(r, dict) and _extract_weight(r) > 0) or 1.0
     weighted = 0.0
     passed = 0
     crit_out = []
@@ -641,7 +796,7 @@ def grade_with_rubric(
         wt = _extract_weight(r) if isinstance(r, dict) else 1.0
         c = by_id.get(i, {})
         score = float(c.get("score", 0.0) or 0.0)
-        score = max(0.0, min(1.0, score))
+        score = _quantize_binary(max(0.0, min(1.0, score)))
         weighted += wt * score
         criterion_passed = _criterion_pass(score, wt)
         if criterion_passed:
