@@ -157,6 +157,23 @@ def build_run_batch_parser(default_model: str, default_parallel: int) -> argpars
         help="Force-rebuild the mock-API image even if the cached tag exists "
              "(use after editing environment/<api>/ server code or baseline CSVs).",
     )
+    parser.add_argument(
+        "--judge-council",
+        dest="judge_council",
+        action="store_true",
+        default=None,
+        help="Use a 3-judge council (Sonnet 4.6 + GLM 5 + Kimi k2.5) instead of "
+             "the single JUDGE_MODEL. Runs members in parallel, aggregates by "
+             "per-criterion mean, requires quorum of 2 surviving members. "
+             "Equivalent to JUDGE_COUNCIL=1. Members are overridable via "
+             "JUDGE_COUNCIL_MEMBERS=<m1>,<m2>,<m3>.",
+    )
+    parser.add_argument(
+        "--no-judge-council",
+        dest="judge_council",
+        action="store_false",
+        help="Force-disable the judge council even if JUDGE_COUNCIL=1 in env.",
+    )
     return parser
 
 

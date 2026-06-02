@@ -209,6 +209,26 @@ def _derive_taxonomy_for_native_task(
     return l1, l2
 
 
+def _append_workspace_hint(prompt: str, attachments: list[dict]) -> str:
+    if not attachments:
+        return prompt
+    names = sorted({str(a.get("storedAs") or a.get("name") or "") for a in attachments if a})
+    names = [n for n in names if n]
+    if not names:
+        return prompt
+    listing = "\n".join(f"- {n}" for n in names[:30])
+    if len(names) > 30:
+        listing += f"\n- ... ({len(names) - 30} more)"
+    hint = (
+        "\n\n---\n"
+        "Workspace inputs (already staged on disk at `/root/workspace/`):\n"
+        f"{listing}\n"
+        "Read these directly with the file/read tools before falling back to "
+        "any other source."
+    )
+    return prompt + hint
+
+
 def _load_native_task(task_dir: Path) -> dict:
     # kensei-native task dir: prompt.txt + rubric.json + persona/ + data/ + mock_data/ + gt/.
     # workspace_path is left empty here; run_batch stages a workspace from
@@ -240,17 +260,18 @@ def _load_native_task(task_dir: Path) -> dict:
                 "mimeType": mime,
                 "path": str(f.resolve()),
                 "size": f.stat().st_size,
-                "storedAs": f.name,
+                "storedAs": rel,
                 "role": "primary",
                 "description": "",
             })
 
     persona_dir = task_dir / "persona"
     derived_l1, derived_l2 = _derive_taxonomy_for_native_task(task_dir, rubrics, attachments)
+    prompt_with_inputs = _append_workspace_hint(prompt, attachments)
     return {
         "task_id": task_dir.name,
-        "prompt": prompt,
-        "initial_prompt": prompt,
+        "prompt": prompt_with_inputs,
+        "initial_prompt": prompt_with_inputs,
         "persona": persona,
         "persona_dir": str(persona_dir) if persona_dir.is_dir() else "",
         "system_prompt": "",

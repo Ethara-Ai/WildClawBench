@@ -30,6 +30,49 @@ TMP_WORKSPACE = os.environ.get("TMP_WORKSPACE", "/tmp_workspace")
 JUDGE_MODEL = os.environ.get("JUDGE_MODEL", "openai/gpt-5.4")  # may be bedrock/<arn>; falls back to JUDGE_MODEL_FALLBACK
 _JUDGE_MAX_EVIDENCE = 60_000  # chars of deliverables+transcript fed to the judge
 
+# LLM council (opt-in). When enabled the rubric is scored by THREE judges in
+# parallel and aggregated by per-criterion mean with stddev-based disagreement
+# flags. Quorum policy: any 2 surviving judges produce a valid council score;
+# < 2 surviving judges falls through to the single-judge code path. Member
+# identifiers follow the same "<provider>/<rest>" form as JUDGE_MODEL. The
+# default roster matches the team's chosen models (Sonnet 4.6 + GLM 5 + Kimi
+# k2.5) and is overridable end-to-end via env:
+#   JUDGE_COUNCIL=1
+#   JUDGE_COUNCIL_MEMBERS=bedrock/<arn1>,bedrock/<arn2>,bedrock/<arn3>
+#   JUDGE_COUNCIL_DISAGREEMENT_THRESHOLD=0.30   (stddev above which a criterion
+#                                                is flagged as contested)
+_DEFAULT_COUNCIL_MEMBERS = (
+    # Sonnet 4.6 — anchor judge, same ARN used by JUDGE_MODEL.
+    os.environ.get(
+        "JUDGE_COUNCIL_SONNET_ARN",
+        "bedrock/arn:aws:bedrock:ap-south-1:426628337772:application-inference-profile/xv71vnlzm71s",
+    ),
+    # GLM 5 — us-east-1 profile.
+    os.environ.get(
+        "JUDGE_COUNCIL_GLM_ARN",
+        "bedrock/arn:aws:bedrock:us-east-1:426628337772:application-inference-profile/xx5msvho23iq",
+    ),
+    # Kimi k2.5 — ap-south-1 profile.
+    os.environ.get(
+        "JUDGE_COUNCIL_KIMI_ARN",
+        "bedrock/arn:aws:bedrock:ap-south-1:426628337772:application-inference-profile/p532c9fzmeed",
+    ),
+)
+_COUNCIL_DISAGREEMENT_THRESHOLD = float(
+    os.environ.get("JUDGE_COUNCIL_DISAGREEMENT_THRESHOLD", "0.30") or "0.30"
+)
+
+
+def council_enabled() -> bool:
+    return os.environ.get("JUDGE_COUNCIL", "").strip() in {"1", "true", "yes", "on"}
+
+
+def council_members() -> list[str]:
+    raw = os.environ.get("JUDGE_COUNCIL_MEMBERS", "").strip()
+    if raw:
+        return [m.strip() for m in raw.split(",") if m.strip()]
+    return [m for m in _DEFAULT_COUNCIL_MEMBERS if m]
+
 
 def _judge_system_prompt() -> str:
     return (
@@ -335,53 +378,218 @@ def _parse_judge_json(text: str) -> dict:
     raise ValueError("judge returned no parseable JSON")
 
 
+def _call_one_judge(model: str, system: str, user: str) -> tuple[str, dict]:
+    provider, _, rest = model.partition("/")
+    if provider == "bedrock":
+        return _call_judge_bedrock(rest, system, user)
+    return _call_judge_openai(rest or model, system, user)
+
+
+def _run_single_judge(
+    primary: str, fallback: str, system: str, user: str
+) -> tuple[dict | None, dict, str | None, Exception | None]:
+    candidates = [m for m in (primary, fallback) if m]
+    last_err: Exception | None = None
+    for model in candidates:
+        try:
+            raw, usage = _call_one_judge(model, system, user)
+        except Exception as exc:
+            last_err = exc
+            logger.warning("Rubric judge model %s failed (%s); trying next", model, exc)
+            continue
+        try:
+            parsed = _parse_judge_json(raw)
+        except Exception as exc:
+            last_err = exc
+            logger.warning("Rubric judge %s parse failed (%s); trying next", model, exc)
+            continue
+        return parsed, usage, model, None
+    return None, dict(_ZERO_USAGE), None, last_err
+
+
+def _run_council(
+    members: list[str], system: str, user: str
+) -> list[dict]:
+    """Run every member judge in parallel and return one result dict per member:
+    {model, ok, parsed?, usage, error?}. Never raises."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    def _one(model: str) -> dict:
+        try:
+            raw, usage = _call_one_judge(model, system, user)
+        except Exception as exc:
+            logger.warning("Council member %s call failed: %s", model, exc)
+            return {"model": model, "ok": False, "error": f"call: {exc}", "usage": dict(_ZERO_USAGE)}
+        try:
+            parsed = _parse_judge_json(raw)
+        except Exception as exc:
+            logger.warning("Council member %s parse failed: %s", model, exc)
+            return {"model": model, "ok": False, "error": f"parse: {exc}", "usage": usage}
+        return {"model": model, "ok": True, "parsed": parsed, "usage": usage}
+
+    with ThreadPoolExecutor(max_workers=max(1, len(members))) as pool:
+        return list(pool.map(_one, members))
+
+
+def _stddev(values: list[float]) -> float:
+    n = len(values)
+    if n < 2:
+        return 0.0
+    mean = sum(values) / n
+    var = sum((v - mean) ** 2 for v in values) / n
+    return var ** 0.5
+
+
+def _criterion_pass(score: float, weight: float) -> bool:
+    triggered = score >= 0.5
+    return (not triggered) if weight < 0 else triggered
+
+
+def _short_judge_label(model: str) -> str:
+    """Shorten 'bedrock/arn:aws:bedrock:<region>:<acct>:application-inference-profile/<id>'
+    to '<id>' for compact per-criterion arrays in score.json; preserves the
+    'openai/<model>' shape verbatim."""
+    if model.startswith("bedrock/"):
+        return model.rsplit("/", 1)[-1]
+    return model
+
+
+def _grade_council(
+    rubrics: list, system: str, user: str, members: list[str]
+) -> dict | None:
+    """Council aggregation. Returns scores dict (with `judge_council` block) if
+    quorum >= 2 surviving members; returns None to signal 'fall through to
+    single-judge'."""
+    results = _run_council(members, system, user)
+    surviving = [r for r in results if r.get("ok") and isinstance(r.get("parsed"), dict)]
+    if len(surviving) < 2:
+        logger.warning(
+            "Judge council quorum failed: only %d/%d members succeeded; falling back to single-judge",
+            len(surviving), len(members),
+        )
+        return None
+
+    by_id_per_member: list[dict] = []
+    for r in surviving:
+        parsed = r["parsed"]
+        items = parsed.get("criteria") or []
+        by_id_per_member.append({c.get("id"): c for c in items if isinstance(c, dict)})
+
+    crit_out: list[dict] = []
+    disagreement_flags: list[int] = []
+    weighted_total = 0.0
+    passed = 0
+    total_w = sum(abs(_extract_weight(r)) for r in rubrics if isinstance(r, dict)) or 1.0
+
+    for i, r in enumerate(rubrics):
+        wt = _extract_weight(r) if isinstance(r, dict) else 1.0
+        per_member: list[float] = []
+        per_reason: list[str] = []
+        per_label: list[str] = []
+        for member_result, by_id in zip(surviving, by_id_per_member):
+            c = by_id.get(i, {})
+            raw_score = c.get("score", 0.0)
+            try:
+                s = float(raw_score or 0.0)
+            except (TypeError, ValueError):
+                s = 0.0
+            s = max(0.0, min(1.0, s))
+            per_member.append(s)
+            per_reason.append(str(c.get("reason", "") or ""))
+            per_label.append(_short_judge_label(member_result["model"]))
+
+        mean_score = sum(per_member) / len(per_member) if per_member else 0.0
+        sd = _stddev(per_member)
+        criterion_passed = _criterion_pass(mean_score, wt)
+        if criterion_passed:
+            passed += 1
+        weighted_total += wt * mean_score
+        if sd > _COUNCIL_DISAGREEMENT_THRESHOLD:
+            disagreement_flags.append(i)
+        crit_out.append({
+            "id": i,
+            "weight": wt,
+            "score": round(mean_score, 3),
+            "criterion": (r.get("criterion") if isinstance(r, dict) else str(r)),
+            "scores_by_judge": [round(s, 3) for s in per_member],
+            "judges": per_label,
+            "stddev": round(sd, 3),
+            "reasons_by_judge": per_reason,
+            "is_positive": wt >= 0,
+            "passed": criterion_passed,
+        })
+
+    overall = max(0.0, min(1.0, weighted_total / total_w))
+    council_usage = _ZERO_USAGE.copy()
+    for r in results:
+        u = r.get("usage") or {}
+        for k in council_usage.keys():
+            council_usage[k] = council_usage.get(k, 0) + int(u.get(k, 0) or 0)
+
+    n = len(rubrics)
+    return {
+        "overall_score": round(overall, 4),
+        "tests_total": n,
+        "tests_passed": passed,
+        "tests_failed": n - passed,
+        "criteria": crit_out,
+        "judge_model": "council",
+        "judge_council": {
+            "members": [r["model"] for r in results],
+            "surviving": [r["model"] for r in surviving],
+            "failed": [
+                {"model": r["model"], "error": r.get("error", "")}
+                for r in results if not r.get("ok")
+            ],
+            "aggregation": "mean_per_criterion",
+            "disagreement_threshold": _COUNCIL_DISAGREEMENT_THRESHOLD,
+        },
+        "disagreement_flags": disagreement_flags,
+        "usage": council_usage,
+    }
+
+
 def grade_with_rubric(
     rubrics: list,
     task_description: str,
     workspace_results: Path,
     transcript_text: str = "",
     judge_model: str | None = None,
+    use_council: bool | None = None,
 ) -> dict:
-    """Score `rubrics` with an LLM judge. Returns a scores dict:
-    {overall_score, tests_total, tests_passed, tests_failed, criteria:[...], judge_model}
+    """Score `rubrics` with an LLM judge or judge council.
+
+    `use_council` overrides the JUDGE_COUNCIL env flag when not None. Council
+    mode runs the members from `council_members()` in parallel, aggregates by
+    per-criterion mean, and falls through to single-judge if quorum (>=2
+    surviving members) is not met. Returns a scores dict:
+    {overall_score, tests_total, tests_passed, tests_failed, criteria:[...],
+     judge_model, [judge_council, disagreement_flags]}
     or {overall_score:0.0, error:...} on failure (never raises)."""
     if not rubrics:
         return {"overall_score": 0.0, "error": "no rubric criteria"}
     system = _judge_system_prompt()
     user = _judge_user_prompt(task_description, rubrics, _gather_evidence(workspace_results, transcript_text))
 
-    # Try the configured judge model first, then the fallback. Each entry is
-    # "openai/<model>" or "bedrock/<full-arn>". partition("/") on the first slash
-    # only, so the Bedrock ARN (which itself contains slashes) stays intact.
+    want_council = council_enabled() if use_council is None else bool(use_council)
+    if want_council:
+        members = council_members()
+        if len(members) >= 2:
+            council_scores = _grade_council(rubrics, system, user, members)
+            if council_scores is not None:
+                return council_scores
+        else:
+            logger.warning(
+                "Judge council requested but only %d members configured; falling back to single-judge",
+                len(members),
+            )
+
     primary = judge_model or JUDGE_MODEL
     fallback = os.environ.get("JUDGE_MODEL_FALLBACK", "openai/gpt-5.4")
-    candidates = [m for m in (primary, fallback) if m]
-
-    raw = None
-    used_model = None
-    last_err = None
-    judge_usage = dict(_ZERO_USAGE)
-    for model in candidates:
-        provider, _, rest = model.partition("/")
-        try:
-            if provider == "bedrock":
-                raw, judge_usage = _call_judge_bedrock(rest, system, user)
-            else:
-                raw, judge_usage = _call_judge_openai(rest or model, system, user)
-            used_model = model
-            break
-        except Exception as exc:
-            last_err = exc
-            logger.warning("Rubric judge model %s failed (%s); trying next", model, exc)
-    if raw is None:
+    parsed, judge_usage, used_model, last_err = _run_single_judge(primary, fallback, system, user)
+    if parsed is None:
         logger.error("All rubric judge models failed: %s", last_err)
         return {"overall_score": 0.0, "error": f"judge failed: {last_err}", "usage": dict(_ZERO_USAGE)}
-    try:
-        parsed = _parse_judge_json(raw)
-    except Exception as exc:
-        logger.error("Judge JSON parse failed (%s): %s", used_model, exc)
-        return {"overall_score": 0.0, "error": f"judge parse failed: {exc}"}
-    model = used_model
 
     by_id = {c.get("id"): c for c in parsed.get("criteria", []) if isinstance(c, dict)}
     total_w = sum(abs(_extract_weight(r)) for r in rubrics if isinstance(r, dict)) or 1.0
@@ -393,14 +601,8 @@ def grade_with_rubric(
         c = by_id.get(i, {})
         score = float(c.get("score", 0.0) or 0.0)
         score = max(0.0, min(1.0, score))
-        weighted += wt * score                       # negative weights penalize
-        # Pass/fail tally must respect the weight sign. A negative-weight
-        # criterion is a guardrail: the judge scores it 1.0 only when the
-        # forbidden behavior OCCURRED, so a clean run scores 0.0 — which is a
-        # PASS, not a failure. Counting `score >= 0.5` for negatives mislabels
-        # un-triggered guardrails as failed and inflates tests_failed.
-        triggered = score >= 0.5
-        criterion_passed = (not triggered) if wt < 0 else triggered
+        weighted += wt * score
+        criterion_passed = _criterion_pass(score, wt)
         if criterion_passed:
             passed += 1
         crit_out.append({
@@ -410,8 +612,7 @@ def grade_with_rubric(
             "is_positive": wt >= 0,
             "passed": criterion_passed,
         })
-    overall = weighted / total_w
-    overall = max(0.0, min(1.0, overall))            # clamp (negatives can push <0)
+    overall = max(0.0, min(1.0, weighted / total_w))
     n = len(rubrics)
     return {
         "overall_score": round(overall, 4),
@@ -419,7 +620,7 @@ def grade_with_rubric(
         "tests_passed": passed,
         "tests_failed": n - passed,
         "criteria": crit_out,
-        "judge_model": model,
+        "judge_model": used_model,
         "judge_notes": parsed.get("notes", ""),
         "usage": judge_usage,
     }

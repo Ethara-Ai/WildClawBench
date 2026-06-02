@@ -302,6 +302,13 @@ tools["deny"] = ["browser", "duckduckgo"]
 # without this line. Same applies to OpenRouter mode below.
 exec_cfg = tools.setdefault("exec", {{}})
 exec_cfg["host"] = "sandbox"
+# Required for tools.exec.host='sandbox' to actually function. Without
+# this, the gateway emits 'sandbox runtime is unavailable for this
+# session' and refuses every exec call. 'all' covers both root agent and
+# spawned subagents (a 'non-main' value would only fix subagents).
+# Observed on gpt-5.5 trajectory 2026-06-01.
+sandbox_cfg = defaults.setdefault("sandbox", {{}})
+sandbox_cfg["mode"] = "all"
 web = tools.setdefault("web", {{}})
 web["search"] = {{"enabled": False}}
 web["fetch"] = {{"enabled": False}}
@@ -323,9 +330,13 @@ d["browser"] = {{"enabled": False}}
 tools = d.setdefault("tools", {{}})
 tools["deny"] = ["browser", "duckduckgo"]
 # Mirror the LiteLLM branch: route exec through the sandbox container, not
-# the gateway host. Required for the agent to run code at all.
+# the gateway host. Required for the agent to run code at all. The sandbox
+# runtime itself must also be enabled via agents.defaults.sandbox.mode or
+# exec calls hit 'sandbox runtime is unavailable for this session'.
 exec_cfg = tools.setdefault("exec", {{}})
 exec_cfg["host"] = "sandbox"
+sandbox_cfg = defaults.setdefault("sandbox", {{}})
+sandbox_cfg["mode"] = "all"
 web = tools.setdefault("web", {{}})
 web["search"] = {{"enabled": False}}
 web["fetch"] = {{"enabled": False}}

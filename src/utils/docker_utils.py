@@ -229,6 +229,16 @@ def inject_api_connectors(
         ["docker", "exec", task_id, "mkdir", "-p", container_skills_root],
         capture_output=True, text=True,
     )
+    # openclaw resolves SKILL.md from a built-in skill root
+    # (/usr/lib/node_modules/openclaw/skills), not from /root/skills.
+    # Symlink each injected connector into that path so the agent can
+    # actually load it. Without this every `read SKILL.md` fails with
+    # ENOENT (seen in gpt/run_1 gateway.log).
+    openclaw_skills_root = "/usr/lib/node_modules/openclaw/skills"
+    subprocess.run(
+        ["docker", "exec", task_id, "mkdir", "-p", openclaw_skills_root],
+        capture_output=True, text=True,
+    )
     injected: list[str] = []
     for api in required_apis:
         connector = env_root / "skills" / f"{api}-connector"
@@ -245,8 +255,15 @@ def inject_api_connectors(
         )
         if r.returncode != 0:
             logger.warning("[%s] Failed to inject connector %s: %s", task_id, api, r.stderr.strip())
-        else:
-            injected.append(api)
+            continue
+        link_target = f"{openclaw_skills_root}/{api}-connector"
+        subprocess.run(
+            ["docker", "exec", task_id, "/bin/bash", "-c",
+             f"rm -rf {shlex.quote(link_target)} && "
+             f"ln -s {shlex.quote(dest)} {shlex.quote(link_target)}"],
+            capture_output=True, text=True,
+        )
+        injected.append(api)
     api_doc = env_root / "API_DOCUMENTATION.md"
     if api_doc.is_file():
         subprocess.run(

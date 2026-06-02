@@ -271,11 +271,15 @@ def _stage_native_workspace(task: dict, config) -> str:
         src = Path(att.get("path", ""))
         if not src.is_file():
             continue
-        dst = exec_dir / (att.get("storedAs") or att.get("name") or src.name)
+        rel = att.get("storedAs") or att.get("name") or src.name
+        # Reject paths that would escape exec_dir (".." or absolute).
+        rel_path = Path(rel)
+        if rel_path.is_absolute() or any(p == ".." for p in rel_path.parts):
+            logger.warning("[%s] skipping unsafe attachment path: %s", task_id_ori, rel)
+            continue
+        dst = exec_dir / rel_path
         try:
             dst.parent.mkdir(parents=True, exist_ok=True)
-            # Hardlink when on the same filesystem (instant + no extra disk for
-            # large up-to-2GB attachments); fall back to a copy across devices.
             try:
                 if dst.exists():
                     dst.unlink()
@@ -613,6 +617,7 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
                 task.get("task_description") or task.get("initial_prompt") or "",
                 results_dir,
                 transcript_text=transcript_text,
+                use_council=task.get("__use_judge_council__"),
             )
             result["scores"] = scores
             if isinstance(scores, dict) and scores.get("usage"):
@@ -1309,6 +1314,11 @@ def _run_dispatch(args, backend, config: Config, mock_env_dict: dict, effective_
     if exec_tests is None:
         exec_tests = bool(gen_tests and enable_mock_stack)
     testexec_timeout = getattr(args, "testexec_timeout", 600)
+    use_judge_council = getattr(args, "judge_council", None)
+    if use_judge_council is True:
+        logger.info("Judge council enabled via --judge-council")
+    elif use_judge_council is False:
+        logger.info("Judge council explicitly disabled via --no-judge-council")
     if gen_tests:
         logger.info("Test generation enabled (Bedrock %s, max_attempts=%d)",
                     config.bedrock_region, testgen_max_attempts)
@@ -1355,6 +1365,7 @@ def _run_dispatch(args, backend, config: Config, mock_env_dict: dict, effective_
             logger.error("File not found: %s", task_file)
             sys.exit(1)
         task = load_task(task_file)
+        task["__use_judge_council__"] = use_judge_council
         logger.info("Single task mode: %s (format=%s)", task["task_id"], task.get("format", "md"))
         result = run_single_task(
             task,
@@ -1401,7 +1412,9 @@ def _run_dispatch(args, backend, config: Config, mock_env_dict: dict, effective_
         tasks = []
         for tf in task_files:
             try:
-                tasks.append(load_task(tf))
+                t = load_task(tf)
+                t["__use_judge_council__"] = use_judge_council
+                tasks.append(t)
             except Exception as exc:
                 logger.error("Parse failed %s: %s", tf, exc)
 
