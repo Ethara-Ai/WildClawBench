@@ -294,21 +294,17 @@ defaults.pop("models", None)
 {set_thinking_line}d["browser"] = {{"enabled": False}}
 tools = d.setdefault("tools", {{}})
 tools["deny"] = ["browser", "duckduckgo"]
-# Without tools.exec.host=sandbox openclaw refuses every exec because the
-# default routes through the gateway process (the harness host). The agent
-# then can only read files and call mock APIs over HTTP, not run code at
-# all. Observed failure: 'exec host not allowed (requested gateway;
-# configure tools.exec.host=sandbox to allow).' — see gateway.log on runs
-# without this line. Same applies to OpenRouter mode below.
+# Exec runs directly in this agent container (host='node'); the container
+# itself is the sandbox (already network-isolated via --internal bridge).
+# We deliberately disable openclaw's nested-Docker sandbox subsystem
+# because wildclawbench-ubuntu:v1.3 ships without a docker daemon or
+# docker CLI; turning sandbox.mode on crashes the agent before any LLM
+# call (observed 2026-06-02 gpt run, 'Sandbox mode requires Docker, but
+# the "docker" command was not found in PATH'). Same applies below.
 exec_cfg = tools.setdefault("exec", {{}})
-exec_cfg["host"] = "sandbox"
-# Required for tools.exec.host='sandbox' to actually function. Without
-# this, the gateway emits 'sandbox runtime is unavailable for this
-# session' and refuses every exec call. 'all' covers both root agent and
-# spawned subagents (a 'non-main' value would only fix subagents).
-# Observed on gpt-5.5 trajectory 2026-06-01.
+exec_cfg["host"] = "node"
 sandbox_cfg = defaults.setdefault("sandbox", {{}})
-sandbox_cfg["mode"] = "all"
+sandbox_cfg["mode"] = "off"
 web = tools.setdefault("web", {{}})
 web["search"] = {{"enabled": False}}
 web["fetch"] = {{"enabled": False}}
@@ -329,14 +325,11 @@ defaults.setdefault("models", {{}})[{json.dumps(normalized)}] = {{}}
 d["browser"] = {{"enabled": False}}
 tools = d.setdefault("tools", {{}})
 tools["deny"] = ["browser", "duckduckgo"]
-# Mirror the LiteLLM branch: route exec through the sandbox container, not
-# the gateway host. Required for the agent to run code at all. The sandbox
-# runtime itself must also be enabled via agents.defaults.sandbox.mode or
-# exec calls hit 'sandbox runtime is unavailable for this session'.
+# Mirror the LiteLLM branch: see comment there for the full rationale.
 exec_cfg = tools.setdefault("exec", {{}})
-exec_cfg["host"] = "sandbox"
+exec_cfg["host"] = "node"
 sandbox_cfg = defaults.setdefault("sandbox", {{}})
-sandbox_cfg["mode"] = "all"
+sandbox_cfg["mode"] = "off"
 web = tools.setdefault("web", {{}})
 web["search"] = {{"enabled": False}}
 web["fetch"] = {{"enabled": False}}

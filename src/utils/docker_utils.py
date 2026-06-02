@@ -229,11 +229,14 @@ def inject_api_connectors(
         ["docker", "exec", task_id, "mkdir", "-p", container_skills_root],
         capture_output=True, text=True,
     )
-    # openclaw resolves SKILL.md from a built-in skill root
-    # (/usr/lib/node_modules/openclaw/skills), not from /root/skills.
-    # Symlink each injected connector into that path so the agent can
-    # actually load it. Without this every `read SKILL.md` fails with
-    # ENOENT (seen in gpt/run_1 gateway.log).
+    # openclaw's skill loader calls realpath() on every entry in its
+    # bundled root and rejects anything resolving outside that root
+    # ('Skipping skill path that resolves outside its configured root').
+    # Symlinks from /usr/lib/.../skills -> /root/skills are rejected.
+    # Copy connector files directly into the bundled root so realpath
+    # returns the same root and the loader accepts them. Observed in
+    # 2026-06-02 gpt trajectory (gateway.log lines 7-14, 17 skill-skip
+    # warnings for etsy/google-classroom/google-drive/instagram).
     openclaw_skills_root = "/usr/lib/node_modules/openclaw/skills"
     subprocess.run(
         ["docker", "exec", task_id, "mkdir", "-p", openclaw_skills_root],
@@ -244,7 +247,11 @@ def inject_api_connectors(
         connector = env_root / "skills" / f"{api}-connector"
         if not connector.is_dir():
             continue
-        dest = f"{container_skills_root}/{api}-connector"
+        dest = f"{openclaw_skills_root}/{api}-connector"
+        subprocess.run(
+            ["docker", "exec", task_id, "rm", "-rf", dest],
+            capture_output=True, text=True,
+        )
         subprocess.run(
             ["docker", "exec", task_id, "mkdir", "-p", dest],
             capture_output=True, text=True,
@@ -256,13 +263,6 @@ def inject_api_connectors(
         if r.returncode != 0:
             logger.warning("[%s] Failed to inject connector %s: %s", task_id, api, r.stderr.strip())
             continue
-        link_target = f"{openclaw_skills_root}/{api}-connector"
-        subprocess.run(
-            ["docker", "exec", task_id, "/bin/bash", "-c",
-             f"rm -rf {shlex.quote(link_target)} && "
-             f"ln -s {shlex.quote(dest)} {shlex.quote(link_target)}"],
-            capture_output=True, text=True,
-        )
         injected.append(api)
     api_doc = env_root / "API_DOCUMENTATION.md"
     if api_doc.is_file():
