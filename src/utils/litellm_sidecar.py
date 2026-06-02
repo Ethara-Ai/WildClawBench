@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import logging
+import os
 import subprocess
 import time
 
@@ -230,7 +232,19 @@ def start_litellm(
 
 
 def wait_for_litellm_healthy(container_name: str, port: int = LITELLM_INTERNAL_PORT,
-                             timeout: float = 60.0) -> bool:
+                             timeout: float | None = None) -> bool:
+    # `KENSEI_LITELLM_HEALTH_TIMEOUT` env override exists so slower hosts
+    # (cold Docker pulls, qemu-emulated arches) can extend the budget
+    # without code edits. Default raised from 60s to 120s after the
+    # openclaw.log 2026-06-02 incident where the sidecar booted fine but
+    # the agent's first call still produced a bare "Connection error." at
+    # the 4-retry/22s mark — the proxy was up, upstream Bedrock was the
+    # actual problem (see verify_litellm_upstream_reachable below).
+    if timeout is None:
+        try:
+            timeout = float(os.environ.get("KENSEI_LITELLM_HEALTH_TIMEOUT", "120"))
+        except ValueError:
+            timeout = 120.0
     probe = (
         "import sys, urllib.request; "
         "urllib.request.urlopen("
@@ -252,6 +266,66 @@ def wait_for_litellm_healthy(container_name: str, port: int = LITELLM_INTERNAL_P
         "[%s] LiteLLM did not become healthy within %.0fs", container_name, timeout
     )
     return False
+
+
+def verify_litellm_upstream_reachable(
+    container_name: str,
+    master_key: str,
+    model_name: str,
+    port: int = LITELLM_INTERNAL_PORT,
+    timeout: float = 30.0,
+) -> tuple[bool, str]:
+    # Synthetic 1-token round-trip via the proxy's /v1/chat/completions to
+    # confirm that the upstream provider (Bedrock/OpenAI) is actually
+    # reachable from inside the sidecar — not just that the proxy's own
+    # liveliness endpoint answers. This catches the "Connection error." +
+    # "LLM request timed out." failure mode seen in openclaw.log on
+    # 2026-06-02T10:36:42: 4 retries within 22s, all failing before any
+    # token streamed, fallbackConfigured=false. wait_for_litellm_healthy
+    # returned True for that batch because /health/liveliness was up; the
+    # real problem was Bedrock egress. Surfacing it here as a precise
+    # batch-startup RuntimeError beats a misattributed agent timeout.
+    body_bytes = json.dumps({
+        "model": model_name,
+        "messages": [{"role": "user", "content": "ping"}],
+        "max_tokens": 1,
+        "stream": False,
+    }).encode()
+    # Run the probe INSIDE the sidecar so we use the same network namespace
+    # and hostname resolution path that openclaw will use when it calls the
+    # proxy. Catches DNS/routing failures specific to the internal bridge.
+    probe = (
+        "import sys, urllib.request, urllib.error\n"
+        f"req = urllib.request.Request('http://localhost:{port}/v1/chat/completions', "
+        f"data={body_bytes!r}, "
+        f"headers={{'Authorization': 'Bearer {master_key}', "
+        "'Content-Type': 'application/json'}, method='POST')\n"
+        "try:\n"
+        f"    r = urllib.request.urlopen(req, timeout={int(timeout)})\n"
+        "    sys.stdout.write('OK status=' + str(r.status))\n"
+        "except urllib.error.HTTPError as e:\n"
+        "    detail = e.read().decode('utf-8', errors='ignore')[:400]\n"
+        "    sys.stdout.write('HTTP ' + str(e.code) + ': ' + detail)\n"
+        "    sys.exit(1)\n"
+        "except Exception as e:\n"
+        "    sys.stdout.write('ERR: ' + repr(e))\n"
+        "    sys.exit(2)\n"
+    )
+    r = subprocess.run(
+        ["docker", "exec", container_name, "python3", "-c", probe],
+        capture_output=True,
+        text=True,
+        timeout=timeout + 10.0,
+    )
+    out = ((r.stdout or "") + (r.stderr or "")).strip()
+    if r.returncode == 0:
+        logger.info("[%s] LiteLLM upstream reachable (%s)", container_name, out)
+        return True, out
+    logger.warning(
+        "[%s] LiteLLM upstream UNREACHABLE rc=%s out=%s",
+        container_name, r.returncode, out,
+    )
+    return False, out
 
 
 def stop_litellm(container_name: str) -> None:

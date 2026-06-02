@@ -51,6 +51,7 @@ from src.utils.litellm_sidecar import (
     remove_network,
     start_litellm,
     stop_litellm,
+    verify_litellm_upstream_reachable,
     wait_for_litellm_healthy,
 )
 from src.utils.trajectory.builder import build_trajectory_from_jsonl
@@ -1061,11 +1062,29 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list):
         usage_log_host_dir=str(usage_dir),
     )
     cleanups.append(lambda: stop_litellm(sidecar))
-    if not wait_for_litellm_healthy(sidecar, timeout=90.0):
+    if not wait_for_litellm_healthy(sidecar):
         raise RuntimeError(
-            f"LiteLLM sidecar {sidecar} did not become healthy within 90s. "
-            f"Strict mode: refusing to continue with a dead sidecar."
+            f"LiteLLM sidecar {sidecar} did not become healthy in time. "
+            f"Strict mode: refusing to continue with a dead sidecar. "
+            f"Override budget via KENSEI_LITELLM_HEALTH_TIMEOUT env (seconds)."
         )
+    probe_model = (
+        "claude-opus-4.7" if config.aws_bearer_token and config.bedrock_inference_arn
+        else "gpt-5.5" if config.openai_api_key
+        else ""
+    )
+    if probe_model:
+        ok, detail = verify_litellm_upstream_reachable(
+            sidecar, master_key=config.litellm_master_key, model_name=probe_model,
+        )
+        if not ok:
+            raise RuntimeError(
+                f"LiteLLM sidecar {sidecar} is up but upstream provider is unreachable "
+                f"via model={probe_model!r}: {detail}. This is the failure mode that "
+                f"produces 'LLM request timed out / Connection error.' in the agent's "
+                f"gateway.log (see openclaw.log 2026-06-02). Fix upstream egress "
+                f"(Bedrock IAM / region / network) before retrying."
+            )
     logger.info("LiteLLM sidecar %s ready on network %s", sidecar, network)
 
     mock_env_dict: dict[str, str] = {}

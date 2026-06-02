@@ -292,19 +292,16 @@ defaults["model"] = {{"primary": {json.dumps(primary)}}}
 defaults["imageModel"] = {{"primary": {json.dumps(primary)}}}
 defaults.pop("models", None)
 {set_thinking_line}d["browser"] = {{"enabled": False}}
-# Defense-in-depth: explicitly disable Chrome / Chromium / Playwright /
-# Puppeteer / Selenium / webdriver provider sub-configs in case a future
-# openclaw plugin surfaces them. The agent image wildclawbench-ubuntu:v1.3
-# ships none of these binaries (verified 2026-06-02), and the agent
-# container is on an --internal Docker network so no headless browser
-# could reach the public web even if it were installed. This is purely a
-# config-side guarantee that no browser tool will ever be allowed.
-d["chrome"] = {{"enabled": False}}
-d["chromium"] = {{"enabled": False}}
-d["playwright"] = {{"enabled": False}}
-d["puppeteer"] = {{"enabled": False}}
-d["selenium"] = {{"enabled": False}}
-d["webdriver"] = {{"enabled": False}}
+# Defense-in-depth against headless-browser tools is handled via the
+# schema-validated tools.deny list below. Earlier Fix 10 also wrote root
+# keys d["chrome"], d["chromium"], d["playwright"], d["puppeteer"],
+# d["selenium"], d["webdriver"] = {{"enabled": False}}; the openclaw config
+# validator rejected all six on 2026-06-02 ('Unrecognized keys: "chrome",
+# "chromium", "playwright", "puppeteer", "selenium", "webdriver"') and
+# refused to load the config. tools.deny is the only legal layer for
+# extra tool blocks. Image lacks every browser binary (verified
+# 2026-06-02) and --internal network blocks egress, so the two remaining
+# defense layers are sufficient.
 tools = d.setdefault("tools", {{}})
 tools["deny"] = [
     "browser", "duckduckgo",
@@ -354,12 +351,6 @@ defaults["model"] = {{"primary": {json.dumps(normalized)}}}
 defaults["imageModel"] = {{"primary": {json.dumps(normalized)}}}
 defaults.setdefault("models", {{}})[{json.dumps(normalized)}] = {{}}
 d["browser"] = {{"enabled": False}}
-d["chrome"] = {{"enabled": False}}
-d["chromium"] = {{"enabled": False}}
-d["playwright"] = {{"enabled": False}}
-d["puppeteer"] = {{"enabled": False}}
-d["selenium"] = {{"enabled": False}}
-d["webdriver"] = {{"enabled": False}}
 tools = d.setdefault("tools", {{}})
 tools["deny"] = [
     "browser", "duckduckgo",
@@ -367,7 +358,8 @@ tools["deny"] = [
     "selenium", "webdriver", "headless_browser",
     "browser_navigate", "browser_screenshot", "browser_eval",
 ]
-# Mirror the LiteLLM branch: see comments there for the full rationale.
+# Mirror the LiteLLM branch: see comments there for the full rationale,
+# including why the chrome/chromium/etc. root-key writes were removed.
 exec_cfg = tools.setdefault("exec", {{}})
 exec_cfg["host"] = "gateway"
 exec_cfg["security"] = "full"

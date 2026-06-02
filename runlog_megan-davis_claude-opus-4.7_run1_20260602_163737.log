@@ -1,0 +1,142 @@
+16:37:37 [INFO] Agent image wildclawbench-ubuntu:v1.3 present
+16:37:37 [INFO] Pulling LiteLLM image ghcr.io/berriai/litellm:main-stable
+16:37:40 [INFO] LiteLLM image ghcr.io/berriai/litellm:main-stable ready
+16:37:40 [INFO] Network k3net-87944978e2f6 created (internal=True)
+16:37:40 [INFO] [ll-87944978e2f6] Starting LiteLLM sidecar on network k3net-87944978e2f6
+16:37:41 [INFO] [ll-87944978e2f6] LiteLLM sidecar dual-homed (internal + default bridge)
+16:37:54 [INFO] [ll-87944978e2f6] LiteLLM healthy
+16:37:57 [INFO] [ll-87944978e2f6] LiteLLM upstream reachable (OK status=200)
+16:37:57 [INFO] LiteLLM sidecar ll-87944978e2f6 ready on network k3net-87944978e2f6
+16:37:57 [INFO] Mock image kensei3-mocks:v1 already built
+16:37:57 [INFO] [mocks-87944978e2f6] mock-stack container started
+16:38:06 [INFO] [mocks-87944978e2f6] mock-stack healthy
+16:38:06 [INFO] Mock stack mocks-87944978e2f6 ready (101 service URLs)
+16:38:06 [INFO] Judge council enabled via --judge-council
+16:38:06 [INFO] Test generation enabled (Bedrock ap-south-1, max_attempts=3)
+16:38:06 [INFO] Test execution enabled (timeout=600s, network=k3net-87944978e2f6)
+16:38:06 [INFO] Single task mode: megan-davis (format=native)
+16:38:06 [INFO] [TESTGEN] task=megan-davis required=['instagram-api', 'pinterest-api', 'quickbooks-api', 'youtube-api'] distractors=['twitter-api', 'twitch-api', 'stripe-api', 'tmdb-api'] services=101 output_format=final_answer
+16:38:10 [INFO] HTTP Request: POST https://bedrock-runtime.ap-south-1.amazonaws.com/model/arn%3Aaws%3Abedrock%3Aap-south-1%3A426628337772%3Aapplication-inference-profile%2F96j5zamnqlci/converse-stream "HTTP/2 200 OK"
+16:38:46 [INFO] [TESTGEN] Passed all lints on attempt 1 (task=megan-davis)
+16:38:46 [INFO] [TESTGEN] Done task=megan-davis code=12284ch weights=16 tokens_in=55701 tokens_out=5204 cache_r=0 cache_w=13117 total=74022 duration=40012ms attempts=1 lint_failures=0 fallback=False
+16:38:46 [INFO] [megan-davis] testgen done: 12284ch code, 16 weights, 1 attempts, fallback=False
+16:38:46 [INFO] [mocks-task-megan-davis-6faab9] overlay instagram-api/media.csv -> /Users/apple/Downloads/WildClaw 2/Wildclow_forked_image_finalized/input/megan-davis/mock_data/instagram-api/media.csv
+16:38:46 [INFO] [mocks-task-megan-davis-6faab9] overlay instagram-api/comments.csv -> /Users/apple/Downloads/WildClaw 2/Wildclow_forked_image_finalized/input/megan-davis/mock_data/instagram-api/comments.csv
+16:38:46 [INFO] [mocks-task-megan-davis-6faab9] overlay instagram-api/user.json -> /Users/apple/Downloads/WildClaw 2/Wildclow_forked_image_finalized/input/megan-davis/mock_data/instagram-api/user.json
+16:38:46 [INFO] [mocks-task-megan-davis-6faab9] overlay pinterest-api/pins.csv -> /Users/apple/Downloads/WildClaw 2/Wildclow_forked_image_finalized/input/megan-davis/mock_data/pinterest-api/pins.csv
+16:38:46 [INFO] [mocks-task-megan-davis-6faab9] overlay pinterest-api/boards.csv -> /Users/apple/Downloads/WildClaw 2/Wildclow_forked_image_finalized/input/megan-davis/mock_data/pinterest-api/boards.csv
+16:38:46 [INFO] [mocks-task-megan-davis-6faab9] overlay pinterest-api/user_account.json -> /Users/apple/Downloads/WildClaw 2/Wildclow_forked_image_finalized/input/megan-davis/mock_data/pinterest-api/user_account.json
+16:38:46 [INFO] [mocks-task-megan-davis-6faab9] overlay quickbooks-api/accounts.csv -> /Users/apple/Downloads/WildClaw 2/Wildclow_forked_image_finalized/input/megan-davis/mock_data/quickbooks-api/accounts.csv
+16:38:46 [INFO] [mocks-task-megan-davis-6faab9] overlay quickbooks-api/vendors.csv -> /Users/apple/Downloads/WildClaw 2/Wildclow_forked_image_finalized/input/megan-davis/mock_data/quickbooks-api/vendors.csv
+16:38:46 [INFO] [mocks-task-megan-davis-6faab9] overlay quickbooks-api/company_info.json -> /Users/apple/Downloads/WildClaw 2/Wildclow_forked_image_finalized/input/megan-davis/mock_data/quickbooks-api/company_info.json
+16:38:46 [INFO] [mocks-task-megan-davis-6faab9] overlay quickbooks-api/expenses.json -> /Users/apple/Downloads/WildClaw 2/Wildclow_forked_image_finalized/input/megan-davis/mock_data/quickbooks-api/expenses.json
+16:38:46 [INFO] [mocks-task-megan-davis-6faab9] overlay youtube-api/videos.csv -> /Users/apple/Downloads/WildClaw 2/Wildclow_forked_image_finalized/input/megan-davis/mock_data/youtube-api/videos.csv
+16:38:46 [INFO] [mocks-task-megan-davis-6faab9] overlay youtube-api/channel.json -> /Users/apple/Downloads/WildClaw 2/Wildclow_forked_image_finalized/input/megan-davis/mock_data/youtube-api/channel.json
+16:38:46 [INFO] [mocks-task-megan-davis-6faab9] overlay youtube-api/channel_sections.json -> /Users/apple/Downloads/WildClaw 2/Wildclow_forked_image_finalized/input/megan-davis/mock_data/youtube-api/channel_sections.json
+16:38:46 [INFO] [mocks-task-megan-davis-6faab9] overlay youtube-api/comments.csv -> /Users/apple/Downloads/WildClaw 2/Wildclow_forked_image_finalized/input/megan-davis/mock_data/youtube-api/comments.csv
+16:38:46 [INFO] [mocks-task-megan-davis-6faab9] mock-stack container started
+16:38:56 [INFO] [mocks-task-megan-davis-6faab9] target ports healthy: 8003 8006 8007 8009
+16:38:56 [INFO] [megan-davis] per-task mock stack mocks-task-megan-davis-6faab9 ready (4 overlay APIs, ports [8003, 8006, 8007, 8009], 101 URLs)
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: ACTIVECAMPAIGN_API_URL=http://mocks-task-megan-davis-6faab9:8101
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: AIRBNB_API_URL=http://mocks-task-megan-davis-6faab9:8038
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: AIRTABLE_API_URL=http://mocks-task-megan-davis-6faab9:8032
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: ALGOLIA_API_URL=http://mocks-task-megan-davis-6faab9:8067
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: ALPACA_API_URL=http://mocks-task-megan-davis-6faab9:8043
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: AMADEUS_API_URL=http://mocks-task-megan-davis-6faab9:8076
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: AMAZON_SELLER_API_URL=http://mocks-task-megan-davis-6faab9:8000
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: AMPLITUDE_API_URL=http://mocks-task-megan-davis-6faab9:8091
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: ASANA_API_URL=http://mocks-task-megan-davis-6faab9:8031
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: BAMBOOHR_API_URL=http://mocks-task-megan-davis-6faab9:8072
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: BIGCOMMERCE_API_URL=http://mocks-task-megan-davis-6faab9:8084
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: BINANCE_API_URL=http://mocks-task-megan-davis-6faab9:8097
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: BOX_API_URL=http://mocks-task-megan-davis-6faab9:8083
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: CALENDLY_API_URL=http://mocks-task-megan-davis-6faab9:8054
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: CLOUDFLARE_API_URL=http://mocks-task-megan-davis-6faab9:8050
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: COINBASE_API_URL=http://mocks-task-megan-davis-6faab9:8023
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: CONFLUENCE_API_URL=http://mocks-task-megan-davis-6faab9:8045
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: CONTENTFUL_API_URL=http://mocks-task-megan-davis-6faab9:8066
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: DATADOG_API_URL=http://mocks-task-megan-davis-6faab9:8048
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: DISCORD_API_URL=http://mocks-task-megan-davis-6faab9:8057
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: DOCUSIGN_API_URL=http://mocks-task-megan-davis-6faab9:8053
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: DOORDASH_API_URL=http://mocks-task-megan-davis-6faab9:8037
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: DROPBOX_API_URL=http://mocks-task-megan-davis-6faab9:8082
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: ETSY_API_URL=http://mocks-task-megan-davis-6faab9:8001
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: EVENTBRITE_API_URL=http://mocks-task-megan-davis-6faab9:8020
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: FEDEX_API_URL=http://mocks-task-megan-davis-6faab9:8095
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: FIGMA_API_URL=http://mocks-task-megan-davis-6faab9:8079
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: FRESHDESK_API_URL=http://mocks-task-megan-davis-6faab9:8093
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: GITHUB_API_URL=http://mocks-task-megan-davis-6faab9:8019
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: GITLAB_API_URL=http://mocks-task-megan-davis-6faab9:8046
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: GMAIL_API_URL=http://mocks-task-megan-davis-6faab9:8017
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: GOOGLE_ANALYTICS_API_URL=http://mocks-task-megan-davis-6faab9:8068
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: GOOGLE_CALENDAR_API_URL=http://mocks-task-megan-davis-6faab9:8016
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: GOOGLE_CLASSROOM_API_URL=http://mocks-task-megan-davis-6faab9:8002
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: GOOGLE_DRIVE_API_URL=http://mocks-task-megan-davis-6faab9:8018
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: GOOGLE_MAPS_API_URL=http://mocks-task-megan-davis-6faab9:8033
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: GREENHOUSE_API_URL=http://mocks-task-megan-davis-6faab9:8073
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: GUSTO_API_URL=http://mocks-task-megan-davis-6faab9:8074
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: HUBSPOT_API_URL=http://mocks-task-megan-davis-6faab9:8024
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: INSTACART_API_URL=http://mocks-task-megan-davis-6faab9:8012
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: INSTAGRAM_API_URL=http://mocks-task-megan-davis-6faab9:8003
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: INTERCOM_API_URL=http://mocks-task-megan-davis-6faab9:8070
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: JIRA_API_URL=http://mocks-task-megan-davis-6faab9:8029
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: KLAVIYO_API_URL=http://mocks-task-megan-davis-6faab9:8089
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: KRAKEN_API_URL=http://mocks-task-megan-davis-6faab9:8098
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: KUBERNETES_API_URL=http://mocks-task-megan-davis-6faab9:8051
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: LINEAR_API_URL=http://mocks-task-megan-davis-6faab9:8004
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: LINKEDIN_API_URL=http://mocks-task-megan-davis-6faab9:8062
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: MAILCHIMP_API_URL=http://mocks-task-megan-davis-6faab9:8081
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: MAILGUN_API_URL=http://mocks-task-megan-davis-6faab9:8094
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: MICROSOFT_TEAMS_API_URL=http://mocks-task-megan-davis-6faab9:8086
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: MIXPANEL_API_URL=http://mocks-task-megan-davis-6faab9:8056
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: MONDAY_API_URL=http://mocks-task-megan-davis-6faab9:8080
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: MYFITNESSPAL_API_URL=http://mocks-task-megan-davis-6faab9:8005
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: NASA_API_URL=http://mocks-task-megan-davis-6faab9:8077
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: NOTION_API_URL=http://mocks-task-megan-davis-6faab9:8010
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: OBSIDIAN_API_URL=http://mocks-task-megan-davis-6faab9:8014
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: OKTA_API_URL=http://mocks-task-megan-davis-6faab9:8049
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: OPENLIBRARY_API_URL=http://mocks-task-megan-davis-6faab9:8078
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: OPENWEATHER_API_URL=http://mocks-task-megan-davis-6faab9:8035
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: OUTLOOK_API_URL=http://mocks-task-megan-davis-6faab9:8087
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: PAGERDUTY_API_URL=http://mocks-task-megan-davis-6faab9:8040
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: PAYPAL_API_URL=http://mocks-task-megan-davis-6faab9:8042
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: PINTEREST_API_URL=http://mocks-task-megan-davis-6faab9:8006
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: PLAID_API_URL=http://mocks-task-megan-davis-6faab9:8022
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: POSTHOG_API_URL=http://mocks-task-megan-davis-6faab9:8092
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: QUICKBOOKS_API_URL=http://mocks-task-megan-davis-6faab9:8007
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: REDDIT_API_URL=http://mocks-task-megan-davis-6faab9:8058
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: RING_API_URL=http://mocks-task-megan-davis-6faab9:8008
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: SALESFORCE_API_URL=http://mocks-task-megan-davis-6faab9:8044
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: SEGMENT_API_URL=http://mocks-task-megan-davis-6faab9:8090
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: SENDGRID_API_URL=http://mocks-task-megan-davis-6faab9:8027
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: SENTRY_API_URL=http://mocks-task-megan-davis-6faab9:8047
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: SERVICENOW_API_URL=http://mocks-task-megan-davis-6faab9:8071
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: SHIPPO_API_URL=http://mocks-task-megan-davis-6faab9:8052
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: SLACK_API_URL=http://mocks-task-megan-davis-6faab9:8013
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: SPOTIFY_API_URL=http://mocks-task-megan-davis-6faab9:8039
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: SQUARE_API_URL=http://mocks-task-megan-davis-6faab9:8041
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: STRAVA_API_URL=http://mocks-task-megan-davis-6faab9:8060
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: STRIPE_API_URL=http://mocks-task-megan-davis-6faab9:8021
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: TELEGRAM_API_URL=http://mocks-task-megan-davis-6faab9:8063
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: TICKETMASTER_API_URL=http://mocks-task-megan-davis-6faab9:8075
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: TMDB_API_URL=http://mocks-task-megan-davis-6faab9:8059
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: TRELLO_API_URL=http://mocks-task-megan-davis-6faab9:8030
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: TWILIO_API_URL=http://mocks-task-megan-davis-6faab9:8026
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: TWITCH_API_URL=http://mocks-task-megan-davis-6faab9:8064
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: TWITTER_API_URL=http://mocks-task-megan-davis-6faab9:8061
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: TYPEFORM_API_URL=http://mocks-task-megan-davis-6faab9:8055
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: UBER_API_URL=http://mocks-task-megan-davis-6faab9:8036
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: UPS_API_URL=http://mocks-task-megan-davis-6faab9:8096
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: VIMEO_API_URL=http://mocks-task-megan-davis-6faab9:8099
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: WEBFLOW_API_URL=http://mocks-task-megan-davis-6faab9:8100
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: WHATSAPP_API_URL=http://mocks-task-megan-davis-6faab9:8015
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: WOOCOMMERCE_API_URL=http://mocks-task-megan-davis-6faab9:8085
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: WORDPRESS_API_URL=http://mocks-task-megan-davis-6faab9:8065
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: XERO_API_URL=http://mocks-task-megan-davis-6faab9:8088
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: YELP_API_URL=http://mocks-task-megan-davis-6faab9:8034
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: YOUTUBE_API_URL=http://mocks-task-megan-davis-6faab9:8009
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: ZENDESK_API_URL=http://mocks-task-megan-davis-6faab9:8025
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: ZILLOW_API_URL=http://mocks-task-megan-davis-6faab9:8011
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Injecting extra env: ZOOM_API_URL=http://mocks-task-megan-davis-6faab9:8028
+16:38:56 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Starting container, mounting /Users/apple/Downloads/WildClaw 2/Wildclow_forked_image_finalized/work/megan-davis/exec → /app (ro)
+16:38:57 [INFO] [megan-davis_claude-opus-4.7_20260602_1638_bdc0f0] Container ID: f9ee85f683ef
