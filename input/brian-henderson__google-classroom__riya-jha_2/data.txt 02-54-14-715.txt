@@ -1,5 +1,0 @@
-Persona: brian-henderson
-L1: Visual Learning
-L2: Textbook/Lecture Comprehension
-API: Google Classroom API
-Tasker: Riya Jha

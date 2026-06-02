@@ -9,7 +9,7 @@ import re
 
 MAX_TESTGEN_ATTEMPTS = 3
 
-ALLOWED_WEIGHTS = frozenset({50, 30, 10, -10, -30, -50})
+ALLOWED_WEIGHTS = frozenset({5, 3, 1, -1, -3, -5})
 
 ALLOWED_IMPORTS = frozenset({
     "json", "os", "subprocess", "sqlite3", "urllib", "pytest", "hashlib",
@@ -64,4 +64,4 @@ class TestNegativeWeightFallback:
         assert True
 '''
 
-FALLBACK_WEIGHTS = {"test_placeholder": 10, "test_placeholder_negative": -10}
+FALLBACK_WEIGHTS = {"test_placeholder": 1, "test_placeholder_negative": -1}

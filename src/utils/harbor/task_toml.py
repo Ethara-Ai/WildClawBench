@@ -32,9 +32,9 @@ def _arr_authors(authors: Iterable[Mapping]) -> str:
     return "[" + ", ".join(items) + "]"
 
 
-def _truncate_for_description(text: str, limit: int = 200) -> str:
+def _truncate_for_description(text: str, limit: int | None = None) -> str:
     s = (text or "").strip().replace("\r\n", " ").replace("\n", " ").replace("\r", " ")
-    if len(s) > limit:
+    if limit is not None and len(s) > limit:
         s = s[: limit - 1] + "\u2026"
     return s
 

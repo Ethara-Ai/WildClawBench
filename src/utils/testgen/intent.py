@@ -81,7 +81,7 @@ def generate_intent_tests(
     *,
     environment_dir: Optional[Path] = None,
     task_toml: str = "",
-    max_tokens: int = 12000,
+    max_tokens: int = 64000,
     temperature: Optional[float] = None,
     timeout: float = 120.0,
 ) -> IntentResult:
@@ -105,7 +105,7 @@ def generate_intent_tests(
         "## Task Instruction (instruction.md)\n",
         "This is the prompt that will be sent to the AI agent. "
         "Generate tests that verify the agent performed these actions correctly.\n\n",
-        prompt[:8000] if len(prompt) > 8000 else prompt,
+        prompt,
         "\n",
     ]
     if task_toml:

@@ -390,14 +390,14 @@ def _write_pass_summary(model_dir: Path, model_type: str, run_index: int, reward
     }, indent=2), encoding="utf-8")
 
 
-def _condense_transcript_for_judge(traj: dict, limit: int = 40_000) -> str:
-    """Flatten the trajectory messages into a compact text the judge can read:
-    assistant text, tool calls (name + short args), and tool-result snippets.
+def _condense_transcript_for_judge(traj: dict, limit: int | None = None) -> str:
+    """Flatten the trajectory messages into a text the judge can read.
 
-    Caps are deliberately generous: aggressive truncation dropped mid-transcript
-    evidence (e.g. a GET to courseWorkMaterials), causing the judge to report
-    false negatives for actions the agent actually took. The whole blob is still
-    bounded by _JUDGE_MAX_EVIDENCE (60k) in grading._gather_evidence."""
+    By user policy (2026-06-02): trajectory is NEVER truncated when fed to the
+    judge. No per-call args cap, no per-tool-result cap, no overall cap. The
+    `limit` kwarg is retained only for API compatibility and is ignored.
+    Grading._gather_evidence is responsible for stitching this together with
+    deliverables; it also no longer applies an overall cap."""
     out: list[str] = []
     for m in traj.get("messages") or []:
         msg = m.get("message", m) if isinstance(m, dict) else {}
@@ -416,16 +416,13 @@ def _condense_transcript_for_judge(traj: dict, limit: int = 40_000) -> str:
             if t == "text" and b.get("text", "").strip():
                 out.append(f"[{role}] {b['text'].strip()}")
             elif t == "toolCall":
-                args = json.dumps(b.get("arguments", {}))[:600]
+                args = json.dumps(b.get("arguments", {}))
                 out.append(f"[{role}:tool] {b.get('name')} {args}")
             elif t == "toolResult" or role == "toolResult":
                 txt = b.get("text") or b.get("content") or ""
                 if isinstance(txt, str) and txt.strip():
-                    out.append(f"[toolResult] {txt.strip()[:1000]}")
-    text = "\n".join(out)
-    if len(text) > limit:                     # keep head + tail (setup + outcome)
-        text = text[: limit // 2] + "\n...[transcript truncated]...\n" + text[-limit // 2:]
-    return text
+                    out.append(f"[toolResult] {txt.strip()}")
+    return "\n".join(out)
 
 
 def _project_agent_usage_top_level(agent_usage: Mapping[str, Any] | None) -> dict[str, Any]:
@@ -662,6 +659,7 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
             }
             entry = dict(traj)
             entry["__test_result__"] = tr_meta
+            entry["__run_index__"] = run_index
             store_path = getattr(config, "state_db", None)
             store = Store(Path(store_path)) if store_path else Store(Path(":memory:"))
             manifest = write_bundle(
@@ -731,22 +729,46 @@ def run_single_task(
         _augment_task_with_mocks(task, config, mock_env_dict)
 
     if generate_tests and config is not None and not (task.get("test_code") or "").strip():
-        try:
-            tg = generate_task_tests(
-                task, config,
-                environment_dir=config.environment_dir,
-                max_attempts=testgen_max_attempts,
-            )
-            task["test_code"] = tg.test_code
-            task["test_weights"] = tg.test_weights_json
-            task["__testgen_usage__"] = dict(tg.usage)
+        force_testgen = bool(task.get("__force_testgen__"))
+        cached_tests_dir = output_root / task_id_ori / "data" / "tests"
+        cached_code_path = cached_tests_dir / "test_outputs.py"
+        cached_weights_path = cached_tests_dir / "test_weights.json"
+        cached_code = ""
+        cached_weights = ""
+        if not force_testgen and cached_code_path.is_file() and cached_weights_path.is_file():
+            try:
+                cached_code = cached_code_path.read_text(encoding="utf-8")
+                cached_weights = cached_weights_path.read_text(encoding="utf-8")
+            except OSError:
+                cached_code = ""
+                cached_weights = ""
+        if cached_code.strip() and cached_weights.strip() and cached_weights.strip() != "{}":
+            task["test_code"] = cached_code
+            task["test_weights"] = cached_weights
+            task["__testgen_usage__"] = {"input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0, "requests": 0}
             logger.info(
-                "[%s] testgen done: %dch code, %d weights, %d attempts, fallback=%s",
-                task_id_ori, len(tg.test_code), len(tg.test_weights),
-                tg.attempts, tg.used_fallback,
+                "[%s] testgen reused from %s (%dch code, %dch weights)",
+                task_id_ori, cached_tests_dir, len(cached_code), len(cached_weights),
             )
-        except Exception as exc:
-            logger.warning("[%s] testgen failed (continuing without): %s", task_id_ori, exc)
+        else:
+            if force_testgen:
+                logger.info("[%s] testgen cache bypassed via --force-testgen", task_id_ori)
+            try:
+                tg = generate_task_tests(
+                    task, config,
+                    environment_dir=config.environment_dir,
+                    max_attempts=testgen_max_attempts,
+                )
+                task["test_code"] = tg.test_code
+                task["test_weights"] = tg.test_weights_json
+                task["__testgen_usage__"] = dict(tg.usage)
+                logger.info(
+                    "[%s] testgen done: %dch code, %d weights, %d attempts, fallback=%s",
+                    task_id_ori, len(tg.test_code), len(tg.test_weights),
+                    tg.attempts, tg.used_fallback,
+                )
+            except Exception as exc:
+                logger.warning("[%s] testgen failed (continuing without): %s", task_id_ori, exc)
 
     # When the task ships its own mock_data, serve it from a dedicated per-task
     # mock container and point the agent at THAT instead of the shared baseline.
@@ -1366,6 +1388,7 @@ def _run_dispatch(args, backend, config: Config, mock_env_dict: dict, effective_
             sys.exit(1)
         task = load_task(task_file)
         task["__use_judge_council__"] = use_judge_council
+        task["__force_testgen__"] = bool(getattr(args, "force_testgen", False))
         logger.info("Single task mode: %s (format=%s)", task["task_id"], task.get("format", "md"))
         result = run_single_task(
             task,
@@ -1414,6 +1437,7 @@ def _run_dispatch(args, backend, config: Config, mock_env_dict: dict, effective_
             try:
                 t = load_task(tf)
                 t["__use_judge_council__"] = use_judge_council
+                t["__force_testgen__"] = bool(getattr(args, "force_testgen", False))
                 tasks.append(t)
             except Exception as exc:
                 logger.error("Parse failed %s: %s", tf, exc)

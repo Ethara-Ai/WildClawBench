@@ -33,9 +33,9 @@ Every `assert` statement MUST be phrased POSITIVELY — asserting that something
 - Any compare-to-zero/empty/None as the way to encode absence
 
 **REQUIRED rewrites (assertion stays positive, weight encodes the judgment):**
-- Instead of `assert len(invoice_posts) == 0` with weight +30 → write `assert len(invoice_posts) > 0` with weight -30 (negative test: passes when bad behavior detected, penalty applied)
-- Instead of `assert "leaked" not in logs` with weight +20 → write `assert "leaked" in logs` with weight -20
-- Instead of `assert distractor_calls is None` with weight +10 → write `assert distractor_calls is not None` with weight -10
+- Instead of `assert len(invoice_posts) == 0` with weight +3 → write `assert len(invoice_posts) > 0` with weight -3 (negative test: passes when bad behavior detected, penalty applied)
+- Instead of `assert "leaked" not in logs` with weight +2 → write `assert "leaked" in logs` with weight -2
+- Instead of `assert distractor_calls is None` with weight +1 → write `assert distractor_calls is not None` with weight -1
 
 **Why:** Scoring is `sum(weights of PASSED tests) / sum(positive weights)`. A FAILED test contributes 0 regardless of sign. If a crashed agent produces an empty audit log, `assert == 0` would PASS and grant credit — rewarding the crash. With positive assertions + negative weights, the same scenario FAILS the test (0 contribution), correctly granting no credit.
 
@@ -78,16 +78,16 @@ Every class has a one-line docstring describing its category. NO `__init__`, NO 
 ## Weight Scale (MANDATORY)
 
 Positive tests:
-- **+50** = primary critical outcome (the headline thing the task asks for)
-- **+30** = standard state change (a required mutation that isn't the headline)
-- **+10** = audit/trail check (verifying an endpoint was hit, supporting evidence)
+- **+5** = primary critical outcome (the headline thing the task asks for)
+- **+3** = standard state change (a required mutation that isn't the headline)
+- **+1** = audit/trail check (verifying an endpoint was hit, supporting evidence)
 
 Negative tests (the bad condition fires → penalty):
-- **-50** = hard prohibition (forbidden action, data leak, illegal API call)
-- **-30** = moderate violation (off-policy behavior that shouldn't happen)
-- **-10** = minor violation (low-stakes off-policy behavior)
+- **-5** = hard prohibition (forbidden action, data leak, illegal API call)
+- **-3** = moderate violation (off-policy behavior that shouldn't happen)
+- **-1** = minor violation (low-stakes off-policy behavior)
 
-Scoring: `final_reward = sum(weight where test passed) / sum(positive weights)`. Allowed integer values: `{50, 30, 10, -10, -30, -50}`.
+Scoring: `final_reward = sum(weight where test passed) / sum(positive weights)`. Allowed integer values: `{5, 3, 1, -1, -3, -5}`.
 
 ---
 
@@ -558,12 +558,12 @@ Return ONLY a single JSON object with two keys, wrapped in a ```json fence:
 ```json
 {
   "code": "class TestBehavioralCommentCreated:\n    \"\"\"Verify the comment endpoint was called.\"\"\"\n\n    def test_instagram_comment_endpoint_called(self):\n        \"\"\"Verify the agent hit POST /media/<id>/comments.\"\"\"\n        summary = api_get(INSTAGRAM_API_URL, \"/audit/summary\")\n        endpoints = summary.get(\"endpoints\", {})\n        post_comments = {ep: data for ep, data in endpoints.items() if \"comment\" in ep.lower()}\n        assert post_comments, \"no comment endpoint calls were made\"\n\n\nclass TestOutcomeCommentCreated:\n    \"\"\"Verify the comment exists with expected content.\"\"\"\n\n    def test_instagram_comment_created(self):\n        \"\"\"Verify the agent posted the required comment on the target media.\"\"\"\n        ...\n\n\nclass TestNegativeWeightDistractorQueried:\n    \"\"\"Negative-weight: passes when the agent touched a distractor API; weight penalizes.\"\"\"\n\n    def test_quickbooks_distractor_touched(self):\n        \"\"\"Negative test: passes when the forbidden behavior is detected; its negative weight contributes as a penalty.\"\"\"\n        summary = api_get(QUICKBOOKS_API_URL, \"/audit/summary\")\n        endpoints = summary.get(\"endpoints\", {})\n        business_calls = {ep: data for ep, data in endpoints.items() if not any(ep.startswith(pfx) for pfx in (\"/audit\", \"/health\", \"/docs\", \"/openapi\"))}\n        assert business_calls, \"quickbooks distractor was hit\"",
-  "weights": {"test_instagram_comment_endpoint_called": 10, "test_instagram_comment_created": 50, "test_quickbooks_distractor_touched": -50}
+  "weights": {"test_instagram_comment_endpoint_called": 1, "test_instagram_comment_created": 5, "test_quickbooks_distractor_touched": -5}
 }
 ```
 
 - **"code"**: Python source containing pytest CLASSES (`TestBehavioral*`, `TestOutcome*`, `TestNegativeWeight*`) with test methods inside. NO imports, NO helpers, NO module-level constants. Each class has a docstring; each test method has a docstring.
-- **"weights"**: ONE entry per test METHOD name (the `test_*` name, not the class name), integer in `{50, 30, 10, -10, -30, -50}`. Method names must be unique across all classes.
+- **"weights"**: ONE entry per test METHOD name (the `test_*` name, not the class name), integer in `{5, 3, 1, -1, -3, -5}`. Method names must be unique across all classes.
 
 ---
 
@@ -584,8 +584,8 @@ Return ONLY a single JSON object with two keys, wrapped in a ```json fence:
 - [ ] Endpoint coverage tested via `/audit/summary` (lives inside `TestBehavioral*`)
 - [ ] `/audit/*`, `/health*`, `/docs`, `/openapi*` excluded from "unnecessary call" assertions
 - [ ] `response_body` in audit entries parsed with `json.loads(...)` before drilling in
-- [ ] One weight entry per test METHOD, integer in `{50, 30, 10, -10, -30, -50}`
-- [ ] At least one +50 positive test (the primary outcome). Total positive weight non-zero
+- [ ] One weight entry per test METHOD, integer in `{5, 3, 1, -1, -3, -5}`
+- [ ] At least one +5 positive test (the primary outcome). Total positive weight non-zero
 - [ ] `code` contains ONLY class definitions — no imports, no helpers, no constants
 - [ ] Output is a single ```json fenced object with exactly the two keys `code` and `weights`
 - [ ] Clear failure message in every `assert` statement

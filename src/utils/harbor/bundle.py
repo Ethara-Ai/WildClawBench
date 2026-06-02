@@ -342,12 +342,28 @@ def write_bundle(
         model_dir.mkdir(parents=True, exist_ok=True)
         per_run: List[dict] = []
 
-        for run_index, entry in enumerate(entries, start=1):
+        for run_index_offset, entry in enumerate(entries, start=1):
+            # Honor a caller-supplied __run_index__ so the bundle writer lines
+            # up with the harness's own run-number bookkeeping (eval/run_batch.py
+            # computes run_index via _next_run_index and creates run_N/ BEFORE
+            # write_bundle runs). Without this, enumerate(start=1) always wrote
+            # to run_1/output.json and silently clobbered the prior run's copy,
+            # leaving runs 1..N-1 with run_N's payload while every other per-run
+            # file (chat.jsonl, gateway.log, score.json) stayed correct.
+            # Observed in megan-davis 2026-06-02: run_1 and run_2 output.json
+            # were byte-identical (same session_id, same usage), but score.json
+            # differed (0.0 vs 0.3513). See also __run_index__ stamp at the
+            # write_bundle call site.
+            run_index = (
+                int(entry["__run_index__"])
+                if isinstance(entry, dict) and entry.get("__run_index__")
+                else run_index_offset
+            )
             run_dir = model_dir / f"run_{run_index}"
             run_dir.mkdir(parents=True, exist_ok=True)
 
             clean_entry = (
-                {k: v for k, v in entry.items() if k != "__test_result__"}
+                {k: v for k, v in entry.items() if k not in ("__test_result__", "__run_index__")}
                 if isinstance(entry, dict) else entry
             )
             (run_dir / "output.json").write_text(
@@ -385,6 +401,12 @@ def write_bundle(
                 )
                 (verifier_dir / "ctrf.json").write_text(
                     json.dumps(ctrf, indent=2, ensure_ascii=False), encoding="utf-8"
+                )
+                (verifier_dir / "test_weights.json").write_text(
+                    test_weights_text, encoding="utf-8"
+                )
+                (verifier_dir / "test_outputs.py").write_text(
+                    test_code or "", encoding="utf-8"
                 )
 
             per_run.append({

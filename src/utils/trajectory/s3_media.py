@@ -25,9 +25,21 @@ _MIME_EXT_MAP = {
     "image/webp": "webp",
     "image/svg+xml": "svg",
     "video/mp4": "mp4",
+    "video/webm": "webm",
+    "video/quicktime": "mov",
     "audio/mp3": "mp3",
     "audio/mpeg": "mp3",
     "audio/wav": "wav",
+    "audio/x-wav": "wav",
+    "audio/ogg": "ogg",
+    # See local_media.py for the .m4a MIME-fragmentation rationale; the
+    # two tables must stay in sync so trajectories saved locally vs to S3
+    # land on identical file extensions.
+    "audio/mp4": "m4a",
+    "audio/mp4a-latm": "m4a",
+    "audio/x-m4a": "m4a",
+    "audio/aac": "aac",
+    "audio/x-aac": "aac",
     "application/pdf": "pdf",
 }
 

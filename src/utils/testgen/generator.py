@@ -160,7 +160,7 @@ def _build_user_message(
     parts = [
         "## Task Instruction (instruction.md)\n",
         "Generate tests that verify the agent performed these actions correctly.\n\n",
-        prompt[:8000] if len(prompt) > 8000 else prompt,
+        prompt,
         "\n",
     ]
     if task_output_format == "final_answer":
@@ -253,7 +253,7 @@ def generate_task_tests(
     environment_dir: Optional[Path] = None,
     task_toml: str = "",
     max_attempts: int = MAX_TESTGEN_ATTEMPTS,
-    max_tokens: int = 12000,
+    max_tokens: int = 64000,
     temperature: Optional[float] = None,
     timeout: float = 300.0,
 ) -> TestGenResult:

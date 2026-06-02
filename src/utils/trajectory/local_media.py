@@ -42,7 +42,19 @@ _MIME_EXT_MAP = {
     "audio/mp3": "mp3",
     "audio/mpeg": "mp3",
     "audio/wav": "wav",
+    "audio/x-wav": "wav",
     "audio/ogg": "ogg",
+    # .m4a files report several different MIME strings depending on the
+    # producer: stdlib mimetypes returns "audio/mp4a-latm", browsers emit
+    # "audio/mp4" or "audio/x-m4a", and some tools use "audio/aac". Without
+    # these entries _ext_for() falls through to mime.split("/")[-1] and
+    # produces ugly extensions like "mp4a-latm" that judges and downstream
+    # readers don't recognize.
+    "audio/mp4": "m4a",
+    "audio/mp4a-latm": "m4a",
+    "audio/x-m4a": "m4a",
+    "audio/aac": "aac",
+    "audio/x-aac": "aac",
     "application/pdf": "pdf",
 }
 

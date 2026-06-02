@@ -105,7 +105,7 @@ def self_validate_tests(
     if weights:
         bad = {n: w for n, w in weights.items() if w not in ALLOWED_WEIGHTS}
         if bad:
-            failures.append("L4: weight values outside the allowed set {50,30,10,-10,-30,-50}: %s" % bad)
+            failures.append("L4: weight values outside the allowed set {5,3,1,-1,-3,-5}: %s" % bad)
 
     # L5: class prefix invariants
     class_names = [n.name for n in ast.walk(tree) if isinstance(n, ast.ClassDef)]

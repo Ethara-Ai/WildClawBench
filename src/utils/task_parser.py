@@ -286,7 +286,7 @@ def _load_native_task(task_dir: Path) -> dict:
         "persona": persona,
         "persona_dir": str(persona_dir) if persona_dir.is_dir() else "",
         "system_prompt": "",
-        "task_description": prompt[:400],
+        "task_description": prompt,
         "rubrics": rubrics,
         "automated_checks": "",
         "difficulty": "medium",

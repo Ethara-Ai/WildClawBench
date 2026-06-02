@@ -673,7 +673,7 @@ def main() -> int:
                 ],
             }}
         ],
-        "max_tokens": 800,
+        "max_tokens": 64000,
         "temperature": 0,
     }}
     request = urllib.request.Request(
@@ -810,12 +810,12 @@ if __name__ == "__main__":
         return (r.stdout or "") + ("\n" if r.stdout else "") + (r.stderr or "")
 
     @staticmethod
-    def _read_text_tail(path: Path, max_chars: int = 20000) -> str:
+    def _read_text_tail(path: Path, max_chars: int | None = None) -> str:
         try:
             text = path.read_text(encoding="utf-8", errors="replace")
         except OSError:
             return ""
-        if len(text) <= max_chars:
+        if max_chars is None or len(text) <= max_chars:
             return text
         return text[-max_chars:]
 

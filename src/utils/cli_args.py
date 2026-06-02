@@ -125,6 +125,16 @@ def build_run_batch_parser(default_model: str, default_parallel: int) -> argpars
         metavar="N",
         help="Max LLM retry attempts for test generation lint loop (default: 3).",
     )
+    parser.add_argument(
+        "--force-testgen",
+        dest="force_testgen",
+        action="store_true",
+        default=False,
+        help="Bypass the on-disk testgen cache and regenerate test_outputs.py + "
+             "test_weights.json even if they already exist under "
+             "<output_root>/<task_id>/data/tests/. Use when the testgen prompt, "
+             "weight scale, or lint rules have changed.",
+    )
     testexec = parser.add_mutually_exclusive_group()
     testexec.add_argument(
         "--execute-tests",

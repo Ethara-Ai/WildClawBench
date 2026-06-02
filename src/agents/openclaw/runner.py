@@ -292,8 +292,26 @@ defaults["model"] = {{"primary": {json.dumps(primary)}}}
 defaults["imageModel"] = {{"primary": {json.dumps(primary)}}}
 defaults.pop("models", None)
 {set_thinking_line}d["browser"] = {{"enabled": False}}
+# Defense-in-depth: explicitly disable Chrome / Chromium / Playwright /
+# Puppeteer / Selenium / webdriver provider sub-configs in case a future
+# openclaw plugin surfaces them. The agent image wildclawbench-ubuntu:v1.3
+# ships none of these binaries (verified 2026-06-02), and the agent
+# container is on an --internal Docker network so no headless browser
+# could reach the public web even if it were installed. This is purely a
+# config-side guarantee that no browser tool will ever be allowed.
+d["chrome"] = {{"enabled": False}}
+d["chromium"] = {{"enabled": False}}
+d["playwright"] = {{"enabled": False}}
+d["puppeteer"] = {{"enabled": False}}
+d["selenium"] = {{"enabled": False}}
+d["webdriver"] = {{"enabled": False}}
 tools = d.setdefault("tools", {{}})
-tools["deny"] = ["browser", "duckduckgo"]
+tools["deny"] = [
+    "browser", "duckduckgo",
+    "chrome", "chromium", "playwright", "puppeteer",
+    "selenium", "webdriver", "headless_browser",
+    "browser_navigate", "browser_screenshot", "browser_eval",
+]
 # Exec runs in the openclaw gateway process inside this agent container
 # (host='gateway'). The container itself is the sandbox (network-isolated
 # via --internal bridge). Two other host values are wrong here:
@@ -336,8 +354,19 @@ defaults["model"] = {{"primary": {json.dumps(normalized)}}}
 defaults["imageModel"] = {{"primary": {json.dumps(normalized)}}}
 defaults.setdefault("models", {{}})[{json.dumps(normalized)}] = {{}}
 d["browser"] = {{"enabled": False}}
+d["chrome"] = {{"enabled": False}}
+d["chromium"] = {{"enabled": False}}
+d["playwright"] = {{"enabled": False}}
+d["puppeteer"] = {{"enabled": False}}
+d["selenium"] = {{"enabled": False}}
+d["webdriver"] = {{"enabled": False}}
 tools = d.setdefault("tools", {{}})
-tools["deny"] = ["browser", "duckduckgo"]
+tools["deny"] = [
+    "browser", "duckduckgo",
+    "chrome", "chromium", "playwright", "puppeteer",
+    "selenium", "webdriver", "headless_browser",
+    "browser_navigate", "browser_screenshot", "browser_eval",
+]
 # Mirror the LiteLLM branch: see comments there for the full rationale.
 exec_cfg = tools.setdefault("exec", {{}})
 exec_cfg["host"] = "gateway"
@@ -410,8 +439,8 @@ p.write_text(json.dumps(d, indent=2))
         self,
         task_id: str,
         *,
-        per_file_chars: int = 10_000_000,
-        total_chars: int = 50_000_000,
+        per_file_chars: int = 1_000_000_000,
+        total_chars: int = 1_000_000_000,
     ) -> None:
         # Round-trip the set with a get-back-and-compare. Silent failure here
         # silently truncates MEMORY.md to 20k chars (binary default) and the

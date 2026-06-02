@@ -90,15 +90,14 @@ def read_services(env_dir: Path | str | None) -> Dict[str, ServiceInfo]:
     return services
 
 
-def read_api_docs(env_dir: Path | str | None, max_chars: int = 30000) -> str:
-    """Read environment/API_DOCUMENTATION.md, truncated to max_chars."""
+def read_api_docs(env_dir: Path | str | None, max_chars: int | None = None) -> str:
     if not env_dir:
         return ""
     path = Path(env_dir) / "API_DOCUMENTATION.md"
     if not path.is_file():
         return ""
     text = path.read_text(encoding="utf-8")
-    if len(text) > max_chars:
+    if max_chars is not None and len(text) > max_chars:
         text = text[:max_chars] + "\n\n... [truncated]"
     return text
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import subprocess
 import tempfile
 from pathlib import Path
@@ -28,7 +29,9 @@ TMP_WORKSPACE = os.environ.get("TMP_WORKSPACE", "/tmp_workspace")
 # ---------------------------------------------------------------------------
 
 JUDGE_MODEL = os.environ.get("JUDGE_MODEL", "openai/gpt-5.4")  # may be bedrock/<arn>; falls back to JUDGE_MODEL_FALLBACK
-_JUDGE_MAX_EVIDENCE = 60_000  # chars of deliverables+transcript fed to the judge
+# User policy 2026-06-02: trajectory + deliverables are NEVER truncated when
+# fed to the judge. Override via env if you need to bound the blob for cost.
+_JUDGE_MAX_EVIDENCE = int(os.environ.get("JUDGE_MAX_EVIDENCE", "0")) or None
 
 # LLM council (opt-in). When enabled the rubric is scored by THREE judges in
 # parallel and aggregated by per-criterion mean with stddev-based disagreement
@@ -42,10 +45,13 @@ _JUDGE_MAX_EVIDENCE = 60_000  # chars of deliverables+transcript fed to the judg
 #   JUDGE_COUNCIL_DISAGREEMENT_THRESHOLD=0.30   (stddev above which a criterion
 #                                                is flagged as contested)
 _DEFAULT_COUNCIL_MEMBERS = (
-    # Sonnet 4.6 — anchor judge, same ARN used by JUDGE_MODEL.
+    # Sonnet 4.6 anchor — points to the operator-supplied inference profile in
+    # ap-south-1. The prior default xv71vnlzm71s is denied by EtharaKenseiPolicy
+    # at the IAM layer; is9bst5tfadh replaces it as the current working anchor.
+    # Override via JUDGE_COUNCIL_SONNET_ARN if you need a different profile.
     os.environ.get(
         "JUDGE_COUNCIL_SONNET_ARN",
-        "bedrock/arn:aws:bedrock:ap-south-1:426628337772:application-inference-profile/xv71vnlzm71s",
+        "bedrock/arn:aws:bedrock:ap-south-1:426628337772:application-inference-profile/is9bst5tfadh",
     ),
     # GLM 5 — us-east-1 profile.
     os.environ.get(
@@ -212,7 +218,7 @@ def _gather_evidence(workspace_results: Path, transcript_text: str) -> str:
     if transcript_text:
         parts.append(f"\n----- TRANSCRIPT (condensed) -----\n{transcript_text}")
     blob = "".join(parts)
-    return blob[:_JUDGE_MAX_EVIDENCE]
+    return blob if _JUDGE_MAX_EVIDENCE is None else blob[:_JUDGE_MAX_EVIDENCE]
 
 
 _ZERO_USAGE = {
@@ -283,73 +289,108 @@ def _call_judge_openai(model: str, system: str, user: str) -> tuple[str, dict]:
     return text, usage
 
 
+_ARN_REGION_RE = re.compile(r"^arn:aws:bedrock:([a-z0-9-]+):")
+
+
+def _bedrock_region_for(arn: str) -> str:
+    m = _ARN_REGION_RE.match(arn or "")
+    if m:
+        return m.group(1)
+    return os.environ.get("KENSEI_AWS_REGION") or os.environ.get("AWS_REGION", "ap-south-1")
+
+
 def _call_judge_bedrock(arn: str, system: str, user: str) -> tuple[str, dict]:
-    import urllib.request, urllib.parse
+    import urllib.request, urllib.parse, urllib.error
     from src.utils.bedrock_eventstream import iter_eventstream
     tok = os.environ.get("KENSEI_AWS_BEARER_TOKEN") or os.environ.get("AWS_BEARER_TOKEN_BEDROCK", "")
-    reg = os.environ.get("KENSEI_AWS_REGION") or os.environ.get("AWS_REGION", "ap-south-1")
     if not tok:
         raise RuntimeError("no Bedrock bearer token for judge")
+    reg = _bedrock_region_for(arn)
     mid = urllib.parse.quote(arn, safe="")
     url = f"https://bedrock-runtime.{reg}.amazonaws.com/model/{mid}/converse-stream"
-    body = json.dumps({
-        "system": [{"text": system}],
-        "messages": [{"role": "user", "content": [{"text": user}]}],
-        "inferenceConfig": {"maxTokens": 4000, "temperature": 0},
-    }).encode()
-    req = urllib.request.Request(
-        url, data=body, method="POST",
-        headers={"Authorization": f"Bearer {tok}", "Content-Type": "application/json",
-                 "Accept": "application/vnd.amazon.eventstream"},
-    )
-    text_parts: list[str] = []
-    u: dict = {}
-    with urllib.request.urlopen(req, timeout=120) as r:
-        def _chunks():
-            while True:
-                chunk = r.read(8192)
-                if not chunk:
-                    return
-                yield chunk
-        for evt_type, evt_payload in iter_eventstream(_chunks()):
-            if not isinstance(evt_payload, dict):
-                continue
-            if evt_type and evt_type.endswith("Exception"):
-                err = evt_payload.get("Message") or evt_payload.get("message") or ""
-                raise RuntimeError(f"Bedrock judge error ({evt_type}): {err}")
-            if evt_type == "contentBlockDelta":
-                delta = evt_payload.get("delta") or {}
-                txt = delta.get("text")
-                if isinstance(txt, str):
-                    text_parts.append(txt)
-            elif evt_type == "metadata":
-                usage_obj = evt_payload.get("usage")
-                if isinstance(usage_obj, dict):
-                    u = usage_obj
-    text = "".join(text_parts)
-    in_tok = int(u.get("inputTokens", 0) or 0)
-    out_tok = int(u.get("outputTokens", 0) or 0)
-    c_read = int(
-        u.get("cacheReadInputTokens")
-        or u.get("cacheReadTokens")
-        or u.get("cache_read_input_tokens")
-        or 0
-    )
-    c_write = int(
-        u.get("cacheWriteInputTokens")
-        or u.get("cacheCreationInputTokens")
-        or u.get("cache_creation_input_tokens")
-        or 0
-    )
-    usage = {
-        "input_tokens": in_tok,
-        "output_tokens": out_tok,
-        "cache_read_tokens": c_read,
-        "cache_write_tokens": c_write,
-        "total_tokens": int(u.get("totalTokens", 0) or (in_tok + out_tok + c_read + c_write)),
-        "request_count": 1,
-    }
-    return text, usage
+
+    def _do_post(include_temperature: bool) -> tuple[str, dict]:
+        infer = {"maxTokens": 4000}
+        if include_temperature:
+            infer["temperature"] = 0
+        body = json.dumps({
+            "system": [{"text": system}],
+            "messages": [{"role": "user", "content": [{"text": user}]}],
+            "inferenceConfig": infer,
+        }).encode()
+        req = urllib.request.Request(
+            url, data=body, method="POST",
+            headers={"Authorization": f"Bearer {tok}", "Content-Type": "application/json",
+                     "Accept": "application/vnd.amazon.eventstream"},
+        )
+        return _consume(req)
+
+    def _consume(req) -> tuple[str, dict]:
+        text_parts: list[str] = []
+        u: dict = {}
+        try:
+            resp = urllib.request.urlopen(req, timeout=120)
+        except urllib.error.HTTPError as e:
+            err_body = ""
+            try:
+                err_body = e.read().decode("utf-8", "replace")[:2000]
+            except Exception:
+                pass
+            raise RuntimeError(f"Bedrock HTTP {e.code} at {url}: {err_body}") from None
+        with resp as r:
+            def _chunks():
+                while True:
+                    chunk = r.read(8192)
+                    if not chunk:
+                        return
+                    yield chunk
+            for evt_type, evt_payload in iter_eventstream(_chunks()):
+                if not isinstance(evt_payload, dict):
+                    continue
+                if evt_type and evt_type.endswith("Exception"):
+                    err = evt_payload.get("Message") or evt_payload.get("message") or ""
+                    raise RuntimeError(f"Bedrock judge error ({evt_type}): {err}")
+                if evt_type == "contentBlockDelta":
+                    delta = evt_payload.get("delta") or {}
+                    txt = delta.get("text")
+                    if isinstance(txt, str):
+                        text_parts.append(txt)
+                elif evt_type == "metadata":
+                    usage_obj = evt_payload.get("usage")
+                    if isinstance(usage_obj, dict):
+                        u = usage_obj
+        text = "".join(text_parts)
+        in_tok = int(u.get("inputTokens", 0) or 0)
+        out_tok = int(u.get("outputTokens", 0) or 0)
+        c_read = int(
+            u.get("cacheReadInputTokens")
+            or u.get("cacheReadTokens")
+            or u.get("cache_read_input_tokens")
+            or 0
+        )
+        c_write = int(
+            u.get("cacheWriteInputTokens")
+            or u.get("cacheCreationInputTokens")
+            or u.get("cache_creation_input_tokens")
+            or 0
+        )
+        usage = {
+            "input_tokens": in_tok,
+            "output_tokens": out_tok,
+            "cache_read_tokens": c_read,
+            "cache_write_tokens": c_write,
+            "total_tokens": int(u.get("totalTokens", 0) or (in_tok + out_tok + c_read + c_write)),
+            "request_count": 1,
+        }
+        return text, usage
+
+    try:
+        return _do_post(include_temperature=True)
+    except RuntimeError as exc:
+        msg = str(exc).lower()
+        if "temperature" in msg and ("deprecated" in msg or "not supported" in msg or "unsupported" in msg):
+            return _do_post(include_temperature=False)
+        raise
 
 
 def _parse_judge_json(text: str) -> dict:
