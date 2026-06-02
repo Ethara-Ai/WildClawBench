@@ -294,15 +294,28 @@ defaults.pop("models", None)
 {set_thinking_line}d["browser"] = {{"enabled": False}}
 tools = d.setdefault("tools", {{}})
 tools["deny"] = ["browser", "duckduckgo"]
-# Exec runs directly in this agent container (host='node'); the container
-# itself is the sandbox (already network-isolated via --internal bridge).
-# We deliberately disable openclaw's nested-Docker sandbox subsystem
-# because wildclawbench-ubuntu:v1.3 ships without a docker daemon or
-# docker CLI; turning sandbox.mode on crashes the agent before any LLM
-# call (observed 2026-06-02 gpt run, 'Sandbox mode requires Docker, but
-# the "docker" command was not found in PATH'). Same applies below.
+# Exec runs in the openclaw gateway process inside this agent container
+# (host='gateway'). The container itself is the sandbox (network-isolated
+# via --internal bridge). Two other host values are wrong here:
+#   * 'sandbox' spawns a nested Docker container per exec, requires the
+#     docker CLI inside this container (wildclawbench-ubuntu:v1.3 has
+#     none); seen 2026-06-02 06:43 'Sandbox mode requires Docker'.
+#   * 'node' routes exec to a paired companion app over WebSocket, which
+#     does not exist in headless benchmark runs; seen 2026-06-02 07:17
+#     'exec host=node requires a paired node (none available)'.
 exec_cfg = tools.setdefault("exec", {{}})
-exec_cfg["host"] = "node"
+exec_cfg["host"] = "gateway"
+# Bypass exec denial in headless benchmark runs. openclaw's config
+# validator (seen 2026-06-02 megan-davis run) accepts exactly three
+# values for tools.exec.security: "deny"|"allowlist"|"full". "full"
+# disables the per-command human-approval check entirely; without it,
+# every exec call waits 120s for an approval channel that does not
+# exist in the harness, then fails with
+#   'exec denied: host=gateway security=deny'
+#   'Channel is required (no configured channels detected)'
+# (~25x in 2026-06-02 07:43 gateway.log). tools.exec.approval is NOT
+# a recognized key per the same validator; do not add it.
+exec_cfg["security"] = "full"
 sandbox_cfg = defaults.setdefault("sandbox", {{}})
 sandbox_cfg["mode"] = "off"
 web = tools.setdefault("web", {{}})
@@ -325,9 +338,10 @@ defaults.setdefault("models", {{}})[{json.dumps(normalized)}] = {{}}
 d["browser"] = {{"enabled": False}}
 tools = d.setdefault("tools", {{}})
 tools["deny"] = ["browser", "duckduckgo"]
-# Mirror the LiteLLM branch: see comment there for the full rationale.
+# Mirror the LiteLLM branch: see comments there for the full rationale.
 exec_cfg = tools.setdefault("exec", {{}})
-exec_cfg["host"] = "node"
+exec_cfg["host"] = "gateway"
+exec_cfg["security"] = "full"
 sandbox_cfg = defaults.setdefault("sandbox", {{}})
 sandbox_cfg["mode"] = "off"
 web = tools.setdefault("web", {{}})
