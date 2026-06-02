@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import os
 import shutil
@@ -11,6 +13,43 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 MOCK_IMAGE = "kensei3-mocks:v1"
+
+_CONTENT_HASH_LABEL = "kensei3.content_hash"
+
+
+def _compute_mock_content_hash(env_dir: Path) -> str:
+    # b54 Issue 9: tag-only cache check let stale images keep running after
+    # environment/ edits. Manifest is (relpath, size, mtime) over every file
+    # under env_dir; mtime included because byte-for-byte content read would
+    # take seconds on 101 dirs. mtime is sufficient because docker build is
+    # the only writer to the cached image and any environment/ edit bumps it.
+    h = hashlib.sha256()
+    env_dir = Path(env_dir)
+    if not env_dir.is_dir():
+        return ""
+    manifest: list[tuple[str, int, int]] = []
+    for path in sorted(env_dir.rglob("*")):
+        if not path.is_file():
+            continue
+        try:
+            st = path.stat()
+        except OSError:
+            continue
+        rel = path.relative_to(env_dir).as_posix()
+        manifest.append((rel, int(st.st_size), int(st.st_mtime)))
+    h.update(json.dumps(manifest, sort_keys=True).encode("utf-8"))
+    return h.hexdigest()[:16]
+
+
+def _image_content_hash(image: str) -> str:
+    r = subprocess.run(
+        ["docker", "image", "inspect", image, "--format",
+         "{{ index .Config.Labels \"" + _CONTENT_HASH_LABEL + "\" }}"],
+        capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        return ""
+    return (r.stdout or "").strip()
 
 
 def read_api_ports(env_dir: Path) -> dict[str, int]:
@@ -114,6 +153,7 @@ def build_mock_image_if_needed(env_dir: Path, image: str = MOCK_IMAGE,
     # (or KENSEI_MOCK_REBUILD=1) rebuilds; default stays cached (no behavior
     # change). Per-task data does NOT need this — it is bind-mounted at runtime.
     force = force or os.environ.get("KENSEI_MOCK_REBUILD", "").strip().lower() in ("1", "true", "yes")
+    current_hash = _compute_mock_content_hash(Path(env_dir))
     if force:
         logger.info("Force-rebuilding mock image %s (removing cached tag)", image)
         subprocess.run(["docker", "rmi", "-f", image], capture_output=True)
@@ -123,8 +163,15 @@ def build_mock_image_if_needed(env_dir: Path, image: str = MOCK_IMAGE,
             capture_output=True,
         )
         if r.returncode == 0:
-            logger.info("Mock image %s already built", image)
-            return True
+            cached_hash = _image_content_hash(image)
+            if current_hash and cached_hash == current_hash:
+                logger.info("Mock image %s already built (content_hash=%s)", image, cached_hash)
+                return True
+            logger.info(
+                "Mock image %s is stale (cached_hash=%r expected=%r); rebuilding",
+                image, cached_hash, current_hash,
+            )
+            subprocess.run(["docker", "rmi", "-f", image], capture_output=True)
 
     env_dir = Path(env_dir)
     if not env_dir.is_dir():
@@ -149,8 +196,12 @@ def build_mock_image_if_needed(env_dir: Path, image: str = MOCK_IMAGE,
         (tmp / "healthcheck.sh").write_text(
             _generate_healthcheck_sh(api_ports), encoding="utf-8"
         )
+        build_cmd = ["docker", "build", "-t", image]
+        if current_hash:
+            build_cmd += ["--label", f"{_CONTENT_HASH_LABEL}={current_hash}"]
+        build_cmd += ["."]
         r = subprocess.run(
-            ["docker", "build", "-t", image, "."],
+            build_cmd,
             cwd=str(tmp),
             capture_output=True,
             text=True,

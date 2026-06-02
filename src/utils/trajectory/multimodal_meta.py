@@ -16,6 +16,7 @@ import json
 import mimetypes
 import os
 import re
+from pathlib import Path
 from typing import Iterable, List, Mapping, Optional
 
 from src.utils.store import Task
@@ -183,6 +184,7 @@ def build_output_artifacts(
     s3_region: str = "",
     task_id: str = "",
     input_filenames: Iterable[str] = (),
+    workspace_root: Optional[Path] = None,
 ) -> List[dict]:
     """Walk turns for agent-written file paths; emit trimmed records.
 
@@ -217,12 +219,28 @@ def build_output_artifacts(
             return
         seen_paths.add(container_path)
         mime = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+        size_bytes = 0
+        if workspace_root is not None:
+            for candidate in (
+                container_path.lstrip("/"),
+                container_path.lstrip("/").replace("tmp_workspace/", "", 1),
+                container_path.lstrip("/").replace("root/workspace/", "", 1),
+                container_path.lstrip("/").replace("root/", "", 1),
+                filename,
+            ):
+                try:
+                    host_path = workspace_root / candidate
+                    if host_path.is_file():
+                        size_bytes = host_path.stat().st_size
+                        break
+                except OSError:
+                    continue
         artifacts.append({
             "ref_id": "artifact_%d" % (len(artifacts)),
             "path": container_path,
             "filename": filename,
             "mime_type": mime,
-            "size_bytes": 0,
+            "size_bytes": size_bytes,
             "source": "agent_workspace",
         })
 

@@ -1,0 +1,58 @@
+{
+  "account": "renata.voss.farm@gmail.com",
+  "timezone": "America/Chicago",
+  "now": "2026-10-14T06:42:00-05:00",
+  "events": [
+    {
+      "id": "evt-001",
+      "summary": "Morning milking",
+      "start": "2026-10-14T04:00:00-05:00",
+      "end":   "2026-10-14T07:00:00-05:00",
+      "recurring": "DAILY",
+      "category": "parlor"
+    },
+    {
+      "id": "evt-002",
+      "summary": "Evening milking",
+      "start": "2026-10-14T16:00:00-05:00",
+      "end":   "2026-10-14T19:00:00-05:00",
+      "recurring": "DAILY",
+      "category": "parlor"
+    },
+    {
+      "id": "evt-003",
+      "summary": "Dr. Bergstrom farm visit - repro panel",
+      "start": "2026-10-13T09:30:00-05:00",
+      "end":   "2026-10-13T11:00:00-05:00",
+      "status": "completed"
+    },
+    {
+      "id": "evt-004",
+      "summary": "Co-op milk pickup (Marv)",
+      "start": "2026-10-16T06:30:00-05:00",
+      "end":   "2026-10-16T08:00:00-05:00"
+    },
+    {
+      "id": "evt-005",
+      "summary": "Stenstrom cull pickup - 4 heifers",
+      "start": "2026-10-16T09:00:00-05:00",
+      "end":   "2026-10-16T10:00:00-05:00",
+      "notes": "Bill of lading at pickup. Certified check."
+    },
+    {
+      "id": "evt-006",
+      "summary": "Hank vacation (Bahamas) - parlor solo",
+      "start": "2026-10-17",
+      "end":   "2026-10-24",
+      "all_day": true,
+      "notes": "Booked August 2026. Renata covers parlor alone all week."
+    },
+    {
+      "id": "evt-007",
+      "summary": "Auto: Pregnancy recheck (clinic 90-day default)",
+      "start": "2027-01-12T10:00:00-06:00",
+      "end":   "2027-01-12T11:00:00-06:00",
+      "notes": "DECOY: auto-scheduled by clinic system at 90 days. Vet's written report (text_1) explicitly recommends 60 days (week of 2026-12-14). Per Renata's rule, the written report supersedes the auto-invite."
+    }
+  ]
+}

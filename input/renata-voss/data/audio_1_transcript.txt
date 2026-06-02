@@ -1,0 +1,14 @@
+[audio_1_cal_voicemail.m4a — auto-transcribed]
+[Source: incoming voicemail, 2026-10-13 15:42 CT, from (715) 555-0167]
+[Duration: 0:47  |  Transcript confidence: high  |  Engine: Verizon visual voicemail]
+
+"Renata, Cal Stenstrom. Friday mornings still on for the four heifers,
+nine sharp like always. I'll have Brent driving the trailer. Price holds
+at ninety four cents a pound live, scale ticket way at my yard, no shrink
+same deal as the august load. I'll have the certified check on me. If
+anything changed on your end, call me back today, otherwise I'll see you
+Friday. Thanks."
+
+[note: Verizon visual voicemail rendered "scale-ticket weight" as "scale ticket way".
+ Other transcripts of this caller have similar substitutions ("weight" -> "way",
+ "wait"). Listen to the audio if anything looks off.]

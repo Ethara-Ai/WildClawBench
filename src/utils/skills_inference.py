@@ -48,6 +48,13 @@ _CURATED_TAGS = {
 # Back-compat alias (nothing external relies on this, but keep it stable).
 DOMAIN_TAGS = _CURATED_TAGS
 
+# Distractor set policy: ALL discovered APIs minus the required ones. This is a
+# 2026-06-02 user-mandated change from the original 4-API curated-tag selection
+# (see b46, b58/m1296). Rationale: every TestNegativeWeight* guardrail should be
+# exercisable on every possible reach-for-distractor, not just 4 curated picks.
+# Implication: ~96 connectors injected per task and harbor bundle ships all 101
+# API dirs. DISTRACTOR_COUNT retained as a non-binding hint for legacy callers
+# that pass `count=` explicitly; the default policy ignores it.
 DISTRACTOR_COUNT = 4
 _MIN_TOKEN_LEN = 3
 # Slug tokens that are too generic to be reliable match keys on their own.
@@ -132,28 +139,18 @@ def infer_required_apis(prompt: str, environment_dir=None) -> list[str]:
 
 
 def compute_distractor_skills(required_apis: list[str], task_id: str,
-                              count: int = DISTRACTOR_COUNT,
+                              count: int | None = None,
                               environment_dir=None) -> list[str]:
-    """Pick `count` plausible-but-unneeded APIs from the discovered catalog,
-    preferring ones that share a curated domain tag with the required APIs."""
-    all_apis = available_apis(environment_dir)
+    """Return every available API except the required ones.
+
+    Result is sorted (deterministic, no shuffle). `task_id` and `count` are
+    accepted for backward compatibility; pass `count=N` to truncate explicitly
+    or leave None for the full complement (the default policy).
+    """
     required_set = set(required_apis)
-    required_tags: set[str] = set()
-    for api in required_apis:
-        required_tags.update(_CURATED_TAGS.get(api, ()))
-
-    domain_pool = sorted(
-        api for api in all_apis
-        if api not in required_set
-        and set(_CURATED_TAGS.get(api, ())) & required_tags
-    )
-    if len(domain_pool) < count:
-        leftover = sorted(
-            api for api in all_apis
-            if api not in required_set and api not in domain_pool
-        )
-        domain_pool = domain_pool + leftover
-
+    pool = [api for api in available_apis(environment_dir) if api not in required_set]
+    if count is None or count <= 0 or count >= len(pool):
+        return pool
     rng = random.Random(task_id or "wildclaw-default")
-    rng.shuffle(domain_pool)
-    return domain_pool[:count]
+    rng.shuffle(pool)
+    return sorted(pool[:count])

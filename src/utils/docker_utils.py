@@ -51,17 +51,43 @@ def start_container(task_id: str, workspace_path: str, extra_env: str = "",
 
     proxy_http = os.environ.get('HTTP_PROXY_INNER', '')
     proxy_https = os.environ.get('HTTPS_PROXY_INNER', '')
-    # When no proxy is configured, bypass any inherited proxy entirely (no_proxy="*").
-    no_proxy_value = os.environ.get("NO_PROXY_INNER", "*") if not proxy_http else os.environ.get("NO_PROXY_INNER", "")
-    env_args = [
-        "-e", f"http_proxy={proxy_http}",
-        "-e", f"https_proxy={proxy_https}",
-        "-e", f"HTTP_PROXY={proxy_http}",
-        "-e", f"HTTPS_PROXY={proxy_https}",
-        "-e", f"BRAVE_API_KEY={BRAVE_API_KEY}",
-        "-e", f"no_proxy={no_proxy_value}",
-        "-e", f"NO_PROXY={no_proxy_value}",
-    ]
+    # The wildclawbench-ubuntu:v1.3 image bakes in
+    #   http_proxy=http://100.104.40.233:7897
+    #   https_proxy=http://100.104.40.233:7897
+    # (from the image builder's prior corporate VPN; unreachable from Docker).
+    # If we don't override them, every outbound HTTP from the agent (curl,
+    # requests, the OpenAI SDK that openclaw uses to call our LiteLLM
+    # sidecar) routes through that dead proxy and returns "Connection
+    # error." instantly. That is the alden-croft 2026-06-02 incident:
+    # rawErrorPreview="Connection error." rawErrorHash=sha256:8ec9a0b7fe5c,
+    # 4 retries within 20s, surface_error, score 0. Empirically reproduced
+    # against bare image (no env injection) — both intra-network sidecar
+    # and public internet calls fail identically because curl tries the
+    # poisoned proxy before TCP-connect to the real target.
+    # Fix: when no external proxy is configured, EXPLICITLY pass `-e
+    # var=""` so Docker overrides the image's baked defaults with empty
+    # strings (most HTTP libs treat empty as "no proxy"; coherent with the
+    # --internal-bridge sandbox from (b14)).
+    env_args: list[str] = ["-e", f"BRAVE_API_KEY={BRAVE_API_KEY}"]
+    if proxy_http or proxy_https:
+        no_proxy_value = os.environ.get("NO_PROXY_INNER", "")
+        env_args += [
+            "-e", f"http_proxy={proxy_http}",
+            "-e", f"https_proxy={proxy_https}",
+            "-e", f"HTTP_PROXY={proxy_http}",
+            "-e", f"HTTPS_PROXY={proxy_https}",
+            "-e", f"no_proxy={no_proxy_value}",
+            "-e", f"NO_PROXY={no_proxy_value}",
+        ]
+    else:
+        env_args += [
+            "-e", "http_proxy=",
+            "-e", "https_proxy=",
+            "-e", "HTTP_PROXY=",
+            "-e", "HTTPS_PROXY=",
+            "-e", "no_proxy=",
+            "-e", "NO_PROXY=",
+        ]
     for line in extra_env.splitlines():
         key = line.strip()
         if not key or key.startswith("#"):
@@ -264,6 +290,37 @@ def inject_api_connectors(
             logger.warning("[%s] Failed to inject connector %s: %s", task_id, api, r.stderr.strip())
             continue
         injected.append(api)
+    # Non-connector utility skills (pdf-extract, audio-extract, video-frames,
+    # self-improving-agent-*) ship in environment/skills/ alongside the 101
+    # <api>-connector dirs. They are NOT keyed by required_apis. Without
+    # injection, agent attempts to read /usr/lib/.../skills/pdf-extract/SKILL.md
+    # and ENOENTs. Observed in alden-croft 2026-06-02T17:05:11 gateway.log line
+    # 3: '[tools] read failed: ENOENT ... /skills/pdf-extract/SKILL.md'. The
+    # agent image's bundled openclaw package does not ship these built-ins; the
+    # harness owns them. Copy every non-connector top-level skill dir.
+    skills_src = env_root / "skills"
+    utility_injected: list[str] = []
+    if skills_src.is_dir():
+        for entry in sorted(skills_src.iterdir()):
+            if not entry.is_dir() or entry.name.endswith("-connector"):
+                continue
+            dest = f"{openclaw_skills_root}/{entry.name}"
+            subprocess.run(
+                ["docker", "exec", task_id, "rm", "-rf", dest],
+                capture_output=True, text=True,
+            )
+            subprocess.run(
+                ["docker", "exec", task_id, "mkdir", "-p", dest],
+                capture_output=True, text=True,
+            )
+            r = subprocess.run(
+                ["docker", "cp", f"{entry}/.", f"{task_id}:{dest}/"],
+                capture_output=True, text=True,
+            )
+            if r.returncode != 0:
+                logger.warning("[%s] Failed to inject utility skill %s: %s", task_id, entry.name, r.stderr.strip())
+                continue
+            utility_injected.append(entry.name)
     api_doc = env_root / "API_DOCUMENTATION.md"
     if api_doc.is_file():
         subprocess.run(
@@ -272,6 +329,8 @@ def inject_api_connectors(
         )
     if injected:
         logger.info("[%s] Injected API connectors: %s", task_id, ",".join(injected))
+    if utility_injected:
+        logger.info("[%s] Injected utility skills: %s", task_id, ",".join(utility_injected))
 
 
 def _parse_service_toml(path: Path) -> dict:

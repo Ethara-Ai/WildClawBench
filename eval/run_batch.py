@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import logging
 import mimetypes
 import os
@@ -84,6 +85,45 @@ OPENROUTER_BASE_URL_CLAUDECODE = normalize_openrouter_base_url_for_claudecode(
     os.environ.get("OPENROUTER_BASE_URL", "")
 )
 MODELS_API_KEY_PLACEHOLDER = "${MY_PROXY_API_KEY}"
+
+# Bumped whenever the cache-key input shape or testgen contract changes
+# (e.g. ALLOWED_WEIGHTS rescale per b30, prompt format edits). Bump invalidates
+# every on-disk testgen cache deterministically so we never silently serve a
+# stale test suite generated under different semantics. See b54 Issue 3.
+_TESTGEN_CACHE_VERSION = "v2-weights531"
+
+
+def _compute_testgen_cache_key(task: dict) -> str:
+    task_dir = task.get("task_dir")
+    if not task_dir:
+        return ""
+    p = Path(task_dir)
+    if not p.is_dir():
+        return ""
+    h = hashlib.sha256()
+    h.update(_TESTGEN_CACHE_VERSION.encode())
+    for fname in ("rubric.json", "prompt.txt", "task_config.yaml"):
+        f = p / fname
+        h.update(f"\x00{fname}\x00".encode())
+        if f.is_file():
+            try:
+                h.update(f.read_bytes())
+            except OSError:
+                h.update(b"<unreadable>")
+    mock_root = p / "mock_data"
+    if mock_root.is_dir():
+        entries = []
+        for sub in sorted(mock_root.iterdir()):
+            if sub.is_dir():
+                for child in sorted(sub.rglob("*")):
+                    if child.is_file():
+                        try:
+                            entries.append((str(child.relative_to(mock_root)), child.stat().st_size))
+                        except OSError:
+                            entries.append((str(child.relative_to(mock_root)), -1))
+        h.update(f"\x00mock_data:{entries}\x00".encode())
+    return h.hexdigest()[:32]
+
 
 ALL_CATEGORIES = [
     "01_Productivity_Flow",
@@ -387,21 +427,35 @@ def _write_pass_summary(model_dir: Path, model_type: str, run_index: int, reward
         except json.JSONDecodeError:
             existing = {}
     per_run = [r for r in existing.get("per_run", []) if r.get("run_index") != run_index]
-    # Real test counts come from the rubric judge (or automated_checks) when
-    # present; fall back to 0 only when nothing scored this run.
     s = scores or {}
+    # Source of truth is the rubric grader: criteria_* (canonical) with tests_*
+    # fallback for legacy score.json files. reward is overall_score (0..1);
+    # rubric_weights_percentage = reward * 100 (user formula m1420 line 2).
+    crit_total = int(s.get("criteria_total", s.get("tests_total", 0)) or 0)
+    crit_passed = int(s.get("criteria_passed", s.get("tests_passed", 0)) or 0)
+    crit_failed = int(s.get("criteria_failed", s.get("tests_failed", 0)) or 0)
+    reward_f = float(reward) if isinstance(reward, (int, float)) else 0.0
+    pct = float(s.get("rubric_weights_percentage", reward_f * 100.0) or 0.0)
     per_run.append({
         "run_index": run_index,
-        "tests_total": int(s.get("tests_total", 0) or 0),
-        "tests_passed": int(s.get("tests_passed", 0) or 0),
-        "tests_failed": int(s.get("tests_failed", 0) or 0),
-        "reward": float(reward) if isinstance(reward, (int, float)) else 0.0,
+        "criteria_total": crit_total,
+        "criteria_passed": crit_passed,
+        "criteria_failed": crit_failed,
+        "tests_total": crit_total,
+        "tests_passed": crit_passed,
+        "tests_failed": crit_failed,
+        "reward": reward_f,
+        "rubric_weights_percentage": round(pct, 2),
     })
     per_run.sort(key=lambda r: r["run_index"])
     rewards = [r["reward"] for r in per_run]
+    pcts = [r.get("rubric_weights_percentage", r["reward"] * 100.0) for r in per_run]
+    avg_reward = (sum(rewards) / len(rewards)) if rewards else 0.0
+    avg_pct = (sum(pcts) / len(pcts)) if pcts else 0.0
     p.write_text(json.dumps({
         "model": model_type, "runs": len(per_run),
-        "average_reward": (sum(rewards) / len(rewards)) if rewards else 0.0,
+        "average_reward": avg_reward,
+        "average_rubric_weights_percentage": round(avg_pct, 2),
         "per_run": per_run,
     }, indent=2), encoding="utf-8")
 
@@ -559,6 +613,7 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
         s3_prefix=(config.s3_prefix if config else ""),
         s3_region=(config.s3_region if config else ""),
         usage_top_level=_project_agent_usage_top_level(agent_usage),
+        workspace_root=output_dir / "task_output" / "workspace_full",
     )
 
     # Project rich S3-upload records to the reference's trimmed schema
@@ -637,9 +692,12 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
                 result["__judge_usage__"] = dict(scores["usage"])
             (output_dir / "score.json").write_text(
                 json.dumps(scores, indent=2, ensure_ascii=False), encoding="utf-8")
-            logger.info("[%s] Rubric judged: overall=%.3f (%d/%d criteria passed, model=%s)",
+            logger.info("[%s] Rubric judged: overall=%.3f (%.2f%%) — %d/%d criteria passed, model=%s",
                         task["task_id"], scores.get("overall_score", 0.0),
-                        scores.get("tests_passed", 0), scores.get("tests_total", 0),
+                        scores.get("rubric_weights_percentage",
+                                   scores.get("overall_score", 0.0) * 100.0),
+                        scores.get("criteria_passed", scores.get("tests_passed", 0)),
+                        scores.get("criteria_total", scores.get("tests_total", 0)),
                         scores.get("judge_model", "?"))
         except Exception as exc:
             logger.warning("[%s] rubric grading failed: %s", task.get("task_id"), exc)
@@ -664,10 +722,13 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
         try:
             tr = result.get("test_result") or {}
             src = tr if tr else scores
+            # When src is a pytest test_result, the tests_* keys are authoritative.
+            # When src is a rubric score (no real pytest ran), canonical keys are
+            # criteria_*; fall back to deprecated tests_* aliases for legacy data.
             tr_meta = {
-                "tests_total": int(src.get("tests_total", 0) or 0),
-                "tests_passed": int(src.get("tests_passed", 0) or 0),
-                "tests_failed": int(src.get("tests_failed", 0) or 0),
+                "tests_total": int(src.get("tests_total", src.get("criteria_total", 0)) or 0),
+                "tests_passed": int(src.get("tests_passed", src.get("criteria_passed", 0)) or 0),
+                "tests_failed": int(src.get("tests_failed", src.get("criteria_failed", 0)) or 0),
                 "tests_errored": int(src.get("tests_errored", 0) or 0),
                 "test_scores": src.get("test_scores", "") or "",
                 "test_output": src.get("test_output", "") or "",
@@ -749,8 +810,11 @@ def run_single_task(
         cached_tests_dir = output_root / task_id_ori / "data" / "tests"
         cached_code_path = cached_tests_dir / "test_outputs.py"
         cached_weights_path = cached_tests_dir / "test_weights.json"
+        cached_key_path = cached_tests_dir / "cache_key.txt"
+        current_key = _compute_testgen_cache_key(task)
         cached_code = ""
         cached_weights = ""
+        cache_key_match = True
         if not force_testgen and cached_code_path.is_file() and cached_weights_path.is_file():
             try:
                 cached_code = cached_code_path.read_text(encoding="utf-8")
@@ -758,13 +822,24 @@ def run_single_task(
             except OSError:
                 cached_code = ""
                 cached_weights = ""
-        if cached_code.strip() and cached_weights.strip() and cached_weights.strip() != "{}":
+            if current_key:
+                try:
+                    cached_key = cached_key_path.read_text(encoding="utf-8").strip() if cached_key_path.is_file() else ""
+                except OSError:
+                    cached_key = ""
+                if cached_key != current_key:
+                    cache_key_match = False
+                    logger.info(
+                        "[%s] testgen cache invalidated: key changed (was=%s now=%s); regenerating",
+                        task_id_ori, cached_key or "<absent>", current_key,
+                    )
+        if cache_key_match and cached_code.strip() and cached_weights.strip() and cached_weights.strip() != "{}":
             task["test_code"] = cached_code
             task["test_weights"] = cached_weights
             task["__testgen_usage__"] = {"input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0, "requests": 0}
             logger.info(
-                "[%s] testgen reused from %s (%dch code, %dch weights)",
-                task_id_ori, cached_tests_dir, len(cached_code), len(cached_weights),
+                "[%s] testgen reused from %s (%dch code, %dch weights, key=%s)",
+                task_id_ori, cached_tests_dir, len(cached_code), len(cached_weights), current_key or "<none>",
             )
         else:
             if force_testgen:
@@ -778,10 +853,16 @@ def run_single_task(
                 task["test_code"] = tg.test_code
                 task["test_weights"] = tg.test_weights_json
                 task["__testgen_usage__"] = dict(tg.usage)
+                if current_key:
+                    try:
+                        cached_tests_dir.mkdir(parents=True, exist_ok=True)
+                        cached_key_path.write_text(current_key, encoding="utf-8")
+                    except OSError as exc:
+                        logger.debug("[%s] testgen cache_key write failed: %s", task_id_ori, exc)
                 logger.info(
-                    "[%s] testgen done: %dch code, %d weights, %d attempts, fallback=%s",
+                    "[%s] testgen done: %dch code, %d weights, %d attempts, fallback=%s, key=%s",
                     task_id_ori, len(tg.test_code), len(tg.test_weights),
-                    tg.attempts, tg.used_fallback,
+                    tg.attempts, tg.used_fallback, current_key or "<none>",
                 )
             except Exception as exc:
                 logger.warning("[%s] testgen failed (continuing without): %s", task_id_ori, exc)

@@ -156,10 +156,23 @@ def write_bundle(
     attachments_list = list(attachments or [])
 
     used_apis: Set[str] = _discover_used_apis(task, task_dir, config.environment_dir)
+    # Bundle must include distractor APIs as live services as well, not just as
+    # connector docs and task.toml metadata. Pre-Fix-A the bundle's
+    # docker-compose only spun up `required` APIs, so the agent's calls into
+    # distractor APIs (which testgen exercises via TestNegativeWeight*
+    # guardrails, see b46) hit empty container hostnames and timed out instead
+    # of being correctly classified as "agent reached for the distractor". The
+    # distractor list is deterministic (seeded by task_id, see
+    # skills_inference.compute_distractor_skills), so this union doesn't add
+    # nondeterminism. See (b46) for full algorithm and (b54) Issue 10.
+    _early_required = sorted(used_apis) if used_apis else list(infer_required_apis(task.initial_prompt or task.seed_prompt or ""))
+    _early_task_id = task.task_id or (str(task.id) if task.id else "")
+    _distractor_for_services = list(compute_distractor_skills(_early_required, _early_task_id))
+    used_apis_with_distractor: Set[str] = set(used_apis) | set(_distractor_for_services)
     all_services = discover_services(config.environment_dir)
     filtered_services = (
-        [s for s in all_services if s.get("name") in used_apis]
-        if used_apis else all_services
+        [s for s in all_services if s.get("name") in used_apis_with_distractor]
+        if used_apis_with_distractor else all_services
     )
     env_vars: Dict[str, str] = {}
     for svc in filtered_services:
@@ -193,9 +206,8 @@ def write_bundle(
     # `infer_required_apis(prompt)` call returns [] for persona-format tasks
     # whose prompt has no literal API names, which silently wrote
     # `required_skills = []` to data/task.toml — the b31 bug class.
-    required = sorted(used_apis) if used_apis else list(infer_required_apis(prompt_text))
-    task_id_for_distractor = task.task_id or (str(task.id) if task.id else "")
-    distractor = list(compute_distractor_skills(required, task_id_for_distractor))
+    required = _early_required
+    distractor = _distractor_for_services
     required_skills = [f"{name}-connector" for name in required]
     distractor_skills = [f"{name}-connector" for name in distractor]
 
@@ -242,12 +254,12 @@ def write_bundle(
             elif child.is_file():
                 shutil.copy2(child, dst / child.name)
     if config.environment_dir.is_dir():
-        if used_apis:
+        if used_apis_with_distractor:
             for item in config.environment_dir.iterdir():
                 if item.is_dir():
                     if item.name == "skills":
                         _copy_skills_filtered(item, env_out / item.name)
-                    elif item.name in used_apis or item.name in _KEEP_TOP_LEVEL:
+                    elif item.name in used_apis_with_distractor or item.name in _KEEP_TOP_LEVEL:
                         shutil.copytree(item, env_out / item.name, ignore=_bundle_ignore)
                 elif item.name in _KEEP_TOP_LEVEL:
                     shutil.copy2(item, env_out / item.name)

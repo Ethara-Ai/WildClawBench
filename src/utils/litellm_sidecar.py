@@ -45,16 +45,25 @@ def build_litellm_config_yaml(
             "      output_cost_per_token: 0.000015"
         )
     if openai_api_key:
-        # OpenAI Responses API needs BOTH effort AND summary to emit reasoning
-        # text. String form `reasoning_effort: high` returns hidden reasoning;
-        # dict form below requests summary="detailed". Paired with the global
-        # `reasoning_auto_summary: true` setting for the /v1/messages adapter.
+        # The dict `reasoning_effort: {effort, summary}` shape is a Responses
+        # API feature; /v1/chat/completions rejects it as
+        # `invalid_request_error: Unsupported value: 'reasoning_effort' does
+        # not support {...}. Supported values are: 'none','low','medium','high'`.
+        # That is exactly the silent 'Connection error.' the agent saw on
+        # 2026-06-02 (alden-croft run_3 chat.jsonl 4x stopReason=error).
+        # Fix: prefix the upstream model with `openai/responses/` so LiteLLM
+        # bridges every chat-completions call to /v1/responses, where the
+        # dict form is accepted. summary="auto" (NOT "detailed") because per
+        # LiteLLM docs/providers/openai#reasoning-effort, "detailed" requires
+        # OpenAI org verification and 400s otherwise; "auto" works for any
+        # gpt-5.5 caller and still emits a reasoning summary. gpt-5.5 default
+        # effort is "medium"; we keep "high" deliberately for hard tasks.
         model_blocks.append(
             "  - model_name: gpt-5.5\n"
             "    litellm_params:\n"
-            "      model: openai/gpt-5.5\n"
+            "      model: openai/responses/gpt-5.5\n"
             "      api_key: os.environ/OPENAI_API_KEY\n"
-            "      reasoning_effort: {\"effort\": \"high\", \"summary\": \"detailed\"}\n"
+            "      reasoning_effort: {\"effort\": \"high\", \"summary\": \"auto\"}\n"
             "      stream_options:\n"
             "        include_usage: true\n"
             "      input_cost_per_token: 0.000005\n"
@@ -77,7 +86,7 @@ def build_litellm_config_yaml(
     # of erroring. Prefer GPT-5.5 (OpenAI), else the Opus inference profile.
     if openai_api_key:
         image_alias = (
-            "      model: openai/gpt-5.5\n"
+            "      model: openai/responses/gpt-5.5\n"
             "      api_key: os.environ/OPENAI_API_KEY"
         )
     elif bedrock_arn:
@@ -119,9 +128,19 @@ def build_litellm_config_yaml(
         "  drop_params: true\n"
         "  modify_params: true\n"
         "  telemetry: false\n"
-        "  num_retries: 1\n"
-        "  request_timeout: 900\n"
-        "  stream_timeout: 300\n"
+        # User policy m1386 2026-06-02: maximum extension on the LiteLLM-side
+        # timeouts. 86400s = 24h is the largest value httpx will accept as a
+        # positive float without overflow concerns; LiteLLM rejects null/-1/0/
+        # 'infinity' so this is the de-facto 'indefinite' value. num_retries
+        # bumped to 10 for non-openclaw paths (testgen, judge council) which
+        # call LiteLLM directly. CAVEAT: for the openclaw agent backend, the
+        # openclaw npm package has its OWN hardcoded ~22s 'LLM request timed
+        # out' ceiling on /v1/messages and /chat/completions \u2014 raising these
+        # numbers does NOT help openclaw runs hit by that ceiling. Do not
+        # 'normalize' these values back down without rereading b66 and m1386.
+        "  num_retries: 10\n"
+        "  request_timeout: 86400\n"
+        "  stream_timeout: 86400\n"
         "  reasoning_auto_summary: true\n"
         "  cache_control_injection_points:\n"
         "    - location: message\n"

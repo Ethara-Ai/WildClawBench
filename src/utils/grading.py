@@ -387,6 +387,24 @@ def _call_judge_openai(model: str, system: str, user: str) -> tuple[str, dict]:
 
 _ARN_REGION_RE = re.compile(r"^arn:aws:bedrock:([a-z0-9-]+):")
 
+# Bedrock prompt-caching support is per-model. Anthropic Claude on Bedrock
+# accepts `cachePoint` blocks; Kimi (`p532c9fzmeed`) and GLM (`xx5msvho23iq`)
+# do NOT and return HTTP 403 "You invoked an unsupported model or your request
+# did not allow prompt caching." Observed in alden-croft 2026-06-02T20:20:04Z
+# gateway.log: 2-of-3 council members 403'd, quorum fell back to single-judge.
+# Identifiers below are the application-inference-profile IDs known to map to
+# Anthropic Claude family models. Add a new ID here only after empirically
+# confirming the underlying model is Anthropic.
+_CACHE_SUPPORTED_PROFILE_IDS = (
+    "is9bst5tfadh",  # Sonnet 4.6 (council default, single-judge primary)
+    "xv71vnlzm71s",  # Sonnet 4.6 (alternate; IAM-denied per b34 but caches when permitted)
+    "96j5zamnqlci",  # Opus (.env KENSEI_BEDROCK_MODEL_ARN)
+)
+
+
+def _supports_prompt_caching(arn: str) -> bool:
+    return any(pid in (arn or "") for pid in _CACHE_SUPPORTED_PROFILE_IDS)
+
 
 def _bedrock_region_for(arn: str) -> str:
     m = _ARN_REGION_RE.match(arn or "")
@@ -410,16 +428,18 @@ def _call_judge_bedrock(arn: str, system: str, user: str) -> tuple[str, dict]:
         if include_temperature:
             infer["temperature"] = 0
         # Bedrock prompt-caching: a `cachePoint` block marks the preceding
-        # blocks as cacheable for ~5 min (Anthropic models on Bedrock). The
-        # judge system prompt is identical across all 3 council members in a
-        # single grade_with_rubric call AND identical across re-runs of the
-        # same task within 5 min, so caching the system block trims input
-        # billing to ~10% on the 2nd/3rd member call. Same pattern already
-        # used by testgen/bedrock.py:83 and proven there. The evidence (in
-        # `user`) is intentionally NOT marked cacheable — it differs per
-        # member (per-member budgets, Fix 14 b43) and per task.
+        # blocks as cacheable for ~5 min on Anthropic models. Kimi K2.5 and
+        # GLM 5 on Bedrock return 403 "your request did not allow prompt
+        # caching" if cachePoint is present (see _CACHE_SUPPORTED_PROFILE_IDS
+        # above). Gate emission on per-ARN allowlist; preserve b49 caching
+        # win on Sonnet/Opus without re-triggering the 2-of-3 council quorum
+        # collapse observed in alden-croft 2026-06-02T20:20Z gateway.log.
+        if _supports_prompt_caching(arn):
+            system_blocks = [{"text": system}, {"cachePoint": {"type": "default"}}]
+        else:
+            system_blocks = [{"text": system}]
         body = json.dumps({
-            "system": [{"text": system}, {"cachePoint": {"type": "default"}}],
+            "system": system_blocks,
             "messages": [{"role": "user", "content": [{"text": user}]}],
             "inferenceConfig": infer,
         }).encode()
@@ -639,9 +659,13 @@ def _grade_council(
     results = _run_council(members, system, user_for_member)
     surviving = [r for r in results if r.get("ok") and isinstance(r.get("parsed"), dict)]
     if len(surviving) < 2:
+        failed_summary = "; ".join(
+            f"{_short_judge_label(r.get('model', '?'))}={(r.get('error') or 'unknown').strip()[:160]}"
+            for r in results if not r.get("ok")
+        ) or "(no failure detail captured)"
         logger.warning(
-            "Judge council quorum failed: only %d/%d members succeeded; falling back to single-judge",
-            len(surviving), len(members),
+            "Judge council quorum failed: only %d/%d members succeeded; failed: %s; falling back to single-judge",
+            len(surviving), len(members), failed_summary,
         )
         return None
 
@@ -710,8 +734,20 @@ def _grade_council(
             council_usage[k] = council_usage.get(k, 0) + int(u.get(k, 0) or 0)
 
     n = len(rubrics)
+    # Schema contract — score.json scores RUBRIC CRITERIA, not pytest tests.
+    # Canonical keys: criteria_total/_passed/_failed and rubric_weights_percentage
+    # (= overall_score * 100, per user formula m1420). The tests_* keys are
+    # deprecated aliases retained ONLY because run_batch.py:706-714 forwards
+    # these counts into the harbor pytest channel (test_result / SQLite store /
+    # ctrf.json) when no real pytest result exists. Deleting the aliases here
+    # without first migrating that adapter will silently zero the harbor bundle's
+    # test counts. See NOMENCLATURE.md for the channel boundary.
     return {
         "overall_score": round(overall, 4),
+        "rubric_weights_percentage": round(overall * 100.0, 2),
+        "criteria_total": n,
+        "criteria_passed": passed,
+        "criteria_failed": n - passed,
         "tests_total": n,
         "tests_passed": passed,
         "tests_failed": n - passed,
@@ -749,8 +785,10 @@ def grade_with_rubric(
     mode runs the members from `council_members()` in parallel, aggregates by
     per-criterion mean, and falls through to single-judge if quorum (>=2
     surviving members) is not met. Returns a scores dict:
-    {overall_score, tests_total, tests_passed, tests_failed, criteria:[...],
-     judge_model, [judge_council, disagreement_flags]}
+    {overall_score, rubric_weights_percentage,
+     criteria_total, criteria_passed, criteria_failed,
+     tests_total, tests_passed, tests_failed,   # deprecated aliases
+     criteria:[...], judge_model, [judge_council, disagreement_flags]}
     or {overall_score:0.0, error:...} on failure (never raises)."""
     if not rubrics:
         return {"overall_score": 0.0, "error": "no rubric criteria"}
@@ -812,6 +850,10 @@ def grade_with_rubric(
     n = len(rubrics)
     return {
         "overall_score": round(overall, 4),
+        "rubric_weights_percentage": round(overall * 100.0, 2),
+        "criteria_total": n,
+        "criteria_passed": passed,
+        "criteria_failed": n - passed,
         "tests_total": n,
         "tests_passed": passed,
         "tests_failed": n - passed,

@@ -13,6 +13,7 @@ import json
 import logging
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Callable, Iterable, List, Mapping, Optional
 
 from src.utils.jsonl_reader import sanitize_jsonl_message
@@ -217,6 +218,7 @@ def build_trajectory_from_jsonl(
     s3_prefix: str = "",
     s3_region: str = "",
     usage_top_level: Optional[Mapping] = None,
+    workspace_root: Optional[Path] = None,
 ) -> dict:
     """Produce reference-schema delivery JSON from OpenClaw JSONL entries.
 
@@ -253,6 +255,7 @@ def build_trajectory_from_jsonl(
         s3_region=s3_region,
         task_id=task.task_id,
         input_filenames=input_filenames,
+        workspace_root=workspace_root,
     )
 
     messages: List[dict] = []

@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import subprocess
+import tempfile
 import time
 from pathlib import Path
 
@@ -95,6 +96,22 @@ class OpenClawAgent(BaseAgent):
         return "/root/.openclaw/agents/main/sessions/chat.jsonl"
 
     def prepare_grading_transcript(self, task_id: str) -> str:
+        # Snapshot chat.jsonl from the agent container to host BEFORE grading so
+        # the grader reads a frozen byte-stream the agent can no longer mutate.
+        # Without this the agent (which runs as root in its container with rw
+        # access to /root/.openclaw/agents/main/sessions/chat.jsonl) could
+        # append fabricated assistant messages claiming the task is done
+        # between agent_proc.wait() and grade_the_task. See b54 Issue 6.
+        try:
+            host_snap = Path(tempfile.gettempdir()) / f"chat-snap-{task_id}.jsonl"
+            r = subprocess.run(
+                ["docker", "cp", f"{task_id}:{self.transcript_container_path}", str(host_snap)],
+                capture_output=True, text=True, timeout=30,
+            )
+            if r.returncode == 0 and host_snap.exists() and host_snap.stat().st_size > 0:
+                return str(host_snap)
+        except (subprocess.SubprocessError, OSError) as exc:
+            logger.warning("[%s] chat.jsonl host snapshot failed: %s", task_id, exc)
         return self.transcript_container_path
 
     def run_task(self, spec: AgentTaskSpec) -> AgentExecution:
