@@ -1,0 +1,40 @@
+{
+  "input_tokens": 1281222,
+  "output_tokens": 24503,
+  "cache_read_tokens": 752628,
+  "cache_write_tokens": 69094,
+  "total_tokens": 1305725,
+  "request_count": 27,
+  "cost_usd": 1.777875,
+  "sources": {
+    "agent": {
+      "input_tokens": 1100057,
+      "output_tokens": 15448,
+      "cache_read_tokens": 752628,
+      "cache_write_tokens": 69094,
+      "total_tokens": 1115505,
+      "cost_usd": 1.777875,
+      "request_count": 24,
+      "usage_source": "litellm",
+      "elapsed_time": 346.54
+    },
+    "testgen": {
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "total_tokens": 0,
+      "request_count": 0
+    },
+    "judge": {
+      "input_tokens": 181165,
+      "output_tokens": 9055,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "total_tokens": 190220,
+      "request_count": 3
+    }
+  },
+  "usage_source": "litellm",
+  "elapsed_time": 346.54
+}

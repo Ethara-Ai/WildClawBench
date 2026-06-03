@@ -1,0 +1,9 @@
+id,page_id,parent_block_id,type,text,order,created_time,last_edited_time,has_children,checked
+block-b01,page-home,,heading_2,Monthly Budget,0,2025-12-28T10:00:00.000Z,2025-12-28T10:00:00.000Z,false,
+block-b02,page-home,,paragraph,Tracking all recurring and variable expenses. Updated targets in August 2026 to reflect actual spending patterns.,1,2025-12-28T10:01:00.000Z,2026-08-01T09:00:00.000Z,false,
+block-b03,page-home,,heading_2,Kids,2,2025-12-30T14:00:00.000Z,2025-12-30T14:00:00.000Z,false,
+block-b04,page-home,,paragraph,Activities and schedules for Ethan and Lily.,3,2025-12-30T14:01:00.000Z,2025-12-30T14:01:00.000Z,false,
+block-b05,page-home,,heading_2,Gear,4,2026-01-10T11:00:00.000Z,2026-01-10T11:00:00.000Z,false,
+block-b06,page-home,,paragraph,Wishlist and research for outdoor gear.,5,2026-01-10T11:01:00.000Z,2026-01-10T11:01:00.000Z,false,
+block-b07,page-budget-groceries,,paragraph,Went up in Aug. Prices just keep climbing and the kids eat more now.,0,2026-08-01T09:00:00.000Z,2026-08-01T09:00:00.000Z,false,
+block-b08,page-budget-dining,,paragraph,Raised this after the Q4 2025 review showed DoorDash creeping up on off-weeks. Better to budget realistically than pretend.,0,2026-08-01T09:05:00.000Z,2026-08-01T09:05:00.000Z,false,

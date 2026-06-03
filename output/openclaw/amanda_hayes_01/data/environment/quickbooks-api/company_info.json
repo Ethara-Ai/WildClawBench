@@ -1,0 +1,27 @@
+{
+  "CompanyName": "Ridgeline Cloud",
+  "LegalName": "Ridgeline Cloud Solutions Inc.",
+  "CompanyAddr": {
+    "Line1": "215 S State St, Suite 1400",
+    "City": "Salt Lake City",
+    "CountrySubDivisionCode": "UT",
+    "PostalCode": "84111"
+  },
+  "Email": {
+    "Address": "accounting@ridgelinecloud.io"
+  },
+  "PrimaryPhone": {
+    "FreeFormNumber": "(801) 555-9200"
+  },
+  "FiscalYearStartMonth": "January",
+  "Country": "US",
+  "IndustryType": "Technology",
+  "NameValue": [
+    { "Name": "OwnerName", "Value": "Marcus Jeffries" },
+    { "Name": "CFO", "Value": "Danielle Sorenson" }
+  ],
+  "MetaData": {
+    "CreateTime": "2019-06-10T08:00:00-06:00",
+    "LastUpdatedTime": "2026-09-30T14:22:00-06:00"
+  }
+}

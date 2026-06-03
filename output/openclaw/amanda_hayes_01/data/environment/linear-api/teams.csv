@@ -1,0 +1,3 @@
+id,name,key,description,color,createdAt,updatedAt
+team-backend,Backend Platform,BKD,Backend services and API infrastructure team,#5E6AD2,2023-08-15T09:00:00,2026-09-01T10:00:00
+team-frontend,Frontend,FE,Frontend and UI team,#26B5CE,2023-08-15T09:00:00,2026-09-01T10:00:00

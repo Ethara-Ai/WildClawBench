@@ -1,0 +1,6 @@
+Id,DisplayName,GivenName,FamilyName,CompanyName,PrimaryEmailAddr,PrimaryPhone,BillAddr_Line1,BillAddr_City,BillAddr_CountrySubDivisionCode,BillAddr_PostalCode,Balance,Active,Job,Notes
+1,Wasatch Health Systems,,,Wasatch Health Systems,ap@wasatchhealth.org,(801) 555-3100,400 Foothill Dr,Salt Lake City,UT,84112,24500.00,true,false,Enterprise tier - 3yr contract renewed Jan 2026
+2,Bonneville Analytics,,,Bonneville Analytics,billing@bonnevilleanalytics.com,(801) 555-3200,1500 S Main St,Salt Lake City,UT,84115,0.00,true,false,Professional tier - monthly billing
+3,Peak Financial Group,,,Peak Financial Group,accounts@peakfinancial.com,(801) 555-3300,201 S Main St Suite 800,Salt Lake City,UT,84111,8750.00,true,false,Enterprise tier - quarterly invoicing
+4,Uinta Software,,,Uinta Software,ap@uintasoftware.io,(801) 555-3400,2700 N Thanksgiving Way,Lehi,UT,84043,0.00,true,false,Startup tier - annual prepaid
+5,Cache Valley Credit Union,,,Cache Valley Credit Union,vendor@cachevalleycu.org,(435) 555-3500,95 N Main St,Logan,UT,84321,12200.00,true,false,Professional tier - net 45 terms
