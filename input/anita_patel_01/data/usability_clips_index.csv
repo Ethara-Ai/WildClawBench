@@ -1,0 +1,6 @@
+clip_id,participant,timestamp_start,timestamp_end,task,quote_excerpt,severity_tag,file_reference
+CLIP-001,P12,00:03,00:05,login,"Oh, that was quick",low,usability_session_p12.mp4
+CLIP-002,P12,00:14,00:16,refill,I keep getting turned around between the prescription list and the checkout options,high,usability_session_p12.mp4
+CLIP-003,P12,00:18,00:20,refill,Navigation keeps sending me back to the dashboard,critical,usability_session_p12.mp4
+CLIP-004,P12,00:32,00:34,messaging,I wish there was a way to attach my pharmacy card photo,medium,usability_session_p12.mp4
+CLIP-005,P08,00:14,00:16,refill,I keep losing my place between the medication list and pickup,high,usability_session_p08.mp4

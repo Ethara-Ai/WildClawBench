@@ -1,0 +1,33 @@
+Data Quality Notes - PPR-26A Audit Preparation
+Prepared by: Tanya Brooks
+Date: October 15, 2026
+
+Issues Found During Data Review:
+
+1. PPR-Z6A Entry in Notion
+   This is clearly a typo of PPR-26A. The finding references frame
+   11:01 which is a valid sprint4 frame, and it's in the correct
+   database. I recommend treating it as PPR-26A for the audit.
+   Correction: Just change the Z to 2 in the output.
+
+2. Frame 12:88 Orphan
+   This frame exists in the stepper file but is referenced by a
+   Notion page under PPR-26A. Since Raj merged stepper into sprint4,
+   this frame is now valid. Include in audit.
+
+3. Sprint 3 Frame References
+   Some Notion pages still reference sprint3 frames (10:xx). These
+   should be updated to sprint4 equivalents:
+   - 10:05 -> 11:01 (Login)
+   - 10:08 -> 11:14 (Refill)
+   - 10:12 -> 11:27 (Messaging)
+   Use the sprint4 IDs in the audit.
+
+4. Competitor Scope
+   The v4 brief lists 3 competitors but Lila's Sept 22 email
+   adds MediTrack back. Use 4 competitors total.
+
+5. Severity
+   No conflicts between whiteboard and Notion for Login (both
+   say critical). Refill and Messaging have conflicts - use
+   Notion values (high, medium) per Anita's instruction.

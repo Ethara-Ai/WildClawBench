@@ -1,0 +1,24 @@
+event_id,email,display_name,response_status,optional,organizer
+evt-mer-001,lila.fontaine@meridianux.com,Lila Fontaine,accepted,false,true
+evt-mer-001,anita.patel@meridianux.com,Anita Patel,accepted,false,false
+evt-mer-001,raj.mehta@meridianux.com,Raj Mehta,accepted,false,false
+evt-mer-001,tanya.brooks@meridianux.com,Tanya Brooks,accepted,false,false
+evt-mer-001,cass.leung@meridianux.com,Cass Leung,tentative,false,false
+evt-mer-002,lila.fontaine@meridianux.com,Lila Fontaine,declined,false,true
+evt-mer-002,anita.patel@meridianux.com,Anita Patel,declined,false,false
+evt-mer-003,anita.patel@meridianux.com,Anita Patel,accepted,false,true
+evt-mer-003,raj.mehta@meridianux.com,Raj Mehta,accepted,false,false
+evt-mer-003,cass.leung@meridianux.com,Cass Leung,accepted,false,false
+evt-mer-003,tanya.brooks@meridianux.com,Tanya Brooks,accepted,false,false
+evt-mer-004,lila.fontaine@meridianux.com,Lila Fontaine,accepted,false,true
+evt-mer-004,anita.patel@meridianux.com,Anita Patel,accepted,false,false
+evt-mer-005,cass.leung@meridianux.com,Cass Leung,accepted,false,true
+evt-mer-005,anita.patel@meridianux.com,Anita Patel,accepted,true,false
+evt-mer-006,morgan.okafor@meridianux.com,Morgan Okafor,accepted,false,true
+evt-mer-006,anita.patel@meridianux.com,Anita Patel,accepted,false,false
+evt-mer-006,raj.mehta@meridianux.com,Raj Mehta,accepted,false,false
+evt-mer-006,priya.shah@meridianux.com,Priya Shah,tentative,false,false
+evt-mer-007,anita.patel@meridianux.com,Anita Patel,accepted,false,true
+evt-mer-007,tanya.brooks@meridianux.com,Tanya Brooks,accepted,false,false
+evt-mer-007,raj.mehta@meridianux.com,Raj Mehta,accepted,false,false
+evt-mer-007,cass.leung@meridianux.com,Cass Leung,accepted,false,false

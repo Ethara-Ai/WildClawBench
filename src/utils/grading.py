@@ -78,34 +78,70 @@ _JUDGE_MAX_EVIDENCE = _resolve_judge_max_evidence()
 # headroom for JSON envelope + scaffold + base64 overhead.
 _AWS_EDGE_BODY_CAP = 24_000_000
 
-# Pattern → budget. First match wins. The default (None match) returns the flat
-# _resolve_judge_max_evidence() value so single-judge calls behave identically
-# to pre-Fix-14 and OpenAI fallback gets the same conservative cap.
-_MEMBER_EVIDENCE_BUDGETS: tuple[tuple[str, int], ...] = (
-    # Sonnet 4.6 — 1,000,000 ctx, generous but bounded by AWS body cap.
-    ("is9bst5tfadh", 2_400_000),
-    # Kimi K2.5 — 256,000 ctx.
-    ("p532c9fzmeed", 600_000),
-    # GLM 5 — 200,000 ctx.
-    ("xx5msvho23iq", 450_000),
+# Pattern → (budget_chars, max_output_tokens). First match wins. The default
+# (None match) returns the flat _resolve_judge_max_evidence() value plus the
+# global JUDGE_MAX_OUTPUT_TOKENS fallback so single-judge calls behave
+# identically to pre-Fix-14 and OpenAI fallback gets the same conservative cap.
+#
+# 2026-06-04 RE-CALIBRATION — web-verified against AWS official model cards
+# (model-card-moonshot-ai-kimi-k2-5.html, model-card-zai-glm-5.html) and the
+# Bedrock constraint `input_tokens + max_tokens <= context_window` per LiteLLM
+# PR #22479. Replaces the prior trial-and-error tuning against one fixture.
+#
+# Per-model published Bedrock caps:
+#   Sonnet 4.6 (is9bst5tfadh): ctx 1,000,000  max_output 8,192   (Anthropic spec)
+#   Kimi K2.5 (p532c9fzmeed) : ctx   262,144  max_output 16,384  (AWS card)
+#   GLM 5     (xx5msvho23iq) : ctx   202,752  max_output 16,384  (AWS card lists 128K, we cap at 16K — verdicts never need more)
+#
+# Empirical chars-per-token floor measured against alden-croft run_3 fixture
+# (denser content than typical, includes 7 persona MDs + workspace dump):
+#   Sonnet 1.42 cpt, Kimi 2.18 cpt, GLM 1.98 cpt
+#
+# Budget formula: budget_chars = (ctx − max_output − 3000_safety) × cpt_floor,
+# then floor to nearest 25k. Honoring AWS-published max_output (not a single
+# global 4K) is what makes the math fit: Kimi at 256K ctx with 4K max_output
+# would have left 252K tokens of input budget × 2.18 = 549K chars, but Bedrock
+# enforces input + max <= ctx so the budget MUST account for the *actual*
+# maxTokens we send, not a hypothetical smaller one.
+#
+# Don't widen these without re-running probe_judge_only.py against a
+# representative trajectory. tests/test_judge_budget_invariant.py guards
+# the worst-case math against the AWS-published windows.
+_MEMBER_EVIDENCE_BUDGETS: tuple[tuple[str, int, int], ...] = (
+    # Sonnet 4.6 — 1,000,000 ctx, 8192 max_output. cpt 1.375 measured against dispatched user_chars (evidence + ~5000-char scaffold).
+    # (1_000_000 − 8192 − 3000) × 1.375 = 1,357,361 dispatched chars − 5,000 scaffold = 1,352,361 → 1_350_000 evidence budget.
+    ("is9bst5tfadh", 1_350_000, 8192),
+    # Kimi K2.5 — 262,144 ctx, 16384 max_output. cpt 1.29 (probe-empirical
+    # 2026-06-04 against alden-croft evidence: 300k chars → 231,898 tokens,
+    # 250k → 189,473; 350k+ hits the 245,760 input cap = 262,144 − 16,384).
+    # Available input: 262,144 − 16,384 − 3000_safety = 242,760 tok.
+    # 242,760 × 1.29 = 313,160 dispatched chars − 5,000 scaffold − 8,160 margin
+    # = 300,000 evidence budget. Earlier 375,000 overshot Bedrock by ~13k tok.
+    ("p532c9fzmeed",   300_000, 16384),
+    # GLM 5 — 202,752 ctx, 16384 max_output. cpt 1.50 (probe-empirical at 279,989 char payload → 186,369 tokens).
+    # (202_752 − 16384 − 3000) × 1.50 = 274,752 dispatched chars − 5,000 scaffold = 269,752 → 250_000 evidence budget.
+    ("xx5msvho23iq",   250_000, 16384),
 )
+# Fallback for unrecognized models (single-judge OpenAI fallback, custom ARNs).
+# OpenAI auto-caches and has its own server-side enforcement; conservative.
+_DEFAULT_MAX_OUTPUT_TOKENS = 4000
 
 
 def _member_evidence_budget(model: str) -> int | None:
-    """Per-member evidence char budget. Returns None to mean 'use the flat
-    JUDGE_MAX_EVIDENCE default' (so single-judge calls and unknown council
-    members stay on the safe conservative cap)."""
-    # Operator-supplied env override wins outright over the per-member table:
-    # JUDGE_MAX_EVIDENCE applies to everyone, single or council, so the
-    # operator stays in control of the maximum cost any judge call can incur.
     env_raw = os.environ.get("JUDGE_MAX_EVIDENCE")
     if env_raw is not None and env_raw.strip() != "":
         return _resolve_judge_max_evidence()
-    for needle, chars in _MEMBER_EVIDENCE_BUDGETS:
+    for needle, chars, _max_out in _MEMBER_EVIDENCE_BUDGETS:
         if needle in model:
-            # Never exceed the AWS edge body cap, even if the table grows.
             return min(chars, _AWS_EDGE_BODY_CAP)
     return _DEFAULT_JUDGE_MAX_EVIDENCE
+
+
+def _member_max_output_tokens(arn: str) -> int:
+    for needle, _chars, max_out in _MEMBER_EVIDENCE_BUDGETS:
+        if needle in (arn or ""):
+            return max_out
+    return _DEFAULT_MAX_OUTPUT_TOKENS
 
 # LLM council (opt-in). When enabled the rubric is scored by THREE judges in
 # parallel and aggregated by per-criterion mean with stddev-based disagreement
@@ -418,7 +454,7 @@ def _call_judge_bedrock(arn: str, system: str, user: str) -> tuple[str, dict]:
     url = f"https://bedrock-runtime.{reg}.amazonaws.com/model/{mid}/converse-stream"
 
     def _do_post(include_temperature: bool) -> tuple[str, dict]:
-        infer = {"maxTokens": 8000}
+        infer = {"maxTokens": _member_max_output_tokens(arn)}
         if include_temperature:
             infer["temperature"] = 0
         # Bedrock prompt-caching: a `cachePoint` block marks the preceding
@@ -637,6 +673,10 @@ def _run_council(
 
     def _one(model: str) -> dict:
         user = _resolve_user(model)
+        logger.info(
+            "Judge dispatch: model=%s user_chars=%d system_chars=%d",
+            _short_judge_label(model), len(user), len(system),
+        )
         try:
             raw, usage = _call_one_judge(model, system, user)
         except Exception as exc:

@@ -1,0 +1,105 @@
+{
+  "audit_entries": [
+    {
+      "finding_id": "page_PPR26A_gt01",
+      "frame_node_id": "11:01",
+      "frame_name": "Login Redesign SSO",
+      "severity": "critical",
+      "audit_status": "scheduled_for_redesign",
+      "competitor_pattern": {
+        "competitor_name": "MyHealthHub Portal",
+        "pattern_label": "floating action menu"
+      },
+      "evidence": {
+        "artifact_sources": [
+          "competitor_annotations.pdf p1",
+          "usability_session_p12.mp4 at 00:18"
+        ],
+        "figma_comments": [
+          "cmt_PPR26A_001"
+        ],
+        "notion_page": "page_PPR26A_gt01"
+      }
+    },
+    {
+      "finding_id": "page_PPR26A_gt02",
+      "frame_node_id": "11:14",
+      "frame_name": "Refill Flow Step Nav",
+      "severity": "high",
+      "audit_status": "scheduled_for_redesign",
+      "competitor_pattern": {
+        "competitor_name": "CareNav Portal",
+        "pattern_label": "progressive disclosure tabs"
+      },
+      "evidence": {
+        "artifact_sources": [
+          "competitor_annotations.pdf p2"
+        ],
+        "figma_comments": [
+          "cmt_PPR26A_002"
+        ],
+        "notion_page": "page_PPR26A_gt02"
+      }
+    },
+    {
+      "finding_id": "page_PPR26A_gt03",
+      "frame_node_id": "11:27",
+      "frame_name": "Secure Messaging Panel",
+      "severity": "high",
+      "audit_status": "pending_review",
+      "competitor_pattern": {
+        "competitor_name": "WellSync Patient Portal",
+        "pattern_label": "modal confirmation flow"
+      },
+      "evidence": {
+        "artifact_sources": [
+          "competitor_annotations.pdf p3"
+        ],
+        "figma_comments": [
+          "cmt_PPR26A_003"
+        ],
+        "notion_page": "page_PPR26A_gt03"
+      }
+    },
+    {
+      "finding_id": "page_PPRZ6A_ghost",
+      "frame_node_id": "11:01",
+      "frame_name": "Login Redesign SSO",
+      "severity": "high",
+      "audit_status": "scheduled_for_redesign",
+      "competitor_pattern": {
+        "competitor_name": "MyHealthHub Portal",
+        "pattern_label": "persistent breadcrumb nav"
+      },
+      "evidence": {
+        "artifact_sources": [
+          "competitor_annotations.pdf p1"
+        ],
+        "figma_comments": [
+          "cmt_PPR26A_001"
+        ],
+        "notion_page": "page_PPRZ6A_ghost"
+      }
+    },
+    {
+      "finding_id": "page_PPR26A_orphan",
+      "frame_node_id": "12:88",
+      "frame_name": "Orphan Test Frame",
+      "severity": "medium",
+      "audit_status": "pending_review",
+      "competitor_pattern": {
+        "competitor_name": "MediTrack Portal",
+        "pattern_label": "drag-and-drop cards"
+      },
+      "evidence": {
+        "artifact_sources": [],
+        "figma_comments": [],
+        "notion_page": "page_PPR26A_orphan"
+      }
+    }
+  ],
+  "project_code": "PPR-26A",
+  "delivery_deadline": "2026-11-30",
+  "sort_order": "severity DESC, evidence_source_count DESC",
+  "note": "DRAFT - includes PPR-Z6A corrected entry and orphan 12:88 frame"
+}

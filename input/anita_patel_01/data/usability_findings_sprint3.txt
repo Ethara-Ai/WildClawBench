@@ -1,0 +1,28 @@
+Usability Findings - Sprint 3 Cycle
+Project: PPR-26A
+Date: September 2026
+Figma File: FK_PPR26A_sprint3
+
+These findings are from the Sprint 3 usability cycle (September).
+Sprint 4 testing is scheduled for October.
+
+Finding 1: Login Redesign
+Frame: 10:05
+Severity: Medium
+Pattern: Standard form login (no SSO yet)
+Quote: "I expected to use my Google account" - P03
+
+Finding 2: Refill Flow
+Frame: 10:08
+Severity: High
+Pattern: Basic list view (no step navigation yet)
+Quote: "This feels like the old pharmacy website" - P05
+
+Finding 3: Secure Messaging
+Frame: 10:12
+Severity: Low
+Pattern: Email-style interface
+Quote: "Works fine, nothing special" - P01
+
+These are superseded by Sprint 4 findings. Do not include in
+final competitive audit.

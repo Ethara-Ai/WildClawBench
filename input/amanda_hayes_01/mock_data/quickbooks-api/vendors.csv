@@ -1,0 +1,6 @@
+Id,DisplayName,CompanyName,PrimaryEmailAddr,PrimaryPhone,BillAddr_Line1,BillAddr_City,BillAddr_CountrySubDivisionCode,BillAddr_PostalCode,Balance,Active,AcctNum,Vendor1099
+1,Amazon Web Services,Amazon Web Services,aws-billing@amazon.com,(206) 555-4000,PO Box 81226,Seattle,WA,98108,28450.00,true,VND-001,false
+2,Google Cloud Platform,Google Cloud Platform,billing@cloud.google.com,(650) 555-4100,1600 Amphitheatre Pkwy,Mountain View,CA,94043,14200.00,true,VND-002,false
+3,JetBrains,JetBrains,sales@jetbrains.com,(420) 555-4200,Na Hrebenech II 1718/8,Prague,CZ,14000,3840.00,true,VND-003,false
+4,Datadog,Datadog Inc.,billing@datadoghq.com,(866) 555-4300,620 8th Ave,New York,NY,10018,6720.00,true,VND-004,false
+5,WeWork,WeWork Companies LLC,billing@wework.com,(801) 555-4400,222 S Main St,Salt Lake City,UT,84101,15500.00,true,VND-005,false

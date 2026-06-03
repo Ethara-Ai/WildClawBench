@@ -1,0 +1,73 @@
+page_id,property_name,property_type,value
+page_PPR26A_gt01,Project Code,select,PPR-26A
+page_PPR26A_gt01,Severity,select,high
+page_PPR26A_gt01,Status,status,scheduled_for_redesign
+page_PPR26A_gt01,Component Ref,rich_text,11:01
+page_PPR26A_gt01,Sprint,select,Sprint 4
+page_PPR26A_gt01,Competitor,rich_text,MyHealthHub Portal
+page_PPR26A_gt02,Project Code,select,PPR-26A
+page_PPR26A_gt02,Severity,select,high
+page_PPR26A_gt02,Status,status,scheduled_for_redesign
+page_PPR26A_gt02,Component Ref,rich_text,11:14
+page_PPR26A_gt02,Sprint,select,Sprint 4
+page_PPR26A_gt02,Competitor,rich_text,CareNav Portal
+page_PPR26A_gt03,Project Code,select,PPR-26A
+page_PPR26A_gt03,Severity,select,medium
+page_PPR26A_gt03,Status,status,pending_review
+page_PPR26A_gt03,Component Ref,rich_text,11:27
+page_PPR26A_gt03,Sprint,select,Sprint 4
+page_PPR26A_gt03,Competitor,rich_text,WellSync Patient Portal
+page_PPR26A_q1cycle,Project Code,select,PPR-26A
+page_PPR26A_q1cycle,Severity,select,medium
+page_PPR26A_q1cycle,Status,status,rejected
+page_PPR26A_q1cycle,Cycle,select,q1-2026
+page_PPR26A_q1cycle,Component Ref,rich_text,5:11
+page_PPR26A_orphan,Project Code,select,PPR-26A
+page_PPR26A_orphan,Severity,select,high
+page_PPR26A_orphan,Status,status,scheduled_for_redesign
+page_PPR26A_orphan,Component Ref,rich_text,12:88
+page_PPR26A_orphan,Sprint,select,Sprint 4
+page_PPRZ6A_typo,Project Code,select,PPR-Z6A
+page_PPRZ6A_typo,Severity,select,high
+page_PPRZ6A_typo,Status,status,scheduled_for_redesign
+page_PPRZ6A_typo,Component Ref,rich_text,11:01
+page_PPRZ6A_typo,Sprint,select,Sprint 4
+page_filler_001,Topic,select,Token Library
+page_filler_001,Status,status,Done
+page_filler_001,Priority,select,Low
+page_filler_002,Topic,select,Onboarding
+page_filler_002,Status,status,In progress
+page_filler_002,Priority,select,Medium
+page_filler_003,Topic,select,Component Audit
+page_filler_003,Status,status,In progress
+page_filler_003,Priority,select,High
+page_filler_004,Topic,select,Accessibility
+page_filler_004,Status,status,Done
+page_filler_004,Priority,select,Medium
+page_filler_005,Topic,select,Spacing
+page_filler_005,Status,status,Todo
+page_filler_005,Priority,select,Low
+page_filler_006,Topic,select,Navigation
+page_filler_006,Status,status,In progress
+page_filler_006,Priority,select,Medium
+page_filler_007,Topic,select,Iconography
+page_filler_007,Status,status,Done
+page_filler_007,Priority,select,Low
+page_filler_008,Topic,select,Form Validation
+page_filler_008,Status,status,In progress
+page_filler_008,Priority,select,Medium
+page_filler_009,Topic,select,Loading States
+page_filler_009,Status,status,Todo
+page_filler_009,Priority,select,Low
+page_filler_010,Topic,select,Microcopy
+page_filler_010,Status,status,Done
+page_filler_010,Priority,select,Low
+page_filler_011,Topic,select,Illustrations
+page_filler_011,Status,status,In progress
+page_filler_011,Priority,select,Medium
+page_filler_012,Topic,select,Animation
+page_filler_012,Status,status,In progress
+page_filler_012,Priority,select,High
+page_filler_013,Topic,select,Accessibility
+page_filler_013,Status,status,Done
+page_filler_013,Priority,select,High

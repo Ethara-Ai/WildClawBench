@@ -1,0 +1,25 @@
+PPR-26A Sprint 4 Planning Notes
+Date: 2026-07-30
+Facilitator: Anita Patel
+
+Sprint window: August 1, 2026 through October 15, 2026
+Objective: Complete competitive portal audit and file redesign recommendations
+
+Components in scope for Sprint 4:
+  - Login SSO Flow (Figma frame 11:01)
+  - Refill Step Navigation (Figma frame 11:14)
+  - Secure Messaging Thread (Figma frame 11:27)
+
+All three components are active in the working Figma file under project code PPR-26A.
+Any frames created or last modified outside the Aug 1 - Oct 15 window are out of scope.
+Archived frames should be excluded from the audit entirely.
+
+Team assignments:
+  Anita Patel - audit lead, competitor annotation photography, output assembly
+  Raj Mehta - Figma design iterations, stepper exploration (separate branch)
+  Cass Leung - usability sessions, participant recruitment
+  Tanya Brooks - severity review, Notion findings curation
+  Lila Fontaine - stakeholder, design review scheduling
+
+Deliverable: output.json with triangulated findings linking artifacts, API data, and audit observations.
+Review target: TBD by Lila, likely mid-October.

@@ -1,0 +1,8 @@
+comment_id,file_key,frame_node_id,author,message,created_at,resolved
+cmt_PPR26A_001,FK_PPR26A_sprint4,11:01,Raj Mehta,SSO flow looks good but stepper would be cleaner,2026-10-03,no
+cmt_PPR26A_002,FK_PPR26A_sprint4,11:14,Anita Patel,Inline tracker matches CareNav pattern. Keep.,2026-10-06,no
+cmt_PPR26A_003,FK_PPR26A_sprint4,11:27,Tanya Brooks,P15 said help button was broken - check tooltip trigger,2026-10-11,no
+cmt_PPR26A_004,FK_PPR26A_stepper,12:01,Raj Mehta,"This is my stepper exploration, don't use for audit",2026-10-14,no
+cmt_PPR26A_005,FK_PPR26A_sprint4,11:33,Anita Patel,Appointment frame not in audit scope yet,2026-10-12,yes
+cmt_backup_001,FK_PPR26A_sprint3,10:05,Anita Patel,Sprint 3 login frame - archived,2026-09-15,yes
+cmt_backup_002,FK_PPR26A_sprint3,10:08,Raj Mehta,"Old refill flow, superseded by 11:14",2026-09-18,yes

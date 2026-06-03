@@ -1,0 +1,28 @@
+Usability Session Notes - Participant P12
+Facilitator: Cass Leung
+Date: October 9, 2026
+Duration: 45 minutes
+
+Task 1: Login Flow (00:00 - 00:12)
+- P12 completed SSO login without issues
+- No significant hesitation points observed
+
+Task 2: Medication Refill (00:12 - 00:28)
+- P12 struggled to find the refill section
+- At 00:18, P12 stated: "The navigation keeps sending me back to
+  the dashboard when I try to access my prescriptions"
+- Took 3 attempts to locate refill flow
+
+Task 3: Messaging (00:28 - 00:42)
+- P12 found messaging easily from sidebar
+- At 00:32, P12 noted: "I wish there was a way to attach my
+  pharmacy card photo directly in the message"
+
+Key Quote: "The navigation keeps sending me back to the dashboard
+when I try to access my prescriptions" (00:18)
+
+Overall: P12 rated the experience 3/5. Main pain point was
+the refill flow, specifically the navigation loop issue.
+
+Severity Recommendation: Refill navigation = critical,
+Login = medium (smooth), Messaging = low (satisfactory)

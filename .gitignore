@@ -44,3 +44,10 @@ cookies.txt
 output.rar
 output_qwen.rar
 *.rar
+
+# Per-run telemetry written by run.sh tee — local, timestamped, machine-specific.
+logs/
+
+# macOS Finder duplicate-on-copy directories ("foo copy/", "foo copy 2/").
+*\ copy/
+*\ copy\ [0-9]*/

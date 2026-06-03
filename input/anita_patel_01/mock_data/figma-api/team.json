@@ -1,0 +1,28 @@
+{
+  "team": {
+    "id": "team_meridian",
+    "name": "Meridian UX Group"
+  },
+  "me": {
+    "id": "u_001",
+    "handle": "anita.patel",
+    "email": "anita.patel@meridianux.com",
+    "img_url": "https://figma-avatars.example.com/u_001.png"
+  },
+  "users": [
+    {"id": "u_001", "handle": "anita.patel", "email": "anita.patel@meridianux.com", "img_url": "https://figma-avatars.example.com/u_001.png"},
+    {"id": "u_002", "handle": "cass.leung", "email": "cass.leung@meridianux.com", "img_url": "https://figma-avatars.example.com/u_002.png"},
+    {"id": "u_003", "handle": "tanya.brooks", "email": "tanya.brooks@meridianux.com", "img_url": "https://figma-avatars.example.com/u_003.png"},
+    {"id": "u_004", "handle": "raj.mehta", "email": "raj.mehta@meridianux.com", "img_url": "https://figma-avatars.example.com/u_004.png"},
+    {"id": "u_010", "handle": "lila.fontaine", "email": "lila.fontaine@meridianux.com", "img_url": "https://figma-avatars.example.com/u_010.png"},
+    {"id": "u_011", "handle": "morgan.okafor", "email": "morgan.okafor@meridianux.com", "img_url": "https://figma-avatars.example.com/u_011.png"},
+    {"id": "u_012", "handle": "priya.shah", "email": "priya.shah@meridianux.com", "img_url": "https://figma-avatars.example.com/u_012.png"},
+    {"id": "u_013", "handle": "kenji.tanaka", "email": "kenji.tanaka@meridianux.com", "img_url": "https://figma-avatars.example.com/u_013.png"},
+    {"id": "u_014", "handle": "amir.haddad", "email": "amir.haddad@meridianux.com", "img_url": "https://figma-avatars.example.com/u_014.png"},
+    {"id": "u_015", "handle": "lin.chen", "email": "lin.chen@meridianux.com", "img_url": "https://figma-avatars.example.com/u_015.png"},
+    {"id": "u_016", "handle": "sofia.gallego", "email": "sofia.gallego@meridianux.com", "img_url": "https://figma-avatars.example.com/u_016.png"},
+    {"id": "u_017", "handle": "marcus.bell", "email": "marcus.bell@meridianux.com", "img_url": "https://figma-avatars.example.com/u_017.png"},
+    {"id": "u_018", "handle": "noah.weber", "email": "noah.weber@meridianux.com", "img_url": "https://figma-avatars.example.com/u_018.png"},
+    {"id": "u_019", "handle": "yuki.nakamura", "email": "yuki.nakamura@meridianux.com", "img_url": "https://figma-avatars.example.com/u_019.png"}
+  ]
+}

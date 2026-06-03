@@ -1,0 +1,8 @@
+page_id,title,project_code,frame_node_id,severity,audit_status,cycle,parent_database,last_edited
+page_PPR26A_gt01,Login Redesign SSO Finding,PPR-26A,11:01,critical,scheduled_for_redesign,Q3,db_portal_audit,2026-10-16
+page_PPR26A_gt02,Refill Flow Step Nav Finding,PPR-26A,11:14,high,scheduled_for_redesign,Q3,db_portal_audit,2026-10-16
+page_PPR26A_gt03,Secure Messaging Finding,PPR-26A,11:27,high,pending_review,Q3,db_portal_audit,2026-10-16
+page_PPRZ6A_ghost,Login Redesign SSO Duplicate,PPR-Z6A,11:01,high,scheduled_for_redesign,Q3,db_portal_audit,2026-10-16
+page_PPR26A_orphan,Orphan Finding,PPR-26A,12:88,medium,pending_review,Q3,db_portal_audit,2026-10-14
+page_PPR26A_q1_old,Q1 Portal Review,PPR-26A,8:01,medium,completed,Q1,db_portal_audit,2026-04-15
+page_PPR26B_001,Provider Login Redesign,PPR-26B,20:01,high,in_progress,Q3,db_provider_audit,2026-10-12

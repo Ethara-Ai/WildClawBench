@@ -1,0 +1,8 @@
+participant_id,session_date,facilitator,login_rating,refill_rating,messaging_rating,key_pain_point,notable_quote
+P01,2026-10-07,Cass Leung,4,3,4,refill flow,Refill was a bit confusing
+P03,2026-10-07,Cass Leung,5,4,3,messaging lag,Messages take too long to send
+P05,2026-10-08,Tanya Brooks,3,2,4,login MFA,Too many steps to log in
+P08,2026-10-08,Tanya Brooks,4,3,3,refill flow,I couldn't find where to refill
+P10,2026-10-09,Cass Leung,3,4,5,login SSO,SSO button was hidden
+P12,2026-10-09,Cass Leung,4,2,4,refill navigation,Navigation keeps looping back to dashboard
+P15,2026-10-10,Cass Leung,5,3,3,messaging,No way to attach files to messages

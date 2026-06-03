@@ -1,0 +1,6 @@
+id,name,is_private,is_archived,topic,purpose,creator,created,num_members
+CMER_001,proj-ppr26a,false,false,PPR-26A Patient Portal Redesign,Project discussions for PPR-26A sprint 4,UMER_001,1719878400,5
+CMER_002,design-general,false,false,Design team updates,General design discussion and announcements,UMER_001,1704067200,7
+CMER_003,usability-lab,false,false,Usability session coordination,Research scheduling and clip sharing,UMER_002,1709251200,4
+CMER_004,random,false,false,Water cooler,Non-work chat,UMER_006,1704067200,7
+CMER_005,design-reviews,true,false,Review logistics,Scheduling and prep for design reviews,UMER_005,1714521600,5

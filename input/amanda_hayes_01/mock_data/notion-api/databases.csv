@@ -1,0 +1,4 @@
+id,title,parent_page_id,created_time,last_edited_time,created_by,icon,archived
+db-budget,Monthly Budget 2026,page-home,2025-12-28T10:00:00.000Z,2026-09-01T08:30:00.000Z,user-amanda,dollar,false
+db-kids-activities,Kids Activities,page-home,2025-12-30T14:00:00.000Z,2026-09-15T19:00:00.000Z,user-amanda,calendar,false
+db-gear-wishlist,Gear Wishlist,page-home,2026-01-10T11:00:00.000Z,2026-08-20T16:00:00.000Z,user-amanda,mountain,false

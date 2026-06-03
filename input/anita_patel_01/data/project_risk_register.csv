@@ -1,0 +1,7 @@
+risk_id,risk_description,probability,impact,mitigation,owner,status
+R-001,Stepper merge breaks sprint4 frame IDs,medium,high,Raj to verify frame IDs post-merge,Raj Mehta,mitigated
+R-002,Notion severity conflicts with whiteboard,high,medium,Use whiteboard as final authority,Tanya Brooks,accepted
+R-003,PPR-Z6A typo causes duplicate findings,low,medium,Manual review before audit submission,Anita Patel,open
+R-004,Deadline confusion (v3 Nov 30 vs v4 Dec 18),medium,high,Use v4 deadline only,Anita Patel,mitigated
+R-005,Out-of-scope competitors included,medium,high,Cross-reference against v4 scope list,Anita Patel,open
+R-006,P12 quote attributed to wrong timestamp,low,medium,Verify against video recording,Cass Leung,open

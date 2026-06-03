@@ -20,6 +20,22 @@ def build_litellm_config_yaml(
     enable_usage_callback: bool = False,
 ) -> str:
     model_blocks: list[str] = []
+    # `cache_control_injection_points` MUST live inside each model's
+    # `litellm_params:` block, NOT in global `litellm_settings:`. Empirically
+    # verified with the LiteLLM main-stable image (probe_cache.py + GitHub
+    # source litellm/litellm_core_utils/litellm_logging.py:917): the
+    # `anthropic_cache_control_hook` only instantiates when the directive is
+    # in the per-call `non_default_params` payload, which is fed from per-
+    # model params. The global-settings form was accepted by the proxy
+    # (visible in DEBUG logs as `setting litellm.cache_control_injection_points
+    # =[...]`) but never produced cache_read/cache_write > 0 on any request.
+    # Required on every Anthropic-on-Bedrock route. OpenAI routes auto-cache
+    # server-side at >=1024 prompt tokens and do not need the directive.
+    cache_marker = (
+        "      cache_control_injection_points:\n"
+        "        - location: message\n"
+        "          role: system\n"
+    )
     if bedrock_arn:
         model_blocks.append(
             "  - model_name: claude-opus-4.7\n"
@@ -29,7 +45,8 @@ def build_litellm_config_yaml(
             "      thinking: {\"type\": \"adaptive\", \"display\": \"summarized\"}\n"
             "      stream_options:\n"
             "        include_usage: true\n"
-            "      input_cost_per_token: 0.000005\n"
+            + cache_marker
+            + "      input_cost_per_token: 0.000005\n"
             "      output_cost_per_token: 0.000025"
         )
     if bedrock_sonnet_arn:
@@ -41,7 +58,8 @@ def build_litellm_config_yaml(
             "      thinking: {\"type\": \"adaptive\", \"display\": \"summarized\"}\n"
             "      stream_options:\n"
             "        include_usage: true\n"
-            "      input_cost_per_token: 0.000003\n"
+            + cache_marker
+            + "      input_cost_per_token: 0.000003\n"
             "      output_cost_per_token: 0.000015"
         )
     if openai_api_key:
@@ -92,7 +110,8 @@ def build_litellm_config_yaml(
     elif bedrock_arn:
         image_alias = (
             f"      model: bedrock/converse/{bedrock_arn}\n"
-            f"      aws_region_name: {aws_region or 'ap-south-1'}"
+            f"      aws_region_name: {aws_region or 'ap-south-1'}\n"
+            + cache_marker.rstrip("\n")
         )
     else:
         image_alias = ""
@@ -111,15 +130,6 @@ def build_litellm_config_yaml(
         '  callbacks: ["litellm_usage_callback.proxy_handler_instance"]\n'
         if enable_usage_callback else ""
     )
-    # `cache_control_injection_points` makes LiteLLM auto-tag the agent's
-    # system prompt with Anthropic's ephemeral cache_control marker on every
-    # passthrough call. Anthropic-on-Bedrock honors this and trims cached
-    # input tokens to ~10% of fresh price. Without this, openclaw's outbound
-    # body has no cache hint and every call re-bills the full system prompt
-    # (which is large for openclaw: persona + skills + workspace listing).
-    # `location: message` + `role: system` is the documented shape (LiteLLM
-    # docs/docs/proxy/prompt_caching.md). 5-minute TTL applies; same task
-    # within a session and same persona across re-runs both benefit.
     return (
         "model_list:\n"
         + "\n".join(model_blocks)
@@ -135,16 +145,13 @@ def build_litellm_config_yaml(
         # bumped to 10 for non-openclaw paths (testgen, judge council) which
         # call LiteLLM directly. CAVEAT: for the openclaw agent backend, the
         # openclaw npm package has its OWN hardcoded ~22s 'LLM request timed
-        # out' ceiling on /v1/messages and /chat/completions \u2014 raising these
+        # out' ceiling on /v1/messages and /chat/completions — raising these
         # numbers does NOT help openclaw runs hit by that ceiling. Do not
         # 'normalize' these values back down without rereading b66 and m1386.
         "  num_retries: 10\n"
         "  request_timeout: 86400\n"
         "  stream_timeout: 86400\n"
         "  reasoning_auto_summary: true\n"
-        "  cache_control_injection_points:\n"
-        "    - location: message\n"
-        "      role: system\n"
         + callback_line
         + "general_settings:\n"
         "  master_key: os.environ/LITELLM_MASTER_KEY\n"

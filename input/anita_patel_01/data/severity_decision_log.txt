@@ -1,0 +1,21 @@
+PPR-26A Severity Decision Log
+Last Updated: October 17, 2026
+
+Our team rule: When whiteboard and Notion severities conflict,
+we defer to the IN-PERSON discussion (whiteboard) as the
+authoritative source since it reflects team consensus.
+
+UPDATE (Oct 17): Anita clarified that for THIS audit, Notion
+values take precedence because Tanya reviewed full evidence
+before updating. This is an exception to our normal rule.
+
+Current Severities (for audit):
+
+Finding              | Whiteboard | Notion    | For Audit
+---------------------|------------|-----------|----------
+Login Redesign       | Critical   | Critical  | Critical
+Refill Flow          | Critical   | High      | High
+Secure Messaging     | High       | Medium    | Medium
+
+Note: Login severity is Critical in BOTH sources so no conflict
+there. The original whiteboard rating stands.

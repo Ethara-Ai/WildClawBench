@@ -1,0 +1,9 @@
+Lila rescheduled the design review, check my calendar for when and let me know the day. I need the competitive portal audit done before that meeting. Pull the project code from the current brief, not the August one that had five portals, she cut to three after mid-September re-scope. Also check our project board in Linear for the sprint deadline on that project code.
+
+In Figma, find my working file for the portal redesign under that code. Raj branched a copy last week for stepper ideas so you'll see two files, mine's the one since August. Only pull active frames modified August 1 through October 15, skip older or archived.
+
+In Notion, match findings to that project code and confirm each cites an active frame from the Figma set. Wrong frame ID or code even slightly off, drop it. Skip Q1 cycle entries too.
+
+I snapped the three in-scope competitor portals and scribbled notes on the printouts, match those against Figma comments and Notion findings. From Cass's usability recording pull the participant's verbatim quote and timestamp, should corroborate at least one finding and one comment.
+
+Tuesday's retro whiteboard has severity ratings Tanya and I wrote but she updated some in Notion after, where they conflict Notion wins. Save as output.json, each finding: evidence sources (artifact, comment, Notion page), competitor pattern, Notion severity, audit status, linked frame. Sort by severity then evidence count descending. Once saved, post in our proj-ppr26a Slack channel for Lila that the audit's ready and I'll walk through it at the review.

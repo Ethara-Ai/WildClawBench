@@ -1,0 +1,24 @@
+OCR Extract - retro_whiteboard.jpg
+Processed: October 16, 2026
+Confidence: 87%
+
+[TOP SECTION - HEADER]
+"Sprint 4 Retro - PPR-26A"
+"Oct 15"
+
+[LEFT COLUMN - FINDINGS]
+1. "Login Redesign" -> "CRITICAL" (circled, underlined)
+2. "Refill Flow" -> "CRITICAL" (circled)
+3. "Secure Msg" -> "HIGH" (written, not circled)
+
+[RIGHT COLUMN - ACTIONS]
+- "Audit by Fri" -> "Anita"
+- "Stepper done?" -> "Raj"
+- "Update Notion sev" -> "Tanya"
+
+[BOTTOM NOTE]
+"Notion wins if conflict" (small text, partially obscured)
+
+[OCR UNCERTAINTY]
+- Item 3 severity could be "MED" not "HIGH" - handwriting unclear
+- Bottom note confidence only 72%

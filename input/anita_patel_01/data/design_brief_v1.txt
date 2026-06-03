@@ -1,0 +1,27 @@
+Project Brief v1.0 - Patient Portal Enhancement
+Project Code: PPR-24A
+Draft Date: 2026-05-12
+Lead Designer: Anita Patel
+Delivery Deadline: 2026-09-30
+
+Scope Overview:
+Redesign the patient portal login and registration flows. Initial scope
+covers four competitor portals for benchmarking:
+- MediTrack Portal
+- VitalView Portal
+- HealthBridge Connect
+- PatientFirst Online
+
+Sprint Cadence: Bi-weekly, starting June 1
+Figma Workspace: FK_PPR24A_concepts
+Active Frame Range: Frames modified May 15 through August 31
+
+Key Deliverables:
+1. Competitive heuristic evaluation
+2. Wireframe set (low-fidelity)
+3. Stakeholder presentation deck
+
+Severity Classification: All findings rated on 4-point scale (critical, high, medium, low)
+
+Team: Anita Patel, Marcus Webb, Dina Chowdhury
+Approved by: Lila Torres, 2026-05-14

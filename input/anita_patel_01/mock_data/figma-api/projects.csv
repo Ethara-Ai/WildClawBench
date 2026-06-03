@@ -1,0 +1,9 @@
+project_id,team_id,name
+PPR-26A,team_meridian,Patient Portal Redesign
+CXM-24Q3,team_meridian,Customer Experience Mobile
+RPL-25B,team_meridian,Settings & Notifications Refresh
+NAV-25C,team_meridian,Mobile Navigation Patterns
+DSY-26A,team_meridian,Design System Token Library
+OBR-25D,team_meridian,Dashboard Grid Migration
+FNT-26B,team_meridian,Fintech Dashboard Components
+HCR-25A,team_meridian,Healthcare Records Viewer

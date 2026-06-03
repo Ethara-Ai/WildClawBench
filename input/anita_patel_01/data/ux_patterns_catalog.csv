@@ -1,0 +1,9 @@
+pattern_id,pattern_name,source_competitor,applicable_frame,priority,notes
+PAT-001,floating action menu,MyHealthHub Portal,11:01,high,primary nav pattern for login
+PAT-002,progressive disclosure tabs,CareNav Portal,11:14,high,refill flow main interaction
+PAT-003,modal confirmation flow,WellSync Patient Portal,11:27,medium,messaging send confirmation
+PAT-004,drag-and-drop cards,MediTrack Portal,12:01,low,"dashboard layout, provider only"
+PAT-005,sticky nav drawer,HealthBridge Connect,N/A,low,not in scope
+PAT-006,persistent breadcrumb nav,MyHealthHub Portal,10:05,medium,"older frame, deprecated"
+PAT-007,inline refill tracker,CareNav Portal,10:08,medium,v2 frame reference
+PAT-008,contextual help tooltips,WellSync Patient Portal,10:12,low,"hover-only, not contextual"

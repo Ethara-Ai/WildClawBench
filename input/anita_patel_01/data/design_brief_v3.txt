@@ -1,0 +1,29 @@
+Project Brief v3.0 - Patient Portal Redesign
+Project Code: PPR-26A
+Revision Date: 2026-09-02
+Lead Designer: Anita Patel
+Delivery Deadline: 2026-11-30
+
+Scope (updated post-August review):
+Four competitor portals remain in scope after Q2 pruning:
+- MyHealthHub Portal
+- CareNav Portal
+- WellSync Patient Portal
+- MediTrack Portal
+
+Sprint Window: Aug 1 through Oct 15, 2026
+Figma File: FK_PPR26A_sprint3
+
+Key Changes from v2:
+- Removed VitalView Portal from scope
+- Added contextual help tooltip pattern from WellSync
+- Moved deadline from Nov 15 to Nov 30 per Lila's request
+
+Active Frames:
+- 10:05 Login Redesign (SSO Integration)
+- 10:08 Refill Flow (Step Navigation)
+- 10:12 Secure Messaging Panel
+- 10:19 MediTrack Comparison View
+
+Severity: 3-tier (critical, medium, low)
+Team: Anita Patel, Raj Mehta, Cass Leung, Tanya Brooks

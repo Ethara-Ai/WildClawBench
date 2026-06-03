@@ -1,0 +1,23 @@
+Project Charter
+Project Name: Provider Portal Redesign
+Project Code: PPR-26B
+Sponsor: Dr. Kenji Watanabe
+Start Date: 2026-07-01
+Target Completion: 2027-01-15
+
+Objective:
+Redesign the provider-facing portal to improve clinical workflow efficiency.
+NOT to be confused with PPR-26A (patient portal, Anita's team).
+
+Competitor Benchmarks:
+- MediTrack Provider Console
+- CareNav Clinician Dashboard
+- HealthBridge Provider Suite
+
+Design Lead: Marcus Webb
+Figma File: FK_PPR26B_sprint1
+Active Frames: 20:01, 20:14, 20:27, 20:33
+
+Severity Scale: P0 (critical), P1 (high), P2 (medium), P3 (low)
+
+Team: Marcus Webb, Dina Chowdhury, Raj Mehta (shared 20%)

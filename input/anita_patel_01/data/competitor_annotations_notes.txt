@@ -1,0 +1,25 @@
+Competitor Annotation Notes - Anita Patel
+Date: August 14, 2026
+
+Photo 1: MyHealthHub Portal (login screen)
+- Noted: floating action menu for quick access to settings
+- Breadcrumb is present but secondary, not the main pattern
+- Scribbled: "sticky nav drawer would work better for our case"
+
+Photo 2: CareNav Portal (medication refill page)
+- Noted: progressive disclosure tabs for refill steps
+- The inline tracker is there but it's a secondary UI element
+- Scribbled: "tabbed approach cleaner than inline"
+
+Photo 3: WellSync Patient Portal (messaging screen)
+- Noted: modal confirmation flow before sending messages
+- Help tooltips exist but triggered on hover only, not contextual
+- Scribbled: "modal pattern worth exploring for our messaging"
+
+Photo 4: MediTrack Portal (dashboard)
+- Noted: card-based layout with drag-and-drop prioritization
+- Scribbled: "too complex for patient-facing, better for providers"
+
+Photo 5: VitalView Portal (appointment view)
+- Noted: calendar widget with inline booking
+- Scribbled: "nice but out of our current sprint scope"

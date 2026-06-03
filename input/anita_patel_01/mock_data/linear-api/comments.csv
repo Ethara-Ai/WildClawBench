@@ -1,0 +1,8 @@
+id,body,issueId,userId,createdAt,updatedAt
+cmt-101-1,Starting audit compilation. Have Figma comments and Notion findings. Need to integrate competitor annotations and usability session before output assembly.,issue-001,user-anita,2026-10-01T10:00:00,2026-10-01T10:00:00
+cmt-101-2,Tanya pushed severity updates to Notion. Login SSO moved to high. Ready to pull final values for output.json.,issue-001,user-anita,2026-10-09T15:00:00,2026-10-09T15:00:00
+cmt-102-1,P12 session complete. Recording saved. Key friction point at the medication-to-pickup transition in the refill flow.,issue-002,user-cass,2026-09-18T16:00:00,2026-09-18T16:00:00
+cmt-103-1,All three competitor portals photographed and annotated. PDF compiled and uploaded to project data folder.,issue-003,user-anita,2026-09-22T15:00:00,2026-09-22T15:00:00
+cmt-104-1,Reviewed retro whiteboard ratings against competitive data. Updated Login SSO from critical to high in Notion. Other severities unchanged.,issue-004,user-tanya,2026-10-09T14:00:00,2026-10-09T14:00:00
+cmt-105-1,Three stepper variants in progress: linear columns and accordion collapse and tab group. Branched from the sprint4 file to keep main clean.,issue-005,user-raj,2026-10-06T14:00:00,2026-10-06T14:00:00
+cmt-106-1,Moved review from Wednesday to Friday. Calendar updated for everyone.,issue-006,user-lila,2026-10-14T11:00:00,2026-10-14T11:00:00

@@ -1,0 +1,7 @@
+competitor_name,portal_type,pattern_label,pattern_category,in_scope,reviewer,review_date
+MyHealthHub Portal,patient,persistent breadcrumb nav,navigation,yes,Anita Patel,2026-08-12
+CareNav Portal,patient,inline refill tracker,medication,yes,Anita Patel,2026-08-14
+WellSync Patient Portal,patient,contextual help tooltips,support,yes,Anita Patel,2026-08-15
+MediTrack Portal,patient,floating action menu,navigation,yes,Raj Mehta,2026-08-18
+VitalView Portal,patient,progressive disclosure tabs,information,yes,Raj Mehta,2026-08-20
+HealthBridge Connect,provider,sticky sidebar nav,navigation,no,Marcus Webb,2026-08-22

@@ -1,0 +1,20 @@
+DRAFT - Project Scope - PPR-26A - August 2026
+
+This is the pre-re-scope version with all five competitor portals.
+DO NOT USE for current audit. See v4 for updated scope.
+
+Competitor Portals (5):
+1. MyHealthHub Portal
+2. CareNav Portal
+3. WellSync Patient Portal
+4. MediTrack Portal
+5. VitalView Portal
+
+Delivery Deadline: November 15, 2026
+Sprint Window: July 1 through September 30, 2026
+
+Figma Workspace: FK_PPR26A_sprint2
+Frames: 8:01, 8:14, 8:27, 8:33, 8:41
+
+Note from Anita (Aug 29): Lila wants to cut to three portals.
+Waiting on confirmation before updating brief.

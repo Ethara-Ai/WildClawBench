@@ -1,0 +1,32 @@
+transaction_id,account_id,amount,iso_currency_code,date,name,merchant_name,category,pending,payment_channel
+txn_0001,acc_chk_001,4900.00,USD,2026-09-01,RIDGELINE CLOUD INC PAYROLL,RIDGELINE CLOUD INC,Transfer;Payroll,false,other
+txn_0002,acc_chk_001,15.99,USD,2026-09-01,NETFLIX INC,NETFLIX.COM,Service;Subscription,false,online
+txn_0003,acc_chk_001,2450.00,USD,2026-09-02,CHASE HOME MORTGAGE PMT,CHASE MORTGAGE,Payment;Mortgage,false,online
+txn_0004,acc_chk_001,1200.00,USD,2026-09-02,ZELLE TRANSFER CHRISTINE HAYES,ZELLE *C HAYES,Transfer;Internal,false,online
+txn_0005,acc_chk_001,10.99,USD,2026-09-03,SPOTIFY PREMIUM,SPOTIFY USA,Service;Subscription,false,online
+txn_0006,acc_chk_001,400.00,USD,2026-09-03,ZELLE TRANSFER CHILD SUPPORT,ZELLE *C HAYES CS,Transfer;Internal,false,online
+txn_0007,acc_chk_001,13.99,USD,2026-09-05,GOOGLE *YOUTUBE PREMIUM,GOOGLE *YOUTUBE,Service;Subscription,false,online
+txn_0008,acc_chk_001,11.99,USD,2026-09-05,STRAVA INC,STRAVA INC,Service;Subscription,false,online
+txn_0009,acc_chk_001,5.00,USD,2026-09-06,ATLASSIAN TRELLO PREMIUM,ATLASSIAN *TRELLO,Service;Subscription,false,online
+txn_0010,acc_chk_001,47.82,USD,2026-09-07,AMAZON.COM *1A2B3C,AMZN MKTP US *1A2B3C,Shops;Online Marketplace,false,online
+txn_0011,acc_chk_001,120.00,USD,2026-09-08,BONNEVILLE ACADEMY LUNCH,BONNEVILLE ACAD,Service;Education,false,online
+txn_0012,acc_chk_001,96.40,USD,2026-09-09,SMITH'S FOOD AND DRUG 0823,SMITHS #0823,Food and Drink;Groceries,false,in store
+txn_0013,acc_chk_001,140.00,USD,2026-09-10,PROGRESSIVE INSURANCE AUTOPAY,PROGRESSIVE INS,Payment;Insurance,false,online
+txn_0014,acc_chk_001,168.92,USD,2026-09-11,WHOLE FOODS MARKET #10847,WHOLEFDS MKT 10847,Food and Drink;Groceries,false,in store
+txn_0015,acc_chk_001,23.45,USD,2026-09-12,CVS/PHARMACY #04521 SLC,CVS/PHARM #04521,Healthcare;Pharmacy,false,in store
+txn_0016,acc_chk_001,88.30,USD,2026-09-14,DOORDASH*CUBBYS SLC,DD *1847362,Food and Drink;Delivery,false,online
+txn_0017,acc_chk_001,4900.00,USD,2026-09-15,RIDGELINE CLOUD INC PAYROLL,RIDGELINE CLOUD INC,Transfer;Payroll,false,other
+txn_0018,acc_chk_001,80.00,USD,2026-09-16,WASATCH SKI AND BOARD,WASATCH SKI BRD,Shops;Sporting Goods,false,in store
+txn_0019,acc_chk_001,58.30,USD,2026-09-18,MAVERIK #0412 SLC UT,MAV OIL #0412,Travel;Gas Stations,false,in store
+txn_0020,acc_chk_001,32.14,USD,2026-09-19,AMAZON.COM *4D5E6F,AMZN MKTP US *4D5E6F,Shops;Online Marketplace,false,online
+txn_0021,acc_chk_001,142.55,USD,2026-09-22,WHOLE FOODS MARKET #10847,WHOLEFDS MKT 10847,Food and Drink;Groceries,false,in store
+txn_0022,acc_chk_001,85.00,USD,2026-09-24,VERIZON WIRELESS AUTOPAY,VZWRLSS *AUTOPAY,Service;Telecommunication,false,online
+txn_0023,acc_chk_001,54.67,USD,2026-09-25,TARGET T-1287 SLC,TARGET 00012870,Shops;General Merchandise,false,in store
+txn_0024,acc_chk_001,245.00,USD,2026-09-26,ROCKY MOUNTAIN POWER,ROCKY MTN PWR,Service;Utilities,false,online
+txn_0025,acc_chk_001,520.00,USD,2026-09-28,MOUNTAIN AMERICA CU AUTO,MTN AMERICA CU,Payment;Loan,false,online
+txn_0026,acc_chk_001,35.00,USD,2026-09-29,BONNEVILLE ACADEMY PTA,BONNEVILLE ACAD PTA,Service;Education,false,online
+txn_0027,acc_chk_001,200.00,USD,2026-09-30,SUGARHOUSE COUNSELING CTR,SUGARHSE COUNSELING,Healthcare;Mental Health,false,online
+txn_0028,acc_chk_001,142.55,USD,2026-09-22,WHOLE FOODS MARKET #10847,WHOLEFDS MKT 10847,Food and Drink;Groceries,true,in store
+txn_0029,acc_chk_001,29.15,USD,2026-09-19,VENMO *KEVIN PARK,VENMO,Transfer;Credit,false,other
+txn_0030,acc_chk_001,12.00,USD,2026-09-15,MONTHLY SERVICE FEE,,Bank Fees;Fee,false,other
+txn_0031,acc_chk_001,6.80,USD,2026-09-17,BLUE COPPER COFFEE SLC,BLUE COPPER COFFEE,Food and Drink;Coffee Shop,false,in store

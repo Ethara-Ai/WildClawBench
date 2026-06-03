@@ -1,0 +1,30 @@
+Competitive UX Audit - Q2 2026
+Project: PPR-26A (Patient Portal Redesign)
+Auditor: Anita Patel
+Cycle: Q2 (April - June 2026)
+
+Summary:
+Reviewed five competitor portals against 12 heuristic criteria.
+
+Key Findings:
+1. Login Redesign - Severity: CRITICAL
+   MediTrack's SSO integration is the gold standard. Our current
+   implementation has 3 extra clicks compared to MediTrack.
+   Frame: 8:01 (Sprint 2 workspace)
+
+2. Refill Flow - Severity: HIGH
+   VitalView's step wizard is the cleanest implementation.
+   CareNav's inline tracker is functional but dated.
+   Frame: 8:14 (Sprint 2 workspace)
+
+3. Messaging - Severity: LOW
+   No competitor has a standout messaging pattern. Deprioritize.
+   Frame: 8:27 (Sprint 2 workspace)
+
+Recommendation: Focus Q3 effort on login and refill. Messaging
+can wait until Q4 or Q1 2027.
+
+Next Steps:
+- Schedule usability sessions for July
+- Update Figma with Q2 findings
+- Present to Lila week of July 7

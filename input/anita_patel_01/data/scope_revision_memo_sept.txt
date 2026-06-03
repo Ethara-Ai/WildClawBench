@@ -1,0 +1,23 @@
+MEMO: Scope Revision - PPR-26A
+Date: September 18, 2026
+From: Lila Torres
+To: Anita Patel, Design Team
+
+Following Friday's stakeholder sync, we're cutting scope to TWO competitor
+portals effective immediately:
+
+KEEP:
+- MyHealthHub Portal (breadcrumb navigation)
+- CareNav Portal (refill tracking)
+
+CUT:
+- WellSync Patient Portal (deprioritized, revisit Q1 2027)
+- MediTrack Portal (already removed in v2)
+- VitalView Portal (removed in v2)
+
+Updated deadline: December 1, 2026 (moved from November 30).
+
+Raj, please archive any stepper frames related to WellSync.
+Anita, update Notion findings accordingly.
+
+- Lila

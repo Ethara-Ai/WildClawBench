@@ -1,0 +1,6 @@
+competitor,login_pattern,refill_pattern,messaging_pattern,overall_score,recommendation
+MyHealthHub Portal,modal SSO popup,breadcrumb refill flow,in-app chat widget,78,adopt login pattern
+CareNav Portal,standard form login,progressive disclosure tabs,email notification,82,adopt refill pattern
+WellSync Patient Portal,biometric auth prompt,inline refill tracker,contextual help overlay,71,adopt messaging pattern
+MediTrack Portal,SSO with MFA,card-based refill queue,secure messaging portal,85,strong overall
+VitalView Portal,passwordless magic link,step wizard refill,no messaging,65,skip

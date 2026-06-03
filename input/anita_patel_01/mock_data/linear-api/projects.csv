@@ -1,0 +1,4 @@
+id,name,description,state,leadId,teamIds,startDate,targetDate,createdAt,updatedAt
+PROJ-PPR26A,PPR-26A Patient Portal Redesign,Competitive portal audit and UX redesign for Login SSO and Refill Step Nav and Secure Messaging flows. Sprint 4 covers the triangulated audit output and stakeholder review.,started,user-anita,team-portal-ux,2026-08-01,2026-12-18,2026-07-15T10:00:00,2026-10-10T14:00:00
+PROJ-DSY26A,DSY-26A Design System Refresh,Quarterly design system token and component audit.,started,user-morgan,team-design-sys,2026-07-01,2026-09-30,2026-06-20T10:00:00,2026-09-28T14:00:00
+PROJ-OBR25D,Onboarding Flow Redesign,Redesign of new user onboarding experience with improved empty states.,completed,user-raj,team-portal-ux,2026-03-01,2026-06-30,2026-02-15T10:00:00,2026-06-28T14:00:00

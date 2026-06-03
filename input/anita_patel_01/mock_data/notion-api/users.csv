@@ -1,0 +1,15 @@
+id,name,email,avatar_url,type,bot,owner_workspace,created_time
+u_001,Anita Patel,anita.patel@meridianux.com,https://avatars.example.com/u_001.png,person,false,ws_meridian_ux,2026-01-15T09:00:00.000Z
+u_002,Cass Leung,cass.leung@meridianux.com,https://avatars.example.com/u_002.png,person,false,ws_meridian_ux,2026-01-20T10:30:00.000Z
+u_003,Tanya Brooks,tanya.brooks@meridianux.com,https://avatars.example.com/u_003.png,person,false,ws_meridian_ux,2026-02-01T11:00:00.000Z
+u_004,Raj Mehta,raj.mehta@meridianux.com,https://avatars.example.com/u_004.png,person,false,ws_meridian_ux,2026-02-10T14:20:00.000Z
+u_010,Lila Fontaine,lila.fontaine@meridianux.com,https://avatars.example.com/u_010.png,person,false,ws_meridian_ux,2026-01-18T09:15:00.000Z
+u_011,Morgan Okafor,morgan.okafor@meridianux.com,https://avatars.example.com/u_011.png,person,false,ws_meridian_ux,2026-03-05T10:00:00.000Z
+u_012,Priya Shah,priya.shah@meridianux.com,https://avatars.example.com/u_012.png,person,false,ws_meridian_ux,2026-03-12T11:30:00.000Z
+u_013,Kenji Tanaka,kenji.tanaka@meridianux.com,https://avatars.example.com/u_013.png,person,false,ws_meridian_ux,2026-04-01T09:45:00.000Z
+u_014,Amir Haddad,amir.haddad@meridianux.com,https://avatars.example.com/u_014.png,person,false,ws_meridian_ux,2026-04-15T14:00:00.000Z
+u_015,Lin Chen,lin.chen@meridianux.com,https://avatars.example.com/u_015.png,person,false,ws_meridian_ux,2026-05-01T10:30:00.000Z
+u_016,Sofia Gallego,sofia.gallego@meridianux.com,https://avatars.example.com/u_016.png,person,false,ws_meridian_ux,2026-03-20T09:00:00.000Z
+u_017,Marcus Bell,marcus.bell@meridianux.com,https://avatars.example.com/u_017.png,person,false,ws_meridian_ux,2026-04-08T11:00:00.000Z
+u_018,Noah Weber,noah.weber@meridianux.com,https://avatars.example.com/u_018.png,person,false,ws_meridian_ux,2026-05-15T09:30:00.000Z
+u_019,Yuki Nakamura,yuki.nakamura@meridianux.com,https://avatars.example.com/u_019.png,person,false,ws_meridian_ux,2026-03-25T14:15:00.000Z

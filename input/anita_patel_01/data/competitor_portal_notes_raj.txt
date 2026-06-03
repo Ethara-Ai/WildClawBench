@@ -1,0 +1,30 @@
+Raj's Competitor Notes - Stepper Research
+Date: October 8, 2026
+
+Looking at stepper patterns across portals for my branched file
+(FK_PPR26A_stepper).
+
+MyHealthHub: Their stepper uses a vertical accordion. Each step
+expands inline. No breadcrumb visible during the flow. The
+breadcrumb nav Anita noted is only on the main dashboard, not
+in any transaction flow.
+
+CareNav: Classic horizontal stepper with numbered circles. The
+"inline refill tracker" is actually a progress bar, not a stepper.
+I'd call it a progress indicator pattern, not an inline tracker.
+
+WellSync: No stepper at all. They use a single long-form page
+with section anchors. The "contextual help tooltips" are just
+standard HTML title attributes, nothing special.
+
+MediTrack: Best stepper implementation. Vertical with sub-steps
+and validation at each stage. This is what I'm modeling my
+frames 12:01, 12:14, 12:27 after.
+
+Recommendation: We should adopt MediTrack's stepper pattern for
+the refill flow. It's more robust than CareNav's approach.
+
+Frame refs in my file:
+- 12:01 Stepper Login Concept
+- 12:14 Stepper Refill Concept
+- 12:27 Stepper Messaging Concept

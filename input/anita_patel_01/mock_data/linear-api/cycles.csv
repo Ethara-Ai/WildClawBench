@@ -1,0 +1,6 @@
+id,name,number,teamId,startsAt,endsAt,completedAt,createdAt,updatedAt
+cycle-ppr-1,Sprint 1,1,team-portal-ux,2026-05-04,2026-05-17,2026-05-17T17:00:00,2026-04-28T09:00:00,2026-05-17T17:00:00
+cycle-ppr-2,Sprint 2,2,team-portal-ux,2026-05-18,2026-06-14,2026-06-14T17:00:00,2026-05-12T09:00:00,2026-06-14T17:00:00
+cycle-ppr-3,Sprint 3,3,team-portal-ux,2026-06-15,2026-07-31,2026-07-31T17:00:00,2026-06-08T09:00:00,2026-07-31T17:00:00
+cycle-ppr-4,Sprint 4,4,team-portal-ux,2026-08-01,2026-10-15,,2026-07-25T09:00:00,2026-10-10T10:00:00
+cycle-dsy-1,Q3 Token Audit,1,team-design-sys,2026-07-01,2026-09-30,2026-09-30T17:00:00,2026-06-25T09:00:00,2026-09-30T17:00:00

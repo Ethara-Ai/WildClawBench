@@ -1,0 +1,13 @@
+Id,Name,AccountType,AccountSubType,CurrentBalance,Active,Classification,Description
+1,Operating Revenue,Income,SalesOfProductIncome,2847500.00,true,Revenue,SaaS platform subscription revenue
+2,Professional Services Revenue,Income,ServiceFeeIncome,485200.00,true,Revenue,Consulting and implementation services
+3,Payroll Expense,Expense,PayrollExpenses,1285400.00,true,Expense,Employee salaries and wages
+4,Cloud Infrastructure,Expense,OtherBusinessExpenses,342800.00,true,Expense,AWS and GCP hosting costs
+5,Office Lease,Expense,RentOrLeaseOfBuildings,186000.00,true,Expense,Downtown SLC office lease
+6,Software Subscriptions,Expense,OtherBusinessExpenses,67450.00,true,Expense,Internal tooling and SaaS subscriptions
+7,Travel & Entertainment,Expense,Travel,43280.00,true,Expense,Employee travel and client entertainment
+8,Business Checking,Bank,Checking,524890.33,true,Asset,Primary operating account
+9,Accounts Receivable,Accounts Receivable,AccountsReceivable,312650.00,true,Asset,Outstanding client invoices
+10,Accounts Payable,Accounts Payable,AccountsPayable,89420.00,true,Liability,Vendor and contractor payables
+11,Equipment & Hardware,Expense,EquipmentRental,28900.00,true,Expense,Laptops monitors and peripherals
+12,Retained Earnings,Equity,RetainedEarnings,1456200.00,true,Equity,Accumulated net income

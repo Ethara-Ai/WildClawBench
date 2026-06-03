@@ -1,0 +1,11 @@
+step,description,status,assigned_to,notes,blocker
+1,Extract project code from brief,complete,Anita,PPR-26A from v4,
+2,Extract deadline from brief,complete,Anita,"Nov 30 from v3, Dec 18 from v4. Using Nov 30.",
+3,Identify active Figma file,complete,Anita,"FK_PPR26A_sprint4 (post Raj merge, includes stepper)",
+4,Pull active frames,complete,Anita,"6 frames: 11:01, 11:14, 11:27, 12:01, 12:14, 12:27",
+5,Match Notion findings,in progress,Anita,5 findings match including PPR-Z6A correction,
+6,Cross-ref competitor annotations,pending,Anita,,Need to check which photos match
+7,Extract usability quote,complete,Cass,"P12 at 00:18, refill navigation quote",
+8,Resolve severity conflicts,complete,Tanya,"No conflicts, both say critical for Login",
+9,Build output.json,pending,Anita,,Steps 5-6 must complete first
+10,Send Lila notification,pending,Anita,,Auto-send after json saved

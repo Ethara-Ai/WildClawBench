@@ -1,0 +1,27 @@
+Design Review Agenda - Friday October 18, 2026
+Project: PPR-26A Patient Portal Redesign
+Facilitator: Lila Torres
+
+1. Competitive Portal Audit Walkthrough (Anita) - 20 min
+   - 5 findings across 3 severity levels
+   - Evidence chain: 6 Figma frames, 5 Notion pages, 
+     3 competitor annotations, 1 usability clip
+   - Output format: output.json
+
+2. Stepper Pattern Proposal (Raj) - 10 min
+   - Merged stepper frames in sprint4 file
+   - MediTrack-inspired approach
+
+3. Severity Calibration Discussion (Tanya) - 10 min
+   - Login: Critical (whiteboard + Notion agree)
+   - Refill: Critical vs High (whiteboard vs Notion)
+   - Messaging: High vs Medium (whiteboard vs Notion)
+
+4. Next Steps and Sprint 5 Planning - 10 min
+
+Pre-Read:
+- output.json (in project root)
+- design_brief_v4.pdf
+- competitor_annotations.pdf
+
+Attendees: Anita, Raj, Tanya, Cass, Lila, Dr. Watanabe (dial-in)

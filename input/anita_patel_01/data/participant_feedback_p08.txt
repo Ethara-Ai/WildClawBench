@@ -1,0 +1,24 @@
+Usability Session - Participant P08
+Facilitator: Tanya Brooks
+Date: October 8, 2026
+
+P08 is a frequent portal user (2-3 times per week).
+
+Key Observations:
+- Login: Smooth, no issues with SSO
+- Refill: P08 took 4 attempts to complete a refill
+- Messaging: Found the interface acceptable
+
+Verbatim Quote at 00:14:
+"I keep losing my place when I switch between the medication
+list and the pickup options"
+
+Wait - correction. That was P12's quote, not P08's. My notes got
+mixed up. P08's actual quote was:
+"Every time I click refill it takes me to a different page and
+I have to start over"
+
+[NOTE TO SELF: Double-check video timestamps before finalizing.
+I think the P12 quote was at 00:18, not 00:14.]
+
+Severity: P08 rated refill as their biggest pain point.

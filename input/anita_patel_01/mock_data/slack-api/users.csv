@@ -1,0 +1,8 @@
+id,name,real_name,email,is_admin,is_bot,tz,status_text,presence
+UMER_001,anita.patel,Anita Patel,anita.patel@meridianux.com,true,false,America/New_York,wrapping portal audit,active
+UMER_002,cass.leung,Cass Leung,cass.leung@meridianux.com,false,false,America/New_York,usability clips uploaded,active
+UMER_003,tanya.brooks,Tanya Brooks,tanya.brooks@meridianux.com,false,false,America/New_York,severity review done,active
+UMER_004,raj.mehta,Raj Mehta,raj.mehta@meridianux.com,false,false,America/New_York,stepper explorations,active
+UMER_005,lila.fontaine,Lila Fontaine,lila.fontaine@meridianux.com,false,false,America/New_York,,active
+UMER_006,morgan.okafor,Morgan Okafor,morgan.okafor@meridianux.com,false,false,America/New_York,,active
+UMER_007,priya.shah,Priya Shah,priya.shah@meridianux.com,false,false,America/New_York,,away

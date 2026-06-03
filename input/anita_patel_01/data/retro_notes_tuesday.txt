@@ -1,0 +1,23 @@
+Sprint 4 Retrospective - Tuesday October 15, 2026
+Whiteboard Notes (transcribed by Tanya Brooks)
+
+SEVERITY RATINGS (agreed in room):
+
+| Finding            | Severity  | Agreed By        |
+|--------------------|-----------|------------------|
+| Login Redesign     | Critical  | Anita, Tanya     |
+| Refill Flow        | Critical  | Anita, Tanya     |
+| Secure Messaging   | High      | Anita, Tanya     |
+
+Action Items:
+1. Anita to compile competitive audit by end of week
+2. Raj to finalize stepper explorations
+3. Tanya to update Notion with retro outcomes
+4. Cass to upload remaining session recordings
+
+Notes:
+- Tanya will update severities in Notion if she disagrees after
+  reviewing the full evidence. Whiteboard was a quick consensus.
+- Lila moved design review to Friday (was Thursday).
+- PPR-26B team asked if we could share our competitor data.
+  Anita to check with Lila first.

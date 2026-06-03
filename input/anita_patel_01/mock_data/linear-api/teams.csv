@@ -1,0 +1,3 @@
+id,name,key,description,color,createdAt,updatedAt
+team-portal-ux,Portal UX,PPR,UX team for the patient portal redesign project,#5E6AD2,2025-06-01T09:00:00,2026-10-01T10:00:00
+team-design-sys,Design Systems,DSY,Design token and component library maintenance,#26B5CE,2025-06-01T09:00:00,2026-09-15T10:00:00

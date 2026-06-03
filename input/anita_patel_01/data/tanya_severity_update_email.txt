@@ -1,0 +1,20 @@
+From: Tanya Brooks <tanya.brooks@meridianux.com>
+To: Anita Patel <anita.patel@meridianux.com>
+Date: 2026-10-09 11:42 AM
+Subject: Re: Severity ratings from Tuesday retro
+
+Hey Anita,
+
+Following up on the retro board from Tuesday. I went through the whiteboard ratings and updated a few in Notion where I felt we over-indexed during the live discussion.
+
+The main change: Login SSO (11:01) was marked "critical" on the whiteboard but after reviewing the competitive data and Cass's session notes, I moved it to "high" in Notion. The SSO redirect issue is real but the breadcrumb pattern from MyHealthHub gives us a clear remediation path, so critical felt too strong.
+
+Refill Step Nav (11:14) stays at "high" in both places, no conflict there.
+
+Messaging (11:27) stays at "medium" in both places too.
+
+For anything where the whiteboard and Notion disagree, just go with what's in Notion since that's the version I reviewed more carefully.
+
+Let me know if you want to walk through the reasoning on any of these before the review.
+
+Tanya

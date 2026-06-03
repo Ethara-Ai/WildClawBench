@@ -1,0 +1,19 @@
+PPR-26A Project Timeline (as of Sept 15, 2026)
+
+Milestone 1: Competitive Research      Jul 1 - Aug 15    COMPLETE
+Milestone 2: Wireframe Iteration       Aug 16 - Sep 30   COMPLETE
+Milestone 3: Usability Testing         Oct 1 - Oct 31    IN PROGRESS
+Milestone 4: Design Review             Nov 1 - Nov 15    UPCOMING
+Milestone 5: Final Handoff             Nov 16 - Nov 30   UPCOMING
+
+Deadline: November 30, 2026
+
+Key Dates:
+- Aug 29: Scope cut from 5 to 4 portals (removed VitalView)
+- Sep 18: Further cut to 3 portals (removed MediTrack)
+- Oct 7: Usability sessions begin (P01 through P15)
+- Oct 22: Retro with severity ratings
+- Nov 1: Design review with stakeholders
+
+Risk: Raj's stepper exploration may delay Milestone 4 if not wrapped
+by Oct 20. Anita to sync with Raj by Oct 15.
