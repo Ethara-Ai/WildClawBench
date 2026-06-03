@@ -1,0 +1,6 @@
+comment_id,videoId,channelId,parentId,authorDisplayName,authorChannelId,textDisplay,likeCount,publishedAt,updatedAt,moderationStatus
+,yt_hadley_week14_lecture,,,Haruki_T,,For Problem 5 to confirm: two-sided test AND p-value is P(D given H0). Got it.,6,2026-05-26T23:08:00Z,,published
+,yt_hadley_week14_lecture,,yc_matt_001,DrHadley_RM305,,Reply to Haruki_T: Watch the recording around the 1h23m mark - I cover this in detail there.,11,2026-05-26T23:14:00Z,,published
+,yt_hadley_week14_lecture,,,Brianna_L,,Wait the PDF said one-tailed. Are we sure?,3,2026-05-27T01:20:00Z,,published
+,yt_hadley_week14_lecture,,yc_matt_003,DrHadley_RM305,,Reply to Brianna_L: Check the errata announcement on Classroom.,9,2026-05-27T02:00:00Z,,published
+,yt_hadley_week14_lecture,,,TA_Marcus_RM305,,"Office hours follow-up for everyone confused on Problem 3: prof clarified the sample size stays n=30 in the actual test formula. The n=36 from the errata is only for descriptive statistics. Hope that helps clear it up.",18,2026-05-27T14:30:00Z,,published
