@@ -1,0 +1,3 @@
+id,summary,description,time_zone,access_role,primary,color_id
+alden.croft.me@gmail.com,Alden Croft,Primary calendar,America/New_York,owner,true,1
+en.usa#holiday@group.v.calendar.google.com,Holidays in United States,US public holidays,America/New_York,reader,false,8

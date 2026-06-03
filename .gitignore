@@ -31,10 +31,6 @@ _workspace/
 workspace/
 script/
 tools/
-output/
-output_sum/
-output_qwen/
-output*/
 .cache/
 .hfd/
 hfd.sh
