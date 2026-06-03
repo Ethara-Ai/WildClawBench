@@ -1,0 +1,4 @@
+id,url,name,path_lower,visibility,file_id
+sl_panel_oct26,https://www.dropbox.com/scl/fi/abc123/lab_panel_oct26.pdf,Lab Panel Report - 2026-09-28.pdf,/pen bay patient documents/lab panel report - 2026-09-28.pdf,team_only,id:dbx_panel_oct26
+sl_prep,https://www.dropbox.com/scl/fi/def456/phleb_prep.pdf,Phlebotomy Prep Instructions.pdf,/pen bay patient documents/phlebotomy prep instructions.pdf,team_only,id:dbx_prep_instructions
+sl_billing_oct26,https://www.dropbox.com/scl/fi/ghi789/billing_oct26.pdf,Account Statement - October 2026.pdf,/pen bay patient documents/account statement - october 2026.pdf,team_only,id:dbx_billing_statement_oct26

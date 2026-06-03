@@ -1,0 +1,3 @@
+id,customer,amount,currency,status,paid,refunded,amount_refunded,description,payment_intent,created
+ch_apr_croft,cus_alden_croft_2024,7500,usd,succeeded,true,false,0,Pen Bay Therapeutic Phlebotomy April 2026 visit,pi_apr_croft,1745347200
+ch_jul_croft,cus_alden_croft_2024,7500,usd,succeeded,true,false,0,Pen Bay Therapeutic Phlebotomy July 2026 visit,pi_jul_croft,1753171200

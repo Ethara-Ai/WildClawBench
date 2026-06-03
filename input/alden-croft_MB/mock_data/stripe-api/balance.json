@@ -1,0 +1,13 @@
+{
+  "object": "balance",
+  "livemode": false,
+  "available": [
+    {"amount": 0, "currency": "usd", "source_types": {"card": 0}}
+  ],
+  "pending": [
+    {"amount": 0, "currency": "usd", "source_types": {"card": 0}}
+  ],
+  "connect_reserved": [
+    {"amount": 0, "currency": "usd"}
+  ]
+}

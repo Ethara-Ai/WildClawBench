@@ -269,9 +269,11 @@ def inject_api_connectors(
         capture_output=True, text=True,
     )
     injected: list[str] = []
+    missing_sources: list[str] = []
     for api in required_apis:
         connector = env_root / "skills" / f"{api}-connector"
         if not connector.is_dir():
+            missing_sources.append(api)
             continue
         dest = f"{openclaw_skills_root}/{api}-connector"
         subprocess.run(
@@ -290,6 +292,11 @@ def inject_api_connectors(
             logger.warning("[%s] Failed to inject connector %s: %s", task_id, api, r.stderr.strip())
             continue
         injected.append(api)
+    if missing_sources:
+        logger.warning(
+            "[%s] Connector source missing for required API(s) (no env_dir/skills/<api>-connector): %s",
+            task_id, missing_sources,
+        )
     # Non-connector utility skills (pdf-extract, audio-extract, video-frames,
     # self-improving-agent-*) ship in environment/skills/ alongside the 101
     # <api>-connector dirs. They are NOT keyed by required_apis. Without
@@ -323,14 +330,20 @@ def inject_api_connectors(
             utility_injected.append(entry.name)
     api_doc = env_root / "API_DOCUMENTATION.md"
     if api_doc.is_file():
-        subprocess.run(
+        r = subprocess.run(
             ["docker", "cp", str(api_doc), f"{task_id}:/root/API_DOCUMENTATION.md"],
             capture_output=True, text=True,
         )
+        if r.returncode == 0:
+            logger.info("[%s] Injected API_DOCUMENTATION.md → /root/API_DOCUMENTATION.md", task_id)
+        else:
+            logger.warning("[%s] Failed to inject API_DOCUMENTATION.md: %s", task_id, r.stderr.strip())
+    else:
+        logger.info("[%s] No API_DOCUMENTATION.md at %s (skipped)", task_id, api_doc)
     if injected:
-        logger.info("[%s] Injected API connectors: %s", task_id, ",".join(injected))
+        logger.info("[%s] Injected API connectors (%d): %s", task_id, len(injected), ",".join(injected))
     if utility_injected:
-        logger.info("[%s] Injected utility skills: %s", task_id, ",".join(utility_injected))
+        logger.info("[%s] Injected utility skills (%d): %s", task_id, len(utility_injected), ",".join(utility_injected))
 
 
 def _parse_service_toml(path: Path) -> dict:
@@ -621,15 +634,15 @@ def collect_output_from_container(
 
     Collection strategy:
       0. Sweep deliverable-shaped files an agent left at /root/ (top-level)
-         into /tmp_workspace/. Agents frequently default to /root as cwd and
-         write KM_diff.csv etc. there instead of /root/workspace; without
-         this rescue the grader sees an empty workspace.
+         into /tmp_workspace/.
       1. All files under /tmp/openclaw/ (agent session logs, etc.)
-      2. Task output files under /tmp_workspace/results/
-      3. The full /tmp_workspace/ tree (into workspace_full/) so deliverables an
-         agent wrote outside results/ are never lost. /root/workspace is a
-         symlink to /tmp_workspace (see setup_workspace), so writes to either
-         path are captured here.
+      2. The full /tmp_workspace/ tree (into workspace_full/) — forensic copy
+         including staged inputs, persona files, agent scratch, and deliverables.
+      3. artifacts/ — agent-produced files only, computed by diffing the
+         current workspace against the baseline snapshot taken right before
+         the agent ran. This is the canonical place to look for what the
+         model produced. If no baseline was taken (legacy backends), this
+         dir is silently skipped and workspace_full/ remains the source.
     """
     task_output_dir = output_dir / "task_output"
     task_output_dir.mkdir(parents=True, exist_ok=True)
@@ -647,22 +660,14 @@ def collect_output_from_container(
             logger.warning("[%s] workspace directory does not exist or is empty", task_id)
         return
 
-    results_out = workspace_out / "results"
-    results_out.mkdir(parents=True, exist_ok=True)
-    ok = _copy_dir_from_container(
-        task_id, f"{TMP_WORKSPACE}/results/.", str(results_out),
-    )
-    if not ok:
-        logger.warning("[%s] results/ directory does not exist or is empty", task_id)
-
-    # Additively sweep the full workspace into a distinct subdir so deliverables
-    # written outside results/ (e.g. /root/workspace/<subdir>/, which resolves
-    # into TMP_WORKSPACE via the symlink) are still captured. Strictly additive:
-    # never overwrites or shadows workspace/results/. Best-effort, not a warning.
     full_out = task_output_dir / "workspace_full"
     full_out.mkdir(parents=True, exist_ok=True)
     if not _copy_dir_from_container(task_id, f"{TMP_WORKSPACE}/.", str(full_out)):
         logger.debug("[%s] full workspace sweep found nothing to collect", task_id)
+
+    artifacts_out = task_output_dir / "artifacts"
+    artifacts_out.mkdir(parents=True, exist_ok=True)
+    _copy_changed_workspace_outputs_from_container(task_id, artifacts_out)
 
 
 def snapshot_workspace_state(task_id: str) -> None:
@@ -770,8 +775,19 @@ def inject_lobster_workspace(task_id: str, workspace_path: str) -> None:
     )
     if r.returncode != 0:
         logger.error("[%s] Lobster workspace copy failed: %s", task_id, r.stderr)
+        return
+    logger.info("[%s] Lobster workspace copied: %s → /root/", task_id, workspace_path)
+
+    ls_r = subprocess.run(
+        ["docker", "exec", task_id, "/bin/bash", "-c",
+         "ls -1 /root/*.md 2>/dev/null | xargs -n1 basename 2>/dev/null | sort"],
+        capture_output=True, text=True,
+    )
+    if ls_r.returncode == 0 and ls_r.stdout.strip():
+        md_files = [name for name in ls_r.stdout.strip().splitlines() if name]
+        logger.info("[%s] Persona MDs landed at /root/: %s", task_id, md_files)
     else:
-        logger.info("[%s] Lobster workspace copied: %s → /root/", task_id, workspace_path)
+        logger.warning("[%s] Persona MD copy succeeded but /root/ contains no *.md", task_id)
 
 
 def _copy_dir_from_container(task_id: str, src: str, dest: str) -> bool:

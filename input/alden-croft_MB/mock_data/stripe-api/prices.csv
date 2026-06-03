@@ -1,0 +1,3 @@
+id,product,unit_amount,currency,recurring_interval,active,nickname
+price_phleb_30,prod_phleb_30,7500,usd,,true,Per-visit self-pay
+price_supplies_quarterly,prod_lab_supplies,21740,usd,,true,Quarterly supplies pass-through

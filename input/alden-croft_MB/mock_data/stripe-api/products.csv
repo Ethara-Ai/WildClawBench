@@ -1,0 +1,3 @@
+id,name,description,active,created
+prod_phleb_30,Therapeutic Phlebotomy (30 min),"Quarterly therapeutic phlebotomy session for hereditary hemochromatosis patients (HFE variant). Self-pay charge per visit.",true,1712016000
+prod_lab_supplies,Laboratory Supplies Pass-Through,"Supplies and processing fees billed quarterly to the patient account.",true,1712016000

@@ -676,9 +676,21 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
     scores = result.get("scores") or {}
     rubrics = task.get("rubrics") or []
     if rubrics and "overall_score" not in scores and not result.get("error"):
+        # Judge reads agent-produced files from `task_output/artifacts/` (b99
+        # canonical, baseline-diff agent-touched files only). The legacy
+        # `workspace/results/` path was deleted in b99 because agents never
+        # wrote there. Fall back to `workspace_full/` (forensic full copy)
+        # only when artifacts/ is missing or empty so older trajectories and
+        # backends that don't snapshot still get judged.
+        artifacts_dir = output_dir / "task_output" / "artifacts"
+        results_dir = artifacts_dir
+        try:
+            if not artifacts_dir.exists() or not any(artifacts_dir.iterdir()):
+                results_dir = output_dir / "task_output" / "workspace_full"
+        except OSError:
+            results_dir = output_dir / "task_output" / "workspace_full"
         try:
             from src.utils.grading import grade_with_rubric
-            results_dir = output_dir / "task_output" / "workspace" / "results"
             transcript_text = _condense_transcript_for_judge(traj)
             scores = grade_with_rubric(
                 rubrics,
@@ -700,7 +712,28 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
                         scores.get("criteria_total", scores.get("tests_total", 0)),
                         scores.get("judge_model", "?"))
         except Exception as exc:
+            # Write a stub score.json so the failure is visible on disk.
+            # Without this, a swallowed exception leaves no trace except a
+            # WARNING in stdout, and the operator can't tell whether judging
+            # was skipped, crashed, or quietly returned empty.
             logger.warning("[%s] rubric grading failed: %s", task.get("task_id"), exc)
+            try:
+                (output_dir / "score.json").write_text(
+                    json.dumps({
+                        "overall_score": None,
+                        "rubric_weights_percentage": None,
+                        "criteria_total": len(rubrics),
+                        "criteria_passed": 0,
+                        "criteria_failed": 0,
+                        "criteria_abstained": len(rubrics),
+                        "judge_model": None,
+                        "error": f"{type(exc).__name__}: {exc}",
+                        "results_dir": str(results_dir),
+                    }, indent=2, ensure_ascii=False),
+                    encoding="utf-8",
+                )
+            except OSError:
+                pass
 
     reward = (result.get("scores") or {}).get("overall_score")
     _write_pass_summary(task_bundle_dir / "trajectories" / model_type, model_type,

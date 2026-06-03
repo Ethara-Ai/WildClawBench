@@ -74,8 +74,8 @@ class TestGenResult:
 
 
 def _load_prompt(name: str) -> str:
-    """Load a prompt MD bundled in src/utils/testgen/prompts/."""
-    return resources.files("src.utils.testgen.prompts").joinpath(name).read_text(encoding="utf-8")
+    from src.utils.prompt_loader import load_prompt
+    return load_prompt(name)
 
 
 def _strip_code_fences(text: str) -> str:
@@ -342,9 +342,9 @@ def generate_task_tests(
     wrapper_prefix = build_wrapper_prefix(services, scoped_apis=scoped)
 
     try:
-        system_prompt = _load_prompt("test_generation_system_prompt.md")
+        system_prompt = _load_prompt("testgen_system")
     except (FileNotFoundError, OSError) as exc:
-        result.error = "failed to load test_generation_system_prompt.md: %s" % exc
+        result.error = "failed to load testgen_system prompt: %s" % exc
         result.test_code = wrapper_prefix + SAFE_FALLBACK_STUB
         result.test_weights = dict(FALLBACK_WEIGHTS)
         result.used_fallback = True

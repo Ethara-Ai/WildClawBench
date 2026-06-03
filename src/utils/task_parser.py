@@ -219,23 +219,22 @@ def _append_workspace_hint(prompt: str, attachments: list[dict]) -> str:
     listing = "\n".join(f"- {n}" for n in names[:30])
     if len(names) > 30:
         listing += f"\n- ... ({len(names) - 30} more)"
-    # openclaw's image/media tools enforce a localRoots allowlist (see
-    # openclaw src/media/local-media-access.ts: assertLocalMediaAllowed).
-    # `/tmp/*` is NOT in the default allowlist; writing extracted frames or
-    # generated images there triggers
-    #   "Local media path is not under an allowed directory: /tmp/<file>"
-    # (seen 2026-06-02 megan-davis run on /tmp/turnin_frame.jpg). The
-    # default allowlist always includes `/root/workspace/`, so tell the
-    # agent to keep media outputs there.
+    # Output-location contract pinned to two harness-side enforcers:
+    # (a) `collect_output_from_container` snapshots `/root/workspace/`
+    # before the agent runs and copies every new-or-modified file out
+    # into `task_output/artifacts/`; (b) openclaw's media tools enforce a
+    # localRoots allowlist (`assertLocalMediaAllowed` in
+    # src/media/local-media-access.ts) that admits `/root/workspace/` and
+    # rejects `/tmp/*` plus `/root/<other>/*`. Deliverables written
+    # anywhere else are invisible to the grader at collection time and
+    # may also fail the image tool at read time.
     hint = (
         "\n\n---\n"
         "Workspace inputs (already staged on disk at `/root/workspace/`):\n"
         f"{listing}\n"
-        "Read these directly with the file/read tools before falling back to "
-        "any other source. When you extract video frames or generate images "
-        "that you want to view with the image tool, save them under "
-        "`/root/workspace/` (NOT `/tmp/`); the image tool's allowlist will "
-        "reject paths outside the workspace."
+        "Save EVERY output artifact you produce under `/root/workspace/`. "
+        "Files written anywhere else (including `/tmp/` and elsewhere "
+        "under `/root/`) will NOT be collected as deliverables."
     )
     return prompt + hint
 

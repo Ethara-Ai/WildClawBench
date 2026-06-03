@@ -1,0 +1,3 @@
+uuid,event,name,email,status,timezone,created_at,questions_and_answers
+inv_jul26_croft,sched_evt_jul26_croft,Alden Croft,alden.croft.me@gmail.com,active,America/New_York,2026-07-15T10:00:05-04:00,"[{""question"":""Most recent ferritin level"",""answer"":""180""}]"
+inv_apr26_croft,sched_evt_jan26_croft,Alden Croft,alden.croft.me@gmail.com,active,America/New_York,2026-04-15T10:00:05-04:00,"[{""question"":""Most recent ferritin level"",""answer"":""210""}]"

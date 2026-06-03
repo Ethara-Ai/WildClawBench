@@ -155,41 +155,20 @@ def council_members() -> list[str]:
 
 
 def _judge_system_prompt() -> str:
-    # 2026-06-02 user policy: rubrics are binary pass/fail only. The earlier
-    # discrete-partial-credit instruction (0/0.25/0.5/0.75/1.0) was producing
-    # judge outputs like 0.7 / 0.8 / 0.9 (non-compliant with the level set
-    # anyway) and the user does not want fractional credit at all. Aggregator
-    # also quantizes to {0.0, 1.0} as a belt-and-suspenders defense, so even
-    # an out-of-spec float emission cannot leak partial credit into the math.
-    # MUST-score-every-id contract retained — missing ids are silently zeroed
-    # by by_id.get(i, {}). Wording on weight polarity unchanged.
-    return (
-        "You are a strict, fair grader for an autonomous-agent benchmark. You are "
-        "given a task description, a list of rubric criteria (each with a numeric "
-        "weight), and EVIDENCE consisting of the agent's deliverable files and a "
-        "condensed transcript of its actions. Score EACH criterion in the rubric; "
-        "you MUST return a score for every id, even if evidence is missing — in "
-        "that case score 0.0 with reason 'no evidence'. Missing ids are NOT "
-        "treated as 'skip'; they are treated as 0.0 by the aggregator.\n"
-        "BINARY SCORING ONLY. Use EXACTLY one of these two values: 1.0 or 0.0. "
-        "Do NOT emit 0.25, 0.5, 0.75, or any other fractional value. Partial "
-        "credit is forbidden. Any float between 0 and 1 will be clamped by the "
-        "aggregator to the nearest of {0.0, 1.0}, so emitting fractions wastes "
-        "your output budget without affecting the final score.\n"
-        "The scoring rule depends on the WEIGHT SIGN, not on the wording:\n"
-        "- POSITIVE weight (> 0): score 1.0 if the criterion is satisfied by "
-        "the evidence, else 0.0. This includes criteria phrased as a prohibition "
-        "(e.g. 'only GET calls were made; no POST/PATCH/DELETE') — if the agent "
-        "COMPLIED (did only GETs), that criterion is SATISFIED → 1.0; score 0.0 "
-        "only if it violated.\n"
-        "- NEGATIVE weight (< 0): this is a penalty guardrail describing forbidden "
-        "behavior. Score 1.0 ONLY if the agent actually COMMITTED that forbidden "
-        "behavior (the negative weight then subtracts), otherwise 0.0.\n"
-        "Judge only on the evidence shown; if evidence is absent, score 0.0. "
-        "Do not assume success. The evidence may be truncated; do not penalize "
-        "for content that would plausibly appear past the truncation horizon.\n"
-        "Respond with ONLY a JSON object, no prose."
-    )
+    # 2026-06-02 judge rewrite — the prompt body lives in
+    # system_prompts/judge_system.md (b78 walkthrough_2026_05_27 spec, b96
+    # centralization). It encodes four operationally-essential rules whose
+    # absence produces graders that drift: the EXACT verdict format the
+    # parser regex depends on (deviation → ParseError → council quorum
+    # collapse), truncation handling (do not penalize beyond visible
+    # evidence), negative-rubric polarity (Satisfied=Yes means the forbidden
+    # behavior OCCURRED, not that the guardrail held), and the Yes/No-only
+    # emission (no N/A, no Maybe, no markdown tables). All four are
+    # referenced in the matching parser at _VERDICT_RE and in the aggregator
+    # at _grade_council; changing the prompt without updating both is a
+    # known-bad refactor pattern.
+    from src.utils.prompt_loader import load_prompt
+    return load_prompt("judge_system")
 
 
 # Rubric schemas in this repo store the weight under either `weight` or
@@ -210,21 +189,29 @@ def _extract_weight(r: dict) -> float:
         return 1.0
 
 
+def _split_evidence(evidence: str) -> tuple[str, str]:
+    marker = "\n----- TRANSCRIPT (condensed) -----\n"
+    if marker in evidence:
+        files_part, _, transcript_part = evidence.partition(marker)
+        return files_part, transcript_part
+    return evidence, ""
+
+
 def _judge_user_prompt(task_description: str, rubrics: list, evidence: str) -> str:
+    from src.utils.prompt_loader import load_prompt
+    output_files, transcript = _split_evidence(evidence)
     crit_lines = []
     for i, r in enumerate(rubrics):
         crit = r.get("criterion") if isinstance(r, dict) else str(r)
         wt = _extract_weight(r) if isinstance(r, dict) else 1.0
-        crit_lines.append(f'  {{"id": {i}, "weight": {wt}, "criterion": {json.dumps(crit)}}}')
-    schema = (
-        '{"criteria": [{"id": <int>, "score": <0.0-1.0>, "reason": "<short>"}], '
-        '"notes": "<one-line overall note>"}'
-    )
-    return (
-        f"TASK:\n{task_description}\n\n"
-        f"RUBRIC CRITERIA (score every id):\n[\n" + ",\n".join(crit_lines) + "\n]\n\n"
-        f"EVIDENCE (agent deliverables + transcript):\n{evidence}\n\n"
-        f"Return JSON exactly in this shape: {schema}"
+        crit_lines.append(f"{i + 1}. {crit}  [points: {wt}]")
+    return load_prompt(
+        "judge_user",
+        task_description=task_description,
+        transcript=transcript or "(no transcript captured)",
+        output_files=output_files or "(no deliverable files were collected)",
+        rubrics_block="\n".join(crit_lines),
+        n_criteria=len(rubrics),
     )
 
 
@@ -332,12 +319,19 @@ def _call_judge_openai(model: str, system: str, user: str) -> tuple[str, dict]:
     key = os.environ.get("KENSEI_OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY", "")
     if not key:
         raise RuntimeError("no OpenAI key for judge")
+    # Yes/No verdict format (judge_walkthrough_2026_05_27.html §1.1 EXACT FORMAT):
+    # judge emits free-form text with `[[RATIONALE:]] [[SATISFIED:Yes|No]]` blocks
+    # wrapped in `<judgment>...</judgment>`. We MUST NOT pass
+    # `response_format={"type":"json_object"}` here — it forces OpenAI to wrap
+    # the entire response in a JSON envelope, which breaks `_VERDICT_RE` and
+    # collapses every council vote into a parse error. max_completion_tokens
+    # raised 4000→8000 so 25-criterion rubrics (≈1.2k verdict tokens) leave
+    # ample headroom for reasoning.
     body = json.dumps({
         "model": model,
         "messages": [{"role": "system", "content": system},
                      {"role": "user", "content": user}],
-        "max_completion_tokens": 4000,
-        "response_format": {"type": "json_object"},
+        "max_completion_tokens": 8000,
         "stream": True,
         "stream_options": {"include_usage": True},
     }).encode()
@@ -424,7 +418,7 @@ def _call_judge_bedrock(arn: str, system: str, user: str) -> tuple[str, dict]:
     url = f"https://bedrock-runtime.{reg}.amazonaws.com/model/{mid}/converse-stream"
 
     def _do_post(include_temperature: bool) -> tuple[str, dict]:
-        infer = {"maxTokens": 4000}
+        infer = {"maxTokens": 8000}
         if include_temperature:
             infer["temperature"] = 0
         # Bedrock prompt-caching: a `cachePoint` block marks the preceding
@@ -544,6 +538,54 @@ def _parse_judge_json(text: str) -> dict:
     raise ValueError("judge returned no parseable JSON")
 
 
+# Parser for the Yes/No verdict format mandated by _judge_system_prompt. Three
+# load-bearing properties: (1) DOTALL so rationale text can span newlines,
+# (2) the leading 'N.' anchor disambiguates each verdict block when judges
+# emit Markdown-style bold/italic markers around the criterion sentence,
+# (3) TRUNCATION_AFFECTED is OPTIONAL so a judge that omits it (older models,
+# rare miss-emission) does not collapse the whole verdict count and trigger
+# quorum failure. Defaults to No when absent. Match this regex's structure
+# against any change to the system prompt's verdict template; deviation here
+# silently zeros all judge votes — see 2026-06-02 alden-croft regression
+# context referenced in _judge_system_prompt.
+_VERDICT_RE = re.compile(
+    r"\d+\.\s.*?"
+    r"\[\[\s*RATIONALE:\s*(.*?)\s*\]\]\s*"
+    r"\[\[\s*SATISFIED:\s*(Yes|No)\s*\]\]"
+    r"(?:\s*\[\[\s*TRUNCATION_AFFECTED:\s*(Yes|No)\s*\]\])?",
+    re.DOTALL | re.IGNORECASE,
+)
+
+
+def _parse_verdict_text(response: str, n_criteria: int) -> list[dict]:
+    if not response:
+        raise ValueError(f"empty judge response (expected up to {n_criteria} verdicts)")
+    # Tolerate judges that wrap the entire block in <judgment>...</judgment> or
+    # emit it bare; either way the verdict items themselves are what we match.
+    matches = _VERDICT_RE.findall(response)
+    # Partial-coverage contract per user m1543: smaller-context judges
+    # (Kimi K2.5 = 256k input, GLM 5 = 200k input) truncate output before
+    # reaching all rubric items on long rubrics (Sonnet 4.6 = 1M handles 69+
+    # comfortably). Renata-voss 2026-06-03 produced GLM=59 / Kimi=54 / Sonnet=69
+    # for a 69-criterion rubric. Returning the partial list lets the council
+    # aggregator vote per-criterion using only judges that actually covered
+    # that index; abstentions never invent No-votes the model did not cast.
+    if not matches:
+        raise ValueError(
+            f"no verdicts parsed (expected up to {n_criteria}); response shape does not match _VERDICT_RE"
+        )
+    out: list[dict] = []
+    # Cap at n_criteria in case a judge emits stray numbered items beyond the
+    # rubric (defensive — verdict list is ordered, criteria N+1.. would be junk).
+    for rationale, satisfied, truncation in matches[:n_criteria]:
+        out.append({
+            "rationale": (rationale or "").strip(),
+            "satisfied": (satisfied or "No").strip().lower() == "yes",
+            "truncation_affected": (truncation or "No").strip().lower() == "yes",
+        })
+    return out
+
+
 def _call_one_judge(model: str, system: str, user: str) -> tuple[str, dict]:
     provider, _, rest = model.partition("/")
     if provider == "bedrock":
@@ -577,13 +619,15 @@ def _run_council(
     members: list[str],
     system: str,
     user_for_member: "dict[str, str] | str",
+    n_criteria: int,
 ) -> list[dict]:
     """Run every member judge in parallel and return one result dict per member:
-    {model, ok, parsed?, usage, error?, user_chars}. Never raises.
+    {model, ok, verdicts?, usage, error?, user_chars, raw_response?}. Never raises.
 
-    `user_for_member` may be a single shared string (legacy behavior) or a
-    {model: user_prompt} dict so each member can receive a payload sized to its
-    own context window."""
+    `user_for_member` may be a single shared string (legacy) or a
+    {model: user_prompt} dict so each member receives a payload sized to its
+    own context window. `n_criteria` is the expected verdict count; parses
+    failing this count return `ok=False, error='parse: ...'` rather than raise."""
     from concurrent.futures import ThreadPoolExecutor
 
     def _resolve_user(model: str) -> str:
@@ -603,16 +647,17 @@ def _run_council(
                 "user_chars": len(user),
             }
         try:
-            parsed = _parse_judge_json(raw)
+            verdicts = _parse_verdict_text(raw, n_criteria)
         except Exception as exc:
             logger.warning("Council member %s parse failed: %s", model, exc)
             return {
                 "model": model, "ok": False,
                 "error": f"parse: {exc}", "usage": usage,
                 "user_chars": len(user),
+                "raw_response": raw[:2000] if isinstance(raw, str) else "",
             }
         return {
-            "model": model, "ok": True, "parsed": parsed, "usage": usage,
+            "model": model, "ok": True, "verdicts": verdicts, "usage": usage,
             "user_chars": len(user),
         }
 
@@ -638,6 +683,16 @@ def _criterion_pass(score: float, weight: float) -> bool:
     return (not triggered) if weight < 0 else triggered
 
 
+def _criterion_pass_from_satisfied(satisfied: bool, weight: float) -> bool:
+    # Walkthrough §2 polarity rule: SATISFIED reflects the literal criterion
+    # text, NOT the point sign. Aggregator applies sign here.
+    #  positive weight + satisfied=True  → passed (desired thing done)
+    #  positive weight + satisfied=False → failed
+    #  negative weight + satisfied=False → passed (guardrail held)
+    #  negative weight + satisfied=True  → failed (forbidden behavior occurred)
+    return (not satisfied) if weight < 0 else satisfied
+
+
 def _short_judge_label(model: str) -> str:
     """Shorten 'bedrock/arn:aws:bedrock:<region>:<acct>:application-inference-profile/<id>'
     to '<id>' for compact per-criterion arrays in score.json; preserves the
@@ -656,8 +711,8 @@ def _grade_council(
     """Council aggregation. Returns scores dict (with `judge_council` block) if
     quorum >= 2 surviving members; returns None to signal 'fall through to
     single-judge'."""
-    results = _run_council(members, system, user_for_member)
-    surviving = [r for r in results if r.get("ok") and isinstance(r.get("parsed"), dict)]
+    results = _run_council(members, system, user_for_member, len(rubrics))
+    surviving = [r for r in results if r.get("ok") and isinstance(r.get("verdicts"), list)]
     if len(surviving) < 2:
         failed_summary = "; ".join(
             f"{_short_judge_label(r.get('model', '?'))}={(r.get('error') or 'unknown').strip()[:160]}"
@@ -669,64 +724,87 @@ def _grade_council(
         )
         return None
 
-    by_id_per_member: list[dict] = []
-    for r in surviving:
-        parsed = r["parsed"]
-        items = parsed.get("criteria") or []
-        by_id_per_member.append({c.get("id"): c for c in items if isinstance(c, dict)})
+    verdicts_per_member: list[list[dict]] = [r["verdicts"] for r in surviving]
+    n_surv = len(surviving)
 
     crit_out: list[dict] = []
-    disagreement_flags: list[int] = []
-    weighted_total = 0.0
+    truncation_flags: list[int] = []
+    abstention_flags: list[int] = []
+    weighted = 0.0
     passed = 0
-    # Denominator is the sum of POSITIVE weights only, mirroring
-    # test_executor._compute_reward's pos_total: negative weights are subtractive
-    # guardrails (penalty on commit), not normalizer contributors. Including
-    # abs(neg_weights) in total_w made a perfect run (all guardrails avoided,
-    # all positives met) score ~50% instead of ~100% — see alden-croft
-    # 2026-06-02 (23/23 passed → overall 0.4986 instead of 0.983).
+    # Denominator is the sum of POSITIVE weights only — walkthrough §4 verbatim:
+    # 'Always use sum(positive_points). Do NOT use sum(all_points) — that
+    # overshoots 1 whenever penalties exist.' Mirrors test_executor._compute_reward
+    # pos_total. See alden-croft 2026-06-02 (23/23 passed → overall 0.4986 was
+    # bug; positive-only denom gives 0.983 correctly).
     total_w = sum(_extract_weight(r) for r in rubrics
                   if isinstance(r, dict) and _extract_weight(r) > 0) or 1.0
 
     for i, r in enumerate(rubrics):
         wt = _extract_weight(r) if isinstance(r, dict) else 1.0
-        per_member: list[float] = []
-        per_reason: list[str] = []
+        # Partial-coverage per-criterion voter pool (user m1543): only judges
+        # that actually emitted a verdict for index i vote on this criterion.
+        # Abstentions (truncated output past index i) are NOT counted as votes
+        # in either direction. Threshold = ceil(voters/2): 2-of-3, 1-of-2,
+        # 1-of-1; tie-on-2 → Yes (b75 recommendation). 0 voters → abstain.
+        per_satisfied: list[bool] = []
+        per_rationale: list[str] = []
+        per_truncation: list[bool] = []
         per_label: list[str] = []
-        for member_result, by_id in zip(surviving, by_id_per_member):
-            c = by_id.get(i, {})
-            raw_score = c.get("score", 0.0)
-            try:
-                s = float(raw_score or 0.0)
-            except (TypeError, ValueError):
-                s = 0.0
-            s = _quantize_binary(max(0.0, min(1.0, s)))
-            per_member.append(s)
-            per_reason.append(str(c.get("reason", "") or ""))
-            per_label.append(_short_judge_label(member_result["model"]))
+        per_voted: list[bool] = []
+        for member_result, verdicts in zip(surviving, verdicts_per_member):
+            label = _short_judge_label(member_result["model"])
+            per_label.append(label)
+            if i < len(verdicts):
+                v = verdicts[i]
+                per_voted.append(True)
+                per_satisfied.append(bool(v.get("satisfied", False)))
+                per_rationale.append(str(v.get("rationale", "") or ""))
+                per_truncation.append(bool(v.get("truncation_affected", False)))
+            else:
+                per_voted.append(False)
+                per_satisfied.append(False)
+                per_rationale.append("(abstained — output truncated before this criterion)")
+                per_truncation.append(False)
 
-        mean_score = sum(per_member) / len(per_member) if per_member else 0.0
-        sd = _stddev(per_member)
-        criterion_passed = _criterion_pass(mean_score, wt)
-        if criterion_passed:
-            passed += 1
-        weighted_total += wt * mean_score
-        if sd > _COUNCIL_DISAGREEMENT_THRESHOLD:
-            disagreement_flags.append(i)
+        voters = sum(1 for vd in per_voted if vd)
+        if voters == 0:
+            abstention_flags.append(i)
+            satisfied_majority = False
+            criterion_passed = False
+        else:
+            crit_threshold = (voters + 1) // 2
+            yes_votes = sum(1 for s, vd in zip(per_satisfied, per_voted) if vd and s)
+            satisfied_majority = yes_votes >= crit_threshold
+            criterion_passed = _criterion_pass_from_satisfied(satisfied_majority, wt)
+            if criterion_passed:
+                passed += 1
+            # Walkthrough §4 reward: contribute weight ONLY if majority says Yes.
+            # No fractions. Yes/No is binary by construction — b51 leak impossible.
+            if satisfied_majority:
+                weighted += wt
+        if any(per_truncation):
+            truncation_flags.append(i)
         crit_out.append({
             "id": i,
             "weight": wt,
-            "score": round(mean_score, 3),
-            "criterion": (r.get("criterion") if isinstance(r, dict) else str(r)),
-            "scores_by_judge": [round(s, 3) for s in per_member],
-            "judges": per_label,
-            "stddev": round(sd, 3),
-            "reasons_by_judge": per_reason,
-            "is_positive": wt >= 0,
+            "satisfied": satisfied_majority,
             "passed": criterion_passed,
+            "voters": voters,
+            "criterion": (r.get("criterion") if isinstance(r, dict) else str(r)),
+            "votes": "/".join(
+                ("Yes" if s else "No") if vd else "Abstain"
+                for s, vd in zip(per_satisfied, per_voted)
+            ),
+            "satisfied_by_judge": per_satisfied,
+            "voted_by_judge": per_voted,
+            "rationales_by_judge": per_rationale,
+            "truncation_affected_by_judge": per_truncation,
+            "judges": per_label,
+            "is_positive": wt >= 0,
         })
 
-    overall = max(0.0, min(1.0, weighted_total / total_w))
+    overall = max(0.0, min(1.0, weighted / total_w))
     council_usage = _ZERO_USAGE.copy()
     for r in results:
         u = r.get("usage") or {}
@@ -734,23 +812,27 @@ def _grade_council(
             council_usage[k] = council_usage.get(k, 0) + int(u.get(k, 0) or 0)
 
     n = len(rubrics)
+    n_abstained = len(abstention_flags)
+    failed = n - passed - n_abstained
     # Schema contract — score.json scores RUBRIC CRITERIA, not pytest tests.
-    # Canonical keys: criteria_total/_passed/_failed and rubric_weights_percentage
-    # (= overall_score * 100, per user formula m1420). The tests_* keys are
-    # deprecated aliases retained ONLY because run_batch.py:706-714 forwards
-    # these counts into the harbor pytest channel (test_result / SQLite store /
-    # ctrf.json) when no real pytest result exists. Deleting the aliases here
-    # without first migrating that adapter will silently zero the harbor bundle's
-    # test counts. See NOMENCLATURE.md for the channel boundary.
+    # Canonical keys: criteria_total/_passed/_failed/_abstained and
+    # rubric_weights_percentage (= overall_score * 100, per user formula m1420).
+    # criteria_total = passed + failed + abstained (b82 invariant). The tests_*
+    # keys are deprecated aliases retained ONLY because run_batch.py:706-714
+    # forwards these counts into the harbor pytest channel (test_result / SQLite
+    # store / ctrf.json) when no real pytest result exists. Deleting the aliases
+    # here without first migrating that adapter will silently zero the harbor
+    # bundle's test counts. See NOMENCLATURE.md for the channel boundary.
     return {
         "overall_score": round(overall, 4),
         "rubric_weights_percentage": round(overall * 100.0, 2),
         "criteria_total": n,
         "criteria_passed": passed,
-        "criteria_failed": n - passed,
+        "criteria_failed": failed,
+        "criteria_abstained": n_abstained,
         "tests_total": n,
         "tests_passed": passed,
-        "tests_failed": n - passed,
+        "tests_failed": failed,
         "criteria": crit_out,
         "judge_model": "council",
         "judge_council": {
@@ -760,13 +842,16 @@ def _grade_council(
                 {"model": r["model"], "error": r.get("error", "")}
                 for r in results if not r.get("ok")
             ],
-            "aggregation": "mean_per_criterion",
-            "disagreement_threshold": _COUNCIL_DISAGREEMENT_THRESHOLD,
+            "aggregation": "majority_vote_partial_coverage",
             "per_member_user_chars": {
                 r["model"]: int(r.get("user_chars", 0) or 0) for r in results
             },
+            "per_member_verdict_count": {
+                r["model"]: len(r["verdicts"]) for r in surviving
+            },
         },
-        "disagreement_flags": disagreement_flags,
+        "truncation_flags": truncation_flags,
+        "abstention_flags": abstention_flags,
         "usage": council_usage,
     }
 
@@ -815,51 +900,90 @@ def grade_with_rubric(
     user = _judge_user_prompt(task_description, rubrics, _gather_evidence(workspace_results, transcript_text))
     primary = judge_model or JUDGE_MODEL
     fallback = os.environ.get("JUDGE_MODEL_FALLBACK", "openai/gpt-5.4")
-    parsed, judge_usage, used_model, last_err = _run_single_judge(primary, fallback, system, user)
-    if parsed is None:
+    n_criteria = len(rubrics)
+    verdicts: list[dict] | None = None
+    judge_usage: dict = dict(_ZERO_USAGE)
+    used_model: str | None = None
+    last_err: Exception | None = None
+    for model in [m for m in (primary, fallback) if m]:
+        try:
+            raw, judge_usage = _call_one_judge(model, system, user)
+        except Exception as exc:
+            last_err = exc
+            logger.warning("Rubric judge model %s failed (%s); trying next", model, exc)
+            continue
+        try:
+            verdicts = _parse_verdict_text(raw, n_criteria)
+            used_model = model
+            break
+        except Exception as exc:
+            last_err = exc
+            logger.warning("Rubric judge %s parse failed (%s); trying next", model, exc)
+            continue
+    if verdicts is None or used_model is None:
         logger.error("All rubric judge models failed: %s", last_err)
         return {"overall_score": 0.0, "error": f"judge failed: {last_err}", "usage": dict(_ZERO_USAGE)}
 
-    by_id = {c.get("id"): c for c in parsed.get("criteria", []) if isinstance(c, dict)}
-    # See _grade_council total_w comment for the alden-croft 2026-06-02 reason
-    # the denominator must filter to POSITIVE weights only. Both paths share the
-    # rule; only the per-criterion score source differs (council = mean of
-    # surviving members, single = parsed["criteria"][i]["score"]).
     total_w = sum(_extract_weight(r) for r in rubrics
                   if isinstance(r, dict) and _extract_weight(r) > 0) or 1.0
     weighted = 0.0
     passed = 0
+    truncation_flags: list[int] = []
+    # Single-judge mirror of b82 partial-coverage policy (user m1543 2026-06-03):
+    # if the judge truncated mid-rubric, indices i >= len(verdicts) are abstentions
+    # (NOT silent No-votes). Abstained criteria contribute 0 to weighted AND are
+    # NOT counted toward criteria_passed/criteria_failed. The walkthrough §4
+    # denominator (sum positive weights) is unchanged so abstentions reduce the
+    # achievable ceiling, mirroring how a missing vote loses winnable points.
+    abstention_flags: list[int] = []
     crit_out = []
     for i, r in enumerate(rubrics):
         wt = _extract_weight(r) if isinstance(r, dict) else 1.0
-        c = by_id.get(i, {})
-        score = float(c.get("score", 0.0) or 0.0)
-        score = _quantize_binary(max(0.0, min(1.0, score)))
-        weighted += wt * score
-        criterion_passed = _criterion_pass(score, wt)
-        if criterion_passed:
-            passed += 1
+        voted = i < len(verdicts)
+        v = verdicts[i] if voted else {}
+        satisfied = bool(v.get("satisfied", False)) if voted else False
+        truncation_affected = bool(v.get("truncation_affected", False)) if voted else False
+        if truncation_affected:
+            truncation_flags.append(i)
+        if not voted:
+            abstention_flags.append(i)
+            criterion_passed = False
+            rationale_text = "(abstained — judge output truncated before this criterion)"
+        else:
+            criterion_passed = _criterion_pass_from_satisfied(satisfied, wt)
+            if criterion_passed:
+                passed += 1
+            if satisfied:
+                weighted += wt
+            rationale_text = str(v.get("rationale", "") or "")
         crit_out.append({
-            "id": i, "weight": wt, "score": round(score, 3),
-            "criterion": (r.get("criterion") if isinstance(r, dict) else str(r)),
-            "reason": c.get("reason", ""),
-            "is_positive": wt >= 0,
+            "id": i, "weight": wt,
+            "voted": voted,
+            "satisfied": satisfied,
             "passed": criterion_passed,
+            "criterion": (r.get("criterion") if isinstance(r, dict) else str(r)),
+            "rationale": rationale_text,
+            "truncation_affected": truncation_affected,
+            "is_positive": wt >= 0,
         })
     overall = max(0.0, min(1.0, weighted / total_w))
     n = len(rubrics)
+    n_abstained = len(abstention_flags)
+    failed = n - passed - n_abstained
     return {
         "overall_score": round(overall, 4),
         "rubric_weights_percentage": round(overall * 100.0, 2),
         "criteria_total": n,
         "criteria_passed": passed,
-        "criteria_failed": n - passed,
+        "criteria_failed": failed,
+        "criteria_abstained": n_abstained,
         "tests_total": n,
         "tests_passed": passed,
-        "tests_failed": n - passed,
+        "tests_failed": failed,
         "criteria": crit_out,
         "judge_model": used_model,
-        "judge_notes": parsed.get("notes", ""),
+        "truncation_flags": truncation_flags,
+        "abstention_flags": abstention_flags,
         "usage": judge_usage,
     }
 

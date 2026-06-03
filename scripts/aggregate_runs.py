@@ -110,12 +110,21 @@ def aggregate(output_root: Path, backend_filter: str | None = None) -> dict:
         per_task_model[(backend, task_id, model)].append(entry)
         per_model[(backend, model)].append(pct)
 
+    # Per (backend, model): collect per-task pass@K values for eval-aggregate
+    # rollup per walkthrough §4: 'eval-aggregate = mean of per-task pass@K values'.
+    # Distinct from per_model[(backend, model)] which is mean of ALL runs (user
+    # m1420 line 3). pass@K rewards the model for ever having succeeded; mean
+    # rewards consistency. Both are reported; neither replaces the other.
+    per_model_pass_at_k: dict[tuple[str, str], list[float]] = defaultdict(list)
+
     summary = {
         "by_task_model": [],
         "by_model": [],
     }
     for (backend, task, model), runs in sorted(per_task_model.items()):
         pcts = [r["rubric_weights_percentage"] for r in runs]
+        pass_at_k = max(pcts)
+        per_model_pass_at_k[(backend, model)].append(pass_at_k)
         summary["by_task_model"].append({
             "backend": backend,
             "task_id": task,
@@ -124,38 +133,49 @@ def aggregate(output_root: Path, backend_filter: str | None = None) -> dict:
             "run_count": len(runs),
             "average_rubric_weights_percentage": round(statistics.fmean(pcts), 2),
             "stddev_rubric_weights_percentage": round(statistics.pstdev(pcts), 2) if len(pcts) > 1 else 0.0,
+            # Walkthrough §4 pass@K: best-of-K rollout per task. K = run_count.
+            "pass_at_k": round(pass_at_k, 2),
+            "k": len(pcts),
         })
     for (backend, model), pcts in sorted(per_model.items()):
+        task_pass_at_k_values = per_model_pass_at_k[(backend, model)]
         summary["by_model"].append({
             "backend": backend,
             "model": model,
             "run_count": len(pcts),
+            "task_count": len(task_pass_at_k_values),
             # User formula m1420 line 3: mean over ALL runs of this model.
             "average_rubric_weights_percentage": round(statistics.fmean(pcts), 2),
             "stddev_rubric_weights_percentage": round(statistics.pstdev(pcts), 2) if len(pcts) > 1 else 0.0,
+            # Walkthrough §4 eval-aggregate: mean of per-task pass@K values.
+            # Each task contributes its best run; this is the headline 'how good
+            # is this model when it tries' number, complementary to the typical
+            # 'how good on average' average_rubric_weights_percentage.
+            "average_pass_at_k": round(statistics.fmean(task_pass_at_k_values), 2) if task_pass_at_k_values else 0.0,
+            "stddev_pass_at_k": round(statistics.pstdev(task_pass_at_k_values), 2) if len(task_pass_at_k_values) > 1 else 0.0,
         })
     return summary
 
 
 def _print_table(summary: dict) -> None:
-    print("\n=== average rubric_weights_percentage by (backend, task, model) ===")
-    print(f"{'backend':<12} {'task_id':<48} {'model':<24} {'runs':>5} {'avg%':>8} {'stddev':>8}")
+    print("\n=== by (backend, task, model): mean and pass@K across K runs ===")
+    print(f"{'backend':<12} {'task_id':<48} {'model':<24} {'runs':>5} {'avg%':>8} {'pass@K':>8}")
     print("-" * 110)
     for row in summary["by_task_model"]:
         print(
             f"{row['backend']:<12} {row['task_id'][:48]:<48} {row['model'][:24]:<24} "
             f"{row['run_count']:>5} {row['average_rubric_weights_percentage']:>8.2f} "
-            f"{row['stddev_rubric_weights_percentage']:>8.2f}"
+            f"{row['pass_at_k']:>8.2f}"
         )
 
-    print("\n=== average rubric_weights_percentage by (backend, model) ===")
-    print(f"{'backend':<12} {'model':<32} {'runs':>5} {'avg%':>8} {'stddev':>8}")
-    print("-" * 72)
+    print("\n=== by (backend, model): mean of runs and mean of per-task pass@K ===")
+    print(f"{'backend':<12} {'model':<32} {'runs':>5} {'tasks':>6} {'avg_runs%':>10} {'avg_pass@K':>11}")
+    print("-" * 92)
     for row in summary["by_model"]:
         print(
             f"{row['backend']:<12} {row['model'][:32]:<32} {row['run_count']:>5} "
-            f"{row['average_rubric_weights_percentage']:>8.2f} "
-            f"{row['stddev_rubric_weights_percentage']:>8.2f}"
+            f"{row['task_count']:>6} {row['average_rubric_weights_percentage']:>10.2f} "
+            f"{row['average_pass_at_k']:>11.2f}"
         )
 
 

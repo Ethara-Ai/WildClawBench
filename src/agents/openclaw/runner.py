@@ -19,6 +19,7 @@ from src.utils.docker_utils import (
     run_warmup,
     setup_skills,
     setup_workspace,
+    snapshot_workspace_state,
     start_container,
 )
 from src.utils.grading import extract_usage_from_jsonl, extract_usage_from_litellm_log
@@ -173,6 +174,15 @@ class OpenClawAgent(BaseAgent):
             )
 
             run_warmup(spec.task_id, spec.task.get("warmup", ""))
+
+            # Capture workspace state RIGHT BEFORE the agent runs so the
+            # post-run diff (see collect_output_from_container) can isolate
+            # agent-produced artifacts from the staged input set (data/,
+            # persona/, openclaw scratch). Everything written or modified
+            # under /tmp_workspace/ between this call and collect time is
+            # by definition agent-generated. Codex+claudecode runners already
+            # do this; without it openclaw runs land an empty artifacts/ dir.
+            snapshot_workspace_state(spec.task_id)
 
             if spec.models_config:
                 inject_openclaw_models(spec.task_id, spec.models_config)
@@ -518,17 +528,40 @@ p.write_text(json.dumps(d, indent=2))
         # 'read failed: ENOENT ... /root/memory/<date>.md') and the persona
         # bootstrap silently falls back to a generic LLM with the prompt
         # only. Seed both with MEMORY.md so the daily-memory layer resolves.
+        # Bootstrap-file allowlist widened 2026-06-03 to all 7 files openclaw
+        # reads on every turn (docs.openclaw.ai/concepts/agent-workspace):
+        # AGENTS/AGENT (instructions), SOUL (personality), MEMORY (long-term),
+        # IDENTITY (name/vibe), USER (user profile), TOOLS (tool notes),
+        # HEARTBEAT (scheduled tasks). Files absent from the task's persona
+        # dir are silently skipped — alden-croft ships all 7, renata-voss
+        # ships only AGENTS/MEMORY/SOUL. See `inject_lobster_workspace`
+        # (docker_utils.py:762) which already does the /root/ surface copy.
+        # Bash emits MD:<name>:<state> tokens parsed by the harness. Token grammar
+        # is load-bearing (Option A per user m1721 'option a'): each token represents
+        # one verified post-copy state. States: present|missing|copy_failed|verified.
+        # 'verified' is emitted only after `test -f /root/memory/<name>` succeeds,
+        # closing the b89 'is it really there' gap that opaque success logs left open.
         cmd = (
             "mkdir -p /root/memory && "
-            "for f in /root/MEMORY.md /root/SOUL.md /root/AGENT.md /root/AGENTS.md; do "
-            '  [ -f "$f" ] && cp "$f" /root/memory/ || true; '
-            "done && "
+            "for f in MEMORY.md SOUL.md AGENT.md AGENTS.md "
+            "IDENTITY.md USER.md TOOLS.md HEARTBEAT.md; do "
+            '  if [ -f "/root/$f" ]; then '
+            '    if cp "/root/$f" /root/memory/ 2>/dev/null && [ -f "/root/memory/$f" ]; then '
+            '      echo "MD:$f:verified"; '
+            "    else "
+            '      echo "MD:$f:copy_failed"; '
+            "    fi; "
+            "  else "
+            '    echo "MD:$f:missing"; '
+            "  fi; "
+            "done; "
             "if [ -f /root/MEMORY.md ]; then "
             '  today=$(date -u +%Y-%m-%d); '
             '  yesterday=$(date -u -d "yesterday" +%Y-%m-%d 2>/dev/null || date -u -v-1d +%Y-%m-%d); '
-            '  cp /root/MEMORY.md "/root/memory/${today}.md"; '
-            '  cp /root/MEMORY.md "/root/memory/${yesterday}.md"; '
-            "fi && "
+            '  cp /root/MEMORY.md "/root/memory/${today}.md" && echo "MD:${today}.md:verified" || echo "MD:${today}.md:copy_failed"; '
+            '  cp /root/MEMORY.md "/root/memory/${yesterday}.md" && echo "MD:${yesterday}.md:verified" || echo "MD:${yesterday}.md:copy_failed"; '
+            "fi; "
+            "echo '---INDEX---'; "
             "openclaw memory index --force 2>&1 | tail -3"
         )
         result = subprocess.run(
@@ -536,7 +569,36 @@ p.write_text(json.dumps(d, indent=2))
             capture_output=True,
             text=True,
         )
+
+        stdout = result.stdout or ""
+        index_marker = "---INDEX---"
+        md_section, _, index_section = stdout.partition(index_marker)
+
+        verified: list[str] = []
+        missing: list[str] = []
+        failed: list[str] = []
+        for line in md_section.splitlines():
+            if not line.startswith("MD:"):
+                continue
+            _, _, rest = line.partition("MD:")
+            name, _, state = rest.partition(":")
+            if state == "verified":
+                verified.append(name)
+            elif state == "missing":
+                missing.append(name)
+            elif state == "copy_failed":
+                failed.append(name)
+
+        logger.info(
+            "[%s] Bootstrap MDs indexed: verified=%s missing=%s",
+            task_id,
+            verified or "[]",
+            missing or "[]",
+        )
+        if failed:
+            logger.warning("[%s] Bootstrap MD copy failures: %s", task_id, failed)
+
         if result.returncode != 0:
-            logger.warning("[%s] memory index failed: %s", task_id, result.stderr[:200])
-        else:
-            logger.info("[%s] Memory indexed: %s", task_id, result.stdout.strip()[:200])
+            logger.warning("[%s] memory index failed (rc=%d): %s", task_id, result.returncode, (result.stderr or "")[:200])
+        elif index_section.strip():
+            logger.info("[%s] openclaw memory index: %s", task_id, index_section.strip()[:200])

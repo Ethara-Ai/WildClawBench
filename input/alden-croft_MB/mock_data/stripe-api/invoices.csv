@@ -1,0 +1,4 @@
+id,customer,subscription,amount_due,amount_paid,currency,status,number,charge,created,due_date
+in_2026_apr_croft,cus_alden_croft_2024,,7500,7500,usd,paid,PB-2026-04-1117,ch_apr_croft,1745347200,
+in_2026_jul_croft,cus_alden_croft_2024,,7500,7500,usd,paid,PB-2026-07-1245,ch_jul_croft,1753171200,
+in_2026_supplies_aug,cus_alden_croft_2024,,21740,0,usd,open,PB-2026-08-1308,,1755561600,1760140800

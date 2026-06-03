@@ -58,11 +58,10 @@ class IntentResult:
 
 
 def _load_intent_system_prompt() -> str:
+    from src.utils.prompt_loader import load_prompt, PromptNotFoundError
     try:
-        return resources.files("src.utils.testgen.prompts").joinpath(
-            "intent_test_generation_prompt.md"
-        ).read_text(encoding="utf-8")
-    except (FileNotFoundError, OSError):
+        return load_prompt("testgen_intent")
+    except (PromptNotFoundError, OSError):
         return _DEFAULT_INTENT_PROMPT
 
 
