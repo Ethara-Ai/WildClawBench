@@ -838,6 +838,16 @@ def run_single_task(
     if config is not None:
         _augment_task_with_mocks(task, config, mock_env_dict)
 
+    if (task.get("test_code") or "").strip():
+        # Task ships its own test suite (input/<task>/test_outputs.py +
+        # test_weights.json, loaded by task_parser._load_provided_tests) — the
+        # gate below is skipped, so the LLM test generator never runs.
+        logger.info(
+            "[%s] using task-provided test suite (%dch code, weights=%s) — skipping LLM test generation",
+            task_id_ori, len(task["test_code"]),
+            "yes" if (task.get("test_weights") or "").strip() else "none",
+        )
+
     if generate_tests and config is not None and not (task.get("test_code") or "").strip():
         force_testgen = bool(task.get("__force_testgen__"))
         cached_tests_dir = output_root / task_id_ori / "data" / "tests"

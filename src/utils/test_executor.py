@@ -41,6 +41,28 @@ _RUNNER_SCRIPT = textwrap.dedent('''
 
     signal.signal(signal.SIGALRM, _alarm_handler)
 
+    # Hand-authored suites commonly `import pytest` at module top level but never
+    # use fixtures (this runner instantiates Test* classes and calls test_*
+    # methods directly — no pytest involved). The sandbox image may not ship
+    # pytest globally, so a bare import would import_error the whole suite. When
+    # the real pytest is absent, install a permissive stub so the import (and any
+    # incidental pytest.* references) succeed; a real pytest takes precedence.
+    try:
+        import pytest  # noqa: F401
+    except Exception:
+        class _PytestStub:
+            def __getattr__(self, _n):
+                return _PytestStub()
+            def __call__(self, *a, **k):
+                if len(a) == 1 and callable(a[0]) and not k:
+                    return a[0]
+                return _PytestStub()
+            def __enter__(self):
+                return self
+            def __exit__(self, *a):
+                return False
+        sys.modules["pytest"] = _PytestStub()
+
     spec = importlib.util.spec_from_file_location("t", "/tests/test_outputs.py")
     mod = importlib.util.module_from_spec(spec)
     out = {"import_error": None, "results": {}}
