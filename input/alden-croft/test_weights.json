@@ -1,0 +1,10 @@
+{
+  "test_profile_has_email": 3,
+  "test_drafts_listing_returns_list": 3,
+  "test_messages_listing_has_entries": 3,
+  "test_calendar_list_has_items": 3,
+  "test_primary_calendar_events_listable": 1,
+  "test_agent_created_a_draft": 5,
+  "test_no_message_sent": -5,
+  "test_no_draft_sent": -5
+}

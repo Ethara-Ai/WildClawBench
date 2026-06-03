@@ -128,6 +128,45 @@ def load_task(path: str | Path) -> dict:
     raise ValueError(f"Unsupported task file format: {p.suffix}")
 
 
+def _load_provided_tests(task_dir: Path) -> tuple[str, str]:
+    """Load a hand-authored test suite shipped with the task, if present.
+
+    When a task directory provides BOTH ``test_outputs.py`` and
+    ``test_weights.json`` (at the task root or under ``tests/``), the harness
+    executes those verbatim instead of LLM-generating a suite. The generate-vs-
+    execute gate in eval/run_batch.py only generates when ``task["test_code"]``
+    is empty, so populating it here transparently skips generation and routes
+    straight to src/utils/test_executor.py.
+
+    Requiring ``test_weights.json`` as the opt-in signal is deliberate: legacy
+    fixture-based ``test_outputs.py`` files (e.g. input/alden-croft/) ship no
+    weights and are incompatible with the no-fixture runner, so they stay on the
+    LLM-generation path.
+
+    The suite must match the runner contract in test_executor.py: top-level
+    ``Test*`` classes with ``test_*(self)`` methods, no pytest fixtures, stdlib
+    only, and mock-API URLs read from ``<SERVICE>_URL`` env vars.
+
+    Returns ``(test_code, test_weights_json)`` — ``test_weights_json`` is the raw
+    file text (the executor consumes a JSON string). Returns ``("", "")`` when no
+    complete provided suite is found.
+    """
+    for sub in ("", "tests"):
+        base = task_dir / sub if sub else task_dir
+        code_f = base / "test_outputs.py"
+        weights_f = base / "test_weights.json"
+        if not (code_f.is_file() and weights_f.is_file()):
+            continue
+        try:
+            code = code_f.read_text(encoding="utf-8")
+            weights = weights_f.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        if code.strip() and weights.strip():
+            return code, weights
+    return "", ""
+
+
 def _attach_drift_script(task: dict, task_dir: Path) -> dict:
     # Surface drift.yaml / drift.yml on the task dict so run_batch can start
     # a DriftDirector. Sets to None (not absent) when no script is present so
@@ -278,10 +317,13 @@ def _load_native_task(task_dir: Path) -> dict:
     persona_dir = task_dir / "persona"
     derived_l1, derived_l2 = _derive_taxonomy_for_native_task(task_dir, rubrics, attachments)
     prompt_with_inputs = _append_workspace_hint(prompt, attachments)
+    provided_test_code, provided_test_weights = _load_provided_tests(task_dir)
     return {
         "task_id": task_dir.name,
         "prompt": prompt_with_inputs,
         "initial_prompt": prompt_with_inputs,
+        "test_code": provided_test_code,
+        "test_weights": provided_test_weights,
         "persona": persona,
         "persona_dir": str(persona_dir) if persona_dir.is_dir() else "",
         "system_prompt": "",
@@ -313,10 +355,13 @@ def _load_yaml_task(path: Path) -> dict:
     task_id = str(raw.get("task_id") or task_dir.name)
     attachments = _load_attachments_yaml(raw, task_dir)
     prompt = str(raw.get("initial_prompt") or raw.get("prompt") or "")
+    provided_test_code, provided_test_weights = _load_provided_tests(task_dir)
     return {
         "task_id": task_id,
         "prompt": prompt,
         "initial_prompt": prompt,
+        "test_code": provided_test_code,
+        "test_weights": provided_test_weights,
         "persona": str(raw.get("persona") or "marcus"),
         "persona_dir": "",
         "system_prompt": str(raw.get("system_prompt") or ""),
