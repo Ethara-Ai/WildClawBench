@@ -1,0 +1,25 @@
+{
+  "CompanyName": "Davis Plumbing LLC",
+  "LegalName": "Davis Plumbing LLC",
+  "CompanyAddr": {
+    "Line1": "Davis Plumbing Yard",
+    "City": "Detroit",
+    "CountrySubDivisionCode": "MI",
+    "PostalCode": "48201",
+    "Country": "US"
+  },
+  "Email": {
+    "Address": "books@davisplumbing.example"
+  },
+  "FiscalYearStartMonth": "January",
+  "Country": "US",
+  "MetaData": {
+    "CreateTime": "2018-03-04T00:00:00Z",
+    "LastUpdatedTime": "2026-05-31T20:00:00Z"
+  },
+  "PrimaryPhone": {
+    "FreeFormNumber": "(000) 000-0000"
+  },
+  "IndustryType": "Other",
+  "NameValue": []
+}

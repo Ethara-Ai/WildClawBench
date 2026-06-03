@@ -1,0 +1,33 @@
+[
+  {
+    "id": "section_smoke_copper_recaps",
+    "snippet": {
+      "channelId": "UCsmoke_copper_bbq",
+      "title": "Recaps (use this naming pattern)",
+      "type": "singlePlaylist",
+      "position": 0,
+      "description": "Every recap clip on this channel follows the same title pattern: 'Smoke & Copper at <event> \u00b7 <category> turn-in \u00b7 <year>'. Do not deviate."
+    },
+    "contentDetails": ""
+  },
+  {
+    "id": "section_smoke_copper_2025_recaps",
+    "snippet": {
+      "channelId": "UCsmoke_copper_bbq",
+      "title": "2025 Season Recaps",
+      "type": "multiplePlaylists",
+      "position": 1
+    },
+    "contentDetails": ""
+  },
+  {
+    "id": "section_smoke_copper_full_cooks",
+    "snippet": {
+      "channelId": "UCsmoke_copper_bbq",
+      "title": "Full Cooks (Unlisted, internal)",
+      "type": "singlePlaylist",
+      "position": 2
+    },
+    "contentDetails": ""
+  }
+]
