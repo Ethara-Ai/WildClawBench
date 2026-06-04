@@ -1,7 +1,0 @@
-Id,Name,AccountType,AccountSubType,CurrentBalance,Active,Classification,Description
-qb_acct_meg_1000,Operating Checking,Bank,Checking,142811.42,true,Asset,
-qb_acct_meg_5000,Materials and Supplies,Expense,SuppliesMaterials,84210.18,true,Expense,
-qb_acct_meg_5100,Vehicle and Fuel,Expense,Auto,21442.00,true,Expense,
-qb_acct_meg_5200,Crew Payroll,Expense,PayrollExpenses,612000.00,true,Expense,
-qb_acct_meg_5800,Owner BBQ Team (non business),Expense,Other Business Expenses,18421.00,true,Expense,
-qb_acct_meg_4000,Service Revenue,Income,ServiceFeeIncome,1612000.00,true,Revenue,

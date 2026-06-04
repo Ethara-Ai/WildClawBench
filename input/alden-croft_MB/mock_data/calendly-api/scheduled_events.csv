@@ -1,3 +1,0 @@
-uuid,owner,event_type,name,status,start_time,end_time,location_type,location,created_at,canceled_reason
-sched_evt_jul26_croft,pen_bay_phlebotomy,et_phleb_30,Therapeutic Phlebotomy - Croft,canceled,2026-07-22T13:00:00-04:00,2026-07-22T13:30:00-04:00,physical,"Pen Bay Medical Center Phlebotomy Suite, 6 Glen Cove Drive, Rockport, ME 04856",2026-07-15T10:00:00-04:00,
-sched_evt_jan26_croft,pen_bay_phlebotomy,et_phleb_30,Therapeutic Phlebotomy - Croft,canceled,2026-04-23T09:00:00-04:00,2026-04-23T09:30:00-04:00,physical,"Pen Bay Medical Center Phlebotomy Suite, 6 Glen Cove Drive, Rockport, ME 04856",2026-04-15T10:00:00-04:00,

@@ -1,8 +1,0 @@
-id,name,path_lower,path_display,is_folder,size,client_modified,rev
-id:dbx_folder_penbay,Pen Bay Patient Documents,/pen bay patient documents,/Pen Bay Patient Documents,true,0,2024-04-01T08:00:00Z,01
-id:dbx_panel_oct26,Lab Panel Report - 2026-09-28.pdf,/pen bay patient documents/lab panel report - 2026-09-28.pdf,/Pen Bay Patient Documents/Lab Panel Report - 2026-09-28.pdf,false,930387,2026-09-28T11:30:00Z,0x21
-id:dbx_panel_jul26,Lab Panel Report - 2026-07-22.pdf,/pen bay patient documents/lab panel report - 2026-07-22.pdf,/Pen Bay Patient Documents/Lab Panel Report - 2026-07-22.pdf,false,872210,2026-07-22T10:18:00Z,0x18
-id:dbx_panel_apr26,Lab Panel Report - 2026-04-23.pdf,/pen bay patient documents/lab panel report - 2026-04-23.pdf,/Pen Bay Patient Documents/Lab Panel Report - 2026-04-23.pdf,false,858740,2026-04-23T10:09:00Z,0x11
-id:dbx_prep_instructions,Phlebotomy Prep Instructions.pdf,/pen bay patient documents/phlebotomy prep instructions.pdf,/Pen Bay Patient Documents/Phlebotomy Prep Instructions.pdf,false,142883,2024-06-10T15:00:00Z,0x09
-id:dbx_billing_statement_oct26,Account Statement - October 2026.pdf,/pen bay patient documents/account statement - october 2026.pdf,/Pen Bay Patient Documents/Account Statement - October 2026.pdf,false,98711,2026-10-01T07:00:00Z,0x22
-id:dbx_consent_form,Phlebotomy Consent Form (signed 2024).pdf,/pen bay patient documents/phlebotomy consent form (signed 2024).pdf,/Pen Bay Patient Documents/Phlebotomy Consent Form (signed 2024).pdf,false,221544,2024-04-01T08:00:00Z,0x02

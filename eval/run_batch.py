@@ -987,6 +987,7 @@ def run_single_task(
     agent_proc = None
     elapsed_time = float(timeout_seconds)
     drift_director = _start_drift_director(task, drift_info, output_dir) if drift_info else None
+    mock_health_logger = _start_mock_health_logger(task, task_id, output_dir)
 
     try:
         execution = backend.run_task(
@@ -1146,6 +1147,13 @@ def run_single_task(
                 logger.info("[%s] Drift director stopped", task_id)
             except Exception as exc:
                 logger.warning("[%s] Drift director shutdown failed: %s", task_id, exc)
+
+        if mock_health_logger is not None:
+            try:
+                mock_health_logger.stop()
+                mock_health_logger.join(timeout=5.0)
+            except Exception as exc:
+                logger.warning("[%s] Mock health logger shutdown failed: %s", task_id, exc)
 
         if task_mock_container:
             try:
@@ -1394,6 +1402,36 @@ def _start_task_mock_stack(task: dict, network: str, environment_dir) -> tuple[d
                          task.get("task_id"))
 
     return env_dict, container, drift_info
+
+
+def _start_mock_health_logger(task: dict, task_id: str, output_dir):
+    """Spin up the per-task mock-API health logger.
+
+    Returns the started thread, or None when the task has no mock URLs to
+    probe. Reads ``KENSEI_MOCK_HEALTH_INTERVAL`` (seconds, default 30) for
+    the polling cadence so operators can tune verbosity without code edits.
+    """
+    env_dict = task.get("env_dict") or {}
+    if not env_dict:
+        return None
+    try:
+        from src.utils.mock_health_logger import MockHealthLogger
+        try:
+            interval = float(os.environ.get("KENSEI_MOCK_HEALTH_INTERVAL", "30") or 30)
+        except ValueError:
+            interval = 30.0
+        thread = MockHealthLogger(
+            task_id=task_id,
+            api_url_map=env_dict,
+            output_dir=output_dir,
+            agent_container=task_id,
+            interval=interval,
+        )
+        thread.start()
+        return thread
+    except Exception as exc:
+        logger.warning("[%s] Mock health logger failed to start: %s", task_id, exc)
+        return None
 
 
 def _start_drift_director(task: dict, drift_info: dict, output_dir):

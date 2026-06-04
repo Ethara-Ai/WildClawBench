@@ -1,4 +1,0 @@
-id,name,section,descriptionHeading,description,room,ownerId,courseState,creationTime,updateTime,enrollmentCode,alternateLink,guardiansEnabled,calendarId
-rm305_s26,Research Methods 305 (Prof Hadley),Spring 2026,,Westbrook University communications program. Quantitative research methods and applied statistics for comms majors. Hybrid format with weekly lecture and online problem sets.,Stone Hall 214,prof_hadley,ACTIVE,2025-12-15T13:00:00Z,,RM305S26,,,cal_rm305_s26
-comm_240,Communications Theory 240,Spring 2026,,Communications theory survey.,Stone Hall 102,prof_winters,ACTIVE,2025-12-15T13:00:00Z,,COMM240S26,,,cal_comm_240
-phil_120,Logic and Critical Thinking 120,Spring 2026,,Intro logic.,Stone Hall 305,prof_oh,ACTIVE,2025-12-15T13:00:00Z,,PHIL120S26,,,cal_phil_120

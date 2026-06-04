@@ -1,5 +1,0 @@
-courseId,id,title,description,state,creationTime,updateTime,creatorUserId,topicId,alternateLink,materialType,materialUrl
-rm305_s26,mat_ps4_pdf,PS4 Problem Set PDF,,,,,,topic_ps,,DRIVE_FILE,https://classroom.kf.local/drive/ps4_problemset_v1.pdf
-rm305_s26,mat_ps4_format,Four Part Solution Format Reference,,,,,,topic_ps,,DRIVE_FILE,https://classroom.kf.local/drive/four_part_format.pdf
-rm305_s26,mat_lecture_index,Class Lecture Recording Index (class YouTube channel),,,,,,topic_lectures,,LINK,https://www.youtube.com/channel/UChadley_rm305
-rm305_s26,mat_textbook_chap_8,Textbook Chapter 8 (CI and Hypothesis Testing),,,,,,topic_ps,,DRIVE_FILE,https://classroom.kf.local/drive/textbook_ch8.pdf
