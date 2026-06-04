@@ -41,6 +41,9 @@ output.rar
 output_qwen.rar
 *.rar
 
+# Benchmark run output (trajectories, scores, artifacts) — large, machine-specific.
+output/
+
 # Per-run telemetry written by run.sh tee — local, timestamped, machine-specific.
 logs/
 

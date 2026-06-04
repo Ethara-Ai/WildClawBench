@@ -1,5 +1,0 @@
-{"import_error": null, "results": {"TestBehavioralFallback::test_placeholder": {"status": "passed"}, "TestNegativeWeightFallback::test_placeholder_negative": {"status": "passed"}}}
-
-[stderr]
-[runner] running TestBehavioralFallback::test_placeholder
-[runner] running TestNegativeWeightFallback::test_placeholder_negative
