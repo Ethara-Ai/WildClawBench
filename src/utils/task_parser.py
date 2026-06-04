@@ -147,15 +147,28 @@ def _load_provided_tests(task_dir: Path) -> tuple[str, str]:
     ``Test*`` classes with ``test_*(self)`` methods, no pytest fixtures, stdlib
     only, and mock-API URLs read from ``<SERVICE>_URL`` env vars.
 
+    The suite file may be named ``test_outputs.py`` (canonical) or
+    ``test_output.py`` (a common singular-typo variant emitted by some
+    generators); both are accepted so a single dropped ``s`` does not silently
+    route the task to the LLM-generation fallback. ``test_outputs.py`` wins when
+    both exist.
+
     Returns ``(test_code, test_weights_json)`` — ``test_weights_json`` is the raw
     file text (the executor consumes a JSON string). Returns ``("", "")`` when no
     complete provided suite is found.
     """
     for sub in ("", "tests"):
         base = task_dir / sub if sub else task_dir
-        code_f = base / "test_outputs.py"
         weights_f = base / "test_weights.json"
-        if not (code_f.is_file() and weights_f.is_file()):
+        if not weights_f.is_file():
+            continue
+        code_f = None
+        for fname in ("test_outputs.py", "test_output.py"):
+            cand = base / fname
+            if cand.is_file():
+                code_f = cand
+                break
+        if code_f is None:
             continue
         try:
             code = code_f.read_text(encoding="utf-8")

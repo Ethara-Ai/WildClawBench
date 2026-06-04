@@ -29,11 +29,14 @@ logger = logging.getLogger(__name__)
 
 
 _RUNNER_SCRIPT = textwrap.dedent('''
-    import importlib.util, inspect, json, signal, sys, traceback
+    import asyncio, importlib.util, inspect, json, signal, sys, traceback, unittest
 
     PER_TEST_TIMEOUT = int(__import__("os").environ.get("WCB_PER_TEST_TIMEOUT", "30"))
 
     class _TestTimeout(Exception):
+        pass
+
+    class _Skipped(Exception):
         pass
 
     def _alarm_handler(signum, frame):
@@ -47,76 +50,234 @@ _RUNNER_SCRIPT = textwrap.dedent('''
     # pytest globally, so a bare import would import_error the whole suite. When
     # the real pytest is absent, install a permissive stub so the import (and any
     # incidental pytest.* references) succeed; a real pytest takes precedence.
+    # The stub also makes pytest.skip / pytest.mark.skip / skipif raise a
+    # recognizable _Skipped so those tests are recorded skipped (not run/errored).
     try:
         import pytest  # noqa: F401
+        _REAL_PYTEST = True
     except Exception:
+        _REAL_PYTEST = False
+        def _skip(*a, **k):
+            raise _Skipped(a[0] if a else "")
         class _PytestStub:
+            # pytest.skip(...) and pytest.fail(...) have call-time semantics.
+            def skip(self, *a, **k):
+                raise _Skipped(a[0] if a else "")
+            def fail(self, *a, **k):
+                raise AssertionError(a[0] if a else "pytest.fail")
             def __getattr__(self, _n):
                 return _PytestStub()
             def __call__(self, *a, **k):
+                # Decorator forms: @pytest.fixture, @pytest.mark.parametrize(...),
+                # used as @deco or @deco(...). Return the function unchanged when
+                # used as a bare decorator; otherwise return a passthrough deco.
                 if len(a) == 1 and callable(a[0]) and not k:
                     return a[0]
-                return _PytestStub()
+                def _passthrough(fn=None):
+                    return fn if fn is not None else (lambda g: g)
+                return _passthrough
             def __enter__(self):
                 return self
             def __exit__(self, *a):
                 return False
         sys.modules["pytest"] = _PytestStub()
 
+    def _is_skip_exc(e):
+        # Recognize our stub skip, real pytest/unittest skips by class name.
+        if isinstance(e, _Skipped):
+            return True
+        n = type(e).__name__
+        return n in ("Skipped", "SkipTest")
+
     spec = importlib.util.spec_from_file_location("t", "/tests/test_outputs.py")
     mod = importlib.util.module_from_spec(spec)
-    out = {"import_error": None, "results": {}}
+    out = {"import_error": None, "results": {}, "collected": 0}
     try:
         spec.loader.exec_module(mod)
     except Exception as e:
         out["import_error"] = f"{type(e).__name__}: {e}\\n{traceback.format_exc()}"
+        # Targeted hint for the two most common authoring mistakes: importing a
+        # local/sibling module (e.g. `import task`) or a 3rd-party dependency
+        # that is not shipped into the hermetic /tests sandbox.
+        if isinstance(e, ModuleNotFoundError):
+            missing = getattr(e, "name", "") or ""
+            out["import_hint"] = (
+                f"suite imports module '{missing}' which is not shipped to the "
+                f"sandbox; the runner ships only test_outputs.py (stdlib only, "
+                f"no local task.py / conftest.py / 3rd-party deps)"
+            )
         print(json.dumps(out)); sys.exit(0)
 
+    def _required_param_names(fn):
+        # Positional/keyword params with no default, excluding self/cls.
+        try:
+            sig = inspect.signature(fn)
+        except (TypeError, ValueError):
+            return []
+        req = []
+        for p in sig.parameters.values():
+            if p.name in ("self", "cls"):
+                continue
+            if p.kind in (p.VAR_POSITIONAL, p.VAR_KEYWORD):
+                continue
+            if p.default is p.empty:
+                req.append(p.name)
+        return req
+
+    def _record(results, full, callable_fn, is_async=False):
+        print(f"[runner] running {full}", file=sys.stderr, flush=True)
+        signal.alarm(PER_TEST_TIMEOUT)
+        try:
+            res = callable_fn()
+            if inspect.iscoroutine(res):  # (F) async test or sync fn returning a coroutine
+                asyncio.run(res)
+            results[full] = {"status": "passed"}
+        except _TestTimeout as e:
+            results[full] = {"status": "errored", "error": f"timeout: {e}", "traceback": ""}
+        except AssertionError as e:
+            results[full] = {"status": "failed",
+                             "error": f"AssertionError: {e}",
+                             "traceback": traceback.format_exc()}
+        except BaseException as e:  # noqa: BLE001 - catch unittest SkipTest too
+            if _is_skip_exc(e):
+                results[full] = {"status": "skipped", "error": f"skipped: {e}"}
+            else:
+                results[full] = {"status": "errored",
+                                 "error": f"{type(e).__name__}: {e}",
+                                 "traceback": traceback.format_exc()}
+        finally:
+            signal.alarm(0)
+
+    def _run_method(results, owner, inst, cls_name, m):
+        # Resolve WITHOUT triggering descriptors/properties (C): a `test_*`
+        # property must never auto-execute during collection, and non-callable
+        # `test_*` data attributes (e.g. test_cases=[...]) are skipped, not
+        # errored. static/classmethods bind correctly via getattr(inst, m).
+        full = f"{cls_name}::{m}"
+        try:
+            raw = inspect.getattr_static(owner, m)
+        except AttributeError:
+            return False
+        if isinstance(raw, property):
+            return False
+        if not (inspect.isfunction(raw) or inspect.ismethod(raw)
+                or isinstance(raw, (staticmethod, classmethod))):
+            return False  # data attribute named test_* — not a test
+        fn = getattr(inst, m)
+        if not callable(fn):
+            return False
+        # (D) fixture-style signature: required params we cannot supply.
+        req = _required_param_names(fn)
+        if req:
+            results[full] = {
+                "status": "errored",
+                "error": ("requires fixtures/params " + ", ".join(req)
+                          + "; the no-fixture runner cannot supply them "
+                          + "(remove pytest fixtures or make the test self-contained)"),
+                "traceback": "",
+            }
+            return True
+        is_async = inspect.iscoroutinefunction(fn)
+        _record(results, full, fn, is_async=is_async)
+        return True
+
+    # ---- Collect & run Test* classes (incl. unittest.TestCase) ----
     for cls_name in sorted(dir(mod)):
         cls = getattr(mod, cls_name)
         if not (inspect.isclass(cls) and cls_name.startswith("Test")):
             continue
+        is_unittest = issubclass(cls, unittest.TestCase)
+        # Instantiate. unittest.TestCase needs a method name; use a dummy that
+        # exists on all TestCase subclasses so __init__ succeeds, then we drive
+        # setUp/tearDown manually around each test.
         try:
-            inst = cls()
-        except Exception as e:
+            inst = cls("run") if is_unittest else cls()
+        except Exception:
+            # Retry unittest with a guaranteed-present method name.
+            try:
+                inst = cls(methodName="__init__") if is_unittest else None
+            except Exception:
+                inst = None
+        if inst is None:
             tb = traceback.format_exc()
             for m in dir(cls):
                 if m.startswith("test_"):
+                    out["collected"] += 1
                     out["results"][f"{cls_name}::{m}"] = {
                         "status": "errored",
-                        "error": f"ctor: {type(e).__name__}: {e}",
+                        "error": "ctor: could not instantiate test class",
                         "traceback": tb,
                     }
             continue
         for m in sorted(dir(cls)):
             if not m.startswith("test_"):
                 continue
-            full = f"{cls_name}::{m}"
-            print(f"[runner] running {full}", file=sys.stderr, flush=True)
-            signal.alarm(PER_TEST_TIMEOUT)
-            try:
-                getattr(inst, m)()
-                out["results"][full] = {"status": "passed"}
-            except _TestTimeout as e:
-                out["results"][full] = {
-                    "status": "errored",
-                    "error": f"timeout: {e}",
-                    "traceback": "",
-                }
-            except AssertionError as e:
-                out["results"][full] = {
-                    "status": "failed",
-                    "error": f"AssertionError: {e}",
-                    "traceback": traceback.format_exc(),
-                }
-            except Exception as e:
-                out["results"][full] = {
-                    "status": "errored",
-                    "error": f"{type(e).__name__}: {e}",
-                    "traceback": traceback.format_exc(),
-                }
-            finally:
-                signal.alarm(0)
+            # (B) unittest lifecycle: setUp before, tearDown after, each test.
+            if is_unittest:
+                full = f"{cls_name}::{m}"
+                raw = None
+                try:
+                    raw = inspect.getattr_static(cls, m)
+                except AttributeError:
+                    pass
+                if isinstance(raw, property) or not (
+                    inspect.isfunction(raw) or inspect.ismethod(raw)
+                    or isinstance(raw, (staticmethod, classmethod))
+                ):
+                    continue
+                fn = getattr(inst, m)
+                if not callable(fn):
+                    continue
+                req = _required_param_names(fn)
+                if req:
+                    out["collected"] += 1
+                    out["results"][full] = {
+                        "status": "errored",
+                        "error": "requires fixtures/params " + ", ".join(req),
+                        "traceback": "",
+                    }
+                    continue
+                out["collected"] += 1
+                def _drive(_fn=fn, _inst=inst):
+                    _inst.setUp()
+                    try:
+                        r = _fn()
+                        if inspect.iscoroutine(r):
+                            asyncio.run(r)
+                    finally:
+                        _inst.tearDown()
+                _record(out["results"], full, _drive)
+            else:
+                if _run_method(out["results"], cls, inst, cls_name, m):
+                    out["collected"] += 1
+
+    # ---- (A) Collect & run top-level test_* functions (no class) ----
+    for fn_name in sorted(dir(mod)):
+        if not fn_name.startswith("test_"):
+            continue
+        try:
+            raw = inspect.getattr_static(mod, fn_name)
+        except AttributeError:
+            continue
+        if not (inspect.isfunction(raw) or isinstance(raw, staticmethod)):
+            continue  # skip module-level data named test_*
+        fn = getattr(mod, fn_name)
+        if not callable(fn):
+            continue
+        full = f"<module>::{fn_name}"
+        req = _required_param_names(fn)
+        if req:
+            out["collected"] += 1
+            out["results"][full] = {
+                "status": "errored",
+                "error": ("requires fixtures/params " + ", ".join(req)
+                          + "; the no-fixture runner cannot supply them"),
+                "traceback": "",
+            }
+            continue
+        out["collected"] += 1
+        _record(out["results"], full, fn, is_async=inspect.iscoroutinefunction(fn))
+
     print(json.dumps(out))
 ''').strip()
 
@@ -146,8 +307,9 @@ def _compute_reward(results: Mapping[str, dict], weights: Mapping[str, float]) -
     neg_penalty = sum(abs(float(w)) for n, w in weights.items() if w < 0 and n in passed_names)
 
     if pos_total <= 0:
-        total = len(results)
-        passed = sum(1 for r in results.values() if r.get("status") == "passed")
+        scored = [r for r in results.values() if r.get("status") != "skipped"]
+        total = len(scored)
+        passed = sum(1 for r in scored if r.get("status") == "passed")
         return round(passed / total, 4) if total else 0.0
     return round(max(0.0, (pos_earned - neg_penalty) / pos_total), 4)
 
@@ -273,21 +435,34 @@ def execute_tests(
 
         results: Dict[str, dict] = payload.get("results", {}) or {}
         scores: Dict[str, str] = {k: v.get("status", "errored") for k, v in results.items()}
-        tests_total = len(scores)
         tests_passed = sum(1 for v in scores.values() if v == "passed")
         tests_failed = sum(1 for v in scores.values() if v == "failed")
         tests_errored = sum(1 for v in scores.values() if v == "errored")
+        tests_skipped = sum(1 for v in scores.values() if v == "skipped")
+        tests_total = tests_passed + tests_failed + tests_errored
         reward = _compute_reward(results, weights)
 
+        if not results:
+            err = "no tests collected (no Test* classes or test_* functions found)"
+            logger.warning("[testexec] %s", err)
+            return {
+                "tests_total": 0, "tests_passed": 0, "tests_failed": 0,
+                "tests_errored": 0, "tests_skipped": 0, "test_scores": "{}",
+                "test_output": output, "test_code": test_code, "reward": 0.0,
+                "duration_execution_ms": int((time.time() - started) * 1000),
+                "error": err,
+            }
+
         logger.info(
-            "[testexec] %d/%d passed (%d failed, %d errored) — reward=%.3f",
-            tests_passed, tests_total, tests_failed, tests_errored, reward,
+            "[testexec] %d/%d passed (%d failed, %d errored, %d skipped) — reward=%.3f",
+            tests_passed, tests_total, tests_failed, tests_errored, tests_skipped, reward,
         )
         return {
             "tests_total": tests_total,
             "tests_passed": tests_passed,
             "tests_failed": tests_failed,
             "tests_errored": tests_errored,
+            "tests_skipped": tests_skipped,
             "test_scores": json.dumps(scores),
             "test_function_outputs": json.dumps({
                 k: v.get("error", "") for k, v in results.items()

@@ -62,6 +62,7 @@ def build_ctrf(
     tests_failed: int,
     tests_errored: int = 0,
     test_scores_json: str = "",
+    tests_skipped: int = 0,
 ) -> Dict[str, Any]:
     """Return a CTRF dict for `/logs/verifier/ctrf.json`.
 
@@ -71,6 +72,7 @@ def build_ctrf(
     tests_passed = int(tests_passed or 0)
     tests_failed = int(tests_failed or 0)
     tests_errored = int(tests_errored or 0)
+    tests_skipped = int(tests_skipped or 0)
 
     scores = _coerce_scores_map(_parse_json(test_scores_json))
 
@@ -83,13 +85,16 @@ def build_ctrf(
                 "duration": 0,
             })
     else:
-        for idx in range(tests_total):
+        synth_total = tests_total + tests_skipped
+        for idx in range(synth_total):
             if idx < tests_passed:
                 status = "passed"
             elif idx < tests_passed + tests_failed:
                 status = "failed"
-            else:
+            elif idx < tests_passed + tests_failed + tests_errored:
                 status = "other"
+            else:
+                status = "skipped"
             tests.append({
                 "name": f"test_unknown_{idx}",
                 "status": status,
@@ -104,7 +109,7 @@ def build_ctrf(
                 "passed": tests_passed,
                 "failed": tests_failed,
                 "pending": 0,
-                "skipped": 0,
+                "skipped": tests_skipped,
                 "other": tests_errored,
             },
             "tests": tests,

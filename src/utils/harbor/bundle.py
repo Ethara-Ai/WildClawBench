@@ -387,6 +387,7 @@ def write_bundle(
             tests_passed = int((tr or {}).get("tests_passed", 0))
             tests_failed = int((tr or {}).get("tests_failed", 0))
             tests_errored = int((tr or {}).get("tests_errored", 0))
+            tests_skipped = int((tr or {}).get("tests_skipped", 0))
             test_scores = (tr or {}).get("test_scores", "")
             test_output = (tr or {}).get("test_output", "")
             test_code = (tr or {}).get("test_code", task.test_code or "")
@@ -410,6 +411,7 @@ def write_bundle(
                     tests_failed=tests_failed,
                     tests_errored=tests_errored,
                     test_scores_json=test_scores,
+                    tests_skipped=tests_skipped,
                 )
                 (verifier_dir / "ctrf.json").write_text(
                     json.dumps(ctrf, indent=2, ensure_ascii=False), encoding="utf-8"

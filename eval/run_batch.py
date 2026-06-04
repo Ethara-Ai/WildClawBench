@@ -763,6 +763,7 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
                 "tests_passed": int(src.get("tests_passed", src.get("criteria_passed", 0)) or 0),
                 "tests_failed": int(src.get("tests_failed", src.get("criteria_failed", 0)) or 0),
                 "tests_errored": int(src.get("tests_errored", 0) or 0),
+                "tests_skipped": int(src.get("tests_skipped", 0) or 0),
                 "test_scores": src.get("test_scores", "") or "",
                 "test_output": src.get("test_output", "") or "",
                 "test_code": task.get("test_code", "") or "",
@@ -1059,6 +1060,7 @@ def run_single_task(
                     tests_failed=te["tests_failed"],
                     tests_errored=te["tests_errored"],
                     test_scores_json=te.get("test_scores", "{}"),
+                    tests_skipped=te.get("tests_skipped", 0),
                 )
                 (verifier_dir / "ctrf.json").write_text(
                     json.dumps(ctrf, indent=2, ensure_ascii=False), encoding="utf-8")

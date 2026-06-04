@@ -10,6 +10,7 @@ fastapi
 pytest
 openai
 litellm
+tomli; python_version < "3.11"
 annotated-doc==0.0.4
 annotated-types==0.7.0
 anyio==4.12.1

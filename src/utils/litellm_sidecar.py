@@ -148,12 +148,19 @@ def build_litellm_config_yaml(
             "      model: openai/whisper-1\n"
             "      api_key: os.environ/OPENAI_API_KEY"
         )
-    # OpenClaw's image tool falls back to a built-in default model id
-    # ("anthropic/gpt-4o") when its own imageModel override isn't applied inside
-    # the container. The gateway doesn't expose that id, so multimodal calls die
-    # with "Unknown model: anthropic/gpt-4o" (see failure reports). Alias it to a
-    # real vision-capable model that IS registered so image tasks resolve instead
-    # of erroring. Prefer GPT-5.5 (OpenAI), else the Opus inference profile.
+    # OpenClaw's image tool falls back to built-in default model ids when its
+    # own imageModel override isn't applied inside the container. The openclaw
+    # 2026.3.11 dist (verified via grep of /usr/lib/node_modules/openclaw/dist)
+    # references BOTH "gpt-4o" (32x) and "gpt-4o-mini" (81x) as defaults, and the
+    # image tool emits them under the "anthropic/" provider slot. The gateway
+    # doesn't expose those ids, so multimodal calls die with e.g.
+    # "Unknown model: anthropic/gpt-4o-mini" (see gateway.log 2026-06-04 06:57).
+    # We alias EVERY fallback id openclaw can emit to a real vision-capable model
+    # that IS registered, so image tasks resolve instead of erroring. The alias
+    # is a pure sidecar rewrite: a request labeled "anthropic/gpt-4o-mini" is
+    # transparently served by gpt-5.5 (or the Opus profile) and NEVER reaches a
+    # real OpenAI gpt-4o/gpt-4o-mini endpoint -- no extra cost, no egress, no
+    # bypass of the --internal sandbox. Prefer GPT-5.5 (OpenAI), else Opus.
     if openai_api_key:
         image_alias = (
             "      model: openai/responses/gpt-5.5\n"
@@ -168,11 +175,17 @@ def build_litellm_config_yaml(
     else:
         image_alias = ""
     if image_alias:
-        model_blocks.append(
-            "  - model_name: anthropic/gpt-4o\n"
-            "    litellm_params:\n"
-            + image_alias
-        )
+        for _img_fallback_id in (
+            "anthropic/gpt-4o",
+            "anthropic/gpt-4o-mini",
+            "gpt-4o",
+            "gpt-4o-mini",
+        ):
+            model_blocks.append(
+                f"  - model_name: {_img_fallback_id}\n"
+                "    litellm_params:\n"
+                + image_alias
+            )
     if not model_blocks:
         return ""
     # Real per-call usage from the proxy itself (not the agent's chat.jsonl
