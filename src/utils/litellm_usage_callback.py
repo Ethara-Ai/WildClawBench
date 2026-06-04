@@ -114,6 +114,41 @@ def _write_row(kwargs: dict, response_obj: Any, start_time: Any, end_time: Any) 
         except Exception:
             pass
 
+        # Cost: prefer litellm.completion_cost() over the proxy-supplied
+        # kwargs["response_cost"], because the latter is systematically wrong on
+        # at least two upstream paths (both verified live against
+        # litellm:main-stable v1.87.0):
+        #   - Bedrock Anthropic streaming with prompt caching: response_cost
+        #     omits cache_write (cache_creation_input_tokens) pricing entirely,
+        #     under-counting opus rows ~12-14x (e.g. a 38k-cache-write turn
+        #     priced at $0.0028 instead of $0.245).
+        #   - OpenAI /responses path (gpt-5.5) with large outputs: response_cost
+        #     comes back 0.0 on ~5/78 rows.
+        # completion_cost(completion_response=, model=) reads the cache fields and
+        # prices them at the correct per-token rates. We fall back to
+        # response_cost ONLY when completion_cost yields <= 0, which preserves
+        # whisper-1 duration billing (no tokens -> completion_cost is 0 and
+        # response_cost is the only valid source). Do NOT revert to plain
+        # response_cost.
+        cost = 0.0
+        try:
+            import litellm
+            cost = float(
+                litellm.completion_cost(
+                    completion_response=response_obj,
+                    model=kwargs.get("model"),
+                )
+                or 0.0
+            )
+        except Exception as exc:
+            sys.stderr.write(
+                f"[litellm_usage_callback] completion_cost failed for "
+                f"model={kwargs.get('model')!r}: {exc}\n"
+            )
+            cost = 0.0
+        if cost <= 0.0:
+            cost = _float(kwargs.get("response_cost"))
+
         row = {
             "ts": datetime.now(timezone.utc).isoformat(),
             "model": kwargs.get("model") or "",
@@ -123,7 +158,7 @@ def _write_row(kwargs: dict, response_obj: Any, start_time: Any, end_time: Any) 
             "cache_read_tokens":  cache_read,
             "cache_write_tokens": cache_write,
             "audio_seconds":      round(audio_seconds, 3),
-            "cost_usd":           _float(kwargs.get("response_cost")),
+            "cost_usd":           cost,
             "duration_s":         round(duration, 3),
         }
         os.makedirs(os.path.dirname(_PATH), exist_ok=True)

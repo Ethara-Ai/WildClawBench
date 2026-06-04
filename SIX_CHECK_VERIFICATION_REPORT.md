@@ -119,7 +119,9 @@ def _business_calls(env_var):
 
 **Issue / nuance found:** GPT-5.5 shows `cache_write = 0`. This is **expected** — OpenAI prompt caching is automatic/server-side (no explicit cache-write accounting like Anthropic's). The 88.6% cache-read ratio (run_2) confirms caching is active and effective. Caching is preserved alongside the `--internal` egress sandbox.
 
-**Verdict: GREEN for both** (>82% cache-read on both, `usage_source: litellm`).
+**Verdict: GREEN for both** (>82% cache-read on both, `usage_source: litellm`). The cache **token** evidence above is correct and the verdict stands.
+
+> **Cost-figure footnote (added 2026-06 during the caching+cost re-verification):** the `cost` column values above were derived from LiteLLM's upstream `response_cost`, which was later found to **systematically under-count**: (a) on Bedrock/Anthropic streaming it omits `cache_write` pricing entirely (~12–14× under-count on cache-creation turns, so e.g. Claude run_13's `$0.499` is actually ≈ `$8.7`), and (b) on the GPT-5.5 `/responses` path it returned `$0.0` for some large-output calls. Additionally, **judge-council cost was never computed** (`usage.json` `sources.judge` carried tokens but no `cost_usd`). All three were fixed (callback now prefers `litellm.completion_cost()`; judge calls now compute `cost_usd` via a per-model rate table with a distinct cached-input rate). This footnote corrects the **dollar** figures only; it does **not** reopen the CHECK 5 verdict, which verified caching **tokens** (correct and unchanged).
 
 ---
 

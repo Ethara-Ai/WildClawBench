@@ -376,7 +376,31 @@ _ZERO_USAGE = {
     "cache_write_tokens": 0,
     "total_tokens": 0,
     "request_count": 0,
+    "cost_usd": 0.0,
 }
+
+
+_JUDGE_RATES = {
+    "is9bst5tfadh": (3e-6, 1.5e-5, 3e-7, 3.75e-6),
+    "xx5msvho23iq": (0.6e-6, 2.4e-6, 0.0, 0.0),
+    "p532c9fzmeed": (0.6e-6, 2.5e-6, 0.0, 0.0),
+    "gpt-5.4": (1.25e-6, 1e-5, 1.25e-7, 0.0),
+    "gpt-5.5": (5e-6, 3e-5, 5e-7, 0.0),
+}
+
+
+def _judge_cost_usd(model: str, in_tok: int, out_tok: int, c_read: int, c_write: int) -> float:
+    rate = None
+    for key, val in _JUDGE_RATES.items():
+        if key in (model or ""):
+            rate = val
+            break
+    if rate is None:
+        logger.warning("[judge_cost] unknown judge id for model=%r; cost defaulted to 0", model)
+        return 0.0
+    r_in, r_out, r_cached, r_cwrite = rate
+    uncached_in = max(0, in_tok - c_read)
+    return uncached_in * r_in + c_read * r_cached + c_write * r_cwrite + out_tok * r_out
 
 
 def _call_judge_openai(model: str, system: str, user: str) -> tuple[str, dict]:
@@ -440,6 +464,7 @@ def _call_judge_openai(model: str, system: str, user: str) -> tuple[str, dict]:
         "cache_write_tokens": 0,
         "total_tokens": int(u.get("total_tokens", 0) or (prompt_tok + comp_tok)),
         "request_count": 1,
+        "cost_usd": _judge_cost_usd(model, prompt_tok, comp_tok, cached_tok, 0),
     }
     return text, usage
 
@@ -565,6 +590,7 @@ def _call_judge_bedrock(arn: str, system: str, user: str) -> tuple[str, dict]:
             "cache_write_tokens": c_write,
             "total_tokens": int(u.get("totalTokens", 0) or (in_tok + out_tok + c_read + c_write)),
             "request_count": 1,
+            "cost_usd": _judge_cost_usd(arn, in_tok, out_tok, c_read, c_write),
         }
         return text, usage
 
@@ -906,7 +932,10 @@ def _grade_council(
     for r in results:
         u = r.get("usage") or {}
         for k in council_usage.keys():
-            council_usage[k] = council_usage.get(k, 0) + int(u.get(k, 0) or 0)
+            if k == "cost_usd":
+                council_usage[k] = float(council_usage.get(k, 0.0)) + float(u.get(k, 0.0) or 0.0)
+            else:
+                council_usage[k] = int(council_usage.get(k, 0)) + int(u.get(k, 0) or 0)
 
     n = len(rubrics)
     n_abstained = len(abstention_flags)
