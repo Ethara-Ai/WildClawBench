@@ -111,16 +111,22 @@ _MEMBER_EVIDENCE_BUDGETS: tuple[tuple[str, int, int], ...] = (
     # Sonnet 4.6 — 1,000,000 ctx, 8192 max_output. cpt 1.375 measured against dispatched user_chars (evidence + ~5000-char scaffold).
     # (1_000_000 − 8192 − 3000) × 1.375 = 1,357,361 dispatched chars − 5,000 scaffold = 1,352,361 → 1_350_000 evidence budget.
     ("is9bst5tfadh", 1_350_000, 8192),
-    # Kimi K2.5 — 262,144 ctx, 16384 max_output. cpt 1.29 (probe-empirical
-    # 2026-06-04 against alden-croft evidence: 300k chars → 231,898 tokens,
-    # 250k → 189,473; 350k+ hits the 245,760 input cap = 262,144 − 16,384).
-    # Available input: 262,144 − 16,384 − 3000_safety = 242,760 tok.
-    # 242,760 × 1.29 = 313,160 dispatched chars − 5,000 scaffold − 8,160 margin
-    # = 300,000 evidence budget. Earlier 375,000 overshot Bedrock by ~13k tok.
-    ("p532c9fzmeed",   300_000, 16384),
-    # GLM 5 — 202,752 ctx, 16384 max_output. cpt 1.50 (probe-empirical at 279,989 char payload → 186,369 tokens).
-    # (202_752 − 16384 − 3000) × 1.50 = 274,752 dispatched chars − 5,000 scaffold = 269,752 → 250_000 evidence budget.
-    ("xx5msvho23iq",   250_000, 16384),
+    # Kimi K2.5 — 262,144 ctx, 16384 max_output. The earlier 300_000 budget was
+    # probe-tuned against alden-croft PROSE (cpt 1.29). Dense financial/CSV
+    # evidence tokenizes harder: amanda_hayes_01 claude/run_3 dispatched 306,639
+    # chars and Bedrock 400'd (exceeded the 245,760 input cap = 262,144 − 16,384),
+    # so the real cpt floor on dense data is ≤ 306,639/245,760 = 1.248. Use a
+    # conservative cpt floor of 1.15 for headroom across data densities:
+    # (262,144 − 16,384 − 3000_safety) = 242,760 input tok; 242,760 × 1.15 =
+    # 279,174 dispatched chars − 5,000 scaffold = 274,174 → floor to 225,000
+    # evidence budget (extra margin below the 306k that failed).
+    ("p532c9fzmeed",   225_000, 16384),
+    # GLM 5 — 202,752 ctx, 16384 max_output. Earlier 250_000 was tuned against
+    # alden-croft (cpt 1.50). amanda run_3 dispatched 256,639 chars → Bedrock 400.
+    # (202,752 − 16,384 − 3000) = 183,368 input tok; 183,368 × 1.15 = 210,873
+    # dispatched chars − 5,000 scaffold = 205,873 → floor to 175,000 evidence
+    # budget (well below the 256k that failed).
+    ("xx5msvho23iq",   175_000, 16384),
 )
 # Fallback for unrecognized models (single-judge OpenAI fallback, custom ARNs).
 # OpenAI auto-caches and has its own server-side enforcement; conservative.
@@ -279,6 +285,14 @@ def _looks_like_deliverable(path: Path, root: Path) -> bool:
         return False
 
 
+def _is_text_deliverable(path: Path) -> bool:
+    # Binary artifacts (.jpg/.pdf/.png) read with errors='replace' inject
+    # hundreds of KB of mojibake that sorts ahead of report.md and exhausts the
+    # smaller council members' truncation budget, breaking per-member evidence
+    # parity (Kimi/GLM hallucinating 'no report.md'). Text-only here.
+    return path.suffix.lower() in _DELIVERABLE_EXTS
+
+
 def _collect_deliverable_files(workspace_results: Path) -> list[Path]:
     files: list[Path] = []
     seen: set[Path] = set()
@@ -287,7 +301,7 @@ def _collect_deliverable_files(workspace_results: Path) -> list[Path]:
         if not root.is_dir():
             return
         for f in sorted(root.rglob("*")):
-            if f.is_file() and f not in seen:
+            if f.is_file() and f not in seen and _is_text_deliverable(f):
                 seen.add(f)
                 files.append(f)
 
@@ -321,7 +335,22 @@ def _gather_evidence(
 ) -> str:
     parts: list[str] = []
     deliverables = _collect_deliverable_files(workspace_results)
-    for f in deliverables:
+    # Order so primary outputs survive every member's truncation budget: named
+    # report/flagged deliverables first, then ascending file size (small,
+    # high-signal text before bulky dumps). Without this, alphabetical order can
+    # bury report.md behind larger files for the smaller-context judges.
+    _PRIMARY = ("report", "flagged")
+
+    def _priority(path: Path) -> tuple:
+        stem = path.stem.lower()
+        rank = 0 if any(k in stem for k in _PRIMARY) else 1
+        try:
+            size = path.stat().st_size
+        except OSError:
+            size = 1 << 30
+        return (rank, size, path.name)
+
+    for f in sorted(deliverables, key=_priority):
         try:
             body = f.read_text(encoding="utf-8", errors="replace")
         except Exception:
@@ -672,30 +701,58 @@ def _run_council(
         return user_for_member
 
     def _one(model: str) -> dict:
+        import time as _time
         user = _resolve_user(model)
+        label = _short_judge_label(model)
+        # Per-member API call telemetry: pre-call line lets operators see WHICH
+        # member is being dispatched WHAT payload before any network I/O; the
+        # post-call ok/fail line below carries timing + tokens + cache deltas
+        # so a single grep over `Judge call` reproduces the full council
+        # fan-out from run.sh logs alone. Mirrors run_batch.py:707
+        # `Rubric judged:` summary line one level up.
         logger.info(
-            "Judge dispatch: model=%s user_chars=%d system_chars=%d",
-            _short_judge_label(model), len(user), len(system),
+            "Judge call start: model=%s user_chars=%d system_chars=%d",
+            label, len(user), len(system),
         )
+        t0 = _time.monotonic()
         try:
             raw, usage = _call_one_judge(model, system, user)
         except Exception as exc:
-            logger.warning("Council member %s call failed: %s", model, exc)
+            elapsed = _time.monotonic() - t0
+            logger.warning(
+                "Judge call fail: model=%s elapsed=%.2fs stage=call error=%s",
+                label, elapsed, str(exc)[:200],
+            )
             return {
                 "model": model, "ok": False,
                 "error": f"call: {exc}", "usage": dict(_ZERO_USAGE),
                 "user_chars": len(user),
             }
+        elapsed = _time.monotonic() - t0
+        in_tok = int(usage.get("input_tokens", 0) or 0)
+        out_tok = int(usage.get("output_tokens", 0) or 0)
+        c_read = int(usage.get("cache_read_tokens", 0) or 0)
+        c_write = int(usage.get("cache_write_tokens", 0) or 0)
         try:
             verdicts = _parse_verdict_text(raw, n_criteria)
         except Exception as exc:
-            logger.warning("Council member %s parse failed: %s", model, exc)
+            logger.warning(
+                "Judge call fail: model=%s elapsed=%.2fs stage=parse "
+                "tokens=in:%d/out:%d/cR:%d/cW:%d error=%s",
+                label, elapsed, in_tok, out_tok, c_read, c_write, str(exc)[:200],
+            )
             return {
                 "model": model, "ok": False,
                 "error": f"parse: {exc}", "usage": usage,
                 "user_chars": len(user),
                 "raw_response": raw[:2000] if isinstance(raw, str) else "",
             }
+        logger.info(
+            "Judge call ok: model=%s elapsed=%.2fs "
+            "tokens=in:%d/out:%d/cR:%d/cW:%d verdicts=%d/%d",
+            label, elapsed, in_tok, out_tok, c_read, c_write,
+            len(verdicts), n_criteria,
+        )
         return {
             "model": model, "ok": True, "verdicts": verdicts, "usage": usage,
             "user_chars": len(user),

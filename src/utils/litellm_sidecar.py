@@ -37,18 +37,70 @@ def build_litellm_config_yaml(
         "          role: system\n"
     )
     if bedrock_arn:
-        model_blocks.append(
-            "  - model_name: claude-opus-4.7\n"
+        # Extended-thinking visibility on opus-4-6/4-7 via Bedrock Converse needs the
+        # EXACT pair thinking:{type:adaptive} + output_config:{effort}. Three shapes
+        # were tried empirically against this LiteLLM (main-stable sha 75543fa1d739):
+        #   - thinking:{type:enabled,budget_tokens} -> Bedrock 400 "thinking.type.enabled
+        #     is not supported... use thinking.type.adaptive and output_config.effort".
+        #   - bare thinking:{type:adaptive} (no effort) -> Bedrock accepts but returns
+        #     ZERO reasoningContent -> 0 thinking blocks every turn (run_4/run_5).
+        #   - additional_model_request_fields:{...} -> Bedrock 400 "Extra inputs are
+        #     not permitted" (LiteLLM forwards the unknown key literally).
+        # The thinking block MUST include display:"summarized". Empirically (direct
+        # Bedrock /converse probes against this opus ARN, sheep-math reasoning prompt):
+        #   - thinking:{type:adaptive} alone           -> reasoning text_len=0 (EMPTY),
+        #     signature present. This is what reasoning_effort:high builds, and it made
+        #     openclaw persist an EMPTY thinking block (run_6 1/32, text len 0).
+        #   - thinking:{type:adaptive,display:summarized} -> reasoning text_len 289-665
+        #     (POPULATED) + signature. THIS is the shape that yields visible reasoning.
+        #   - display:"detailed" -> Bedrock 400 "display: Input should be summarized or
+        #     omitted". Valid values are ONLY "summarized" or "omitted".
+        # output_config:{effort} is OPTIONAL once display:summarized is present (the
+        # no-output_config probe returned MORE text, 665). So we pass the explicit
+        # thinking dict (same known-good shape the sonnet judge entry uses below) rather
+        # than reasoning_effort:high, which strips display and yields empty text.
+        #
+        # CRITICAL routing/detection decoupling (still required): adaptive-thinking
+        # detection keys off the `model` STRING via get_base_model()->_is_opus_4_6_model()
+        # substring match. Our opus access is an opaque application-inference-profile ARN
+        # (.../96j5zamnqlci); putting that ARN in `model:` makes get_base_model return
+        # "96j5zamnqlci" (split('/')[-1]) -> fails the opus-4-6 substring -> Bedrock
+        # 400s the legacy shape. Fix: `model:` carries the RECOGNIZABLE name
+        # "anthropic.claude-opus-4-6-v1"; `model_id:` (common_utils.py:get_bedrock_model_id
+        # pops it, URL-encodes into the endpoint URL) carries the real ARN for routing.
+        # Do NOT collapse these into a single `model: bedrock/converse/<ARN>` line, and
+        # do NOT drop display:summarized -- either re-breaks thinking visibility.
+        opus_params = (
             "    litellm_params:\n"
-            f"      model: bedrock/converse/{bedrock_arn}\n"
+            # NO `converse/` infix: per LiteLLM common_utils.py:873 (`if "claude"
+            # in model -> AmazonAnthropicClaudeMessagesConfig`), /v1/messages routes
+            # a claude model through Bedrock INVOKE (native Anthropic SSE) not
+            # Converse. Direct HTTP probes proved Invoke emits parseable thinking_
+            # delta+signature_delta+text_delta; Converse leaks camelCase
+            # reasoningContent that pi-ai's @anthropic-ai/sdk cannot parse. The
+            # "anthropic.claude-opus-4-6-v1" substring must remain so get_base_model
+            # ->_is_opus_4_6_model() matches and adaptive detection fires; model_id
+            # carries the real ARN. Do NOT re-add `converse/` -- re-breaks thinking.
+            "      model: bedrock/anthropic.claude-opus-4-6-v1\n"
+            f"      model_id: {bedrock_arn}\n"
             f"      aws_region_name: {aws_region or 'ap-south-1'}\n"
+            # output_config.effort:high: probes showed bare adaptive can return an
+            # empty/absent thinking block; +effort:high reliably populates it.
             "      thinking: {\"type\": \"adaptive\", \"display\": \"summarized\"}\n"
+            "      output_config: {\"effort\": \"high\"}\n"
             "      stream_options:\n"
             "        include_usage: true\n"
             + cache_marker
             + "      input_cost_per_token: 0.000005\n"
             "      output_cost_per_token: 0.000025"
         )
+        model_blocks.append("  - model_name: claude-opus-4.7\n" + opus_params)
+        # openclaw's _set_model presents the recognized id "claude-opus-4-6" to
+        # activate extended thinking (see runner.py); that id arrives here on the
+        # /v1/messages route and must resolve to the SAME opus ARN as
+        # claude-opus-4.7. Both names alias one ARN so the harness model arg and
+        # the openclaw-facing id stay decoupled.
+        model_blocks.append("  - model_name: claude-opus-4-6\n" + opus_params)
     if bedrock_sonnet_arn:
         model_blocks.append(
             "  - model_name: claude-sonnet-4-6\n"
@@ -230,6 +282,9 @@ def start_litellm(
     usage_log_host_dir: str = "",
 ) -> None:
     env_args: list[str] = ["-e", f"LITELLM_MASTER_KEY={master_key}"]
+    _litellm_log = os.environ.get("LITELLM_LOG", "").strip()
+    if _litellm_log:
+        env_args += ["-e", f"LITELLM_LOG={_litellm_log}"]
     if aws_bearer_token:
         env_args += [
             "-e", f"AWS_BEARER_TOKEN_BEDROCK={aws_bearer_token}",

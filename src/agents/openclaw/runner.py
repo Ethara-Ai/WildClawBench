@@ -293,22 +293,78 @@ class OpenClawAgent(BaseAgent):
     def _set_model(self, task_id: str, model: str, thinking: str | None = None) -> None:
         if self.litellm_config_yaml:
             model_id = model[len("litellm/"):] if model.startswith("litellm/") else model
-            primary = f"litellm/{model_id}"
-            base_url = f"http://{self.litellm_container_name}:{self.litellm_port}/v1"
-            litellm_provider = {
-                "baseUrl": base_url,
-                "apiKey": self.litellm_master_key or "sk-litellm",
-                "auth": "api-key",
-                "api": "openai-completions",
-                "models": [
-                    {"id": "claude-opus-4.7", "name": "claude-opus-4.7",
-                     "input": ["text", "image"], "reasoning": True,
-                     "contextWindow": 200000, "maxTokens": 128000},
-                    {"id": "gpt-5.5", "name": "gpt-5.5",
-                     "input": ["text", "image"], "reasoning": True,
-                     "contextWindow": 1050000, "maxTokens": 128000},
-                ],
-            }
+            # Anthropic models use api="anthropic-messages" so openclaw posts via
+            # the bundled Anthropic SDK to {baseUrl}/v1/messages and round-trips
+            # thinking_blocks[].signature on every turn. The OpenAI Chat
+            # Completions wire format has no field for signed thinking blocks
+            # and silently drops them, so a single api="openai-completions"
+            # provider for all models lost reasoning visibility after turn 0
+            # (empirical: alden-croft claude/run_2 had 1/30 thinking_blocks
+            # across all assistant turns despite --thinking xhigh). LiteLLM's
+            # /v1/messages handler bridges Anthropic <-> Bedrock Converse and
+            # preserves thinking_blocks bidirectionally
+            # (litellm/litellm_core_utils/prompt_templates/factory.py:4798-4815).
+            # gpt-5.5 stays on openai-completions because it has no native
+            # thinking blocks to preserve (OpenAI reasoning is internal). The
+            # baseUrl suffix differs by SDK: Anthropic SDK appends /v1/messages
+            # to model.baseUrl; OpenAI SDK appends /chat/completions and
+            # requires baseUrl to already end with /v1.
+            is_anthropic_model = "claude" in model_id.lower()
+            # openclaw 2026.3.11 gates extended thinking on a HARDCODED model
+            # allowlist (config-mlcrIFGX.js): the registry tops out at
+            # claude-opus-4-6 / claude-sonnet-4-6 (dash form). supportsXHighThinking
+            # does an exact Set.has on `${provider}/${model}` and mapThinkingLevel
+            # only emits a thinkingBudget for a recognized id. Our harness model id
+            # "claude-opus-4.7" (dot, version 4.7) is NOT in that allowlist, so
+            # openclaw never requests reasoning and the trajectory persists 0
+            # thinking blocks (empirical: amanda_hayes_01 claude/run_2 had 0/23
+            # despite --thinking xhigh). We present a RECOGNIZED id to openclaw so
+            # thinking activates; the actual inference still hits the real opus ARN
+            # via LiteLLM (litellm_sidecar.py routes both names to the same
+            # bedrock/converse ARN). self.model_id stays "claude-opus-4.7" so the
+            # output dir + usage threading are unaffected.
+            openclaw_model_id = "claude-opus-4-6" if is_anthropic_model else model_id
+            # openclaw 2026.3.11 gates thinking-capability on the PROVIDER KEY too,
+            # not only the model id. supportsXHighThinking does an exact Set.has on
+            # `${provider}/${model}` and XHIGH_MODEL_SET contains only `anthropic/...`
+            # refs, and mapThinkingLevel only emits a thinkingBudget for recognized
+            # provider+model pairs. Under the custom provider key "litellm" the agent
+            # still produced 0 thinking blocks even with the recognized id
+            # claude-opus-4-6 (empirical: amanda_hayes_01 claude/run_3 0/29). We
+            # therefore register the sidecar provider under the key "anthropic" so
+            # `anthropic/claude-opus-4-6` matches the allowlist and thinking
+            # activates. Our providers["anthropic"] override carries baseUrl pointing
+            # at the LiteLLM sidecar and api="anthropic-messages", so it shadows
+            # openclaw's built-in anthropic provider (api.anthropic.com) and all
+            # traffic still goes to the sidecar /v1/messages (verified via
+            # ll_stream.log POST /v1/messages, never api.anthropic.com).
+            provider_key = "anthropic" if is_anthropic_model else "litellm"
+            primary = f"{provider_key}/{openclaw_model_id}"
+            base_url_root = f"http://{self.litellm_container_name}:{self.litellm_port}"
+            base_url_v1 = f"{base_url_root}/v1"
+            if is_anthropic_model:
+                litellm_provider = {
+                    "baseUrl": base_url_root,
+                    "apiKey": self.litellm_master_key or "sk-litellm",
+                    "api": "anthropic-messages",
+                    "models": [
+                        {"id": openclaw_model_id, "name": openclaw_model_id,
+                         "input": ["text", "image"], "reasoning": True,
+                         "contextWindow": 200000, "maxTokens": 128000},
+                    ],
+                }
+            else:
+                litellm_provider = {
+                    "baseUrl": base_url_v1,
+                    "apiKey": self.litellm_master_key or "sk-litellm",
+                    "auth": "api-key",
+                    "api": "openai-completions",
+                    "models": [
+                        {"id": "gpt-5.5", "name": "gpt-5.5",
+                         "input": ["text", "image"], "reasoning": True,
+                         "contextWindow": 1050000, "maxTokens": 128000},
+                    ],
+                }
             thinking_default = (thinking or "").strip()
             set_thinking_line = (
                 f'defaults["thinkingDefault"] = {json.dumps(thinking_default)}\n'
@@ -321,7 +377,7 @@ p = pathlib.Path("/root/.openclaw/openclaw.json")
 d = json.loads(p.read_text()) if p.exists() else {{}}
 models = d.setdefault("models", {{}})
 providers = models.setdefault("providers", {{}})
-providers["litellm"] = json.loads({json.dumps(json.dumps(litellm_provider))})
+providers[{json.dumps(provider_key)}] = json.loads({json.dumps(json.dumps(litellm_provider))})
 agents = d.setdefault("agents", {{}})
 defaults = agents.setdefault("defaults", {{}})
 defaults["model"] = {{"primary": {json.dumps(primary)}}}

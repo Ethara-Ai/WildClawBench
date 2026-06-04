@@ -205,7 +205,7 @@ def _coerce_issues(rows):
             "cycleId": r["cycleId"] if r["cycleId"] else None,
             "labelIds": [l.strip() for l in r["labelIds"].split(",")] if r["labelIds"] else [],
             "dueDate": r["dueDate"] if r["dueDate"] else None,
-            "sortOrder": float(r["sortOrder"]),
+            "sortOrder": float(r["sortOrder"]) if r["sortOrder"] else 0.0,
             "branchName": r["branchName"] if r["branchName"] else None,
             "createdAt": r["createdAt"],
             "updatedAt": r["updatedAt"],
