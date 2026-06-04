@@ -148,6 +148,26 @@ def build_litellm_config_yaml(
             "      model: openai/whisper-1\n"
             "      api_key: os.environ/OPENAI_API_KEY"
         )
+        # OpenClaw's built-in transcribeAudio runner auto-POSTs the sidecar's
+        # /v1/audio/transcriptions but its OpenAI plugin defaults to model=
+        # "gpt-4o-mini-transcribe" (DEFAULT_OPENAI_AUDIO_MODEL), NOT whisper-1.
+        # With only whisper-1 registered, that request 400s "Invalid model
+        # name" and the agent punts ("give it a listen yourself"), zeroing
+        # audio-dependent criteria. Alias every audio id openclaw can emit to
+        # the same openai/whisper-1 upstream (a pure sidecar rewrite, same
+        # pattern as the image aliases below). whisper-1 is the correct OpenAI
+        # transcription model + /v1/audio/transcriptions the correct multipart
+        # endpoint per developers.openai.com/api/docs/guides/speech-to-text.
+        for _audio_fallback_id in (
+            "gpt-4o-mini-transcribe",
+            "gpt-4o-transcribe",
+        ):
+            model_blocks.append(
+                f"  - model_name: {_audio_fallback_id}\n"
+                "    litellm_params:\n"
+                "      model: openai/whisper-1\n"
+                "      api_key: os.environ/OPENAI_API_KEY"
+            )
     # OpenClaw's image tool falls back to built-in default model ids when its
     # own imageModel override isn't applied inside the container. The openclaw
     # 2026.3.11 dist (verified via grep of /usr/lib/node_modules/openclaw/dist)
@@ -217,6 +237,15 @@ def build_litellm_config_yaml(
         "  request_timeout: 86400\n"
         "  stream_timeout: 86400\n"
         "  reasoning_auto_summary: true\n"
+        # Transcription response cache: LiteLLM keys on the audio BYTE hash
+        # (auto-injected metadata.file_checksum), NOT the filename, so distinct
+        # recordings never collide. supported_call_types is scoped to ONLY
+        # (a)transcription so chat/judge/opus caching is unaffected; do not widen
+        # it without re-checking judge-council determinism.
+        "  cache: true\n"
+        "  cache_params:\n"
+        "    type: local\n"
+        "    supported_call_types: [\"transcription\", \"atranscription\"]\n"
         + callback_line
         + "general_settings:\n"
         "  master_key: os.environ/LITELLM_MASTER_KEY\n"

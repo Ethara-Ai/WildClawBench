@@ -83,6 +83,31 @@ def _write_row(kwargs: dict, response_obj: Any, start_time: Any, end_time: Any) 
             cache_read = _int(usage_dict.get("cache_read_input_tokens"))
         cache_write = _int(usage_dict.get("cache_creation_input_tokens"))
 
+        # Audio transcription (/v1/audio/transcriptions) responses use a different
+        # usage schema than chat completions. LiteLLM emits one of two shapes:
+        #   token-billed (gpt-4o-transcribe / gpt-4o-mini-transcribe):
+        #       {type: "tokens", input_tokens, output_tokens, total_tokens, input_token_details}
+        #   duration-billed (whisper-1):
+        #       {type: "duration", seconds}   -- NO token fields at all
+        # Chat keys (prompt_tokens/completion_tokens) are absent in both, so fall
+        # back to the transcription keys; whisper's seconds is surfaced separately.
+        input_tokens = _int(usage_dict.get("prompt_tokens"))
+        if not input_tokens:
+            input_tokens = _int(usage_dict.get("input_tokens"))
+        output_tokens = _int(usage_dict.get("completion_tokens"))
+        if not output_tokens:
+            output_tokens = _int(usage_dict.get("output_tokens"))
+        total_tokens = _int(usage_dict.get("total_tokens"))
+        if not total_tokens:
+            total_tokens = input_tokens + output_tokens
+        # whisper-1 (default json format) returns NO usage object at all; the audio
+        # length is exposed only as the top-level TranscriptionResponse.duration
+        # attribute (verified live in litellm:main-stable). Prefer usage.seconds
+        # when present (verbose_json / future shapes), else fall back to .duration.
+        audio_seconds = _float(usage_dict.get("seconds"))
+        if not audio_seconds:
+            audio_seconds = _float(getattr(response_obj, "duration", None))
+
         duration = 0.0
         try:
             duration = (end_time - start_time).total_seconds()
@@ -92,11 +117,12 @@ def _write_row(kwargs: dict, response_obj: Any, start_time: Any, end_time: Any) 
         row = {
             "ts": datetime.now(timezone.utc).isoformat(),
             "model": kwargs.get("model") or "",
-            "input_tokens":       _int(usage_dict.get("prompt_tokens")),
-            "output_tokens":      _int(usage_dict.get("completion_tokens")),
-            "total_tokens":       _int(usage_dict.get("total_tokens")),
+            "input_tokens":       input_tokens,
+            "output_tokens":      output_tokens,
+            "total_tokens":       total_tokens,
             "cache_read_tokens":  cache_read,
             "cache_write_tokens": cache_write,
+            "audio_seconds":      round(audio_seconds, 3),
             "cost_usd":           _float(kwargs.get("response_cost")),
             "duration_s":         round(duration, 3),
         }

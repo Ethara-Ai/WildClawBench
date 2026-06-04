@@ -1357,6 +1357,7 @@ def extract_usage_from_litellm_log(
         "cache_read_tokens": 0,
         "cache_write_tokens": 0,
         "total_tokens": 0,
+        "audio_seconds": 0.0,
         "cost_usd": 0.0,
         "request_count": 0,
         "usage_source": "litellm",
@@ -1396,9 +1397,11 @@ def extract_usage_from_litellm_log(
         totals["cache_read_tokens"]  += int(row.get("cache_read_tokens", 0) or 0)
         totals["cache_write_tokens"] += int(row.get("cache_write_tokens", 0) or 0)
         totals["total_tokens"]       += int(row.get("total_tokens", 0) or 0)
+        totals["audio_seconds"]      += float(row.get("audio_seconds", 0.0) or 0.0)
         totals["cost_usd"]           += float(row.get("cost_usd", 0.0) or 0.0)
 
     totals["cost_usd"] = round(totals["cost_usd"], 6)
+    totals["audio_seconds"] = round(totals["audio_seconds"], 3)
     return totals
 
 
@@ -1409,6 +1412,7 @@ def extract_usage_from_jsonl(jsonl_path: Path) -> dict:
         "cache_read_tokens": 0,
         "cache_write_tokens": 0,
         "total_tokens": 0,
+        "audio_seconds": 0.0,
         "cost_usd": 0.0,
         "request_count": 0,
         "usage_source": "openclaw",

@@ -570,6 +570,31 @@ def _scan_verifier_artifacts(verifier_dir: Path, run_dir: Path, start_idx: int) 
     return out
 
 
+# Display-only relabel: the dash form "claude-opus-4-6" is load-bearing and
+# MUST stay unchanged in runner.py (OpenClaw 2026.3.11 thinking allowlist) and
+# litellm_sidecar.py (adaptive-thinking substring match); renaming either to
+# 4.7 silently disables thinking. The agent stamps the dash id into chat.jsonl,
+# which flows into the persisted trajectory. The model actually served is the
+# opus-4.7 inference profile, so only the user-facing trajectory artifact is
+# relabeled here.
+_DISPLAY_MODEL_REWRITES = {
+    "anthropic/claude-opus-4-6": "anthropic/claude-opus-4.7",
+    "claude-opus-4-6": "claude-opus-4.7",
+}
+
+
+def _normalize_display_model(obj: Any) -> None:
+    if isinstance(obj, dict):
+        for key, val in obj.items():
+            if key == "model" and isinstance(val, str) and val in _DISPLAY_MODEL_REWRITES:
+                obj[key] = _DISPLAY_MODEL_REWRITES[val]
+            else:
+                _normalize_display_model(val)
+    elif isinstance(obj, list):
+        for item in obj:
+            _normalize_display_model(item)
+
+
 def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
                       model_type: str, run_index: int, result: dict,
                       config: Config | None = None,
@@ -653,6 +678,8 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
         seen_paths.add(rec["path"])
         next_idx += 1
     traj["output_artifacts"] = artifacts_list
+
+    _normalize_display_model(traj)
 
     (output_dir / "output.json").write_text(
         json.dumps(traj, indent=2, ensure_ascii=False), encoding="utf-8",
