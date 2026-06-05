@@ -246,6 +246,16 @@ _BASELINE_SKILL_PIP_DEPS: tuple[str, ...] = (
 )
 
 
+# Offline wheelhouse. Agent containers run on an --internal docker network
+# (litellm_sidecar.py:272-307) so PyPI is unreachable; we docker-cp these
+# wheels in and `pip install --no-index --find-links`.
+_REPO_ROOT: Path = Path(__file__).resolve().parent.parent.parent
+_WHEELHOUSE_HOST_DIR: Path = _REPO_ROOT / "wheelhouse" / "skill-deps"
+# /opt is writable and avoids colliding with /tmp_workspace (ro) and /opt/mocks
+# (mock_stack.py:216-256 bind mounts).
+_WHEELHOUSE_CONTAINER_DIR: str = "/opt/wb_wheels"
+
+
 _BIN_TO_APT_PACKAGE: dict[str, str] = {
     "ffmpeg": "ffmpeg",
     "ffprobe": "ffmpeg",
@@ -400,23 +410,73 @@ def _install_skill_runtime_deps(task_id: str, env_root: Path) -> dict[str, list[
 
     sorted_pip = sorted(pip_deps)
     if sorted_pip:
-        r = subprocess.run(
-            ["docker", "exec", task_id, "pip", "install", "--quiet",
-             "--disable-pip-version-check", "--no-input", *sorted_pip],
-            capture_output=True, text=True,
-        )
-        if r.returncode != 0:
-            logger.warning(
-                "[%s] Skill runtime pip install returned %d (continuing). stderr: %s",
-                task_id, r.returncode, (r.stderr or "").strip()[:500],
-            )
-        else:
-            logger.info(
-                "[%s] Installed skill runtime pip deps (%d): %s",
-                task_id, len(sorted_pip), ",".join(sorted_pip),
-            )
+        _install_pip_deps_from_wheelhouse(task_id, sorted_pip)
 
     return {"pip": sorted_pip, "apt": sorted_apt}
+
+
+def _install_pip_deps_from_wheelhouse(task_id: str, sorted_pip: list[str]) -> None:
+    requirements_file = _WHEELHOUSE_HOST_DIR / "requirements.txt"
+    if not _WHEELHOUSE_HOST_DIR.is_dir() or not requirements_file.is_file():
+        logger.error(
+            "[%s] Wheelhouse missing at %s (expected requirements.txt + *.whl). "
+            "Skill runtime pip deps will NOT be installed; pdf/image/audio skills will fail. "
+            "Rebuild via: docker run --rm --platform linux/amd64 -v %s:/out python:3.10-slim "
+            "bash -c 'pip download --dest /out --platform manylinux2014_x86_64 "
+            "--python-version 310 --implementation cp --abi cp310 --only-binary=:all: %s'",
+            task_id, _WHEELHOUSE_HOST_DIR, _WHEELHOUSE_HOST_DIR, " ".join(sorted_pip),
+        )
+        return
+
+    wheels = list(_WHEELHOUSE_HOST_DIR.glob("*.whl"))
+    if not wheels:
+        logger.error(
+            "[%s] Wheelhouse %s contains no *.whl files; skill runtime pip deps will NOT be installed",
+            task_id, _WHEELHOUSE_HOST_DIR,
+        )
+        return
+
+    mkdir = subprocess.run(
+        ["docker", "exec", task_id, "mkdir", "-p", _WHEELHOUSE_CONTAINER_DIR],
+        capture_output=True, text=True,
+    )
+    if mkdir.returncode != 0:
+        logger.warning(
+            "[%s] Failed to create %s in container (continuing). stderr: %s",
+            task_id, _WHEELHOUSE_CONTAINER_DIR, (mkdir.stderr or "").strip()[:300],
+        )
+        return
+
+    cp = subprocess.run(
+        ["docker", "cp", f"{_WHEELHOUSE_HOST_DIR}/.", f"{task_id}:{_WHEELHOUSE_CONTAINER_DIR}/"],
+        capture_output=True, text=True,
+    )
+    if cp.returncode != 0:
+        logger.warning(
+            "[%s] docker cp wheelhouse -> %s failed (continuing). stderr: %s",
+            task_id, _WHEELHOUSE_CONTAINER_DIR, (cp.stderr or "").strip()[:300],
+        )
+        return
+
+    install = subprocess.run(
+        ["docker", "exec", task_id, "pip", "install",
+         "--quiet", "--disable-pip-version-check", "--no-input",
+         "--no-index", "--find-links", _WHEELHOUSE_CONTAINER_DIR,
+         "-r", f"{_WHEELHOUSE_CONTAINER_DIR}/requirements.txt",
+         *sorted_pip],
+        capture_output=True, text=True,
+    )
+    if install.returncode != 0:
+        logger.warning(
+            "[%s] Offline pip install from wheelhouse returned %d (continuing; "
+            "verify probe will report missing modules). stderr: %s",
+            task_id, install.returncode, (install.stderr or "").strip()[:500],
+        )
+    else:
+        logger.info(
+            "[%s] Installed skill runtime pip deps offline from %s (%d wheels staged, %d top-level deps): %s",
+            task_id, _WHEELHOUSE_CONTAINER_DIR, len(wheels), len(sorted_pip), ",".join(sorted_pip),
+        )
 
 
 def _verify_skill_runtime_deps(task_id: str) -> list[str]:
