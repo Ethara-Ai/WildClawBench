@@ -331,6 +331,7 @@ def _load_native_task(task_dir: Path) -> dict:
     derived_l1, derived_l2 = _derive_taxonomy_for_native_task(task_dir, rubrics, attachments)
     prompt_with_inputs = _append_workspace_hint(prompt, attachments)
     provided_test_code, provided_test_weights = _load_provided_tests(task_dir)
+    declared_overrides = _load_native_api_overrides(task_dir)
     return {
         "task_id": task_dir.name,
         "prompt": prompt_with_inputs,
@@ -358,8 +359,84 @@ def _load_native_task(task_dir: Path) -> dict:
         "skills_path": "",
         "warmup": "",
         "env": "",
+        "required_apis_declared": declared_overrides["required_apis"],
+        "distractor_apis_declared": declared_overrides["distractor_apis"],
         "format": "native",
     }
+
+
+def _load_native_api_overrides(task_dir: Path) -> dict:
+    override_path = task_dir / "task.json"
+    if override_path.is_file():
+        try:
+            raw = json.loads(override_path.read_text(encoding="utf-8")) or {}
+            if isinstance(raw, dict):
+                return {
+                    "required_apis": _normalize_declared_api_list(
+                        raw, "required_apis", "required_mock_apis",
+                    ),
+                    "distractor_apis": _normalize_declared_api_list(
+                        raw, "distractor_apis", "distractor_mock_apis",
+                    ),
+                }
+        except (json.JSONDecodeError, OSError):
+            pass
+    return {"required_apis": [], "distractor_apis": []}
+
+
+_AUTO_SENTINEL = "__AUTO__"
+
+
+def _normalize_declared_api_list(raw: dict, *keys: str) -> list[str] | str:
+    """Normalize a declared API list from one or more aliased keys.
+
+    Returns _AUTO_SENTINEL if any aliased key holds the string "auto" or the
+    YAML bare token `auto` (which PyYAML parses as Python True only for
+    "yes"/"no"; "auto" parses as the string "auto"). Otherwise returns a
+    sorted, de-duplicated list of `<name>-api` strings, accepting either bare
+    names or already-suffixed names. A scalar string value is treated as a
+    one-item list.
+    """
+    raw_value = None
+    for k in keys:
+        if k in raw and raw[k] is not None:
+            raw_value = raw[k]
+            break
+    if raw_value is None:
+        return []
+    if isinstance(raw_value, str) and raw_value.strip().lower() == "auto":
+        return _AUTO_SENTINEL
+    if isinstance(raw_value, str):
+        raw_value = [raw_value]
+    out: set[str] = set()
+    for item in raw_value:
+        s = str(item).strip()
+        if not s:
+            continue
+        if not s.endswith("-api"):
+            s = f"{s}-api"
+        out.add(s)
+    return sorted(out)
+
+
+_TEXT_MODALITIES = {"text", "txt", "plain"}
+
+
+def _normalize_modalities(raw: dict) -> list[str]:
+    v = raw.get("modalities")
+    if v is None:
+        return []
+    if isinstance(v, str):
+        v = [v]
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in v:
+        s = str(item).strip().lower()
+        if not s or s in seen:
+            continue
+        seen.add(s)
+        out.append(s)
+    return out
 
 
 def _load_yaml_task(path: Path) -> dict:
@@ -369,6 +446,9 @@ def _load_yaml_task(path: Path) -> dict:
     attachments = _load_attachments_yaml(raw, task_dir)
     prompt = str(raw.get("initial_prompt") or raw.get("prompt") or "")
     provided_test_code, provided_test_weights = _load_provided_tests(task_dir)
+    task_type = str(raw.get("task_type") or raw.get("category") or "")
+    modalities = _normalize_modalities(raw)
+    has_non_text_modality = any(m not in _TEXT_MODALITIES for m in modalities)
     return {
         "task_id": task_id,
         "prompt": prompt,
@@ -384,9 +464,11 @@ def _load_yaml_task(path: Path) -> dict:
         "difficulty": str(raw.get("difficulty") or "medium"),
         "l1": str(raw.get("l1") or raw.get("taxonomy_l1") or ""),
         "l2": str(raw.get("l2") or raw.get("taxonomy_l2") or ""),
-        "task_type": str(raw.get("task_type") or ""),
+        "task_type": task_type,
         "timeout_seconds": int(raw.get("timeout_seconds") or 1800),
-        "category": str(raw.get("category") or ""),
+        "category": task_type,
+        "modalities": modalities,
+        "multimodal": "true" if has_non_text_modality else "false",
         "file_path": str(path),
         "task_dir": str(task_dir),
         "gt_dir": str(task_dir / "gt") if (task_dir / "gt").is_dir() else "",
@@ -396,6 +478,12 @@ def _load_yaml_task(path: Path) -> dict:
         "skills_path": "",
         "warmup": str(raw.get("warmup") or ""),
         "env": str(raw.get("env") or ""),
+        "required_apis_declared": _normalize_declared_api_list(
+            raw, "required_apis", "required_mock_apis",
+        ),
+        "distractor_apis_declared": _normalize_declared_api_list(
+            raw, "distractor_apis", "distractor_mock_apis",
+        ),
         "format": "yaml",
     }
 

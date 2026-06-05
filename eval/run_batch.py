@@ -43,7 +43,11 @@ from src.utils.grading import (
 from src.utils.config import Config
 from src.utils.task_parser import load_task
 from src.utils.docker_utils import discover_services, require_image_present, DOCKER_IMAGE
-from src.utils.skills_inference import infer_required_apis, compute_distractor_skills
+from src.utils.skills_inference import (
+    infer_required_apis,
+    compute_distractor_skills,
+    available_apis,
+)
 from src.utils.testgen import generate_task_tests
 from src.utils.litellm_sidecar import (
     build_litellm_config_yaml,
@@ -355,28 +359,49 @@ def _stage_native_workspace(task: dict, config) -> str:
 
 def _augment_task_with_mocks(task: dict, config, mock_env_dict: dict | None) -> None:
     """Populate env_dir / required_apis / env_dict on the task dict so the
-    openclaw runner injects API connectors and the shared mock-stack URLs."""
+    openclaw runner injects API connectors and the shared mock-stack URLs.
+
+    Precedence for required_apis (highest first):
+      1. Explicit `required_apis_declared` from the task file
+         (yaml `required_apis:` or native `task.json`).
+      2. mock_data/<api>/ subdirs.
+      3. Keyword inference over the prompt.
+
+    When (1) is present, (3) is skipped entirely so curated-keyword false
+    positives can never override author intent. mock_data unions in only when
+    (1) is absent, because an explicit declaration is a contract.
+    """
     env_dir = str(config.environment_dir) if config.environment_dir else ""
+    raw_declared_required = task.get("required_apis_declared")
+    raw_declared_distractor = task.get("distractor_apis_declared")
+    declared = set(raw_declared_required) if isinstance(raw_declared_required, list) else set()
+    distractor_is_auto = raw_declared_distractor == "__AUTO__"
+    declared_distractors = (
+        set(raw_declared_distractor)
+        if isinstance(raw_declared_distractor, list)
+        else set()
+    )
+
     required: set[str] = set()
-    # 1) APIs inferred from the prompt text (catalog discovered from env_dir)
-    try:
-        required.update(infer_required_apis(
-            task.get("initial_prompt") or task.get("prompt") or "",
-            environment_dir=config.environment_dir,
-        ))
-    except Exception:
-        pass
-    # 2) APIs named by the task's mock_data/<api>/ subdirs (native tasks).
-    #    Also build the per-task overlay map {api: {filename: host_path}} so the
-    #    task's OWN mock_data CSVs get bind-mounted over the baked-in baseline
-    #    (same shape as harbor/bundle.py). Without this the agent only ever sees
-    #    the generic baked dataset (course_001..005 + uscg-...), never the task's.
+    if declared:
+        required.update(declared)
+    else:
+        try:
+            required.update(infer_required_apis(
+                task.get("initial_prompt") or task.get("prompt") or "",
+                environment_dir=config.environment_dir,
+            ))
+        except Exception:
+            pass
+
     task_dir = task.get("task_dir", "")
     overlays: dict[str, dict[str, str]] = {}
     if task_dir:
         mock_root = Path(task_dir) / "mock_data"
         if mock_root.is_dir():
-            required.update(d.name for d in mock_root.iterdir() if d.is_dir())
+            mock_apis = {d.name for d in mock_root.iterdir() if d.is_dir()}
+            if not declared:
+                required.update(mock_apis)
             overlays = {
                 api_dir.name: {
                     p.name: str(p.resolve())
@@ -385,22 +410,40 @@ def _augment_task_with_mocks(task: dict, config, mock_env_dict: dict | None) -> 
                 for api_dir in sorted(mock_root.iterdir())
                 if api_dir.is_dir() and any(p.is_file() for p in api_dir.iterdir())
             }
+
+    try:
+        catalog = set(available_apis(config.environment_dir))
+    except Exception:
+        catalog = set()
+    if catalog:
+        unknown_required = sorted(required - catalog)
+        if unknown_required:
+            logger.warning(
+                "[%s] declared/inferred APIs not present in catalog (dropped): %s",
+                task.get("task_id"), unknown_required,
+            )
+            required -= set(unknown_required)
+        unknown_distractor = sorted(declared_distractors - catalog)
+        if unknown_distractor:
+            logger.warning(
+                "[%s] declared distractor APIs not present in catalog (dropped): %s",
+                task.get("task_id"), unknown_distractor,
+            )
+            declared_distractors -= set(unknown_distractor)
+
     task["env_dir"] = env_dir
     task["required_apis"] = sorted(required)
     task["mock_overlays"] = overlays
-    # Distractor APIs are exposed to the agent the same way required APIs are
-    # (connector skill docs + URL env var), so the agent must actively choose
-    # between plausible-but-unneeded surfaces. This is the design intent of
-    # distractor_skills in task.toml (b46); before 2026-06-02 only the harbor
-    # bundle + testgen saw them, so the live agent could not actually be
-    # tempted by them. The selection is deterministic per task_id, so reruns
-    # of the same task see the same distractor set.
+
     try:
-        task["distractor_apis"] = list(compute_distractor_skills(
-            sorted(required),
-            task.get("task_id") or task.get("task_id_ori") or "",
-            environment_dir=config.environment_dir,
-        ))
+        if declared_distractors and not distractor_is_auto:
+            task["distractor_apis"] = sorted(declared_distractors - required)
+        else:
+            task["distractor_apis"] = list(compute_distractor_skills(
+                sorted(required),
+                task.get("task_id") or task.get("task_id_ori") or "",
+                environment_dir=config.environment_dir,
+            ))
     except Exception:
         task["distractor_apis"] = []
     # Expose the shared mock-stack URLs to the task (the full service map; the
@@ -1110,6 +1153,7 @@ def run_single_task(
                     tests_errored=te["tests_errored"],
                     test_scores_json=te.get("test_scores", "{}"),
                     tests_skipped=te.get("tests_skipped", 0),
+                    reward=te.get("reward"),
                 )
                 (verifier_dir / "ctrf.json").write_text(
                     json.dumps(ctrf, indent=2, ensure_ascii=False), encoding="utf-8")

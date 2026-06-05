@@ -412,6 +412,7 @@ def write_bundle(
                     tests_errored=tests_errored,
                     test_scores_json=test_scores,
                     tests_skipped=tests_skipped,
+                    reward=reward,
                 )
                 (verifier_dir / "ctrf.json").write_text(
                     json.dumps(ctrf, indent=2, ensure_ascii=False), encoding="utf-8"

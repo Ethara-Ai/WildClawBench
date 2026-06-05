@@ -86,6 +86,14 @@ else:
 with open(reward_path, "w") as f:
     f.write(f"{reward:.6f}\n")
 
+if isinstance(ctrf, dict) and isinstance(results, dict) and isinstance(summary, dict):
+    summary["overall_score"] = round(reward, 4)
+    summary["weighted_percentage"] = round(reward * 100.0, 2)
+    results["summary"] = summary
+    ctrf["results"] = results
+    with open(ctrf_path, "w") as f:
+        json.dump(ctrf, f, indent=2, ensure_ascii=False)
+
 print(f"reward={reward:.6f} (pos_total={pos_total} pos_earned={pos_earned} neg_penalty={neg_penalty} passed={tests_passed}/{tests_total})")
 PY
 """

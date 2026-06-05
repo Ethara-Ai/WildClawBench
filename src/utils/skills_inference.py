@@ -20,16 +20,26 @@ DEFAULT_ENVIRONMENT_DIR = Path(__file__).resolve().parents[2] / "environment"
 # These add domain-specific terms that don't appear in the slug (e.g. quickbooks
 # -> "invoice", "ledger") and coarse domain tags used for distractor selection.
 _CURATED_KEYWORDS = {
-    "amazon-seller-api":    ("amazon", "seller", "asin", "sku", "fba", "seller central"),
-    "etsy-api":             ("etsy", "listing", "shop", "handmade", "craft", "woodwork", "woodcraft"),
-    "pinterest-api":        ("pinterest", "pin", "board"),
-    "instagram-api":        ("instagram", "insta", "ig ", "ig,", "post", "reel", "story", "stories", "media"),
-    "youtube-api":          ("youtube", "video", "channel", "subscriber", "playlist", "upload"),
-    "linear-api":           ("linear", "issue", "project management", "sprint", "backlog", "ticket"),
-    "quickbooks-api":       ("quickbooks", "invoice", "accounting", "expense", "bill", "payment", "ledger"),
+    "amazon-seller-api":    ("amazon", "asin", "sku", "fba", "seller central"),
+    "etsy-api":             ("etsy", "handmade", "woodwork", "woodcraft"),
+    "pinterest-api":        ("pinterest",),
+    "instagram-api":        ("instagram", "insta", "ig ", "ig,", "reel"),
+    "youtube-api":          ("youtube", "subscriber", "playlist"),
+    "linear-api":           ("linear",),
+    "quickbooks-api":       ("quickbooks", "ledger"),
+    "google-classroom-api": ("google classroom",),
+    "myfitnesspal-api":     ("myfitnesspal",),
+    "ring-api":             ("ring doorbell",),
+}
+
+_GENERIC_KEYWORDS = {
+    "linear-api":           ("issue", "project management", "sprint", "backlog", "ticket"),
+    "quickbooks-api":       ("invoice", "accounting", "expense", "bill", "payment"),
     "google-classroom-api": ("classroom", "course", "assignment", "student", "teacher", "grading"),
-    "myfitnesspal-api":     ("myfitnesspal", "fitness", "calorie", "exercise", "workout", "nutrition", "diet", "meal", "run ", "running"),
-    "ring-api":             ("ring", "doorbell", "camera", "security", "motion"),
+    "myfitnesspal-api":     ("fitness", "calorie", "exercise", "workout", "nutrition"),
+    "ring-api":             ("doorbell", "motion"),
+    "etsy-api":             ("listing", "shop", "craft"),
+    "amazon-seller-api":    ("seller",),
 }
 
 _CURATED_TAGS = {
@@ -84,58 +94,76 @@ def _slug_keywords(api: str) -> tuple[set[str], set[str]]:
     return tokens, phrases
 
 
-def _compile_keywords(api: str) -> "re.Pattern | None":
-    """Build one word-boundary regex from an API's slug-derived + curated
-    keywords. Word boundaries avoid substring false positives (e.g. 'ring'
-    must not match 'bring'/'during')."""
-    tokens, phrases = _slug_keywords(api)
-    keys: set[str] = set()
-    for k in tokens | phrases:
-        if k.strip():
-            keys.add(k.strip())
-    for k in _CURATED_KEYWORDS.get(api, ()):
-        if k.strip():                      # tolerate legacy trailing-space hacks
-            keys.add(k.strip())
-    if not keys:
+def _compile_pattern(keys: set[str]) -> "re.Pattern | None":
+    cleaned = {k.strip() for k in keys if k and k.strip()}
+    if not cleaned:
         return None
-    alts = "|".join(re.escape(k) for k in sorted(keys))
+    alts = "|".join(re.escape(k) for k in sorted(cleaned))
     return re.compile(rf"\b(?:{alts})\b")
 
 
+def _compile_matchers(api: str) -> "tuple[re.Pattern | None, re.Pattern | None]":
+    """Return (strong, generic) matchers for an API.
+
+    A `strong` hit alone is enough to mark the API as required: slug tokens
+    (e.g. `\\bnotion\\b`, `\\bstripe\\b`) and brand-locked curated keywords
+    (`\\bquickbooks\\b`, `ring doorbell`).
+
+    A `generic` hit alone is NOT enough: these are domain words that fire on
+    common English ("post", "channel", "running", "board"). They only count
+    if a second hit from the same API (strong OR generic) also matches.
+    """
+    tokens, phrases = _slug_keywords(api)
+    strong: set[str] = set(tokens) | set(phrases) | set(_CURATED_KEYWORDS.get(api, ()))
+    generic: set[str] = set(_GENERIC_KEYWORDS.get(api, ()))
+    return _compile_pattern(strong), _compile_pattern(generic)
+
+
 @lru_cache(maxsize=8)
-def _build_catalog(env_str: str) -> dict[str, "re.Pattern"]:
-    """Discover every API in the environment folder and compile its keyword
-    matcher. Falls back to the curated set if the environment folder is missing."""
+def _build_catalog(env_str: str) -> "dict[str, tuple[re.Pattern | None, re.Pattern | None]]":
     env = Path(env_str)
-    catalog: dict[str, re.Pattern] = {}
+    catalog: dict[str, tuple[re.Pattern | None, re.Pattern | None]] = {}
     if env.is_dir():
         for d in sorted(env.iterdir()):
             if not (d.is_dir() and d.name.endswith("-api") and (d / "service.toml").is_file()):
                 continue
-            pat = _compile_keywords(d.name)
-            if pat is not None:
-                catalog[d.name] = pat
+            strong, generic = _compile_matchers(d.name)
+            if strong is not None or generic is not None:
+                catalog[d.name] = (strong, generic)
     if not catalog:
         for api in _CURATED_KEYWORDS:
-            pat = _compile_keywords(api)
-            if pat is not None:
-                catalog[api] = pat
+            strong, generic = _compile_matchers(api)
+            if strong is not None or generic is not None:
+                catalog[api] = (strong, generic)
     return catalog
 
 
 def available_apis(environment_dir=None) -> list[str]:
-    """All API names discovered in the environment folder (sorted)."""
     return sorted(_build_catalog(str(_env_dir(environment_dir))).keys())
 
 
 def infer_required_apis(prompt: str, environment_dir=None) -> list[str]:
-    """Return the APIs (discovered from environment/) whose keywords appear in
-    the prompt, matched on word boundaries to avoid substring false positives."""
+    """Return APIs whose keywords appear in the prompt with word-boundary matching.
+
+    Strong matches (slug + brand-locked curated terms) qualify on a single hit.
+    Generic matches (domain words like "invoice", "calorie", "doorbell") require
+    a second hit from the same API to qualify, eliminating the false-positive
+    storm from common-English words.
+    """
     if not prompt:
         return []
     pl = prompt.lower()
     catalog = _build_catalog(str(_env_dir(environment_dir)))
-    return sorted(api for api, pat in catalog.items() if pat.search(pl))
+    matched: list[str] = []
+    for api, (strong, generic) in catalog.items():
+        strong_hits = len(strong.findall(pl)) if strong is not None else 0
+        generic_hits = len(generic.findall(pl)) if generic is not None else 0
+        total_hits = strong_hits + generic_hits
+        if strong_hits >= 1:
+            matched.append(api)
+        elif generic_hits >= 2 and total_hits >= 2:
+            matched.append(api)
+    return sorted(matched)
 
 
 def compute_distractor_skills(required_apis: list[str], task_id: str,

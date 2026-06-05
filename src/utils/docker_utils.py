@@ -236,6 +236,241 @@ def setup_skills(
             )
 
 
+_BASELINE_SKILL_PIP_DEPS: tuple[str, ...] = (
+    "pymupdf",
+    "pillow",
+    "pytesseract",
+    "pdfplumber",
+    "pdf2image",
+    "opencv-python-headless",
+)
+
+
+_BIN_TO_APT_PACKAGE: dict[str, str] = {
+    "ffmpeg": "ffmpeg",
+    "ffprobe": "ffmpeg",
+    "tesseract": "tesseract-ocr",
+    "pdftotext": "poppler-utils",
+    "pdfinfo": "poppler-utils",
+}
+
+
+_BASELINE_SKILL_APT_PACKAGES: tuple[str, ...] = (
+    "ffmpeg",
+    "tesseract-ocr",
+    "poppler-utils",
+)
+
+
+_SKILL_DEP_PROBE_IMPORTS: tuple[tuple[str, str], ...] = (
+    ("fitz", "pymupdf"),
+    ("PIL", "pillow"),
+    ("pytesseract", "pytesseract"),
+    ("pdfplumber", "pdfplumber"),
+)
+
+
+_SKILL_DEP_PROBE_BINS: tuple[str, ...] = ("ffmpeg", "tesseract")
+
+
+def _parse_skill_pip_deps(skill_md_path: Path) -> list[str]:
+    if not skill_md_path.is_file():
+        return []
+    try:
+        text = skill_md_path.read_text(encoding="utf-8")
+    except OSError:
+        return []
+    if not text.startswith("---"):
+        return []
+    parts = text.split("---", 2)
+    if len(parts) < 3:
+        return []
+    try:
+        import yaml as _yaml
+        frontmatter = _yaml.safe_load(parts[1]) or {}
+    except Exception:
+        return []
+    if not isinstance(frontmatter, dict):
+        return []
+    metadata = frontmatter.get("metadata") or {}
+    if not isinstance(metadata, dict):
+        return []
+    clawdbot = metadata.get("clawdbot") or {}
+    if not isinstance(clawdbot, dict):
+        return []
+    pip_deps = clawdbot.get("pip") or []
+    requires = clawdbot.get("requires") or {}
+    requires_pip = requires.get("pip") or [] if isinstance(requires, dict) else []
+    deps = list(pip_deps) + list(requires_pip)
+    return [str(d).strip() for d in deps if str(d).strip()]
+
+
+def _parse_skill_bin_deps(skill_md_path: Path) -> list[str]:
+    if not skill_md_path.is_file():
+        return []
+    try:
+        text = skill_md_path.read_text(encoding="utf-8")
+    except OSError:
+        return []
+    if not text.startswith("---"):
+        return []
+    parts = text.split("---", 2)
+    if len(parts) < 3:
+        return []
+    try:
+        import yaml as _yaml
+        frontmatter = _yaml.safe_load(parts[1]) or {}
+    except Exception:
+        return []
+    if not isinstance(frontmatter, dict):
+        return []
+    metadata = frontmatter.get("metadata") or {}
+    if not isinstance(metadata, dict):
+        return []
+    clawdbot = metadata.get("clawdbot") or {}
+    if not isinstance(clawdbot, dict):
+        return []
+    requires = clawdbot.get("requires") or {}
+    bins = requires.get("bins") or [] if isinstance(requires, dict) else []
+    return [str(b).strip() for b in bins if str(b).strip()]
+
+
+def _install_skill_runtime_deps(task_id: str, env_root: Path) -> dict[str, list[str]]:
+    pip_deps: set[str] = set(_BASELINE_SKILL_PIP_DEPS)
+    apt_packages: set[str] = set(_BASELINE_SKILL_APT_PACKAGES)
+    skills_src = env_root / "skills"
+    if skills_src.is_dir():
+        for entry in sorted(skills_src.iterdir()):
+            if not entry.is_dir() or entry.name.endswith("-connector"):
+                continue
+            skill_md = entry / "SKILL.md"
+            for pkg in _parse_skill_pip_deps(skill_md):
+                pip_deps.add(pkg)
+            for binary in _parse_skill_bin_deps(skill_md):
+                apt_pkg = _BIN_TO_APT_PACKAGE.get(binary)
+                if apt_pkg:
+                    apt_packages.add(apt_pkg)
+
+    sorted_apt = sorted(apt_packages)
+    if sorted_apt:
+        apt_cmd = (
+            "set -e; "
+            "if ! command -v apt-get >/dev/null 2>&1; then "
+            "  echo 'no-apt' >&2; exit 0; "
+            "fi; "
+            "export DEBIAN_FRONTEND=noninteractive; "
+            "missing=''; "
+            "for p in " + " ".join(shlex.quote(p) for p in sorted_apt) + "; do "
+            "  dpkg -s \"$p\" >/dev/null 2>&1 || missing=\"$missing $p\"; "
+            "done; "
+            "if [ -z \"$missing\" ]; then "
+            "  echo 'all-present'; exit 0; "
+            "fi; "
+            "apt-get update -qq >/dev/null 2>&1 || true; "
+            "if apt-get install -y --no-install-recommends $missing >/dev/null 2>&1; then "
+            "  echo \"installed:$missing\"; exit 0; "
+            "fi; "
+            "echo \"install-failed:$missing\" >&2; exit 1"
+        )
+        r = subprocess.run(
+            ["docker", "exec", task_id, "bash", "-lc", apt_cmd],
+            capture_output=True, text=True,
+        )
+        if r.returncode != 0:
+            logger.warning(
+                "[%s] Skill runtime apt install FAILED (continuing; verify probe will report): %s",
+                task_id, (r.stderr or "").strip()[:500],
+            )
+        else:
+            stdout = (r.stdout or "").strip()
+            if stdout == "all-present":
+                logger.info(
+                    "[%s] Skill runtime apt packages already present (%d): %s",
+                    task_id, len(sorted_apt), ",".join(sorted_apt),
+                )
+            elif stdout.startswith("installed:"):
+                logger.info(
+                    "[%s] Skill runtime apt packages installed:%s",
+                    task_id, stdout[len("installed:"):],
+                )
+            elif stdout == "no-apt":
+                logger.warning("[%s] apt-get not available in image; skipping apt step", task_id)
+            else:
+                logger.info("[%s] Skill runtime apt step OK (output=%r)", task_id, stdout[:120])
+
+    sorted_pip = sorted(pip_deps)
+    if sorted_pip:
+        r = subprocess.run(
+            ["docker", "exec", task_id, "pip", "install", "--quiet",
+             "--disable-pip-version-check", "--no-input", *sorted_pip],
+            capture_output=True, text=True,
+        )
+        if r.returncode != 0:
+            logger.warning(
+                "[%s] Skill runtime pip install returned %d (continuing). stderr: %s",
+                task_id, r.returncode, (r.stderr or "").strip()[:500],
+            )
+        else:
+            logger.info(
+                "[%s] Installed skill runtime pip deps (%d): %s",
+                task_id, len(sorted_pip), ",".join(sorted_pip),
+            )
+
+    return {"pip": sorted_pip, "apt": sorted_apt}
+
+
+def _verify_skill_runtime_deps(task_id: str) -> list[str]:
+    probe = (
+        "import importlib, json, shutil, sys\n"
+        "modules = " + repr([m for m, _ in _SKILL_DEP_PROBE_IMPORTS]) + "\n"
+        "bins = " + repr(list(_SKILL_DEP_PROBE_BINS)) + "\n"
+        "missing_modules = []\n"
+        "for m in modules:\n"
+        "    try:\n"
+        "        importlib.import_module(m)\n"
+        "    except Exception:\n"
+        "        missing_modules.append(m)\n"
+        "missing_bins = [b for b in bins if shutil.which(b) is None]\n"
+        "sys.stdout.write(json.dumps({'modules': missing_modules, 'bins': missing_bins}))\n"
+    )
+    r = subprocess.run(
+        ["docker", "exec", task_id, "python3", "-c", probe],
+        capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        logger.warning(
+            "[%s] Skill runtime verification probe failed to run: %s",
+            task_id, (r.stderr or "").strip()[:300],
+        )
+        return []
+    try:
+        result = json.loads(r.stdout.strip() or "{}")
+    except json.JSONDecodeError:
+        logger.warning(
+            "[%s] Skill runtime verification: could not parse probe stdout: %r",
+            task_id, r.stdout[:200],
+        )
+        return []
+    module_to_pkg = dict(_SKILL_DEP_PROBE_IMPORTS)
+    missing_pkgs = [module_to_pkg.get(m, m) for m in result.get("modules", [])]
+    missing_bins = list(result.get("bins", []))
+    all_missing = missing_pkgs + missing_bins
+    if all_missing:
+        logger.error(
+            "[%s] Skill runtime deps STILL MISSING after install "
+            "(pdf/image/audio skills will fail): pip=%s bins=%s",
+            task_id, ",".join(missing_pkgs) or "-", ",".join(missing_bins) or "-",
+        )
+    else:
+        logger.info(
+            "[%s] Skill runtime deps verified present: pip=%s bins=%s",
+            task_id,
+            ",".join(m for m, _ in _SKILL_DEP_PROBE_IMPORTS),
+            ",".join(_SKILL_DEP_PROBE_BINS),
+        )
+    return all_missing
+
+
 def inject_api_connectors(
     task_id: str,
     env_dir: str,
@@ -328,6 +563,15 @@ def inject_api_connectors(
                 logger.warning("[%s] Failed to inject utility skill %s: %s", task_id, entry.name, r.stderr.strip())
                 continue
             utility_injected.append(entry.name)
+    # The wildclawbench-ubuntu:v1.3 image does not ship pymupdf/pillow/etc.
+    # pdf-extract's SKILL.md declares pip:["pymupdf"] in its frontmatter; without
+    # this install pass the agent reads SKILL.md, follows its instructions, then
+    # hits `ModuleNotFoundError: No module named 'fitz'`. Observed in trajectory
+    # 727a9129-fadc-495b-b29f-0abba34cd594 (2026-06-05). Image-OCR libs are also
+    # absent (PIL/pytesseract/cv2). Until the image is rebuilt, install at task
+    # startup. Verification probe afterward catches future drift loudly.
+    _install_skill_runtime_deps(task_id, env_root)
+    _verify_skill_runtime_deps(task_id)
     api_doc = env_root / "API_DOCUMENTATION.md"
     if api_doc.is_file():
         r = subprocess.run(
