@@ -1,0 +1,4 @@
+schedule_id,name,time_zone,escalation_policy_id,current_oncall_user_id,oncall_start,oncall_end
+SCH_CROPSCI_PRIMARY,Crop Sci Primary On-Call,Africa/Lagos,EP_CROPSCI,PU_AKPAN,2026-10-04T00:00:00+01:00,2026-10-11T00:00:00+01:00
+SCH_ESFES_PRIMARY,ESFES Primary On-Call,Africa/Lagos,EP_ESFES,PU_LAYLA,2026-10-04T00:00:00+01:00,2026-10-11T00:00:00+01:00
+SCH_CROPSCI_BACKUP,Crop Sci Backup,Africa/Lagos,EP_CROPSCI,PU_LAYLA,2026-10-04T00:00:00+01:00,2026-10-11T00:00:00+01:00

@@ -1,0 +1,4 @@
+id,name,desc,closed,id_organization,url,member_ids
+BRD_CASSAVA,Cassava Paper,Manuscript H22 + supporting analyses,False,org_nnu_crop_sci,https://trello.com/b/CASSAVA,"TM_LAYLA,TM_AKPAN,TM_WALSH"
+BRD_WAITA,WAITA Grant Extension,Y2 deliverables + extension paperwork,False,org_nnu_crop_sci,https://trello.com/b/WAITA,"TM_LAYLA,TM_AMINA"
+BRD_TEACHING,Teaching Prep,CROP 411 lecture + tutorial prep,False,org_nnu_crop_sci,https://trello.com/b/TEACHING,"TM_LAYLA,TM_WALSH"

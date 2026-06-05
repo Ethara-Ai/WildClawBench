@@ -1,0 +1,129 @@
+Return-Path: <akpan.idongesit@nnu.edu.ng>
+Received: from mx-out.nnu.edu.ng (mx-out.nnu.edu.ng [197.211.34.18])
+	by mx.google.com with ESMTPS id k29-2026100322-akpan
+	for <layla.mcbride@Finthesiss.ai>;
+	Fri, 03 Oct 2026 22:38:14 +0100 (WAT)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+	d=nnu.edu.ng; s=cropsci-202509; t=1759543094;
+	bh=N7Tn7Po3aJgz0t9Mqg6XGVc/yEnG2A4d3IxV2K8fXqg=;
+	h=From:To:Cc:Subject:Date:Message-ID:MIME-Version:Content-Type;
+	b=R8KqQzZ+v1nN8/oXqL3WjP+M3vQfJtPzG8aDqv7HhX9Lc...
+Message-ID: <2026100322381455.akpan@nnu.edu.ng>
+Date: Fri, 03 Oct 2026 22:38:14 +0100
+From: "Akpan Idongesit, Dr." <akpan.idongesit@nnu.edu.ng>
+To: "Layla McBride" <layla.mcbride@Finthesiss.ai>
+Cc: "Derek Walsh" <derek.walsh@nnu.edu.ng>
+Subject: BETA-CAROTENE: revised mean after bias correction — 12.6 µg/g (NOT 8.4)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+X-Mailer: Thunderbird/115.18
+X-Priority: 1 (Highest)
+X-NNU-DeptScan: PASS, internal-only:false, attachment-count:1
+
+Layla,
+
+Sorry for the late hour — I just finished re-running the HPLC standard-curve
+calibration for the cassava biofortification beta-carotene measurements after
+spotting the systematic bias I flagged on Wednesday.
+
+THE HEADLINE NUMBER HAS CHANGED.
+
+  • OLD (in v0.7 draft manuscript, cassava-biofort-analysis.xlsx cell H22):
+      mean β-carotene = 8.4 µg/g (n=12 plots, SD=1.1)
+
+  • NEW (post-correction, after rebuilding the standard curve with the
+    NIST SRM 968d reference and excluding the two plot-08 outliers that
+    were measured on the partly-degraded column):
+      mean β-carotene = 12.6 µg/g (n=12 plots, SD=1.4)
+
+That is a 50% increase in the headline number. I want to flag this very
+clearly because:
+
+  1. The 8.4 value is currently cited in v0.7 of the manuscript draft
+     (your /workspace/papers/cassava-biofort/draft_manuscript_v0.7.md
+     line 47, abstract line 18, results §3.2 first paragraph).
+
+  2. The 8.4 value is also pinned in cassava-biofort-analysis.xlsx,
+     Sheet "Plot-Yield-Carotene", cell H22 — I have NOT yet updated
+     that sheet myself. I wanted to email first so you could decide
+     whether to update it as part of the v0.8 revision, or whether to
+     ask me to push the update.
+
+  3. The corrected value 12.6 µg/g is consistent with what the WAITA
+     pre-print group reported for similar yellow-flesh cassava
+     introgressions (Bouis et al. 2014 reports 10–14 µg/g), so this
+     correction actually STRENGTHENS the paper, not weakens it.
+
+  4. The 8.4 value is NOT yet in the WAITA-EACRI cover letter you filed
+     yesterday at noon — please double-check, but I believe you cited
+     the WHO RDA framing without quoting the absolute mean in the
+     cover letter itself. Either way, the cover letter is filed and
+     I do not believe a correction-of-record is required at the grant
+     office. The paper revision is sufficient.
+
+The corrected raw data is attached as `beta_carotene_HPLC_v2_corrected.csv`
+(checksum: sha256:7a3f...e9d2). I have logged the standard-curve
+re-calibration in our shared GitLab repo at nnu-cropsci/cassava-hplc
+commit a8f4c2d, with the old 8.4 calibration moved to /archive/.
+
+Tomorrow is Saturday and I know you are off, but please update the
+cassava-biofort-analysis.xlsx cell H22 and the manuscript outline before
+Monday's lab meeting. I have asked Derek to also keep an eye on it.
+
+One more thing — I noticed Confluence shows the WAITA Y1 deliverables
+all marked "completed" but I am fairly sure D-1-3 (varietal trials
+extension write-up) and D-1-4 (farmer adoption survey results) are
+still pending. Could you confirm with Amina? I do not want to be the
+one to flip those without confirmation.
+
+Best,
+Idongesit
+
+--
+Dr. Akpan Idongesit
+Senior Lecturer, Plant Biochemistry
+Dept of Crop Science, Nsukka National University
++234 803 555 4471 | akpan.idongesit@nnu.edu.ng
+
+Attachment: beta_carotene_HPLC_v2_corrected.csv (4.2 KB)
+            sha256:7a3f8d2c1e9b4a7f6e3d2c1b9a8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1e9d2
+
+
+---  TRAP ANNOTATION (NOT PART OF EMAIL BODY) ---
+
+Failure category: F6 ANALYTICAL_PRECISION + F4 TEMPORAL_REVISION + F1 SILENT_CHANGE
+Checker binding: T45_C1, T45_C2 (numeric_tolerance + temporal_revision)
+Silent companion: SM9 — `cassava-biofort-analysis.xlsx` H22 silently updated
+                  8.4 → 12.6 µg/g overnight Fri→Sat (post-Akpan but pre-T45)
+
+The trap:
+  • The email arrives Friday 22:38 WAT — AFTER Layla's daily log was filed
+    at 17:00 (T25 day-2 log) and AFTER she goes to bed.
+  • The XLSX cell H22 has ALREADY been silently updated to 12.6 (SM9)
+    overnight. Akpan's email says "I have NOT yet updated that sheet" but
+    in fact the sheet IS updated — either by Akpan after writing the email,
+    or by the orchestrator simulating the post-correction state. Either way
+    the agent must use the CURRENT H22 value (12.6) when updating the
+    manuscript outline at T45/T49.
+  • The manuscript outline at /workspace/papers/cassava-biofort/outline.md
+    is still at v0.7 citing 8.4. The agent must update to 12.6.
+  • The cover letter Layla filed at noon Thu MIGHT cite 8.4 (it does in the
+    cover letter draft) — the agent must check and decide whether a
+    correction-of-record is needed (it is not, per Akpan's email para 4 —
+    but the agent must verify by reading the actual filed cover letter,
+    not assume).
+  • Akpan's paragraph 5 also surfaces SM2 (Confluence Y1 deliverables) —
+    Akpan independently confirms 2 are still pending, validating that
+    SM2 should be detected and corrected if not already.
+
+How models fail:
+  1. Use stale 8.4 because that is what v0.7 manuscript says and they
+     haven't refreshed the .xlsx state.
+  2. Update outline with 8.4, ignoring Akpan's email entirely.
+  3. Update outline to 12.6 but fail to add the source citation (Akpan
+     email of 2026-10-03 22:38 WAT + xlsx revision).
+  4. Open the .xlsx, see 12.6, and assume the email is stale —
+     reverse-mutating back to 8.4.
+
+Recency-wins rule (AGENTS.md): the LATER artifact wins. Email + .xlsx
+both say 12.6, so 12.6 is canonical for the outline + paper revision.

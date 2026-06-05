@@ -1,0 +1,9 @@
+message_id,conversation_id,direction,from_wa_id,to_wa_id,type,text,template_name,status,sent_at
+wamsg_001,conv_marcus,in,2348012340001,biz,text,Sophia forgot her lunchbox. Can you swing home?,,delivered,2026-10-04T07:12:00+01:00
+wamsg_002,conv_marcus,out,biz,2348012340001,text,"On it, leaving lab now.",,read,2026-10-04T07:14:00+01:00
+wamsg_003,conv_blessing,in,2348012340002,biz,text,Elijah ate okay. Going for bath.,,delivered,2026-10-03T20:30:00+01:00
+wamsg_004,conv_tunde,in,2348012340003,biz,text,Workshop Friday confirmed. Need projector.,,delivered,2026-10-03T18:14:00+01:00
+wamsg_005,conv_amina,in,254712340001,biz,text,Wed call still on?,,delivered,2026-10-04T06:50:00+03:00
+wamsg_006,conv_amina,out,biz,254712340001,text,Yes 15:00 WAT. See you then.,,delivered,2026-10-04T06:52:00+03:00
+wamsg_007,conv_tunde,out,biz,2348012340003,template,Workshop kit confirmed — see Q4 calendar.,esfes_workshop_kit_confirm,delivered,2026-10-01T16:00:00+01:00
+wamsg_008,conv_blessing,out,biz,2348012340002,text,Thanks Blessing. Be home by 8.,,read,2026-10-03T20:32:00+01:00

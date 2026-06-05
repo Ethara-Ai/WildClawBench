@@ -1,0 +1,6 @@
+id,employeeId,name,type,start,end
+OUT_001,EMP_002,Idongesit Akpan,Conference,2026-10-10,2026-10-12
+OUT_002,EMP_006,Grace Obi,Sick,2026-10-04,2026-10-04
+OUT_003,EMP_008,Ifeoma Onye,Vacation,2026-10-13,2026-10-17
+OUT_004,EMP_007,Emeka Nwosu,Training,2026-10-20,2026-10-22
+OUT_005,EMP_010,Blessing Okafor,Field-Day,2026-10-08,2026-10-08

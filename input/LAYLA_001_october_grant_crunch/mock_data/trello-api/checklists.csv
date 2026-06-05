@@ -1,0 +1,4 @@
+id,name,id_card,id_board,items
+CL_001,Reviewer comments,CRD_C_001,BRD_CASSAVA,"[{""text"":""Comment 1: methods clarity"",""done"":true},{""text"":""Comment 2: stat power"",""done"":true},{""text"":""Comment 3: bioassay validation"",""done"":false}]"
+CL_002,IRB checklist,CRD_W_001,BRD_WAITA,"[{""text"":""Consent form"",""done"":true},{""text"":""Risk section"",""done"":false},{""text"":""Data retention"",""done"":false}]"
+CL_003,Module 4 prep,CRD_T_001,BRD_TEACHING,"[{""text"":""Lecture slides"",""done"":true},{""text"":""Reading list"",""done"":true},{""text"":""Worked example"",""done"":false}]"

@@ -1,0 +1,7 @@
+id,name,email,avatar_url,type,bot,owner_workspace,created_time
+usr_layla,Layla McBride,layla.mcbride@nnu.edu.ng,,person,False,ws_nnu_crop_sci_2024,2024-03-12T08:00:00.000Z
+usr_amina,Amina Bello,a.bello@eacri.ac.ke,,person,False,ws_nnu_crop_sci_2024,2024-04-02T08:00:00.000Z
+usr_akpan,Idongesit Akpan,akpan.idongesit@nnu.edu.ng,,person,False,ws_nnu_crop_sci_2024,2024-05-12T08:00:00.000Z
+usr_tunde,Tunde Aderemi,esfes_coord@esfes.org.ng,,person,False,ws_nnu_crop_sci_2024,2024-06-21T08:00:00.000Z
+usr_amelia,Amelia Akpan (WAITA),amelia.akpan@waita.org,,person,False,ws_nnu_crop_sci_2024,2024-07-15T08:00:00.000Z
+usr_walsh,Derek Walsh,d.walsh@nnu.edu.ng,,person,False,ws_nnu_crop_sci_2024,2024-08-04T08:00:00.000Z

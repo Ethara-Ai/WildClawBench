@@ -1,0 +1,4 @@
+baseId,id,name,primaryFieldId,records_csv
+appFTUdi2026,tblPlots,Plots,fldPlotID,records_plots.csv
+appFTUdi2026,tblFarmers,Farmers,fldFarmerID,records_farmers.csv
+appFTUdi2026,tblEquipment,Equipment,fldAssetID,records_equipment.csv

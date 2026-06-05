@@ -1,0 +1,6 @@
+envelope_id,status,email_subject,sender_name,sender_email,created_time,sent_time,completed_time,template_id
+DS-ENV-2026-1004-1342,sent,URGENT: WAITA Y2 cover letter — please countersign,Amelia Akpan,amelia-akpan@waita-foundation.org,2026-10-04T13:42:00Z,2026-10-04T13:42:00Z,,DS_TPL_001
+DS-ENV-2026-0930-0900,completed,Y2 Q3 reporting — coord sign-off,Layla McBride,layla.mcbride@nnu.edu.ng,2026-09-30T09:00:00Z,2026-09-30T09:00:00Z,2026-09-30T17:14:00Z,DS_TPL_002
+DS-ENV-2026-0915-1100,completed,ESFES field-worker contract — Chika Igwe,Tunde Aderemi,esfes_coord@esfes.org.ng,2026-09-15T11:00:00Z,2026-09-15T11:00:00Z,2026-09-15T16:32:00Z,DS_TPL_003
+DS-ENV-2026-0820-1430,completed,WAADA Y2 extension cover letter,Layla McBride,layla.mcbride@nnu.edu.ng,2026-08-20T14:30:00Z,2026-08-20T14:30:00Z,2026-08-21T10:14:00Z,DS_TPL_001
+DS-ENV-2026-0712-1530,voided,Voided — incorrect amount on cover,Layla McBride,layla.mcbride@nnu.edu.ng,2026-07-12T15:30:00Z,2026-07-12T15:30:00Z,,DS_TPL_001

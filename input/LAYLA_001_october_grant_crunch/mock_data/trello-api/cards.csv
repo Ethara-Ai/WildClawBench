@@ -1,0 +1,11 @@
+id,name,desc,id_board,id_list,pos,due,closed,member_ids,labels
+CRD_C_001,H22 manuscript v0.4 revisions,Reviewer comments addressed,BRD_CASSAVA,LST_C_REVIEW,1,2026-10-15,False,TM_LAYLA,"manuscript,high-pri"
+CRD_C_002,β-carotene HPLC re-run,Initial 8.4 µg/g flagged preliminary by Akpan,BRD_CASSAVA,LST_C_DOING,2,2026-10-04,False,TM_AKPAN,"lab,blocker"
+CRD_C_003,Supplementary tables — Udi yields,Plots UDI-001..UDI-070 yield_kg_m2 table,BRD_CASSAVA,LST_C_BACKLOG,3,,False,TM_LAYLA,manuscript
+CRD_W_001,D-1-3 IRB section finalisation,Add IRB language; Amina to review,BRD_WAITA,LST_W_TODO,1,2026-10-09,False,"TM_LAYLA,TM_AMINA",deliverable
+CRD_W_002,D-1-4 lab assay sign-off,Wait for β-carotene revised value,BRD_WAITA,LST_W_BLOCKED,2,2026-10-12,False,TM_LAYLA,"deliverable,blocked"
+CRD_W_003,M-Y2-04 target review,Confirm Q3 2027 still holds after Oct data lock,BRD_WAITA,LST_W_TODO,3,2026-10-22,False,TM_LAYLA,milestone
+CRD_T_001,CROP 411 Module 4 lecture deck,Plant breeding fundamentals,BRD_TEACHING,LST_T_PREP,1,2026-10-05,False,TM_LAYLA,teaching
+CRD_T_002,CROP 411 Module 4 tutorial set,Tutorial sheet + answer key,BRD_TEACHING,LST_T_PREP,2,2026-10-06,False,TM_WALSH,teaching
+CRD_T_003,CROP 411 mid-term moderation,Pre-board moderation review,BRD_TEACHING,LST_T_PREP,3,2026-10-30,False,"TM_LAYLA,TM_WALSH","teaching,exam"
+CRD_C_004,Pre-print mirror push,Push H22 v0.3 to OpenAIRE mirror,BRD_CASSAVA,LST_C_DOING,4,2026-10-08,False,TM_LAYLA,manuscript

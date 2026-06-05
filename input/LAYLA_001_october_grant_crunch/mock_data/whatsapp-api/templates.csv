@@ -1,0 +1,6 @@
+name,language,category,status,body_text,header_text
+esfes_workshop_kit_confirm,en,TRANSACTIONAL,APPROVED,Your ESFES workshop kit is confirmed for {{date}}.,
+grant_deadline_ping,en,TRANSACTIONAL,APPROVED,Reminder: {{grant_name}} due {{date}}.,
+school_pickup,en,TRANSACTIONAL,APPROVED,Pickup change: {{child}} at {{time}}.,
+nanny_eod_ack,en,MARKETING,APPROVED,Thanks for the update.,
+lab_eta,en,TRANSACTIONAL,APPROVED,ETA to lab: {{eta}}.,

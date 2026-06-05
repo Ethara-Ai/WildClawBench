@@ -1,0 +1,6 @@
+id,createdTime,AssetID,Name,Status,AssignedTo,LastCalibrated
+recEQ001,2026-03-15T08:00:00.000Z,EQ-LAB-001,Soil moisture probe,Active,Idongesit Akpan,2026-08-12
+recEQ002,2026-03-15T08:00:00.000Z,EQ-LAB-002,β-carotene HPLC col.,Active,Idongesit Akpan,2026-09-02
+recEQ003,2026-03-15T08:00:00.000Z,EQ-LAB-003,Field weighing scale,Active,Layla McBride,2026-07-30
+recEQ004,2026-03-15T08:00:00.000Z,EQ-LAB-004,NDVI camera kit,Maintenance,Layla McBride,2026-06-18
+recEQ005,2026-03-15T08:00:00.000Z,EQ-FLD-001,ESFES workshop tent,Active,Tunde Aderemi,

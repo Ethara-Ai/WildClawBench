@@ -1,0 +1,7 @@
+id,name,real_name,email,is_admin,is_bot,tz,status_text,presence
+U_LAYLA,layla,Layla McBride,layla.mcbride@nnu.edu.ng,True,False,Africa/Lagos,Heads-down,active
+U_AMINA,amina,Amina Bello,a.bello@eacri.ac.ke,False,False,Africa/Nairobi,,away
+U_AKPAN,akpan,Idongesit Akpan,akpan.idongesit@nnu.edu.ng,False,False,Africa/Lagos,Lab,active
+U_WALSH,walsh,Derek Walsh,d.walsh@nnu.edu.ng,False,False,Africa/Lagos,,active
+U_TUNDE,tunde,Tunde Aderemi,esfes_coord@esfes.org.ng,False,False,Africa/Lagos,Field,away
+U_GRANTBOT,grantbot,Grant Tracker Bot,bot@nnu.edu.ng,False,True,UTC,,active

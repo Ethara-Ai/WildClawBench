@@ -1,0 +1,9 @@
+id,type,status,title,space_key,parent_id,version,body,created_by,created_at
+pg_overview,page,current,WAITA-EACRI Programme Overview,WAITA,,12,Joint NNU-EACRI yam improvement programme. Y2 of 3.,Amina Bello,2025-04-02T08:00:00.000Z
+pg_d_1_3,page,current,D-1-3 Y2 Cultivar Adoption Survey,WAITA,pg_overview,5,Survey design v0.4. Field rollout Nov-Dec 2026. Status: In Progress.,Layla McBride,2025-10-01T08:00:00.000Z
+pg_d_1_4,page,current,D-1-4 Y2 Beta-Carotene Lab Assay,WAITA,pg_overview,7,HPLC quantification underway. Initial value 8.4 µg/g. Status: In Progress.,Layla McBride,2025-10-01T08:00:00.000Z
+pg_m_y2_04,page,current,M-Y2-04 Field Trial Data Lock,WAITA,pg_overview,3,Target completion quarter: Q3 2027. Owner: Layla McBride.,Layla McBride,2025-10-01T08:00:00.000Z
+pg_budget_q3,page,current,Q3 2026 Budget Reconciliation,WAITA,pg_overview,2,Q3 burn rate within ±3% of plan. Cross-reference DocuSign DS-ENV-2026-1004-1342.,Amina Bello,2026-09-25T08:00:00.000Z
+pg_meeting_notes,page,current,Bi-weekly Coord Notes — 2026 Q3,WAITA,pg_overview,19,Notes from Wed 15:00 WAT bi-weekly calls. Last entry 2026-09-30.,Amina Bello,2026-07-09T16:00:00.000Z
+pg_lab_sop,page,current,Crop Science Lab SOP v3.1,CROPSCI,,4,"Lab safety, sample chain-of-custody, β-carotene HPLC protocol.",Layla McBride,2024-08-12T08:00:00.000Z
+pg_teaching,page,current,CROP 411 — Lecture Schedule,CROPSCI,,1,Spring 2026 lecture plan. Co-taught with Dr. Walsh.,Layla McBride,2026-01-08T08:00:00.000Z

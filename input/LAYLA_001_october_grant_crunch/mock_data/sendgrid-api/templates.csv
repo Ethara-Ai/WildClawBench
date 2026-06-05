@@ -1,0 +1,6 @@
+id,name,generation,subject,html_content,active,updated_at
+tpl_grant_progress,Grant Progress Update,dynamic,Q3 Progress — {{grant_name}},"<p>Hi {{first_name}},</p><p>Q3 progress…</p>",True,2026-09-01T08:00:00Z
+tpl_esfes_workshop,ESFES Workshop Invite,dynamic,Join us — {{workshop_date}},"<p>Hello,</p><p>Workshop on {{date}}…</p>",True,2026-08-15T08:00:00Z
+tpl_y2_review,Y2 Review Heads-up,dynamic,Y2 review window,<p>Heads-up…</p>,True,2026-09-25T08:00:00Z
+tpl_diaspora_launch,Diaspora Pilot Launch,dynamic,Diaspora pilot is live,"<p>Hi {{first_name}},</p><p>Launch…</p>",False,2026-07-20T08:00:00Z
+tpl_thank_you,Workshop Thank-you,dynamic,Thank you for attending,<p>Thanks {{first_name}}!</p>,True,2026-08-30T08:00:00Z

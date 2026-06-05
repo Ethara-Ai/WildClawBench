@@ -1,0 +1,7 @@
+id,email,first_name,last_name,country,list_ids,created_at,updated_at
+ctc_001,farmer.001@village.ng,Chinedu,Eze,NG,lst_esfes_farmers,2024-07-20T08:00:00Z,2026-09-15T08:00:00Z
+ctc_002,farmer.002@village.ng,Ada,Okwu,NG,lst_esfes_farmers,2024-07-21T08:00:00Z,2026-09-15T08:00:00Z
+ctc_003,amelia.akpan@waita.org,Amelia,Akpan,NG,lst_waita_partners,2024-07-15T08:00:00Z,2026-09-20T08:00:00Z
+ctc_004,a.bello@eacri.ac.ke,Amina,Bello,KE,lst_waita_partners,2025-04-02T08:00:00Z,2026-09-30T08:00:00Z
+ctc_005,diaspora.test@example.com,Test,Customer,US,lst_diaspora_pilot,2026-06-12T08:00:00Z,2026-09-25T08:00:00Z
+ctc_006,alumna.001@crop-sci.ng,Ifeoma,Onyeka,NG,lst_research_alumni,2024-09-30T08:00:00Z,2026-09-15T08:00:00Z

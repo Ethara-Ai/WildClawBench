@@ -1,0 +1,6 @@
+metric,scope,base_value,amplitude,unit
+crop_sci.storage.used_pct,host:crop-sci-storage-01,73.0,1.5,percent
+crop_sci.storage.total_tb,host:crop-sci-storage-01,8.0,0.0,terabyte
+crop_sci.compute.gpu_util,host:crop-sci-compute-01,22.3,8.0,percent
+lab_lims.db.connections,host:lab-lims-db-01,14.0,3.0,count
+esfes.cms.requests_per_min,host:esfes-cms-01,32.0,12.0,count

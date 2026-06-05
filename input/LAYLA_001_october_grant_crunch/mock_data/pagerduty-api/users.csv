@@ -1,0 +1,5 @@
+user_id,name,email,role,time_zone,job_title
+PU_LAYLA,Layla McBride,layla.mcbride@nnu.edu.ng,manager,Africa/Lagos,Senior Research Fellow
+PU_AKPAN,Idongesit Akpan,akpan.idongesit@nnu.edu.ng,responder,Africa/Lagos,Senior Lecturer
+PU_WALSH,Derek Walsh,d.walsh@nnu.edu.ng,responder,Africa/Lagos,Lecturer
+PU_AMINA,Amina Bello,a.bello@eacri.ac.ke,observer,Africa/Nairobi,Co-PI (EACRI)

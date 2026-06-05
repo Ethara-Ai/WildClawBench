@@ -1,0 +1,23 @@
+page_id,property_name,property_type,value
+pg_cassava_y2,Co-PI Split — Layla %,number,50
+pg_cassava_y2,Co-PI Split — Amina %,number,50
+pg_cassava_y2,Grant Total (₦),number,127450000
+pg_cassava_y2,Status,select,In Progress
+pg_cassava_y2,Funder,select,WAADA
+pg_cassava_y2,Year,select,Y2 of 3
+pg_cassava_y2,Reporting Due,date,2026-10-15
+pg_waita_grant,Status,select,In Progress
+pg_waita_grant,Co-PI,person,Amina Bello
+pg_waita_grant,Reporting Due,date,2026-10-16
+pg_contact_amelia,Email,email,amelia.akpan@waita.org
+pg_contact_amelia,Role,rich_text,WAITA Programme Officer
+pg_contact_amelia,Phone,phone_number,+2348012345678
+pg_contact_tunde,Email,email,esfes_coord@esfes.org.ng
+pg_contact_tunde,Role,rich_text,ESFES Field Training Coordinator
+pg_deliv_d13,Status,select,In Progress
+pg_deliv_d14,Status,select,In Progress
+pg_milestone_y204,Status,select,Pending
+pg_milestone_y204,Target Quarter,select,Q3 2027
+pg_paper_h22,Status,select,In Review
+pg_paper_h22,Journal,rich_text,Nature Plants
+pg_grants_review,Status,select,In Progress

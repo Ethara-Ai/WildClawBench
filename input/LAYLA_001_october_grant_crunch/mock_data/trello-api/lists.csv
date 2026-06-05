@@ -1,0 +1,7 @@
+id,name,id_board,pos,closed
+LST_C_BACKLOG,Backlog,BRD_CASSAVA,1,False
+LST_C_DOING,Doing,BRD_CASSAVA,2,False
+LST_C_REVIEW,In Review,BRD_CASSAVA,3,False
+LST_W_TODO,To Do,BRD_WAITA,1,False
+LST_W_BLOCKED,Blocked,BRD_WAITA,2,False
+LST_T_PREP,Prep,BRD_TEACHING,1,False

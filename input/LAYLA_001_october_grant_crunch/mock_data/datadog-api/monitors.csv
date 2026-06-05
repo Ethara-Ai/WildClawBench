@@ -1,0 +1,6 @@
+id,name,type,query,message,overall_state,priority,tags,created,modified
+mon_storage_70,Crop Sci storage > 70%,metric alert,avg(last_5m):avg:crop_sci.storage.used_pct{*} > 70,Storage approaching capacity,Warn,3,team:crop-sci,2024-10-01T08:00:00Z,2026-09-30T08:00:00Z
+mon_lims_db_99,LIMS DB CPU > 80%,metric alert,avg(last_5m):avg:system.cpu.user{host:lab-lims-db-01} > 80,DB pressure,OK,2,team:crop-sci,2024-10-01T08:00:00Z,2026-09-30T08:00:00Z
+mon_esfes_5xx,ESFES CMS 5xx,metric alert,sum(last_5m):sum:esfes.cms.errors_5xx{*}.as_count() > 5,Investigate proxy,OK,2,team:esfes,2025-03-12T08:00:00Z,2026-08-15T08:00:00Z
+mon_grant_latency,Notion write latency,metric alert,avg(last_10m):avg:notion.write.ms{*} > 800,Notion p95 slow,OK,3,team:crop-sci,2026-06-01T08:00:00Z,2026-09-15T08:00:00Z
+mon_oncall_cover,On-call coverage check,service check,service_check_status:pagerduty.coverage,PD coverage gap,OK,4,team:crop-sci,2025-08-22T08:00:00Z,2026-09-30T08:00:00Z

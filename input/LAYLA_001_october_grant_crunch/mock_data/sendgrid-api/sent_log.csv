@@ -1,0 +1,7 @@
+message_id,to_email,from_email,subject,template_id,status,opens,clicks,sent_at
+sgmsg_001,amelia.akpan@waita.org,layla.mcbride@nnu.edu.ng,WAITA Y2 extension cover,,delivered,3,1,2026-09-24T15:00:00Z
+sgmsg_002,a.bello@eacri.ac.ke,layla.mcbride@nnu.edu.ng,Re: WAITA Y2 deliverables,,delivered,5,0,2026-09-30T17:00:00Z
+sgmsg_003,farmer.001@village.ng,esfes@nnu.edu.ng,Workshop invite,tpl_esfes_workshop,delivered,1,0,2026-09-15T08:00:00Z
+sgmsg_004,alumna.001@crop-sci.ng,esfes@nnu.edu.ng,Y2 review heads-up,tpl_y2_review,delivered,2,1,2026-09-25T08:00:00Z
+sgmsg_005,diaspora.test@example.com,esfes@nnu.edu.ng,Diaspora pilot launch,tpl_diaspora_launch,bounced,0,0,2026-07-22T08:00:00Z
+sgmsg_006,farmer.002@village.ng,esfes@nnu.edu.ng,Workshop invite,tpl_esfes_workshop,delivered,1,0,2026-09-15T08:00:00Z

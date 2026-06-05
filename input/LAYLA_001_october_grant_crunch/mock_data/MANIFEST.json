@@ -1,0 +1,123 @@
+{
+  "task_id": "LAYLA_001_october_grant_crunch",
+  "generated_at_utc": "2026-06-03T14:44:06+00:00",
+  "services": [
+    "gmail-api",
+    "google-calendar-api",
+    "notion-api",
+    "slack-api",
+    "confluence-api",
+    "airtable-api",
+    "whatsapp-api",
+    "sendgrid-api",
+    "twilio-api",
+    "datadog-api",
+    "pagerduty-api",
+    "amadeus-api",
+    "bamboohr-api",
+    "docusign-api",
+    "trello-api"
+  ],
+  "files": {
+    "gmail-api": [
+      "Mock Data/gmail-api/profile.json",
+      "Mock Data/gmail-api/labels.csv",
+      "Mock Data/gmail-api/messages.csv",
+      "Mock Data/gmail-api/drafts.csv"
+    ],
+    "google-calendar-api": [
+      "Mock Data/google-calendar-api/calendars.csv",
+      "Mock Data/google-calendar-api/events.csv",
+      "Mock Data/google-calendar-api/event_attendees.csv"
+    ],
+    "notion-api": [
+      "Mock Data/notion-api/users.csv",
+      "Mock Data/notion-api/databases.csv",
+      "Mock Data/notion-api/pages.csv",
+      "Mock Data/notion-api/page_properties.csv",
+      "Mock Data/notion-api/blocks.csv",
+      "Mock Data/notion-api/comments.csv",
+      "Mock Data/notion-api/workspace.json"
+    ],
+    "slack-api": [
+      "Mock Data/slack-api/team.json",
+      "Mock Data/slack-api/users.csv",
+      "Mock Data/slack-api/channels.csv",
+      "Mock Data/slack-api/channel_members.csv",
+      "Mock Data/slack-api/messages.csv"
+    ],
+    "confluence-api": [
+      "Mock Data/confluence-api/spaces.csv",
+      "Mock Data/confluence-api/pages.csv",
+      "Mock Data/confluence-api/labels.csv",
+      "Mock Data/confluence-api/comments.csv"
+    ],
+    "airtable-api": [
+      "Mock Data/airtable-api/bases.csv",
+      "Mock Data/airtable-api/tables.csv",
+      "Mock Data/airtable-api/fields.csv",
+      "Mock Data/airtable-api/records_plots.csv",
+      "Mock Data/airtable-api/records_farmers.csv",
+      "Mock Data/airtable-api/records_equipment.csv"
+    ],
+    "whatsapp-api": [
+      "Mock Data/whatsapp-api/business.json",
+      "Mock Data/whatsapp-api/contacts.csv",
+      "Mock Data/whatsapp-api/conversations.csv",
+      "Mock Data/whatsapp-api/messages.csv",
+      "Mock Data/whatsapp-api/templates.csv"
+    ],
+    "sendgrid-api": [
+      "Mock Data/sendgrid-api/lists.csv",
+      "Mock Data/sendgrid-api/contacts.csv",
+      "Mock Data/sendgrid-api/templates.csv",
+      "Mock Data/sendgrid-api/sent_log.csv",
+      "Mock Data/sendgrid-api/stats.csv"
+    ],
+    "twilio-api": [
+      "Mock Data/twilio-api/account.json",
+      "Mock Data/twilio-api/phone_numbers.csv",
+      "Mock Data/twilio-api/messages.csv",
+      "Mock Data/twilio-api/calls.csv"
+    ],
+    "datadog-api": [
+      "Mock Data/datadog-api/hosts.csv",
+      "Mock Data/datadog-api/metrics.csv",
+      "Mock Data/datadog-api/dashboards.csv",
+      "Mock Data/datadog-api/monitors.csv",
+      "Mock Data/datadog-api/events.csv"
+    ],
+    "pagerduty-api": [
+      "Mock Data/pagerduty-api/users.csv",
+      "Mock Data/pagerduty-api/escalation_policies.csv",
+      "Mock Data/pagerduty-api/services.csv",
+      "Mock Data/pagerduty-api/schedules.csv",
+      "Mock Data/pagerduty-api/incidents.csv"
+    ],
+    "amadeus-api": [
+      "Mock Data/amadeus-api/airlines.csv",
+      "Mock Data/amadeus-api/airports.csv",
+      "Mock Data/amadeus-api/flight_offers.json"
+    ],
+    "bamboohr-api": [
+      "Mock Data/bamboohr-api/company.json",
+      "Mock Data/bamboohr-api/employees.csv",
+      "Mock Data/bamboohr-api/whos_out.csv",
+      "Mock Data/bamboohr-api/time_off_requests.csv"
+    ],
+    "docusign-api": [
+      "Mock Data/docusign-api/templates.csv",
+      "Mock Data/docusign-api/envelopes.csv",
+      "Mock Data/docusign-api/recipients.csv",
+      "Mock Data/docusign-api/documents.csv"
+    ],
+    "trello-api": [
+      "Mock Data/trello-api/boards.csv",
+      "Mock Data/trello-api/lists.csv",
+      "Mock Data/trello-api/cards.csv",
+      "Mock Data/trello-api/checklists.csv",
+      "Mock Data/trello-api/members.csv"
+    ]
+  },
+  "skipped": {}
+}
