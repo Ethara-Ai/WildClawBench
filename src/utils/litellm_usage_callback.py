@@ -84,6 +84,38 @@ def _float(value: Any, default: float = 0.0) -> float:
         return default
 
 
+def _is_preflight_ping(kwargs: dict) -> bool:
+    # The sidecar startup probe at src/utils/litellm_sidecar.py::
+    # verify_litellm_upstream_reachable posts exactly:
+    #   {"messages":[{"role":"user","content":"ping"}], "max_tokens":1, "stream":false}
+    # to /v1/chat/completions. Tag it so the host-side extractor can put its
+    # cost in `sources.preflight` instead of dropping it on the floor (it
+    # happens BEFORE any task's run window, so the in-window agent extractor
+    # filters it out).
+    try:
+        op = kwargs.get("optional_params") or {}
+        max_tok = kwargs.get("max_tokens", op.get("max_tokens", op.get("maxTokens")))
+        if max_tok not in (1, "1"):
+            return False
+        messages = kwargs.get("messages") or []
+        if not isinstance(messages, list) or len(messages) != 1:
+            return False
+        msg = messages[0]
+        if not isinstance(msg, dict) or msg.get("role") != "user":
+            return False
+        content = msg.get("content")
+        if isinstance(content, str):
+            return content.strip().lower() == "ping"
+        if isinstance(content, list) and len(content) == 1:
+            inner = content[0]
+            if isinstance(inner, dict):
+                text = inner.get("text") or inner.get("content")
+                return isinstance(text, str) and text.strip().lower() == "ping"
+        return False
+    except Exception:
+        return False
+
+
 def _write_row(kwargs: dict, response_obj: Any, start_time: Any, end_time: Any) -> None:
     try:
         usage_dict = _usage_to_dict(getattr(response_obj, "usage", None))
@@ -110,23 +142,36 @@ def _write_row(kwargs: dict, response_obj: Any, start_time: Any, end_time: Any) 
         if not output_tokens:
             output_tokens = _int(usage_dict.get("output_tokens"))
 
-        # Bedrock-native split: input_tokens = NON-cached input only. Across every
-        # provider shape this callback sees (OpenAI Chat Completions; Anthropic /
-        # Bedrock-Claude as normalized by LiteLLM; audio), prompt_tokens FOLDS IN
-        # cache_read but NEVER cache_write (cache_creation is always a sibling).
-        # So the universal rule is subtract cache_read ONLY; cache_write is
-        # genuinely-additional billed input added on top in total_tokens. Never
-        # subtract cache_write (doing so silently under-reports input whenever
-        # cache_write < true non-cached input).
-        if cache_read > prompt_tokens_raw:
-            input_tokens = 0
+        # input_tokens = NON-cached input only. Across every provider shape
+        # this callback sees, prompt_tokens already folds in cache_read AND
+        # cache_write whenever those exist, so the universal recovery rule is
+        # `non_cached = prompt - cache_read - cache_write` (clamped to 0).
+        # Verified provider shapes (litellm v1.87.x):
+        #   - Bedrock-Converse — llms/bedrock/chat/converse_transformation.py
+        #     _transform_usage lines 1715-1748: adds BOTH cacheReadInputTokens
+        #     AND cacheWriteInputTokens to input_tokens before emitting it as
+        #     prompt_tokens.
+        #   - Anthropic-native /v1/messages — llms/anthropic/chat/
+        #     transformation.py lines 2173-2193: adds BOTH cache_read_input_tokens
+        #     AND cache_creation_input_tokens to prompt_tokens.
+        #   - OpenAI Chat Completions: no cache_creation field exists in the
+        #     provider response at all (grep confirms zero hits in llms/openai/),
+        #     so cache_write extracted at line 96 is always 0 and the third
+        #     term is a no-op.
+        #   - Audio: no cache fields; both terms are 0.
+        # The prior rule "subtract cache_read only" was wrong on the two
+        # Anthropic paths: a 38k-cache-write opus turn over-reported input by
+        # ~38,000 tokens. Diagnosed via the rohan-dasgupta trajectory against
+        # CloudWatch ModelInvocationLog; do not revert.
+        non_cached = prompt_tokens_raw - cache_read - cache_write
+        if non_cached < 0:
             _warn_once_per_day(
                 kwargs.get("model"),
-                "prompt_tokens (%d) < cache_read (%d); clamping non-cached input to 0",
-                prompt_tokens_raw, cache_read,
+                "prompt_tokens (%d) < cache_read (%d) + cache_write (%d); clamping non-cached input to 0",
+                prompt_tokens_raw, cache_read, cache_write,
             )
-        else:
-            input_tokens = prompt_tokens_raw - cache_read
+            non_cached = 0
+        input_tokens = non_cached
         total_tokens = input_tokens + output_tokens + cache_read + cache_write
         # whisper-1 (default json format) returns NO usage object at all; the audio
         # length is exposed only as the top-level TranscriptionResponse.duration
@@ -180,6 +225,7 @@ def _write_row(kwargs: dict, response_obj: Any, start_time: Any, end_time: Any) 
         row = {
             "ts": datetime.now(timezone.utc).isoformat(),
             "model": kwargs.get("model") or "",
+            "kind": "preflight" if _is_preflight_ping(kwargs) else "agent",
             "input_tokens":       input_tokens,
             "output_tokens":      output_tokens,
             "total_tokens":       total_tokens,
@@ -201,9 +247,16 @@ def _write_row(kwargs: dict, response_obj: Any, start_time: Any, end_time: Any) 
 
 
 class UsageWriter(CustomLogger):
-    def log_success_event(self, kwargs, response_obj, start_time, end_time):
-        _write_row(kwargs, response_obj, start_time, end_time)
-
+    # async-only on purpose: LiteLLM's streaming_handler.run_success_logging_and_
+    # cache_storage and its async stream finalizer dispatch BOTH success_handler
+    # (sync) AND async_success_handler on every streamed completion. The
+    # litellm_logging.has_run_logging dedup early-returns for self.stream=True
+    # (litellm v1.87.x line 1631), so the has_logged_sync_success / async_success
+    # flags are never set and both branches run. Defining log_success_event here
+    # in addition to async_log_success_event therefore writes every Bedrock
+    # streaming row twice. Verified live against the rohan-dasgupta trajectory
+    # vs CloudWatch ModelInvocationLog: request_count/output/cache_read/
+    # cache_write all matched 2x exactly until log_success_event was removed.
     async def async_log_success_event(self, kwargs, response_obj, start_time, end_time):
         _write_row(kwargs, response_obj, start_time, end_time)
 

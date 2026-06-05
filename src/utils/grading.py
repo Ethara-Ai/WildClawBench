@@ -1428,6 +1428,8 @@ def extract_usage_from_litellm_log(
             continue
         if ts < lo or ts > hi:
             continue
+        if row.get("kind") == "preflight":
+            continue
         totals["request_count"] += 1
         totals["input_tokens"]       += int(row.get("input_tokens", 0) or 0)
         totals["output_tokens"]      += int(row.get("output_tokens", 0) or 0)
@@ -1437,6 +1439,56 @@ def extract_usage_from_litellm_log(
         totals["audio_seconds"]      += float(row.get("audio_seconds", 0.0) or 0.0)
         totals["cost_usd"]           += float(row.get("cost_usd", 0.0) or 0.0)
 
+    totals["cost_usd"] = round(totals["cost_usd"], 6)
+    totals["audio_seconds"] = round(totals["audio_seconds"], 3)
+    return totals
+
+
+def extract_preflight_usage_from_litellm_log(log_path: Path) -> dict:
+    # Aggregates every row tagged kind="preflight" in the LiteLLM callback log,
+    # with no time-window filter. Preflight runs once per sidecar startup
+    # (eval/run_batch.py::verify_litellm_upstream_reachable), BEFORE any task's
+    # run window, so the in-window agent extractor skips it. Per user policy
+    # (m1402, "All tasks" attribution), every task in the batch picks up the
+    # same preflight cost so each task's usage.json reflects the true LLM
+    # traffic that occurred during its execution. Returns the agent-shaped
+    # totals dict (zero values when no preflight ran) so save_usage can drop
+    # it straight into sources["preflight"].
+    totals = {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+        "total_tokens": 0,
+        "audio_seconds": 0.0,
+        "cost_usd": 0.0,
+        "request_count": 0,
+        "usage_source": "litellm",
+    }
+    if not log_path or not log_path.exists():
+        return totals
+    try:
+        lines = log_path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return totals
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if row.get("kind") != "preflight":
+            continue
+        totals["request_count"] += 1
+        totals["input_tokens"]       += int(row.get("input_tokens", 0) or 0)
+        totals["output_tokens"]      += int(row.get("output_tokens", 0) or 0)
+        totals["cache_read_tokens"]  += int(row.get("cache_read_tokens", 0) or 0)
+        totals["cache_write_tokens"] += int(row.get("cache_write_tokens", 0) or 0)
+        totals["total_tokens"]       += int(row.get("total_tokens", 0) or 0)
+        totals["audio_seconds"]      += float(row.get("audio_seconds", 0.0) or 0.0)
+        totals["cost_usd"]           += float(row.get("cost_usd", 0.0) or 0.0)
     totals["cost_usd"] = round(totals["cost_usd"], 6)
     totals["audio_seconds"] = round(totals["audio_seconds"], 3)
     return totals

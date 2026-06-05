@@ -236,10 +236,14 @@ def save_usage(
     *,
     testgen_usage: dict | None = None,
     judge_usage: dict | None = None,
+    preflight_usage: dict | None = None,
 ) -> dict:
-    """Write usage.json with per-source breakdown (agent + testgen + judge)."""
+    """Write usage.json with per-source breakdown (agent + testgen + judge + preflight)."""
     agent_usage = dict(usage)
+    agent_usage.pop("__preflight__", None)
     sources: dict[str, dict] = {"agent": agent_usage}
+    if preflight_usage:
+        sources["preflight"] = dict(preflight_usage)
     if testgen_usage:
         sources["testgen"] = dict(testgen_usage)
     # `is not None` (not truthiness): a failed-judge stub is request_count=0
@@ -1137,6 +1141,7 @@ def run_single_task(
             output_dir, result, usage, task_id,
             testgen_usage=task.get("__testgen_usage__"),
             judge_usage=result.get("__judge_usage__"),
+            preflight_usage=usage.get("__preflight__"),
         )
 
         if gateway_proc is not None:

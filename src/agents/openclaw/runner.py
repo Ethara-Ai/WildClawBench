@@ -23,7 +23,11 @@ from src.utils.docker_utils import (
     snapshot_workspace_state,
     start_container,
 )
-from src.utils.grading import extract_usage_from_jsonl, extract_usage_from_litellm_log
+from src.utils.grading import (
+    extract_preflight_usage_from_litellm_log,
+    extract_usage_from_jsonl,
+    extract_usage_from_litellm_log,
+)
 
 load_dotenv()
 
@@ -267,11 +271,15 @@ class OpenClawAgent(BaseAgent):
         )
 
         usage: dict
+        preflight_usage: dict | None = None
         if self.litellm_usage_log:
             window = self._task_windows.get(task_id)
             if window is None:
                 window = (time.time() - max(elapsed_time, 1.0), time.time())
             usage = extract_usage_from_litellm_log(Path(self.litellm_usage_log), window[0], window[1])
+            preflight_usage = extract_preflight_usage_from_litellm_log(Path(self.litellm_usage_log))
+            if preflight_usage.get("request_count", 0) == 0:
+                preflight_usage = None
         else:
             usage = {"request_count": 0}
 
@@ -293,6 +301,8 @@ class OpenClawAgent(BaseAgent):
 
         self._task_windows.pop(task_id, None)
         usage["elapsed_time"] = round(elapsed_time, 2)
+        if preflight_usage is not None:
+            usage["__preflight__"] = preflight_usage
         return usage
 
     def _set_model(self, task_id: str, model: str, thinking: str | None = None) -> None:
