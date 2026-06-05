@@ -9,22 +9,24 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_str, strict_bool, strict_float, strict_int)
 
 _store = get_store("shippo-api")
+_API = "shippo-api"
 
 _store.register("addresses", primary_key="object_id",
-                initial_loader=lambda: _coerce_addresses(_load("addresses.csv")))
+                initial_loader=lambda: _coerce_addresses(_load("addresses.csv", "addresses")))
 _store.register("parcels", primary_key="object_id",
-                initial_loader=lambda: _coerce_parcels(_load("parcels.csv")))
+                initial_loader=lambda: _coerce_parcels(_load("parcels.csv", "parcels")))
 _store.register("shipments", primary_key="object_id",
-                initial_loader=lambda: _coerce_shipments(_load("shipments.csv")))
+                initial_loader=lambda: _coerce_shipments(_load("shipments.csv", "shipments")))
 _store.register("rates", primary_key="object_id",
-                initial_loader=lambda: _coerce_rates(_load("rates.csv")))
+                initial_loader=lambda: _coerce_rates(_load("rates.csv", "rates")))
 _store.register("transactions", primary_key="object_id",
-                initial_loader=lambda: _coerce_transactions(_load("transactions.csv")))
+                initial_loader=lambda: _coerce_transactions(_load("transactions.csv", "transactions")))
 _store.register("tracking", primary_key="carrier",
-                initial_loader=lambda: _coerce_tracking(_load("tracking.csv")))
+                initial_loader=lambda: _coerce_tracking(_load("tracking.csv", "tracking")))
 
 
 def _addresses_rows():
@@ -52,9 +54,12 @@ def _tracking_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -73,9 +78,9 @@ def _coerce_addresses(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "is_residential": _to_bool(r["is_residential"]),
-            "validated": _to_bool(r["validated"]),
+            **_strip_ctx(r),
+            "is_residential": strict_bool(r, "is_residential"),
+            "validated": strict_bool(r, "validated"),
         })
     return out
 
@@ -84,37 +89,37 @@ def _coerce_parcels(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "length": float(r["length"]),
-            "width": float(r["width"]),
-            "height": float(r["height"]),
-            "weight": float(r["weight"]),
-            "template": r["template"] or None,
+            **_strip_ctx(r),
+            "length": strict_float(r, "length"),
+            "width": strict_float(r, "width"),
+            "height": strict_float(r, "height"),
+            "weight": strict_float(r, "weight"),
+            "template": opt_str(r, "template", default="") or None,
         })
     return out
 
 
 def _coerce_shipments(rows):
-    return [{**r} for r in rows]
+    return [{**_strip_ctx(r)} for r in rows]
 
 
 def _coerce_rates(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "amount": float(r["amount"]),
-            "estimated_days": int(r["estimated_days"]),
+            **_strip_ctx(r),
+            "amount": strict_float(r, "amount"),
+            "estimated_days": strict_int(r, "estimated_days"),
         })
     return out
 
 
 def _coerce_transactions(rows):
-    return [{**r} for r in rows]
+    return [{**_strip_ctx(r)} for r in rows]
 
 
 def _coerce_tracking(rows):
-    return [{**r} for r in rows]
+    return [{**_strip_ctx(r)} for r in rows]
 
 
 
@@ -370,3 +375,5 @@ def get_tracking(carrier, tracking_number):
             "status_date": h["status_time"],
         } for h in history],
     }
+
+_store.eager_load()

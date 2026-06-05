@@ -14,20 +14,24 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store,
+    strict_bool,
+)
 
 _store = get_store("paypal-api")
+_API = "paypal-api"
 
 _store.register("orders", primary_key="id",
-                initial_loader=lambda: _coerce_orders(_load("orders.csv")))
+                initial_loader=lambda: _coerce_orders(_load("orders.csv", "orders")))
 _store.register("captures", primary_key="id",
-                initial_loader=lambda: _coerce_captures(_load("captures.csv")))
+                initial_loader=lambda: _coerce_captures(_load("captures.csv", "captures")))
 _store.register("invoices", primary_key="id",
-                initial_loader=lambda: _coerce_invoices(_load("invoices.csv")))
+                initial_loader=lambda: _coerce_invoices(_load("invoices.csv", "invoices")))
 _store.register("payouts", primary_key="payout_batch_id",
-                initial_loader=lambda: [{**r, 'payout_batch_id': r['batch_header']['payout_batch_id']} for r in _coerce_payouts(_load("payouts.csv"))])
+                initial_loader=lambda: [{**_strip_ctx(r), 'payout_batch_id': r['batch_header']['payout_batch_id']} for r in _coerce_payouts(_load("payouts.csv", "payouts"))])
 _store.register("refunds", primary_key="id",
-                initial_loader=lambda: _coerce_refunds(_load("refunds.csv")))
+                initial_loader=lambda: _coerce_refunds(_load("refunds.csv", "refunds")))
 
 
 def _orders_rows():
@@ -51,9 +55,12 @@ def _refunds_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -101,7 +108,7 @@ def _coerce_captures(rows):
             "order_id": r["order_id"],
             "status": r["status"],
             "amount": _money(r["amount_value"], r["currency_code"]),
-            "final_capture": _to_bool(r["final_capture"]),
+            "final_capture": strict_bool(r, "final_capture"),
             "create_time": r["create_time"],
         })
     return out
@@ -319,3 +326,5 @@ def create_payout(sender_batch_id=None, amount_value="0.00", currency_code="USD"
     }
     _payouts_rows().append(payout)
     return payout
+
+_store.eager_load()

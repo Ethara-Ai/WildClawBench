@@ -9,14 +9,18 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store
-
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_csv_list, opt_str, strict_int)
 _store = get_store("instagram-api")
+_API = "instagram-api"
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -33,14 +37,14 @@ def _coerce_media(rows):
         out.append({
             "id": r["id"],
             "user_id": r["user_id"],
-            "caption": r["caption"] if r["caption"] else None,
+            "caption": opt_str(r, "caption", default="") or None,
             "media_type": r["media_type"],
             "media_url": r["media_url"],
             "permalink": r["permalink"],
-            "thumbnail_url": r["thumbnail_url"] if r["thumbnail_url"] else None,
+            "thumbnail_url": opt_str(r, "thumbnail_url", default="") or None,
             "timestamp": r["timestamp"],
-            "like_count": int(r["like_count"]),
-            "comments_count": int(r["comments_count"]),
+            "like_count": strict_int(r, "like_count"),
+            "comments_count": strict_int(r, "comments_count"),
             "is_comment_enabled": r["is_comment_enabled"].lower() == "true",
         })
     return out
@@ -56,9 +60,9 @@ def _coerce_comments(rows):
             "username": r["username"],
             "text": r["text"],
             "timestamp": r["timestamp"],
-            "like_count": int(r["like_count"]),
+            "like_count": strict_int(r, "like_count"),
             "hidden": r["hidden"].lower() == "true",
-            "parent_id": r["parent_id"] if r["parent_id"] else None,
+            "parent_id": opt_str(r, "parent_id", default="") or None,
         })
     return out
 
@@ -73,10 +77,10 @@ def _coerce_stories(rows):
             "media_url": r["media_url"],
             "timestamp": r["timestamp"],
             "expiring_at": r["expiring_at"],
-            "caption": r["caption"] if r["caption"] else None,
-            "link": r["link"] if r["link"] else None,
-            "poll_question": r["poll_question"] if r["poll_question"] else None,
-            "poll_options": r["poll_options"].split("|") if r["poll_options"] else None,
+            "caption": opt_str(r, "caption", default="") or None,
+            "link": opt_str(r, "link", default="") or None,
+            "poll_question": opt_str(r, "poll_question", default="") or None,
+            "poll_options": (opt_csv_list(r, "poll_options", sep="|") or None),
         })
     return out
 
@@ -86,13 +90,13 @@ def _coerce_media_insights(rows):
     for r in rows:
         out.append({
             "media_id": r["media_id"],
-            "impressions": int(r["impressions"]),
-            "reach": int(r["reach"]),
-            "engagement": int(r["engagement"]),
-            "saves": int(r["saves"]),
-            "shares": int(r["shares"]),
-            "profile_visits": int(r["profile_visits"]),
-            "follows": int(r["follows"]),
+            "impressions": strict_int(r, "impressions"),
+            "reach": strict_int(r, "reach"),
+            "engagement": strict_int(r, "engagement"),
+            "saves": strict_int(r, "saves"),
+            "shares": strict_int(r, "shares"),
+            "profile_visits": strict_int(r, "profile_visits"),
+            "follows": strict_int(r, "follows"),
         })
     return out
 
@@ -116,7 +120,7 @@ def _coerce_hashtags(rows):
         out.append({
             "id": r["id"],
             "name": r["name"],
-            "media_count": int(r["media_count"]),
+            "media_count": strict_int(r, "media_count"),
         })
     return out
 
@@ -131,7 +135,7 @@ def _coerce_mentions(rows):
             "mentioned_by_username": r["mentioned_by_username"],
             "media_url": r["media_url"],
             "timestamp": r["timestamp"],
-            "caption": r["caption"] if r["caption"] else None,
+            "caption": opt_str(r, "caption", default="") or None,
         })
     return out
 
@@ -144,19 +148,19 @@ def _load_users():
 
 
 _store.register("media", primary_key="id",
-                initial_loader=lambda: _coerce_media(_load("media.csv")))
+                initial_loader=lambda: _coerce_media(_load("media.csv", "media")))
 _store.register("comments", primary_key="id",
-                initial_loader=lambda: _coerce_comments(_load("comments.csv")))
+                initial_loader=lambda: _coerce_comments(_load("comments.csv", "comments")))
 _store.register("stories", primary_key="id",
-                initial_loader=lambda: _coerce_stories(_load("stories.csv")))
+                initial_loader=lambda: _coerce_stories(_load("stories.csv", "stories")))
 _store.register("media_insights", primary_key="media_id",
-                initial_loader=lambda: _coerce_media_insights(_load("media_insights.csv")))
+                initial_loader=lambda: _coerce_media_insights(_load("media_insights.csv", "media_insights")))
 _store.register("carousel_children", primary_key="id",
-                initial_loader=lambda: _coerce_carousel_children(_load("carousel_children.csv")))
+                initial_loader=lambda: _coerce_carousel_children(_load("carousel_children.csv", "carousel_children")))
 _store.register("hashtags", primary_key="id",
-                initial_loader=lambda: _coerce_hashtags(_load("hashtags.csv")))
+                initial_loader=lambda: _coerce_hashtags(_load("hashtags.csv", "hashtags")))
 _store.register("mentions", primary_key="id",
-                initial_loader=lambda: _coerce_mentions(_load("mentions.csv")))
+                initial_loader=lambda: _coerce_mentions(_load("mentions.csv", "mentions")))
 _store.register("users", primary_key="id", initial_loader=_load_users)
 
 
@@ -685,3 +689,5 @@ def get_media_container_status(container_id: str):
         if c["id"] == container_id:
             return {"id": c["id"], "status": c["status"], "status_code": "PUBLISHED" if c["status"] == "FINISHED" else "IN_PROGRESS"}
     return {"error": {"message": f"Container {container_id} not found", "type": "IGApiException", "code": 100}}
+
+_store.eager_load()

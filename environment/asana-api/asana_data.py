@@ -10,18 +10,20 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_str, strict_bool)
 
 _store = get_store("asana-api")
+_API = "asana-api"
 
 _store.register("users", primary_key="gid",
-                initial_loader=lambda: _coerce_users(_load("users.csv")))
+                initial_loader=lambda: _coerce_users(_load("users.csv", "users")))
 _store.register("projects", primary_key="gid",
-                initial_loader=lambda: _coerce_projects(_load("projects.csv")))
+                initial_loader=lambda: _coerce_projects(_load("projects.csv", "projects")))
 _store.register("sections", primary_key="gid",
-                initial_loader=lambda: _coerce_sections(_load("sections.csv")))
+                initial_loader=lambda: _coerce_sections(_load("sections.csv", "sections")))
 _store.register("tasks", primary_key="gid",
-                initial_loader=lambda: _coerce_tasks(_load("tasks.csv")))
+                initial_loader=lambda: _coerce_tasks(_load("tasks.csv", "tasks")))
 _store.register_document("workspace", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "workspace.json", encoding="utf-8")))
 
 
@@ -46,9 +48,12 @@ def _workspace_doc():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -64,32 +69,32 @@ def _to_bool(v):
 # ---------------------------------------------------------------------------
 
 def _coerce_users(rows):
-    return [dict(r) for r in rows]
+    return [_strip_ctx(r) for r in rows]
 
 
 def _coerce_projects(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "archived": _to_bool(r["archived"]),
+            **_strip_ctx(r),
+            "archived": strict_bool(r, "archived"),
         })
     return out
 
 
 def _coerce_sections(rows):
-    return [dict(r) for r in rows]
+    return [_strip_ctx(r) for r in rows]
 
 
 def _coerce_tasks(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "completed": _to_bool(r["completed"]),
-            "assignee_gid": r["assignee_gid"] or None,
-            "due_on": r["due_on"] or None,
-            "section_gid": r["section_gid"] or None,
+            **_strip_ctx(r),
+            "completed": strict_bool(r, "completed"),
+            "assignee_gid": opt_str(r, "assignee_gid", default="") or None,
+            "due_on": opt_str(r, "due_on", default="") or None,
+            "section_gid": opt_str(r, "section_gid", default="") or None,
         })
     return out
 
@@ -285,3 +290,5 @@ def update_task(task_gid, name=None, completed=None, assignee_gid=None,
             _tasks_rows()[i]["modified_at"] = _now()
             return {"data": _task_view(_tasks_rows()[i])}
     return {"error": f"Task {task_gid} not found"}
+
+_store.eager_load()

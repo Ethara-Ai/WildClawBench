@@ -199,6 +199,35 @@ def _merge_usage_source(dst: dict, src: dict) -> None:
         dst["cost_usd"] = float(dst.get("cost_usd", 0.0)) + float(src.get("cost_usd", 0.0) or 0.0)
 
 
+def recompute_combined(sources: dict[str, dict], task_id: str = "") -> dict:
+    """Sum per-source usage under the canonical Bedrock-native convention
+    (input_tokens excludes cache; total_tokens == input+output+cR+cW). Shared
+    by save_usage and scripts/regrade.py; warns+overwrites if a source desyncs
+    the invariant. See token-accounting convention docs.
+    """
+    combined: dict[str, Any] = {k: 0 for k in _USAGE_NUMERIC_KEYS}
+    combined["cost_usd"] = 0.0
+    for src in sources.values():
+        _merge_usage_source(combined, src)
+
+    expected_total = (
+        combined["input_tokens"]
+        + combined["output_tokens"]
+        + combined["cache_read_tokens"]
+        + combined["cache_write_tokens"]
+    )
+    if combined["total_tokens"] != expected_total:
+        logger.warning(
+            "[%s] total_tokens invariant violated: stored=%d expected=%d "
+            "(input=%d output=%d cache_read=%d cache_write=%d) - overwriting",
+            task_id, combined["total_tokens"], expected_total,
+            combined["input_tokens"], combined["output_tokens"],
+            combined["cache_read_tokens"], combined["cache_write_tokens"],
+        )
+    combined["total_tokens"] = expected_total
+    return combined
+
+
 def save_usage(
     output_dir: Path,
     result: dict,
@@ -213,24 +242,12 @@ def save_usage(
     sources: dict[str, dict] = {"agent": agent_usage}
     if testgen_usage:
         sources["testgen"] = dict(testgen_usage)
-    if judge_usage:
+    # `is not None` (not truthiness): a failed-judge stub is request_count=0
+    # but must still persist so the failure is visible; only None = no judge ran.
+    if judge_usage is not None:
         sources["judge"] = dict(judge_usage)
 
-    combined: dict[str, Any] = {k: 0 for k in _USAGE_NUMERIC_KEYS}
-    combined["cost_usd"] = 0.0
-    for src in sources.values():
-        _merge_usage_source(combined, src)
-
-    if "total_tokens" in combined and (
-        combined["total_tokens"] == 0
-        or combined["total_tokens"] < combined["input_tokens"] + combined["output_tokens"]
-    ):
-        combined["total_tokens"] = (
-            combined["input_tokens"]
-            + combined["output_tokens"]
-            + combined["cache_read_tokens"]
-            + combined["cache_write_tokens"]
-        )
+    combined = recompute_combined(sources, task_id)
 
     out: dict[str, Any] = dict(combined)
     out["sources"] = sources
@@ -1292,6 +1309,25 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list):
     return True, litellm_yaml, network, sidecar, mock_env_dict, str(usage_log_path)
 
 
+def _dump_mock_logs(container: str, api_names) -> str:
+    """Must run BEFORE stop_mock_stack removes the container, otherwise the
+    docker exec has nothing to read."""
+    blobs: list[str] = []
+    for api in sorted(api_names):
+        try:
+            r = subprocess.run(
+                ["docker", "exec", container, "cat", f"/tmp/{api}.err"],
+                capture_output=True, text=True, timeout=15,
+            )
+            err = (r.stdout or "").strip() or (r.stderr or "").strip()
+        except Exception as exc:
+            err = f"<failed to read /tmp/{api}.err: {exc}>"
+        if err:
+            logger.error("[mock-logs] %s /tmp/%s.err:\n%s", container, api, err)
+            blobs.append(f"=== {api} (/tmp/{api}.err) ===\n{err}")
+    return "\n\n".join(blobs)
+
+
 def _start_task_mock_stack(task: dict, network: str, environment_dir) -> tuple[dict, str | None, dict]:
     """Start a per-task mock-stack container with this task's mock_data CSVs
     bind-mounted read-only over the baked-in baseline, and return
@@ -1368,14 +1404,26 @@ def _start_task_mock_stack(task: dict, network: str, environment_dir) -> tuple[d
         )
     except Exception as exc:
         logger.error("[%s] per-task mock stack failed to start: %s", task.get("task_id"), exc)
-        return {}, None, {}
+        logs = _dump_mock_logs(container, overlays.keys())
+        stop_mock_stack(container)
+        raise RuntimeError(
+            f"per-task mock stack {container} failed to start for task "
+            f"{task.get('task_id')}: {exc}; overlay CSV likely malformed"
+            + (f"\n{logs}" if logs else "")
+        )
 
     # Wait only for the overlaid API(s) to answer /health inside the container.
     if not wait_for_ports_healthy(container, overlaid_ports, timeout=180.0):
         logger.error("[%s] per-task mock stack %s: overlaid ports %s not healthy; tearing down",
                      task.get("task_id"), container, overlaid_ports)
+        logs = _dump_mock_logs(container, overlays.keys())
         stop_mock_stack(container)
-        return {}, None, {}
+        raise RuntimeError(
+            f"per-task mock stack {container} not healthy for task "
+            f"{task.get('task_id')} (overlaid ports {overlaid_ports}); "
+            f"overlay CSV likely malformed"
+            + (f"\n{logs}" if logs else "")
+        )
 
     env_dict = {ev: f"http://{container}:{port}" for ev, port in env_dict_template.items()}
     logger.info("[%s] per-task mock stack %s ready (%d overlay APIs, ports %s, %d URLs)",

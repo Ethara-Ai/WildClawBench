@@ -14,18 +14,20 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_int, opt_str)
 
 _store = get_store("greenhouse-api")
+_API = "greenhouse-api"
 
 _store.register("candidates", primary_key="id",
-                initial_loader=lambda: _coerce_candidates(_load("candidates.csv")))
+                initial_loader=lambda: _coerce_candidates(_load("candidates.csv", "candidates")))
 _store.register("jobs", primary_key="id",
-                initial_loader=lambda: _coerce_jobs(_load("jobs.csv")))
+                initial_loader=lambda: _coerce_jobs(_load("jobs.csv", "jobs")))
 _store.register("applications", primary_key="id",
-                initial_loader=lambda: _coerce_applications(_load("applications.csv")))
+                initial_loader=lambda: _coerce_applications(_load("applications.csv", "applications")))
 _store.register("scorecards", primary_key="id",
-                initial_loader=lambda: _coerce_scorecards(_load("scorecards.csv")))
+                initial_loader=lambda: _coerce_scorecards(_load("scorecards.csv", "scorecards")))
 
 
 def _candidates_rows():
@@ -48,9 +50,12 @@ def _scorecards_rows():
 STAGES = ["Application Review", "Interview", "Offer", "Hired"]
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -71,27 +76,27 @@ def _to_int(v, default=0):
 # ---------------------------------------------------------------------------
 
 def _coerce_candidates(rows):
-    return [dict(r) for r in rows]
+    return [_strip_ctx(r) for r in rows]
 
 
 def _coerce_jobs(rows):
     out = []
     for r in rows:
-        d = dict(r)
-        d["closed_at"] = r["closed_at"] or None
+        d = _strip_ctx(r)
+        d["closed_at"] = opt_str(r, "closed_at", default="") or None
         out.append(d)
     return out
 
 
 def _coerce_applications(rows):
-    return [dict(r) for r in rows]
+    return [_strip_ctx(r) for r in rows]
 
 
 def _coerce_scorecards(rows):
     out = []
     for r in rows:
-        d = dict(r)
-        d["rating"] = _to_int(r["rating"])
+        d = _strip_ctx(r)
+        d["rating"] = opt_int(r, "rating", default=0)
         out.append(d)
     return out
 
@@ -233,3 +238,5 @@ def list_scorecards(application_id=None, candidate_id=None):
     if candidate_id:
         results = [s for s in results if s["candidate_id"] == candidate_id]
     return results
+
+_store.eager_load()

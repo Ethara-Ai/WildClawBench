@@ -399,8 +399,7 @@ def _judge_cost_usd(model: str, in_tok: int, out_tok: int, c_read: int, c_write:
         logger.warning("[judge_cost] unknown judge id for model=%r; cost defaulted to 0", model)
         return 0.0
     r_in, r_out, r_cached, r_cwrite = rate
-    uncached_in = max(0, in_tok - c_read)
-    return uncached_in * r_in + c_read * r_cached + c_write * r_cwrite + out_tok * r_out
+    return in_tok * r_in + c_read * r_cached + c_write * r_cwrite + out_tok * r_out
 
 
 def _call_judge_openai(model: str, system: str, user: str) -> tuple[str, dict]:
@@ -457,14 +456,15 @@ def _call_judge_openai(model: str, system: str, user: str) -> tuple[str, dict]:
     prompt_tok = int(u.get("prompt_tokens", 0) or 0)
     comp_tok = int(u.get("completion_tokens", 0) or 0)
     cached_tok = int(details.get("cached_tokens", 0) or 0)
+    input_excl = max(0, prompt_tok - cached_tok)
     usage = {
-        "input_tokens": prompt_tok,
+        "input_tokens": input_excl,
         "output_tokens": comp_tok,
         "cache_read_tokens": cached_tok,
         "cache_write_tokens": 0,
-        "total_tokens": int(u.get("total_tokens", 0) or (prompt_tok + comp_tok)),
+        "total_tokens": input_excl + comp_tok + cached_tok,
         "request_count": 1,
-        "cost_usd": _judge_cost_usd(model, prompt_tok, comp_tok, cached_tok, 0),
+        "cost_usd": _judge_cost_usd(model, input_excl, comp_tok, cached_tok, 0),
     }
     return text, usage
 
@@ -588,7 +588,7 @@ def _call_judge_bedrock(arn: str, system: str, user: str) -> tuple[str, dict]:
             "output_tokens": out_tok,
             "cache_read_tokens": c_read,
             "cache_write_tokens": c_write,
-            "total_tokens": int(u.get("totalTokens", 0) or (in_tok + out_tok + c_read + c_write)),
+            "total_tokens": in_tok + out_tok + c_read + c_write,
             "request_count": 1,
             "cost_usd": _judge_cost_usd(arn, in_tok, out_tok, c_read, c_write),
         }
@@ -751,7 +751,8 @@ def _run_council(
             )
             return {
                 "model": model, "ok": False,
-                "error": f"call: {exc}", "usage": dict(_ZERO_USAGE),
+                "error": f"call: {exc}",
+                "usage": {**_ZERO_USAGE, "error": f"call: {exc}"},
                 "user_chars": len(user),
             }
         elapsed = _time.monotonic() - t0
@@ -936,6 +937,10 @@ def _grade_council(
                 council_usage[k] = float(council_usage.get(k, 0.0)) + float(u.get(k, 0.0) or 0.0)
             else:
                 council_usage[k] = int(council_usage.get(k, 0)) + int(u.get(k, 0) or 0)
+    council_usage["total_tokens"] = (
+        council_usage["input_tokens"] + council_usage["output_tokens"]
+        + council_usage["cache_read_tokens"] + council_usage["cache_write_tokens"]
+    )
 
     n = len(rubrics)
     n_abstained = len(abstention_flags)
@@ -1048,7 +1053,10 @@ def grade_with_rubric(
             continue
     if verdicts is None or used_model is None:
         logger.error("All rubric judge models failed: %s", last_err)
-        return {"overall_score": 0.0, "error": f"judge failed: {last_err}", "usage": dict(_ZERO_USAGE)}
+        return {
+            "overall_score": 0.0, "error": f"judge failed: {last_err}",
+            "usage": {**_ZERO_USAGE, "error": f"judge failed: {last_err}"},
+        }
 
     total_w = sum(_extract_weight(r) for r in rubrics
                   if isinstance(r, dict) and _extract_weight(r) > 0) or 1.0

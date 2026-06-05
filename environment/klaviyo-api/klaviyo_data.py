@@ -16,16 +16,18 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_int, opt_str)
 
 _store = get_store("klaviyo-api")
+_API = "klaviyo-api"
 
 _store.register("profiles", primary_key="id",
-                initial_loader=lambda: _coerce_profiles(_load("profiles.csv")))
+                initial_loader=lambda: _coerce_profiles(_load("profiles.csv", "profiles")))
 _store.register("lists", primary_key="id",
-                initial_loader=lambda: _coerce_lists(_load("lists.csv")))
+                initial_loader=lambda: _coerce_lists(_load("lists.csv", "lists")))
 _store.register("campaigns", primary_key="id",
-                initial_loader=lambda: _coerce_campaigns(_load("campaigns.csv")))
+                initial_loader=lambda: _coerce_campaigns(_load("campaigns.csv", "campaigns")))
 
 
 def _profiles_rows():
@@ -41,9 +43,12 @@ def _campaigns_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _to_int(v):
@@ -83,7 +88,7 @@ def _coerce_lists(rows):
         out.append({
             "id": r["id"],
             "name": r["name"],
-            "profile_count": _to_int(r["profile_count"]),
+            "profile_count": opt_int(r, "profile_count", default=0),
             "created": r["created"],
             "updated": r["updated"],
         })
@@ -102,7 +107,7 @@ def _coerce_campaigns(rows):
             "from_email": r["from_email"],
             "from_label": r["from_label"],
             "list_id": r["list_id"],
-            "send_time": r["send_time"] or None,
+            "send_time": opt_str(r, "send_time", default="") or None,
             "created": r["created"],
             "updated": r["updated"],
         })
@@ -242,3 +247,5 @@ def list_campaigns(status=None, channel=None):
     if channel:
         campaigns = [c for c in campaigns if c["channel"].lower() == channel.lower()]
     return {"data": [_serialize_campaign(c) for c in campaigns]}
+
+_store.eager_load()

@@ -12,18 +12,23 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store,
+    opt_int,
+    opt_float,
+)
 
 _store = get_store("ticketmaster-api")
+_API = "ticketmaster-api"
 
 _store.register("classifications", primary_key="id",
-                initial_loader=lambda: _coerce_classifications(_load("classifications.csv")))
+                initial_loader=lambda: _coerce_classifications(_load("classifications.csv", "classifications")))
 _store.register("venues", primary_key="id",
-                initial_loader=lambda: _coerce_venues(_load("venues.csv")))
+                initial_loader=lambda: _coerce_venues(_load("venues.csv", "venues")))
 _store.register("attractions", primary_key="id",
-                initial_loader=lambda: _coerce_attractions(_load("attractions.csv")))
+                initial_loader=lambda: _coerce_attractions(_load("attractions.csv", "attractions")))
 _store.register("events", primary_key="id",
-                initial_loader=lambda: _coerce_events(_load("events.csv")))
+                initial_loader=lambda: _coerce_events(_load("events.csv", "events")))
 
 
 def _classifications_rows():
@@ -43,9 +48,12 @@ def _events_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _to_float(v, default=0.0):
@@ -71,15 +79,15 @@ def _to_int(v, default=0):
 # ---------------------------------------------------------------------------
 
 def _coerce_classifications(rows):
-    return [dict(r) for r in rows]
+    return [_strip_ctx(r) for r in rows]
 
 
 def _coerce_venues(rows):
     out = []
     for r in rows:
-        d = dict(r)
-        d["latitude"] = _to_float(r["latitude"])
-        d["longitude"] = _to_float(r["longitude"])
+        d = _strip_ctx(r)
+        d["latitude"] = opt_float(r, "latitude", default=0.0)
+        d["longitude"] = opt_float(r, "longitude", default=0.0)
         out.append(d)
     return out
 
@@ -87,8 +95,8 @@ def _coerce_venues(rows):
 def _coerce_attractions(rows):
     out = []
     for r in rows:
-        d = dict(r)
-        d["upcoming_events"] = _to_int(r["upcoming_events"])
+        d = _strip_ctx(r)
+        d["upcoming_events"] = opt_int(r, "upcoming_events", default=0)
         out.append(d)
     return out
 
@@ -96,9 +104,9 @@ def _coerce_attractions(rows):
 def _coerce_events(rows):
     out = []
     for r in rows:
-        d = dict(r)
-        d["price_min"] = _to_float(r["price_min"])
-        d["price_max"] = _to_float(r["price_max"])
+        d = _strip_ctx(r)
+        d["price_min"] = opt_float(r, "price_min", default=0.0)
+        d["price_max"] = opt_float(r, "price_max", default=0.0)
         out.append(d)
     return out
 
@@ -273,3 +281,5 @@ def list_classifications():
             },
         })
     return out
+
+_store.eager_load()

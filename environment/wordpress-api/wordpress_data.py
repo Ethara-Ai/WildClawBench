@@ -11,24 +11,28 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store,
+    strict_int, opt_int,
+)
 
 _store = get_store("wordpress-api")
+_API = "wordpress-api"
 
 _store.register("posts", primary_key="id",
-                initial_loader=lambda: _coerce_posts(_load("posts.csv")))
+                initial_loader=lambda: _coerce_posts(_load("posts.csv", "posts")))
 _store.register("pages", primary_key="id",
-                initial_loader=lambda: _coerce_pages(_load("pages.csv")))
+                initial_loader=lambda: _coerce_pages(_load("pages.csv", "pages")))
 _store.register("categories", primary_key="id",
-                initial_loader=lambda: _coerce_categories(_load("categories.csv")))
+                initial_loader=lambda: _coerce_categories(_load("categories.csv", "categories")))
 _store.register("tags", primary_key="id",
-                initial_loader=lambda: _coerce_tags(_load("tags.csv")))
+                initial_loader=lambda: _coerce_tags(_load("tags.csv", "tags")))
 _store.register("comments", primary_key="id",
-                initial_loader=lambda: _coerce_comments(_load("comments.csv")))
+                initial_loader=lambda: _coerce_comments(_load("comments.csv", "comments")))
 _store.register("media", primary_key="id",
-                initial_loader=lambda: _coerce_media(_load("media.csv")))
+                initial_loader=lambda: _coerce_media(_load("media.csv", "media")))
 _store.register("users", primary_key="id",
-                initial_loader=lambda: _coerce_users(_load("users.csv")))
+                initial_loader=lambda: _coerce_users(_load("users.csv", "users")))
 
 
 def _posts_rows():
@@ -60,9 +64,12 @@ def _users_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -85,11 +92,11 @@ def _coerce_posts(rows):
     out = []
     for r in rows:
         out.append({
-            "id": int(r["id"]),
+            "id": strict_int(r, "id"),
             "title": _rendered(r["title"]),
             "slug": r["slug"],
             "status": r["status"],
-            "author": int(r["author"]),
+            "author": strict_int(r, "author"),
             "content": _rendered(r["content"]),
             "excerpt": _rendered(r["excerpt"]),
             "categories": _split_ids(r["category_ids"]),
@@ -106,15 +113,15 @@ def _coerce_pages(rows):
     out = []
     for r in rows:
         out.append({
-            "id": int(r["id"]),
+            "id": strict_int(r, "id"),
             "title": _rendered(r["title"]),
             "slug": r["slug"],
             "status": r["status"],
-            "author": int(r["author"]),
+            "author": strict_int(r, "author"),
             "content": _rendered(r["content"]),
             "date": r["date"],
             "modified": r["modified"],
-            "parent": int(r["parent"]),
+            "parent": strict_int(r, "parent"),
             "type": "page",
         })
     return out
@@ -124,12 +131,12 @@ def _coerce_categories(rows):
     out = []
     for r in rows:
         out.append({
-            "id": int(r["id"]),
+            "id": strict_int(r, "id"),
             "name": r["name"],
             "slug": r["slug"],
             "description": r["description"],
-            "parent": int(r["parent"]),
-            "count": int(r["count"]),
+            "parent": strict_int(r, "parent"),
+            "count": strict_int(r, "count"),
             "taxonomy": "category",
         })
     return out
@@ -139,11 +146,11 @@ def _coerce_tags(rows):
     out = []
     for r in rows:
         out.append({
-            "id": int(r["id"]),
+            "id": strict_int(r, "id"),
             "name": r["name"],
             "slug": r["slug"],
             "description": r["description"],
-            "count": int(r["count"]),
+            "count": strict_int(r, "count"),
             "taxonomy": "post_tag",
         })
     return out
@@ -153,14 +160,14 @@ def _coerce_comments(rows):
     out = []
     for r in rows:
         out.append({
-            "id": int(r["id"]),
-            "post": int(r["post"]),
+            "id": strict_int(r, "id"),
+            "post": strict_int(r, "post"),
             "author_name": r["author_name"],
             "author_email": r["author_email"],
             "content": _rendered(r["content"]),
             "status": r["status"],
             "date": r["date"],
-            "parent": int(r["parent"]),
+            "parent": strict_int(r, "parent"),
         })
     return out
 
@@ -169,15 +176,15 @@ def _coerce_media(rows):
     out = []
     for r in rows:
         out.append({
-            "id": int(r["id"]),
+            "id": strict_int(r, "id"),
             "title": _rendered(r["title"]),
             "slug": r["slug"],
             "media_type": r["media_type"],
             "mime_type": r["mime_type"],
             "source_url": r["source_url"],
             "alt_text": r["alt_text"],
-            "author": int(r["author"]),
-            "post": int(r["post"]) if r["post"] and r["post"] != "0" else None,
+            "author": strict_int(r, "author"),
+            "post": opt_int(r, "post", default=None) or None,
             "date": r["date"],
             "type": "attachment",
         })
@@ -188,7 +195,7 @@ def _coerce_users(rows):
     out = []
     for r in rows:
         out.append({
-            "id": int(r["id"]),
+            "id": strict_int(r, "id"),
             "name": r["name"],
             "slug": r["slug"],
             "description": r["description"],
@@ -356,3 +363,5 @@ def list_media():
 
 def list_users():
     return list(_users_rows())
+
+_store.eager_load()

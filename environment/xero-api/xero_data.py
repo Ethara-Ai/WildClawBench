@@ -15,16 +15,21 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store,
+    strict_bool,
+    opt_float,
+)
 
 _store = get_store("xero-api")
+_API = "xero-api"
 
 _store.register("contacts", primary_key="ContactID",
-                initial_loader=lambda: _coerce_contacts(_load("contacts.csv")))
+                initial_loader=lambda: _coerce_contacts(_load("contacts.csv", "contacts")))
 _store.register("accounts", primary_key="AccountID",
-                initial_loader=lambda: _coerce_accounts(_load("accounts.csv")))
+                initial_loader=lambda: _coerce_accounts(_load("accounts.csv", "accounts")))
 _store.register("invoices", primary_key="InvoiceID",
-                initial_loader=lambda: _coerce_invoices(_load("invoices.csv")))
+                initial_loader=lambda: _coerce_invoices(_load("invoices.csv", "invoices")))
 
 
 def _contacts_rows():
@@ -40,9 +45,12 @@ def _invoices_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _to_bool(v):
@@ -69,8 +77,8 @@ def _coerce_contacts(rows):
             "FirstName": r["first_name"],
             "LastName": r["last_name"],
             "EmailAddress": r["email"],
-            "IsCustomer": _to_bool(r["is_customer"]),
-            "IsSupplier": _to_bool(r["is_supplier"]),
+            "IsCustomer": strict_bool(r, "is_customer"),
+            "IsSupplier": strict_bool(r, "is_supplier"),
             "ContactStatus": r["status"],
             "AccountNumber": r["account_number"],
         })
@@ -88,7 +96,7 @@ def _coerce_accounts(rows):
             "TaxType": r["tax_type"],
             "Status": r["status"],
             "Description": r["description"],
-            "EnablePaymentsToAccount": _to_bool(r["enable_payments_to_account"]),
+            "EnablePaymentsToAccount": strict_bool(r, "enable_payments_to_account"),
         })
     return out
 
@@ -106,11 +114,11 @@ def _coerce_invoices(rows):
             "DueDate": r["due_date"],
             "Status": r["status"],
             "LineAmountTypes": r["line_amount_types"],
-            "SubTotal": _to_float(r["sub_total"]),
-            "TotalTax": _to_float(r["total_tax"]),
-            "Total": _to_float(r["total"]),
-            "AmountDue": _to_float(r["amount_due"]),
-            "AmountPaid": _to_float(r["amount_paid"]),
+            "SubTotal": opt_float(r, "sub_total", default=None),
+            "TotalTax": opt_float(r, "total_tax", default=None),
+            "Total": opt_float(r, "total", default=None),
+            "AmountDue": opt_float(r, "amount_due", default=None),
+            "AmountPaid": opt_float(r, "amount_paid", default=None),
             "CurrencyCode": r["currency_code"],
             "Reference": r["reference"],
         })
@@ -237,3 +245,5 @@ def list_contacts():
 
 def list_accounts():
     return {"Accounts": [_serialize_account(a) for a in _accounts_rows()]}
+
+_store.eager_load()

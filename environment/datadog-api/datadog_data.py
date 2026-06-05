@@ -11,20 +11,26 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store,
+    strict_int,
+    strict_float,
+    strict_bool,
+)
 
 _store = get_store("datadog-api")
+_API = "datadog-api"
 
 _store.register("monitors", primary_key="id",
-                initial_loader=lambda: _coerce_monitors(_load("monitors.csv")))
+                initial_loader=lambda: _coerce_monitors(_load("monitors.csv", "monitors")))
 _store.register("dashboards", primary_key="id",
-                initial_loader=lambda: _coerce_dashboards(_load("dashboards.csv")))
+                initial_loader=lambda: _coerce_dashboards(_load("dashboards.csv", "dashboards")))
 _store.register("events", primary_key="id",
-                initial_loader=lambda: _coerce_events(_load("events.csv")))
+                initial_loader=lambda: _coerce_events(_load("events.csv", "events")))
 _store.register("hosts", primary_key="name",
-                initial_loader=lambda: _coerce_hosts(_load("hosts.csv")))
+                initial_loader=lambda: _coerce_hosts(_load("hosts.csv", "hosts")))
 _store.register("metrics", primary_key="metric",
-                initial_loader=lambda: _coerce_metrics(_load("metrics.csv")))
+                initial_loader=lambda: _coerce_metrics(_load("metrics.csv", "metrics")))
 
 
 def _monitors_rows():
@@ -48,9 +54,12 @@ def _metrics_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now_iso():
@@ -73,9 +82,9 @@ def _coerce_monitors(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "id": int(r["id"]),
-            "priority": int(r["priority"]),
+            **_strip_ctx(r),
+            "id": strict_int(r, "id"),
+            "priority": strict_int(r, "priority"),
             "tags": _split_tags(r["tags"]),
         })
     return out
@@ -85,9 +94,9 @@ def _coerce_dashboards(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "widget_count": int(r["widget_count"]),
-            "is_read_only": _to_bool(r["is_read_only"]),
+            **_strip_ctx(r),
+            "widget_count": strict_int(r, "widget_count"),
+            "is_read_only": strict_bool(r, "is_read_only"),
         })
     return out
 
@@ -96,10 +105,10 @@ def _coerce_events(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "id": int(r["id"]),
+            **_strip_ctx(r),
+            "id": strict_int(r, "id"),
             "tags": _split_tags(r["tags"]),
-            "date_happened": int(r["date_happened"]),
+            "date_happened": strict_int(r, "date_happened"),
         })
     return out
 
@@ -108,12 +117,12 @@ def _coerce_hosts(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "up": _to_bool(r["up"]),
+            **_strip_ctx(r),
+            "up": strict_bool(r, "up"),
             "apps": _split_tags(r["apps"]),
-            "cpu_pct": float(r["cpu_pct"]),
-            "mem_pct": float(r["mem_pct"]),
-            "last_reported": int(r["last_reported"]),
+            "cpu_pct": strict_float(r, "cpu_pct"),
+            "mem_pct": strict_float(r, "mem_pct"),
+            "last_reported": strict_int(r, "last_reported"),
         })
     return out
 
@@ -122,9 +131,9 @@ def _coerce_metrics(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "base_value": float(r["base_value"]),
-            "amplitude": float(r["amplitude"]),
+            **_strip_ctx(r),
+            "base_value": strict_float(r, "base_value"),
+            "amplitude": strict_float(r, "amplitude"),
         })
     return out
 
@@ -304,3 +313,5 @@ def create_event(title, text, alert_type="info", priority="normal", host=None, t
 
 def list_hosts():
     return {"host_list": list(_hosts_rows()), "total_returned": len(_hosts_rows())}
+
+_store.eager_load()

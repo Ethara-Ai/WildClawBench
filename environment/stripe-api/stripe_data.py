@@ -14,22 +14,24 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_int, opt_str, strict_bool)
 
 _store = get_store("stripe-api")
+_API = "stripe-api"
 
 _store.register("customers", primary_key="id",
-                initial_loader=lambda: _coerce_customers(_load("customers.csv")))
+                initial_loader=lambda: _coerce_customers(_load("customers.csv", "customers")))
 _store.register("products", primary_key="id",
-                initial_loader=lambda: _coerce_products(_load("products.csv")))
+                initial_loader=lambda: _coerce_products(_load("products.csv", "products")))
 _store.register("prices", primary_key="id",
-                initial_loader=lambda: _coerce_prices(_load("prices.csv")))
+                initial_loader=lambda: _coerce_prices(_load("prices.csv", "prices")))
 _store.register("charges", primary_key="id",
-                initial_loader=lambda: _coerce_charges(_load("charges.csv")))
+                initial_loader=lambda: _coerce_charges(_load("charges.csv", "charges")))
 _store.register("invoices", primary_key="id",
-                initial_loader=lambda: _coerce_invoices(_load("invoices.csv")))
+                initial_loader=lambda: _coerce_invoices(_load("invoices.csv", "invoices")))
 _store.register("subscriptions", primary_key="id",
-                initial_loader=lambda: _coerce_subscriptions(_load("subscriptions.csv")))
+                initial_loader=lambda: _coerce_subscriptions(_load("subscriptions.csv", "subscriptions")))
 _store.register_document("balance", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "balance.json", encoding="utf-8")))
 _store.register("payment_intents", primary_key="payment_intent_id",
                 initial_loader=lambda: [])
@@ -74,9 +76,12 @@ def _refunds_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -102,18 +107,18 @@ def _coerce_customers(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
+            **_strip_ctx(r),
             "object": "customer",
-            "delinquent": _to_bool(r["delinquent"]),
-            "balance": _to_int(r["balance"]),
-            "created": _to_int(r["created"]),
+            "delinquent": strict_bool(r, "delinquent"),
+            "balance": opt_int(r, "balance", default=0),
+            "created": opt_int(r, "created", default=0),
         })
     return out
 
 
 def _coerce_products(rows):
-    return [{**r, "object": "product", "active": _to_bool(r["active"]),
-             "created": _to_int(r["created"])} for r in rows]
+    return [{**_strip_ctx(r), "object": "product", "active": strict_bool(r, "active"),
+             "created": opt_int(r, "created", default=0)} for r in rows]
 
 
 def _coerce_prices(rows):
@@ -121,10 +126,10 @@ def _coerce_prices(rows):
     for r in rows:
         recurring = {"interval": r["recurring_interval"]} if r["recurring_interval"] else None
         out.append({
-            **r,
+            **_strip_ctx(r),
             "object": "price",
-            "unit_amount": _to_int(r["unit_amount"]),
-            "active": _to_bool(r["active"]),
+            "unit_amount": opt_int(r, "unit_amount", default=0),
+            "active": strict_bool(r, "active"),
             "recurring": recurring,
             "type": "recurring" if recurring else "one_time",
         })
@@ -132,34 +137,34 @@ def _coerce_prices(rows):
 
 
 def _coerce_charges(rows):
-    return [{**r, "object": "charge", "amount": _to_int(r["amount"]),
-             "paid": _to_bool(r["paid"]), "refunded": _to_bool(r["refunded"]),
-             "amount_refunded": _to_int(r["amount_refunded"]),
-             "created": _to_int(r["created"])} for r in rows]
+    return [{**_strip_ctx(r), "object": "charge", "amount": opt_int(r, "amount", default=0),
+             "paid": strict_bool(r, "paid"), "refunded": strict_bool(r, "refunded"),
+             "amount_refunded": opt_int(r, "amount_refunded", default=0),
+             "created": opt_int(r, "created", default=0)} for r in rows]
 
 
 def _coerce_invoices(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
+            **_strip_ctx(r),
             "object": "invoice",
-            "subscription": r["subscription"] or None,
-            "charge": r["charge"] or None,
-            "amount_due": _to_int(r["amount_due"]),
-            "amount_paid": _to_int(r["amount_paid"]),
-            "created": _to_int(r["created"]),
-            "due_date": _to_int(r["due_date"]) if r["due_date"] else None,
+            "subscription": opt_str(r, "subscription", default="") or None,
+            "charge": opt_str(r, "charge", default="") or None,
+            "amount_due": opt_int(r, "amount_due", default=0),
+            "amount_paid": opt_int(r, "amount_paid", default=0),
+            "created": opt_int(r, "created", default=0),
+            "due_date": opt_int(r, "due_date", default=None),
         })
     return out
 
 
 def _coerce_subscriptions(rows):
-    return [{**r, "object": "subscription", "quantity": _to_int(r["quantity"]),
-             "current_period_start": _to_int(r["current_period_start"]),
-             "current_period_end": _to_int(r["current_period_end"]),
-             "cancel_at_period_end": _to_bool(r["cancel_at_period_end"]),
-             "created": _to_int(r["created"])} for r in rows]
+    return [{**_strip_ctx(r), "object": "subscription", "quantity": opt_int(r, "quantity", default=0),
+             "current_period_start": opt_int(r, "current_period_start", default=0),
+             "current_period_end": opt_int(r, "current_period_end", default=0),
+             "cancel_at_period_end": strict_bool(r, "cancel_at_period_end"),
+             "created": opt_int(r, "created", default=0)} for r in rows]
 
 
 
@@ -416,3 +421,5 @@ def create_subscription(customer=None, price=None, quantity=1):
 
 def get_balance():
     return _balance_doc()
+
+_store.eager_load()

@@ -11,14 +11,16 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_int, opt_str, strict_bool)
 
 _store = get_store("google-drive-api")
+_API = "google-drive-api"
 
 _store.register("files", primary_key="id",
-                initial_loader=lambda: _coerce_files(_load("files.csv")))
+                initial_loader=lambda: _coerce_files(_load("files.csv", "files")))
 _store.register("permissions", primary_key="id",
-                initial_loader=lambda: _load("permissions.csv"))
+                initial_loader=lambda: [_strip_ctx(r) for r in _load("permissions.csv", "permissions")])
 _store.register_document("about", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "about.json", encoding="utf-8")))
 
 
@@ -35,9 +37,12 @@ def _about_doc():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -52,11 +57,11 @@ def _coerce_files(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "size": int(r["size"]) if r["size"] else 0,
-            "starred": _to_bool(r["starred"]),
-            "trashed": _to_bool(r["trashed"]),
-            "parent_id": r["parent_id"] or None,
+            **_strip_ctx(r),
+            "size": opt_int(r, "size", default=0),
+            "starred": strict_bool(r, "starred"),
+            "trashed": strict_bool(r, "trashed"),
+            "parent_id": opt_str(r, "parent_id", default="") or None,
         })
     return out
 
@@ -267,3 +272,5 @@ def delete_permission(file_id, permission_id):
             _permissions_rows().pop(i)
             return {"deleted": True, "id": permission_id}
     return {"error": f"Permission {permission_id} not found on {file_id}"}
+
+_store.eager_load()

@@ -34,6 +34,18 @@ except Exception:  # pragma: no cover - litellm only present inside the sidecar
 _PATH = os.environ.get("LITELLM_USAGE_LOG_PATH", "/var/litellm_usage/usage.jsonl")
 _LOCK = threading.Lock()
 
+# Rate-limit usage-invariant warnings to once per (model, UTC date) so a
+# persistent upstream mis-report cannot flood the sidecar's stderr/gateway.log.
+_WARN_SEEN: set[tuple[str, str]] = set()
+
+
+def _warn_once_per_day(model: Any, fmt: str, *args: Any) -> None:
+    key = (str(model or ""), datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    if key in _WARN_SEEN:
+        return
+    _WARN_SEEN.add(key)
+    sys.stderr.write(f"[litellm_usage_callback] WARN model={model!r}: " + (fmt % args) + "\n")
+
 
 def _usage_to_dict(usage: Any) -> dict[str, Any]:
     if usage is None:
@@ -91,15 +103,31 @@ def _write_row(kwargs: dict, response_obj: Any, start_time: Any, end_time: Any) 
         #       {type: "duration", seconds}   -- NO token fields at all
         # Chat keys (prompt_tokens/completion_tokens) are absent in both, so fall
         # back to the transcription keys; whisper's seconds is surfaced separately.
-        input_tokens = _int(usage_dict.get("prompt_tokens"))
-        if not input_tokens:
-            input_tokens = _int(usage_dict.get("input_tokens"))
+        prompt_tokens_raw = _int(usage_dict.get("prompt_tokens"))
+        if not prompt_tokens_raw:
+            prompt_tokens_raw = _int(usage_dict.get("input_tokens"))
         output_tokens = _int(usage_dict.get("completion_tokens"))
         if not output_tokens:
             output_tokens = _int(usage_dict.get("output_tokens"))
-        total_tokens = _int(usage_dict.get("total_tokens"))
-        if not total_tokens:
-            total_tokens = input_tokens + output_tokens
+
+        # Bedrock-native split: input_tokens = NON-cached input only. Across every
+        # provider shape this callback sees (OpenAI Chat Completions; Anthropic /
+        # Bedrock-Claude as normalized by LiteLLM; audio), prompt_tokens FOLDS IN
+        # cache_read but NEVER cache_write (cache_creation is always a sibling).
+        # So the universal rule is subtract cache_read ONLY; cache_write is
+        # genuinely-additional billed input added on top in total_tokens. Never
+        # subtract cache_write (doing so silently under-reports input whenever
+        # cache_write < true non-cached input).
+        if cache_read > prompt_tokens_raw:
+            input_tokens = 0
+            _warn_once_per_day(
+                kwargs.get("model"),
+                "prompt_tokens (%d) < cache_read (%d); clamping non-cached input to 0",
+                prompt_tokens_raw, cache_read,
+            )
+        else:
+            input_tokens = prompt_tokens_raw - cache_read
+        total_tokens = input_tokens + output_tokens + cache_read + cache_write
         # whisper-1 (default json format) returns NO usage object at all; the audio
         # length is exposed only as the top-level TranscriptionResponse.duration
         # attribute (verified live in litellm:main-stable). Prefer usage.seconds

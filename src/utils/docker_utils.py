@@ -651,10 +651,9 @@ def collect_output_from_container(
 
     _sweep_root_deliverables_to_workspace(task_id)
 
-    workspace_out = task_output_dir / "workspace"
-    workspace_out.mkdir(parents=True, exist_ok=True)
-
     if include_workspace_changes:
+        workspace_out = task_output_dir / "workspace"
+        workspace_out.mkdir(parents=True, exist_ok=True)
         ok = _copy_dir_from_container(task_id, f"{TMP_WORKSPACE}/.", str(workspace_out))
         if not ok:
             logger.warning("[%s] workspace directory does not exist or is empty", task_id)
@@ -788,6 +787,37 @@ def inject_lobster_workspace(task_id: str, workspace_path: str) -> None:
         logger.info("[%s] Persona MDs landed at /root/: %s", task_id, md_files)
     else:
         logger.warning("[%s] Persona MD copy succeeded but /root/ contains no *.md", task_id)
+
+
+def inject_persona_into_workspace(task_id: str, persona_dir: str) -> None:
+    """Copy the task persona into the agent workspace (TMP_WORKSPACE).
+
+    OpenClaw assembles AGENTS/SOUL/MEMORY context from the workspace, not /root
+    (where inject_lobster_workspace puts it). MUST run AFTER setup_workspace so
+    the persona OVERWRITES the image's stock scaffold that cp -r /app/. lays down.
+    """
+    r = subprocess.run(
+        ["docker", "cp", f"{persona_dir}/.", f"{task_id}:{TMP_WORKSPACE}/"],
+        capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        logger.error("[%s] Persona→workspace copy failed: %s", task_id, r.stderr)
+        return
+    logger.info("[%s] Persona copied: %s → %s/", task_id, persona_dir, TMP_WORKSPACE)
+
+    ls_r = subprocess.run(
+        ["docker", "exec", task_id, "/bin/bash", "-c",
+         f"ls -1 {TMP_WORKSPACE}/*.md 2>/dev/null | xargs -n1 basename 2>/dev/null | sort"],
+        capture_output=True, text=True,
+    )
+    if ls_r.returncode == 0 and ls_r.stdout.strip():
+        md_files = [name for name in ls_r.stdout.strip().splitlines() if name]
+        logger.info("[%s] Persona MDs landed in workspace: %s", task_id, md_files)
+    else:
+        logger.warning(
+            "[%s] Persona→workspace copy succeeded but %s contains no *.md",
+            task_id, TMP_WORKSPACE,
+        )
 
 
 def _copy_dir_from_container(task_id: str, src: str, dest: str) -> bool:

@@ -15,14 +15,18 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store
-
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_float, opt_int, opt_str)
 _store = get_store("mailchimp-api")
+_API = "mailchimp-api"
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -57,8 +61,8 @@ def _coerce_lists(rows):
             "from_name": r["from_name"],
             "from_email": r["from_email"],
             "subject": r["subject"],
-            "member_count": _to_int(r["member_count"]),
-            "unsubscribe_count": _to_int(r["unsubscribe_count"]),
+            "member_count": opt_int(r, "member_count", default=0),
+            "unsubscribe_count": opt_int(r, "unsubscribe_count", default=0),
             "date_created": r["date_created"],
         })
     return out
@@ -75,7 +79,7 @@ def _coerce_members(rows):
             "full_name": r["full_name"],
             "status": r["status"],
             "timestamp_signup": r["timestamp_signup"],
-            "member_rating": _to_int(r["member_rating"]),
+            "member_rating": opt_int(r, "member_rating", default=0),
             "_pk": f"{r['list_id']}@{_subscriber_hash(email)}",
         })
     return out
@@ -89,8 +93,8 @@ def _coerce_campaigns(rows):
             "list_id": r["list_id"],
             "type": r["type"],
             "status": r["status"],
-            "emails_sent": _to_int(r["emails_sent"]),
-            "send_time": r["send_time"] or None,
+            "emails_sent": opt_int(r, "emails_sent", default=0),
+            "send_time": opt_str(r, "send_time", default="") or None,
             "create_time": r["create_time"],
             "recipients": {"list_id": r["list_id"]},
             "settings": {
@@ -108,31 +112,31 @@ def _coerce_reports(rows):
     for r in rows:
         out.append({
             "id": r["campaign_id"],
-            "emails_sent": _to_int(r["emails_sent"]),
+            "emails_sent": opt_int(r, "emails_sent", default=0),
             "opens": {
-                "opens_total": _to_int(r["opens_total"]),
-                "unique_opens": _to_int(r["unique_opens"]),
-                "open_rate": _to_float(r["open_rate"]),
+                "opens_total": opt_int(r, "opens_total", default=0),
+                "unique_opens": opt_int(r, "unique_opens", default=0),
+                "open_rate": opt_float(r, "open_rate", default=0.0),
             },
             "clicks": {
-                "clicks_total": _to_int(r["clicks_total"]),
-                "unique_clicks": _to_int(r["unique_clicks"]),
-                "click_rate": _to_float(r["click_rate"]),
+                "clicks_total": opt_int(r, "clicks_total", default=0),
+                "unique_clicks": opt_int(r, "unique_clicks", default=0),
+                "click_rate": opt_float(r, "click_rate", default=0.0),
             },
-            "unsubscribed": _to_int(r["unsubscribed"]),
-            "bounces": {"hard_bounces": _to_int(r["bounces"])},
+            "unsubscribed": opt_int(r, "unsubscribed", default=0),
+            "bounces": {"hard_bounces": opt_int(r, "bounces", default=0)},
         })
     return out
 
 
 _store.register("lists", primary_key="id",
-                initial_loader=lambda: _coerce_lists(_load("lists.csv")))
+                initial_loader=lambda: _coerce_lists(_load("lists.csv", "lists")))
 _store.register("members", primary_key="_pk",
-                initial_loader=lambda: _coerce_members(_load("members.csv")))
+                initial_loader=lambda: _coerce_members(_load("members.csv", "members")))
 _store.register("campaigns", primary_key="id",
-                initial_loader=lambda: _coerce_campaigns(_load("campaigns.csv")))
+                initial_loader=lambda: _coerce_campaigns(_load("campaigns.csv", "campaigns")))
 _store.register("reports", primary_key="id",
-                initial_loader=lambda: _coerce_reports(_load("reports.csv")))
+                initial_loader=lambda: _coerce_reports(_load("reports.csv", "reports")))
 
 
 def _lists_rows(): return _store.table("lists").rows()
@@ -293,3 +297,5 @@ def get_report(campaign_id):
     if _store.table("campaigns").get(campaign_id):
         return {"error": f"No report available for campaign {campaign_id}"}
     return {"error": f"Campaign {campaign_id} not found"}
+
+_store.eager_load()

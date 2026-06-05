@@ -13,16 +13,21 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store,
+    strict_int,
+    strict_bool,
+)
 
 _store = get_store("posthog-api")
+_API = "posthog-api"
 
 _store.register("events", primary_key="id",
-                initial_loader=lambda: _coerce_events(_load("events.csv")))
+                initial_loader=lambda: _coerce_events(_load("events.csv", "events")))
 _store.register("flags", primary_key="id",
-                initial_loader=lambda: _coerce_flags(_load("feature_flags.csv")))
+                initial_loader=lambda: _coerce_flags(_load("feature_flags.csv", "flags")))
 _store.register("persons", primary_key="id",
-                initial_loader=lambda: _coerce_persons(_load("persons.csv")))
+                initial_loader=lambda: _coerce_persons(_load("persons.csv", "persons")))
 
 
 def _events_rows():
@@ -38,9 +43,12 @@ def _persons_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _to_bool(v):
@@ -66,7 +74,7 @@ def _coerce_events(rows):
     for r in rows:
         out.append({
             "id": r["id"],
-            "project_id": int(r["project_id"]),
+            "project_id": strict_int(r, "project_id"),
             "distinct_id": r["distinct_id"],
             "event": r["event"],
             "timestamp": r["timestamp"],
@@ -80,11 +88,11 @@ def _coerce_flags(rows):
     for r in rows:
         out.append({
             "id": r["id"],
-            "project_id": int(r["project_id"]),
+            "project_id": strict_int(r, "project_id"),
             "key": r["key"],
             "name": r["name"],
-            "active": _to_bool(r["active"]),
-            "rollout_percentage": int(r["rollout_percentage"]),
+            "active": strict_bool(r, "active"),
+            "rollout_percentage": strict_int(r, "rollout_percentage"),
         })
     return out
 
@@ -94,7 +102,7 @@ def _coerce_persons(rows):
     for r in rows:
         out.append({
             "id": r["id"],
-            "project_id": int(r["project_id"]),
+            "project_id": strict_int(r, "project_id"),
             "distinct_id": r["distinct_id"],
             "name": r["name"],
             "email": r["email"],
@@ -202,3 +210,5 @@ def decide(payload):
         "featureFlags": enabled,
         "distinctId": distinct_id,
     }
+
+_store.eager_load()

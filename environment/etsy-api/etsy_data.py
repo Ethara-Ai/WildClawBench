@@ -9,26 +9,28 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_csv_list, opt_float, opt_int, opt_str, strict_float, strict_int)
 
 _store = get_store("etsy-api")
+_API = "etsy-api"
 
 _store.register("listings", primary_key="listing_id",
-                initial_loader=lambda: _coerce_listings(_load("listings.csv")))
+                initial_loader=lambda: _coerce_listings(_load("listings.csv", "listings")))
 _store.register("listing_images", primary_key="listing_image_id",
-                initial_loader=lambda: _coerce_listing_images(_load("listing_images.csv")))
+                initial_loader=lambda: _coerce_listing_images(_load("listing_images.csv", "listing_images")))
 _store.register("receipts", primary_key="receipt_id",
-                initial_loader=lambda: _coerce_receipts(_load("receipts.csv")))
+                initial_loader=lambda: _coerce_receipts(_load("receipts.csv", "receipts")))
 _store.register("transactions", primary_key="transaction_id",
-                initial_loader=lambda: _coerce_transactions(_load("transactions.csv")))
+                initial_loader=lambda: _coerce_transactions(_load("transactions.csv", "transactions")))
 _store.register("reviews", primary_key="review_id",
-                initial_loader=lambda: _coerce_reviews(_load("reviews.csv")))
+                initial_loader=lambda: _coerce_reviews(_load("reviews.csv", "reviews")))
 _store.register("shop_sections", primary_key="shop_section_id",
-                initial_loader=lambda: _coerce_shop_sections(_load("shop_sections.csv")))
+                initial_loader=lambda: _coerce_shop_sections(_load("shop_sections.csv", "shop_sections")))
 _store.register("shipping_profiles", primary_key="shipping_profile_id",
-                initial_loader=lambda: _coerce_shipping_profiles(_load("shipping_profiles.csv")))
+                initial_loader=lambda: _coerce_shipping_profiles(_load("shipping_profiles.csv", "shipping_profiles")))
 _store.register("return_policies", primary_key="return_policy_id",
-                initial_loader=lambda: _coerce_return_policies(_load("return_policies.csv")))
+                initial_loader=lambda: _coerce_return_policies(_load("return_policies.csv", "return_policies")))
 _store.register_document("shop", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "shop.json", encoding="utf-8")))
 
 
@@ -69,9 +71,12 @@ def _shop_doc():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -86,25 +91,25 @@ def _coerce_listings(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "listing_id": int(r["listing_id"]),
-            "shop_id": int(r["shop_id"]),
-            "price": float(r["price"]),
-            "quantity": int(r["quantity"]),
-            "taxonomy_id": int(r["taxonomy_id"]),
-            "tags": [t.strip() for t in r["tags"].split(",")] if r["tags"] else [],
-            "materials": [m.strip() for m in r["materials"].split(",")] if r["materials"] else [],
-            "shop_section_id": int(r["shop_section_id"]) if r["shop_section_id"] else None,
-            "processing_min": int(r["processing_min"]) if r["processing_min"] else None,
-            "processing_max": int(r["processing_max"]) if r["processing_max"] else None,
-            "item_weight": float(r["item_weight"]) if r["item_weight"] else None,
-            "item_length": float(r["item_length"]) if r["item_length"] else None,
-            "item_width": float(r["item_width"]) if r["item_width"] else None,
-            "item_height": float(r["item_height"]) if r["item_height"] else None,
-            "views": int(r["views"]),
-            "num_favorers": int(r["num_favorers"]),
-            "shipping_profile_id": int(r["shipping_profile_id"]) if r["shipping_profile_id"] else None,
-            "return_policy_id": int(r["return_policy_id"]) if r["return_policy_id"] else None,
+            **_strip_ctx(r),
+            "listing_id": strict_int(r, "listing_id"),
+            "shop_id": strict_int(r, "shop_id"),
+            "price": strict_float(r, "price"),
+            "quantity": strict_int(r, "quantity"),
+            "taxonomy_id": strict_int(r, "taxonomy_id"),
+            "tags": [t.strip() for t in opt_csv_list(r, "tags", sep=",")],
+            "materials": [m.strip() for m in opt_csv_list(r, "materials", sep=",")],
+            "shop_section_id": opt_int(r, "shop_section_id", default=None),
+            "processing_min": opt_int(r, "processing_min", default=None),
+            "processing_max": opt_int(r, "processing_max", default=None),
+            "item_weight": opt_float(r, "item_weight", default=None),
+            "item_length": opt_float(r, "item_length", default=None),
+            "item_width": opt_float(r, "item_width", default=None),
+            "item_height": opt_float(r, "item_height", default=None),
+            "views": strict_int(r, "views"),
+            "num_favorers": strict_int(r, "num_favorers"),
+            "shipping_profile_id": opt_int(r, "shipping_profile_id", default=None),
+            "return_policy_id": opt_int(r, "return_policy_id", default=None),
             "is_supply": r["is_supply"].lower() == "true",
             "is_customizable": r["is_customizable"].lower() == "true",
             "is_personalizable": r["is_personalizable"].lower() == "true",
@@ -116,11 +121,11 @@ def _coerce_listing_images(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "listing_image_id": int(r["listing_image_id"]),
-            "listing_id": int(r["listing_id"]),
-            "shop_id": int(r["shop_id"]),
-            "rank": int(r["rank"]),
+            **_strip_ctx(r),
+            "listing_image_id": strict_int(r, "listing_image_id"),
+            "listing_id": strict_int(r, "listing_id"),
+            "shop_id": strict_int(r, "shop_id"),
+            "rank": strict_int(r, "rank"),
         })
     return out
 
@@ -129,21 +134,21 @@ def _coerce_receipts(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "receipt_id": int(r["receipt_id"]),
-            "shop_id": int(r["shop_id"]),
-            "buyer_user_id": int(r["buyer_user_id"]),
-            "grandtotal": float(r["grandtotal"]),
-            "subtotal": float(r["subtotal"]),
-            "total_shipping_cost": float(r["total_shipping_cost"]),
-            "total_tax_cost": float(r["total_tax_cost"]),
-            "discount_amt": float(r["discount_amt"]),
+            **_strip_ctx(r),
+            "receipt_id": strict_int(r, "receipt_id"),
+            "shop_id": strict_int(r, "shop_id"),
+            "buyer_user_id": strict_int(r, "buyer_user_id"),
+            "grandtotal": strict_float(r, "grandtotal"),
+            "subtotal": strict_float(r, "subtotal"),
+            "total_shipping_cost": strict_float(r, "total_shipping_cost"),
+            "total_tax_cost": strict_float(r, "total_tax_cost"),
+            "discount_amt": strict_float(r, "discount_amt"),
             "is_gift": r["is_gift"].lower() == "true",
-            "gift_message": r["gift_message"] if r["gift_message"] else None,
-            "shipped_timestamp": r["shipped_timestamp"] if r["shipped_timestamp"] else None,
-            "estimated_delivery": r["estimated_delivery"] if r["estimated_delivery"] else None,
-            "shipping_carrier": r["shipping_carrier"] if r["shipping_carrier"] else None,
-            "tracking_code": r["tracking_code"] if r["tracking_code"] else None,
+            "gift_message": opt_str(r, "gift_message", default="") or None,
+            "shipped_timestamp": opt_str(r, "shipped_timestamp", default="") or None,
+            "estimated_delivery": opt_str(r, "estimated_delivery", default="") or None,
+            "shipping_carrier": opt_str(r, "shipping_carrier", default="") or None,
+            "tracking_code": opt_str(r, "tracking_code", default="") or None,
         })
     return out
 
@@ -152,15 +157,15 @@ def _coerce_transactions(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "transaction_id": int(r["transaction_id"]),
-            "receipt_id": int(r["receipt_id"]),
-            "listing_id": int(r["listing_id"]),
-            "shop_id": int(r["shop_id"]),
-            "buyer_user_id": int(r["buyer_user_id"]),
-            "quantity": int(r["quantity"]),
-            "price": float(r["price"]),
-            "shipping_cost": float(r["shipping_cost"]),
+            **_strip_ctx(r),
+            "transaction_id": strict_int(r, "transaction_id"),
+            "receipt_id": strict_int(r, "receipt_id"),
+            "listing_id": strict_int(r, "listing_id"),
+            "shop_id": strict_int(r, "shop_id"),
+            "buyer_user_id": strict_int(r, "buyer_user_id"),
+            "quantity": strict_int(r, "quantity"),
+            "price": strict_float(r, "price"),
+            "shipping_cost": strict_float(r, "shipping_cost"),
             "is_digital": r["is_digital"].lower() == "true",
         })
     return out
@@ -170,13 +175,13 @@ def _coerce_reviews(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "review_id": int(r["review_id"]),
-            "shop_id": int(r["shop_id"]),
-            "listing_id": int(r["listing_id"]),
-            "buyer_user_id": int(r["buyer_user_id"]),
-            "rating": int(r["rating"]),
-            "image_url": r["image_url"] if r["image_url"] else None,
+            **_strip_ctx(r),
+            "review_id": strict_int(r, "review_id"),
+            "shop_id": strict_int(r, "shop_id"),
+            "listing_id": strict_int(r, "listing_id"),
+            "buyer_user_id": strict_int(r, "buyer_user_id"),
+            "rating": strict_int(r, "rating"),
+            "image_url": opt_str(r, "image_url", default="") or None,
         })
     return out
 
@@ -185,11 +190,11 @@ def _coerce_shop_sections(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "shop_section_id": int(r["shop_section_id"]),
-            "shop_id": int(r["shop_id"]),
-            "rank": int(r["rank"]),
-            "active_listing_count": int(r["active_listing_count"]),
+            **_strip_ctx(r),
+            "shop_section_id": strict_int(r, "shop_section_id"),
+            "shop_id": strict_int(r, "shop_id"),
+            "rank": strict_int(r, "rank"),
+            "active_listing_count": strict_int(r, "active_listing_count"),
         })
     return out
 
@@ -198,15 +203,15 @@ def _coerce_shipping_profiles(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "shipping_profile_id": int(r["shipping_profile_id"]),
-            "shop_id": int(r["shop_id"]),
-            "processing_min": int(r["processing_min"]),
-            "processing_max": int(r["processing_max"]),
-            "min_delivery_days": int(r["min_delivery_days"]),
-            "max_delivery_days": int(r["max_delivery_days"]),
-            "cost": float(r["cost"]),
-            "secondary_cost": float(r["secondary_cost"]),
+            **_strip_ctx(r),
+            "shipping_profile_id": strict_int(r, "shipping_profile_id"),
+            "shop_id": strict_int(r, "shop_id"),
+            "processing_min": strict_int(r, "processing_min"),
+            "processing_max": strict_int(r, "processing_max"),
+            "min_delivery_days": strict_int(r, "min_delivery_days"),
+            "max_delivery_days": strict_int(r, "max_delivery_days"),
+            "cost": strict_float(r, "cost"),
+            "secondary_cost": strict_float(r, "secondary_cost"),
         })
     return out
 
@@ -215,12 +220,12 @@ def _coerce_return_policies(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "return_policy_id": int(r["return_policy_id"]),
-            "shop_id": int(r["shop_id"]),
+            **_strip_ctx(r),
+            "return_policy_id": strict_int(r, "return_policy_id"),
+            "shop_id": strict_int(r, "shop_id"),
             "accepts_returns": r["accepts_returns"].lower() == "true",
             "accepts_exchanges": r["accepts_exchanges"].lower() == "true",
-            "return_deadline": int(r["return_deadline"]),
+            "return_deadline": strict_int(r, "return_deadline"),
         })
     return out
 
@@ -245,6 +250,7 @@ def _coerce_return_policies(rows):
 
 
 
+_store.eager_load()
 _next_listing_id = max(l["listing_id"] for l in _listings_rows()) + 1
 _next_receipt_id = max(r["receipt_id"] for r in _receipts_rows()) + 1
 _next_image_id = max(i["listing_image_id"] for i in _listing_images_rows()) + 1

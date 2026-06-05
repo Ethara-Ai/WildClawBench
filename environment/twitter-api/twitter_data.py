@@ -9,20 +9,22 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_str, strict_bool, strict_int)
 
 _store = get_store("twitter-api")
+_API = "twitter-api"
 
 _store.register("users", primary_key="id",
-                initial_loader=lambda: _coerce_users(_load("users.csv")))
+                initial_loader=lambda: _coerce_users(_load("users.csv", "users")))
 _store.register("tweets", primary_key="id",
-                initial_loader=lambda: _coerce_tweets(_load("tweets.csv")))
+                initial_loader=lambda: _coerce_tweets(_load("tweets.csv", "tweets")))
 _store.register("follows", primary_key="follower_id",
-                initial_loader=lambda: _load("follows.csv"))
+                initial_loader=lambda: [_strip_ctx(r) for r in _load("follows.csv", "follows")])
 _store.register("likes", primary_key="user_id",
-                initial_loader=lambda: _load("likes.csv"))
+                initial_loader=lambda: [_strip_ctx(r) for r in _load("likes.csv", "likes")])
 _store.register("retweets", primary_key="user_id",
-                initial_loader=lambda: _load("retweets.csv"))
+                initial_loader=lambda: [_strip_ctx(r) for r in _load("retweets.csv", "retweets")])
 
 
 def _users_rows():
@@ -46,9 +48,12 @@ def _retweets_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -67,13 +72,13 @@ def _coerce_users(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "verified": _to_bool(r["verified"]),
-            "protected": _to_bool(r["protected"]),
+            **_strip_ctx(r),
+            "verified": strict_bool(r, "verified"),
+            "protected": strict_bool(r, "protected"),
             "public_metrics": {
-                "followers_count": int(r["followers_count"]),
-                "following_count": int(r["following_count"]),
-                "tweet_count": int(r["tweet_count"]),
+                "followers_count": strict_int(r, "followers_count"),
+                "following_count": strict_int(r, "following_count"),
+                "tweet_count": strict_int(r, "tweet_count"),
             },
         })
     return out
@@ -88,12 +93,12 @@ def _coerce_tweets(rows):
             "text": r["text"],
             "created_at": r["created_at"],
             "lang": r["lang"],
-            "reply_to_tweet_id": r["reply_to_tweet_id"] or None,
+            "reply_to_tweet_id": opt_str(r, "reply_to_tweet_id", default="") or None,
             "public_metrics": {
-                "like_count": int(r["like_count"]),
-                "retweet_count": int(r["retweet_count"]),
-                "reply_count": int(r["reply_count"]),
-                "quote_count": int(r["quote_count"]),
+                "like_count": strict_int(r, "like_count"),
+                "retweet_count": strict_int(r, "retweet_count"),
+                "reply_count": strict_int(r, "reply_count"),
+                "quote_count": strict_int(r, "quote_count"),
             },
         })
     return out
@@ -264,3 +269,5 @@ def retweet(user_id, tweet_id):
         _retweets_rows().append({"user_id": user_id, "tweet_id": tweet_id})
         target["public_metrics"]["retweet_count"] += 1
     return {"data": {"retweeted": True}}
+
+_store.eager_load()

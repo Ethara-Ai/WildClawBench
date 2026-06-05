@@ -11,18 +11,23 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store,
+    strict_int,
+    opt_float,
+)
 
 _store = get_store("binance-api")
+_API = "binance-api"
 
 _store.register("prices", primary_key="symbol",
-                initial_loader=lambda: _coerce_prices(_load("prices.csv")))
+                initial_loader=lambda: _coerce_prices(_load("prices.csv", "prices")))
 _store.register("klines", primary_key="symbol",
-                initial_loader=lambda: _coerce_klines(_load("klines.csv")))
+                initial_loader=lambda: _coerce_klines(_load("klines.csv", "klines")))
 _store.register("balances", primary_key="asset",
-                initial_loader=lambda: _coerce_balances(_load("balances.csv")))
+                initial_loader=lambda: _coerce_balances(_load("balances.csv", "balances")))
 _store.register("depth", primary_key="symbol",
-                initial_loader=lambda: _coerce_depth(_load("depth.csv")))
+                initial_loader=lambda: _coerce_depth(_load("depth.csv", "depth")))
 
 
 def _prices_rows():
@@ -42,9 +47,12 @@ def _depth_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _to_float(v):
@@ -68,12 +76,12 @@ def _coerce_prices(rows):
     for r in rows:
         out.append({
             "symbol": r["symbol"],
-            "price": _to_float(r["price"]),
-            "priceChange": _to_float(r["priceChange"]),
-            "priceChangePercent": _to_float(r["priceChangePercent"]),
-            "highPrice": _to_float(r["highPrice"]),
-            "lowPrice": _to_float(r["lowPrice"]),
-            "volume": _to_float(r["volume"]),
+            "price": opt_float(r, "price", default=None),
+            "priceChange": opt_float(r, "priceChange", default=None),
+            "priceChangePercent": opt_float(r, "priceChangePercent", default=None),
+            "highPrice": opt_float(r, "highPrice", default=None),
+            "lowPrice": opt_float(r, "lowPrice", default=None),
+            "volume": opt_float(r, "volume", default=None),
         })
     return out
 
@@ -84,13 +92,13 @@ def _coerce_klines(rows):
         out.append({
             "symbol": r["symbol"],
             "interval": r["interval"],
-            "open_time": int(r["open_time"]),
-            "open": _to_float(r["open"]),
-            "high": _to_float(r["high"]),
-            "low": _to_float(r["low"]),
-            "close": _to_float(r["close"]),
-            "volume": _to_float(r["volume"]),
-            "close_time": int(r["close_time"]),
+            "open_time": strict_int(r, "open_time"),
+            "open": opt_float(r, "open", default=None),
+            "high": opt_float(r, "high", default=None),
+            "low": opt_float(r, "low", default=None),
+            "close": opt_float(r, "close", default=None),
+            "volume": opt_float(r, "volume", default=None),
+            "close_time": strict_int(r, "close_time"),
         })
     return out
 
@@ -100,8 +108,8 @@ def _coerce_balances(rows):
     for r in rows:
         out.append({
             "asset": r["asset"],
-            "free": _to_float(r["free"]),
-            "locked": _to_float(r["locked"]),
+            "free": opt_float(r, "free", default=None),
+            "locked": opt_float(r, "locked", default=None),
         })
     return out
 
@@ -112,8 +120,8 @@ def _coerce_depth(rows):
         out.append({
             "symbol": r["symbol"],
             "side": r["side"],
-            "price": _to_float(r["price"]),
-            "qty": _to_float(r["qty"]),
+            "price": opt_float(r, "price", default=None),
+            "qty": opt_float(r, "qty", default=None),
         })
     return out
 
@@ -237,3 +245,5 @@ def get_account():
         "balances": balances,
         "permissions": ["SPOT"],
     }
+
+_store.eager_load()

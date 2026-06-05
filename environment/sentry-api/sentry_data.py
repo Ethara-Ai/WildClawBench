@@ -8,20 +8,22 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_str, strict_int)
 
 _store = get_store("sentry-api")
+_API = "sentry-api"
 
 _store.register("organizations", primary_key="id",
-                initial_loader=lambda: _coerce_organizations(_load("organizations.csv")))
+                initial_loader=lambda: _coerce_organizations(_load("organizations.csv", "organizations")))
 _store.register("projects", primary_key="id",
-                initial_loader=lambda: _coerce_projects(_load("projects.csv")))
+                initial_loader=lambda: _coerce_projects(_load("projects.csv", "projects")))
 _store.register("issues", primary_key="id",
-                initial_loader=lambda: _coerce_issues(_load("issues.csv")))
+                initial_loader=lambda: _coerce_issues(_load("issues.csv", "issues")))
 _store.register("events", primary_key="event_id",
-                initial_loader=lambda: _coerce_events(_load("events.csv")))
+                initial_loader=lambda: _coerce_events(_load("events.csv", "events")))
 _store.register("releases", primary_key="version",
-                initial_loader=lambda: _coerce_releases(_load("releases.csv")))
+                initial_loader=lambda: _coerce_releases(_load("releases.csv", "releases")))
 
 
 def _organizations_rows():
@@ -45,9 +47,12 @@ def _releases_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -59,21 +64,21 @@ def _now():
 # ---------------------------------------------------------------------------
 
 def _coerce_organizations(rows):
-    return [{**r, "id": int(r["id"])} for r in rows]
+    return [{**_strip_ctx(r), "id": strict_int(r, "id")} for r in rows]
 
 
 def _coerce_projects(rows):
-    return [{**r, "id": int(r["id"])} for r in rows]
+    return [{**_strip_ctx(r), "id": strict_int(r, "id")} for r in rows]
 
 
 def _coerce_issues(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "id": int(r["id"]),
-            "count": int(r["count"]),
-            "user_count": int(r["user_count"]),
+            **_strip_ctx(r),
+            "id": strict_int(r, "id"),
+            "count": strict_int(r, "count"),
+            "user_count": strict_int(r, "user_count"),
         })
     return out
 
@@ -82,9 +87,9 @@ def _coerce_events(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "id": int(r["id"]),
-            "issue_id": int(r["issue_id"]),
+            **_strip_ctx(r),
+            "id": strict_int(r, "id"),
+            "issue_id": strict_int(r, "issue_id"),
         })
     return out
 
@@ -93,9 +98,9 @@ def _coerce_releases(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "new_groups": int(r["new_groups"]),
-            "date_released": r["date_released"] or None,
+            **_strip_ctx(r),
+            "new_groups": strict_int(r, "new_groups"),
+            "date_released": opt_str(r, "date_released", default="") or None,
         })
     return out
 
@@ -245,3 +250,5 @@ def list_releases(org_slug, project_slug=None):
         results = [r for r in results if r["project_slug"] == project_slug]
     results.sort(key=lambda r: r["date_created"], reverse=True)
     return [_serialize_release(r) for r in results]
+
+_store.eager_load()

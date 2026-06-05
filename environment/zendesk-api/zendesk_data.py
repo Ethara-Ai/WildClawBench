@@ -13,18 +13,20 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_csv_list, opt_int, strict_bool)
 
 _store = get_store("zendesk-api")
+_API = "zendesk-api"
 
 _store.register("users", primary_key="id",
-                initial_loader=lambda: _coerce_users(_load("users.csv")))
+                initial_loader=lambda: _coerce_users(_load("users.csv", "users")))
 _store.register("organizations", primary_key="id",
-                initial_loader=lambda: _coerce_orgs(_load("organizations.csv")))
+                initial_loader=lambda: _coerce_orgs(_load("organizations.csv", "organizations")))
 _store.register("tickets", primary_key="id",
-                initial_loader=lambda: _coerce_tickets(_load("tickets.csv")))
+                initial_loader=lambda: _coerce_tickets(_load("tickets.csv", "tickets")))
 _store.register("comments", primary_key="id",
-                initial_loader=lambda: _coerce_comments(_load("comments.csv")))
+                initial_loader=lambda: _coerce_comments(_load("comments.csv", "comments")))
 
 
 def _users_rows():
@@ -47,9 +49,12 @@ VALID_STATUS = {"new", "open", "pending", "hold", "solved", "closed"}
 VALID_PRIORITY = {"low", "normal", "high", "urgent"}
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -75,37 +80,37 @@ def _to_int(v, default=None):
 
 def _coerce_users(rows):
     return [{
-        "id": _to_int(r["id"]),
+        "id": opt_int(r, "id", default=None),
         "name": r["name"],
         "email": r["email"],
         "role": r["role"],
-        "organization_id": _to_int(r["organization_id"]),
-        "active": _to_bool(r["active"]),
+        "organization_id": opt_int(r, "organization_id", default=None),
+        "active": strict_bool(r, "active"),
         "created_at": r["created_at"],
     } for r in rows]
 
 
 def _coerce_orgs(rows):
     return [{
-        "id": _to_int(r["id"]),
+        "id": opt_int(r, "id", default=None),
         "name": r["name"],
-        "domain_names": [d for d in r["domain_names"].split(";") if d],
+        "domain_names": [d for d in opt_csv_list(r, "domain_names", sep=";") if d],
         "created_at": r["created_at"],
     } for r in rows]
 
 
 def _coerce_tickets(rows):
     return [{
-        "id": _to_int(r["id"]),
+        "id": opt_int(r, "id", default=None),
         "subject": r["subject"],
         "description": r["description"],
         "status": r["status"],
         "priority": r["priority"],
         "type": r["type"],
-        "requester_id": _to_int(r["requester_id"]),
-        "assignee_id": _to_int(r["assignee_id"]),
-        "organization_id": _to_int(r["organization_id"]),
-        "tags": [t for t in r["tags"].split(";") if t],
+        "requester_id": opt_int(r, "requester_id", default=None),
+        "assignee_id": opt_int(r, "assignee_id", default=None),
+        "organization_id": opt_int(r, "organization_id", default=None),
+        "tags": [t for t in opt_csv_list(r, "tags", sep=";") if t],
         "created_at": r["created_at"],
         "updated_at": r["updated_at"],
     } for r in rows]
@@ -113,11 +118,11 @@ def _coerce_tickets(rows):
 
 def _coerce_comments(rows):
     return [{
-        "id": _to_int(r["id"]),
-        "ticket_id": _to_int(r["ticket_id"]),
-        "author_id": _to_int(r["author_id"]),
+        "id": opt_int(r, "id", default=None),
+        "ticket_id": opt_int(r, "ticket_id", default=None),
+        "author_id": opt_int(r, "author_id", default=None),
         "body": r["body"],
-        "public": _to_bool(r["public"]),
+        "public": strict_bool(r, "public"),
         "created_at": r["created_at"],
     } for r in rows]
 
@@ -135,7 +140,7 @@ def _coerce_comments(rows):
 # ---------------------------------------------------------------------------
 
 def _next_id(store):
-    return (max((x["id"] for x in store), default=0) + 1) if store else 1
+    return (max((x["id"] for x in store), default=None) + 1) if store else 1
 
 
 def _find(store, obj_id):
@@ -288,3 +293,5 @@ def get_user(user_id):
 
 def list_organizations():
     return {"organizations": list(_organizations_rows()), "count": len(_organizations_rows())}
+
+_store.eager_load()

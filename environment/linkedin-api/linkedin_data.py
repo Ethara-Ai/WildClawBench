@@ -10,18 +10,20 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_csv_list, strict_int)
 
 _store = get_store("linkedin-api")
+_API = "linkedin-api"
 
 _store.register("posts", primary_key="id",
-                initial_loader=lambda: _coerce_posts(_load("posts.csv")))
+                initial_loader=lambda: _coerce_posts(_load("posts.csv", "posts")))
 _store.register("organizations", primary_key="id",
-                initial_loader=lambda: _coerce_orgs(_load("organizations.csv")))
+                initial_loader=lambda: _coerce_orgs(_load("organizations.csv", "organizations")))
 _store.register("jobs", primary_key="id",
-                initial_loader=lambda: _coerce_jobs(_load("jobs.csv")))
+                initial_loader=lambda: _coerce_jobs(_load("jobs.csv", "jobs")))
 _store.register("connections", primary_key="id",
-                initial_loader=lambda: _load("connections.csv"))
+                initial_loader=lambda: [_strip_ctx(r) for r in _load("connections.csv", "connections")])
 _store.register_document("profile", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "profile.json", encoding="utf-8")))
 
 
@@ -46,9 +48,12 @@ def _profile_doc():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -63,11 +68,11 @@ def _coerce_posts(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
+            **_strip_ctx(r),
             "socialDetail": {
-                "likeCount": int(r["like_count"]),
-                "commentCount": int(r["comment_count"]),
-                "shareCount": int(r["share_count"]),
+                "likeCount": strict_int(r, "like_count"),
+                "commentCount": strict_int(r, "comment_count"),
+                "shareCount": strict_int(r, "share_count"),
             },
         })
         # Drop the flat metric columns now that they are nested.
@@ -80,8 +85,8 @@ def _coerce_orgs(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "followerCount": int(r["followerCount"]),
+            **_strip_ctx(r),
+            "followerCount": strict_int(r, "followerCount"),
         })
     return out
 
@@ -90,9 +95,9 @@ def _coerce_jobs(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "applicants": int(r["applicants"]),
-            "keywords": [k for k in r["keywords"].split(" ") if k],
+            **_strip_ctx(r),
+            "applicants": strict_int(r, "applicants"),
+            "keywords": [k for k in opt_csv_list(r, "keywords", sep=" ") if k],
         })
     return out
 
@@ -195,3 +200,5 @@ def get_job(job_id):
         if j["id"] == job_id:
             return j
     return {"error": f"Job {job_id} not found"}
+
+_store.eager_load()

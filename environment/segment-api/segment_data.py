@@ -14,16 +14,18 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_str, strict_bool)
 
 _store = get_store("segment-api")
+_API = "segment-api"
 
 _store.register("events", primary_key="messageId",
-                initial_loader=lambda: _coerce_events(_load("events.csv")))
+                initial_loader=lambda: _coerce_events(_load("events.csv", "events")))
 _store.register("sources", primary_key="id",
-                initial_loader=lambda: _coerce_sources(_load("sources.csv")))
+                initial_loader=lambda: _coerce_sources(_load("sources.csv", "sources")))
 _store.register("destinations", primary_key="id",
-                initial_loader=lambda: _coerce_destinations(_load("destinations.csv")))
+                initial_loader=lambda: _coerce_destinations(_load("destinations.csv", "destinations")))
 
 
 def _events_rows():
@@ -39,9 +41,12 @@ def _destinations_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _to_bool(v):
@@ -68,8 +73,8 @@ def _coerce_events(rows):
         out.append({
             "messageId": r["messageId"],
             "type": r["type"],
-            "userId": r["userId"] or None,
-            "event": r["event"] or None,
+            "userId": opt_str(r, "userId", default="") or None,
+            "event": opt_str(r, "event", default="") or None,
             "timestamp": r["timestamp"],
             "properties": _parse_props(r["properties"]),
         })
@@ -83,7 +88,7 @@ def _coerce_sources(rows):
             "id": r["id"],
             "name": r["name"],
             "slug": r["slug"],
-            "enabled": _to_bool(r["enabled"]),
+            "enabled": strict_bool(r, "enabled"),
             "type": r["type"],
             "createdAt": r["created_at"],
         })
@@ -97,7 +102,7 @@ def _coerce_destinations(rows):
             "id": r["id"],
             "name": r["name"],
             "slug": r["slug"],
-            "enabled": _to_bool(r["enabled"]),
+            "enabled": strict_bool(r, "enabled"),
             "sourceId": r["source_id"],
             "createdAt": r["created_at"],
         })
@@ -182,3 +187,5 @@ def list_sources():
 
 def list_destinations():
     return {"destinations": list(_destinations_rows()), "count": len(_destinations_rows())}
+
+_store.eager_load()

@@ -15,6 +15,7 @@ from src.utils.docker_utils import (
     inject_api_connectors,
     inject_lobster_workspace,
     inject_openclaw_models,
+    inject_persona_into_workspace,
     run_background,
     run_warmup,
     setup_skills,
@@ -153,6 +154,10 @@ class OpenClawAgent(BaseAgent):
                 self._index_memory(spec.task_id)
 
             setup_workspace(spec.task_id, thinking=spec.thinking)
+
+            if persona_dir:
+                inject_persona_into_workspace(spec.task_id, persona_dir)
+
             setup_skills(
                 spec.task_id,
                 spec.task.get("skills", ""),

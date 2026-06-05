@@ -10,16 +10,18 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_float, opt_int, opt_str, strict_bool, strict_int)
 
 _store = get_store("twilio-api")
+_API = "twilio-api"
 
 _store.register("phone_numbers", primary_key="sid",
-                initial_loader=lambda: _coerce_phone_numbers(_load("phone_numbers.csv")))
+                initial_loader=lambda: _coerce_phone_numbers(_load("phone_numbers.csv", "phone_numbers")))
 _store.register("messages", primary_key="sid",
-                initial_loader=lambda: _coerce_messages(_load("messages.csv")))
+                initial_loader=lambda: _coerce_messages(_load("messages.csv", "messages")))
 _store.register("calls", primary_key="sid",
-                initial_loader=lambda: _coerce_calls(_load("calls.csv")))
+                initial_loader=lambda: _coerce_calls(_load("calls.csv", "calls")))
 _store.register_document("account", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "account.json", encoding="utf-8")))
 
 
@@ -40,9 +42,12 @@ def _account_doc():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -70,11 +75,11 @@ def _coerce_phone_numbers(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "sms_enabled": _to_bool(r["sms_enabled"]),
-            "voice_enabled": _to_bool(r["voice_enabled"]),
-            "mms_enabled": _to_bool(r["mms_enabled"]),
-            "capabilities_fax": _to_bool(r["capabilities_fax"]),
+            **_strip_ctx(r),
+            "sms_enabled": strict_bool(r, "sms_enabled"),
+            "voice_enabled": strict_bool(r, "voice_enabled"),
+            "mms_enabled": strict_bool(r, "mms_enabled"),
+            "capabilities_fax": strict_bool(r, "capabilities_fax"),
         })
     return out
 
@@ -83,11 +88,11 @@ def _coerce_messages(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "num_segments": int(r["num_segments"]),
-            "price": _to_float(r["price"]),
-            "error_code": int(r["error_code"]) if r["error_code"] else None,
-            "date_sent": r["date_sent"] or None,
+            **_strip_ctx(r),
+            "num_segments": strict_int(r, "num_segments"),
+            "price": opt_float(r, "price", default=None),
+            "error_code": opt_int(r, "error_code", default=None),
+            "date_sent": opt_str(r, "date_sent", default="") or None,
         })
     return out
 
@@ -96,12 +101,12 @@ def _coerce_calls(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "duration": int(r["duration"]),
-            "price": _to_float(r["price"]),
-            "answered_by": r["answered_by"] or None,
-            "start_time": r["start_time"] or None,
-            "end_time": r["end_time"] or None,
+            **_strip_ctx(r),
+            "duration": strict_int(r, "duration"),
+            "price": opt_float(r, "price", default=None),
+            "answered_by": opt_str(r, "answered_by", default="") or None,
+            "start_time": opt_str(r, "start_time", default="") or None,
+            "end_time": opt_str(r, "end_time", default="") or None,
         })
     return out
 
@@ -310,3 +315,5 @@ def lookup(phone_number):
         "caller_name": owned["friendly_name"] if owned else None,
         "url": f"/v1/PhoneNumbers/{phone_number}",
     }
+
+_store.eager_load()

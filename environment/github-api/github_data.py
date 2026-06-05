@@ -9,18 +9,20 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_csv_list, opt_str, strict_bool, strict_int)
 
 _store = get_store("github-api")
+_API = "github-api"
 
 _store.register("repos", primary_key="id",
-                initial_loader=lambda: _coerce_repos(_load("repos.csv")))
+                initial_loader=lambda: _coerce_repos(_load("repos.csv", "repos")))
 _store.register("issues", primary_key="id",
-                initial_loader=lambda: _coerce_issues(_load("issues.csv")))
+                initial_loader=lambda: _coerce_issues(_load("issues.csv", "issues")))
 _store.register("pulls", primary_key="number",
-                initial_loader=lambda: _coerce_pulls(_load("pulls.csv")))
+                initial_loader=lambda: _coerce_pulls(_load("pulls.csv", "pulls")))
 _store.register("comments", primary_key="id",
-                initial_loader=lambda: _coerce_comments(_load("comments.csv")))
+                initial_loader=lambda: _coerce_comments(_load("comments.csv", "comments")))
 _store.register_document("user", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "user.json", encoding="utf-8")))
 
 
@@ -45,9 +47,12 @@ def _user_doc():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -62,12 +67,12 @@ def _coerce_repos(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "id": int(r["id"]),
-            "private": _to_bool(r["private"]),
-            "stars": int(r["stars"]),
-            "forks": int(r["forks"]),
-            "open_issues": int(r["open_issues"]),
+            **_strip_ctx(r),
+            "id": strict_int(r, "id"),
+            "private": strict_bool(r, "private"),
+            "stars": strict_int(r, "stars"),
+            "forks": strict_int(r, "forks"),
+            "open_issues": strict_int(r, "open_issues"),
         })
     return out
 
@@ -76,13 +81,13 @@ def _coerce_issues(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "id": int(r["id"]),
-            "number": int(r["number"]),
-            "is_pull_request": _to_bool(r["is_pull_request"]),
-            "labels": [l for l in r["labels"].split(";") if l],
-            "closed_at": r["closed_at"] or None,
-            "milestone": r["milestone"] or None,
+            **_strip_ctx(r),
+            "id": strict_int(r, "id"),
+            "number": strict_int(r, "number"),
+            "is_pull_request": strict_bool(r, "is_pull_request"),
+            "labels": [l for l in opt_csv_list(r, "labels", sep=";") if l],
+            "closed_at": opt_str(r, "closed_at", default="") or None,
+            "milestone": opt_str(r, "milestone", default="") or None,
         })
     return out
 
@@ -91,20 +96,20 @@ def _coerce_pulls(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "number": int(r["number"]),
-            "merged": _to_bool(r["merged"]),
-            "mergeable": _to_bool(r["mergeable"]),
-            "draft": _to_bool(r["draft"]),
-            "additions": int(r["additions"]),
-            "deletions": int(r["deletions"]),
-            "changed_files": int(r["changed_files"]),
+            **_strip_ctx(r),
+            "number": strict_int(r, "number"),
+            "merged": strict_bool(r, "merged"),
+            "mergeable": strict_bool(r, "mergeable"),
+            "draft": strict_bool(r, "draft"),
+            "additions": strict_int(r, "additions"),
+            "deletions": strict_int(r, "deletions"),
+            "changed_files": strict_int(r, "changed_files"),
         })
     return out
 
 
 def _coerce_comments(rows):
-    return [{**r, "id": int(r["id"]), "issue_number": int(r["issue_number"])} for r in rows]
+    return [{**_strip_ctx(r), "id": strict_int(r, "id"), "issue_number": strict_int(r, "issue_number")} for r in rows]
 
 
 
@@ -318,3 +323,5 @@ def create_comment(owner, repo_name, number, body):
     }
     _comments_rows().append(comment)
     return comment
+
+_store.eager_load()

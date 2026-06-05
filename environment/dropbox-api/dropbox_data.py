@@ -12,15 +12,20 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store,
+    strict_bool,
+    opt_int,
+)
 
 _store = get_store("dropbox-api")
+_API = "dropbox-api"
 
-_store.register_document("account", initial_loader=lambda: _coerce_account(_load("account.csv")))
+_store.register_document("account", initial_loader=lambda: _coerce_account(_load("account.csv", "account")))
 _store.register("files", primary_key="id",
-                initial_loader=lambda: _coerce_files(_load("files.csv")))
+                initial_loader=lambda: _coerce_files(_load("files.csv", "files")))
 _store.register("shared_links", primary_key="id",
-                initial_loader=lambda: _coerce_shared_links(_load("shared_links.csv")))
+                initial_loader=lambda: _coerce_shared_links(_load("shared_links.csv", "shared_links")))
 
 
 def _account_doc():
@@ -36,9 +41,12 @@ def _shared_links_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _to_bool(v):
@@ -68,7 +76,7 @@ def _coerce_account(rows):
             "abbreviated_name": (r["name_given"][:1] + r["name_surname"][:1]).upper(),
         },
         "email": r["email"],
-        "email_verified": _to_bool(r["email_verified"]),
+        "email_verified": strict_bool(r, "email_verified"),
         "country": r["country"],
         "locale": r["locale"],
         "account_type": {".tag": r["account_type"]},
@@ -85,8 +93,8 @@ def _coerce_files(rows):
             "name": r["name"],
             "path_lower": r["path_lower"],
             "path_display": r["path_display"],
-            "is_folder": _to_bool(r["is_folder"]),
-            "size": _to_int(r["size"]),
+            "is_folder": strict_bool(r, "is_folder"),
+            "size": opt_int(r, "size", default=0),
             "client_modified": r["client_modified"],
             "rev": r["rev"],
         })
@@ -254,3 +262,5 @@ def list_shared_links(path=None):
         "links": [_serialize_link(s) for s in links],
         "has_more": False,
     }
+
+_store.eager_load()

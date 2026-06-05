@@ -11,14 +11,16 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_str, strict_bool, strict_float, strict_int)
 
 _store = get_store("uber-api")
+_API = "uber-api"
 
 _store.register("products", primary_key="product_id",
-                initial_loader=lambda: _coerce_products(_load("products.csv")))
+                initial_loader=lambda: _coerce_products(_load("products.csv", "products")))
 _store.register("trips", primary_key="request_id",
-                initial_loader=lambda: _coerce_trips(_load("trips.csv")))
+                initial_loader=lambda: _coerce_trips(_load("trips.csv", "trips")))
 _store.register_document("rider", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "rider.json", encoding="utf-8")))
 
 
@@ -35,9 +37,12 @@ def _rider_doc():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now_iso():
@@ -56,14 +61,14 @@ def _coerce_products(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "capacity": int(r["capacity"]),
-            "base_fare": float(r["base_fare"]),
-            "cost_per_mile": float(r["cost_per_mile"]),
-            "cost_per_minute": float(r["cost_per_minute"]),
-            "booking_fee": float(r["booking_fee"]),
-            "minimum_fare": float(r["minimum_fare"]),
-            "shared": _to_bool(r["shared"]),
+            **_strip_ctx(r),
+            "capacity": strict_int(r, "capacity"),
+            "base_fare": strict_float(r, "base_fare"),
+            "cost_per_mile": strict_float(r, "cost_per_mile"),
+            "cost_per_minute": strict_float(r, "cost_per_minute"),
+            "booking_fee": strict_float(r, "booking_fee"),
+            "minimum_fare": strict_float(r, "minimum_fare"),
+            "shared": strict_bool(r, "shared"),
         })
     return out
 
@@ -72,19 +77,19 @@ def _coerce_trips(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "start_latitude": float(r["start_latitude"]),
-            "start_longitude": float(r["start_longitude"]),
-            "end_latitude": float(r["end_latitude"]),
-            "end_longitude": float(r["end_longitude"]),
-            "distance_miles": float(r["distance_miles"]),
-            "duration_minutes": float(r["duration_minutes"]),
-            "fare": float(r["fare"]),
-            "surge_multiplier": float(r["surge_multiplier"]),
-            "driver_name": r["driver_name"] or None,
-            "vehicle": r["vehicle"] or None,
-            "license_plate": r["license_plate"] or None,
-            "completed_at": r["completed_at"] or None,
+            **_strip_ctx(r),
+            "start_latitude": strict_float(r, "start_latitude"),
+            "start_longitude": strict_float(r, "start_longitude"),
+            "end_latitude": strict_float(r, "end_latitude"),
+            "end_longitude": strict_float(r, "end_longitude"),
+            "distance_miles": strict_float(r, "distance_miles"),
+            "duration_minutes": strict_float(r, "duration_minutes"),
+            "fare": strict_float(r, "fare"),
+            "surge_multiplier": strict_float(r, "surge_multiplier"),
+            "driver_name": opt_str(r, "driver_name", default="") or None,
+            "vehicle": opt_str(r, "vehicle", default="") or None,
+            "license_plate": opt_str(r, "license_plate", default="") or None,
+            "completed_at": opt_str(r, "completed_at", default="") or None,
         })
     return out
 
@@ -268,3 +273,5 @@ def get_history(rider_id=None, limit=50, offset=0):
 
 def get_me():
     return _rider_doc()
+
+_store.eager_load()

@@ -10,18 +10,20 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_str, strict_bool, strict_int)
 
 _store = get_store("calendly-api")
+_API = "calendly-api"
 
 _store.register("event_types", primary_key="uuid",
-                initial_loader=lambda: _coerce_event_types(_load("event_types.csv")))
+                initial_loader=lambda: _coerce_event_types(_load("event_types.csv", "event_types")))
 _store.register("scheduled_events", primary_key="uuid",
-                initial_loader=lambda: _coerce_scheduled_events(_load("scheduled_events.csv")))
+                initial_loader=lambda: _coerce_scheduled_events(_load("scheduled_events.csv", "scheduled_events")))
 _store.register("invitees", primary_key="uuid",
-                initial_loader=lambda: _coerce_invitees(_load("invitees.csv")))
+                initial_loader=lambda: _coerce_invitees(_load("invitees.csv", "invitees")))
 _store.register("availability", primary_key="owner",
-                initial_loader=lambda: _coerce_availability(_load("availability.csv")))
+                initial_loader=lambda: _coerce_availability(_load("availability.csv", "availability")))
 _store.register_document("user", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "user.json", encoding="utf-8")))
 
 
@@ -48,9 +50,12 @@ def _user_doc():
 BASE_URI = "https://api.calendly.com"
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -82,9 +87,9 @@ def _coerce_event_types(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "duration": int(r["duration"]),
-            "active": _to_bool(r["active"]),
+            **_strip_ctx(r),
+            "duration": strict_int(r, "duration"),
+            "active": strict_bool(r, "active"),
         })
     return out
 
@@ -93,8 +98,8 @@ def _coerce_scheduled_events(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "canceled_reason": r["canceled_reason"] or None,
+            **_strip_ctx(r),
+            "canceled_reason": opt_str(r, "canceled_reason", default="") or None,
         })
     return out
 
@@ -103,14 +108,14 @@ def _coerce_invitees(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
+            **_strip_ctx(r),
             "questions_and_answers": _parse_qa(r["questions_and_answers"]),
         })
     return out
 
 
 def _coerce_availability(rows):
-    return [{**r} for r in rows]
+    return [{**_strip_ctx(r)} for r in rows]
 
 
 
@@ -318,3 +323,5 @@ def cancel_event(uuid_, reason=None):
                 "canceler_type": "host",
             }}
     return {"error": f"scheduled event {uuid_} not found"}
+
+_store.eager_load()

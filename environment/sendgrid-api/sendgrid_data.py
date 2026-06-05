@@ -9,20 +9,22 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_csv_list, opt_int, strict_bool)
 
 _store = get_store("sendgrid-api")
+_API = "sendgrid-api"
 
 _store.register("templates", primary_key="id",
-                initial_loader=lambda: _coerce_templates(_load("templates.csv")))
+                initial_loader=lambda: _coerce_templates(_load("templates.csv", "templates")))
 _store.register("lists", primary_key="id",
-                initial_loader=lambda: _coerce_lists(_load("lists.csv")))
+                initial_loader=lambda: _coerce_lists(_load("lists.csv", "lists")))
 _store.register("contacts", primary_key="id",
-                initial_loader=lambda: _coerce_contacts(_load("contacts.csv")))
+                initial_loader=lambda: _coerce_contacts(_load("contacts.csv", "contacts")))
 _store.register("sent_log", primary_key="message_id",
-                initial_loader=lambda: _coerce_sent_log(_load("sent_log.csv")))
+                initial_loader=lambda: _coerce_sent_log(_load("sent_log.csv", "sent_log")))
 _store.register("stats", primary_key="date",
-                initial_loader=lambda: _coerce_stats(_load("stats.csv")))
+                initial_loader=lambda: _coerce_stats(_load("stats.csv", "stats")))
 
 
 def _templates_rows():
@@ -46,9 +48,12 @@ def _stats_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -74,8 +79,8 @@ def _coerce_templates(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "active": _to_bool(r["active"]),
+            **_strip_ctx(r),
+            "active": strict_bool(r, "active"),
         })
     return out
 
@@ -84,8 +89,8 @@ def _coerce_lists(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "contact_count": _to_int(r["contact_count"]),
+            **_strip_ctx(r),
+            "contact_count": opt_int(r, "contact_count", default=0),
         })
     return out
 
@@ -94,8 +99,8 @@ def _coerce_contacts(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "list_ids": [x for x in r["list_ids"].split(";") if x],
+            **_strip_ctx(r),
+            "list_ids": [x for x in opt_csv_list(r, "list_ids", sep=";") if x],
         })
     return out
 
@@ -104,9 +109,9 @@ def _coerce_sent_log(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "opens": _to_int(r["opens"]),
-            "clicks": _to_int(r["clicks"]),
+            **_strip_ctx(r),
+            "opens": opt_int(r, "opens", default=0),
+            "clicks": opt_int(r, "clicks", default=0),
         })
     return out
 
@@ -116,15 +121,15 @@ def _coerce_stats(rows):
     for r in rows:
         out.append({
             "date": r["date"],
-            "requests": _to_int(r["requests"]),
-            "delivered": _to_int(r["delivered"]),
-            "opens": _to_int(r["opens"]),
-            "unique_opens": _to_int(r["unique_opens"]),
-            "clicks": _to_int(r["clicks"]),
-            "unique_clicks": _to_int(r["unique_clicks"]),
-            "bounces": _to_int(r["bounces"]),
-            "spam_reports": _to_int(r["spam_reports"]),
-            "unsubscribes": _to_int(r["unsubscribes"]),
+            "requests": opt_int(r, "requests", default=0),
+            "delivered": opt_int(r, "delivered", default=0),
+            "opens": opt_int(r, "opens", default=0),
+            "unique_opens": opt_int(r, "unique_opens", default=0),
+            "clicks": opt_int(r, "clicks", default=0),
+            "unique_clicks": opt_int(r, "unique_clicks", default=0),
+            "bounces": opt_int(r, "bounces", default=0),
+            "spam_reports": opt_int(r, "spam_reports", default=0),
+            "unsubscribes": opt_int(r, "unsubscribes", default=0),
         })
     return out
 
@@ -316,3 +321,5 @@ def get_stats(start_date=None, end_date=None):
             }],
         })
     return out
+
+_store.eager_load()

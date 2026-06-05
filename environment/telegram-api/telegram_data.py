@@ -13,18 +13,20 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_int, opt_str, strict_bool, strict_int)
 
 _store = get_store("telegram-api")
+_API = "telegram-api"
 
 _store.register("users", primary_key="id",
-                initial_loader=lambda: _coerce_users(_load("users.csv")))
+                initial_loader=lambda: _coerce_users(_load("users.csv", "users")))
 _store.register("chats", primary_key="id",
-                initial_loader=lambda: _coerce_chats(_load("chats.csv")))
+                initial_loader=lambda: _coerce_chats(_load("chats.csv", "chats")))
 _store.register("messages", primary_key="message_id",
-                initial_loader=lambda: _coerce_messages(_load("messages.csv")))
+                initial_loader=lambda: _coerce_messages(_load("messages.csv", "messages")))
 _store.register("members", primary_key="chat_id",
-                initial_loader=lambda: _coerce_members(_load("chat_members.csv")))
+                initial_loader=lambda: _coerce_members(_load("chat_members.csv", "members")))
 _store.register_document("bot", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "bot.json", encoding="utf-8")))
 
 
@@ -49,9 +51,12 @@ def _bot_doc():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _to_bool(v):
@@ -66,12 +71,12 @@ def _coerce_users(rows):
     out = []
     for r in rows:
         out.append({
-            "id": int(r["id"]),
-            "is_bot": _to_bool(r["is_bot"]),
+            "id": strict_int(r, "id"),
+            "is_bot": strict_bool(r, "is_bot"),
             "first_name": r["first_name"],
-            "last_name": r["last_name"] or None,
-            "username": r["username"] or None,
-            "language_code": r["language_code"] or None,
+            "last_name": opt_str(r, "last_name", default="") or None,
+            "username": opt_str(r, "username", default="") or None,
+            "language_code": opt_str(r, "language_code", default="") or None,
         })
     return out
 
@@ -80,7 +85,7 @@ def _coerce_chats(rows):
     out = []
     for r in rows:
         chat = {
-            "id": int(r["id"]),
+            "id": strict_int(r, "id"),
             "type": r["type"],
         }
         if r["title"]:
@@ -93,7 +98,7 @@ def _coerce_chats(rows):
             chat["last_name"] = r["last_name"]
         if r["description"]:
             chat["description"] = r["description"]
-        chat["member_count"] = int(r["member_count"])
+        chat["member_count"] = strict_int(r, "member_count")
         out.append(chat)
     return out
 
@@ -102,12 +107,12 @@ def _coerce_messages(rows):
     out = []
     for r in rows:
         out.append({
-            "message_id": int(r["message_id"]),
-            "chat_id": int(r["chat_id"]),
-            "from_id": int(r["from_id"]),
+            "message_id": strict_int(r, "message_id"),
+            "chat_id": strict_int(r, "chat_id"),
+            "from_id": strict_int(r, "from_id"),
             "text": r["text"],
-            "date": int(r["date"]),
-            "reply_to_message_id": int(r["reply_to_message_id"]) if r["reply_to_message_id"] else None,
+            "date": strict_int(r, "date"),
+            "reply_to_message_id": opt_int(r, "reply_to_message_id", default=None),
         })
     return out
 
@@ -116,8 +121,8 @@ def _coerce_members(rows):
     out = []
     for r in rows:
         out.append({
-            "chat_id": int(r["chat_id"]),
-            "user_id": int(r["user_id"]),
+            "chat_id": strict_int(r, "chat_id"),
+            "user_id": strict_int(r, "user_id"),
             "status": r["status"],
         })
     return out
@@ -129,6 +134,7 @@ def _coerce_members(rows):
 
 
 # Monotonic message id counter for new messages.
+_store.eager_load()
 _next_message_id = max((m["message_id"] for m in _messages_rows()), default=0) + 1
 # Update offset counter for getUpdates.
 _next_update_id = 100001

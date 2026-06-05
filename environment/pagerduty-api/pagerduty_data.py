@@ -9,20 +9,22 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_str, strict_int)
 
 _store = get_store("pagerduty-api")
+_API = "pagerduty-api"
 
 _store.register("users", primary_key="user_id",
-                initial_loader=lambda: _coerce_users(_load("users.csv")))
+                initial_loader=lambda: _coerce_users(_load("users.csv", "users")))
 _store.register("services", primary_key="service_id",
-                initial_loader=lambda: _coerce_services(_load("services.csv")))
+                initial_loader=lambda: _coerce_services(_load("services.csv", "services")))
 _store.register("incidents", primary_key="incident_id",
-                initial_loader=lambda: _coerce_incidents(_load("incidents.csv")))
+                initial_loader=lambda: _coerce_incidents(_load("incidents.csv", "incidents")))
 _store.register("policies", primary_key="escalation_policy_id",
-                initial_loader=lambda: _coerce_policies(_load("escalation_policies.csv")))
+                initial_loader=lambda: _coerce_policies(_load("escalation_policies.csv", "policies")))
 _store.register("schedules", primary_key="schedule_id",
-                initial_loader=lambda: _coerce_schedules(_load("schedules.csv")))
+                initial_loader=lambda: _coerce_schedules(_load("schedules.csv", "schedules")))
 
 
 def _users_rows():
@@ -48,9 +50,12 @@ def _schedules_rows():
 VALID_STATUSES = {"triggered", "acknowledged", "resolved"}
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now_iso():
@@ -62,15 +67,15 @@ def _now_iso():
 # ---------------------------------------------------------------------------
 
 def _coerce_users(rows):
-    return [dict(r) for r in rows]
+    return [_strip_ctx(r) for r in rows]
 
 
 def _coerce_services(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "auto_resolve_timeout": int(r["auto_resolve_timeout"]),
+            **_strip_ctx(r),
+            "auto_resolve_timeout": strict_int(r, "auto_resolve_timeout"),
         })
     return out
 
@@ -79,10 +84,10 @@ def _coerce_incidents(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "incident_number": int(r["incident_number"]),
-            "assigned_to": r["assigned_to"] or None,
-            "resolved_at": r["resolved_at"] or None,
+            **_strip_ctx(r),
+            "incident_number": strict_int(r, "incident_number"),
+            "assigned_to": opt_str(r, "assigned_to", default="") or None,
+            "resolved_at": opt_str(r, "resolved_at", default="") or None,
         })
     return out
 
@@ -91,14 +96,14 @@ def _coerce_policies(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "num_loops": int(r["num_loops"]),
+            **_strip_ctx(r),
+            "num_loops": strict_int(r, "num_loops"),
         })
     return out
 
 
 def _coerce_schedules(rows):
-    return [dict(r) for r in rows]
+    return [_strip_ctx(r) for r in rows]
 
 
 
@@ -262,3 +267,5 @@ def list_schedules():
 
 def list_escalation_policies():
     return {"escalation_policies": deepcopy(_policies_rows())}
+
+_store.eager_load()

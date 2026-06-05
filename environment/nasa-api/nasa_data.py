@@ -11,20 +11,26 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store,
+    strict_int,
+    strict_float,
+    strict_bool,
+)
 
 _store = get_store("nasa-api")
+_API = "nasa-api"
 
 _store.register("apod", primary_key="date",
-                initial_loader=lambda: _coerce_apod(_load("apod.csv")))
+                initial_loader=lambda: _coerce_apod(_load("apod.csv", "apod")))
 _store.register("rover_photos", primary_key="id",
-                initial_loader=lambda: _coerce_rover_photos(_load("rover_photos.csv")))
+                initial_loader=lambda: _coerce_rover_photos(_load("rover_photos.csv", "rover_photos")))
 _store.register("rovers", primary_key="name",
-                initial_loader=lambda: _coerce_rovers(_load("rovers.csv")))
+                initial_loader=lambda: _coerce_rovers(_load("rovers.csv", "rovers")))
 _store.register("neos", primary_key="id",
-                initial_loader=lambda: _coerce_neos(_load("neos.csv")))
+                initial_loader=lambda: _coerce_neos(_load("neos.csv", "neos")))
 _store.register("epic", primary_key="identifier",
-                initial_loader=lambda: _coerce_epic(_load("epic.csv")))
+                initial_loader=lambda: _coerce_epic(_load("epic.csv", "epic")))
 
 
 def _apod_rows():
@@ -48,9 +54,12 @@ def _epic_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _to_bool(v):
@@ -84,9 +93,9 @@ def _coerce_rover_photos(rows):
     out = []
     for r in rows:
         out.append({
-            "id": int(r["id"]),
+            "id": strict_int(r, "id"),
             "rover": r["rover"],
-            "sol": int(r["sol"]),
+            "sol": strict_int(r, "sol"),
             "camera": r["camera"],
             "camera_full_name": r["camera_full_name"],
             "img_src": r["img_src"],
@@ -103,9 +112,9 @@ def _coerce_rovers(rows):
             "status": r["status"],
             "landing_date": r["landing_date"],
             "launch_date": r["launch_date"],
-            "max_sol": int(r["max_sol"]),
+            "max_sol": strict_int(r, "max_sol"),
             "max_date": r["max_date"],
-            "total_photos": int(r["total_photos"]),
+            "total_photos": strict_int(r, "total_photos"),
         })
     return out
 
@@ -117,12 +126,12 @@ def _coerce_neos(rows):
             "id": r["id"],
             "name": r["name"],
             "close_approach_date": r["close_approach_date"],
-            "absolute_magnitude_h": float(r["absolute_magnitude_h"]),
-            "est_diameter_min_km": float(r["est_diameter_min_km"]),
-            "est_diameter_max_km": float(r["est_diameter_max_km"]),
-            "is_potentially_hazardous": _to_bool(r["is_potentially_hazardous"]),
-            "miss_distance_km": float(r["miss_distance_km"]),
-            "relative_velocity_kph": float(r["relative_velocity_kph"]),
+            "absolute_magnitude_h": strict_float(r, "absolute_magnitude_h"),
+            "est_diameter_min_km": strict_float(r, "est_diameter_min_km"),
+            "est_diameter_max_km": strict_float(r, "est_diameter_max_km"),
+            "is_potentially_hazardous": strict_bool(r, "is_potentially_hazardous"),
+            "miss_distance_km": strict_float(r, "miss_distance_km"),
+            "relative_velocity_kph": strict_float(r, "relative_velocity_kph"),
             "orbiting_body": r["orbiting_body"],
         })
     return out
@@ -137,8 +146,8 @@ def _coerce_epic(rows):
             "caption": r["caption"],
             "date": r["date"],
             "centroid_coordinates": {
-                "lat": float(r["centroid_lat"]),
-                "lon": float(r["centroid_lon"]),
+                "lat": strict_float(r, "centroid_lat"),
+                "lon": strict_float(r, "centroid_lon"),
             },
         })
     return out
@@ -297,3 +306,5 @@ def get_neo(neo_id):
 
 def get_epic_natural():
     return list(_epic_rows())
+
+_store.eager_load()

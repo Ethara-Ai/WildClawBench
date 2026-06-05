@@ -10,13 +10,15 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_csv_list, strict_int)
 
 _store = get_store("obsidian-api")
+_API = "obsidian-api"
 
 _store.register("notes", primary_key="path",
-                initial_loader=lambda: _coerce_notes(_load("notes.csv")))
-_store.register_document("contents", initial_loader=lambda: _coerce_contents(_load("note_contents.csv")))
+                initial_loader=lambda: _coerce_notes(_load("notes.csv", "notes")))
+_store.register_document("contents", initial_loader=lambda: _coerce_contents(_load("note_contents.csv", "contents")))
 _store.register_document("vault", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "vault.json", encoding="utf-8")))
 
 
@@ -33,9 +35,12 @@ def _vault_doc():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -46,9 +51,9 @@ def _coerce_notes(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "size_bytes": int(r["size_bytes"]),
-            "tags": [t.strip() for t in r["tags"].split(";") if t.strip()],
+            **_strip_ctx(r),
+            "size_bytes": strict_int(r, "size_bytes"),
+            "tags": [t.strip() for t in opt_csv_list(r, "tags", sep=";") if t.strip()],
         })
     return out
 
@@ -199,3 +204,5 @@ def list_backlinks(path):
 def get_daily(date_str):
     path = f"Daily/{date_str}.md"
     return get_note(path)
+
+_store.eager_load()

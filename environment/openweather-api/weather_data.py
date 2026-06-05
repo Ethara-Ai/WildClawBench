@@ -10,16 +10,18 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_str, strict_float, strict_int)
 
 _store = get_store("openweather-api")
+_API = "openweather-api"
 
 _store.register("cities", primary_key="id",
-                initial_loader=lambda: _coerce_cities(_load("cities.csv")))
+                initial_loader=lambda: _coerce_cities(_load("cities.csv", "cities")))
 _store.register("current", primary_key="city_id",
-                initial_loader=lambda: _coerce_current(_load("current_weather.csv")))
+                initial_loader=lambda: _coerce_current(_load("current_weather.csv", "current")))
 _store.register("forecast", primary_key="city_id",
-                initial_loader=lambda: _coerce_forecast(_load("forecast.csv")))
+                initial_loader=lambda: _coerce_forecast(_load("forecast.csv", "forecast")))
 
 
 def _cities_rows():
@@ -35,9 +37,12 @@ def _forecast_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 # ---------------------------------------------------------------------------
@@ -48,13 +53,13 @@ def _coerce_cities(rows):
     out = []
     for r in rows:
         out.append({
-            "id": int(r["id"]),
+            "id": strict_int(r, "id"),
             "name": r["name"],
             "country": r["country"],
-            "state": r["state"] or None,
-            "lat": float(r["lat"]),
-            "lon": float(r["lon"]),
-            "timezone": int(r["timezone"]),
+            "state": opt_str(r, "state", default="") or None,
+            "lat": strict_float(r, "lat"),
+            "lon": strict_float(r, "lon"),
+            "timezone": strict_int(r, "timezone"),
         })
     return out
 
@@ -63,22 +68,22 @@ def _coerce_current(rows):
     out = []
     for r in rows:
         out.append({
-            "city_id": int(r["city_id"]),
-            "weather_id": int(r["weather_id"]),
+            "city_id": strict_int(r, "city_id"),
+            "weather_id": strict_int(r, "weather_id"),
             "weather_main": r["weather_main"],
             "weather_description": r["weather_description"],
             "weather_icon": r["weather_icon"],
-            "temp": float(r["temp"]),
-            "feels_like": float(r["feels_like"]),
-            "temp_min": float(r["temp_min"]),
-            "temp_max": float(r["temp_max"]),
-            "pressure": int(r["pressure"]),
-            "humidity": int(r["humidity"]),
-            "wind_speed": float(r["wind_speed"]),
-            "wind_deg": int(r["wind_deg"]),
-            "clouds": int(r["clouds"]),
-            "visibility": int(r["visibility"]),
-            "dt": int(r["dt"]),
+            "temp": strict_float(r, "temp"),
+            "feels_like": strict_float(r, "feels_like"),
+            "temp_min": strict_float(r, "temp_min"),
+            "temp_max": strict_float(r, "temp_max"),
+            "pressure": strict_int(r, "pressure"),
+            "humidity": strict_int(r, "humidity"),
+            "wind_speed": strict_float(r, "wind_speed"),
+            "wind_deg": strict_int(r, "wind_deg"),
+            "clouds": strict_int(r, "clouds"),
+            "visibility": strict_int(r, "visibility"),
+            "dt": strict_int(r, "dt"),
         })
     return out
 
@@ -87,23 +92,23 @@ def _coerce_forecast(rows):
     out = []
     for r in rows:
         out.append({
-            "city_id": int(r["city_id"]),
-            "dt": int(r["dt"]),
+            "city_id": strict_int(r, "city_id"),
+            "dt": strict_int(r, "dt"),
             "dt_txt": r["dt_txt"],
-            "temp": float(r["temp"]),
-            "feels_like": float(r["feels_like"]),
-            "temp_min": float(r["temp_min"]),
-            "temp_max": float(r["temp_max"]),
-            "pressure": int(r["pressure"]),
-            "humidity": int(r["humidity"]),
-            "weather_id": int(r["weather_id"]),
+            "temp": strict_float(r, "temp"),
+            "feels_like": strict_float(r, "feels_like"),
+            "temp_min": strict_float(r, "temp_min"),
+            "temp_max": strict_float(r, "temp_max"),
+            "pressure": strict_int(r, "pressure"),
+            "humidity": strict_int(r, "humidity"),
+            "weather_id": strict_int(r, "weather_id"),
             "weather_main": r["weather_main"],
             "weather_description": r["weather_description"],
             "weather_icon": r["weather_icon"],
-            "wind_speed": float(r["wind_speed"]),
-            "wind_deg": int(r["wind_deg"]),
-            "clouds": int(r["clouds"]),
-            "pop": float(r["pop"]),
+            "wind_speed": strict_float(r, "wind_speed"),
+            "wind_deg": strict_int(r, "wind_deg"),
+            "clouds": strict_int(r, "clouds"),
+            "pop": strict_float(r, "pop"),
         })
     return out
 
@@ -270,3 +275,5 @@ def geocode_direct(q, limit=5):
             "state": c["state"],
         })
     return out
+
+_store.eager_load()

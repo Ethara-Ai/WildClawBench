@@ -7,16 +7,22 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store,
+    strict_int,
+    strict_float,
+    strict_bool,
+)
 
 _store = get_store("yelp-api")
+_API = "yelp-api"
 
 _store.register("businesses", primary_key="id",
-                initial_loader=lambda: _coerce_businesses(_load("businesses.csv")))
+                initial_loader=lambda: _coerce_businesses(_load("businesses.csv", "businesses")))
 _store.register("reviews", primary_key="id",
-                initial_loader=lambda: _coerce_reviews(_load("reviews.csv")))
+                initial_loader=lambda: _coerce_reviews(_load("reviews.csv", "reviews")))
 _store.register("categories", primary_key="alias",
-                initial_loader=lambda: _coerce_categories(_load("categories.csv")))
+                initial_loader=lambda: _coerce_categories(_load("categories.csv", "categories")))
 
 
 def _businesses_rows():
@@ -35,9 +41,12 @@ def _categories_rows():
 _PRICE_LEVEL = {"$": 1, "$$": 2, "$$$": 3, "$$$$": 4}
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _to_bool(v):
@@ -55,14 +64,14 @@ def _coerce_businesses(rows):
             "id": r["id"],
             "alias": r["id"],
             "name": r["name"],
-            "rating": float(r["rating"]),
+            "rating": strict_float(r, "rating"),
             "price": r["price"],
-            "review_count": int(r["review_count"]),
-            "is_closed": _to_bool(r["is_closed"]),
+            "review_count": strict_int(r, "review_count"),
+            "is_closed": strict_bool(r, "is_closed"),
             "phone": r["phone"],
             "image_url": r["image_url"],
             "categories": [{"alias": r["category"], "title": r["category_title"]}],
-            "coordinates": {"latitude": float(r["latitude"]), "longitude": float(r["longitude"])},
+            "coordinates": {"latitude": strict_float(r, "latitude"), "longitude": strict_float(r, "longitude")},
             "location": {
                 "address1": r["address"],
                 "city": r["city"],
@@ -79,7 +88,7 @@ def _coerce_reviews(rows):
         out.append({
             "id": r["id"],
             "business_id": r["business_id"],
-            "rating": int(r["rating"]),
+            "rating": strict_int(r, "rating"),
             "text": r["text"],
             "time_created": r["time_created"],
             "user": {"name": r["user_name"]},
@@ -161,3 +170,5 @@ def get_business_reviews(business_id):
 
 def list_categories():
     return {"categories": _categories_rows()}
+
+_store.eager_load()

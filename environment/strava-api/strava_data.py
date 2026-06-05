@@ -13,16 +13,18 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_int, strict_float, strict_int)
 
 _store = get_store("strava-api")
+_API = "strava-api"
 
 _store.register("activities", primary_key="id",
-                initial_loader=lambda: _coerce_activities(_load("activities.csv")))
+                initial_loader=lambda: _coerce_activities(_load("activities.csv", "activities")))
 _store.register("segments", primary_key="id",
-                initial_loader=lambda: _coerce_segments(_load("segments.csv")))
+                initial_loader=lambda: _coerce_segments(_load("segments.csv", "segments")))
 _store.register("kudoers", primary_key="activity_id",
-                initial_loader=lambda: _coerce_kudoers(_load("kudoers.csv")))
+                initial_loader=lambda: _coerce_kudoers(_load("kudoers.csv", "kudoers")))
 _store.register_document("athlete", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "athlete.json", encoding="utf-8")))
 
 
@@ -43,9 +45,12 @@ def _athlete_doc():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _epoch(iso):
@@ -64,18 +69,18 @@ def _coerce_activities(rows):
     out = []
     for r in rows:
         out.append({
-            "id": int(r["id"]),
+            "id": strict_int(r, "id"),
             "name": r["name"],
             "type": r["type"],
             "sport_type": r["type"],
-            "distance": float(r["distance"]),
-            "moving_time": int(r["moving_time"]),
-            "elapsed_time": int(r["elapsed_time"]),
-            "total_elevation_gain": float(r["total_elevation_gain"]),
-            "average_speed": float(r["average_speed"]),
+            "distance": strict_float(r, "distance"),
+            "moving_time": strict_int(r, "moving_time"),
+            "elapsed_time": strict_int(r, "elapsed_time"),
+            "total_elevation_gain": strict_float(r, "total_elevation_gain"),
+            "average_speed": strict_float(r, "average_speed"),
             "start_date": r["start_date"],
-            "kudos_count": int(r["kudos_count"]),
-            "segment_id": int(r["segment_id"]) if r["segment_id"] else None,
+            "kudos_count": strict_int(r, "kudos_count"),
+            "segment_id": opt_int(r, "segment_id", default=None),
         })
     return out
 
@@ -84,15 +89,15 @@ def _coerce_segments(rows):
     out = []
     for r in rows:
         out.append({
-            "id": int(r["id"]),
+            "id": strict_int(r, "id"),
             "name": r["name"],
             "activity_type": r["activity_type"],
-            "distance": float(r["distance"]),
-            "average_grade": float(r["average_grade"]),
-            "maximum_grade": float(r["maximum_grade"]),
-            "elevation_high": float(r["elevation_high"]),
-            "elevation_low": float(r["elevation_low"]),
-            "climb_category": int(r["climb_category"]),
+            "distance": strict_float(r, "distance"),
+            "average_grade": strict_float(r, "average_grade"),
+            "maximum_grade": strict_float(r, "maximum_grade"),
+            "elevation_high": strict_float(r, "elevation_high"),
+            "elevation_low": strict_float(r, "elevation_low"),
+            "climb_category": strict_int(r, "climb_category"),
             "city": r["city"],
             "state": r["state"],
         })
@@ -103,8 +108,8 @@ def _coerce_kudoers(rows):
     out = []
     for r in rows:
         out.append({
-            "activity_id": int(r["activity_id"]),
-            "athlete_id": int(r["athlete_id"]),
+            "activity_id": strict_int(r, "activity_id"),
+            "athlete_id": strict_int(r, "athlete_id"),
             "firstname": r["firstname"],
             "lastname": r["lastname"],
         })
@@ -203,3 +208,5 @@ def athlete_stats(athlete_id):
         "all_ride_totals": _totals("Ride"),
         "all_swim_totals": _totals("Swim"),
     }
+
+_store.eager_load()
