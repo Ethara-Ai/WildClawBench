@@ -986,7 +986,91 @@ def run_single_task(
     gateway_proc = None
     agent_proc = None
     elapsed_time = float(timeout_seconds)
-    drift_director = _start_drift_director(task, drift_info, output_dir) if drift_info else None
+    # Two mutually-exclusive injection models share the admin-plane substrate:
+    #  * stages.yaml -> ClawMark-style: invoke the agent across turns, injecting
+    #    SILENTLY between turns while the agent is idle (no race, no notification).
+    #  * drift.yaml  -> racing: a background DriftDirector mutates state DURING a
+    #    single continuous run. Staged mode wins when both are present.
+    drift_director = None
+    stage_applier = None
+    inject_applier = None
+    stage_turns: tuple[str, ...] | None = None
+    stage_before_turn = None
+    # Loud guard: a task shipping an injection config but no live admin plane
+    # (per-task mock stack failed to come up) would silently degrade to a single
+    # no-injection turn. Make that unmistakable rather than reporting a clean run.
+    _wants_injection = task.get("inject_path") or task.get("stages_path") or task.get("drift_script_path")
+    if _wants_injection and not drift_info:
+        logger.error(
+            "[%s] INJECTION DISABLED: task ships an injection config (%s) but the per-task "
+            "mock admin plane is not available; running a single NON-INJECTED turn. The score "
+            "is NOT a valid measurement of the injection scenario.",
+            task_id,
+            "inject" if task.get("inject_path") else
+            ("stages.yaml" if task.get("stages_path") else "drift.yaml"),
+        )
+    if drift_info and task.get("inject_path"):
+        # Talos inject-format: a fixed multi-turn wake-up script (prompts.txt)
+        # with silent mutations applied at specific turn boundaries via the
+        # admin plane. The mock_data overlays already hold the canonical
+        # pre-T0 baseline, so the stage0 `loud` seed is NOT replayed; only the
+        # `silent` mutations fire (kept out of the agent-visible audit feed).
+        try:
+            from src.utils.inject_director import InjectScript, InjectApplier
+            _is = InjectScript.load(task["inject_path"])
+            inject_applier = InjectApplier(
+                host_api_to_url=drift_info.get("host_api_to_url") or {},
+                admin_token=drift_info.get("admin_token"),
+                timeline_path=output_dir / "inject_timeline.jsonl",
+                inject_root=Path(task["inject_path"]),
+                copy_into_workspace=None,  # filesystem drops overlap data/+persona/; logged-skipped
+            )
+            inject_applier.seed(_is)
+            raw_turns = list(task.get("turn_messages") or [])
+            # `prompt` already carries the system-prompt prefix + workspace hint
+            # for turn 0; later turns are fed verbatim from prompts.txt.
+            stage_turns = tuple([prompt] + raw_turns[1:]) if raw_turns else (prompt,)
+
+            def _inject_before_turn(turn_index: int, _is=_is, _ap=inject_applier):
+                # Agent is idle here; apply the stage whose boundary ends at this turn.
+                st = _is.stage_for_boundary(turn_index)
+                if st is not None:
+                    _ap.apply_stage(st, turn_index)
+
+            stage_before_turn = _inject_before_turn
+            logger.info("[%s] inject-format injection enabled: %d turns, %d stage(s)",
+                        task_id, len(stage_turns), len(_is.stages))
+        except Exception as exc:
+            logger.error("[%s] inject/ setup failed (continuing single-turn): %s",
+                         task_id, exc)
+            stage_turns = None
+            stage_before_turn = None
+    elif drift_info and task.get("stages_path"):
+        try:
+            from src.utils.stage_director import StageScript, StageApplier
+            _ss = StageScript.load(task["stages_path"])
+            stage_applier = StageApplier(
+                host_api_to_url=drift_info.get("host_api_to_url") or {},
+                admin_token=drift_info.get("admin_token"),
+                timeline_path=output_dir / "stage_timeline.jsonl",
+            )
+            stage_turns = _ss.turn_messages(prompt)
+
+            def _before_turn(turn_index: int, _ss=_ss, _ap=stage_applier):
+                # Agent is idle here; apply the matching stage's silent injection.
+                _ap.record_turn(turn_index, "start")
+                _ap.apply(_ss.stages[turn_index - 1], turn_index)
+
+            stage_before_turn = _before_turn
+            logger.info("[%s] staged injection enabled: %d turns, %d silent stage(s)",
+                        task_id, len(stage_turns), len(_ss.stages))
+        except Exception as exc:
+            logger.error("[%s] stages.yaml setup failed (continuing single-turn): %s",
+                         task_id, exc)
+            stage_turns = None
+            stage_before_turn = None
+    elif drift_info:
+        drift_director = _start_drift_director(task, drift_info, output_dir)
     mock_health_logger = _start_mock_health_logger(task, task_id, output_dir)
 
     try:
@@ -1002,6 +1086,8 @@ def run_single_task(
                 thinking=thinking,
                 models_config=models_config,
                 lobster=lobster,
+                turns=stage_turns,
+                before_turn=stage_before_turn,
             )
         )
         gateway_proc = execution.gateway_proc
@@ -1147,6 +1233,18 @@ def run_single_task(
                 logger.info("[%s] Drift director stopped", task_id)
             except Exception as exc:
                 logger.warning("[%s] Drift director shutdown failed: %s", task_id, exc)
+
+        if stage_applier is not None:
+            try:
+                stage_applier.close()
+            except Exception as exc:
+                logger.warning("[%s] Stage applier shutdown failed: %s", task_id, exc)
+
+        if inject_applier is not None:
+            try:
+                inject_applier.close()
+            except Exception as exc:
+                logger.warning("[%s] Inject applier shutdown failed: %s", task_id, exc)
 
         if mock_health_logger is not None:
             try:
@@ -1311,10 +1409,10 @@ def _start_task_mock_stack(task: dict, network: str, environment_dir) -> tuple[d
     """
     overlays = task.get("mock_overlays") or {}
     if not overlays or not network or not environment_dir:
-        if task.get("drift_script_path"):
+        if task.get("drift_script_path") or task.get("stages_path") or task.get("inject_path"):
             logger.error(
-                "[%s] drift.yaml requires per-task mock stack but task ships no overlays / "
-                "mock-stack disabled; refusing to start director",
+                "[%s] drift.yaml/stages.yaml/inject requires per-task mock stack but task ships "
+                "no overlays / mock-stack disabled; refusing to enable admin plane",
                 task.get("task_id"),
             )
         return {}, None, {}
@@ -1341,18 +1439,31 @@ def _start_task_mock_stack(task: dict, network: str, environment_dir) -> tuple[d
         for s in services if s.get("port") and s.get("name")
     }
 
-    # Configure admin plane + port-publishing only when the task ships a drift
-    # script. Quiescent runs keep the existing zero-port-exposure surface.
+    # Configure admin plane + port-publishing when the task ships a drift script
+    # OR a stages script — both mutate mock state via the admin plane and need
+    # host-reachable ports. Quiescent runs keep the existing zero-port-exposure
+    # surface.
     drift_path = task.get("drift_script_path")
+    stages_path = task.get("stages_path")
+    inject_path = task.get("inject_path")
+    needs_admin = bool(drift_path or stages_path or inject_path)
     admin_env: dict[str, str] | None = None
     publish_ports: list[int] | None = None
     admin_token: str | None = None
-    if drift_path:
+    if needs_admin:
         gateway = get_network_gateway(network) or "127.0.0.1"
+        # The host-side applier reaches the admin plane through published ports
+        # on 127.0.0.1; docker-proxy SNATs those to the DEFAULT-BRIDGE gateway
+        # (the per-task container is dual-homed onto the bridge so its ports are
+        # host-reachable). The admin plane's IP allowlist therefore sees the
+        # bridge gateway, not the task-network gateway. Allowlist BOTH so the
+        # applier's requests are accepted regardless of ingress path.
+        bridge_gateway = get_network_gateway("bridge")
+        allow = ",".join(dict.fromkeys(g for g in (gateway, bridge_gateway) if g))
         admin_token = uuid.uuid4().hex
         admin_env = {
             "MOCK_ADMIN_ENABLED": "1",
-            "MOCK_ADMIN_ALLOWLIST": gateway,
+            "MOCK_ADMIN_ALLOWLIST": allow,
             "MOCK_ADMIN_TOKEN": admin_token,
         }
         publish_ports = list(overlaid_ports)
@@ -1371,9 +1482,30 @@ def _start_task_mock_stack(task: dict, network: str, environment_dir) -> tuple[d
         return {}, None, {}
 
     # Wait only for the overlaid API(s) to answer /health inside the container.
-    if not wait_for_ports_healthy(container, overlaid_ports, timeout=180.0):
-        logger.error("[%s] per-task mock stack %s: overlaid ports %s not healthy; tearing down",
-                     task.get("task_id"), container, overlaid_ports)
+    # A per-task container cold-starts one uvicorn process per overlaid API, so
+    # the budget must scale with the API count (a 15-overlay task booting amd64
+    # services under emulation routinely needs >180s on the first cold start).
+    # Floor 180s, ~20s/API, override via KENSEI_TASK_MOCK_HEALTH_TIMEOUT.
+    try:
+        health_timeout = float(os.environ.get("KENSEI_TASK_MOCK_HEALTH_TIMEOUT", "0")) or \
+            max(180.0, 20.0 * len(overlaid_ports))
+    except ValueError:
+        health_timeout = max(180.0, 20.0 * len(overlaid_ports))
+    if not wait_for_ports_healthy(container, overlaid_ports, timeout=health_timeout):
+        logger.error("[%s] per-task mock stack %s: overlaid ports %s not healthy within %.0fs; "
+                     "tearing down (set KENSEI_TASK_MOCK_HEALTH_TIMEOUT to raise the budget)",
+                     task.get("task_id"), container, overlaid_ports, health_timeout)
+        # Capture the container's own logs before teardown so a crashing overlaid
+        # service (vs merely slow boot) is diagnosable from the run log.
+        try:
+            _dl = subprocess.run(["docker", "logs", "--tail", "60", container],
+                                 capture_output=True, text=True, timeout=15)
+            _tail = ((_dl.stdout or "") + (_dl.stderr or "")).strip()[-2000:]
+            if _tail:
+                logger.error("[%s] per-task mock stack logs (tail):\n%s",
+                             task.get("task_id"), _tail)
+        except Exception:
+            pass
         stop_mock_stack(container)
         return {}, None, {}
 
@@ -1382,7 +1514,7 @@ def _start_task_mock_stack(task: dict, network: str, environment_dir) -> tuple[d
                 task.get("task_id"), container, len(overlays), overlaid_ports, len(env_dict))
 
     drift_info: dict = {}
-    if drift_path:
+    if needs_admin:
         host_ports = get_published_ports(container, overlaid_ports)
         host_api_to_url: dict[str, str] = {}
         for internal_port, host_port in host_ports.items():
@@ -1390,15 +1522,18 @@ def _start_task_mock_stack(task: dict, network: str, environment_dir) -> tuple[d
             if api_name:
                 host_api_to_url[api_name] = f"http://127.0.0.1:{host_port}"
         if host_api_to_url:
+            # script_path is None for a stages-only task; _start_drift_director
+            # returns None in that case, so no DriftDirector is started. The
+            # StageApplier consumes host_api_to_url + admin_token directly.
             drift_info = {
                 "script_path": drift_path,
                 "host_api_to_url": host_api_to_url,
                 "admin_token": admin_token,
             }
-            logger.info("[%s] drift director will target %d APIs via 127.0.0.1",
+            logger.info("[%s] admin plane will target %d APIs via 127.0.0.1",
                         task.get("task_id"), len(host_api_to_url))
         else:
-            logger.error("[%s] drift requested but no host ports resolved; director disabled",
+            logger.error("[%s] injection requested but no host ports resolved; admin plane disabled",
                          task.get("task_id"))
 
     return env_dict, container, drift_info

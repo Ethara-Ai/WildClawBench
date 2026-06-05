@@ -107,7 +107,9 @@ def load_task(path: str | Path) -> dict:
             f = p / candidate
             if f.is_file():
                 return _attach_drift_script(load_task(f), p)
-        if (p / "prompt.txt").is_file() and (p / "rubric.json").is_file():
+        # Native layout accepts either prompt.txt (single prompt) or prompts.txt
+        # (Talos inject-format per-turn wake-up script; see inject_director.py).
+        if ((p / "prompt.txt").is_file() or (p / "prompts.txt").is_file()) and (p / "rubric.json").is_file():
             return _attach_drift_script(_load_native_task(p), p)
         raise FileNotFoundError(f"No task file found in {p}")
     suffix = p.suffix.lower()
@@ -184,12 +186,30 @@ def _attach_drift_script(task: dict, task_dir: Path) -> dict:
     # Surface drift.yaml / drift.yml on the task dict so run_batch can start
     # a DriftDirector. Sets to None (not absent) when no script is present so
     # downstream code can use a single key check.
+    task["drift_script_path"] = None
     for candidate in ("drift.yaml", "drift.yml"):
         f = task_dir / candidate
         if f.is_file():
             task["drift_script_path"] = str(f.resolve())
-            return task
-    task["drift_script_path"] = None
+            break
+    # stages.yaml drives the ClawMark-style multi-turn, inject-while-idle model
+    # (silent injection between agent turns). Like drift it needs the admin
+    # plane on the per-task mock stack, so run_batch keys admin-plane setup on
+    # either key being present.
+    task["stages_path"] = None
+    for candidate in ("stages.yaml", "stages.yml"):
+        f = task_dir / candidate
+        if f.is_file():
+            task["stages_path"] = str(f.resolve())
+            break
+    # inject/ dir drives the Talos-style staged injection (per-turn wake-up
+    # script in prompts.txt + inject/stageN/mutations.json applied at turn
+    # boundaries). Like drift/stages it needs the admin plane on the per-task
+    # mock stack. See src/utils/inject_director.py.
+    task["inject_path"] = None
+    inject_dir = task_dir / "inject"
+    if inject_dir.is_dir():
+        task["inject_path"] = str(inject_dir.resolve())
     return task
 
 
@@ -295,7 +315,18 @@ def _load_native_task(task_dir: Path) -> dict:
     # kensei-native task dir: prompt.txt + rubric.json + persona/ + data/ + mock_data/ + gt/.
     # workspace_path is left empty here; run_batch stages a workspace from
     # `attachments` so task solutions/tests under data/ are never exposed.
-    prompt = (task_dir / "prompt.txt").read_text(encoding="utf-8").strip()
+    turn_messages: list[str] = []
+    if (task_dir / "prompt.txt").is_file():
+        prompt = (task_dir / "prompt.txt").read_text(encoding="utf-8").strip()
+    elif (task_dir / "prompts.txt").is_file():
+        # Talos inject-format task: prompts.txt holds the per-turn wake-up script.
+        # Turn 0 is the initial prompt; later turns drive the multi-turn silent-
+        # injection loop applied at stage boundaries (see inject_director.py).
+        from src.utils.inject_director import parse_prompts_file
+        turn_messages = parse_prompts_file(task_dir / "prompts.txt")
+        prompt = (turn_messages[0] if turn_messages else "").strip()
+    else:
+        prompt = ""
     try:
         rubrics = json.loads((task_dir / "rubric.json").read_text(encoding="utf-8")) or []
         if isinstance(rubrics, dict):
@@ -359,6 +390,9 @@ def _load_native_task(task_dir: Path) -> dict:
         "warmup": "",
         "env": "",
         "format": "native",
+        # Full per-turn wake-up script for Talos inject-format tasks (empty for
+        # single-prompt tasks). run_batch feeds these to the multi-turn runner.
+        "turn_messages": turn_messages,
     }
 
 

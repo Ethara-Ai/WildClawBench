@@ -210,32 +210,54 @@ class OpenClawAgent(BaseAgent):
             logger.info("[%s] Waiting for gateway (2s)...", spec.task_id)
             time.sleep(2)
 
-            safe_prompt = spec.prompt.replace("'", "'\\''")
+            # Multi-turn / staged injection: invoke the agent once per turn on
+            # the SAME session ("chat") so context carries across turns. Turn 0
+            # is the task prompt; each later turn is a follow-up message, and
+            # before each later turn the agent is idle while before_turn(i)
+            # applies that stage's silent mock-data injection. Single-turn runs
+            # (spec.turns is None) execute exactly one iteration with spec.prompt,
+            # behaviour-identical to the prior single-shot path.
+            turn_messages: tuple[str, ...] = spec.turns or (spec.prompt,)
             start_time = time.perf_counter()
             wall_start = time.time()
-            agent_proc = run_background(
-                spec.task_id,
-                bash_cmd=(
-                    f"openclaw agent --session-id chat "
-                    f"--timeout {spec.timeout_seconds} "
-                    f"--message '{safe_prompt}'"
-                ),
-                log_path=spec.output_dir / "agent.log",
-            )
-
-            logger.info("[%s] Waiting for agent to finish...", spec.task_id)
-            try:
-                agent_proc.wait(timeout=spec.timeout_seconds)
-                elapsed_time = time.perf_counter() - start_time
-                logger.info("[%s] Agent finished (%.2fs)", spec.task_id, elapsed_time)
-            except subprocess.TimeoutExpired:
-                logger.warning("[%s] Agent timed out", spec.task_id)
-                elapsed_time = float(spec.timeout_seconds)
-                agent_proc.kill()
-                agent_proc.wait()
+            agent_proc = None
+            for turn_index, message in enumerate(turn_messages):
+                if turn_index > 0 and spec.before_turn is not None:
+                    # Agent is idle here -> apply this stage's injection.
+                    try:
+                        spec.before_turn(turn_index)
+                    except Exception as exc:
+                        logger.error("[%s] before_turn(%d) hook failed: %s",
+                                     spec.task_id, turn_index, exc)
+                safe_msg = message.replace("'", "'\\''")
+                if len(turn_messages) > 1:
+                    logger.info("[%s] Agent turn %d/%d starting",
+                                spec.task_id, turn_index + 1, len(turn_messages))
+                agent_proc = run_background(
+                    spec.task_id,
+                    bash_cmd=(
+                        f"openclaw agent --session-id chat "
+                        f"--timeout {spec.timeout_seconds} "
+                        f"--message '{safe_msg}'"
+                    ),
+                    log_path=spec.output_dir / "agent.log",
+                )
+                logger.info("[%s] Waiting for agent to finish...", spec.task_id)
+                try:
+                    agent_proc.wait(timeout=spec.timeout_seconds)
+                    logger.info("[%s] Agent turn %d finished", spec.task_id, turn_index + 1)
+                except subprocess.TimeoutExpired:
+                    logger.warning("[%s] Agent turn %d timed out", spec.task_id, turn_index + 1)
+                    agent_proc.kill()
+                    agent_proc.wait()
+                    break
+            elapsed_time = time.perf_counter() - start_time
             self._task_windows[spec.task_id] = (wall_start, time.time())
+            logger.info("[%s] Agent finished (%.2fs, %d turn(s))",
+                        spec.task_id, elapsed_time, len(turn_messages))
 
-            logger.info("[%s] Agent exit code: %s", spec.task_id, agent_proc.returncode)
+            logger.info("[%s] Agent exit code: %s", spec.task_id,
+                        agent_proc.returncode if agent_proc else "n/a")
             return AgentExecution(
                 elapsed_time=elapsed_time,
                 error=None,

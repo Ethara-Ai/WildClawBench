@@ -254,6 +254,25 @@ def start_mock_stack(container_name: str, network: str,
     if r.returncode != 0:
         raise RuntimeError(f"mock-stack start failed:\n{r.stderr}")
     logger.info("[%s] mock-stack container started", container_name)
+    if publish_ports:
+        # Published ports (-p) only route from the host when the container is
+        # reachable on a host-connected network. The task network is created
+        # with --internal, so an internal-only container is isolated and
+        # `docker port` reports nothing -- the host-side admin plane then has
+        # no URL and injection is disabled ("no host ports resolved").
+        # Dual-home onto the default bridge (mirrors the LiteLLM sidecar) so the
+        # published admin ports become reachable on 127.0.0.1.
+        rb = subprocess.run(
+            ["docker", "network", "connect", "bridge", container_name],
+            capture_output=True, text=True,
+        )
+        if rb.returncode != 0:
+            logger.warning("[%s] could not dual-home to default bridge "
+                           "(published admin ports may be unreachable): %s",
+                           container_name, (rb.stderr or "").strip())
+        else:
+            logger.info("[%s] dual-homed to default bridge for published admin ports",
+                        container_name)
 
 
 def get_published_ports(container_name: str, internal_ports: list[int]) -> dict[int, int]:
