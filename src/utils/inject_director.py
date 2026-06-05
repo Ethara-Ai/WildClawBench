@@ -421,30 +421,44 @@ class InjectApplier:
         candidate store tables for the matching row and map field casing to the
         row's real column names.
         """
-        fields = self._extract_fields(op)
-        if not fields:
+        new_fields = self._extract_fields(op)
+        if not new_fields:
             return None
         key = self._extract_key_from_path(op.get("path", ""))
         prefixes, key_cols = _SERVICE_RESOLUTION.get(api, ((), ("id",)))
-        tables = self._admin_get(api, "/admin/tables") or []
-        table_names = [t.get("name") if isinstance(t, dict) else t for t in tables]
+        # /admin/tables returns {"tables":[{name,...}], "documents":[...]}.
+        tbl_resp = self._admin_get(api, "/admin/tables")
+        tlist = tbl_resp.get("tables", []) if isinstance(tbl_resp, dict) else (tbl_resp or [])
+        table_names = [t.get("name") if isinstance(t, dict) else t for t in tlist]
         candidates = [t for t in table_names
-                      if any(t.startswith(p) for p in prefixes)] or table_names
+                      if any(str(t).startswith(p) for p in prefixes)] or table_names
         for table in candidates:
-            rows = self._admin_get(api, f"/admin/data/{table}") or []
-            if isinstance(rows, dict):
-                rows = rows.get("rows") or rows.get("data") or []
+            # /admin/data/{table} returns {"rows":[{id, ..., fields:{...}}]}.
+            data = self._admin_get(api, f"/admin/data/{table}")
+            rows = data.get("rows", data.get("data", [])) if isinstance(data, dict) else (data or [])
             for row in rows:
                 if not isinstance(row, dict):
                     continue
-                if key is not None and not self._row_matches_key(row, key, key_cols):
+                # airtable-style rows nest the business columns under "fields";
+                # other services keep them top-level. Match + patch the bag that
+                # actually holds the columns.
+                nested = isinstance(row.get("fields"), dict)
+                bag = row["fields"] if nested else row
+                if key is not None and not self._bag_matches_key(bag, key, key_cols):
                     continue
                 pk = row.get("id") or row.get("pk")
                 if pk is None:
                     continue
-                mapped = self._map_fields_to_row(fields, row)
-                if mapped:
-                    return table, str(pk), mapped
+                mapped = self._map_fields_to_row(new_fields, bag)
+                if not mapped:
+                    continue
+                if nested:
+                    # Table.patch shallow-replaces top-level keys, so the nested
+                    # "fields" sub-object must be resent whole (merged).
+                    patch_fields = {"fields": {**row["fields"], **mapped}}
+                else:
+                    patch_fields = mapped
+                return table, str(pk), patch_fields
         return None
 
     @staticmethod
@@ -481,10 +495,11 @@ class InjectApplier:
         return token.strip() or None
 
     @staticmethod
-    def _row_matches_key(row: Dict[str, Any], key: str, key_cols: Tuple[str, ...]) -> bool:
+    def _bag_matches_key(bag: Dict[str, Any], key: str, key_cols: Tuple[str, ...]) -> bool:
+        """True if the column bag identifies the target row by its business key."""
         norm = key.replace("_", " ").replace("-", " ").lower().strip()
         for col in key_cols:
-            for rk, rv in row.items():
+            for rk, rv in bag.items():
                 if rk.lower() != col.lower():
                     continue
                 if rv is None:
@@ -493,7 +508,7 @@ class InjectApplier:
                 if rvn == norm or norm in rvn or rvn in norm:
                     return True
         # also try any column equalling the raw key
-        for rv in row.values():
+        for rv in bag.values():
             if rv is not None and str(rv).strip().lower() == key.strip().lower():
                 return True
         return False
