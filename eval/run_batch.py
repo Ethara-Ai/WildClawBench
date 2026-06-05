@@ -1097,6 +1097,8 @@ def run_single_task(
                 lobster=lobster,
                 turns=stage_turns,
                 before_turn=stage_before_turn,
+                multi_agent_enabled=bool(task.get("multi_agent_enabled")),
+                multi_agent_config=task.get("multi_agent_config"),
             )
         )
         gateway_proc = execution.gateway_proc
@@ -1163,6 +1165,13 @@ def run_single_task(
                 ws = output_dir / "task_output" / "workspace_full"
                 testexec_env = dict(mock_env_dict or {})
                 testexec_env.update(task.get("env_dict") or {})
+                state = None
+                if task.get("multi_agent_enabled"):
+                    from src.utils.spawn_tree_checks import build_checker_state
+                    state = build_checker_state(
+                        ws / "spawn_tree.jsonl",
+                        task.get("multi_agent_config"),
+                    )
                 te = _exec_tests(
                     test_code=task["test_code"],
                     test_weights_json=task.get("test_weights") or "{}",
@@ -1171,6 +1180,7 @@ def run_single_task(
                     network=network or None,
                     image=getattr(config, "docker_image", "wildclawbench-ubuntu:v1.3") if config else "wildclawbench-ubuntu:v1.3",
                     timeout=testexec_timeout,
+                    state=state,
                 )
                 result["test_result"] = te
                 verifier_dir = output_dir / "task_output" / "logs" / "verifier"

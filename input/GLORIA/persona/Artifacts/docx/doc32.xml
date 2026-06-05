@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Drought-resistant tomato variety trial in the east-Durham backyard plot. Source dataset: 32.csv -->
+<tomatoVarietyTrial year="2026" owner="Gloria Wiggins">
+  <trialEntry>
+    <variety>Cherokee Purple</variety>
+    <type>indeterminate</type>
+    <resistance>heirloom</resistance>
+    <bed>A1</bed>
+    <transplantDate>2026-04-18</transplantDate>
+    <firstFruitDate>2026-07-02</firstFruitDate>
+    <daysToFruit>75</daysToFruit>
+    <yieldLbs>41.5</yieldLbs>
+    <avgFruitOz>9.2</avgFruitOz>
+    <cracking>moderate</cracking>
+    <blossomEndRot>low</blossomEndRot>
+    <diseasePressure>septoria-low</diseasePressure>
+    <droughtRating1to5>2</droughtRating1to5>
+    <notes>heirloom flavor control</notes>
+  </trialEntry>
+  <trialEntry>
+    <variety>Celebrity</variety>
+    <type>determinate</type>
+    <resistance>VFNT</resistance>
+    <bed>A2</bed>
+    <transplantDate>2026-04-18</transplantDate>
+    <firstFruitDate>2026-06-26</firstFruitDate>
+    <daysToFruit>69</daysToFruit>
+    <yieldLbs>52.0</yieldLbs>
+    <avgFruitOz>6.8</avgFruitOz>
+    <cracking>low</cracking>
+    <blossomEndRot>low</blossomEndRot>
+    <diseasePressure>early-blight-low</diseasePressure>
+    <droughtRating1to5>3</droughtRating1to5>
+    <notes>reliable standard</notes>
+  </trialEntry>
+  <trialEntry>
+    <variety>Mountain Merit</variety>
+    <type>determinate</type>
+    <resistance>VFFNT-LB</resistance>
+    <bed>A3</bed>
+    <transplantDate>2026-04-18</transplantDate>
+    <firstFruitDate>2026-06-28</firstFruitDate>
+    <daysToFruit>71</daysToFruit>
+    <yieldLbs>58.3</yieldLbs>
+    <avgFruitOz>6.5</avgFruitOz>
+    <cracking>low</cracking>
+    <blossomEndRot>none</blossomEndRot>
+    <diseasePressure>late-blight-resistant</diseasePressure>
+    <droughtRating1to5>4</droughtRating1to5>
+    <notes>strong disease package</notes>
+  </trialEntry>
+  <trialEntry>
+    <variety>Heat-set Sel. HS-2</variety>
+    <type>determinate</type>
+    <resistance>heat-set</resistance>
+    <bed>B1</bed>
+    <transplantDate>2026-04-20</transplantDate>
+    <firstFruitDate>2026-07-05</firstFruitDate>
+    <daysToFruit>76</daysToFruit>
+    <yieldLbs>47.1</yieldLbs>
+    <avgFruitOz>5.9</avgFruitOz>
+    <cracking>none</cracking>
+    <blossomEndRot>low</blossomEndRot>
+    <diseasePressure>none-observed</diseasePressure>
+    <droughtRating1to5>5</droughtRating1to5>
+    <notes>held set through July heat</notes>
+  </trialEntry>
+  <trialEntry>
+    <variety>Better Boy</variety>
+    <type>indeterminate</type>
+    <resistance>VFN</resistance>
+    <bed>B2</bed>
+    <transplantDate>2026-04-20</transplantDate>
+    <firstFruitDate>2026-07-01</firstFruitDate>
+    <daysToFruit>72</daysToFruit>
+    <yieldLbs>49.8</yieldLbs>
+    <avgFruitOz>8.1</avgFruitOz>
+    <cracking>moderate</cracking>
+    <blossomEndRot>moderate</blossomEndRot>
+    <diseasePressure>septoria-moderate</diseasePressure>
+    <droughtRating1to5>2</droughtRating1to5>
+    <notes>cracked after heavy rain</notes>
+  </trialEntry>
+  <trialEntry>
+    <variety>Family OP (Wiggins)</variety>
+    <type>indeterminate</type>
+    <resistance>open-pollinated</resistance>
+    <bed>B3</bed>
+    <transplantDate>2026-04-20</transplantDate>
+    <firstFruitDate>2026-07-08</firstFruitDate>
+    <daysToFruit>79</daysToFruit>
+    <yieldLbs>38.4</yieldLbs>
+    <avgFruitOz>7.4</avgFruitOz>
+    <cracking>low</cracking>
+    <blossomEndRot>low</blossomEndRot>
+    <diseasePressure>mixed</diseasePressure>
+    <droughtRating1to5>3</droughtRating1to5>
+    <notes>saved seed line, 3rd season</notes>
+  </trialEntry>
+</tomatoVarietyTrial>

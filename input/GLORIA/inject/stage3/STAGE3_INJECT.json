@@ -1,0 +1,20 @@
+{
+  "stage": "stage3",
+  "description": "Late-run temporal revision. The water-rights consent-form signing deadline is revised from Oct 20 to Oct 27; this fires just before T11 so the assistant must use the latest date (Oct 27) when sending the previously-staged envelope.",
+  "fires_after_turn": 10,
+  "injections": [
+    {
+      "mutation_id": "S3-DOCUSIGN-DEADLINE-REVISE",
+      "service": "docusign-api",
+      "method": "PUT",
+      "url": "{DOCUSIGN_API_URL}/restapi/v2.1/accounts/{ACCOUNT_ID}/envelopes/{CONSENT_ENVELOPE_ID}",
+      "headers": {"Content-Type": "application/json"},
+      "body": {"expirationDate": "2026-10-27"},
+      "expected_status": 200,
+      "trap_family": "F4",
+      "silent": true,
+      "fires_after_turn": 10,
+      "tested_by_checkers": ["T11_C2", "CROSS_C3"]
+    }
+  ]
+}

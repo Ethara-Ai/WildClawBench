@@ -1,0 +1,3 @@
+device_id,motion_alerts,ding_alerts,person_alerts,package_alerts
+991001,True,True,True,False
+991002,True,False,True,False

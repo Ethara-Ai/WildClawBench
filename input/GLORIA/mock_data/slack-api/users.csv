@@ -1,0 +1,6 @@
+id,name,real_name,email,is_admin,is_bot,tz,status_text,presence
+U_GLORIA,gloria,Gloria Wiggins,gloria.wiggins@voissync.ai,True,False,America/New_York,Deep Roots crunch,active
+U_DOROTHY,dorothy,Dorothy Mae Jenkins,heritageoak.center@gmail.com,True,False,America/New_York,,away
+U_TAMIKA,tamika,Tamika Jefferson,tamika.jefferson@gmail.com,False,False,America/New_York,,away
+U_VOL1,renee,Renee Caldwell,renee.caldwell@gmail.com,False,False,America/New_York,,away
+U_VOL2,andre,Andre Pittman,andre.pittman@gmail.com,False,False,America/New_York,,away

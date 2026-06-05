@@ -1,0 +1,13 @@
+[
+  {
+    "Id": "1",
+    "TxnDate": "2026-09-28",
+    "PaymentType": "CreditCard",
+    "AccountRef": {
+      "value": "2",
+      "name": "Deep Roots - Materials & Soil Testing"
+    },
+    "TotalAmt": 140.0,
+    "PrivateNote": "Soil panels for four client plots."
+  }
+]

@@ -1,0 +1,48 @@
+{
+  "doorbots": [
+    {
+      "id": 991001,
+      "description": "Greenhouse Doorbell",
+      "device_id": "rda-991001",
+      "kind": "doorbell_v4",
+      "battery_life": "85",
+      "firmware_version": "1.9.2",
+      "time_zone": "America/New_York",
+      "wifi_signal_strength": -47,
+      "wifi_signal_category": "good",
+      "external_connection": false,
+      "subscribed": true,
+      "location_id": "loc-gloria-home",
+      "alerts": {
+        "connection": "online"
+      },
+      "settings": {
+        "motion_detection_enabled": true,
+        "live_view_preset_profile": "middle"
+      }
+    }
+  ],
+  "stickup_cams": [
+    {
+      "id": 991002,
+      "description": "Backyard Greenhouse Cam",
+      "device_id": "rda-991002",
+      "kind": "stickup_cam_v4",
+      "battery_life": "72",
+      "firmware_version": "2.1.0",
+      "time_zone": "America/New_York",
+      "wifi_signal_strength": -52,
+      "wifi_signal_category": "good",
+      "external_connection": false,
+      "subscribed": true,
+      "location_id": "loc-gloria-home",
+      "alerts": {
+        "connection": "online"
+      },
+      "settings": {
+        "motion_detection_enabled": true
+      }
+    }
+  ],
+  "chimes": []
+}

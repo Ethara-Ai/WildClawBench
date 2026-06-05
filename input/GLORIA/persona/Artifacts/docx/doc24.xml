@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Gullah/Geechee vocabulary study list kept between class sessions. Source dataset: 24.csv -->
+<gullahGeecheeVocabulary owner="Gloria Wiggins" context="weekly online class + family">
+  <entry>
+    <term>benne</term>
+    <meaningNote>sesame (West African origin)</meaningNote>
+    <exampleUse>'benne wafers for the holiday'</exampleUse>
+    <heardFrom>class + family</heardFrom>
+    <sessionDate>2026-05-03</sessionDate>
+    <alsoUsedAtHome>yes</alsoUsedAtHome>
+  </entry>
+  <entry>
+    <term>oonah</term>
+    <meaningNote>you / you-all (plural)</meaningNote>
+    <exampleUse>'oonah come eat'</exampleUse>
+    <heardFrom>grandmother</heardFrom>
+    <sessionDate>2026-05-10</sessionDate>
+    <alsoUsedAtHome>yes</alsoUsedAtHome>
+  </entry>
+  <entry>
+    <term>tabby</term>
+    <meaningNote>oyster-shell lime building material</meaningNote>
+    <exampleUse>'the old tabby wall'</exampleUse>
+    <heardFrom>class</heardFrom>
+    <sessionDate>2026-05-10</sessionDate>
+    <alsoUsedAtHome>no</alsoUsedAtHome>
+  </entry>
+  <entry>
+    <term>cooter</term>
+    <meaningNote>turtle</meaningNote>
+    <exampleUse>'cooter soup'</exampleUse>
+    <heardFrom>family</heardFrom>
+    <sessionDate>2026-05-17</sessionDate>
+    <alsoUsedAtHome>yes</alsoUsedAtHome>
+  </entry>
+  <entry>
+    <term>buckra</term>
+    <meaningNote>white person</meaningNote>
+    <exampleUse>(historical/context term)</exampleUse>
+    <heardFrom>class</heardFrom>
+    <sessionDate>2026-05-17</sessionDate>
+    <alsoUsedAtHome>no</alsoUsedAtHome>
+  </entry>
+  <entry>
+    <term>yeddy</term>
+    <meaningNote>to hear</meaningNote>
+    <exampleUse>'you yeddy me?'</exampleUse>
+    <heardFrom>grandmother</heardFrom>
+    <sessionDate>2026-05-24</sessionDate>
+    <alsoUsedAtHome>yes</alsoUsedAtHome>
+  </entry>
+  <entry>
+    <term>gwine</term>
+    <meaningNote>going to</meaningNote>
+    <exampleUse>'I gwine to the garden'</exampleUse>
+    <heardFrom>family</heardFrom>
+    <sessionDate>2026-05-24</sessionDate>
+    <alsoUsedAtHome>yes</alsoUsedAtHome>
+  </entry>
+</gullahGeecheeVocabulary>

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Weekly rainfall and drip-irrigation log for the backyard trial plot. Source dataset: 29.csv -->
+<rainfallIrrigationLog plot="backyard A" owner="Gloria Wiggins">
+  <week>
+    <weekOf>2026-05-25</weekOf>
+    <plot>backyard A</plot>
+    <rainfallIn>0.4</rainfallIn>
+    <irrigationIn>0.8</irrigationIn>
+    <totalWaterIn>1.2</totalWaterIn>
+    <soilMoisture>adequate</soilMoisture>
+    <notes>steady drip</notes>
+  </week>
+  <week>
+    <weekOf>2026-06-01</weekOf>
+    <plot>backyard A</plot>
+    <rainfallIn>0.0</rainfallIn>
+    <irrigationIn>1.3</irrigationIn>
+    <totalWaterIn>1.3</totalWaterIn>
+    <soilMoisture>dry start</soilMoisture>
+    <notes>heat wave; deep watering</notes>
+  </week>
+  <week>
+    <weekOf>2026-06-08</weekOf>
+    <plot>backyard A</plot>
+    <rainfallIn>1.6</rainfallIn>
+    <irrigationIn>0.0</irrigationIn>
+    <totalWaterIn>1.6</totalWaterIn>
+    <soilMoisture>wet</soilMoisture>
+    <notes>skipped drip after rain</notes>
+  </week>
+  <week>
+    <weekOf>2026-06-15</weekOf>
+    <plot>backyard A</plot>
+    <rainfallIn>0.2</rainfallIn>
+    <irrigationIn>1.1</irrigationIn>
+    <totalWaterIn>1.3</totalWaterIn>
+    <soilMoisture>adequate</soilMoisture>
+    <notes/>
+  </week>
+  <week>
+    <weekOf>2026-06-22</weekOf>
+    <plot>backyard A</plot>
+    <rainfallIn>2.4</rainfallIn>
+    <irrigationIn>0.0</irrigationIn>
+    <totalWaterIn>2.4</totalWaterIn>
+    <soilMoisture>saturated</soilMoisture>
+    <notes>watch for cracking/disease</notes>
+  </week>
+  <week>
+    <weekOf>2026-06-29</weekOf>
+    <plot>backyard A</plot>
+    <rainfallIn>0.1</rainfallIn>
+    <irrigationIn>1.2</irrigationIn>
+    <totalWaterIn>1.3</totalWaterIn>
+    <soilMoisture>adequate</soilMoisture>
+    <notes>morning irrigation</notes>
+  </week>
+</rainfallIrrigationLog>

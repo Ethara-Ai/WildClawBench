@@ -1,0 +1,111 @@
+{
+  "stage": "stage1",
+  "description": "Seeds the live Airtable trial-plot database and the water-rights case roster before the variety-reconciliation turn. Establishes the baseline Better Boy yield (49.8) that is silently mutated later, and the six-farm roster used in the water-rights packet.",
+  "fires_after_turn": 0,
+  "injections": [
+    {
+      "mutation_id": "S1-AIRTABLE-CHEROKEE",
+      "service": "airtable-api",
+      "method": "POST",
+      "url": "{AIRTABLE_API_URL}/v0/{TRIAL_BASE_ID}/Trial%20Data",
+      "headers": {"Content-Type": "application/json"},
+      "body": {"records": [{"fields": {"Variety": "Cherokee Purple", "Type": "indeterminate heirloom", "Yield_lbs": 41.5, "Drought": 2}}]},
+      "expected_status": 200,
+      "trap_family": null,
+      "silent": false,
+      "fires_after_turn": 0,
+      "tested_by_checkers": ["T1_C2"]
+    },
+    {
+      "mutation_id": "S1-AIRTABLE-CELEBRITY",
+      "service": "airtable-api",
+      "method": "POST",
+      "url": "{AIRTABLE_API_URL}/v0/{TRIAL_BASE_ID}/Trial%20Data",
+      "headers": {"Content-Type": "application/json"},
+      "body": {"records": [{"fields": {"Variety": "Celebrity", "Type": "determinate", "Yield_lbs": 52.0, "Drought": 3}}]},
+      "expected_status": 200,
+      "trap_family": null,
+      "silent": false,
+      "fires_after_turn": 0,
+      "tested_by_checkers": ["T1_C2", "T5_C1"]
+    },
+    {
+      "mutation_id": "S1-AIRTABLE-MTNMERIT",
+      "service": "airtable-api",
+      "method": "POST",
+      "url": "{AIRTABLE_API_URL}/v0/{TRIAL_BASE_ID}/Trial%20Data",
+      "headers": {"Content-Type": "application/json"},
+      "body": {"records": [{"fields": {"Variety": "Mountain Merit", "Type": "determinate", "Yield_lbs": 58.3, "Drought": 4}}]},
+      "expected_status": 200,
+      "trap_family": null,
+      "silent": false,
+      "fires_after_turn": 0,
+      "tested_by_checkers": ["T1_C2", "MG-01"]
+    },
+    {
+      "mutation_id": "S1-AIRTABLE-HEATSET",
+      "service": "airtable-api",
+      "method": "POST",
+      "url": "{AIRTABLE_API_URL}/v0/{TRIAL_BASE_ID}/Trial%20Data",
+      "headers": {"Content-Type": "application/json"},
+      "body": {"records": [{"fields": {"Variety": "Heat-set HS-2", "Type": "determinate", "Yield_lbs": 47.1, "Drought": 5}}]},
+      "expected_status": 200,
+      "trap_family": null,
+      "silent": false,
+      "fires_after_turn": 0,
+      "tested_by_checkers": ["T1_C2"]
+    },
+    {
+      "mutation_id": "S1-AIRTABLE-BETTERBOY",
+      "service": "airtable-api",
+      "method": "POST",
+      "url": "{AIRTABLE_API_URL}/v0/{TRIAL_BASE_ID}/Trial%20Data",
+      "headers": {"Content-Type": "application/json"},
+      "body": {"records": [{"fields": {"Variety": "Better Boy", "Type": "indeterminate", "Yield_lbs": 49.8, "Drought": 2}}]},
+      "expected_status": 200,
+      "trap_family": null,
+      "silent": false,
+      "fires_after_turn": 0,
+      "tested_by_checkers": ["T1_C2"]
+    },
+    {
+      "mutation_id": "S1-AIRTABLE-FAMILYOP",
+      "service": "airtable-api",
+      "method": "POST",
+      "url": "{AIRTABLE_API_URL}/v0/{TRIAL_BASE_ID}/Trial%20Data",
+      "headers": {"Content-Type": "application/json"},
+      "body": {"records": [{"fields": {"Variety": "Family OP (Wiggins)", "Type": "indeterminate OP", "Yield_lbs": 38.4, "Drought": 3}}]},
+      "expected_status": 200,
+      "trap_family": null,
+      "silent": false,
+      "fires_after_turn": 0,
+      "tested_by_checkers": ["T1_C2"]
+    },
+    {
+      "mutation_id": "S1-DRIVE-FARM-ROSTER",
+      "service": "google-drive-api",
+      "method": "POST",
+      "url": "{GOOGLE_DRIVE_API_URL}/drive/v3/files",
+      "headers": {"Content-Type": "application/json"},
+      "body": {"name": "Water Rights - Affected Farms Roster (6 farms)", "mimeType": "application/vnd.google-apps.document", "parents": ["{WATER_CASE_FOLDER_ID}"]},
+      "expected_status": 201,
+      "trap_family": null,
+      "silent": false,
+      "fires_after_turn": 0,
+      "tested_by_checkers": ["T6_C2"]
+    },
+    {
+      "mutation_id": "S1-DRIVE-CONSULT-LOG",
+      "service": "google-drive-api",
+      "method": "POST",
+      "url": "{GOOGLE_DRIVE_API_URL}/drive/v3/files",
+      "headers": {"Content-Type": "application/json"},
+      "body": {"name": "Farm Visit Consultation Log (F-014 .. F-021)", "mimeType": "application/vnd.google-apps.document", "parents": ["{FIELD_RECORDS_FOLDER_ID}"]},
+      "expected_status": 201,
+      "trap_family": null,
+      "silent": false,
+      "fires_after_turn": 0,
+      "tested_by_checkers": ["T6_C2", "T8_C1"]
+    }
+  ]
+}

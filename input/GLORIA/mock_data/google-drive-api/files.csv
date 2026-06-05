@@ -1,0 +1,7 @@
+id,name,mime_type,parent_id,size,created_time,modified_time,owner_email,starred,trashed,web_view_link
+folder-deep-roots-grant,Deep Roots Grant,application/vnd.google-apps.folder,,0,2026-08-01T09:00:00Z,2026-10-09T17:00:00Z,gloria.wiggins@voissync.ai,True,False,https://drive.google.com/drive/folders/folder-deep-roots-grant
+folder-water-rights-case,Water Rights Case,application/vnd.google-apps.folder,,0,2026-07-15T09:00:00Z,2026-10-08T12:00:00Z,gloria.wiggins@voissync.ai,False,False,https://drive.google.com/drive/folders/folder-water-rights-case
+folder-field-records,Field Records,application/vnd.google-apps.folder,,0,2026-03-01T09:00:00Z,2026-10-05T18:00:00Z,gloria.wiggins@voissync.ai,False,False,https://drive.google.com/drive/folders/folder-field-records
+file-grant-draft,Deep Roots Grant Proposal Draft,application/vnd.google-apps.document,folder-deep-roots-grant,48213,2026-09-02T09:00:00Z,2026-10-09T16:45:00Z,gloria.wiggins@voissync.ai,False,False,https://drive.google.com/file/d/file-grant-draft/view
+file-trial-2026,Tomato Variety Trial 2026,application/vnd.google-apps.spreadsheet,folder-deep-roots-grant,22117,2026-04-18T09:00:00Z,2026-09-30T10:15:00Z,gloria.wiggins@voissync.ai,False,False,https://drive.google.com/file/d/file-trial-2026/view
+file-consult-log,Farm Visit Consultation Log,application/vnd.google-apps.spreadsheet,folder-water-rights-case,18044,2026-06-01T09:00:00Z,2026-10-07T13:30:00Z,gloria.wiggins@voissync.ai,False,False,https://drive.google.com/file/d/file-consult-log/view

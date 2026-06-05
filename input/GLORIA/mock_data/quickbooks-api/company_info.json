@@ -1,0 +1,15 @@
+{
+  "CompanyName": "Gloria Wiggins - Deep Roots Program",
+  "LegalName": "Piedmont County Cooperative Extension - Deep Roots",
+  "CompanyAddr": {
+    "Line1": "120 Extension Drive",
+    "City": "Durham",
+    "CountrySubDivisionCode": "NC",
+    "PostalCode": "27701"
+  },
+  "Email": {
+    "Address": "gloria.wiggins@voissync.ai"
+  },
+  "FiscalYearStartMonth": "January",
+  "Country": "US"
+}

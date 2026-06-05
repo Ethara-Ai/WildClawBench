@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Herb garden drying inventory and yields (mullein, lemon balm, chamomile, etc.). Source dataset: 26.csv -->
+<herbDryingInventory owner="Gloria Wiggins">
+  <herbBatch>
+    <herb>Mullein</herb>
+    <partUsed>leaf</partUsed>
+    <harvestDate>10-06-2026</harvestDate>
+    <freshWeightG>320</freshWeightG>
+    <dryWeightG>48</dryWeightG>
+    <dryingMethod>hang-dry back room</dryingMethod>
+    <jarLabel>MULLEIN-2026</jarLabel>
+    <year>2026</year>
+    <intendedUse>respiratory tea</intendedUse>
+  </herbBatch>
+  <herbBatch>
+    <herb>Lemon balm</herb>
+    <partUsed>leaf</partUsed>
+    <harvestDate>12-06-2026</harvestDate>
+    <freshWeightG>260</freshWeightG>
+    <dryWeightG>41</dryWeightG>
+    <dryingMethod>hang-dry</dryingMethod>
+    <jarLabel>LEMONBALM-2026</jarLabel>
+    <year>2026</year>
+    <intendedUse>calming tea</intendedUse>
+  </herbBatch>
+  <herbBatch>
+    <herb>Chamomile</herb>
+    <partUsed>flower</partUsed>
+    <harvestDate>20-06-2026</harvestDate>
+    <freshWeightG>180</freshWeightG>
+    <dryWeightG>34</dryWeightG>
+    <dryingMethod>screen-dry</dryingMethod>
+    <jarLabel>CHAMOMILE-2026</jarLabel>
+    <year>2026</year>
+    <intendedUse>rest tea</intendedUse>
+  </herbBatch>
+  <herbBatch>
+    <herb>Peppermint</herb>
+    <partUsed>leaf</partUsed>
+    <harvestDate>22-06-2026</harvestDate>
+    <freshWeightG>210</freshWeightG>
+    <dryWeightG>37</dryWeightG>
+    <dryingMethod>hang-dry</dryingMethod>
+    <jarLabel>MINT-2026</jarLabel>
+    <year>2026</year>
+    <intendedUse>digestive tea</intendedUse>
+  </herbBatch>
+  <herbBatch>
+    <herb>Echinacea</herb>
+    <partUsed>aerial+root</partUsed>
+    <harvestDate>05-09-2026</harvestDate>
+    <freshWeightG>410</freshWeightG>
+    <dryWeightG>95</dryWeightG>
+    <dryingMethod>dehydrator low</dryingMethod>
+    <jarLabel>ECHINACEA-2026</jarLabel>
+    <year>2026</year>
+    <intendedUse>immune support</intendedUse>
+  </herbBatch>
+  <herbBatch>
+    <herb>Elderberry</herb>
+    <partUsed>ripe berry</partUsed>
+    <harvestDate>18-09-2026</harvestDate>
+    <freshWeightG>540</freshWeightG>
+    <dryWeightG/>
+    <dryingMethod>cook fresh -&gt; syrup</dryingMethod>
+    <jarLabel>ELDER-SYRUP-2026</jarLabel>
+    <year>2026</year>
+    <intendedUse>syrup (cooked only)</intendedUse>
+  </herbBatch>
+</herbDryingInventory>

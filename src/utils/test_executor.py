@@ -89,6 +89,18 @@ _RUNNER_SCRIPT = textwrap.dedent('''
         n = type(e).__name__
         return n in ("Skipped", "SkipTest")
 
+    # Phase 3 multi-agent: when /tests/state.json is mounted, expose it to
+    # test methods whose required-param is `state`. Tests without this param
+    # are unaffected.
+    STATE = None
+    try:
+        with open("/tests/state.json", "r", encoding="utf-8") as _sf:
+            STATE = json.load(_sf)
+    except FileNotFoundError:
+        STATE = None
+    except Exception:
+        STATE = None
+
     spec = importlib.util.spec_from_file_location("t", "/tests/test_outputs.py")
     mod = importlib.util.module_from_spec(spec)
     out = {"import_error": None, "results": {}, "collected": 0}
@@ -169,6 +181,17 @@ _RUNNER_SCRIPT = textwrap.dedent('''
         # (D) fixture-style signature: required params we cannot supply.
         req = _required_param_names(fn)
         if req:
+            if req == ["state"]:
+                if STATE is not None:
+                    is_async = inspect.iscoroutinefunction(fn)
+                    _record(results, full, lambda _fn=fn: _fn(state=STATE), is_async=is_async)
+                    return True
+                results[full] = {
+                    "status": "errored",
+                    "error": "requires `state` fixture; /tests/state.json missing",
+                    "traceback": "",
+                }
+                return True
             results[full] = {
                 "status": "errored",
                 "error": ("requires fixtures/params " + ", ".join(req)
@@ -230,10 +253,25 @@ _RUNNER_SCRIPT = textwrap.dedent('''
                     continue
                 req = _required_param_names(fn)
                 if req:
+                    if req == ["state"] and STATE is not None:
+                        out["collected"] += 1
+                        def _drive_state(_fn=fn, _inst=inst):
+                            _inst.setUp()
+                            try:
+                                r = _fn(state=STATE)
+                                if inspect.iscoroutine(r):
+                                    asyncio.run(r)
+                            finally:
+                                _inst.tearDown()
+                        _record(out["results"], full, _drive_state)
+                        continue
                     out["collected"] += 1
+                    err = ("requires `state` fixture; /tests/state.json missing"
+                           if req == ["state"]
+                           else "requires fixtures/params " + ", ".join(req))
                     out["results"][full] = {
                         "status": "errored",
-                        "error": "requires fixtures/params " + ", ".join(req),
+                        "error": err,
                         "traceback": "",
                     }
                     continue
@@ -267,11 +305,19 @@ _RUNNER_SCRIPT = textwrap.dedent('''
         full = f"<module>::{fn_name}"
         req = _required_param_names(fn)
         if req:
+            if req == ["state"] and STATE is not None:
+                out["collected"] += 1
+                _record(out["results"], full, lambda _fn=fn: _fn(state=STATE),
+                        is_async=inspect.iscoroutinefunction(fn))
+                continue
             out["collected"] += 1
+            err = ("requires `state` fixture; /tests/state.json missing"
+                   if req == ["state"]
+                   else ("requires fixtures/params " + ", ".join(req)
+                         + "; the no-fixture runner cannot supply them"))
             out["results"][full] = {
                 "status": "errored",
-                "error": ("requires fixtures/params " + ", ".join(req)
-                          + "; the no-fixture runner cannot supply them"),
+                "error": err,
                 "traceback": "",
             }
             continue
@@ -323,6 +369,7 @@ def execute_tests(
     network: Optional[str] = None,
     image: str = "wildclawbench-ubuntu:v1.3",
     timeout: int = 300,
+    state: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Run `test_code` against the live mock stack. Returns a test_result dict.
 
@@ -353,6 +400,8 @@ def execute_tests(
         (tmp / "test_outputs.py").write_text(test_code, encoding="utf-8")
         (tmp / "test_weights.json").write_text(test_weights_json or "{}", encoding="utf-8")
         (tmp / "runner.py").write_text(_RUNNER_SCRIPT, encoding="utf-8")
+        if state is not None:
+            (tmp / "state.json").write_text(json.dumps(state), encoding="utf-8")
 
         ws_mount = workspace_dir if workspace_dir and workspace_dir.is_dir() else tmp
         cmd = [

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Saved-seed inventory including the family open-pollinated line. Source dataset: 30.csv -->
+<seedSavingInventory owner="Gloria Wiggins">
+  <seed>
+    <crop>Tomato</crop>
+    <variety>Family OP (Wiggins)</variety>
+    <type>open-pollinated</type>
+    <yearSaved>2025</yearSaved>
+    <source>own plot</source>
+    <germinationPct>88</germinationPct>
+    <quantitySeeds>210</quantitySeeds>
+    <storage>jar, cool/dark</storage>
+    <notes>3rd season line</notes>
+  </seed>
+  <seed>
+    <crop>Okra</crop>
+    <variety>Clemson Spineless</variety>
+    <type>open-pollinated</type>
+    <yearSaved>2025</yearSaved>
+    <source>own plot</source>
+    <germinationPct>92</germinationPct>
+    <quantitySeeds>160</quantitySeeds>
+    <storage>envelope</storage>
+    <notes>reliable</notes>
+  </seed>
+  <seed>
+    <crop>Field pea</crop>
+    <variety>Whippoorwill</variety>
+    <type>heirloom</type>
+    <yearSaved>2025</yearSaved>
+    <source>gifted - elder</source>
+    <germinationPct>85</germinationPct>
+    <quantitySeeds>340</quantitySeeds>
+    <storage>jar</storage>
+    <notes>heritage variety</notes>
+  </seed>
+  <seed>
+    <crop>Collards</crop>
+    <variety>Georgia Southern</variety>
+    <type>open-pollinated</type>
+    <yearSaved>2024</yearSaved>
+    <source>own plot</source>
+    <germinationPct>79</germinationPct>
+    <quantitySeeds>120</quantitySeeds>
+    <storage>jar</storage>
+    <notes>test germ before sowing</notes>
+  </seed>
+  <seed>
+    <crop>Pepper</crop>
+    <variety>sweet, family</variety>
+    <type>open-pollinated</type>
+    <yearSaved>2025</yearSaved>
+    <source>own plot</source>
+    <germinationPct>81</germinationPct>
+    <quantitySeeds>95</quantitySeeds>
+    <storage>envelope</storage>
+    <notes>isolate from hot types</notes>
+  </seed>
+  <seed>
+    <crop>Tomato</crop>
+    <variety>Better Boy</variety>
+    <type>hybrid F1</type>
+    <yearSaved>2025</yearSaved>
+    <source>store plant</source>
+    <germinationPct>-</germinationPct>
+    <quantitySeeds>-</quantitySeeds>
+    <storage>do not save</storage>
+    <notes>hybrid - will not breed true</notes>
+  </seed>
+</seedSavingInventory>

@@ -1,0 +1,12 @@
+[
+  {
+    "Id": "1",
+    "TxnDate": "2026-08-15",
+    "CustomerRef": {
+      "value": "1",
+      "name": "Fieldstone Agricultural Foundation"
+    },
+    "TotalAmt": 85000.0,
+    "PrivateNote": "Deep Roots two-year budget estimate."
+  }
+]

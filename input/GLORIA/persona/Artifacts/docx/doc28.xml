@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Backyard/extension planting calendar for the North Carolina Piedmont. Source dataset: 28.csv -->
+<plantingCalendar region="Piedmont" owner="Gloria Wiggins">
+  <cropPlan>
+    <crop>Tomato</crop>
+    <season>warm</season>
+    <startIndoors>late Feb-early Mar</startIndoors>
+    <transplantOut>mid-late Apr</transplantOut>
+    <directSow/>
+    <harvestStart>Jul</harvestStart>
+    <harvestEnd>Sep</harvestEnd>
+    <spacingIn>18-24</spacingIn>
+    <notes>stake; after last frost</notes>
+  </cropPlan>
+  <cropPlan>
+    <crop>Collard greens</crop>
+    <season>cool</season>
+    <startIndoors/>
+    <transplantOut>Aug-Sep</transplantOut>
+    <directSow>Aug-Sep</directSow>
+    <harvestStart>Oct</harvestStart>
+    <harvestEnd>Mar</harvestEnd>
+    <spacingIn>18-24</spacingIn>
+    <notes>frost sweetens leaves</notes>
+  </cropPlan>
+  <cropPlan>
+    <crop>Okra</crop>
+    <season>warm</season>
+    <startIndoors/>
+    <transplantOut/>
+    <directSow>late May-Jun</directSow>
+    <harvestStart>Jul</harvestStart>
+    <harvestEnd>Oct</harvestEnd>
+    <spacingIn>12-18</spacingIn>
+    <notes>needs warm soil</notes>
+  </cropPlan>
+  <cropPlan>
+    <crop>Sweet potato</crop>
+    <season>warm</season>
+    <startIndoors>slips Mar-Apr</startIndoors>
+    <transplantOut>mid-late May</transplantOut>
+    <directSow/>
+    <harvestStart>Sep</harvestStart>
+    <harvestEnd>Oct</harvestEnd>
+    <spacingIn>12 on ridges</spacingIn>
+    <notes>cure after harvest</notes>
+  </cropPlan>
+  <cropPlan>
+    <crop>Field peas</crop>
+    <season>warm</season>
+    <startIndoors/>
+    <transplantOut/>
+    <directSow>May-Jun</directSow>
+    <harvestStart>Jul</harvestStart>
+    <harvestEnd>Sep</harvestEnd>
+    <spacingIn>3-4</spacingIn>
+    <notes>nitrogen fixer</notes>
+  </cropPlan>
+  <cropPlan>
+    <crop>Pepper</crop>
+    <season>warm</season>
+    <startIndoors>late Feb-Mar</startIndoors>
+    <transplantOut>late Apr-May</transplantOut>
+    <directSow/>
+    <harvestStart>Jul</harvestStart>
+    <harvestEnd>Oct</harvestEnd>
+    <spacingIn>18</spacingIn>
+    <notes>full sun</notes>
+  </cropPlan>
+  <cropPlan>
+    <crop>Lettuce</crop>
+    <season>cool</season>
+    <startIndoors>Feb / Aug</startIndoors>
+    <transplantOut>Mar / Sep</transplantOut>
+    <directSow>Mar / Sep</directSow>
+    <harvestStart>Apr / Oct</harvestStart>
+    <harvestEnd>May / Nov</harvestEnd>
+    <spacingIn>8-12</spacingIn>
+    <notes>bolts in heat</notes>
+  </cropPlan>
+  <cropPlan>
+    <crop>Garlic</crop>
+    <season>cool</season>
+    <startIndoors/>
+    <transplantOut>Oct-Nov (cloves)</transplantOut>
+    <directSow>Oct-Nov</directSow>
+    <harvestStart>next Jun</harvestStart>
+    <harvestEnd>Jun</harvestEnd>
+    <spacingIn>6</spacingIn>
+    <notes>plant fall, harvest summer</notes>
+  </cropPlan>
+</plantingCalendar>

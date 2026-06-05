@@ -1,0 +1,10 @@
+tableId,id,name,type
+tblTrialData,fldVariety,Variety,singleLineText
+tblTrialData,fldType,Type,singleLineText
+tblTrialData,fldResistance,Resistance,singleLineText
+tblTrialData,fldTransplant,Transplant,date
+tblTrialData,fldFirstFruit,First Fruit,date
+tblTrialData,fldDaysToFruit,Days to Fruit,number
+tblTrialData,fldYieldLbs,Yield (lbs),number
+tblTrialData,fldDrought,Drought (1-5),number
+tblTrialData,fldNotes,Notes,multilineText

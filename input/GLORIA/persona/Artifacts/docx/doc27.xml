@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Herbal preparations & community-sharing log (tinctures, syrups, salves). Source dataset: 27.csv -->
+<herbalPreparations owner="Gloria Wiggins" nature="traditional practice, shared not sold">
+  <preparationEntry>
+    <preparation>Lemon balm tincture</preparation>
+    <herb>lemon balm</herb>
+    <form>alcohol tincture</form>
+    <dateMade>2026-06-15</dateMade>
+    <readyDate>2026-07-27</readyDate>
+    <quantity>250 ml</quantity>
+    <container>dark glass</container>
+    <sharedWithCommunity>yes</sharedWithCommunity>
+    <notes>calming; gift</notes>
+  </preparationEntry>
+  <preparationEntry>
+    <preparation>Mullein tea blend</preparation>
+    <herb>mullein</herb>
+    <form>dried blend</form>
+    <dateMade>2026-06-14</dateMade>
+    <readyDate>2026-06-14</readyDate>
+    <quantity>120 g</quantity>
+    <container>glass jar</container>
+    <sharedWithCommunity>yes</sharedWithCommunity>
+    <notes>chest comfort</notes>
+  </preparationEntry>
+  <preparationEntry>
+    <preparation>Elderberry syrup</preparation>
+    <herb>elderberry</herb>
+    <form>cooked syrup</form>
+    <dateMade>2026-09-20</dateMade>
+    <readyDate>2026-09-20</readyDate>
+    <quantity>500 ml</quantity>
+    <container>bottle</container>
+    <sharedWithCommunity>yes</sharedWithCommunity>
+    <notes>cooked only; keep refrigerated</notes>
+  </preparationEntry>
+  <preparationEntry>
+    <preparation>Plantain salve</preparation>
+    <herb>plantain</herb>
+    <form>oil-infused salve</form>
+    <dateMade>2026-07-02</dateMade>
+    <readyDate>2026-08-13</readyDate>
+    <quantity>8 tins</quantity>
+    <container>tins</container>
+    <sharedWithCommunity>yes</sharedWithCommunity>
+    <notes>skin; bug bites</notes>
+  </preparationEntry>
+  <preparationEntry>
+    <preparation>Chamomile honey</preparation>
+    <herb>chamomile</herb>
+    <form>infused honey</form>
+    <dateMade>2026-06-25</dateMade>
+    <readyDate>2026-07-09</readyDate>
+    <quantity>2 jars</quantity>
+    <container>jars</container>
+    <sharedWithCommunity>no</sharedWithCommunity>
+    <notes>household</notes>
+  </preparationEntry>
+</herbalPreparations>

@@ -576,6 +576,166 @@ PY"""
     logger.info("[%s] Injected custom models config", task_id)
 
 
+_SUBAGENT_SKILL_NAME = "spawn-subagent-connector"
+_SUBAGENT_CONTAINER_ROOT = f"/usr/lib/node_modules/openclaw/skills/{_SUBAGENT_SKILL_NAME}"
+_SUBAGENT_TURN_MARKER = f"{TMP_WORKSPACE}/.wildclaw_current_turn"
+_SUBAGENT_SPAWN_TREE = f"{TMP_WORKSPACE}/spawn_tree.jsonl"
+
+
+def _render_subagent_skill_md(multi_agent_config: dict | None) -> str:
+    cfg = multi_agent_config or {}
+    default_tools = cfg.get("default_allowed_tools") or []
+    tools_line = (
+        ", ".join(f"`{t}`" for t in default_tools) if default_tools else "_(none — text-only)_"
+    )
+    return (
+        "---\n"
+        f"name: {_SUBAGENT_SKILL_NAME}\n"
+        "description: >\n"
+        "  Spawn a bounded sub-agent that performs one focused task and returns plain text.\n"
+        "  Use it to fan work out across independent angles within a turn (e.g. parallel\n"
+        "  reconciliation, extraction, drafting). Sub-agents cannot spawn further sub-agents.\n"
+        "metadata: {\"clawdbot\":{\"emoji\":\"🪺\"}}\n"
+        "---\n"
+        "\n"
+        "# Spawn Sub-Agent\n"
+        "\n"
+        "Run a short, bounded sub-agent and return its final text answer.\n"
+        "\n"
+        "## How to invoke\n"
+        "\n"
+        "Pipe a JSON spec to the script on stdin and read the sub-agent's final text\n"
+        "from stdout:\n"
+        "\n"
+        "```bash\n"
+        "echo '{\n"
+        "  \"role\": \"budget-extractor\",\n"
+        "  \"instructions\": \"Extract the five Deep Roots budget line items from /work/draft.docx.\",\n"
+        "  \"allowed_tools\": [\"read_file\"],\n"
+        "  \"context\": \"\",\n"
+        "  \"max_tool_calls\": 10\n"
+        "}' | python3 {baseDir}/scripts/spawn_subagent.py\n"
+        "```\n"
+        "\n"
+        "## Spec fields\n"
+        "\n"
+        "| Field | Required | Notes |\n"
+        "|-------|----------|-------|\n"
+        "| `role` | yes | Short name describing the sub-agent's role. |\n"
+        "| `instructions` | yes | One concrete task for the sub-agent. |\n"
+        "| `allowed_tools` | no | Subset of your tools the child may use. Default: " + tools_line + ". |\n"
+        "| `context` | no | Extra context (file excerpts, prior findings) to seed the child. |\n"
+        "| `model` | no | Override model. Default: inherit parent's model. |\n"
+        "| `max_tool_calls` | no | Default 20, ceiling 50. |\n"
+        "| `max_tokens` | no | Default 4096, ceiling 16384. |\n"
+        "| `timeout_seconds` | no | Default 120, ceiling 600. |\n"
+        "\n"
+        "## Rules\n"
+        "\n"
+        "* Each spawn is independent — children do NOT see each other.\n"
+        "* Children may NOT spawn further sub-agents.\n"
+        "* Issue multiple spawns in parallel by calling this skill multiple times; results land in the order they complete.\n"
+        "* The sub-agent's full transcript is at "
+        f"`{TMP_WORKSPACE}/subagents/{{spawn_id}}.jsonl` if you need to audit it.\n"
+    )
+
+
+def inject_subagent_tool(
+    task_id: str,
+    multi_agent_config: dict | None = None,
+    *,
+    subagent_director_src: str | None = None,
+) -> None:
+    """Install the spawn_subagent skill into the openclaw skill root.
+
+    Mirrors the inject_api_connectors pattern: copies into the bundled root
+    (symlinks rejected by openclaw's realpath check). Also initializes the
+    empty spawn_tree.jsonl ledger and the turn-marker file used by the
+    sub-agent script to correlate spawns to turns. No-op for backends other
+    than openclaw; callers gate on AgentTaskSpec.multi_agent_enabled.
+    """
+    if subagent_director_src is None:
+        subagent_director_src = str(
+            Path(__file__).resolve().parent / "subagent_director.py"
+        )
+    src_path = Path(subagent_director_src)
+    if not src_path.is_file():
+        raise RuntimeError(
+            f"inject_subagent_tool: subagent_director.py not found at {src_path}"
+        )
+
+    subprocess.run(
+        ["docker", "exec", task_id, "rm", "-rf", _SUBAGENT_CONTAINER_ROOT],
+        capture_output=True, text=True,
+    )
+    subprocess.run(
+        ["docker", "exec", task_id, "mkdir", "-p", f"{_SUBAGENT_CONTAINER_ROOT}/scripts"],
+        capture_output=True, text=True,
+    )
+
+    with tempfile.TemporaryDirectory() as staging:
+        staging_path = Path(staging)
+        skill_md = staging_path / "SKILL.md"
+        skill_md.write_text(_render_subagent_skill_md(multi_agent_config), encoding="utf-8")
+        scripts_dir = staging_path / "scripts"
+        scripts_dir.mkdir()
+        entry = scripts_dir / "spawn_subagent.py"
+        entry.write_bytes(src_path.read_bytes())
+
+        for src_file, container_dst in (
+            (skill_md, f"{_SUBAGENT_CONTAINER_ROOT}/SKILL.md"),
+            (entry, f"{_SUBAGENT_CONTAINER_ROOT}/scripts/spawn_subagent.py"),
+        ):
+            r = subprocess.run(
+                ["docker", "cp", str(src_file), f"{task_id}:{container_dst}"],
+                capture_output=True, text=True,
+            )
+            if r.returncode != 0:
+                raise RuntimeError(
+                    f"inject_subagent_tool: docker cp failed for {container_dst}: {r.stderr.strip()}"
+                )
+
+    subprocess.run(
+        ["docker", "exec", task_id, "chmod", "+x",
+         f"{_SUBAGENT_CONTAINER_ROOT}/scripts/spawn_subagent.py"],
+        capture_output=True, text=True,
+    )
+
+    init_cmd = (
+        f"mkdir -p {TMP_WORKSPACE}/subagents && "
+        f"touch {_SUBAGENT_SPAWN_TREE} && "
+        f"printf 0 > {_SUBAGENT_TURN_MARKER}"
+    )
+    r = subprocess.run(
+        ["docker", "exec", task_id, "/bin/bash", "-c", init_cmd],
+        capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        logger.warning(
+            "[%s] subagent ledger init failed: %s", task_id, r.stderr.strip()
+        )
+
+    logger.info("[%s] Injected spawn_subagent skill into %s", task_id, _SUBAGENT_CONTAINER_ROOT)
+
+
+def write_turn_marker(task_id: str, turn_index: int) -> None:
+    """Write the current 0-indexed turn into the in-container marker file.
+
+    Called between turns by the openclaw runner so that sub-agent spawns
+    landing in the next turn carry the right turn_index in spawn_tree.jsonl.
+    """
+    r = subprocess.run(
+        ["docker", "exec", task_id, "/bin/bash", "-c",
+         f"printf {int(turn_index)} > {_SUBAGENT_TURN_MARKER}"],
+        capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        logger.warning(
+            "[%s] turn marker write failed for turn %s: %s",
+            task_id, turn_index, r.stderr.strip(),
+        )
+
+
 def run_warmup(
     task_id: str,
     warmup: str,

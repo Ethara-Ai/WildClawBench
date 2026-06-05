@@ -1,0 +1,12 @@
+[
+  {
+    "Id": "1",
+    "TxnDate": "2026-09-10",
+    "CustomerRef": {
+      "value": "1",
+      "name": "Fieldstone Agricultural Foundation"
+    },
+    "TotalAmt": 0.0,
+    "PrivateNote": "Placeholder."
+  }
+]

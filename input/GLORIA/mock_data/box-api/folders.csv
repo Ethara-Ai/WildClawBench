@@ -1,0 +1,5 @@
+id,name,parent_id,owner_id,description,created_at,modified_at,item_count
+0,All Files,,11446498,,2026-01-10T09:00:00-05:00,2026-10-01T09:00:00-04:00,1
+folder-fieldstone,Fieldstone Agricultural Foundation,0,20055123,Shared grant materials from the Fieldstone Agricultural Foundation.,2026-08-01T09:00:00-04:00,2026-09-25T09:00:00-04:00,2
+folder-grant-templates,Grant Templates,folder-fieldstone,20055123,Deep Roots application and budget templates.,2026-08-01T09:05:00-04:00,2026-09-25T09:00:00-04:00,2
+folder-submission-forms,Submission Forms,folder-fieldstone,20055123,Final submission checklist and cover forms.,2026-08-01T09:06:00-04:00,2026-09-25T09:00:00-04:00,1

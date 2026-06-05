@@ -1,0 +1,14 @@
+{
+  "user": {
+    "displayName": "Gloria Wiggins",
+    "emailAddress": "gloria.wiggins@voissync.ai",
+    "permissionId": "perm-gloria"
+  },
+  "storageQuota": {
+    "limit": "16106127360",
+    "usage": "2240518400",
+    "usageInDrive": "2100000000",
+    "usageInDriveTrash": "8000000"
+  },
+  "maxUploadSize": "5368709120"
+}

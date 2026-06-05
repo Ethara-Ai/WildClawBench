@@ -1,0 +1,9 @@
+Id,Name,AccountType,AccountSubType,CurrentBalance,Active,Classification,Description
+1,Deep Roots - Personnel/Outreach,Expense,PayrollExpenses,38000,True,Expense,"Deep Roots grant: program coordinator and community outreach, two-year."
+2,Deep Roots - Materials & Soil Testing,Expense,SuppliesMaterials,16500,True,Expense,"Deep Roots grant: trial materials, seed, and soil testing."
+3,Deep Roots - Travel,Expense,Travel,9500,True,Expense,Deep Roots grant: field travel across Piedmont counties.
+4,Deep Roots - Translation/Documentation,Expense,OtherMiscellaneousServiceCost,12000,True,Expense,Deep Roots grant: Gullah/Geechee documentation and translation.
+5,Deep Roots - Evaluation,Expense,OtherMiscellaneousServiceCost,9000,True,Expense,Deep Roots grant: program evaluation and reporting.
+6,Business Checking,Bank,Checking,14250.75,True,Asset,Operating checking account.
+7,Grant Income,Income,OtherPrimaryIncome,0,True,Revenue,Deep Roots grant income (pending award).
+8,Accounts Payable,Accounts Payable,AccountsPayable,0,True,Liability,Vendor payables.

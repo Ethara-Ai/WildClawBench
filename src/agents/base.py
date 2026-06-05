@@ -29,6 +29,11 @@ class AgentTaskSpec:
     # run a single turn from ``prompt`` and ignore them.
     turns: tuple[str, ...] | None = None
     before_turn: Callable[[int], None] | None = None
+    # Sub-agent (``spawn_subagent``) support. Opt-in via the task's
+    # ``task_config.yaml``. Only the openclaw backend honours these fields;
+    # other backends ignore them.
+    multi_agent_enabled: bool = False
+    multi_agent_config: dict[str, Any] | None = None
 
 
 @dataclass

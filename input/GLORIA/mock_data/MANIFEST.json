@@ -1,0 +1,112 @@
+{
+  "task_id": "GLORI_001_october_grant_crunch",
+  "generated_at_utc": "2026-06-05T11:48:57+00:00",
+  "services": [
+    "gmail-api",
+    "google-drive-api",
+    "google-calendar-api",
+    "notion-api",
+    "quickbooks-api",
+    "airtable-api",
+    "docusign-api",
+    "slack-api",
+    "box-api",
+    "mailchimp-api",
+    "ring-api",
+    "trello-api",
+    "nasa-api"
+  ],
+  "files": {
+    "gmail-api": [
+      "Mock Data/gmail-api/profile.json",
+      "Mock Data/gmail-api/labels.csv",
+      "Mock Data/gmail-api/messages.csv",
+      "Mock Data/gmail-api/drafts.csv"
+    ],
+    "google-drive-api": [
+      "Mock Data/google-drive-api/about.json",
+      "Mock Data/google-drive-api/files.csv",
+      "Mock Data/google-drive-api/permissions.csv"
+    ],
+    "google-calendar-api": [
+      "Mock Data/google-calendar-api/calendars.csv",
+      "Mock Data/google-calendar-api/events.csv",
+      "Mock Data/google-calendar-api/event_attendees.csv"
+    ],
+    "notion-api": [
+      "Mock Data/notion-api/workspace.json",
+      "Mock Data/notion-api/users.csv",
+      "Mock Data/notion-api/pages.csv",
+      "Mock Data/notion-api/databases.csv",
+      "Mock Data/notion-api/blocks.csv",
+      "Mock Data/notion-api/page_properties.csv",
+      "Mock Data/notion-api/comments.csv"
+    ],
+    "quickbooks-api": [
+      "Mock Data/quickbooks-api/accounts.csv",
+      "Mock Data/quickbooks-api/customers.csv",
+      "Mock Data/quickbooks-api/vendors.csv",
+      "Mock Data/quickbooks-api/items.csv",
+      "Mock Data/quickbooks-api/company_info.json",
+      "Mock Data/quickbooks-api/invoices.json",
+      "Mock Data/quickbooks-api/bills.json",
+      "Mock Data/quickbooks-api/payments.json",
+      "Mock Data/quickbooks-api/estimates.json",
+      "Mock Data/quickbooks-api/expenses.json"
+    ],
+    "airtable-api": [
+      "Mock Data/airtable-api/bases.csv",
+      "Mock Data/airtable-api/tables.csv",
+      "Mock Data/airtable-api/fields.csv",
+      "Mock Data/airtable-api/records_trial_data.csv"
+    ],
+    "docusign-api": [
+      "Mock Data/docusign-api/templates.csv",
+      "Mock Data/docusign-api/envelopes.csv",
+      "Mock Data/docusign-api/documents.csv",
+      "Mock Data/docusign-api/recipients.csv"
+    ],
+    "slack-api": [
+      "Mock Data/slack-api/team.json",
+      "Mock Data/slack-api/users.csv",
+      "Mock Data/slack-api/channels.csv",
+      "Mock Data/slack-api/channel_members.csv",
+      "Mock Data/slack-api/messages.csv"
+    ],
+    "box-api": [
+      "Mock Data/box-api/users.csv",
+      "Mock Data/box-api/folders.csv",
+      "Mock Data/box-api/files.csv"
+    ],
+    "mailchimp-api": [
+      "Mock Data/mailchimp-api/lists.csv",
+      "Mock Data/mailchimp-api/members.csv",
+      "Mock Data/mailchimp-api/campaigns.csv",
+      "Mock Data/mailchimp-api/reports.csv"
+    ],
+    "ring-api": [
+      "Mock Data/ring-api/devices.json",
+      "Mock Data/ring-api/location.json",
+      "Mock Data/ring-api/active_dings.json",
+      "Mock Data/ring-api/events.csv",
+      "Mock Data/ring-api/shared_users.csv",
+      "Mock Data/ring-api/motion_zones.csv",
+      "Mock Data/ring-api/notification_prefs.csv"
+    ],
+    "trello-api": [
+      "Mock Data/trello-api/members.csv",
+      "Mock Data/trello-api/boards.csv",
+      "Mock Data/trello-api/lists.csv",
+      "Mock Data/trello-api/cards.csv",
+      "Mock Data/trello-api/checklists.csv"
+    ],
+    "nasa-api": [
+      "Mock Data/nasa-api/apod.csv",
+      "Mock Data/nasa-api/rover_photos.csv",
+      "Mock Data/nasa-api/rovers.csv",
+      "Mock Data/nasa-api/neos.csv",
+      "Mock Data/nasa-api/epic.csv"
+    ]
+  },
+  "skipped": {}
+}

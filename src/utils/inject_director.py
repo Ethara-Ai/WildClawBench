@@ -151,23 +151,48 @@ class InjectScript:
             raise InjectConfigError(f"no stageN/ dirs under {d}")
         stages: List[InjectStage] = []
         for sd in stage_dirs:
+            idx = int(re.match(r"stage(\d+)$", sd.name).group(1))
             mf = sd / "mutations.json"
             if not mf.is_file():
-                LOG.warning("inject: %s has no mutations.json; skipping", sd.name)
-                continue
+                # Talos task-pack export form (e.g. GLORIA) uses STAGE{N}_INJECT.json.
+                alt = sd / f"STAGE{idx}_INJECT.json"
+                if alt.is_file():
+                    mf = alt
+                else:
+                    LOG.warning("inject: %s has no mutations.json or %s; skipping",
+                                sd.name, alt.name)
+                    continue
             try:
                 raw = json.loads(mf.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError) as exc:
                 raise InjectConfigError(f"{mf}: {exc}") from exc
-            idx = int(re.match(r"stage(\d+)$", sd.name).group(1))
             between = (
                 raw.get("applies_between_turns")
                 or raw.get("applied_between")
-                or [None, None]
             )
+            if not between:
+                # Talos export form carries a single integer `fires_after_turn: N`.
+                # Stage with index 0 is always the seed by convention (its loud ops
+                # are NOT replayed by default; see module docstring), so it maps to
+                # (None, None) regardless of file contents. For other stages, a
+                # `fires_after_turn: N` means "applied between TN and T(N+1)".
+                if idx == 0:
+                    between = [None, None]
+                else:
+                    fat = raw.get("fires_after_turn")
+                    n = _turn_to_index(fat)
+                    if n is None or n < 0:
+                        between = [None, None]
+                    else:
+                        between = [n, n + 1]
             from_turn = _turn_to_index(between[0]) if len(between) > 0 else None
             to_turn = _turn_to_index(between[1]) if len(between) > 1 else None
-            fs, loud, silent = _coerce_mutation_buckets(raw.get("mutations"))
+            # Talos export uses `injections` for the flat op list; the original
+            # LAYLA-flavored form uses `mutations` (dict-of-buckets or list).
+            raw_muts = raw.get("mutations")
+            if raw_muts is None:
+                raw_muts = raw.get("injections")
+            fs, loud, silent = _coerce_mutation_buckets(raw_muts)
             if not (fs or loud or silent):
                 LOG.warning("inject: %s mutations had no recognized ops "
                             "(shape=%s)", sd.name, type(raw.get("mutations")).__name__)
@@ -205,16 +230,18 @@ class InjectScript:
 # prompts.txt parsing (50-turn wake-up script)
 # ---------------------------------------------------------------------------
 
-_TURN_RE = re.compile(r"^---\s*TURN\s+T(\d+)\b.*?---\s*$", re.IGNORECASE)
+_TURN_RE = re.compile(r"^---\s*TURN\s+T?(\d+)\b.*?---\s*$", re.IGNORECASE)
 
 
 def parse_prompts_file(path: Path | str) -> List[str]:
     """Parse a ``prompts.txt`` into an ordered list of per-turn wake-up messages.
 
-    Recognizes block headers of the form ``--- TURN T<n> (...) ---``; the body
-    is every non-comment, non-blank line until the next header. Leading ``#``
-    banner/comment lines (before the first TURN header, and full-line ``#``
-    comments) are ignored. Turns are returned ordered by their T-index.
+    Recognizes block headers of the form ``--- TURN T<n> (...) ---`` (LAYLA
+    convention) OR ``--- TURN <n> (...) ---`` (GLORIA / Talos export convention,
+    no ``T`` prefix). The body is every non-comment, non-blank line until the
+    next header. Leading ``#`` banner/comment lines (before the first TURN
+    header, and full-line ``#`` comments) are ignored. Turns are returned
+    ordered by their numeric index.
     """
     text = Path(path).read_text(encoding="utf-8")
     turns: Dict[int, List[str]] = {}

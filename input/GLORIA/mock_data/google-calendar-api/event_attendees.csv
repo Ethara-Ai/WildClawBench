@@ -1,0 +1,3 @@
+event_id,email,display_name,response_status,optional,organizer
+evt_hawkins_review_call,gloria.wiggins@voissync.ai,Gloria Wiggins,accepted,False,False
+evt_hawkins_review_call,patricia.hawkins@gmail.com,Dr. Patricia Hawkins,accepted,False,True

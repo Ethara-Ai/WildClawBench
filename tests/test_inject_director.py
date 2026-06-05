@@ -75,3 +75,119 @@ def test_sm3_resolves_against_live_store_despite_placeholder_and_casing():
     assert fields.get("Yield_kg_m2") == 16.8  # yield_kg_m2 -> real column casing
     assert "_last_modified_by" not in fields  # underscore meta stripped
     assert "_last_modified_at" not in fields
+
+
+# ---------------------------------------------------------------------------
+# Talos task-pack export form (GLORIA-style) compatibility
+# ---------------------------------------------------------------------------
+#
+# These tests run without the LAYLA fixture: they build tiny on-disk inject
+# trees in tmp_path so they exercise the loader/parser additions in isolation.
+
+import json
+import pytest
+
+
+def _write_stage(stage_dir: Path, payload: dict, filename: str) -> None:
+    stage_dir.mkdir(parents=True, exist_ok=True)
+    (stage_dir / filename).write_text(json.dumps(payload))
+
+
+def test_load_accepts_stagen_inject_filename(tmp_path):
+    """Talos export uses STAGE{N}_INJECT.json instead of mutations.json."""
+    inject_root = tmp_path / "inject"
+    _write_stage(inject_root / "stage0", {"mutations": {"silent": []}}, "STAGE0_INJECT.json")
+    _write_stage(
+        inject_root / "stage1",
+        {"applies_between_turns": ["T1", "T2"], "mutations": {"silent": []}},
+        "STAGE1_INJECT.json",
+    )
+
+    sc = InjectScript.load(inject_root)
+    by_idx = {s.index: s for s in sc.stages}
+    assert set(by_idx) == {0, 1}
+    assert by_idx[0].is_seed
+    assert (by_idx[1].from_turn, by_idx[1].to_turn) == (1, 2)
+
+
+def test_load_synthesizes_boundary_from_fires_after_turn(tmp_path):
+    """fires_after_turn: N -> applied_between [N, N+1]; stage 0 stays seed."""
+    inject_root = tmp_path / "inject"
+    _write_stage(
+        inject_root / "stage0",
+        {"fires_after_turn": 0, "mutations": {"silent": []}},
+        "STAGE0_INJECT.json",
+    )
+    _write_stage(
+        inject_root / "stage1",
+        {"fires_after_turn": 5, "mutations": {"silent": []}},
+        "STAGE1_INJECT.json",
+    )
+    _write_stage(
+        inject_root / "stage2",
+        {"fires_after_turn": 12, "mutations": {"silent": []}},
+        "STAGE2_INJECT.json",
+    )
+
+    sc = InjectScript.load(inject_root)
+    by_idx = {s.index: s for s in sc.stages}
+    # stage 0 is always seed regardless of fires_after_turn value
+    assert by_idx[0].is_seed
+    assert (by_idx[0].from_turn, by_idx[0].to_turn) == (None, None)
+    # other stages synthesize a [N, N+1] boundary
+    assert (by_idx[1].from_turn, by_idx[1].to_turn) == (5, 6)
+    assert (by_idx[2].from_turn, by_idx[2].to_turn) == (12, 13)
+    assert sc.stage_for_boundary(6) is by_idx[1]
+    assert sc.stage_for_boundary(13) is by_idx[2]
+    assert sc.stage_for_boundary(99) is None
+
+
+def test_load_accepts_flat_injections_list_with_silent_flag(tmp_path):
+    """Talos uses 'injections:[]' with per-op 'silent: true|false'."""
+    inject_root = tmp_path / "inject"
+    _write_stage(
+        inject_root / "stage0",
+        {
+            "injections": [
+                {"id": "F0-A", "kind": "filesystem", "copy_into_workspace": ["data/x.txt", "x.txt"]},
+                {"id": "LOUD-A", "service": "airtable-api", "method": "POST",
+                 "path": "/v0/seed", "body": {"x": 1}, "silent": False},
+                {"id": "SM-A", "service": "airtable-api", "method": "PATCH",
+                 "path": "/v0/things/recA", "body": {"fields": {"x": 2}}, "silent": True},
+            ],
+        },
+        "STAGE0_INJECT.json",
+    )
+
+    sc = InjectScript.load(inject_root)
+    [stage0] = sc.stages
+    # silent flag routes to silent bucket; missing/False routes to loud
+    silent_ids = [op.get("id") for op in stage0.silent]
+    loud_ids = [op.get("id") for op in stage0.loud]
+    fs_ids = [op.get("id") for op in stage0.filesystem]
+    assert silent_ids == ["SM-A"]
+    assert loud_ids == ["LOUD-A"]
+    assert fs_ids == ["F0-A"]
+
+
+def test_parse_prompts_file_accepts_turn_without_t_prefix(tmp_path):
+    """GLORIA uses '--- TURN <n> ---'; LAYLA uses '--- TURN T<n> ---'."""
+    p = tmp_path / "prompts.txt"
+    p.write_text(
+        "# header comment\n"
+        "--- TURN 1 (Day 1, 08:00, Light) ---\n"
+        "first turn body line one\n"
+        "first turn body line two\n"
+        "--- TURN T2 (Day 1, 09:00, Multi-Agent) ---\n"
+        "second turn body\n"
+        "--- TURN 3 ---\n"
+        "third turn body\n"
+    )
+    turns = parse_prompts_file(p)
+    assert len(turns) == 3
+    assert turns[0].startswith("first turn body")
+    assert "first turn body line two" in turns[0]
+    assert turns[1].startswith("second turn body")
+    assert turns[2].startswith("third turn body")
+    # comment/banner lines never leak into a turn body
+    assert "header comment" not in "\n".join(turns)

@@ -210,6 +210,19 @@ def _attach_drift_script(task: dict, task_dir: Path) -> dict:
     inject_dir = task_dir / "inject"
     if inject_dir.is_dir():
         task["inject_path"] = str(inject_dir.resolve())
+    # task_config.yaml carries opt-in feature toggles (currently the
+    # multi_agent.* block consumed by openclaw's spawn_subagent skill).
+    task["multi_agent_config"] = {}
+    cfg_path = task_dir / "task_config.yaml"
+    if cfg_path.is_file():
+        try:
+            raw = yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {}
+            if isinstance(raw, dict):
+                ma = raw.get("multi_agent")
+                if isinstance(ma, dict):
+                    task["multi_agent_config"] = ma
+        except (yaml.YAMLError, OSError):
+            pass
     return task
 
 

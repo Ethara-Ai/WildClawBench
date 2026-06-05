@@ -1,0 +1,7 @@
+id,createdTime,Variety,Type,Resistance,Transplant,First Fruit,Days to Fruit,Yield (lbs),Drought (1-5),Notes
+recCherokeeP001,2026-04-18T08:00:00.000Z,Cherokee Purple,indeterminate,heirloom,2026-04-18,2026-07-02,75,41.5,2,"Heirloom flavor favorite; soft in heat, lower set."
+recCelebrity002,2026-04-18T08:00:00.000Z,Celebrity,determinate,VFNT,2026-04-18,2026-06-26,69,52.0,3,Reliable standard; consistent across plots.
+recMtnMerit003,2026-04-18T08:00:00.000Z,Mountain Merit,determinate,VFFNT-LB,2026-04-18,2026-06-28,71,58.3,4,Strong disease package; top static-sheet yield.
+recHeatSet004,2026-04-18T08:00:00.000Z,Heat-set HS-2,determinate,heat-set,2026-04-20,2026-07-05,76,47.1,5,Held fruit set through the July heat spike.
+recBetterBoy005,2026-04-18T08:00:00.000Z,Better Boy,indeterminate,VFN,2026-04-20,2026-07-01,72,49.8,2,Cracked after the late-June rain; staking helped.
+recFamilyOP006,2026-04-18T08:00:00.000Z,Family OP (Wiggins),indeterminate,OP,2026-04-20,2026-07-08,79,38.4,3,Grandma Bernice's saved seed line; keeping for stewardship.

@@ -1,0 +1,3 @@
+id,name,close_approach_date,absolute_magnitude_h,est_diameter_min_km,est_diameter_max_km,is_potentially_hazardous,miss_distance_km,relative_velocity_kph,orbiting_body
+2000001,(2026 GW1),2026-10-12,22.1,0.08,0.18,False,4500000,38000,Earth
+2000002,(2026 PA3),2026-10-15,19.8,0.21,0.47,True,2100000,61000,Earth

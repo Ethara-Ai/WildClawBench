@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Harvest log tracking where the season's produce goes (family kitchen, freezer, shared). Source dataset: 25.csv -->
+<harvestDistributionLog owner="Gloria Wiggins" year="2026">
+  <harvest>
+    <date>26-06-2026</date>
+    <crop>tomato</crop>
+    <variety>Celebrity</variety>
+    <quantityLbs>6.2</quantityLbs>
+    <destination>grandmother's kitchen</destination>
+    <notes>first ripe</notes>
+  </harvest>
+  <harvest>
+    <date>04-07-2026</date>
+    <crop>tomato</crop>
+    <variety>Mountain Merit</variety>
+    <quantityLbs>9.8</quantityLbs>
+    <destination>mother's freezer (sauce)</destination>
+    <notes>peak week</notes>
+  </harvest>
+  <harvest>
+    <date>04-07-2026</date>
+    <crop>okra</crop>
+    <variety>Clemson Spineless</variety>
+    <quantityLbs>2.1</quantityLbs>
+    <destination>household</destination>
+    <notes>picked young</notes>
+  </harvest>
+  <harvest>
+    <date>12-07-2026</date>
+    <crop>tomato</crop>
+    <variety>Cherokee Purple</variety>
+    <quantityLbs>7.5</quantityLbs>
+    <destination>shared - neighbors</destination>
+    <notes>flavor favorite</notes>
+  </harvest>
+  <harvest>
+    <date>02-08-2026</date>
+    <crop>field peas</crop>
+    <variety>Whippoorwill</variety>
+    <quantityLbs>4</quantityLbs>
+    <destination>Sunday dinner</destination>
+    <notes>shelled</notes>
+  </harvest>
+  <harvest>
+    <date>10-09-2026</date>
+    <crop>sweet potato</crop>
+    <variety>Beauregard</variety>
+    <quantityLbs>22</quantityLbs>
+    <destination>cure then store</destination>
+    <notes>dug before frost risk</notes>
+  </harvest>
+  <harvest>
+    <date>18-10-2026</date>
+    <crop>collards</crop>
+    <variety>Georgia Southern</variety>
+    <quantityLbs>5.5</quantityLbs>
+    <destination>mother's kitchen</destination>
+    <notes>after first light frost</notes>
+  </harvest>
+</harvestDistributionLog>

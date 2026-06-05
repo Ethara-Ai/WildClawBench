@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Soil test results for backyard beds and client farms (Piedmont red clay). Source dataset: 31.csv -->
+<soilTestResults owner="Gloria Wiggins" targetPH="6.2-6.8">
+  <sample>
+    <sampleDate>2026-01-12</sampleDate>
+    <plot>backyard bed A</plot>
+    <cropPlanned>tomato</cropPlanned>
+    <ph>6.1</ph>
+    <pPpm>48</pPpm>
+    <kPpm>165</kPpm>
+    <caPpm>1100</caPpm>
+    <mgPpm>140</mgPpm>
+    <organicMatterPct>3.4</organicMatterPct>
+    <limeRecLbs1000sqft>30</limeRecLbs1000sqft>
+    <notes>slightly acidic; lime applied</notes>
+  </sample>
+  <sample>
+    <sampleDate>2026-01-12</sampleDate>
+    <plot>backyard bed B</plot>
+    <cropPlanned>greens/okra</cropPlanned>
+    <ph>6.4</ph>
+    <pPpm>52</pPpm>
+    <kPpm>180</kPpm>
+    <caPpm>1250</caPpm>
+    <mgPpm>155</mgPpm>
+    <organicMatterPct>3.8</organicMatterPct>
+    <limeRecLbs1000sqft>0</limeRecLbs1000sqft>
+    <notes>in range</notes>
+  </sample>
+  <sample>
+    <sampleDate>2026-01-15</sampleDate>
+    <plot>herb garden</plot>
+    <cropPlanned>perennial herbs</cropPlanned>
+    <ph>6.6</ph>
+    <pPpm>40</pPpm>
+    <kPpm>150</kPpm>
+    <caPpm>1300</caPpm>
+    <mgPpm>160</mgPpm>
+    <organicMatterPct>4.1</organicMatterPct>
+    <limeRecLbs1000sqft>0</limeRecLbs1000sqft>
+    <notes>good structure</notes>
+  </sample>
+  <sample>
+    <sampleDate>2026-02-02</sampleDate>
+    <plot>client - North plot</plot>
+    <cropPlanned>mixed veg</cropPlanned>
+    <ph>5.7</ph>
+    <pPpm>31</pPpm>
+    <kPpm>120</kPpm>
+    <caPpm>900</caPpm>
+    <mgPpm>110</mgPpm>
+    <organicMatterPct>2.2</organicMatterPct>
+    <limeRecLbs1000sqft>50</limeRecLbs1000sqft>
+    <notes>needs lime + compost</notes>
+  </sample>
+  <sample>
+    <sampleDate>2026-02-02</sampleDate>
+    <plot>client - South plot</plot>
+    <cropPlanned>sweet potato</cropPlanned>
+    <ph>6.0</ph>
+    <pPpm>38</pPpm>
+    <kPpm>140</kPpm>
+    <caPpm>1000</caPpm>
+    <mgPpm>130</mgPpm>
+    <organicMatterPct>2.9</organicMatterPct>
+    <limeRecLbs1000sqft>25</limeRecLbs1000sqft>
+    <notes>loosen for ridges</notes>
+  </sample>
+</soilTestResults>

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Farm visit & consultation log for small and Black-owned Piedmont farms (clients anonymized). Source dataset: 23.csv -->
+<farmVisitLog owner="Gloria Wiggins" office="Piedmont County Cooperative Extension" confidentiality="client refs anonymized">
+  <visit>
+    <date>2026-03-10</date>
+    <farmRef>F-014</farmRef>
+    <countyArea>north</countyArea>
+    <crops>mixed vegetable</crops>
+    <concern>low yield, acidic soil</concern>
+    <recommendation>soil test + lime + compost</recommendation>
+    <referral>NCDA soil lab</referral>
+    <followupDate>2026-04-10</followupDate>
+    <status>done</status>
+  </visit>
+  <visit>
+    <date>2026-03-24</date>
+    <farmRef>F-007</farmRef>
+    <countyArea>east</countyArea>
+    <crops>sweet potato</crops>
+    <concern>heavy clay drainage</concern>
+    <recommendation>raised ridges, loosen subsoil</recommendation>
+    <referral>cost-share</referral>
+    <followupDate>2026-05-01</followupDate>
+    <status>open</status>
+  </visit>
+  <visit>
+    <date>2026-04-15</date>
+    <farmRef>F-021</farmRef>
+    <countyArea>south</countyArea>
+    <crops>tomato, peppers</crops>
+    <concern>early blight history</concern>
+    <recommendation>staking, rotation, drip</recommendation>
+    <referral>extension workshop</referral>
+    <followupDate>2026-05-20</followupDate>
+    <status>open</status>
+  </visit>
+  <visit>
+    <date>2026-04-29</date>
+    <farmRef>F-003</farmRef>
+    <countyArea>west</countyArea>
+    <crops>row crops</crops>
+    <concern>water access dispute</concern>
+    <recommendation>document use; seek help early</recommendation>
+    <referral>legal aid</referral>
+    <followupDate>2026-05-15</followupDate>
+    <status>open</status>
+  </visit>
+  <visit>
+    <date>2026-05-12</date>
+    <farmRef>F-018</farmRef>
+    <countyArea>north</countyArea>
+    <crops>greens, okra</crops>
+    <concern>heirs' property, no farm number</concern>
+    <recommendation>clear title; obtain farm number</recommendation>
+    <referral>legal aid + USDA</referral>
+    <followupDate>2026-06-12</followupDate>
+    <status>open</status>
+  </visit>
+</farmVisitLog>
