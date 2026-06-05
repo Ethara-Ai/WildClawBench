@@ -111,6 +111,12 @@ def sanitize_jsonl_message(msg: Mapping) -> dict:
     for key in _INTERNAL_MSG_FIELDS:
         out.pop(key, None)
 
+    usage = out.get("usage")
+    if isinstance(usage, dict) and "cost" in usage:
+        usage = dict(usage)
+        usage.pop("cost", None)
+        out["usage"] = usage
+
     content = out.get("content")
     if isinstance(content, list):
         cleaned = []
