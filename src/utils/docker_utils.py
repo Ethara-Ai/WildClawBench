@@ -22,6 +22,72 @@ def remove_container(name: str) -> None:
     subprocess.run(["docker", "rm", "-f", name], capture_output=True)
 
 
+def _container_running(task_id: str) -> bool:
+    r = subprocess.run(
+        ["docker", "inspect", "-f", "{{.State.Running}}", task_id],
+        capture_output=True, text=True,
+    )
+    return r.returncode == 0 and r.stdout.strip() == "true"
+
+
+def _map_workspace_dst(container_dst: str) -> str:
+    """Map an inject mutation's container path to the live agent workspace.
+
+    Inject mutations address files as ``/workspace/<rel>`` (occasionally
+    ``/app/<rel>``); the agent's writable tree lives at ``TMP_WORKSPACE``, which
+    ``/root/workspace`` and ``/root/.openclaw/workspace`` symlink to. A relative
+    path is taken as workspace-relative. Other absolute paths are honored as-is.
+    """
+    p = str(container_dst or "").strip()
+    for prefix in ("/workspace/", "/app/"):
+        if p.startswith(prefix):
+            return str(PurePosixPath(TMP_WORKSPACE) / p[len(prefix):])
+    if p in ("/workspace", "/app"):
+        return TMP_WORKSPACE
+    if p.startswith(TMP_WORKSPACE) or p.startswith("/"):
+        return p
+    return str(PurePosixPath(TMP_WORKSPACE) / p)
+
+
+def copy_file_into_workspace(task_id: str, host_src: "Path | None",
+                             container_dst: str, mkdir: bool = False) -> bool:
+    """InjectDirector filesystem hook: place a host file (or mkdir) inside the
+    running agent container's workspace via ``docker cp`` / ``docker exec``.
+
+    Returns False (the caller logs it as a skipped fs op) when the container is
+    not running — e.g. the pre-T0 seed stage, which fires before the agent
+    container starts and whose drops are redundant with the mounted ``/app``
+    baseline. Per-turn drops fire mid-run while the container is up.
+    """
+    if not _container_running(task_id):
+        logger.info("[%s] inject fs: container not up; skip %s", task_id, container_dst)
+        return False
+    dst = _map_workspace_dst(container_dst)
+    try:
+        if mkdir:
+            r = subprocess.run(["docker", "exec", task_id, "mkdir", "-p", dst],
+                               capture_output=True, text=True)
+            return r.returncode == 0
+        if host_src is None:
+            return False
+        parent = str(PurePosixPath(dst).parent)
+        subprocess.run(["docker", "exec", task_id, "mkdir", "-p", parent],
+                       capture_output=True, text=True)
+        r = subprocess.run(["docker", "cp", str(host_src), f"{task_id}:{dst}"],
+                           capture_output=True, text=True)
+        if r.returncode != 0:
+            logger.warning("[%s] inject fs: docker cp failed %s -> %s: %s",
+                           task_id, host_src, dst, (r.stderr or "").strip())
+            return False
+        # Keep agent-writable so later turns can edit (mirrors setup_workspace).
+        subprocess.run(["docker", "exec", task_id, "chmod", "-R", "u+w", dst],
+                       capture_output=True, text=True)
+        return True
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning("[%s] inject fs: error placing %s: %s", task_id, dst, exc)
+        return False
+
+
 def require_image_present(image: str) -> None:
     # Strict precheck for images that must already exist locally (the agent
     # image is loaded from the HuggingFace tar via `docker load`; we never

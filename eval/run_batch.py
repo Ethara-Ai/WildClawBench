@@ -1017,13 +1017,22 @@ def run_single_task(
         # `silent` mutations fire (kept out of the agent-visible audit feed).
         try:
             from src.utils.inject_director import InjectScript, InjectApplier
+            from src.utils.docker_utils import copy_file_into_workspace
             _is = InjectScript.load(task["inject_path"])
+
+            def _copy_into_workspace(host_src, dst, mkdir=False, _tid=task_id):
+                # Drop per-turn inject artifacts (emails, PDFs, silent file
+                # swaps) into the running agent container's workspace. The pre-T0
+                # seed fires before the container exists -> hook returns False and
+                # the op is logged skipped (baseline already mounted at /app).
+                return copy_file_into_workspace(_tid, host_src, dst, mkdir=mkdir)
+
             inject_applier = InjectApplier(
                 host_api_to_url=drift_info.get("host_api_to_url") or {},
                 admin_token=drift_info.get("admin_token"),
                 timeline_path=output_dir / "inject_timeline.jsonl",
                 inject_root=Path(task["inject_path"]),
-                copy_into_workspace=None,  # filesystem drops overlap data/+persona/; logged-skipped
+                copy_into_workspace=_copy_into_workspace,
             )
             inject_applier.seed(_is)
             raw_turns = list(task.get("turn_messages") or [])

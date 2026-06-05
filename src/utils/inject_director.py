@@ -340,12 +340,22 @@ class InjectApplier:
             rec.update(ok=False, status="skipped", reason="missing src/dst")
             self._append({"type": "inject.fs", **rec, "ts": time.time()})
             return rec
-        host_src = (Path(stage.source).parent / src).resolve()
+        stage_dir = Path(stage.source).parent
+        host_src = (stage_dir / src).resolve()
+        # Several Talos ops name only the bare filename in ``src`` while the file
+        # actually lives in a stage subdir (grants/, family/, field/maps/, ...).
+        # Fall back to a basename search within the stage dir before giving up.
+        if not host_src.exists():
+            hits = [p for p in stage_dir.rglob(Path(src).name)
+                    if p.is_file() and "_placeholders" not in p.parts]
+            if hits:
+                host_src = hits[0].resolve()
         # Placeholder stand-ins are never load-bearing content; skip with a note.
         if not host_src.exists():
             rec.update(ok=False, status="missing_src", reason=str(host_src))
             self._append({"type": "inject.fs", **rec, "ts": time.time()})
             return rec
+        rec["src"] = str(host_src)
         try:
             ok = self._copy(host_src, dst)
             rec.update(ok=bool(ok), status="copied")
@@ -388,6 +398,182 @@ class InjectApplier:
         except requests.RequestException as exc:
             return {"ok": False, "error": str(exc)}
 
+    def _admin_post(self, api: str, suffix: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        base = self._urls.get(api)
+        if not base:
+            return {"ok": False, "error": "no admin URL"}
+        try:
+            r = self._session.post(base.rstrip("/") + suffix, json=payload,
+                                   headers=self._headers(), timeout=5.0)
+            ctype = r.headers.get("content-type", "")
+            return {"ok": r.status_code < 300, "status": r.status_code,
+                    "body": r.json() if ctype.startswith("application/json") else r.text[:200]}
+        except requests.RequestException as exc:
+            return {"ok": False, "error": str(exc)}
+
+    def _list_tables(self, api: str) -> List[str]:
+        resp = self._admin_get(api, "/admin/tables")
+        tlist = resp.get("tables", []) if isinstance(resp, dict) else (resp or [])
+        return [t.get("name") if isinstance(t, dict) else t for t in tlist]
+
+    def _resolve_store_table(self, api: str, wanted: Optional[str]) -> Optional[str]:
+        """Map a friendly table name to the real registered store table name
+        (airtable registers tables as ``records_<tableId>``, etc.)."""
+        if not wanted:
+            return wanted
+        names = self._list_tables(api)
+        w = str(wanted).lower()
+        for n in names:                       # exact
+            if str(n).lower() == w:
+                return n
+        for n in names:                       # records_<wanted> / plural
+            if str(n).lower() in (f"records_{w}", f"{w}s", f"records_{w}s"):
+                return n
+        for n in names:                       # substring either direction
+            nl = str(n).lower()
+            if w in nl or nl in w:
+                return n
+        return wanted
+
+    def _admin_get_rows(self, api: str, table: str) -> List[Dict[str, Any]]:
+        data = self._admin_get(api, f"/admin/data/{table}")
+        if isinstance(data, dict):
+            return data.get("rows", data.get("data", [])) or []
+        return data or []
+
+    @staticmethod
+    def _row_bag(row: Dict[str, Any]) -> Dict[str, Any]:
+        return row["fields"] if isinstance(row.get("fields"), dict) else row
+
+    def _patch_row(self, api: str, table: str, row: Dict[str, Any],
+                   set_: Dict[str, Any]) -> Dict[str, Any]:
+        """Patch one row, nested-``fields`` aware. The admin PATCH shallow-merges
+        top-level keys, so an airtable-style nested ``fields`` object must be
+        resent whole (existing + overrides)."""
+        pk = row.get("id") or row.get("pk")
+        if pk is None:
+            return {"ok": False, "error": "no pk"}
+        if isinstance(row.get("fields"), dict):
+            payload = {"fields": {**row["fields"], **set_}}
+        else:
+            payload = dict(set_)
+        return self._admin_patch(api, table, str(pk), payload)
+
+    def _apply_admin_op(self, api: str, spec: Dict[str, Any], op: Dict[str, Any],
+                        silent: bool = True) -> Dict[str, Any]:
+        """Apply an explicit admin-plane op. ``spec`` is the op's ``admin`` block:
+          * ``{op:'patch', table, pk, set:{...}}``          -- one row
+          * ``{op:'update_where', table, where:{...}, set:{...}}`` -- bulk by field
+          * ``{op:'doc_set', document, path:[...], value}`` -- nested document value
+        """
+        kind = (spec.get("op") or "patch").lower()
+        rec: Dict[str, Any] = {"id": op.get("id"), "service": api, "silent": silent,
+                               "admin_op": kind}
+        try:
+            if kind == "patch":
+                table = self._resolve_store_table(api, spec.get("table"))
+                pk = str(spec.get("pk"))
+                set_ = spec.get("set") or {}
+                row = self._admin_get(api, f"/admin/data/{table}/{pk}")
+                if not isinstance(row, dict):
+                    rec.update(ok=False, status="unresolved", table=table, pk=pk,
+                               reason="row not found")
+                else:
+                    bag = self._row_bag(row)
+                    before = {k: bag.get(k) for k in set_}
+                    res = self._patch_row(api, table, row, set_)
+                    after = {k: v for k, v in set_.items()} if res.get("ok") else before
+                    rec.update(table=table, pk=pk, ok=bool(res.get("ok")),
+                               http=res.get("status"), before=before, after=after,
+                               changed=res.get("ok") and before != after,
+                               status="applied" if res.get("ok") else "failed")
+            elif kind in ("update_where", "bulk"):
+                table = self._resolve_store_table(api, spec.get("table"))
+                where = spec.get("where") or {}
+                set_ = spec.get("set") or {}
+                rows = self._admin_get_rows(api, table)
+                matched = ok = 0
+                before = after = None
+                for row in rows:
+                    if not isinstance(row, dict):
+                        continue
+                    bag = self._row_bag(row)
+                    if not all(self._loose_eq(bag.get(k), v) for k, v in where.items()):
+                        continue
+                    if before is None:
+                        before = {k: bag.get(k) for k in set_}
+                    res = self._patch_row(api, table, row, set_)
+                    matched += 1
+                    ok += 1 if res.get("ok") else 0
+                after = dict(set_) if ok else before
+                rec.update(table=table, matched=matched, patched=ok,
+                           before=before, after=after,
+                           changed=ok > 0 and before != after,
+                           ok=ok > 0, status="applied" if ok else "no-match")
+            elif kind == "upsert":
+                # Inject a new row (an incoming email / slack message / page) so it
+                # appears when the agent next READS that service — silent (no audit
+                # POST). For airtable-style stores the row nests under ``fields``.
+                table = self._resolve_store_table(api, spec.get("table"))
+                row = dict(spec.get("row") or {})
+                pk_field = spec.get("pk_field") or "id"
+                pk = row.get(pk_field)
+                existed = self._admin_get(api, f"/admin/data/{table}/{pk}") if pk else None
+                res = self._admin_post(api, f"/admin/data/{table}", {"row": row})
+                rec.update(table=table, pk=pk, ok=bool(res.get("ok")), http=res.get("status"),
+                           before=None if not isinstance(existed, dict) else "exists",
+                           after=pk,
+                           changed=res.get("ok") and not isinstance(existed, dict),
+                           status="applied" if res.get("ok") else "failed")
+            elif kind in ("doc_set", "doc_merge", "doc.merge"):
+                doc = spec.get("document") or spec.get("doc")
+                res = self._admin_doc_set(api, doc, spec.get("path") or [], spec.get("value"))
+                rec.update(document=doc, before=res.get("before"), after=res.get("after"),
+                           changed=res.get("changed"), ok=res.get("ok"), http=res.get("status"),
+                           status=("applied" if res.get("ok") and res.get("changed")
+                                   else ("no-change" if res.get("ok") else "failed")),
+                           reason=res.get("reason"))
+            else:
+                rec.update(ok=False, status="unresolved", reason=f"unknown admin op '{kind}'")
+        except Exception as exc:  # pragma: no cover - defensive
+            rec.update(ok=False, status="error", reason=str(exc))
+        self._append({"type": "inject.api", **rec, "ts": time.time()})
+        return rec
+
+    def _admin_doc_set(self, api: str, doc: str, path: List[Any], value: Any) -> Dict[str, Any]:
+        """Read-modify-merge a nested value in a registered document store
+        (e.g. notion ``properties`` = ``{page_id:{prop:{type,value}}}``)."""
+        cur = self._admin_get(api, f"/admin/doc/{doc}")
+        if not isinstance(cur, dict):
+            return {"ok": False, "before": None, "after": None, "changed": False,
+                    "reason": f"doc '{doc}' not found"}
+        if not path:
+            return {"ok": False, "changed": False, "reason": "empty path"}
+        node = cur
+        for key in path[:-1]:
+            if not isinstance(node, dict) or key not in node:
+                return {"ok": False, "before": None, "after": None, "changed": False,
+                        "reason": f"path {path} missing at '{key}'"}
+            node = node[key]
+        leaf = path[-1]
+        before = node.get(leaf) if isinstance(node, dict) else None
+        if before == value:
+            return {"ok": True, "before": before, "after": before, "changed": False}
+        node[leaf] = value
+        top = path[0]
+        res = self._admin_post(api, f"/admin/doc/{doc}/merge", {"fields": {top: cur[top]}})
+        return {"ok": bool(res.get("ok")), "before": before,
+                "after": value if res.get("ok") else before,
+                "changed": bool(res.get("ok")), "status": res.get("status")}
+
+    @staticmethod
+    def _loose_eq(a: Any, b: Any) -> bool:
+        if a == b:
+            return True
+        # tolerate bool/str ("True"/"true"/True) and numeric/str mismatches
+        sa, sb = str(a).strip().lower(), str(b).strip().lower()
+        return sa == sb
+
     def _apply_api_mutation(self, op: Dict[str, Any], stage: InjectStage,
                             turn_index: int, silent: bool) -> Dict[str, Any]:
         api = op.get("service") or op.get("api")
@@ -397,10 +583,23 @@ class InjectApplier:
             rec.update(ok=False, status="unresolved", reason=f"no admin URL for {api}")
             self._append({"type": "inject.api", **rec, "ts": time.time()})
             return rec
+        # Explicit admin-op form (the unambiguous representation): the op carries
+        # an ``admin`` block naming the exact store table/document, pk/where/path,
+        # and the values to set. Dispatched directly — no fuzzy path resolution.
+        if isinstance(op.get("admin"), dict):
+            return self._apply_admin_op(api, op["admin"], op, silent)
         resolved = self._resolve_target(api, op)
         if resolved is None:
-            rec.update(ok=False, status="unresolved",
-                       reason="could not locate target row in live store")
+            params = op.get("params") if isinstance(op.get("params"), dict) else None
+            if params and params.get("filter") and not params.get("field_updates"):
+                # e.g. SM8 "archive 53 rows matching <filter>": a bulk op with no
+                # per-row field_updates/record_id. Not a single-row patch; the
+                # archive column+value is unspecified, so we cannot apply it.
+                reason = ("bulk filter op unsupported (no record_id/field_updates; "
+                          f"filter={params.get('filter')!r})")
+            else:
+                reason = "could not locate target row in live store"
+            rec.update(ok=False, status="unresolved", reason=reason)
             self._append({"type": "inject.api", **rec, "ts": time.time()})
             return rec
         table, pk, fields = resolved
@@ -420,11 +619,20 @@ class InjectApplier:
         extract the business key embedded in the path placeholder, then scan the
         candidate store tables for the matching row and map field casing to the
         row's real column names.
+
+        Two on-disk op shapes are supported:
+          * stage1/2 REST form: ``{method, path:".../{rec_KEY}", body:{fields|
+            properties:{...}}}`` — key comes from the path placeholder.
+          * stage3 ``params`` form: ``{action, params:{table_id, record_id,
+            field_updates:{...}}}`` — record_id is the business key and
+            field_updates carries the new values. Bulk/filter params with no
+            ``record_id``/``field_updates`` (e.g. archive-by-filter) are not a
+            single-row patch and resolve to None (logged distinctly upstream).
         """
         new_fields = self._extract_fields(op)
         if not new_fields:
             return None
-        key = self._extract_key_from_path(op.get("path", ""))
+        key = self._extract_key_from_op(op)
         prefixes, key_cols = _SERVICE_RESOLUTION.get(api, ((), ("id",)))
         # /admin/tables returns {"tables":[{name,...}], "documents":[...]}.
         tbl_resp = self._admin_get(api, "/admin/tables")
@@ -444,11 +652,15 @@ class InjectApplier:
                 # actually holds the columns.
                 nested = isinstance(row.get("fields"), dict)
                 bag = row["fields"] if nested else row
-                if key is not None and not self._bag_matches_key(bag, key, key_cols):
-                    continue
                 pk = row.get("id") or row.get("pk")
                 if pk is None:
                     continue
+                if key is not None:
+                    # The key may be the store pk directly (stage3 record_id,
+                    # e.g. "recUDI007") or a business key in a column.
+                    pk_match = str(pk).strip().lower() == key.strip().lower()
+                    if not pk_match and not self._bag_matches_key(bag, key, key_cols):
+                        continue
                 mapped = self._map_fields_to_row(new_fields, bag)
                 if not mapped:
                     continue
@@ -463,6 +675,11 @@ class InjectApplier:
 
     @staticmethod
     def _extract_fields(op: Dict[str, Any]) -> Dict[str, Any]:
+        # stage3 params form: the new values live under params.field_updates.
+        params = op.get("params")
+        if isinstance(params, dict) and isinstance(params.get("field_updates"), dict):
+            return {k: v for k, v in params["field_updates"].items()
+                    if not str(k).startswith("_")}
         body = op.get("body") or {}
         if not isinstance(body, dict):
             return {}
@@ -478,6 +695,19 @@ class InjectApplier:
         # whole-body scalar fields (rare)
         return {k: v for k, v in body.items()
                 if isinstance(v, (str, int, float, bool)) and not k.startswith("_")}
+
+    @classmethod
+    def _extract_key_from_op(cls, op: Dict[str, Any]) -> Optional[str]:
+        """Business key for an op: stage3 ``params.record_id`` if present, else
+        the placeholder embedded in the REST path."""
+        params = op.get("params")
+        if isinstance(params, dict):
+            rid = params.get("record_id") or params.get("page_id") or params.get("id")
+            if rid:
+                # record_id may itself be a store pk (recUDI007) or a business
+                # key; _bag_matches_key handles both, but strip any rec_/page_ wrap.
+                return re.sub(r"^(rec_|page_id_|id_|page_)", "", str(rid)).strip() or None
+        return cls._extract_key_from_path(op.get("path", ""))
 
     @staticmethod
     def _extract_key_from_path(path: str) -> Optional[str]:

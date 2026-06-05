@@ -5,3 +5,4 @@ C_ESFES,esfes,True,False,ESFES,ESFES farmer training,U_TUNDE,1721001600,3
 C_RANDOM,random,False,False,Chitchat,Random,U_LAYLA,1710201600,6
 C_GRANT_ALERTS,grant-alerts,False,False,Bot alerts,Auto-pings from grant tracker,U_LAYLA,1748736000,5
 C_TEACHING,teaching-crop411,True,False,CROP 411,Course coord,U_LAYLA,1767830400,3
+C-CASSAVA-PUBS,publications,False,False,Cassava biofortification publications,Manuscript + figure coordination,U_LAYLA,1735689600,5
