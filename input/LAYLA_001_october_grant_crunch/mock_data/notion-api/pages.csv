@@ -10,3 +10,4 @@ pg_deliv_d14,database,db_deliv,D-1-4 Y2 Beta-Carotene Lab Assay,2025-10-01T08:00
 pg_milestone_y204,database,db_deliv,M-Y2-04 Field Trial Data Lock,2025-10-01T08:00:00.000Z,2026-09-15T09:00:00.000Z,usr_layla,False,🔒,
 pg_paper_h22,database,db_publications,Manuscript H-22 — Vitamin-A Biofortification,2025-06-12T08:00:00.000Z,2026-10-01T08:00:00.000Z,usr_layla,False,📄,
 pg_grants_review,database,db_grants,Q3 2026 Grant Pipeline Review,2026-08-10T08:00:00.000Z,2026-09-29T16:00:00.000Z,usr_layla,False,💰,
+npg_family_001,workspace,ws_nnu_crop_sci_2024,Family — Health & Care,2025-01-10T08:00:00.000Z,2026-10-02T20:00:00.000Z,usr_layla,False,🏠,

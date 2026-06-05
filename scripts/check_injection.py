@@ -126,6 +126,27 @@ def main() -> int:
                 total += 1
                 api = op.get("service") or op.get("api")
                 base = host_api_to_url.get(api, "")
+                # Explicit admin-op form: dispatch through the real applier, which
+                # computes before/after itself (handles bulk + document ops).
+                if base and isinstance(op.get("admin"), dict):
+                    rec = applier._apply_admin_op(api, op["admin"], op)
+                    ok = bool(rec.get("ok"))
+                    did_change = bool(rec.get("changed"))
+                    applied += 1 if ok else 0
+                    changed += 1 if did_change else 0
+                    if not ok:
+                        unresolved += 1
+                    tgt = rec.get("table") or rec.get("document") or ""
+                    if rec.get("pk"):
+                        tgt = f"{tgt}/{rec['pk']}"
+                    if rec.get("matched") is not None:
+                        tgt = f"{tgt} (matched={rec['matched']})"
+                    flag = "APPLIED" if (ok and did_change) else (
+                        "NO-CHANGE" if ok else "UNRESOLVED")
+                    print(f"   [{flag}] {op.get('id')}  {api}  {tgt}")
+                    print(f"        before={rec.get('before')}  ->  after={rec.get('after')}"
+                          f"  ({rec.get('status')})")
+                    continue
                 resolved = applier._resolve_target(api, op) if base else None
                 if not resolved:
                     unresolved += 1

@@ -9,6 +9,7 @@ tblFarmers,fldLGA,LGA,singleSelect
 tblFarmers,fldActive,Active,checkbox
 tblFarmers,fldJoinedDate,JoinedDate,singleLineText
 tblFarmers,fldPhone,Phone,singleLineText
+tblFarmers,fldCoopStatus,CoopStatus,singleSelect
 tblEquipment,fldAssetID,AssetID,singleLineText
 tblEquipment,fldName,Name,singleLineText
 tblEquipment,fldStatus,Status,singleSelect
