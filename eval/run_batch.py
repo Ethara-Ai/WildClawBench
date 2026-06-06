@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
+import math
 import mimetypes
 import os
 import re
 import subprocess
 import sys
-import json
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
@@ -376,6 +377,10 @@ def _augment_task_with_mocks(task: dict, config, mock_env_dict: dict | None) -> 
     raw_declared_distractor = task.get("distractor_apis_declared")
     declared = set(raw_declared_required) if isinstance(raw_declared_required, list) else set()
     distractor_is_auto = raw_declared_distractor == "__AUTO__"
+    distractor_is_absent = (
+        "distractor_apis_declared" not in task
+        or raw_declared_distractor == "__ABSENT__"
+    )
     declared_distractors = (
         set(raw_declared_distractor)
         if isinstance(raw_declared_distractor, list)
@@ -436,14 +441,14 @@ def _augment_task_with_mocks(task: dict, config, mock_env_dict: dict | None) -> 
     task["mock_overlays"] = overlays
 
     try:
-        if declared_distractors and not distractor_is_auto:
-            task["distractor_apis"] = sorted(declared_distractors - required)
-        else:
+        if distractor_is_auto or distractor_is_absent:
             task["distractor_apis"] = list(compute_distractor_skills(
                 sorted(required),
                 task.get("task_id") or task.get("task_id_ori") or "",
                 environment_dir=config.environment_dir,
             ))
+        else:
+            task["distractor_apis"] = sorted(declared_distractors - required)
     except Exception:
         task["distractor_apis"] = []
     # Expose the shared mock-stack URLs to the task (the full service map; the
@@ -659,6 +664,41 @@ def _normalize_display_model(obj: Any) -> None:
             _normalize_display_model(item)
 
 
+def _augment_score_with_combined_rewards(scores: dict, result: dict) -> None:
+    if not isinstance(scores, dict):
+        return
+    test_reward: float | None = None
+    te = (result or {}).get("test_result") or {}
+    if isinstance(te, dict):
+        raw_test = te.get("reward")
+        if (
+            isinstance(raw_test, (int, float))
+            and not isinstance(raw_test, bool)
+            and math.isfinite(float(raw_test))
+            and te.get("tests_total")
+        ):
+            test_reward = float(raw_test)
+    rubric_reward: float | None = None
+    raw_rubric = scores.get("overall_score")
+    if (
+        isinstance(raw_rubric, (int, float))
+        and not isinstance(raw_rubric, bool)
+        and math.isfinite(float(raw_rubric))
+    ):
+        rubric_reward = float(raw_rubric)
+    if test_reward is not None and rubric_reward is not None:
+        combined_reward: float | None = (test_reward + rubric_reward) / 2.0
+    elif test_reward is not None:
+        combined_reward = test_reward
+    elif rubric_reward is not None:
+        combined_reward = rubric_reward
+    else:
+        combined_reward = None
+    scores["test_based_reward"] = test_reward
+    scores["rubric_based_reward"] = rubric_reward
+    scores["combined_reward"] = combined_reward
+
+
 def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
                       model_type: str, run_index: int, result: dict,
                       config: Config | None = None,
@@ -793,6 +833,7 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
             result["scores"] = scores
             if isinstance(scores, dict) and scores.get("usage"):
                 result["__judge_usage__"] = dict(scores["usage"])
+            _augment_score_with_combined_rewards(scores, result)
             (output_dir / "score.json").write_text(
                 json.dumps(scores, indent=2, ensure_ascii=False), encoding="utf-8")
             logger.info("[%s] Rubric judged: overall=%.3f (%.2f%%) — %d/%d criteria passed, model=%s",
@@ -809,18 +850,20 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
             # was skipped, crashed, or quietly returned empty.
             logger.warning("[%s] rubric grading failed: %s", task.get("task_id"), exc)
             try:
+                stub = {
+                    "overall_score": None,
+                    "rubric_weights_percentage": None,
+                    "criteria_total": len(rubrics),
+                    "criteria_passed": 0,
+                    "criteria_failed": 0,
+                    "criteria_abstained": len(rubrics),
+                    "judge_model": None,
+                    "error": f"{type(exc).__name__}: {exc}",
+                    "results_dir": str(results_dir),
+                }
+                _augment_score_with_combined_rewards(stub, result)
                 (output_dir / "score.json").write_text(
-                    json.dumps({
-                        "overall_score": None,
-                        "rubric_weights_percentage": None,
-                        "criteria_total": len(rubrics),
-                        "criteria_passed": 0,
-                        "criteria_failed": 0,
-                        "criteria_abstained": len(rubrics),
-                        "judge_model": None,
-                        "error": f"{type(exc).__name__}: {exc}",
-                        "results_dir": str(results_dir),
-                    }, indent=2, ensure_ascii=False),
+                    json.dumps(stub, indent=2, ensure_ascii=False),
                     encoding="utf-8",
                 )
             except OSError:
@@ -1266,6 +1309,7 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list):
         bedrock_arn=config.bedrock_inference_arn if config.aws_bearer_token else "",
         aws_region=config.bedrock_region,
         openai_api_key=config.openai_api_key,
+        openai_whisper_api_key=config.openai_whisper_api_key,
         enable_usage_callback=True,
     )
     if not litellm_yaml:
@@ -1300,6 +1344,7 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list):
         aws_bearer_token=config.aws_bearer_token,
         aws_region=config.bedrock_region,
         openai_api_key=config.openai_api_key,
+        openai_whisper_api_key=config.openai_whisper_api_key,
         usage_callback_host_path=str(callback_src),
         usage_log_host_dir=str(usage_dir),
     )

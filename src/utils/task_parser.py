@@ -396,37 +396,32 @@ def _load_native_api_overrides(task_dir: Path) -> dict:
         try:
             raw = json.loads(override_path.read_text(encoding="utf-8")) or {}
             if isinstance(raw, dict):
+                req = _normalize_declared_api_list(raw, "required_apis", "required_mock_apis")
+                dist = _normalize_declared_api_list(raw, "distractor_apis", "distractor_mock_apis")
                 return {
-                    "required_apis": _normalize_declared_api_list(
-                        raw, "required_apis", "required_mock_apis",
-                    ),
-                    "distractor_apis": _normalize_declared_api_list(
-                        raw, "distractor_apis", "distractor_mock_apis",
-                    ),
+                    "required_apis": [] if req == _ABSENT_SENTINEL else req,
+                    "distractor_apis": _ABSENT_SENTINEL if dist == _ABSENT_SENTINEL else dist,
                 }
         except (json.JSONDecodeError, OSError):
             pass
-    return {"required_apis": [], "distractor_apis": []}
+    return {"required_apis": [], "distractor_apis": _ABSENT_SENTINEL}
 
 
 _AUTO_SENTINEL = "__AUTO__"
+_ABSENT_SENTINEL = "__ABSENT__"
 
 
 def _normalize_declared_api_list(raw: dict, *keys: str) -> list[str] | str:
-    """Normalize a declared API list from one or more aliased keys.
-
-    Returns _AUTO_SENTINEL if any aliased key holds the string "auto" or the
-    YAML bare token `auto` (which PyYAML parses as Python True only for
-    "yes"/"no"; "auto" parses as the string "auto"). Otherwise returns a
-    sorted, de-duplicated list of `<name>-api` strings, accepting either bare
-    names or already-suffixed names. A scalar string value is treated as a
-    one-item list.
-    """
     raw_value = None
+    found = False
     for k in keys:
-        if k in raw and raw[k] is not None:
-            raw_value = raw[k]
-            break
+        if k in raw:
+            found = True
+            if raw[k] is not None:
+                raw_value = raw[k]
+                break
+    if not found:
+        return _ABSENT_SENTINEL
     if raw_value is None:
         return []
     if isinstance(raw_value, str) and raw_value.strip().lower() == "auto":
@@ -501,10 +496,10 @@ def _overlay_yaml_metadata(base: dict, yaml_path: Path) -> dict:
         base["category"] = str(task_type)
 
     required = _normalize_declared_api_list(raw, "required_apis", "required_mock_apis")
-    if required:
+    if required != _ABSENT_SENTINEL:
         base["required_apis_declared"] = required
     distractor = _normalize_declared_api_list(raw, "distractor_apis", "distractor_mock_apis")
-    if distractor:
+    if distractor != _ABSENT_SENTINEL:
         base["distractor_apis_declared"] = distractor
 
     ignored = [k for k in raw.keys() if k not in _YAML_METADATA_KEYS]
