@@ -20,7 +20,7 @@ _store.register("cities", primary_key="id",
                 initial_loader=lambda: _coerce_cities(_load("cities.csv", "cities")))
 _store.register("current", primary_key="city_id",
                 initial_loader=lambda: _coerce_current(_load("current_weather.csv", "current")))
-_store.register("forecast", primary_key="city_id",
+_store.register("forecast", primary_key="_pk",
                 initial_loader=lambda: _coerce_forecast(_load("forecast.csv", "forecast")))
 
 
@@ -91,9 +91,12 @@ def _coerce_current(rows):
 def _coerce_forecast(rows):
     out = []
     for r in rows:
+        city_id = strict_int(r, "city_id")
+        dt = strict_int(r, "dt")
         out.append({
-            "city_id": strict_int(r, "city_id"),
-            "dt": strict_int(r, "dt"),
+            "_pk": f"{city_id}@{dt}",
+            "city_id": city_id,
+            "dt": dt,
             "dt_txt": r["dt_txt"],
             "temp": strict_float(r, "temp"),
             "feels_like": strict_float(r, "feels_like"),

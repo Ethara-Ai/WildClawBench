@@ -626,15 +626,41 @@ class Store:
     def _populate_table(self, table_name: str) -> None:
         t = self._tables[table_name]
         rows = list(self._initial_loaders[table_name]())
-        for r in rows:
+        seen_pks: Dict[Any, int] = {}
+        collapse_count = 0
+        first_collision: Optional[Any] = None
+        for idx, r in enumerate(rows):
             if t._pk not in r:
                 raise StoreError(
                     f"initial row for table '{table_name}' missing primary key "
                     f"'{t._pk}': {list(r.keys())[:8]}"
                 )
             pk_value = r[t._pk]
-            t._rows[pk_value] = copy.deepcopy(r)
-            t._order.append(pk_value)
+            if pk_value in seen_pks:
+                if first_collision is None:
+                    first_collision = pk_value
+                collapse_count += 1
+                stored_row = copy.deepcopy(r)
+                stored_row["_pk"] = f"{pk_value}#{idx}"
+                stored_key = stored_row["_pk"]
+            else:
+                seen_pks[pk_value] = idx
+                stored_row = copy.deepcopy(r)
+                stored_key = pk_value
+            t._rows[stored_key] = stored_row
+            t._order.append(stored_key)
+        if collapse_count:
+            import sys as _sys
+            print(
+                f"[mutable_store] WARN: table '{self._name}.{table_name}' "
+                f"declares primary_key='{t._pk}' but {collapse_count} of "
+                f"{len(rows)} rows share PK values (first collision: "
+                f"{first_collision!r}). Auto-suffixed colliding rows with "
+                f"'_pk' to preserve data. Fix by declaring a row-unique "
+                f"primary key (natural unique column, or synthetic '_pk' "
+                f"composite such as f\"{{parent_id}}@{{child_id}}\").",
+                file=_sys.stderr, flush=True,
+            )
         self._initialized[table_name] = True
 
     def list_tables(self) -> List[str]:
