@@ -94,25 +94,48 @@ def parse_task_md(task_file: Path) -> dict:
 # ---------------------------------------------------------------------------
 
 def load_task(path: str | Path) -> dict:
-    """Load a task from a .md / .yaml file or a native task directory.
+    """Load a task from a .md file or a native task directory.
 
-    - .md          -> parse_task_md (unchanged fork behavior), normalized superset
-    - .yaml/.yml   -> _load_yaml_task
-    - directory    -> task.yaml|task.yml|task.md inside, else native
-                      (prompt.txt + rubric.json) layout
+    Task content authority:
+    - Native dir = prompt.txt + rubric.json (+ persona/ + data/ + mock_data/ + tests).
+      This is the sole source of truth for prompt body, rubric, tests, and attachments.
+    - task.yaml (optional sidecar) carries METADATA + connector declarations ONLY:
+      difficulty, modalities, l1/l2, task_type, required_apis, distractor_apis (per b3).
+      It is overlaid on top of the native dict via `_overlay_yaml_metadata`; it CANNOT
+      supply prompt text, rubrics, tests, attachments, or persona — those keys are
+      ignored if present in YAML.
+    - .md tasks use parse_task_md (unchanged fork behavior), normalized superset.
+
+    The directory dispatcher therefore always prefers prompt.txt+rubric.json native
+    loading when present, then overlays task.yaml on top. A bare YAML file path (no
+    sibling prompt.txt) is rejected so callers cannot accidentally use YAML as a
+    standalone task format (regression observed with layla_mcbride trajectory
+    2026-06-05T22:04:30 where YAML-only loading produced an empty user prompt and
+    the model asked "What do you need me to solve?").
     """
     p = Path(path)
     if p.is_dir():
-        for candidate in ("task.yaml", "task.yml", "task.md"):
-            f = p / candidate
-            if f.is_file():
-                return _attach_drift_script(load_task(f), p)
+        md = p / "task.md"
+        if md.is_file():
+            return _attach_drift_script(load_task(md), p)
         if (p / "prompt.txt").is_file() and (p / "rubric.json").is_file():
-            return _attach_drift_script(_load_native_task(p), p)
-        raise FileNotFoundError(f"No task file found in {p}")
+            base = _load_native_task(p)
+            for cand in ("task.yaml", "task.yml"):
+                yf = p / cand
+                if yf.is_file():
+                    base = _overlay_yaml_metadata(base, yf)
+                    break
+            return _attach_drift_script(base, p)
+        raise FileNotFoundError(
+            f"No task content in {p}: native layout requires prompt.txt + rubric.json. "
+            "task.yaml alone is not a valid task (it is a metadata sidecar)."
+        )
     suffix = p.suffix.lower()
     if suffix in (".yaml", ".yml"):
-        return _attach_drift_script(_load_yaml_task(p), p.parent)
+        raise ValueError(
+            f"task.yaml is a metadata sidecar, not a standalone task format. "
+            f"Pass the task directory ({p.parent}) instead of the YAML file."
+        )
     if suffix == ".md":
         base = parse_task_md(p)
         # Augment the md dict with the uniform superset used by the kensei flow.
@@ -348,6 +371,8 @@ def _load_native_task(task_dir: Path) -> dict:
         "l1": derived_l1,
         "l2": derived_l2,
         "task_type": "",
+        "modalities": [],
+        "multimodal": "false",
         "timeout_seconds": 1800,
         "category": "",
         "file_path": str(task_dir),
@@ -439,89 +464,52 @@ def _normalize_modalities(raw: dict) -> list[str]:
     return out
 
 
-def _load_yaml_task(path: Path) -> dict:
-    raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    task_dir = path.parent
-    task_id = str(raw.get("task_id") or task_dir.name)
-    attachments = _load_attachments_yaml(raw, task_dir)
-    prompt = str(raw.get("initial_prompt") or raw.get("prompt") or "")
-    provided_test_code, provided_test_weights = _load_provided_tests(task_dir)
-    task_type = str(raw.get("task_type") or raw.get("category") or "")
+_YAML_METADATA_KEYS = frozenset({
+    "difficulty",
+    "modalities",
+    "l1", "taxonomy_l1",
+    "l2", "taxonomy_l2",
+    "task_type", "category",
+    "required_apis", "required_mock_apis",
+    "distractor_apis", "distractor_mock_apis",
+})
+
+
+def _overlay_yaml_metadata(base: dict, yaml_path: Path) -> dict:
+    raw = yaml.safe_load(yaml_path.read_text(encoding="utf-8")) or {}
+    if not isinstance(raw, dict):
+        return base
+
+    if "difficulty" in raw and raw["difficulty"] is not None:
+        base["difficulty"] = str(raw["difficulty"])
+
     modalities = _normalize_modalities(raw)
-    has_non_text_modality = any(m not in _TEXT_MODALITIES for m in modalities)
-    return {
-        "task_id": task_id,
-        "prompt": prompt,
-        "initial_prompt": prompt,
-        "test_code": provided_test_code,
-        "test_weights": provided_test_weights,
-        "persona": str(raw.get("persona") or "marcus"),
-        "persona_dir": "",
-        "system_prompt": str(raw.get("system_prompt") or ""),
-        "task_description": str(raw.get("task_description") or ""),
-        "rubrics": raw.get("rubrics") or [],
-        "automated_checks": str(raw.get("automated_checks") or ""),
-        "difficulty": str(raw.get("difficulty") or "medium"),
-        "l1": str(raw.get("l1") or raw.get("taxonomy_l1") or ""),
-        "l2": str(raw.get("l2") or raw.get("taxonomy_l2") or ""),
-        "task_type": task_type,
-        "timeout_seconds": int(raw.get("timeout_seconds") or 1800),
-        "category": task_type,
-        "modalities": modalities,
-        "multimodal": "true" if has_non_text_modality else "false",
-        "file_path": str(path),
-        "task_dir": str(task_dir),
-        "gt_dir": str(task_dir / "gt") if (task_dir / "gt").is_dir() else "",
-        "attachments": attachments,
-        "workspace_path": "",
-        "skills": str(raw.get("skills") or ""),
-        "skills_path": "",
-        "warmup": str(raw.get("warmup") or ""),
-        "env": str(raw.get("env") or ""),
-        "required_apis_declared": _normalize_declared_api_list(
-            raw, "required_apis", "required_mock_apis",
-        ),
-        "distractor_apis_declared": _normalize_declared_api_list(
-            raw, "distractor_apis", "distractor_mock_apis",
-        ),
-        "format": "yaml",
-    }
+    if modalities:
+        base["modalities"] = modalities
+        base["multimodal"] = "true" if any(m not in _TEXT_MODALITIES for m in modalities) else "false"
 
+    l1 = raw.get("l1") or raw.get("taxonomy_l1")
+    if l1:
+        base["l1"] = str(l1)
+    l2 = raw.get("l2") or raw.get("taxonomy_l2")
+    if l2:
+        base["l2"] = str(l2)
 
-def _load_attachments_yaml(raw: dict, task_dir: Path) -> list[dict]:
-    att_dir = task_dir / "attachments"
-    declared: list = raw.get("attachments") or []
-    attachments: list[dict] = []
-    for spec in declared:
-        if isinstance(spec, str):
-            spec = {"path": spec}
-        p = Path(spec["path"])
-        if not p.is_absolute():
-            p = (att_dir / spec["path"]).resolve()
-        if not p.is_file():
-            continue
-        mime = spec.get("mimeType") or mimetypes.guess_type(p.name)[0] or "application/octet-stream"
-        attachments.append({
-            "name": spec.get("name") or p.name,
-            "mimeType": mime,
-            "path": str(p),
-            "size": p.stat().st_size,
-            "storedAs": p.name,
-                "role": spec.get("role") or "primary",
-            "description": spec.get("description") or "",
-        })
-    if not declared and att_dir.is_dir():
-        for f in sorted(att_dir.iterdir()):
-            if not f.is_file():
-                continue
-            mime = mimetypes.guess_type(f.name)[0] or "application/octet-stream"
-            attachments.append({
-                "name": f.name,
-                "mimeType": mime,
-                "path": str(f),
-                "size": f.stat().st_size,
-                "storedAs": f.name,
-                "role": "primary",
-                "description": "",
-            })
-    return attachments
+    task_type = raw.get("task_type") or raw.get("category")
+    if task_type:
+        base["task_type"] = str(task_type)
+        base["category"] = str(task_type)
+
+    required = _normalize_declared_api_list(raw, "required_apis", "required_mock_apis")
+    if required:
+        base["required_apis_declared"] = required
+    distractor = _normalize_declared_api_list(raw, "distractor_apis", "distractor_mock_apis")
+    if distractor:
+        base["distractor_apis_declared"] = distractor
+
+    ignored = [k for k in raw.keys() if k not in _YAML_METADATA_KEYS]
+    if ignored:
+        base.setdefault("_yaml_ignored_keys", []).extend(sorted(ignored))
+
+    base["format"] = "native+yaml"
+    return base
