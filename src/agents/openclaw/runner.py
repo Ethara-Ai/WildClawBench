@@ -130,13 +130,34 @@ class OpenClawAgent(BaseAgent):
             tmp_path = os.path.join(spec.workspace_path, "tmp")
             os.makedirs(exec_path, exist_ok=True)
 
+            # WCB_AUDIO_TRANSCRIBE_URL points the audio-extract skill at the
+            # in-cluster LiteLLM sidecar's /v1/audio/transcriptions endpoint
+            # (litellm_sidecar.py:142-170 registers whisper-1 there). The
+            # agent container has no internet egress under the --internal
+            # bridge, so this URL is the only working transcription path;
+            # without it the agent silently drops audio inputs (see
+            # ruth_flynn trajectory 925303a7-0a9d-40be-86b4-51da4d6e6544
+            # turns 41-57 where every fallback - whisper CLI, pip install,
+            # OPENAI_API_KEY env probe - failed in turn).
+            extra_env_dict = dict(spec.task.get("env_dict") or {})
+            if self.litellm_config_yaml and self.litellm_container_name:
+                extra_env_dict.setdefault(
+                    "WCB_AUDIO_TRANSCRIBE_URL",
+                    f"http://{self.litellm_container_name}:{self.litellm_port}"
+                    f"/v1/audio/transcriptions",
+                )
+                extra_env_dict.setdefault(
+                    "WCB_AUDIO_TRANSCRIBE_AUTH",
+                    self.litellm_master_key or "sk-litellm",
+                )
+
             start_container(
                 spec.task_id,
                 exec_path,
                 extra_env=spec.task.get("env", ""),
                 tmp_path=tmp_path,
                 lobster_env=spec.lobster.get("env") if spec.lobster else None,
-                extra_env_dict=spec.task.get("env_dict") or None,
+                extra_env_dict=extra_env_dict or None,
                 network=self.litellm_network,
             )
 

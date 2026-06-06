@@ -243,17 +243,24 @@ _BASELINE_SKILL_PIP_DEPS: tuple[str, ...] = (
     "pdfplumber",
     "pdf2image",
     "opencv-python-headless",
+    "openpyxl",
+    "python-docx",
+    "pandas",
+    "pypdf",
 )
 
 
-# Offline wheelhouse. Agent containers run on an --internal docker network
-# (litellm_sidecar.py:272-307) so PyPI is unreachable; we docker-cp these
-# wheels in and `pip install --no-index --find-links`.
+# Offline wheelhouse + debhouse. Agent containers run on an --internal docker
+# network (litellm_sidecar.py:272-307) so PyPI and archive.ubuntu.com are
+# unreachable; we docker-cp these in and install offline with
+# `pip install --no-index --find-links` / `dpkg -i`.
 _REPO_ROOT: Path = Path(__file__).resolve().parent.parent.parent
 _WHEELHOUSE_HOST_DIR: Path = _REPO_ROOT / "wheelhouse" / "skill-deps"
 # /opt is writable and avoids colliding with /tmp_workspace (ro) and /opt/mocks
 # (mock_stack.py:216-256 bind mounts).
 _WHEELHOUSE_CONTAINER_DIR: str = "/opt/wb_wheels"
+_DEBHOUSE_HOST_DIR: Path = _REPO_ROOT / "debhouse" / "skill-deps"
+_DEBHOUSE_CONTAINER_DIR: str = "/opt/wb_debs"
 
 
 _BIN_TO_APT_PACKAGE: dict[str, str] = {
@@ -262,6 +269,7 @@ _BIN_TO_APT_PACKAGE: dict[str, str] = {
     "tesseract": "tesseract-ocr",
     "pdftotext": "poppler-utils",
     "pdfinfo": "poppler-utils",
+    "unzip": "unzip",
 }
 
 
@@ -269,6 +277,7 @@ _BASELINE_SKILL_APT_PACKAGES: tuple[str, ...] = (
     "ffmpeg",
     "tesseract-ocr",
     "poppler-utils",
+    "unzip",
 )
 
 
@@ -277,10 +286,19 @@ _SKILL_DEP_PROBE_IMPORTS: tuple[tuple[str, str], ...] = (
     ("PIL", "pillow"),
     ("pytesseract", "pytesseract"),
     ("pdfplumber", "pdfplumber"),
+    ("openpyxl", "openpyxl"),
+    ("docx", "python-docx"),
+    ("pandas", "pandas"),
+    ("pypdf", "pypdf"),
 )
 
 
-_SKILL_DEP_PROBE_BINS: tuple[str, ...] = ("ffmpeg", "tesseract")
+_SKILL_DEP_PROBE_BINS: tuple[str, ...] = (
+    "ffmpeg",
+    "tesseract",
+    "pdftotext",
+    "unzip",
+)
 
 
 def _parse_skill_pip_deps(skill_md_path: Path) -> list[str]:
@@ -363,56 +381,109 @@ def _install_skill_runtime_deps(task_id: str, env_root: Path) -> dict[str, list[
 
     sorted_apt = sorted(apt_packages)
     if sorted_apt:
-        apt_cmd = (
-            "set -e; "
-            "if ! command -v apt-get >/dev/null 2>&1; then "
-            "  echo 'no-apt' >&2; exit 0; "
-            "fi; "
-            "export DEBIAN_FRONTEND=noninteractive; "
-            "missing=''; "
-            "for p in " + " ".join(shlex.quote(p) for p in sorted_apt) + "; do "
-            "  dpkg -s \"$p\" >/dev/null 2>&1 || missing=\"$missing $p\"; "
-            "done; "
-            "if [ -z \"$missing\" ]; then "
-            "  echo 'all-present'; exit 0; "
-            "fi; "
-            "apt-get update -qq >/dev/null 2>&1 || true; "
-            "if apt-get install -y --no-install-recommends $missing >/dev/null 2>&1; then "
-            "  echo \"installed:$missing\"; exit 0; "
-            "fi; "
-            "echo \"install-failed:$missing\" >&2; exit 1"
-        )
-        r = subprocess.run(
-            ["docker", "exec", task_id, "bash", "-lc", apt_cmd],
-            capture_output=True, text=True,
-        )
-        if r.returncode != 0:
-            logger.warning(
-                "[%s] Skill runtime apt install FAILED (continuing; verify probe will report): %s",
-                task_id, (r.stderr or "").strip()[:500],
-            )
-        else:
-            stdout = (r.stdout or "").strip()
-            if stdout == "all-present":
-                logger.info(
-                    "[%s] Skill runtime apt packages already present (%d): %s",
-                    task_id, len(sorted_apt), ",".join(sorted_apt),
-                )
-            elif stdout.startswith("installed:"):
-                logger.info(
-                    "[%s] Skill runtime apt packages installed:%s",
-                    task_id, stdout[len("installed:"):],
-                )
-            elif stdout == "no-apt":
-                logger.warning("[%s] apt-get not available in image; skipping apt step", task_id)
-            else:
-                logger.info("[%s] Skill runtime apt step OK (output=%r)", task_id, stdout[:120])
+        _install_apt_deps_from_debhouse(task_id, sorted_apt)
 
     sorted_pip = sorted(pip_deps)
     if sorted_pip:
         _install_pip_deps_from_wheelhouse(task_id, sorted_pip)
 
     return {"pip": sorted_pip, "apt": sorted_apt}
+
+
+def _install_apt_deps_from_debhouse(task_id: str, sorted_apt: list[str]) -> None:
+    precheck_cmd = (
+        "set -e; "
+        "if ! command -v dpkg >/dev/null 2>&1; then echo 'no-dpkg'; exit 0; fi; "
+        "missing=''; "
+        "for p in " + " ".join(shlex.quote(p) for p in sorted_apt) + "; do "
+        "  dpkg -s \"$p\" >/dev/null 2>&1 || missing=\"$missing $p\"; "
+        "done; "
+        "if [ -z \"$missing\" ]; then echo 'all-present'; else echo \"missing:$missing\"; fi"
+    )
+    precheck = subprocess.run(
+        ["docker", "exec", task_id, "bash", "-lc", precheck_cmd],
+        capture_output=True, text=True,
+    )
+    pre_stdout = (precheck.stdout or "").strip()
+    if pre_stdout == "all-present":
+        logger.info(
+            "[%s] Skill runtime apt packages already present (%d): %s",
+            task_id, len(sorted_apt), ",".join(sorted_apt),
+        )
+        return
+    if pre_stdout == "no-dpkg":
+        logger.warning(
+            "[%s] dpkg not available in image; skipping apt step", task_id,
+        )
+        return
+
+    if not _DEBHOUSE_HOST_DIR.is_dir():
+        logger.error(
+            "[%s] Debhouse missing at %s. Skill runtime apt deps will NOT be installed; "
+            "pdf/image/audio skills will fail. Rebuild via: "
+            "docker run --rm --platform linux/amd64 -v %s:/out ubuntu:22.04 bash -c "
+            "'apt-get update && apt-get install -y --no-install-recommends apt-rdepends && "
+            "for p in %s; do for d in $(apt-rdepends $p 2>/dev/null | grep -v \"^ \"); do "
+            "apt-get download \"$d\" 2>/dev/null || true; done; done && mv *.deb /out/'",
+            task_id, _DEBHOUSE_HOST_DIR, _DEBHOUSE_HOST_DIR, " ".join(sorted_apt),
+        )
+        return
+
+    debs = list(_DEBHOUSE_HOST_DIR.glob("*.deb"))
+    if not debs:
+        logger.error(
+            "[%s] Debhouse %s contains no *.deb files; skill runtime apt deps will NOT be installed",
+            task_id, _DEBHOUSE_HOST_DIR,
+        )
+        return
+
+    mkdir = subprocess.run(
+        ["docker", "exec", task_id, "mkdir", "-p", _DEBHOUSE_CONTAINER_DIR],
+        capture_output=True, text=True,
+    )
+    if mkdir.returncode != 0:
+        logger.warning(
+            "[%s] Failed to create %s in container (continuing). stderr: %s",
+            task_id, _DEBHOUSE_CONTAINER_DIR, (mkdir.stderr or "").strip()[:300],
+        )
+        return
+
+    cp = subprocess.run(
+        ["docker", "cp", f"{_DEBHOUSE_HOST_DIR}/.", f"{task_id}:{_DEBHOUSE_CONTAINER_DIR}/"],
+        capture_output=True, text=True,
+    )
+    if cp.returncode != 0:
+        logger.warning(
+            "[%s] docker cp debhouse -> %s failed (continuing). stderr: %s",
+            task_id, _DEBHOUSE_CONTAINER_DIR, (cp.stderr or "").strip()[:300],
+        )
+        return
+
+    install_cmd = (
+        "set -e; "
+        "export DEBIAN_FRONTEND=noninteractive; "
+        "cd " + shlex.quote(_DEBHOUSE_CONTAINER_DIR) + "; "
+        "dpkg -i *.deb >/tmp/wb_dpkg.log 2>&1 || { "
+        "  cat /tmp/wb_dpkg.log >&2; exit 1; "
+        "}; "
+        "echo 'installed-offline'"
+    )
+    install = subprocess.run(
+        ["docker", "exec", task_id, "bash", "-lc", install_cmd],
+        capture_output=True, text=True,
+    )
+    if install.returncode != 0:
+        logger.warning(
+            "[%s] Offline dpkg install from debhouse returned %d (continuing; "
+            "verify probe will report missing bins). stderr: %s",
+            task_id, install.returncode, (install.stderr or "").strip()[:500],
+        )
+    else:
+        logger.info(
+            "[%s] Installed skill runtime apt deps offline from %s "
+            "(%d .debs staged, %d top-level packages): %s",
+            task_id, _DEBHOUSE_CONTAINER_DIR, len(debs), len(sorted_apt), ",".join(sorted_apt),
+        )
 
 
 def _install_pip_deps_from_wheelhouse(task_id: str, sorted_pip: list[str]) -> None:
