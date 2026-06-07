@@ -31,12 +31,23 @@ SELECTION
   --only NAME[,NAME...]  restrict to specific connectors (by api name, e.g. gmail).
   --force                regenerate even if references/ already exists (still skips
                          the curated RICH set unless --include-rich is also given).
+
+BUNDLE ENRICH MODE (--bundle-root)
+  A bundle produced by repackage_to_bundle.py copies data/environment/skills/
+  verbatim from a run-output SNAPSHOT frozen at run time, so tasks run before this
+  generator existed carry THIN connector dirs (SKILL.md only) even though the live
+  environment/skills tree is now rich. With --bundle-root, this tool switches to an
+  in-place enrich pass: it copies references/ + scripts/ from the live
+  environment/skills/<name>-api-connector into every connector dir ALREADY present
+  in the bundle (never adding a new API, never touching media skills). Use the live
+  tree as the source — run the default generate mode first so it is rich.
 """
 
 from __future__ import annotations
 
 import argparse
 import re
+import shutil
 import sys
 from pathlib import Path
 
@@ -45,6 +56,12 @@ RICH_CONNECTORS = {
     "amazon-seller", "etsy", "google-classroom", "instagram", "linear",
     "myfitnesspal", "pinterest", "quickbooks", "ring", "youtube",
 }
+
+# --bundle-root enrich mode: the two doc subdirs copied from live -> bundle, and the
+# patterns excluded so no build cruft leaks into a published bundle.
+ENRICH_SUBDIRS = ("references", "scripts")
+COPY_IGNORE = shutil.ignore_patterns("__pycache__", ".DS_Store", "*.pyc")
+CONNECTOR_SUFFIX = "-api-connector"
 
 # Endpoint table row: | GET | `/path/{id}` |  (backticks optional, spacing loose).
 _ROW_RE = re.compile(r"^\|\s*([A-Z]+)\s*\|\s*`?([^`|]+?)`?\s*\|\s*$")
@@ -368,6 +385,65 @@ def process_connector(
     return "written"
 
 
+def find_bundle_skill_dirs(bundle_root: Path) -> list[Path]:
+    return sorted(
+        p for p in bundle_root.glob("**/data/environment/skills/*" + CONNECTOR_SUFFIX)
+        if p.is_dir()
+    )
+
+
+def enrich_one(bundle_skill_dir: Path, skills_root: Path, force: bool,
+               dry_run: bool, verbose: bool) -> str:
+    """Copy live references/+scripts/ into one bundle connector dir.
+
+    Returns: copied | skipped-no-live | skipped-empty | skipped-rich.
+    The caller's count summary keys off these exact strings.
+    """
+    name = bundle_skill_dir.name
+    live_dir = skills_root / name
+    if not live_dir.is_dir():
+        if verbose:
+            print(f"    ! no live connector for {name}; skipping", file=sys.stderr)
+        return "skipped-no-live"
+
+    live_subdirs = [s for s in ENRICH_SUBDIRS if (live_dir / s).is_dir()]
+    if not live_subdirs:
+        return "skipped-empty"
+
+    # Already rich and not forcing -> leave it (e.g. originally-rich quickbooks).
+    if all((bundle_skill_dir / s).is_dir() for s in live_subdirs) and not force:
+        return "skipped-rich"
+
+    for sub in live_subdirs:
+        dest = bundle_skill_dir / sub
+        if dest.exists() and force and not dry_run:
+            shutil.rmtree(dest)
+        if not dry_run:
+            shutil.copytree(live_dir / sub, dest, ignore=COPY_IGNORE, dirs_exist_ok=True)
+        if verbose:
+            print(f"    {'~ ' if dry_run else '+ '}{name}/{sub}")
+    return "copied"
+
+
+def enrich_bundle(bundle_root: Path, skills_root: Path, force: bool,
+                  dry_run: bool, verbose: bool) -> int:
+    skill_dirs = find_bundle_skill_dirs(bundle_root)
+    print(f"bundle-root : {bundle_root}")
+    print(f"skills-root : {skills_root}")
+    print(f"found       : {len(skill_dirs)} connector skill dir(s) in bundle")
+    if dry_run:
+        print("(dry-run: no files written)")
+
+    counts: dict[str, int] = {}
+    for sd in skill_dirs:
+        status = enrich_one(sd, skills_root, force, dry_run, verbose)
+        counts[status] = counts.get(status, 0) + 1
+
+    summary = ", ".join(f"{k}={v}" for k, v in sorted(counts.items()))
+    print(f"done        : {summary or '(nothing matched)'}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--skills-root", default="environment/skills",
@@ -380,6 +456,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="Regenerate even if references/ already exists.")
     ap.add_argument("--include-rich", action="store_true",
                     help="Also (re)generate the 10 curated connectors (NOT recommended).")
+    ap.add_argument("--bundle-root", default="",
+                    help="Enrich mode: copy live references/+scripts/ into an already-built "
+                         "bundle's connector dirs (sourced from --skills-root) instead of "
+                         "generating into the live tree.")
     ap.add_argument("--dry-run", action="store_true", help="List what would be written; write nothing.")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args(argv)
@@ -389,6 +469,13 @@ def main(argv: list[str] | None = None) -> int:
     if not skills_root.is_dir():
         print(f"error: --skills-root not a directory: {skills_root}", file=sys.stderr)
         return 2
+
+    if args.bundle_root:
+        bundle_root = Path(args.bundle_root).resolve()
+        if not bundle_root.is_dir():
+            print(f"error: --bundle-root not a directory: {bundle_root}", file=sys.stderr)
+            return 2
+        return enrich_bundle(bundle_root, skills_root, args.force, args.dry_run, args.verbose)
 
     only = {s.strip() for s in args.only.split(",") if s.strip()}
     connectors = sorted(p for p in skills_root.iterdir()
