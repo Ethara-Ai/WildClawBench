@@ -63,7 +63,9 @@ DESIGN CHOICES (documented, since some target fields are absent in our data)
 * rubric[].passed          <- criteria[].passed   (for negative items, passed==True
                               means the agent correctly AVOIDED the bad behavior,
                               matching the reference semantics)
-* rubric[].justification   <- criteria[].rationale  (empty string when passed & no note)
+* rubric[].justification   <- single-judge criteria[].rationale, or, on a council
+                              score.json, the first non-empty criteria[].rationales_by_judge
+                              entry; emitted ONLY on failed items (empty string if none)
 * rubric[].type / importance / evaluation_target are NOT in our score.json.
     - importance is DERIVED: abs(weight) >= 5 -> "critically_important" else "important"
     - type and evaluation_target are emitted as "" (unknown) unless --infer-rubric-meta
@@ -250,6 +252,18 @@ def _infer_meta(criterion: str, is_positive: bool) -> tuple[str, str]:
     return typ, target
 
 
+def _pick_rationale(c: dict[str, Any]) -> str:
+    rationale = c.get("rationale")
+    if isinstance(rationale, str) and rationale:
+        return rationale
+    by_judge = c.get("rationales_by_judge")
+    if isinstance(by_judge, list):
+        for r in by_judge:
+            if isinstance(r, str) and r:
+                return r
+    return ""
+
+
 def _build_rubric_block(score: dict[str, Any], infer_meta: bool) -> list[dict[str, Any]]:
     rubric: list[dict[str, Any]] = []
     for c in score.get("criteria", []):
@@ -270,7 +284,7 @@ def _build_rubric_block(score: dict[str, Any], infer_meta: bool) -> list[dict[st
             "passed": passed,
         }
         if not passed:
-            item["justification"] = c.get("rationale", "") or ""
+            item["justification"] = _pick_rationale(c)
         rubric.append(item)
     return rubric
 
@@ -427,6 +441,7 @@ def convert_task(
                 "API_DOCUMENTATION.md",
                 "sqlite_mcp_server.db",
                 "tracking_middleware.py",
+                "_meta.json",
             ),
         )
 
