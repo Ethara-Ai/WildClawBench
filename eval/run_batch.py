@@ -440,13 +440,22 @@ def _augment_task_with_mocks(task: dict, config, mock_env_dict: dict | None) -> 
     task["required_apis"] = sorted(required)
     task["mock_overlays"] = overlays
 
+    # Distractor policy (m0750 contract; supersedes b22):
+    #   distractor_apis: auto      -> full catalog complement (compute_distractor_skills)
+    #   distractor_apis: [a, b, c] -> exactly those (minus any overlap with required)
+    #   distractor_apis: [] | null | key absent -> NO distractors at all
+    # The previous behavior treated "absent" as "auto", which caused the
+    # docker-compose to spin up all 101 APIs for every task even when the
+    # task.yaml left distractor_apis unspecified.
     try:
-        if distractor_is_auto or distractor_is_absent:
+        if distractor_is_auto:
             task["distractor_apis"] = list(compute_distractor_skills(
                 sorted(required),
                 task.get("task_id") or task.get("task_id_ori") or "",
                 environment_dir=config.environment_dir,
             ))
+        elif distractor_is_absent:
+            task["distractor_apis"] = []
         else:
             task["distractor_apis"] = sorted(declared_distractors - required)
     except Exception:
@@ -730,6 +739,10 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
         test_code=task.get("test_code", "") or "",
         test_weights=task.get("test_weights", "") or "",
         golden_trajectory=task.get("golden_trajectory", "") or "",
+        extra={
+            "required_apis": list(task.get("required_apis") or []),
+            "distractor_apis": list(task.get("distractor_apis") or []),
+        },
     )
     artifacts_dir = task_bundle_dir / "artifacts"
 

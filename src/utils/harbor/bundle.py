@@ -155,25 +155,33 @@ def write_bundle(
 
     attachments_list = list(attachments or [])
 
-    used_apis: Set[str] = _discover_used_apis(task, task_dir, config.environment_dir)
-    # Bundle must include distractor APIs as live services as well, not just as
-    # connector docs and task.toml metadata. Pre-Fix-A the bundle's
-    # docker-compose only spun up `required` APIs, so the agent's calls into
-    # distractor APIs (which testgen exercises via TestNegativeWeight*
-    # guardrails, see b46) hit empty container hostnames and timed out instead
-    # of being correctly classified as "agent reached for the distractor". The
-    # distractor list is deterministic (seeded by task_id, see
-    # skills_inference.compute_distractor_skills), so this union doesn't add
-    # nondeterminism. See (b46) for full algorithm and (b54) Issue 10.
-    _early_required = sorted(used_apis) if used_apis else list(infer_required_apis(task.initial_prompt or task.seed_prompt or ""))
-    _early_task_id = task.task_id or (str(task.id) if task.id else "")
-    _distractor_for_services = list(compute_distractor_skills(_early_required, _early_task_id))
+    # Prefer the authoritative required/distractor lists already resolved by
+    # `_augment_task_with_mocks` (eval/run_batch.py) and threaded through
+    # Task.extra. Falls back to local discovery only when extras are absent
+    # (e.g. legacy callers or store-replay paths). Distractor policy is
+    # honored as authored: explicit list = exactly those, empty/absent = none,
+    # "auto" is already resolved upstream into a concrete list.
+    _extra = getattr(task, "extra", None) or {}
+    _ext_required = _extra.get("required_apis") if isinstance(_extra, dict) else None
+    _ext_distractor = _extra.get("distractor_apis") if isinstance(_extra, dict) else None
+
+    if isinstance(_ext_required, list):
+        used_apis = set(_ext_required)
+    else:
+        used_apis = _discover_used_apis(task, task_dir, config.environment_dir)
+
+    if isinstance(_ext_distractor, list):
+        _distractor_for_services = list(_ext_distractor)
+    else:
+        _early_required = sorted(used_apis) if used_apis else list(infer_required_apis(task.initial_prompt or task.seed_prompt or ""))
+        _early_task_id = task.task_id or (str(task.id) if task.id else "")
+        _distractor_for_services = list(compute_distractor_skills(_early_required, _early_task_id))
+
     used_apis_with_distractor: Set[str] = set(used_apis) | set(_distractor_for_services)
     all_services = discover_services(config.environment_dir)
-    filtered_services = (
-        [s for s in all_services if s.get("name") in used_apis_with_distractor]
-        if used_apis_with_distractor else all_services
-    )
+    filtered_services = [
+        s for s in all_services if s.get("name") in used_apis_with_distractor
+    ]
     env_vars: Dict[str, str] = {}
     for svc in filtered_services:
         env_var_name = svc.get("env_var_name")
@@ -206,7 +214,7 @@ def write_bundle(
     # `infer_required_apis(prompt)` call returns [] for persona-format tasks
     # whose prompt has no literal API names, which silently wrote
     # `required_skills = []` to data/task.toml — the b31 bug class.
-    required = _early_required
+    required = sorted(used_apis)
     distractor = _distractor_for_services
     required_skills = [f"{name}-connector" for name in required]
     distractor_skills = [f"{name}-connector" for name in distractor]
