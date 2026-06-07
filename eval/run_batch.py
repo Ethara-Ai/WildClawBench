@@ -1118,6 +1118,32 @@ def run_single_task(
             merged.update(task_mock_env)
             task["env_dict"] = merged
 
+    # Inject only the *_API_URL env vars for APIs this task actually runs
+    # (required + distractor + overlays). The full ~101-entry service map is
+    # otherwise handed to the agent as inert pointers to dead ports; trimming
+    # keeps the container env (and the launch log) to just the live services.
+    # Connectors only exist for the enabled set, so this is cosmetic — no
+    # behavior change. Falls back to the full map if resolution fails.
+    if task.get("env_dict") and config is not None:
+        enabled_names = (
+            set(task.get("required_apis") or [])
+            | set(task.get("distractor_apis") or [])
+            | set((task.get("mock_overlays") or {}).keys())
+        )
+        if enabled_names:
+            try:
+                env_var_by_name = {
+                    s["name"]: s.get("env_var_name")
+                    for s in discover_services(config.environment_dir)
+                }
+                keep = {env_var_by_name.get(n) for n in enabled_names}
+                keep.discard(None)
+                filtered = {k: v for k, v in task["env_dict"].items() if k in keep}
+                if filtered:
+                    task["env_dict"] = filtered
+            except Exception:
+                pass
+
     prompt          = task["prompt"]
     system_prompt = f"You are an expert in a restricted, non-interactive environment. Solve the task efficiently before the timeout ({timeout_seconds}s). Run all processes in the foreground without user input or background services. Provide a complete, functional solution in a single pass with no placeholders. \n"
     prompt = system_prompt + prompt
