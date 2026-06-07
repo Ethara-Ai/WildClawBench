@@ -258,19 +258,20 @@ def _build_rubric_block(score: dict[str, Any], infer_meta: bool) -> list[dict[st
         criterion = c.get("criterion", "")
         importance = "critically_important" if abs(float(weight)) >= 5 else "important"
         typ, target = _infer_meta(criterion, is_positive) if infer_meta else ("", "")
-        rubric.append(
-            {
-                "number": f"R{int(c.get('id', 0)) + 1}",
-                "criterion": criterion,
-                "type": typ,
-                "evaluation_target": target,
-                "importance": importance,
-                "score": int(weight),
-                "is_positive": is_positive,
-                "passed": bool(c.get("passed", False)),
-                "justification": c.get("rationale", "") or "",
-            }
-        )
+        passed = bool(c.get("passed", False))
+        item: dict[str, Any] = {
+            "number": f"R{int(c.get('id', 0)) + 1}",
+            "criterion": criterion,
+            "type": typ,
+            "evaluation_target": target,
+            "importance": importance,
+            "score": int(weight),
+            "is_positive": is_positive,
+            "passed": passed,
+        }
+        if not passed:
+            item["justification"] = c.get("rationale", "") or ""
+        rubric.append(item)
     return rubric
 
 
@@ -411,27 +412,35 @@ def convert_task(
         return None
 
     bundle = dest_root / task_dir.name
-    # Copy task skeleton (prompt.txt, rubric.json, data/) — IGNORE litellm-proxy.
-    for fname in ("prompt.txt", "rubric.json"):
-        src = task_dir / fname
-        if src.exists():
-            bundle.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(src, bundle / fname)
+    # rubric.json + data/ come from the run-output task dir; prompt.txt is
+    # re-sourced from the original input task dir (data/ minus litellm-proxy).
+    if (task_dir / "rubric.json").exists():
+        bundle.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(task_dir / "rubric.json", bundle / "rubric.json")
     if (task_dir / "data").is_dir():
         shutil.copytree(
             task_dir / "data",
             bundle / "data",
             dirs_exist_ok=True,
-            ignore=shutil.ignore_patterns("litellm-proxy"),
+            ignore=shutil.ignore_patterns(
+                "litellm-proxy",
+                "API_DOCUMENTATION.md",
+                "sqlite_mcp_server.db",
+                "tracking_middleware.py",
+            ),
         )
 
-    # Re-source persona/ and staged input files (stripped from run output) from
-    # the original input task dir, fuzzy-matched by persona core name.
+    # Re-source prompt.txt, persona/ and staged input files (stripped/altered in
+    # run output) from the original input task dir, fuzzy-matched by persona core.
     input_task_dir = _find_input_task_dir(input_root, task_dir.name)
     if input_task_dir is not None:
+        prompt_src = input_task_dir / "prompt.txt"
+        if prompt_src.exists():
+            bundle.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(prompt_src, bundle / "prompt.txt")
         stage_persona_and_artifacts(input_task_dir, bundle, verbose)
     elif verbose:
-        print(f"    (no input dir matched under {input_root}; persona/artifacts skipped)")
+        print(f"    (no input dir matched under {input_root}; prompt/persona/artifacts skipped)")
 
     produced_any = False
     for harness_dir in sorted(p for p in trajectories.iterdir() if p.is_dir()):
