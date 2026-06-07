@@ -106,9 +106,13 @@ def start_container(task_id: str, workspace_path: str, extra_env: str = "",
         masked = value[:4] + "***"
         logger.info("[%s] Injecting lobster env: %s=%s", task_id, key, masked)
 
+    _injected_keys: list[str] = []
     for k, v in (extra_env_dict or {}).items():
         env_args += ["-e", f"{k}={v}"]
-        logger.info("[%s] Injecting extra env: %s=%s", task_id, k, v)
+        _injected_keys.append(k)
+    if _injected_keys:
+        logger.info("[%s] Injected %d extra env vars: %s",
+                    task_id, len(_injected_keys), ",".join(sorted(_injected_keys)))
 
     image = os.environ.get("DOCKER_IMAGE", DOCKER_IMAGE)
     network_args = ["--network", network] if network else []

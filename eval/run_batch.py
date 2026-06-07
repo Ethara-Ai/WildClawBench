@@ -1483,7 +1483,8 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
         for svc in discover_services(config.environment_dir):
             if svc.get("env_var_name"):
                 mock_env_dict[svc["env_var_name"]] = f"http://{mock_container}:{svc['port']}"
-        logger.info("Mock stack %s ready (%d service URLs)", mock_container, len(mock_env_dict))
+        _running = len(mock_enabled_apis) if mock_enabled_apis else len(mock_env_dict)
+        logger.info("Mock stack %s ready (%d APIs running)", mock_container, _running)
 
     return True, litellm_yaml, network, sidecar, mock_env_dict, str(usage_log_path)
 
@@ -1613,8 +1614,8 @@ def _start_task_mock_stack(task: dict, network: str, environment_dir) -> tuple[d
         )
 
     env_dict = {ev: f"http://{container}:{port}" for ev, port in env_dict_template.items()}
-    logger.info("[%s] per-task mock stack %s ready (%d overlay APIs, ports %s, %d URLs)",
-                task.get("task_id"), container, len(overlays), overlaid_ports, len(env_dict))
+    logger.info("[%s] per-task mock stack %s ready (%d overlay APIs, ports %s)",
+                task.get("task_id"), container, len(overlays), overlaid_ports)
 
     drift_info: dict = {}
     if drift_path:
