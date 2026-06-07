@@ -401,6 +401,32 @@ class OpenClawAgent(BaseAgent):
                          "contextWindow": 1050000, "maxTokens": 128000},
                     ],
                 }
+            # Also register an `openai` provider that points at the SAME sidecar.
+            # The built-in `image` (vision) tool resolves to provider "openai"
+            # whenever the agent doesn't pin model=anthropic/... (or its internal
+            # fallback chain kicks in). In litellm mode the agent container has no
+            # openai key in auth-profiles.json AND cannot reach api.openai.com
+            # (internal bridge), so openclaw fails locally with
+            #   "image failed: No API key found for provider openai"
+            # (kayla-morgan 2026-06-07 11:55:50) even though the sidecar already
+            # aliases gpt-4o / gpt-4o-mini -> the Opus/gpt-5.5 route. Overriding
+            # providers["openai"] -> sidecar makes those calls route through
+            # LiteLLM (vision-capable) instead of dying on missing auth. The
+            # agent never reaches real OpenAI; this is a pure sidecar rewrite.
+            openai_sidecar_provider = {
+                "baseUrl": base_url_v1,
+                "apiKey": self.litellm_master_key or "sk-litellm",
+                "auth": "api-key",
+                "api": "openai-completions",
+                "models": [
+                    {"id": "gpt-4o", "name": "gpt-4o",
+                     "input": ["text", "image"], "reasoning": False,
+                     "contextWindow": 128000, "maxTokens": 16384},
+                    {"id": "gpt-4o-mini", "name": "gpt-4o-mini",
+                     "input": ["text", "image"], "reasoning": False,
+                     "contextWindow": 128000, "maxTokens": 16384},
+                ],
+            }
             thinking_default = (thinking or "").strip()
             set_thinking_line = (
                 f'defaults["thinkingDefault"] = {json.dumps(thinking_default)}\n'
@@ -414,6 +440,7 @@ d = json.loads(p.read_text()) if p.exists() else {{}}
 models = d.setdefault("models", {{}})
 providers = models.setdefault("providers", {{}})
 providers[{json.dumps(provider_key)}] = json.loads({json.dumps(json.dumps(litellm_provider))})
+providers["openai"] = json.loads({json.dumps(json.dumps(openai_sidecar_provider))})
 agents = d.setdefault("agents", {{}})
 defaults = agents.setdefault("defaults", {{}})
 defaults["model"] = {{"primary": {json.dumps(primary)}}}

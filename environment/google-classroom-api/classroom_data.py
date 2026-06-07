@@ -600,6 +600,52 @@ def reclaim_submission(course_id, coursework_id, submission_id):
     return {"error": f"Submission {submission_id} not found"}
 
 
+def turn_in_submission(course_id, coursework_id, submission_id):
+    """Student turn-in: transition the submission to TURNED_IN.
+
+    Mirrors the real Classroom `studentSubmissions.turnIn` action. Without this,
+    a turn-in task is uncompletable (only grade/return/reclaim existed), forcing
+    agents into out-of-scope fallbacks that trip the non-submission guardrail.
+
+    Uses the store's `patch` so the state change persists (the older
+    grade/return/reclaim handlers mutate a `rows()` deepcopy and do not).
+    """
+    if not any(c["id"] == course_id for c in _courses_rows()):
+        return {"error": f"Course {course_id} not found"}
+    tbl = _store.table("submissions")
+    row = tbl.get(submission_id)
+    if (row is None or row.get("courseId") != course_id
+            or row.get("courseWorkId") != coursework_id):
+        return {"error": f"Submission {submission_id} not found"}
+    updated = tbl.patch(submission_id, {"state": "TURNED_IN", "updateTime": _now()})
+    return {"studentSubmission": updated}
+
+
+def modify_submission_attachments(course_id, coursework_id, submission_id, add_attachments):
+    """Attach materials to a student submission (Classroom `modifyAttachments`).
+
+    `add_attachments` is the list from the request body's `addAttachments`.
+    Persisted under the submission's `assignmentSubmission.attachments` so a
+    later GET reflects the attached worked-solutions document.
+    """
+    if not any(c["id"] == course_id for c in _courses_rows()):
+        return {"error": f"Course {course_id} not found"}
+    tbl = _store.table("submissions")
+    row = tbl.get(submission_id)
+    if (row is None or row.get("courseId") != course_id
+            or row.get("courseWorkId") != coursework_id):
+        return {"error": f"Submission {submission_id} not found"}
+    existing = row.get("assignmentSubmission") or {}
+    attachments = list(existing.get("attachments", []))
+    if isinstance(add_attachments, list):
+        attachments.extend(add_attachments)
+    updated = tbl.patch(
+        submission_id,
+        {"assignmentSubmission": {"attachments": attachments}, "updateTime": _now()},
+    )
+    return {"studentSubmission": updated}
+
+
 # ---------------------------------------------------------------------------
 # Students
 # ---------------------------------------------------------------------------

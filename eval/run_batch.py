@@ -358,9 +358,11 @@ def _stage_native_workspace(task: dict, config) -> str:
     return str(staging)
 
 
-def _augment_task_with_mocks(task: dict, config, mock_env_dict: dict | None) -> None:
-    """Populate env_dir / required_apis / env_dict on the task dict so the
-    openclaw runner injects API connectors and the shared mock-stack URLs.
+def _resolve_task_apis(task: dict, config) -> "tuple[set[str], list[str], dict]":
+    """Resolve a task's (required_apis, distractor_apis, mock_overlays) without
+    mutating the task. Single source of truth for both `_augment_task_with_mocks`
+    (per-task) and `_collect_enabled_apis` (which limits the shared mock stack to
+    only the APIs any task actually needs).
 
     Precedence for required_apis (highest first):
       1. Explicit `required_apis_declared` from the task file
@@ -371,8 +373,12 @@ def _augment_task_with_mocks(task: dict, config, mock_env_dict: dict | None) -> 
     When (1) is present, (3) is skipped entirely so curated-keyword false
     positives can never override author intent. mock_data unions in only when
     (1) is absent, because an explicit declaration is a contract.
+
+    Distractor policy (m0750 contract; supersedes b22):
+      distractor_apis: auto      -> full catalog complement (compute_distractor_skills)
+      distractor_apis: [a, b, c] -> exactly those (minus any overlap with required)
+      distractor_apis: [] | null | key absent -> NO distractors at all
     """
-    env_dir = str(config.environment_dir) if config.environment_dir else ""
     raw_declared_required = task.get("required_apis_declared")
     raw_declared_distractor = task.get("distractor_apis_declared")
     declared = set(raw_declared_required) if isinstance(raw_declared_required, list) else set()
@@ -436,30 +442,69 @@ def _augment_task_with_mocks(task: dict, config, mock_env_dict: dict | None) -> 
             )
             declared_distractors -= set(unknown_distractor)
 
-    task["env_dir"] = env_dir
-    task["required_apis"] = sorted(required)
-    task["mock_overlays"] = overlays
-
-    # Distractor policy (m0750 contract; supersedes b22):
-    #   distractor_apis: auto      -> full catalog complement (compute_distractor_skills)
-    #   distractor_apis: [a, b, c] -> exactly those (minus any overlap with required)
-    #   distractor_apis: [] | null | key absent -> NO distractors at all
-    # The previous behavior treated "absent" as "auto", which caused the
-    # docker-compose to spin up all 101 APIs for every task even when the
-    # task.yaml left distractor_apis unspecified.
     try:
         if distractor_is_auto:
-            task["distractor_apis"] = list(compute_distractor_skills(
+            distractor = list(compute_distractor_skills(
                 sorted(required),
                 task.get("task_id") or task.get("task_id_ori") or "",
                 environment_dir=config.environment_dir,
             ))
         elif distractor_is_absent:
-            task["distractor_apis"] = []
+            distractor = []
         else:
-            task["distractor_apis"] = sorted(declared_distractors - required)
+            distractor = sorted(declared_distractors - required)
     except Exception:
-        task["distractor_apis"] = []
+        distractor = []
+
+    return required, distractor, overlays
+
+
+def _collect_enabled_apis(args, config) -> "set[str] | None":
+    """Union of (required + distractor) APIs across the task(s) this invocation
+    will run. Used to start the shared mock stack with only those services up
+    instead of all ~101. Returns None when the set can't be determined for every
+    task (the safe fallback: run the full catalog, preserving prior behavior).
+
+    A task that this stack serves only ever reaches APIs in its own
+    required+distractor set, so the batch-wide union is sufficient for every
+    task while still excluding APIs no task references.
+    """
+    try:
+        task_files: list[Path] = []
+        if getattr(args, "task", None):
+            tf = Path(args.task)
+            if tf.exists():
+                task_files = [tf]
+        else:
+            cats = ALL_CATEGORIES if args.category.lower() == "all" else [args.category]
+            for c in cats:
+                d = TASKS_DIR / c
+                if d.is_dir():
+                    task_files += sorted(d.glob("*task_*.md"))
+        if not task_files:
+            return None
+        enabled: set[str] = set()
+        for tf in task_files:
+            t = load_task(tf)
+            required, distractor, _ = _resolve_task_apis(t, config)
+            enabled |= set(required) | set(distractor)
+        return enabled or None
+    except Exception as exc:
+        logger.warning("Could not resolve per-task API set; mock stack will run "
+                       "all APIs. Reason: %s", exc)
+        return None
+
+
+def _augment_task_with_mocks(task: dict, config, mock_env_dict: dict | None) -> None:
+    """Populate env_dir / required_apis / env_dict on the task dict so the
+    openclaw runner injects API connectors and the shared mock-stack URLs.
+    Required/distractor resolution is delegated to `_resolve_task_apis`.
+    """
+    required, distractor, overlays = _resolve_task_apis(task, config)
+    task["env_dir"] = str(config.environment_dir) if config.environment_dir else ""
+    task["required_apis"] = sorted(required)
+    task["mock_overlays"] = overlays
+    task["distractor_apis"] = distractor
     # Expose the shared mock-stack URLs to the task (the full service map; the
     # extra entries are inert env vars for APIs this task doesn't call).
     if mock_env_dict:
@@ -1302,7 +1347,8 @@ def _run_cleanups(cleanups: list) -> None:
     cleanups.clear()
 
 
-def _setup_litellm_and_mocks(args, config: Config, cleanups: list):
+def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
+                             mock_enabled_apis: "set[str] | None" = None):
     """For the openclaw backend, optionally bring up a per-batch shared LiteLLM
     sidecar + docker network (+ mock-API stack). Returns
     (use_litellm, litellm_yaml, network, sidecar, mock_env_dict, usage_log_path).
@@ -1401,7 +1447,7 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list):
                 "without the mock stack when --mock-stack was requested."
             )
         mock_container = f"mocks-{batch_id}"
-        start_mock_stack(mock_container, network)
+        start_mock_stack(mock_container, network, enabled_apis=mock_enabled_apis)
         cleanups.append(lambda: stop_mock_stack(mock_container))
         if not wait_for_mock_stack_healthy(mock_container, timeout=180.0):
             raise RuntimeError(
@@ -1502,12 +1548,20 @@ def _start_task_mock_stack(task: dict, network: str, environment_dir) -> tuple[d
 
     safe_id = re.sub(r"[^a-zA-Z0-9._-]", "_", task.get("task_id", "task"))[:40]
     container = f"mocks-task-{safe_id}-{uuid.uuid4().hex[:6]}".lower()
+    # Bring up only this task's required+distractor APIs plus whatever it overlays
+    # (an overlaid API must serve even if not in required). Empty => all.
+    enabled_apis = (
+        set(task.get("required_apis") or [])
+        | set(task.get("distractor_apis") or [])
+        | set(overlays.keys())
+    ) or None
     try:
         start_mock_stack(
             container, network,
             overlays=overlays,
             admin_env=admin_env,
             publish_ports=publish_ports,
+            enabled_apis=enabled_apis,
         )
     except Exception as exc:
         logger.error("[%s] per-task mock stack failed to start: %s", task.get("task_id"), exc)
@@ -1569,6 +1623,28 @@ def _start_mock_health_logger(task: dict, task_id: str, output_dir):
     env_dict = task.get("env_dict") or {}
     if not env_dict:
         return None
+    # Probe only the APIs this task actually runs (required + distractor +
+    # overlays). The shared env map carries all ~101 URLs, but the mock stack
+    # is filtered to this task's set — so probing the rest would flag the ~96
+    # intentionally-disabled distractors as "failed" every tick (pure noise).
+    enabled_names = (
+        set(task.get("required_apis") or [])
+        | set(task.get("distractor_apis") or [])
+        | set((task.get("mock_overlays") or {}).keys())
+    )
+    if enabled_names:
+        try:
+            env_var_by_name = {
+                s["name"]: s.get("env_var_name")
+                for s in discover_services(task.get("env_dir") or "")
+            }
+            keep_vars = {env_var_by_name.get(n) for n in enabled_names}
+            keep_vars.discard(None)
+            filtered = {k: v for k, v in env_dict.items() if k in keep_vars}
+            if filtered:
+                env_dict = filtered
+        except Exception:
+            pass  # fall back to probing the full map
     try:
         from src.utils.mock_health_logger import MockHealthLogger
         try:
@@ -1659,9 +1735,14 @@ def main() -> None:
             openrouter_base_url=OPENROUTER_BASE_URL_OPENCLAW,
         )
     else:
+        # Resolve the required+distractor APIs for this invocation's task(s) so
+        # the shared mock stack only brings up those services, not all ~101.
+        # None => run the full catalog (safe fallback).
+        mock_enabled_apis = _collect_enabled_apis(args, config)
         try:
             use_litellm, litellm_yaml, network, sidecar, mock_env_dict, usage_log_path = (
-                _setup_litellm_and_mocks(args, config, cleanups)
+                _setup_litellm_and_mocks(args, config, cleanups,
+                                         mock_enabled_apis=mock_enabled_apis)
             )
         except Exception:
             # Setup registers teardown callables before the main try/finally
