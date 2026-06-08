@@ -1,5 +1,5 @@
 ts,channel_id,user_id,text,thread_ts,reply_count,reactions
-1728918000.000100,CMER_001,UMER_005,Heads up everyone - I moved the design review from Wednesday to Friday. Calendar invite updated.,,,thumbsup:UMER_001;eyes:UMER_003
+1728918000.000100,CMER_001,UMER_005,Heads up everyone - I moved the design review from Wednesday to Friday. Calendar invite updated.,,0,thumbsup:UMER_001;eyes:UMER_003
 1728918300.000200,CMER_001,UMER_001,Got it Lila. Audit should be ready by then.,,0,
 1728831600.000300,CMER_001,UMER_003,Severity updates pushed to Notion. Login SSO moved from critical to high after reviewing the competitive data more carefully.,,0,
 1728745200.000400,CMER_003,UMER_002,P12 session recording uploaded. Key quote around the 14 second mark about losing place in the refill flow.,,1,

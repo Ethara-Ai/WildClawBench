@@ -14,20 +14,22 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_csv_list, opt_str, strict_bool, strict_int)
 
 _store = get_store("discord-api")
+_API = "discord-api"
 
 _store.register("guilds", primary_key="id",
-                initial_loader=lambda: _coerce_guilds(_load("guilds.csv")))
+                initial_loader=lambda: _coerce_guilds(_load("guilds.csv", "guilds")))
 _store.register("channels", primary_key="id",
-                initial_loader=lambda: _coerce_channels(_load("channels.csv")))
+                initial_loader=lambda: _coerce_channels(_load("channels.csv", "channels")))
 _store.register("messages", primary_key="id",
-                initial_loader=lambda: _coerce_messages(_load("messages.csv")))
+                initial_loader=lambda: _coerce_messages(_load("messages.csv", "messages")))
 _store.register("members", primary_key="guild_id",
-                initial_loader=lambda: _coerce_members(_load("members.csv")))
+                initial_loader=lambda: _coerce_members(_load("members.csv", "members")))
 _store.register("roles", primary_key="id",
-                initial_loader=lambda: _coerce_roles(_load("roles.csv")))
+                initial_loader=lambda: _coerce_roles(_load("roles.csv", "roles")))
 _store.register_document("me", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "me.json", encoding="utf-8")))
 
 
@@ -60,9 +62,12 @@ _DISCORD_EPOCH = 1420070400000
 _seq = 0
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -93,9 +98,9 @@ def _coerce_guilds(rows):
             "id": r["id"],
             "name": r["name"],
             "owner_id": r["owner_id"],
-            "approximate_member_count": int(r["member_count"]),
-            "description": r["description"] or None,
-            "icon": r["icon"] or None,
+            "approximate_member_count": strict_int(r, "member_count"),
+            "description": opt_str(r, "description", default="") or None,
+            "icon": opt_str(r, "icon", default="") or None,
             "region": r["region"],
         })
     return out
@@ -108,10 +113,10 @@ def _coerce_channels(rows):
             "id": r["id"],
             "guild_id": r["guild_id"],
             "name": r["name"],
-            "type": int(r["type"]),
-            "position": int(r["position"]),
-            "topic": r["topic"] or None,
-            "nsfw": _to_bool(r["nsfw"]),
+            "type": strict_int(r, "type"),
+            "position": strict_int(r, "position"),
+            "topic": opt_str(r, "topic", default="") or None,
+            "nsfw": strict_bool(r, "nsfw"),
         })
     return out
 
@@ -125,7 +130,7 @@ def _coerce_messages(rows):
             "author": {"id": r["author_id"], "username": r["author_username"]},
             "content": r["content"],
             "timestamp": r["timestamp"],
-            "pinned": _to_bool(r["pinned"]),
+            "pinned": strict_bool(r, "pinned"),
             "edited_timestamp": None,
         })
     return out
@@ -139,12 +144,12 @@ def _coerce_members(rows):
             "user": {
                 "id": r["user_id"],
                 "username": r["username"],
-                "global_name": r["global_name"] or None,
-                "bot": _to_bool(r["bot"]),
+                "global_name": opt_str(r, "global_name", default="") or None,
+                "bot": strict_bool(r, "bot"),
             },
-            "nick": r["nick"] or None,
+            "nick": opt_str(r, "nick", default="") or None,
             "joined_at": r["joined_at"],
-            "roles": [x for x in r["roles"].split(";") if x],
+            "roles": [x for x in opt_csv_list(r, "roles", sep=";") if x],
         })
     return out
 
@@ -156,10 +161,10 @@ def _coerce_roles(rows):
             "id": r["id"],
             "guild_id": r["guild_id"],
             "name": r["name"],
-            "color": int(r["color"]),
-            "position": int(r["position"]),
-            "hoist": _to_bool(r["hoist"]),
-            "mentionable": _to_bool(r["mentionable"]),
+            "color": strict_int(r, "color"),
+            "position": strict_int(r, "position"),
+            "hoist": strict_bool(r, "hoist"),
+            "mentionable": strict_bool(r, "mentionable"),
             "permissions": r["permissions"],
         })
     return out
@@ -266,3 +271,5 @@ def create_message(channel_id, content, author_id=None):
     }
     _messages_rows().append(msg)
     return msg
+
+_store.eager_load()

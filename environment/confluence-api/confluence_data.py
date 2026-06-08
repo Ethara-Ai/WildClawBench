@@ -14,18 +14,20 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_int, opt_str)
 
 _store = get_store("confluence-api")
+_API = "confluence-api"
 
 _store.register("spaces", primary_key="id",
-                initial_loader=lambda: _coerce_spaces(_load("spaces.csv")))
+                initial_loader=lambda: _coerce_spaces(_load("spaces.csv", "spaces")))
 _store.register("pages", primary_key="id",
-                initial_loader=lambda: _coerce_pages(_load("pages.csv")))
+                initial_loader=lambda: _coerce_pages(_load("pages.csv", "pages")))
 _store.register("comments", primary_key="id",
-                initial_loader=lambda: _coerce_comments(_load("comments.csv")))
+                initial_loader=lambda: _coerce_comments(_load("comments.csv", "comments")))
 _store.register("labels", primary_key="id",
-                initial_loader=lambda: _coerce_labels(_load("labels.csv")))
+                initial_loader=lambda: _coerce_labels(_load("labels.csv", "labels")))
 
 
 def _spaces_rows():
@@ -47,9 +49,12 @@ def _labels_rows():
 BASE = "/wiki/rest/api"
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -71,7 +76,7 @@ def _coerce_spaces(rows):
     out = []
     for r in rows:
         out.append({
-            "id": _to_int(r["id"]),
+            "id": opt_int(r, "id", default=0),
             "key": r["key"],
             "name": r["name"],
             "type": r["type"],
@@ -90,8 +95,8 @@ def _coerce_pages(rows):
             "status": r["status"],
             "title": r["title"],
             "space_key": r["space_key"],
-            "parent_id": r["parent_id"] or None,
-            "version": _to_int(r["version"], 1),
+            "parent_id": opt_str(r, "parent_id", default="") or None,
+            "version": opt_int(r, "version", default=1),
             "body": r["body"],
             "created_by": r["created_by"],
             "created_at": r["created_at"],
@@ -304,3 +309,5 @@ def search(cql):
         "totalSize": len(views),
         "cqlQuery": cql,
     }
+
+_store.eager_load()

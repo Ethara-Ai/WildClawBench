@@ -15,18 +15,22 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store,
+    strict_bool,
+)
 
 _store = get_store("servicenow-api")
+_API = "servicenow-api"
 
 _store.register("incidents", primary_key="sys_id",
-                initial_loader=lambda: _coerce_incidents(_load("incident.csv")))
+                initial_loader=lambda: _coerce_incidents(_load("incident.csv", "incidents")))
 _store.register("changes", primary_key="sys_id",
-                initial_loader=lambda: _coerce_changes(_load("change_request.csv")))
+                initial_loader=lambda: _coerce_changes(_load("change_request.csv", "changes")))
 _store.register("problems", primary_key="sys_id",
-                initial_loader=lambda: _coerce_problems(_load("problem.csv")))
+                initial_loader=lambda: _coerce_problems(_load("problem.csv", "problems")))
 _store.register("users", primary_key="sys_id",
-                initial_loader=lambda: _coerce_users(_load("sys_user.csv")))
+                initial_loader=lambda: _coerce_users(_load("sys_user.csv", "users")))
 
 
 def _incidents_rows():
@@ -49,9 +53,12 @@ def _users_rows():
 INCIDENT_STATES = {"1": "New", "2": "In Progress", "3": "On Hold", "6": "Resolved", "7": "Closed"}
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -67,22 +74,22 @@ def _to_bool(v):
 # ---------------------------------------------------------------------------
 
 def _coerce_incidents(rows):
-    return [dict(r) for r in rows]
+    return [_strip_ctx(r) for r in rows]
 
 
 def _coerce_changes(rows):
-    return [dict(r) for r in rows]
+    return [_strip_ctx(r) for r in rows]
 
 
 def _coerce_problems(rows):
-    return [dict(r) for r in rows]
+    return [_strip_ctx(r) for r in rows]
 
 
 def _coerce_users(rows):
     out = []
     for r in rows:
-        d = dict(r)
-        d["active"] = _to_bool(r["active"])
+        d = _strip_ctx(r)
+        d["active"] = strict_bool(r, "active")
         out.append(d)
     return out
 
@@ -235,3 +242,5 @@ def get_user(sys_id):
     if not rec:
         return {"error": f"User {sys_id} not found"}
     return rec
+
+_store.eager_load()

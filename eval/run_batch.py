@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
+import math
 import mimetypes
 import os
 import re
 import subprocess
 import sys
-import json
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
@@ -43,7 +44,11 @@ from src.utils.grading import (
 from src.utils.config import Config
 from src.utils.task_parser import load_task
 from src.utils.docker_utils import discover_services, require_image_present, DOCKER_IMAGE
-from src.utils.skills_inference import infer_required_apis, compute_distractor_skills
+from src.utils.skills_inference import (
+    infer_required_apis,
+    compute_distractor_skills,
+    available_apis,
+)
 from src.utils.testgen import generate_task_tests
 from src.utils.litellm_sidecar import (
     build_litellm_config_yaml,
@@ -199,6 +204,35 @@ def _merge_usage_source(dst: dict, src: dict) -> None:
         dst["cost_usd"] = float(dst.get("cost_usd", 0.0)) + float(src.get("cost_usd", 0.0) or 0.0)
 
 
+def recompute_combined(sources: dict[str, dict], task_id: str = "") -> dict:
+    """Sum per-source usage under the canonical Bedrock-native convention
+    (input_tokens excludes cache; total_tokens == input+output+cR+cW). Shared
+    by save_usage and scripts/regrade.py; warns+overwrites if a source desyncs
+    the invariant. See token-accounting convention docs.
+    """
+    combined: dict[str, Any] = {k: 0 for k in _USAGE_NUMERIC_KEYS}
+    combined["cost_usd"] = 0.0
+    for src in sources.values():
+        _merge_usage_source(combined, src)
+
+    expected_total = (
+        combined["input_tokens"]
+        + combined["output_tokens"]
+        + combined["cache_read_tokens"]
+        + combined["cache_write_tokens"]
+    )
+    if combined["total_tokens"] != expected_total:
+        logger.warning(
+            "[%s] total_tokens invariant violated: stored=%d expected=%d "
+            "(input=%d output=%d cache_read=%d cache_write=%d) - overwriting",
+            task_id, combined["total_tokens"], expected_total,
+            combined["input_tokens"], combined["output_tokens"],
+            combined["cache_read_tokens"], combined["cache_write_tokens"],
+        )
+    combined["total_tokens"] = expected_total
+    return combined
+
+
 def save_usage(
     output_dir: Path,
     result: dict,
@@ -207,30 +241,22 @@ def save_usage(
     *,
     testgen_usage: dict | None = None,
     judge_usage: dict | None = None,
+    preflight_usage: dict | None = None,
 ) -> dict:
-    """Write usage.json with per-source breakdown (agent + testgen + judge)."""
+    """Write usage.json with per-source breakdown (agent + testgen + judge + preflight)."""
     agent_usage = dict(usage)
+    agent_usage.pop("__preflight__", None)
     sources: dict[str, dict] = {"agent": agent_usage}
+    if preflight_usage:
+        sources["preflight"] = dict(preflight_usage)
     if testgen_usage:
         sources["testgen"] = dict(testgen_usage)
-    if judge_usage:
+    # `is not None` (not truthiness): a failed-judge stub is request_count=0
+    # but must still persist so the failure is visible; only None = no judge ran.
+    if judge_usage is not None:
         sources["judge"] = dict(judge_usage)
 
-    combined: dict[str, Any] = {k: 0 for k in _USAGE_NUMERIC_KEYS}
-    combined["cost_usd"] = 0.0
-    for src in sources.values():
-        _merge_usage_source(combined, src)
-
-    if "total_tokens" in combined and (
-        combined["total_tokens"] == 0
-        or combined["total_tokens"] < combined["input_tokens"] + combined["output_tokens"]
-    ):
-        combined["total_tokens"] = (
-            combined["input_tokens"]
-            + combined["output_tokens"]
-            + combined["cache_read_tokens"]
-            + combined["cache_write_tokens"]
-        )
+    combined = recompute_combined(sources, task_id)
 
     out: dict[str, Any] = dict(combined)
     out["sources"] = sources
@@ -332,30 +358,61 @@ def _stage_native_workspace(task: dict, config) -> str:
     return str(staging)
 
 
-def _augment_task_with_mocks(task: dict, config, mock_env_dict: dict | None) -> None:
-    """Populate env_dir / required_apis / env_dict on the task dict so the
-    openclaw runner injects API connectors and the shared mock-stack URLs."""
-    env_dir = str(config.environment_dir) if config.environment_dir else ""
+def _resolve_task_apis(task: dict, config) -> "tuple[set[str], list[str], dict]":
+    """Resolve a task's (required_apis, distractor_apis, mock_overlays) without
+    mutating the task. Single source of truth for both `_augment_task_with_mocks`
+    (per-task) and `_collect_enabled_apis` (which limits the shared mock stack to
+    only the APIs any task actually needs).
+
+    Precedence for required_apis (highest first):
+      1. Explicit `required_apis_declared` from the task file
+         (yaml `required_apis:` or native `task.json`).
+      2. mock_data/<api>/ subdirs.
+      3. Keyword inference over the prompt.
+
+    When (1) is present, (3) is skipped entirely so curated-keyword false
+    positives can never override author intent. mock_data unions in only when
+    (1) is absent, because an explicit declaration is a contract.
+
+    Distractor policy (m0750 contract; supersedes b22):
+      distractor_apis: auto      -> full catalog complement (compute_distractor_skills)
+      distractor_apis: [a, b, c] -> exactly those (minus any overlap with required)
+      distractor_apis: [] | null | key absent -> NO distractors at all
+    """
+    raw_declared_required = task.get("required_apis_declared")
+    raw_declared_distractor = task.get("distractor_apis_declared")
+    declared = set(raw_declared_required) if isinstance(raw_declared_required, list) else set()
+    distractor_is_auto = raw_declared_distractor == "__AUTO__"
+    distractor_is_absent = (
+        "distractor_apis_declared" not in task
+        or raw_declared_distractor == "__ABSENT__"
+    )
+    declared_distractors = (
+        set(raw_declared_distractor)
+        if isinstance(raw_declared_distractor, list)
+        else set()
+    )
+
     required: set[str] = set()
-    # 1) APIs inferred from the prompt text (catalog discovered from env_dir)
-    try:
-        required.update(infer_required_apis(
-            task.get("initial_prompt") or task.get("prompt") or "",
-            environment_dir=config.environment_dir,
-        ))
-    except Exception:
-        pass
-    # 2) APIs named by the task's mock_data/<api>/ subdirs (native tasks).
-    #    Also build the per-task overlay map {api: {filename: host_path}} so the
-    #    task's OWN mock_data CSVs get bind-mounted over the baked-in baseline
-    #    (same shape as harbor/bundle.py). Without this the agent only ever sees
-    #    the generic baked dataset (course_001..005 + uscg-...), never the task's.
+    if declared:
+        required.update(declared)
+    else:
+        try:
+            required.update(infer_required_apis(
+                task.get("initial_prompt") or task.get("prompt") or "",
+                environment_dir=config.environment_dir,
+            ))
+        except Exception:
+            pass
+
     task_dir = task.get("task_dir", "")
     overlays: dict[str, dict[str, str]] = {}
     if task_dir:
         mock_root = Path(task_dir) / "mock_data"
         if mock_root.is_dir():
-            required.update(d.name for d in mock_root.iterdir() if d.is_dir())
+            mock_apis = {d.name for d in mock_root.iterdir() if d.is_dir()}
+            if not declared:
+                required.update(mock_apis)
             overlays = {
                 api_dir.name: {
                     p.name: str(p.resolve())
@@ -364,24 +421,90 @@ def _augment_task_with_mocks(task: dict, config, mock_env_dict: dict | None) -> 
                 for api_dir in sorted(mock_root.iterdir())
                 if api_dir.is_dir() and any(p.is_file() for p in api_dir.iterdir())
             }
-    task["env_dir"] = env_dir
+
+    try:
+        catalog = set(available_apis(config.environment_dir))
+    except Exception:
+        catalog = set()
+    if catalog:
+        unknown_required = sorted(required - catalog)
+        if unknown_required:
+            logger.warning(
+                "[%s] declared/inferred APIs not present in catalog (dropped): %s",
+                task.get("task_id"), unknown_required,
+            )
+            required -= set(unknown_required)
+        unknown_distractor = sorted(declared_distractors - catalog)
+        if unknown_distractor:
+            logger.warning(
+                "[%s] declared distractor APIs not present in catalog (dropped): %s",
+                task.get("task_id"), unknown_distractor,
+            )
+            declared_distractors -= set(unknown_distractor)
+
+    try:
+        if distractor_is_auto:
+            distractor = list(compute_distractor_skills(
+                sorted(required),
+                task.get("task_id") or task.get("task_id_ori") or "",
+                environment_dir=config.environment_dir,
+            ))
+        elif distractor_is_absent:
+            distractor = []
+        else:
+            distractor = sorted(declared_distractors - required)
+    except Exception:
+        distractor = []
+
+    return required, distractor, overlays
+
+
+def _collect_enabled_apis(args, config) -> "set[str] | None":
+    """Union of (required + distractor) APIs across the task(s) this invocation
+    will run. Used to start the shared mock stack with only those services up
+    instead of all ~101. Returns None when the set can't be determined for every
+    task (the safe fallback: run the full catalog, preserving prior behavior).
+
+    A task that this stack serves only ever reaches APIs in its own
+    required+distractor set, so the batch-wide union is sufficient for every
+    task while still excluding APIs no task references.
+    """
+    try:
+        task_files: list[Path] = []
+        if getattr(args, "task", None):
+            tf = Path(args.task)
+            if tf.exists():
+                task_files = [tf]
+        else:
+            cats = ALL_CATEGORIES if args.category.lower() == "all" else [args.category]
+            for c in cats:
+                d = TASKS_DIR / c
+                if d.is_dir():
+                    task_files += sorted(d.glob("*task_*.md"))
+        if not task_files:
+            return None
+        enabled: set[str] = set()
+        for tf in task_files:
+            t = load_task(tf)
+            required, distractor, _ = _resolve_task_apis(t, config)
+            enabled |= set(required) | set(distractor)
+        return enabled or None
+    except Exception as exc:
+        logger.warning("Could not resolve per-task API set; mock stack will run "
+                       "all APIs. Reason: %s", exc)
+        return None
+
+
+def _augment_task_with_mocks(task: dict, config, mock_env_dict: dict | None) -> None:
+    """Populate env_dir / required_apis / env_dict on the task dict so the
+    openclaw runner injects API connectors and the shared mock-stack URLs.
+    Required/distractor resolution is delegated to `_resolve_task_apis`.
+    """
+    required, distractor, overlays = _resolve_task_apis(task, config)
+    task["env_dir"] = str(config.environment_dir) if config.environment_dir else ""
     task["required_apis"] = sorted(required)
     task["mock_overlays"] = overlays
-    # Distractor APIs are exposed to the agent the same way required APIs are
-    # (connector skill docs + URL env var), so the agent must actively choose
-    # between plausible-but-unneeded surfaces. This is the design intent of
-    # distractor_skills in task.toml (b46); before 2026-06-02 only the harbor
-    # bundle + testgen saw them, so the live agent could not actually be
-    # tempted by them. The selection is deterministic per task_id, so reruns
-    # of the same task see the same distractor set.
-    try:
-        task["distractor_apis"] = list(compute_distractor_skills(
-            sorted(required),
-            task.get("task_id") or task.get("task_id_ori") or "",
-            environment_dir=config.environment_dir,
-        ))
-    except Exception:
-        task["distractor_apis"] = []
+    task["distractor_apis"] = distractor
     # Expose the shared mock-stack URLs to the task (the full service map; the
     # extra entries are inert env vars for APIs this task doesn't call).
     if mock_env_dict:
@@ -595,6 +718,41 @@ def _normalize_display_model(obj: Any) -> None:
             _normalize_display_model(item)
 
 
+def _augment_score_with_combined_rewards(scores: dict, result: dict) -> None:
+    if not isinstance(scores, dict):
+        return
+    test_reward: float | None = None
+    te = (result or {}).get("test_result") or {}
+    if isinstance(te, dict):
+        raw_test = te.get("reward")
+        if (
+            isinstance(raw_test, (int, float))
+            and not isinstance(raw_test, bool)
+            and math.isfinite(float(raw_test))
+            and te.get("tests_total")
+        ):
+            test_reward = float(raw_test)
+    rubric_reward: float | None = None
+    raw_rubric = scores.get("overall_score")
+    if (
+        isinstance(raw_rubric, (int, float))
+        and not isinstance(raw_rubric, bool)
+        and math.isfinite(float(raw_rubric))
+    ):
+        rubric_reward = float(raw_rubric)
+    if test_reward is not None and rubric_reward is not None:
+        combined_reward: float | None = (test_reward + rubric_reward) / 2.0
+    elif test_reward is not None:
+        combined_reward = test_reward
+    elif rubric_reward is not None:
+        combined_reward = rubric_reward
+    else:
+        combined_reward = None
+    scores["test_based_reward"] = test_reward
+    scores["rubric_based_reward"] = rubric_reward
+    scores["combined_reward"] = combined_reward
+
+
 def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
                       model_type: str, run_index: int, result: dict,
                       config: Config | None = None,
@@ -626,6 +784,10 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
         test_code=task.get("test_code", "") or "",
         test_weights=task.get("test_weights", "") or "",
         golden_trajectory=task.get("golden_trajectory", "") or "",
+        extra={
+            "required_apis": list(task.get("required_apis") or []),
+            "distractor_apis": list(task.get("distractor_apis") or []),
+        },
     )
     artifacts_dir = task_bundle_dir / "artifacts"
 
@@ -729,6 +891,7 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
             result["scores"] = scores
             if isinstance(scores, dict) and scores.get("usage"):
                 result["__judge_usage__"] = dict(scores["usage"])
+            _augment_score_with_combined_rewards(scores, result)
             (output_dir / "score.json").write_text(
                 json.dumps(scores, indent=2, ensure_ascii=False), encoding="utf-8")
             logger.info("[%s] Rubric judged: overall=%.3f (%.2f%%) — %d/%d criteria passed, model=%s",
@@ -745,18 +908,20 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
             # was skipped, crashed, or quietly returned empty.
             logger.warning("[%s] rubric grading failed: %s", task.get("task_id"), exc)
             try:
+                stub = {
+                    "overall_score": None,
+                    "rubric_weights_percentage": None,
+                    "criteria_total": len(rubrics),
+                    "criteria_passed": 0,
+                    "criteria_failed": 0,
+                    "criteria_abstained": len(rubrics),
+                    "judge_model": None,
+                    "error": f"{type(exc).__name__}: {exc}",
+                    "results_dir": str(results_dir),
+                }
+                _augment_score_with_combined_rewards(stub, result)
                 (output_dir / "score.json").write_text(
-                    json.dumps({
-                        "overall_score": None,
-                        "rubric_weights_percentage": None,
-                        "criteria_total": len(rubrics),
-                        "criteria_passed": 0,
-                        "criteria_failed": 0,
-                        "criteria_abstained": len(rubrics),
-                        "judge_model": None,
-                        "error": f"{type(exc).__name__}: {exc}",
-                        "results_dir": str(results_dir),
-                    }, indent=2, ensure_ascii=False),
+                    json.dumps(stub, indent=2, ensure_ascii=False),
                     encoding="utf-8",
                 )
             except OSError:
@@ -952,6 +1117,32 @@ def run_single_task(
             merged = dict(task.get("env_dict") or {})
             merged.update(task_mock_env)
             task["env_dict"] = merged
+
+    # Inject only the *_API_URL env vars for APIs this task actually runs
+    # (required + distractor + overlays). The full ~101-entry service map is
+    # otherwise handed to the agent as inert pointers to dead ports; trimming
+    # keeps the container env (and the launch log) to just the live services.
+    # Connectors only exist for the enabled set, so this is cosmetic — no
+    # behavior change. Falls back to the full map if resolution fails.
+    if task.get("env_dict") and config is not None:
+        enabled_names = (
+            set(task.get("required_apis") or [])
+            | set(task.get("distractor_apis") or [])
+            | set((task.get("mock_overlays") or {}).keys())
+        )
+        if enabled_names:
+            try:
+                env_var_by_name = {
+                    s["name"]: s.get("env_var_name")
+                    for s in discover_services(config.environment_dir)
+                }
+                keep = {env_var_by_name.get(n) for n in enabled_names}
+                keep.discard(None)
+                filtered = {k: v for k, v in task["env_dict"].items() if k in keep}
+                if filtered:
+                    task["env_dict"] = filtered
+            except Exception:
+                pass
 
     prompt          = task["prompt"]
     system_prompt = f"You are an expert in a restricted, non-interactive environment. Solve the task efficiently before the timeout ({timeout_seconds}s). Run all processes in the foreground without user input or background services. Provide a complete, functional solution in a single pass with no placeholders. \n"
@@ -1194,6 +1385,7 @@ def run_single_task(
                     tests_errored=te["tests_errored"],
                     test_scores_json=te.get("test_scores", "{}"),
                     tests_skipped=te.get("tests_skipped", 0),
+                    reward=te.get("reward"),
                 )
                 (verifier_dir / "ctrf.json").write_text(
                     json.dumps(ctrf, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -1225,6 +1417,7 @@ def run_single_task(
             output_dir, result, usage, task_id,
             testgen_usage=task.get("__testgen_usage__"),
             judge_usage=result.get("__judge_usage__"),
+            preflight_usage=usage.get("__preflight__"),
         )
 
         if gateway_proc is not None:
@@ -1297,7 +1490,8 @@ def _run_cleanups(cleanups: list) -> None:
     cleanups.clear()
 
 
-def _setup_litellm_and_mocks(args, config: Config, cleanups: list):
+def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
+                             mock_enabled_apis: "set[str] | None" = None):
     """For the openclaw backend, optionally bring up a per-batch shared LiteLLM
     sidecar + docker network (+ mock-API stack). Returns
     (use_litellm, litellm_yaml, network, sidecar, mock_env_dict, usage_log_path).
@@ -1317,6 +1511,7 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list):
         bedrock_arn=config.bedrock_inference_arn if config.aws_bearer_token else "",
         aws_region=config.bedrock_region,
         openai_api_key=config.openai_api_key,
+        openai_whisper_api_key=config.openai_whisper_api_key,
         enable_usage_callback=True,
     )
     if not litellm_yaml:
@@ -1351,6 +1546,7 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list):
         aws_bearer_token=config.aws_bearer_token,
         aws_region=config.bedrock_region,
         openai_api_key=config.openai_api_key,
+        openai_whisper_api_key=config.openai_whisper_api_key,
         usage_callback_host_path=str(callback_src),
         usage_log_host_dir=str(usage_dir),
     )
@@ -1394,7 +1590,7 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list):
                 "without the mock stack when --mock-stack was requested."
             )
         mock_container = f"mocks-{batch_id}"
-        start_mock_stack(mock_container, network)
+        start_mock_stack(mock_container, network, enabled_apis=mock_enabled_apis)
         cleanups.append(lambda: stop_mock_stack(mock_container))
         if not wait_for_mock_stack_healthy(mock_container, timeout=180.0):
             raise RuntimeError(
@@ -1404,9 +1600,29 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list):
         for svc in discover_services(config.environment_dir):
             if svc.get("env_var_name"):
                 mock_env_dict[svc["env_var_name"]] = f"http://{mock_container}:{svc['port']}"
-        logger.info("Mock stack %s ready (%d service URLs)", mock_container, len(mock_env_dict))
+        _running = len(mock_enabled_apis) if mock_enabled_apis else len(mock_env_dict)
+        logger.info("Mock stack %s ready (%d APIs running)", mock_container, _running)
 
     return True, litellm_yaml, network, sidecar, mock_env_dict, str(usage_log_path)
+
+
+def _dump_mock_logs(container: str, api_names) -> str:
+    """Must run BEFORE stop_mock_stack removes the container, otherwise the
+    docker exec has nothing to read."""
+    blobs: list[str] = []
+    for api in sorted(api_names):
+        try:
+            r = subprocess.run(
+                ["docker", "exec", container, "cat", f"/tmp/{api}.err"],
+                capture_output=True, text=True, timeout=15,
+            )
+            err = (r.stdout or "").strip() or (r.stderr or "").strip()
+        except Exception as exc:
+            err = f"<failed to read /tmp/{api}.err: {exc}>"
+        if err:
+            logger.error("[mock-logs] %s /tmp/%s.err:\n%s", container, api, err)
+            blobs.append(f"=== {api} (/tmp/{api}.err) ===\n{err}")
+    return "\n\n".join(blobs)
 
 
 def _start_task_mock_stack(task: dict, network: str, environment_dir) -> tuple[dict, str | None, dict]:
@@ -1489,16 +1705,30 @@ def _start_task_mock_stack(task: dict, network: str, environment_dir) -> tuple[d
 
     safe_id = re.sub(r"[^a-zA-Z0-9._-]", "_", task.get("task_id", "task"))[:40]
     container = f"mocks-task-{safe_id}-{uuid.uuid4().hex[:6]}".lower()
+    # Bring up only this task's required+distractor APIs plus whatever it overlays
+    # (an overlaid API must serve even if not in required). Empty => all.
+    enabled_apis = (
+        set(task.get("required_apis") or [])
+        | set(task.get("distractor_apis") or [])
+        | set(overlays.keys())
+    ) or None
     try:
         start_mock_stack(
             container, network,
             overlays=overlays,
             admin_env=admin_env,
             publish_ports=publish_ports,
+            enabled_apis=enabled_apis,
         )
     except Exception as exc:
         logger.error("[%s] per-task mock stack failed to start: %s", task.get("task_id"), exc)
-        return {}, None, {}
+        logs = _dump_mock_logs(container, overlays.keys())
+        stop_mock_stack(container)
+        raise RuntimeError(
+            f"per-task mock stack {container} failed to start for task "
+            f"{task.get('task_id')}: {exc}; overlay CSV likely malformed"
+            + (f"\n{logs}" if logs else "")
+        )
 
     # Wait only for the overlaid API(s) to answer /health inside the container.
     # A per-task container cold-starts one uvicorn process per overlaid API, so
@@ -1514,23 +1744,18 @@ def _start_task_mock_stack(task: dict, network: str, environment_dir) -> tuple[d
         logger.error("[%s] per-task mock stack %s: overlaid ports %s not healthy within %.0fs; "
                      "tearing down (set KENSEI_TASK_MOCK_HEALTH_TIMEOUT to raise the budget)",
                      task.get("task_id"), container, overlaid_ports, health_timeout)
-        # Capture the container's own logs before teardown so a crashing overlaid
-        # service (vs merely slow boot) is diagnosable from the run log.
-        try:
-            _dl = subprocess.run(["docker", "logs", "--tail", "60", container],
-                                 capture_output=True, text=True, timeout=15)
-            _tail = ((_dl.stdout or "") + (_dl.stderr or "")).strip()[-2000:]
-            if _tail:
-                logger.error("[%s] per-task mock stack logs (tail):\n%s",
-                             task.get("task_id"), _tail)
-        except Exception:
-            pass
+        logs = _dump_mock_logs(container, overlays.keys())
         stop_mock_stack(container)
-        return {}, None, {}
+        raise RuntimeError(
+            f"per-task mock stack {container} not healthy for task "
+            f"{task.get('task_id')} (overlaid ports {overlaid_ports}); "
+            f"overlay CSV likely malformed"
+            + (f"\n{logs}" if logs else "")
+        )
 
     env_dict = {ev: f"http://{container}:{port}" for ev, port in env_dict_template.items()}
-    logger.info("[%s] per-task mock stack %s ready (%d overlay APIs, ports %s, %d URLs)",
-                task.get("task_id"), container, len(overlays), overlaid_ports, len(env_dict))
+    logger.info("[%s] per-task mock stack %s ready (%d overlay APIs, ports %s)",
+                task.get("task_id"), container, len(overlays), overlaid_ports)
 
     drift_info: dict = {}
     if needs_admin:
@@ -1568,6 +1793,28 @@ def _start_mock_health_logger(task: dict, task_id: str, output_dir):
     env_dict = task.get("env_dict") or {}
     if not env_dict:
         return None
+    # Probe only the APIs this task actually runs (required + distractor +
+    # overlays). The shared env map carries all ~101 URLs, but the mock stack
+    # is filtered to this task's set — so probing the rest would flag the ~96
+    # intentionally-disabled distractors as "failed" every tick (pure noise).
+    enabled_names = (
+        set(task.get("required_apis") or [])
+        | set(task.get("distractor_apis") or [])
+        | set((task.get("mock_overlays") or {}).keys())
+    )
+    if enabled_names:
+        try:
+            env_var_by_name = {
+                s["name"]: s.get("env_var_name")
+                for s in discover_services(task.get("env_dir") or "")
+            }
+            keep_vars = {env_var_by_name.get(n) for n in enabled_names}
+            keep_vars.discard(None)
+            filtered = {k: v for k, v in env_dict.items() if k in keep_vars}
+            if filtered:
+                env_dict = filtered
+        except Exception:
+            pass  # fall back to probing the full map
     try:
         from src.utils.mock_health_logger import MockHealthLogger
         try:
@@ -1658,9 +1905,14 @@ def main() -> None:
             openrouter_base_url=OPENROUTER_BASE_URL_OPENCLAW,
         )
     else:
+        # Resolve the required+distractor APIs for this invocation's task(s) so
+        # the shared mock stack only brings up those services, not all ~101.
+        # None => run the full catalog (safe fallback).
+        mock_enabled_apis = _collect_enabled_apis(args, config)
         try:
             use_litellm, litellm_yaml, network, sidecar, mock_env_dict, usage_log_path = (
-                _setup_litellm_and_mocks(args, config, cleanups)
+                _setup_litellm_and_mocks(args, config, cleanups,
+                                         mock_enabled_apis=mock_enabled_apis)
             )
         except Exception:
             # Setup registers teardown callables before the main try/finally

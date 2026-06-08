@@ -13,18 +13,20 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_str, strict_bool, strict_float, strict_int)
 
 _store = get_store("reddit-api")
+_API = "reddit-api"
 
 _store.register("subreddits", primary_key="id",
-                initial_loader=lambda: _coerce_subreddits(_load("subreddits.csv")))
+                initial_loader=lambda: _coerce_subreddits(_load("subreddits.csv", "subreddits")))
 _store.register("posts", primary_key="id",
-                initial_loader=lambda: _coerce_posts(_load("posts.csv")))
+                initial_loader=lambda: _coerce_posts(_load("posts.csv", "posts")))
 _store.register("comments", primary_key="id",
-                initial_loader=lambda: _coerce_comments(_load("comments.csv")))
+                initial_loader=lambda: _coerce_comments(_load("comments.csv", "comments")))
 _store.register("users", primary_key="id",
-                initial_loader=lambda: _coerce_users(_load("users.csv")))
+                initial_loader=lambda: _coerce_users(_load("users.csv", "users")))
 
 
 def _subreddits_rows():
@@ -44,9 +46,12 @@ def _users_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _to_bool(v):
@@ -65,9 +70,9 @@ def _coerce_subreddits(rows):
             "display_name": r["name"],
             "title": r["title"],
             "public_description": r["public_description"],
-            "subscribers": int(r["subscribers"]),
-            "created_utc": float(r["created_utc"]),
-            "over18": _to_bool(r["over18"]),
+            "subscribers": strict_int(r, "subscribers"),
+            "created_utc": strict_float(r, "created_utc"),
+            "over18": strict_bool(r, "over18"),
         })
     return out
 
@@ -80,13 +85,13 @@ def _coerce_posts(rows):
             "subreddit": r["subreddit"],
             "title": r["title"],
             "author": r["author"],
-            "url": r["url"] or None,
+            "url": opt_str(r, "url", default="") or None,
             "selftext": r["selftext"],
-            "score": int(r["score"]),
-            "ups": int(r["score"]),
-            "num_comments": int(r["num_comments"]),
-            "created_utc": float(r["created_utc"]),
-            "is_self": _to_bool(r["is_self"]),
+            "score": strict_int(r, "score"),
+            "ups": strict_int(r, "score"),
+            "num_comments": strict_int(r, "num_comments"),
+            "created_utc": strict_float(r, "created_utc"),
+            "is_self": strict_bool(r, "is_self"),
             "_likes": None,  # local per-process vote direction tracker
         })
     return out
@@ -101,9 +106,9 @@ def _coerce_comments(rows):
             "parent_id": r["parent_id"],
             "author": r["author"],
             "body": r["body"],
-            "score": int(r["score"]),
-            "ups": int(r["score"]),
-            "created_utc": float(r["created_utc"]),
+            "score": strict_int(r, "score"),
+            "ups": strict_int(r, "score"),
+            "created_utc": strict_float(r, "created_utc"),
         })
     return out
 
@@ -114,11 +119,11 @@ def _coerce_users(rows):
         out.append({
             "name": r["name"],
             "id": r["id"],
-            "link_karma": int(r["link_karma"]),
-            "comment_karma": int(r["comment_karma"]),
-            "created_utc": float(r["created_utc"]),
-            "is_gold": _to_bool(r["is_gold"]),
-            "is_mod": _to_bool(r["is_mod"]),
+            "link_karma": strict_int(r, "link_karma"),
+            "comment_karma": strict_int(r, "comment_karma"),
+            "created_utc": strict_float(r, "created_utc"),
+            "is_gold": strict_bool(r, "is_gold"),
+            "is_mod": strict_bool(r, "is_mod"),
         })
     return out
 
@@ -257,3 +262,5 @@ def user_about(username):
     if not u:
         return {"error": f"user {username} not found"}
     return {"kind": "t2", "data": u}
+
+_store.eager_load()

@@ -15,20 +15,22 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_csv_list, opt_int, opt_str)
 
 _store = get_store("square-api")
+_API = "square-api"
 
 _store.register("customers", primary_key="id",
-                initial_loader=lambda: _coerce_customers(_load("customers.csv")))
+                initial_loader=lambda: _coerce_customers(_load("customers.csv", "customers")))
 _store.register("catalog", primary_key="id",
-                initial_loader=lambda: _coerce_catalog(_load("catalog_items.csv")))
+                initial_loader=lambda: _coerce_catalog(_load("catalog_items.csv", "catalog")))
 _store.register("inventory", primary_key="catalog_object_id",
-                initial_loader=lambda: _coerce_inventory(_load("inventory.csv")))
+                initial_loader=lambda: _coerce_inventory(_load("inventory.csv", "inventory")))
 _store.register("payments", primary_key="id",
-                initial_loader=lambda: _coerce_payments(_load("payments.csv")))
+                initial_loader=lambda: _coerce_payments(_load("payments.csv", "payments")))
 _store.register("orders", primary_key="id",
-                initial_loader=lambda: _coerce_orders(_load("orders.csv")))
+                initial_loader=lambda: _coerce_orders(_load("orders.csv", "orders")))
 _store.register_document("merchant", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "merchant.json", encoding="utf-8")))
 _store.register("refunds", primary_key="refund_id",
                 initial_loader=lambda: [])
@@ -63,9 +65,12 @@ def _refunds_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -98,9 +103,9 @@ def _coerce_customers(rows):
             "id": r["id"],
             "given_name": r["given_name"],
             "family_name": r["family_name"],
-            "email_address": r["email_address"] or None,
-            "phone_number": r["phone_number"] or None,
-            "company_name": r["company_name"] or None,
+            "email_address": opt_str(r, "email_address", default="") or None,
+            "phone_number": opt_str(r, "phone_number", default="") or None,
+            "company_name": opt_str(r, "company_name", default="") or None,
             "created_at": r["created_at"],
         })
     return out
@@ -135,7 +140,7 @@ def _coerce_inventory(rows):
         out.append({
             "catalog_object_id": r["catalog_object_id"],
             "location_id": r["location_id"],
-            "quantity": str(_to_int(r["quantity"])),
+            "quantity": str(opt_int(r, "quantity", default=0)),
             "state": r["state"],
         })
     return out
@@ -146,8 +151,8 @@ def _coerce_payments(rows):
     for r in rows:
         out.append({
             "id": r["id"],
-            "order_id": r["order_id"] or None,
-            "customer_id": r["customer_id"] or None,
+            "order_id": opt_str(r, "order_id", default="") or None,
+            "customer_id": opt_str(r, "customer_id", default="") or None,
             "amount_money": _money(r["amount"], r["currency"]),
             "status": r["status"],
             "source_type": r["source_type"],
@@ -162,7 +167,7 @@ def _coerce_orders(rows):
     out = []
     for r in rows:
         line_items = []
-        for chunk in [c.strip() for c in r["line_items"].split(";") if c.strip()]:
+        for chunk in [c.strip() for c in opt_csv_list(r, "line_items", sep=";") if c.strip()]:
             parts = chunk.rsplit("x", 1)
             uid = parts[0].strip()
             qty = parts[1].strip() if len(parts) > 1 else "1"
@@ -172,7 +177,7 @@ def _coerce_orders(rows):
             })
         out.append({
             "id": r["id"],
-            "customer_id": r["customer_id"] or None,
+            "customer_id": opt_str(r, "customer_id", default="") or None,
             "location_id": r["location_id"],
             "line_items": line_items,
             "total_money": _money(r["total_amount"], r["currency"]),
@@ -360,3 +365,5 @@ def get_inventory(catalog_object_id):
 
 def get_merchant():
     return {"merchant": _merchant_doc()}
+
+_store.eager_load()

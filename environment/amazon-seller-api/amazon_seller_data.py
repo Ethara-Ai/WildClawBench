@@ -9,24 +9,26 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_csv_list, opt_float, opt_str, strict_float, strict_int)
 
 _store = get_store("amazon-seller-api")
+_API = "amazon-seller-api"
 
 _store.register("catalog_items", primary_key="sku",
-                initial_loader=lambda: _coerce_catalog_items(_load("catalog_items.csv")))
+                initial_loader=lambda: _coerce_catalog_items(_load("catalog_items.csv", "catalog_items")))
 _store.register("orders", primary_key="AmazonOrderId",
-                initial_loader=lambda: _coerce_orders(_load("orders.csv")))
+                initial_loader=lambda: _coerce_orders(_load("orders.csv", "orders")))
 _store.register("order_items", primary_key="OrderItemId",
-                initial_loader=lambda: _coerce_order_items(_load("order_items.csv")))
+                initial_loader=lambda: _coerce_order_items(_load("order_items.csv", "order_items")))
 _store.register("inventory", primary_key="fnSku",
-                initial_loader=lambda: _coerce_inventory(_load("inventory.csv")))
+                initial_loader=lambda: _coerce_inventory(_load("inventory.csv", "inventory")))
 _store.register("returns", primary_key="returnId",
-                initial_loader=lambda: _coerce_returns(_load("returns.csv")))
+                initial_loader=lambda: _coerce_returns(_load("returns.csv", "returns")))
 _store.register("reports", primary_key="reportId",
-                initial_loader=lambda: _coerce_reports(_load("reports.csv")))
+                initial_loader=lambda: _coerce_reports(_load("reports.csv", "reports")))
 _store.register("pricing", primary_key="asin",
-                initial_loader=lambda: _coerce_pricing(_load("pricing.csv")))
+                initial_loader=lambda: _coerce_pricing(_load("pricing.csv", "pricing")))
 _store.register_document("seller_account", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "seller_account.json", encoding="utf-8")))
 
 
@@ -63,9 +65,12 @@ def _seller_account_doc():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -80,14 +85,14 @@ def _coerce_catalog_items(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "price": float(r["price"]),
-            "quantity": int(r["quantity"]),
-            "itemWeight": float(r["itemWeight"]) if r["itemWeight"] else None,
-            "itemLength": float(r["itemLength"]) if r["itemLength"] else None,
-            "itemWidth": float(r["itemWidth"]) if r["itemWidth"] else None,
-            "itemHeight": float(r["itemHeight"]) if r["itemHeight"] else None,
-            "bulletPoints": r["bulletPoints"].split("|") if r["bulletPoints"] else [],
+            **_strip_ctx(r),
+            "price": strict_float(r, "price"),
+            "quantity": strict_int(r, "quantity"),
+            "itemWeight": opt_float(r, "itemWeight", default=None),
+            "itemLength": opt_float(r, "itemLength", default=None),
+            "itemWidth": opt_float(r, "itemWidth", default=None),
+            "itemHeight": opt_float(r, "itemHeight", default=None),
+            "bulletPoints": opt_csv_list(r, "bulletPoints", sep="|"),
         })
     return out
 
@@ -96,10 +101,10 @@ def _coerce_orders(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "OrderTotal_Amount": float(r["OrderTotal_Amount"]),
-            "NumberOfItemsShipped": int(r["NumberOfItemsShipped"]),
-            "NumberOfItemsUnshipped": int(r["NumberOfItemsUnshipped"]),
+            **_strip_ctx(r),
+            "OrderTotal_Amount": strict_float(r, "OrderTotal_Amount"),
+            "NumberOfItemsShipped": strict_int(r, "NumberOfItemsShipped"),
+            "NumberOfItemsUnshipped": strict_int(r, "NumberOfItemsUnshipped"),
             "IsPrime": r["IsPrime"].lower() == "true",
             "IsBusinessOrder": r["IsBusinessOrder"].lower() == "true",
             "IsSoldByAB": r["IsSoldByAB"].lower() == "true",
@@ -111,12 +116,12 @@ def _coerce_order_items(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "QuantityOrdered": int(r["QuantityOrdered"]),
-            "QuantityShipped": int(r["QuantityShipped"]),
-            "ItemPrice_Amount": float(r["ItemPrice_Amount"]),
-            "ItemTax_Amount": float(r["ItemTax_Amount"]),
-            "PromotionDiscount_Amount": float(r["PromotionDiscount_Amount"]),
+            **_strip_ctx(r),
+            "QuantityOrdered": strict_int(r, "QuantityOrdered"),
+            "QuantityShipped": strict_int(r, "QuantityShipped"),
+            "ItemPrice_Amount": strict_float(r, "ItemPrice_Amount"),
+            "ItemTax_Amount": strict_float(r, "ItemTax_Amount"),
+            "PromotionDiscount_Amount": strict_float(r, "PromotionDiscount_Amount"),
             "IsGift": r["IsGift"].lower() == "true",
         })
     return out
@@ -126,14 +131,14 @@ def _coerce_inventory(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "totalQuantity": int(r["totalQuantity"]),
-            "inStockSupplyQuantity": int(r["inStockSupplyQuantity"]),
-            "inboundWorkingQuantity": int(r["inboundWorkingQuantity"]),
-            "inboundShippedQuantity": int(r["inboundShippedQuantity"]),
-            "inboundReceivingQuantity": int(r["inboundReceivingQuantity"]),
-            "reservedQuantity": int(r["reservedQuantity"]),
-            "unfulfillableQuantity": int(r["unfulfillableQuantity"]),
+            **_strip_ctx(r),
+            "totalQuantity": strict_int(r, "totalQuantity"),
+            "inStockSupplyQuantity": strict_int(r, "inStockSupplyQuantity"),
+            "inboundWorkingQuantity": strict_int(r, "inboundWorkingQuantity"),
+            "inboundShippedQuantity": strict_int(r, "inboundShippedQuantity"),
+            "inboundReceivingQuantity": strict_int(r, "inboundReceivingQuantity"),
+            "reservedQuantity": strict_int(r, "reservedQuantity"),
+            "unfulfillableQuantity": strict_int(r, "unfulfillableQuantity"),
         })
     return out
 
@@ -142,9 +147,9 @@ def _coerce_returns(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "returnQuantity": int(r["returnQuantity"]),
-            "refundAmount": float(r["refundAmount"]),
+            **_strip_ctx(r),
+            "returnQuantity": strict_int(r, "returnQuantity"),
+            "refundAmount": strict_float(r, "refundAmount"),
         })
     return out
 
@@ -153,9 +158,9 @@ def _coerce_reports(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "processingEndTime": r["processingEndTime"] if r["processingEndTime"] else None,
-            "reportDocumentId": r["reportDocumentId"] if r["reportDocumentId"] else None,
+            **_strip_ctx(r),
+            "processingEndTime": opt_str(r, "processingEndTime", default="") or None,
+            "reportDocumentId": opt_str(r, "reportDocumentId", default="") or None,
         })
     return out
 
@@ -164,13 +169,13 @@ def _coerce_pricing(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "competitivePrice_Amount": float(r["competitivePrice_Amount"]),
-            "listingPrice_Amount": float(r["listingPrice_Amount"]),
-            "landedPrice_Amount": float(r["landedPrice_Amount"]),
-            "shipping_Amount": float(r["shipping_Amount"]),
-            "numberOfOffers": int(r["numberOfOffers"]),
-            "buyBoxPrice_Amount": float(r["buyBoxPrice_Amount"]),
+            **_strip_ctx(r),
+            "competitivePrice_Amount": strict_float(r, "competitivePrice_Amount"),
+            "listingPrice_Amount": strict_float(r, "listingPrice_Amount"),
+            "landedPrice_Amount": strict_float(r, "landedPrice_Amount"),
+            "shipping_Amount": strict_float(r, "shipping_Amount"),
+            "numberOfOffers": strict_int(r, "numberOfOffers"),
+            "buyBoxPrice_Amount": strict_float(r, "buyBoxPrice_Amount"),
             "buyBoxWinner": r["buyBoxWinner"].lower() == "true",
         })
     return out
@@ -781,3 +786,5 @@ def close_return(return_id):
             _returns_rows()[i]["resolution"] = "CLOSED"
             return {"type": "return_close", "status": "SUCCESS", "returnId": return_id}
     return {"error": f"Return {return_id} not found"}
+
+_store.eager_load()

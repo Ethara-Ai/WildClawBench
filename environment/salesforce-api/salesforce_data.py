@@ -15,14 +15,18 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store
+from _mutable_store import read_csv_with_ctx, get_store
 
 _store = get_store("salesforce-api")
+_API = "salesforce-api"
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -37,7 +41,7 @@ _NUMERIC_FIELDS = {
 def _coerce(rows, sobject):
     out = []
     for r in rows:
-        rec = dict(r)
+        rec = _strip_ctx(r)
         for k, v in list(rec.items()):
             if k in _NUMERIC_FIELDS and v not in (None, ""):
                 try:
@@ -62,7 +66,7 @@ for _name, _csv in _SOBJECT_CSV.items():
     _store.register(
         _name,
         primary_key="Id",
-        initial_loader=(lambda n=_name, c=_csv: _coerce(_load(c), n)),
+        initial_loader=(lambda n=_name, c=_csv: _coerce(_load(c, n), n)),
     )
 
 
@@ -201,3 +205,5 @@ def query(soql):
         "done": True,
         "records": results,
     }
+
+_store.eager_load()

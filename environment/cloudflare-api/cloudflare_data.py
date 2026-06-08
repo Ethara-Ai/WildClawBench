@@ -9,18 +9,23 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store,
+    strict_int,
+    strict_bool,
+)
 
 _store = get_store("cloudflare-api")
+_API = "cloudflare-api"
 
 _store.register("zones", primary_key="id",
-                initial_loader=lambda: _coerce_zones(_load("zones.csv")))
+                initial_loader=lambda: _coerce_zones(_load("zones.csv", "zones")))
 _store.register("dns", primary_key="id",
-                initial_loader=lambda: _coerce_dns(_load("dns_records.csv")))
+                initial_loader=lambda: _coerce_dns(_load("dns_records.csv", "dns")))
 _store.register("firewall", primary_key="id",
-                initial_loader=lambda: _coerce_firewall(_load("firewall_rules.csv")))
+                initial_loader=lambda: _coerce_firewall(_load("firewall_rules.csv", "firewall")))
 _store.register("page_rules", primary_key="id",
-                initial_loader=lambda: _coerce_page_rules(_load("page_rules.csv")))
+                initial_loader=lambda: _coerce_page_rules(_load("page_rules.csv", "page_rules")))
 
 
 def _zones_rows():
@@ -40,9 +45,12 @@ def _page_rules_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -61,9 +69,9 @@ def _coerce_zones(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "paused": _to_bool(r["paused"]),
-            "development_mode": int(r["development_mode"]),
+            **_strip_ctx(r),
+            "paused": strict_bool(r, "paused"),
+            "development_mode": strict_int(r, "development_mode"),
         })
     return out
 
@@ -72,10 +80,10 @@ def _coerce_dns(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "ttl": int(r["ttl"]),
-            "proxied": _to_bool(r["proxied"]),
-            "priority": int(r["priority"]),
+            **_strip_ctx(r),
+            "ttl": strict_int(r, "ttl"),
+            "proxied": strict_bool(r, "proxied"),
+            "priority": strict_int(r, "priority"),
         })
     return out
 
@@ -84,15 +92,15 @@ def _coerce_firewall(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "paused": _to_bool(r["paused"]),
-            "priority": int(r["priority"]),
+            **_strip_ctx(r),
+            "paused": strict_bool(r, "paused"),
+            "priority": strict_int(r, "priority"),
         })
     return out
 
 
 def _coerce_page_rules(rows):
-    return [{**r, "priority": int(r["priority"])} for r in rows]
+    return [{**_strip_ctx(r), "priority": strict_int(r, "priority")} for r in rows]
 
 
 
@@ -276,3 +284,5 @@ def list_firewall_rules(zone_id):
     results = [r for r in _firewall_rows() if r["zone_id"] == zone_id]
     results.sort(key=lambda r: r["priority"])
     return _ok([_serialize_firewall(r) for r in results])
+
+_store.eager_load()

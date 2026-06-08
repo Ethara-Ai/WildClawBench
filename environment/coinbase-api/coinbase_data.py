@@ -15,16 +15,21 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store,
+    strict_bool,
+    opt_float,
+)
 
 _store = get_store("coinbase-api")
+_API = "coinbase-api"
 
 _store.register("accounts", primary_key="id",
-                initial_loader=lambda: _coerce_accounts(_load("accounts.csv")))
+                initial_loader=lambda: _coerce_accounts(_load("accounts.csv", "accounts")))
 _store.register("prices", primary_key="pair",
-                initial_loader=lambda: _coerce_prices(_load("prices.csv")))
+                initial_loader=lambda: _coerce_prices(_load("prices.csv", "prices")))
 _store.register("transactions", primary_key="id",
-                initial_loader=lambda: _coerce_transactions(_load("transactions.csv")))
+                initial_loader=lambda: _coerce_transactions(_load("transactions.csv", "transactions")))
 _store.register_document("user", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "user.json", encoding="utf-8")))
 
 
@@ -45,9 +50,12 @@ def _user_doc():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -75,22 +83,22 @@ def _coerce_accounts(rows):
         out.append({
             "id": r["id"],
             "name": r["name"],
-            "primary": _to_bool(r["primary"]),
+            "primary": strict_bool(r, "primary"),
             "type": r["type"],
             "currency": {"code": r["currency_code"], "name": r["currency_name"]},
             "balance": {"amount": r["balance_amount"], "currency": r["currency_code"]},
             "native_balance": {"amount": r["native_balance_amount"], "currency": r["native_currency"]},
             "created_at": r["created_at"],
             "updated_at": r["updated_at"],
-            "_balance_num": _to_float(r["balance_amount"]),
-            "_native_num": _to_float(r["native_balance_amount"]),
+            "_balance_num": opt_float(r, "balance_amount", default=0.0),
+            "_native_num": opt_float(r, "native_balance_amount", default=0.0),
         })
     return out
 
 
 def _coerce_prices(rows):
     return [{"pair": r["pair"], "base": r["base"], "currency": r["currency"],
-             "amount": r["amount"], "_amount_num": _to_float(r["amount"])}
+             "amount": r["amount"], "_amount_num": opt_float(r, "amount", default=0.0)}
             for r in rows]
 
 
@@ -260,3 +268,5 @@ def list_transactions(account_id):
 
 def get_user():
     return {"data": _user_doc()}
+
+_store.eager_load()

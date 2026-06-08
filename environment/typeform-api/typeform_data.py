@@ -9,18 +9,23 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store,
+    strict_int,
+    strict_bool,
+)
 
 _store = get_store("typeform-api")
+_API = "typeform-api"
 
 _store.register("forms", primary_key="form_id",
-                initial_loader=lambda: _coerce_forms(_load("forms.csv")))
+                initial_loader=lambda: _coerce_forms(_load("forms.csv", "forms")))
 _store.register("fields", primary_key="field_id",
-                initial_loader=lambda: _coerce_fields(_load("fields.csv")))
+                initial_loader=lambda: _coerce_fields(_load("fields.csv", "fields")))
 _store.register("responses", primary_key="response_id",
-                initial_loader=lambda: _coerce_responses(_load("responses.csv")))
+                initial_loader=lambda: _coerce_responses(_load("responses.csv", "responses")))
 _store.register("answers", primary_key="response_id",
-                initial_loader=lambda: _coerce_answers(_load("answers.csv")))
+                initial_loader=lambda: _coerce_answers(_load("answers.csv", "answers")))
 
 
 def _forms_rows():
@@ -40,9 +45,12 @@ def _answers_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -65,9 +73,9 @@ def _coerce_forms(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "is_public": _to_bool(r["is_public"]),
-            "response_count": int(r["response_count"]),
+            **_strip_ctx(r),
+            "is_public": strict_bool(r, "is_public"),
+            "response_count": strict_int(r, "response_count"),
         })
     return out
 
@@ -76,20 +84,20 @@ def _coerce_fields(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "required": _to_bool(r["required"]),
+            **_strip_ctx(r),
+            "required": strict_bool(r, "required"),
             "choices": _choices(r["choices"]),
-            "order": int(r["order"]),
+            "order": strict_int(r, "order"),
         })
     return out
 
 
 def _coerce_responses(rows):
-    return [{**r, "completed": _to_bool(r["completed"])} for r in rows]
+    return [{**_strip_ctx(r), "completed": strict_bool(r, "completed")} for r in rows]
 
 
 def _coerce_answers(rows):
-    return [{**r} for r in rows]
+    return [{**_strip_ctx(r)} for r in rows]
 
 
 
@@ -317,3 +325,5 @@ def insights_summary(form_id):
         "completion_rate": completion_rate,
         "fields": field_summaries,
     }
+
+_store.eager_load()

@@ -10,21 +10,31 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, # noqa: E402
+    get_store,
+    strict_int,
+    strict_bool,
+    strict_str,
+    opt_bool,
+    opt_float,
+    opt_str,
+)
 
 _store = get_store("notion-api")
+_API = "notion-api"
 
 _store.register("users", primary_key="id",
-                initial_loader=lambda: _coerce_users(_load("users.csv")))
+                initial_loader=lambda: _coerce_users(_load("users.csv", "users")))
 _store.register("databases", primary_key="id",
-                initial_loader=lambda: _coerce_databases(_load("databases.csv")))
+                initial_loader=lambda: _coerce_databases(_load("databases.csv", "databases")))
 _store.register("pages", primary_key="id",
-                initial_loader=lambda: _coerce_pages(_load("pages.csv")))
+                initial_loader=lambda: _coerce_pages(_load("pages.csv", "pages")))
 _store.register("blocks", primary_key="id",
-                initial_loader=lambda: _coerce_blocks(_load("blocks.csv")))
+                initial_loader=lambda: _coerce_blocks(_load("blocks.csv", "blocks")))
 _store.register("comments", primary_key="id",
-                initial_loader=lambda: _coerce_comments(_load("comments.csv")))
-_store.register_document("properties", initial_loader=lambda: _coerce_properties(_load("page_properties.csv")))
+                initial_loader=lambda: _coerce_comments(_load("comments.csv", "comments")))
+_store.register_document("properties", initial_loader=lambda: _coerce_properties(_load("page_properties.csv", "page_properties")))
 _store.register_document("workspace", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "workspace.json", encoding="utf-8")))
 
 
@@ -57,17 +67,16 @@ def _workspace_doc():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
     return datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.000Z")
-
-
-def _to_bool(v):
-    return str(v).strip().lower() == "true"
 
 
 # ---------------------------------------------------------------------------
@@ -78,10 +87,10 @@ def _coerce_users(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "bot": _to_bool(r["bot"]),
-            "avatar_url": r["avatar_url"] or None,
-            "email": r["email"] or None,
+            **_strip_ctx(r),
+            "bot": strict_bool(r, "bot"),
+            "avatar_url": opt_str(r, "avatar_url", default="") or None,
+            "email": opt_str(r, "email", default="") or None,
         })
     return out
 
@@ -90,8 +99,8 @@ def _coerce_databases(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "archived": _to_bool(r["archived"]),
+            **_strip_ctx(r),
+            "archived": strict_bool(r, "archived"),
         })
     return out
 
@@ -100,9 +109,9 @@ def _coerce_pages(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "archived": _to_bool(r["archived"]),
-            "cover_url": r["cover_url"] or None,
+            **_strip_ctx(r),
+            "archived": strict_bool(r, "archived"),
+            "cover_url": opt_str(r, "cover_url", default="") or None,
         })
     return out
 
@@ -111,11 +120,11 @@ def _coerce_blocks(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "order": int(r["order"]),
-            "has_children": _to_bool(r["has_children"]),
-            "checked": _to_bool(r["checked"]) if r.get("checked") else None,
-            "parent_block_id": r["parent_block_id"] or None,
+            **_strip_ctx(r),
+            "order": strict_int(r, "order"),
+            "has_children": strict_bool(r, "has_children"),
+            "checked": opt_bool(r, "checked", default=None) if r.get("checked") else None,
+            "parent_block_id": opt_str(r, "parent_block_id", default="") or None,
         })
     return out
 
@@ -124,9 +133,9 @@ def _coerce_comments(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "resolved": _to_bool(r["resolved"]),
-            "parent_block_id": r["parent_block_id"] or None,
+            **_strip_ctx(r),
+            "resolved": strict_bool(r, "resolved"),
+            "parent_block_id": opt_str(r, "parent_block_id", default="") or None,
         })
     return out
 
@@ -135,17 +144,17 @@ def _coerce_properties(rows):
     # Group by page_id -> {property_name: {type, value}}
     grouped = {}
     for r in rows:
-        page_id = r["page_id"]
+        page_id = strict_str(r, "page_id")
         grouped.setdefault(page_id, {})
-        value = r["value"]
+        value = strict_str(r, "value")
         # Coerce by type
-        ptype = r["property_type"]
+        ptype = strict_str(r, "property_type")
         if ptype == "number":
             try:
                 value = float(value)
             except ValueError:
                 pass
-        grouped[page_id][r["property_name"]] = {
+        grouped[page_id][strict_str(r, "property_name")] = {
             "type": ptype,
             "value": value,
         }
@@ -433,3 +442,6 @@ def create_comment(parent_page_id, parent_block_id, author_id, text):
     }
     _comments_rows().append(comment)
     return comment
+
+
+_store.eager_load()

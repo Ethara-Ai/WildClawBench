@@ -10,18 +10,22 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store,
+    strict_bool,
+)
 
 _store = get_store("whatsapp-api")
+_API = "whatsapp-api"
 
 _store.register("contacts", primary_key="wa_id",
-                initial_loader=lambda: _coerce_contacts(_load("contacts.csv")))
+                initial_loader=lambda: _coerce_contacts(_load("contacts.csv", "contacts")))
 _store.register("conversations", primary_key="conversation_id",
-                initial_loader=lambda: _coerce_conversations(_load("conversations.csv")))
+                initial_loader=lambda: _coerce_conversations(_load("conversations.csv", "conversations")))
 _store.register("templates", primary_key="name",
-                initial_loader=lambda: _load("templates.csv"))
+                initial_loader=lambda: [_strip_ctx(r) for r in _load("templates.csv", "templates")])
 _store.register("messages", primary_key="message_id",
-                initial_loader=lambda: _load("messages.csv"))
+                initial_loader=lambda: [_strip_ctx(r) for r in _load("messages.csv", "messages")])
 _store.register_document("business", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "business.json", encoding="utf-8")))
 
 
@@ -46,9 +50,12 @@ def _business_doc():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -60,11 +67,11 @@ def _to_bool(v):
 
 
 def _coerce_contacts(rows):
-    return [{**r, "opted_in": _to_bool(r["opted_in"])} for r in rows]
+    return [{**_strip_ctx(r), "opted_in": strict_bool(r, "opted_in")} for r in rows]
 
 
 def _coerce_conversations(rows):
-    return [{**r, "within_24h_window": _to_bool(r["within_24h_window"])} for r in rows]
+    return [{**_strip_ctx(r), "within_24h_window": strict_bool(r, "within_24h_window")} for r in rows]
 
 
 
@@ -222,3 +229,5 @@ def mark_read(message_id):
             _messages_rows()[i]["status"] = "read"
             return {"success": True, "message_id": message_id}
     return {"error": f"Message {message_id} not found"}
+
+_store.eager_load()

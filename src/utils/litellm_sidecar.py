@@ -18,7 +18,13 @@ def build_litellm_config_yaml(
     openai_api_key: str = "",
     bedrock_sonnet_arn: str = "",
     enable_usage_callback: bool = False,
+    openai_whisper_api_key: str = "",
 ) -> str:
+    whisper_env_ref = (
+        "os.environ/OPENAI_API_KEY_WHISPER"
+        if openai_whisper_api_key
+        else "os.environ/OPENAI_API_KEY"
+    )
     model_blocks: list[str] = []
     # `cache_control_injection_points` MUST live inside each model's
     # `litellm_params:` block, NOT in global `litellm_settings:`. Empirically
@@ -146,7 +152,7 @@ def build_litellm_config_yaml(
             "  - model_name: whisper-1\n"
             "    litellm_params:\n"
             "      model: openai/whisper-1\n"
-            "      api_key: os.environ/OPENAI_API_KEY"
+            f"      api_key: {whisper_env_ref}"
         )
         # OpenClaw's built-in transcribeAudio runner auto-POSTs the sidecar's
         # /v1/audio/transcriptions but its OpenAI plugin defaults to model=
@@ -166,7 +172,7 @@ def build_litellm_config_yaml(
                 f"  - model_name: {_audio_fallback_id}\n"
                 "    litellm_params:\n"
                 "      model: openai/whisper-1\n"
-                "      api_key: os.environ/OPENAI_API_KEY"
+                f"      api_key: {whisper_env_ref}"
             )
     # OpenClaw's image tool falls back to built-in default model ids when its
     # own imageModel override isn't applied inside the container. The openclaw
@@ -322,6 +328,7 @@ def start_litellm(
     port: int = LITELLM_INTERNAL_PORT,
     usage_callback_host_path: str = "",
     usage_log_host_dir: str = "",
+    openai_whisper_api_key: str = "",
 ) -> None:
     env_args: list[str] = ["-e", f"LITELLM_MASTER_KEY={master_key}"]
     _litellm_log = os.environ.get("LITELLM_LOG", "").strip()
@@ -334,6 +341,8 @@ def start_litellm(
         ]
     if openai_api_key:
         env_args += ["-e", f"OPENAI_API_KEY={openai_api_key}"]
+    if openai_whisper_api_key:
+        env_args += ["-e", f"OPENAI_API_KEY_WHISPER={openai_whisper_api_key}"]
 
     # Mount the callback module + writable log dir so UsageWriter can write
     # real provider-side usage rows from inside the sidecar. The env var name

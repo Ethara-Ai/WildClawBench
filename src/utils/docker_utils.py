@@ -172,9 +172,13 @@ def start_container(task_id: str, workspace_path: str, extra_env: str = "",
         masked = value[:4] + "***"
         logger.info("[%s] Injecting lobster env: %s=%s", task_id, key, masked)
 
+    _injected_keys: list[str] = []
     for k, v in (extra_env_dict or {}).items():
         env_args += ["-e", f"{k}={v}"]
-        logger.info("[%s] Injecting extra env: %s=%s", task_id, k, v)
+        _injected_keys.append(k)
+    if _injected_keys:
+        logger.info("[%s] Injected %d extra env vars: %s",
+                    task_id, len(_injected_keys), ",".join(sorted(_injected_keys)))
 
     image = os.environ.get("DOCKER_IMAGE", DOCKER_IMAGE)
     network_args = ["--network", network] if network else []
@@ -302,6 +306,372 @@ def setup_skills(
             )
 
 
+_BASELINE_SKILL_PIP_DEPS: tuple[str, ...] = (
+    "pymupdf",
+    "pillow",
+    "pytesseract",
+    "pdfplumber",
+    "pdf2image",
+    "opencv-python-headless",
+    "openpyxl",
+    "python-docx",
+    "pandas",
+    "pypdf",
+)
+
+
+# Offline wheelhouse + debhouse. Agent containers run on an --internal docker
+# network (litellm_sidecar.py:272-307) so PyPI and archive.ubuntu.com are
+# unreachable; we docker-cp these in and install offline with
+# `pip install --no-index --find-links` / `dpkg -i`.
+_REPO_ROOT: Path = Path(__file__).resolve().parent.parent.parent
+_WHEELHOUSE_HOST_DIR: Path = _REPO_ROOT / "wheelhouse" / "skill-deps"
+# /opt is writable and avoids colliding with /tmp_workspace (ro) and /opt/mocks
+# (mock_stack.py:216-256 bind mounts).
+_WHEELHOUSE_CONTAINER_DIR: str = "/opt/wb_wheels"
+_DEBHOUSE_HOST_DIR: Path = _REPO_ROOT / "debhouse" / "skill-deps"
+_DEBHOUSE_CONTAINER_DIR: str = "/opt/wb_debs"
+
+
+_BIN_TO_APT_PACKAGE: dict[str, str] = {
+    "ffmpeg": "ffmpeg",
+    "ffprobe": "ffmpeg",
+    "tesseract": "tesseract-ocr",
+    "pdftotext": "poppler-utils",
+    "pdfinfo": "poppler-utils",
+    "unzip": "unzip",
+}
+
+
+_BASELINE_SKILL_APT_PACKAGES: tuple[str, ...] = (
+    "ffmpeg",
+    "tesseract-ocr",
+    "poppler-utils",
+    "unzip",
+)
+
+
+_SKILL_DEP_PROBE_IMPORTS: tuple[tuple[str, str], ...] = (
+    ("fitz", "pymupdf"),
+    ("PIL", "pillow"),
+    ("pytesseract", "pytesseract"),
+    ("pdfplumber", "pdfplumber"),
+    ("openpyxl", "openpyxl"),
+    ("docx", "python-docx"),
+    ("pandas", "pandas"),
+    ("pypdf", "pypdf"),
+)
+
+
+_SKILL_DEP_PROBE_BINS: tuple[str, ...] = (
+    "ffmpeg",
+    "tesseract",
+    "pdftotext",
+    "unzip",
+)
+
+
+def _parse_skill_pip_deps(skill_md_path: Path) -> list[str]:
+    if not skill_md_path.is_file():
+        return []
+    try:
+        text = skill_md_path.read_text(encoding="utf-8")
+    except OSError:
+        return []
+    if not text.startswith("---"):
+        return []
+    parts = text.split("---", 2)
+    if len(parts) < 3:
+        return []
+    try:
+        import yaml as _yaml
+        frontmatter = _yaml.safe_load(parts[1]) or {}
+    except Exception:
+        return []
+    if not isinstance(frontmatter, dict):
+        return []
+    metadata = frontmatter.get("metadata") or {}
+    if not isinstance(metadata, dict):
+        return []
+    clawdbot = metadata.get("clawdbot") or {}
+    if not isinstance(clawdbot, dict):
+        return []
+    pip_deps = clawdbot.get("pip") or []
+    requires = clawdbot.get("requires") or {}
+    requires_pip = requires.get("pip") or [] if isinstance(requires, dict) else []
+    deps = list(pip_deps) + list(requires_pip)
+    return [str(d).strip() for d in deps if str(d).strip()]
+
+
+def _parse_skill_bin_deps(skill_md_path: Path) -> list[str]:
+    if not skill_md_path.is_file():
+        return []
+    try:
+        text = skill_md_path.read_text(encoding="utf-8")
+    except OSError:
+        return []
+    if not text.startswith("---"):
+        return []
+    parts = text.split("---", 2)
+    if len(parts) < 3:
+        return []
+    try:
+        import yaml as _yaml
+        frontmatter = _yaml.safe_load(parts[1]) or {}
+    except Exception:
+        return []
+    if not isinstance(frontmatter, dict):
+        return []
+    metadata = frontmatter.get("metadata") or {}
+    if not isinstance(metadata, dict):
+        return []
+    clawdbot = metadata.get("clawdbot") or {}
+    if not isinstance(clawdbot, dict):
+        return []
+    requires = clawdbot.get("requires") or {}
+    bins = requires.get("bins") or [] if isinstance(requires, dict) else []
+    return [str(b).strip() for b in bins if str(b).strip()]
+
+
+def _install_skill_runtime_deps(task_id: str, env_root: Path) -> dict[str, list[str]]:
+    pip_deps: set[str] = set(_BASELINE_SKILL_PIP_DEPS)
+    apt_packages: set[str] = set(_BASELINE_SKILL_APT_PACKAGES)
+    skills_src = env_root / "skills"
+    if skills_src.is_dir():
+        for entry in sorted(skills_src.iterdir()):
+            if not entry.is_dir() or entry.name.endswith("-connector"):
+                continue
+            skill_md = entry / "SKILL.md"
+            for pkg in _parse_skill_pip_deps(skill_md):
+                pip_deps.add(pkg)
+            for binary in _parse_skill_bin_deps(skill_md):
+                apt_pkg = _BIN_TO_APT_PACKAGE.get(binary)
+                if apt_pkg:
+                    apt_packages.add(apt_pkg)
+
+    sorted_apt = sorted(apt_packages)
+    if sorted_apt:
+        _install_apt_deps_from_debhouse(task_id, sorted_apt)
+
+    sorted_pip = sorted(pip_deps)
+    if sorted_pip:
+        _install_pip_deps_from_wheelhouse(task_id, sorted_pip)
+
+    return {"pip": sorted_pip, "apt": sorted_apt}
+
+
+def _install_apt_deps_from_debhouse(task_id: str, sorted_apt: list[str]) -> None:
+    precheck_cmd = (
+        "set -e; "
+        "if ! command -v dpkg >/dev/null 2>&1; then echo 'no-dpkg'; exit 0; fi; "
+        "missing=''; "
+        "for p in " + " ".join(shlex.quote(p) for p in sorted_apt) + "; do "
+        "  dpkg -s \"$p\" >/dev/null 2>&1 || missing=\"$missing $p\"; "
+        "done; "
+        "if [ -z \"$missing\" ]; then echo 'all-present'; else echo \"missing:$missing\"; fi"
+    )
+    precheck = subprocess.run(
+        ["docker", "exec", task_id, "bash", "-lc", precheck_cmd],
+        capture_output=True, text=True,
+    )
+    pre_stdout = (precheck.stdout or "").strip()
+    if pre_stdout == "all-present":
+        logger.info(
+            "[%s] Skill runtime apt packages already present (%d): %s",
+            task_id, len(sorted_apt), ",".join(sorted_apt),
+        )
+        return
+    if pre_stdout == "no-dpkg":
+        logger.warning(
+            "[%s] dpkg not available in image; skipping apt step", task_id,
+        )
+        return
+
+    if not _DEBHOUSE_HOST_DIR.is_dir():
+        logger.error(
+            "[%s] Debhouse missing at %s. Skill runtime apt deps will NOT be installed; "
+            "pdf/image/audio skills will fail. Rebuild via: "
+            "docker run --rm --platform linux/amd64 -v %s:/out ubuntu:22.04 bash -c "
+            "'apt-get update && apt-get install -y --no-install-recommends apt-rdepends && "
+            "for p in %s; do for d in $(apt-rdepends $p 2>/dev/null | grep -v \"^ \"); do "
+            "apt-get download \"$d\" 2>/dev/null || true; done; done && mv *.deb /out/'",
+            task_id, _DEBHOUSE_HOST_DIR, _DEBHOUSE_HOST_DIR, " ".join(sorted_apt),
+        )
+        return
+
+    debs = list(_DEBHOUSE_HOST_DIR.glob("*.deb"))
+    if not debs:
+        logger.error(
+            "[%s] Debhouse %s contains no *.deb files; skill runtime apt deps will NOT be installed",
+            task_id, _DEBHOUSE_HOST_DIR,
+        )
+        return
+
+    mkdir = subprocess.run(
+        ["docker", "exec", task_id, "mkdir", "-p", _DEBHOUSE_CONTAINER_DIR],
+        capture_output=True, text=True,
+    )
+    if mkdir.returncode != 0:
+        logger.warning(
+            "[%s] Failed to create %s in container (continuing). stderr: %s",
+            task_id, _DEBHOUSE_CONTAINER_DIR, (mkdir.stderr or "").strip()[:300],
+        )
+        return
+
+    cp = subprocess.run(
+        ["docker", "cp", f"{_DEBHOUSE_HOST_DIR}/.", f"{task_id}:{_DEBHOUSE_CONTAINER_DIR}/"],
+        capture_output=True, text=True,
+    )
+    if cp.returncode != 0:
+        logger.warning(
+            "[%s] docker cp debhouse -> %s failed (continuing). stderr: %s",
+            task_id, _DEBHOUSE_CONTAINER_DIR, (cp.stderr or "").strip()[:300],
+        )
+        return
+
+    install_cmd = (
+        "set -e; "
+        "export DEBIAN_FRONTEND=noninteractive; "
+        "cd " + shlex.quote(_DEBHOUSE_CONTAINER_DIR) + "; "
+        "dpkg -i *.deb >/tmp/wb_dpkg.log 2>&1 || { "
+        "  cat /tmp/wb_dpkg.log >&2; exit 1; "
+        "}; "
+        "echo 'installed-offline'"
+    )
+    install = subprocess.run(
+        ["docker", "exec", task_id, "bash", "-lc", install_cmd],
+        capture_output=True, text=True,
+    )
+    if install.returncode != 0:
+        logger.warning(
+            "[%s] Offline dpkg install from debhouse returned %d (continuing; "
+            "verify probe will report missing bins). stderr: %s",
+            task_id, install.returncode, (install.stderr or "").strip()[:500],
+        )
+    else:
+        logger.info(
+            "[%s] Installed skill runtime apt deps offline from %s "
+            "(%d .debs staged, %d top-level packages): %s",
+            task_id, _DEBHOUSE_CONTAINER_DIR, len(debs), len(sorted_apt), ",".join(sorted_apt),
+        )
+
+
+def _install_pip_deps_from_wheelhouse(task_id: str, sorted_pip: list[str]) -> None:
+    requirements_file = _WHEELHOUSE_HOST_DIR / "requirements.txt"
+    if not _WHEELHOUSE_HOST_DIR.is_dir() or not requirements_file.is_file():
+        logger.error(
+            "[%s] Wheelhouse missing at %s (expected requirements.txt + *.whl). "
+            "Skill runtime pip deps will NOT be installed; pdf/image/audio skills will fail. "
+            "Rebuild via: docker run --rm --platform linux/amd64 -v %s:/out python:3.10-slim "
+            "bash -c 'pip download --dest /out --platform manylinux2014_x86_64 "
+            "--python-version 310 --implementation cp --abi cp310 --only-binary=:all: %s'",
+            task_id, _WHEELHOUSE_HOST_DIR, _WHEELHOUSE_HOST_DIR, " ".join(sorted_pip),
+        )
+        return
+
+    wheels = list(_WHEELHOUSE_HOST_DIR.glob("*.whl"))
+    if not wheels:
+        logger.error(
+            "[%s] Wheelhouse %s contains no *.whl files; skill runtime pip deps will NOT be installed",
+            task_id, _WHEELHOUSE_HOST_DIR,
+        )
+        return
+
+    mkdir = subprocess.run(
+        ["docker", "exec", task_id, "mkdir", "-p", _WHEELHOUSE_CONTAINER_DIR],
+        capture_output=True, text=True,
+    )
+    if mkdir.returncode != 0:
+        logger.warning(
+            "[%s] Failed to create %s in container (continuing). stderr: %s",
+            task_id, _WHEELHOUSE_CONTAINER_DIR, (mkdir.stderr or "").strip()[:300],
+        )
+        return
+
+    cp = subprocess.run(
+        ["docker", "cp", f"{_WHEELHOUSE_HOST_DIR}/.", f"{task_id}:{_WHEELHOUSE_CONTAINER_DIR}/"],
+        capture_output=True, text=True,
+    )
+    if cp.returncode != 0:
+        logger.warning(
+            "[%s] docker cp wheelhouse -> %s failed (continuing). stderr: %s",
+            task_id, _WHEELHOUSE_CONTAINER_DIR, (cp.stderr or "").strip()[:300],
+        )
+        return
+
+    install = subprocess.run(
+        ["docker", "exec", task_id, "pip", "install",
+         "--quiet", "--disable-pip-version-check", "--no-input",
+         "--no-index", "--find-links", _WHEELHOUSE_CONTAINER_DIR,
+         "-r", f"{_WHEELHOUSE_CONTAINER_DIR}/requirements.txt",
+         *sorted_pip],
+        capture_output=True, text=True,
+    )
+    if install.returncode != 0:
+        logger.warning(
+            "[%s] Offline pip install from wheelhouse returned %d (continuing; "
+            "verify probe will report missing modules). stderr: %s",
+            task_id, install.returncode, (install.stderr or "").strip()[:500],
+        )
+    else:
+        logger.info(
+            "[%s] Installed skill runtime pip deps offline from %s (%d wheels staged, %d top-level deps): %s",
+            task_id, _WHEELHOUSE_CONTAINER_DIR, len(wheels), len(sorted_pip), ",".join(sorted_pip),
+        )
+
+
+def _verify_skill_runtime_deps(task_id: str) -> list[str]:
+    probe = (
+        "import importlib, json, shutil, sys\n"
+        "modules = " + repr([m for m, _ in _SKILL_DEP_PROBE_IMPORTS]) + "\n"
+        "bins = " + repr(list(_SKILL_DEP_PROBE_BINS)) + "\n"
+        "missing_modules = []\n"
+        "for m in modules:\n"
+        "    try:\n"
+        "        importlib.import_module(m)\n"
+        "    except Exception:\n"
+        "        missing_modules.append(m)\n"
+        "missing_bins = [b for b in bins if shutil.which(b) is None]\n"
+        "sys.stdout.write(json.dumps({'modules': missing_modules, 'bins': missing_bins}))\n"
+    )
+    r = subprocess.run(
+        ["docker", "exec", task_id, "python3", "-c", probe],
+        capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        logger.warning(
+            "[%s] Skill runtime verification probe failed to run: %s",
+            task_id, (r.stderr or "").strip()[:300],
+        )
+        return []
+    try:
+        result = json.loads(r.stdout.strip() or "{}")
+    except json.JSONDecodeError:
+        logger.warning(
+            "[%s] Skill runtime verification: could not parse probe stdout: %r",
+            task_id, r.stdout[:200],
+        )
+        return []
+    module_to_pkg = dict(_SKILL_DEP_PROBE_IMPORTS)
+    missing_pkgs = [module_to_pkg.get(m, m) for m in result.get("modules", [])]
+    missing_bins = list(result.get("bins", []))
+    all_missing = missing_pkgs + missing_bins
+    if all_missing:
+        logger.error(
+            "[%s] Skill runtime deps STILL MISSING after install "
+            "(pdf/image/audio skills will fail): pip=%s bins=%s",
+            task_id, ",".join(missing_pkgs) or "-", ",".join(missing_bins) or "-",
+        )
+    else:
+        logger.info(
+            "[%s] Skill runtime deps verified present: pip=%s bins=%s",
+            task_id,
+            ",".join(m for m, _ in _SKILL_DEP_PROBE_IMPORTS),
+            ",".join(_SKILL_DEP_PROBE_BINS),
+        )
+    return all_missing
+
+
 def inject_api_connectors(
     task_id: str,
     env_dir: str,
@@ -394,6 +764,15 @@ def inject_api_connectors(
                 logger.warning("[%s] Failed to inject utility skill %s: %s", task_id, entry.name, r.stderr.strip())
                 continue
             utility_injected.append(entry.name)
+    # The wildclawbench-ubuntu:v1.3 image does not ship pymupdf/pillow/etc.
+    # pdf-extract's SKILL.md declares pip:["pymupdf"] in its frontmatter; without
+    # this install pass the agent reads SKILL.md, follows its instructions, then
+    # hits `ModuleNotFoundError: No module named 'fitz'`. Observed in trajectory
+    # 727a9129-fadc-495b-b29f-0abba34cd594 (2026-06-05). Image-OCR libs are also
+    # absent (PIL/pytesseract/cv2). Until the image is rebuilt, install at task
+    # startup. Verification probe afterward catches future drift loudly.
+    _install_skill_runtime_deps(task_id, env_root)
+    _verify_skill_runtime_deps(task_id)
     api_doc = env_root / "API_DOCUMENTATION.md"
     if api_doc.is_file():
         r = subprocess.run(
@@ -877,10 +1256,9 @@ def collect_output_from_container(
 
     _sweep_root_deliverables_to_workspace(task_id)
 
-    workspace_out = task_output_dir / "workspace"
-    workspace_out.mkdir(parents=True, exist_ok=True)
-
     if include_workspace_changes:
+        workspace_out = task_output_dir / "workspace"
+        workspace_out.mkdir(parents=True, exist_ok=True)
         ok = _copy_dir_from_container(task_id, f"{TMP_WORKSPACE}/.", str(workspace_out))
         if not ok:
             logger.warning("[%s] workspace directory does not exist or is empty", task_id)
@@ -1014,6 +1392,37 @@ def inject_lobster_workspace(task_id: str, workspace_path: str) -> None:
         logger.info("[%s] Persona MDs landed at /root/: %s", task_id, md_files)
     else:
         logger.warning("[%s] Persona MD copy succeeded but /root/ contains no *.md", task_id)
+
+
+def inject_persona_into_workspace(task_id: str, persona_dir: str) -> None:
+    """Copy the task persona into the agent workspace (TMP_WORKSPACE).
+
+    OpenClaw assembles AGENTS/SOUL/MEMORY context from the workspace, not /root
+    (where inject_lobster_workspace puts it). MUST run AFTER setup_workspace so
+    the persona OVERWRITES the image's stock scaffold that cp -r /app/. lays down.
+    """
+    r = subprocess.run(
+        ["docker", "cp", f"{persona_dir}/.", f"{task_id}:{TMP_WORKSPACE}/"],
+        capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        logger.error("[%s] Persona→workspace copy failed: %s", task_id, r.stderr)
+        return
+    logger.info("[%s] Persona copied: %s → %s/", task_id, persona_dir, TMP_WORKSPACE)
+
+    ls_r = subprocess.run(
+        ["docker", "exec", task_id, "/bin/bash", "-c",
+         f"ls -1 {TMP_WORKSPACE}/*.md 2>/dev/null | xargs -n1 basename 2>/dev/null | sort"],
+        capture_output=True, text=True,
+    )
+    if ls_r.returncode == 0 and ls_r.stdout.strip():
+        md_files = [name for name in ls_r.stdout.strip().splitlines() if name]
+        logger.info("[%s] Persona MDs landed in workspace: %s", task_id, md_files)
+    else:
+        logger.warning(
+            "[%s] Persona→workspace copy succeeded but %s contains no *.md",
+            task_id, TMP_WORKSPACE,
+        )
 
 
 def _copy_dir_from_container(task_id: str, src: str, dest: str) -> bool:

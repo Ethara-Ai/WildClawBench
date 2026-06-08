@@ -14,16 +14,20 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store,
+    opt_int,
+)
 
 _store = get_store("contentful-api")
+_API = "contentful-api"
 
 _store.register("content_types", primary_key="id",
-                initial_loader=lambda: _coerce_content_types(_load("content_types.csv")))
+                initial_loader=lambda: _coerce_content_types(_load("content_types.csv", "content_types")))
 _store.register("entries", primary_key="id",
-                initial_loader=lambda: _coerce_entries(_load("entries.csv")))
+                initial_loader=lambda: _coerce_entries(_load("entries.csv", "entries")))
 _store.register("assets", primary_key="id",
-                initial_loader=lambda: _coerce_assets(_load("assets.csv")))
+                initial_loader=lambda: _coerce_assets(_load("assets.csv", "assets")))
 _store.register_document("space", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "space.json", encoding="utf-8")))
 
 
@@ -44,9 +48,12 @@ def _space_doc():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -95,7 +102,7 @@ def _coerce_entries(rows):
             "content_type": r["content_type"],
             "created_at": r["created_at"],
             "updated_at": r["updated_at"],
-            "published_version": _to_int(r["published_version"]),
+            "published_version": opt_int(r, "published_version", default=0),
             "fields": _parse_json(r["fields_json"], {}),
         })
     return out
@@ -108,13 +115,13 @@ def _coerce_assets(rows):
             "id": r["id"],
             "created_at": r["created_at"],
             "updated_at": r["updated_at"],
-            "published_version": _to_int(r["published_version"]),
+            "published_version": opt_int(r, "published_version", default=0),
             "title": r["title"],
             "description": r["description"],
             "file_url": r["file_url"],
             "content_type": r["content_type"],
             "file_name": r["file_name"],
-            "size": _to_int(r["size"]),
+            "size": opt_int(r, "size", default=0),
         })
     return out
 
@@ -296,3 +303,5 @@ def get_asset(asset_id):
 
 def get_space():
     return deepcopy(_space_doc())
+
+_store.eager_load()

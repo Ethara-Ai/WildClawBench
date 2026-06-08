@@ -27,8 +27,44 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from eval.run_batch import _condense_transcript_for_judge  # noqa: E402
+from eval.run_batch import _condense_transcript_for_judge, recompute_combined  # noqa: E402
 from src.utils.grading import grade_with_rubric  # noqa: E402
+
+_USAGE_KEYS = (
+    "input_tokens", "output_tokens", "cache_read_tokens",
+    "cache_write_tokens", "total_tokens", "request_count", "cost_usd",
+)
+
+
+def _update_usage_json(run_dir: Path, scores: dict) -> None:
+    usage_path = run_dir / "usage.json"
+    if not usage_path.is_file():
+        print(f"[regrade] no usage.json at {usage_path}; skipping usage update", file=sys.stderr)
+        return
+    try:
+        usage = json.loads(usage_path.read_text(encoding="utf-8")) or {}
+    except (json.JSONDecodeError, OSError) as exc:
+        print(f"[regrade] could not read usage.json ({exc}); skipping usage update", file=sys.stderr)
+        return
+
+    sources = dict(usage.get("sources") or {})
+    old_cost = float(usage.get("cost_usd", 0.0) or 0.0)
+    new_judge = dict(scores.get("usage") or {})
+    sources["judge"] = new_judge
+
+    combined = recompute_combined(sources, task_id=run_dir.parents[2].name)
+    out = {k: combined[k] for k in _USAGE_KEYS}
+    out["sources"] = sources
+    for k, v in usage.items():
+        if k not in out and k != "sources":
+            out[k] = v
+
+    usage_path.write_text(json.dumps(out, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(
+        f"[regrade] usage.json updated: judge cost ${float(new_judge.get('cost_usd',0.0)):.4f}, "
+        f"combined cost ${old_cost:.4f} -> ${float(out.get('cost_usd',0.0)):.4f}",
+        file=sys.stderr,
+    )
 
 
 def _derive_task_id(run_dir: Path) -> str:
@@ -127,8 +163,9 @@ def regrade(run_dir: Path, rubric_override: Path | None = None) -> dict:
 
     score_path = run_dir / "score.json"
     score_path.write_text(json.dumps(scores, indent=2, ensure_ascii=False), encoding="utf-8")
-
     print(f"[regrade] wrote {score_path}", file=sys.stderr)
+
+    _update_usage_json(run_dir, scores)
     return scores
 
 

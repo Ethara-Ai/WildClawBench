@@ -10,16 +10,18 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_str, strict_int)
 
 _store = get_store("zoom-api")
+_API = "zoom-api"
 
 _store.register("meetings", primary_key="id",
-                initial_loader=lambda: _coerce_meetings(_load("meetings.csv")))
+                initial_loader=lambda: _coerce_meetings(_load("meetings.csv", "meetings")))
 _store.register("recordings", primary_key="id",
-                initial_loader=lambda: _coerce_recordings(_load("recordings.csv")))
+                initial_loader=lambda: _coerce_recordings(_load("recordings.csv", "recordings")))
 _store.register("registrants", primary_key="id",
-                initial_loader=lambda: _coerce_registrants(_load("registrants.csv")))
+                initial_loader=lambda: _coerce_registrants(_load("registrants.csv", "registrants")))
 _store.register_document("user", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "user.json", encoding="utf-8")))
 
 
@@ -40,9 +42,12 @@ def _user_doc():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -64,10 +69,10 @@ def _coerce_meetings(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "id": int(r["id"]),
-            "type": int(r["type"]),
-            "duration": int(r["duration"]),
+            **_strip_ctx(r),
+            "id": strict_int(r, "id"),
+            "type": strict_int(r, "type"),
+            "duration": strict_int(r, "duration"),
             "agenda": r["agenda"] or "",
         })
     return out
@@ -77,9 +82,9 @@ def _coerce_recordings(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "meeting_id": int(r["meeting_id"]),
-            "file_size": int(r["file_size"]),
+            **_strip_ctx(r),
+            "meeting_id": strict_int(r, "meeting_id"),
+            "file_size": strict_int(r, "file_size"),
         })
     return out
 
@@ -88,9 +93,9 @@ def _coerce_registrants(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "meeting_id": int(r["meeting_id"]),
-            "join_time": r["join_time"] or None,
+            **_strip_ctx(r),
+            "meeting_id": strict_int(r, "meeting_id"),
+            "join_time": opt_str(r, "join_time", default="") or None,
         })
     return out
 
@@ -254,3 +259,5 @@ def list_registrants(meeting_id, status="approved"):
         "total_records": len(regs),
         "registrants": regs,
     }
+
+_store.eager_load()

@@ -84,6 +84,8 @@ cleanly inside the slim Docker image used by every mock service.
 from __future__ import annotations
 
 import copy
+import csv
+import math
 import threading
 import time
 import uuid
@@ -96,6 +98,205 @@ Predicate = Callable[[Row], bool]
 
 class StoreError(Exception):
     """Raised for misuse of the store API (unknown table, missing PK, etc.)."""
+
+
+class CoerceError(StoreError):
+    """Load-time failure coercing a mock CSV cell to its declared type.
+
+    Subclasses StoreError for backward-compat (existing ``except StoreError``
+    still catches it) while remaining greppable/isinstance-separable from the
+    pre-existing primary-key-missing StoreError. Carries api/table/file/
+    row_index/column/raw-value context so an operator can fix the exact cell.
+    """
+
+
+_MISSING = object()
+
+_TRUE_TOKENS = frozenset({"true", "1", "yes", "t", "y"})
+_FALSE_TOKENS = frozenset({"false", "0", "no", "f", "n"})
+
+
+def _ctx(row: Row, column: str) -> str:
+    api = row.get("__api__", "?")
+    table = row.get("__table__", "?")
+    src = row.get("__file__", "?")
+    idx = row.get("__row_index__", "?")
+    return (
+        f"api={api} table={table} file={src} "
+        f"row_index={idx} column={column!r}"
+    )
+
+
+def read_csv_with_ctx(path: Any, api: str, table: str) -> List[Row]:
+    """Centralized load-time CSV contract inherited by all mock APIs.
+
+    Raises CoerceError on file-shape corruption: duplicate header columns
+    (DictReader would silently keep last), ragged rows = more fields than
+    header (unquoted-comma bug; would silently misalign columns), and
+    non-utf-8/csv.Error. Returns [] for empty/header-only files (valid empty
+    table). Injects __api__/__table__/__file__/__row_index__ per row.
+
+    Deliberate asymmetry (do not "fix"): SHORT rows (fewer fields -> None for
+    missing keys) are NOT rejected here -- strict_* raises on those Nones,
+    opt_* defaults them, preserving author-encoded required/optional intent.
+    Per-cell coercion is the caller's job, not this function's.
+    """
+    src = str(path)
+    try:
+        with open(src, newline="", encoding="utf-8-sig") as f:
+            reader = csv.DictReader(f, restkey="__ragged__", restval=None)
+            fieldnames = reader.fieldnames or []
+            if len(fieldnames) != len(set(fieldnames)):
+                dupes = sorted({c for c in fieldnames if fieldnames.count(c) > 1})
+                raise CoerceError(
+                    f"duplicate header columns {dupes!r}: "
+                    f"api={api} table={table} file={src}"
+                )
+            rows: List[Row] = []
+            for idx, r in enumerate(reader):
+                ragged = r.pop("__ragged__", None)
+                if ragged:
+                    raise CoerceError(
+                        f"ragged row: expected {len(fieldnames)} fields "
+                        f"({fieldnames!r}), got {len(fieldnames) + len(ragged)} "
+                        f"(extra values: {ragged!r}); likely an unquoted comma "
+                        f"in a text field. api={api} table={table} file={src} "
+                        f"row_index={idx}"
+                    )
+                r["__api__"] = api
+                r["__table__"] = table
+                r["__file__"] = src
+                r["__row_index__"] = idx
+                rows.append(r)
+            return rows
+    except CoerceError:
+        raise
+    except UnicodeDecodeError as exc:
+        raise CoerceError(
+            f"file is not valid UTF-8 ({exc}): "
+            f"api={api} table={table} file={src}"
+        )
+    except csv.Error as exc:
+        raise CoerceError(
+            f"malformed CSV ({exc}): api={api} table={table} file={src}"
+        )
+
+
+def strict_int(row: Row, column: str) -> int:
+    if column not in row:
+        raise CoerceError(f"required column missing: {_ctx(row, column)}")
+    v = row[column]
+    if v is None or (isinstance(v, str) and v.strip() == ""):
+        raise CoerceError(f"required int is blank: {_ctx(row, column)}")
+    try:
+        return int(str(v).strip())
+    except (TypeError, ValueError):
+        raise CoerceError(
+            f"required int unparseable, got {v!r}: {_ctx(row, column)}"
+        )
+
+
+def strict_float(row: Row, column: str) -> float:
+    if column not in row:
+        raise CoerceError(f"required column missing: {_ctx(row, column)}")
+    v = row[column]
+    if v is None or (isinstance(v, str) and v.strip() == ""):
+        raise CoerceError(f"required float is blank: {_ctx(row, column)}")
+    try:
+        f = float(str(v).strip())
+    except (TypeError, ValueError):
+        raise CoerceError(
+            f"required float unparseable, got {v!r}: {_ctx(row, column)}"
+        )
+    if math.isnan(f) or math.isinf(f):
+        raise CoerceError(
+            f"required float is non-finite ({f}), got {v!r}: {_ctx(row, column)}"
+        )
+    return f
+
+
+def strict_bool(row: Row, column: str) -> bool:
+    if column not in row:
+        raise CoerceError(f"required column missing: {_ctx(row, column)}")
+    v = row[column]
+    if v is None or (isinstance(v, str) and v.strip() == ""):
+        raise CoerceError(f"required bool is blank: {_ctx(row, column)}")
+    token = str(v).strip().lower()
+    if token in _TRUE_TOKENS:
+        return True
+    if token in _FALSE_TOKENS:
+        return False
+    raise CoerceError(
+        f"required bool unrecognized, got {v!r} "
+        f"(expected one of true/false/1/0/yes/no): {_ctx(row, column)}"
+    )
+
+
+def strict_str(row: Row, column: str) -> str:
+    if column not in row:
+        raise CoerceError(f"required column missing: {_ctx(row, column)}")
+    v = row[column]
+    return "" if v is None else str(v)
+
+
+def strict_csv_list(row: Row, column: str, sep: str = ",") -> List[str]:
+    if column not in row:
+        raise CoerceError(f"required column missing: {_ctx(row, column)}")
+    v = row[column]
+    if v is None or str(v).strip() == "":
+        return []
+    return [part for part in str(v).split(sep)]
+
+
+def opt_int(row: Row, column: str, default: Optional[int] = None) -> Optional[int]:
+    v = row.get(column, _MISSING)
+    if v is _MISSING or v is None or (isinstance(v, str) and v.strip() == ""):
+        return default
+    try:
+        return int(str(v).strip())
+    except (TypeError, ValueError):
+        return default
+
+
+def opt_float(row: Row, column: str, default: Optional[float] = None) -> Optional[float]:
+    v = row.get(column, _MISSING)
+    if v is _MISSING or v is None or (isinstance(v, str) and v.strip() == ""):
+        return default
+    try:
+        f = float(str(v).strip())
+    except (TypeError, ValueError):
+        return default
+    if math.isnan(f) or math.isinf(f):
+        return default
+    return f
+
+
+def opt_bool(row: Row, column: str, default: bool = False) -> bool:
+    v = row.get(column, _MISSING)
+    if v is _MISSING or v is None or (isinstance(v, str) and v.strip() == ""):
+        return default
+    token = str(v).strip().lower()
+    if token in _TRUE_TOKENS:
+        return True
+    if token in _FALSE_TOKENS:
+        return False
+    return default
+
+
+def opt_str(row: Row, column: str, default: str = "") -> str:
+    v = row.get(column, _MISSING)
+    if v is _MISSING or v is None:
+        return default
+    return str(v)
+
+
+def opt_csv_list(
+    row: Row, column: str, sep: str = ",", default: Optional[List[str]] = None
+) -> List[str]:
+    v = row.get(column, _MISSING)
+    if v is _MISSING or v is None or str(v).strip() == "":
+        return [] if default is None else list(default)
+    return [part for part in str(v).split(sep)]
 
 
 class Table:
@@ -385,6 +586,21 @@ class Store:
             self._initialized[f"doc::{doc_name}"] = False
             return d
 
+    def eager_load(self) -> None:
+        """Force every registered table and document to load now, surfacing any
+        CoerceError at import time (before the container reports healthy) instead
+        of lazily on the first agent request. Idempotent: already-initialized
+        tables are skipped, so output is identical to lazy loading."""
+        with self._lock:
+            for table_name in list(self._tables):
+                if not self._initialized[table_name]:
+                    self._populate_table(table_name)
+            for doc_name in list(self._documents):
+                if not self._initialized[f"doc::{doc_name}"]:
+                    d = self._documents[doc_name]
+                    d._value = copy.deepcopy(self._initial_docs[doc_name]())
+                    self._initialized[f"doc::{doc_name}"] = True
+
     def table(self, table_name: str) -> Table:
         with self._lock:
             if table_name not in self._tables:
@@ -410,15 +626,41 @@ class Store:
     def _populate_table(self, table_name: str) -> None:
         t = self._tables[table_name]
         rows = list(self._initial_loaders[table_name]())
-        for r in rows:
+        seen_pks: Dict[Any, int] = {}
+        collapse_count = 0
+        first_collision: Optional[Any] = None
+        for idx, r in enumerate(rows):
             if t._pk not in r:
                 raise StoreError(
                     f"initial row for table '{table_name}' missing primary key "
                     f"'{t._pk}': {list(r.keys())[:8]}"
                 )
             pk_value = r[t._pk]
-            t._rows[pk_value] = copy.deepcopy(r)
-            t._order.append(pk_value)
+            if pk_value in seen_pks:
+                if first_collision is None:
+                    first_collision = pk_value
+                collapse_count += 1
+                stored_row = copy.deepcopy(r)
+                stored_row["_pk"] = f"{pk_value}#{idx}"
+                stored_key = stored_row["_pk"]
+            else:
+                seen_pks[pk_value] = idx
+                stored_row = copy.deepcopy(r)
+                stored_key = pk_value
+            t._rows[stored_key] = stored_row
+            t._order.append(stored_key)
+        if collapse_count:
+            import sys as _sys
+            print(
+                f"[mutable_store] WARN: table '{self._name}.{table_name}' "
+                f"declares primary_key='{t._pk}' but {collapse_count} of "
+                f"{len(rows)} rows share PK values (first collision: "
+                f"{first_collision!r}). Auto-suffixed colliding rows with "
+                f"'_pk' to preserve data. Fix by declaring a row-unique "
+                f"primary key (natural unique column, or synthetic '_pk' "
+                f"composite such as f\"{{parent_id}}@{{child_id}}\").",
+                file=_sys.stderr, flush=True,
+            )
         self._initialized[table_name] = True
 
     def list_tables(self) -> List[str]:

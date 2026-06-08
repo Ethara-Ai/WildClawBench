@@ -15,17 +15,19 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_float, opt_str, strict_bool)
 
 _store = get_store("alpaca-api")
+_API = "alpaca-api"
 
 _store.register("positions", primary_key="asset_id",
-                initial_loader=lambda: _coerce_positions(_load("positions.csv")))
+                initial_loader=lambda: _coerce_positions(_load("positions.csv", "positions")))
 _store.register("orders", primary_key="id",
-                initial_loader=lambda: _coerce_orders(_load("orders.csv")))
+                initial_loader=lambda: _coerce_orders(_load("orders.csv", "orders")))
 _store.register("assets", primary_key="id",
-                initial_loader=lambda: _coerce_assets(_load("assets.csv")))
-_store.register_document("quotes", initial_loader=lambda: _coerce_quotes(_load("quotes.csv")))
+                initial_loader=lambda: _coerce_assets(_load("assets.csv", "assets")))
+_store.register_document("quotes", initial_loader=lambda: _coerce_quotes(_load("quotes.csv", "quotes")))
 _store.register_document("account", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "account.json", encoding="utf-8")))
 
 
@@ -50,9 +52,12 @@ def _account_doc():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -105,11 +110,11 @@ def _coerce_orders(rows):
             "side": r["side"],
             "type": r["type"],
             "time_in_force": r["time_in_force"],
-            "limit_price": r["limit_price"] or None,
+            "limit_price": opt_str(r, "limit_price", default="") or None,
             "status": r["status"],
-            "filled_avg_price": r["filled_avg_price"] or None,
+            "filled_avg_price": opt_str(r, "filled_avg_price", default="") or None,
             "submitted_at": r["submitted_at"],
-            "filled_at": r["filled_at"] or None,
+            "filled_at": opt_str(r, "filled_at", default="") or None,
         })
     return out
 
@@ -123,8 +128,8 @@ def _coerce_assets(rows):
             "name": r["name"],
             "exchange": r["exchange"],
             "class": r["asset_class"],
-            "tradable": _to_bool(r["tradable"]),
-            "fractionable": _to_bool(r["fractionable"]),
+            "tradable": strict_bool(r, "tradable"),
+            "fractionable": strict_bool(r, "fractionable"),
             "status": "active",
         })
     return out
@@ -135,10 +140,10 @@ def _coerce_quotes(rows):
     for r in rows:
         quotes[r["symbol"]] = {
             "t": r["timestamp"],
-            "bp": _to_float(r["bid_price"]),
-            "bs": int(_to_float(r["bid_size"])),
-            "ap": _to_float(r["ask_price"]),
-            "as": int(_to_float(r["ask_size"])),
+            "bp": opt_float(r, "bid_price", default=0.0),
+            "bs": int(opt_float(r, "bid_size", default=0.0)),
+            "ap": opt_float(r, "ask_price", default=0.0),
+            "as": int(opt_float(r, "ask_size", default=0.0)),
         }
     return quotes
 
@@ -300,3 +305,5 @@ def get_latest_quote(symbol):
     if not q:
         return {"error": f"no quote for {symbol.upper()}", "code": 40410000}
     return {"symbol": symbol.upper(), "quote": q}
+
+_store.eager_load()

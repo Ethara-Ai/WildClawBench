@@ -12,16 +12,20 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store,
+    opt_int,
+)
 
 _store = get_store("box-api")
+_API = "box-api"
 
 _store.register("users", primary_key="id",
-                initial_loader=lambda: _coerce_users(_load("users.csv")))
+                initial_loader=lambda: _coerce_users(_load("users.csv", "users")))
 _store.register("folders", primary_key="id",
-                initial_loader=lambda: _coerce_folders(_load("folders.csv")))
+                initial_loader=lambda: _coerce_folders(_load("folders.csv", "folders")))
 _store.register("files", primary_key="id",
-                initial_loader=lambda: _coerce_files(_load("files.csv")))
+                initial_loader=lambda: _coerce_files(_load("files.csv", "files")))
 
 
 def _users_rows():
@@ -37,9 +41,12 @@ def _files_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _to_int(v):
@@ -68,9 +75,9 @@ def _coerce_users(rows):
             "status": r["status"],
             "language": r["language"],
             "timezone": r["timezone"],
-            "space_amount": _to_int(r["space_amount"]),
-            "space_used": _to_int(r["space_used"]),
-            "max_upload_size": _to_int(r["max_upload_size"]),
+            "space_amount": opt_int(r, "space_amount", default=0),
+            "space_used": opt_int(r, "space_used", default=0),
+            "max_upload_size": opt_int(r, "max_upload_size", default=0),
             "job_title": r["job_title"],
             "phone": r["phone"],
             "created_at": r["created_at"],
@@ -89,7 +96,7 @@ def _coerce_folders(rows):
             "description": r["description"],
             "created_at": r["created_at"],
             "modified_at": r["modified_at"],
-            "item_count": _to_int(r["item_count"]),
+            "item_count": opt_int(r, "item_count", default=0),
         })
     return out
 
@@ -103,7 +110,7 @@ def _coerce_files(rows):
             "parent_id": r["parent_id"],
             "owner_id": r["owner_id"],
             "description": r["description"],
-            "size": _to_int(r["size"]),
+            "size": opt_int(r, "size", default=0),
             "extension": r["extension"],
             "sha1": r["sha1"],
             "created_at": r["created_at"],
@@ -261,3 +268,5 @@ def search(query=None, type_filter=None, limit=100, offset=0):
         "offset": offset,
         "limit": limit,
     }
+
+_store.eager_load()

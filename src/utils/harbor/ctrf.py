@@ -63,10 +63,15 @@ def build_ctrf(
     tests_errored: int = 0,
     test_scores_json: str = "",
     tests_skipped: int = 0,
+    reward: float | None = None,
 ) -> Dict[str, Any]:
     """Return a CTRF dict for `/logs/verifier/ctrf.json`.
 
     Mirrors `_build_ctrf_from_test_result` (kensei2.py:3248).
+
+    `reward` (0..1, from compute_test_reward) is the weighted score and is
+    surfaced as summary.overall_score/weighted_percentage. It is NOT
+    passed/total: distractor penalties make the raw ratio misleading.
     """
     tests_total = int(tests_total or 0)
     tests_passed = int(tests_passed or 0)
@@ -101,17 +106,22 @@ def build_ctrf(
                 "duration": 0,
             })
 
+    summary: Dict[str, Any] = {
+        "tests": tests_total,
+        "passed": tests_passed,
+        "failed": tests_failed,
+        "pending": 0,
+        "skipped": tests_skipped,
+        "other": tests_errored,
+    }
+    if reward is not None:
+        summary["overall_score"] = round(float(reward), 4)
+        summary["weighted_percentage"] = round(float(reward) * 100.0, 2)
+
     return {
         "results": {
             "tool": {"name": "pytest", "version": "8.4.1"},
-            "summary": {
-                "tests": tests_total,
-                "passed": tests_passed,
-                "failed": tests_failed,
-                "pending": 0,
-                "skipped": tests_skipped,
-                "other": tests_errored,
-            },
+            "summary": summary,
             "tests": tests,
         }
     }

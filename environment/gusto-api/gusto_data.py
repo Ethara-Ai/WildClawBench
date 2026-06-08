@@ -15,18 +15,24 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store,
+    strict_bool,
+    opt_int,
+    opt_float,
+)
 
 _store = get_store("gusto-api")
+_API = "gusto-api"
 
 _store.register("employees", primary_key="id",
-                initial_loader=lambda: _coerce_employees(_load("employees.csv")))
+                initial_loader=lambda: _coerce_employees(_load("employees.csv", "employees")))
 _store.register("compensations", primary_key="id",
-                initial_loader=lambda: _coerce_compensations(_load("compensations.csv")))
+                initial_loader=lambda: _coerce_compensations(_load("compensations.csv", "compensations")))
 _store.register("payrolls", primary_key="id",
-                initial_loader=lambda: _coerce_payrolls(_load("payrolls.csv")))
+                initial_loader=lambda: _coerce_payrolls(_load("payrolls.csv", "payrolls")))
 _store.register("contractors", primary_key="id",
-                initial_loader=lambda: _coerce_contractors(_load("contractors.csv")))
+                initial_loader=lambda: _coerce_contractors(_load("contractors.csv", "contractors")))
 _store.register_document("company", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "company.json", encoding="utf-8")))
 
 
@@ -51,9 +57,12 @@ def _company_doc():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now_date():
@@ -89,9 +98,9 @@ def _to_int(v, default=0):
 def _coerce_employees(rows):
     out = []
     for r in rows:
-        d = dict(r)
-        d["rate"] = _to_float(r["rate"])
-        d["terminated"] = _to_bool(r["terminated"])
+        d = _strip_ctx(r)
+        d["rate"] = opt_float(r, "rate", default=0.0)
+        d["terminated"] = strict_bool(r, "terminated")
         out.append(d)
     return out
 
@@ -99,8 +108,8 @@ def _coerce_employees(rows):
 def _coerce_compensations(rows):
     out = []
     for r in rows:
-        d = dict(r)
-        d["rate"] = _to_float(r["rate"])
+        d = _strip_ctx(r)
+        d["rate"] = opt_float(r, "rate", default=0.0)
         out.append(d)
     return out
 
@@ -108,11 +117,11 @@ def _coerce_compensations(rows):
 def _coerce_payrolls(rows):
     out = []
     for r in rows:
-        d = dict(r)
-        d["processed"] = _to_bool(r["processed"])
-        d["gross_pay"] = _to_float(r["gross_pay"])
-        d["net_pay"] = _to_float(r["net_pay"])
-        d["employee_count"] = _to_int(r["employee_count"])
+        d = _strip_ctx(r)
+        d["processed"] = strict_bool(r, "processed")
+        d["gross_pay"] = opt_float(r, "gross_pay", default=0.0)
+        d["net_pay"] = opt_float(r, "net_pay", default=0.0)
+        d["employee_count"] = opt_int(r, "employee_count", default=0)
         out.append(d)
     return out
 
@@ -120,8 +129,8 @@ def _coerce_payrolls(rows):
 def _coerce_contractors(rows):
     out = []
     for r in rows:
-        d = dict(r)
-        d["hourly_rate"] = _to_float(r["hourly_rate"])
+        d = _strip_ctx(r)
+        d["hourly_rate"] = opt_float(r, "hourly_rate", default=0.0)
         out.append(d)
     return out
 
@@ -256,3 +265,5 @@ def list_company_contractors(company_id):
     if company_id != _company_doc()["id"]:
         return {"error": f"Company {company_id} not found"}
     return [c for c in _contractors_rows() if c["company_id"] == company_id]
+
+_store.eager_load()

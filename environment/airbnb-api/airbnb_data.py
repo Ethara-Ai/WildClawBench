@@ -9,16 +9,21 @@ from pathlib import Path
 DATA_DIR = Path(__file__).parent
 
 sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_csv_list, strict_bool, strict_float, strict_int)
 
 _store = get_store("airbnb-api")
+_API = "airbnb-api"
 
 SERVICE_FEE_PCT = 14.0  # guest service fee as percent of nightly subtotal
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now_iso():
@@ -46,15 +51,15 @@ def _coerce_listings(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "price_per_night": float(r["price_per_night"]),
-            "cleaning_fee": float(r["cleaning_fee"]),
-            "beds": int(r["beds"]),
-            "baths": float(r["baths"]),
-            "max_guests": int(r["max_guests"]),
-            "rating": float(r["rating"]),
-            "review_count": int(r["review_count"]),
-            "instant_book": _to_bool(r["instant_book"]),
+            **_strip_ctx(r),
+            "price_per_night": strict_float(r, "price_per_night"),
+            "cleaning_fee": strict_float(r, "cleaning_fee"),
+            "beds": strict_int(r, "beds"),
+            "baths": strict_float(r, "baths"),
+            "max_guests": strict_int(r, "max_guests"),
+            "rating": strict_float(r, "rating"),
+            "review_count": strict_int(r, "review_count"),
+            "instant_book": strict_bool(r, "instant_book"),
         })
     return out
 
@@ -63,11 +68,11 @@ def _coerce_hosts(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "superhost": _to_bool(r["superhost"]),
-            "joined_year": int(r["joined_year"]),
-            "response_rate": int(r["response_rate"]),
-            "languages": [x.strip() for x in r["languages"].split(",")],
+            **_strip_ctx(r),
+            "superhost": strict_bool(r, "superhost"),
+            "joined_year": strict_int(r, "joined_year"),
+            "response_rate": strict_int(r, "response_rate"),
+            "languages": [x.strip() for x in opt_csv_list(r, "languages", sep=",")],
         })
     return out
 
@@ -76,8 +81,8 @@ def _coerce_availability(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "available": _to_bool(r["available"]),
+            **_strip_ctx(r),
+            "available": strict_bool(r, "available"),
         })
     return out
 
@@ -86,23 +91,23 @@ def _coerce_reviews(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "rating": int(r["rating"]),
+            **_strip_ctx(r),
+            "rating": strict_int(r, "rating"),
         })
     return out
 
 
 _store.register("listings", primary_key="listing_id",
-                initial_loader=lambda: _coerce_listings(_load("listings.csv")))
+                initial_loader=lambda: _coerce_listings(_load("listings.csv", "listings")))
 _store.register("hosts", primary_key="host_id",
-                initial_loader=lambda: _coerce_hosts(_load("hosts.csv")))
+                initial_loader=lambda: _coerce_hosts(_load("hosts.csv", "hosts")))
 _store.register("availability", primary_key="_pk",
                 initial_loader=lambda: [
                     {**row, "_pk": f"{row['listing_id']}@{row['start_date']}"}
-                    for row in _coerce_availability(_load("availability.csv"))
+                    for row in _coerce_availability(_load("availability.csv", "availability"))
                 ])
 _store.register("reviews", primary_key="review_id",
-                initial_loader=lambda: _coerce_reviews(_load("reviews.csv")))
+                initial_loader=lambda: _coerce_reviews(_load("reviews.csv", "reviews")))
 _store.register("reservations", primary_key="reservation_id",
                 initial_loader=lambda: [])
 
@@ -261,3 +266,5 @@ def cancel_reservation(reservation_id):
         return {"error": f"Reservation {reservation_id} is already cancelled"}
     _store.table("reservations").patch(reservation_id, {"status": "cancelled"})
     return _store.table("reservations").get(reservation_id)
+
+_store.eager_load()

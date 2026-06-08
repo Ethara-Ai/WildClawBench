@@ -9,20 +9,21 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import read_csv_with_ctx, get_store, opt_str  # noqa: E402
 
 _store = get_store("okta-api")
+_API = "okta-api"
 
 _store.register("users", primary_key="id",
-                initial_loader=lambda: _coerce_users(_load("users.csv")))
+                initial_loader=lambda: _coerce_users(_load("users.csv", "users")))
 _store.register("groups", primary_key="id",
-                initial_loader=lambda: _load("groups.csv"))
+                initial_loader=lambda: [_strip_ctx(r) for r in _load("groups.csv", "groups")])
 _store.register("memberships", primary_key="group_id",
-                initial_loader=lambda: _load("group_memberships.csv"))
+                initial_loader=lambda: [_strip_ctx(r) for r in _load("group_memberships.csv", "memberships")])
 _store.register("apps", primary_key="id",
-                initial_loader=lambda: _load("apps.csv"))
+                initial_loader=lambda: [_strip_ctx(r) for r in _load("apps.csv", "apps")])
 _store.register("app_assignments", primary_key="app_id",
-                initial_loader=lambda: _load("app_assignments.csv"))
+                initial_loader=lambda: [_strip_ctx(r) for r in _load("app_assignments.csv", "app_assignments")])
 
 
 def _users_rows():
@@ -46,9 +47,12 @@ def _app_assignments_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -63,9 +67,9 @@ def _coerce_users(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "activated": r["activated"] or None,
-            "last_login": r["last_login"] or None,
+            **_strip_ctx(r),
+            "activated": opt_str(r, "activated", default="") or None,
+            "last_login": opt_str(r, "last_login", default="") or None,
         })
     return out
 
@@ -242,3 +246,5 @@ def list_apps(status=None):
     if status:
         results = [a for a in results if a["status"] == status]
     return [_serialize_app(a) for a in results]
+
+_store.eager_load()

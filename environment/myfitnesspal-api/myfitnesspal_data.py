@@ -9,22 +9,27 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store,
+    strict_int,
+    strict_float,
+)
 
 _store = get_store("myfitnesspal-api")
+_API = "myfitnesspal-api"
 
 _store.register("foods", primary_key="food_id",
-                initial_loader=lambda: _coerce_foods(_load("foods.csv")))
+                initial_loader=lambda: _coerce_foods(_load("foods.csv", "foods")))
 _store.register("diary_entries", primary_key="entry_id",
-                initial_loader=lambda: _coerce_diary_entries(_load("diary_entries.csv")))
+                initial_loader=lambda: _coerce_diary_entries(_load("diary_entries.csv", "diary_entries")))
 _store.register("exercise_types", primary_key="exercise_type_id",
-                initial_loader=lambda: _coerce_exercise_types(_load("exercise_types.csv")))
+                initial_loader=lambda: _coerce_exercise_types(_load("exercise_types.csv", "exercise_types")))
 _store.register("exercise_log", primary_key="exercise_id",
-                initial_loader=lambda: _coerce_exercise_log(_load("exercise_log.csv")))
+                initial_loader=lambda: _coerce_exercise_log(_load("exercise_log.csv", "exercise_log")))
 _store.register("weight_log", primary_key="weight_id",
-                initial_loader=lambda: _coerce_weight_log(_load("weight_log.csv")))
+                initial_loader=lambda: _coerce_weight_log(_load("weight_log.csv", "weight_log")))
 _store.register("water_log", primary_key="water_id",
-                initial_loader=lambda: _coerce_water_log(_load("water_log.csv")))
+                initial_loader=lambda: _coerce_water_log(_load("water_log.csv", "water_log")))
 _store.register_document("user_profile", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "user_profile.json", encoding="utf-8")))
 
 
@@ -57,9 +62,12 @@ def _user_profile_doc():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -74,18 +82,18 @@ def _coerce_foods(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "food_id": int(r["food_id"]),
-            "calories": float(r["calories"]),
-            "total_fat_g": float(r["total_fat_g"]),
-            "saturated_fat_g": float(r["saturated_fat_g"]),
-            "cholesterol_mg": float(r["cholesterol_mg"]),
-            "sodium_mg": float(r["sodium_mg"]),
-            "total_carbs_g": float(r["total_carbs_g"]),
-            "dietary_fiber_g": float(r["dietary_fiber_g"]),
-            "sugars_g": float(r["sugars_g"]),
-            "protein_g": float(r["protein_g"]),
-            "potassium_mg": float(r["potassium_mg"]),
+            **_strip_ctx(r),
+            "food_id": strict_int(r, "food_id"),
+            "calories": strict_float(r, "calories"),
+            "total_fat_g": strict_float(r, "total_fat_g"),
+            "saturated_fat_g": strict_float(r, "saturated_fat_g"),
+            "cholesterol_mg": strict_float(r, "cholesterol_mg"),
+            "sodium_mg": strict_float(r, "sodium_mg"),
+            "total_carbs_g": strict_float(r, "total_carbs_g"),
+            "dietary_fiber_g": strict_float(r, "dietary_fiber_g"),
+            "sugars_g": strict_float(r, "sugars_g"),
+            "protein_g": strict_float(r, "protein_g"),
+            "potassium_mg": strict_float(r, "potassium_mg"),
             "is_verified": r["is_verified"].lower() == "true",
         })
     return out
@@ -95,19 +103,19 @@ def _coerce_diary_entries(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "entry_id": int(r["entry_id"]),
-            "food_id": int(r["food_id"]),
-            "servings": float(r["servings"]),
-            "calories": float(r["calories"]),
-            "total_fat_g": float(r["total_fat_g"]),
-            "saturated_fat_g": float(r["saturated_fat_g"]),
-            "cholesterol_mg": float(r["cholesterol_mg"]),
-            "sodium_mg": float(r["sodium_mg"]),
-            "total_carbs_g": float(r["total_carbs_g"]),
-            "dietary_fiber_g": float(r["dietary_fiber_g"]),
-            "sugars_g": float(r["sugars_g"]),
-            "protein_g": float(r["protein_g"]),
+            **_strip_ctx(r),
+            "entry_id": strict_int(r, "entry_id"),
+            "food_id": strict_int(r, "food_id"),
+            "servings": strict_float(r, "servings"),
+            "calories": strict_float(r, "calories"),
+            "total_fat_g": strict_float(r, "total_fat_g"),
+            "saturated_fat_g": strict_float(r, "saturated_fat_g"),
+            "cholesterol_mg": strict_float(r, "cholesterol_mg"),
+            "sodium_mg": strict_float(r, "sodium_mg"),
+            "total_carbs_g": strict_float(r, "total_carbs_g"),
+            "dietary_fiber_g": strict_float(r, "dietary_fiber_g"),
+            "sugars_g": strict_float(r, "sugars_g"),
+            "protein_g": strict_float(r, "protein_g"),
         })
     return out
 
@@ -116,11 +124,11 @@ def _coerce_exercise_types(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "exercise_type_id": int(r["exercise_type_id"]),
-            "calories_per_minute_low": float(r["calories_per_minute_low"]),
-            "calories_per_minute_high": float(r["calories_per_minute_high"]),
-            "met_value": float(r["met_value"]),
+            **_strip_ctx(r),
+            "exercise_type_id": strict_int(r, "exercise_type_id"),
+            "calories_per_minute_low": strict_float(r, "calories_per_minute_low"),
+            "calories_per_minute_high": strict_float(r, "calories_per_minute_high"),
+            "met_value": strict_float(r, "met_value"),
         })
     return out
 
@@ -129,11 +137,11 @@ def _coerce_exercise_log(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "exercise_id": int(r["exercise_id"]),
-            "exercise_type_id": int(r["exercise_type_id"]),
-            "duration_minutes": int(r["duration_minutes"]),
-            "calories_burned": int(r["calories_burned"]),
+            **_strip_ctx(r),
+            "exercise_id": strict_int(r, "exercise_id"),
+            "exercise_type_id": strict_int(r, "exercise_type_id"),
+            "duration_minutes": strict_int(r, "duration_minutes"),
+            "calories_burned": strict_int(r, "calories_burned"),
         })
     return out
 
@@ -142,9 +150,9 @@ def _coerce_weight_log(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "weight_id": int(r["weight_id"]),
-            "weight_lbs": float(r["weight_lbs"]),
+            **_strip_ctx(r),
+            "weight_id": strict_int(r, "weight_id"),
+            "weight_lbs": strict_float(r, "weight_lbs"),
         })
     return out
 
@@ -153,9 +161,9 @@ def _coerce_water_log(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "water_id": int(r["water_id"]),
-            "cups": int(r["cups"]),
+            **_strip_ctx(r),
+            "water_id": strict_int(r, "water_id"),
+            "cups": strict_int(r, "cups"),
         })
     return out
 
@@ -176,6 +184,7 @@ def _coerce_water_log(rows):
 
 
 
+_store.eager_load()
 _next_entry_id = max(e["entry_id"] for e in _diary_entries_rows()) + 1
 _next_exercise_id = max(e["exercise_id"] for e in _exercise_log_rows()) + 1
 _next_weight_id = max(w["weight_id"] for w in _weight_log_rows()) + 1

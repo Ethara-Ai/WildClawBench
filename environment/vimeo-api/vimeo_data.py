@@ -13,14 +13,16 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_csv_list, strict_int)
 
 _store = get_store("vimeo-api")
+_API = "vimeo-api"
 
 _store.register("users", primary_key="id",
-                initial_loader=lambda: _coerce_users(_load("users.csv")))
+                initial_loader=lambda: _coerce_users(_load("users.csv", "users")))
 _store.register("videos", primary_key="id",
-                initial_loader=lambda: _coerce_videos(_load("videos.csv")))
+                initial_loader=lambda: _coerce_videos(_load("videos.csv", "videos")))
 
 
 def _users_rows():
@@ -35,9 +37,12 @@ def _videos_rows():
 _ME = "12000001"
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 # ---------------------------------------------------------------------------
@@ -55,7 +60,7 @@ def _coerce_users(rows):
             "bio": r["bio"],
             "account": r["account"],
             "created_time": r["created_time"],
-            "websites": [x for x in r["websites"].split(";") if x],
+            "websites": [x for x in opt_csv_list(r, "websites", sep=";") if x],
         })
     return out
 
@@ -68,13 +73,13 @@ def _coerce_videos(rows):
             "user_id": r["user_id"],
             "name": r["name"],
             "description": r["description"],
-            "duration": int(r["duration"]),
-            "width": int(r["width"]),
-            "height": int(r["height"]),
+            "duration": strict_int(r, "duration"),
+            "width": strict_int(r, "width"),
+            "height": strict_int(r, "height"),
             "privacy": r["privacy"],
             "status": r["status"],
-            "plays": int(r["plays"]),
-            "likes": int(r["likes"]),
+            "plays": strict_int(r, "plays"),
+            "likes": strict_int(r, "likes"),
             "created_time": r["created_time"],
             "modified_time": r["modified_time"],
             "link": r["link"],
@@ -188,3 +193,5 @@ def get_user_videos(user_id, page=1, per_page=25):
     videos = [v for v in _videos_rows() if v["user_id"] == str(user_id)]
     videos = sorted(videos, key=lambda v: v["created_time"], reverse=True)
     return _paged([_serialize_video(v) for v in videos], page=page, per_page=per_page)
+
+_store.eager_load()

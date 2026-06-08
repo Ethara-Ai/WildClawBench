@@ -12,16 +12,18 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_csv_list, opt_float, opt_int, strict_bool)
 
 _store = get_store("bigcommerce-api")
+_API = "bigcommerce-api"
 
 _store.register("products", primary_key="id",
-                initial_loader=lambda: _coerce_products(_load("products.csv")))
+                initial_loader=lambda: _coerce_products(_load("products.csv", "products")))
 _store.register("customers", primary_key="id",
-                initial_loader=lambda: _coerce_customers(_load("customers.csv")))
+                initial_loader=lambda: _coerce_customers(_load("customers.csv", "customers")))
 _store.register("orders", primary_key="id",
-                initial_loader=lambda: _coerce_orders(_load("orders.csv")))
+                initial_loader=lambda: _coerce_orders(_load("orders.csv", "orders")))
 
 
 def _products_rows():
@@ -37,9 +39,12 @@ def _orders_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _to_bool(v):
@@ -68,19 +73,19 @@ def _coerce_products(rows):
     out = []
     for r in rows:
         out.append({
-            "id": _to_int(r["id"]),
+            "id": opt_int(r, "id", default=0),
             "name": r["name"],
             "sku": r["sku"],
             "type": r["type"],
-            "price": _to_float(r["price"]),
-            "sale_price": _to_float(r["sale_price"]),
-            "cost_price": _to_float(r["cost_price"]),
-            "weight": _to_float(r["weight"]),
-            "inventory_level": _to_int(r["inventory_level"]),
+            "price": opt_float(r, "price", default=None),
+            "sale_price": opt_float(r, "sale_price", default=None),
+            "cost_price": opt_float(r, "cost_price", default=None),
+            "weight": opt_float(r, "weight", default=None),
+            "inventory_level": opt_int(r, "inventory_level", default=0),
             "inventory_tracking": r["inventory_tracking"],
-            "is_visible": _to_bool(r["is_visible"]),
-            "brand_id": _to_int(r["brand_id"]),
-            "categories": [int(c) for c in r["categories"].split(";") if c],
+            "is_visible": strict_bool(r, "is_visible"),
+            "brand_id": opt_int(r, "brand_id", default=0),
+            "categories": [int(c) for c in opt_csv_list(r, "categories", sep=";") if c],
             "description": r["description"],
             "date_created": r["date_created"],
         })
@@ -91,13 +96,13 @@ def _coerce_customers(rows):
     out = []
     for r in rows:
         out.append({
-            "id": _to_int(r["id"]),
+            "id": opt_int(r, "id", default=0),
             "first_name": r["first_name"],
             "last_name": r["last_name"],
             "email": r["email"],
             "company": r["company"],
             "phone": r["phone"],
-            "customer_group_id": _to_int(r["customer_group_id"]),
+            "customer_group_id": opt_int(r, "customer_group_id", default=0),
             "date_created": r["date_created"],
         })
     return out
@@ -107,15 +112,15 @@ def _coerce_orders(rows):
     out = []
     for r in rows:
         out.append({
-            "id": _to_int(r["id"]),
-            "customer_id": _to_int(r["customer_id"]),
-            "status_id": _to_int(r["status_id"]),
+            "id": opt_int(r, "id", default=0),
+            "customer_id": opt_int(r, "customer_id", default=0),
+            "status_id": opt_int(r, "status_id", default=0),
             "status": r["status"],
-            "total_inc_tax": _to_float(r["total_inc_tax"]),
-            "subtotal_inc_tax": _to_float(r["subtotal_inc_tax"]),
+            "total_inc_tax": opt_float(r, "total_inc_tax", default=None),
+            "subtotal_inc_tax": opt_float(r, "subtotal_inc_tax", default=None),
             "currency_code": r["currency_code"],
             "payment_method": r["payment_method"],
-            "items_total": _to_int(r["items_total"]),
+            "items_total": opt_int(r, "items_total", default=0),
             "date_created": r["date_created"],
             "billing_first_name": r["billing_first_name"],
             "billing_last_name": r["billing_last_name"],
@@ -304,3 +309,5 @@ def list_customers(email=None, company=None, page=1, limit=50):
         "data": [_serialize_customer(c) for c in page_items],
         "meta": _meta(total, len(page_items), page, limit),
     }
+
+_store.eager_load()

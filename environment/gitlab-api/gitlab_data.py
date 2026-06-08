@@ -10,20 +10,22 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_csv_list, opt_str, strict_bool, strict_int)
 
 _store = get_store("gitlab-api")
+_API = "gitlab-api"
 
 _store.register("projects", primary_key="id",
-                initial_loader=lambda: _coerce_projects(_load("projects.csv")))
+                initial_loader=lambda: _coerce_projects(_load("projects.csv", "projects")))
 _store.register("issues", primary_key="id",
-                initial_loader=lambda: _coerce_issues(_load("issues.csv")))
+                initial_loader=lambda: _coerce_issues(_load("issues.csv", "issues")))
 _store.register("merge_requests", primary_key="id",
-                initial_loader=lambda: _coerce_merge_requests(_load("merge_requests.csv")))
+                initial_loader=lambda: _coerce_merge_requests(_load("merge_requests.csv", "merge_requests")))
 _store.register("pipelines", primary_key="id",
-                initial_loader=lambda: _coerce_pipelines(_load("pipelines.csv")))
+                initial_loader=lambda: _coerce_pipelines(_load("pipelines.csv", "pipelines")))
 _store.register("users", primary_key="id",
-                initial_loader=lambda: _coerce_users(_load("users.csv")))
+                initial_loader=lambda: _coerce_users(_load("users.csv", "users")))
 _store.register_document("current_user", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "current_user.json", encoding="utf-8")))
 
 
@@ -52,9 +54,12 @@ def _current_user_doc():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -73,11 +78,11 @@ def _coerce_projects(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "id": int(r["id"]),
-            "star_count": int(r["star_count"]),
-            "forks_count": int(r["forks_count"]),
-            "open_issues_count": int(r["open_issues_count"]),
+            **_strip_ctx(r),
+            "id": strict_int(r, "id"),
+            "star_count": strict_int(r, "star_count"),
+            "forks_count": strict_int(r, "forks_count"),
+            "open_issues_count": strict_int(r, "open_issues_count"),
         })
     return out
 
@@ -86,12 +91,12 @@ def _coerce_issues(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "id": int(r["id"]),
-            "iid": int(r["iid"]),
-            "project_id": int(r["project_id"]),
-            "labels": [l for l in r["labels"].split(";") if l],
-            "closed_at": r["closed_at"] or None,
+            **_strip_ctx(r),
+            "id": strict_int(r, "id"),
+            "iid": strict_int(r, "iid"),
+            "project_id": strict_int(r, "project_id"),
+            "labels": [l for l in opt_csv_list(r, "labels", sep=";") if l],
+            "closed_at": opt_str(r, "closed_at", default="") or None,
         })
     return out
 
@@ -100,12 +105,12 @@ def _coerce_merge_requests(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "id": int(r["id"]),
-            "iid": int(r["iid"]),
-            "project_id": int(r["project_id"]),
-            "draft": _to_bool(r["draft"]),
-            "merged_at": r["merged_at"] or None,
+            **_strip_ctx(r),
+            "id": strict_int(r, "id"),
+            "iid": strict_int(r, "iid"),
+            "project_id": strict_int(r, "project_id"),
+            "draft": strict_bool(r, "draft"),
+            "merged_at": opt_str(r, "merged_at", default="") or None,
         })
     return out
 
@@ -114,10 +119,10 @@ def _coerce_pipelines(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "id": int(r["id"]),
-            "project_id": int(r["project_id"]),
-            "duration": int(r["duration"]),
+            **_strip_ctx(r),
+            "id": strict_int(r, "id"),
+            "project_id": strict_int(r, "project_id"),
+            "duration": strict_int(r, "duration"),
         })
     return out
 
@@ -126,9 +131,9 @@ def _coerce_users(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "id": int(r["id"]),
-            "is_admin": _to_bool(r["is_admin"]),
+            **_strip_ctx(r),
+            "id": strict_int(r, "id"),
+            "is_admin": strict_bool(r, "is_admin"),
         })
     return out
 
@@ -339,3 +344,5 @@ def list_pipelines(project_id, status=None):
         results = [p for p in results if p["status"] == status]
     results.sort(key=lambda p: p["created_at"], reverse=True)
     return results
+
+_store.eager_load()

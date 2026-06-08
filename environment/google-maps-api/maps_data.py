@@ -13,14 +13,16 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_csv_list, strict_float, strict_int)
 
 _store = get_store("google-maps-api")
+_API = "google-maps-api"
 
 _store.register("places", primary_key="place_id",
-                initial_loader=lambda: _coerce_places(_load("places.csv")))
+                initial_loader=lambda: _coerce_places(_load("places.csv", "places")))
 _store.register("geocodes", primary_key="query",
-                initial_loader=lambda: _coerce_geocodes(_load("geocodes.csv")))
+                initial_loader=lambda: _coerce_geocodes(_load("geocodes.csv", "geocodes")))
 
 
 def _places_rows():
@@ -36,9 +38,12 @@ WALK_SPEED_MPS = 1.39       # ~5 km/h
 DRIVE_SPEED_MPS = 13.4      # ~48 km/h (urban average)
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 # ---------------------------------------------------------------------------
@@ -52,12 +57,12 @@ def _coerce_places(rows):
             "place_id": r["place_id"],
             "name": r["name"],
             "formatted_address": r["formatted_address"],
-            "geometry": {"location": {"lat": float(r["lat"]), "lng": float(r["lng"])}},
-            "rating": float(r["rating"]),
-            "user_ratings_total": int(r["user_ratings_total"]),
-            "types": [t for t in r["types"].split("|") if t],
+            "geometry": {"location": {"lat": strict_float(r, "lat"), "lng": strict_float(r, "lng")}},
+            "rating": strict_float(r, "rating"),
+            "user_ratings_total": strict_int(r, "user_ratings_total"),
+            "types": [t for t in opt_csv_list(r, "types", sep="|") if t],
             "business_status": r["business_status"],
-            "price_level": int(r["price_level"]),
+            "price_level": strict_int(r, "price_level"),
         })
     return out
 
@@ -68,8 +73,8 @@ def _coerce_geocodes(rows):
         out.append({
             "query": r["query"],
             "formatted_address": r["formatted_address"],
-            "lat": float(r["lat"]),
-            "lng": float(r["lng"]),
+            "lat": strict_float(r, "lat"),
+            "lng": strict_float(r, "lng"),
             "place_id": r["place_id"],
             "location_type": r["location_type"],
         })
@@ -274,3 +279,5 @@ def distance_matrix(origins, destinations, mode="driving"):
         "destination_addresses": dest_addresses,
         "rows": rows,
     }
+
+_store.eager_load()

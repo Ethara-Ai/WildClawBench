@@ -14,16 +14,18 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_csv_list, opt_int, strict_bool, strict_int)
 
 _store = get_store("freshdesk-api")
+_API = "freshdesk-api"
 
 _store.register("tickets", primary_key="id",
-                initial_loader=lambda: _coerce_tickets(_load("tickets.csv")))
+                initial_loader=lambda: _coerce_tickets(_load("tickets.csv", "tickets")))
 _store.register("contacts", primary_key="id",
-                initial_loader=lambda: _coerce_contacts(_load("contacts.csv")))
+                initial_loader=lambda: _coerce_contacts(_load("contacts.csv", "contacts")))
 _store.register("agents", primary_key="id",
-                initial_loader=lambda: _coerce_agents(_load("agents.csv")))
+                initial_loader=lambda: _coerce_agents(_load("agents.csv", "agents")))
 
 
 def _tickets_rows():
@@ -39,9 +41,12 @@ def _agents_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _to_bool(v):
@@ -63,15 +68,15 @@ def _coerce_tickets(rows):
     out = []
     for r in rows:
         out.append({
-            "id": int(r["id"]),
+            "id": strict_int(r, "id"),
             "subject": r["subject"],
             "description": r["description"],
-            "status": int(r["status"]),
-            "priority": int(r["priority"]),
-            "requester_id": int(r["requester_id"]),
-            "responder_id": _to_int(r["responder_id"]),
+            "status": strict_int(r, "status"),
+            "priority": strict_int(r, "priority"),
+            "requester_id": strict_int(r, "requester_id"),
+            "responder_id": opt_int(r, "responder_id", default=None),
             "type": r["type"],
-            "tags": [t for t in r["tags"].split(";") if t],
+            "tags": [t for t in opt_csv_list(r, "tags", sep=";") if t],
             "created_at": r["created_at"],
             "updated_at": r["updated_at"],
         })
@@ -82,12 +87,12 @@ def _coerce_contacts(rows):
     out = []
     for r in rows:
         out.append({
-            "id": int(r["id"]),
+            "id": strict_int(r, "id"),
             "name": r["name"],
             "email": r["email"],
             "phone": r["phone"],
-            "company_id": _to_int(r["company_id"]),
-            "active": _to_bool(r["active"]),
+            "company_id": opt_int(r, "company_id", default=None),
+            "active": strict_bool(r, "active"),
             "created_at": r["created_at"],
         })
     return out
@@ -97,10 +102,10 @@ def _coerce_agents(rows):
     out = []
     for r in rows:
         out.append({
-            "id": int(r["id"]),
-            "available": _to_bool(r["available"]),
-            "ticket_scope": int(r["ticket_scope"]),
-            "occasional": _to_bool(r["occasional"]),
+            "id": strict_int(r, "id"),
+            "available": strict_bool(r, "available"),
+            "ticket_scope": strict_int(r, "ticket_scope"),
+            "occasional": strict_bool(r, "occasional"),
             "created_at": r["created_at"],
             "contact": {
                 "name": r["name"],
@@ -195,3 +200,5 @@ def list_contacts():
 
 def list_agents():
     return list(_agents_rows())
+
+_store.eager_load()

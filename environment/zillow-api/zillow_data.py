@@ -9,18 +9,20 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_str, strict_float, strict_int)
 
 _store = get_store("zillow-api")
+_API = "zillow-api"
 
 _store.register("properties", primary_key="zpid",
-                initial_loader=lambda: _coerce_properties(_load("properties.csv")))
+                initial_loader=lambda: _coerce_properties(_load("properties.csv", "properties")))
 _store.register("price_history", primary_key="zpid",
-                initial_loader=lambda: _coerce_price_history(_load("price_history.csv")))
+                initial_loader=lambda: _coerce_price_history(_load("price_history.csv", "price_history")))
 _store.register("agents", primary_key="agent_id",
-                initial_loader=lambda: _coerce_agents(_load("agents.csv")))
+                initial_loader=lambda: _coerce_agents(_load("agents.csv", "agents")))
 _store.register("saved_searches", primary_key="search_id",
-                initial_loader=lambda: _coerce_saved_searches(_load("saved_searches.csv")))
+                initial_loader=lambda: _coerce_saved_searches(_load("saved_searches.csv", "saved_searches")))
 
 
 def _properties_rows():
@@ -40,9 +42,12 @@ def _saved_searches_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -53,19 +58,19 @@ def _coerce_properties(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "zpid": int(r["zpid"]),
-            "latitude": float(r["latitude"]),
-            "longitude": float(r["longitude"]),
-            "bedrooms": int(r["bedrooms"]),
-            "bathrooms": float(r["bathrooms"]),
-            "living_area_sqft": int(r["living_area_sqft"]),
-            "lot_size_sqft": int(r["lot_size_sqft"]),
-            "year_built": int(r["year_built"]),
-            "list_price": int(r["list_price"]),
-            "zestimate": int(r["zestimate"]),
-            "rent_zestimate": int(r["rent_zestimate"]),
-            "days_on_zillow": int(r["days_on_zillow"]),
+            **_strip_ctx(r),
+            "zpid": strict_int(r, "zpid"),
+            "latitude": strict_float(r, "latitude"),
+            "longitude": strict_float(r, "longitude"),
+            "bedrooms": strict_int(r, "bedrooms"),
+            "bathrooms": strict_float(r, "bathrooms"),
+            "living_area_sqft": strict_int(r, "living_area_sqft"),
+            "lot_size_sqft": strict_int(r, "lot_size_sqft"),
+            "year_built": strict_int(r, "year_built"),
+            "list_price": strict_int(r, "list_price"),
+            "zestimate": strict_int(r, "zestimate"),
+            "rent_zestimate": strict_int(r, "rent_zestimate"),
+            "days_on_zillow": strict_int(r, "days_on_zillow"),
         })
     return out
 
@@ -74,10 +79,10 @@ def _coerce_price_history(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "zpid": int(r["zpid"]),
-            "price": float(r["price"]),
-            "price_per_sqft": float(r["price_per_sqft"]),
+            **_strip_ctx(r),
+            "zpid": strict_int(r, "zpid"),
+            "price": strict_float(r, "price"),
+            "price_per_sqft": strict_float(r, "price_per_sqft"),
         })
     return out
 
@@ -86,11 +91,11 @@ def _coerce_agents(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "active_listings": int(r["active_listings"]),
-            "sold_last_12mo": int(r["sold_last_12mo"]),
-            "rating": float(r["rating"]),
-            "reviews": int(r["reviews"]),
+            **_strip_ctx(r),
+            "active_listings": strict_int(r, "active_listings"),
+            "sold_last_12mo": strict_int(r, "sold_last_12mo"),
+            "rating": strict_float(r, "rating"),
+            "reviews": strict_int(r, "reviews"),
         })
     return out
 
@@ -99,12 +104,12 @@ def _coerce_saved_searches(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "min_price": int(r["min_price"]),
-            "max_price": int(r["max_price"]),
-            "min_beds": int(r["min_beds"]),
-            "min_baths": float(r["min_baths"]),
-            "city": r["city"] or None,
+            **_strip_ctx(r),
+            "min_price": strict_int(r, "min_price"),
+            "max_price": strict_int(r, "max_price"),
+            "min_beds": strict_int(r, "min_beds"),
+            "min_baths": strict_float(r, "min_baths"),
+            "city": opt_str(r, "city", default="") or None,
         })
     return out
 
@@ -255,3 +260,5 @@ def delete_saved_search(search_id):
             _saved_searches_rows().pop(i)
             return {"deleted": True, "search_id": search_id}
     return {"error": f"Saved search {search_id} not found"}
+
+_store.eager_load()

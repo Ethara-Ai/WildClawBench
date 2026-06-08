@@ -44,6 +44,7 @@ class Config:
 
     # ---- OpenAI (direct / via-LiteLLM) ----
     openai_api_key: str = ""
+    openai_whisper_api_key: str = ""
 
     # ---- OpenRouter (fallback LLM routing) ----
     openrouter_api_key: str = ""
@@ -138,6 +139,7 @@ class Config:
             s3_access_key_id=s("KENSEI_S3_ACCESS_KEY_ID", "AWS_ACCESS_KEY_ID"),
             s3_secret_access_key=s("KENSEI_S3_SECRET_ACCESS_KEY", "AWS_SECRET_ACCESS_KEY"),
             openai_api_key=s("KENSEI_OPENAI_API_KEY", "OPENAI_API_KEY"),
+            openai_whisper_api_key=s("KENSEI_OPENAI_WHISPER_API_KEY", "OPENAI_WHISPER_API_KEY"),
             openrouter_api_key=s("OPENROUTER_API_KEY"),
             openrouter_base_url=s("OPENROUTER_BASE_URL", default="https://openrouter.ai/api/v1"),
             brave_api_key=s("BRAVE_API_KEY", default="placeholder"),

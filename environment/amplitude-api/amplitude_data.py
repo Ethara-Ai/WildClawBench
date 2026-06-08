@@ -13,16 +13,20 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store,
+    strict_int,
+)
 
 _store = get_store("amplitude-api")
+_API = "amplitude-api"
 
 _store.register("events", primary_key="event_id",
-                initial_loader=lambda: _coerce_events(_load("events.csv")))
+                initial_loader=lambda: _coerce_events(_load("events.csv", "events")))
 _store.register("users", primary_key="user_id",
-                initial_loader=lambda: _coerce_users(_load("users.csv")))
+                initial_loader=lambda: _coerce_users(_load("users.csv", "users")))
 _store.register("segmentation", primary_key="event_type",
-                initial_loader=lambda: _coerce_segmentation(_load("segmentation.csv")))
+                initial_loader=lambda: _coerce_segmentation(_load("segmentation.csv", "segmentation")))
 
 
 def _events_rows():
@@ -38,9 +42,12 @@ def _segmentation_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _parse_props(raw):
@@ -92,7 +99,7 @@ def _coerce_segmentation(rows):
         out.append({
             "event_type": r["event_type"],
             "date": r["date"],
-            "count": int(r["count"]),
+            "count": strict_int(r, "count"),
         })
     return out
 
@@ -176,3 +183,5 @@ def user_activity(user):
         "userData": matched,
         "events": user_events,
     }
+
+_store.eager_load()

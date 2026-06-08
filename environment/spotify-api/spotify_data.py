@@ -11,20 +11,22 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_csv_list, strict_bool, strict_int)
 
 _store = get_store("spotify-api")
+_API = "spotify-api"
 
 _store.register("artists", primary_key="artist_id",
-                initial_loader=lambda: _coerce_artists(_load("artists.csv")))
+                initial_loader=lambda: _coerce_artists(_load("artists.csv", "artists")))
 _store.register("albums", primary_key="album_id",
-                initial_loader=lambda: _coerce_albums(_load("albums.csv")))
+                initial_loader=lambda: _coerce_albums(_load("albums.csv", "albums")))
 _store.register("tracks", primary_key="track_id",
-                initial_loader=lambda: _coerce_tracks(_load("tracks.csv")))
+                initial_loader=lambda: _coerce_tracks(_load("tracks.csv", "tracks")))
 _store.register("playlists", primary_key="playlist_id",
-                initial_loader=lambda: _coerce_playlists(_load("playlists.csv")))
+                initial_loader=lambda: _coerce_playlists(_load("playlists.csv", "playlists")))
 _store.register("playlist_tracks", primary_key="playlist_id",
-                initial_loader=lambda: _coerce_playlist_tracks(_load("playlist_tracks.csv")))
+                initial_loader=lambda: _coerce_playlist_tracks(_load("playlist_tracks.csv", "playlist_tracks")))
 _store.register_document("user", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "user.json", encoding="utf-8")))
 
 
@@ -55,9 +57,12 @@ def _user_doc():
 _BASE62 = string.ascii_letters + string.digits
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now_iso():
@@ -81,10 +86,10 @@ def _coerce_artists(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "genres": [g.strip() for g in r["genres"].split(",")],
-            "followers": int(r["followers"]),
-            "popularity": int(r["popularity"]),
+            **_strip_ctx(r),
+            "genres": [g.strip() for g in opt_csv_list(r, "genres", sep=",")],
+            "followers": strict_int(r, "followers"),
+            "popularity": strict_int(r, "popularity"),
         })
     return out
 
@@ -93,8 +98,8 @@ def _coerce_albums(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "total_tracks": int(r["total_tracks"]),
+            **_strip_ctx(r),
+            "total_tracks": strict_int(r, "total_tracks"),
         })
     return out
 
@@ -103,11 +108,11 @@ def _coerce_tracks(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "duration_ms": int(r["duration_ms"]),
-            "popularity": int(r["popularity"]),
-            "explicit": _to_bool(r["explicit"]),
-            "track_number": int(r["track_number"]),
+            **_strip_ctx(r),
+            "duration_ms": strict_int(r, "duration_ms"),
+            "popularity": strict_int(r, "popularity"),
+            "explicit": strict_bool(r, "explicit"),
+            "track_number": strict_int(r, "track_number"),
         })
     return out
 
@@ -116,9 +121,9 @@ def _coerce_playlists(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "public": _to_bool(r["public"]),
-            "collaborative": _to_bool(r["collaborative"]),
+            **_strip_ctx(r),
+            "public": strict_bool(r, "public"),
+            "collaborative": strict_bool(r, "collaborative"),
         })
     return out
 
@@ -127,8 +132,8 @@ def _coerce_playlist_tracks(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "position": int(r["position"]),
+            **_strip_ctx(r),
+            "position": strict_int(r, "position"),
         })
     return out
 
@@ -334,3 +339,5 @@ def start_playback(uris=None, context_uri=None):
     if item is not None:
         _playback_state["item"] = item
     return deepcopy(_playback_state)
+
+_store.eager_load()

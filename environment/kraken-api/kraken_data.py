@@ -14,14 +14,21 @@ from pathlib import Path
 DATA_DIR = Path(__file__).parent
 
 sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store,
+    strict_int,
+)
 
 _store = get_store("kraken-api")
+_API = "kraken-api"
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 # ---------------------------------------------------------------------------
@@ -50,14 +57,14 @@ def _coerce_ohlc(rows):
     for r in rows:
         out.append({
             "pair": r["pair"],
-            "time": int(r["time"]),
+            "time": strict_int(r, "time"),
             "open": r["open"],
             "high": r["high"],
             "low": r["low"],
             "close": r["close"],
             "vwap": r["vwap"],
             "volume": r["volume"],
-            "count": int(r["count"]),
+            "count": strict_int(r, "count"),
         })
     return out
 
@@ -71,8 +78,8 @@ def _coerce_pairs(rows):
             "wsname": r["wsname"],
             "base": r["base"],
             "quote": r["quote"],
-            "pair_decimals": int(r["pair_decimals"]),
-            "lot_decimals": int(r["lot_decimals"]),
+            "pair_decimals": strict_int(r, "pair_decimals"),
+            "lot_decimals": strict_int(r, "lot_decimals"),
             "ordermin": r["ordermin"],
             "status": r["status"],
         })
@@ -86,8 +93,8 @@ def _coerce_assets(rows):
             "asset": r["asset"],
             "altname": r["altname"],
             "aclass": r["aclass"],
-            "decimals": int(r["decimals"]),
-            "display_decimals": int(r["display_decimals"]),
+            "decimals": strict_int(r, "decimals"),
+            "display_decimals": strict_int(r, "display_decimals"),
         })
     return out
 
@@ -97,18 +104,18 @@ def _coerce_balances(rows):
 
 
 _store.register("tickers", primary_key="pair",
-                initial_loader=lambda: _coerce_tickers(_load("tickers.csv")))
+                initial_loader=lambda: _coerce_tickers(_load("tickers.csv", "tickers")))
 _store.register("ohlc", primary_key="_pk",
                 initial_loader=lambda: [
                     {**row, "_pk": f"{row['pair']}@{row['time']}"}
-                    for row in _coerce_ohlc(_load("ohlc.csv"))
+                    for row in _coerce_ohlc(_load("ohlc.csv", "ohlc"))
                 ])
 _store.register("pairs", primary_key="pair",
-                initial_loader=lambda: _coerce_pairs(_load("pairs.csv")))
+                initial_loader=lambda: _coerce_pairs(_load("pairs.csv", "pairs")))
 _store.register("assets", primary_key="asset",
-                initial_loader=lambda: _coerce_assets(_load("assets.csv")))
+                initial_loader=lambda: _coerce_assets(_load("assets.csv", "assets")))
 _store.register("balances", primary_key="asset",
-                initial_loader=lambda: _coerce_balances(_load("balances.csv")))
+                initial_loader=lambda: _coerce_balances(_load("balances.csv", "balances")))
 
 
 def _rows(table):
@@ -243,3 +250,5 @@ def get_assets(asset=None):
 def get_balance():
     result = {b["asset"]: b["balance"] for b in _rows("balances")}
     return _envelope(result)
+
+_store.eager_load()

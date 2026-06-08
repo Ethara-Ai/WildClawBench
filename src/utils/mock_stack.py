@@ -16,6 +16,12 @@ MOCK_IMAGE = "kensei3-mocks:v1"
 
 _CONTENT_HASH_LABEL = "kensei3.content_hash"
 
+# Bump whenever the image's build recipe (Dockerfile / entrypoint / supervisord
+# generation / healthcheck) changes so cached images rebuild even when the
+# environment/ contents are byte-identical. _compute_mock_content_hash folds
+# this in, so a recipe change shifts the content hash and invalidates the cache.
+_BUILDER_VERSION = "rt-filter-1"
+
 
 def _compute_mock_content_hash(env_dir: Path) -> str:
     # b54 Issue 9: tag-only cache check let stale images keep running after
@@ -38,6 +44,7 @@ def _compute_mock_content_hash(env_dir: Path) -> str:
         rel = path.relative_to(env_dir).as_posix()
         manifest.append((rel, int(st.st_size), int(st.st_mtime)))
     h.update(json.dumps(manifest, sort_keys=True).encode("utf-8"))
+    h.update(_BUILDER_VERSION.encode("utf-8"))
     return h.hexdigest()[:16]
 
 
@@ -89,39 +96,76 @@ def _extract_port(path: Path) -> int | None:
     return None
 
 
-def _generate_supervisord_conf(api_ports: dict[str, int]) -> str:
-    lines = [
-        "[supervisord]",
-        "nodaemon=true",
-        "logfile=/tmp/supervisord.log",
-        "logfile_maxbytes=0",
+def _generate_ports_manifest(api_ports: dict[str, int]) -> str:
+    """Full {api_name: port} map baked into the image. The entrypoint reads this
+    plus MOCK_ENABLED_APIS at container start to decide which services to run."""
+    return json.dumps({k: int(v) for k, v in sorted(api_ports.items())}, indent=2)
+
+
+# Generates /tmp/supervisord.conf and /tmp/mock_enabled_ports at CONTAINER START
+# from the baked manifest, honoring the MOCK_ENABLED_APIS env var. This is what
+# makes the same cached image run only a task's required+distractor APIs instead
+# of all ~101: pass MOCK_ENABLED_APIS=a-api,b-api to start_mock_stack. Empty /
+# unset MOCK_ENABLED_APIS => run everything (back-compat). A filter that selects
+# nothing falls back to all, so a typo never yields a dead, empty stack.
+_GEN_SUPERVISORD_PY = r'''import json, os
+
+with open("/opt/mock_ports.json") as f:
+    ports = json.load(f)
+
+raw = (os.environ.get("MOCK_ENABLED_APIS") or "").strip()
+if raw:
+    wanted = {n.strip() for n in raw.split(",") if n.strip()}
+    selected = {n: p for n, p in ports.items() if n in wanted}
+    if not selected:
+        selected = ports
+else:
+    selected = ports
+
+lines = [
+    "[supervisord]",
+    "nodaemon=true",
+    "logfile=/tmp/supervisord.log",
+    "logfile_maxbytes=0",
+    "",
+]
+for name, port in sorted(selected.items()):
+    lines += [
+        "[program:%s]" % name,
+        "command=uvicorn server:app --host 0.0.0.0 --port %d" % int(port),
+        'environment=PYTHONPATH="/opt/mocks"',
+        "directory=/opt/mocks/%s" % name,
+        "autorestart=true",
+        "startsecs=3",
+        "startretries=3",
+        "stdout_logfile=/tmp/%s.log" % name,
+        "stderr_logfile=/tmp/%s.err" % name,
         "",
     ]
-    for name, port in sorted(api_ports.items()):
-        lines.extend([
-            f"[program:{name}]",
-            f"command=uvicorn server:app --host 0.0.0.0 --port {port}",
-            "environment=PYTHONPATH=\"/opt/mocks\"",
-            f"directory=/opt/mocks/{name}",
-            "autorestart=true",
-            "startsecs=3",
-            "startretries=3",
-            f"stdout_logfile=/tmp/{name}.log",
-            f"stderr_logfile=/tmp/{name}.err",
-            "",
-        ])
-    return "\n".join(lines)
+with open("/tmp/supervisord.conf", "w") as f:
+    f.write("\n".join(lines))
+with open("/tmp/mock_enabled_ports", "w") as f:
+    f.write(" ".join(str(int(p)) for p in sorted(selected.values())))
+print("mock-stack: running %d/%d APIs" % (len(selected), len(ports)))
+'''
 
+_START_SH = """#!/bin/bash
+set -e
+python3 /opt/gen_supervisord.py
+exec supervisord -c /tmp/supervisord.conf -n
+"""
 
-def _generate_healthcheck_sh(api_ports: dict[str, int]) -> str:
-    ports = " ".join(str(p) for p in sorted(api_ports.values()))
-    return (
-        "#!/bin/bash\n"
-        "set -e\n"
-        f"for port in {ports}; do\n"
-        "  curl -sf --max-time 2 http://localhost:$port/health >/dev/null || exit 1\n"
-        "done\n"
-    )
+# Healthcheck probes ONLY the ports the entrypoint actually started (written to
+# /tmp/mock_enabled_ports), not the full baked catalog. Probing all ~101 would
+# never go green when a task only runs a handful of services.
+_HEALTHCHECK_SH = """#!/bin/bash
+set -e
+PORTS=$(cat /tmp/mock_enabled_ports 2>/dev/null || true)
+[ -z "$PORTS" ] && exit 1
+for port in $PORTS; do
+  curl -sf --max-time 2 http://localhost:$port/health >/dev/null || exit 1
+done
+"""
 
 
 def _generate_dockerfile(api_dirs: list[str]) -> str:
@@ -135,13 +179,15 @@ RUN set -e; for f in /opt/mocks/*/requirements.txt; do \\
         pip install --no-cache-dir -r "$f" 2>&1 | tail -3 || \\
         echo "warn: $f had failures"; \\
     done
-COPY supervisord.conf /etc/supervisor.conf
+COPY mock_ports.json /opt/mock_ports.json
+COPY gen_supervisord.py /opt/gen_supervisord.py
+COPY start.sh /start.sh
 COPY healthcheck.sh /healthcheck.sh
-RUN chmod +x /healthcheck.sh
+RUN chmod +x /start.sh /healthcheck.sh
 ENV PYTHONPATH=/opt/mocks
 HEALTHCHECK --interval=15s --timeout=10s --retries=10 --start-period=60s \\
     CMD /healthcheck.sh
-CMD ["supervisord", "-c", "/etc/supervisor.conf", "-n"]
+CMD ["/start.sh"]
 """
 
 
@@ -190,12 +236,12 @@ def build_mock_image_if_needed(env_dir: Path, image: str = MOCK_IMAGE,
         tmp = Path(tmpdir)
         shutil.copytree(env_dir, tmp / "env_dir", symlinks=False, dirs_exist_ok=True)
         (tmp / "Dockerfile").write_text(_generate_dockerfile(api_dirs), encoding="utf-8")
-        (tmp / "supervisord.conf").write_text(
-            _generate_supervisord_conf(api_ports), encoding="utf-8"
+        (tmp / "mock_ports.json").write_text(
+            _generate_ports_manifest(api_ports), encoding="utf-8"
         )
-        (tmp / "healthcheck.sh").write_text(
-            _generate_healthcheck_sh(api_ports), encoding="utf-8"
-        )
+        (tmp / "gen_supervisord.py").write_text(_GEN_SUPERVISORD_PY, encoding="utf-8")
+        (tmp / "start.sh").write_text(_START_SH, encoding="utf-8")
+        (tmp / "healthcheck.sh").write_text(_HEALTHCHECK_SH, encoding="utf-8")
         build_cmd = ["docker", "build", "-t", image]
         if current_hash:
             build_cmd += ["--label", f"{_CONTENT_HASH_LABEL}={current_hash}"]
@@ -217,7 +263,8 @@ def start_mock_stack(container_name: str, network: str,
                      image: str = MOCK_IMAGE,
                      overlays: dict | None = None,
                      admin_env: dict[str, str] | None = None,
-                     publish_ports: list[int] | None = None) -> None:
+                     publish_ports: list[int] | None = None,
+                     enabled_apis: "set[str] | list[str] | None" = None) -> None:
     subprocess.run(["docker", "rm", "-f", container_name], capture_output=True)
     mount_args: list[str] = []
     for api_name, files in (overlays or {}).items():
@@ -229,6 +276,13 @@ def start_mock_stack(container_name: str, network: str,
             logger.info("[%s] overlay %s/%s -> %s",
                         container_name, api_name, filename, host_path)
     env_args: list[str] = []
+    # Limit the stack to exactly these API services. Empty/None => run all
+    # (back-compat). The image's entrypoint reads MOCK_ENABLED_APIS at start.
+    if enabled_apis:
+        enabled_csv = ",".join(sorted(enabled_apis))
+        env_args += ["-e", f"MOCK_ENABLED_APIS={enabled_csv}"]
+        logger.info("[%s] mock-stack limited to %d APIs: %s",
+                    container_name, len(set(enabled_apis)), enabled_csv)
     for k, v in (admin_env or {}).items():
         env_args += ["-e", f"{k}={v}"]
     if admin_env:

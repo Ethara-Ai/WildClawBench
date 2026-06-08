@@ -14,15 +14,19 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store,
+    strict_int,
+)
 
 _store = get_store("mixpanel-api")
+_API = "mixpanel-api"
 
 _store.register("events", primary_key="event_id",
-                initial_loader=lambda: _coerce_events(_load("events.csv")))
-_store.register_document("funnels", initial_loader=lambda: _coerce_funnels(_load("funnels.csv")))
+                initial_loader=lambda: _coerce_events(_load("events.csv", "events")))
+_store.register_document("funnels", initial_loader=lambda: _coerce_funnels(_load("funnels.csv", "funnels")))
 _store.register("profiles", primary_key="distinct_id",
-                initial_loader=lambda: _coerce_profiles(_load("profiles.csv")))
+                initial_loader=lambda: _coerce_profiles(_load("profiles.csv", "profiles")))
 
 
 def _events_rows():
@@ -38,9 +42,12 @@ def _profiles_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -76,9 +83,9 @@ def _coerce_funnels(rows):
         fid = r["funnel_id"]
         f = grouped.setdefault(fid, {"funnel_id": fid, "name": r["name"], "steps": []})
         f["steps"].append({
-            "order": int(r["step_order"]),
+            "order": strict_int(r, "step_order"),
             "event": r["step_event"],
-            "count": int(r["count"]),
+            "count": strict_int(r, "count"),
         })
     for f in grouped.values():
         f["steps"].sort(key=lambda s: s["order"])
@@ -95,7 +102,7 @@ def _coerce_profiles(rows):
                 "$email": r["email"],
                 "country": r["country"],
                 "plan": r["plan"],
-                "total_events": int(r["total_events"]),
+                "total_events": strict_int(r, "total_events"),
                 "$last_seen": r["last_seen"],
             },
         })
@@ -256,3 +263,5 @@ def engage(distinct_id=None, where=None, page_size=50):
         "page_size": page_size,
         "total": len(results),
     }
+
+_store.eager_load()

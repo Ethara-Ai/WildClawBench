@@ -14,16 +14,18 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_csv_list, strict_bool)
 
 _store = get_store("webflow-api")
+_API = "webflow-api"
 
 _store.register("sites", primary_key="id",
-                initial_loader=lambda: _coerce_sites(_load("sites.csv")))
+                initial_loader=lambda: _coerce_sites(_load("sites.csv", "sites")))
 _store.register("collections", primary_key="id",
-                initial_loader=lambda: _coerce_collections(_load("collections.csv")))
+                initial_loader=lambda: _coerce_collections(_load("collections.csv", "collections")))
 _store.register("items", primary_key="id",
-                initial_loader=lambda: _coerce_items(_load("items.csv")))
+                initial_loader=lambda: _coerce_items(_load("items.csv", "items")))
 
 
 def _sites_rows():
@@ -39,9 +41,12 @@ def _items_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _to_bool(v):
@@ -81,7 +86,7 @@ def _coerce_sites(rows):
             "time_zone": r["time_zone"],
             "created_on": r["created_on"],
             "last_published": r["last_published"],
-            "custom_domains": [d for d in r["custom_domains"].split(";") if d],
+            "custom_domains": [d for d in opt_csv_list(r, "custom_domains", sep=";") if d],
         })
     return out
 
@@ -109,8 +114,8 @@ def _coerce_items(rows):
             "collection_id": r["collection_id"],
             "name": r["name"],
             "slug": r["slug"],
-            "is_draft": _to_bool(r["is_draft"]),
-            "is_archived": _to_bool(r["is_archived"]),
+            "is_draft": strict_bool(r, "is_draft"),
+            "is_archived": strict_bool(r, "is_archived"),
             "summary": r["summary"],
             "created_on": r["created_on"],
             "last_updated": r["last_updated"],
@@ -237,3 +242,5 @@ def create_item(collection_id, field_data, is_draft=False, is_archived=False):
     for k, v in field_data.items():
         serialized["fieldData"].setdefault(k, v)
     return serialized
+
+_store.eager_load()

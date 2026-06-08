@@ -8,20 +8,22 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_int, opt_str, strict_bool, strict_int)
 
 _store = get_store("jira-api")
+_API = "jira-api"
 
 _store.register("projects", primary_key="id",
-                initial_loader=lambda: _coerce_projects(_load("projects.csv")))
+                initial_loader=lambda: _coerce_projects(_load("projects.csv", "projects")))
 _store.register("users", primary_key="account_id",
-                initial_loader=lambda: _coerce_users(_load("users.csv")))
+                initial_loader=lambda: _coerce_users(_load("users.csv", "users")))
 _store.register("boards", primary_key="id",
-                initial_loader=lambda: _coerce_boards(_load("boards.csv")))
+                initial_loader=lambda: _coerce_boards(_load("boards.csv", "boards")))
 _store.register("sprints", primary_key="id",
-                initial_loader=lambda: _coerce_sprints(_load("sprints.csv")))
+                initial_loader=lambda: _coerce_sprints(_load("sprints.csv", "sprints")))
 _store.register("issues", primary_key="id",
-                initial_loader=lambda: _coerce_issues(_load("issues.csv")))
+                initial_loader=lambda: _coerce_issues(_load("issues.csv", "issues")))
 
 
 def _projects_rows():
@@ -45,9 +47,12 @@ def _issues_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -84,26 +89,26 @@ _STATUS_CATEGORY = {
 # ---------------------------------------------------------------------------
 
 def _coerce_projects(rows):
-    return [{**r, "id": r["id"]} for r in rows]
+    return [{**_strip_ctx(r), "id": r["id"]} for r in rows]
 
 
 def _coerce_users(rows):
-    return [{**r, "active": _to_bool(r["active"])} for r in rows]
+    return [{**_strip_ctx(r), "active": strict_bool(r, "active")} for r in rows]
 
 
 def _coerce_boards(rows):
-    return [{**r, "id": int(r["id"])} for r in rows]
+    return [{**_strip_ctx(r), "id": strict_int(r, "id")} for r in rows]
 
 
 def _coerce_sprints(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "id": int(r["id"]),
-            "board_id": int(r["board_id"]),
-            "start_date": r["start_date"] or None,
-            "end_date": r["end_date"] or None,
+            **_strip_ctx(r),
+            "id": strict_int(r, "id"),
+            "board_id": strict_int(r, "board_id"),
+            "start_date": opt_str(r, "start_date", default="") or None,
+            "end_date": opt_str(r, "end_date", default="") or None,
         })
     return out
 
@@ -112,11 +117,11 @@ def _coerce_issues(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
+            **_strip_ctx(r),
             "id": r["id"],
-            "sprint_id": _to_int(r["sprint_id"]),
-            "story_points": _to_int(r["story_points"]),
-            "assignee": r["assignee"] or None,
+            "sprint_id": opt_int(r, "sprint_id", default=0),
+            "story_points": opt_int(r, "story_points", default=0),
+            "assignee": opt_str(r, "assignee", default="") or None,
         })
     return out
 
@@ -341,3 +346,5 @@ def list_sprints(board_id, state=None):
             for s in sprints
         ],
     }
+
+_store.eager_load()

@@ -10,16 +10,20 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store
-
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_str, strict_float)
 _store = get_store("quickbooks-api")
+_API = "quickbooks-api"
 
 REALM_ID = "4620816365272861350"
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _load_json(filename):
@@ -37,9 +41,9 @@ def _coerce_customers(rows):
         out.append({
             "Id": r["Id"],
             "DisplayName": r["DisplayName"],
-            "GivenName": r["GivenName"] if r["GivenName"] else None,
-            "FamilyName": r["FamilyName"] if r["FamilyName"] else None,
-            "CompanyName": r["CompanyName"] if r["CompanyName"] else None,
+            "GivenName": opt_str(r, "GivenName", default="") or None,
+            "FamilyName": opt_str(r, "FamilyName", default="") or None,
+            "CompanyName": opt_str(r, "CompanyName", default="") or None,
             "PrimaryEmailAddr": {"Address": r["PrimaryEmailAddr"]} if r["PrimaryEmailAddr"] else None,
             "PrimaryPhone": {"FreeFormNumber": r["PrimaryPhone"]} if r["PrimaryPhone"] else None,
             "BillAddr": {
@@ -48,10 +52,10 @@ def _coerce_customers(rows):
                 "CountrySubDivisionCode": r["BillAddr_CountrySubDivisionCode"],
                 "PostalCode": r["BillAddr_PostalCode"],
             },
-            "Balance": float(r["Balance"]),
+            "Balance": strict_float(r, "Balance"),
             "Active": r["Active"].lower() == "true",
             "Job": r["Job"].lower() == "true",
-            "Notes": r["Notes"] if r["Notes"] else None,
+            "Notes": opt_str(r, "Notes", default="") or None,
             "MetaData": {"CreateTime": _now(), "LastUpdatedTime": _now()},
             "SyncToken": "0",
         })
@@ -64,7 +68,7 @@ def _coerce_vendors(rows):
         out.append({
             "Id": r["Id"],
             "DisplayName": r["DisplayName"],
-            "CompanyName": r["CompanyName"] if r["CompanyName"] else None,
+            "CompanyName": opt_str(r, "CompanyName", default="") or None,
             "PrimaryEmailAddr": {"Address": r["PrimaryEmailAddr"]} if r["PrimaryEmailAddr"] else None,
             "PrimaryPhone": {"FreeFormNumber": r["PrimaryPhone"]} if r["PrimaryPhone"] else None,
             "BillAddr": {
@@ -73,9 +77,9 @@ def _coerce_vendors(rows):
                 "CountrySubDivisionCode": r["BillAddr_CountrySubDivisionCode"],
                 "PostalCode": r["BillAddr_PostalCode"],
             },
-            "Balance": float(r["Balance"]),
+            "Balance": strict_float(r, "Balance"),
             "Active": r["Active"].lower() == "true",
-            "AcctNum": r["AcctNum"] if r["AcctNum"] else None,
+            "AcctNum": opt_str(r, "AcctNum", default="") or None,
             "Vendor1099": r["Vendor1099"].lower() == "true",
             "MetaData": {"CreateTime": _now(), "LastUpdatedTime": _now()},
             "SyncToken": "0",
@@ -89,9 +93,9 @@ def _coerce_items(rows):
         out.append({
             "Id": r["Id"],
             "Name": r["Name"],
-            "Description": r["Description"] if r["Description"] else None,
+            "Description": opt_str(r, "Description", default="") or None,
             "Type": r["Type"],
-            "UnitPrice": float(r["UnitPrice"]),
+            "UnitPrice": strict_float(r, "UnitPrice"),
             "IncomeAccountRef": {
                 "value": r["IncomeAccountRef_value"],
                 "name": r["IncomeAccountRef_name"],
@@ -112,10 +116,10 @@ def _coerce_accounts(rows):
             "Name": r["Name"],
             "AccountType": r["AccountType"],
             "AccountSubType": r["AccountSubType"],
-            "CurrentBalance": float(r["CurrentBalance"]),
+            "CurrentBalance": strict_float(r, "CurrentBalance"),
             "Active": r["Active"].lower() == "true",
             "Classification": r["Classification"],
-            "Description": r["Description"] if r["Description"] else None,
+            "Description": opt_str(r, "Description", default="") or None,
             "MetaData": {"CreateTime": _now(), "LastUpdatedTime": _now()},
             "SyncToken": "0",
         })
@@ -123,13 +127,13 @@ def _coerce_accounts(rows):
 
 
 _store.register("customers", primary_key="Id",
-                initial_loader=lambda: _coerce_customers(_load("customers.csv")))
+                initial_loader=lambda: _coerce_customers(_load("customers.csv", "customers")))
 _store.register("vendors", primary_key="Id",
-                initial_loader=lambda: _coerce_vendors(_load("vendors.csv")))
+                initial_loader=lambda: _coerce_vendors(_load("vendors.csv", "vendors")))
 _store.register("items", primary_key="Id",
-                initial_loader=lambda: _coerce_items(_load("items.csv")))
+                initial_loader=lambda: _coerce_items(_load("items.csv", "items")))
 _store.register("accounts", primary_key="Id",
-                initial_loader=lambda: _coerce_accounts(_load("accounts.csv")))
+                initial_loader=lambda: _coerce_accounts(_load("accounts.csv", "accounts")))
 _store.register("invoices", primary_key="Id",
                 initial_loader=lambda: _load_json("invoices.json"))
 _store.register("bills", primary_key="Id",
@@ -900,3 +904,5 @@ def accounts_payable_aging():
         },
         "Rows": {"Row": rows},
     }
+
+_store.eager_load()

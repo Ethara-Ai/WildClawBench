@@ -15,6 +15,7 @@ from src.utils.docker_utils import (
     inject_api_connectors,
     inject_lobster_workspace,
     inject_openclaw_models,
+    inject_persona_into_workspace,
     inject_subagent_tool,
     run_background,
     run_warmup,
@@ -24,7 +25,11 @@ from src.utils.docker_utils import (
     start_container,
     write_turn_marker,
 )
-from src.utils.grading import extract_usage_from_jsonl, extract_usage_from_litellm_log
+from src.utils.grading import (
+    extract_preflight_usage_from_litellm_log,
+    extract_usage_from_jsonl,
+    extract_usage_from_litellm_log,
+)
 
 load_dotenv()
 
@@ -127,13 +132,34 @@ class OpenClawAgent(BaseAgent):
             tmp_path = os.path.join(spec.workspace_path, "tmp")
             os.makedirs(exec_path, exist_ok=True)
 
+            # WCB_AUDIO_TRANSCRIBE_URL points the audio-extract skill at the
+            # in-cluster LiteLLM sidecar's /v1/audio/transcriptions endpoint
+            # (litellm_sidecar.py:142-170 registers whisper-1 there). The
+            # agent container has no internet egress under the --internal
+            # bridge, so this URL is the only working transcription path;
+            # without it the agent silently drops audio inputs (see
+            # ruth_flynn trajectory 925303a7-0a9d-40be-86b4-51da4d6e6544
+            # turns 41-57 where every fallback - whisper CLI, pip install,
+            # OPENAI_API_KEY env probe - failed in turn).
+            extra_env_dict = dict(spec.task.get("env_dict") or {})
+            if self.litellm_config_yaml and self.litellm_container_name:
+                extra_env_dict.setdefault(
+                    "WCB_AUDIO_TRANSCRIBE_URL",
+                    f"http://{self.litellm_container_name}:{self.litellm_port}"
+                    f"/v1/audio/transcriptions",
+                )
+                extra_env_dict.setdefault(
+                    "WCB_AUDIO_TRANSCRIBE_AUTH",
+                    self.litellm_master_key or "sk-litellm",
+                )
+
             start_container(
                 spec.task_id,
                 exec_path,
                 extra_env=spec.task.get("env", ""),
                 tmp_path=tmp_path,
                 lobster_env=spec.lobster.get("env") if spec.lobster else None,
-                extra_env_dict=spec.task.get("env_dict") or None,
+                extra_env_dict=extra_env_dict or None,
                 network=self.litellm_network,
             )
 
@@ -155,6 +181,10 @@ class OpenClawAgent(BaseAgent):
                 self._index_memory(spec.task_id)
 
             setup_workspace(spec.task_id, thinking=spec.thinking)
+
+            if persona_dir:
+                inject_persona_into_workspace(spec.task_id, persona_dir)
+
             setup_skills(
                 spec.task_id,
                 spec.task.get("skills", ""),
@@ -291,11 +321,15 @@ class OpenClawAgent(BaseAgent):
         )
 
         usage: dict
+        preflight_usage: dict | None = None
         if self.litellm_usage_log:
             window = self._task_windows.get(task_id)
             if window is None:
                 window = (time.time() - max(elapsed_time, 1.0), time.time())
             usage = extract_usage_from_litellm_log(Path(self.litellm_usage_log), window[0], window[1])
+            preflight_usage = extract_preflight_usage_from_litellm_log(Path(self.litellm_usage_log))
+            if preflight_usage.get("request_count", 0) == 0:
+                preflight_usage = None
         else:
             usage = {"request_count": 0}
 
@@ -351,6 +385,8 @@ class OpenClawAgent(BaseAgent):
 
         self._task_windows.pop(task_id, None)
         usage["elapsed_time"] = round(elapsed_time, 2)
+        if preflight_usage is not None:
+            usage["__preflight__"] = preflight_usage
         return usage
 
     def _set_model(self, task_id: str, model: str, thinking: str | None = None) -> None:
@@ -428,6 +464,32 @@ class OpenClawAgent(BaseAgent):
                          "contextWindow": 1050000, "maxTokens": 128000},
                     ],
                 }
+            # Also register an `openai` provider that points at the SAME sidecar.
+            # The built-in `image` (vision) tool resolves to provider "openai"
+            # whenever the agent doesn't pin model=anthropic/... (or its internal
+            # fallback chain kicks in). In litellm mode the agent container has no
+            # openai key in auth-profiles.json AND cannot reach api.openai.com
+            # (internal bridge), so openclaw fails locally with
+            #   "image failed: No API key found for provider openai"
+            # (kayla-morgan 2026-06-07 11:55:50) even though the sidecar already
+            # aliases gpt-4o / gpt-4o-mini -> the Opus/gpt-5.5 route. Overriding
+            # providers["openai"] -> sidecar makes those calls route through
+            # LiteLLM (vision-capable) instead of dying on missing auth. The
+            # agent never reaches real OpenAI; this is a pure sidecar rewrite.
+            openai_sidecar_provider = {
+                "baseUrl": base_url_v1,
+                "apiKey": self.litellm_master_key or "sk-litellm",
+                "auth": "api-key",
+                "api": "openai-completions",
+                "models": [
+                    {"id": "gpt-4o", "name": "gpt-4o",
+                     "input": ["text", "image"], "reasoning": False,
+                     "contextWindow": 128000, "maxTokens": 16384},
+                    {"id": "gpt-4o-mini", "name": "gpt-4o-mini",
+                     "input": ["text", "image"], "reasoning": False,
+                     "contextWindow": 128000, "maxTokens": 16384},
+                ],
+            }
             thinking_default = (thinking or "").strip()
             set_thinking_line = (
                 f'defaults["thinkingDefault"] = {json.dumps(thinking_default)}\n'
@@ -441,6 +503,7 @@ d = json.loads(p.read_text()) if p.exists() else {{}}
 models = d.setdefault("models", {{}})
 providers = models.setdefault("providers", {{}})
 providers[{json.dumps(provider_key)}] = json.loads({json.dumps(json.dumps(litellm_provider))})
+providers["openai"] = json.loads({json.dumps(json.dumps(openai_sidecar_provider))})
 agents = d.setdefault("agents", {{}})
 defaults = agents.setdefault("defaults", {{}})
 defaults["model"] = {{"primary": {json.dumps(primary)}}}

@@ -9,24 +9,26 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_str, strict_int)
 
 _store = get_store("pinterest-api")
+_API = "pinterest-api"
 
 _store.register("boards", primary_key="board_id",
-                initial_loader=lambda: _coerce_boards(_load("boards.csv")))
+                initial_loader=lambda: _coerce_boards(_load("boards.csv", "boards")))
 _store.register("board_sections", primary_key="section_id",
-                initial_loader=lambda: _coerce_board_sections(_load("board_sections.csv")))
+                initial_loader=lambda: _coerce_board_sections(_load("board_sections.csv", "board_sections")))
 _store.register("pins", primary_key="pin_id",
-                initial_loader=lambda: _coerce_pins(_load("pins.csv")))
+                initial_loader=lambda: _coerce_pins(_load("pins.csv", "pins")))
 _store.register("pin_analytics", primary_key="pin_id",
-                initial_loader=lambda: _coerce_pin_analytics(_load("pin_analytics.csv")))
+                initial_loader=lambda: _coerce_pin_analytics(_load("pin_analytics.csv", "pin_analytics")))
 _store.register("user_analytics", primary_key="date",
-                initial_loader=lambda: _coerce_user_analytics(_load("user_analytics.csv")))
+                initial_loader=lambda: _coerce_user_analytics(_load("user_analytics.csv", "user_analytics")))
 _store.register("ad_accounts", primary_key="ad_account_id",
-                initial_loader=lambda: _coerce_ad_accounts(_load("ad_accounts.csv")))
+                initial_loader=lambda: _coerce_ad_accounts(_load("ad_accounts.csv", "ad_accounts")))
 _store.register("campaigns", primary_key="campaign_id",
-                initial_loader=lambda: _coerce_campaigns(_load("campaigns.csv")))
+                initial_loader=lambda: _coerce_campaigns(_load("campaigns.csv", "campaigns")))
 _store.register_document("user_account_raw", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "user_account.json", encoding="utf-8")))
 
 
@@ -63,9 +65,12 @@ def _user_account_raw_doc():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -80,11 +85,11 @@ def _coerce_boards(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
+            **_strip_ctx(r),
             "board_id": r["board_id"],
-            "pin_count": int(r["pin_count"]),
-            "follower_count": int(r["follower_count"]),
-            "collaborator_count": int(r["collaborator_count"]),
+            "pin_count": strict_int(r, "pin_count"),
+            "follower_count": strict_int(r, "follower_count"),
+            "collaborator_count": strict_int(r, "collaborator_count"),
         })
     return out
 
@@ -93,10 +98,10 @@ def _coerce_board_sections(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
+            **_strip_ctx(r),
             "section_id": r["section_id"],
             "board_id": r["board_id"],
-            "pin_count": int(r["pin_count"]),
+            "pin_count": strict_int(r, "pin_count"),
         })
     return out
 
@@ -105,16 +110,16 @@ def _coerce_pins(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
+            **_strip_ctx(r),
             "pin_id": r["pin_id"],
             "board_id": r["board_id"],
-            "board_section_id": r["board_section_id"] if r["board_section_id"] else None,
-            "link": r["link"] if r["link"] else None,
-            "alt_text": r["alt_text"] if r["alt_text"] else None,
+            "board_section_id": opt_str(r, "board_section_id", default="") or None,
+            "link": opt_str(r, "link", default="") or None,
+            "alt_text": opt_str(r, "alt_text", default="") or None,
             "is_promoted": r["is_promoted"].lower() == "true",
-            "pin_metrics_impressions": int(r["pin_metrics_impressions"]),
-            "pin_metrics_saves": int(r["pin_metrics_saves"]),
-            "pin_metrics_clicks": int(r["pin_metrics_clicks"]),
+            "pin_metrics_impressions": strict_int(r, "pin_metrics_impressions"),
+            "pin_metrics_saves": strict_int(r, "pin_metrics_saves"),
+            "pin_metrics_clicks": strict_int(r, "pin_metrics_clicks"),
         })
     return out
 
@@ -125,10 +130,10 @@ def _coerce_pin_analytics(rows):
         out.append({
             "pin_id": r["pin_id"],
             "date": r["date"],
-            "impressions": int(r["impressions"]),
-            "saves": int(r["saves"]),
-            "pin_clicks": int(r["pin_clicks"]),
-            "outbound_clicks": int(r["outbound_clicks"]),
+            "impressions": strict_int(r, "impressions"),
+            "saves": strict_int(r, "saves"),
+            "pin_clicks": strict_int(r, "pin_clicks"),
+            "outbound_clicks": strict_int(r, "outbound_clicks"),
         })
     return out
 
@@ -138,12 +143,12 @@ def _coerce_user_analytics(rows):
     for r in rows:
         out.append({
             "date": r["date"],
-            "impressions": int(r["impressions"]),
-            "saves": int(r["saves"]),
-            "pin_clicks": int(r["pin_clicks"]),
-            "outbound_clicks": int(r["outbound_clicks"]),
-            "profile_visits": int(r["profile_visits"]),
-            "follows": int(r["follows"]),
+            "impressions": strict_int(r, "impressions"),
+            "saves": strict_int(r, "saves"),
+            "pin_clicks": strict_int(r, "pin_clicks"),
+            "outbound_clicks": strict_int(r, "outbound_clicks"),
+            "profile_visits": strict_int(r, "profile_visits"),
+            "follows": strict_int(r, "follows"),
         })
     return out
 
@@ -152,7 +157,7 @@ def _coerce_ad_accounts(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
+            **_strip_ctx(r),
             "ad_account_id": r["ad_account_id"],
         })
     return out
@@ -162,12 +167,12 @@ def _coerce_campaigns(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
+            **_strip_ctx(r),
             "campaign_id": r["campaign_id"],
             "ad_account_id": r["ad_account_id"],
-            "daily_spend_cap_micro": int(r["daily_spend_cap_micro"]),
-            "lifetime_spend_cap_micro": int(r["lifetime_spend_cap_micro"]),
-            "end_time": r["end_time"] if r["end_time"] else None,
+            "daily_spend_cap_micro": strict_int(r, "daily_spend_cap_micro"),
+            "lifetime_spend_cap_micro": strict_int(r, "lifetime_spend_cap_micro"),
+            "end_time": opt_str(r, "end_time", default="") or None,
         })
     return out
 
@@ -203,6 +208,7 @@ def _extract_numeric_id(id_str, prefix):
         return 0
 
 
+_store.eager_load()
 _next_board_id = max(_extract_numeric_id(b["board_id"], "board_") for b in _boards_rows()) + 1
 _next_section_id = max(_extract_numeric_id(s["section_id"], "section_") for s in _board_sections_rows()) + 1
 _next_pin_id = max(_extract_numeric_id(p["pin_id"], "pin_") for p in _pins_rows()) + 1

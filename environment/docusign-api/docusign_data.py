@@ -9,18 +9,20 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_str, strict_bool, strict_int)
 
 _store = get_store("docusign-api")
+_API = "docusign-api"
 
 _store.register("envelopes", primary_key="envelope_id",
-                initial_loader=lambda: _coerce_envelopes(_load("envelopes.csv")))
+                initial_loader=lambda: _coerce_envelopes(_load("envelopes.csv", "envelopes")))
 _store.register("recipients", primary_key="recipient_id",
-                initial_loader=lambda: _coerce_recipients(_load("recipients.csv")))
+                initial_loader=lambda: _coerce_recipients(_load("recipients.csv", "recipients")))
 _store.register("documents", primary_key="document_id",
-                initial_loader=lambda: _coerce_documents(_load("documents.csv")))
+                initial_loader=lambda: _coerce_documents(_load("documents.csv", "documents")))
 _store.register("templates", primary_key="template_id",
-                initial_loader=lambda: _coerce_templates(_load("templates.csv")))
+                initial_loader=lambda: _coerce_templates(_load("templates.csv", "templates")))
 
 
 def _envelopes_rows():
@@ -40,9 +42,12 @@ def _templates_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -61,10 +66,10 @@ def _coerce_envelopes(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "sent_time": r["sent_time"] or None,
-            "completed_time": r["completed_time"] or None,
-            "template_id": r["template_id"] or None,
+            **_strip_ctx(r),
+            "sent_time": opt_str(r, "sent_time", default="") or None,
+            "completed_time": opt_str(r, "completed_time", default="") or None,
+            "template_id": opt_str(r, "template_id", default="") or None,
         })
     return out
 
@@ -73,9 +78,9 @@ def _coerce_recipients(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "routing_order": int(r["routing_order"]),
-            "signed_time": r["signed_time"] or None,
+            **_strip_ctx(r),
+            "routing_order": strict_int(r, "routing_order"),
+            "signed_time": opt_str(r, "signed_time", default="") or None,
         })
     return out
 
@@ -84,15 +89,15 @@ def _coerce_documents(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "page_count": int(r["page_count"]),
-            "order": int(r["order"]),
+            **_strip_ctx(r),
+            "page_count": strict_int(r, "page_count"),
+            "order": strict_int(r, "order"),
         })
     return out
 
 
 def _coerce_templates(rows):
-    return [{**r, "shared": _to_bool(r["shared"])} for r in rows]
+    return [{**_strip_ctx(r), "shared": strict_bool(r, "shared")} for r in rows]
 
 
 
@@ -272,3 +277,5 @@ def list_templates():
         "resultSetSize": str(len(_templates_rows())),
         "envelopeTemplates": [_template_obj(t) for t in _templates_rows()],
     }
+
+_store.eager_load()

@@ -14,16 +14,21 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store,
+    strict_int,
+    opt_float,
+)
 
 _store = get_store("fedex-api")
+_API = "fedex-api"
 
 _store.register("rates", primary_key="service_type",
-                initial_loader=lambda: _coerce_rates(_load("rates.csv")))
+                initial_loader=lambda: _coerce_rates(_load("rates.csv", "rates")))
 _store.register("shipments", primary_key="tracking_number",
-                initial_loader=lambda: _coerce_shipments(_load("shipments.csv")))
+                initial_loader=lambda: _coerce_shipments(_load("shipments.csv", "shipments")))
 _store.register("tracking", primary_key="tracking_number",
-                initial_loader=lambda: _coerce_tracking(_load("tracking.csv")))
+                initial_loader=lambda: _coerce_tracking(_load("tracking.csv", "tracking")))
 
 
 def _rates_rows():
@@ -39,9 +44,12 @@ def _tracking_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _to_float(v):
@@ -63,10 +71,10 @@ def _coerce_rates(rows):
             "service_name": r["service_name"],
             "origin_zip": r["origin_zip"],
             "dest_zip": r["dest_zip"],
-            "weight_lb": _to_float(r["weight_lb"]),
+            "weight_lb": opt_float(r, "weight_lb", default=None),
             "currency": r["currency"],
-            "net_charge": _to_float(r["net_charge"]),
-            "transit_days": int(r["transit_days"]),
+            "net_charge": opt_float(r, "net_charge", default=None),
+            "transit_days": strict_int(r, "transit_days"),
             "delivery_day": r["delivery_day"],
         })
     return out
@@ -82,9 +90,9 @@ def _coerce_shipments(rows):
             "ship_date": r["ship_date"],
             "origin_zip": r["origin_zip"],
             "dest_zip": r["dest_zip"],
-            "weight_lb": _to_float(r["weight_lb"]),
+            "weight_lb": opt_float(r, "weight_lb", default=None),
             "currency": r["currency"],
-            "net_charge": _to_float(r["net_charge"]),
+            "net_charge": opt_float(r, "net_charge", default=None),
             "label_url": r["label_url"],
         })
     return out
@@ -262,3 +270,5 @@ def track(tracking_number):
             }],
         }
     }
+
+_store.eager_load()
