@@ -503,6 +503,8 @@ def _call_judge_bedrock(arn: str, system: str, user: str) -> tuple[str, dict]:
     tok = os.environ.get("KENSEI_AWS_BEARER_TOKEN") or os.environ.get("AWS_BEARER_TOKEN_BEDROCK", "")
     if not tok:
         raise RuntimeError("no Bedrock bearer token for judge")
+    while arn.startswith("bedrock/"):
+        arn = arn[len("bedrock/"):]
     reg = _bedrock_region_for(arn)
     mid = urllib.parse.quote(arn, safe="")
     url = f"https://bedrock-runtime.{reg}.amazonaws.com/model/{mid}/converse-stream"
@@ -678,10 +680,24 @@ def _parse_verdict_text(response: str, n_criteria: int) -> list[dict]:
 
 
 def _call_one_judge(model: str, system: str, user: str) -> tuple[str, dict]:
-    provider, _, rest = model.partition("/")
-    if provider == "bedrock":
-        return _call_judge_bedrock(rest, system, user)
-    return _call_judge_openai(rest or model, system, user)
+    # Provider routing is CONTENT-AWARE, not naive partition("/"): a Bedrock
+    # application-inference-profile ARN itself contains slashes, so a bare ARN
+    # (missing the "bedrock/" prefix) would partition to provider != "bedrock" and
+    # be silently misrouted to OpenAI, which 404s on the unknown model id. Detect
+    # Bedrock by shape so an ARN never reaches OpenAI.
+    m = (model or "").strip()
+    head = m.partition("/")[0]
+    if head == "bedrock":
+        return _call_judge_bedrock(m.partition("/")[2], system, user)
+    if head == "openai":
+        return _call_judge_openai(m.partition("/")[2] or m, system, user)
+    if m.startswith("arn:aws:bedrock:") or ":application-inference-profile/" in m:
+        # Bare (unprefixed) Bedrock ARN — route to Bedrock instead of OpenAI.
+        return _call_judge_bedrock(m, system, user)
+    if not m:
+        raise RuntimeError("empty judge model id")
+    # Unknown/unprefixed id: treat as an OpenAI model name (e.g. "gpt-5.5").
+    return _call_judge_openai(m, system, user)
 
 
 def _run_single_judge(
