@@ -326,35 +326,17 @@ def load_models_config(models_config_path: Path) -> dict:
 
 
 def _stage_native_workspace(task: dict, config) -> str:
-    """Stage a per-task workspace dir (<work>/<task_id>/exec) from a native/yaml
-    task's attachments, returning the parent dir to pass as workspace_path.
-    The openclaw runner mounts <workspace_path>/exec into the container."""
-    import shutil
+    """Create the per-task workspace dir (<work>/<task_id>/exec) the openclaw runner
+    mounts at /app, returning the parent dir to pass as workspace_path.
+
+    Input artifacts are NOT staged here anymore: they ship inside persona/home/ and
+    reach the container via the persona injection (docker_utils.inject_persona_into_workspace
+    surfaces persona/home/ at /root/workspace/home). The exec dir is created empty so the
+    /app:ro mount + `cp -r /app/.` workspace bootstrap in setup_workspace still succeeds."""
     task_id_ori = task["task_id"]
     staging = Path(config.work_dir) / re.sub(r"[^a-zA-Z0-9._-]", "_", task_id_ori)
     exec_dir = staging / "exec"
     exec_dir.mkdir(parents=True, exist_ok=True)
-    for att in task.get("attachments", []) or []:
-        src = Path(att.get("path", ""))
-        if not src.is_file():
-            continue
-        rel = att.get("storedAs") or att.get("name") or src.name
-        # Reject paths that would escape exec_dir (".." or absolute).
-        rel_path = Path(rel)
-        if rel_path.is_absolute() or any(p == ".." for p in rel_path.parts):
-            logger.warning("[%s] skipping unsafe attachment path: %s", task_id_ori, rel)
-            continue
-        dst = exec_dir / rel_path
-        try:
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            try:
-                if dst.exists():
-                    dst.unlink()
-                os.link(src, dst)
-            except OSError:
-                shutil.copy2(src, dst)
-        except OSError as exc:
-            logger.warning("[%s] attachment copy failed (%s): %s", task_id_ori, src, exc)
     return str(staging)
 
 

@@ -1,0 +1,20 @@
+{
+  "model": "Claude Opus 4.7",
+  "runs": 2,
+  "average_test_weights_percentage": 50.0,
+  "average_rubric_weights_percentage": 35.72,
+  "per_run": [
+    {
+      "run_index": 1,
+      "include_multimodal": true,
+      "test_weights_percentage": 100.0,
+      "rubric_weights_percentage": 71.43
+    },
+    {
+      "run_index": 2,
+      "include_multimodal": true,
+      "test_weights_percentage": 0.0,
+      "rubric_weights_percentage": 0.0
+    }
+  ]
+}
