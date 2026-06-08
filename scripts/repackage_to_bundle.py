@@ -106,8 +106,6 @@ ARTIFACTS_SCRATCH_DIRNAME = "_tmp"
 # The run-output tree strips the persona/ and staged input files from
 # data/environment/. The published bundle (amanda_webb reference) keeps them, so
 # we re-source them from the ORIGINAL task input dir (default root: "input").
-# Reference persona uses singular "AGENT.md"; our input ships plural "AGENTS.md".
-PERSONA_RENAME = {"AGENTS.md": "AGENT.md"}
 # Where staged inputs live inside the bundle's environment dir.
 ARTIFACTS_INPUTS_SUBPATH = ("artifacts", "inputs", "files")
 
@@ -395,7 +393,7 @@ def stage_persona_and_artifacts(
         dest_persona.mkdir(parents=True, exist_ok=True)
         for item in src_persona.iterdir():
             if item.is_file() and item.name != ".DS_Store":
-                shutil.copy2(item, dest_persona / PERSONA_RENAME.get(item.name, item.name))
+                shutil.copy2(item, dest_persona / item.name)
                 n_persona += 1
 
     n_files = 0
