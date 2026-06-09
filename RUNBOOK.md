@@ -306,8 +306,15 @@ LITELLM_LOG=DEBUG ./run.sh ...
 | `JUDGE_COUNCIL=1` | Enable council without `--judge-council` flag. |
 | `JUDGE_MAX_EVIDENCE=N` | Override per-judge evidence char cap (default 450k, per-member budgets apply). |
 | `JUDGE_COUNCIL_DISAGREEMENT_THRESHOLD=0.30` | Stddev threshold for disagreement flags (legacy mean-aggregator artifact). |
+| `KENSEI_JUDGE_USE_LITELLM=true` | Route judge calls through LiteLLM library mode (default OFF → urllib direct). On any LiteLLM error the dispatcher falls back to urllib. |
+| `KENSEI_JUDGE_HEADROOM_ENABLED=false` | Disable Headroom compression while keeping LiteLLM (A/B testing). Default ON when `KENSEI_JUDGE_USE_LITELLM=true`. |
+| `KENSEI_JUDGE_HEADROOM_TARGET_RATIO=0.4` | Headroom target compression ratio. |
+| `KENSEI_JUDGE_HEADROOM_PROTECT_RECENT=2` | Headroom protect-recent message count. |
+| `KENSEI_JUDGE_HEADROOM_MIN_TOKENS=2000` | Skip Headroom compression below this token count. |
 | `WCB_PROMPT_NOCACHE=1` | Bypass prompt cache, re-read `.md` per call. |
 | `LITELLM_LOG=DEBUG` | Verbose sidecar logs. |
+
+**Headroom telemetry:** when `KENSEI_JUDGE_USE_LITELLM=true`, per-call compression stats land in `score.json.judge_council.headroom_per_member` and the cumulative `headroom_tokens_saved_total`. Inspect via `jq '.judge_council.headroom_per_member' output/**/score.json`.
 
 ---
 
