@@ -1,0 +1,9 @@
+id,customer,amount,currency,status,paid,refunded,amount_refunded,description,payment_intent,created
+ch_AuroraK7,cus_NovaQ2,1199,usd,succeeded,true,false,0,Starter Monthly,pi_AuroraK7,1727510001
+ch_BravoM3,cus_PineL9,999,usd,succeeded,true,false,0,Cloud Backup monthly,pi_BravoM3,1729010003
+ch_CedarP6,cus_RiverT4,4999,usd,succeeded,true,false,0,Pro plan annual renewal,pi_CedarP6,1730510005
+ch_DeltaQ8,cus_StoneV1,2699,usd,succeeded,true,false,0,Domain renewal,pi_DeltaQ8,1732010007
+ch_EchoR2,cus_TerraW7,1399,usd,succeeded,true,false,0,Office supplies order,pi_EchoR2,1733510009
+ch_FoxtrotS5,cus_UnityX3,6499,usd,succeeded,true,false,0,Meal kit delivery,pi_FoxtrotS5,1735100000
+ch_GolfT9,cus_ValorY6,1699,usd,succeeded,true,false,0,E-book bundle,pi_GolfT9,1736600002
+ch_HotelU4,cus_WrenZ8,999,usd,succeeded,true,false,0,Streaming subscription,pi_HotelU4,1738100004
