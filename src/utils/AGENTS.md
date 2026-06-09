@@ -30,7 +30,18 @@ plus 3 sub-packages (`testgen/`, `harbor/`, `trajectory/`).
   smallest judge-council context window — read the `grading.py` header before changing it.
 
 ## ANTI-PATTERNS
-- Don't call the LiteLLM sidecar from host-side utils (grading/judge) — it's network-isolated
-  to the batch; call OpenAI/Bedrock providers directly.
+- Don't call the per-batch LiteLLM **sidecar** from host-side utils — it's network-isolated
+  to the batch (no published port, `--internal` bridge). Grading MAY use LiteLLM in
+  **library mode** (in-process `litellm.completion()`) when `KENSEI_JUDGE_USE_LITELLM=true`;
+  default OFF and falls back to the urllib direct-provider path on any LiteLLM error.
+  Both transports MUST produce the same 7-key per-judge `usage` dict shape — see the
+  `grading.py` header and `judge_litellm.py` module docstring.
+- When LiteLLM library mode is on, judges MUST use Headroom with `compress_system_messages=False`
+  (the system prompt is verdict-format-load-bearing — compressing it can break `_VERDICT_RE`).
+  See `judge_litellm.maybe_compress` for the locked config.
 - Don't bypass `Config.from_env`'s `s()/b()/i()/f()` helpers when adding env vars — keep the
-  KENSEI_*-first alias ordering.
+  KENSEI_*-first alias ordering. (Exception: per-feature judge toggles like
+  `KENSEI_JUDGE_USE_LITELLM` and the `KENSEI_JUDGE_HEADROOM_*` family read `os.environ`
+  directly, matching the existing `JUDGE_MAX_EVIDENCE` / `JUDGE_COUNCIL_MEMBERS` precedent
+  in `grading.py` — Config is for system-wide infra (Bedrock ARNs, S3 keys), not per-call
+  feature flags.)

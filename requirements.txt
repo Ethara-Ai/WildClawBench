@@ -10,6 +10,7 @@ fastapi
 pytest
 openai
 litellm
+headroom-ai>=0.24,<0.25
 tomli; python_version < "3.11"
 annotated-doc==0.0.4
 annotated-types==0.7.0

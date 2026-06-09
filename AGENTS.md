@@ -54,8 +54,12 @@ tasks/           # NOT in repo — downloaded from HuggingFace via prepare.sh
 - Don't trust README model-name rules over `cli_args.py` — fork normalizes differently
   per backend (OpenClaw/Codex want `openrouter/<p>/<m>`; Claude Code/Hermes want `<p>/<m>`).
 - Don't commit `.env` or real `KENSEI_*` secrets (`.env.example` is the tracked template).
-- LiteLLM sidecar is **per-batch, not host-reachable**; host-side code (grading judge)
-  must call providers directly — see `grading.py` header.
+- LiteLLM **sidecar** is per-batch, not host-reachable. Host-side grading defaults to
+  direct provider calls via urllib; it MAY use LiteLLM in **library mode** (in-process)
+  when `KENSEI_JUDGE_USE_LITELLM=true`. The library-mode path optionally compresses the
+  judge user-turn via Headroom (`KENSEI_JUDGE_HEADROOM_ENABLED`, default on). On any
+  LiteLLM/Headroom error the dispatcher falls back to the urllib path so grading never
+  fails because of transport choice. See `grading.py` header + `judge_litellm.py`.
 
 ## COMMANDS
 ```bash
