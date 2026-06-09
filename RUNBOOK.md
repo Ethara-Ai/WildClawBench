@@ -306,8 +306,32 @@ LITELLM_LOG=DEBUG ./run.sh ...
 | `JUDGE_COUNCIL=1` | Enable council without `--judge-council` flag. |
 | `JUDGE_MAX_EVIDENCE=N` | Override per-judge evidence char cap (default 450k, per-member budgets apply). |
 | `JUDGE_COUNCIL_DISAGREEMENT_THRESHOLD=0.30` | Stddev threshold for disagreement flags (legacy mean-aggregator artifact). |
+| `KENSEI_JUDGE_USE_LITELLM=true` | Route judge calls through LiteLLM library mode (default OFF → urllib direct). On any LiteLLM error the dispatcher falls back to urllib. |
+| `KENSEI_JUDGE_HEADROOM_ENABLED=false` | Disable Headroom compression while keeping LiteLLM (A/B testing). Default ON when `KENSEI_JUDGE_USE_LITELLM=true`. |
+| `KENSEI_JUDGE_HEADROOM_TARGET_RATIO=0.4` | Headroom target compression ratio. |
+| `KENSEI_JUDGE_HEADROOM_PROTECT_RECENT=2` | Headroom protect-recent message count. |
+| `KENSEI_JUDGE_HEADROOM_MIN_TOKENS=2000` | Skip Headroom compression below this token count. |
+| `KENSEI_AGENT_HEADROOM_ENABLED=true` | Enable Headroom compression on the AGENT-path sidecar (`claude-opus-4.7`, `gpt-5.5`). Default OFF → sidecar uses stock `ghcr.io/berriai/litellm:main-stable`. When ON, sidecar uses `wildclawbench-litellm-headroom:v1` (must be built first; see below). |
+| `KENSEI_AGENT_HEADROOM_TARGET_RATIO=0.4` | Agent-path Headroom target compression ratio. |
+| `KENSEI_AGENT_HEADROOM_PROTECT_RECENT=4` | Agent-path protect-recent message count (larger than judge's 2 because tool loops have more recent context worth preserving). |
+| `KENSEI_AGENT_HEADROOM_MIN_TOKENS=2000` | Skip agent-path compression below this token count. |
+| `KENSEI_AGENT_HEADROOM_LOG_PATH=/var/litellm_headroom/headroom.jsonl` | Agent-path compression-telemetry JSONL path INSIDE the sidecar container (separate from `LITELLM_USAGE_LOG_PATH` by mandate — token tracking is owned exclusively by `litellm_usage_callback.py`). |
 | `WCB_PROMPT_NOCACHE=1` | Bypass prompt cache, re-read `.md` per call. |
 | `LITELLM_LOG=DEBUG` | Verbose sidecar logs. |
+
+**Headroom telemetry (judge):** when `KENSEI_JUDGE_USE_LITELLM=true`, per-call compression stats land in `score.json.judge_council.headroom_per_member` and the cumulative `headroom_tokens_saved_total`. Inspect via `jq '.judge_council.headroom_per_member' output/**/score.json`.
+
+**Headroom telemetry (agent sidecar):** when `KENSEI_AGENT_HEADROOM_ENABLED=true`, the sidecar writes per-request compression rows to a SEPARATE JSONL at the host mount `config.work_dir/litellm-headroom-<batch_id>/headroom.jsonl` (8 keys: `ts, model, call_type, tokens_before, tokens_after, tokens_saved, compression_ratio, transforms_applied`). The 11-key `usage.jsonl` token-tracking schema is untouched.
+
+**Building the agent-path Headroom image (one-time, only needed when `KENSEI_AGENT_HEADROOM_ENABLED=true`):**
+```bash
+docker build -f docker/litellm-headroom.Dockerfile -t wildclawbench-litellm-headroom:v1 .
+```
+Inspect compression stats per batch:
+```bash
+jq -s 'group_by(.model) | map({model: .[0].model, total_saved: (map(.tokens_saved) | add), n: length})' \
+  /tmp/wildclawbench/litellm-headroom-<batch_id>/headroom.jsonl
+```
 
 ---
 

@@ -22,13 +22,27 @@ TMP_WORKSPACE = os.environ.get("TMP_WORKSPACE", "/tmp_workspace")
 # degenerate reward:0.0 / tests_total:0 no matter how well the agent did. This
 # judge scores each rubric criterion 0..1 against the agent's deliverables +
 # transcript, then weights them into an overall_score and per-criterion test
-# counts. It calls the judge model DIRECTLY from the host (OpenAI or Bedrock) —
-# the per-batch LiteLLM sidecar is not host-reachable, and the host can reach
-# both providers directly (verified). Fully best-effort: any failure returns a
-# structured error and never raises into the run loop.
+# counts. Transport selection (m1612):
+#   * DEFAULT — direct urllib POST to OpenAI / Bedrock-Converse from the host.
+#     The per-batch LiteLLM SIDECAR is not host-reachable (--internal bridge,
+#     no published port); the host can reach both providers directly (verified).
+#   * OPT-IN — when KENSEI_JUDGE_USE_LITELLM=true, the dispatcher routes through
+#     LiteLLM in *library mode* (in-process `litellm.completion`) via
+#     `src/utils/judge_litellm.py`, with optional Headroom user-turn compression
+#     gated by KENSEI_JUDGE_HEADROOM_ENABLED. On ANY LiteLLM/Headroom error the
+#     dispatcher falls through to the urllib path so grading never fails because
+#     of transport choice. Both transports MUST produce the same 7-key per-judge
+#     `usage` dict (input/output/cache_read/cache_write/total tokens, request_count,
+#     cost_usd); LiteLLM path adds an OPTIONAL `headroom` sub-dict aggregated into
+#     `score.json.judge_council.headroom_per_member`.
+# Fully best-effort: any failure returns a structured error and never raises
+# into the run loop.
 # ---------------------------------------------------------------------------
 
-JUDGE_MODEL = os.environ.get("JUDGE_MODEL", "openai/gpt-5.4")  # may be bedrock/<arn>; falls back to JUDGE_MODEL_FALLBACK
+# JUDGE_MODEL / JUDGE_MODEL_FALLBACK envs are no longer consulted (m1609):
+# single-judge mode was removed and the council is the only grading path.
+# Configure council members via JUDGE_COUNCIL_MEMBERS or the per-judge
+# JUDGE_COUNCIL_SONNET_ARN / _GLM_ARN / _KIMI_ARN env vars (see _DEFAULT_COUNCIL_MEMBERS).
 # Smallest-member-governs evidence cap, derived from AWS Bedrock official
 # context-window numbers (2026-06-02 web-confirmed, no longer hit-and-trial):
 #   * Claude Sonnet 4.6 (is9bst5tfadh) — 1,000,000 input tokens
@@ -605,32 +619,6 @@ def _call_judge_bedrock(arn: str, system: str, user: str) -> tuple[str, dict]:
         raise
 
 
-def _parse_judge_json(text: str) -> dict:
-    text = (text or "").strip()
-    # Strip a leading ```json / ``` fence if present.
-    if text.startswith("```"):
-        text = text.split("\n", 1)[-1]
-        if text.rstrip().endswith("```"):
-            text = text.rstrip()[:-3]
-    text = text.strip()
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        pass
-    # Decode the FIRST balanced JSON object, ignoring any trailing data (some
-    # judge models append a second object or prose after the first — that was
-    # the "Extra data: line 2 column 1" failure).
-    start = text.find("{")
-    if start != -1:
-        try:
-            obj, _ = json.JSONDecoder().raw_decode(text[start:])
-            if isinstance(obj, dict):
-                return obj
-        except json.JSONDecodeError:
-            pass
-    raise ValueError("judge returned no parseable JSON")
-
-
 # Parser for the Yes/No verdict format mandated by _judge_system_prompt. Three
 # load-bearing properties: (1) DOTALL so rationale text can span newlines,
 # (2) the leading 'N.' anchor disambiguates each verdict block when judges
@@ -679,6 +667,28 @@ def _parse_verdict_text(response: str, n_criteria: int) -> list[dict]:
     return out
 
 
+def _arn_from_model(model: str) -> str:
+    """Strip the optional 'bedrock/' prefix so `_member_max_output_tokens` and
+    `_bedrock_region_for` (which do substring matches against ARN tails) work
+    identically whether the caller passed `bedrock/arn:...` or the bare ARN.
+    Non-Bedrock model strings pass through unchanged."""
+    m = (model or "").strip()
+    if m.startswith("bedrock/"):
+        return m[len("bedrock/"):]
+    return m
+
+
+def _judge_use_litellm() -> bool:
+    """Master toggle for the LiteLLM-backed judge path. Mirrors
+    `judge_litellm.judge_use_litellm()` but is duplicated here so the env check
+    is a cheap module-local function call — we don't want to import the
+    `judge_litellm` module on every judge call when the flag is off. Default
+    OFF: the urllib direct-provider path is the production-verified default;
+    flipping to LiteLLM is opt-in until soak validates the new transport."""
+    v = os.environ.get("KENSEI_JUDGE_USE_LITELLM", "").strip().lower()
+    return v in ("1", "true", "yes", "on")
+
+
 def _call_one_judge(model: str, system: str, user: str) -> tuple[str, dict]:
     # Provider routing is CONTENT-AWARE, not naive partition("/"): a Bedrock
     # application-inference-profile ARN itself contains slashes, so a bare ARN
@@ -686,6 +696,35 @@ def _call_one_judge(model: str, system: str, user: str) -> tuple[str, dict]:
     # be silently misrouted to OpenAI, which 404s on the unknown model id. Detect
     # Bedrock by shape so an ARN never reaches OpenAI.
     m = (model or "").strip()
+    if not m:
+        raise RuntimeError("empty judge model id")
+
+    # LiteLLM-backed path (opt-in via KENSEI_JUDGE_USE_LITELLM). On ANY exception
+    # we fall through to the urllib direct-provider path below — this is the
+    # explicit user m0039 contract: "If litellm is not configured for LLM
+    # council account for that as well in your plan and it should follow the
+    # code at all times." A hard fallback at the dispatcher (not inside the
+    # LiteLLM call) means a missing dep, a misconfigured env, a network blip,
+    # or a LiteLLM-internal regression all degrade gracefully to the production
+    # path without losing the verdict.
+    if _judge_use_litellm():
+        try:
+            from . import judge_litellm  # local import: avoid import-time cost
+            arn_tail = _arn_from_model(m)
+            return judge_litellm.call_judge_via_litellm(
+                model=m,
+                system=system,
+                user=user,
+                max_output_tokens=_member_max_output_tokens(arn_tail),
+                cost_fn=_judge_cost_usd,
+            )
+        except Exception as exc:  # pragma: no cover - fallback path
+            logger.warning(
+                "Judge LiteLLM path failed for %s: %s — falling back to direct urllib path",
+                _short_judge_label(m), str(exc)[:200],
+            )
+            # fall through to urllib routing below
+
     head = m.partition("/")[0]
     if head == "bedrock":
         return _call_judge_bedrock(m.partition("/")[2], system, user)
@@ -694,32 +733,8 @@ def _call_one_judge(model: str, system: str, user: str) -> tuple[str, dict]:
     if m.startswith("arn:aws:bedrock:") or ":application-inference-profile/" in m:
         # Bare (unprefixed) Bedrock ARN — route to Bedrock instead of OpenAI.
         return _call_judge_bedrock(m, system, user)
-    if not m:
-        raise RuntimeError("empty judge model id")
     # Unknown/unprefixed id: treat as an OpenAI model name (e.g. "gpt-5.5").
     return _call_judge_openai(m, system, user)
-
-
-def _run_single_judge(
-    primary: str, fallback: str, system: str, user: str
-) -> tuple[dict | None, dict, str | None, Exception | None]:
-    candidates = [m for m in (primary, fallback) if m]
-    last_err: Exception | None = None
-    for model in candidates:
-        try:
-            raw, usage = _call_one_judge(model, system, user)
-        except Exception as exc:
-            last_err = exc
-            logger.warning("Rubric judge model %s failed (%s); trying next", model, exc)
-            continue
-        try:
-            parsed = _parse_judge_json(raw)
-        except Exception as exc:
-            last_err = exc
-            logger.warning("Rubric judge %s parse failed (%s); trying next", model, exc)
-            continue
-        return parsed, usage, model, None
-    return None, dict(_ZERO_USAGE), None, last_err
 
 
 def _run_council(
@@ -805,10 +820,6 @@ def _run_council(
         return list(pool.map(_one, members))
 
 
-def _quantize_binary(score: float) -> float:
-    return 1.0 if score >= 0.5 else 0.0
-
-
 def _stddev(values: list[float]) -> float:
     n = len(values)
     if n < 2:
@@ -847,25 +858,42 @@ def _grade_council(
     system: str,
     user_for_member: "dict[str, str] | str",
     members: list[str],
-) -> dict | None:
-    """Council aggregation. Returns scores dict (with `judge_council` block) if
-    quorum >= 2 surviving members; returns None to signal 'fall through to
-    single-judge'."""
+) -> dict:
+    """Council aggregation — UNANIMOUS-ONLY (m1609 2026-06-09).
+
+    Single-judge mode was removed (m1609): the council is now the only grading
+    path. Per-criterion verdict is unanimous-or-abstain:
+      * all surviving judges say SATISFIED=Yes → criterion satisfied (Pass after
+        polarity); contribute weight to numerator.
+      * all surviving judges say SATISFIED=No  → criterion not satisfied (Fail
+        after polarity); contribute 0.
+      * any disagreement OR any missing verdict (truncation) → "Human Evaluation":
+        index added to abstention_flags, counted in criteria_abstained,
+        contributes 0 to numerator. The per-criterion `human_eval` field is ""
+        on unanimous outcomes (no review needed) and "required" on disagreement
+        or missing coverage (human review needed).
+
+    Always returns a scores dict; on total council failure (zero surviving
+    members) every criterion is recorded as an abstention (Human Evaluation)
+    and overall_score is 0.0. No single-judge fallback exists."""
     results = _run_council(members, system, user_for_member, len(rubrics))
     surviving = [r for r in results if r.get("ok") and isinstance(r.get("verdicts"), list)]
-    if len(surviving) < 2:
+    if len(surviving) < len(members):
         failed_summary = "; ".join(
             f"{_short_judge_label(r.get('model', '?'))}={(r.get('error') or 'unknown').strip()[:160]}"
             for r in results if not r.get("ok")
-        ) or "(no failure detail captured)"
+        ) or "(none — all members responded)"
+        # Not fatal under unanimous rule: any non-surviving member just means the
+        # remaining survivors must all agree for a determinate verdict. With zero
+        # survivors every criterion abstains and overall_score is 0.0.
         logger.warning(
-            "Judge council quorum failed: only %d/%d members succeeded; failed: %s; falling back to single-judge",
+            "Judge council partial: %d/%d members succeeded; failed: %s; "
+            "criteria without full coverage will require Human Evaluation",
             len(surviving), len(members), failed_summary,
         )
-        return None
 
     verdicts_per_member: list[list[dict]] = [r["verdicts"] for r in surviving]
-    n_surv = len(surviving)
+    n_members = len(members)
 
     crit_out: list[dict] = []
     truncation_flags: list[int] = []
@@ -882,21 +910,30 @@ def _grade_council(
 
     for i, r in enumerate(rubrics):
         wt = _extract_weight(r) if isinstance(r, dict) else 1.0
-        # Partial-coverage per-criterion voter pool (user m1543): only judges
-        # that actually emitted a verdict for index i vote on this criterion.
-        # Abstentions (truncated output past index i) are NOT counted as votes
-        # in either direction. Threshold = ceil(voters/2): 2-of-3, 1-of-2,
-        # 1-of-1; tie-on-2 → Yes (b75 recommendation). 0 voters → abstain.
+        # Unanimous-or-abstain (m1609): every council member listed in `members`
+        # must (a) be a surviving member AND (b) have emitted a verdict at index
+        # i AND (c) agree with the others on SATISFIED. Any deviation routes the
+        # criterion to Human Evaluation (abstention).
         per_satisfied: list[bool] = []
         per_rationale: list[str] = []
         per_truncation: list[bool] = []
-        per_label: list[str] = []
+        per_label: list[str] = [_short_judge_label(m) for m in members]
         per_voted: list[bool] = []
-        for member_result, verdicts in zip(surviving, verdicts_per_member):
-            label = _short_judge_label(member_result["model"])
-            per_label.append(label)
-            if i < len(verdicts):
-                v = verdicts[i]
+
+        # Build per-member vote state aligned to the full `members` list so a
+        # member that failed entirely (not in `surviving`) shows up as Abstain
+        # in the votes string, matching the truncated-mid-rubric semantics.
+        survivor_lookup = {r["model"]: vs for r, vs in zip(surviving, verdicts_per_member)}
+        for m in members:
+            vs = survivor_lookup.get(m)
+            if vs is None:
+                per_voted.append(False)
+                per_satisfied.append(False)
+                per_rationale.append("(abstained — judge call failed)")
+                per_truncation.append(False)
+                continue
+            if i < len(vs):
+                v = vs[i]
                 per_voted.append(True)
                 per_satisfied.append(bool(v.get("satisfied", False)))
                 per_rationale.append(str(v.get("rationale", "") or ""))
@@ -908,21 +945,32 @@ def _grade_council(
                 per_truncation.append(False)
 
         voters = sum(1 for vd in per_voted if vd)
-        if voters == 0:
-            abstention_flags.append(i)
-            satisfied_majority = False
-            criterion_passed = False
+        full_coverage = (voters == n_members)
+        if full_coverage:
+            yes_votes = sum(1 for s in per_satisfied if s)
+            unanimous_yes = (yes_votes == n_members)
+            unanimous_no = (yes_votes == 0)
         else:
-            crit_threshold = (voters + 1) // 2
-            yes_votes = sum(1 for s, vd in zip(per_satisfied, per_voted) if vd and s)
-            satisfied_majority = yes_votes >= crit_threshold
+            unanimous_yes = False
+            unanimous_no = False
+
+        if unanimous_yes or unanimous_no:
+            satisfied_majority = unanimous_yes
             criterion_passed = _criterion_pass_from_satisfied(satisfied_majority, wt)
             if criterion_passed:
                 passed += 1
-            # Walkthrough §4 reward: contribute weight ONLY if majority says Yes.
-            # No fractions. Yes/No is binary by construction — b51 leak impossible.
+            human_eval = ""
+            # Walkthrough §4 reward: contribute weight ONLY when council
+            # unanimously says Yes. No fractions. b51 leak impossible.
             if satisfied_majority:
                 weighted += wt
+        else:
+            # Disagreement OR missing coverage → Human Evaluation required.
+            abstention_flags.append(i)
+            satisfied_majority = False
+            criterion_passed = False
+            human_eval = "required"
+
         if any(per_truncation):
             truncation_flags.append(i)
         crit_out.append({
@@ -930,6 +978,7 @@ def _grade_council(
             "weight": wt,
             "satisfied": satisfied_majority,
             "passed": criterion_passed,
+            "human_eval": human_eval,
             "voters": voters,
             "criterion": (r.get("criterion") if isinstance(r, dict) else str(r)),
             "votes": "/".join(
@@ -957,6 +1006,17 @@ def _grade_council(
         council_usage["input_tokens"] + council_usage["output_tokens"]
         + council_usage["cache_read_tokens"] + council_usage["cache_write_tokens"]
     )
+
+    headroom_per_member: dict[str, dict] = {}
+    headroom_tokens_saved_total = 0
+    headroom_enabled = False
+    for r in results:
+        h = (r.get("usage") or {}).get("headroom") or {}
+        if not isinstance(h, dict) or not h:
+            continue
+        headroom_enabled = True
+        headroom_per_member[_short_judge_label(r.get("model", ""))] = h
+        headroom_tokens_saved_total += int(h.get("tokens_saved", 0) or 0)
 
     n = len(rubrics)
     n_abstained = len(abstention_flags)
@@ -992,6 +1052,9 @@ def _grade_council(
             "per_member_verdict_count": {
                 r["model"]: len(r["verdicts"]) for r in surviving
             },
+            "headroom_enabled": headroom_enabled,
+            "headroom_tokens_saved_total": headroom_tokens_saved_total,
+            "headroom_per_member": headroom_per_member,
         },
         "truncation_flags": truncation_flags,
         "abstention_flags": abstention_flags,
@@ -1007,127 +1070,38 @@ def grade_with_rubric(
     judge_model: str | None = None,
     use_council: bool | None = None,
 ) -> dict:
-    """Score `rubrics` with an LLM judge or judge council.
+    """Score `rubrics` with the LLM judge COUNCIL (m1609 2026-06-09).
 
-    `use_council` overrides the JUDGE_COUNCIL env flag when not None. Council
-    mode runs the members from `council_members()` in parallel, aggregates by
-    per-criterion mean, and falls through to single-judge if quorum (>=2
-    surviving members) is not met. Returns a scores dict:
+    Single-judge mode was removed; the council is the only grading path.
+    The `judge_model` and `use_council` parameters are retained for backward
+    call-site compatibility but are ignored — every invocation runs the full
+    council. Aggregation is unanimous-or-abstain (see `_grade_council`).
+
+    Returns a scores dict:
     {overall_score, rubric_weights_percentage,
      criteria_total, criteria_passed, criteria_failed, criteria_abstained,
-     criteria:[...], judge_model, [judge_council, disagreement_flags]}
-    or {overall_score:0.0, error:...} on failure (never raises)."""
+     criteria:[...], judge_model:'council', judge_council:{...},
+     truncation_flags, abstention_flags, usage}
+    or {overall_score:0.0, error:...} when no rubrics or no council members
+    are configured (never raises)."""
     if not rubrics:
         return {"overall_score": 0.0, "error": "no rubric criteria"}
     system = _judge_system_prompt()
 
-    want_council = council_enabled() if use_council is None else bool(use_council)
-    if want_council:
-        members = council_members()
-        if len(members) >= 2:
-            user_for_member: dict[str, str] = {}
-            for m in members:
-                budget = _member_evidence_budget(m)
-                ev = _gather_evidence(workspace_results, transcript_text, budget=budget)
-                user_for_member[m] = _judge_user_prompt(task_description, rubrics, ev)
-            council_scores = _grade_council(rubrics, system, user_for_member, members)
-            if council_scores is not None:
-                return council_scores
-        else:
-            logger.warning(
-                "Judge council requested but only %d members configured; falling back to single-judge",
-                len(members),
-            )
-
-    user = _judge_user_prompt(task_description, rubrics, _gather_evidence(workspace_results, transcript_text))
-    primary = judge_model or JUDGE_MODEL
-    fallback = os.environ.get("JUDGE_MODEL_FALLBACK", "openai/gpt-5.4")
-    n_criteria = len(rubrics)
-    verdicts: list[dict] | None = None
-    judge_usage: dict = dict(_ZERO_USAGE)
-    used_model: str | None = None
-    last_err: Exception | None = None
-    for model in [m for m in (primary, fallback) if m]:
-        try:
-            raw, judge_usage = _call_one_judge(model, system, user)
-        except Exception as exc:
-            last_err = exc
-            logger.warning("Rubric judge model %s failed (%s); trying next", model, exc)
-            continue
-        try:
-            verdicts = _parse_verdict_text(raw, n_criteria)
-            used_model = model
-            break
-        except Exception as exc:
-            last_err = exc
-            logger.warning("Rubric judge %s parse failed (%s); trying next", model, exc)
-            continue
-    if verdicts is None or used_model is None:
-        logger.error("All rubric judge models failed: %s", last_err)
+    members = council_members()
+    if not members:
         return {
-            "overall_score": 0.0, "error": f"judge failed: {last_err}",
-            "usage": {**_ZERO_USAGE, "error": f"judge failed: {last_err}"},
+            "overall_score": 0.0,
+            "error": "no judge council members configured (set JUDGE_COUNCIL_MEMBERS)",
+            "usage": dict(_ZERO_USAGE),
         }
 
-    total_w = sum(_extract_weight(r) for r in rubrics
-                  if isinstance(r, dict) and _extract_weight(r) > 0) or 1.0
-    weighted = 0.0
-    passed = 0
-    truncation_flags: list[int] = []
-    # Single-judge mirror of b82 partial-coverage policy (user m1543 2026-06-03):
-    # if the judge truncated mid-rubric, indices i >= len(verdicts) are abstentions
-    # (NOT silent No-votes). Abstained criteria contribute 0 to weighted AND are
-    # NOT counted toward criteria_passed/criteria_failed. The walkthrough §4
-    # denominator (sum positive weights) is unchanged so abstentions reduce the
-    # achievable ceiling, mirroring how a missing vote loses winnable points.
-    abstention_flags: list[int] = []
-    crit_out = []
-    for i, r in enumerate(rubrics):
-        wt = _extract_weight(r) if isinstance(r, dict) else 1.0
-        voted = i < len(verdicts)
-        v = verdicts[i] if voted else {}
-        satisfied = bool(v.get("satisfied", False)) if voted else False
-        truncation_affected = bool(v.get("truncation_affected", False)) if voted else False
-        if truncation_affected:
-            truncation_flags.append(i)
-        if not voted:
-            abstention_flags.append(i)
-            criterion_passed = False
-            rationale_text = "(abstained — judge output truncated before this criterion)"
-        else:
-            criterion_passed = _criterion_pass_from_satisfied(satisfied, wt)
-            if criterion_passed:
-                passed += 1
-            if satisfied:
-                weighted += wt
-            rationale_text = str(v.get("rationale", "") or "")
-        crit_out.append({
-            "id": i, "weight": wt,
-            "voted": voted,
-            "satisfied": satisfied,
-            "passed": criterion_passed,
-            "criterion": (r.get("criterion") if isinstance(r, dict) else str(r)),
-            "rationale": rationale_text,
-            "truncation_affected": truncation_affected,
-            "is_positive": wt >= 0,
-        })
-    overall = max(0.0, min(1.0, weighted / total_w))
-    n = len(rubrics)
-    n_abstained = len(abstention_flags)
-    failed = n - passed - n_abstained
-    return {
-        "overall_score": round(overall, 4),
-        "rubric_weights_percentage": round(overall * 100.0, 2),
-        "criteria_total": n,
-        "criteria_passed": passed,
-        "criteria_failed": failed,
-        "criteria_abstained": n_abstained,
-        "criteria": crit_out,
-        "judge_model": used_model,
-        "truncation_flags": truncation_flags,
-        "abstention_flags": abstention_flags,
-        "usage": judge_usage,
-    }
+    user_for_member: dict[str, str] = {}
+    for m in members:
+        budget = _member_evidence_budget(m)
+        ev = _gather_evidence(workspace_results, transcript_text, budget=budget)
+        user_for_member[m] = _judge_user_prompt(task_description, rubrics, ev)
+    return _grade_council(rubrics, system, user_for_member, members)
 
 def _write_score(output_dir: Path, task_id: str, scores: dict) -> None:
     score_path = output_dir / "score.json"
