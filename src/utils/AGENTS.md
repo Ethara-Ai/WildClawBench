@@ -11,7 +11,7 @@ plus 3 sub-packages (`testgen/`, `harbor/`, `trajectory/`).
 | Docker lifecycle, skills install, output collection | `docker_utils.py` |
 | sqlite persistence (`task`/`sandbox` tables) | `store.py` (`Store`, `Task`) |
 | Grading + host-side LLM rubric judge | `grading.py` |
-| LiteLLM sidecar container mgmt | `litellm_sidecar.py`, `litellm_usage_callback.py` |
+| LiteLLM sidecar container mgmt | `litellm_sidecar.py`, `litellm_usage_callback.py`, `litellm_headroom_callback.py` |
 | Bedrock Converse streaming | `bedrock_eventstream.py` |
 | Mid-run state mutation orchestration | `drift_director.py` (host side of admin_plane) |
 | Mock container fleet up/down | `mock_stack.py`, `mock_health_logger.py` |
@@ -39,9 +39,19 @@ plus 3 sub-packages (`testgen/`, `harbor/`, `trajectory/`).
 - When LiteLLM library mode is on, judges MUST use Headroom with `compress_system_messages=False`
   (the system prompt is verdict-format-load-bearing — compressing it can break `_VERDICT_RE`).
   See `judge_litellm.maybe_compress` for the locked config.
+- The agent-path sidecar Headroom compressor (`litellm_headroom_callback.py`) MUST keep
+  `compress_system_messages=False` (openclaw's system prompt carries tool schemas + verbatim
+  instructions) and MUST write telemetry to a SEPARATE JSONL via `KENSEI_AGENT_HEADROOM_LOG_PATH`
+  — it is FORBIDDEN to write into the 11-key `LITELLM_USAGE_LOG_PATH` JSONL that
+  `litellm_usage_callback.py` owns. The two callbacks coexist via LiteLLM's pre-call dispatch
+  skip-rule: only headroom overrides `async_pre_call_hook`, only the usage writer overrides
+  `async_log_success_event`, so they cannot fight. Headroom mutates the request; the usage
+  writer observes the response — order is fixed by LiteLLM's lifecycle, not YAML list position.
 - Don't bypass `Config.from_env`'s `s()/b()/i()/f()` helpers when adding env vars — keep the
   KENSEI_*-first alias ordering. (Exception: per-feature judge toggles like
   `KENSEI_JUDGE_USE_LITELLM` and the `KENSEI_JUDGE_HEADROOM_*` family read `os.environ`
   directly, matching the existing `JUDGE_MAX_EVIDENCE` / `JUDGE_COUNCIL_MEMBERS` precedent
-  in `grading.py` — Config is for system-wide infra (Bedrock ARNs, S3 keys), not per-call
-  feature flags.)
+  in `grading.py`. Same exception applies to `KENSEI_AGENT_HEADROOM_*` — the sidecar reads
+  them at container-start time and forwards them as `-e` flags, not via the host Config
+  dataclass. Config is for system-wide infra (Bedrock ARNs, S3 keys), not per-call feature
+  flags.)
