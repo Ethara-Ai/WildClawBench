@@ -60,6 +60,13 @@ tasks/           # NOT in repo — downloaded from HuggingFace via prepare.sh
   judge user-turn via Headroom (`KENSEI_JUDGE_HEADROOM_ENABLED`, default on). On any
   LiteLLM/Headroom error the dispatcher falls back to the urllib path so grading never
   fails because of transport choice. See `grading.py` header + `judge_litellm.py`.
+- The agent-path sidecar OPTIONALLY runs Headroom compression on outgoing requests via
+  a mounted `async_pre_call_hook` (`litellm_headroom_callback.py`), gated by
+  `KENSEI_AGENT_HEADROOM_ENABLED=true` (default OFF — production hot path unchanged).
+  When enabled the sidecar uses image `wildclawbench-litellm-headroom:v1` (built from
+  `docker/litellm-headroom.Dockerfile`) and writes compression telemetry to a SEPARATE
+  JSONL via `KENSEI_AGENT_HEADROOM_LOG_PATH`. The 11-key token-tracking JSONL at
+  `LITELLM_USAGE_LOG_PATH` (owned by `litellm_usage_callback.py`) is NEVER touched.
 
 ## COMMANDS
 ```bash
