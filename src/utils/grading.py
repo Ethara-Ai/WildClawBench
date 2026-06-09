@@ -964,12 +964,11 @@ def _grade_council(
     # Schema contract — score.json scores RUBRIC CRITERIA, not pytest tests.
     # Canonical keys: criteria_total/_passed/_failed/_abstained and
     # rubric_weights_percentage (= overall_score * 100, per user formula m1420).
-    # criteria_total = passed + failed + abstained (b82 invariant). The tests_*
-    # keys are deprecated aliases retained ONLY because run_batch.py:706-714
-    # forwards these counts into the harbor pytest channel (test_result / SQLite
-    # store / ctrf.json) when no real pytest result exists. Deleting the aliases
-    # here without first migrating that adapter will silently zero the harbor
-    # bundle's test counts. See NOMENCLATURE.md for the channel boundary.
+    # criteria_total = passed + failed + abstained (b82 invariant). The deprecated
+    # tests_* aliases were dropped here; the harbor pytest channel (test_result /
+    # SQLite store / ctrf.json) derives its tests_* counts from criteria_* via the
+    # tr_meta adapter at eval/run_batch.py:936-938, which already falls back to
+    # criteria_* when no real pytest ran. See NOMENCLATURE.md for the channel boundary.
     return {
         "overall_score": round(overall, 4),
         "rubric_weights_percentage": round(overall * 100.0, 2),
@@ -977,9 +976,6 @@ def _grade_council(
         "criteria_passed": passed,
         "criteria_failed": failed,
         "criteria_abstained": n_abstained,
-        "tests_total": n,
-        "tests_passed": passed,
-        "tests_failed": failed,
         "criteria": crit_out,
         "judge_model": "council",
         "judge_council": {
@@ -1018,8 +1014,7 @@ def grade_with_rubric(
     per-criterion mean, and falls through to single-judge if quorum (>=2
     surviving members) is not met. Returns a scores dict:
     {overall_score, rubric_weights_percentage,
-     criteria_total, criteria_passed, criteria_failed,
-     tests_total, tests_passed, tests_failed,   # deprecated aliases
+     criteria_total, criteria_passed, criteria_failed, criteria_abstained,
      criteria:[...], judge_model, [judge_council, disagreement_flags]}
     or {overall_score:0.0, error:...} on failure (never raises)."""
     if not rubrics:
@@ -1127,9 +1122,6 @@ def grade_with_rubric(
         "criteria_passed": passed,
         "criteria_failed": failed,
         "criteria_abstained": n_abstained,
-        "tests_total": n,
-        "tests_passed": passed,
-        "tests_failed": failed,
         "criteria": crit_out,
         "judge_model": used_model,
         "truncation_flags": truncation_flags,
