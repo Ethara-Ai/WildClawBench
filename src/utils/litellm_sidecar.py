@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 LITELLM_IMAGE = "ghcr.io/berriai/litellm:main-stable"
 LITELLM_INTERNAL_PORT = 4000
+LITELLM_HEADROOM_IMAGE = "wildclawbench-litellm-headroom:v1"
 
 
 def build_litellm_config_yaml(
@@ -18,6 +19,7 @@ def build_litellm_config_yaml(
     openai_api_key: str = "",
     bedrock_sonnet_arn: str = "",
     enable_usage_callback: bool = False,
+    enable_headroom_callback: bool = False,
 ) -> str:
     model_blocks: list[str] = []
     # `cache_control_injection_points` MUST live inside each model's
@@ -211,10 +213,26 @@ def build_litellm_config_yaml(
     # Real per-call usage from the proxy itself (not the agent's chat.jsonl
     # which openclaw writes with all-zero usage). Loaded by the LiteLLM
     # callback file mounted at /app/litellm_usage_callback.py.
-    callback_line = (
-        '  callbacks: ["litellm_usage_callback.proxy_handler_instance"]\n'
-        if enable_usage_callback else ""
-    )
+    #
+    # When `enable_headroom_callback=True`, mount the Headroom pre-call
+    # compressor AFTER the usage callback. Ordering rationale: LiteLLM iterates
+    # `for cb in litellm.callbacks` for the pre-call dispatch. The usage
+    # callback does NOT override `async_pre_call_hook` so LiteLLM auto-skips
+    # it in that loop (litellm/proxy/utils.py skip-rule: `if cb.async_pre_call_hook
+    # != CustomLogger.async_pre_call_hook`), which means the headroom callback
+    # is effectively first in the pre-call phase regardless of list position.
+    # Post-call, the usage logger sees `kwargs["messages"]` AS COMPRESSED, so
+    # it records the post-compression token count — exactly what Bedrock/OpenAI
+    # billed — preserving the existing 11-key JSONL schema unchanged.
+    _cbs: list[str] = []
+    if enable_usage_callback:
+        _cbs.append("litellm_usage_callback.proxy_handler_instance")
+    if enable_headroom_callback:
+        _cbs.append("litellm_headroom_callback.headroom_callback_instance")
+    if _cbs:
+        callback_line = "  callbacks: [" + ", ".join(f'"{c}"' for c in _cbs) + "]\n"
+    else:
+        callback_line = ""
     return (
         "model_list:\n"
         + "\n".join(model_blocks)
@@ -322,6 +340,9 @@ def start_litellm(
     port: int = LITELLM_INTERNAL_PORT,
     usage_callback_host_path: str = "",
     usage_log_host_dir: str = "",
+    headroom_callback_host_path: str = "",
+    headroom_log_host_dir: str = "",
+    enable_headroom: bool = False,
 ) -> None:
     env_args: list[str] = ["-e", f"LITELLM_MASTER_KEY={master_key}"]
     _litellm_log = os.environ.get("LITELLM_LOG", "").strip()
@@ -346,14 +367,37 @@ def start_litellm(
             "-e", "LITELLM_USAGE_LOG_PATH=/var/litellm_usage/usage.jsonl",
         ]
 
+    # Headroom pre-call compressor: writes to a SEPARATE JSONL sink
+    # (/var/litellm_headroom/headroom.jsonl). Must never collide with
+    # LITELLM_USAGE_LOG_PATH — token-tracking invariant (user m0130).
+    # LITELLM_HEADROOM_IMAGE has `headroom-ai` baked in; the stock image
+    # cannot `import headroom` at proxy startup (no egress at that point).
+    headroom_args: list[str] = []
+    image_to_run = LITELLM_IMAGE
+    if enable_headroom and headroom_callback_host_path and headroom_log_host_dir:
+        image_to_run = LITELLM_HEADROOM_IMAGE
+        headroom_args = [
+            "-v", f"{headroom_callback_host_path}:/app/litellm_headroom_callback.py:ro",
+            "-v", f"{headroom_log_host_dir}:/var/litellm_headroom",
+            "-e", "KENSEI_AGENT_HEADROOM_LOG_PATH=/var/litellm_headroom/headroom.jsonl",
+            "-e", f"KENSEI_AGENT_HEADROOM_ENABLED={os.environ.get('KENSEI_AGENT_HEADROOM_ENABLED', 'true')}",
+        ]
+        for _k in ("KENSEI_AGENT_HEADROOM_TARGET_RATIO",
+                   "KENSEI_AGENT_HEADROOM_PROTECT_RECENT",
+                   "KENSEI_AGENT_HEADROOM_MIN_TOKENS"):
+            _v = os.environ.get(_k)
+            if _v:
+                headroom_args += ["-e", f"{_k}={_v}"]
+
     cmd = [
         "docker", "run", "-d",
         "--name", container_name,
         "--network", network,
         *env_args,
         *callback_args,
+        *headroom_args,
         "-v", f"{host_config_path}:/app/config.yaml:ro",
-        LITELLM_IMAGE,
+        image_to_run,
         "--config", "/app/config.yaml",
         "--port", str(port),
     ]

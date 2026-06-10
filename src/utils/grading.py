@@ -677,11 +677,65 @@ def _parse_verdict_text(response: str, n_criteria: int) -> list[dict]:
     return out
 
 
+def _arn_from_model(model: str) -> str:
+    """Strip the optional 'bedrock/' prefix so `_member_max_output_tokens` and
+    `_bedrock_region_for` (which do substring matches against ARN tails) work
+    identically whether the caller passed `bedrock/arn:...` or the bare ARN.
+    Non-Bedrock model strings pass through unchanged."""
+    m = (model or "").strip()
+    if m.startswith("bedrock/"):
+        return m[len("bedrock/"):]
+    return m
+
+
+def _judge_use_litellm() -> bool:
+    """Master toggle for the LiteLLM-backed judge path. Mirrors
+    `judge_litellm.judge_use_litellm()` but is duplicated here so the env check
+    is a cheap module-local function call — we don't want to import the
+    `judge_litellm` module on every judge call when the flag is off. Default
+    OFF: the urllib direct-provider path is the production-verified default;
+    flipping to LiteLLM is opt-in until soak validates the new transport."""
+    v = os.environ.get("KENSEI_JUDGE_USE_LITELLM", "").strip().lower()
+    return v in ("1", "true", "yes", "on")
+
+
 def _call_one_judge(model: str, system: str, user: str) -> tuple[str, dict]:
-    provider, _, rest = model.partition("/")
+    m = (model or "").strip()
+    if not m:
+        raise RuntimeError("empty judge model id")
+
+    # LiteLLM-backed path (opt-in via KENSEI_JUDGE_USE_LITELLM). On ANY exception
+    # we fall through to the urllib direct-provider path below — this is the
+    # explicit user m0039 contract: "If litellm is not configured for LLM
+    # council account for that as well in your plan and it should follow the
+    # code at all times." A hard fallback at the dispatcher (not inside the
+    # LiteLLM call) means a missing dep, a misconfigured env, a network blip,
+    # or a LiteLLM-internal regression all degrade gracefully to the production
+    # path without losing the verdict. The optional Headroom user-turn
+    # compression (gated by KENSEI_JUDGE_HEADROOM_ENABLED) lives inside
+    # judge_litellm.call_judge_via_litellm.
+    if _judge_use_litellm():
+        try:
+            from . import judge_litellm  # local import: avoid import-time cost
+            arn_tail = _arn_from_model(m)
+            return judge_litellm.call_judge_via_litellm(
+                model=m,
+                system=system,
+                user=user,
+                max_output_tokens=_member_max_output_tokens(arn_tail),
+                cost_fn=_judge_cost_usd,
+            )
+        except Exception as exc:  # pragma: no cover - fallback path
+            logger.warning(
+                "Judge LiteLLM path failed for %s: %s — falling back to direct urllib path",
+                _short_judge_label(m), str(exc)[:200],
+            )
+            # fall through to urllib routing below
+
+    provider, _, rest = m.partition("/")
     if provider == "bedrock":
         return _call_judge_bedrock(rest, system, user)
-    return _call_judge_openai(rest or model, system, user)
+    return _call_judge_openai(rest or m, system, user)
 
 
 def _run_single_judge(
@@ -937,6 +991,22 @@ def _grade_council(
             else:
                 council_usage[k] = int(council_usage.get(k, 0)) + int(u.get(k, 0) or 0)
 
+    # Optional Headroom per-member compression stats. Each judge member's usage
+    # dict carries a `headroom` sub-dict ONLY when it ran through the LiteLLM
+    # path with Headroom enabled (judge_litellm.call_judge_via_litellm). On the
+    # urllib path the sub-dict is absent, so headroom_enabled stays False and the
+    # maps stay empty — harmless for direct-provider grading.
+    headroom_per_member: dict[str, dict] = {}
+    headroom_tokens_saved_total = 0
+    headroom_enabled = False
+    for r in results:
+        h = (r.get("usage") or {}).get("headroom") or {}
+        if not isinstance(h, dict) or not h:
+            continue
+        headroom_enabled = True
+        headroom_per_member[_short_judge_label(r.get("model", ""))] = h
+        headroom_tokens_saved_total += int(h.get("tokens_saved", 0) or 0)
+
     n = len(rubrics)
     n_abstained = len(abstention_flags)
     failed = n - passed - n_abstained
@@ -975,6 +1045,9 @@ def _grade_council(
             "per_member_verdict_count": {
                 r["model"]: len(r["verdicts"]) for r in surviving
             },
+            "headroom_enabled": headroom_enabled,
+            "headroom_tokens_saved_total": headroom_tokens_saved_total,
+            "headroom_per_member": headroom_per_member,
         },
         "truncation_flags": truncation_flags,
         "abstention_flags": abstention_flags,
