@@ -602,7 +602,8 @@ def _condense_transcript_for_judge(traj: dict, limit: int | None = None) -> str:
 
 def _project_agent_usage_top_level(agent_usage: Mapping[str, Any] | None) -> dict[str, Any]:
     if not agent_usage:
-        return {"input_tokens": 0, "output_tokens": 0, "cached_input_tokens": 0, "cost_usd": 0.0}
+        return {"input_tokens": 0, "output_tokens": 0, "cached_input_tokens": 0,
+                "cache_read_tokens": 0, "cache_write_tokens": 0, "cost_usd": 0.0}
     def _int(k: str) -> int:
         v = agent_usage.get(k)
         try:
@@ -617,6 +618,8 @@ def _project_agent_usage_top_level(agent_usage: Mapping[str, Any] | None) -> dic
         "input_tokens": _int("input_tokens"),
         "output_tokens": _int("output_tokens"),
         "cached_input_tokens": _int("cache_read_tokens"),
+        "cache_read_tokens": _int("cache_read_tokens"),
+        "cache_write_tokens": _int("cache_write_tokens"),
         "cost_usd": round(cost, 6),
     }
 
@@ -1371,6 +1374,8 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
     network = f"k3net-{batch_id}"
     sidecar = f"ll-{batch_id}"
 
+    _agent_headroom = (os.environ.get("KENSEI_AGENT_HEADROOM_ENABLED", "").strip().lower()
+                       in ("1", "true", "yes", "on"))
     litellm_yaml = build_litellm_config_yaml(
         bedrock_sonnet_arn=config.bedrock_sonnet_arn if config.aws_bearer_token else "",
         bedrock_arn=config.bedrock_inference_arn if config.aws_bearer_token else "",
@@ -1378,6 +1383,7 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
         openai_api_key=config.openai_api_key,
         openai_whisper_api_key=config.openai_whisper_api_key,
         enable_usage_callback=True,
+        enable_headroom_callback=_agent_headroom,
     )
     if not litellm_yaml:
         raise RuntimeError(
@@ -1403,6 +1409,20 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
     except OSError:
         pass
 
+    headroom_callback_src = ""
+    headroom_log_dir_str = ""
+    if _agent_headroom:
+        headroom_callback_src = str(
+            Path(__file__).resolve().parent.parent / "src" / "utils" / "litellm_headroom_callback.py"
+        )
+        headroom_log_dir = config.work_dir / f"litellm-headroom-{batch_id}"
+        headroom_log_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            os.chmod(headroom_log_dir, 0o777)
+        except OSError:
+            pass
+        headroom_log_dir_str = str(headroom_log_dir)
+
     start_litellm(
         container_name=sidecar,
         network=network,
@@ -1414,6 +1434,9 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
         openai_whisper_api_key=config.openai_whisper_api_key,
         usage_callback_host_path=str(callback_src),
         usage_log_host_dir=str(usage_dir),
+        headroom_callback_host_path=headroom_callback_src,
+        headroom_log_host_dir=headroom_log_dir_str,
+        enable_headroom=_agent_headroom,
     )
     cleanups.append(lambda: stop_litellm(sidecar))
     if not wait_for_litellm_healthy(sidecar):

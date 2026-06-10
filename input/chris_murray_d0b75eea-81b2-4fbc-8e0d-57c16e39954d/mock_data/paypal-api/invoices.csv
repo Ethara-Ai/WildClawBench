@@ -1,0 +1,6 @@
+id,invoice_number,status,recipient_email,amount_value,currency_code,due_date,note
+INV2-9F3A-7B21-4C08-D5E6,INV-1042,PAID,elena.rodriguez@gmail.com,1500.00,USD,2026-09-01,Mariana Rodriguez quinceanera deposit
+INV2-2A11-9C42-1188-EE21,INV-1039,PAID,tanya.brooks@gmail.com,185.00,USD,2026-08-10,Birthday party balloon package
+INV2-7C55-3D90-6622-AB10,INV-1040,SENT,derek.holloway@gmail.com,615.00,USD,2026-09-18,Baby shower decor and setup
+INV2-4E80-1F23-7744-CC30,INV-1041,PAID,monica.salazar@gmail.com,145.00,USD,2026-08-29,Anniversary centerpiece rental
+INV2-6B22-8A47-9911-DF40,INV-1043,SENT,priya.menon@gmail.com,1325.00,USD,2026-09-26,Graduation luncheon decor

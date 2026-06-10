@@ -1,0 +1,9 @@
+payout_batch_id,sender_batch_id,status,amount_value,currency_code,recipient_email,create_time
+PAYOUT-MOM-20260820-01,Momentos_2026_08_20,SUCCESS,800.00,USD,billing@emeraldhalllv.com,2026-08-20T10:17:09Z
+PAYOUT-MOM-20260814-01,Momentos_2026_08_14,SUCCESS,400.00,USD,carmen@carmendavidsonphoto.com,2026-08-14T09:41:13Z
+PAYOUT-MOM-20260922-01,Momentos_2026_09_22,SUCCESS,200.00,USD,orders@bloomsbyrosa.com,2026-09-22T14:06:29Z
+PAYOUT-MOM-20260821-07,Momentos_2026_08_21,SUCCESS,800.00,USD,billing@emeraldhalllv.com,2026-08-21T11:39:41Z
+PAYOUT-MOM-20260930-03,Momentos_2026_09_30,SUCCESS,350.00,USD,events@laspalmasbanquet.com,2026-09-30T16:23:53Z
+PAYOUT-MOM-20260512-02,Momentos_2026_05_12,SUCCESS,175.00,USD,alvarez.catering@gmail.com,2026-05-12T08:03:01Z
+PAYOUT-MOM-20260608-04,Momentos_2026_06_08,SUCCESS,95.00,USD,quickprintlv@example.com,2026-06-08T08:03:01Z
+PAYOUT-MOM-20260705-05,Momentos_2026_07_05,SUCCESS,1275.00,USD,deserttents@example.com,2026-07-05T08:03:01Z

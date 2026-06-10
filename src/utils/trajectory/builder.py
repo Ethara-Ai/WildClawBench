@@ -183,6 +183,8 @@ _ZERO_TOP_USAGE: dict[str, Any] = {
     "input_tokens": 0,
     "output_tokens": 0,
     "cached_input_tokens": 0,
+    "cache_read_tokens": 0,
+    "cache_write_tokens": 0,
     "cost_usd": 0.0,
 }
 
@@ -204,6 +206,8 @@ def _coerce_top_usage(src: Optional[Mapping]) -> dict[str, Any]:
         "input_tokens": _int("input_tokens"),
         "output_tokens": _int("output_tokens"),
         "cached_input_tokens": _int("cached_input_tokens"),
+        "cache_read_tokens": _int("cache_read_tokens"),
+        "cache_write_tokens": _int("cache_write_tokens"),
         "cost_usd": round(cost, 6),
     }
 
@@ -227,9 +231,9 @@ def build_trajectory_from_jsonl(
     - `turns`: optional turn-feedback dicts (prompt, hints, is_auto_hint).
     - `media_handler`: callable(messages, task_id) -> messages, used to
       rewrite inline media `source` fields. Defaults to no-op.
-    - `usage_top_level`: 4-key projection of agent usage. Coerced to
-      `{input_tokens, output_tokens, cached_input_tokens, cost_usd}`;
-      missing/malformed fields default to 0.
+    - `usage_top_level`: projection of agent usage. Coerced to
+      `{input_tokens, output_tokens, cached_input_tokens, cache_read_tokens,
+      cache_write_tokens, cost_usd}`; missing/malformed fields default to 0.
 
     Output_artifacts is initially empty (or transcript-derived from turns).
     The caller is expected to merge workspace-collected records before
