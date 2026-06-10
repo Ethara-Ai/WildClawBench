@@ -169,14 +169,42 @@ done
 
 
 def _generate_dockerfile(api_dirs: list[str]) -> str:
+    # BUG-S-001 non-root runtime: create the `app` system user EARLY (idempotent,
+    # depends on no later state), do all root-only work (apt install, pip
+    # install into /usr/local site-packages, chmod scripts) BEFORE the USER
+    # switch, then chown the writable trees (/opt) right before flipping
+    # USER app. supervisord here drives the 101 FastAPI services bound to
+    # non-privileged ports 8000+ — no CAP_NET_BIND_SERVICE required. The
+    # mirror of the per-API Dockerfile S-001 hardening; CVSS 8.4 / CWE-250.
+    #
+    # BUG-S-002 base image pinned by @sha256: digest (CVSS 8.0 / CWE-829). The
+    # digest below is python:3.11-slim resolved 2026-06-10 from docker.io. Do
+    # NOT remove the @sha256: suffix — without it the build is vulnerable to
+    # tag-mutation supply-chain attacks (a malicious publisher pushing a
+    # backdoored layer under the same tag). To refresh the digest after an
+    # upstream release: `docker pull python:3.11-slim && docker inspect
+    # python:3.11-slim --format '{{index .RepoDigests 0}}'` and replace the
+    # suffix here AND in every environment/*-api/Dockerfile. Per-API surface
+    # currently uses python:3.12-slim@sha256:090ba77...; the version mismatch
+    # is a separate tracking item, but both surfaces MUST stay digest-pinned.
+    #
+    # BUG-S-003 hash-pinned per-service install (CVSS 7.7 / CWE-1357). The
+    # runtime per-service install loop reads requirements-locked.txt (NOT the
+    # human-edited requirements.txt) and passes --require-hashes so any wheel
+    # whose sha256 does not match the lockfile is rejected. This is the
+    # parallel of the per-API Dockerfile S-003 hardening; lockfiles live at
+    # environment/<api>/requirements-locked.txt and are regenerated via
+    # `pip-compile --generate-hashes` inside the digest-pinned base image
+    # (see audit/BUGS.md BUG-S-003 for the full refresh recipe).
     return """\
-FROM python:3.11-slim
+FROM python:3.11-slim@sha256:a3ab0b966bc4e91546a033e22093cb840908979487a9fc0e6e38295747e49ac0
+RUN groupadd -r app && useradd -r -g app -d /opt/mocks -s /usr/sbin/nologin app
 RUN apt-get update && apt-get install -y --no-install-recommends curl procps \\
     && rm -rf /var/lib/apt/lists/*
 RUN pip install --no-cache-dir supervisor fastapi uvicorn flask pydantic
 COPY env_dir/ /opt/mocks/
-RUN set -e; for f in /opt/mocks/*/requirements.txt; do \\
-        pip install --no-cache-dir -r "$f" 2>&1 | tail -3 || \\
+RUN set -e; for f in /opt/mocks/*/requirements-locked.txt; do \\
+        pip install --no-cache-dir --require-hashes -r "$f" 2>&1 | tail -3 || \\
         echo "warn: $f had failures"; \\
     done
 COPY mock_ports.json /opt/mock_ports.json
@@ -184,9 +212,11 @@ COPY gen_supervisord.py /opt/gen_supervisord.py
 COPY start.sh /start.sh
 COPY healthcheck.sh /healthcheck.sh
 RUN chmod +x /start.sh /healthcheck.sh
+RUN chown -R app:app /opt/mocks /opt/mock_ports.json /opt/gen_supervisord.py
 ENV PYTHONPATH=/opt/mocks
 HEALTHCHECK --interval=15s --timeout=10s --retries=10 --start-period=60s \\
     CMD /healthcheck.sh
+USER app
 CMD ["/start.sh"]
 """
 

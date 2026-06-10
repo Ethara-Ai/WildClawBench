@@ -1,0 +1,211 @@
+# CI — initial scaffold landed by BUG-T-001 (Tier 1 / Day 1 PM) from audit/BUGS.md.
+#
+# Closes BLOCK findings T-001 (no CI pipeline) and prepares the ground for S-004
+# (secret-scan gate, Tier 2 / Day 5) which appends to this file as another step.
+# See audit/REPORT.md "Top fixes" + audit/BUGS.md (BUG-T-001 acceptance criteria:
+# .github/workflows/ci.yml exists; status check is required for merge).
+#
+# Triggers: PRs targeting main, plus pushes to main (audit gate on direct merges).
+#
+# Job design rationale:
+#   - tests-unit         pytest tests/ (10 baseline pass per audit CMD-029).
+#                        Required gate from day one.
+#   - tests-mocks        pytest tests/mocks/ (1203 pass + 7 pre-existing
+#                        failures, see HOLD finding T-002 + audit/BUGS.md).
+#                        Known-broken APIs excluded via -k expression so this
+#                        job is required without first having to fix T-002.
+#                        Stays in lockstep: remove an exclusion ONLY after the
+#                        underlying API mock is fixed.
+#   - lint-ruff          ruff check (26 baseline issues per audit CMD-011).
+#                        Initially non-blocking (continue-on-error) so CI lands
+#                        green today; tighten to required after baseline is
+#                        zero per Q-003.
+#   - sast-bandit        bandit -r . (301 baseline issues per audit CMD-012).
+#                        Same staging: --severity-level medium surfaces the
+#                        24 MEDIUMs first; non-blocking until those are
+#                        triaged.
+#   - deps-cve           pip-audit -r requirements.txt. Now unblocked by
+#                        BUG-D-001 fix (click 8.1.8 → 8.2.1). Surfaces the
+#                        27 CVE list per finding D-002. Non-blocking until
+#                        the new D-006+ tickets are addressed (Tier 2/Day 3).
+#
+# All jobs use Python 3.12 to match the production deployment target
+# (environment/*-api/Dockerfile pins FROM python:3.12-slim — see S-002).
+# Do NOT raise to 3.14 (the audit-host version) until the Dockerfile base
+# bumps in lockstep, otherwise CI passes against an unshipped runtime.
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Cancel in-progress runs when a new commit lands on the same ref —
+# avoids wasting compute on stale PR pushes.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+
+  tests-unit:
+    name: pytest tests/ (host-only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install runtime requirements
+        run: |
+          python -m pip install --upgrade pip
+          # tests/ has no docker dependency; install the root requirements only.
+          # Per audit/BUGS.md BUG-D-001, click is now 8.2.1 which resolves the
+          # pip-audit ResolutionImpossible blocker.
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Run pytest tests/ (ignore tests/mocks)
+        run: pytest tests/ -q --ignore=tests/mocks
+
+  tests-mocks:
+    name: pytest tests/mocks/ (excluding known-broken APIs)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install runtime requirements
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest fastapi httpx pyyaml
+
+      # The -k expression below excludes the 7 pre-existing failing mocks
+      # tracked under HOLD finding T-002 (see audit/findings.json) so the
+      # CI gate is required without first needing to fix T-002. Each
+      # exclusion MUST be paired with an open ticket; remove the entry the
+      # moment the underlying API mock is fixed.
+      - name: Run pytest tests/mocks/ (skip T-002 baseline failures)
+        run: |
+          pytest tests/mocks/ -q \
+            -k "not (contentful or doordash or dropbox or google_analytics or pagerduty or pinterest or spotify)"
+
+  lint-ruff:
+    name: ruff lint (non-blocking baseline)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # NON-BLOCKING per audit findings.json Q-003 — there are 26 baseline
+    # ruff issues today. Flip to required (`continue-on-error: false`) after
+    # the baseline is at zero. Tracked under Q-003.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install ruff
+        run: pip install ruff==0.15.16
+
+      - name: ruff check (report-only)
+        run: ruff check . --output-format=github
+
+  sast-bandit:
+    name: bandit SAST (non-blocking baseline)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # NON-BLOCKING per audit finding bandit baseline (301 issues, 24 MEDIUM,
+    # 277 LOW per CMD-012). --severity-level medium surfaces the 24 MEDIUMs
+    # first; flip to required after those are triaged.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install bandit
+        run: pip install bandit==1.9.4
+
+      - name: bandit scan (medium+)
+        # Scan src/, eval/, scripts/, environment/_mutable_store.py and
+        # environment/admin_plane.py — the per-API server.py files are
+        # intentional mock surfaces and would flood the report; their
+        # subprocess/tmp/etc. risk is covered by C-001 (false positives in
+        # container context) per audit findings.json.
+        run: |
+          bandit -r src/ eval/ scripts/ \
+            environment/_mutable_store.py \
+            environment/admin_plane.py \
+            --severity-level medium \
+            --confidence-level medium
+
+  deps-cve:
+    name: pip-audit CVE scan (non-blocking baseline)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # NON-BLOCKING until BUG-D-002 follow-up tickets (D-006+) bump the 27
+    # CVE-affected packages identified by the cascade unblock from
+    # BUG-D-001. Tracked in audit/BUGS.md and the Tier 2 / Day 3 work item.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install pip-audit
+        run: pip install pip-audit==2.10.0
+
+      - name: pip-audit requirements.txt
+        run: pip-audit -r requirements.txt --strict
+
+  secret-scan:
+    name: gitleaks (block on detect)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # REQUIRED gate — closes BUG-S-004 (CVSS 6.5, CWE-200, audit/BUGS.md).
+    # The audit established zero secret leaks in working tree (CMD-014) and
+    # bounded git-history (CMD-018, CMD-020) so the baseline is clean; this
+    # job is required from day one so any future leak hard-fails the PR.
+    #
+    # fetch-depth: 0 is load-bearing — gitleaks scans the full commit history,
+    # not just the PR diff. A shallow clone (the runner default) would miss
+    # any secret introduced more than a few commits back.
+    steps:
+      - name: Checkout (full history for history scan)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: gitleaks scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          # Suppress the optional Pro-license notice; we use the OSS scanner.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

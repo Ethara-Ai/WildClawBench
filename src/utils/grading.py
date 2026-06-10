@@ -263,21 +263,38 @@ def _judge_user_prompt(task_description: str, rubrics: list, evidence: str) -> s
 # trajectory failure report — wrote to deliverables/, scored 0/18).
 _DELIVERABLE_DIR_NAMES = ("results", "deliverables", "output", "out", "artifacts")
 
-# Text-readable deliverable formats. Used only for the workspace-ROOT scan
-# below (files saved directly under /tmp_workspace rather than in a named
-# subdir). Binary formats (pdf/docx/xlsx/png) would inject decode garbage into
-# the judge evidence and are almost always supplied inputs, not agent output.
+# Text-readable deliverable formats. Files matching these go straight into the
+# judge evidence dump unmodified (UTF-8 read, errors='replace'). Adding a
+# binary extension here regresses per-member evidence parity: a 512 KB PDF
+# becomes ~512 KB of mojibake which sorts ahead of report.md and exhausts the
+# smaller council members' (Kimi 225 KB, GLM 175 KB per _MEMBER_EVIDENCE_BUDGETS)
+# truncation budget, producing "no report.md found" hallucinations. Strictly
+# text-only here.
 _DELIVERABLE_EXTS = {
     ".csv", ".tsv", ".md", ".markdown", ".json", ".txt", ".text",
     ".yaml", ".yml", ".html", ".htm", ".xml", ".log",
 }
+# Binary deliverable formats. These are made VISIBLE to the grader (listed in
+# the deliverables manifest, collected by `_collect_deliverable_files`) so
+# rubrics that simply check "did the agent produce report.pdf?" can grade them,
+# but their content does NOT go into the judge evidence dump verbatim — the
+# mojibake-poisoning hazard above still applies. A host-side text-extraction
+# pass (pypdf / openpyxl / python-docx / python-pptx) will be wired into
+# `_is_text_deliverable` in a follow-up step; until then binaries appear as
+# presence-only entries.
+_BINARY_DELIVERABLE_EXTS = {
+    ".pdf", ".xlsx", ".docx", ".pptx",
+}
+_ALL_DELIVERABLE_EXTS = _DELIVERABLE_EXTS | _BINARY_DELIVERABLE_EXTS
 _ROOT_SCAN_MAX_FILE_BYTES = 512_000   # skip oversized files in the root scan
 
 
 def _looks_like_deliverable(path: Path, root: Path) -> bool:
-    """True if a workspace-root file looks like agent output (text-readable
-    extension) rather than an oversized blob or binary input."""
-    if path.suffix.lower() not in _DELIVERABLE_EXTS:
+    """True if a workspace-root file looks like agent output (any deliverable
+    extension, text or supported binary) rather than an oversized blob or binary
+    input outside our supported set. Used by the presence-scan stage so binaries
+    like report.pdf / flagged_items.xlsx surface in the manifest."""
+    if path.suffix.lower() not in _ALL_DELIVERABLE_EXTS:
         return False
     try:
         return path.stat().st_size <= _ROOT_SCAN_MAX_FILE_BYTES
@@ -289,8 +306,19 @@ def _is_text_deliverable(path: Path) -> bool:
     # Binary artifacts (.jpg/.pdf/.png) read with errors='replace' inject
     # hundreds of KB of mojibake that sorts ahead of report.md and exhausts the
     # smaller council members' truncation budget, breaking per-member evidence
-    # parity (Kimi/GLM hallucinating 'no report.md'). Text-only here.
+    # parity (Kimi/GLM hallucinating 'no report.md'). Text-only here. Supported
+    # binaries (_BINARY_DELIVERABLE_EXTS) flow through _looks_like_deliverable
+    # for presence, but are excluded from this verbatim-content path until
+    # host-side text extraction lands.
     return path.suffix.lower() in _DELIVERABLE_EXTS
+
+
+def _is_binary_deliverable(path: Path) -> bool:
+    """True if the path is a recognised binary deliverable (pdf/xlsx/docx/pptx)
+    whose content we cannot dump verbatim into judge evidence today, but whose
+    presence still must appear in the manifest for rubrics keyed on file
+    existence (e.g. 'did the agent write report.pdf?')."""
+    return path.suffix.lower() in _BINARY_DELIVERABLE_EXTS
 
 
 def _collect_deliverable_files(workspace_results: Path) -> list[Path]:
@@ -301,9 +329,18 @@ def _collect_deliverable_files(workspace_results: Path) -> list[Path]:
         if not root.is_dir():
             return
         for f in sorted(root.rglob("*")):
-            if f.is_file() and f not in seen and _is_text_deliverable(f):
+            if not (f.is_file() and f not in seen):
+                continue
+            if _is_text_deliverable(f):
                 seen.add(f)
                 files.append(f)
+            elif _is_binary_deliverable(f):
+                try:
+                    if f.stat().st_size <= _ROOT_SCAN_MAX_FILE_BYTES:
+                        seen.add(f)
+                        files.append(f)
+                except OSError:
+                    continue
 
     if workspace_results:
         results_path = Path(workspace_results)

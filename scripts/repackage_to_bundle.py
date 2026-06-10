@@ -28,6 +28,9 @@ it emits the published bundle layout (like the amanda_webb_01 reference):
             pass_summary.json                         (REBUILT schema)
             run_N/
                 output.json                           (copied as-is)
+                logs/verifier/                        (raw: ctrf.json,
+                                                       test_weights.json,
+                                                       reward.txt, siblings)
                 report.json                           (BUILT from ctrf+score)
                 output_media/<rendered files>         (artifacts minus _tmp/)
 
@@ -340,6 +343,34 @@ def build_report(
     }
 
 
+def copy_verifier_logs(run_dir: Path, dest_run: Path) -> int:
+    """Copy task_output/logs/verifier/* into the bundle at run_N/logs/verifier/*.
+
+    Preserves the raw pytest CTRF, test_weights, reward.txt and any sibling
+    artifacts the harness emits there. report.json carries a normalized view
+    derived from these inputs, but downstream tooling (pytest-replay, third-
+    party grading, audit) needs the raw inputs too. Mirrors copy_output_media:
+    same scratch-skip + .DS_Store guard pattern.
+    """
+    src = run_dir / "task_output" / "logs" / "verifier"
+    dest = dest_run / "logs" / "verifier"
+    if not src.is_dir():
+        return 0
+    dest.mkdir(parents=True, exist_ok=True)
+    count = 0
+    for item in src.iterdir():
+        if item.name == ".DS_Store":
+            continue
+        target = dest / item.name
+        if item.is_dir():
+            shutil.copytree(item, target, dirs_exist_ok=True)
+            count += sum(1 for _ in target.rglob("*") if _.is_file())
+        else:
+            shutil.copy2(item, target)
+            count += 1
+    return count
+
+
 def copy_output_media(run_dir: Path, dest_run: Path) -> int:
     artifacts = run_dir / "task_output" / "artifacts"
     media_dest = dest_run / "output_media"
@@ -474,11 +505,15 @@ def convert_task(
             if src_out.exists():
                 shutil.copy2(src_out, dest_run / "output.json")
 
-            # 2) report.json built
+            # 2) logs/verifier/ copied as-is (raw ctrf.json, test_weights.json,
+            #    reward.txt and siblings — see copy_verifier_logs docstring)
+            n_verifier = copy_verifier_logs(run_dir, dest_run)
+
+            # 3) report.json built
             report = build_report(run_dir, task_dir, pretty, ridx, infer_meta)
             _write_json(dest_run / "report.json", report)
 
-            # 3) output_media
+            # 4) output_media
             n_media = copy_output_media(run_dir, dest_run)
 
             per_run_summ.append(
@@ -493,7 +528,7 @@ def convert_task(
             if verbose:
                 print(
                     f"    {pretty}/run_{ridx}: report.json + output.json "
-                    f"+ {n_media} media file(s)"
+                    f"+ {n_verifier} verifier file(s) + {n_media} media file(s)"
                 )
 
         # pass_summary.json REBUILT from the runs we actually emitted.
