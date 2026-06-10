@@ -9,26 +9,38 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, # noqa: E402
+    get_store,
+    strict_int,
+    strict_float,
+    strict_bool,
+    strict_str,
+    opt_int,
+    opt_float,
+    opt_str,
+    opt_csv_list,
+)
 
 _store = get_store("linear-api")
+_API = "linear-api"
 
 _store.register("teams", primary_key="id",
-                initial_loader=lambda: _coerce_teams(_load("teams.csv")))
+                initial_loader=lambda: _coerce_teams(_load("teams.csv", "teams")))
 _store.register("users", primary_key="id",
-                initial_loader=lambda: _coerce_users(_load("users.csv")))
+                initial_loader=lambda: _coerce_users(_load("users.csv", "users")))
 _store.register("workflow_states", primary_key="id",
-                initial_loader=lambda: _coerce_workflow_states(_load("workflow_states.csv")))
+                initial_loader=lambda: _coerce_workflow_states(_load("workflow_states.csv", "workflow_states")))
 _store.register("labels", primary_key="id",
-                initial_loader=lambda: _coerce_labels(_load("labels.csv")))
+                initial_loader=lambda: _coerce_labels(_load("labels.csv", "labels")))
 _store.register("projects", primary_key="id",
-                initial_loader=lambda: _coerce_projects(_load("projects.csv")))
+                initial_loader=lambda: _coerce_projects(_load("projects.csv", "projects")))
 _store.register("cycles", primary_key="id",
-                initial_loader=lambda: _coerce_cycles(_load("cycles.csv")))
+                initial_loader=lambda: _coerce_cycles(_load("cycles.csv", "cycles")))
 _store.register("issues", primary_key="id",
-                initial_loader=lambda: _coerce_issues(_load("issues.csv")))
+                initial_loader=lambda: _coerce_issues(_load("issues.csv", "issues")))
 _store.register("comments", primary_key="id",
-                initial_loader=lambda: _coerce_comments(_load("comments.csv")))
+                initial_loader=lambda: _coerce_comments(_load("comments.csv", "comments")))
 _store.register_document("workspace", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "workspace.json", encoding="utf-8")))
 
 
@@ -69,9 +81,12 @@ def _workspace_doc():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -86,14 +101,14 @@ def _coerce_teams(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "id": r["id"],
-            "name": r["name"],
-            "key": r["key"],
-            "description": r["description"],
-            "color": r["color"],
-            "createdAt": r["createdAt"],
-            "updatedAt": r["updatedAt"],
+            **_strip_ctx(r),
+            "id": strict_str(r, "id"),
+            "name": strict_str(r, "name"),
+            "key": strict_str(r, "key"),
+            "description": strict_str(r, "description"),
+            "color": strict_str(r, "color"),
+            "createdAt": strict_str(r, "createdAt"),
+            "updatedAt": strict_str(r, "updatedAt"),
         })
     return out
 
@@ -102,17 +117,17 @@ def _coerce_users(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "id": r["id"],
-            "name": r["name"],
-            "displayName": r["displayName"],
-            "email": r["email"],
-            "avatarUrl": r["avatarUrl"],
-            "active": r["active"].lower() == "true",
-            "admin": r["admin"].lower() == "true",
-            "teamId": r["teamId"],
-            "createdAt": r["createdAt"],
-            "updatedAt": r["updatedAt"],
+            **_strip_ctx(r),
+            "id": strict_str(r, "id"),
+            "name": strict_str(r, "name"),
+            "displayName": strict_str(r, "displayName"),
+            "email": strict_str(r, "email"),
+            "avatarUrl": strict_str(r, "avatarUrl"),
+            "active": strict_bool(r, "active"),
+            "admin": strict_bool(r, "admin"),
+            "teamId": strict_str(r, "teamId"),
+            "createdAt": strict_str(r, "createdAt"),
+            "updatedAt": strict_str(r, "updatedAt"),
         })
     return out
 
@@ -121,14 +136,14 @@ def _coerce_workflow_states(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "id": r["id"],
-            "name": r["name"],
-            "type": r["type"],
-            "color": r["color"],
-            "position": int(r["position"]),
-            "teamId": r["teamId"],
-            "description": r["description"],
+            **_strip_ctx(r),
+            "id": strict_str(r, "id"),
+            "name": strict_str(r, "name"),
+            "type": strict_str(r, "type"),
+            "color": strict_str(r, "color"),
+            "position": strict_int(r, "position"),
+            "teamId": strict_str(r, "teamId"),
+            "description": strict_str(r, "description"),
         })
     return out
 
@@ -137,14 +152,14 @@ def _coerce_labels(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "id": r["id"],
-            "name": r["name"],
-            "color": r["color"],
-            "description": r["description"],
-            "teamId": r["teamId"] if r["teamId"] else None,
-            "createdAt": r["createdAt"],
-            "updatedAt": r["updatedAt"],
+            **_strip_ctx(r),
+            "id": strict_str(r, "id"),
+            "name": strict_str(r, "name"),
+            "color": strict_str(r, "color"),
+            "description": strict_str(r, "description"),
+            "teamId": opt_str(r, "teamId", default="") or None,
+            "createdAt": strict_str(r, "createdAt"),
+            "updatedAt": strict_str(r, "updatedAt"),
         })
     return out
 
@@ -153,17 +168,17 @@ def _coerce_projects(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "id": r["id"],
-            "name": r["name"],
-            "description": r["description"],
-            "state": r["state"],
-            "leadId": r["leadId"] if r["leadId"] else None,
-            "teamIds": [t.strip() for t in r["teamIds"].split(",")] if r["teamIds"] else [],
-            "startDate": r["startDate"] if r["startDate"] else None,
-            "targetDate": r["targetDate"] if r["targetDate"] else None,
-            "createdAt": r["createdAt"],
-            "updatedAt": r["updatedAt"],
+            **_strip_ctx(r),
+            "id": strict_str(r, "id"),
+            "name": strict_str(r, "name"),
+            "description": strict_str(r, "description"),
+            "state": strict_str(r, "state"),
+            "leadId": opt_str(r, "leadId", default="") or None,
+            "teamIds": [t.strip() for t in opt_csv_list(r, "teamIds")],
+            "startDate": opt_str(r, "startDate", default="") or None,
+            "targetDate": opt_str(r, "targetDate", default="") or None,
+            "createdAt": strict_str(r, "createdAt"),
+            "updatedAt": strict_str(r, "updatedAt"),
         })
     return out
 
@@ -172,16 +187,16 @@ def _coerce_cycles(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "id": r["id"],
-            "name": r["name"],
-            "number": int(r["number"]),
-            "teamId": r["teamId"],
-            "startsAt": r["startsAt"],
-            "endsAt": r["endsAt"],
-            "completedAt": r["completedAt"] if r["completedAt"] else None,
-            "createdAt": r["createdAt"],
-            "updatedAt": r["updatedAt"],
+            **_strip_ctx(r),
+            "id": strict_str(r, "id"),
+            "name": strict_str(r, "name"),
+            "number": strict_int(r, "number"),
+            "teamId": strict_str(r, "teamId"),
+            "startsAt": strict_str(r, "startsAt"),
+            "endsAt": strict_str(r, "endsAt"),
+            "completedAt": opt_str(r, "completedAt", default="") or None,
+            "createdAt": strict_str(r, "createdAt"),
+            "updatedAt": strict_str(r, "updatedAt"),
         })
     return out
 
@@ -190,28 +205,28 @@ def _coerce_issues(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "id": r["id"],
-            "identifier": r["identifier"],
-            "number": int(r["number"]),
-            "title": r["title"],
-            "description": r["description"],
-            "priority": int(r["priority"]),
-            "estimate": int(r["estimate"]) if r["estimate"] else None,
-            "stateId": r["stateId"],
-            "assigneeId": r["assigneeId"] if r["assigneeId"] else None,
-            "teamId": r["teamId"],
-            "projectId": r["projectId"] if r["projectId"] else None,
-            "cycleId": r["cycleId"] if r["cycleId"] else None,
-            "labelIds": [l.strip() for l in r["labelIds"].split(",")] if r["labelIds"] else [],
-            "dueDate": r["dueDate"] if r["dueDate"] else None,
-            "sortOrder": float(r["sortOrder"]) if r["sortOrder"] else 0.0,
-            "branchName": r["branchName"] if r["branchName"] else None,
-            "createdAt": r["createdAt"],
-            "updatedAt": r["updatedAt"],
-            "startedAt": r["startedAt"] if r["startedAt"] else None,
-            "completedAt": r["completedAt"] if r["completedAt"] else None,
-            "canceledAt": r["canceledAt"] if r["canceledAt"] else None,
+            **_strip_ctx(r),
+            "id": strict_str(r, "id"),
+            "identifier": strict_str(r, "identifier"),
+            "number": strict_int(r, "number"),
+            "title": strict_str(r, "title"),
+            "description": strict_str(r, "description"),
+            "priority": strict_int(r, "priority"),
+            "estimate": opt_int(r, "estimate"),
+            "stateId": strict_str(r, "stateId"),
+            "assigneeId": opt_str(r, "assigneeId", default="") or None,
+            "teamId": strict_str(r, "teamId"),
+            "projectId": opt_str(r, "projectId", default="") or None,
+            "cycleId": opt_str(r, "cycleId", default="") or None,
+            "labelIds": [l.strip() for l in opt_csv_list(r, "labelIds")],
+            "dueDate": opt_str(r, "dueDate", default="") or None,
+            "sortOrder": opt_float(r, "sortOrder", default=0.0),
+            "branchName": opt_str(r, "branchName", default="") or None,
+            "createdAt": strict_str(r, "createdAt"),
+            "updatedAt": strict_str(r, "updatedAt"),
+            "startedAt": opt_str(r, "startedAt", default="") or None,
+            "completedAt": opt_str(r, "completedAt", default="") or None,
+            "canceledAt": opt_str(r, "canceledAt", default="") or None,
         })
     return out
 
@@ -220,13 +235,13 @@ def _coerce_comments(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "id": r["id"],
-            "body": r["body"],
-            "issueId": r["issueId"],
-            "userId": r["userId"],
-            "createdAt": r["createdAt"],
-            "updatedAt": r["updatedAt"],
+            **_strip_ctx(r),
+            "id": strict_str(r, "id"),
+            "body": strict_str(r, "body"),
+            "issueId": strict_str(r, "issueId"),
+            "userId": strict_str(r, "userId"),
+            "createdAt": strict_str(r, "createdAt"),
+            "updatedAt": strict_str(r, "updatedAt"),
         })
     return out
 
@@ -250,6 +265,8 @@ def _coerce_comments(rows):
 
 
 
+
+_store.eager_load()
 
 _next_issue_number = max(i["number"] for i in _issues_rows()) + 1
 _next_comment_id = len(_comments_rows()) + 1

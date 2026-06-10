@@ -31,6 +31,28 @@ def _load_json(filename):
         return json.load(f)
 
 
+def _load_qbo_envelope(filename, envelope_key):
+    # QBO-canonical seed loader, UNWIRED. Probes two on-disk shapes:
+    #   (a) Real QBO API envelope: {"QueryResponse": {"<envelope_key>": [...]}}
+    #   (b) Bare list: [...] — used by invoices/bills/payments/etc.
+    # Kept available because the authored overlay format for vendors/accounts is the FLAT
+    # CSV (lives at <task>/mock_data/quickbooks-api/{vendors,accounts}.csv and bind-mounts
+    # over the baked-in fixtures via eval/run_batch.py:393-405 + mock_stack.py:270-275).
+    # CSVs are routed through _coerce_vendors / _coerce_accounts to match the QBO row shape
+    # the API consumers expect. The bundled vendors.json/accounts.json files in this
+    # directory are NOT registered with _store and ship as reference fixtures only — if a
+    # future table needs a real-QBO-envelope JSON seed instead of a flat CSV, wire that
+    # table through this helper (mirror the invoices.json / bills.json pattern).
+    raw = _load_json(filename)
+    if isinstance(raw, dict):
+        qr = raw.get("QueryResponse")
+        if isinstance(qr, dict) and envelope_key in qr:
+            inner = qr[envelope_key]
+            if isinstance(inner, list):
+                return inner
+    return raw
+
+
 def _now():
     return datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S-00:00")
 

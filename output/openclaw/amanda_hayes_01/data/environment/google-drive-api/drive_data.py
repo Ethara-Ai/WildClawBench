@@ -8,17 +8,21 @@ from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+BLOB_DIR = DATA_DIR / "file_blobs"
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_int, opt_str, strict_bool,
+    DownloadError, extract_file_content_text)
 
 _store = get_store("google-drive-api")
+_API = "google-drive-api"
 
 _store.register("files", primary_key="id",
-                initial_loader=lambda: _coerce_files(_load("files.csv")))
+                initial_loader=lambda: _coerce_files(_load("files.csv", "files")))
 _store.register("permissions", primary_key="id",
-                initial_loader=lambda: _load("permissions.csv"))
+                initial_loader=lambda: [_strip_ctx(r) for r in _load("permissions.csv", "permissions")])
 _store.register_document("about", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "about.json", encoding="utf-8")))
 
 
@@ -35,9 +39,12 @@ def _about_doc():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -52,11 +59,11 @@ def _coerce_files(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "size": int(r["size"]) if r["size"] else 0,
-            "starred": _to_bool(r["starred"]),
-            "trashed": _to_bool(r["trashed"]),
-            "parent_id": r["parent_id"] or None,
+            **_strip_ctx(r),
+            "size": opt_int(r, "size", default=0),
+            "starred": strict_bool(r, "starred"),
+            "trashed": strict_bool(r, "trashed"),
+            "parent_id": opt_str(r, "parent_id", default="") or None,
         })
     return out
 
@@ -176,6 +183,23 @@ def get_file(file_id):
     return {"error": f"File {file_id} not found"}
 
 
+def download_file_content(file_id):
+    row = next((f for f in _files_rows() if f["id"] == file_id), None)
+    if row is None:
+        raise DownloadError(http_status=404, code="not_found",
+                            message=f"File {file_id} not found")
+    name = row["name"]
+    mime_type = row.get("mime_type") or "application/octet-stream"
+    text = extract_file_content_text(BLOB_DIR, name, mime_type)
+    return {
+        "file_id": file_id,
+        "name": name,
+        "mime_type": mime_type,
+        "size_bytes": len(text.encode("utf-8")),
+        "content": text,
+    }
+
+
 def create_file(name, mime_type, parent_id=None, owner_email="amelia@orbit-labs.com",
                 size=0):
     if parent_id and not any(f["id"] == parent_id for f in _files_rows()):
@@ -267,3 +291,5 @@ def delete_permission(file_id, permission_id):
             _permissions_rows().pop(i)
             return {"deleted": True, "id": permission_id}
     return {"error": f"Permission {permission_id} not found on {file_id}"}
+
+_store.eager_load()

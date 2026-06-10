@@ -47,7 +47,16 @@ def list_files(
 
 
 @app.get("/drive/v3/files/{file_id}")
-def get_file(file_id: str):
+def get_file(file_id: str, alt: Optional[str] = None):
+    if alt == "media":
+        try:
+            return drive_data.download_file_content(file_id)
+        except drive_data.DownloadError as e:
+            return JSONResponse(
+                status_code=e.http_status,
+                content={"error": {"code": e.http_status, "message": e.message,
+                                   "status": e.code.upper()}},
+            )
     result = drive_data.get_file(file_id)
     if "error" in result:
         return JSONResponse(status_code=404, content=result)
