@@ -16,21 +16,21 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, opt_int, opt_str)
+    read_json_with_ctx, get_store, opt_csv_list, opt_int, opt_str)
 
 _store = get_store("square-api")
 _API = "square-api"
 
 _store.register("customers", primary_key="id",
-                initial_loader=lambda: _coerce_customers(_load("customers.csv", "customers")))
+                initial_loader=lambda: _coerce_customers(_load("customers.json", "customers")))
 _store.register("catalog", primary_key="id",
-                initial_loader=lambda: _coerce_catalog(_load("catalog_items.csv", "catalog")))
+                initial_loader=lambda: _coerce_catalog(_load("catalog_items.json", "catalog")))
 _store.register("inventory", primary_key="catalog_object_id",
-                initial_loader=lambda: _coerce_inventory(_load("inventory.csv", "inventory")))
+                initial_loader=lambda: _coerce_inventory(_load("inventory.json", "inventory")))
 _store.register("payments", primary_key="id",
-                initial_loader=lambda: _coerce_payments(_load("payments.csv", "payments")))
+                initial_loader=lambda: _coerce_payments(_load("payments.json", "payments")))
 _store.register("orders", primary_key="id",
-                initial_loader=lambda: _coerce_orders(_load("orders.csv", "orders")))
+                initial_loader=lambda: _coerce_orders(_load("orders.json", "orders")))
 _store.register_document("merchant", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "merchant.json", encoding="utf-8")))
 _store.register("refunds", primary_key="refund_id",
                 initial_loader=lambda: [])
@@ -66,7 +66,7 @@ def _refunds_rows():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

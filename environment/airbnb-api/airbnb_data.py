@@ -10,7 +10,7 @@ DATA_DIR = Path(__file__).parent
 
 sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, strict_bool, strict_float, strict_int)
+    read_json_with_ctx, get_store, opt_csv_list, strict_bool, strict_float, strict_int)
 
 _store = get_store("airbnb-api")
 _API = "airbnb-api"
@@ -19,7 +19,7 @@ SERVICE_FEE_PCT = 14.0  # guest service fee as percent of nightly subtotal
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):
@@ -98,16 +98,16 @@ def _coerce_reviews(rows):
 
 
 _store.register("listings", primary_key="listing_id",
-                initial_loader=lambda: _coerce_listings(_load("listings.csv", "listings")))
+                initial_loader=lambda: _coerce_listings(_load("listings.json", "listings")))
 _store.register("hosts", primary_key="host_id",
-                initial_loader=lambda: _coerce_hosts(_load("hosts.csv", "hosts")))
+                initial_loader=lambda: _coerce_hosts(_load("hosts.json", "hosts")))
 _store.register("availability", primary_key="_pk",
                 initial_loader=lambda: [
                     {**row, "_pk": f"{row['listing_id']}@{row['start_date']}"}
-                    for row in _coerce_availability(_load("availability.csv", "availability"))
+                    for row in _coerce_availability(_load("availability.json", "availability"))
                 ])
 _store.register("reviews", primary_key="review_id",
-                initial_loader=lambda: _coerce_reviews(_load("reviews.csv", "reviews")))
+                initial_loader=lambda: _coerce_reviews(_load("reviews.json", "reviews")))
 _store.register("reservations", primary_key="reservation_id",
                 initial_loader=lambda: [])
 

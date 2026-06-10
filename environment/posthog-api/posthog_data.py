@@ -14,7 +14,7 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store,
+    read_json_with_ctx, get_store,
     strict_int,
     strict_bool,
 )
@@ -23,11 +23,11 @@ _store = get_store("posthog-api")
 _API = "posthog-api"
 
 _store.register("events", primary_key="id",
-                initial_loader=lambda: _coerce_events(_load("events.csv", "events")))
+                initial_loader=lambda: _coerce_events(_load("events.json", "events")))
 _store.register("flags", primary_key="id",
-                initial_loader=lambda: _coerce_flags(_load("feature_flags.csv", "flags")))
+                initial_loader=lambda: _coerce_flags(_load("feature_flags.json", "flags")))
 _store.register("persons", primary_key="id",
-                initial_loader=lambda: _coerce_persons(_load("persons.csv", "persons")))
+                initial_loader=lambda: _coerce_persons(_load("persons.json", "persons")))
 
 
 def _events_rows():
@@ -44,7 +44,7 @@ def _persons_rows():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

@@ -10,26 +10,27 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, opt_float, opt_str, strict_float, strict_int)
+    read_json_with_ctx, get_store, opt_csv_list, opt_float, opt_str, strict_float, strict_int)
 
 _store = get_store("amazon-seller-api")
 _API = "amazon-seller-api"
 
 _store.register("catalog_items", primary_key="sku",
-                initial_loader=lambda: _coerce_catalog_items(_load("catalog_items.csv", "catalog_items")))
+                initial_loader=lambda: _coerce_catalog_items(_load("catalog_items.json", "catalog_items")))
 _store.register("orders", primary_key="AmazonOrderId",
-                initial_loader=lambda: _coerce_orders(_load("orders.csv", "orders")))
+                initial_loader=lambda: _coerce_orders(_load("orders.json", "orders")))
 _store.register("order_items", primary_key="OrderItemId",
-                initial_loader=lambda: _coerce_order_items(_load("order_items.csv", "order_items")))
+                initial_loader=lambda: _coerce_order_items(_load("order_items.json", "order_items")))
 _store.register("inventory", primary_key="fnSku",
-                initial_loader=lambda: _coerce_inventory(_load("inventory.csv", "inventory")))
+                initial_loader=lambda: _coerce_inventory(_load("inventory.json", "inventory")))
 _store.register("returns", primary_key="returnId",
-                initial_loader=lambda: _coerce_returns(_load("returns.csv", "returns")))
+                initial_loader=lambda: _coerce_returns(_load("returns.json", "returns")))
 _store.register("reports", primary_key="reportId",
-                initial_loader=lambda: _coerce_reports(_load("reports.csv", "reports")))
+                initial_loader=lambda: _coerce_reports(_load("reports.json", "reports")))
 _store.register("pricing", primary_key="asin",
-                initial_loader=lambda: _coerce_pricing(_load("pricing.csv", "pricing")))
+                initial_loader=lambda: _coerce_pricing(_load("pricing.json", "pricing")))
 _store.register_document("seller_account", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "seller_account.json", encoding="utf-8")))
+_store.register_document("buying_notes", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "buying_notes_fw26.json", encoding="utf-8")))
 
 
 def _catalog_items_rows():
@@ -66,7 +67,7 @@ def _seller_account_doc():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):
@@ -199,8 +200,8 @@ def _coerce_pricing(rows):
 
 
 
-_next_report_id = 1
-_next_return_id = 1
+_next_report_id = 11
+_next_return_id = 6
 
 
 # ---------------------------------------------------------------------------
@@ -208,15 +209,19 @@ _next_return_id = 1
 # ---------------------------------------------------------------------------
 
 def get_seller_account():
-    return {"type": "seller_account", "seller": _seller_account_doc()}
+    return {"type": "seller_account", "seller": _seller_store}
+
+
+def get_buying_notes():
+    return {"type": "buying_notes", "buyingNotes": _store.document("buying_notes").get()}
 
 
 def get_account_health():
-    return {"type": "account_health", "accountHealth": _seller_account_doc()["accountHealth"]}
+    return {"type": "account_health", "accountHealth": _seller_store["accountHealth"]}
 
 
 def get_performance_notifications(severity=None):
-    results = list(_seller_account_doc()["performanceNotifications"])
+    results = list(_seller_store["performanceNotifications"])
     if severity:
         results = [n for n in results if n["severity"].upper() == severity.upper()]
     return {"type": "notifications", "count": len(results), "results": results}
@@ -233,7 +238,7 @@ def search_catalog_items(
     page_size=10,
     status=None,
 ):
-    results = _catalog_items_rows()
+    results = list(_catalog_store)
 
     if status:
         results = [r for r in results if r["status"].upper() == status.upper()]
@@ -290,14 +295,14 @@ def _format_catalog_item(item):
 
 
 def get_catalog_item(asin):
-    for item in _catalog_items_rows():
+    for item in _catalog_store:
         if item["asin"] == asin:
             return {"type": "catalog_item", "item": _format_catalog_item(item)}
     return {"error": f"Item with ASIN {asin} not found"}
 
 
 def get_listing_item(seller_id, sku):
-    for item in _catalog_items_rows():
+    for item in _catalog_store:
         if item["sku"] == sku and item["sellerId"] == seller_id:
             return {"type": "listing_item", "listing": {
                 "sku": item["sku"],
@@ -325,15 +330,14 @@ def get_listing_item(seller_id, sku):
 
 
 def create_listing_item(seller_id, sku, data):
-    catalog_table = _store.table("catalog_items")
-    for item in catalog_table.rows():
+    for item in _catalog_store:
         if item["sku"] == sku and item["sellerId"] == seller_id:
             return {"error": f"Listing with SKU {sku} already exists"}
 
     now = _now()
     new_item = {
         "sku": sku,
-        "asin": data.get("asin", f"B0NEW{len(catalog_table):05d}"),
+        "asin": data.get("asin", f"B0NEW{len(_catalog_store):05d}"),
         "sellerId": seller_id,
         "title": data.get("title", ""),
         "description": data.get("description", ""),
@@ -357,40 +361,35 @@ def create_listing_item(seller_id, sku, data):
         "createdDate": now,
         "lastUpdatedDate": now,
     }
-    catalog_table.upsert(new_item)
+    _catalog_store.append(new_item)
     return {"type": "listing_item", "status": "ACCEPTED", "sku": sku, "issues": []}
 
 
 def update_listing_item(seller_id, sku, data):
-    catalog_table = _store.table("catalog_items")
-    for item in catalog_table.rows():
+    for i, item in enumerate(_catalog_store):
         if item["sku"] == sku and item["sellerId"] == seller_id:
             updatable = {
                 "title", "description", "brand", "bulletPoints", "price",
                 "quantity", "fulfillmentChannel", "status", "condition",
                 "productType", "mainImageUrl", "category",
             }
-            patch = {}
             for k, v in data.items():
-                if k not in updatable:
-                    continue
-                if k == "price" and v is not None:
-                    patch[k] = float(v)
-                elif k == "quantity" and v is not None:
-                    patch[k] = int(v)
-                else:
-                    patch[k] = v
-            patch["lastUpdatedDate"] = _now()
-            catalog_table.patch(sku, patch)
+                if k in updatable:
+                    if k == "price" and v is not None:
+                        _catalog_store[i][k] = float(v)
+                    elif k == "quantity" and v is not None:
+                        _catalog_store[i][k] = int(v)
+                    else:
+                        _catalog_store[i][k] = v
+            _catalog_store[i]["lastUpdatedDate"] = _now()
             return {"type": "listing_item", "status": "ACCEPTED", "sku": sku, "issues": []}
     return {"error": f"Listing with SKU {sku} not found for seller {seller_id}"}
 
 
 def delete_listing_item(seller_id, sku):
-    catalog_table = _store.table("catalog_items")
-    for item in catalog_table.rows():
+    for i, item in enumerate(_catalog_store):
         if item["sku"] == sku and item["sellerId"] == seller_id:
-            catalog_table.delete(sku)
+            _catalog_store.pop(i)
             return {"type": "listing_item", "status": "ACCEPTED", "sku": sku, "deleted": True}
     return {"error": f"Listing with SKU {sku} not found for seller {seller_id}"}
 
@@ -511,22 +510,18 @@ def get_order_items(order_id):
 
 
 def confirm_shipment(order_id, data):
-    orders_table = _store.table("orders")
-    order_items_table = _store.table("order_items")
-    for o in orders_table.rows():
+    for i, o in enumerate(_orders_rows()):
         if o["AmazonOrderId"] == order_id:
             if o["OrderStatus"] not in ("Unshipped", "PartiallyShipped"):
                 return {"error": f"Order {order_id} cannot be shipped (status: {o['OrderStatus']})"}
+            _orders_rows()[i]["OrderStatus"] = "Shipped"
+            _orders_rows()[i]["LastUpdateDate"] = _now()
             shipped = o["NumberOfItemsShipped"] + o["NumberOfItemsUnshipped"]
-            orders_table.patch(order_id, {
-                "OrderStatus": "Shipped",
-                "LastUpdateDate": _now(),
-                "NumberOfItemsShipped": shipped,
-                "NumberOfItemsUnshipped": 0,
-            })
-            for oi in order_items_table.rows():
+            _orders_rows()[i]["NumberOfItemsShipped"] = shipped
+            _orders_rows()[i]["NumberOfItemsUnshipped"] = 0
+            for j, oi in enumerate(_order_items_rows()):
                 if oi["AmazonOrderId"] == order_id:
-                    order_items_table.patch(oi["OrderItemId"], {"QuantityShipped": oi["QuantityOrdered"]})
+                    _order_items_rows()[j]["QuantityShipped"] = oi["QuantityOrdered"]
             return {"type": "shipment_confirmation", "status": "SUCCESS", "orderId": order_id}
     return {"error": f"Order {order_id} not found"}
 
@@ -577,14 +572,11 @@ def get_inventory_summaries(
 
 
 def update_inventory(seller_sku, quantity):
-    inv_table = _store.table("inventory")
-    for inv in inv_table.rows():
+    for i, inv in enumerate(_inventory_rows()):
         if inv["sellerSku"] == seller_sku:
-            inv_table.patch(inv["fnSku"], {
-                "totalQuantity": int(quantity),
-                "inStockSupplyQuantity": int(quantity),
-                "lastUpdatedTime": _now(),
-            })
+            _inventory_rows()[i]["totalQuantity"] = int(quantity)
+            _inventory_rows()[i]["inStockSupplyQuantity"] = int(quantity)
+            _inventory_rows()[i]["lastUpdatedTime"] = _now()
             return {"type": "inventory_update", "status": "SUCCESS", "sellerSku": seller_sku}
     return {"error": f"Inventory for SKU {seller_sku} not found"}
 
@@ -653,7 +645,7 @@ def create_report(report_type, data_start_time, data_end_time):
         "processingEndTime": None,
         "reportDocumentId": None,
     }
-    _store.table("reports").upsert(report)
+    _reports_rows().append(report)
     _next_report_id += 1
     return {
         "type": "report_created",
@@ -782,39 +774,28 @@ def get_return(return_id):
 
 
 def authorize_return(return_id):
-    returns_table = _store.table("returns")
-    for r in returns_table.rows():
+    for i, r in enumerate(_returns_rows()):
         if r["returnId"] == return_id:
             if r["returnStatus"] != "Authorized":
                 return {"error": f"Return {return_id} is not in Authorized status"}
-            returns_table.patch(return_id, {"returnStatus": "Completed", "resolution": "REFUND"})
+            _returns_rows()[i]["returnStatus"] = "Completed"
+            _returns_rows()[i]["resolution"] = "REFUND"
             return {"type": "return_authorization", "status": "SUCCESS", "returnId": return_id}
     return {"error": f"Return {return_id} not found"}
 
 
 def close_return(return_id):
-    returns_table = _store.table("returns")
-    for r in returns_table.rows():
+    for i, r in enumerate(_returns_rows()):
         if r["returnId"] == return_id:
-            returns_table.patch(return_id, {"returnStatus": "Closed", "resolution": "CLOSED"})
+            _returns_rows()[i]["returnStatus"] = "Closed"
+            _returns_rows()[i]["resolution"] = "CLOSED"
             return {"type": "return_close", "status": "SUCCESS", "returnId": return_id}
     return {"error": f"Return {return_id} not found"}
 
-
 _store.eager_load()
 
-
-def _max_numeric_suffix(rows, key, prefix):
-    hi = 0
-    for r in rows:
-        v = str(r.get(key, ""))
-        if v.startswith(prefix):
-            try:
-                hi = max(hi, int(v[len(prefix):]))
-            except ValueError:
-                continue
-    return hi
-
-
-_next_report_id = _max_numeric_suffix(_store.table("reports").rows(), "reportId", "REP-") + 1
-_next_return_id = _max_numeric_suffix(_store.table("returns").rows(), "returnId", "RET-") + 1
+# Module-level handles the accessor functions operate on. The catalog is a
+# mutable list (create/update/delete go through it), seeded once from the store
+# table; the seller account is the registered document's value.
+_catalog_store = _catalog_items_rows()
+_seller_store = _seller_account_doc()

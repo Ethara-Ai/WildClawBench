@@ -12,7 +12,7 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store,
+    read_json_with_ctx, get_store,
     strict_int,
     opt_float,
 )
@@ -21,13 +21,13 @@ _store = get_store("binance-api")
 _API = "binance-api"
 
 _store.register("prices", primary_key="symbol",
-                initial_loader=lambda: _coerce_prices(_load("prices.csv", "prices")))
+                initial_loader=lambda: _coerce_prices(_load("prices.json", "prices")))
 _store.register("klines", primary_key="symbol",
-                initial_loader=lambda: _coerce_klines(_load("klines.csv", "klines")))
+                initial_loader=lambda: _coerce_klines(_load("klines.json", "klines")))
 _store.register("balances", primary_key="asset",
-                initial_loader=lambda: _coerce_balances(_load("balances.csv", "balances")))
+                initial_loader=lambda: _coerce_balances(_load("balances.json", "balances")))
 _store.register("depth", primary_key="symbol",
-                initial_loader=lambda: _coerce_depth(_load("depth.csv", "depth")))
+                initial_loader=lambda: _coerce_depth(_load("depth.json", "depth")))
 
 
 def _prices_rows():
@@ -48,7 +48,7 @@ def _depth_rows():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

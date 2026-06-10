@@ -10,27 +10,27 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_float, opt_str, strict_int)
+    read_json_with_ctx, get_store, opt_float, opt_str, strict_int)
 
 _store = get_store("google-classroom-api")
 _API = "google-classroom-api"
 
 _store.register("courses", primary_key="id",
-                initial_loader=lambda: _coerce_courses(_load("courses.csv", "courses")))
+                initial_loader=lambda: _coerce_courses(_load("courses.json", "courses")))
 _store.register("coursework", primary_key="id",
-                initial_loader=lambda: _coerce_coursework(_load("coursework.csv", "coursework")))
+                initial_loader=lambda: _coerce_coursework(_load("coursework.json", "coursework")))
 _store.register("topics", primary_key="courseId",
-                initial_loader=lambda: _coerce_topics(_load("topics.csv", "topics")))
+                initial_loader=lambda: _coerce_topics(_load("topics.json", "topics")))
 _store.register("students", primary_key="courseId",
-                initial_loader=lambda: _coerce_students(_load("students.csv", "students")))
+                initial_loader=lambda: _coerce_students(_load("students.json", "students")))
 _store.register("teachers", primary_key="courseId",
-                initial_loader=lambda: _coerce_teachers(_load("teachers.csv", "teachers")))
+                initial_loader=lambda: _coerce_teachers(_load("teachers.json", "teachers")))
 _store.register("submissions", primary_key="id",
-                initial_loader=lambda: _coerce_submissions(_load("submissions.csv", "submissions")))
+                initial_loader=lambda: _coerce_submissions(_load("submissions.json", "submissions")))
 _store.register("announcements", primary_key="id",
-                initial_loader=lambda: _coerce_announcements(_load("announcements.csv", "announcements")))
+                initial_loader=lambda: _coerce_announcements(_load("announcements.json", "announcements")))
 _store.register("materials", primary_key="id",
-                initial_loader=lambda: _coerce_materials(_load("materials.csv", "materials")))
+                initial_loader=lambda: _coerce_materials(_load("materials.json", "materials")))
 
 
 def _courses_rows():
@@ -67,7 +67,7 @@ def _materials_rows():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

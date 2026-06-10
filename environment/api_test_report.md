@@ -1,10 +1,10 @@
 # kensei2 Mock API Test Report
 
-- Generated: 2026-05-28 08:08:57 UTC
-- Python: 3.9.6
-- Environments tested: 61
-- Endpoints exercised: 1087
-- Totals: PASS 891 | WARN(4xx) 188 | FAIL 0 | SKIP 8
+- Generated: 2026-06-09 11:41:54 UTC
+- Python: 3.12.13
+- Environments tested: 101
+- Endpoints exercised: 1436
+- Totals: PASS 1239 | WARN(4xx) 189 | FAIL 0 | SKIP 8
 
 Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), FAIL = 5xx / connection error / server down, SKIP = unresolved `{{variable}}` (not sent).
 
@@ -12,62 +12,102 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 
 | Environment | Port | Server | Endpoints | PASS | WARN | FAIL | SKIP |
 |-------------|------|--------|-----------|------|------|------|------|
+| activecampaign-api | 8101 | started | 8 | 8 | 0 | 0 | 0 |
 | airbnb-api | 8038 | started | 8 | 6 | 0 | 0 | 2 |
 | airtable-api | 8032 | started | 10 | 10 | 0 | 0 | 0 |
+| algolia-api | 8067 | started | 10 | 10 | 0 | 0 | 0 |
 | alpaca-api | 8043 | started | 11 | 11 | 0 | 0 | 0 |
+| amadeus-api | 8076 | started | 7 | 7 | 0 | 0 | 0 |
 | amazon-seller-api | 8000 | started | 54 | 37 | 17 | 0 | 0 |
+| amplitude-api | 8091 | started | 5 | 5 | 0 | 0 | 0 |
 | asana-api | 8031 | started | 11 | 11 | 0 | 0 | 0 |
+| bamboohr-api | 8072 | started | 10 | 10 | 0 | 0 | 0 |
+| bigcommerce-api | 8084 | started | 8 | 8 | 0 | 0 | 0 |
+| binance-api | 8097 | started | 7 | 7 | 0 | 0 | 0 |
+| box-api | 8083 | started | 7 | 7 | 0 | 0 | 0 |
 | calendly-api | 8054 | started | 9 | 9 | 0 | 0 | 0 |
 | cloudflare-api | 8050 | started | 10 | 10 | 0 | 0 | 0 |
 | coinbase-api | 8023 | started | 9 | 9 | 0 | 0 | 0 |
 | confluence-api | 8045 | started | 12 | 12 | 0 | 0 | 0 |
+| contentful-api | 8066 | started | 12 | 12 | 0 | 0 | 0 |
 | datadog-api | 8048 | started | 12 | 12 | 0 | 0 | 0 |
 | discord-api | 8057 | started | 10 | 10 | 0 | 0 | 0 |
 | docusign-api | 8053 | started | 8 | 8 | 0 | 0 | 0 |
 | doordash-api | 8037 | started | 10 | 7 | 0 | 0 | 3 |
+| dropbox-api | 8082 | started | 7 | 7 | 0 | 0 | 0 |
 | etsy-api | 8001 | started | 51 | 40 | 11 | 0 | 0 |
 | eventbrite-api | 8020 | started | 14 | 14 | 0 | 0 | 0 |
+| fedex-api | 8095 | started | 4 | 4 | 0 | 0 | 0 |
+| figma-api | 8079 | started | 9 | 9 | 0 | 0 | 0 |
+| freshdesk-api | 8093 | started | 8 | 8 | 0 | 0 | 0 |
 | github-api | 8019 | started | 13 | 13 | 0 | 0 | 0 |
 | gitlab-api | 8046 | started | 12 | 12 | 0 | 0 | 0 |
 | gmail-api | 8017 | started | 15 | 15 | 0 | 0 | 0 |
+| google-analytics-api | 8068 | started | 7 | 7 | 0 | 0 | 0 |
 | google-calendar-api | 8016 | started | 10 | 10 | 0 | 0 | 0 |
 | google-classroom-api | 8002 | started | 61 | 52 | 9 | 0 | 0 |
 | google-drive-api | 8018 | started | 14 | 14 | 0 | 0 | 0 |
 | google-maps-api | 8033 | started | 7 | 7 | 0 | 0 | 0 |
+| greenhouse-api | 8073 | started | 11 | 11 | 0 | 0 | 0 |
+| gusto-api | 8074 | started | 10 | 10 | 0 | 0 | 0 |
 | hubspot-api | 8024 | started | 11 | 11 | 0 | 0 | 0 |
 | instacart-api | 8012 | started | 12 | 10 | 0 | 0 | 2 |
 | instagram-api | 8003 | started | 59 | 24 | 35 | 0 | 0 |
+| intercom-api | 8070 | started | 12 | 12 | 0 | 0 | 0 |
 | jira-api | 8029 | started | 10 | 10 | 0 | 0 | 0 |
+| klaviyo-api | 8089 | started | 8 | 8 | 0 | 0 | 0 |
+| kraken-api | 8098 | started | 10 | 10 | 0 | 0 | 0 |
 | kubernetes-api | 8051 | started | 10 | 10 | 0 | 0 | 0 |
 | linear-api | 8004 | started | 66 | 29 | 37 | 0 | 0 |
+| linkedin-api | 8062 | started | 10 | 10 | 0 | 0 | 0 |
+| mailchimp-api | 8081 | started | 12 | 12 | 0 | 0 | 0 |
+| mailgun-api | 8094 | started | 7 | 7 | 0 | 0 | 0 |
+| microsoft-teams-api | 8086 | started | 6 | 6 | 0 | 0 | 0 |
 | mixpanel-api | 8056 | started | 8 | 8 | 0 | 0 | 0 |
+| monday-api | 8080 | started | 12 | 12 | 0 | 0 | 0 |
 | myfitnesspal-api | 8005 | started | 45 | 34 | 11 | 0 | 0 |
+| nasa-api | 8077 | started | 9 | 9 | 0 | 0 | 0 |
 | notion-api | 8010 | started | 18 | 18 | 0 | 0 | 0 |
 | obsidian-api | 8014 | started | 10 | 10 | 0 | 0 | 0 |
 | okta-api | 8049 | started | 12 | 12 | 0 | 0 | 0 |
+| openlibrary-api | 8078 | started | 10 | 10 | 0 | 0 | 0 |
 | openweather-api | 8035 | started | 5 | 5 | 0 | 0 | 0 |
+| outlook-api | 8087 | started | 7 | 7 | 0 | 0 | 0 |
 | pagerduty-api | 8040 | started | 13 | 13 | 0 | 0 | 0 |
 | paypal-api | 8042 | started | 9 | 9 | 0 | 0 | 0 |
 | pinterest-api | 8006 | started | 42 | 31 | 11 | 0 | 0 |
 | plaid-api | 8022 | started | 6 | 6 | 0 | 0 | 0 |
+| posthog-api | 8092 | started | 7 | 7 | 0 | 0 | 0 |
 | quickbooks-api | 8007 | started | 58 | 38 | 20 | 0 | 0 |
 | reddit-api | 8058 | started | 8 | 8 | 0 | 0 | 0 |
 | ring-api | 8008 | started | 62 | 41 | 21 | 0 | 0 |
 | salesforce-api | 8044 | started | 17 | 17 | 0 | 0 | 0 |
+| segment-api | 8090 | started | 9 | 9 | 0 | 0 | 0 |
 | sendgrid-api | 8027 | started | 9 | 8 | 0 | 0 | 1 |
 | sentry-api | 8047 | started | 10 | 10 | 0 | 0 | 0 |
+| servicenow-api | 8071 | started | 12 | 12 | 0 | 0 | 0 |
 | shippo-api | 8052 | started | 9 | 9 | 0 | 0 | 0 |
 | slack-api | 8013 | started | 16 | 16 | 0 | 0 | 0 |
 | spotify-api | 8039 | started | 10 | 10 | 0 | 0 | 0 |
 | square-api | 8041 | started | 13 | 13 | 0 | 0 | 0 |
 | strava-api | 8060 | started | 8 | 8 | 0 | 0 | 0 |
-| stripe-api | 8021 | started | 19 | 18 | 1 | 0 | 0 |
+| stripe-api | 8102 | started | 19 | 18 | 1 | 0 | 0 |
+| telegram-api | 8063 | started | 9 | 9 | 0 | 0 | 0 |
+| ticketmaster-api | 8075 | started | 11 | 11 | 0 | 0 | 0 |
 | tmdb-api | 8059 | started | 8 | 8 | 0 | 0 | 0 |
 | trello-api | 8030 | started | 10 | 10 | 0 | 0 | 0 |
 | twilio-api | 8026 | started | 9 | 9 | 0 | 0 | 0 |
+| twitch-api | 8064 | started | 9 | 9 | 0 | 0 | 0 |
+| twitter-api | 8061 | started | 13 | 13 | 0 | 0 | 0 |
 | typeform-api | 8055 | started | 8 | 8 | 0 | 0 | 0 |
 | uber-api | 8036 | started | 10 | 9 | 1 | 0 | 0 |
+| ups-api | 8096 | started | 4 | 4 | 0 | 0 | 0 |
+| vimeo-api | 8099 | started | 7 | 6 | 1 | 0 | 0 |
+| webflow-api | 8100 | started | 6 | 6 | 0 | 0 | 0 |
 | whatsapp-api | 8015 | started | 11 | 11 | 0 | 0 | 0 |
+| woocommerce-api | 8085 | started | 8 | 8 | 0 | 0 | 0 |
+| wordpress-api | 8065 | started | 14 | 14 | 0 | 0 | 0 |
+| xero-api | 8088 | started | 7 | 7 | 0 | 0 | 0 |
 | yelp-api | 8034 | started | 6 | 6 | 0 | 0 | 0 |
 | youtube-api | 8009 | started | 49 | 35 | 14 | 0 | 0 |
 | zendesk-api | 8025 | started | 10 | 10 | 0 | 0 | 0 |
@@ -75,6 +115,225 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 | zoom-api | 8028 | started | 10 | 10 | 0 | 0 | 0 |
 
 ## Details
+
+### activecampaign-api (port 8101) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | GET | /api/3/contacts?limit=20&offset=0 | 200 | list contacts |
+| PASS | GET | /api/3/contacts?email=olivia.bennett@example.com | 200 | filter contacts by email |
+| PASS | GET | /api/3/contacts/4 | 200 | get contact |
+| PASS | POST | /api/3/contacts | 201 | create contact |
+| PASS | GET | /api/3/lists | 200 | list lists |
+| PASS | GET | /api/3/campaigns | 200 | list campaigns |
+| PASS | GET | /api/3/deals | 200 | list deals |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**GET list contacts** — `/api/3/contacts?limit=20&offset=0` (status 200)
+
+```
+{
+  "contacts": [
+    {
+      "id": "1",
+      "email": "olivia.bennett@example.com",
+      "firstName": "Olivia",
+      "lastName": "Bennett",
+      "phone": "+1-415-555-0182",
+      "status": "1",
+      "cdate": "2026-04-02T09:12:00-05:00",
+      "udate": "2026-05-18T11:30:00-05:00",
+      "links": {
+        "contactLists": "/api/3/contacts/1/contactLists",
+        "deals": "/api/3/contacts/1/deals"
+      }
+    },
+    {
+      "id": "2",
+      "email": "noah.kim@example.com",
+      "firstName": "Noah",
+      "lastName": "Kim",
+      "phone": "+1-206-555-0143",
+      "status": "1",
+      "cdat
+... (truncated)
+```
+
+**GET filter contacts by email** — `/api/3/contacts?email=olivia.bennett@example.com` (status 200)
+
+```
+{
+  "contacts": [
+    {
+      "id": "1",
+      "email": "olivia.bennett@example.com",
+      "firstName": "Olivia",
+      "lastName": "Bennett",
+      "phone": "+1-415-555-0182",
+      "status": "1",
+      "cdate": "2026-04-02T09:12:00-05:00",
+      "udate": "2026-05-18T11:30:00-05:00",
+      "links": {
+        "contactLists": "/api/3/contacts/1/contactLists",
+        "deals": "/api/3/contacts/1/deals"
+      }
+    }
+  ],
+  "meta": {
+    "total": "1",
+    "page_input": {
+      "offset": 0,
+      "limit": 20
+    }
+  }
+}
+```
+
+**GET get contact** — `/api/3/contacts/4` (status 200)
+
+```
+{
+  "contact": {
+    "id": "4",
+    "email": "liam.osei@example.com",
+    "firstName": "Liam",
+    "lastName": "Osei",
+    "phone": "+44-20-7946-0321",
+    "status": "1",
+    "cdate": "2026-04-15T16:00:00-05:00",
+    "udate": "2026-05-21T13:45:00-05:00",
+    "links": {
+      "contactLists": "/api/3/contacts/4/contactLists",
+      "deals": "/api/3/contacts/4/deals"
+    }
+  }
+}
+```
+
+**POST create contact** — `/api/3/contacts` (status 201)
+
+```
+{
+  "contact": {
+    "id": "9",
+    "email": "grace.park@example.com",
+    "firstName": "Grace",
+    "lastName": "Park",
+    "phone": "+1-503-555-0120",
+    "status": "1",
+    "cdate": "2026-06-09T11:41:54+00:00",
+    "udate": "2026-06-09T11:41:54+00:00",
+    "links": {
+      "contactLists": "/api/3/contacts/9/contactLists",
+      "deals": "/api/3/contacts/9/deals"
+    }
+  }
+}
+```
+
+**GET list lists** — `/api/3/lists` (status 200)
+
+```
+{
+  "lists": [
+    {
+      "id": "1",
+      "name": "Newsletter Subscribers",
+      "stringid": "newsletter-subscribers",
+      "subscriber_count": "5210",
+      "sender_url": "https://acme.example.com",
+      "sender_reminder": "You signed up on our website.",
+      "cdate": "2026-01-10T09:00:00-05:00"
+    },
+    {
+      "id": "2",
+      "name": "Product Updates",
+      "stringid": "product-updates",
+      "subscriber_count": "3140",
+      "sender_url": "https://acme.example.com/product",
+      "sender_reminder": "You opted in for product news.",
+      "cdate": "2026-02-01T09:00:00-05:00"
+   
+... (truncated)
+```
+
+**GET list campaigns** — `/api/3/campaigns` (status 200)
+
+```
+{
+  "campaigns": [
+    {
+      "id": "1",
+      "name": "May Newsletter",
+      "type": "single",
+      "status": "5",
+      "listid": "1",
+      "subject": "What's new in May",
+      "send_amt": "5180",
+      "opens": "2410",
+      "linkclicks": "612",
+      "sdate": "2026-05-05T10:00:00-05:00",
+      "cdate": "2026-05-04T16:00:00-05:00"
+    },
+    {
+      "id": "2",
+      "name": "Feature Launch - Insights",
+      "type": "single",
+      "status": "5",
+      "listid": "2",
+      "subject": "Introducing Insights",
+      "send_amt": "3110",
+      "opens": "1620",
+      "linkclicks": "498",
+   
+... (truncated)
+```
+
+**GET list deals** — `/api/3/deals` (status 200)
+
+```
+{
+  "deals": [
+    {
+      "id": "1",
+      "title": "Acme Annual Plan",
+      "contact": "1",
+      "value": "1200000",
+      "currency": "usd",
+      "status": "0",
+      "stage": "2",
+      "owner": "3",
+      "cdate": "2026-04-10T09:00:00-05:00",
+      "mdate": "2026-05-20T12:00:00-05:00"
+    },
+    {
+      "id": "2",
+      "title": "Northwind Pilot",
+      "contact": "4",
+      "value": "450000",
+      "currency": "usd",
+      "status": "0",
+      "stage": "1",
+      "owner": "3",
+      "cdate": "2026-04-18T10:00:00-05:00",
+      "mdate": "2026-05-19T09:30:00-05:00"
+    },
+    {
+      "id
+... (truncated)
+```
+
+</details>
 
 ### airbnb-api (port 8038) — server: started
 
@@ -172,7 +431,8 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
       "listing_id": "lst-101",
       "start_date": "2026-06-01",
       "end_date": "2026-06-30",
-      "available": true
+      "available": true,
+      "_pk": "lst-101@2026-06-01"
     }
   ]
 }
@@ -209,7 +469,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 
 ```
 {
-  "reservation_id": "res-3cf47c87b8",
+  "reservation_id": "res-1417fedf0a",
   "listing_id": "lst-101",
   "guest_name": "Tomas R.",
   "checkin": "2026-06-05",
@@ -221,7 +481,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
   "cleaning_fee": 75.0,
   "service_fee": 105.84,
   "total": 936.84,
-  "created_at": "2026-05-28T08:08:57Z"
+  "created_at": "2026-06-09T11:41:55Z"
 }
 ```
 
@@ -414,8 +674,8 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 {
   "records": [
     {
-      "id": "recf52804ae75644b",
-      "createdTime": "2026-05-28T08:08:58.000Z",
+      "id": "rec581b969f9ab64b",
+      "createdTime": "2026-06-09T11:41:56.000Z",
       "fields": {
         "Name": "Write API docs",
         "Status": "Todo",
@@ -450,6 +710,221 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 {
   "id": "recTask0000000010",
   "deleted": true
+}
+```
+
+</details>
+
+### algolia-api (port 8067) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | GET | /1/indexes | 200 | list indexes |
+| PASS | POST | /1/indexes/products/query | 200 | query products |
+| PASS | POST | /1/indexes/products/query | 200 | query products with filter |
+| PASS | POST | /1/indexes/docs/query | 200 | query docs |
+| PASS | GET | /1/indexes/products/prod-001 | 200 | get object |
+| PASS | GET | /1/indexes/products/settings | 200 | get settings |
+| PASS | POST | /1/indexes/products | 201 | add object |
+| PASS | PUT | /1/indexes/products/prod-004 | 200 | update object |
+| PASS | DELETE | /1/indexes/products/prod-008 | 200 | delete object |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**GET list indexes** — `/1/indexes` (status 200)
+
+```
+{
+  "items": [
+    {
+      "name": "products",
+      "entries": 8,
+      "dataSize": 4096,
+      "createdAt": "2025-09-01T10:00:00.000Z",
+      "updatedAt": "2026-05-01T10:00:00.000Z"
+    },
+    {
+      "name": "docs",
+      "entries": 6,
+      "dataSize": 3072,
+      "createdAt": "2025-09-01T10:00:00.000Z",
+      "updatedAt": "2026-05-10T10:00:00.000Z"
+    }
+  ],
+  "nbPages": 1
+}
+```
+
+**POST query products** — `/1/indexes/products/query` (status 200)
+
+```
+{
+  "hits": [
+    {
+      "objectID": "prod-001",
+      "name": "Aurora Wireless Headphones",
+      "description": "Over-ear noise cancelling wireless headphones",
+      "category": "audio",
+      "brand": "Aurora",
+      "price": 199.99,
+      "in_stock": true
+    },
+    {
+      "objectID": "prod-002",
+      "name": "Aurora Earbuds Mini",
+      "description": "Compact true wireless earbuds with charging case",
+      "category": "audio",
+      "brand": "Aurora",
+      "price": 89.99,
+      "in_stock": true
+    }
+  ],
+  "nbHits": 2,
+  "page": 0,
+  "nbPages": 1,
+  "hitsPerPage": 10,
+  "query": "
+```
+
+**POST query products with filter** — `/1/indexes/products/query` (status 200)
+
+```
+{
+  "hits": [
+    {
+      "objectID": "prod-003",
+      "name": "Nimbus 4K Monitor",
+      "description": "27 inch 4K UHD monitor with USB-C",
+      "category": "displays",
+      "brand": "Nimbus",
+      "price": 449,
+      "in_stock": true
+    },
+    {
+      "objectID": "prod-004",
+      "name": "Nimbus Curved Monitor",
+      "description": "34 inch ultrawide curved gaming monitor",
+      "category": "displays",
+      "brand": "Nimbus",
+      "price": 599,
+      "in_stock": false
+    }
+  ],
+  "nbHits": 2,
+  "page": 0,
+  "nbPages": 1,
+  "hitsPerPage": 10,
+  "query": "",
+  "params": "query=&hit
+```
+
+**POST query docs** — `/1/indexes/docs/query` (status 200)
+
+```
+{
+  "hits": [
+    {
+      "objectID": "doc-indexing",
+      "title": "Indexing Records",
+      "body": "How to add and update records in an index",
+      "section": "guides",
+      "tags": "indexing"
+    },
+    {
+      "objectID": "doc-querying",
+      "title": "Querying an Index",
+      "body": "Search records using query and filters",
+      "section": "guides",
+      "tags": "search"
+    }
+  ],
+  "nbHits": 2,
+  "page": 0,
+  "nbPages": 1,
+  "hitsPerPage": 20,
+  "query": "index",
+  "params": "query=index&hitsPerPage=20&page=0"
+}
+```
+
+**GET get object** — `/1/indexes/products/prod-001` (status 200)
+
+```
+{
+  "objectID": "prod-001",
+  "name": "Aurora Wireless Headphones",
+  "description": "Over-ear noise cancelling wireless headphones",
+  "category": "audio",
+  "brand": "Aurora",
+  "price": 199.99,
+  "in_stock": true
+}
+```
+
+**GET get settings** — `/1/indexes/products/settings` (status 200)
+
+```
+{
+  "searchableAttributes": [
+    "name",
+    "description",
+    "brand",
+    "category"
+  ],
+  "attributesForFaceting": [
+    "category",
+    "brand",
+    "in_stock"
+  ],
+  "hitsPerPage": 20,
+  "ranking": [
+    "typo",
+    "geo",
+    "words",
+    "proximity",
+    "attribute",
+    "exact",
+    "custom"
+  ]
+}
+```
+
+**POST add object** — `/1/indexes/products` (status 201)
+
+```
+{
+  "objectID": "prod-009",
+  "createdAt": "",
+  "taskID": 966364
+}
+```
+
+**PUT update object** — `/1/indexes/products/prod-004` (status 200)
+
+```
+{
+  "objectID": "prod-004",
+  "updatedAt": "",
+  "taskID": 515664
+}
+```
+
+**DELETE delete object** — `/1/indexes/products/prod-008` (status 200)
+
+```
+{
+  "objectID": "prod-008",
+  "deletedAt": "",
+  "taskID": 725352
 }
 ```
 
@@ -606,8 +1081,8 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 
 ```
 {
-  "id": "ORD-7c15ee2e-3435-41e4-956a-3b48ba743e59",
-  "client_order_id": "cli-d63b7aa02baa",
+  "id": "ORD-a8392e12-017a-4c28-a115-5b3c0a209db0",
+  "client_order_id": "cli-369bf83f50d3",
   "symbol": "GOOGL",
   "qty": "5",
   "filled_qty": "0",
@@ -617,7 +1092,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
   "limit_price": null,
   "status": "new",
   "filled_avg_price": null,
-  "submitted_at": "2026-05-28T08:08:58Z",
+  "submitted_at": "2026-06-09T11:41:57Z",
   "filled_at": null
 }
 ```
@@ -626,8 +1101,8 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 
 ```
 {
-  "id": "ORD-46901a1a-ca46-475b-b103-fe13a1da1bf7",
-  "client_order_id": "cli-69046ca04192",
+  "id": "ORD-e546a5de-99a4-4d39-9d47-c55aa57bc46f",
+  "client_order_id": "cli-0e0bdac048ae",
   "symbol": "AAPL",
   "qty": "10",
   "filled_qty": "0",
@@ -637,7 +1112,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
   "limit_price": "195.0",
   "status": "new",
   "filled_avg_price": null,
-  "submitted_at": "2026-05-28T08:08:58Z",
+  "submitted_at": "2026-06-09T11:41:57Z",
   "filled_at": null
 }
 ```
@@ -694,6 +1169,215 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
     "ap": 191.25,
     "as": 2
   }
+}
+```
+
+</details>
+
+### amadeus-api (port 8076) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | GET | /v2/shopping/flight-offers?originLocationCode=JFK&destinationLocationCode=LHR&departureDate=2026-06-15&adults=2 | 200 | flight offers search |
+| PASS | GET | /v2/shopping/flight-offers?originLocationCode=LAX&destinationLocationCode=NRT&adults=1 | 200 | flight offers search (no date) |
+| PASS | POST | /v1/shopping/flight-offers/pricing | 200 | price flight offer |
+| PASS | GET | /v1/reference-data/locations?keyword=London&subType=AIRPORT,CITY | 200 | search locations |
+| PASS | GET | /v1/reference-data/locations/AJFK | 200 | get location |
+| PASS | GET | /v1/reference-data/airlines?airlineCodes=BA,AF | 200 | get airlines |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**GET flight offers search** — `/v2/shopping/flight-offers?originLocationCode=JFK&destinationLocationCode=LHR&departureDate=2026-06-15&adults=2` (status 200)
+
+```
+{
+  "meta": {
+    "count": 2
+  },
+  "data": [
+    {
+      "id": "1",
+      "type": "flight-offer",
+      "source": "GDS",
+      "oneWay": true,
+      "numberOfBookableSeats": 7,
+      "itineraries": [
+        {
+          "duration": "PT7H25M",
+          "segments": [
+            {
+              "departure": {
+                "iataCode": "JFK",
+                "terminal": "4",
+                "at": "2026-06-15T21:45:00"
+              },
+              "arrival": {
+                "iataCode": "LHR",
+                "terminal": "5",
+                "at": "2026-06-16T09:10:00"
+              },
+    
+... (truncated)
+```
+
+**GET flight offers search (no date)** — `/v2/shopping/flight-offers?originLocationCode=LAX&destinationLocationCode=NRT&adults=1` (status 200)
+
+```
+{
+  "meta": {
+    "count": 1
+  },
+  "data": [
+    {
+      "id": "3",
+      "type": "flight-offer",
+      "source": "GDS",
+      "oneWay": true,
+      "numberOfBookableSeats": 9,
+      "itineraries": [
+        {
+          "duration": "PT11H40M",
+          "segments": [
+            {
+              "departure": {
+                "iataCode": "LAX",
+                "terminal": "B",
+                "at": "2026-07-02T11:30:00"
+              },
+              "arrival": {
+                "iataCode": "NRT",
+                "terminal": "1",
+                "at": "2026-07-03T15:10:00"
+              },
+   
+... (truncated)
+```
+
+**POST price flight offer** — `/v1/shopping/flight-offers/pricing` (status 200)
+
+```
+{
+  "data": {
+    "type": "flight-offers-pricing",
+    "flightOffers": [
+      {
+        "id": "1",
+        "type": "flight-offer",
+        "source": "GDS",
+        "oneWay": true,
+        "numberOfBookableSeats": 7,
+        "itineraries": [
+          {
+            "duration": "PT7H25M",
+            "segments": [
+              {
+                "departure": {
+                  "iataCode": "JFK",
+                  "terminal": "4",
+                  "at": "2026-06-15T21:45:00"
+                },
+                "arrival": {
+                  "iataCode": "LHR",
+                  "terminal": "5",
+
+... (truncated)
+```
+
+**GET search locations** — `/v1/reference-data/locations?keyword=London&subType=AIRPORT,CITY` (status 200)
+
+```
+{
+  "meta": {
+    "count": 2
+  },
+  "data": [
+    {
+      "type": "location",
+      "subType": "AIRPORT",
+      "id": "ALHR",
+      "name": "Heathrow Airport",
+      "iataCode": "LHR",
+      "address": {
+        "cityName": "London",
+        "cityCode": "LON",
+        "countryName": "United Kingdom",
+        "countryCode": "GB"
+      },
+      "geoCode": {
+        "latitude": 51.47,
+        "longitude": -0.4543
+      },
+      "timeZone": {
+        "offset": "Europe/London"
+      }
+    },
+    {
+      "type": "location",
+      "subType": "CITY",
+      "id": "CLON",
+      "name": "London",
+      "
+```
+
+**GET get location** — `/v1/reference-data/locations/AJFK` (status 200)
+
+```
+{
+  "data": {
+    "type": "location",
+    "subType": "AIRPORT",
+    "id": "AJFK",
+    "name": "John F Kennedy International Airport",
+    "iataCode": "JFK",
+    "address": {
+      "cityName": "New York",
+      "cityCode": "NYC",
+      "countryName": "United States",
+      "countryCode": "US"
+    },
+    "geoCode": {
+      "latitude": 40.6413,
+      "longitude": -73.7781
+    },
+    "timeZone": {
+      "offset": "America/New_York"
+    }
+  }
+}
+```
+
+**GET get airlines** — `/v1/reference-data/airlines?airlineCodes=BA,AF` (status 200)
+
+```
+{
+  "meta": {
+    "count": 2
+  },
+  "data": [
+    {
+      "type": "airline",
+      "iataCode": "BA",
+      "icaoCode": "BAW",
+      "businessName": "British Airways p.l.c.",
+      "commonName": "British Airways"
+    },
+    {
+      "type": "airline",
+      "iataCode": "AF",
+      "icaoCode": "AFR",
+      "businessName": "Air France",
+      "commonName": "Air France"
+    }
+  ]
 }
 ```
 
@@ -1699,6 +2383,133 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 
 </details>
 
+### amplitude-api (port 8091) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | POST | /2/httpapi | 200 | httpapi upload |
+| PASS | GET | /api/2/events/segmentation?e=purchase&start=2026-05-02&end=2026-05-06 | 200 | segmentation |
+| PASS | GET | /api/2/events/segmentation | 200 | segmentation all |
+| PASS | GET | /api/2/useractivity?user=user_2001 | 200 | user activity |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**POST httpapi upload** — `/2/httpapi` (status 200)
+
+```
+{
+  "code": 200,
+  "events_ingested": 1,
+  "server_upload_time": "2026-06-09T11:41:59Z"
+}
+```
+
+**GET segmentation** — `/api/2/events/segmentation?e=purchase&start=2026-05-02&end=2026-05-06` (status 200)
+
+```
+{
+  "data": {
+    "series": [
+      [
+        3,
+        5,
+        8,
+        6,
+        9
+      ]
+    ],
+    "seriesLabels": [
+      "purchase"
+    ],
+    "xValues": [
+      "2026-05-02",
+      "2026-05-03",
+      "2026-05-04",
+      "2026-05-05",
+      "2026-05-06"
+    ]
+  }
+}
+```
+
+**GET segmentation all** — `/api/2/events/segmentation` (status 200)
+
+```
+{
+  "data": {
+    "series": [
+      [
+        3,
+        5,
+        8,
+        6,
+        9
+      ],
+      [
+        120,
+        134,
+        128,
+        141,
+        150
+      ]
+    ],
+    "seriesLabels": [
+      "purchase",
+      "session_start"
+    ],
+    "xValues": [
+      "2026-05-02",
+      "2026-05-03",
+      "2026-05-04",
+      "2026-05-05",
+      "2026-05-06"
+    ]
+  }
+}
+```
+
+**GET user activity** — `/api/2/useractivity?user=user_2001` (status 200)
+
+```
+{
+  "userData": {
+    "user_id": "user_2001",
+    "device_id": "dev_aa01",
+    "country": "United States",
+    "platform": "web",
+    "version": "4.2.0",
+    "first_seen": "2026-04-20T08:00:00Z",
+    "last_seen": "2026-05-05T09:45:51Z"
+  },
+  "events": [
+    {
+      "event_id": "ev_900001",
+      "user_id": "user_2001",
+      "device_id": "dev_aa01",
+      "event_type": "session_start",
+      "event_time": "2026-05-02T08:00:00Z",
+      "event_properties": {
+        "platform": "web"
+      }
+    },
+    {
+      "event_id": "ev_900002",
+      "user_id": "user_2001",
+      "device_id": "dev_aa01",
+... (truncated)
+```
+
+</details>
+
 ### asana-api (port 8031) — server: started
 
 | Result | Method | Path | Status | Endpoint |
@@ -1941,14 +2752,14 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 ```
 {
   "data": {
-    "gid": "3396506136704883",
+    "gid": "2363455032837709",
     "resource_type": "task",
     "name": "Write release notes",
     "completed": false,
     "due_on": "2026-07-10",
     "notes": "Summarize v2 changes",
-    "created_at": "2026-05-28T08:08:59.000Z",
-    "modified_at": "2026-05-28T08:08:59.000Z",
+    "created_at": "2026-06-09T11:41:59.000Z",
+    "modified_at": "2026-06-09T11:41:59.000Z",
     "assignee": {
       "gid": "1202000000001002",
       "resource_type": "user",
@@ -1973,15 +2784,15 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
     "gid": "1205000000004002",
     "resource_type": "task",
     "name": "Design new homepage hero",
-    "completed": true,
-    "due_on": "2026-06-05",
+    "completed": false,
+    "due_on": "2026-06-10",
     "notes": "Three variants for A/B test",
     "created_at": "2026-01-20T09:30:00.000Z",
-    "modified_at": "2026-05-28T08:08:59.000Z",
+    "modified_at": "2026-05-22T12:00:00.000Z",
     "assignee": {
-      "gid": "1202000000001001",
+      "gid": "1202000000001004",
       "resource_type": "user",
-      "name": "Priya Raman"
+      "name": "Liam OConnor"
     },
     "memberships": [
       {
@@ -1990,7 +2801,893 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
           "resource_type": "project",
           "name": "Website Redesign"
         },
-        
+      
+```
+
+</details>
+
+### bamboohr-api (port 8072) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | GET | /api/gateway.php/orbitlabs/v1/company | 200 | get company |
+| PASS | GET | /api/gateway.php/orbitlabs/v1/employees/directory | 200 | employees directory |
+| PASS | GET | /api/gateway.php/orbitlabs/v1/employees/emp-102 | 200 | get employee |
+| PASS | POST | /api/gateway.php/orbitlabs/v1/employees | 201 | create employee |
+| PASS | GET | /api/gateway.php/orbitlabs/v1/time_off/requests?status=requested | 200 | list time off requests |
+| PASS | POST | /api/gateway.php/orbitlabs/v1/time_off/requests | 201 | create time off request |
+| PASS | PUT | /api/gateway.php/orbitlabs/v1/time_off/requests/tor-5003/status | 200 | approve time off request |
+| PASS | GET | /api/gateway.php/orbitlabs/v1/time_off/whos_out | 200 | whos out |
+| PASS | GET | /api/gateway.php/orbitlabs/v1/reports/1 | 200 | get report |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**GET get company** — `/api/gateway.php/orbitlabs/v1/company` (status 200)
+
+```
+{
+  "subdomain": "orbitlabs",
+  "name": "Orbit Labs Inc.",
+  "employeeCount": 12,
+  "industry": "Software",
+  "headquarters": "San Francisco, CA",
+  "fiscalYearStart": "01-01",
+  "timeOffPolicies": [
+    "Vacation",
+    "Sick",
+    "Personal",
+    "Holiday"
+  ]
+}
+```
+
+**GET employees directory** — `/api/gateway.php/orbitlabs/v1/employees/directory` (status 200)
+
+```
+{
+  "employees": [
+    {
+      "id": "emp-101",
+      "firstName": "Amelia",
+      "lastName": "Ortega",
+      "workEmail": "amelia.ortega@orbit-labs.com",
+      "department": "Engineering",
+      "jobTitle": "VP of Engineering",
+      "location": "San Francisco",
+      "hireDate": "2019-03-04",
+      "status": "Active",
+      "supervisorId": null
+    },
+    {
+      "id": "emp-102",
+      "firstName": "Jonas",
+      "lastName": "Pereira",
+      "workEmail": "jonas.pereira@orbit-labs.com",
+      "department": "Engineering",
+      "jobTitle": "Staff Software Engineer",
+      "location": "San Fra
+... (truncated)
+```
+
+**GET get employee** — `/api/gateway.php/orbitlabs/v1/employees/emp-102` (status 200)
+
+```
+{
+  "id": "emp-102",
+  "firstName": "Jonas",
+  "lastName": "Pereira",
+  "workEmail": "jonas.pereira@orbit-labs.com",
+  "department": "Engineering",
+  "jobTitle": "Staff Software Engineer",
+  "location": "San Francisco",
+  "hireDate": "2020-06-15",
+  "status": "Active",
+  "supervisorId": "emp-101"
+}
+```
+
+**POST create employee** — `/api/gateway.php/orbitlabs/v1/employees` (status 201)
+
+```
+{
+  "id": "emp-325b9ac9",
+  "firstName": "Aisha",
+  "lastName": "Khan",
+  "workEmail": "aisha.khan@orbit-labs.com",
+  "department": "Engineering",
+  "jobTitle": "Software Engineer",
+  "location": "Remote",
+  "hireDate": "2026-06-09",
+  "status": "Active",
+  "supervisorId": "emp-102"
+}
+```
+
+**GET list time off requests** — `/api/gateway.php/orbitlabs/v1/time_off/requests?status=requested` (status 200)
+
+```
+[
+  {
+    "id": "tor-5003",
+    "employeeId": "emp-104",
+    "type": "Vacation",
+    "status": "requested",
+    "start": "2026-07-01",
+    "end": "2026-07-10",
+    "amount": 8,
+    "unit": "days",
+    "notes": "Summer holiday",
+    "created": "2026-05-22"
+  },
+  {
+    "id": "tor-5006",
+    "employeeId": "emp-108",
+    "type": "Vacation",
+    "status": "requested",
+    "start": "2026-08-04",
+    "end": "2026-08-15",
+    "amount": 10,
+    "unit": "days",
+    "notes": "Annual leave",
+    "created": "2026-05-25"
+  },
+  {
+    "id": "tor-5008",
+    "employeeId": "emp-112",
+    "type": "Personal",
+  
+```
+
+**POST create time off request** — `/api/gateway.php/orbitlabs/v1/time_off/requests` (status 201)
+
+```
+{
+  "id": "tor-ab93393e",
+  "employeeId": "emp-104",
+  "type": "Vacation",
+  "status": "requested",
+  "start": "2026-07-20",
+  "end": "2026-07-24",
+  "amount": 5,
+  "unit": "days",
+  "notes": "Conference travel",
+  "created": "2026-06-09"
+}
+```
+
+**PUT approve time off request** — `/api/gateway.php/orbitlabs/v1/time_off/requests/tor-5003/status` (status 200)
+
+```
+{
+  "id": "tor-5003",
+  "employeeId": "emp-104",
+  "type": "Vacation",
+  "status": "approved",
+  "start": "2026-07-01",
+  "end": "2026-07-10",
+  "amount": 8,
+  "unit": "days",
+  "notes": "Summer holiday",
+  "created": "2026-05-22"
+}
+```
+
+**GET whos out** — `/api/gateway.php/orbitlabs/v1/time_off/whos_out` (status 200)
+
+```
+[
+  {
+    "id": "who-9001",
+    "employeeId": "emp-102",
+    "name": "Jonas Pereira",
+    "type": "Vacation",
+    "start": "2026-06-08",
+    "end": "2026-06-12"
+  },
+  {
+    "id": "who-9002",
+    "employeeId": "emp-107",
+    "name": "Yuki Tanaka",
+    "type": "Vacation",
+    "start": "2026-05-28",
+    "end": "2026-05-30"
+  },
+  {
+    "id": "who-9003",
+    "employeeId": "emp-105",
+    "name": "Noor Aziz",
+    "type": "Sick",
+    "start": "2026-05-26",
+    "end": "2026-05-26"
+  },
+  {
+    "id": "who-9004",
+    "employeeId": "emp-103",
+    "name": "Helena Park",
+    "type": "Vacation",
+    "start
+```
+
+**GET get report** — `/api/gateway.php/orbitlabs/v1/reports/1` (status 200)
+
+```
+{
+  "title": "Headcount by Department",
+  "fields": [
+    {
+      "id": "department",
+      "name": "Department"
+    },
+    {
+      "id": "headcount",
+      "name": "Headcount"
+    }
+  ],
+  "employees": [
+    {
+      "department": "Engineering",
+      "headcount": 4
+    },
+    {
+      "department": "Executive",
+      "headcount": 1
+    },
+    {
+      "department": "Marketing",
+      "headcount": 2
+    },
+    {
+      "department": "People",
+      "headcount": 2
+    },
+    {
+      "department": "Sales",
+      "headcount": 2
+    }
+  ]
+}
+```
+
+</details>
+
+### bigcommerce-api (port 8084) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | GET | /v3/catalog/products?limit=5&page=1 | 200 | list products |
+| PASS | GET | /v3/catalog/products?name=wireless | 200 | filter products by name |
+| PASS | GET | /v3/catalog/products/101 | 200 | get product |
+| PASS | GET | /v2/orders?customer_id=1001 | 200 | list orders |
+| PASS | GET | /v2/orders/2001 | 200 | get order |
+| PASS | POST | /v2/orders | 200 | create order |
+| PASS | GET | /v3/customers?email=olivia | 200 | list customers |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**GET list products** — `/v3/catalog/products?limit=5&page=1` (status 200)
+
+```
+{
+  "data": [
+    {
+      "id": 101,
+      "name": "Aurora Wireless Headphones",
+      "sku": "AUR-WH-001",
+      "type": "physical",
+      "price": 149.99,
+      "sale_price": 129.99,
+      "cost_price": 72.5,
+      "weight": 0.45,
+      "inventory_level": 120,
+      "inventory_tracking": "product",
+      "is_visible": true,
+      "brand_id": 11,
+      "categories": [
+        21,
+        24
+      ],
+      "description": "Over-ear wireless headphones with ANC",
+      "date_created": "2026-01-12T08:00:00Z"
+    },
+    {
+      "id": 102,
+      "name": "Nimbus Bluetooth Speaker",
+      "sku": "NIM
+... (truncated)
+```
+
+**GET filter products by name** — `/v3/catalog/products?name=wireless` (status 200)
+
+```
+{
+  "data": [
+    {
+      "id": 101,
+      "name": "Aurora Wireless Headphones",
+      "sku": "AUR-WH-001",
+      "type": "physical",
+      "price": 149.99,
+      "sale_price": 129.99,
+      "cost_price": 72.5,
+      "weight": 0.45,
+      "inventory_level": 120,
+      "inventory_tracking": "product",
+      "is_visible": true,
+      "brand_id": 11,
+      "categories": [
+        21,
+        24
+      ],
+      "description": "Over-ear wireless headphones with ANC",
+      "date_created": "2026-01-12T08:00:00Z"
+    }
+  ],
+  "meta": {
+    "pagination": {
+      "total": 1,
+      "count": 1,
+      "per
+```
+
+**GET get product** — `/v3/catalog/products/101` (status 200)
+
+```
+{
+  "data": {
+    "id": 101,
+    "name": "Aurora Wireless Headphones",
+    "sku": "AUR-WH-001",
+    "type": "physical",
+    "price": 149.99,
+    "sale_price": 129.99,
+    "cost_price": 72.5,
+    "weight": 0.45,
+    "inventory_level": 120,
+    "inventory_tracking": "product",
+    "is_visible": true,
+    "brand_id": 11,
+    "categories": [
+      21,
+      24
+    ],
+    "description": "Over-ear wireless headphones with ANC",
+    "date_created": "2026-01-12T08:00:00Z"
+  },
+  "meta": {}
+}
+```
+
+**GET list orders** — `/v2/orders?customer_id=1001` (status 200)
+
+```
+[
+  {
+    "id": 2001,
+    "customer_id": 1001,
+    "status_id": 2,
+    "status": "Shipped",
+    "total_inc_tax": "159.98",
+    "subtotal_inc_tax": "149.99",
+    "currency_code": "USD",
+    "payment_method": "Credit Card",
+    "items_total": 1,
+    "date_created": "2026-04-02T10:05:00Z",
+    "billing_address": {
+      "first_name": "Olivia",
+      "last_name": "Bennett",
+      "email": "olivia.bennett@example.com"
+    }
+  },
+  {
+    "id": 2006,
+    "customer_id": 1001,
+    "status_id": 2,
+    "status": "Shipped",
+    "total_inc_tax": "79.99",
+    "subtotal_inc_tax": "69.99",
+    "currency_code"
+... (truncated)
+```
+
+**GET get order** — `/v2/orders/2001` (status 200)
+
+```
+{
+  "id": 2001,
+  "customer_id": 1001,
+  "status_id": 2,
+  "status": "Shipped",
+  "total_inc_tax": "159.98",
+  "subtotal_inc_tax": "149.99",
+  "currency_code": "USD",
+  "payment_method": "Credit Card",
+  "items_total": 1,
+  "date_created": "2026-04-02T10:05:00Z",
+  "billing_address": {
+    "first_name": "Olivia",
+    "last_name": "Bennett",
+    "email": "olivia.bennett@example.com"
+  }
+}
+```
+
+**POST create order** — `/v2/orders` (status 200)
+
+```
+{
+  "id": 2007,
+  "customer_id": 1002,
+  "status_id": 1,
+  "status": "Pending",
+  "total_inc_tax": "239.00",
+  "subtotal_inc_tax": "239.00",
+  "currency_code": "USD",
+  "payment_method": "Credit Card",
+  "items_total": 2,
+  "date_created": "2026-05-28T00:00:00Z",
+  "billing_address": {
+    "first_name": "Marcus",
+    "last_name": "Lee",
+    "email": "marcus.lee@example.com"
+  }
+}
+```
+
+**GET list customers** — `/v3/customers?email=olivia` (status 200)
+
+```
+{
+  "data": [
+    {
+      "id": 1001,
+      "first_name": "Olivia",
+      "last_name": "Bennett",
+      "email": "olivia.bennett@example.com",
+      "company": "Bennett Studio",
+      "phone": "+1-415-555-0110",
+      "customer_group_id": 2,
+      "date_created": "2026-01-05T10:00:00Z"
+    }
+  ],
+  "meta": {
+    "pagination": {
+      "total": 1,
+      "count": 1,
+      "per_page": 50,
+      "current_page": 1,
+      "total_pages": 1
+    }
+  }
+}
+```
+
+</details>
+
+### binance-api (port 8097) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | GET | /api/v3/ticker/price | 200 | ticker price all |
+| PASS | GET | /api/v3/ticker/price?symbol=BTCUSDT | 200 | ticker price symbol |
+| PASS | GET | /api/v3/ticker/24hr?symbol=ETHUSDT | 200 | ticker 24hr |
+| PASS | GET | /api/v3/depth?symbol=BTCUSDT&limit=5 | 200 | depth |
+| PASS | GET | /api/v3/klines?symbol=BTCUSDT&interval=1h | 200 | klines |
+| PASS | GET | /api/v3/account | 200 | account |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**GET ticker price all** — `/api/v3/ticker/price` (status 200)
+
+```
+[
+  {
+    "symbol": "BTCUSDT",
+    "price": "67250.45000000"
+  },
+  {
+    "symbol": "ETHUSDT",
+    "price": "3520.18000000"
+  },
+  {
+    "symbol": "BNBUSDT",
+    "price": "592.74000000"
+  },
+  {
+    "symbol": "SOLUSDT",
+    "price": "168.92000000"
+  },
+  {
+    "symbol": "XRPUSDT",
+    "price": "0.52340000"
+  },
+  {
+    "symbol": "ADAUSDT",
+    "price": "0.46120000"
+  },
+  {
+    "symbol": "DOGEUSDT",
+    "price": "0.15820000"
+  },
+  {
+    "symbol": "MATICUSDT",
+    "price": "0.72450000"
+  },
+  {
+    "symbol": "DOTUSDT",
+    "price": "7.21400000"
+  },
+  {
+    "symbol": "LTCUSDT",
+    "price": "8
+```
+
+**GET ticker price symbol** — `/api/v3/ticker/price?symbol=BTCUSDT` (status 200)
+
+```
+{
+  "symbol": "BTCUSDT",
+  "price": "67250.45000000"
+}
+```
+
+**GET ticker 24hr** — `/api/v3/ticker/24hr?symbol=ETHUSDT` (status 200)
+
+```
+{
+  "symbol": "ETHUSDT",
+  "priceChange": "-45.32000000",
+  "priceChangePercent": "-1.271",
+  "lastPrice": "3520.18000000",
+  "highPrice": "3601.40000000",
+  "lowPrice": "3480.05000000",
+  "volume": "92344.11800000"
+}
+```
+
+**GET depth** — `/api/v3/depth?symbol=BTCUSDT&limit=5` (status 200)
+
+```
+{
+  "lastUpdateId": 1027024,
+  "bids": [
+    [
+      "67250.00000000",
+      "0.51200000"
+    ],
+    [
+      "67249.50000000",
+      "1.23000000"
+    ],
+    [
+      "67248.10000000",
+      "0.87500000"
+    ],
+    [
+      "67247.00000000",
+      "2.14000000"
+    ],
+    [
+      "67245.20000000",
+      "0.33000000"
+    ]
+  ],
+  "asks": [
+    [
+      "67251.00000000",
+      "0.64000000"
+    ],
+    [
+      "67252.40000000",
+      "1.08000000"
+    ],
+    [
+      "67253.90000000",
+      "0.42000000"
+    ],
+    [
+      "67255.00000000",
+      "1.77000000"
+    ],
+    [
+      "67256.80000000",
+      "0.
+```
+
+**GET klines** — `/api/v3/klines?symbol=BTCUSDT&interval=1h` (status 200)
+
+```
+[
+  [
+    1779004800000,
+    "66100.00000000",
+    "66480.00000000",
+    "66020.50000000",
+    "66410.20000000",
+    "812.44100000",
+    1779008399999,
+    "53954369.29820000",
+    0,
+    "0",
+    "0",
+    "0"
+  ],
+  [
+    1779008400000,
+    "66410.20000000",
+    "66900.00000000",
+    "66380.00000000",
+    "66850.75000000",
+    "945.11800000",
+    1779011999999,
+    "63181847.13850001",
+    0,
+    "0",
+    "0",
+    "0"
+  ],
+  [
+    1779012000000,
+    "66850.75000000",
+    "67200.00000000",
+    "66800.10000000",
+    "67120.40000000",
+    "1023.66700000",
+    1779015599999,
+    "68708938.5068000
+... (truncated)
+```
+
+**GET account** — `/api/v3/account` (status 200)
+
+```
+{
+  "makerCommission": 10,
+  "takerCommission": 10,
+  "buyerCommission": 0,
+  "sellerCommission": 0,
+  "canTrade": true,
+  "canWithdraw": true,
+  "canDeposit": true,
+  "accountType": "SPOT",
+  "balances": [
+    {
+      "asset": "BTC",
+      "free": "0.45821000",
+      "locked": "0.01000000"
+    },
+    {
+      "asset": "ETH",
+      "free": "3.20140000",
+      "locked": "0.50000000"
+    },
+    {
+      "asset": "BNB",
+      "free": "12.40000000",
+      "locked": "0.00000000"
+    },
+    {
+      "asset": "SOL",
+      "free": "85.00000000",
+      "locked": "5.00000000"
+    },
+    {
+      "asset": "U
+... (truncated)
+```
+
+</details>
+
+### box-api (port 8083) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | GET | /2.0/users/me | 200 | current user |
+| PASS | GET | /2.0/folders/0 | 200 | get root folder |
+| PASS | GET | /2.0/folders/0/items?limit=10&offset=0 | 200 | get folder items |
+| PASS | GET | /2.0/folders/160001/items | 200 | get marketing folder items |
+| PASS | GET | /2.0/files/500001 | 200 | get file |
+| PASS | GET | /2.0/search?query=campaign&type=file | 200 | search |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**GET current user** — `/2.0/users/me` (status 200)
+
+```
+{
+  "type": "user",
+  "id": "11446498",
+  "name": "Aaron Levie",
+  "login": "aaron@example.com",
+  "role": "admin",
+  "status": "active",
+  "language": "en",
+  "timezone": "America/Los_Angeles",
+  "space_amount": 10995116277760,
+  "space_used": 2147483648,
+  "max_upload_size": 5368709120,
+  "job_title": "CEO",
+  "phone": "+1-650-555-0100",
+  "created_at": "2025-09-01T10:00:00-07:00"
+}
+```
+
+**GET get root folder** — `/2.0/folders/0` (status 200)
+
+```
+{
+  "type": "folder",
+  "id": "0",
+  "name": "All Files",
+  "description": "Root folder",
+  "size": 0,
+  "created_at": "2025-09-01T10:00:00-07:00",
+  "modified_at": "2026-05-20T14:00:00-07:00",
+  "item_count": 3,
+  "parent": null,
+  "owned_by": {
+    "type": "user",
+    "id": "11446498",
+    "name": "Aaron Levie",
+    "login": "aaron@example.com"
+  }
+}
+```
+
+**GET get folder items** — `/2.0/folders/0/items?limit=10&offset=0` (status 200)
+
+```
+{
+  "total_count": 3,
+  "entries": [
+    {
+      "type": "folder",
+      "id": "160001",
+      "name": "Marketing",
+      "description": "Marketing collateral and assets",
+      "size": 7086080,
+      "created_at": "2025-10-01T09:00:00-07:00",
+      "modified_at": "2026-05-18T16:20:00-07:00",
+      "item_count": 3,
+      "parent": {
+        "type": "folder",
+        "id": "0",
+        "name": "All Files"
+      },
+      "owned_by": {
+        "type": "user",
+        "id": "11446498",
+        "name": "Aaron Levie",
+        "login": "aaron@example.com"
+      }
+    },
+    {
+      "type": "folder",
+
+... (truncated)
+```
+
+**GET get marketing folder items** — `/2.0/folders/160001/items` (status 200)
+
+```
+{
+  "total_count": 3,
+  "entries": [
+    {
+      "type": "folder",
+      "id": "160004",
+      "name": "Campaigns",
+      "description": "Active campaign folder",
+      "size": 72704,
+      "created_at": "2026-02-10T11:00:00-08:00",
+      "modified_at": "2026-05-10T12:00:00-08:00",
+      "item_count": 1,
+      "parent": {
+        "type": "folder",
+        "id": "160001",
+        "name": "Marketing"
+      },
+      "owned_by": {
+        "type": "user",
+        "id": "22893011",
+        "name": "Priya Nair",
+        "login": "priya@example.com"
+      }
+    },
+    {
+      "type": "file",
+      "id
+... (truncated)
+```
+
+**GET get file** — `/2.0/files/500001` (status 200)
+
+```
+{
+  "type": "file",
+  "id": "500001",
+  "name": "brand-guidelines.pdf",
+  "description": "Brand guidelines v3",
+  "size": 1843200,
+  "extension": "pdf",
+  "sha1": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345601",
+  "created_at": "2026-03-01T10:00:00-08:00",
+  "modified_at": "2026-05-12T09:00:00-07:00",
+  "parent": {
+    "type": "folder",
+    "id": "160001",
+    "name": "Marketing"
+  },
+  "owned_by": {
+    "type": "user",
+    "id": "11446498",
+    "name": "Aaron Levie",
+    "login": "aaron@example.com"
+  }
+}
+```
+
+**GET search** — `/2.0/search?query=campaign&type=file` (status 200)
+
+```
+{
+  "total_count": 1,
+  "entries": [
+    {
+      "type": "file",
+      "id": "500003",
+      "name": "q2-campaign-plan.docx",
+      "description": "Q2 campaign plan",
+      "size": 72704,
+      "extension": "docx",
+      "sha1": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345603",
+      "created_at": "2026-04-15T09:20:00-07:00",
+      "modified_at": "2026-05-10T12:00:00-07:00",
+      "parent": {
+        "type": "folder",
+        "id": "160004",
+        "name": "Campaigns"
+      },
+      "owned_by": {
+        "type": "user",
+        "id": "22893011",
+        "name": "Priya Nair",
+        "login": "priya
 ```
 
 </details>
@@ -2169,7 +3866,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 ```
 {
   "resource": {
-    "uri": "https://api.calendly.com/scheduled_events/sev-5bb41cfb3bbb",
+    "uri": "https://api.calendly.com/scheduled_events/sev-a260b789fd8a",
     "name": "Intro Call",
     "status": "active",
     "start_time": "2026-06-03T17:00:00.000000Z",
@@ -2185,7 +3882,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
       }
     ],
     "cancellation": null,
-    "created_at": "2026-05-28T08:09:00.000000Z"
+    "created_at": "2026-06-09T11:42:02.000000Z"
   }
 }
 ```
@@ -2374,7 +4071,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
   "errors": [],
   "messages": [],
   "result": {
-    "id": "ab55543b12cf41cb9e66cd184cccbe064b360d91",
+    "id": "cae9c5b4b69e4e10ad27d8893b6eda2f28e85139",
     "zone_id": "zone1aaaa1111bbbb2222cccc3333dddd",
     "type": "A",
     "name": "docs.orbit-labs.com",
@@ -2382,8 +4079,8 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
     "ttl": 3600,
     "proxied": true,
     "priority": 0,
-    "created_on": "2026-05-28T08:09:01.000000Z",
-    "modified_on": "2026-05-28T08:09:01.000000Z"
+    "created_on": "2026-06-09T11:42:03.000000Z",
+    "modified_on": "2026-06-09T11:42:03.000000Z"
   }
 }
 ```
@@ -2400,12 +4097,12 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
     "zone_id": "zone1aaaa1111bbbb2222cccc3333dddd",
     "type": "A",
     "name": "orbit-labs.com",
-    "content": "203.0.113.11",
+    "content": "203.0.113.10",
     "ttl": 1,
-    "proxied": false,
+    "proxied": true,
     "priority": 0,
     "created_on": "2024-01-10T10:00:00.000Z",
-    "modified_on": "2026-05-28T08:09:01.000000Z"
+    "modified_on": "2026-05-20T10:00:00.000Z"
   }
 }
 ```
@@ -2590,7 +4287,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 ```
 {
   "data": {
-    "id": "351add8b-439d-48b6-961f-545be85d5715",
+    "id": "21049c17-6d08-4124-ba09-024078570db5",
     "status": "completed",
     "resource": "buy",
     "amount": {
@@ -2606,8 +4303,8 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
       "currency": "USD"
     },
     "account_id": "acct-btc-001",
-    "transaction_id": "2f959ab9-1696-4945-a30b-dd883b40ea5a",
-    "created_at": "2026-05-28T08:09:01Z"
+    "transaction_id": "8a19bae7-fa4f-486c-8739-4521cb245411",
+    "created_at": "2026-06-09T11:42:03Z"
   }
 }
 ```
@@ -2617,7 +4314,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 ```
 {
   "data": {
-    "id": "e28802ab-f202-4f14-a913-ab11220d4c78",
+    "id": "0b5563e2-e0fa-463e-a1bc-47c7793d325f",
     "status": "completed",
     "resource": "sell",
     "amount": {
@@ -2633,8 +4330,8 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
       "currency": "USD"
     },
     "account_id": "acct-eth-002",
-    "transaction_id": "67e79806-1864-42c4-a178-350436c89b69",
-    "created_at": "2026-05-28T08:09:01Z"
+    "transaction_id": "d6095908-475a-40c9-8c44-39fffdbc9608",
+    "created_at": "2026-06-09T11:42:03Z"
   }
 }
 ```
@@ -2645,28 +4342,29 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 {
   "data": [
     {
-      "id": "2f959ab9-1696-4945-a30b-dd883b40ea5a",
-      "account_id": "acct-btc-001",
-      "type": "buy",
-      "status": "completed",
-      "amount": {
-        "amount": "0.05000000",
-        "currency": "BTC"
-      },
-      "native_amount": {
-        "amount": "3250.00",
-        "currency": "USD"
-      },
-      "description": "Buy 0.05 BTC",
-      "created_at": "2026-05-28T08:09:01Z",
-      "updated_at": "2026-05-28T08:09:01Z"
-    },
-    {
       "id": "txn-btc-003",
       "account_id": "acct-btc-001",
       "type": "sell",
       "status": "completed",
       "amount": {
+        "amount": "-0.05000000",
+        "currency": "BTC"
+      },
+      "native_amount": {
+        "amount": "-3250.00",
+        "currency": "USD"
+      },
+      "description": "Sold 0.05 BTC",
+      "created_at": "2026-04-10T09:15:00Z",
+      "updated_at": "2026-04-10T09:15:00Z"
+    },
+    {
+      "id": "txn-btc-002",
+      "account_id": "acct-btc-001",
+      "type": "buy",
+      "status": "completed",
+      "amount": {
+        "amount": "0.
 ... (truncated)
 ```
 
@@ -2786,7 +4484,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 
 ```
 {
-  "id": "7138218",
+  "id": "7644733",
   "type": "page",
   "status": "current",
   "title": "Incident Postmortem Template",
@@ -2800,10 +4498,10 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
     "createdBy": {
       "username": "apiuser"
     },
-    "createdDate": "2026-05-28T08:09:02.000Z"
+    "createdDate": "2026-06-09T11:42:04.000Z"
   },
   "_links": {
-    "webui": "/spaces/ENG/pages/7138218"
+    "webui": "/spaces/ENG/pages/7644733"
   },
   "ancestors": [
     {
@@ -3065,6 +4763,345 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 
 </details>
 
+### contentful-api (port 8066) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | GET | /spaces/space-orbit-cms | 200 | get space |
+| PASS | GET | /spaces/space-orbit-cms/environments/master/content_types | 200 | list content types |
+| PASS | GET | /spaces/space-orbit-cms/environments/master/content_types/blogPost | 200 | get content type |
+| PASS | GET | /spaces/space-orbit-cms/environments/master/entries?content_type=blogPost&limit=10 | 200 | list entries |
+| PASS | GET | /spaces/space-orbit-cms/environments/master/entries?content_type=blogPost&fields.slug=getting-started | 200 | list entries by field |
+| PASS | GET | /spaces/space-orbit-cms/environments/master/entries/post-getting-started | 200 | get entry |
+| PASS | POST | /spaces/space-orbit-cms/environments/master/entries | 201 | create entry |
+| PASS | PUT | /spaces/space-orbit-cms/environments/master/entries/post-draft-webhooks | 200 | update entry |
+| PASS | DELETE | /spaces/space-orbit-cms/environments/master/entries/post-content-modeling | 200 | delete entry |
+| PASS | GET | /spaces/space-orbit-cms/environments/master/assets | 200 | list assets |
+| PASS | GET | /spaces/space-orbit-cms/environments/master/assets/asset-hero-1 | 200 | get asset |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**GET get space** — `/spaces/space-orbit-cms` (status 200)
+
+```
+{
+  "id": "space-orbit-cms",
+  "name": "Orbit Labs CMS",
+  "default_environment": "master",
+  "locales": [
+    "en-US"
+  ],
+  "created_at": "2025-09-01T09:00:00.000Z",
+  "organization": "org-orbit-labs"
+}
+```
+
+**GET list content types** — `/spaces/space-orbit-cms/environments/master/content_types` (status 200)
+
+```
+{
+  "sys": {
+    "type": "Array"
+  },
+  "total": 3,
+  "skip": 0,
+  "limit": 3,
+  "items": [
+    {
+      "sys": {
+        "id": "blogPost",
+        "type": "ContentType"
+      },
+      "name": "Blog Post",
+      "displayField": "title",
+      "description": "A single article or blog entry",
+      "fields": [
+        {
+          "id": "title",
+          "name": "Title",
+          "type": "Symbol",
+          "required": true
+        },
+        {
+          "id": "slug",
+          "name": "Slug",
+          "type": "Symbol",
+          "required": true
+        },
+        {
+          "id": "body",
+   
+... (truncated)
+```
+
+**GET get content type** — `/spaces/space-orbit-cms/environments/master/content_types/blogPost` (status 200)
+
+```
+{
+  "sys": {
+    "id": "blogPost",
+    "type": "ContentType"
+  },
+  "name": "Blog Post",
+  "displayField": "title",
+  "description": "A single article or blog entry",
+  "fields": [
+    {
+      "id": "title",
+      "name": "Title",
+      "type": "Symbol",
+      "required": true
+    },
+    {
+      "id": "slug",
+      "name": "Slug",
+      "type": "Symbol",
+      "required": true
+    },
+    {
+      "id": "body",
+      "name": "Body",
+      "type": "Text",
+      "required": false
+    },
+    {
+      "id": "author",
+      "name": "Author",
+      "type": "Link",
+      "linkType": "Entry",
+      "requ
+```
+
+**GET list entries** — `/spaces/space-orbit-cms/environments/master/entries?content_type=blogPost&limit=10` (status 200)
+
+```
+{
+  "sys": {
+    "type": "Array"
+  },
+  "total": 3,
+  "skip": 0,
+  "limit": 10,
+  "items": [
+    {
+      "sys": {
+        "id": "post-getting-started",
+        "type": "Entry",
+        "createdAt": "2025-09-10T08:00:00.000Z",
+        "updatedAt": "2025-09-12T14:00:00.000Z",
+        "publishedVersion": 5,
+        "contentType": {
+          "sys": {
+            "type": "Link",
+            "linkType": "ContentType",
+            "id": "blogPost"
+          }
+        }
+      },
+      "fields": {
+        "title": "Getting Started with Headless CMS",
+        "slug": "getting-started",
+        "body": 
+... (truncated)
+```
+
+**GET list entries by field** — `/spaces/space-orbit-cms/environments/master/entries?content_type=blogPost&fields.slug=getting-started` (status 200)
+
+```
+{
+  "sys": {
+    "type": "Array"
+  },
+  "total": 1,
+  "skip": 0,
+  "limit": 100,
+  "items": [
+    {
+      "sys": {
+        "id": "post-getting-started",
+        "type": "Entry",
+        "createdAt": "2025-09-10T08:00:00.000Z",
+        "updatedAt": "2025-09-12T14:00:00.000Z",
+        "publishedVersion": 5,
+        "contentType": {
+          "sys": {
+            "type": "Link",
+            "linkType": "ContentType",
+            "id": "blogPost"
+          }
+        }
+      },
+      "fields": {
+        "title": "Getting Started with Headless CMS",
+        "slug": "getting-started",
+        "body":
+```
+
+**GET get entry** — `/spaces/space-orbit-cms/environments/master/entries/post-getting-started` (status 200)
+
+```
+{
+  "sys": {
+    "id": "post-getting-started",
+    "type": "Entry",
+    "createdAt": "2025-09-10T08:00:00.000Z",
+    "updatedAt": "2025-09-12T14:00:00.000Z",
+    "publishedVersion": 5,
+    "contentType": {
+      "sys": {
+        "type": "Link",
+        "linkType": "ContentType",
+        "id": "blogPost"
+      }
+    }
+  },
+  "fields": {
+    "title": "Getting Started with Headless CMS",
+    "slug": "getting-started",
+    "body": "Headless CMS decouples content from presentation.",
+    "author": {
+      "sys": {
+        "type": "Link",
+        "linkType": "Entry",
+        "id": "author-mara"
+    
+```
+
+**POST create entry** — `/spaces/space-orbit-cms/environments/master/entries` (status 201)
+
+```
+{
+  "sys": {
+    "id": "d10ffd6ede424dbf",
+    "type": "Entry",
+    "createdAt": "2026-06-09T11:42:05.000Z",
+    "updatedAt": "2026-06-09T11:42:05.000Z",
+    "publishedVersion": 0,
+    "contentType": {
+      "sys": {
+        "type": "Link",
+        "linkType": "ContentType",
+        "id": "blogPost"
+      }
+    }
+  },
+  "fields": {
+    "title": "Scaling Content Delivery",
+    "slug": "scaling-content-delivery",
+    "body": "Tips for a fast CDN-backed delivery.",
+    "published": false
+  }
+}
+```
+
+**PUT update entry** — `/spaces/space-orbit-cms/environments/master/entries/post-draft-webhooks` (status 200)
+
+```
+{
+  "sys": {
+    "id": "post-draft-webhooks",
+    "type": "Entry",
+    "createdAt": "2025-11-05T08:00:00.000Z",
+    "updatedAt": "2026-06-09T11:42:05.000Z",
+    "publishedVersion": 0,
+    "contentType": {
+      "sys": {
+        "type": "Link",
+        "linkType": "ContentType",
+        "id": "blogPost"
+      }
+    }
+  },
+  "fields": {
+    "title": "Using Webhooks Effectively",
+    "slug": "using-webhooks",
+    "body": "Draft post about webhook patterns.",
+    "author": {
+      "sys": {
+        "type": "Link",
+        "linkType": "Entry",
+        "id": "author-mara"
+      }
+    },
+    "publishe
+```
+
+**DELETE delete entry** — `/spaces/space-orbit-cms/environments/master/entries/post-content-modeling` (status 200)
+
+```
+{
+  "id": "post-content-modeling",
+  "deleted": true
+}
+```
+
+**GET list assets** — `/spaces/space-orbit-cms/environments/master/assets` (status 200)
+
+```
+{
+  "sys": {
+    "type": "Array"
+  },
+  "total": 4,
+  "skip": 0,
+  "limit": 4,
+  "items": [
+    {
+      "sys": {
+        "id": "asset-hero-1",
+        "type": "Asset",
+        "createdAt": "2025-09-09T08:00:00.000Z",
+        "updatedAt": "2025-09-09T08:00:00.000Z",
+        "publishedVersion": 2
+      },
+      "fields": {
+        "title": "Headless diagram",
+        "description": "Diagram of headless architecture",
+        "file": {
+          "url": "https://assets.example.com/headless-diagram.png",
+          "fileName": "headless-diagram.png",
+          "contentType": "image/png",
+          "
+... (truncated)
+```
+
+**GET get asset** — `/spaces/space-orbit-cms/environments/master/assets/asset-hero-1` (status 200)
+
+```
+{
+  "sys": {
+    "id": "asset-hero-1",
+    "type": "Asset",
+    "createdAt": "2025-09-09T08:00:00.000Z",
+    "updatedAt": "2025-09-09T08:00:00.000Z",
+    "publishedVersion": 2
+  },
+  "fields": {
+    "title": "Headless diagram",
+    "description": "Diagram of headless architecture",
+    "file": {
+      "url": "https://assets.example.com/headless-diagram.png",
+      "fileName": "headless-diagram.png",
+      "contentType": "image/png",
+      "details": {
+        "size": 184320
+      }
+    }
+  }
+}
+```
+
+</details>
+
 ### datadog-api (port 8048) — server: started
 
 | Result | Method | Path | Status | Endpoint |
@@ -3211,8 +5248,8 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
   "tags": [
     "service:auth-service"
   ],
-  "created": "2026-05-28T08:09:02+00:00",
-  "modified": "2026-05-28T08:09:02+00:00"
+  "created": "2026-06-09T11:42:05+00:00",
+  "modified": "2026-06-09T11:42:05+00:00"
 }
 ```
 
@@ -3225,14 +5262,14 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
   "type": "metric alert",
   "query": "avg(last_5m):avg:trace.http.request.duration{service:auth-service} > 0.6",
   "message": "Auth API latency is high",
-  "overall_state": "OK",
+  "overall_state": "Alert",
   "priority": 1,
   "tags": [
     "service:auth-service",
     "team:platform"
   ],
   "created": "2025-11-01T10:00:00+00:00",
-  "modified": "2026-05-28T08:09:02+00:00"
+  "modified": "2026-05-26T09:00:00+00:00"
 }
 ```
 
@@ -3325,7 +5362,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
       "service:auth-service",
       "event:rollback"
     ],
-    "date_happened": 1779955742
+    "date_happened": 1781005325
   }
 }
 ```
@@ -3597,14 +5634,14 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 
 ```
 {
-  "id": "1509468536018305025",
+  "id": "1513870805398061057",
   "channel_id": "800100200300400001",
   "author": {
     "id": "500100200300400001",
     "username": "amelia"
   },
   "content": "Posting from the mock API.",
-  "timestamp": "2026-05-28T08:09:03.000000+00:00",
+  "timestamp": "2026-06-09T11:42:06.000000+00:00",
   "pinned": false,
   "edited_timestamp": null
 }
@@ -3663,10 +5700,10 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 
 ```
 {
-  "envelopeId": "2726cda5-169d-4d8c-bd74-97691c0304b8",
+  "envelopeId": "5d2fe580-ca34-42ef-b182-0f2154da079c",
   "status": "sent",
-  "statusDateTime": "2026-05-28T08:09:04.0000000Z",
-  "uri": "/envelopes/2726cda5-169d-4d8c-bd74-97691c0304b8"
+  "statusDateTime": "2026-06-09T11:42:06.0000000Z",
+  "uri": "/envelopes/5d2fe580-ca34-42ef-b182-0f2154da079c"
 }
 ```
 
@@ -3694,7 +5731,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 {
   "envelopeId": "env-2001",
   "status": "voided",
-  "statusDateTime": "2026-05-28T08:09:04.0000000Z"
+  "statusDateTime": "2026-06-09T11:42:06.0000000Z"
 }
 ```
 
@@ -3915,10 +5952,10 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 
 ```
 {
-  "cart_id": "cart-fc6ae700",
+  "cart_id": "cart-19748e70",
   "store_id": "store-sakura",
   "items": [],
-  "created_at": "2026-05-28T08:09:04Z",
+  "created_at": "2026-06-09T11:42:07Z",
   "subtotal": 0.0,
   "delivery_fee": 2.99,
   "service_fee": 0.0,
@@ -3954,8 +5991,185 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
       "item_id": "item-sak-003",
       "quantity": 1,
       "unit_price": 7.5,
-      "line_total": 7.5
-    
+      "line_total": 7.5,
+   
+```
+
+</details>
+
+### dropbox-api (port 8082) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | POST | /2/users/get_current_account | 200 | get current account |
+| PASS | POST | /2/files/list_folder | 200 | list folder root |
+| PASS | POST | /2/files/list_folder | 200 | list folder documents |
+| PASS | POST | /2/files/get_metadata | 200 | get metadata |
+| PASS | POST | /2/files/search_v2 | 200 | search v2 |
+| PASS | POST | /2/sharing/list_shared_links | 200 | list shared links |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**POST get current account** — `/2/users/get_current_account` (status 200)
+
+```
+{
+  "account_id": "dbid:AAH4f99T0taONIb-OurWxbNQ6ywGRopQngc",
+  "name": {
+    "given_name": "Maya",
+    "surname": "Robinson",
+    "display_name": "Maya Robinson",
+    "familiar_name": "Maya",
+    "abbreviated_name": "MR"
+  },
+  "email": "maya.robinson@example.com",
+  "email_verified": true,
+  "country": "US",
+  "locale": "en",
+  "account_type": {
+    ".tag": "business"
+  },
+  "is_paired": false,
+  "disabled": false
+}
+```
+
+**POST list folder root** — `/2/files/list_folder` (status 200)
+
+```
+{
+  "entries": [
+    {
+      ".tag": "folder",
+      "id": "id:a4ayc_80000000000000000000001",
+      "name": "Documents",
+      "path_lower": "/documents",
+      "path_display": "/Documents"
+    },
+    {
+      ".tag": "folder",
+      "id": "id:a4ayc_80000000000000000000002",
+      "name": "Photos",
+      "path_lower": "/photos",
+      "path_display": "/Photos"
+    },
+    {
+      ".tag": "folder",
+      "id": "id:a4ayc_80000000000000000000003",
+      "name": "Projects",
+      "path_lower": "/projects",
+      "path_display": "/Projects"
+    }
+  ],
+  "cursor": "AAH4f99T0taONIb-mock-cursor",
+  "ha
+```
+
+**POST list folder documents** — `/2/files/list_folder` (status 200)
+
+```
+{
+  "entries": [
+    {
+      ".tag": "file",
+      "id": "id:a4ayc_80000000000000000000004",
+      "name": "Q2-Report.pdf",
+      "path_lower": "/documents/q2-report.pdf",
+      "path_display": "/Documents/Q2-Report.pdf",
+      "size": 284517,
+      "client_modified": "2026-05-10T14:32:00Z",
+      "server_modified": "2026-05-10T14:32:00Z",
+      "rev": "0123456789abcdef01000001",
+      "is_downloadable": true
+    },
+    {
+      ".tag": "file",
+      "id": "id:a4ayc_80000000000000000000005",
+      "name": "Budget-2026.xlsx",
+      "path_lower": "/documents/budget-2026.xlsx",
+      "path_display
+... (truncated)
+```
+
+**POST get metadata** — `/2/files/get_metadata` (status 200)
+
+```
+{
+  ".tag": "file",
+  "id": "id:a4ayc_80000000000000000000004",
+  "name": "Q2-Report.pdf",
+  "path_lower": "/documents/q2-report.pdf",
+  "path_display": "/Documents/Q2-Report.pdf",
+  "size": 284517,
+  "client_modified": "2026-05-10T14:32:00Z",
+  "server_modified": "2026-05-10T14:32:00Z",
+  "rev": "0123456789abcdef01000001",
+  "is_downloadable": true
+}
+```
+
+**POST search v2** — `/2/files/search_v2` (status 200)
+
+```
+{
+  "matches": [
+    {
+      "match_type": {
+        ".tag": "filename"
+      },
+      "metadata": {
+        ".tag": "metadata",
+        "metadata": {
+          ".tag": "file",
+          "id": "id:a4ayc_80000000000000000000004",
+          "name": "Q2-Report.pdf",
+          "path_lower": "/documents/q2-report.pdf",
+          "path_display": "/Documents/Q2-Report.pdf",
+          "size": 284517,
+          "client_modified": "2026-05-10T14:32:00Z",
+          "server_modified": "2026-05-10T14:32:00Z",
+          "rev": "0123456789abcdef01000001",
+          "is_downloadable": true
+        }
+      }
+ 
+```
+
+**POST list shared links** — `/2/sharing/list_shared_links` (status 200)
+
+```
+{
+  "links": [
+    {
+      ".tag": "file",
+      "id": "sl_0001",
+      "url": "https://www.dropbox.com/s/abc123def456/Q2-Report.pdf?dl=0",
+      "name": "Q2-Report.pdf",
+      "path_lower": "/documents/q2-report.pdf",
+      "link_permissions": {
+        "resolved_visibility": {
+          ".tag": "public"
+        },
+        "can_revoke": true
+      }
+    },
+    {
+      ".tag": "file",
+      "id": "sl_0002",
+      "url": "https://www.dropbox.com/s/ghi789jkl012/Budget-2026.xlsx?dl=0",
+      "name": "Budget-2026.xlsx",
+      "path_lower": "/documents/budget-2026.xlsx",
+      "link_permissions": {
+... (truncated)
 ```
 
 </details>
@@ -4060,11 +6274,9 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
     "shop_name": "WalshWoodcraft",
     "user_id": 81726354,
     "title": "Hand-Carved Woodwork & Artisan Crafts \u2022 Pacific Northwest",
-    "announcement": "Summer sale! 15% off all mugs through July.",
+    "announcement": "Welcome to Walsh Woodcraft! Every piece is hand-carved in my Tacoma, WA workshop using locally-sourced Pacific Northwest woods. I also sell woven baskets, beaded jewelry, and handmade instruments at the Steilacoom Artisan Market. Please allow 1-3 weeks for made-to-order items. Custom wildlife carvings and fly boxes available\u2014just message me!",
     "currency_code": "USD",
-    "is_vacation": false,
-    "vacation_message": null,
-    "sale_message": "Thank you for your order! I\u2019ll begin working on your piece within 3-5 business days. Each item is hand-carved, so natural wood grain variations make every piece one of a kind. Don\u2019t hesitate to reach out if you have any qu
+    
 ... (truncated)
 ```
 
@@ -4327,15 +6539,14 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
     "shop_id": 29457183,
     "title": "Hand-Carved Mortar & Pestle Set - Red Cedar",
     "description": "Solid red cedar mortar and pestle set hand-carved in my Tacoma workshop. The mortar stands approximately 7 inches tall with a 5-inch opening. Pestle is shaped for a comfortable grip. Finished with food-safe mineral oil. Each set shows unique grain patterns.",
-    "price": 35.0,
+    "price": 180.0,
     "currency_code": "USD",
-    "quantity": 12,
+    "quantity": 3,
     "taxonomy_id": 6516,
     "tags": [
-      "ceramic mug",
-      "handmade mug",
-      "pottery mug",
-   
+      "mortar and pestle",
+      "wood mortar",
+      "hand carved"
 ... (truncated)
 ```
 
@@ -4351,7 +6562,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
     "description": "Starter kit for beginner woodcarvers. Includes two basswood blanks, a basic carving knife, a gouge, sandpaper, and a printed guide with three projects. NOT YET AVAILABLE - assembling kits for summer workshops at the Tacoma Community Craft Center.",
     "price": 40.0,
     "currency_code": "USD",
-    "quantity": 5,
+    "quantity": 0,
     "taxonomy_id": 6516,
     "tags": [
       "woodcarving kit",
@@ -4696,7 +6907,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
     "address_state": "TN",
     "address_zip": "37201",
     "address_country": "US",
-    "status": "shipped",
+    "status": "paid",
     "payment_method": "cc",
     "grandtotal": 41.99,
     "subtotal": 35.0,
@@ -4705,7 +6916,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
     "discount_amt": 0.0,
     "gift_message": null,
     "is_gift": false,
-    "shippin
+    "shipping_c
 ... (truncated)
 ```
 
@@ -4725,14 +6936,14 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
     "address_state": "NY",
     "address_zip": "11201",
     "address_country": "US",
-    "status": "shipped",
+    "status": "paid",
     "payment_method": "paypal",
     "grandtotal": 580.99,
     "subtotal": 550.0,
     "total_shipping_cost": 24.99,
     "total_tax_cost": 6.0,
     "discount_amt": 0.0,
-    "gift_message": "Congratulations on 
+    "gift_message": "Congratulations on you
 ... (truncated)
 ```
 
@@ -5174,7 +7385,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 
 ```
 {
-  "id": "evt-f584bc4b",
+  "id": "evt-7e38ecc6",
   "organization_id": "org-cascade",
   "name": {
     "text": "Service-mesh deep dive",
@@ -5190,7 +7401,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
   "is_free": false,
   "online_event": false,
   "url": "",
-  "created": "2026-05-28T08:09:06Z",
+  "created": "2026-06-09T11:42:09Z",
   "start": {
     "timezone": "America/Los_Angeles",
     "utc": "2026-08-15T17:00:00Z"
@@ -5211,7 +7422,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
     "html": "<p>Bay Area auth + identity meetup</p>"
   },
   "summary": "Lightning talks + networking on auth/identity.",
-  "status": "live",
+  "status": "draft",
   "start_utc": "2026-07-09T01:00:00Z",
   "end_utc": "2026-07-09T04:00:00Z",
   "timezone": "America/Los_Angeles",
@@ -5222,7 +7433,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
   "url": "https://eventbrite.example.com/e/auth-meetup",
   "created": "2026-05-20T10:00:00Z",
   "start": {
-    "timezone": "America/Los_
+    "timezone": "America/Los
 ... (truncated)
 ```
 
@@ -5237,7 +7448,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
     "html": "<p>Saturday Presidio loop run</p>"
   },
   "summary": "5 mile group run with optional coffee after.",
-  "status": "canceled",
+  "status": "live",
   "start_utc": "2026-05-31T15:00:00Z",
   "end_utc": "2026-05-31T17:00:00Z",
   "timezone": "America/Los_Angeles",
@@ -5248,7 +7459,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
   "url": "https://eventbrite.example.com/e/presidio-run",
   "created": "2026-05-10T10:00:00Z",
   "start": {
-    "timezone": "America/Los_
+    "timezone": "America/Los_Ange
 ... (truncated)
 ```
 
@@ -5317,7 +7528,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 
 ```
 {
-  "id": "tc-72080a6a",
+  "id": "tc-6d40d5ec",
   "event_id": "evt-7000003",
   "name": "Early bird",
   "quantity_total": 30,
@@ -5325,8 +7536,8 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
   "cost": 1500,
   "fee": 150,
   "free": false,
-  "sales_start": "2026-05-28T08:09:06Z",
-  "sales_end": "2026-05-28T08:09:06Z"
+  "sales_start": "2026-06-09T11:42:09Z",
+  "sales_end": "2026-06-09T11:42:09Z"
 }
 ```
 
@@ -5365,14 +7576,14 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 
 ```
 {
-  "id": "att-dd960acb",
+  "id": "att-b0cbd6e1",
   "event_id": "evt-7000004",
   "ticket_class_id": "tc-005",
   "name": "Helena Park",
   "email": "helena@orbit-labs.com",
   "status": "attending",
   "checked_in": false,
-  "created": "2026-05-28T08:09:06Z"
+  "created": "2026-06-09T11:42:09Z"
 }
 ```
 
@@ -5386,9 +7597,547 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
   "name": "Amelia Ortega",
   "email": "amelia@orbit-labs.com",
   "status": "attending",
-  "checked_in": true,
+  "checked_in": false,
   "created": "2026-04-05T10:00:00Z"
 }
+```
+
+</details>
+
+### fedex-api (port 8095) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | POST | /rate/v1/rates/quotes | 200 | rate quote |
+| PASS | POST | /ship/v1/shipments | 200 | create shipment |
+| PASS | POST | /track/v1/trackingnumbers | 200 | track |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**POST rate quote** — `/rate/v1/rates/quotes` (status 200)
+
+```
+{
+  "output": {
+    "rateReplyDetails": [
+      {
+        "serviceType": "FEDEX_GROUND",
+        "serviceName": "FedEx Ground",
+        "packagingType": "YOUR_PACKAGING",
+        "commit": {
+          "dateDetail": {
+            "dayCxsFormat": "2026-05-29"
+          },
+          "transitDays": 4
+        },
+        "ratedShipmentDetails": [
+          {
+            "rateType": "ACCOUNT",
+            "totalNetCharge": 18.45,
+            "currency": "USD"
+          }
+        ]
+      },
+      {
+        "serviceType": "FEDEX_2_DAY",
+        "serviceName": "FedEx 2Day",
+        "packagingType": "YOU
+... (truncated)
+```
+
+**POST create shipment** — `/ship/v1/shipments` (status 200)
+
+```
+{
+  "output": {
+    "transactionShipments": [
+      {
+        "serviceType": "FEDEX_GROUND",
+        "serviceName": "FedEx Ground",
+        "shipDatestamp": "2026-06-09",
+        "masterTrackingNumber": "794612035895",
+        "pieceResponses": [
+          {
+            "trackingNumber": "794612035895",
+            "netChargeAmount": 18.45,
+            "currency": "USD",
+            "packageDocuments": [
+              {
+                "contentType": "LABEL",
+                "docType": "PDF",
+                "url": "https://fedex.example/labels/794612035895.pdf"
+              }
+            ]
+ 
+```
+
+**POST track** — `/track/v1/trackingnumbers` (status 200)
+
+```
+{
+  "output": {
+    "completeTrackResults": [
+      {
+        "trackingNumber": "794612035840",
+        "trackResults": [
+          {
+            "trackingNumberInfo": {
+              "trackingNumber": "794612035840",
+              "carrierCode": "FDXG"
+            },
+            "latestStatusDetail": {
+              "code": "DL",
+              "description": "Delivered",
+              "scanLocation": {
+                "city": "New York, NY"
+              }
+            },
+            "serviceDetail": {
+              "description": "FedEx Ground"
+            },
+            "dateAndTimes": [
+   
+```
+
+</details>
+
+### figma-api (port 8079) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | GET | /v1/me | 200 | get me |
+| PASS | GET | /v1/teams/team-501/projects | 200 | team projects |
+| PASS | GET | /v1/projects/proj-201/files | 200 | project files |
+| PASS | GET | /v1/files/FK001abcdefg | 200 | get file |
+| PASS | GET | /v1/files/FK001abcdefg/nodes?ids=5:10,5:20 | 200 | get file nodes |
+| PASS | GET | /v1/files/FK001abcdefg/comments | 200 | get comments |
+| PASS | POST | /v1/files/FK001abcdefg/comments | 201 | create comment |
+| PASS | GET | /v1/files/FK004vwxyz12/components | 200 | get components |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**GET get me** — `/v1/me` (status 200)
+
+```
+{
+  "id": "user-1001",
+  "handle": "Priya Nair",
+  "email": "priya@orbit-labs.example.com",
+  "img_url": "https://figma-avatars.example.com/user-1001.png"
+}
+```
+
+**GET team projects** — `/v1/teams/team-501/projects` (status 200)
+
+```
+{
+  "name": "Orbit Labs Design",
+  "projects": [
+    {
+      "id": "proj-201",
+      "name": "Mobile App"
+    },
+    {
+      "id": "proj-202",
+      "name": "Marketing Website"
+    },
+    {
+      "id": "proj-203",
+      "name": "Design System"
+    }
+  ]
+}
+```
+
+**GET project files** — `/v1/projects/proj-201/files` (status 200)
+
+```
+{
+  "name": "Mobile App",
+  "files": [
+    {
+      "key": "FK001abcdefg",
+      "name": "Onboarding Flow",
+      "thumbnail_url": "https://figma-thumbs.example.com/FK001.png",
+      "last_modified": "2026-05-22T14:30:00Z"
+    },
+    {
+      "key": "FK002hijklmn",
+      "name": "Checkout Redesign",
+      "thumbnail_url": "https://figma-thumbs.example.com/FK002.png",
+      "last_modified": "2026-05-24T09:12:00Z"
+    }
+  ]
+}
+```
+
+**GET get file** — `/v1/files/FK001abcdefg` (status 200)
+
+```
+{
+  "name": "Onboarding Flow",
+  "role": "owner",
+  "lastModified": "2026-05-22T14:30:00Z",
+  "editorType": "figma",
+  "thumbnailUrl": "https://figma-thumbs.example.com/FK001.png",
+  "version": "4920183",
+  "document": {
+    "id": "0:0",
+    "name": "Document",
+    "type": "DOCUMENT",
+    "children": [
+      {
+        "id": "1:2",
+        "name": "Page 1",
+        "type": "CANVAS",
+        "backgroundColor": {
+          "r": 0.96,
+          "g": 0.96,
+          "b": 0.96,
+          "a": 1
+        },
+        "children": [
+          {
+            "id": "5:10",
+            "name": "Welcome Screen
+... (truncated)
+```
+
+**GET get file nodes** — `/v1/files/FK001abcdefg/nodes?ids=5:10,5:20` (status 200)
+
+```
+{
+  "name": "Onboarding Flow",
+  "lastModified": "2026-05-22T14:30:00Z",
+  "version": "4920183",
+  "nodes": {
+    "5:10": {
+      "document": {
+        "id": "5:10",
+        "name": "Welcome Screen",
+        "type": "FRAME",
+        "absoluteBoundingBox": {
+          "x": 0,
+          "y": 0,
+          "width": 375,
+          "height": 812
+        },
+        "children": [
+          {
+            "id": "5:11",
+            "name": "Headline",
+            "type": "TEXT",
+            "characters": "Welcome to Orbit"
+          },
+          {
+            "id": "5:12",
+            "name": "Nav / Bott
+... (truncated)
+```
+
+**GET get comments** — `/v1/files/FK001abcdefg/comments` (status 200)
+
+```
+{
+  "comments": [
+    {
+      "id": "cmt-9001",
+      "file_key": "FK001abcdefg",
+      "message": "Can we increase the tap target on this button?",
+      "client_meta": {
+        "node_id": "5:12"
+      },
+      "user": {
+        "id": "user-1001",
+        "handle": "Priya Nair",
+        "img_url": "https://figma-avatars.example.com/user-1001.png"
+      },
+      "resolved_at": null,
+      "created_at": "2026-05-22T15:01:00Z"
+    },
+    {
+      "id": "cmt-9002",
+      "file_key": "FK001abcdefg",
+      "message": "Agreed; bumping to 48px height.",
+      "client_meta": {
+        "node_id": "5:12
+... (truncated)
+```
+
+**POST create comment** — `/v1/files/FK001abcdefg/comments` (status 201)
+
+```
+{
+  "id": "cmt-bac45d6c",
+  "file_key": "FK001abcdefg",
+  "message": "Let's align the spacing here.",
+  "client_meta": {
+    "node_id": "5:11"
+  },
+  "user": {
+    "id": "user-1003",
+    "handle": "Mara Lindqvist",
+    "img_url": "https://figma-avatars.example.com/user-1003.png"
+  },
+  "resolved_at": null,
+  "created_at": "2026-06-09T11:42:10Z"
+}
+```
+
+**GET get components** — `/v1/files/FK004vwxyz12/components` (status 200)
+
+```
+{
+  "meta": {
+    "components": [
+      {
+        "key": "comp-btn-primary",
+        "file_key": "FK004vwxyz12",
+        "node_id": "10:21",
+        "name": "Button / Primary",
+        "description": "Primary call to action button"
+      },
+      {
+        "key": "comp-btn-secondary",
+        "file_key": "FK004vwxyz12",
+        "node_id": "10:22",
+        "name": "Button / Secondary",
+        "description": "Secondary action button"
+      },
+      {
+        "key": "comp-input-text",
+        "file_key": "FK004vwxyz12",
+        "node_id": "10:30",
+        "name": "Input / Text",
+        "descrip
+```
+
+</details>
+
+### freshdesk-api (port 8093) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | GET | /api/v2/tickets | 200 | list tickets |
+| PASS | GET | /api/v2/tickets?status=2&priority=2 | 200 | list tickets filtered |
+| PASS | GET | /api/v2/tickets/70001 | 200 | get ticket |
+| PASS | POST | /api/v2/tickets | 201 | create ticket |
+| PASS | PUT | /api/v2/tickets/70001 | 200 | update ticket |
+| PASS | GET | /api/v2/contacts | 200 | list contacts |
+| PASS | GET | /api/v2/agents | 200 | list agents |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**GET list tickets** — `/api/v2/tickets` (status 200)
+
+```
+[
+  {
+    "id": 70001,
+    "subject": "Cannot log in to dashboard",
+    "description": "User reports a 403 error after password reset.",
+    "status": 2,
+    "priority": 2,
+    "requester_id": 90001,
+    "responder_id": 80001,
+    "type": "Incident",
+    "tags": [
+      "login",
+      "auth"
+    ],
+    "created_at": "2026-05-02T09:12:00Z",
+    "updated_at": "2026-05-02T10:01:00Z"
+  },
+  {
+    "id": 70002,
+    "subject": "Invoice charged twice",
+    "description": "Customer was billed twice for the May subscription.",
+    "status": 3,
+    "priority": 3,
+    "requester_id": 90002,
+    "responder
+... (truncated)
+```
+
+**GET list tickets filtered** — `/api/v2/tickets?status=2&priority=2` (status 200)
+
+```
+[
+  {
+    "id": 70001,
+    "subject": "Cannot log in to dashboard",
+    "description": "User reports a 403 error after password reset.",
+    "status": 2,
+    "priority": 2,
+    "requester_id": 90001,
+    "responder_id": 80001,
+    "type": "Incident",
+    "tags": [
+      "login",
+      "auth"
+    ],
+    "created_at": "2026-05-02T09:12:00Z",
+    "updated_at": "2026-05-02T10:01:00Z"
+  }
+]
+```
+
+**GET get ticket** — `/api/v2/tickets/70001` (status 200)
+
+```
+{
+  "id": 70001,
+  "subject": "Cannot log in to dashboard",
+  "description": "User reports a 403 error after password reset.",
+  "status": 2,
+  "priority": 2,
+  "requester_id": 90001,
+  "responder_id": 80001,
+  "type": "Incident",
+  "tags": [
+    "login",
+    "auth"
+  ],
+  "created_at": "2026-05-02T09:12:00Z",
+  "updated_at": "2026-05-02T10:01:00Z"
+}
+```
+
+**POST create ticket** — `/api/v2/tickets` (status 201)
+
+```
+{
+  "id": 70009,
+  "subject": "Billing question",
+  "description": "Please clarify my last invoice.",
+  "status": 2,
+  "priority": 2,
+  "requester_id": 90001,
+  "responder_id": null,
+  "type": "Question",
+  "tags": [
+    "billing"
+  ],
+  "created_at": "2026-06-09T11:42:11Z",
+  "updated_at": "2026-06-09T11:42:11Z"
+}
+```
+
+**PUT update ticket** — `/api/v2/tickets/70001` (status 200)
+
+```
+{
+  "id": 70001,
+  "subject": "Cannot log in to dashboard",
+  "description": "User reports a 403 error after password reset.",
+  "status": 2,
+  "priority": 2,
+  "requester_id": 90001,
+  "responder_id": 80001,
+  "type": "Incident",
+  "tags": [
+    "login",
+    "auth"
+  ],
+  "created_at": "2026-05-02T09:12:00Z",
+  "updated_at": "2026-05-02T10:01:00Z"
+}
+```
+
+**GET list contacts** — `/api/v2/contacts` (status 200)
+
+```
+[
+  {
+    "id": 90001,
+    "name": "Avery Collins",
+    "email": "avery@acme.example",
+    "phone": "+1-202-555-0101",
+    "company_id": 60001,
+    "active": true,
+    "created_at": "2026-04-10T09:00:00Z"
+  },
+  {
+    "id": 90002,
+    "name": "Bianca Ruiz",
+    "email": "bianca@globex.example",
+    "phone": "+1-202-555-0102",
+    "company_id": 60002,
+    "active": true,
+    "created_at": "2026-04-12T09:00:00Z"
+  },
+  {
+    "id": 90003,
+    "name": "Caleb Nguyen",
+    "email": "caleb@initech.example",
+    "phone": "+1-202-555-0103",
+    "company_id": 60003,
+    "active": true,
+    "created_at":
+... (truncated)
+```
+
+**GET list agents** — `/api/v2/agents` (status 200)
+
+```
+[
+  {
+    "id": 80001,
+    "available": true,
+    "ticket_scope": 1,
+    "occasional": false,
+    "created_at": "2026-03-01T09:00:00Z",
+    "contact": {
+      "name": "Priya Sharma",
+      "email": "priya@support.example"
+    }
+  },
+  {
+    "id": 80002,
+    "available": true,
+    "ticket_scope": 1,
+    "occasional": false,
+    "created_at": "2026-03-02T09:00:00Z",
+    "contact": {
+      "name": "Marcus Lee",
+      "email": "marcus@support.example"
+    }
+  },
+  {
+    "id": 80003,
+    "available": false,
+    "ticket_scope": 2,
+    "occasional": true,
+    "created_at": "2026-03-03T09:00:00Z",
+   
+... (truncated)
 ```
 
 </details>
@@ -5578,8 +8327,8 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
     }
   ],
   "milestone": null,
-  "created_at": "2026-05-28T08:09:06Z",
-  "updated_at": "2026-05-28T08:09:06Z",
+  "created_at": "2026-06-09T11:42:11Z",
+  "updated_at": "2026-06-09T11:42:11Z",
   "closed_at": null,
   "pull_request": null
 }
@@ -5607,7 +8356,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
   ],
   "milestone": null,
   "created_at": "2026-04-15T10:00:00Z",
-  "updated_at": "2026-05-28T08:09:06Z",
+  "updated_at": "2026-05-10T14:00:00Z",
   "closed_at": "2026-05-10T14:00:00Z",
   "pull_request": null
 }
@@ -5723,7 +8472,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
   "repo": "auth-api",
   "user": "amelia-ortega",
   "body": "Re-running the load test on N=8 batch now.",
-  "created_at": "2026-05-28T08:09:06Z"
+  "created_at": "2026-06-09T11:42:11Z"
 }
 ```
 
@@ -5888,8 +8637,8 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
   "labels": [
     "security"
   ],
-  "created_at": "2026-05-28T08:09:07.000Z",
-  "updated_at": "2026-05-28T08:09:07.000Z",
+  "created_at": "2026-06-09T11:42:12.000Z",
+  "updated_at": "2026-06-09T11:42:12.000Z",
   "closed_at": null
 }
 ```
@@ -5903,15 +8652,15 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
   "project_id": 101,
   "title": "Add queue-depth metric for dual-writer",
   "description": "Need a gauge for the dual-writer queue depth so we can alert when it grows.",
-  "state": "closed",
+  "state": "opened",
   "author": "amelia-ortega",
   "assignee": "helena-park",
   "labels": [
     "enhancement"
   ],
   "created_at": "2026-05-20T10:00:00.000Z",
-  "updated_at": "2026-05-28T08:09:07.000Z",
-  "closed_at": "2026-05-28T08:09:07.000Z"
+  "updated_at": "2026-05-23T16:00:00.000Z",
+  "closed_at": null
 }
 ```
 
@@ -5955,8 +8704,8 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
   "assignee": "",
   "merge_status": "can_be_merged",
   "draft": false,
-  "created_at": "2026-05-28T08:09:07.000Z",
-  "updated_at": "2026-05-28T08:09:07.000Z",
+  "created_at": "2026-06-09T11:42:12.000Z",
+  "updated_at": "2026-06-09T11:42:12.000Z",
   "merged_at": null
 }
 ```
@@ -5970,7 +8719,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
   "project_id": 101,
   "title": "Introduce dual-write shim",
   "description": "Adds the dual-write shim behind the auth_v2_rollout flag.",
-  "state": "merged",
+  "state": "opened",
   "source_branch": "feature/dual-write-shim",
   "target_branch": "main",
   "author": "amelia-ortega",
@@ -5978,8 +8727,8 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
   "merge_status": "can_be_merged",
   "draft": false,
   "created_at": "2026-05-18T11:00:00.000Z",
-  "updated_at": "2026-05-28T08:09:07.000Z",
-  "merged_at": "2026-05-28T08:09:07.000Z"
+  "updated_at": "2026-05-25T14:00:00.000Z",
+  "merged_at": null
 }
 ```
 
@@ -6107,7 +8856,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 
 ```
 {
-  "id": "Label_81da6a32",
+  "id": "Label_862cb287",
   "name": "Customer escalations",
   "type": "user",
   "messages_total": 0,
@@ -6196,13 +8945,13 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 
 ```
 {
-  "id": "msg-7eb3a7c0f8",
+  "id": "msg-ec4dd5186d",
   "threadId": "thr-101",
   "labelIds": [
     "SENT"
   ],
   "snippet": "Helena \u2014 let's correlate the spike with shim warmup. Pulling timing now.",
-  "internalDate": "1779935948026",
+  "internalDate": "1780985533174",
   "sizeEstimate": 95,
   "payload": {
     "headers": [
@@ -6234,8 +8983,8 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
   "threadId": "thr-101",
   "labelIds": [
     "INBOX",
-    "Label_followup",
-    "Label_orbit"
+    "Label_orbit",
+    "Label_followup"
   ],
   "snippet": "FYI alertmanager fired at 10:42 UTC for auth.refresh p95 > 600ms...",
   "internalDate": "1748005200000",
@@ -6268,8 +9017,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
   "threadId": "thr-105",
   "labelIds": [
     "INBOX",
-    "Label_followup",
-    "STARRED"
+    "Label_followup"
   ],
   "snippet": "Quick reminder about the open house...",
   "internalDate": "1748191500000",
@@ -6291,7 +9039,9 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
       {
         "name": "Subject",
         "value": "Open house this Saturday \u2014 412 Maple Grove"
-   
+      },
+      {
+ 
 ... (truncated)
 ```
 
@@ -6302,8 +9052,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
   "id": "msg-104",
   "threadId": "thr-104",
   "labelIds": [
-    "SPAM",
-    "TRASH"
+    "SPAM"
   ],
   "snippet": "We came across your profile...",
   "internalDate": "1748145600000",
@@ -6328,7 +9077,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
       },
       {
         "name": "Date",
- 
+        "value
 ... (truncated)
 ```
 
@@ -6377,13 +9126,13 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 
 ```
 {
-  "id": "draft-c76042a01e",
+  "id": "draft-3227731602",
   "thread_id": "",
   "to_addr": "jonas@orbit-labs.com",
   "cc_addr": "",
   "subject": "Cutover dry-run notes",
   "body": "Few quick notes from the dry-run...",
-  "updated_at": "2026-05-28T08:09:08Z"
+  "updated_at": "2026-06-09T11:42:13Z"
 }
 ```
 
@@ -6391,13 +9140,13 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 
 ```
 {
-  "id": "msg-44e173a92c",
+  "id": "msg-8d6fb6160c",
   "threadId": "thr-101",
   "labelIds": [
     "SENT"
   ],
   "snippet": "Helena \u2014 adding @jonas. Let's correlate the spike with the shim warmup. Can you pull the timing of the dual-writer flush?\n\n\u2014 Amelia",
-  "internalDate": "1779935948038",
+  "internalDate": "1780985533184",
   "sizeEstimate": 169,
   "payload": {
     "headers": [
@@ -6415,6 +9164,258 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
       },
       {
         "name": 
+... (truncated)
+```
+
+</details>
+
+### google-analytics-api (port 8068) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | GET | /v1beta/properties/412233445 | 200 | get property |
+| PASS | GET | /v1beta/properties/412233445/metadata | 200 | get metadata |
+| PASS | POST | /v1beta/properties/412233445:runReport | 200 | run report by country |
+| PASS | POST | /v1beta/properties/412233445:runReport | 200 | run report by date and device |
+| PASS | POST | /v1beta/properties/412233445:runRealtimeReport | 200 | run realtime report |
+| PASS | POST | /v1beta/properties/412233445:batchRunReports | 200 | batch run reports |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**GET get property** — `/v1beta/properties/412233445` (status 200)
+
+```
+{
+  "property_id": "412233445",
+  "name": "Orbit Labs Website",
+  "currency_code": "USD",
+  "time_zone": "America/New_York",
+  "create_time": "2025-01-15T10:00:00.000Z",
+  "industry_category": "TECHNOLOGY"
+}
+```
+
+**GET get metadata** — `/v1beta/properties/412233445/metadata` (status 200)
+
+```
+{
+  "name": "properties/412233445/metadata",
+  "dimensions": [
+    {
+      "apiName": "date",
+      "uiName": "date",
+      "category": "General"
+    },
+    {
+      "apiName": "country",
+      "uiName": "country",
+      "category": "General"
+    },
+    {
+      "apiName": "pagePath",
+      "uiName": "pagePath",
+      "category": "Page / Screen"
+    },
+    {
+      "apiName": "deviceCategory",
+      "uiName": "deviceCategory",
+      "category": "General"
+    }
+  ],
+  "metrics": [
+    {
+      "apiName": "sessions",
+      "uiName": "sessions",
+      "type": "TYPE_INTEGER"
+    },
+    {
+      "apiNam
+... (truncated)
+```
+
+**POST run report by country** — `/v1beta/properties/412233445:runReport` (status 200)
+
+```
+{
+  "dimensionHeaders": [
+    {
+      "name": "country"
+    }
+  ],
+  "metricHeaders": [
+    {
+      "name": "sessions",
+      "type": "TYPE_INTEGER"
+    },
+    {
+      "name": "activeUsers",
+      "type": "TYPE_INTEGER"
+    }
+  ],
+  "rows": [
+    {
+      "dimensionValues": [
+        {
+          "value": "United States"
+        }
+      ],
+      "metricValues": [
+        {
+          "value": "688"
+        },
+        {
+          "value": "571"
+        }
+      ]
+    },
+    {
+      "dimensionValues": [
+        {
+          "value": "United Kingdom"
+        }
+      ],
+      "metricValues": [
+        
+... (truncated)
+```
+
+**POST run report by date and device** — `/v1beta/properties/412233445:runReport` (status 200)
+
+```
+{
+  "dimensionHeaders": [
+    {
+      "name": "date"
+    },
+    {
+      "name": "deviceCategory"
+    }
+  ],
+  "metricHeaders": [
+    {
+      "name": "screenPageViews",
+      "type": "TYPE_INTEGER"
+    },
+    {
+      "name": "eventCount",
+      "type": "TYPE_INTEGER"
+    }
+  ],
+  "rows": [
+    {
+      "dimensionValues": [
+        {
+          "value": "20260520"
+        },
+        {
+          "value": "desktop"
+        }
+      ],
+      "metricValues": [
+        {
+          "value": "435"
+        },
+        {
+          "value": "1580"
+        }
+      ]
+    },
+    {
+      "dimensionValues": [
+    
+... (truncated)
+```
+
+**POST run realtime report** — `/v1beta/properties/412233445:runRealtimeReport` (status 200)
+
+```
+{
+  "dimensionHeaders": [
+    {
+      "name": "country"
+    }
+  ],
+  "metricHeaders": [
+    {
+      "name": "activeUsers",
+      "type": "TYPE_INTEGER"
+    }
+  ],
+  "rows": [
+    {
+      "dimensionValues": [
+        {
+          "value": "United States"
+        }
+      ],
+      "metricValues": [
+        {
+          "value": "29"
+        }
+      ]
+    },
+    {
+      "dimensionValues": [
+        {
+          "value": "United Kingdom"
+        }
+      ],
+      "metricValues": [
+        {
+          "value": "7"
+        }
+      ]
+    },
+    {
+      "dimensionValues": [
+        {
+          "value": "Ge
+```
+
+**POST batch run reports** — `/v1beta/properties/412233445:batchRunReports` (status 200)
+
+```
+{
+  "kind": "analyticsData#batchRunReports",
+  "reports": [
+    {
+      "dimensionHeaders": [
+        {
+          "name": "country"
+        }
+      ],
+      "metricHeaders": [
+        {
+          "name": "sessions",
+          "type": "TYPE_INTEGER"
+        }
+      ],
+      "rows": [
+        {
+          "dimensionValues": [
+            {
+              "value": "United States"
+            }
+          ],
+          "metricValues": [
+            {
+              "value": "688"
+            }
+          ]
+        },
+        {
+          "dimensionValues": [
+            {
+              "value": "United K
 ... (truncated)
 ```
 
@@ -6574,7 +9575,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 
 ```
 {
-  "id": "evt-24518e256d",
+  "id": "evt-2d5540b94b",
   "calendar_id": "amelia@orbit-labs.com",
   "summary": "RFC review: billing gRPC",
   "description": "",
@@ -6593,11 +9594,8 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
   "organizer": "amelia@orbit-labs.com",
   "recurrence": [],
   "visibility": "default",
-  "attendees": [
-    {
-      "email": "jonas@orbit-labs.com",
-      "display
-... (truncated)
+  "attendees": []
+}
 ```
 
 **PATCH patch event** — `/calendar/v3/calendars/primary/events/evt-003` (status 200)
@@ -6618,7 +9616,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
     "timeZone": "America/Los_Angeles"
   },
   "all_day": false,
-  "status": "confirmed",
+  "status": "tentative",
   "creator": "amelia@orbit-labs.com",
   "organizer": "amelia@orbit-labs.com",
   "recurrence": [],
@@ -6656,12 +9654,14 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
           "end": "2026-05-26T17:00:00-07:00"
         },
         {
-          "start": "2026-05-28T17:00:00-07:00",
-          "end": "2026-05-28T19:00:00-07:00"
-        },
-        {
           "start": "2026-05-27T09:00:00-07:00",
-          "end": "2026-05-27T
+          "end": "2026-05-27T11:30:00-07:00"
+        }
+      ]
+    },
+    "orbit-labs.com_eng@group.calendar.google.com": {
+      "busy": []
+  
 ```
 
 </details>
@@ -6866,8 +9866,8 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
     "room": "Room 214",
     "ownerId": null,
     "courseState": "ACTIVE",
-    "creationTime": "2026-05-28T08:09:09Z",
-    "updateTime": "2026-05-28T08:09:09Z",
+    "creationTime": "2026-06-09T11:42:15Z",
+    "updateTime": "2026-06-09T11:42:15Z",
     "enrollmentCode": "code5",
     "alternateLink": "https://classroom.google.com/c/course_005",
     "guardiansEnabled": false,
@@ -6885,18 +9885,15 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
     "name": "AP Computer Science A",
     "section": "Period 2",
     "descriptionHeading": "Welcome to AP CS A",
-    "description": "Updated: Rigorous college-level Java course with emphasis on AP exam preparation.",
+    "description": "Rigorous college-level course covering Java programming fundamentals including object-oriented design data structures and algorithms. Prepares students for the AP Computer Science A exam.",
     "room": "Room 214",
     "ownerId": "teacher_001",
     "courseState": "ACTIVE",
     "creationTime": "2025-01-06T08:00:00Z",
-    "updateTime": "2026-05-28T08:09:09Z",
+    "updateTime": "2025-04-25T14:30:00Z",
     "enrollmentCode": "apcsa25",
-    "alternateLink": "https://classroom.google.com/c/course_001",
-    "guardiansEnabled": false,
-    "calendarId": "calendar_001"
-  }
-}
+    "alternateLink": "https://classr
+... (truncated)
 ```
 
 **POST Archive Course** — `/v1/courses/course_004:archive` (status 200)
@@ -6913,7 +9910,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
     "ownerId": "teacher_001",
     "courseState": "ARCHIVED",
     "creationTime": "2024-08-19T08:00:00Z",
-    "updateTime": "2026-05-28T08:09:09Z",
+    "updateTime": "2024-12-20T15:00:00Z",
     "enrollmentCode": "python24",
     "alternateLink": "https://classroom.google.com/c/course_004",
     "guardi
@@ -7056,8 +10053,8 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
     "maxPoints": 75.0,
     "workType": "ASSIGNMENT",
     "topicId": "topic_107",
-    "creationTime": "2026-05-28T08:09:09Z",
-    "updateTime": "2026-05-28T08:09:09Z",
+    "creationTime": "2026-06-09T11:42:15Z",
+    "updateTime": "2026-06-09T11:42:15Z",
     "dueDate": {
       "year": 2025,
       "month": 5,
@@ -7083,8 +10080,8 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
     "maxPoints": 10.0,
     "workType": "SHORT_ANSWER_QUESTION",
     "topicId": "topic_202",
-    "creationTime": "2026-05-28T08:09:09Z",
-    "updateTime": "2026-05-28T08:09:09Z",
+    "creationTime": "2026-06-09T11:42:15Z",
+    "updateTime": "2026-06-09T11:42:15Z",
     "dueDate": null,
     "dueTime": null,
     "alternateLink": "https://classroom.google.com/c/course_002/a/cw_401"
@@ -7102,16 +10099,16 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
     "title": "AP Practice: FRQ Set 1",
     "description": "Complete Free Response Questions 1-3 from the 2023 AP CS A exam practice set. Show all work.",
     "state": "PUBLISHED",
-    "maxPoints": 120.0,
+    "maxPoints": 100.0,
     "workType": "ASSIGNMENT",
     "topicId": "topic_107",
     "creationTime": "2025-04-21T09:00:00Z",
-    "updateTime": "2026-05-28T08:09:09Z",
+    "updateTime": "2025-04-21T09:00:00Z",
     "alternateLink": "https://classroom.google.com/c/course_001/a/cw_109",
     "dueDate": {
       "year": 2025,
       "month": 5,
-      "day": 5
+      "day": 2
     },
     "dueTime": {
       "hours"
@@ -7148,18 +10145,18 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
       "courseId": "course_001",
       "topicId": "topic_102",
       "name": "Unit 2: Using Objects",
-      "updateTime": "2025-01-27T08:00:00Z"
+      "updateTime": "2025-01-27T08:00:00Z",
+      "_pk": "course_001#1"
     },
     {
       "courseId": "course_001",
       "topicId": "topic_103",
       "name": "Unit 3: Boolean Expressions and if Statements",
-      "updateTime": "2025-02-10T08:00:00Z"
+      "updateTime": "2025-02-10T08:00:00Z",
+      "_pk": "course_001#2"
     },
     {
-      "courseId": "course_001",
-      "topicId": "topic_104",
-      "name": "Unit 
+      "courseId": "cours
 ... (truncated)
 ```
 
@@ -7178,7 +10175,8 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
       "courseId": "course_005",
       "topicId": "topic_502",
       "name": "Mackworth 2024",
-      "updateTime": "2025-04-10T14:00:00Z"
+      "updateTime": "2025-04-10T14:00:00Z",
+      "_pk": "course_005#19"
     }
   ]
 }
@@ -7213,7 +10211,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
     "courseId": "course_001",
     "topicId": "topic_400",
     "name": "Unit 8: 2D Arrays",
-    "updateTime": "2026-05-28T08:09:09Z"
+    "updateTime": "2026-06-09T11:42:15Z"
   }
 }
 ```
@@ -7225,8 +10223,8 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
   "topic": {
     "courseId": "course_001",
     "topicId": "topic_101",
-    "name": "Unit 1: Primitive Types & Expressions",
-    "updateTime": "2026-05-28T08:09:09Z"
+    "name": "Unit 1: Primitive Types",
+    "updateTime": "2025-01-10T08:00:00Z"
   }
 }
 ```
@@ -7406,10 +10404,10 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
     "state": "TURNED_IN",
     "late": false,
     "creationTime": "2025-04-15T10:00:00Z",
-    "updateTime": "2026-05-28T08:09:09Z",
+    "updateTime": "2025-04-15T10:00:00Z",
     "alternateLink": "https://classroom.google.com/c/course_001/a/cw_108/submissions/sub_024",
-    "assignedGrade": 45.0,
-    "draftGrade": 45.0
+    "assignedGrade": null,
+    "draftGrade": null
   }
 }
 ```
@@ -7423,13 +10421,13 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
     "courseWorkId": "cw_108",
     "id": "sub_024",
     "userId": "student_001",
-    "state": "RETURNED",
+    "state": "TURNED_IN",
     "late": false,
     "creationTime": "2025-04-15T10:00:00Z",
-    "updateTime": "2026-05-28T08:09:09Z",
+    "updateTime": "2025-04-15T10:00:00Z",
     "alternateLink": "https://classroom.google.com/c/course_001/a/cw_108/submissions/sub_024",
-    "assignedGrade": 45.0,
-    "draftGrade": 45.0
+    "assignedGrade": null,
+    "draftGrade": null
   }
 }
 ```
@@ -7443,10 +10441,10 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
     "courseWorkId": "cw_108",
     "id": "sub_025",
     "userId": "student_002",
-    "state": "RECLAIMED_BY_STUDENT",
+    "state": "TURNED_IN",
     "late": false,
     "creationTime": "2025-04-16T08:00:00Z",
-    "updateTime": "2026-05-28T08:09:09Z",
+    "updateTime": "2025-04-16T08:00:00Z",
     "alternateLink": "https://classroom.google.com/c/course_001/a/cw_108/submissions/sub_025",
     "assignedGrade": null,
     "draftGrade": null
@@ -7529,7 +10527,8 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
         },
         "emailAddress": "rgreen@westlake.edu",
         "photoUrl": "https://lh3.googleusercontent.com/a/student050"
-      }
+      },
+      "_pk": "course_002#38"
     },
     {
       "courseId": "course_002",
@@ -7540,7 +10539,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
           "fullName": "David Park"
         },
         "emailAddress": "dpark@westlake.edu",
-        "photoUrl": "https://lh3.googleus
+        "ph
 ... (truncated)
 ```
 
@@ -7731,8 +10730,8 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
     "id": "ann_020",
     "text": "Extra credit opportunity: attend the CS guest speaker event this Thursday at 3pm in the auditorium.",
     "state": null,
-    "creationTime": "2026-05-28T08:09:09Z",
-    "updateTime": "2026-05-28T08:09:09Z",
+    "creationTime": "2026-06-09T11:42:15Z",
+    "updateTime": "2026-06-09T11:42:15Z",
     "creatorUserId": "teacher_001",
     "alternateLink": "https://classroom.google.com/c/course_001/p/ann_020"
   }
@@ -7746,10 +10745,10 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
   "announcement": {
     "courseId": "course_001",
     "id": "ann_002",
-    "text": "UPDATED: Unit 2 test moved to Monday. Extra review session Friday after school.",
+    "text": "Reminder: Unit 2 test on Friday. Review String methods and Scanner input. Office hours Tuesday and Thursday after school.",
     "state": "PUBLISHED",
     "creationTime": "2025-02-03T08:00:00Z",
-    "updateTime": "2026-05-28T08:09:09Z",
+    "updateTime": "2025-02-03T08:00:00Z",
     "creatorUserId": "teacher_001",
     "alternateLink": "https://classroom.google.com/c/course_001/p/ann_002"
   }
@@ -7827,8 +10826,8 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
     "title": "ArrayList Tutorial Video",
     "description": "Comprehensive video tutorial on Java ArrayList operations",
     "state": "PUBLISHED",
-    "creationTime": "2026-05-28T08:09:09Z",
-    "updateTime": "2026-05-28T08:09:09Z",
+    "creationTime": "2026-06-09T11:42:15Z",
+    "updateTime": "2026-06-09T11:42:15Z",
     "creatorUserId": "teacher_001",
     "topicId": "topic_107",
     "alternateLink": "https://classroom.google.com/c/course_001/m/mat_010",
@@ -7850,8 +10849,8 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
     "title": "Survey Evidence Plates - May 2025",
     "description": "Photographic evidence plates from Mackworth Island intertidal survey",
     "state": "PUBLISHED",
-    "creationTime": "2026-05-28T08:09:09Z",
-    "updateTime": "2026-05-28T08:09:09Z",
+    "creationTime": "2026-06-09T11:42:15Z",
+    "updateTime": "2026-06-09T11:42:15Z",
     "creatorUserId": "teacher_001",
     "topicId": "topic_501",
     "alternateLink": "https://classroom.google.com/c/course_005/m/mat_011",
@@ -8058,15 +11057,15 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 ```
 {
   "kind": "drive#file",
-  "id": "file-7c3811529c",
+  "id": "file-93f6eff728",
   "name": "Postmortems",
   "mimeType": "application/vnd.google-apps.folder",
   "parents": [
     "folder-eng"
   ],
   "size": "0",
-  "createdTime": "2026-05-28T08:09:09Z",
-  "modifiedTime": "2026-05-28T08:09:09Z",
+  "createdTime": "2026-06-09T11:42:15Z",
+  "modifiedTime": "2026-06-09T11:42:15Z",
   "owners": [
     {
       "emailAddress": "amelia@orbit-labs.com"
@@ -8084,14 +11083,14 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 {
   "kind": "drive#file",
   "id": "file-trace",
-  "name": "Trace export 2026-05-20 (auth.refresh).json",
+  "name": "Trace export 2026-05-20.json",
   "mimeType": "application/json",
   "parents": [
     "folder-eng"
   ],
   "size": "1024000",
   "createdTime": "2026-05-20T15:00:00Z",
-  "modifiedTime": "2026-05-28T08:09:09Z",
+  "modifiedTime": "2026-05-20T15:00:00Z",
   "owners": [
     {
       "emailAddress": "helena@orbit-labs.com"
@@ -8116,13 +11115,13 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
   ],
   "size": "184320",
   "createdTime": "2025-12-01T09:00:00Z",
-  "modifiedTime": "2026-05-28T08:09:09Z",
+  "modifiedTime": "2026-04-30T15:00:00Z",
   "owners": [
     {
       "emailAddress": "amelia@orbit-labs.com"
     }
   ],
-  "starred": true,
+  "starred": false,
   "trashed": false,
   "webViewLink": "https://drive.google.com/file/d/file-budget"
 }
@@ -8141,14 +11140,14 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
   ],
   "size": "512000",
   "createdTime": "2026-02-14T12:00:00Z",
-  "modifiedTime": "2026-05-28T08:09:09Z",
+  "modifiedTime": "2026-02-14T12:00:00Z",
   "owners": [
     {
       "emailAddress": "amelia@orbit-labs.com"
     }
   ],
   "starred": false,
-  "trashed": true,
+  "trashed": false,
   "webViewLink": "https://drive.google.com/file/d/file-personal"
 }
 ```
@@ -8192,7 +11191,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 
 ```
 {
-  "id": "perm-1fafed",
+  "id": "perm-787d2c",
   "file_id": "file-rfc-auth",
   "type": "user",
   "role": "writer",
@@ -8410,6 +11409,469 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 
 </details>
 
+### greenhouse-api (port 8073) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | GET | /v1/candidates | 200 | list candidates |
+| PASS | GET | /v1/candidates/cand-7001 | 200 | get candidate |
+| PASS | POST | /v1/candidates | 201 | create candidate |
+| PASS | GET | /v1/jobs?status=open | 200 | list jobs open |
+| PASS | GET | /v1/jobs/job-3001 | 200 | get job |
+| PASS | GET | /v1/applications?job_id=job-3001 | 200 | list applications |
+| PASS | GET | /v1/applications/app-4001 | 200 | get application |
+| PASS | POST | /v1/applications/app-4001/advance | 200 | advance application |
+| PASS | POST | /v1/applications/app-4007/reject | 200 | reject application |
+| PASS | GET | /v1/scorecards?application_id=app-4002 | 200 | list scorecards |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**GET list candidates** — `/v1/candidates` (status 200)
+
+```
+[
+  {
+    "id": "cand-7001",
+    "first_name": "Maya",
+    "last_name": "Robinson",
+    "email": "maya.robinson@example.com",
+    "phone": "+1-415-555-0101",
+    "company": "Northwind",
+    "title": "Backend Engineer",
+    "source": "LinkedIn",
+    "created_at": "2026-04-02T10:00:00Z"
+  },
+  {
+    "id": "cand-7002",
+    "first_name": "Liam",
+    "last_name": "Chen",
+    "email": "liam.chen@example.com",
+    "phone": "+1-415-555-0102",
+    "company": "Acme Corp",
+    "title": "Frontend Engineer",
+    "source": "Referral",
+    "created_at": "2026-04-05T11:30:00Z"
+  },
+  {
+    "id": "cand-7003",
+
+... (truncated)
+```
+
+**GET get candidate** — `/v1/candidates/cand-7001` (status 200)
+
+```
+{
+  "id": "cand-7001",
+  "first_name": "Maya",
+  "last_name": "Robinson",
+  "email": "maya.robinson@example.com",
+  "phone": "+1-415-555-0101",
+  "company": "Northwind",
+  "title": "Backend Engineer",
+  "source": "LinkedIn",
+  "created_at": "2026-04-02T10:00:00Z"
+}
+```
+
+**POST create candidate** — `/v1/candidates` (status 201)
+
+```
+{
+  "id": "cand-4ea3a4c4",
+  "first_name": "Priya",
+  "last_name": "Sharma",
+  "email": "priya.sharma@example.com",
+  "phone": "",
+  "company": "Vandelay",
+  "title": "Backend Engineer",
+  "source": "Referral",
+  "created_at": "2026-06-09T11:42:17Z"
+}
+```
+
+**GET list jobs open** — `/v1/jobs?status=open` (status 200)
+
+```
+[
+  {
+    "id": "job-3001",
+    "title": "Senior Backend Engineer",
+    "status": "open",
+    "department": "Engineering",
+    "location": "San Francisco",
+    "opened_at": "2026-03-01T00:00:00Z",
+    "closed_at": null
+  },
+  {
+    "id": "job-3002",
+    "title": "Frontend Engineer",
+    "status": "open",
+    "department": "Engineering",
+    "location": "Remote",
+    "opened_at": "2026-03-10T00:00:00Z",
+    "closed_at": null
+  },
+  {
+    "id": "job-3003",
+    "title": "Product Designer",
+    "status": "open",
+    "department": "Design",
+    "location": "New York",
+    "opened_at": "2026-03-15T0
+... (truncated)
+```
+
+**GET get job** — `/v1/jobs/job-3001` (status 200)
+
+```
+{
+  "id": "job-3001",
+  "title": "Senior Backend Engineer",
+  "status": "open",
+  "department": "Engineering",
+  "location": "San Francisco",
+  "opened_at": "2026-03-01T00:00:00Z",
+  "closed_at": null
+}
+```
+
+**GET list applications** — `/v1/applications?job_id=job-3001` (status 200)
+
+```
+[
+  {
+    "id": "app-4001",
+    "candidate_id": "cand-7001",
+    "job_id": "job-3001",
+    "status": "active",
+    "current_stage": "Application Review",
+    "applied_at": "2026-04-02T10:05:00Z",
+    "last_activity_at": "2026-04-03T09:00:00Z"
+  },
+  {
+    "id": "app-4002",
+    "candidate_id": "cand-7005",
+    "job_id": "job-3001",
+    "status": "active",
+    "current_stage": "Interview",
+    "applied_at": "2026-04-15T08:25:00Z",
+    "last_activity_at": "2026-04-20T11:00:00Z"
+  }
+]
+```
+
+**GET get application** — `/v1/applications/app-4001` (status 200)
+
+```
+{
+  "id": "app-4001",
+  "candidate_id": "cand-7001",
+  "job_id": "job-3001",
+  "status": "active",
+  "current_stage": "Application Review",
+  "applied_at": "2026-04-02T10:05:00Z",
+  "last_activity_at": "2026-04-03T09:00:00Z"
+}
+```
+
+**POST advance application** — `/v1/applications/app-4001/advance` (status 200)
+
+```
+{
+  "id": "app-4001",
+  "candidate_id": "cand-7001",
+  "job_id": "job-3001",
+  "status": "active",
+  "current_stage": "Interview",
+  "applied_at": "2026-04-02T10:05:00Z",
+  "last_activity_at": "2026-06-09T11:42:17Z"
+}
+```
+
+**POST reject application** — `/v1/applications/app-4007/reject` (status 200)
+
+```
+{
+  "id": "app-4007",
+  "candidate_id": "cand-7006",
+  "job_id": "job-3005",
+  "status": "rejected",
+  "current_stage": "Application Review",
+  "applied_at": "2026-04-18T16:05:00Z",
+  "last_activity_at": "2026-06-09T11:42:17Z",
+  "rejection_reason": "Position filled internally"
+}
+```
+
+**GET list scorecards** — `/v1/scorecards?application_id=app-4002` (status 200)
+
+```
+[
+  {
+    "id": "sc-6001",
+    "application_id": "app-4002",
+    "candidate_id": "cand-7005",
+    "interviewer": "Amelia Ortega",
+    "stage": "Interview",
+    "overall_recommendation": "strong_yes",
+    "rating": 5,
+    "submitted_at": "2026-04-20T11:30:00Z",
+    "notes": "Excellent system design depth."
+  },
+  {
+    "id": "sc-6006",
+    "application_id": "app-4002",
+    "candidate_id": "cand-7005",
+    "interviewer": "Helena Park",
+    "stage": "Interview",
+    "overall_recommendation": "yes",
+    "rating": 4,
+    "submitted_at": "2026-04-19T13:00:00Z",
+    "notes": "Strong coding; clarify s
+```
+
+</details>
+
+### gusto-api (port 8074) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | GET | /v1/companies/comp-001 | 200 | get company |
+| PASS | GET | /v1/companies/comp-001/employees | 200 | list company employees |
+| PASS | GET | /v1/employees/gemp-202 | 200 | get employee |
+| PASS | GET | /v1/companies/comp-001/payrolls | 200 | list company payrolls |
+| PASS | GET | /v1/companies/comp-001/payrolls?processed=false | 200 | list unprocessed payrolls |
+| PASS | GET | /v1/payrolls/pay-401 | 200 | get payroll |
+| PASS | POST | /v1/companies/comp-001/payrolls | 201 | create payroll |
+| PASS | PUT | /v1/payrolls/pay-404/submit | 200 | submit payroll |
+| PASS | GET | /v1/companies/comp-001/contractors | 200 | list company contractors |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**GET get company** — `/v1/companies/comp-001` (status 200)
+
+```
+{
+  "id": "comp-001",
+  "name": "Orbit Labs Inc.",
+  "ein": "84-1234567",
+  "entity_type": "C-Corporation",
+  "company_status": "Approved",
+  "primary_address": "500 Market St, San Francisco, CA 94105",
+  "pay_schedule": "Semimonthly",
+  "currency": "USD"
+}
+```
+
+**GET list company employees** — `/v1/companies/comp-001/employees` (status 200)
+
+```
+[
+  {
+    "id": "gemp-201",
+    "company_id": "comp-001",
+    "first_name": "Amelia",
+    "last_name": "Ortega",
+    "email": "amelia.ortega@orbit-labs.com",
+    "department": "Engineering",
+    "job_title": "VP of Engineering",
+    "rate": 210000.0,
+    "payment_unit": "Year",
+    "flsa_status": "Exempt",
+    "start_date": "2019-03-04",
+    "terminated": false,
+    "compensation": {
+      "id": "gcomp-301",
+      "employee_id": "gemp-201",
+      "job_title": "VP of Engineering",
+      "rate": 210000.0,
+      "payment_unit": "Year",
+      "flsa_status": "Exempt",
+      "effective_date": "2024-
+... (truncated)
+```
+
+**GET get employee** — `/v1/employees/gemp-202` (status 200)
+
+```
+{
+  "id": "gemp-202",
+  "company_id": "comp-001",
+  "first_name": "Jonas",
+  "last_name": "Pereira",
+  "email": "jonas.pereira@orbit-labs.com",
+  "department": "Engineering",
+  "job_title": "Staff Software Engineer",
+  "rate": 185000.0,
+  "payment_unit": "Year",
+  "flsa_status": "Exempt",
+  "start_date": "2020-06-15",
+  "terminated": false,
+  "compensation": {
+    "id": "gcomp-302",
+    "employee_id": "gemp-202",
+    "job_title": "Staff Software Engineer",
+    "rate": 185000.0,
+    "payment_unit": "Year",
+    "flsa_status": "Exempt",
+    "effective_date": "2024-01-01"
+  }
+}
+```
+
+**GET list company payrolls** — `/v1/companies/comp-001/payrolls` (status 200)
+
+```
+[
+  {
+    "id": "pay-401",
+    "company_id": "comp-001",
+    "pay_period_start": "2026-04-01",
+    "pay_period_end": "2026-04-15",
+    "check_date": "2026-04-20",
+    "processed": true,
+    "gross_pay": 48750.0,
+    "net_pay": 35420.5,
+    "employee_count": 8
+  },
+  {
+    "id": "pay-402",
+    "company_id": "comp-001",
+    "pay_period_start": "2026-04-16",
+    "pay_period_end": "2026-04-30",
+    "check_date": "2026-05-05",
+    "processed": true,
+    "gross_pay": 48975.25,
+    "net_pay": 35610.1,
+    "employee_count": 8
+  },
+  {
+    "id": "pay-403",
+    "company_id": "comp-001",
+    "pay_period_
+... (truncated)
+```
+
+**GET list unprocessed payrolls** — `/v1/companies/comp-001/payrolls?processed=false` (status 200)
+
+```
+[
+  {
+    "id": "pay-404",
+    "company_id": "comp-001",
+    "pay_period_start": "2026-05-16",
+    "pay_period_end": "2026-05-31",
+    "check_date": "2026-06-05",
+    "processed": false,
+    "gross_pay": 0.0,
+    "net_pay": 0.0,
+    "employee_count": 8
+  }
+]
+```
+
+**GET get payroll** — `/v1/payrolls/pay-401` (status 200)
+
+```
+{
+  "id": "pay-401",
+  "company_id": "comp-001",
+  "pay_period_start": "2026-04-01",
+  "pay_period_end": "2026-04-15",
+  "check_date": "2026-04-20",
+  "processed": true,
+  "gross_pay": 48750.0,
+  "net_pay": 35420.5,
+  "employee_count": 8
+}
+```
+
+**POST create payroll** — `/v1/companies/comp-001/payrolls` (status 201)
+
+```
+{
+  "id": "pay-291bbe15",
+  "company_id": "comp-001",
+  "pay_period_start": "2026-06-01",
+  "pay_period_end": "2026-06-15",
+  "check_date": "2026-06-20",
+  "processed": false,
+  "gross_pay": 0.0,
+  "net_pay": 0.0,
+  "employee_count": 8
+}
+```
+
+**PUT submit payroll** — `/v1/payrolls/pay-404/submit` (status 200)
+
+```
+{
+  "id": "pay-404",
+  "company_id": "comp-001",
+  "pay_period_start": "2026-05-16",
+  "pay_period_end": "2026-05-31",
+  "check_date": "2026-06-05",
+  "processed": true,
+  "gross_pay": 44691.78,
+  "net_pay": 32446.23,
+  "employee_count": 8
+}
+```
+
+**GET list company contractors** — `/v1/companies/comp-001/contractors` (status 200)
+
+```
+[
+  {
+    "id": "gcon-501",
+    "company_id": "comp-001",
+    "first_name": "Sam",
+    "last_name": "Whitaker",
+    "business_name": "",
+    "type": "Individual",
+    "email": "sam.whitaker@example.com",
+    "hourly_rate": 85.0,
+    "wage_type": "Hourly",
+    "start_date": "2025-02-01"
+  },
+  {
+    "id": "gcon-502",
+    "company_id": "comp-001",
+    "first_name": "",
+    "last_name": "",
+    "business_name": "Brightline Design LLC",
+    "type": "Business",
+    "email": "billing@brightlinedesign.com",
+    "hourly_rate": 0.0,
+    "wage_type": "Fixed",
+    "start_date": "2025-06-15"
+  },
+  {
+    
+... (truncated)
+```
+
+</details>
+
 ### hubspot-api (port 8024) — server: started
 
 | Result | Method | Path | Status | Endpoint |
@@ -8491,7 +11953,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 
 ```
 {
-  "id": "39426608313",
+  "id": "381168801324",
   "properties": {
     "firstname": "Lena",
     "lastname": "Vargas",
@@ -8500,11 +11962,11 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
     "jobtitle": "COO",
     "company": "",
     "lifecyclestage": "lead",
-    "createdate": "2026-05-28T08:09:11.000Z",
-    "lastmodifieddate": "2026-05-28T08:09:11.000Z"
+    "createdate": "2026-06-09T11:42:18.000Z",
+    "lastmodifieddate": "2026-06-09T11:42:18.000Z"
   },
-  "createdAt": "2026-05-28T08:09:11.000Z",
-  "updatedAt": "2026-05-28T08:09:11.000Z",
+  "createdAt": "2026-06-09T11:42:18.000Z",
+  "updatedAt": "2026-06-09T11:42:18.000Z",
   "archived": false
 }
 ```
@@ -8523,10 +11985,10 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
     "company": "Pelagic Freight Co",
     "lifecyclestage": "opportunity",
     "createdate": "2026-02-20T16:00:00Z",
-    "lastmodifieddate": "2026-05-28T08:09:11.000Z"
+    "lastmodifieddate": "2026-06-09T11:42:18.000Z"
   },
   "createdAt": "2026-02-20T16:00:00Z",
-  "updatedAt": "2026-05-28T08:09:11.000Z",
+  "updatedAt": "2026-06-09T11:42:18.000Z",
   "archived": false
 }
 ```
@@ -8614,7 +12076,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 
 ```
 {
-  "id": "653423250731",
+  "id": "227516451265",
   "properties": {
     "dealname": "Driftwood Renewal",
     "pipeline": "default",
@@ -8622,11 +12084,11 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
     "amount": "20000",
     "closedate": "",
     "dealtype": "",
-    "createdate": "2026-05-28T08:09:11.000Z",
-    "lastmodifieddate": "2026-05-28T08:09:11.000Z"
+    "createdate": "2026-06-09T11:42:18.000Z",
+    "lastmodifieddate": "2026-06-09T11:42:18.000Z"
   },
-  "createdAt": "2026-05-28T08:09:11.000Z",
-  "updatedAt": "2026-05-28T08:09:11.000Z",
+  "createdAt": "2026-06-09T11:42:18.000Z",
+  "updatedAt": "2026-06-09T11:42:18.000Z",
   "archived": false
 }
 ```
@@ -8644,10 +12106,10 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
     "closedate": "2026-07-01T00:00:00Z",
     "dealtype": "newbusiness",
     "createdate": "2026-02-25T16:00:00Z",
-    "lastmodifieddate": "2026-05-28T08:09:11.000Z"
+    "lastmodifieddate": "2026-06-09T11:42:18.000Z"
   },
   "createdAt": "2026-02-25T16:00:00Z",
-  "updatedAt": "2026-05-28T08:09:11.000Z",
+  "updatedAt": "2026-06-09T11:42:18.000Z",
   "archived": false
 }
 ```
@@ -8833,11 +12295,11 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 
 ```
 {
-  "cart_id": "cart-eb32ca7b",
+  "cart_id": "cart-aa39f3ba",
   "user_id": "user-emily",
   "retailer_id": "ret-safeway",
   "items": [],
-  "created_at": "2026-05-28T08:09:11Z",
+  "created_at": "2026-06-09T11:42:19Z",
   "subtotal": 0.0,
   "service_fee": 0.0,
   "delivery_fee": 3.99,
@@ -8914,7 +12376,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
   "order_id": "order-003",
   "user_id": "user-emily",
   "retailer_id": "ret-traderjoes",
-  "status": "CANCELLED",
+  "status": "SHOPPING",
   "subtotal": 29.96,
   "delivery_fee": 5.99,
   "service_fee": 1.5,
@@ -9487,7 +12949,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
       "values": [
         {
           "value": 146100,
-          "end_time": "2026-05-28T08:09:12+0000"
+          "end_time": "2026-06-09T11:42:19+0000"
         }
       ],
       "title": "Impressions",
@@ -9499,7 +12961,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
       "values": [
         {
           "value": 118000,
-          "end_time": "2026-05-28T08:09:12+0000"
+          "end_time": "2026-06-09T11:42:19+0000"
         }
       ],
       "title": "Reach",
@@ -9521,7 +12983,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
       "values": [
         {
           "value": 146100,
-          "end_time": "2026-05-28T08:09:12+0000"
+          "end_time": "2026-06-09T11:42:19+0000"
         }
       ],
       "title": "Impressions",
@@ -9533,7 +12995,7 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
       "values": [
         {
           "value": 118000,
-          "end_time": "2026-05-28T08:09:12+0000"
+          "end_time": "2026-06-09T11:42:19+0000"
         }
       ],
       "title": "Reach",
@@ -9677,18 +13139,19 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 {
   "data": [
     {
+      "id": "17870002001",
+      "media_id": "17900200001",
+      "mentioned_by_user_id": "17841400999140",
+      "mentioned_by_username": "connect_app_official",
+      "media_url": "https://instagram.mock/media/mention_beta_001.jpg",
+      "timestamp": "2026-05-15T08:00:00",
+      "caption": "Connect Beta feedback is officially open. Tag us with #ConnectBeta to report onboarding bugs and UI issues across iOS and Android."
+    },
+    {
       "id": "17870002002",
       "media_id": "17900200002",
       "mentioned_by_user_id": "17841400999141",
-      "mentioned_by_username": "techreview_daily",
-      "media_url": "https://instagram.mock/media/mention_beta_002.jpg",
-      "timestamp": "2026-05-14T17:00:00",
-      "caption": "Hands-on with the @connect_app_official onboarding beta. Crashes, OTP failures, and broken layouts on multiple devices. Full review thread below. #ConnectBeta #ConnectBug"
-    },
-    {
-      "id": "17870002003",
-      "media_id": "17900200003",
-      "mentioned_by_user_id": "1784140099914
+      "mentioned_by_username": "
 ... (truncated)
 ```
 
@@ -9698,18 +13161,19 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 {
   "data": [
     {
+      "id": "17870002001",
+      "media_id": "17900200001",
+      "mentioned_by_user_id": "17841400999140",
+      "mentioned_by_username": "connect_app_official",
+      "media_url": "https://instagram.mock/media/mention_beta_001.jpg",
+      "timestamp": "2026-05-15T08:00:00",
+      "caption": "Connect Beta feedback is officially open. Tag us with #ConnectBeta to report onboarding bugs and UI issues across iOS and Android."
+    },
+    {
       "id": "17870002002",
       "media_id": "17900200002",
       "mentioned_by_user_id": "17841400999141",
-      "mentioned_by_username": "techreview_daily",
-      "media_url": "https://instagram.mock/media/mention_beta_002.jpg",
-      "timestamp": "2026-05-14T17:00:00",
-      "caption": "Hands-on with the @connect_app_official onboarding beta. Crashes, OTP failures, and broken layouts on multiple devices. Full review thread below. #ConnectBeta #ConnectBug"
-    },
-    {
-      "id": "17870002003",
-      "media_id": "17900200003",
-      "mentioned_by_user_id": "1784140099914
+      "mentioned_by_username": "
 ... (truncated)
 ```
 
@@ -9798,6 +13262,304 @@ Result legend: PASS = 2xx/3xx, WARN = 4xx (error-path or runtime-dependent id), 
 ```
 {
   "id": "17920001004"
+}
+```
+
+</details>
+
+### intercom-api (port 8070) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | GET | /contacts?role=user | 200 | list contacts |
+| PASS | GET | /contacts/contact-mara | 200 | get contact |
+| PASS | POST | /contacts | 201 | create contact |
+| PASS | GET | /conversations?state=open | 200 | list conversations |
+| PASS | GET | /conversations/conv-1001 | 200 | get conversation |
+| PASS | POST | /conversations | 201 | create conversation |
+| PASS | POST | /conversations/conv-1001/reply | 200 | reply to conversation |
+| PASS | POST | /conversations/conv-1003/parts | 200 | assign conversation |
+| PASS | POST | /conversations/conv-1001/parts | 200 | close conversation |
+| PASS | GET | /companies | 200 | list companies |
+| PASS | GET | /companies/company-brightpath | 200 | get company |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**GET list contacts** — `/contacts?role=user` (status 200)
+
+```
+{
+  "type": "list",
+  "data": [
+    {
+      "id": "contact-mara",
+      "role": "user",
+      "name": "Mara Lindgren",
+      "email": "mara@brightpath.io",
+      "phone": "+1-202-555-0101",
+      "company_id": "company-brightpath",
+      "created_at": "2025-09-02T08:00:00.000Z",
+      "last_seen_at": "2026-05-25T14:00:00.000Z"
+    },
+    {
+      "id": "contact-tomas",
+      "role": "user",
+      "name": "Tomas Vega",
+      "email": "tomas@brightpath.io",
+      "phone": "+1-202-555-0102",
+      "company_id": "company-brightpath",
+      "created_at": "2025-09-05T09:00:00.000Z",
+      "last_seen_
+... (truncated)
+```
+
+**GET get contact** — `/contacts/contact-mara` (status 200)
+
+```
+{
+  "type": "contact",
+  "id": "contact-mara",
+  "role": "user",
+  "name": "Mara Lindgren",
+  "email": "mara@brightpath.io",
+  "phone": "+1-202-555-0101",
+  "company_id": "company-brightpath",
+  "created_at": "2025-09-02T08:00:00.000Z",
+  "last_seen_at": "2026-05-25T14:00:00.000Z"
+}
+```
+
+**POST create contact** — `/contacts` (status 201)
+
+```
+{
+  "type": "contact",
+  "id": "contact-4c2e5655e4d1",
+  "role": "lead",
+  "name": "Priya Nair",
+  "email": "priya@delta-io.com",
+  "phone": null,
+  "company_id": null,
+  "created_at": "2026-06-09T11:42:20.000Z",
+  "last_seen_at": null
+}
+```
+
+**GET list conversations** — `/conversations?state=open` (status 200)
+
+```
+{
+  "type": "conversation.list",
+  "conversations": [
+    {
+      "type": "conversation",
+      "id": "conv-1001",
+      "state": "open",
+      "open": true,
+      "title": "Cannot export reports to CSV",
+      "created_at": "2026-05-20T09:00:00.000Z",
+      "updated_at": "2026-05-25T14:00:00.000Z",
+      "contact_id": "contact-mara",
+      "admin_assignee_id": "admin-jonas"
+    },
+    {
+      "type": "conversation",
+      "id": "conv-1003",
+      "state": "open",
+      "open": true,
+      "title": "Request for SSO setup",
+      "created_at": "2026-05-22T13:00:00.000Z",
+      "updated_at": "20
+```
+
+**GET get conversation** — `/conversations/conv-1001` (status 200)
+
+```
+{
+  "type": "conversation",
+  "id": "conv-1001",
+  "state": "open",
+  "open": true,
+  "title": "Cannot export reports to CSV",
+  "created_at": "2026-05-20T09:00:00.000Z",
+  "updated_at": "2026-05-25T14:00:00.000Z",
+  "contact_id": "contact-mara",
+  "admin_assignee_id": "admin-jonas",
+  "conversation_parts": {
+    "type": "conversation_part.list",
+    "total_count": 3,
+    "conversation_parts": [
+      {
+        "id": "part-1",
+        "conversation_id": "conv-1001",
+        "part_type": "comment",
+        "author_type": "user",
+        "author_id": "contact-mara",
+        "body": "The CSV expo
+... (truncated)
+```
+
+**POST create conversation** — `/conversations` (status 201)
+
+```
+{
+  "type": "conversation",
+  "id": "conv-4c478aa90513",
+  "state": "open",
+  "open": true,
+  "title": "Inviting teammates",
+  "created_at": "2026-06-09T11:42:20.000Z",
+  "updated_at": "2026-06-09T11:42:20.000Z",
+  "contact_id": "contact-hannah",
+  "admin_assignee_id": null,
+  "conversation_parts": {
+    "type": "conversation_part.list",
+    "total_count": 1,
+    "conversation_parts": [
+      {
+        "id": "part-98fdc92215cd",
+        "conversation_id": "conv-4c478aa90513",
+        "part_type": "comment",
+        "author_type": "user",
+        "author_id": "contact-hannah",
+        "body": "
+```
+
+**POST reply to conversation** — `/conversations/conv-1001/reply` (status 200)
+
+```
+{
+  "type": "conversation",
+  "id": "conv-1001",
+  "state": "open",
+  "open": true,
+  "title": "Cannot export reports to CSV",
+  "created_at": "2026-05-20T09:00:00.000Z",
+  "updated_at": "2026-06-09T11:42:20.000Z",
+  "contact_id": "contact-mara",
+  "admin_assignee_id": "admin-jonas",
+  "conversation_parts": {
+    "type": "conversation_part.list",
+    "total_count": 4,
+    "conversation_parts": [
+      {
+        "id": "part-1",
+        "conversation_id": "conv-1001",
+        "part_type": "comment",
+        "author_type": "user",
+        "author_id": "contact-mara",
+        "body": "The CSV expo
+... (truncated)
+```
+
+**POST assign conversation** — `/conversations/conv-1003/parts` (status 200)
+
+```
+{
+  "type": "conversation",
+  "id": "conv-1003",
+  "state": "open",
+  "open": true,
+  "title": "Request for SSO setup",
+  "created_at": "2026-05-22T13:00:00.000Z",
+  "updated_at": "2026-06-09T11:42:20.000Z",
+  "contact_id": "contact-grace",
+  "admin_assignee_id": "admin-helena",
+  "conversation_parts": {
+    "type": "conversation_part.list",
+    "total_count": 2,
+    "conversation_parts": [
+      {
+        "id": "part-7",
+        "conversation_id": "conv-1003",
+        "part_type": "comment",
+        "author_type": "user",
+        "author_id": "contact-grace",
+        "body": "We need SAML SSO
+... (truncated)
+```
+
+**POST close conversation** — `/conversations/conv-1001/parts` (status 200)
+
+```
+{
+  "type": "conversation",
+  "id": "conv-1001",
+  "state": "closed",
+  "open": false,
+  "title": "Cannot export reports to CSV",
+  "created_at": "2026-05-20T09:00:00.000Z",
+  "updated_at": "2026-06-09T11:42:20.000Z",
+  "contact_id": "contact-mara",
+  "admin_assignee_id": "admin-jonas",
+  "conversation_parts": {
+    "type": "conversation_part.list",
+    "total_count": 5,
+    "conversation_parts": [
+      {
+        "id": "part-1",
+        "conversation_id": "conv-1001",
+        "part_type": "comment",
+        "author_type": "user",
+        "author_id": "contact-mara",
+        "body": "The CSV e
+... (truncated)
+```
+
+**GET list companies** — `/companies` (status 200)
+
+```
+{
+  "type": "list",
+  "data": [
+    {
+      "id": "company-brightpath",
+      "company_id": "BP-001",
+      "name": "Brightpath",
+      "plan": "Pro",
+      "monthly_spend": 499.0,
+      "user_count": 2,
+      "industry": "Software",
+      "created_at": "2025-09-01T08:00:00.000Z"
+    },
+    {
+      "id": "company-nimbus",
+      "company_id": "NB-002",
+      "name": "Nimbus Co",
+      "plan": "Growth",
+      "monthly_spend": 199.0,
+      "user_count": 2,
+      "industry": "Marketing",
+      "created_at": "2025-09-20T08:00:00.000Z"
+    },
+    {
+      "id": "company-helio",
+      "company_id": "H
+... (truncated)
+```
+
+**GET get company** — `/companies/company-brightpath` (status 200)
+
+```
+{
+  "type": "company",
+  "id": "company-brightpath",
+  "company_id": "BP-001",
+  "name": "Brightpath",
+  "plan": "Pro",
+  "monthly_spend": 499.0,
+  "user_count": 2,
+  "industry": "Software",
+  "created_at": "2025-09-01T08:00:00.000Z"
 }
 ```
 
@@ -9933,13 +13695,13 @@ _(empty)_
   "expand": "schema,names",
   "startAt": 0,
   "maxResults": 50,
-  "total": 4,
+  "total": 3,
   "issues": [
     {
       "id": "20002",
       "key": "ENG-102",
       "fields": {
-        "summary": "Refresh-token latency spike under heavy load",
+        "summary": "Refresh-token latency spike under load",
         "description": "p95 issuance latency exceeds 600ms.",
         "issuetype": {
           "name": "Bug"
@@ -9954,7 +13716,8 @@ _(empty)_
             "key": "indeterminate",
             "name": "In Progress"
           }
-        }
+        },
+    
 ... (truncated)
 ```
 
@@ -10004,6 +13767,558 @@ _(empty)_
       "goal": "Ship dual-write shim"
     }
   ]
+}
+```
+
+</details>
+
+### klaviyo-api (port 8089) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | GET | /api/profiles | 200 | list profiles |
+| PASS | GET | /api/profiles?email=jane.doe@example.com | 200 | filter profiles by email |
+| PASS | GET | /api/profiles/01HZPROF000000000000000001 | 200 | get profile |
+| PASS | POST | /api/profiles | 201 | create profile |
+| PASS | GET | /api/lists | 200 | list lists |
+| PASS | GET | /api/campaigns | 200 | list campaigns |
+| PASS | GET | /api/campaigns?status=Sent&channel=email | 200 | list sent email campaigns |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**GET list profiles** — `/api/profiles` (status 200)
+
+```
+{
+  "data": [
+    {
+      "type": "profile",
+      "id": "01HZPROF000000000000000001",
+      "attributes": {
+        "email": "jane.doe@example.com",
+        "phone_number": "+14155550101",
+        "first_name": "Jane",
+        "last_name": "Doe",
+        "organization": "Contoso",
+        "title": "Marketing Lead",
+        "location": {
+          "city": "San Francisco",
+          "region": "California",
+          "country": "United States"
+        },
+        "created": "2026-03-01T09:00:00Z",
+        "updated": "2026-05-10T12:00:00Z"
+      }
+    },
+    {
+      "type": "profile",
+      "id": 
+... (truncated)
+```
+
+**GET filter profiles by email** — `/api/profiles?email=jane.doe@example.com` (status 200)
+
+```
+{
+  "data": [
+    {
+      "type": "profile",
+      "id": "01HZPROF000000000000000001",
+      "attributes": {
+        "email": "jane.doe@example.com",
+        "phone_number": "+14155550101",
+        "first_name": "Jane",
+        "last_name": "Doe",
+        "organization": "Contoso",
+        "title": "Marketing Lead",
+        "location": {
+          "city": "San Francisco",
+          "region": "California",
+          "country": "United States"
+        },
+        "created": "2026-03-01T09:00:00Z",
+        "updated": "2026-05-10T12:00:00Z"
+      }
+    }
+  ]
+}
+```
+
+**GET get profile** — `/api/profiles/01HZPROF000000000000000001` (status 200)
+
+```
+{
+  "data": {
+    "type": "profile",
+    "id": "01HZPROF000000000000000001",
+    "attributes": {
+      "email": "jane.doe@example.com",
+      "phone_number": "+14155550101",
+      "first_name": "Jane",
+      "last_name": "Doe",
+      "organization": "Contoso",
+      "title": "Marketing Lead",
+      "location": {
+        "city": "San Francisco",
+        "region": "California",
+        "country": "United States"
+      },
+      "created": "2026-03-01T09:00:00Z",
+      "updated": "2026-05-10T12:00:00Z"
+    }
+  }
+}
+```
+
+**POST create profile** — `/api/profiles` (status 201)
+
+```
+{
+  "data": {
+    "type": "profile",
+    "id": "01HZPROFQ4WYW8D8EACW4UXO6T",
+    "attributes": {
+      "email": "new.lead@example.com",
+      "phone_number": "",
+      "first_name": "New",
+      "last_name": "Lead",
+      "organization": "Contoso",
+      "title": "",
+      "location": {
+        "city": "Seattle",
+        "region": "Washington",
+        "country": "United States"
+      },
+      "created": "2026-06-09T11:42:21Z",
+      "updated": "2026-06-09T11:42:21Z"
+    }
+  }
+}
+```
+
+**GET list lists** — `/api/lists` (status 200)
+
+```
+{
+  "data": [
+    {
+      "type": "list",
+      "id": "01HZLIST000000000000000001",
+      "attributes": {
+        "name": "Newsletter Subscribers",
+        "profile_count": 4820,
+        "created": "2026-01-10T09:00:00Z",
+        "updated": "2026-05-26T08:00:00Z"
+      }
+    },
+    {
+      "type": "list",
+      "id": "01HZLIST000000000000000002",
+      "attributes": {
+        "name": "VIP Customers",
+        "profile_count": 312,
+        "created": "2026-01-15T10:00:00Z",
+        "updated": "2026-05-25T12:30:00Z"
+      }
+    },
+    {
+      "type": "list",
+      "id": "01HZLIST00000000000000000
+... (truncated)
+```
+
+**GET list campaigns** — `/api/campaigns` (status 200)
+
+```
+{
+  "data": [
+    {
+      "type": "campaign",
+      "id": "01HZCAMP000000000000000001",
+      "attributes": {
+        "name": "May Newsletter",
+        "status": "Sent",
+        "channel": "email",
+        "subject": "Whats New in May",
+        "from_email": "hello@contoso.com",
+        "from_label": "Contoso",
+        "send_time": "2026-05-05T15:00:00Z",
+        "created": "2026-05-01T09:00:00Z",
+        "updated": "2026-05-05T15:05:00Z"
+      },
+      "relationships": {
+        "list": {
+          "data": {
+            "type": "list",
+            "id": "01HZLIST000000000000000001"
+          
+... (truncated)
+```
+
+**GET list sent email campaigns** — `/api/campaigns?status=Sent&channel=email` (status 200)
+
+```
+{
+  "data": [
+    {
+      "type": "campaign",
+      "id": "01HZCAMP000000000000000001",
+      "attributes": {
+        "name": "May Newsletter",
+        "status": "Sent",
+        "channel": "email",
+        "subject": "Whats New in May",
+        "from_email": "hello@contoso.com",
+        "from_label": "Contoso",
+        "send_time": "2026-05-05T15:00:00Z",
+        "created": "2026-05-01T09:00:00Z",
+        "updated": "2026-05-05T15:05:00Z"
+      },
+      "relationships": {
+        "list": {
+          "data": {
+            "type": "list",
+            "id": "01HZLIST000000000000000001"
+          
+... (truncated)
+```
+
+</details>
+
+### kraken-api (port 8098) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | GET | /0/public/Ticker?pair=XBTUSD | 200 | ticker single |
+| PASS | GET | /0/public/Ticker?pair=XBTUSD,ETHUSD | 200 | ticker multi |
+| PASS | GET | /0/public/Ticker | 200 | ticker all |
+| PASS | GET | /0/public/OHLC?pair=XBTUSD&interval=60 | 200 | ohlc |
+| PASS | GET | /0/public/AssetPairs | 200 | asset pairs all |
+| PASS | GET | /0/public/AssetPairs?pair=ETHUSD | 200 | asset pairs filter |
+| PASS | GET | /0/public/Assets | 200 | assets all |
+| PASS | GET | /0/public/Assets?asset=XBT,ETH | 200 | assets filter |
+| PASS | POST | /0/private/Balance | 200 | balance |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**GET ticker single** — `/0/public/Ticker?pair=XBTUSD` (status 200)
+
+```
+{
+  "error": [],
+  "result": {
+    "XXBTZUSD": {
+      "a": [
+        "67250.10",
+        "1",
+        "1.000"
+      ],
+      "b": [
+        "67248.90",
+        "1",
+        "1.000"
+      ],
+      "c": [
+        "67249.50",
+        "0.10000000"
+      ],
+      "v": [
+        "1842.55231000",
+        "1842.55231000"
+      ],
+      "h": [
+        "68120.00",
+        "68120.00"
+      ],
+      "l": [
+        "66310.40",
+        "66310.40"
+      ],
+      "o": "66980.20"
+    }
+  }
+}
+```
+
+**GET ticker multi** — `/0/public/Ticker?pair=XBTUSD,ETHUSD` (status 200)
+
+```
+{
+  "error": [],
+  "result": {
+    "XXBTZUSD": {
+      "a": [
+        "67250.10",
+        "1",
+        "1.000"
+      ],
+      "b": [
+        "67248.90",
+        "1",
+        "1.000"
+      ],
+      "c": [
+        "67249.50",
+        "0.10000000"
+      ],
+      "v": [
+        "1842.55231000",
+        "1842.55231000"
+      ],
+      "h": [
+        "68120.00",
+        "68120.00"
+      ],
+      "l": [
+        "66310.40",
+        "66310.40"
+      ],
+      "o": "66980.20"
+    },
+    "XETHZUSD": {
+      "a": [
+        "3712.45",
+        "1",
+        "1.000"
+      ],
+      "b": [
+        "3711.80",
+    
+```
+
+**GET ticker all** — `/0/public/Ticker` (status 200)
+
+```
+{
+  "error": [],
+  "result": {
+    "XXBTZUSD": {
+      "a": [
+        "67250.10",
+        "1",
+        "1.000"
+      ],
+      "b": [
+        "67248.90",
+        "1",
+        "1.000"
+      ],
+      "c": [
+        "67249.50",
+        "0.10000000"
+      ],
+      "v": [
+        "1842.55231000",
+        "1842.55231000"
+      ],
+      "h": [
+        "68120.00",
+        "68120.00"
+      ],
+      "l": [
+        "66310.40",
+        "66310.40"
+      ],
+      "o": "66980.20"
+    },
+    "XETHZUSD": {
+      "a": [
+        "3712.45",
+        "1",
+        "1.000"
+      ],
+      "b": [
+        "3711.80",
+    
+... (truncated)
+```
+
+**GET ohlc** — `/0/public/OHLC?pair=XBTUSD&interval=60` (status 200)
+
+```
+{
+  "error": [],
+  "result": {
+    "XXBTZUSD": [
+      [
+        1747008000,
+        "66980.20",
+        "67340.10",
+        "66810.00",
+        "67120.40",
+        "67050.80",
+        "142.41201000",
+        3120
+      ],
+      [
+        1747011600,
+        "67120.40",
+        "67510.60",
+        "67010.20",
+        "67388.90",
+        "67280.10",
+        "98.55120000",
+        2410
+      ],
+      [
+        1747015200,
+        "67388.90",
+        "67620.00",
+        "67210.40",
+        "67249.50",
+        "67410.20",
+        "110.20114000",
+        2685
+      ]
+    ],
+    "last": 1747015200
+ 
+```
+
+**GET asset pairs all** — `/0/public/AssetPairs` (status 200)
+
+```
+{
+  "error": [],
+  "result": {
+    "XXBTZUSD": {
+      "altname": "XBTUSD",
+      "wsname": "XBT/USD",
+      "aclass_base": "currency",
+      "base": "XXBT",
+      "aclass_quote": "currency",
+      "quote": "ZUSD",
+      "pair_decimals": 1,
+      "lot_decimals": 8,
+      "ordermin": "0.0001",
+      "status": "online"
+    },
+    "XETHZUSD": {
+      "altname": "ETHUSD",
+      "wsname": "ETH/USD",
+      "aclass_base": "currency",
+      "base": "XETH",
+      "aclass_quote": "currency",
+      "quote": "ZUSD",
+      "pair_decimals": 2,
+      "lot_decimals": 8,
+      "ordermin": "0.01",
+      "status
+... (truncated)
+```
+
+**GET asset pairs filter** — `/0/public/AssetPairs?pair=ETHUSD` (status 200)
+
+```
+{
+  "error": [],
+  "result": {
+    "XETHZUSD": {
+      "altname": "ETHUSD",
+      "wsname": "ETH/USD",
+      "aclass_base": "currency",
+      "base": "XETH",
+      "aclass_quote": "currency",
+      "quote": "ZUSD",
+      "pair_decimals": 2,
+      "lot_decimals": 8,
+      "ordermin": "0.01",
+      "status": "online"
+    }
+  }
+}
+```
+
+**GET assets all** — `/0/public/Assets` (status 200)
+
+```
+{
+  "error": [],
+  "result": {
+    "XXBT": {
+      "aclass": "currency",
+      "altname": "XBT",
+      "decimals": 10,
+      "display_decimals": 5
+    },
+    "XETH": {
+      "aclass": "currency",
+      "altname": "ETH",
+      "decimals": 10,
+      "display_decimals": 5
+    },
+    "ZUSD": {
+      "aclass": "currency",
+      "altname": "USD",
+      "decimals": 4,
+      "display_decimals": 2
+    },
+    "ZEUR": {
+      "aclass": "currency",
+      "altname": "EUR",
+      "decimals": 4,
+      "display_decimals": 2
+    },
+    "XXRP": {
+      "aclass": "currency",
+      "altname": "XRP",
+      "decima
+... (truncated)
+```
+
+**GET assets filter** — `/0/public/Assets?asset=XBT,ETH` (status 200)
+
+```
+{
+  "error": [],
+  "result": {
+    "XXBT": {
+      "aclass": "currency",
+      "altname": "XBT",
+      "decimals": 10,
+      "display_decimals": 5
+    },
+    "XETH": {
+      "aclass": "currency",
+      "altname": "ETH",
+      "decimals": 10,
+      "display_decimals": 5
+    }
+  }
+}
+```
+
+**POST balance** — `/0/private/Balance` (status 200)
+
+```
+{
+  "error": [],
+  "result": {
+    "ZUSD": "15420.5230",
+    "XXBT": "0.84210000",
+    "XETH": "4.21100000",
+    "SOL": "32.50000000",
+    "ADA": "1200.00000000",
+    "USDT": "2500.00000000"
+  }
 }
 ```
 
@@ -10710,13 +15025,13 @@ _(empty)_
 {
   "type": "label",
   "label": {
-    "id": "label-a1e918a1",
+    "id": "label-338c0cc9",
     "name": "needs-review",
     "color": "#F2C94C",
     "description": "Issues requiring additional review",
     "teamId": "team-backend",
-    "createdAt": "2026-05-28T08:09:14",
-    "updatedAt": "2026-05-28T08:09:14"
+    "createdAt": "2026-06-09T11:42:23",
+    "updatedAt": "2026-06-09T11:42:23"
   }
 }
 ```
@@ -10734,17 +15049,15 @@ _(empty)_
     {
       "id": "PROJ-PORTAL",
       "name": "Patient Portal UX Redesign",
-      "description": "Cross-functional redesign of the Cumberland patient portal covering medications",
-      "state": " dashboard",
-      "leadId": " dark mode",
+      "description": "Cross-functional redesign of the Cumberland patient portal covering medications, dashboard, dark mode, and form validation flows. Charge nurse David Nelson signs off in this tracker before go-live.",
+      "state": "started",
+      "leadId": "user-patty",
       "teamIds": [
-        "and form validation flows. Charge nurse David Nelson signs off in this tracker before go-live."
+        "team-ux"
       ],
-      "startDate": "started",
-      "targetDate": "user-patty",
-      "createdAt": "team-ux",
-      "updatedAt": "2026-02-01",
-   
+      "startDate": "2026-02-01",
+      "targetDate": "2026-05-30",
+      "createdAt": "2026-01-25T10:0
 ```
 
 **GET GET Project by ID** — `/v1/projects/proj-api-v2` (status 404)
@@ -10777,7 +15090,7 @@ _(empty)_
 {
   "type": "project",
   "project": {
-    "id": "proj-b1d974eb",
+    "id": "proj-0f00e178",
     "name": "Mobile App MVP",
     "description": "Build first version of the mobile companion app",
     "state": "planned",
@@ -10788,8 +15101,8 @@ _(empty)_
     ],
     "startDate": "2025-06-01",
     "targetDate": "2025-09-30",
-    "createdAt": "2026-05-28T08:09:14",
-    "updatedAt": "2026-05-28T08:09:14"
+    "createdAt": "2026-06-09T11:42:23",
+    "updatedAt": "2026-06-09T11:42:23"
   }
 }
 ```
@@ -10852,23 +15165,11 @@ _(empty)_
 ```
 {
   "type": "cycles",
-  "count": 1,
-  "total": 1,
+  "count": 0,
+  "total": 0,
   "offset": 0,
   "limit": 50,
-  "results": [
-    {
-      "id": "cycle-port-6",
-      "name": "Sprint 6",
-      "number": 6,
-      "teamId": "team-ux",
-      "startsAt": "2026-05-18",
-      "endsAt": "2026-05-31",
-      "completedAt": null,
-      "createdAt": "2026-05-10T09:00:00",
-      "updatedAt": "2026-05-10T10:00:00"
-    }
-  ]
+  "results": []
 }
 ```
 
@@ -10934,15 +15235,15 @@ _(empty)_
 {
   "type": "cycle",
   "cycle": {
-    "id": "cycle-af83956b",
+    "id": "cycle-6f7868e1",
     "name": "Sprint 25",
     "number": 1,
     "teamId": "team-backend",
     "startsAt": "2025-05-19",
     "endsAt": "2025-06-01",
     "completedAt": null,
-    "createdAt": "2026-05-28T08:09:14",
-    "updatedAt": "2026-05-28T08:09:14"
+    "createdAt": "2026-06-09T11:42:23",
+    "updatedAt": "2026-06-09T11:42:23"
   }
 }
 ```
@@ -11177,7 +15478,7 @@ _(empty)_
 {
   "type": "issue",
   "issue": {
-    "id": "issue-6090f92d",
+    "id": "issue-c65c7c9d",
     "identifier": "MER-213",
     "number": 213,
     "title": "Add rate limit headers to API responses",
@@ -11313,6 +15614,819 @@ _(empty)_
 
 </details>
 
+### linkedin-api (port 8062) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | GET | /v2/me | 200 | get me |
+| PASS | GET | /v2/connections?count=10 | 200 | list connections |
+| PASS | GET | /v2/posts | 200 | list posts |
+| PASS | GET | /v2/posts?author_id=urn:li:person:amelia-ortega | 200 | list posts by author |
+| PASS | GET | /v2/posts/6003 | 200 | get post |
+| PASS | POST | /v2/posts | 201 | create post |
+| PASS | GET | /v2/organizations/5001 | 200 | get organization |
+| PASS | GET | /v2/jobs?keywords=backend&location=Remote | 200 | search jobs |
+| PASS | GET | /v2/jobs/7001 | 200 | get job |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**GET get me** — `/v2/me` (status 200)
+
+```
+{
+  "id": "urn:li:person:amelia-ortega",
+  "localizedFirstName": "Amelia",
+  "localizedLastName": "Ortega",
+  "headline": "VP Engineering at Orbit Labs | Distributed Systems",
+  "vanityName": "amelia-ortega",
+  "location": "Seattle, Washington, United States",
+  "industry": "Software Development",
+  "summary": "Engineering leader focused on developer platforms and reliability. Previously infra lead at two high-growth startups.",
+  "profilePicture": "https://media.example.com/amelia.png",
+  "publicProfileUrl": "https://www.linkedin.com/in/amelia-ortega",
+  "numConnections": 842,
+  "currentOrgan
+```
+
+**GET list connections** — `/v2/connections?count=10` (status 200)
+
+```
+{
+  "elements": [
+    {
+      "id": "urn:li:person:jonas-pereira",
+      "firstName": "Jonas",
+      "lastName": "Pereira",
+      "headline": "Senior Infrastructure Engineer at Orbit Labs",
+      "location": "Lisbon Portugal",
+      "industry": "Software Development",
+      "connectedAt": "2024-02-11T10:00:00.000Z",
+      "organizationId": "5001"
+    },
+    {
+      "id": "urn:li:person:helena-park",
+      "firstName": "Helena",
+      "lastName": "Park",
+      "headline": "Staff Frontend Engineer | Accessibility",
+      "location": "Austin Texas",
+      "industry": "Software Development",
+     
+... (truncated)
+```
+
+**GET list posts** — `/v2/posts` (status 200)
+
+```
+{
+  "elements": [
+    {
+      "id": "6006",
+      "author_id": "urn:li:person:amelia-ortega",
+      "commentary": "Reliability tip: gate every rollout on p95 latency, not averages. Averages hide the pain your users feel.",
+      "visibility": "PUBLIC",
+      "created_at": "2026-05-25T08:15:00.000Z",
+      "socialDetail": {
+        "likeCount": 512,
+        "commentCount": 71,
+        "shareCount": 94
+      }
+    },
+    {
+      "id": "6005",
+      "author_id": "urn:li:person:noor-aziz",
+      "commentary": "New migration guide is up: moving to the Orbit plugin API without downtime. Took us a we
+... (truncated)
+```
+
+**GET list posts by author** — `/v2/posts?author_id=urn:li:person:amelia-ortega` (status 200)
+
+```
+{
+  "elements": [
+    {
+      "id": "6006",
+      "author_id": "urn:li:person:amelia-ortega",
+      "commentary": "Reliability tip: gate every rollout on p95 latency, not averages. Averages hide the pain your users feel.",
+      "visibility": "PUBLIC",
+      "created_at": "2026-05-25T08:15:00.000Z",
+      "socialDetail": {
+        "likeCount": 512,
+        "commentCount": 71,
+        "shareCount": 94
+      }
+    },
+    {
+      "id": "6002",
+      "author_id": "urn:li:person:amelia-ortega",
+      "commentary": "Hiring two senior backend engineers for the platform team. Remote-friendly across EU
+... (truncated)
+```
+
+**GET get post** — `/v2/posts/6003` (status 200)
+
+```
+{
+  "id": "6003",
+  "author_id": "urn:li:organization:orbit-labs",
+  "commentary": "Orbit CLI 2.0 is live. Faster cold starts and a new plugin system. Read the launch post on our blog.",
+  "visibility": "PUBLIC",
+  "created_at": "2026-05-21T17:00:00.000Z",
+  "socialDetail": {
+    "likeCount": 904,
+    "commentCount": 112,
+    "shareCount": 210
+  }
+}
+```
+
+**POST create post** — `/v2/posts` (status 201)
+
+```
+{
+  "id": "6273681967",
+  "author_id": "urn:li:person:amelia-ortega",
+  "commentary": "Thrilled to share our team shipped the new plugin API today.",
+  "visibility": "PUBLIC",
+  "created_at": "2026-06-09T11:42:24.000Z",
+  "socialDetail": {
+    "likeCount": 0,
+    "commentCount": 0,
+    "shareCount": 0
+  }
+}
+```
+
+**GET get organization** — `/v2/organizations/5001` (status 200)
+
+```
+{
+  "id": "5001",
+  "name": "Orbit Labs",
+  "vanityName": "orbit-labs",
+  "industry": "Software Development",
+  "website": "https://orbit-labs.com",
+  "location": "Remote",
+  "staffCountRange": "51-200",
+  "followerCount": 48210,
+  "description": "Developer tooling for the modern stack. Makers of the Orbit CLI and platform."
+}
+```
+
+**GET search jobs** — `/v2/jobs?keywords=backend&location=Remote` (status 200)
+
+```
+{
+  "elements": [
+    {
+      "id": "7001",
+      "title": "Senior Backend Engineer",
+      "organizationId": "5001",
+      "location": "Remote",
+      "workplaceType": "REMOTE",
+      "employmentType": "FULL_TIME",
+      "seniority": "Senior",
+      "keywords": [
+        "backend",
+        "python",
+        "distributed-systems"
+      ],
+      "postedAt": "2026-05-15T09:00:00.000Z",
+      "applicants": 64,
+      "description": "Build and scale the Orbit platform services in Python and Go."
+    }
+  ],
+  "paging": {
+    "start": 0,
+    "count": 50,
+    "total": 1
+  }
+}
+```
+
+**GET get job** — `/v2/jobs/7001` (status 200)
+
+```
+{
+  "id": "7001",
+  "title": "Senior Backend Engineer",
+  "organizationId": "5001",
+  "location": "Remote",
+  "workplaceType": "REMOTE",
+  "employmentType": "FULL_TIME",
+  "seniority": "Senior",
+  "keywords": [
+    "backend",
+    "python",
+    "distributed-systems"
+  ],
+  "postedAt": "2026-05-15T09:00:00.000Z",
+  "applicants": 64,
+  "description": "Build and scale the Orbit platform services in Python and Go."
+}
+```
+
+</details>
+
+### mailchimp-api (port 8081) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | GET | /3.0/lists | 200 | list lists |
+| PASS | GET | /3.0/lists/list-newsletter | 200 | get list |
+| PASS | GET | /3.0/lists/list-newsletter/members?status=subscribed | 200 | list members |
+| PASS | POST | /3.0/lists/list-newsletter/members | 201 | create member |
+| PASS | GET | /3.0/lists/list-newsletter/members/mara@brightpath.io | 200 | get member |
+| PASS | PATCH | /3.0/lists/list-newsletter/members/tomas@brightpath.io | 200 | update member |
+| PASS | GET | /3.0/campaigns?status=sent | 200 | list campaigns |
+| PASS | POST | /3.0/campaigns | 201 | create campaign |
+| PASS | GET | /3.0/campaigns/camp-sep-news | 200 | get campaign |
+| PASS | POST | /3.0/campaigns/camp-nov-draft/actions/send | 200 | send campaign |
+| PASS | GET | /3.0/reports/camp-oct-news | 200 | get report |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**GET list lists** — `/3.0/lists` (status 200)
+
+```
+{
+  "lists": [
+    {
+      "id": "list-newsletter",
+      "name": "Orbit Monthly Newsletter",
+      "company": "Orbit Labs",
+      "from_name": "Orbit Labs",
+      "from_email": "news@orbit-labs.com",
+      "subject": "Orbit Monthly",
+      "member_count": 5,
+      "unsubscribe_count": 1,
+      "date_created": "2025-09-01T10:00:00.000Z"
+    },
+    {
+      "id": "list-product",
+      "name": "Product Updates",
+      "company": "Orbit Labs",
+      "from_name": "Orbit Product",
+      "from_email": "product@orbit-labs.com",
+      "subject": "Product Updates",
+      "member_count": 4,
+      "unsubs
+```
+
+**GET get list** — `/3.0/lists/list-newsletter` (status 200)
+
+```
+{
+  "id": "list-newsletter",
+  "name": "Orbit Monthly Newsletter",
+  "company": "Orbit Labs",
+  "from_name": "Orbit Labs",
+  "from_email": "news@orbit-labs.com",
+  "subject": "Orbit Monthly",
+  "member_count": 5,
+  "unsubscribe_count": 1,
+  "date_created": "2025-09-01T10:00:00.000Z"
+}
+```
+
+**GET list members** — `/3.0/lists/list-newsletter/members?status=subscribed` (status 200)
+
+```
+{
+  "members": [
+    {
+      "id": "0d05c30f3ef9742e1a0144755a9299b4",
+      "list_id": "list-newsletter",
+      "email_address": "mara@brightpath.io",
+      "full_name": "Mara Lindgren",
+      "status": "subscribed",
+      "timestamp_signup": "2025-09-02T08:00:00.000Z",
+      "member_rating": 4
+    },
+    {
+      "id": "e680f3f5e04d7a7de7e1d2aa788f12b6",
+      "list_id": "list-newsletter",
+      "email_address": "tomas@brightpath.io",
+      "full_name": "Tomas Vega",
+      "status": "subscribed",
+      "timestamp_signup": "2025-09-05T09:00:00.000Z",
+      "member_rating": 3
+    },
+    {
+     
+... (truncated)
+```
+
+**POST create member** — `/3.0/lists/list-newsletter/members` (status 201)
+
+```
+{
+  "id": "9e55e80ea942b2727c9d6d0c625ca636",
+  "list_id": "list-newsletter",
+  "email_address": "newuser@example.com",
+  "full_name": "New User",
+  "status": "subscribed",
+  "timestamp_signup": "2026-06-09T11:42:24+00:00",
+  "member_rating": 0
+}
+```
+
+**GET get member** — `/3.0/lists/list-newsletter/members/mara@brightpath.io` (status 200)
+
+```
+{
+  "id": "0d05c30f3ef9742e1a0144755a9299b4",
+  "list_id": "list-newsletter",
+  "email_address": "mara@brightpath.io",
+  "full_name": "Mara Lindgren",
+  "status": "subscribed",
+  "timestamp_signup": "2025-09-02T08:00:00.000Z",
+  "member_rating": 4
+}
+```
+
+**PATCH update member** — `/3.0/lists/list-newsletter/members/tomas@brightpath.io` (status 200)
+
+```
+{
+  "id": "e680f3f5e04d7a7de7e1d2aa788f12b6",
+  "list_id": "list-newsletter",
+  "email_address": "tomas@brightpath.io",
+  "full_name": "Tomas Vega",
+  "status": "unsubscribed",
+  "timestamp_signup": "2025-09-05T09:00:00.000Z",
+  "member_rating": 3
+}
+```
+
+**GET list campaigns** — `/3.0/campaigns?status=sent` (status 200)
+
+```
+{
+  "campaigns": [
+    {
+      "id": "camp-sep-news",
+      "list_id": "list-newsletter",
+      "type": "regular",
+      "status": "sent",
+      "emails_sent": 5,
+      "send_time": "2025-09-28T15:00:00.000Z",
+      "create_time": "2025-09-25T10:00:00.000Z",
+      "recipients": {
+        "list_id": "list-newsletter"
+      },
+      "settings": {
+        "subject_line": "September Highlights",
+        "from_name": "Orbit Labs",
+        "reply_to": "news@orbit-labs.com",
+        "title": "September Newsletter"
+      }
+    },
+    {
+      "id": "camp-oct-news",
+      "list_id": "list-newsletter",
+ 
+... (truncated)
+```
+
+**POST create campaign** — `/3.0/campaigns` (status 201)
+
+```
+{
+  "id": "camp-022d1cb073",
+  "list_id": "list-product",
+  "type": "regular",
+  "status": "save",
+  "emails_sent": 0,
+  "send_time": null,
+  "create_time": "2026-06-09T11:42:24+00:00",
+  "recipients": {
+    "list_id": "list-product"
+  },
+  "settings": {
+    "subject_line": "December Update",
+    "from_name": "Orbit Product",
+    "reply_to": "product@orbit-labs.com",
+    "title": "December Update"
+  }
+}
+```
+
+**GET get campaign** — `/3.0/campaigns/camp-sep-news` (status 200)
+
+```
+{
+  "id": "camp-sep-news",
+  "list_id": "list-newsletter",
+  "type": "regular",
+  "status": "sent",
+  "emails_sent": 5,
+  "send_time": "2025-09-28T15:00:00.000Z",
+  "create_time": "2025-09-25T10:00:00.000Z",
+  "recipients": {
+    "list_id": "list-newsletter"
+  },
+  "settings": {
+    "subject_line": "September Highlights",
+    "from_name": "Orbit Labs",
+    "reply_to": "news@orbit-labs.com",
+    "title": "September Newsletter"
+  }
+}
+```
+
+**POST send campaign** — `/3.0/campaigns/camp-nov-draft/actions/send` (status 200)
+
+```
+{
+  "id": "camp-nov-draft",
+  "status": "sent",
+  "emails_sent": 6
+}
+```
+
+**GET get report** — `/3.0/reports/camp-oct-news` (status 200)
+
+```
+{
+  "id": "camp-oct-news",
+  "emails_sent": 5,
+  "opens": {
+    "opens_total": 22,
+    "unique_opens": 5,
+    "open_rate": 1.0
+  },
+  "clicks": {
+    "clicks_total": 9,
+    "unique_clicks": 4,
+    "click_rate": 0.8
+  },
+  "unsubscribed": 1,
+  "bounces": {
+    "hard_bounces": 0
+  }
+}
+```
+
+</details>
+
+### mailgun-api (port 8094) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | POST | /v3/sandbox.mailgun.org/messages | 200 | send message |
+| PASS | GET | /v3/sandbox.mailgun.org/events | 200 | events |
+| PASS | GET | /v3/sandbox.mailgun.org/events?event=delivered | 200 | events by type |
+| PASS | GET | /v3/sandbox.mailgun.org/stats/total | 200 | stats total |
+| PASS | GET | /v3/lists/newsletter@sandbox.mailgun.org/members | 200 | list members |
+| PASS | GET | /v3/lists/newsletter@sandbox.mailgun.org/members?subscribed=true | 200 | list members subscribed |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**POST send message** — `/v3/sandbox.mailgun.org/messages` (status 200)
+
+```
+{
+  "id": "<20260609114225.03D6223A34E3@sandbox.mailgun.org>",
+  "message": "Queued. Thank you."
+}
+```
+
+**GET events** — `/v3/sandbox.mailgun.org/events` (status 200)
+
+```
+{
+  "items": [
+    {
+      "id": "ev_0012",
+      "event": "accepted",
+      "timestamp": "2026-05-24T17:56:11Z",
+      "recipient": "grace@example.com",
+      "message": {
+        "headers": {
+          "message-id": "20260524175611.7.A7B8C9D0E1F2@sandbox.mailgun.org"
+        }
+      }
+    },
+    {
+      "id": "ev_0011",
+      "event": "delivered",
+      "timestamp": "2026-05-20T11:39:06Z",
+      "recipient": "frank@example.com",
+      "message": {
+        "headers": {
+          "message-id": "20260520113900.6.F6A7B8C9D0E1@sandbox.mailgun.org"
+        }
+      }
+    },
+    {
+      "id": "ev_00
+... (truncated)
+```
+
+**GET events by type** — `/v3/sandbox.mailgun.org/events?event=delivered` (status 200)
+
+```
+{
+  "items": [
+    {
+      "id": "ev_0011",
+      "event": "delivered",
+      "timestamp": "2026-05-20T11:39:06Z",
+      "recipient": "frank@example.com",
+      "message": {
+        "headers": {
+          "message-id": "20260520113900.6.F6A7B8C9D0E1@sandbox.mailgun.org"
+        }
+      }
+    },
+    {
+      "id": "ev_0009",
+      "event": "delivered",
+      "timestamp": "2026-05-15T10:47:39Z",
+      "recipient": "erin@example.com",
+      "message": {
+        "headers": {
+          "message-id": "20260515104733.5.E5F6A7B8C9D0@sandbox.mailgun.org"
+        }
+      }
+    },
+    {
+      "id": "ev_00
+... (truncated)
+```
+
+**GET stats total** — `/v3/sandbox.mailgun.org/stats/total` (status 200)
+
+```
+{
+  "start": "2026-05-01T09:30:12Z",
+  "end": "2026-05-24T17:56:11Z",
+  "resolution": "month",
+  "stats": [
+    {
+      "time": "2026-06-09T11:42:25Z",
+      "accepted": {
+        "total": 4
+      }
+    },
+    {
+      "time": "2026-06-09T11:42:25Z",
+      "delivered": {
+        "total": 5
+      }
+    },
+    {
+      "time": "2026-06-09T11:42:25Z",
+      "failed": {
+        "total": 1
+      }
+    },
+    {
+      "time": "2026-06-09T11:42:25Z",
+      "opened": {
+        "total": 1
+      }
+    },
+    {
+      "time": "2026-06-09T11:42:25Z",
+      "clicked": {
+        "total": 1
+      }
+    }
+  ]
+}
+```
+
+**GET list members** — `/v3/lists/newsletter@sandbox.mailgun.org/members` (status 200)
+
+```
+{
+  "items": [
+    {
+      "address": "alice@example.com",
+      "name": "Alice Adams",
+      "subscribed": true,
+      "vars": "{\"plan\":\"pro\"}"
+    },
+    {
+      "address": "bob@example.com",
+      "name": "Bob Brown",
+      "subscribed": true,
+      "vars": "{\"plan\":\"free\"}"
+    },
+    {
+      "address": "carol@example.com",
+      "name": "Carol Clark",
+      "subscribed": false,
+      "vars": "{\"plan\":\"free\"}"
+    },
+    {
+      "address": "dave@example.com",
+      "name": "Dave Davis",
+      "subscribed": true,
+      "vars": "{\"plan\":\"enterprise\"}"
+    }
+  ],
+  "total_coun
+```
+
+**GET list members subscribed** — `/v3/lists/newsletter@sandbox.mailgun.org/members?subscribed=true` (status 200)
+
+```
+{
+  "items": [
+    {
+      "address": "alice@example.com",
+      "name": "Alice Adams",
+      "subscribed": true,
+      "vars": "{\"plan\":\"pro\"}"
+    },
+    {
+      "address": "bob@example.com",
+      "name": "Bob Brown",
+      "subscribed": true,
+      "vars": "{\"plan\":\"free\"}"
+    },
+    {
+      "address": "dave@example.com",
+      "name": "Dave Davis",
+      "subscribed": true,
+      "vars": "{\"plan\":\"enterprise\"}"
+    }
+  ],
+  "total_count": 3
+}
+```
+
+</details>
+
+### microsoft-teams-api (port 8086) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | GET | /v1.0/me/joinedTeams | 200 | joined teams |
+| PASS | GET | /v1.0/teams/19:team-eng0001@thread.tacv2 | 200 | get team |
+| PASS | GET | /v1.0/teams/19:team-eng0001@thread.tacv2/channels | 200 | list channels |
+| PASS | GET | /v1.0/teams/19:team-eng0001@thread.tacv2/channels/19:chan-eng-gen01@thread.tacv2/messages | 200 | list channel messages |
+| PASS | POST | /v1.0/teams/19:team-eng0001@thread.tacv2/channels/19:chan-eng-gen01@thread.tacv2/messages | 201 | send channel message |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**GET joined teams** — `/v1.0/me/joinedTeams` (status 200)
+
+```
+{
+  "value": [
+    {
+      "id": "19:team-eng0001@thread.tacv2",
+      "displayName": "Engineering",
+      "description": "Core engineering team for platform and infra",
+      "visibility": "private",
+      "isArchived": false,
+      "webUrl": "https://teams.microsoft.com/l/team/19%3Ateam-eng0001"
+    },
+    {
+      "id": "19:team-allco005@thread.tacv2",
+      "displayName": "All Company",
+      "description": "Company-wide announcements and town halls",
+      "visibility": "public",
+      "isArchived": false,
+      "webUrl": "https://teams.microsoft.com/l/team/19%3Ateam-allco005"
+    }
+  ]
+}
+```
+
+**GET get team** — `/v1.0/teams/19:team-eng0001@thread.tacv2` (status 200)
+
+```
+{
+  "id": "19:team-eng0001@thread.tacv2",
+  "displayName": "Engineering",
+  "description": "Core engineering team for platform and infra",
+  "visibility": "private",
+  "isArchived": false,
+  "webUrl": "https://teams.microsoft.com/l/team/19%3Ateam-eng0001"
+}
+```
+
+**GET list channels** — `/v1.0/teams/19:team-eng0001@thread.tacv2/channels` (status 200)
+
+```
+{
+  "value": [
+    {
+      "id": "19:chan-eng-gen01@thread.tacv2",
+      "displayName": "General",
+      "description": "Default channel for the Engineering team",
+      "membershipType": "standard",
+      "webUrl": "https://teams.microsoft.com/l/channel/19%3Achan-eng-gen01",
+      "createdDateTime": "2026-01-12T09:00:00Z"
+    },
+    {
+      "id": "19:chan-eng-plat02@thread.tacv2",
+      "displayName": "Platform",
+      "description": "Platform services discussion",
+      "membershipType": "standard",
+      "webUrl": "https://teams.microsoft.com/l/channel/19%3Achan-eng-plat02",
+      "createdD
+... (truncated)
+```
+
+**GET list channel messages** — `/v1.0/teams/19:team-eng0001@thread.tacv2/channels/19:chan-eng-gen01@thread.tacv2/messages` (status 200)
+
+```
+{
+  "value": [
+    {
+      "id": "1747900000002",
+      "messageType": "message",
+      "createdDateTime": "2026-05-11T13:45:00Z",
+      "importance": "high",
+      "channelIdentity": {
+        "teamId": "19:team-eng0001@thread.tacv2",
+        "channelId": "19:chan-eng-gen01@thread.tacv2"
+      },
+      "from": {
+        "user": {
+          "id": "user-002",
+          "displayName": "Priya Nair"
+        }
+      },
+      "body": {
+        "contentType": "html",
+        "content": "Reminder: sprint planning at 2pm today."
+      }
+    },
+    {
+      "id": "1747900000001",
+      "messageType": "me
+... (truncated)
+```
+
+**POST send channel message** — `/v1.0/teams/19:team-eng0001@thread.tacv2/channels/19:chan-eng-gen01@thread.tacv2/messages` (status 201)
+
+```
+{
+  "id": "17810053460004efc",
+  "messageType": "message",
+  "createdDateTime": "2026-06-09T11:42:26Z",
+  "importance": "high",
+  "channelIdentity": {
+    "teamId": "19:team-eng0001@thread.tacv2",
+    "channelId": "19:chan-eng-gen01@thread.tacv2"
+  },
+  "from": {
+    "user": {
+      "id": "user-001",
+      "displayName": "Alex Carter"
+    }
+  },
+  "body": {
+    "contentType": "html",
+    "content": "Deploy window confirmed for 3pm."
+  }
+}
+```
+
+</details>
+
 ### mixpanel-api (port 8056) — server: started
 
 | Result | Method | Path | Status | Endpoint |
@@ -11341,7 +16455,7 @@ _(empty)_
 ```
 {
   "status": 1,
-  "event_id": "evt-15f6745f"
+  "event_id": "evt-835467c1"
 }
 ```
 
@@ -11357,17 +16471,17 @@ _(empty)_
       "2025-05-04"
     ],
     "values": {
-      "App Open": {
-        "2025-05-01": 1,
-        "2025-05-02": 2,
-        "2025-05-03": 1,
-        "2025-05-04": 1
-      },
       "Checkout": {
         "2025-05-01": 1,
         "2025-05-02": 0,
         "2025-05-03": 1,
         "2025-05-04": 0
+      },
+      "App Open": {
+        "2025-05-01": 1,
+        "2025-05-02": 2,
+        "2025-05-03": 1,
+        "2025-05-04": 1
       }
     }
   },
@@ -11515,6 +16629,357 @@ _(empty)_
 
 </details>
 
+### monday-api (port 8080) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | GET | /v2/workspaces | 200 | list workspaces |
+| PASS | GET | /v2/boards?workspace_id=ws-1 | 200 | list boards |
+| PASS | GET | /v2/boards/board-101 | 200 | get board |
+| PASS | GET | /v2/boards/board-101/items | 200 | board items |
+| PASS | GET | /v2/items?board_id=board-101&group_id=grp-todo | 200 | list items |
+| PASS | GET | /v2/items/item-1001 | 200 | get item |
+| PASS | POST | /v2/items | 201 | create item |
+| PASS | PUT | /v2/items/item-1002 | 200 | update item (change status) |
+| PASS | PUT | /v2/items/item-1002 | 200 | update item (move group) |
+| PASS | DELETE | /v2/items/item-1004 | 200 | delete item |
+| PASS | GET | /v2/users | 200 | list users |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**GET list workspaces** — `/v2/workspaces` (status 200)
+
+```
+{
+  "workspaces": [
+    {
+      "id": "ws-1",
+      "name": "Engineering",
+      "kind": "open",
+      "description": "Engineering delivery and sprint planning"
+    },
+    {
+      "id": "ws-2",
+      "name": "Marketing",
+      "kind": "open",
+      "description": "Campaigns and content calendar"
+    }
+  ]
+}
+```
+
+**GET list boards** — `/v2/boards?workspace_id=ws-1` (status 200)
+
+```
+{
+  "boards": [
+    {
+      "id": "board-101",
+      "name": "Sprint Backlog",
+      "description": "Current sprint work items",
+      "state": "active",
+      "board_kind": "public",
+      "workspace_id": "ws-1"
+    },
+    {
+      "id": "board-102",
+      "name": "Bug Tracker",
+      "description": "Reported defects and triage",
+      "state": "active",
+      "board_kind": "public",
+      "workspace_id": "ws-1"
+    }
+  ]
+}
+```
+
+**GET get board** — `/v2/boards/board-101` (status 200)
+
+```
+{
+  "id": "board-101",
+  "name": "Sprint Backlog",
+  "description": "Current sprint work items",
+  "state": "active",
+  "board_kind": "public",
+  "workspace_id": "ws-1",
+  "groups": [
+    {
+      "id": "grp-todo",
+      "title": "To Do",
+      "color": "#fdab3d",
+      "position": 1
+    },
+    {
+      "id": "grp-doing",
+      "title": "In Progress",
+      "color": "#0086c0",
+      "position": 2
+    },
+    {
+      "id": "grp-done",
+      "title": "Done",
+      "color": "#00c875",
+      "position": 3
+    }
+  ],
+  "columns": [
+    {
+      "id": "status",
+      "title": "Status",
+      "type": "st
+... (truncated)
+```
+
+**GET board items** — `/v2/boards/board-101/items` (status 200)
+
+```
+{
+  "items": [
+    {
+      "id": "item-1001",
+      "name": "Implement OAuth token refresh",
+      "board_id": "board-101",
+      "group": {
+        "id": "grp-doing"
+      },
+      "created_at": "2026-05-18T09:00:00Z",
+      "column_values": [
+        {
+          "id": "status",
+          "text": "In Progress",
+          "value": null
+        },
+        {
+          "id": "owner",
+          "text": "Helena Park",
+          "value": "usr-2"
+        },
+        {
+          "id": "due",
+          "text": "2026-05-30",
+          "value": null
+        },
+        {
+          "id": "notes",
+          
+... (truncated)
+```
+
+**GET list items** — `/v2/items?board_id=board-101&group_id=grp-todo` (status 200)
+
+```
+{
+  "items": [
+    {
+      "id": "item-1002",
+      "name": "Add pagination to users endpoint",
+      "board_id": "board-101",
+      "group": {
+        "id": "grp-todo"
+      },
+      "created_at": "2026-05-19T10:30:00Z",
+      "column_values": [
+        {
+          "id": "status",
+          "text": "Todo",
+          "value": null
+        },
+        {
+          "id": "owner",
+          "text": "Marco Bianchi",
+          "value": "usr-3"
+        },
+        {
+          "id": "due",
+          "text": "2026-06-02",
+          "value": null
+        }
+      ]
+    },
+    {
+      "id": "item-1004",
+   
+... (truncated)
+```
+
+**GET get item** — `/v2/items/item-1001` (status 200)
+
+```
+{
+  "id": "item-1001",
+  "name": "Implement OAuth token refresh",
+  "board_id": "board-101",
+  "group": {
+    "id": "grp-doing"
+  },
+  "created_at": "2026-05-18T09:00:00Z",
+  "column_values": [
+    {
+      "id": "status",
+      "text": "In Progress",
+      "value": null
+    },
+    {
+      "id": "owner",
+      "text": "Helena Park",
+      "value": "usr-2"
+    },
+    {
+      "id": "due",
+      "text": "2026-05-30",
+      "value": null
+    },
+    {
+      "id": "notes",
+      "text": "Blocked on auth service deploy",
+      "value": null
+    }
+  ]
+}
+```
+
+**POST create item** — `/v2/items` (status 201)
+
+```
+{
+  "id": "item-88cf1555",
+  "name": "Add rate limiting to API gateway",
+  "board_id": "board-101",
+  "group": {
+    "id": "grp-todo"
+  },
+  "created_at": "2026-06-09T11:42:27Z",
+  "column_values": [
+    {
+      "id": "status",
+      "text": "Todo",
+      "value": null
+    },
+    {
+      "id": "owner",
+      "text": "Helena Park",
+      "value": "usr-2"
+    }
+  ]
+}
+```
+
+**PUT update item (change status)** — `/v2/items/item-1002` (status 200)
+
+```
+{
+  "id": "item-1002",
+  "name": "Add pagination to users endpoint",
+  "board_id": "board-101",
+  "group": {
+    "id": "grp-todo"
+  },
+  "created_at": "2026-05-19T10:30:00Z",
+  "column_values": [
+    {
+      "id": "status",
+      "text": "In Progress",
+      "value": null
+    },
+    {
+      "id": "owner",
+      "text": "Marco Bianchi",
+      "value": "usr-3"
+    },
+    {
+      "id": "due",
+      "text": "2026-06-02",
+      "value": null
+    }
+  ]
+}
+```
+
+**PUT update item (move group)** — `/v2/items/item-1002` (status 200)
+
+```
+{
+  "id": "item-1002",
+  "name": "Add pagination to users endpoint",
+  "board_id": "board-101",
+  "group": {
+    "id": "grp-doing"
+  },
+  "created_at": "2026-05-19T10:30:00Z",
+  "column_values": [
+    {
+      "id": "status",
+      "text": "In Progress",
+      "value": null
+    },
+    {
+      "id": "owner",
+      "text": "Marco Bianchi",
+      "value": "usr-3"
+    },
+    {
+      "id": "due",
+      "text": "2026-06-02",
+      "value": null
+    }
+  ]
+}
+```
+
+**DELETE delete item** — `/v2/items/item-1004` (status 200)
+
+```
+{
+  "id": "item-1004",
+  "deleted": true
+}
+```
+
+**GET list users** — `/v2/users` (status 200)
+
+```
+{
+  "users": [
+    {
+      "id": "usr-1",
+      "name": "Amelia Stone",
+      "email": "amelia@orbit-labs.example.com",
+      "title": "Engineering Manager",
+      "is_admin": true
+    },
+    {
+      "id": "usr-2",
+      "name": "Helena Park",
+      "email": "helena@orbit-labs.example.com",
+      "title": "Backend Engineer",
+      "is_admin": false
+    },
+    {
+      "id": "usr-3",
+      "name": "Marco Bianchi",
+      "email": "marco@orbit-labs.example.com",
+      "title": "Frontend Engineer",
+      "is_admin": false
+    },
+    {
+      "id": "usr-4",
+      "name": "Sara Okonkwo",
+      "email"
+... (truncated)
+```
+
+</details>
+
 ### myfitnesspal-api (port 8005) — server: started
 
 | Result | Method | Path | Status | Endpoint |
@@ -11617,15 +17082,15 @@ _(empty)_
     "height_cm": 177.8,
     "current_weight_lbs": 192.0,
     "goal_weight_lbs": 175.0,
-    "activity_level": "very_active",
+    "activity_level": "moderately_active",
     "profile_image_url": "https://mfp-static.example.com/avatars/alexrivera32.jpg",
     "location": "Austin, TX",
     "joined_date": "2024-11-15",
-    "daily_calorie_goal": 2000,
+    "daily_calorie_goal": 1800,
     "macro_goals": {
       "carbs_pct": 40,
       "fat_pct": 25,
-      "
+ 
 ... (truncated)
 ```
 
@@ -11635,7 +17100,7 @@ _(empty)_
 {
   "type": "goals",
   "goals": {
-    "daily_calorie_goal": 2000,
+    "daily_calorie_goal": 1800,
     "macro_goals": {
       "carbs_pct": 40,
       "fat_pct": 25,
@@ -11667,14 +17132,14 @@ _(empty)_
 {
   "type": "goals",
   "goals": {
-    "daily_calorie_goal": 1900,
+    "daily_calorie_goal": 1800,
     "macro_goals": {
-      "carbs_pct": 35,
+      "carbs_pct": 40,
       "fat_pct": 25,
-      "protein_pct": 40
+      "protein_pct": 35
     },
     "nutrient_goals": {
-      "calories": 1900,
+      "calories": 1800,
       "total_fat_g": 50,
       "saturated_fat_g": 16,
       "cholesterol_mg": 300,
@@ -11994,16 +17459,16 @@ _(empty)_
     "brand": "",
     "serving_size": "1",
     "serving_unit": "cup",
-    "servings": 2.0,
-    "calories": 308.0,
-    "total_fat_g": 5.2,
-    "saturated_fat_g": 0.8,
+    "servings": 1.0,
+    "calories": 154.0,
+    "total_fat_g": 2.6,
+    "saturated_fat_g": 0.4,
     "cholesterol_mg": 0.0,
-    "sodium_mg": 18.0,
-    "total_carbs_g": 54.0,
-    "dietary_fiber_g": 8.0,
-    "sugars_g": 2.2,
-    "protein_g": 10.8
+    "sodium_mg": 9.0,
+    "total_carbs_g": 27.0,
+    "dietary_fiber_g": 4.0,
+    "sugars_g": 1.1,
+    "protein_g": 5.4
   }
 }
 ```
@@ -12041,18 +17506,18 @@ _(empty)_
   "type": "daily_totals",
   "date": "2025-04-28",
   "totals": {
-    "calories": 1730.0,
-    "total_fat_g": 51.3,
+    "calories": 1720.0,
+    "total_fat_g": 51.2,
     "saturated_fat_g": 15.5,
     "cholesterol_mg": 678.0,
-    "sodium_mg": 1488.0,
-    "total_carbs_g": 175.7,
-    "dietary_fiber_g": 31.0,
-    "sugars_g": 34.8,
-    "protein_g": 150.1
+    "sodium_mg": 1489.0,
+    "total_carbs_g": 173.7,
+    "dietary_fiber_g": 32.3,
+    "sugars_g": 39.4,
+    "protein_g": 149.3
   },
   "goal": {
-    "calories": 1900,
+    "calories": 1800,
     "total_fat_g": 50,
     "saturated_fat_g": 16,
     "cholesterol_mg": 300,
@@ -12085,7 +17550,7 @@ _(empty)_
     "protein_g": 0
   },
   "goal": {
-    "calories": 1900,
+    "calories": 1800,
     "total_fat_g": 50,
     "saturated_fat_g": 16,
     "cholesterol_mg": 300,
@@ -12109,10 +17574,10 @@ _(empty)_
   "start_date": "2025-04-22",
   "end_date": "2025-04-28",
   "averages": {
-    "calories": 1559.6,
-    "protein_g": 122.1,
-    "total_carbs_g": 155.4,
-    "total_fat_g": 52.7
+    "calories": 1558.1,
+    "protein_g": 122.0,
+    "total_carbs_g": 155.1,
+    "total_fat_g": 52.6
   },
   "days": [
     {
@@ -12141,16 +17606,16 @@ _(empty)_
 {
   "type": "progress",
   "period_days": 30,
-  "calorie_goal": 1900,
+  "calorie_goal": 1800,
   "results": [
     {
       "date": "2025-03-30",
-      "calories_consumed": 1631.0,
+      "calories_consumed": 1477.0,
       "calories_burned": 385,
-      "net_calories": 1246.0,
-      "protein_g": 117.8,
-      "total_carbs_g": 200.2,
-      "total_fat_g": 42.0
+      "net_calories": 1092.0,
+      "protein_g": 112.4,
+      "total_carbs_g": 173.2,
+      "total_fat_g": 39.4
     },
     {
       "date": "2025-03-31",
@@ -12174,7 +17639,7 @@ _(empty)_
 {
   "type": "progress",
   "period_days": 7,
-  "calorie_goal": 1900,
+  "calorie_goal": 1800,
   "results": [
     {
       "date": "2025-04-22",
@@ -12523,8 +17988,8 @@ _(empty)_
   "water": {
     "water_id": 30,
     "date": "2025-04-28",
-    "cups": 10,
-    "notes": "Updated - extra water after workout"
+    "cups": 8,
+    "notes": ""
   }
 }
 ```
@@ -12535,6 +18000,228 @@ _(empty)_
 {
   "error": "Water entry for 2020-01-01 not found"
 }
+```
+
+</details>
+
+### nasa-api (port 8077) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | GET | /planetary/apod | 200 | apod latest |
+| PASS | GET | /planetary/apod?date=2026-05-24 | 200 | apod by date |
+| PASS | GET | /planetary/apod?start_date=2026-05-20&end_date=2026-05-23 | 200 | apod range |
+| PASS | GET | /mars-photos/api/v1/rovers/curiosity/photos?sol=4100&camera=MAST | 200 | rover photos |
+| PASS | GET | /mars-photos/api/v1/rovers/perseverance | 200 | rover manifest |
+| PASS | GET | /neo/rest/v1/feed?start_date=2026-05-20&end_date=2026-05-21 | 200 | neo feed |
+| PASS | GET | /neo/rest/v1/neo/3726710 | 200 | neo by id |
+| PASS | GET | /EPIC/api/natural | 200 | epic natural |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**GET apod latest** — `/planetary/apod` (status 200)
+
+```
+{
+  "date": "2026-05-27",
+  "title": "Sunspot Region AR4012 in Close Up",
+  "explanation": "A high-resolution view of a complex sunspot group near the solar limb.",
+  "url": "https://apod.nasa.gov/apod/image/2605/sunspot_ar4012.jpg",
+  "media_type": "image",
+  "service_version": "v1",
+  "hdurl": "https://apod.nasa.gov/apod/image/2605/sunspot_ar4012_big.jpg",
+  "copyright": "Solar Observatory Team"
+}
+```
+
+**GET apod by date** — `/planetary/apod?date=2026-05-24` (status 200)
+
+```
+{
+  "date": "2026-05-24",
+  "title": "The Andromeda Galaxy Up Close",
+  "explanation": "A mosaic of our nearest large galactic neighbor spanning six degrees of sky.",
+  "url": "https://apod.nasa.gov/apod/image/2605/m31_mosaic.jpg",
+  "media_type": "image",
+  "service_version": "v1",
+  "hdurl": "https://apod.nasa.gov/apod/image/2605/m31_mosaic_big.jpg",
+  "copyright": "Robert Chen"
+}
+```
+
+**GET apod range** — `/planetary/apod?start_date=2026-05-20&end_date=2026-05-23` (status 200)
+
+```
+[
+  {
+    "date": "2026-05-20",
+    "title": "The Veil Nebula in Hydrogen and Oxygen",
+    "explanation": "A delicate web of glowing gas marks the expanding remnant of a supernova in Cygnus.",
+    "url": "https://apod.nasa.gov/apod/image/2605/veil_hoo.jpg",
+    "media_type": "image",
+    "service_version": "v1",
+    "hdurl": "https://apod.nasa.gov/apod/image/2605/veil_hoo_big.jpg",
+    "copyright": "Deep Sky West"
+  },
+  {
+    "date": "2026-05-21",
+    "title": "A Total Lunar Eclipse over the Andes",
+    "explanation": "The fully eclipsed Moon glows copper-red above a high desert ridge line.",
+... (truncated)
+```
+
+**GET rover photos** — `/mars-photos/api/v1/rovers/curiosity/photos?sol=4100&camera=MAST` (status 200)
+
+```
+{
+  "photos": [
+    {
+      "id": 1000202,
+      "sol": 4100,
+      "camera": {
+        "name": "MAST",
+        "full_name": "Mast Camera"
+      },
+      "img_src": "https://mars.nasa.gov/msl-raw-images/MAST/4100_0002.jpg",
+      "earth_date": "2026-04-12",
+      "rover": {
+        "name": "curiosity",
+        "landing_date": "2012-08-06",
+        "launch_date": "2011-11-26",
+        "status": "active"
+      }
+    }
+  ]
+}
+```
+
+**GET rover manifest** — `/mars-photos/api/v1/rovers/perseverance` (status 200)
+
+```
+{
+  "photo_manifest": {
+    "name": "perseverance",
+    "landing_date": "2021-02-18",
+    "launch_date": "2020-07-30",
+    "status": "active",
+    "max_sol": 1111,
+    "max_date": "2026-05-01",
+    "total_photos": 358900,
+    "photos": [
+      {
+        "sol": 1110,
+        "earth_date": "2026-04-30",
+        "total_photos": 3,
+        "cameras": [
+          "FRONT_HAZCAM_LEFT_A",
+          "MCZ_RIGHT",
+          "NAVCAM_LEFT"
+        ]
+      },
+      {
+        "sol": 1111,
+        "earth_date": "2026-05-01",
+        "total_photos": 1,
+        "cameras": [
+          "MCZ_LEFT"
+        ]
+      
+```
+
+**GET neo feed** — `/neo/rest/v1/feed?start_date=2026-05-20&end_date=2026-05-21` (status 200)
+
+```
+{
+  "element_count": 4,
+  "near_earth_objects": {
+    "2026-05-20": [
+      {
+        "id": "3542519",
+        "neo_reference_id": "3542519",
+        "name": "(2010 PK9)",
+        "absolute_magnitude_h": 21.3,
+        "estimated_diameter": {
+          "kilometers": {
+            "estimated_diameter_min": 0.1487,
+            "estimated_diameter_max": 0.3325
+          }
+        },
+        "is_potentially_hazardous_asteroid": false,
+        "close_approach_data": [
+          {
+            "close_approach_date": "2026-05-20",
+            "relative_velocity": {
+              "kilometers_per_hour": 
+... (truncated)
+```
+
+**GET neo by id** — `/neo/rest/v1/neo/3726710` (status 200)
+
+```
+{
+  "id": "3726710",
+  "neo_reference_id": "3726710",
+  "name": "(2015 TB145)",
+  "absolute_magnitude_h": 19.9,
+  "estimated_diameter": {
+    "kilometers": {
+      "estimated_diameter_min": 0.2837,
+      "estimated_diameter_max": 0.6343
+    }
+  },
+  "is_potentially_hazardous_asteroid": true,
+  "close_approach_data": [
+    {
+      "close_approach_date": "2026-05-20",
+      "relative_velocity": {
+        "kilometers_per_hour": "126400.4"
+      },
+      "miss_distance": {
+        "kilometers": "1980455.2"
+      },
+      "orbiting_body": "Earth"
+    }
+  ]
+}
+```
+
+**GET epic natural** — `/EPIC/api/natural` (status 200)
+
+```
+[
+  {
+    "identifier": "20260527003633",
+    "image": "epic_1b_20260527003633",
+    "caption": "This image was taken by the DSCOVR EPIC camera",
+    "date": "2026-05-27 00:31:45",
+    "centroid_coordinates": {
+      "lat": 7.12,
+      "lon": -165.34
+    }
+  },
+  {
+    "identifier": "20260527021810",
+    "image": "epic_1b_20260527021810",
+    "caption": "This image was taken by the DSCOVR EPIC camera",
+    "date": "2026-05-27 02:13:22",
+    "centroid_coordinates": {
+      "lat": 6.98,
+      "lon": -192.07
+    }
+  },
+  {
+    "identifier": "20260527040022",
+    "image": "epic_1b_20260527040022",
+... (truncated)
 ```
 
 </details>
@@ -12758,26 +18445,17 @@ _(empty)_
 
 ```
 {
-  "id": "page-ac4159f79af2",
+  "id": "page-3e53950fd20b",
   "parent_type": "database",
   "parent_id": "db-tasks",
   "title": "Investigate flaky billing tests",
-  "created_time": "2026-05-28T08:09:16.000Z",
-  "last_edited_time": "2026-05-28T08:09:16.000Z",
+  "created_time": "2026-06-09T11:42:29.000Z",
+  "last_edited_time": "2026-06-09T11:42:29.000Z",
   "created_by": "user-amelia",
   "archived": false,
   "icon": "",
   "cover_url": null,
-  "properties": {
-    "Status": {
-      "type": "status",
-      "value": "Todo"
-    },
-    "Priority": {
-      "type": "select",
-      "value": "Medium"
-    }
-  }
+  "properties": {}
 }
 ```
 
@@ -12790,7 +18468,7 @@ _(empty)_
   "parent_id": "db-tasks",
   "title": "Add tracing to ingestion pipeline",
   "created_time": "2025-10-15T13:00:00.000Z",
-  "last_edited_time": "2026-05-28T08:09:16.000Z",
+  "last_edited_time": "2026-05-18T16:00:00.000Z",
   "created_by": "user-helena",
   "archived": false,
   "icon": "zap",
@@ -12798,7 +18476,7 @@ _(empty)_
   "properties": {
     "Status": {
       "type": "status",
-      "value": "In progress"
+      "value": "Todo"
     },
     "Priority": {
       "type": "select",
@@ -12810,7 +18488,7 @@ _(empty)_
     },
     "Due": {
       "type": "date",
-   
+      "val
 ```
 
 **DELETE archive page** — `/v1/pages/page-task-004` (status 200)
@@ -12822,9 +18500,9 @@ _(empty)_
   "parent_id": "db-tasks",
   "title": "Vendor security review",
   "created_time": "2025-11-02T08:30:00.000Z",
-  "last_edited_time": "2026-05-28T08:09:16.000Z",
+  "last_edited_time": "2026-05-12T12:00:00.000Z",
   "created_by": "user-amelia",
-  "archived": true,
+  "archived": false,
   "icon": "shield",
   "cover_url": null,
   "properties": {
@@ -12842,7 +18520,7 @@ _(empty)_
     },
     "Due": {
       "type": "date",
-      "value": "2026-0
+      "value": "2026-
 ```
 
 **GET list block children** — `/v1/blocks/page-task-001/children` (status 200)
@@ -12881,14 +18559,14 @@ _(empty)_
   "object": "list",
   "results": [
     {
-      "id": "block-b88a91800caa",
+      "id": "block-61a6f893ea79",
       "page_id": "page-task-001",
       "parent_block_id": null,
       "type": "paragraph",
       "text": "Follow-up: also gate cookie issuer.",
       "order": 5,
-      "created_time": "2026-05-28T08:09:16.000Z",
-      "last_edited_time": "2026-05-28T08:09:16.000Z",
+      "created_time": "2026-06-09T11:42:29.000Z",
+      "last_edited_time": "2026-06-09T11:42:29.000Z",
       "has_children": false,
       "checked": null
     }
@@ -12907,9 +18585,9 @@ _(empty)_
   "text": "Build dual-write shim",
   "order": 4,
   "created_time": "2025-10-04T09:09:00.000Z",
-  "last_edited_time": "2026-05-28T08:09:16.000Z",
+  "last_edited_time": "2026-05-20T14:00:00.000Z",
   "has_children": false,
-  "checked": true
+  "checked": false
 }
 ```
 
@@ -12943,23 +18621,22 @@ _(empty)_
       "parent_page_id": "page-task-001",
       "parent_block_id": "block-005",
       "author_id": "user-amelia",
-      "text": "Yes",
-      "created_time": " gating on `auth_v2_rollout`.",
-      "resolved": false,
-      "null": [
-        "fals
+      "text": "Yes, gating on `auth_v2_rollout`.",
+      "created_time": "2026-05-15T11:05:00.000Z",
+      "resolved": false
+    }
 ```
 
 **POST create comment** — `/v1/comments` (status 201)
 
 ```
 {
-  "id": "comment-6daa1d3cc80d",
+  "id": "comment-8a25a1239cfa",
   "parent_page_id": "page-task-001",
   "parent_block_id": "block-005",
   "author_id": "user-helena",
   "text": "Ack \u2014 will review tomorrow.",
-  "created_time": "2026-05-28T08:09:16.000Z",
+  "created_time": "2026-06-09T11:42:29.000Z",
   "resolved": false
 }
 ```
@@ -13058,7 +18735,7 @@ _(empty)_
   "path": "Inbox/idea-cache-warmup.md",
   "title": "idea-cache-warmup",
   "size_bytes": 61,
-  "modified_at": "2026-05-28T08:09:17Z",
+  "modified_at": "2026-06-09T11:42:29Z",
   "tags": [],
   "content": "# Cache warm-up\n\nPre-warm L7 caches before failover dry-run.\n"
 }
@@ -13070,10 +18747,13 @@ _(empty)_
 {
   "path": "Daily/2026-05-26.md",
   "title": "2026-05-26 Daily",
-  "size_bytes": 213,
-  "modified_at": "2026-05-28T08:09:17Z",
-  "tags": [],
-  "content": "# 2026-05-26\n\n- [ ] Review [[Auth v2]] cutover plan\n- [ ] Send weekly status to leads\n- Met with @helena re: latency spike on auth.refresh \u2014 tracked under [[Auth v2]].\n\n- Decided: ship auth v2 dry-run Wednesday."
+  "size_bytes": 612,
+  "modified_at": "2026-05-26T19:00:00Z",
+  "tags": [
+    "daily",
+    "journal"
+  ],
+  "content": "# 2026-05-26\n\n- [ ] Review [[Auth v2]] cutover plan\n- [ ] Send weekly status to leads\n- Met with @helena re: latency spike on auth.refresh \u2014 tracked under [[Auth v2]].\n"
 }
 ```
 
@@ -13138,10 +18818,13 @@ _(empty)_
 {
   "path": "Daily/2026-05-26.md",
   "title": "2026-05-26 Daily",
-  "size_bytes": 213,
-  "modified_at": "2026-05-28T08:09:17Z",
-  "tags": [],
-  "content": "# 2026-05-26\n\n- [ ] Review [[Auth v2]] cutover plan\n- [ ] Send weekly status to leads\n- Met with @helena re: latency spike on auth.refresh \u2014 tracked under [[Auth v2]].\n\n- Decided: ship auth v2 dry-run Wednesday."
+  "size_bytes": 612,
+  "modified_at": "2026-05-26T19:00:00Z",
+  "tags": [
+    "daily",
+    "journal"
+  ],
+  "content": "# 2026-05-26\n\n- [ ] Review [[Auth v2]] cutover plan\n- [ ] Send weekly status to leads\n- Met with @helena re: latency spike on auth.refresh \u2014 tracked under [[Auth v2]].\n"
 }
 ```
 
@@ -13254,10 +18937,10 @@ _(empty)_
 
 ```
 {
-  "id": "00ud461e1f36",
+  "id": "00u40074382d",
   "status": "ACTIVE",
-  "created": "2026-05-28T08:09:17.000Z",
-  "activated": "2026-05-28T08:09:17.000Z",
+  "created": "2026-06-09T11:42:30.000Z",
+  "activated": "2026-06-09T11:42:30.000Z",
   "lastLogin": null,
   "profile": {
     "firstName": "Dana",
@@ -13275,7 +18958,7 @@ _(empty)_
   "id": "00u5noor",
   "status": "ACTIVE",
   "created": "2026-05-20T16:45:00.000Z",
-  "activated": "2026-05-28T08:09:17.000Z",
+  "activated": "2026-06-09T11:42:30.000Z",
   "lastLogin": null,
   "profile": {
     "firstName": "Noor",
@@ -13374,7 +19057,7 @@ _(empty)_
 [
   {
     "id": "00u1amelia",
-    "status": "SUSPENDED",
+    "status": "ACTIVE",
     "created": "2024-01-10T10:00:00.000Z",
     "activated": "2024-01-10T10:05:00.000Z",
     "lastLogin": "2026-05-26T08:00:00.000Z",
@@ -13393,7 +19076,7 @@ _(empty)_
     "lastLogin": "2026-05-25T17:00:00.000Z",
     "profile": {
       "firstName": "Jonas",
-   
+      
 ... (truncated)
 ```
 
@@ -13428,6 +19111,319 @@ _(empty)_
   {
     "id": "0oa4datadog",
     "name": "datadog",
+```
+
+</details>
+
+### openlibrary-api (port 8078) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | GET | /search.json?q=foundation | 200 | search by q |
+| PASS | GET | /search.json?author=Le%20Guin | 200 | search by author |
+| PASS | GET | /search.json?title=Dune | 200 | search by title |
+| PASS | GET | /works/OL893415W.json | 200 | get work |
+| PASS | GET | /works/OL27448W/editions.json | 200 | get work editions |
+| PASS | GET | /authors/OL26320A.json | 200 | get author |
+| PASS | GET | /authors/OL34184A/works.json | 200 | get author works |
+| PASS | GET | /subjects/science_fiction.json | 200 | get subject |
+| PASS | GET | /isbn/9780441013593.json | 200 | get isbn |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**GET search by q** — `/search.json?q=foundation` (status 200)
+
+```
+{
+  "numFound": 1,
+  "start": 0,
+  "numFoundExact": true,
+  "docs": [
+    {
+      "key": "/works/OL46125W",
+      "type": "work",
+      "title": "Foundation",
+      "first_publish_year": 1951,
+      "author_key": [
+        "OL23919A"
+      ],
+      "author_name": [
+        "Isaac Asimov"
+      ],
+      "subject": [
+        "science fiction",
+        "galactic empire",
+        "psychohistory"
+      ],
+      "edition_count": 205
+    }
+  ]
+}
+```
+
+**GET search by author** — `/search.json?author=Le%20Guin` (status 200)
+
+```
+{
+  "numFound": 2,
+  "start": 0,
+  "numFoundExact": true,
+  "docs": [
+    {
+      "key": "/works/OL27513W",
+      "type": "work",
+      "title": "The Left Hand of Darkness",
+      "first_publish_year": 1969,
+      "author_key": [
+        "OL34184A"
+      ],
+      "author_name": [
+        "Ursula K. Le Guin"
+      ],
+      "subject": [
+        "science fiction",
+        "gender",
+        "winter",
+        "diplomacy"
+      ],
+      "edition_count": 141
+    },
+    {
+      "key": "/works/OL45804W",
+      "type": "work",
+      "title": "A Wizard of Earthsea",
+      "first_publish_year": 1968,
+    
+```
+
+**GET search by title** — `/search.json?title=Dune` (status 200)
+
+```
+{
+  "numFound": 1,
+  "start": 0,
+  "numFoundExact": true,
+  "docs": [
+    {
+      "key": "/works/OL893415W",
+      "type": "work",
+      "title": "Dune",
+      "first_publish_year": 1965,
+      "author_key": [
+        "OL18319A"
+      ],
+      "author_name": [
+        "Frank Herbert"
+      ],
+      "subject": [
+        "science fiction",
+        "desert",
+        "politics",
+        "ecology"
+      ],
+      "edition_count": 287
+    }
+  ]
+}
+```
+
+**GET get work** — `/works/OL893415W.json` (status 200)
+
+```
+{
+  "key": "/works/OL893415W",
+  "title": "Dune",
+  "description": "On the desert planet Arrakis a noble family fights for control of the spice melange.",
+  "first_publish_date": "1965",
+  "subjects": [
+    "science fiction",
+    "desert",
+    "politics",
+    "ecology"
+  ],
+  "authors": [
+    {
+      "author": {
+        "key": "/authors/OL18319A"
+      },
+      "type": {
+        "key": "/type/author_role"
+      }
+    }
+  ],
+  "type": {
+    "key": "/type/work"
+  }
+}
+```
+
+**GET get work editions** — `/works/OL27448W/editions.json` (status 200)
+
+```
+{
+  "links": {
+    "work": "/works/OL27448W"
+  },
+  "size": 2,
+  "entries": [
+    {
+      "key": "/books/OL7891234M",
+      "title": "The Lord of the Rings (50th Anniversary Edition)",
+      "works": [
+        {
+          "key": "/works/OL27448W"
+        }
+      ],
+      "isbn_13": [
+        "9780618640157"
+      ],
+      "isbn_10": [
+        "0618640150"
+      ],
+      "publishers": [
+        "Houghton Mifflin"
+      ],
+      "publish_date": "2005-10-17",
+      "number_of_pages": 1216,
+      "languages": [
+        {
+          "key": "/languages/eng"
+        }
+      ],
+      "type": {
+        
+... (truncated)
+```
+
+**GET get author** — `/authors/OL26320A.json` (status 200)
+
+```
+{
+  "key": "/authors/OL26320A",
+  "name": "J. R. R. Tolkien",
+  "birth_date": "3 January 1892",
+  "death_date": "2 September 1973",
+  "bio": "English writer and philologist best known for high fantasy.",
+  "top_work": "The Lord of the Rings",
+  "work_count": 142,
+  "type": {
+    "key": "/type/author"
+  }
+}
+```
+
+**GET get author works** — `/authors/OL34184A/works.json` (status 200)
+
+```
+{
+  "size": 2,
+  "entries": [
+    {
+      "key": "/works/OL45804W",
+      "title": "A Wizard of Earthsea",
+      "first_publish_date": "1968",
+      "subjects": [
+        "fantasy",
+        "coming of age",
+        "magic",
+        "wizards"
+      ],
+      "type": {
+        "key": "/type/work"
+      }
+    },
+    {
+      "key": "/works/OL27513W",
+      "title": "The Left Hand of Darkness",
+      "first_publish_date": "1969",
+      "subjects": [
+        "science fiction",
+        "gender",
+        "winter",
+        "diplomacy"
+      ],
+      "type": {
+        "key": "/type/work"
+      }
+    }
+  
+```
+
+**GET get subject** — `/subjects/science_fiction.json` (status 200)
+
+```
+{
+  "key": "/subjects/science_fiction",
+  "name": "Science Fiction",
+  "subject_type": "subject",
+  "work_count": 6,
+  "works": [
+    {
+      "key": "/works/OL893415W",
+      "title": "Dune",
+      "authors": [
+        {
+          "key": "/authors/OL18319A",
+          "name": "Frank Herbert"
+        }
+      ],
+      "first_publish_year": 1965,
+      "edition_count": 287
+    },
+    {
+      "key": "/works/OL46125W",
+      "title": "Foundation",
+      "authors": [
+        {
+          "key": "/authors/OL23919A",
+          "name": "Isaac Asimov"
+        }
+      ],
+      "first_publish_year": 1951,
+
+... (truncated)
+```
+
+**GET get isbn** — `/isbn/9780441013593.json` (status 200)
+
+```
+{
+  "key": "/books/OL2456789M",
+  "title": "Dune",
+  "works": [
+    {
+      "key": "/works/OL893415W"
+    }
+  ],
+  "isbn_13": [
+    "9780441013593"
+  ],
+  "isbn_10": [
+    "0441013597"
+  ],
+  "publishers": [
+    "Ace Books"
+  ],
+  "publish_date": "2005-08-02",
+  "number_of_pages": 688,
+  "languages": [
+    {
+      "key": "/languages/eng"
+    }
+  ],
+  "type": {
+    "key": "/type/edition"
+  }
+}
 ```
 
 </details>
@@ -13596,6 +19592,191 @@ _(empty)_
 
 </details>
 
+### outlook-api (port 8087) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | GET | /v1.0/me/messages | 200 | list messages |
+| PASS | GET | /v1.0/me/messages?isRead=false | 200 | list unread messages |
+| PASS | GET | /v1.0/me/messages/AAMkAGmsg0000001 | 200 | get message |
+| PASS | POST | /v1.0/me/sendMail | 202 | send mail |
+| PASS | GET | /v1.0/me/events | 200 | list events |
+| PASS | GET | /v1.0/me/contacts | 200 | list contacts |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**GET list messages** — `/v1.0/me/messages` (status 200)
+
+```
+{
+  "value": [
+    {
+      "id": "AAMkAGmsg0000008",
+      "subject": "Weekly metrics digest",
+      "bodyPreview": "Signups are up 12 percent week over week. Full report inside.",
+      "importance": "normal",
+      "isRead": true,
+      "receivedDateTime": "2026-05-25T06:00:00Z",
+      "from": {
+        "emailAddress": {
+          "name": "Analytics",
+          "address": "analytics@contoso.com"
+        }
+      },
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "name": "Alex Carter",
+            "address": "alex.carter@contoso.com"
+          }
+        }
+      ],
+   
+... (truncated)
+```
+
+**GET list unread messages** — `/v1.0/me/messages?isRead=false` (status 200)
+
+```
+{
+  "value": [
+    {
+      "id": "AAMkAGmsg0000006",
+      "subject": "Security advisory: rotate keys",
+      "bodyPreview": "Please rotate your API keys before the end of the month.",
+      "importance": "high",
+      "isRead": false,
+      "receivedDateTime": "2026-05-15T07:55:00Z",
+      "from": {
+        "emailAddress": {
+          "name": "Security Team",
+          "address": "security@contoso.com"
+        }
+      },
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "name": "Alex Carter",
+            "address": "alex.carter@contoso.com"
+          }
+        }
+      
+... (truncated)
+```
+
+**GET get message** — `/v1.0/me/messages/AAMkAGmsg0000001` (status 200)
+
+```
+{
+  "id": "AAMkAGmsg0000001",
+  "subject": "Q2 Budget Review",
+  "bodyPreview": "Please find attached the Q2 budget for your review before Friday.",
+  "importance": "high",
+  "isRead": false,
+  "receivedDateTime": "2026-05-04T08:30:00Z",
+  "from": {
+    "emailAddress": {
+      "name": "Priya Nair",
+      "address": "priya.nair@contoso.com"
+    }
+  },
+  "toRecipients": [
+    {
+      "emailAddress": {
+        "name": "Alex Carter",
+        "address": "alex.carter@contoso.com"
+      }
+    }
+  ],
+  "body": {
+    "contentType": "html",
+    "content": "Please find attached the Q2 budget for your rev
+```
+
+**POST send mail** — `/v1.0/me/sendMail` (status 202)
+
+```
+{
+  "status": "accepted",
+  "id": "AAMkAGsent9c385792e8f8"
+}
+```
+
+**GET list events** — `/v1.0/me/events` (status 200)
+
+```
+{
+  "value": [
+    {
+      "id": "AAMkAGevt0000001",
+      "subject": "Sprint Planning",
+      "isAllDay": false,
+      "isOnlineMeeting": true,
+      "start": {
+        "dateTime": "2026-05-11T14:00:00Z",
+        "timeZone": "UTC"
+      },
+      "end": {
+        "dateTime": "2026-05-11T15:00:00Z",
+        "timeZone": "UTC"
+      },
+      "location": {
+        "displayName": "Teams Meeting"
+      },
+      "organizer": {
+        "emailAddress": {
+          "name": "Alex Carter",
+          "address": "alex.carter@contoso.com"
+        }
+      },
+      "attendees": [
+        {
+          "emailAddr
+... (truncated)
+```
+
+**GET list contacts** — `/v1.0/me/contacts` (status 200)
+
+```
+{
+  "value": [
+    {
+      "id": "AAMkAGcnt0000002",
+      "displayName": "Diego Santos",
+      "givenName": "Diego",
+      "surname": "Santos",
+      "emailAddresses": [
+        {
+          "address": "diego.santos@contoso.com",
+          "name": "Diego Santos"
+        }
+      ],
+      "jobTitle": "Senior Engineer",
+      "companyName": "Contoso",
+      "mobilePhone": "+1-415-555-0102"
+    },
+    {
+      "id": "AAMkAGcnt0000006",
+      "displayName": "Grace Lee",
+      "givenName": "Grace",
+      "surname": "Lee",
+      "emailAddresses": [
+        {
+          "address": "grace.lee@contoso.com
+... (truncated)
+```
+
+</details>
+
 ### pagerduty-api (port 8040) — server: started
 
 | Result | Method | Path | Status | Endpoint |
@@ -13713,7 +19894,7 @@ _(empty)_
 
 ```
 {
-  "incident_id": "PI-94b5df6c7b",
+  "incident_id": "PI-7c11f83825",
   "incident_number": 1044,
   "title": "auth-api refresh token endpoint timing out",
   "status": "triggered",
@@ -13721,7 +19902,7 @@ _(empty)_
   "service_id": "PS001",
   "escalation_policy_id": "EP001",
   "assigned_to": "PU004",
-  "created_at": "2026-05-28T08:09:18Z",
+  "created_at": "2026-06-09T11:42:32Z",
   "resolved_at": null
 }
 ```
@@ -13733,7 +19914,7 @@ _(empty)_
   "incident_id": "PI001",
   "incident_number": 1042,
   "title": "auth-api token refresh latency above 2s p99",
-  "status": "acknowledged",
+  "status": "triggered",
   "urgency": "high",
   "service_id": "PS001",
   "escalation_policy_id": "EP001",
@@ -13750,13 +19931,13 @@ _(empty)_
   "incident_id": "PI001",
   "incident_number": 1042,
   "title": "auth-api token refresh latency above 2s p99",
-  "status": "resolved",
+  "status": "triggered",
   "urgency": "high",
   "service_id": "PS001",
   "escalation_policy_id": "EP001",
   "assigned_to": "PU004",
   "created_at": "2026-05-27T09:14:00Z",
-  "resolved_at": "2026-05-28T08:09:18Z"
+  "resolved_at": null
 }
 ```
 
@@ -13764,11 +19945,11 @@ _(empty)_
 
 ```
 {
-  "note_id": "NOTE-d326a38ed3",
+  "note_id": "NOTE-746079ad2a",
   "incident_id": "PI001",
   "content": "Rolled back auth-api deploy, p99 recovering.",
   "user_id": "PU004",
-  "created_at": "2026-05-28T08:09:18Z"
+  "created_at": "2026-06-09T11:42:32Z"
 }
 ```
 
@@ -13915,7 +20096,7 @@ _(empty)_
 
 ```
 {
-  "id": "ORDER-E31919E6BF9D4FFF8",
+  "id": "ORDER-9DF6862F3C4C4C2CA",
   "intent": "CAPTURE",
   "status": "CREATED",
   "purchase_units": [
@@ -13930,7 +20111,7 @@ _(empty)_
       "description": "New order"
     }
   ],
-  "create_time": "2026-05-28T08:09:19Z"
+  "create_time": "2026-06-09T11:42:33Z"
 }
 ```
 
@@ -13968,7 +20149,7 @@ _(empty)_
       "payments": {
         "captures": [
           {
-            "id": "CAP_5E02A6002DF047DC",
+            "id": "CAP_719C5297149C4356",
             "order_id": "ORDER-8AB54321CD987654E",
             "status": "COMPLETED",
             "amount": {
@@ -13976,7 +20157,7 @@ _(empty)_
               "value": "19.00"
             },
             "final_capture": true,
-            "create_time": "2026-05-28T08:09:19Z"
+            "create_time": "2026-06-09T11:42:33Z"
           }
         ]
       }
@@ -13989,7 +20170,7 @@ _(empty)_
 
 ```
 {
-  "id": "REF_AFD19DBED4164FFC",
+  "id": "REF_510A81ADB3F0482E",
   "capture_id": "CAP_3C679384HN8401234",
   "status": "COMPLETED",
   "amount": {
@@ -13997,7 +20178,7 @@ _(empty)_
     "value": "5.00"
   },
   "note_to_payer": "Goodwill credit",
-  "create_time": "2026-05-28T08:09:19Z"
+  "create_time": "2026-06-09T11:42:33Z"
 }
 ```
 
@@ -14055,7 +20236,7 @@ _(empty)_
 
 ```
 {
-  "id": "INV2_6792DCEF5ECA4EF6",
+  "id": "INV2_7EC70EDB2F4D4B68",
   "detail": {
     "invoice_number": "INV-0006",
     "currency_code": "USD",
@@ -14082,7 +20263,7 @@ _(empty)_
 ```
 {
   "batch_header": {
-    "payout_batch_id": "PAYOUT-471FF4A410E9",
+    "payout_batch_id": "PAYOUT-4EF1FE66769D",
     "batch_status": "PENDING",
     "sender_batch_header": {
       "sender_batch_id": "Payouts_2026_05_28",
@@ -14094,7 +20275,7 @@ _(empty)_
     }
   },
   "recipient_email": "partner@orbit-labs.com",
-  "create_time": "2026-05-28T08:09:19Z"
+  "create_time": "2026-06-09T11:42:33Z"
 }
 ```
 
@@ -14371,8 +20552,8 @@ _(empty)_
     "name": "Outdoor Living Spaces",
     "description": "Patio and garden design ideas",
     "privacy": "PUBLIC",
-    "created_at": "2026-05-28T08:09:20",
-    "updated_at": "2026-05-28T08:09:20",
+    "created_at": "2026-06-09T11:42:34",
+    "updated_at": "2026-06-09T11:42:34",
     "pin_count": 0,
     "follower_count": 0,
     "collaborator_count": 0
@@ -14388,10 +20569,10 @@ _(empty)_
   "board": {
     "board_id": "board_1001",
     "name": "Orchid Show Mood",
-    "description": "Updated: Beautiful living room designs and modern interior inspiration",
+    "description": "Greenhouse setups and display ideas for orchid society shows and competitions",
     "privacy": "PUBLIC",
     "created_at": "2025-11-03T09:10:00",
-    "updated_at": "2026-05-28T08:09:20",
+    "updated_at": "2026-05-12T14:30:00",
     "pin_count": 18,
     "follower_count": 324,
     "collaborator_count": 0
@@ -14621,8 +20802,8 @@ _(empty)_
     "description": "Transform your space with these boho-chic design tips #boho #livingroom",
     "link": "https://www.cozynestinteriors.com/blog/boho-makeover",
     "media_type": "image",
-    "created_at": "2026-05-28T08:09:20",
-    "updated_at": "2026-05-28T08:09:20",
+    "created_at": "2026-06-09T11:42:34",
+    "updated_at": "2026-06-09T11:42:34",
     "dominant_color": null,
     "alt_text": "A boho-styled living room with macrame and plants",
     "is_promoted": false,
@@ -14639,15 +20820,14 @@ _(empty)_
     "pin_id": "pin_3001",
     "board_id": "board_1001",
     "board_section_id": null,
-    "title": "Scandinavian Living Room with Warm Neutrals - Updated Guide",
-    "description": "Updated 2026 guide to creating a cozy Scandinavian-inspired living room",
+    "title": "Paphiopedilum Show Display Setup",
+    "description": "Elegant arrangement ideas for slipper orchids on competition tables. Moss bases and accent lighting. #orchidshow #paphiopedilum #orchiddisplay",
     "link": "https://www.aos.org/orchids/orchid-shows.aspx",
     "media_type": "image",
     "created_at": "2025-11-10T09:00:00",
-    "updated_at": "2026-05-28T08:09:20",
+    "updated_at": "2026-05-10T14:00:00",
     "dominant_color": "#4A6741",
-    "alt_text": "Three Paphiopedilum orchids arranged on moss-covered display stands with soft lighting",
-    "
+    "alt_text": "Three Paphiopedilum orchids arranged on moss-cover
 ... (truncated)
 ```
 
@@ -14691,7 +20871,8 @@ _(empty)_
       "impressions": 148,
       "saves": 12,
       "pin_clicks": 8,
-      "outbound_clicks": 5
+      "outbound_clicks": 5,
+      "_pk": "pin_3001#1"
     },
     {
       "pin_id": "pin_3001",
@@ -14699,10 +20880,9 @@ _(empty)_
       "impressions": 182,
       "saves": 16,
       "pin_clicks": 11,
-      "outbound_clicks": 7
-    },
-    {
-      "pin_id": "pi
+      "outbound_clicks": 7,
+    
+... (truncated)
 ```
 
 **GET GET Pin Analytics - Date Range** — `/v5/pins/pin_3005/analytics?start_date=2026-04-01&end_date=2026-04-03` (status 200)
@@ -14727,7 +20907,8 @@ _(empty)_
       "impressions": 198,
       "saves": 18,
       "pin_clicks": 12,
-      "outbound_clicks": 8
+      "outbound_clicks": 8,
+      "_pk": "pin_3005#11"
     },
     {
       "pin_id": "pin_3005",
@@ -14735,10 +20916,8 @@ _(empty)_
       "impressions": 172,
       "saves": 14,
       "pin_clicks": 9,
-      "outbound_clicks": 6
-    }
-  ]
-}
+      "outbound_clicks": 6,
+  
 ```
 
 **GET GET Pin Analytics - 404** — `/v5/pins/pin_99999/analytics` (status 404)
@@ -15053,7 +21232,7 @@ _(empty)_
       "122105155"
     ]
   },
-  "request_id": "67cfaf38a4a24b8e"
+  "request_id": "f0974e28549a4af7"
 }
 ```
 
@@ -15085,6 +21264,176 @@ _(empty)_
             {
               "data": "amelia.ortega@orbit-labs.com",
         
+... (truncated)
+```
+
+</details>
+
+### posthog-api (port 8092) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | POST | /capture | 200 | capture |
+| PASS | POST | /decide | 200 | decide |
+| PASS | GET | /api/projects/1/events | 200 | events |
+| PASS | GET | /api/projects/1/events?event=$pageview&distinct_id=user_3001 | 200 | events filtered |
+| PASS | GET | /api/projects/1/feature_flags | 200 | feature flags |
+| PASS | GET | /api/projects/1/persons | 200 | persons |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**POST capture** — `/capture` (status 200)
+
+```
+{
+  "status": 1
+}
+```
+
+**POST decide** — `/decide` (status 200)
+
+```
+{
+  "featureFlags": {
+    "new-onboarding": true,
+    "beta-dashboard": true,
+    "dark-mode": false,
+    "fast-checkout": true
+  },
+  "distinctId": "user_3001"
+}
+```
+
+**GET events** — `/api/projects/1/events` (status 200)
+
+```
+{
+  "results": [
+    {
+      "id": "evt_30001",
+      "project_id": 1,
+      "distinct_id": "user_3001",
+      "event": "$pageview",
+      "timestamp": "2026-05-02T09:00:00Z",
+      "properties": {
+        "$current_url": "/dashboard"
+      }
+    },
+    {
+      "id": "evt_30002",
+      "project_id": 1,
+      "distinct_id": "user_3001",
+      "event": "button_clicked",
+      "timestamp": "2026-05-02T09:02:11Z",
+      "properties": {
+        "name": "export",
+        "plan": "pro"
+      }
+    },
+    {
+      "id": "evt_30003",
+      "project_id": 1,
+      "distinct_id": "user_3002",
+      "event"
+... (truncated)
+```
+
+**GET events filtered** — `/api/projects/1/events?event=$pageview&distinct_id=user_3001` (status 200)
+
+```
+{
+  "results": [
+    {
+      "id": "evt_30001",
+      "project_id": 1,
+      "distinct_id": "user_3001",
+      "event": "$pageview",
+      "timestamp": "2026-05-02T09:00:00Z",
+      "properties": {
+        "$current_url": "/dashboard"
+      }
+    }
+  ],
+  "count": 1
+}
+```
+
+**GET feature flags** — `/api/projects/1/feature_flags` (status 200)
+
+```
+{
+  "results": [
+    {
+      "id": "flag_4001",
+      "key": "new-onboarding",
+      "name": "New Onboarding Flow",
+      "active": true,
+      "rollout_percentage": 100
+    },
+    {
+      "id": "flag_4002",
+      "key": "beta-dashboard",
+      "name": "Beta Dashboard",
+      "active": true,
+      "rollout_percentage": 50
+    },
+    {
+      "id": "flag_4003",
+      "key": "dark-mode",
+      "name": "Dark Mode",
+      "active": false,
+      "rollout_percentage": 0
+    },
+    {
+      "id": "flag_4004",
+      "key": "fast-checkout",
+      "name": "Fast Checkout",
+      "active": true,
+      "roll
+```
+
+**GET persons** — `/api/projects/1/persons` (status 200)
+
+```
+{
+  "results": [
+    {
+      "id": "per_5001",
+      "distinct_ids": [
+        "user_3001"
+      ],
+      "name": "Jordan Reyes",
+      "properties": {
+        "email": "jordan@example.com",
+        "name": "Jordan Reyes"
+      },
+      "created_at": "2026-04-21T09:00:00Z"
+    },
+    {
+      "id": "per_5002",
+      "distinct_ids": [
+        "user_3002"
+      ],
+      "name": "Mira Patel",
+      "properties": {
+        "email": "mira@example.com",
+        "name": "Mira Patel"
+      },
+      "created_at": "2026-04-23T09:00:00Z"
+    },
+    {
+      "id": "per_5003",
+      "distinct_ids": [
+       
 ... (truncated)
 ```
 
@@ -15278,8 +21627,8 @@ _(empty)_
     "Job": false,
     "Notes": null,
     "MetaData": {
-      "CreateTime": "2026-05-28T08:09:21-00:00",
-      "LastUpdatedTime": "2026-05-28T08:09:21-00:00"
+      "CreateTime": "2026-06-09T11:42:36-00:00",
+      "LastUpdatedTime": "2026-06-09T11:42:36-00:00"
     },
     "SyncToken": "0"
   }
@@ -15368,7 +21717,7 @@ _(empty)_
     "AcctNum": "FCV-014",
     "Vendor1099": false,
     "MetaData": {
-      "CreateTime": "2026-05-28T08:09:21-00:00",
+      "CreateTime": "2026-06-09T11:42:35-00:00",
       
 ```
 
@@ -15398,8 +21747,8 @@ _(empty)_
     "AcctNum": null,
     "Vendor1099": null,
     "MetaData": {
-      "CreateTime": "2026-05-28T08:09:21-00:00",
-      "LastUpdatedTime": "2026-05-28T08:09:21-00:00"
+      "CreateTime": "2026-06-09T11:42:36-00:00",
+      "LastUpdatedTime": "2026-06-09T11:42:36-00:00"
     },
     "SyncToken": "0"
   }
@@ -15431,8 +21780,8 @@ _(empty)_
     "AcctNum": "FCV-015",
     "Vendor1099": false,
     "MetaData": {
-      "CreateTime": "2026-05-28T08:09:21-00:00",
-      "LastUpdatedTime": "2026-05-28T08
+      "CreateTime": "2026-06-09T11:42:35-00:00",
+      "LastUpdatedTime": "2026-06-09T11
 ```
 
 **GET GET Query All Items** — `/v3/company/4620816365272861350/query?query=SELECT * FROM Item` (status 200)
@@ -15454,8 +21803,8 @@ _(empty)_
         "Active": true,
         "Taxable": false,
         "MetaData": {
-          "CreateTime": "2026-05-28T08:09:21-00:00",
-          "LastUpdatedTime": "2026-05-28T08:09:21-00:00"
+          "CreateTime": "2026-06-09T11:42:35-00:00",
+          "LastUpdatedTime": "2026-06-09T11:42:35-00:00"
         },
         "SyncToken": "0"
       },
@@ -15481,8 +21830,8 @@ _(empty)_
     "Active": true,
     "Taxable": false,
     "MetaData": {
-      "CreateTime": "2026-05-28T08:09:21-00:00",
-      "LastUpdatedTime": "2026-05-28T08:09:21-00:00"
+      "CreateTime": "2026-06-09T11:42:35-00:00",
+      "LastUpdatedTime": "2026-06-09T11:42:35-00:00"
     },
     "SyncToken": "0"
   }
@@ -15511,8 +21860,8 @@ _(empty)_
     "Active": true,
     "Taxable": null,
     "MetaData": {
-      "CreateTime": "2026-05-28T08:09:21-00:00",
-      "LastUpdatedTime": "2026-05-28T08:09:21-00:00"
+      "CreateTime": "2026-06-09T11:42:36-00:00",
+      "LastUpdatedTime": "2026-06-09T11:42:36-00:00"
     },
     "SyncToken": "0"
   }
@@ -15536,8 +21885,8 @@ _(empty)_
     "Active": true,
     "Taxable": false,
     "MetaData": {
-      "CreateTime": "2026-05-28T08:09:21-00:00",
-      "LastUpdatedTime": "2026-05-28T08:09:21-00:00"
+      "CreateTime": "2026-06-09T11:42:35-00:00",
+      "LastUpdatedTime": "2026-06-09T11:42:36-00:00"
     },
     "SyncToken": "1"
   }
@@ -15560,8 +21909,8 @@ _(empty)_
         "Classification": "Revenue",
         "Description": "Grant or contract funds allocated to Franklin County housing reimbursements",
         "MetaData": {
-          "CreateTime": "2026-05-28T08:09:21-00:00",
-          "LastUpdatedTime": "2026-05-28T08:09:21-00:00"
+          "CreateTime": "2026-06-09T11:42:35-00:00",
+          "LastUpdatedTime": "2026-06-09T11:42:35-00:00"
         },
         "SyncToken": "0"
       },
@@ -15585,8 +21934,8 @@ _(empty)_
     "Classification": "Expense",
     "Description": "Mileage and fuel reimbursements for coalition volunteer support",
     "MetaData": {
-      "CreateTime": "2026-05-28T08:09:21-00:00",
-      "LastUpdatedTime": "2026-05-28T08:09:21-00:00"
+      "CreateTime": "2026-06-09T11:42:35-00:00",
+      "LastUpdatedTime": "2026-06-09T11:42:35-00:00"
     },
     "SyncToken": "0"
   }
@@ -15965,8 +22314,8 @@ _(empty)_
       }
     ],
     "MetaData": {
-      "CreateTime": "2026-05-28T08:09:21-00:00",
-      "LastUpdatedTime": "2026-05-28T08:09:21-00:00"
+      "CreateTime": "2026-06-09T11:42:36-00:00",
+      "LastUpdatedTime": "2026-06-09T11:42:36-00:00"
     },
     "SyncToken": "0"
   }
@@ -16079,8 +22428,8 @@ _(empty)_
   "Invoice": {
     "Id": "5010",
     "DocNumber": "5010",
-    "TxnDate": "2026-05-28",
-    "DueDate": "2026-05-28",
+    "TxnDate": "2026-06-09",
+    "DueDate": "2026-06-09",
     "CustomerRef": {
       "value": "25",
       "name": "Sandra Phillips"
@@ -16178,7 +22527,7 @@ _(empty)_
       }
     ],
     "MetaData": {
-      "CreateTime": "2026-05-28T08:09:21-00:00",
+      "CreateTime": "2026-06-09T11:42:36-00:00",
       "LastUpdatedTime": "2026-
 ```
 
@@ -16397,7 +22746,7 @@ _(empty)_
               "name": "Sandra Phillips"
             },
             "Balance": 1450.0,
-            "DueDate": "2026-05-28"
+            "DueDate": "2026-06-09"
           }
         ]
       },
@@ -16436,7 +22785,7 @@ _(empty)_
             "value": "1-30"
           },
           {
-            "value": "2423.50"
+            "value": "1723.50"
           }
         ],
         "Details": [
@@ -16584,8 +22933,8 @@ _(empty)_
   "json": {
     "errors": [],
     "data": {
-      "id": "t3_8fa4c3",
-      "name": "t3_8fa4c3",
+      "id": "t3_bc2834",
+      "name": "t3_bc2834",
       "url": "https://example.com/csv-diff"
     }
   }
@@ -17662,7 +24011,7 @@ _(empty)_
 
 ```
 {
-  "id": "0013E5C82506D464D8",
+  "id": "00193476528ECC343D",
   "success": true,
   "errors": []
 }
@@ -17724,7 +24073,7 @@ _(empty)_
 
 ```
 {
-  "id": "00358656D2E7D904C8",
+  "id": "003329209FC9635408",
   "success": true,
   "errors": []
 }
@@ -17785,7 +24134,7 @@ _(empty)_
 
 ```
 {
-  "id": "00Q809B9179867844E",
+  "id": "00QB5617AD673504C5",
   "success": true,
   "errors": []
 }
@@ -17847,7 +24196,7 @@ _(empty)_
 
 ```
 {
-  "id": "006542E658E75BB4DD",
+  "id": "00631ECAC7F0DA0462",
   "success": true,
   "errors": []
 }
@@ -17895,6 +24244,185 @@ _(empty)_
 
 </details>
 
+### segment-api (port 8090) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | POST | /v1/track | 200 | track |
+| PASS | POST | /v1/identify | 200 | identify |
+| PASS | POST | /v1/page | 200 | page |
+| PASS | POST | /v1/batch | 200 | batch |
+| PASS | GET | /v1/events | 200 | events |
+| PASS | GET | /v1/events?type=track&userId=user_1001 | 200 | events by type |
+| PASS | GET | /v1/sources | 200 | sources |
+| PASS | GET | /v1/destinations | 200 | destinations |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**POST track** — `/v1/track` (status 200)
+
+```
+{
+  "success": true
+}
+```
+
+**POST identify** — `/v1/identify` (status 200)
+
+```
+{
+  "success": true
+}
+```
+
+**POST page** — `/v1/page` (status 200)
+
+```
+{
+  "success": true
+}
+```
+
+**POST batch** — `/v1/batch` (status 200)
+
+```
+{
+  "success": true,
+  "ingested": 2
+}
+```
+
+**GET events** — `/v1/events` (status 200)
+
+```
+{
+  "events": [
+    {
+      "messageId": "msg_0a1b2c3d01",
+      "type": "track",
+      "userId": "user_1001",
+      "event": "Order Completed",
+      "timestamp": "2026-05-02T09:14:22Z",
+      "properties": {
+        "order_id": "ord_5501",
+        "revenue": "129.99",
+        "currency": "USD"
+      }
+    },
+    {
+      "messageId": "msg_0a1b2c3d02",
+      "type": "track",
+      "userId": "user_1002",
+      "event": "Product Viewed",
+      "timestamp": "2026-05-03T11:42:05Z",
+      "properties": {
+        "product_id": "sku_204",
+        "category": "footwear"
+      }
+    },
+    {
+      "mes
+... (truncated)
+```
+
+**GET events by type** — `/v1/events?type=track&userId=user_1001` (status 200)
+
+```
+{
+  "events": [
+    {
+      "messageId": "msg_0a1b2c3d01",
+      "type": "track",
+      "userId": "user_1001",
+      "event": "Order Completed",
+      "timestamp": "2026-05-02T09:14:22Z",
+      "properties": {
+        "order_id": "ord_5501",
+        "revenue": "129.99",
+        "currency": "USD"
+      }
+    }
+  ],
+  "count": 1
+}
+```
+
+**GET sources** — `/v1/sources` (status 200)
+
+```
+{
+  "sources": [
+    {
+      "id": "src_web01",
+      "name": "Marketing Website",
+      "slug": "marketing-website",
+      "enabled": true,
+      "type": "javascript",
+      "createdAt": "2026-04-12T09:00:00Z"
+    },
+    {
+      "id": "src_ios01",
+      "name": "iOS App",
+      "slug": "ios-app",
+      "enabled": true,
+      "type": "ios",
+      "createdAt": "2026-04-14T09:00:00Z"
+    },
+    {
+      "id": "src_and01",
+      "name": "Android App",
+      "slug": "android-app",
+      "enabled": true,
+      "type": "android",
+      "createdAt": "2026-04-16T09:00:00Z"
+    },
+    {
+      "id": "src
+... (truncated)
+```
+
+**GET destinations** — `/v1/destinations` (status 200)
+
+```
+{
+  "destinations": [
+    {
+      "id": "dst_ga4001",
+      "name": "Google Analytics 4",
+      "slug": "google-analytics-4",
+      "enabled": true,
+      "sourceId": "src_web01",
+      "createdAt": "2026-04-13T09:00:00Z"
+    },
+    {
+      "id": "dst_ampl01",
+      "name": "Amplitude",
+      "slug": "amplitude",
+      "enabled": true,
+      "sourceId": "src_web01",
+      "createdAt": "2026-04-13T10:00:00Z"
+    },
+    {
+      "id": "dst_bq001",
+      "name": "BigQuery Warehouse",
+      "slug": "bigquery",
+      "enabled": true,
+      "sourceId": "src_srv01",
+      "createdAt": "2026-04-19T09:0
+... (truncated)
+```
+
+</details>
+
 ### sendgrid-api (port 8027) — server: started
 
 | Result | Method | Path | Status | Endpoint |
@@ -17925,7 +24453,7 @@ _(empty)_
 {
   "accepted": 1,
   "message_ids": [
-    "msg-eab4761beba6"
+    "msg-ab59f60c1db1"
   ],
   "status": "queued"
 }
@@ -17985,7 +24513,7 @@ _(empty)_
   "result": [
     {
       "id": "contact-00a1",
-      "email": "amelia.ortega@example.com",
+      "email": "amelia.ortega@orbit-labs.com",
       "first_name": "Amelia",
       "last_name": "Ortega",
       "country": "US",
@@ -17998,7 +24526,7 @@ _(empty)_
     },
     {
       "id": "contact-00a2",
-      "email": "jonas.pereira@example.com",
+      "email": "jonas.pereira@orbit-labs.com",
       "first_name": "Jonas",
       "last_name": "Pereira",
       "country": "PT",
@@ -18006,7 +24534,7 @@ _(empty)_
         "list-7788aa11",
         "list-7788aa22"
       ],
-      "created
+      "c
 ... (truncated)
 ```
 
@@ -18014,10 +24542,10 @@ _(empty)_
 
 ```
 {
-  "job_id": "job-bf8c33821dfa",
+  "job_id": "job-75622c567bcd",
   "upserted": 1,
   "contact_ids": [
-    "contact-42b841ac912a"
+    "contact-ebb17b8a7c06"
   ]
 }
 ```
@@ -18240,14 +24768,14 @@ _(empty)_
   "title": "DeadlineExceeded refreshing session token",
   "culprit": "session_store.write",
   "level": "error",
-  "status": "resolved",
+  "status": "unresolved",
   "count": 1842,
   "userCount": 612,
   "project": {
     "slug": "auth-service"
   },
   "firstSeen": "2026-05-22T11:00:00.000Z",
-  "lastSeen": "2026-05-28T08:09:24.000Z"
+  "lastSeen": "2026-05-26T09:00:00.000Z"
 }
 ```
 
@@ -18260,14 +24788,14 @@ _(empty)_
   "title": "NilPointer in token validator",
   "culprit": "token.validate",
   "level": "error",
-  "status": "ignored",
+  "status": "unresolved",
   "count": 73,
   "userCount": 40,
   "project": {
     "slug": "auth-service"
   },
   "firstSeen": "2026-05-24T08:00:00.000Z",
-  "lastSeen": "2026-05-28T08:09:24.000Z"
+  "lastSeen": "2026-05-26T07:00:00.000Z"
 }
 ```
 
@@ -18369,6 +24897,292 @@ _(empty)_
 
 </details>
 
+### servicenow-api (port 8071) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | GET | /api/now/table/incident | 200 | list incidents |
+| PASS | GET | /api/now/table/incident?sysparm_query=state=2^priority=1&sysparm_limit=5 | 200 | list incidents filtered |
+| PASS | GET | /api/now/table/incident/inc-0001001 | 200 | get incident |
+| PASS | POST | /api/now/table/incident | 201 | create incident |
+| PASS | PATCH | /api/now/table/incident/inc-0001003 | 200 | update incident |
+| PASS | GET | /api/now/table/change_request | 200 | list change requests |
+| PASS | GET | /api/now/table/change_request/chg-0002001 | 200 | get change request |
+| PASS | GET | /api/now/table/problem | 200 | list problems |
+| PASS | GET | /api/now/table/problem/prb-0003001 | 200 | get problem |
+| PASS | GET | /api/now/table/sys_user | 200 | list users |
+| PASS | GET | /api/now/table/sys_user/usr-amelia | 200 | get user |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**GET list incidents** — `/api/now/table/incident` (status 200)
+
+```
+{
+  "result": [
+    {
+      "sys_id": "inc-0001001",
+      "number": "INC0001001",
+      "short_description": "Email service intermittently unavailable",
+      "description": "Users report Outlook disconnecting every few minutes since 9am.",
+      "state": "2",
+      "priority": "1",
+      "impact": "1",
+      "urgency": "1",
+      "category": "software",
+      "assigned_to": "usr-jonas",
+      "opened_by": "usr-noor",
+      "opened_at": "2026-05-20T09:12:00Z",
+      "updated_at": "2026-05-20T10:40:00Z"
+    },
+    {
+      "sys_id": "inc-0001002",
+      "number": "INC0001002",
+      "short_desc
+... (truncated)
+```
+
+**GET list incidents filtered** — `/api/now/table/incident?sysparm_query=state=2^priority=1&sysparm_limit=5` (status 200)
+
+```
+{
+  "result": [
+    {
+      "sys_id": "inc-0001001",
+      "number": "INC0001001",
+      "short_description": "Email service intermittently unavailable",
+      "description": "Users report Outlook disconnecting every few minutes since 9am.",
+      "state": "2",
+      "priority": "1",
+      "impact": "1",
+      "urgency": "1",
+      "category": "software",
+      "assigned_to": "usr-jonas",
+      "opened_by": "usr-noor",
+      "opened_at": "2026-05-20T09:12:00Z",
+      "updated_at": "2026-05-20T10:40:00Z"
+    },
+    {
+      "sys_id": "inc-0001006",
+      "number": "INC0001006",
+      "short_desc
+... (truncated)
+```
+
+**GET get incident** — `/api/now/table/incident/inc-0001001` (status 200)
+
+```
+{
+  "result": {
+    "sys_id": "inc-0001001",
+    "number": "INC0001001",
+    "short_description": "Email service intermittently unavailable",
+    "description": "Users report Outlook disconnecting every few minutes since 9am.",
+    "state": "2",
+    "priority": "1",
+    "impact": "1",
+    "urgency": "1",
+    "category": "software",
+    "assigned_to": "usr-jonas",
+    "opened_by": "usr-noor",
+    "opened_at": "2026-05-20T09:12:00Z",
+    "updated_at": "2026-05-20T10:40:00Z"
+  }
+}
+```
+
+**POST create incident** — `/api/now/table/incident` (status 201)
+
+```
+{
+  "result": {
+    "sys_id": "2b1116ff10944bd0a1823d5d444dfd0c",
+    "number": "INC0001011",
+    "short_description": "New monitor flickering",
+    "description": "Desk monitor flickers intermittently.",
+    "state": "1",
+    "priority": "4",
+    "impact": "3",
+    "urgency": "3",
+    "category": "hardware",
+    "assigned_to": "usr-jonas",
+    "opened_by": "usr-noor",
+    "opened_at": "2026-06-09T11:42:40Z",
+    "updated_at": "2026-06-09T11:42:40Z"
+  }
+}
+```
+
+**PATCH update incident** — `/api/now/table/incident/inc-0001003` (status 200)
+
+```
+{
+  "result": {
+    "sys_id": "inc-0001003",
+    "number": "INC0001003",
+    "short_description": "Laptop will not boot after BIOS update",
+    "description": "Finance laptop shows black screen following overnight update.",
+    "state": "2",
+    "priority": "3",
+    "impact": "3",
+    "urgency": "3",
+    "category": "hardware",
+    "assigned_to": "usr-helena",
+    "opened_by": "usr-noor",
+    "opened_at": "2026-05-22T11:20:00Z",
+    "updated_at": "2026-06-09T11:42:40Z"
+  }
+}
+```
+
+**GET list change requests** — `/api/now/table/change_request` (status 200)
+
+```
+{
+  "result": [
+    {
+      "sys_id": "chg-0002001",
+      "number": "CHG0002001",
+      "short_description": "Upgrade core firewall firmware",
+      "description": "Apply vendor security firmware to perimeter firewalls during window.",
+      "state": "assess",
+      "priority": "2",
+      "risk": "high",
+      "type": "normal",
+      "assigned_to": "usr-helena",
+      "requested_by": "usr-amelia",
+      "start_date": "2026-06-01T22:00:00Z",
+      "end_date": "2026-06-02T02:00:00Z"
+    },
+    {
+      "sys_id": "chg-0002002",
+      "number": "CHG0002002",
+      "short_description": "Patch produ
+... (truncated)
+```
+
+**GET get change request** — `/api/now/table/change_request/chg-0002001` (status 200)
+
+```
+{
+  "result": {
+    "sys_id": "chg-0002001",
+    "number": "CHG0002001",
+    "short_description": "Upgrade core firewall firmware",
+    "description": "Apply vendor security firmware to perimeter firewalls during window.",
+    "state": "assess",
+    "priority": "2",
+    "risk": "high",
+    "type": "normal",
+    "assigned_to": "usr-helena",
+    "requested_by": "usr-amelia",
+    "start_date": "2026-06-01T22:00:00Z",
+    "end_date": "2026-06-02T02:00:00Z"
+  }
+}
+```
+
+**GET list problems** — `/api/now/table/problem` (status 200)
+
+```
+{
+  "result": [
+    {
+      "sys_id": "prb-0003001",
+      "number": "PRB0003001",
+      "short_description": "Recurring email disconnects",
+      "description": "Root cause analysis for repeated Outlook disconnection incidents.",
+      "state": "2",
+      "priority": "1",
+      "assigned_to": "usr-priya",
+      "opened_by": "usr-amelia",
+      "opened_at": "2026-05-20T11:00:00Z",
+      "related_incident": "inc-0001001"
+    },
+    {
+      "sys_id": "prb-0003002",
+      "number": "PRB0003002",
+      "short_description": "VPN gateway instability after patches",
+      "description": "Investigatin
+... (truncated)
+```
+
+**GET get problem** — `/api/now/table/problem/prb-0003001` (status 200)
+
+```
+{
+  "result": {
+    "sys_id": "prb-0003001",
+    "number": "PRB0003001",
+    "short_description": "Recurring email disconnects",
+    "description": "Root cause analysis for repeated Outlook disconnection incidents.",
+    "state": "2",
+    "priority": "1",
+    "assigned_to": "usr-priya",
+    "opened_by": "usr-amelia",
+    "opened_at": "2026-05-20T11:00:00Z",
+    "related_incident": "inc-0001001"
+  }
+}
+```
+
+**GET list users** — `/api/now/table/sys_user` (status 200)
+
+```
+{
+  "result": [
+    {
+      "sys_id": "usr-amelia",
+      "user_name": "amelia.ortega",
+      "name": "Amelia Ortega",
+      "email": "amelia.ortega@orbit-labs.com",
+      "title": "IT Service Manager",
+      "department": "IT Service Management",
+      "active": true
+    },
+    {
+      "sys_id": "usr-jonas",
+      "user_name": "jonas.pereira",
+      "name": "Jonas Pereira",
+      "email": "jonas.pereira@orbit-labs.com",
+      "title": "Senior Support Engineer",
+      "department": "IT Support",
+      "active": true
+    },
+    {
+      "sys_id": "usr-helena",
+      "user_name": "helena.park",
+ 
+... (truncated)
+```
+
+**GET get user** — `/api/now/table/sys_user/usr-amelia` (status 200)
+
+```
+{
+  "result": {
+    "sys_id": "usr-amelia",
+    "user_name": "amelia.ortega",
+    "name": "Amelia Ortega",
+    "email": "amelia.ortega@orbit-labs.com",
+    "title": "IT Service Manager",
+    "department": "IT Service Management",
+    "active": true
+  }
+}
+```
+
+</details>
+
 ### shippo-api (port 8052) — server: started
 
 | Result | Method | Path | Status | Endpoint |
@@ -18397,7 +25211,7 @@ _(empty)_
 
 ```
 {
-  "object_id": "addr-7155fd86dd5b",
+  "object_id": "addr-168c32f4d839",
   "name": "Noor Aziz",
   "company": "",
   "street1": "22 Greenway Dr",
@@ -18427,7 +25241,7 @@ _(empty)_
   "zip": "78704",
   "country": "US",
   "phone": "5125550182",
-  "email": "amelia.ortega@example.com",
+  "email": "amelia.ortega@orbit-labs.com",
   "is_residential": true,
   "validated": true
 }
@@ -18437,9 +25251,9 @@ _(empty)_
 
 ```
 {
-  "object_id": "ship-00682e7739e8",
+  "object_id": "ship-9ae678b4ca2f",
   "status": "SUCCESS",
-  "object_created": "2026-05-28T08:09:25Z",
+  "object_created": "2026-06-09T11:42:40Z",
   "address_from": {
     "object_id": "addr-sender-01",
     "name": "Orbit Labs Fulfillment",
@@ -18530,15 +25344,15 @@ _(empty)_
 
 ```
 {
-  "object_id": "txn-60ef68313ae5",
+  "object_id": "txn-6234c9c4310a",
   "rate": "rate-ups-ground-01",
   "shipment": "ship-1001",
   "status": "SUCCESS",
-  "tracking_number": "1Z999AA18046260599",
+  "tracking_number": "1Z999AA18130858761",
   "tracking_status": "PRE_TRANSIT",
   "carrier": "UPS",
-  "label_url": "https://shippo-delivery.s3.amazonaws.com/labels/1Z999AA18046260599.pdf",
-  "created_time": "2026-05-28T08:09:25Z"
+  "label_url": "https://shippo-delivery.s3.amazonaws.com/labels/1Z999AA18130858761.pdf",
+  "created_time": "2026-06-09T11:42:40Z"
 }
 ```
 
@@ -18710,7 +25524,7 @@ _(empty)_
 ```
 {
   "ok": true,
-  "presence": "away"
+  "presence": "active"
 }
 ```
 
@@ -18770,14 +25584,14 @@ _(empty)_
 {
   "ok": true,
   "channel": {
-    "id": "C018D4077B1",
+    "id": "C01DA06E8A6",
     "name": "proj-billing-grpc",
     "is_private": false,
     "is_archived": false,
     "topic": "",
     "purpose": "",
     "creator": "U01AMELIA",
-    "created": 1779955765,
+    "created": 1781005361,
     "num_members": 1
   }
 }
@@ -18852,7 +25666,7 @@ _(empty)_
     "purpose": "Project channel for auth migration",
     "creator": "U01AMELIA",
     "created": 1740000000,
-    "num_members": 4
+    "num_members": 3
   }
 }
 ```
@@ -18863,9 +25677,9 @@ _(empty)_
 {
   "ok": true,
   "channel": "C01AUTHV2",
-  "ts": "1779955765.912936",
+  "ts": "1781005361.473974",
   "message": {
-    "ts": "1779955765.912936",
+    "ts": "1781005361.473974",
     "channel_id": "C01AUTHV2",
     "user_id": "U01AMELIA",
     "text": "Cutover scheduled for Friday 8am PT.",
@@ -18901,7 +25715,7 @@ _(empty)_
 {
   "ok": true,
   "messages": {
-    "total": 2,
+    "total": 1,
     "matches": [
       {
         "ts": "1748210100.000200",
@@ -18911,17 +25725,10 @@ _(empty)_
         "thread_ts": "1748210000.000100",
         "reply_count": 0,
         "reactions": []
-      },
-      {
-        "ts": "1779955765.912936",
-        "channel_id": "C01AUTHV2",
-        "user_id": "U01AMELIA",
-        "text": "Cutover scheduled for Friday 8am PT.",
-        "thread_ts": null,
-        "reply_count": 0,
-        "reactions": []
       }
-    
+    ]
+  }
+}
 ```
 
 </details>
@@ -19069,7 +25876,7 @@ _(empty)_
 
 ```
 {
-  "id": "1o7kqpyJJtoo97Xe6FKvb9",
+  "id": "YLCHC8s5ZoBZuiz3cl0e4W",
   "name": "Road Trip 2026",
   "description": "Long drive mix",
   "owner": {
@@ -19077,7 +25884,7 @@ _(empty)_
   },
   "public": false,
   "collaborative": false,
-  "uri": "spotify:playlist:1o7kqpyJJtoo97Xe6FKvb9",
+  "uri": "spotify:playlist:YLCHC8s5ZoBZuiz3cl0e4W",
   "tracks": {
     "total": 0,
     "items": []
@@ -19091,7 +25898,7 @@ _(empty)_
 {
   "playlist_id": "2v3iNvBX8Ay1Gt2uXtUKUg",
   "added": 1,
-  "snapshot_id": "WeD7ay6BZEJ5YS5Ogvac9C"
+  "snapshot_id": "kjr7sdVPBKE0LD2MuqVLvC"
 }
 ```
 
@@ -19281,7 +26088,7 @@ _(empty)_
 ```
 {
   "payment": {
-    "id": "PAY_070F582D07EC47C79A",
+    "id": "PAY_EA0218B78E2A438DA9",
     "order_id": null,
     "customer_id": "CUST_HARPER01",
     "amount_money": {
@@ -19292,7 +26099,7 @@ _(empty)_
     "source_type": "CARD",
     "location_id": "LOC_MAIN",
     "receipt_number": "RCP008",
-    "created_at": "2026-05-28T08:09:27Z"
+    "created_at": "2026-06-09T11:42:42Z"
   }
 }
 ```
@@ -19302,7 +26109,7 @@ _(empty)_
 ```
 {
   "refund": {
-    "id": "REF_1DFC767770574308A0",
+    "id": "REF_46D76E79A55F4C5B81",
     "payment_id": "PAY_AURORA01",
     "amount_money": {
       "amount": 825,
@@ -19310,7 +26117,7 @@ _(empty)_
     },
     "status": "COMPLETED",
     "reason": "Damaged item",
-    "created_at": "2026-05-28T08:09:27Z"
+    "created_at": "2026-06-09T11:42:42Z"
   }
 }
 ```
@@ -19365,13 +26172,13 @@ _(empty)_
 ```
 {
   "customer": {
-    "id": "CUST_6D9D4E4A28D54A32B7",
+    "id": "CUST_8E101BBA7EF04524AF",
     "given_name": "Nina",
     "family_name": "Costa",
     "email_address": "nina.costa@example.com",
     "phone_number": null,
     "company_name": null,
-    "created_at": "2026-05-28T08:09:27Z"
+    "created_at": "2026-06-09T11:42:42Z"
   }
 }
 ```
@@ -19414,7 +26221,7 @@ _(empty)_
 ```
 {
   "order": {
-    "id": "ORD_689F18A1EACA49DAB7",
+    "id": "ORD_E0F589C37AE348E5B6",
     "customer_id": "CUST_DIEGO02",
     "location_id": "LOC_MAIN",
     "line_items": [
@@ -19432,7 +26239,7 @@ _(empty)_
       "currency": "USD"
     },
     "state": "OPEN",
-    "created_at": "2026-05-28T08:09:27Z"
+    "created_at": "2026-06-09T11:42:42Z"
   }
 }
 ```
@@ -19586,7 +26393,7 @@ _(empty)_
 ```
 {
   "id": 9002,
-  "name": "Tempo Tuesday (renamed)",
+  "name": "Tempo Tuesday",
   "type": "Run",
   "sport_type": "Run",
   "distance": 11800.0,
@@ -19667,7 +26474,7 @@ _(empty)_
 
 </details>
 
-### stripe-api (port 8021) — server: started
+### stripe-api (port 8102) — server: started
 
 | Result | Method | Path | Status | Endpoint |
 |--------|--------|------|--------|----------|
@@ -19752,7 +26559,7 @@ _(empty)_
 
 ```
 {
-  "id": "cus_26f044fa6bd441cd",
+  "id": "cus_4632cd7f3bb94362",
   "object": "customer",
   "name": "Nimbus Coffee",
   "email": "billing@nimbus.coffee",
@@ -19761,7 +26568,7 @@ _(empty)_
   "delinquent": false,
   "balance": 0,
   "phone": "",
-  "created": 1779955768
+  "created": 1781005363
 }
 ```
 
@@ -19832,15 +26639,15 @@ _(empty)_
 
 ```
 {
-  "id": "pi_1c7432828fad471e",
+  "id": "pi_a4152327a70e4ead",
   "object": "payment_intent",
   "amount": 4900,
   "currency": "usd",
   "customer": "cus_Nb3Lumen",
   "description": "Pro Monthly",
   "status": "succeeded",
-  "latest_charge": "ch_d65471da7f974fbb",
-  "created": 1779955768
+  "latest_charge": "ch_b005a879c89e44fa",
+  "created": 1781005363
 }
 ```
 
@@ -19906,7 +26713,7 @@ _(empty)_
 
 ```
 {
-  "id": "ch_dafde88762754d2d",
+  "id": "ch_94251ff413fd45a8",
   "object": "charge",
   "customer": "cus_Nb1Aurora",
   "amount": 9900,
@@ -19917,7 +26724,7 @@ _(empty)_
   "amount_refunded": 0,
   "description": "POS Bundle",
   "payment_intent": null,
-  "created": 1779955768
+  "created": 1781005363
 }
 ```
 
@@ -19925,14 +26732,14 @@ _(empty)_
 
 ```
 {
-  "id": "re_89e7b1a2670740bd",
+  "id": "re_695033d8d7a64e78",
   "object": "refund",
   "charge": "ch_3Aurora01",
   "amount": 1900,
   "currency": "usd",
   "reason": "requested_by_customer",
   "status": "succeeded",
-  "created": 1779955768
+  "created": 1781005363
 }
 ```
 
@@ -19990,7 +26797,7 @@ _(empty)_
 
 ```
 {
-  "id": "in_678189d627a34608",
+  "id": "in_5bd001c30ca54020",
   "object": "invoice",
   "customer": "cus_Nb1Aurora",
   "subscription": null,
@@ -20000,7 +26807,7 @@ _(empty)_
   "status": "draft",
   "number": "ORBIT-0008",
   "charge": null,
-  "created": 1779955768,
+  "created": 1781005363,
   "due_date": null
 }
 ```
@@ -20056,16 +26863,16 @@ _(empty)_
 
 ```
 {
-  "id": "sub_8a6b549145ef42ee",
+  "id": "sub_a2d5ec1f2f7d4c0b",
   "object": "subscription",
   "customer": "cus_Nb1Aurora",
   "price": "price_Pro_M",
   "status": "active",
   "quantity": 1,
-  "current_period_start": 1779955768,
-  "current_period_end": 1782547768,
+  "current_period_start": 1781005363,
+  "current_period_end": 1783597363,
   "cancel_at_period_end": false,
-  "created": 1779955768
+  "created": 1781005363
 }
 ```
 
@@ -20100,6 +26907,574 @@ _(empty)_
     }
   ]
 }
+```
+
+</details>
+
+### telegram-api (port 8063) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | GET | /bot/getMe | 200 | getMe |
+| PASS | GET | /bot/getUpdates?limit=10 | 200 | getUpdates |
+| PASS | GET | /bot/getChat?chat_id=-200500 | 200 | getChat |
+| PASS | GET | /bot/getChatMember?chat_id=-200500&user_id=9002 | 200 | getChatMember |
+| PASS | POST | /bot/sendMessage | 200 | sendMessage |
+| PASS | POST | /bot/sendPhoto | 200 | sendPhoto |
+| PASS | POST | /bot/editMessageText | 200 | editMessageText |
+| PASS | POST | /bot/deleteMessage | 200 | deleteMessage |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**GET getMe** — `/bot/getMe` (status 200)
+
+```
+{
+  "ok": true,
+  "result": {
+    "id": 7654321098,
+    "is_bot": true,
+    "first_name": "Orbit Ops Bot",
+    "username": "orbit_ops_bot",
+    "can_join_groups": true,
+    "can_read_all_group_messages": false,
+    "supports_inline_queries": false
+  }
+}
+```
+
+**GET getUpdates** — `/bot/getUpdates?limit=10` (status 200)
+
+```
+{
+  "ok": true,
+  "result": [
+    {
+      "update_id": 100001,
+      "message": {
+        "message_id": 5001,
+        "from": {
+          "id": 9001,
+          "is_bot": false,
+          "first_name": "Amelia",
+          "last_name": "Ortega",
+          "username": "amelia_o"
+        },
+        "chat": {
+          "id": -200500,
+          "type": "group",
+          "title": "Orbit Eng Standup",
+          "description": "Daily standup and incident coordination for the platform team."
+        },
+        "date": 1748240000,
+        "text": "Standup in 5. Drop blockers in the thread."
+      }
+    
+... (truncated)
+```
+
+**GET getChat** — `/bot/getChat?chat_id=-200500` (status 200)
+
+```
+{
+  "ok": true,
+  "result": {
+    "id": -200500,
+    "type": "group",
+    "title": "Orbit Eng Standup",
+    "description": "Daily standup and incident coordination for the platform team.",
+    "member_count": 6
+  }
+}
+```
+
+**GET getChatMember** — `/bot/getChatMember?chat_id=-200500&user_id=9002` (status 200)
+
+```
+{
+  "ok": true,
+  "result": {
+    "user": {
+      "id": 9002,
+      "is_bot": false,
+      "first_name": "Jonas",
+      "last_name": "Pereira",
+      "username": "jonas_p"
+    },
+    "status": "administrator"
+  }
+}
+```
+
+**POST sendMessage** — `/bot/sendMessage` (status 200)
+
+```
+{
+  "ok": true,
+  "result": {
+    "message_id": 5010,
+    "from": {
+      "id": 7654321098,
+      "is_bot": true,
+      "first_name": "Orbit Ops Bot",
+      "username": "orbit_ops_bot"
+    },
+    "chat": {
+      "id": -200500,
+      "type": "group",
+      "title": "Orbit Eng Standup",
+      "description": "Daily standup and incident coordination for the platform team."
+    },
+    "date": 1781005364,
+    "text": "Standup starting now."
+  }
+}
+```
+
+**POST sendPhoto** — `/bot/sendPhoto` (status 200)
+
+```
+{
+  "ok": true,
+  "result": {
+    "message_id": 5011,
+    "from": {
+      "id": 7654321098,
+      "is_bot": true,
+      "first_name": "Orbit Ops Bot",
+      "username": "orbit_ops_bot"
+    },
+    "chat": {
+      "id": -200501,
+      "type": "supergroup",
+      "title": "Orbit Deploys",
+      "description": "Automated deploy and alerting notifications."
+    },
+    "date": 1781005364,
+    "caption": "Latest deploy dashboard",
+    "photo": [
+      {
+        "file_id": "AgACAgIAAxkBAAIB",
+        "width": 1280,
+        "height": 720
+      }
+    ]
+  }
+}
+```
+
+**POST editMessageText** — `/bot/editMessageText` (status 200)
+
+```
+{
+  "ok": true,
+  "result": {
+    "message_id": 5006,
+    "from": {
+      "id": 7654321098,
+      "is_bot": true,
+      "first_name": "Orbit Ops Bot",
+      "username": "orbit_ops_bot"
+    },
+    "chat": {
+      "id": 1001,
+      "type": "private",
+      "username": "amelia_o",
+      "first_name": "Amelia",
+      "last_name": "Ortega"
+    },
+    "date": 1748242000,
+    "text": "Your on-call shift starts tomorrow at 10:00 UTC.",
+    "edit_date": 1781005364
+  }
+}
+```
+
+**POST deleteMessage** — `/bot/deleteMessage` (status 200)
+
+```
+{
+  "ok": true,
+  "result": true
+}
+```
+
+</details>
+
+### ticketmaster-api (port 8075) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | GET | /discovery/v2/events | 200 | search events |
+| PASS | GET | /discovery/v2/events?keyword=Aria | 200 | search events by keyword |
+| PASS | GET | /discovery/v2/events?city=New York&classificationName=Music | 200 | search events by city + classification |
+| PASS | GET | /discovery/v2/events?startDateTime=2026-09-01T00:00:00Z | 200 | search events by startDateTime |
+| PASS | GET | /discovery/v2/events/evt-1001 | 200 | get event |
+| PASS | GET | /discovery/v2/venues?keyword=Arena | 200 | search venues |
+| PASS | GET | /discovery/v2/venues/ven-001 | 200 | get venue |
+| PASS | GET | /discovery/v2/attractions?keyword=Echoes | 200 | search attractions |
+| PASS | GET | /discovery/v2/attractions/att-001 | 200 | get attraction |
+| PASS | GET | /discovery/v2/classifications | 200 | list classifications |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**GET search events** — `/discovery/v2/events` (status 200)
+
+```
+{
+  "_embedded": {
+    "events": [
+      {
+        "id": "evt-1001",
+        "name": "The Midnight Echoes Live",
+        "dates": {
+          "start": {
+            "dateTime": "2026-07-12T20:00:00Z"
+          },
+          "status": {
+            "code": "onsale"
+          }
+        },
+        "classifications": [
+          {
+            "segment": {
+              "name": "Music"
+            },
+            "genre": {
+              "name": "Rock"
+            },
+            "subGenre": {
+              "name": "Alternative Rock"
+            }
+          }
+        ],
+        "priceRanges": [
+      
+... (truncated)
+```
+
+**GET search events by keyword** — `/discovery/v2/events?keyword=Aria` (status 200)
+
+```
+{
+  "_embedded": {
+    "events": [
+      {
+        "id": "evt-1002",
+        "name": "Aria Sloane World Tour",
+        "dates": {
+          "start": {
+            "dateTime": "2026-08-03T19:30:00Z"
+          },
+          "status": {
+            "code": "onsale"
+          }
+        },
+        "classifications": [
+          {
+            "segment": {
+              "name": "Music"
+            },
+            "genre": {
+              "name": "Pop"
+            },
+            "subGenre": {
+              "name": "Pop"
+            }
+          }
+        ],
+        "priceRanges": [
+          {
+          
+... (truncated)
+```
+
+**GET search events by city + classification** — `/discovery/v2/events?city=New York&classificationName=Music` (status 200)
+
+```
+{
+  "_embedded": {
+    "events": [
+      {
+        "id": "evt-1001",
+        "name": "The Midnight Echoes Live",
+        "dates": {
+          "start": {
+            "dateTime": "2026-07-12T20:00:00Z"
+          },
+          "status": {
+            "code": "onsale"
+          }
+        },
+        "classifications": [
+          {
+            "segment": {
+              "name": "Music"
+            },
+            "genre": {
+              "name": "Rock"
+            },
+            "subGenre": {
+              "name": "Alternative Rock"
+            }
+          }
+        ],
+        "priceRanges": [
+      
+... (truncated)
+```
+
+**GET search events by startDateTime** — `/discovery/v2/events?startDateTime=2026-09-01T00:00:00Z` (status 200)
+
+```
+{
+  "_embedded": {
+    "events": [
+      {
+        "id": "evt-1006",
+        "name": "Starlight Musical Premiere",
+        "dates": {
+          "start": {
+            "dateTime": "2026-09-10T19:00:00Z"
+          },
+          "status": {
+            "code": "onsale"
+          }
+        },
+        "classifications": [
+          {
+            "segment": {
+              "name": "Arts & Theatre"
+            },
+            "genre": {
+              "name": "Theatre"
+            },
+            "subGenre": {
+              "name": "Musical"
+            }
+          }
+        ],
+        "priceRanges": [
+ 
+... (truncated)
+```
+
+**GET get event** — `/discovery/v2/events/evt-1001` (status 200)
+
+```
+{
+  "id": "evt-1001",
+  "name": "The Midnight Echoes Live",
+  "dates": {
+    "start": {
+      "dateTime": "2026-07-12T20:00:00Z"
+    },
+    "status": {
+      "code": "onsale"
+    }
+  },
+  "classifications": [
+    {
+      "segment": {
+        "name": "Music"
+      },
+      "genre": {
+        "name": "Rock"
+      },
+      "subGenre": {
+        "name": "Alternative Rock"
+      }
+    }
+  ],
+  "priceRanges": [
+    {
+      "type": "standard",
+      "currency": "USD",
+      "min": 55.0,
+      "max": 180.0
+    }
+  ],
+  "_embedded": {
+    "venues": [
+      {
+        "id": "ven-001",
+        "name": "Ma
+... (truncated)
+```
+
+**GET search venues** — `/discovery/v2/venues?keyword=Arena` (status 200)
+
+```
+{
+  "_embedded": {
+    "venues": [
+      {
+        "id": "ven-001",
+        "name": "Madison Arc Arena",
+        "city": {
+          "name": "New York"
+        },
+        "state": {
+          "stateCode": "NY"
+        },
+        "country": {
+          "countryCode": "US"
+        },
+        "postalCode": "10001",
+        "address": {
+          "line1": "4 Pennsylvania Plaza"
+        },
+        "location": {
+          "latitude": 40.7505,
+          "longitude": -73.9934
+        }
+      }
+    ]
+  },
+  "page": {
+    "size": 1,
+    "totalElements": 1,
+    "totalPages": 1,
+    "number": 0
+  }
+}
+```
+
+**GET get venue** — `/discovery/v2/venues/ven-001` (status 200)
+
+```
+{
+  "id": "ven-001",
+  "name": "Madison Arc Arena",
+  "city": {
+    "name": "New York"
+  },
+  "state": {
+    "stateCode": "NY"
+  },
+  "country": {
+    "countryCode": "US"
+  },
+  "postalCode": "10001",
+  "address": {
+    "line1": "4 Pennsylvania Plaza"
+  },
+  "location": {
+    "latitude": 40.7505,
+    "longitude": -73.9934
+  }
+}
+```
+
+**GET search attractions** — `/discovery/v2/attractions?keyword=Echoes` (status 200)
+
+```
+{
+  "_embedded": {
+    "attractions": [
+      {
+        "id": "att-001",
+        "name": "The Midnight Echoes",
+        "type": "band",
+        "upcomingEvents": {
+          "_total": 3
+        },
+        "classifications": [
+          {
+            "segment": {
+              "name": "Music"
+            },
+            "genre": {
+              "name": "Rock"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "page": {
+    "size": 1,
+    "totalElements": 1,
+    "totalPages": 1,
+    "number": 0
+  }
+}
+```
+
+**GET get attraction** — `/discovery/v2/attractions/att-001` (status 200)
+
+```
+{
+  "id": "att-001",
+  "name": "The Midnight Echoes",
+  "type": "band",
+  "upcomingEvents": {
+    "_total": 3
+  },
+  "classifications": [
+    {
+      "segment": {
+        "name": "Music"
+      },
+      "genre": {
+        "name": "Rock"
+      }
+    }
+  ]
+}
+```
+
+**GET list classifications** — `/discovery/v2/classifications` (status 200)
+
+```
+{
+  "_embedded": {
+    "classifications": [
+      {
+        "id": "cls-music-rock",
+        "segment": {
+          "name": "Music",
+          "_embedded": {
+            "genres": [
+              {
+                "name": "Rock",
+                "_embedded": {
+                  "subgenres": [
+                    {
+                      "name": "Alternative Rock"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "cls-music-pop",
+        "segment": {
+          "name": "Music",
+          "_embedded": {
+   
+... (truncated)
 ```
 
 </details>
@@ -20500,7 +27875,7 @@ _(empty)_
 
 ```
 {
-  "id": "e5351eae4520b870cec2e747",
+  "id": "bf3318daa2a1a4a128bfe83c",
   "name": "Investigate webhook retries",
   "desc": "Add exponential backoff",
   "idBoard": "60b1000000000000000000b1",
@@ -20521,7 +27896,7 @@ _(empty)_
   "name": "Mobile offline mode",
   "desc": "Spike offline sync for mobile app",
   "idBoard": "60b1000000000000000000b1",
-  "idList": "61c1000000000000000000c2",
+  "idList": "61c1000000000000000000c1",
   "pos": 16384.0,
   "due": null,
   "closed": false,
@@ -20583,7 +27958,7 @@ _(empty)_
 
 ```
 {
-  "id": "c58abd0ce5bcc3561004a751",
+  "id": "6eb8901fc0aeb5ee471d3b8d",
   "name": "Spike tasks",
   "idCard": "62d1000000000000000000d4",
   "idBoard": "60b1000000000000000000b1",
@@ -20689,7 +28064,7 @@ _(empty)_
 
 ```
 {
-  "sid": "SMf43f3a791afb432488ed0fe786d522df",
+  "sid": "SMdd86dc33aa684fa282eedd6685c6a936",
   "account_sid": "ACXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
   "from": "+14155550123",
   "to": "+14155557777",
@@ -20701,8 +28076,8 @@ _(empty)_
   "price_unit": "USD",
   "error_code": null,
   "date_sent": null,
-  "date_created": "2026-05-28T08:09:30Z",
-  "uri": "/2010-04-01/Accounts/ACXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX/Messages/SMf43f3a791afb432488ed0fe786d522df.json"
+  "date_created": "2026-06-09T11:42:46Z",
+  "uri": "/2010-04-01/Accounts/ACXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX/Messages/SMdd86dc33aa684fa282eedd6685c6a936.json"
 }
 ```
 
@@ -20736,7 +28111,7 @@ _(empty)_
 
 ```
 {
-  "sid": "CA564d295b26dc4fc1993c918a54d82738",
+  "sid": "CA363a97918f244feead12c9bee46f2976",
   "account_sid": "ACXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
   "from": "+14155550123",
   "to": "+14155557777",
@@ -20748,8 +28123,8 @@ _(empty)_
   "answered_by": null,
   "start_time": null,
   "end_time": null,
-  "date_created": "2026-05-28T08:09:30Z",
-  "uri": "/2010-04-01/Accounts/ACXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX/Calls/CA564d295b26dc4fc1993c918a54d82738.json"
+  "date_created": "2026-06-09T11:42:46Z",
+  "uri": "/2010-04-01/Accounts/ACXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX/Calls/CA363a97918f244feead12c9bee46f2976.json"
 }
 ```
 
@@ -20790,6 +28165,503 @@ _(empty)_
   "valid": true,
   "caller_name": "Orbit Support Line",
   "url": "/v1/PhoneNumbers/+14155550123"
+}
+```
+
+</details>
+
+### twitch-api (port 8064) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | GET | /helix/users?login=pixelpaladin | 200 | get users |
+| PASS | GET | /helix/streams | 200 | get streams (live) |
+| PASS | GET | /helix/streams?user_login=sprintqueen | 200 | get streams by login |
+| PASS | GET | /helix/channels?broadcaster_id=40001 | 200 | get channel |
+| PASS | GET | /helix/channels/followers?broadcaster_id=40003 | 200 | get channel followers |
+| PASS | GET | /helix/games/top?first=5 | 200 | get top games |
+| PASS | GET | /helix/games?name=Elden Ring | 200 | get game by name |
+| PASS | GET | /helix/clips?broadcaster_id=40001 | 200 | get clips by broadcaster |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**GET get users** — `/helix/users?login=pixelpaladin` (status 200)
+
+```
+{
+  "data": [
+    {
+      "id": "40001",
+      "login": "pixelpaladin",
+      "display_name": "PixelPaladin",
+      "type": "",
+      "broadcaster_type": "partner",
+      "description": "Variety RPG streamer and speedrunner.",
+      "view_count": 4210000,
+      "created_at": "2016-02-10T18:00:00Z",
+      "profile_image_url": "https://static.example.com/pixelpaladin.png"
+    }
+  ]
+}
+```
+
+**GET get streams (live)** — `/helix/streams` (status 200)
+
+```
+{
+  "data": [
+    {
+      "id": "80001",
+      "user_id": "40001",
+      "user_login": "pixelpaladin",
+      "user_name": "PixelPaladin",
+      "game_id": "30003",
+      "game_name": "Elden Ring",
+      "type": "live",
+      "title": "Blind Elden Ring run - no spoilers please",
+      "viewer_count": 18400,
+      "started_at": "2026-05-27T14:00:00Z",
+      "language": "en",
+      "is_live": true
+    },
+    {
+      "id": "80002",
+      "user_id": "40003",
+      "user_login": "sprintqueen",
+      "user_name": "SprintQueen",
+      "game_id": "30005",
+      "game_name": "Speedrunning",
+      "type"
+... (truncated)
+```
+
+**GET get streams by login** — `/helix/streams?user_login=sprintqueen` (status 200)
+
+```
+{
+  "data": [
+    {
+      "id": "80002",
+      "user_id": "40003",
+      "user_login": "sprintqueen",
+      "user_name": "SprintQueen",
+      "game_id": "30005",
+      "game_name": "Speedrunning",
+      "type": "live",
+      "title": "WR attempts all morning",
+      "viewer_count": 9200,
+      "started_at": "2026-05-27T13:30:00Z",
+      "language": "en",
+      "is_live": true
+    }
+  ]
+}
+```
+
+**GET get channel** — `/helix/channels?broadcaster_id=40001` (status 200)
+
+```
+{
+  "data": [
+    {
+      "broadcaster_id": "40001",
+      "broadcaster_login": "pixelpaladin",
+      "broadcaster_name": "PixelPaladin",
+      "game_id": "30003",
+      "game_name": "Elden Ring",
+      "title": "Blind Elden Ring run - no spoilers please",
+      "broadcaster_language": "en",
+      "tags": [
+        "RPG",
+        "Blind",
+        "English"
+      ],
+      "follower_count": 512000
+    }
+  ]
+}
+```
+
+**GET get channel followers** — `/helix/channels/followers?broadcaster_id=40003` (status 200)
+
+```
+{
+  "data": [],
+  "total": 890000
+}
+```
+
+**GET get top games** — `/helix/games/top?first=5` (status 200)
+
+```
+{
+  "data": [
+    {
+      "id": "30001",
+      "name": "Just Chatting",
+      "box_art_url": "https://static.example.com/box/justchatting.jpg",
+      "rank": 1,
+      "viewer_count": 420000
+    },
+    {
+      "id": "30002",
+      "name": "Software and Game Development",
+      "box_art_url": "https://static.example.com/box/gamedev.jpg",
+      "rank": 2,
+      "viewer_count": 38000
+    },
+    {
+      "id": "30003",
+      "name": "Elden Ring",
+      "box_art_url": "https://static.example.com/box/eldenring.jpg",
+      "rank": 3,
+      "viewer_count": 156000
+    },
+    {
+      "id": "30004",
+      
+... (truncated)
+```
+
+**GET get game by name** — `/helix/games?name=Elden Ring` (status 200)
+
+```
+{
+  "data": [
+    {
+      "id": "30003",
+      "name": "Elden Ring",
+      "box_art_url": "https://static.example.com/box/eldenring.jpg",
+      "rank": 3,
+      "viewer_count": 156000
+    }
+  ]
+}
+```
+
+**GET get clips by broadcaster** — `/helix/clips?broadcaster_id=40001` (status 200)
+
+```
+{
+  "data": [
+    {
+      "id": "ClipAlpha01",
+      "broadcaster_id": "40001",
+      "broadcaster_name": "PixelPaladin",
+      "creator_id": "40004",
+      "creator_name": "TacticalTurtle",
+      "game_id": "30003",
+      "title": "Insane last-second parry",
+      "view_count": 48200,
+      "duration": 28.5,
+      "created_at": "2026-05-25T19:12:00Z",
+      "url": "https://clips.example.com/ClipAlpha01"
+    },
+    {
+      "id": "ClipDelta04",
+      "broadcaster_id": "40001",
+      "broadcaster_name": "PixelPaladin",
+      "creator_id": "40003",
+      "creator_name": "SprintQueen",
+      "game
+... (truncated)
+```
+
+</details>
+
+### twitter-api (port 8061) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | GET | /2/users/me | 200 | get me |
+| PASS | GET | /2/users/2002 | 200 | get user |
+| PASS | GET | /2/users/by/username/orbit_labs | 200 | get user by username |
+| PASS | GET | /2/users/2001/tweets?max_results=5 | 200 | get user tweets |
+| PASS | GET | /2/users/2001/followers | 200 | get followers |
+| PASS | GET | /2/tweets?max_results=5 | 200 | list tweets |
+| PASS | GET | /2/tweets/3002 | 200 | get tweet |
+| PASS | GET | /2/tweets/search/recent?query=SLO | 200 | search recent |
+| PASS | POST | /2/tweets | 201 | create tweet |
+| PASS | DELETE | /2/tweets/3008 | 200 | delete tweet |
+| PASS | POST | /2/users/2001/likes | 200 | like tweet |
+| PASS | POST | /2/users/2001/retweets | 200 | retweet |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**GET get me** — `/2/users/me` (status 200)
+
+```
+{
+  "data": {
+    "id": "2001",
+    "username": "maya_dev",
+    "name": "Maya Chen",
+    "description": "Backend engineer. Distributed systems and coffee.",
+    "verified": true,
+    "protected": false,
+    "location": "Seattle WA",
+    "profile_image_url": "https://pbs.example.com/maya.png",
+    "created_at": "2018-03-12T09:00:00.000Z",
+    "followers_count": "18432",
+    "following_count": "312",
+    "tweet_count": "1840",
+    "public_metrics": {
+      "followers_count": 18432,
+      "following_count": 312,
+      "tweet_count": 1840
+    }
+  }
+}
+```
+
+**GET get user** — `/2/users/2002` (status 200)
+
+```
+{
+  "data": {
+    "id": "2002",
+    "username": "orbit_labs",
+    "name": "Orbit Labs",
+    "description": "Building developer tooling for the modern stack.",
+    "verified": true,
+    "protected": false,
+    "location": "Remote",
+    "profile_image_url": "https://pbs.example.com/orbit.png",
+    "created_at": "2019-06-01T10:00:00.000Z",
+    "followers_count": "54210",
+    "following_count": "128",
+    "tweet_count": "920",
+    "public_metrics": {
+      "followers_count": 54210,
+      "following_count": 128,
+      "tweet_count": 920
+    }
+  }
+}
+```
+
+**GET get user by username** — `/2/users/by/username/orbit_labs` (status 200)
+
+```
+{
+  "data": {
+    "id": "2002",
+    "username": "orbit_labs",
+    "name": "Orbit Labs",
+    "description": "Building developer tooling for the modern stack.",
+    "verified": true,
+    "protected": false,
+    "location": "Remote",
+    "profile_image_url": "https://pbs.example.com/orbit.png",
+    "created_at": "2019-06-01T10:00:00.000Z",
+    "followers_count": "54210",
+    "following_count": "128",
+    "tweet_count": "920",
+    "public_metrics": {
+      "followers_count": 54210,
+      "following_count": 128,
+      "tweet_count": 920
+    }
+  }
+}
+```
+
+**GET get user tweets** — `/2/users/2001/tweets?max_results=5` (status 200)
+
+```
+{
+  "data": [
+    {
+      "id": "3005",
+      "author_id": "2001",
+      "text": "Hot take: most observability dashboards measure activity not health. Track SLOs instead.",
+      "created_at": "2026-05-23T08:00:00.000Z",
+      "lang": "en",
+      "reply_to_tweet_id": null,
+      "public_metrics": {
+        "like_count": 734,
+        "retweet_count": 182,
+        "reply_count": 67,
+        "quote_count": 19
+      }
+    },
+    {
+      "id": "3001",
+      "author_id": "2001",
+      "text": "Shipped a 40% latency cut on our session store today. Turns out the bottleneck was a missing index. Classic
+... (truncated)
+```
+
+**GET get followers** — `/2/users/2001/followers` (status 200)
+
+```
+{
+  "data": [
+    {
+      "id": "2002",
+      "username": "orbit_labs",
+      "name": "Orbit Labs",
+      "description": "Building developer tooling for the modern stack.",
+      "verified": true,
+      "protected": false,
+      "location": "Remote",
+      "profile_image_url": "https://pbs.example.com/orbit.png",
+      "created_at": "2019-06-01T10:00:00.000Z",
+      "followers_count": "54210",
+      "following_count": "128",
+      "tweet_count": "920",
+      "public_metrics": {
+        "followers_count": 54210,
+        "following_count": 128,
+        "tweet_count": 920
+      }
+    },
+    {
+   
+... (truncated)
+```
+
+**GET list tweets** — `/2/tweets?max_results=5` (status 200)
+
+```
+{
+  "data": [
+    {
+      "id": "3010",
+      "author_id": "2004",
+      "text": "Finally migrated our design tokens to a single source of truth. No more drift between Figma and code.",
+      "created_at": "2026-05-25T10:05:00.000Z",
+      "lang": "en",
+      "reply_to_tweet_id": null,
+      "public_metrics": {
+        "like_count": 302,
+        "retweet_count": 58,
+        "reply_count": 22,
+        "quote_count": 7
+      }
+    },
+    {
+      "id": "3009",
+      "author_id": "2002",
+      "text": "We are hiring two senior backend engineers. Remote friendly. Apply via the careers page.",
+     
+... (truncated)
+```
+
+**GET get tweet** — `/2/tweets/3002` (status 200)
+
+```
+{
+  "data": {
+    "id": "3002",
+    "author_id": "2002",
+    "text": "Orbit CLI 2.0 is out. Faster cold starts and a brand new plugin system. Changelog in the thread.",
+    "created_at": "2026-05-21T17:30:00.000Z",
+    "lang": "en",
+    "reply_to_tweet_id": null,
+    "public_metrics": {
+      "like_count": 1820,
+      "retweet_count": 640,
+      "reply_count": 140,
+      "quote_count": 72
+    }
+  }
+}
+```
+
+**GET search recent** — `/2/tweets/search/recent?query=SLO` (status 200)
+
+```
+{
+  "data": [
+    {
+      "id": "3007",
+      "author_id": "2003",
+      "text": "@maya_dev totally agree on the SLO point. We gated our last rollout on p95 and it caught a regression.",
+      "created_at": "2026-05-23T08:45:00.000Z",
+      "lang": "en",
+      "reply_to_tweet_id": "3005",
+      "public_metrics": {
+        "like_count": 52,
+        "retweet_count": 3,
+        "reply_count": 2,
+        "quote_count": 0
+      }
+    },
+    {
+      "id": "3005",
+      "author_id": "2001",
+      "text": "Hot take: most observability dashboards measure activity not health. Track SLOs instead.",
+     
+... (truncated)
+```
+
+**POST create tweet** — `/2/tweets` (status 201)
+
+```
+{
+  "data": {
+    "id": "854895412442513027",
+    "author_id": "2001",
+    "text": "Just deployed the new plugin API. No downtime.",
+    "created_at": "2026-06-09T11:42:47.000Z",
+    "lang": "en",
+    "reply_to_tweet_id": null,
+    "public_metrics": {
+      "like_count": 0,
+      "retweet_count": 0,
+      "reply_count": 0,
+      "quote_count": 0
+    }
+  }
+}
+```
+
+**DELETE delete tweet** — `/2/tweets/3008` (status 200)
+
+```
+{
+  "data": {
+    "deleted": true
+  }
+}
+```
+
+**POST like tweet** — `/2/users/2001/likes` (status 200)
+
+```
+{
+  "data": {
+    "liked": true
+  }
+}
+```
+
+**POST retweet** — `/2/users/2001/retweets` (status 200)
+
+```
+{
+  "data": {
+    "retweeted": true
+  }
 }
 ```
 
@@ -20851,7 +28723,7 @@ _(empty)_
 
 ```
 {
-  "id": "frm-fadca3af07",
+  "id": "frm-53c5ba668f",
   "title": "NPS Pulse",
   "language": "en",
   "workspace": {
@@ -20860,24 +28732,13 @@ _(empty)_
   "settings": {
     "is_public": true
   },
-  "fields": [
-    {
-      "id": "fld-fb77d21cc7",
-      "title": "How likely are you to recommend us?",
-      "ref": "nps",
-      "type": "rating",
-      "required": true
-    },
-    {
-      "id": "fld-3e97793183",
-      "title": "Your email",
-      "ref": "email",
-      "type": "email",
-      "required": false
-    }
-  ],
+  "fields": [],
   "_links": {
-    "display": "https://orbitlabs.typeform.com/to/frm-fadca3af
+    "display": "https://orbitlabs.typeform.com/to/frm-53c5ba668f"
+  },
+  "created_at": "2026-06-09T11:42:48Z",
+  "last_updated_at": "2026-06-09T11:42:48Z"
+}
 ```
 
 **GET get form** — `/forms/frm-csat-01` (status 200)
@@ -20995,7 +28856,7 @@ _(empty)_
 {
   "form": {
     "id": "frm-csat-01",
-    "title": "Customer Satisfaction Survey (Q2)"
+    "title": "Customer Satisfaction Survey"
   },
   "total_responses": 3,
   "completed_responses": 3,
@@ -21021,6 +28882,7 @@ _(empty)_
     {
       "field": {
         "id": "fld-csat-recommend",
+    
 ... (truncated)
 ```
 
@@ -21163,7 +29025,7 @@ _(empty)_
 
 ```
 {
-  "request_id": "req-ded6057f",
+  "request_id": "req-d0f49b77",
   "product_id": "uberx",
   "status": "processing",
   "rider_id": "rider-marco",
@@ -21181,7 +29043,7 @@ _(empty)_
   "fare": 11.23,
   "surge_multiplier": 1.0,
   "eta_minutes": 3,
-  "requested_at": "2026-05-28T08:09:31Z",
+  "requested_at": "2026-06-09T11:42:49Z",
   "completed_at": null
 }
 ```
@@ -21275,6 +29137,450 @@ _(empty)_
   ],
   "home_address": "1455 Market St, San Francisco, CA",
   "work_ad
+```
+
+</details>
+
+### ups-api (port 8096) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | POST | /api/rating/v1/Rate | 200 | rate |
+| PASS | POST | /api/shipments/v1/ship | 200 | ship |
+| PASS | GET | /api/track/v1/details/1Z999AA10123456784 | 200 | track |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**POST rate** — `/api/rating/v1/Rate` (status 200)
+
+```
+{
+  "RateResponse": {
+    "Response": {
+      "ResponseStatus": {
+        "Code": "1",
+        "Description": "Success"
+      }
+    },
+    "RatedShipment": [
+      {
+        "Service": {
+          "Code": "03",
+          "Description": "UPS Ground"
+        },
+        "TotalCharges": {
+          "CurrencyCode": "USD",
+          "MonetaryValue": "16.20"
+        },
+        "GuaranteedDelivery": {
+          "BusinessDaysInTransit": "5",
+          "DeliveryByTime": "2026-05-30"
+        }
+      },
+      {
+        "Service": {
+          "Code": "02",
+          "Description": "UPS 2nd Day Air"
+       
+... (truncated)
+```
+
+**POST ship** — `/api/shipments/v1/ship` (status 200)
+
+```
+{
+  "ShipmentResponse": {
+    "Response": {
+      "ResponseStatus": {
+        "Code": "1",
+        "Description": "Success"
+      }
+    },
+    "ShipmentResults": {
+      "ShipmentIdentificationNumber": "1Z999AA1013456839",
+      "ShipmentCharges": {
+        "TotalCharges": {
+          "CurrencyCode": "USD",
+          "MonetaryValue": "16.20"
+        }
+      },
+      "PackageResults": [
+        {
+          "TrackingNumber": "1Z999AA1013456839",
+          "ShippingLabel": {
+            "ImageFormat": {
+              "Code": "GIF"
+            },
+            "GraphicImage": "https://ups.example/la
+```
+
+**GET track** — `/api/track/v1/details/1Z999AA10123456784` (status 200)
+
+```
+{
+  "trackResponse": {
+    "shipment": [
+      {
+        "package": [
+          {
+            "trackingNumber": "1Z999AA10123456784",
+            "currentStatus": {
+              "type": "D",
+              "code": "011",
+              "description": "Delivered"
+            },
+            "service": {
+              "description": "UPS Ground"
+            },
+            "deliveryDate": [
+              {
+                "type": "SDD",
+                "date": "2026-05-25"
+              }
+            ],
+            "activity": [
+              {
+                "status": {
+                  "type": 
+```
+
+</details>
+
+### vimeo-api (port 8099) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | GET | /me | 200 | me |
+| PASS | GET | /me/videos?page=1&per_page=25 | 200 | my videos |
+| PASS | GET | /videos/901000103 | 200 | video by id |
+| WARN | GET | /videos/999999999 | 404 | video not found |
+| PASS | GET | /users/12000002 | 200 | user by id |
+| PASS | GET | /users/12000004/videos?page=1&per_page=25 | 200 | user videos |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**GET me** — `/me` (status 200)
+
+```
+{
+  "uri": "/users/12000001",
+  "name": "Aiko Tanaka",
+  "link": "https://vimeo.com/aikotanaka",
+  "location": "Tokyo JP",
+  "bio": "Documentary filmmaker and editor.",
+  "account": "pro",
+  "created_time": "2026-01-12T09:15:00+00:00",
+  "websites": [
+    {
+      "uri": "",
+      "link": "https://aiko.example.com"
+    }
+  ],
+  "metadata": {
+    "connections": {
+      "videos": {
+        "uri": "/users/12000001/videos",
+        "total": 2
+      }
+    }
+  }
+}
+```
+
+**GET my videos** — `/me/videos?page=1&per_page=25` (status 200)
+
+```
+{
+  "total": 2,
+  "page": 1,
+  "per_page": 25,
+  "paging": {
+    "next": null,
+    "previous": null,
+    "first": "?page=1",
+    "last": "?page=1"
+  },
+  "data": [
+    {
+      "uri": "/videos/901000102",
+      "name": "Editing Workflow 2026",
+      "description": "My current Resolve color pipeline.",
+      "link": "https://vimeo.com/901000102",
+      "duration": 1284,
+      "width": 1920,
+      "height": 1080,
+      "created_time": "2026-05-09T13:00:00+00:00",
+      "modified_time": "2026-05-09T14:22:00+00:00",
+      "privacy": {
+        "view": "anybody"
+      },
+      "status": "available",
+
+... (truncated)
+```
+
+**GET video by id** — `/videos/901000103` (status 200)
+
+```
+{
+  "uri": "/videos/901000103",
+  "name": "Neon Streets",
+  "description": "Music video shot entirely at night.",
+  "link": "https://vimeo.com/901000103",
+  "duration": 221,
+  "width": 3840,
+  "height": 2160,
+  "created_time": "2026-05-04T20:15:00+00:00",
+  "modified_time": "2026-05-05T01:40:00+00:00",
+  "privacy": {
+    "view": "anybody"
+  },
+  "status": "available",
+  "stats": {
+    "plays": 52310
+  },
+  "metadata": {
+    "connections": {
+      "likes": {
+        "total": 4120
+      }
+    }
+  },
+  "user": {
+    "uri": "/users/12000002",
+    "name": "Marcus Reed",
+    "link": "https://vimeo.c
+```
+
+**GET video not found** — `/videos/999999999` (status 404)
+
+```
+{
+  "error": "The requested video could not be found.",
+  "video_id": "999999999"
+}
+```
+
+**GET user by id** — `/users/12000002` (status 200)
+
+```
+{
+  "uri": "/users/12000002",
+  "name": "Marcus Reed",
+  "link": "https://vimeo.com/marcusreed",
+  "location": "Brooklyn NY",
+  "bio": "Music video director.",
+  "account": "plus",
+  "created_time": "2026-02-03T14:42:00+00:00",
+  "websites": [
+    {
+      "uri": "",
+      "link": "https://marcusreed.example.com"
+    }
+  ],
+  "metadata": {
+    "connections": {
+      "videos": {
+        "uri": "/users/12000002/videos",
+        "total": 2
+      }
+    }
+  }
+}
+```
+
+**GET user videos** — `/users/12000004/videos?page=1&per_page=25` (status 200)
+
+```
+{
+  "total": 2,
+  "page": 1,
+  "per_page": 25,
+  "paging": {
+    "next": null,
+    "previous": null,
+    "first": "?page=1",
+    "last": "?page=1"
+  },
+  "data": [
+    {
+      "uri": "/videos/901000107",
+      "name": "Color Grading Travel Footage",
+      "description": "Grading workflow for warm tropical looks.",
+      "link": "https://vimeo.com/901000107",
+      "duration": 1020,
+      "width": 1920,
+      "height": 1080,
+      "created_time": "2026-05-15T15:10:00+00:00",
+      "modified_time": "2026-05-15T16:05:00+00:00",
+      "privacy": {
+        "view": "anybody"
+      },
+      "status":
+... (truncated)
+```
+
+</details>
+
+### webflow-api (port 8100) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | GET | /v2/sites | 200 | list sites |
+| PASS | GET | /v2/sites/650a1f0000000000000001a1 | 200 | get site |
+| PASS | GET | /v2/sites/650a1f0000000000000001a1/collections | 200 | list collections |
+| PASS | GET | /v2/collections/660b2a0000000000000002b1/items?limit=100&offset=0 | 200 | list items |
+| PASS | POST | /v2/collections/660b2a0000000000000002b1/items | 202 | create item |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**GET list sites** — `/v2/sites` (status 200)
+
+```
+{
+  "sites": [
+    {
+      "id": "650a1f0000000000000001a1",
+      "workspaceId": "ws_000001",
+      "displayName": "Northwind Studio",
+      "shortName": "northwind-studio",
+      "previewUrl": "https://northwind-studio.webflow.io",
+      "timeZone": "America/New_York",
+      "createdOn": "2026-01-15T10:00:00.000Z",
+      "lastPublished": "2026-05-20T14:30:00.000Z",
+      "customDomains": [
+        {
+          "id": "6264cfb069e0320f",
+          "url": "www.northwind.example.com"
+        }
+      ]
+    },
+    {
+      "id": "650a1f0000000000000001a2",
+      "workspaceId": "ws_000001",
+      "di
+... (truncated)
+```
+
+**GET get site** — `/v2/sites/650a1f0000000000000001a1` (status 200)
+
+```
+{
+  "id": "650a1f0000000000000001a1",
+  "workspaceId": "ws_000001",
+  "displayName": "Northwind Studio",
+  "shortName": "northwind-studio",
+  "previewUrl": "https://northwind-studio.webflow.io",
+  "timeZone": "America/New_York",
+  "createdOn": "2026-01-15T10:00:00.000Z",
+  "lastPublished": "2026-05-20T14:30:00.000Z",
+  "customDomains": [
+    {
+      "id": "66505d231799e2ca",
+      "url": "www.northwind.example.com"
+    }
+  ]
+}
+```
+
+**GET list collections** — `/v2/sites/650a1f0000000000000001a1/collections` (status 200)
+
+```
+{
+  "collections": [
+    {
+      "id": "660b2a0000000000000002b1",
+      "siteId": "650a1f0000000000000001a1",
+      "displayName": "Blog Posts",
+      "singularName": "Blog Post",
+      "slug": "blog-posts",
+      "createdOn": "2026-01-16T10:30:00.000Z",
+      "lastUpdated": "2026-05-19T12:00:00.000Z"
+    },
+    {
+      "id": "660b2a0000000000000002b2",
+      "siteId": "650a1f0000000000000001a1",
+      "displayName": "Authors",
+      "singularName": "Author",
+      "slug": "authors",
+      "createdOn": "2026-01-16T10:35:00.000Z",
+      "lastUpdated": "2026-05-10T09:00:00.000Z"
+    }
+  ]
+}
+```
+
+**GET list items** — `/v2/collections/660b2a0000000000000002b1/items?limit=100&offset=0` (status 200)
+
+```
+{
+  "items": [
+    {
+      "id": "770c3b0000000000000003c1",
+      "cmsLocaleId": null,
+      "lastPublished": null,
+      "lastUpdated": "2026-05-02T09:00:00.000Z",
+      "createdOn": "2026-05-02T08:00:00.000Z",
+      "isArchived": false,
+      "isDraft": false,
+      "fieldData": {
+        "name": "Shipping Faster With Edge Caching",
+        "slug": "shipping-faster-with-edge-caching",
+        "summary": "How we cut TTFB by 40 percent."
+      }
+    },
+    {
+      "id": "770c3b0000000000000003c2",
+      "cmsLocaleId": null,
+      "lastPublished": null,
+      "lastUpdated": "2026-05-09T12:15:0
+... (truncated)
+```
+
+**POST create item** — `/v2/collections/660b2a0000000000000002b1/items` (status 202)
+
+```
+{
+  "id": "b9c87f8cb73793b2e03832ec",
+  "cmsLocaleId": null,
+  "lastPublished": null,
+  "lastUpdated": "2026-06-09T11:42:50.000Z",
+  "createdOn": "2026-06-09T11:42:50.000Z",
+  "isArchived": false,
+  "isDraft": false,
+  "fieldData": {
+    "name": "Caching at the Edge, Part 2",
+    "slug": "caching-at-the-edge-part-2",
+    "summary": "Follow-up on edge cache invalidation."
+  }
+}
 ```
 
 </details>
@@ -21463,7 +29769,7 @@ _(empty)_
 {
   "messages": [
     {
-      "id": "wamid.117C4655FA4C40CAB9F75736",
+      "id": "wamid.449283093A9342F68C290E85",
       "message_status": "accepted"
     }
   ]
@@ -21476,7 +29782,7 @@ _(empty)_
 {
   "messages": [
     {
-      "id": "wamid.6EE86A6462C44B72BF797C93",
+      "id": "wamid.A2570F4BE0A049F38638FE20",
       "message_status": "accepted"
     }
   ]
@@ -21490,6 +29796,868 @@ _(empty)_
   "success": true,
   "message_id": "msg-001"
 }
+```
+
+</details>
+
+### woocommerce-api (port 8085) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | GET | /wp-json/wc/v3/products?per_page=5&page=1 | 200 | list products |
+| PASS | GET | /wp-json/wc/v3/products?search=mug | 200 | search products |
+| PASS | GET | /wp-json/wc/v3/products/201 | 200 | get product |
+| PASS | GET | /wp-json/wc/v3/orders?customer=301 | 200 | list orders |
+| PASS | GET | /wp-json/wc/v3/orders/401 | 200 | get order |
+| PASS | POST | /wp-json/wc/v3/orders | 200 | create order |
+| PASS | GET | /wp-json/wc/v3/customers?email=emma | 200 | list customers |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**GET list products** — `/wp-json/wc/v3/products?per_page=5&page=1` (status 200)
+
+```
+[
+  {
+    "id": 201,
+    "name": "Handcrafted Ceramic Mug",
+    "slug": "handcrafted-ceramic-mug",
+    "sku": "WC-MUG-201",
+    "type": "simple",
+    "status": "publish",
+    "price": "18.00",
+    "regular_price": "22.00",
+    "sale_price": "18.00",
+    "on_sale": true,
+    "stock_quantity": 150,
+    "stock_status": "instock",
+    "manage_stock": true,
+    "categories": [
+      {
+        "name": "Kitchen",
+        "slug": "kitchen"
+      },
+      {
+        "name": "Drinkware",
+        "slug": "drinkware"
+      }
+    ],
+    "description": "Stoneware mug glazed by hand",
+    "date_created": "202
+... (truncated)
+```
+
+**GET search products** — `/wp-json/wc/v3/products?search=mug` (status 200)
+
+```
+[
+  {
+    "id": 201,
+    "name": "Handcrafted Ceramic Mug",
+    "slug": "handcrafted-ceramic-mug",
+    "sku": "WC-MUG-201",
+    "type": "simple",
+    "status": "publish",
+    "price": "18.00",
+    "regular_price": "22.00",
+    "sale_price": "18.00",
+    "on_sale": true,
+    "stock_quantity": 150,
+    "stock_status": "instock",
+    "manage_stock": true,
+    "categories": [
+      {
+        "name": "Kitchen",
+        "slug": "kitchen"
+      },
+      {
+        "name": "Drinkware",
+        "slug": "drinkware"
+      }
+    ],
+    "description": "Stoneware mug glazed by hand",
+    "date_created": "202
+```
+
+**GET get product** — `/wp-json/wc/v3/products/201` (status 200)
+
+```
+{
+  "id": 201,
+  "name": "Handcrafted Ceramic Mug",
+  "slug": "handcrafted-ceramic-mug",
+  "sku": "WC-MUG-201",
+  "type": "simple",
+  "status": "publish",
+  "price": "18.00",
+  "regular_price": "22.00",
+  "sale_price": "18.00",
+  "on_sale": true,
+  "stock_quantity": 150,
+  "stock_status": "instock",
+  "manage_stock": true,
+  "categories": [
+    {
+      "name": "Kitchen",
+      "slug": "kitchen"
+    },
+    {
+      "name": "Drinkware",
+      "slug": "drinkware"
+    }
+  ],
+  "description": "Stoneware mug glazed by hand",
+  "date_created": "2026-01-08T09:00:00"
+}
+```
+
+**GET list orders** — `/wp-json/wc/v3/orders?customer=301` (status 200)
+
+```
+[
+  {
+    "id": 401,
+    "number": "401",
+    "customer_id": 301,
+    "status": "completed",
+    "currency": "USD",
+    "total": "40.00",
+    "subtotal": "36.00",
+    "total_tax": "4.00",
+    "payment_method": "stripe",
+    "payment_method_title": "Credit Card (Stripe)",
+    "billing": {
+      "first_name": "Emma",
+      "last_name": "Wright",
+      "email": "emma.wright@example.com"
+    },
+    "date_created": "2026-04-03T10:05:00"
+  },
+  {
+    "id": 406,
+    "number": "406",
+    "customer_id": 301,
+    "status": "refunded",
+    "currency": "USD",
+    "total": "42.00",
+    "subtotal": "38.18",
+... (truncated)
+```
+
+**GET get order** — `/wp-json/wc/v3/orders/401` (status 200)
+
+```
+{
+  "id": 401,
+  "number": "401",
+  "customer_id": 301,
+  "status": "completed",
+  "currency": "USD",
+  "total": "40.00",
+  "subtotal": "36.00",
+  "total_tax": "4.00",
+  "payment_method": "stripe",
+  "payment_method_title": "Credit Card (Stripe)",
+  "billing": {
+    "first_name": "Emma",
+    "last_name": "Wright",
+    "email": "emma.wright@example.com"
+  },
+  "date_created": "2026-04-03T10:05:00"
+}
+```
+
+**POST create order** — `/wp-json/wc/v3/orders` (status 200)
+
+```
+{
+  "id": 407,
+  "number": "407",
+  "customer_id": 302,
+  "status": "pending",
+  "currency": "USD",
+  "total": "75.90",
+  "subtotal": "69.00",
+  "total_tax": "6.90",
+  "payment_method": "stripe",
+  "payment_method_title": "Credit Card (Stripe)",
+  "billing": {
+    "first_name": "Noah",
+    "last_name": "Kim",
+    "email": "noah.kim@example.com"
+  },
+  "date_created": "2026-05-28T00:00:00"
+}
+```
+
+**GET list customers** — `/wp-json/wc/v3/customers?email=emma` (status 200)
+
+```
+[
+  {
+    "id": 301,
+    "first_name": "Emma",
+    "last_name": "Wright",
+    "email": "emma.wright@example.com",
+    "username": "emmaw",
+    "role": "customer",
+    "billing": {
+      "city": "Portland",
+      "country": "US"
+    },
+    "is_paying_customer": true,
+    "date_created": "2026-01-03T10:00:00"
+  }
+]
+```
+
+</details>
+
+### wordpress-api (port 8065) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | GET | /wp-json/wp/v2/posts?per_page=5 | 200 | list posts |
+| PASS | GET | /wp-json/wp/v2/posts?categories=11 | 200 | list posts by category |
+| PASS | GET | /wp-json/wp/v2/posts/101 | 200 | get post |
+| PASS | POST | /wp-json/wp/v2/posts | 201 | create post |
+| PASS | PUT | /wp-json/wp/v2/posts/106 | 200 | update post |
+| PASS | DELETE | /wp-json/wp/v2/posts/108 | 200 | delete post |
+| PASS | GET | /wp-json/wp/v2/pages | 200 | list pages |
+| PASS | GET | /wp-json/wp/v2/categories | 200 | list categories |
+| PASS | GET | /wp-json/wp/v2/tags | 200 | list tags |
+| PASS | GET | /wp-json/wp/v2/comments?post=101 | 200 | list comments for post |
+| PASS | POST | /wp-json/wp/v2/comments | 201 | create comment |
+| PASS | GET | /wp-json/wp/v2/media | 200 | list media |
+| PASS | GET | /wp-json/wp/v2/users | 200 | list users |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**GET list posts** — `/wp-json/wp/v2/posts?per_page=5` (status 200)
+
+```
+[
+  {
+    "id": 107,
+    "title": {
+      "rendered": "Hiring senior backend engineers"
+    },
+    "slug": "hiring-backend-engineers",
+    "status": "publish",
+    "author": 1,
+    "content": {
+      "rendered": "We are growing the platform team. Remote-friendly roles across EU and US time zones."
+    },
+    "excerpt": {
+      "rendered": "Join the platform team."
+    },
+    "categories": [
+      13
+    ],
+    "tags": [],
+    "comment_status": "open",
+    "date": "2026-05-24T16:00:00",
+    "modified": "2026-05-24T16:00:00",
+    "type": "post"
+  },
+  {
+    "id": 105,
+    "title": {
+      "rende
+... (truncated)
+```
+
+**GET list posts by category** — `/wp-json/wp/v2/posts?categories=11` (status 200)
+
+```
+[
+  {
+    "id": 102,
+    "title": {
+      "rendered": "Event-driven cleanup beats cron"
+    },
+    "slug": "event-driven-cleanup",
+    "status": "publish",
+    "author": 2,
+    "content": {
+      "rendered": "Replacing our cron-based reaper with an event-driven pipeline flattened our memory graphs."
+    },
+    "excerpt": {
+      "rendered": "Why we ditched cron for events."
+    },
+    "categories": [
+      10,
+      11
+    ],
+    "tags": [
+      22,
+      25
+    ],
+    "comment_status": "open",
+    "date": "2026-05-22T09:00:00",
+    "modified": "2026-05-22T09:10:00",
+    "type": "post"
+  },
+  
+... (truncated)
+```
+
+**GET get post** — `/wp-json/wp/v2/posts/101` (status 200)
+
+```
+{
+  "id": 101,
+  "title": {
+    "rendered": "Cutting session-store latency by 40 percent"
+  },
+  "slug": "cutting-session-store-latency",
+  "status": "publish",
+  "author": 1,
+  "content": {
+    "rendered": "We traced our p95 latency to a missing index. Here is how we found it and what we changed."
+  },
+  "excerpt": {
+    "rendered": "A deep dive into a sneaky indexing bug."
+  },
+  "categories": [
+    10,
+    11
+  ],
+  "tags": [
+    20,
+    25
+  ],
+  "comment_status": "open",
+  "date": "2026-05-20T15:00:00",
+  "modified": "2026-05-20T15:30:00",
+  "type": "post"
+}
+```
+
+**POST create post** — `/wp-json/wp/v2/posts` (status 201)
+
+```
+{
+  "id": 109,
+  "title": {
+    "rendered": "Postmortem: the cache stampede"
+  },
+  "slug": "postmortem:-the-cache-stampede",
+  "status": "publish",
+  "author": 2,
+  "content": {
+    "rendered": "What happened and how we fixed it."
+  },
+  "excerpt": {
+    "rendered": ""
+  },
+  "categories": [
+    10,
+    11
+  ],
+  "tags": [
+    25
+  ],
+  "comment_status": "open",
+  "date": "2026-06-09T11:42:52",
+  "modified": "2026-06-09T11:42:52",
+  "type": "post"
+}
+```
+
+**PUT update post** — `/wp-json/wp/v2/posts/106` (status 200)
+
+```
+{
+  "id": 106,
+  "title": {
+    "rendered": "Rethinking our on-call rotation"
+  },
+  "slug": "rethinking-oncall-rotation",
+  "status": "publish",
+  "author": 2,
+  "content": {
+    "rendered": "Early notes on a follow-the-sun on-call model. Not ready to publish yet."
+  },
+  "excerpt": {
+    "rendered": "Work in progress."
+  },
+  "categories": [
+    11
+  ],
+  "tags": [
+    22
+  ],
+  "comment_status": "closed",
+  "date": "2026-05-25T08:00:00",
+  "modified": "2026-06-09T11:42:52",
+  "type": "post"
+}
+```
+
+**DELETE delete post** — `/wp-json/wp/v2/posts/108` (status 200)
+
+```
+{
+  "deleted": true,
+  "previous": {
+    "id": 108,
+    "title": {
+      "rendered": "Draft: observability that measures health"
+    },
+    "slug": "observability-measures-health",
+    "status": "draft",
+    "author": 3,
+    "content": {
+      "rendered": "Most dashboards measure activity, not health. Draft on SLO-first observability."
+    },
+    "excerpt": {
+      "rendered": "SLO-first observability draft."
+    },
+    "categories": [
+      11
+    ],
+    "tags": [
+      25
+    ],
+    "comment_status": "open",
+    "date": "2026-05-26T09:00:00",
+    "modified": "2026-05-26T09:30:00",
+    "type"
+```
+
+**GET list pages** — `/wp-json/wp/v2/pages` (status 200)
+
+```
+[
+  {
+    "id": 204,
+    "title": {
+      "rendered": "Engineering Team"
+    },
+    "slug": "engineering-team",
+    "status": "publish",
+    "author": 1,
+    "content": {
+      "rendered": "Meet the people behind the platform."
+    },
+    "date": "2025-02-01T11:00:00",
+    "modified": "2025-05-20T11:00:00",
+    "parent": 201,
+    "type": "page"
+  },
+  {
+    "id": 203,
+    "title": {
+      "rendered": "Privacy Policy"
+    },
+    "slug": "privacy-policy",
+    "status": "publish",
+    "author": 1,
+    "content": {
+      "rendered": "How we handle your data on this blog. Short version: minimally."
+... (truncated)
+```
+
+**GET list categories** — `/wp-json/wp/v2/categories` (status 200)
+
+```
+[
+  {
+    "id": 10,
+    "name": "Engineering",
+    "slug": "engineering",
+    "description": "Posts about how we build software.",
+    "parent": 0,
+    "count": 4,
+    "taxonomy": "category"
+  },
+  {
+    "id": 11,
+    "name": "Reliability",
+    "slug": "reliability",
+    "description": "On-call, incidents, and SLOs.",
+    "parent": 10,
+    "count": 2,
+    "taxonomy": "category"
+  },
+  {
+    "id": 12,
+    "name": "Frontend",
+    "slug": "frontend",
+    "description": "UI, design systems, and accessibility.",
+    "parent": 10,
+    "count": 1,
+    "taxonomy": "category"
+  },
+  {
+    "id": 13,
+   
+... (truncated)
+```
+
+**GET list tags** — `/wp-json/wp/v2/tags` (status 200)
+
+```
+[
+  {
+    "id": 20,
+    "name": "python",
+    "slug": "python",
+    "description": "Posts mentioning Python.",
+    "count": 3,
+    "taxonomy": "post_tag"
+  },
+  {
+    "id": 21,
+    "name": "rust",
+    "slug": "rust",
+    "description": "Posts mentioning Rust.",
+    "count": 1,
+    "taxonomy": "post_tag"
+  },
+  {
+    "id": 22,
+    "name": "kubernetes",
+    "slug": "kubernetes",
+    "description": "Container orchestration.",
+    "count": 2,
+    "taxonomy": "post_tag"
+  },
+  {
+    "id": 23,
+    "name": "accessibility",
+    "slug": "accessibility",
+    "description": "Inclusive design and a11y.",
+
+... (truncated)
+```
+
+**GET list comments for post** — `/wp-json/wp/v2/comments?post=101` (status 200)
+
+```
+[
+  {
+    "id": 301,
+    "post": 101,
+    "author_name": "Dana Li",
+    "author_email": "dana.li@example.com",
+    "content": {
+      "rendered": "Great write-up. The missing index gotcha bites everyone eventually."
+    },
+    "status": "approved",
+    "date": "2026-05-20T16:10:00",
+    "parent": 0
+  },
+  {
+    "id": 302,
+    "post": 101,
+    "author_name": "Marco Ferri",
+    "author_email": "marco.ferri@example.com",
+    "content": {
+      "rendered": "Did you consider a partial index instead?"
+    },
+    "status": "approved",
+    "date": "2026-05-20T17:00:00",
+    "parent": 0
+  },
+  {
+    "i
+... (truncated)
+```
+
+**POST create comment** — `/wp-json/wp/v2/comments` (status 201)
+
+```
+{
+  "id": 308,
+  "post": 104,
+  "author_name": "Reader One",
+  "author_email": "reader@example.com",
+  "content": {
+    "rendered": "Excited to try the new plugin system!"
+  },
+  "status": "approved",
+  "date": "2026-06-09T11:42:52",
+  "parent": 0
+}
+```
+
+**GET list media** — `/wp-json/wp/v2/media` (status 200)
+
+```
+[
+  {
+    "id": 401,
+    "title": {
+      "rendered": "latency-graph"
+    },
+    "slug": "latency-graph",
+    "media_type": "image",
+    "mime_type": "image/png",
+    "source_url": "https://cdn.example.com/uploads/latency-graph.png",
+    "alt_text": "Graph showing p95 latency dropping",
+    "author": 1,
+    "post": 101,
+    "date": "2026-05-20T14:50:00",
+    "type": "attachment"
+  },
+  {
+    "id": 402,
+    "title": {
+      "rendered": "memory-flat"
+    },
+    "slug": "memory-flat",
+    "media_type": "image",
+    "mime_type": "image/png",
+    "source_url": "https://cdn.example.com/uploads/memor
+... (truncated)
+```
+
+**GET list users** — `/wp-json/wp/v2/users` (status 200)
+
+```
+[
+  {
+    "id": 1,
+    "name": "Amelia Ortega",
+    "slug": "amelia-ortega",
+    "description": "Editor in chief and platform lead.",
+    "url": "https://blog.example.com/author/amelia",
+    "roles": [
+      "administrator"
+    ],
+    "avatar_urls": {
+      "96": "https://gravatar.example.com/amelia.png"
+    }
+  },
+  {
+    "id": 2,
+    "name": "Jonas Pereira",
+    "slug": "jonas-pereira",
+    "description": "Infrastructure writer and SRE.",
+    "url": "https://blog.example.com/author/jonas",
+    "roles": [
+      "editor"
+    ],
+    "avatar_urls": {
+      "96": "https://gravatar.example.com/jon
+... (truncated)
+```
+
+</details>
+
+### xero-api (port 8088) — server: started
+
+| Result | Method | Path | Status | Endpoint |
+|--------|--------|------|--------|----------|
+| PASS | GET | /health | 200 | health |
+| PASS | GET | /api.xro/2.0/Invoices | 200 | list invoices |
+| PASS | GET | /api.xro/2.0/Invoices?Status=AUTHORISED | 200 | list authorised invoices |
+| PASS | GET | /api.xro/2.0/Invoices/i0000001-0000-0000-0000-000000000001 | 200 | get invoice |
+| PASS | POST | /api.xro/2.0/Invoices | 200 | create invoice |
+| PASS | GET | /api.xro/2.0/Contacts | 200 | list contacts |
+| PASS | GET | /api.xro/2.0/Accounts | 200 | list accounts |
+
+<details><summary>responses</summary>
+
+**GET health** — `/health` (status 200)
+
+```
+{
+  "status": "ok"
+}
+```
+
+**GET list invoices** — `/api.xro/2.0/Invoices` (status 200)
+
+```
+{
+  "Invoices": [
+    {
+      "InvoiceID": "i0000001-0000-0000-0000-000000000001",
+      "InvoiceNumber": "INV-2041",
+      "Type": "ACCREC",
+      "Contact": {
+        "ContactID": "c0000001-0000-0000-0000-000000000001",
+        "Name": "Vandelay Industries"
+      },
+      "Date": "2026-04-20",
+      "DueDate": "2026-05-05",
+      "Status": "AUTHORISED",
+      "LineAmountTypes": "Exclusive",
+      "SubTotal": 4500.0,
+      "TotalTax": 450.0,
+      "Total": 4950.0,
+      "AmountDue": 4950.0,
+      "AmountPaid": 0.0,
+      "CurrencyCode": "USD",
+      "Reference": "April retainer"
+    },
+    {
+
+... (truncated)
+```
+
+**GET list authorised invoices** — `/api.xro/2.0/Invoices?Status=AUTHORISED` (status 200)
+
+```
+{
+  "Invoices": [
+    {
+      "InvoiceID": "i0000001-0000-0000-0000-000000000001",
+      "InvoiceNumber": "INV-2041",
+      "Type": "ACCREC",
+      "Contact": {
+        "ContactID": "c0000001-0000-0000-0000-000000000001",
+        "Name": "Vandelay Industries"
+      },
+      "Date": "2026-04-20",
+      "DueDate": "2026-05-05",
+      "Status": "AUTHORISED",
+      "LineAmountTypes": "Exclusive",
+      "SubTotal": 4500.0,
+      "TotalTax": 450.0,
+      "Total": 4950.0,
+      "AmountDue": 4950.0,
+      "AmountPaid": 0.0,
+      "CurrencyCode": "USD",
+      "Reference": "April retainer"
+    },
+    {
+
+... (truncated)
+```
+
+**GET get invoice** — `/api.xro/2.0/Invoices/i0000001-0000-0000-0000-000000000001` (status 200)
+
+```
+{
+  "Invoices": [
+    {
+      "InvoiceID": "i0000001-0000-0000-0000-000000000001",
+      "InvoiceNumber": "INV-2041",
+      "Type": "ACCREC",
+      "Contact": {
+        "ContactID": "c0000001-0000-0000-0000-000000000001",
+        "Name": "Vandelay Industries"
+      },
+      "Date": "2026-04-20",
+      "DueDate": "2026-05-05",
+      "Status": "AUTHORISED",
+      "LineAmountTypes": "Exclusive",
+      "SubTotal": 4500.0,
+      "TotalTax": 450.0,
+      "Total": 4950.0,
+      "AmountDue": 4950.0,
+      "AmountPaid": 0.0,
+      "CurrencyCode": "USD",
+      "Reference": "April retainer"
+    }
+  ]
+}
+```
+
+**POST create invoice** — `/api.xro/2.0/Invoices` (status 200)
+
+```
+{
+  "Invoices": [
+    {
+      "InvoiceID": "26e207fc-4e5f-41cf-9ec5-3069838b477c",
+      "InvoiceNumber": "INV-2053",
+      "Type": "ACCREC",
+      "Contact": {
+        "ContactID": "c0000003-0000-0000-0000-000000000003",
+        "Name": "Globex Corporation"
+      },
+      "Date": "2026-05-28",
+      "DueDate": "2026-06-27",
+      "Status": "DRAFT",
+      "LineAmountTypes": "Exclusive",
+      "SubTotal": 1500.0,
+      "TotalTax": 150.0,
+      "Total": 1650.0,
+      "AmountDue": 1650.0,
+      "AmountPaid": 0.0,
+      "CurrencyCode": "USD",
+      "Reference": "New project"
+    }
+  ]
+}
+```
+
+**GET list contacts** — `/api.xro/2.0/Contacts` (status 200)
+
+```
+{
+  "Contacts": [
+    {
+      "ContactID": "c0000001-0000-0000-0000-000000000001",
+      "Name": "Vandelay Industries",
+      "FirstName": "Omar",
+      "LastName": "Haddad",
+      "EmailAddress": "ap@vandelay.com",
+      "IsCustomer": true,
+      "IsSupplier": false,
+      "ContactStatus": "ACTIVE",
+      "AccountNumber": "VAND-001"
+    },
+    {
+      "ContactID": "c0000002-0000-0000-0000-000000000002",
+      "Name": "Initech LLC",
+      "FirstName": "Bill",
+      "LastName": "Lumbergh",
+      "EmailAddress": "accounts@initech.com",
+      "IsCustomer": true,
+      "IsSupplier": false,
+      "
+... (truncated)
+```
+
+**GET list accounts** — `/api.xro/2.0/Accounts` (status 200)
+
+```
+{
+  "Accounts": [
+    {
+      "AccountID": "a0000001-0000-0000-0000-000000000001",
+      "Code": "200",
+      "Name": "Sales",
+      "Type": "REVENUE",
+      "TaxType": "OUTPUT",
+      "Status": "ACTIVE",
+      "Description": "Income from any normal business activity",
+      "EnablePaymentsToAccount": false
+    },
+    {
+      "AccountID": "a0000002-0000-0000-0000-000000000002",
+      "Code": "260",
+      "Name": "Other Revenue",
+      "Type": "REVENUE",
+      "TaxType": "OUTPUT",
+      "Status": "ACTIVE",
+      "Description": "Any other income that does not relate to normal business",
+      "E
+... (truncated)
 ```
 
 </details>
@@ -21633,15 +30801,16 @@ _(empty)_
       "id": "rev-0000000005",
       "business_id": "biz-tartine-0002",
       "rating": 5,
-      "text": "Best bakery in the city",
-      "time_created": "Jonas R",
+      "text": "Best bakery in the city, hands down.",
+      "time_created": "2026-03-30T07:50:00",
       "user": {
-        "name": " hands down."
+        "name": "Jonas R"
       }
     },
     {
       "id": "rev-0000000006",
-      "business_id": "biz-tartine-0
+      "business
+... (truncated)
 ```
 
 **GET list categories** — `/v3/categories` (status 200)
@@ -21966,7 +31135,7 @@ _(empty)_
     {
       "id": "PL_011",
       "snippet": {
-        "publishedAt": "2026-05-28T08:09:33Z",
+        "publishedAt": "2026-06-09T11:42:54Z",
         "channelId": "UC_EquineHealthChannel",
         "title": "AI & Machine Learning",
         "description": "Tutorials on AI, ML, and LLMs for developers",
@@ -22062,9 +31231,9 @@ _(empty)_
   "kind": "youtube#playlistItem",
   "items": [
     {
-      "id": "PLI_026",
+      "id": "PLI_040",
       "snippet": {
-        "publishedAt": "2026-05-28T08:09:33Z",
+        "publishedAt": "2026-06-09T11:42:54Z",
         "channelId": "UC_EquineHealthChannel",
         "title": "Equine Eye Emergencies - Do Not Wait on These",
         "playlistId": "PL_001",
@@ -22235,8 +31404,8 @@ _(empty)_
         "textDisplay": "Thanks for asking! I used Next.js with the app router.",
         "textOriginal": "Thanks for asking! I used Next.js with the app router.",
         "likeCount": 0,
-        "publishedAt": "2026-05-28T08:09:33Z",
-        "updatedAt": "2026-05-28T08:09:33Z",
+        "publishedAt": "2026-06-09T11:42:54Z",
+        "updatedAt": "2026-06-09T11:42:54Z",
         "videoId": "vid_001",
         "parentId": "cmt_0
 ```
@@ -22611,8 +31780,8 @@ _(empty)_
     "assignee_id": null,
     "organization_id": null,
     "tags": [],
-    "created_at": "2026-05-28T08:09:33Z",
-    "updated_at": "2026-05-28T08:09:33Z"
+    "created_at": "2026-06-09T11:42:54Z",
+    "updated_at": "2026-06-09T11:42:54Z"
   }
 }
 ```
@@ -22636,7 +31805,7 @@ _(empty)_
       "rate-limit"
     ],
     "created_at": "2026-05-24T10:00:00Z",
-    "updated_at": "2026-05-28T08:09:33Z"
+    "updated_at": "2026-06-09T11:42:54Z"
   }
 }
 ```
@@ -22676,12 +31845,12 @@ _(empty)_
 ```
 {
   "comment": {
-    "id": 813,
+    "id": 811,
     "ticket_id": 701,
     "author_id": 602,
     "body": "We shipped a firmware fix; please update and retry.",
     "public": true,
-    "created_at": "2026-05-28T08:09:33Z"
+    "created_at": "2026-06-09T11:42:54Z"
   }
 }
 ```
@@ -22883,7 +32052,8 @@ _(empty)_
       "event": "Sold",
       "price": 1280000.0,
       "price_per_sqft": 451.0,
-      "source": "County"
+      "source": "County",
+      "_pk": "84120001#1"
     },
     {
       "zpid": 84120001,
@@ -22891,10 +32061,7 @@ _(empty)_
       "event": "Sold",
       "price": 725000.0,
       "price_per_sqft": 255.0,
-      "source": "County"
-    }
-  ]
-}
+      "source": 
 ```
 
 **GET list agents** — `/v1/agents?city=Bellevue` (status 200)
@@ -22990,7 +32157,7 @@ _(empty)_
 
 ```
 {
-  "search_id": "search-c5457fb0",
+  "search_id": "search-f1f91a25",
   "user_id": "user-buyer-001",
   "name": "Sammamish family",
   "city": "Sammamish",
@@ -23000,7 +32167,7 @@ _(empty)_
   "min_beds": 4,
   "min_baths": 0.0,
   "home_type": "SingleFamily",
-  "created_at": "2026-05-28"
+  "created_at": "2026-06-09"
 }
 ```
 
@@ -23123,7 +32290,7 @@ _(empty)_
 
 ```
 {
-  "id": 81555123290,
+  "id": 82993532313,
   "host_id": "u-amelia-9f4b2e8d",
   "topic": "Incident Postmortem",
   "type": 2,
@@ -23132,8 +32299,8 @@ _(empty)_
   "duration": 50,
   "timezone": "America/Los_Angeles",
   "agenda": "Review the 5/26 outage",
-  "join_url": "https://zoom.us/j/81555123290",
-  "created_at": "2026-05-28T08:09:35Z"
+  "join_url": "https://zoom.us/j/82993532313",
+  "created_at": "2026-06-09T11:42:55Z"
 }
 ```
 
@@ -23165,9 +32332,9 @@ _(empty)_
   "type": 2,
   "status": "waiting",
   "start_time": "2026-05-29T16:00:00Z",
-  "duration": 75,
+  "duration": 60,
   "timezone": "America/Los_Angeles",
-  "agenda": "Extended sync",
+  "agenda": "Sprint progress and blockers",
   "join_url": "https://zoom.us/j/85012345678",
   "created_at": "2026-05-20T10:00:00Z"
 }

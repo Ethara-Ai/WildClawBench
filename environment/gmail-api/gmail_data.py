@@ -12,17 +12,17 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, strict_bool, strict_int)
+    read_json_with_ctx, get_store, opt_csv_list, strict_bool, strict_int)
 
 _store = get_store("gmail-api")
 _API = "gmail-api"
 
 _store.register("labels", primary_key="id",
-                initial_loader=lambda: _coerce_labels(_load("labels.csv", "labels")))
+                initial_loader=lambda: _coerce_labels(_load("labels.json", "labels")))
 _store.register("messages", primary_key="id",
-                initial_loader=lambda: _coerce_messages(_load("messages.csv", "messages")))
+                initial_loader=lambda: _coerce_messages(_load("messages.json", "messages")))
 _store.register("drafts", primary_key="id",
-                initial_loader=lambda: _coerce_drafts(_load("drafts.csv", "drafts")))
+                initial_loader=lambda: _coerce_drafts(_load("drafts.json", "drafts")))
 _store.register_document("profile", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "profile.json", encoding="utf-8")))
 
 
@@ -44,7 +44,7 @@ def _profile_doc():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

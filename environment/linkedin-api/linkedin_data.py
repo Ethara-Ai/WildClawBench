@@ -11,19 +11,19 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, strict_int)
+    read_json_with_ctx, get_store, opt_csv_list, strict_int)
 
 _store = get_store("linkedin-api")
 _API = "linkedin-api"
 
 _store.register("posts", primary_key="id",
-                initial_loader=lambda: _coerce_posts(_load("posts.csv", "posts")))
+                initial_loader=lambda: _coerce_posts(_load("posts.json", "posts")))
 _store.register("organizations", primary_key="id",
-                initial_loader=lambda: _coerce_orgs(_load("organizations.csv", "organizations")))
+                initial_loader=lambda: _coerce_orgs(_load("organizations.json", "organizations")))
 _store.register("jobs", primary_key="id",
-                initial_loader=lambda: _coerce_jobs(_load("jobs.csv", "jobs")))
+                initial_loader=lambda: _coerce_jobs(_load("jobs.json", "jobs")))
 _store.register("connections", primary_key="id",
-                initial_loader=lambda: [_strip_ctx(r) for r in _load("connections.csv", "connections")])
+                initial_loader=lambda: [_strip_ctx(r) for r in _load("connections.json", "connections")])
 _store.register_document("profile", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "profile.json", encoding="utf-8")))
 
 
@@ -49,7 +49,7 @@ def _profile_doc():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

@@ -9,21 +9,21 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, opt_float, opt_str, strict_bool)
+    read_json_with_ctx, get_store, opt_csv_list, opt_float, opt_str, strict_bool)
 
 _store = get_store("trello-api")
 _API = "trello-api"
 
 _store.register("members", primary_key="id",
-                initial_loader=lambda: _coerce_members(_load("members.csv", "members")))
+                initial_loader=lambda: _coerce_members(_load("members.json", "members")))
 _store.register("boards", primary_key="id",
-                initial_loader=lambda: _coerce_boards(_load("boards.csv", "boards")))
+                initial_loader=lambda: _coerce_boards(_load("boards.json", "boards")))
 _store.register("lists", primary_key="id",
-                initial_loader=lambda: _coerce_lists(_load("lists.csv", "lists")))
+                initial_loader=lambda: _coerce_lists(_load("lists.json", "lists")))
 _store.register("cards", primary_key="id",
-                initial_loader=lambda: _coerce_cards(_load("cards.csv", "cards")))
+                initial_loader=lambda: _coerce_cards(_load("cards.json", "cards")))
 _store.register("checklists", primary_key="id",
-                initial_loader=lambda: _coerce_checklists(_load("checklists.csv", "checklists")))
+                initial_loader=lambda: _coerce_checklists(_load("checklists.json", "checklists")))
 
 
 def _members_rows():
@@ -48,7 +48,7 @@ def _checklists_rows():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

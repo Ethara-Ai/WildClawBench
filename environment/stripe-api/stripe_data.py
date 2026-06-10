@@ -15,23 +15,23 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_int, opt_str, strict_bool)
+    read_json_with_ctx, get_store, opt_int, opt_str, strict_bool)
 
 _store = get_store("stripe-api")
 _API = "stripe-api"
 
 _store.register("customers", primary_key="id",
-                initial_loader=lambda: _coerce_customers(_load("customers.csv", "customers")))
+                initial_loader=lambda: _coerce_customers(_load("customers.json", "customers")))
 _store.register("products", primary_key="id",
-                initial_loader=lambda: _coerce_products(_load("products.csv", "products")))
+                initial_loader=lambda: _coerce_products(_load("products.json", "products")))
 _store.register("prices", primary_key="id",
-                initial_loader=lambda: _coerce_prices(_load("prices.csv", "prices")))
+                initial_loader=lambda: _coerce_prices(_load("prices.json", "prices")))
 _store.register("charges", primary_key="id",
-                initial_loader=lambda: _coerce_charges(_load("charges.csv", "charges")))
+                initial_loader=lambda: _coerce_charges(_load("charges.json", "charges")))
 _store.register("invoices", primary_key="id",
-                initial_loader=lambda: _coerce_invoices(_load("invoices.csv", "invoices")))
+                initial_loader=lambda: _coerce_invoices(_load("invoices.json", "invoices")))
 _store.register("subscriptions", primary_key="id",
-                initial_loader=lambda: _coerce_subscriptions(_load("subscriptions.csv", "subscriptions")))
+                initial_loader=lambda: _coerce_subscriptions(_load("subscriptions.json", "subscriptions")))
 _store.register_document("balance", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "balance.json", encoding="utf-8")))
 _store.register("payment_intents", primary_key="payment_intent_id",
                 initial_loader=lambda: [])
@@ -77,7 +77,7 @@ def _refunds_rows():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

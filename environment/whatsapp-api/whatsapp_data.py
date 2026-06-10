@@ -11,7 +11,7 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store,
+    read_json_with_ctx, get_store,
     strict_bool,
 )
 
@@ -19,13 +19,13 @@ _store = get_store("whatsapp-api")
 _API = "whatsapp-api"
 
 _store.register("contacts", primary_key="wa_id",
-                initial_loader=lambda: _coerce_contacts(_load("contacts.csv", "contacts")))
+                initial_loader=lambda: _coerce_contacts(_load("contacts.json", "contacts")))
 _store.register("conversations", primary_key="conversation_id",
-                initial_loader=lambda: _coerce_conversations(_load("conversations.csv", "conversations")))
+                initial_loader=lambda: _coerce_conversations(_load("conversations.json", "conversations")))
 _store.register("templates", primary_key="name",
-                initial_loader=lambda: [_strip_ctx(r) for r in _load("templates.csv", "templates")])
+                initial_loader=lambda: [_strip_ctx(r) for r in _load("templates.json", "templates")])
 _store.register("messages", primary_key="message_id",
-                initial_loader=lambda: [_strip_ctx(r) for r in _load("messages.csv", "messages")])
+                initial_loader=lambda: [_strip_ctx(r) for r in _load("messages.json", "messages")])
 _store.register_document("business", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "business.json", encoding="utf-8")))
 
 
@@ -51,7 +51,7 @@ def _business_doc():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

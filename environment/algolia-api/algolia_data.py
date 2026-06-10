@@ -14,14 +14,14 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, opt_int)
+    read_json_with_ctx, get_store, opt_csv_list, opt_int)
 
 _store = get_store("algolia-api")
 _API = "algolia-api"
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):
@@ -75,7 +75,7 @@ def _coerce_record(row):
     return out
 
 
-_indices_meta = [_strip_ctx(r) for r in _load("indices.csv", "indices")]
+_indices_meta = [_strip_ctx(r) for r in _load("indices.json", "indices")]
 
 
 def _records_table_name(index: str) -> str:
@@ -121,7 +121,7 @@ _store.register(
     "settings",
     primary_key="index",
     initial_loader=lambda: [
-        {"index": r["index"], **_coerce_settings(r)} for r in _load("settings.csv", "settings")
+        {"index": r["index"], **_coerce_settings(r)} for r in _load("settings.json", "settings")
     ],
 )
 

@@ -12,7 +12,7 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store,
+    read_json_with_ctx, get_store,
     strict_int,
     strict_float,
     strict_bool,
@@ -22,15 +22,15 @@ _store = get_store("nasa-api")
 _API = "nasa-api"
 
 _store.register("apod", primary_key="date",
-                initial_loader=lambda: _coerce_apod(_load("apod.csv", "apod")))
+                initial_loader=lambda: _coerce_apod(_load("apod.json", "apod")))
 _store.register("rover_photos", primary_key="id",
-                initial_loader=lambda: _coerce_rover_photos(_load("rover_photos.csv", "rover_photos")))
+                initial_loader=lambda: _coerce_rover_photos(_load("rover_photos.json", "rover_photos")))
 _store.register("rovers", primary_key="name",
-                initial_loader=lambda: _coerce_rovers(_load("rovers.csv", "rovers")))
+                initial_loader=lambda: _coerce_rovers(_load("rovers.json", "rovers")))
 _store.register("neos", primary_key="id",
-                initial_loader=lambda: _coerce_neos(_load("neos.csv", "neos")))
+                initial_loader=lambda: _coerce_neos(_load("neos.json", "neos")))
 _store.register("epic", primary_key="identifier",
-                initial_loader=lambda: _coerce_epic(_load("epic.csv", "epic")))
+                initial_loader=lambda: _coerce_epic(_load("epic.json", "epic")))
 
 
 def _apod_rows():
@@ -55,7 +55,7 @@ def _epic_rows():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

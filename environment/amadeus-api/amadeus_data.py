@@ -14,7 +14,7 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store,
+    read_json_with_ctx, get_store,
     strict_float,
 )
 
@@ -22,9 +22,9 @@ _store = get_store("amadeus-api")
 _API = "amadeus-api"
 
 _store.register("airports", primary_key="iata_code",
-                initial_loader=lambda: _coerce_airports(_load("airports.csv", "airports")))
+                initial_loader=lambda: _coerce_airports(_load("airports.json", "airports")))
 _store.register("airlines", primary_key="iata_code",
-                initial_loader=lambda: _coerce_airlines(_load("airlines.csv", "airlines")))
+                initial_loader=lambda: _coerce_airlines(_load("airlines.json", "airlines")))
 _store.register_document("offers", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "flight_offers.json", encoding="utf-8")))
 
 
@@ -42,7 +42,7 @@ def _offers_doc():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

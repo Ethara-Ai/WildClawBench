@@ -10,19 +10,19 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_str, strict_float, strict_int)
+    read_json_with_ctx, get_store, opt_str, strict_float, strict_int)
 
 _store = get_store("zillow-api")
 _API = "zillow-api"
 
 _store.register("properties", primary_key="zpid",
-                initial_loader=lambda: _coerce_properties(_load("properties.csv", "properties")))
+                initial_loader=lambda: _coerce_properties(_load("properties.json", "properties")))
 _store.register("price_history", primary_key="zpid",
-                initial_loader=lambda: _coerce_price_history(_load("price_history.csv", "price_history")))
+                initial_loader=lambda: _coerce_price_history(_load("price_history.json", "price_history")))
 _store.register("agents", primary_key="agent_id",
-                initial_loader=lambda: _coerce_agents(_load("agents.csv", "agents")))
+                initial_loader=lambda: _coerce_agents(_load("agents.json", "agents")))
 _store.register("saved_searches", primary_key="search_id",
-                initial_loader=lambda: _coerce_saved_searches(_load("saved_searches.csv", "saved_searches")))
+                initial_loader=lambda: _coerce_saved_searches(_load("saved_searches.json", "saved_searches")))
 
 
 def _properties_rows():
@@ -43,7 +43,7 @@ def _saved_searches_rows():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

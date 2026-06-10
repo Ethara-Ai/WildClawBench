@@ -11,21 +11,21 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, opt_str, strict_bool, strict_int)
+    read_json_with_ctx, get_store, opt_csv_list, opt_str, strict_bool, strict_int)
 
 _store = get_store("gitlab-api")
 _API = "gitlab-api"
 
 _store.register("projects", primary_key="id",
-                initial_loader=lambda: _coerce_projects(_load("projects.csv", "projects")))
+                initial_loader=lambda: _coerce_projects(_load("projects.json", "projects")))
 _store.register("issues", primary_key="id",
-                initial_loader=lambda: _coerce_issues(_load("issues.csv", "issues")))
+                initial_loader=lambda: _coerce_issues(_load("issues.json", "issues")))
 _store.register("merge_requests", primary_key="id",
-                initial_loader=lambda: _coerce_merge_requests(_load("merge_requests.csv", "merge_requests")))
+                initial_loader=lambda: _coerce_merge_requests(_load("merge_requests.json", "merge_requests")))
 _store.register("pipelines", primary_key="id",
-                initial_loader=lambda: _coerce_pipelines(_load("pipelines.csv", "pipelines")))
+                initial_loader=lambda: _coerce_pipelines(_load("pipelines.json", "pipelines")))
 _store.register("users", primary_key="id",
-                initial_loader=lambda: _coerce_users(_load("users.csv", "users")))
+                initial_loader=lambda: _coerce_users(_load("users.json", "users")))
 _store.register_document("current_user", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "current_user.json", encoding="utf-8")))
 
 
@@ -55,7 +55,7 @@ def _current_user_doc():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

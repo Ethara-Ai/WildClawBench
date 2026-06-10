@@ -12,7 +12,7 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store,
+    read_json_with_ctx, get_store,
     strict_int,
     strict_float,
 )
@@ -21,15 +21,15 @@ _store = get_store("tmdb-api")
 _API = "tmdb-api"
 
 _store.register("genres", primary_key="id",
-                initial_loader=lambda: _coerce_genres(_load("genres.csv", "genres")))
+                initial_loader=lambda: _coerce_genres(_load("genres.json", "genres")))
 _store.register("movies", primary_key="id",
-                initial_loader=lambda: _coerce_movies(_load("movies.csv", "movies")))
+                initial_loader=lambda: _coerce_movies(_load("movies.json", "movies")))
 _store.register("people", primary_key="id",
-                initial_loader=lambda: _coerce_people(_load("people.csv", "people")))
+                initial_loader=lambda: _coerce_people(_load("people.json", "people")))
 _store.register("credits", primary_key="movie_id",
-                initial_loader=lambda: _coerce_credits(_load("credits.csv", "credits")))
+                initial_loader=lambda: _coerce_credits(_load("credits.json", "credits")))
 _store.register("tv", primary_key="id",
-                initial_loader=lambda: _coerce_tv(_load("tv.csv", "tv")))
+                initial_loader=lambda: _coerce_tv(_load("tv.json", "tv")))
 
 
 def _genres_rows():
@@ -54,7 +54,7 @@ def _tv_rows():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

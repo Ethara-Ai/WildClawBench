@@ -6,6 +6,7 @@ envelopes.
 """
 
 import csv
+from copy import deepcopy
 import math
 from pathlib import Path
 
@@ -14,15 +15,15 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, strict_float, strict_int)
+    read_json_with_ctx, get_store, opt_csv_list, strict_float, strict_int)
 
 _store = get_store("google-maps-api")
 _API = "google-maps-api"
 
 _store.register("places", primary_key="place_id",
-                initial_loader=lambda: _coerce_places(_load("places.csv", "places")))
+                initial_loader=lambda: _coerce_places(_load("places.json", "places")))
 _store.register("geocodes", primary_key="query",
-                initial_loader=lambda: _coerce_geocodes(_load("geocodes.csv", "geocodes")))
+                initial_loader=lambda: _coerce_geocodes(_load("geocodes.json", "geocodes")))
 
 
 def _places_rows():
@@ -39,7 +40,7 @@ DRIVE_SPEED_MPS = 13.4      # ~48 km/h (urban average)
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

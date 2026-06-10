@@ -6,8 +6,8 @@ process memory and reset on restart.
 """
 
 import csv
-import uuid
 from copy import deepcopy
+import uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -16,19 +16,19 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_int, opt_str)
+    read_json_with_ctx, get_store, opt_int, opt_str)
 
 _store = get_store("confluence-api")
 _API = "confluence-api"
 
 _store.register("spaces", primary_key="id",
-                initial_loader=lambda: _coerce_spaces(_load("spaces.csv", "spaces")))
+                initial_loader=lambda: _coerce_spaces(_load("spaces.json", "spaces")))
 _store.register("pages", primary_key="id",
-                initial_loader=lambda: _coerce_pages(_load("pages.csv", "pages")))
+                initial_loader=lambda: _coerce_pages(_load("pages.json", "pages")))
 _store.register("comments", primary_key="id",
-                initial_loader=lambda: _coerce_comments(_load("comments.csv", "comments")))
+                initial_loader=lambda: _coerce_comments(_load("comments.json", "comments")))
 _store.register("labels", primary_key="id",
-                initial_loader=lambda: _coerce_labels(_load("labels.csv", "labels")))
+                initial_loader=lambda: _coerce_labels(_load("labels.json", "labels")))
 
 
 def _spaces_rows():
@@ -51,7 +51,7 @@ BASE = "/wiki/rest/api"
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

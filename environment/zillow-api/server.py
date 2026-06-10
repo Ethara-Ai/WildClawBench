@@ -36,7 +36,7 @@ def search_properties(
     min_beds: Optional[int] = None,
     min_baths: Optional[float] = None,
     home_type: Optional[str] = None,
-    status: Optional[str] = None,
+    status: Optional[str] = "FOR_SALE",
     limit: int = Query(25, ge=1, le=100),
     offset: int = Query(0, ge=0),
     sort_by: str = "list_price",

@@ -6,7 +6,7 @@ sharing/list_shared_links.
 """
 
 import csv
-import mimetypes
+from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
@@ -15,20 +15,20 @@ BLOB_DIR = DATA_DIR / "file_blobs"
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store,
+    read_json_with_ctx, get_store,
     strict_bool,
     opt_int,
-    DownloadError, extract_file_content_text,
+    DownloadError, extract_file_content_text, guess_download_mime,
 )
 
 _store = get_store("dropbox-api")
 _API = "dropbox-api"
 
-_store.register_document("account", initial_loader=lambda: _coerce_account(_load("account.csv", "account")))
+_store.register_document("account", initial_loader=lambda: _coerce_account(_load("account.json", "account")))
 _store.register("files", primary_key="id",
-                initial_loader=lambda: _coerce_files(_load("files.csv", "files")))
+                initial_loader=lambda: _coerce_files(_load("files.json", "files")))
 _store.register("shared_links", primary_key="id",
-                initial_loader=lambda: _coerce_shared_links(_load("shared_links.csv", "shared_links")))
+                initial_loader=lambda: _coerce_shared_links(_load("shared_links.json", "shared_links")))
 
 
 def _account_doc():
@@ -45,7 +45,7 @@ def _shared_links_rows():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):
@@ -240,9 +240,7 @@ def download_file_content(path=None):
         raise DownloadError(http_status=415, code="unsupported_mime",
                             message=f"path {path!r} is a folder")
     name = row["name"]
-    mime_type, _ = mimetypes.guess_type(name)
-    if not mime_type:
-        mime_type = "application/octet-stream"
+    mime_type = guess_download_mime(name)
     text = extract_file_content_text(BLOB_DIR, name, mime_type)
     return {
         "file_id": row["id"],

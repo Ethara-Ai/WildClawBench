@@ -6,8 +6,8 @@ Mutations (created/updated contacts and deals) reset on container restart.
 """
 
 import csv
-import uuid
 from copy import deepcopy
+import uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -16,7 +16,7 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store,
+    read_json_with_ctx, get_store,
     strict_int,
     strict_bool,
     opt_float,
@@ -26,7 +26,7 @@ _store = get_store("hubspot-api")
 _API = "hubspot-api"
 
 _store.register("pipelines", primary_key="id",
-                initial_loader=lambda: _coerce_stages(_load("pipeline_stages.csv", "pipelines")))
+                initial_loader=lambda: _coerce_stages(_load("pipeline_stages.json", "pipelines")))
 
 
 def _pipelines_rows():
@@ -35,7 +35,7 @@ def _pipelines_rows():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):
@@ -113,9 +113,9 @@ def _coerce_stages(rows):
     return list(pipelines.values())
 
 
-_contacts_store = _coerce_objects(_load("contacts.csv", "contacts"), _CONTACT_PROPS)
-_companies_store = _coerce_objects(_load("companies.csv", "companies"), _COMPANY_PROPS)
-_deals_store = _coerce_objects(_load("deals.csv", "deals"), _DEAL_PROPS, extra=_deal_extra)
+_contacts = _coerce_objects(_load("contacts.json", "contacts"), _CONTACT_PROPS)
+_companies = _coerce_objects(_load("companies.json", "companies"), _COMPANY_PROPS)
+_deals = _coerce_objects(_load("deals.json", "deals"), _DEAL_PROPS, extra=_deal_extra)
 
 
 
@@ -155,11 +155,11 @@ def _find(store, obj_id):
 # ---------------------------------------------------------------------------
 
 def list_contacts(limit=10, after=None):
-    return _paginate(_contacts_store, limit, after)
+    return _paginate(_contacts, limit, after)
 
 
 def get_contact(contact_id):
-    c = _find(_contacts_store, contact_id)
+    c = _find(_contacts, contact_id)
     if not c:
         return {"error": f"Contact {contact_id} not found", "category": "OBJECT_NOT_FOUND"}
     return _public(c)
@@ -178,12 +178,12 @@ def create_contact(properties):
         "updatedAt": now,
         "archived": False,
     }
-    _contacts_store.append(contact)
+    _contacts.append(contact)
     return _public(contact)
 
 
 def update_contact(contact_id, properties):
-    c = _find(_contacts_store, contact_id)
+    c = _find(_contacts, contact_id)
     if not c:
         return {"error": f"Contact {contact_id} not found", "category": "OBJECT_NOT_FOUND"}
     c["properties"].update({k: v for k, v in (properties or {}).items()})
@@ -197,11 +197,11 @@ def update_contact(contact_id, properties):
 # ---------------------------------------------------------------------------
 
 def list_companies(limit=10, after=None):
-    return _paginate(_companies_store, limit, after)
+    return _paginate(_companies, limit, after)
 
 
 def get_company(company_id):
-    c = _find(_companies_store, company_id)
+    c = _find(_companies, company_id)
     if not c:
         return {"error": f"Company {company_id} not found", "category": "OBJECT_NOT_FOUND"}
     return _public(c)
@@ -212,11 +212,11 @@ def get_company(company_id):
 # ---------------------------------------------------------------------------
 
 def list_deals(limit=10, after=None):
-    return _paginate(_deals_store, limit, after)
+    return _paginate(_deals, limit, after)
 
 
 def get_deal(deal_id):
-    d = _find(_deals_store, deal_id)
+    d = _find(_deals, deal_id)
     if not d:
         return {"error": f"Deal {deal_id} not found", "category": "OBJECT_NOT_FOUND"}
     return _public(d)
@@ -247,12 +247,12 @@ def create_deal(properties):
         "_company": None,
         "_contact": None,
     }
-    _deals_store.append(deal)
+    _deals.append(deal)
     return _public(deal)
 
 
 def update_deal(deal_id, properties):
-    d = _find(_deals_store, deal_id)
+    d = _find(_deals, deal_id)
     if not d:
         return {"error": f"Deal {deal_id} not found", "category": "OBJECT_NOT_FOUND"}
     props = properties or {}

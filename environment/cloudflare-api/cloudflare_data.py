@@ -10,7 +10,7 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store,
+    read_json_with_ctx, get_store,
     strict_int,
     strict_bool,
 )
@@ -19,13 +19,13 @@ _store = get_store("cloudflare-api")
 _API = "cloudflare-api"
 
 _store.register("zones", primary_key="id",
-                initial_loader=lambda: _coerce_zones(_load("zones.csv", "zones")))
+                initial_loader=lambda: _coerce_zones(_load("zones.json", "zones")))
 _store.register("dns", primary_key="id",
-                initial_loader=lambda: _coerce_dns(_load("dns_records.csv", "dns")))
+                initial_loader=lambda: _coerce_dns(_load("dns_records.json", "dns")))
 _store.register("firewall", primary_key="id",
-                initial_loader=lambda: _coerce_firewall(_load("firewall_rules.csv", "firewall")))
+                initial_loader=lambda: _coerce_firewall(_load("firewall_rules.json", "firewall")))
 _store.register("page_rules", primary_key="id",
-                initial_loader=lambda: _coerce_page_rules(_load("page_rules.csv", "page_rules")))
+                initial_loader=lambda: _coerce_page_rules(_load("page_rules.json", "page_rules")))
 
 
 def _zones_rows():
@@ -46,7 +46,7 @@ def _page_rules_rows():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

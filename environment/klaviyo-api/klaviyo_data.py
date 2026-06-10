@@ -17,17 +17,17 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_int, opt_str)
+    read_json_with_ctx, get_store, opt_int, opt_str)
 
 _store = get_store("klaviyo-api")
 _API = "klaviyo-api"
 
 _store.register("profiles", primary_key="id",
-                initial_loader=lambda: _coerce_profiles(_load("profiles.csv", "profiles")))
+                initial_loader=lambda: _coerce_profiles(_load("profiles.json", "profiles")))
 _store.register("lists", primary_key="id",
-                initial_loader=lambda: _coerce_lists(_load("lists.csv", "lists")))
+                initial_loader=lambda: _coerce_lists(_load("lists.json", "lists")))
 _store.register("campaigns", primary_key="id",
-                initial_loader=lambda: _coerce_campaigns(_load("campaigns.csv", "campaigns")))
+                initial_loader=lambda: _coerce_campaigns(_load("campaigns.json", "campaigns")))
 
 
 def _profiles_rows():
@@ -44,7 +44,7 @@ def _campaigns_rows():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

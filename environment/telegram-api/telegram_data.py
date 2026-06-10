@@ -5,6 +5,7 @@ or {"ok": false, "error_code": int, "description": str} on failure.
 """
 
 import csv
+from copy import deepcopy
 import json
 import time
 from pathlib import Path
@@ -14,19 +15,19 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_int, opt_str, strict_bool, strict_int)
+    read_json_with_ctx, get_store, opt_int, opt_str, strict_bool, strict_int)
 
 _store = get_store("telegram-api")
 _API = "telegram-api"
 
 _store.register("users", primary_key="id",
-                initial_loader=lambda: _coerce_users(_load("users.csv", "users")))
+                initial_loader=lambda: _coerce_users(_load("users.json", "users")))
 _store.register("chats", primary_key="id",
-                initial_loader=lambda: _coerce_chats(_load("chats.csv", "chats")))
+                initial_loader=lambda: _coerce_chats(_load("chats.json", "chats")))
 _store.register("messages", primary_key="message_id",
-                initial_loader=lambda: _coerce_messages(_load("messages.csv", "messages")))
+                initial_loader=lambda: _coerce_messages(_load("messages.json", "messages")))
 _store.register("members", primary_key="chat_id",
-                initial_loader=lambda: _coerce_members(_load("chat_members.csv", "members")))
+                initial_loader=lambda: _coerce_members(_load("chat_members.json", "members")))
 _store.register_document("bot", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "bot.json", encoding="utf-8")))
 
 
@@ -52,7 +53,7 @@ def _bot_doc():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

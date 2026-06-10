@@ -1,0 +1,11 @@
+[
+  {
+    "id": "team-ux",
+    "name": "Patient Portal UX",
+    "key": "PORT",
+    "description": "UX team building and reviewing the Cumberland patient portal redesign",
+    "color": "#5E6AD2",
+    "createdAt": "2026-01-15T09:00:00",
+    "updatedAt": "2026-05-01T10:00:00"
+  }
+]

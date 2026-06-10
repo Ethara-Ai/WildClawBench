@@ -10,7 +10,7 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, opt_str, strict_int)
+    read_json_with_ctx, get_store, opt_csv_list, opt_str, strict_int)
 _store = get_store("youtube-api")
 _API = "youtube-api"
 
@@ -22,7 +22,7 @@ _CHANNEL_TITLE = _channel_raw["snippet"]["title"]
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):
@@ -188,15 +188,15 @@ def _coerce_captions(rows):
 
 
 _store.register("videos", primary_key="id",
-                initial_loader=lambda: _coerce_videos(_load("videos.csv", "videos")))
+                initial_loader=lambda: _coerce_videos(_load("videos.json", "videos")))
 _store.register("playlists", primary_key="id",
-                initial_loader=lambda: _coerce_playlists(_load("playlists.csv", "playlists")))
+                initial_loader=lambda: _coerce_playlists(_load("playlists.json", "playlists")))
 _store.register("playlist_items", primary_key="id",
-                initial_loader=lambda: _coerce_playlist_items(_load("playlist_items.csv", "playlist_items")))
+                initial_loader=lambda: _coerce_playlist_items(_load("playlist_items.json", "playlist_items")))
 _store.register("comments", primary_key="id",
-                initial_loader=lambda: _coerce_comments(_load("comments.csv", "comments")))
+                initial_loader=lambda: _coerce_comments(_load("comments.json", "comments")))
 _store.register("captions", primary_key="id",
-                initial_loader=lambda: _coerce_captions(_load("captions.csv", "captions")))
+                initial_loader=lambda: _coerce_captions(_load("captions.json", "captions")))
 _store.register_document("channel", initial_loader=lambda: _channel_raw)
 _store.register_document("video_categories",
                          initial_loader=lambda: _load_json("video_categories.json"))

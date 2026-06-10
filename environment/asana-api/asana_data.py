@@ -11,19 +11,19 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_str, strict_bool)
+    read_json_with_ctx, get_store, opt_str, strict_bool)
 
 _store = get_store("asana-api")
 _API = "asana-api"
 
 _store.register("users", primary_key="gid",
-                initial_loader=lambda: _coerce_users(_load("users.csv", "users")))
+                initial_loader=lambda: _coerce_users(_load("users.json", "users")))
 _store.register("projects", primary_key="gid",
-                initial_loader=lambda: _coerce_projects(_load("projects.csv", "projects")))
+                initial_loader=lambda: _coerce_projects(_load("projects.json", "projects")))
 _store.register("sections", primary_key="gid",
-                initial_loader=lambda: _coerce_sections(_load("sections.csv", "sections")))
+                initial_loader=lambda: _coerce_sections(_load("sections.json", "sections")))
 _store.register("tasks", primary_key="gid",
-                initial_loader=lambda: _coerce_tasks(_load("tasks.csv", "tasks")))
+                initial_loader=lambda: _coerce_tasks(_load("tasks.json", "tasks")))
 _store.register_document("workspace", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "workspace.json", encoding="utf-8")))
 
 
@@ -49,7 +49,7 @@ def _workspace_doc():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

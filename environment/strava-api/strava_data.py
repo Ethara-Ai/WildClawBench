@@ -14,17 +14,17 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_int, strict_float, strict_int)
+    read_json_with_ctx, get_store, opt_int, strict_float, strict_int)
 
 _store = get_store("strava-api")
 _API = "strava-api"
 
 _store.register("activities", primary_key="id",
-                initial_loader=lambda: _coerce_activities(_load("activities.csv", "activities")))
+                initial_loader=lambda: _coerce_activities(_load("activities.json", "activities")))
 _store.register("segments", primary_key="id",
-                initial_loader=lambda: _coerce_segments(_load("segments.csv", "segments")))
+                initial_loader=lambda: _coerce_segments(_load("segments.json", "segments")))
 _store.register("kudoers", primary_key="activity_id",
-                initial_loader=lambda: _coerce_kudoers(_load("kudoers.csv", "kudoers")))
+                initial_loader=lambda: _coerce_kudoers(_load("kudoers.json", "kudoers")))
 _store.register_document("athlete", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "athlete.json", encoding="utf-8")))
 
 
@@ -46,7 +46,7 @@ def _athlete_doc():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

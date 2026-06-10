@@ -31,6 +31,11 @@ def get_user_profile():
     return myfitnesspal_data.get_user_profile()
 
 
+@app.get("/v1/user/scenario-profile")
+def get_scenario_user_profile():
+    return myfitnesspal_data.get_scenario_user_profile()
+
+
 class ProfileUpdateBody(BaseModel):
     display_name: Optional[str] = None
     daily_calorie_goal: Optional[int] = None

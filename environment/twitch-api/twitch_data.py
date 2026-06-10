@@ -11,21 +11,21 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_str, strict_bool, strict_float, strict_int)
+    read_json_with_ctx, get_store, opt_str, strict_bool, strict_float, strict_int)
 
 _store = get_store("twitch-api")
 _API = "twitch-api"
 
 _store.register("users", primary_key="id",
-                initial_loader=lambda: _coerce_users(_load("users.csv", "users")))
+                initial_loader=lambda: _coerce_users(_load("users.json", "users")))
 _store.register("games", primary_key="id",
-                initial_loader=lambda: _coerce_games(_load("games.csv", "games")))
+                initial_loader=lambda: _coerce_games(_load("games.json", "games")))
 _store.register("channels", primary_key="broadcaster_id",
-                initial_loader=lambda: _coerce_channels(_load("channels.csv", "channels")))
+                initial_loader=lambda: _coerce_channels(_load("channels.json", "channels")))
 _store.register("streams", primary_key="id",
-                initial_loader=lambda: _coerce_streams(_load("streams.csv", "streams")))
+                initial_loader=lambda: _coerce_streams(_load("streams.json", "streams")))
 _store.register("clips", primary_key="id",
-                initial_loader=lambda: _coerce_clips(_load("clips.csv", "clips")))
+                initial_loader=lambda: _coerce_clips(_load("clips.json", "clips")))
 
 
 def _users_rows():
@@ -50,7 +50,7 @@ def _clips_rows():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

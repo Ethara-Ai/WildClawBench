@@ -10,23 +10,23 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_str, strict_bool, strict_float, strict_int)
+    read_json_with_ctx, get_store, opt_str, strict_bool, strict_float, strict_int)
 
 _store = get_store("shippo-api")
 _API = "shippo-api"
 
 _store.register("addresses", primary_key="object_id",
-                initial_loader=lambda: _coerce_addresses(_load("addresses.csv", "addresses")))
+                initial_loader=lambda: _coerce_addresses(_load("addresses.json", "addresses")))
 _store.register("parcels", primary_key="object_id",
-                initial_loader=lambda: _coerce_parcels(_load("parcels.csv", "parcels")))
+                initial_loader=lambda: _coerce_parcels(_load("parcels.json", "parcels")))
 _store.register("shipments", primary_key="object_id",
-                initial_loader=lambda: _coerce_shipments(_load("shipments.csv", "shipments")))
+                initial_loader=lambda: _coerce_shipments(_load("shipments.json", "shipments")))
 _store.register("rates", primary_key="object_id",
-                initial_loader=lambda: _coerce_rates(_load("rates.csv", "rates")))
+                initial_loader=lambda: _coerce_rates(_load("rates.json", "rates")))
 _store.register("transactions", primary_key="object_id",
-                initial_loader=lambda: _coerce_transactions(_load("transactions.csv", "transactions")))
+                initial_loader=lambda: _coerce_transactions(_load("transactions.json", "transactions")))
 _store.register("tracking", primary_key="carrier",
-                initial_loader=lambda: _coerce_tracking(_load("tracking.csv", "tracking")))
+                initial_loader=lambda: _coerce_tracking(_load("tracking.json", "tracking")))
 
 
 def _addresses_rows():
@@ -55,7 +55,7 @@ def _tracking_rows():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

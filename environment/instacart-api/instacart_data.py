@@ -11,19 +11,19 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, opt_float, opt_str, strict_bool, strict_float, strict_int)
+    read_json_with_ctx, get_store, opt_csv_list, opt_float, opt_str, strict_bool, strict_float, strict_int)
 
 _store = get_store("instacart-api")
 _API = "instacart-api"
 
 _store.register("retailers", primary_key="retailer_id",
-                initial_loader=lambda: _coerce_retailers(_load("retailers.csv", "retailers")))
+                initial_loader=lambda: _coerce_retailers(_load("retailers.json", "retailers")))
 _store.register("products", primary_key="product_id",
-                initial_loader=lambda: _coerce_products(_load("products.csv", "products")))
+                initial_loader=lambda: _coerce_products(_load("products.json", "products")))
 _store.register("orders", primary_key="order_id",
-                initial_loader=lambda: _coerce_orders(_load("orders.csv", "orders")))
+                initial_loader=lambda: _coerce_orders(_load("orders.json", "orders")))
 _store.register("order_items", primary_key="order_id",
-                initial_loader=lambda: _coerce_order_items(_load("order_items.csv", "order_items")))
+                initial_loader=lambda: _coerce_order_items(_load("order_items.json", "order_items")))
 _store.register_document("user", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "user.json", encoding="utf-8")))
 
 
@@ -49,7 +49,7 @@ def _user_doc():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

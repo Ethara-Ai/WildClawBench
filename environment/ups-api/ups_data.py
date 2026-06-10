@@ -14,7 +14,7 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store,
+    read_json_with_ctx, get_store,
     strict_int,
     opt_float,
 )
@@ -23,11 +23,11 @@ _store = get_store("ups-api")
 _API = "ups-api"
 
 _store.register("rates", primary_key="service_code",
-                initial_loader=lambda: _coerce_rates(_load("rates.csv", "rates")))
+                initial_loader=lambda: _coerce_rates(_load("rates.json", "rates")))
 _store.register("shipments", primary_key="tracking_number",
-                initial_loader=lambda: _coerce_shipments(_load("shipments.csv", "shipments")))
+                initial_loader=lambda: _coerce_shipments(_load("shipments.json", "shipments")))
 _store.register("tracking", primary_key="tracking_number",
-                initial_loader=lambda: _coerce_tracking(_load("tracking.csv", "tracking")))
+                initial_loader=lambda: _coerce_tracking(_load("tracking.json", "tracking")))
 
 
 def _rates_rows():
@@ -44,7 +44,7 @@ def _tracking_rows():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

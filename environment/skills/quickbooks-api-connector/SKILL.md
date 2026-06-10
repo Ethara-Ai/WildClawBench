@@ -561,6 +561,88 @@ GET /v3/company/{realmId}/reports/AgedPayableDetail
 |-----------|------|------|----------|-------------|
 | `realmId` | string | path | yes | Company realm ID |
 
+### Break-Even Analysis report
+
+Returns a break-even analysis worksheet for the company, including current monthly revenue and expense breakdowns and the contribution-margin math used to derive the break-even point.
+
+```
+GET /v3/company/{realmId}/reports/BreakEvenAnalysis
+```
+
+| Parameter | Type | In | Required | Description |
+|-----------|------|------|----------|-------------|
+| `realmId` | string | path | yes | Company realm ID |
+
+Response shape: `{"BreakEvenAnalysis": {"PreparedBy": …, "PreparedDate": …, "CurrentState": {"MonthlyRevenue": {…}, "MonthlyExpenses": {…}}, …}}`.
+
+---
+
+## Company
+
+### Get company (raw)
+
+Returns the raw company profile document as stored, in the QuickBooks `CompanyInfo` envelope. Unlike `/companyinfo/{companyId}`, this path takes no company ID.
+
+```
+GET /v3/company/{realmId}/company
+```
+
+| Parameter | Type | In | Required | Description |
+|-----------|------|------|----------|-------------|
+| `realmId` | string | path | yes | Company realm ID |
+
+Response shape: `{"CompanyInfo": {"CompanyName": …, "LegalName": …, "CompanyAddr": {…}, "Email": {…}, "PrimaryPhone": {…}, "FiscalYearStartMonth": …, "IndustryType": …}}`.
+
+---
+
+## Bill Payments
+
+### List bill payments
+
+Returns all bill payment transactions, each linking a payment to one or more bills via `LinkedTxn`.
+
+```
+GET /v3/company/{realmId}/billpayments
+```
+
+| Parameter | Type | In | Required | Description |
+|-----------|------|------|----------|-------------|
+| `realmId` | string | path | yes | Company realm ID |
+
+Response shape: `{"QueryResponse": {"BillPayment": [{"Id": …, "VendorRef": {"value": …, "name": …}, "TxnDate": …, "TotalAmt": …, "Line": [{"LinkedTxn": [{"TxnId": …, "TxnType": "Bill"}], "Amount": …}], "PayType": …}]}}`.
+
+---
+
+## Internal Documents
+
+### Get corporate expense ledger
+
+Returns the corporate expense ledger document — a list of itemized expense entries (date, merchant, employee, amount) tied to an account.
+
+```
+GET /v3/company/{realmId}/documents/CorporateExpenseLedger
+```
+
+| Parameter | Type | In | Required | Description |
+|-----------|------|------|----------|-------------|
+| `realmId` | string | path | yes | Company realm ID |
+
+Response shape: `{"document_name": "Corporate Expense Ledger", "account_id": N, "entries": [{"date": …, "merchant": …, "employee": …, "amount": …}]}`.
+
+### Get reimbursement policy
+
+Returns the reimbursement policy document — a versioned set of validation rules governing which expense submissions are auto-approved, reviewed, or rejected.
+
+```
+GET /v3/company/{realmId}/documents/ReimbursementPolicy
+```
+
+| Parameter | Type | In | Required | Description |
+|-----------|------|------|----------|-------------|
+| `realmId` | string | path | yes | Company realm ID |
+
+Response shape: `{"policy_name": "Reimbursement Policy", "version": …, "validation_rules": [{"rule": …, "requirement": …, "action": …, "notes": …}]}`.
+
 ---
 
 ## General Conventions

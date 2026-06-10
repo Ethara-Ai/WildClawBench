@@ -10,7 +10,7 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store,
+    read_json_with_ctx, get_store,
     strict_int,
     strict_float,
 )
@@ -19,18 +19,19 @@ _store = get_store("myfitnesspal-api")
 _API = "myfitnesspal-api"
 
 _store.register("foods", primary_key="food_id",
-                initial_loader=lambda: _coerce_foods(_load("foods.csv", "foods")))
+                initial_loader=lambda: _coerce_foods(_load("foods.json", "foods")))
 _store.register("diary_entries", primary_key="entry_id",
-                initial_loader=lambda: _coerce_diary_entries(_load("diary_entries.csv", "diary_entries")))
+                initial_loader=lambda: _coerce_diary_entries(_load("diary_entries.json", "diary_entries")))
 _store.register("exercise_types", primary_key="exercise_type_id",
-                initial_loader=lambda: _coerce_exercise_types(_load("exercise_types.csv", "exercise_types")))
+                initial_loader=lambda: _coerce_exercise_types(_load("exercise_types.json", "exercise_types")))
 _store.register("exercise_log", primary_key="exercise_id",
-                initial_loader=lambda: _coerce_exercise_log(_load("exercise_log.csv", "exercise_log")))
+                initial_loader=lambda: _coerce_exercise_log(_load("exercise_log.json", "exercise_log")))
 _store.register("weight_log", primary_key="weight_id",
-                initial_loader=lambda: _coerce_weight_log(_load("weight_log.csv", "weight_log")))
+                initial_loader=lambda: _coerce_weight_log(_load("weight_log.json", "weight_log")))
 _store.register("water_log", primary_key="water_id",
-                initial_loader=lambda: _coerce_water_log(_load("water_log.csv", "water_log")))
+                initial_loader=lambda: _coerce_water_log(_load("water_log.json", "water_log")))
 _store.register_document("user_profile", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "user_profile.json", encoding="utf-8")))
+_store.register_document("scenario_user_profile", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "myfitnesspal_user_profile.json", encoding="utf-8")))
 
 
 def _foods_rows():
@@ -61,9 +62,14 @@ def _user_profile_doc():
     return _store.document("user_profile").get()
 
 
+def get_scenario_user_profile():
+    # myfitnesspal_user_profile.json wraps {"user_profile": {...}}; served verbatim.
+    return _store.document("scenario_user_profile").get()
+
+
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

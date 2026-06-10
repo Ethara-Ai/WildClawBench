@@ -11,7 +11,7 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_str, strict_float)
+    read_json_with_ctx, get_store, opt_str, strict_float)
 _store = get_store("quickbooks-api")
 _API = "quickbooks-api"
 
@@ -19,7 +19,7 @@ REALM_ID = "4620816365272861350"
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):
@@ -149,13 +149,13 @@ def _coerce_accounts(rows):
 
 
 _store.register("customers", primary_key="Id",
-                initial_loader=lambda: _coerce_customers(_load("customers.csv", "customers")))
+                initial_loader=lambda: _coerce_customers(_load("customers.json", "customers")))
 _store.register("vendors", primary_key="Id",
-                initial_loader=lambda: _coerce_vendors(_load("vendors.csv", "vendors")))
+                initial_loader=lambda: _coerce_vendors(_load("vendors.json", "vendors")))
 _store.register("items", primary_key="Id",
-                initial_loader=lambda: _coerce_items(_load("items.csv", "items")))
+                initial_loader=lambda: _coerce_items(_load("items.json", "items")))
 _store.register("accounts", primary_key="Id",
-                initial_loader=lambda: _coerce_accounts(_load("accounts.csv", "accounts")))
+                initial_loader=lambda: _coerce_accounts(_load("accounts.json", "accounts")))
 _store.register("invoices", primary_key="Id",
                 initial_loader=lambda: _load_json("invoices.json"))
 _store.register("bills", primary_key="Id",
@@ -169,6 +169,16 @@ _store.register("expenses", primary_key="Id",
 
 _store.register_document("company_info",
                          initial_loader=lambda: _load_json("company_info.json"))
+_store.register_document("company_raw",
+                         initial_loader=lambda: _load_json("company.json"))
+_store.register_document("bill_payments",
+                         initial_loader=lambda: _load_json("bill-payments.json"))
+_store.register_document("corporate_expense_ledger",
+                         initial_loader=lambda: _load_json("Corporate_Expense_Ledger.json"))
+_store.register_document("reimbursement_policy",
+                         initial_loader=lambda: _load_json("Reimbursement_Policy.json"))
+_store.register_document("break_even_analysis",
+                         initial_loader=lambda: _load_json("break-even-analysis.json"))
 
 
 def _next_int_id(table_name: str) -> int:
@@ -189,6 +199,27 @@ def _next_int_id(table_name: str) -> int:
 
 def get_company_info():
     return {"CompanyInfo": _store.document("company_info").get()}
+
+
+def get_company_raw():
+    # company.json is already API-shaped ({"CompanyInfo": {...}}); served verbatim.
+    return _store.document("company_raw").get()
+
+
+def get_bill_payments():
+    return _store.document("bill_payments").get()
+
+
+def get_corporate_expense_ledger():
+    return _store.document("corporate_expense_ledger").get()
+
+
+def get_reimbursement_policy():
+    return _store.document("reimbursement_policy").get()
+
+
+def get_break_even_analysis():
+    return _store.document("break_even_analysis").get()
 
 
 def list_customers():

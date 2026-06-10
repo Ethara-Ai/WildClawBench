@@ -11,17 +11,17 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_float, opt_int, opt_str, strict_bool, strict_int)
+    read_json_with_ctx, get_store, opt_float, opt_int, opt_str, strict_bool, strict_int)
 
 _store = get_store("twilio-api")
 _API = "twilio-api"
 
 _store.register("phone_numbers", primary_key="sid",
-                initial_loader=lambda: _coerce_phone_numbers(_load("phone_numbers.csv", "phone_numbers")))
+                initial_loader=lambda: _coerce_phone_numbers(_load("phone_numbers.json", "phone_numbers")))
 _store.register("messages", primary_key="sid",
-                initial_loader=lambda: _coerce_messages(_load("messages.csv", "messages")))
+                initial_loader=lambda: _coerce_messages(_load("messages.json", "messages")))
 _store.register("calls", primary_key="sid",
-                initial_loader=lambda: _coerce_calls(_load("calls.csv", "calls")))
+                initial_loader=lambda: _coerce_calls(_load("calls.json", "calls")))
 _store.register_document("account", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "account.json", encoding="utf-8")))
 
 
@@ -43,7 +43,7 @@ def _account_doc():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

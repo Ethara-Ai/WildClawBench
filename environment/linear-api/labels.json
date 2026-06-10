@@ -1,0 +1,92 @@
+[
+  {
+    "id": "label-bug",
+    "name": "Bug",
+    "color": "#eb5757",
+    "description": "Something isn't working correctly",
+    "teamId": "",
+    "createdAt": "2026-01-15T09:00:00",
+    "updatedAt": "2026-01-15T09:00:00"
+  },
+  {
+    "id": "label-critical",
+    "name": "Critical",
+    "color": "#eb5757",
+    "description": "Critical severity",
+    "teamId": "",
+    "createdAt": "2026-01-15T09:00:00",
+    "updatedAt": "2026-01-15T09:00:00"
+  },
+  {
+    "id": "label-high",
+    "name": "High",
+    "color": "#f2994a",
+    "description": "High severity",
+    "teamId": "",
+    "createdAt": "2026-01-15T09:00:00",
+    "updatedAt": "2026-01-15T09:00:00"
+  },
+  {
+    "id": "label-medium",
+    "name": "Medium",
+    "color": "#f2c94c",
+    "description": "Medium severity",
+    "teamId": "",
+    "createdAt": "2026-01-15T09:00:00",
+    "updatedAt": "2026-01-15T09:00:00"
+  },
+  {
+    "id": "label-low",
+    "name": "Low",
+    "color": "#bdbdbd",
+    "description": "Low severity",
+    "teamId": "",
+    "createdAt": "2026-01-15T09:00:00",
+    "updatedAt": "2026-01-15T09:00:00"
+  },
+  {
+    "id": "label-dark-mode",
+    "name": "Dark Mode",
+    "color": "#5e6ad2",
+    "description": "Dark mode contrast and theming issues",
+    "teamId": "team-ux",
+    "createdAt": "2026-01-15T09:00:00",
+    "updatedAt": "2026-01-15T09:00:00"
+  },
+  {
+    "id": "label-form-validation",
+    "name": "Form Validation",
+    "color": "#26b5ce",
+    "description": "Form validation behavior and copy",
+    "teamId": "team-ux",
+    "createdAt": "2026-01-15T09:00:00",
+    "updatedAt": "2026-01-15T09:00:00"
+  },
+  {
+    "id": "label-medications",
+    "name": "Medications",
+    "color": "#bb6bd9",
+    "description": "Medications module of the patient portal",
+    "teamId": "team-ux",
+    "createdAt": "2026-01-15T09:00:00",
+    "updatedAt": "2026-01-15T09:00:00"
+  },
+  {
+    "id": "label-dashboard",
+    "name": "Dashboard",
+    "color": "#6fcf97",
+    "description": "Dashboard module of the patient portal",
+    "teamId": "team-ux",
+    "createdAt": "2026-01-15T09:00:00",
+    "updatedAt": "2026-01-15T09:00:00"
+  },
+  {
+    "id": "label-charge-nurse-review",
+    "name": "Charge Nurse Review",
+    "color": "#f2c94c",
+    "description": "Requires charge nurse spot-test sign-off",
+    "teamId": "team-ux",
+    "createdAt": "2026-01-15T09:00:00",
+    "updatedAt": "2026-01-15T09:00:00"
+  }
+]

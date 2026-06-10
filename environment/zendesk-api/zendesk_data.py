@@ -14,19 +14,19 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, opt_int, strict_bool)
+    read_json_with_ctx, get_store, opt_csv_list, opt_int, strict_bool)
 
 _store = get_store("zendesk-api")
 _API = "zendesk-api"
 
 _store.register("users", primary_key="id",
-                initial_loader=lambda: _coerce_users(_load("users.csv", "users")))
+                initial_loader=lambda: _coerce_users(_load("users.json", "users")))
 _store.register("organizations", primary_key="id",
-                initial_loader=lambda: _coerce_orgs(_load("organizations.csv", "organizations")))
+                initial_loader=lambda: _coerce_orgs(_load("organizations.json", "organizations")))
 _store.register("tickets", primary_key="id",
-                initial_loader=lambda: _coerce_tickets(_load("tickets.csv", "tickets")))
+                initial_loader=lambda: _coerce_tickets(_load("tickets.json", "tickets")))
 _store.register("comments", primary_key="id",
-                initial_loader=lambda: _coerce_comments(_load("comments.csv", "comments")))
+                initial_loader=lambda: _coerce_comments(_load("comments.json", "comments")))
 
 
 def _users_rows():
@@ -50,7 +50,7 @@ VALID_PRIORITY = {"low", "normal", "high", "urgent"}
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

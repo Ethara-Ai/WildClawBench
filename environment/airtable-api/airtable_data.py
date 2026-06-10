@@ -17,14 +17,14 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store)
+    read_json_with_ctx, get_store)
 
 _store = get_store("airtable-api")
 _API = "airtable-api"
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):
@@ -39,9 +39,9 @@ def _to_bool(v):
     return str(v).strip().lower() == "true"
 
 
-_bases = [_strip_ctx(r) for r in _load("bases.csv", "bases")]
-_tables = [_strip_ctx(r) for r in _load("tables.csv", "tables")]
-_fields_rows = [_strip_ctx(r) for r in _load("fields.csv", "fields")]
+_bases = [_strip_ctx(r) for r in _load("bases.json", "bases")]
+_tables = [_strip_ctx(r) for r in _load("tables.json", "tables")]
+_fields_rows = [_strip_ctx(r) for r in _load("fields.json", "fields")]
 
 _field_types: dict[str, dict[str, str]] = {}
 _field_meta: dict[str, list[dict]] = {}

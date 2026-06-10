@@ -10,7 +10,7 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store,
+    read_json_with_ctx, get_store,
     strict_int,
     strict_float,
     strict_bool,
@@ -20,13 +20,13 @@ _store = get_store("doordash-api")
 _API = "doordash-api"
 
 _store.register("stores", primary_key="store_id",
-                initial_loader=lambda: _coerce_stores(_load("stores.csv", "stores")))
+                initial_loader=lambda: _coerce_stores(_load("stores.json", "stores")))
 _store.register("menu_items", primary_key="item_id",
-                initial_loader=lambda: _coerce_menu(_load("menu_items.csv", "menu_items")))
+                initial_loader=lambda: _coerce_menu(_load("menu_items.json", "menu_items")))
 _store.register("orders", primary_key="order_id",
-                initial_loader=lambda: _coerce_orders(_load("orders.csv", "orders")))
+                initial_loader=lambda: _coerce_orders(_load("orders.json", "orders")))
 _store.register("order_items", primary_key="order_id",
-                initial_loader=lambda: _coerce_order_items(_load("order_items.csv", "order_items")))
+                initial_loader=lambda: _coerce_order_items(_load("order_items.json", "order_items")))
 
 
 def _stores_rows():
@@ -49,7 +49,7 @@ SERVICE_FEE_PCT = 10.0  # percent of subtotal
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):
@@ -162,7 +162,7 @@ def get_store(store_id):
 def get_menu(store_id):
     if not any(s["store_id"] == store_id for s in _stores_rows()):
         return {"error": f"Store {store_id} not found"}
-    items = [i for i in _menu_store if i["store_id"] == store_id]
+    items = [i for i in _menu_items_rows() if i["store_id"] == store_id]
     categories = {}
     for it in items:
         categories.setdefault(it["category"], []).append(it)
@@ -177,7 +177,7 @@ def get_menu(store_id):
 
 
 def _get_item(item_id):
-    return next((i for i in _menu_store if i["item_id"] == item_id), None)
+    return next((i for i in _menu_items_rows() if i["item_id"] == item_id), None)
 
 
 # ---------------------------------------------------------------------------

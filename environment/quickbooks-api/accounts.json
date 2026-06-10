@@ -1,289 +1,122 @@
-{
-  "QueryResponse": {
-    "Account": [
-      {
-        "Id": "1",
-        "Name": "Operating Checking",
-        "AccountType": "Bank",
-        "AccountSubType": "Checking",
-        "CurrentBalance": 5842.5,
-        "Active": true,
-        "Description": "Primary operating account - OnPoint Credit Union"
-      },
-      {
-        "Id": "2",
-        "Name": "Tournament Reserve",
-        "AccountType": "Bank",
-        "AccountSubType": "Savings",
-        "CurrentBalance": 1450.0,
-        "Active": true,
-        "Description": "Set aside for tournament expenses and equipment replacement"
-      },
-      {
-        "Id": "3",
-        "Name": "Membership Income",
-        "AccountType": "Income",
-        "AccountSubType": "ServiceFeeIncome",
-        "CurrentBalance": 0,
-        "Active": true,
-        "Description": "Monthly membership dues - $95/member"
-      },
-      {
-        "Id": "4",
-        "Name": "Drop-in Fees",
-        "AccountType": "Income",
-        "AccountSubType": "ServiceFeeIncome",
-        "CurrentBalance": 0,
-        "Active": true,
-        "Description": "Walk-in class fees - $20/session"
-      },
-      {
-        "Id": "5",
-        "Name": "Tournament Revenue",
-        "AccountType": "Income",
-        "AccountSubType": "ServiceFeeIncome",
-        "CurrentBalance": 0,
-        "Active": true,
-        "Description": "Registration fees and spectator entry for tournaments"
-      },
-      {
-        "Id": "6",
-        "Name": "Equipment Sales",
-        "AccountType": "Income",
-        "AccountSubType": "SalesOfProductIncome",
-        "CurrentBalance": 0,
-        "Active": true,
-        "Description": "Gi, shinai, bokken sales to students"
-      },
-      {
-        "Id": "7",
-        "Name": "Rent Expense",
-        "AccountType": "Expense",
-        "AccountSubType": "RentOrLeaseOfBuildings",
-        "CurrentBalance": 0,
-        "Active": true,
-        "Description": "Monthly lease - Westbrook Property Mgmt"
-      },
-      {
-        "Id": "8",
-        "Name": "Utilities",
-        "AccountType": "Expense",
-        "AccountSubType": "Utilities",
-        "CurrentBalance": 0,
-        "Active": true,
-        "Description": "Electric + water/sewer"
-      },
-      {
-        "Id": "9",
-        "Name": "Insurance",
-        "AccountType": "Expense",
-        "AccountSubType": "Insurance",
-        "CurrentBalance": 0,
-        "Active": true,
-        "Description": "General liability + property - quarterly"
-      },
-      {
-        "Id": "10",
-        "Name": "Instructor Pay",
-        "AccountType": "Expense",
-        "AccountSubType": "PayrollExpenses",
-        "CurrentBalance": 0,
-        "Active": true,
-        "Description": "Raj Patel monthly draw"
-      },
-      {
-        "Id": "11",
-        "Name": "Supplies & Equipment",
-        "AccountType": "Expense",
-        "AccountSubType": "SuppliesMaterials",
-        "CurrentBalance": 0,
-        "Active": true,
-        "Description": "Training equipment, cleaning supplies, mat maintenance"
-      },
-      {
-        "Id": "12",
-        "Name": "Cleaning Services",
-        "AccountType": "Expense",
-        "AccountSubType": "RepairMaintenance",
-        "CurrentBalance": 0,
-        "Active": true,
-        "Description": "Willamette Cleaning - bi-weekly"
-      },
-      {
-        "Id": "13",
-        "Name": "Tournament Expenses",
-        "AccountType": "Expense",
-        "AccountSubType": "EntertainmentMeals",
-        "CurrentBalance": 0,
-        "Active": true,
-        "Description": "Mats rental, trophies, referee fees, event costs"
-      },
-      {
-        "Id": "14",
-        "Name": "Marketing & Advertising",
-        "AccountType": "Expense",
-        "AccountSubType": "Advertising",
-        "CurrentBalance": 0,
-        "Active": true,
-        "Description": "Flyers, social media ads, community board postings"
-      },
-      {
-        "Id": "201",
-        "Name": "Beat Sales Revenue",
-        "AccountType": "Income",
-        "AccountSubType": "ServiceFeeIncome",
-        "CurrentBalance": 0.0,
-        "Active": true,
-        "Classification": "Revenue",
-        "MetaData": {
-          "CreateTime": "2024-01-15T10:00:00",
-          "LastUpdatedTime": "2024-06-01T10:00:00"
-        },
-        "Description": ""
-      },
-      {
-        "Id": "202",
-        "Name": "Streaming Royalties",
-        "AccountType": "Income",
-        "AccountSubType": "OtherPrimaryIncome",
-        "CurrentBalance": 0.0,
-        "Active": true,
-        "Classification": "Revenue",
-        "MetaData": {
-          "CreateTime": "2024-01-15T10:00:00",
-          "LastUpdatedTime": "2024-06-01T10:00:00"
-        },
-        "Description": ""
-      },
-      {
-        "Id": "203",
-        "Name": "Consulting Revenue",
-        "AccountType": "Income",
-        "AccountSubType": "ServiceFeeIncome",
-        "CurrentBalance": 0.0,
-        "Active": true,
-        "Classification": "Revenue",
-        "MetaData": {
-          "CreateTime": "2024-01-15T10:00:00",
-          "LastUpdatedTime": "2024-06-01T10:00:00"
-        },
-        "Description": ""
-      },
-      {
-        "Id": "204",
-        "Name": "Business Checking",
-        "AccountType": "Bank",
-        "AccountSubType": "Checking",
-        "CurrentBalance": 2850000.0,
-        "Active": true,
-        "Classification": "Asset",
-        "MetaData": {
-          "CreateTime": "2024-01-15T10:00:00",
-          "LastUpdatedTime": "2024-06-01T10:00:00"
-        },
-        "Description": ""
-      },
-      {
-        "Id": "205",
-        "Name": "Software Expense",
-        "AccountType": "Expense",
-        "AccountSubType": "OtherBusinessExpenses",
-        "CurrentBalance": 0.0,
-        "Active": true,
-        "Classification": "Expense",
-        "MetaData": {
-          "CreateTime": "2024-01-15T10:00:00",
-          "LastUpdatedTime": "2024-06-01T10:00:00"
-        },
-        "Description": ""
-      },
-      {
-        "Id": "206",
-        "Name": "Equipment Expense",
-        "AccountType": "Expense",
-        "AccountSubType": "EquipmentRental",
-        "CurrentBalance": 0.0,
-        "Active": true,
-        "Classification": "Expense",
-        "MetaData": {
-          "CreateTime": "2024-01-15T10:00:00",
-          "LastUpdatedTime": "2024-06-01T10:00:00"
-        },
-        "Description": ""
-      },
-      {
-        "Id": "207",
-        "Name": "Studio Expense",
-        "AccountType": "Expense",
-        "AccountSubType": "OtherBusinessExpenses",
-        "CurrentBalance": 0.0,
-        "Active": true,
-        "Classification": "Expense",
-        "MetaData": {
-          "CreateTime": "2024-01-15T10:00:00",
-          "LastUpdatedTime": "2024-06-01T10:00:00"
-        },
-        "Description": ""
-      },
-      {
-        "Id": "208",
-        "Name": "Marketing Expense",
-        "AccountType": "Expense",
-        "AccountSubType": "Advertising",
-        "CurrentBalance": 0.0,
-        "Active": true,
-        "Classification": "Expense",
-        "MetaData": {
-          "CreateTime": "2024-01-15T10:00:00",
-          "LastUpdatedTime": "2024-06-01T10:00:00"
-        },
-        "Description": ""
-      },
-      {
-        "Id": "209",
-        "Name": "Meals Expense",
-        "AccountType": "Expense",
-        "AccountSubType": "Meals",
-        "CurrentBalance": 0.0,
-        "Active": true,
-        "Classification": "Expense",
-        "MetaData": {
-          "CreateTime": "2024-01-15T10:00:00",
-          "LastUpdatedTime": "2024-06-01T10:00:00"
-        },
-        "Description": ""
-      },
-      {
-        "Id": "210",
-        "Name": "Workspace Expense",
-        "AccountType": "Expense",
-        "AccountSubType": "OtherBusinessExpenses",
-        "CurrentBalance": 0.0,
-        "Active": true,
-        "Classification": "Expense",
-        "MetaData": {
-          "CreateTime": "2024-01-15T10:00:00",
-          "LastUpdatedTime": "2024-06-01T10:00:00"
-        },
-        "Description": ""
-      },
-      {
-        "Id": "421",
-        "Name": "Food Cost - Seafood",
-        "AccountType": "Expense",
-        "AccountSubType": "CostOfLaborCos",
-        "CurrentBalance": 0.0,
-        "Active": true,
-        "Classification": "Expense",
-        "MetaData": {
-          "CreateTime": "2026-05-14T09:00:00",
-          "LastUpdatedTime": "2026-05-14T09:00:00"
-        },
-        "Description": ""
-      }
-    ],
-    "startPosition": 1,
-    "maxResults": 25,
-    "totalCount": 25
+[
+  {
+    "Id": "1",
+    "Name": "Reimbursement Grant Revenue",
+    "AccountType": "Income",
+    "AccountSubType": "NonProfitIncome",
+    "CurrentBalance": "5211.92",
+    "Active": "true",
+    "Classification": "Revenue",
+    "Description": "Grant or contract funds allocated to Franklin County housing reimbursements"
+  },
+  {
+    "Id": "2",
+    "Name": "Emergency Housing Reimbursements",
+    "AccountType": "Expense",
+    "AccountSubType": "OtherBusinessExpenses",
+    "CurrentBalance": "2290.22",
+    "Active": "true",
+    "Classification": "Expense",
+    "Description": "Motel and temporary housing reimbursements for tenant relocation cases"
+  },
+  {
+    "Id": "3",
+    "Name": "Volunteer Travel Reimbursements",
+    "AccountType": "Expense",
+    "AccountSubType": "Travel",
+    "CurrentBalance": "481.81",
+    "Active": "true",
+    "Classification": "Expense",
+    "Description": "Mileage and fuel reimbursements for coalition volunteer support"
+  },
+  {
+    "Id": "4",
+    "Name": "Food & Essentials Reimbursements",
+    "AccountType": "Expense",
+    "AccountSubType": "SuppliesMaterials",
+    "CurrentBalance": "305.74",
+    "Active": "true",
+    "Classification": "Expense",
+    "Description": "Food and essential supply reimbursements for supported households"
+  },
+  {
+    "Id": "5",
+    "Name": "Reimbursement Clearing",
+    "AccountType": "Bank",
+    "AccountSubType": "Checking",
+    "CurrentBalance": "25000.00",
+    "Active": "true",
+    "Classification": "Asset",
+    "Description": "Clearing account for approved reimbursement payments"
+  },
+  {
+    "Id": "6",
+    "Name": "Accounts Receivable",
+    "AccountType": "Accounts Receivable",
+    "AccountSubType": "AccountsReceivable",
+    "CurrentBalance": "4245.43",
+    "Active": "true",
+    "Classification": "Asset",
+    "Description": "Pending reimbursement documentation awaiting review or clarification"
+  },
+  {
+    "Id": "7",
+    "Name": "Accounts Payable",
+    "AccountType": "Accounts Payable",
+    "AccountSubType": "AccountsPayable",
+    "CurrentBalance": "4245.43",
+    "Active": "true",
+    "Classification": "Liability",
+    "Description": "Outstanding reimbursements not yet approved for payment"
+  },
+  {
+    "Id": "8",
+    "Name": "Duplicate Review Reserve",
+    "AccountType": "Other Current Liability",
+    "AccountSubType": "OtherCurrentLiabilities",
+    "CurrentBalance": "1293.28",
+    "Active": "true",
+    "Classification": "Liability",
+    "Description": "Held amount for duplicate-flagged uploads and repeated reimbursement trails"
+  },
+  {
+    "Id": "9",
+    "Name": "Document Reconciliation",
+    "AccountType": "Expense",
+    "AccountSubType": "OtherBusinessExpenses",
+    "CurrentBalance": "0.00",
+    "Active": "true",
+    "Classification": "Expense",
+    "Description": "Administrative review for missing dates and mixed household documents"
+  },
+  {
+    "Id": "10",
+    "Name": "Retained Earnings",
+    "AccountType": "Equity",
+    "AccountSubType": "RetainedEarnings",
+    "CurrentBalance": "0.00",
+    "Active": "true",
+    "Classification": "Equity",
+    "Description": "Accumulated net assets for the reimbursement workspace"
+  },
+  {
+    "Id": "11",
+    "Name": "Relocation Transportation Reimbursements",
+    "AccountType": "Expense",
+    "AccountSubType": "Travel",
+    "CurrentBalance": "624.90",
+    "Active": "true",
+    "Classification": "Expense",
+    "Description": "Truck rental and relocation transportation reimbursements"
+  },
+  {
+    "Id": "12",
+    "Name": "Utility and Deposit Reimbursements",
+    "AccountType": "Expense",
+    "AccountSubType": "OtherBusinessExpenses",
+    "CurrentBalance": "2230.00",
+    "Active": "true",
+    "Classification": "Expense",
+    "Description": "Utility deposit and security deposit reimbursements subject to intake limits"
   }
-}
+]

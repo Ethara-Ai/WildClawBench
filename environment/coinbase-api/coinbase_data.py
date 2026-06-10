@@ -16,7 +16,7 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store,
+    read_json_with_ctx, get_store,
     strict_bool,
     opt_float,
 )
@@ -25,11 +25,11 @@ _store = get_store("coinbase-api")
 _API = "coinbase-api"
 
 _store.register("accounts", primary_key="id",
-                initial_loader=lambda: _coerce_accounts(_load("accounts.csv", "accounts")))
+                initial_loader=lambda: _coerce_accounts(_load("accounts.json", "accounts")))
 _store.register("prices", primary_key="pair",
-                initial_loader=lambda: _coerce_prices(_load("prices.csv", "prices")))
+                initial_loader=lambda: _coerce_prices(_load("prices.json", "prices")))
 _store.register("transactions", primary_key="id",
-                initial_loader=lambda: _coerce_transactions(_load("transactions.csv", "transactions")))
+                initial_loader=lambda: _coerce_transactions(_load("transactions.json", "transactions")))
 _store.register_document("user", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "user.json", encoding="utf-8")))
 
 
@@ -51,7 +51,7 @@ def _user_doc():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

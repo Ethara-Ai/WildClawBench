@@ -15,13 +15,13 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_str, strict_bool, strict_int)
+    read_json_with_ctx, get_store, opt_str, strict_bool, strict_int)
 _store = get_store("monday-api")
 _API = "monday-api"
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):
@@ -84,26 +84,26 @@ def _coerce_users(rows):
 
 
 _store.register("workspaces", primary_key="workspace_id",
-                initial_loader=lambda: _coerce_workspaces(_load("workspaces.csv", "workspaces")))
+                initial_loader=lambda: _coerce_workspaces(_load("workspaces.json", "workspaces")))
 _store.register("boards", primary_key="board_id",
-                initial_loader=lambda: _coerce_boards(_load("boards.csv", "boards")))
+                initial_loader=lambda: _coerce_boards(_load("boards.json", "boards")))
 # groups have group_id but it is not unique across boards -> synth pk
 _store.register("groups", primary_key="_pk",
                 initial_loader=lambda: [
                     {**g, "_pk": f"{g['board_id']}@{g['group_id']}"}
-                    for g in _coerce_groups(_load("groups.csv", "groups"))
+                    for g in _coerce_groups(_load("groups.json", "groups"))
                 ])
 _store.register("columns", primary_key="_pk",
                 initial_loader=lambda: [
                     {**c, "_pk": f"{c['board_id']}@{c['column_id']}"}
-                    for c in _coerce_columns(_load("columns.csv", "columns"))
+                    for c in _coerce_columns(_load("columns.json", "columns"))
                 ])
 _store.register("items", primary_key="item_id",
-                initial_loader=lambda: _coerce_items(_load("items.csv", "items")))
+                initial_loader=lambda: _coerce_items(_load("items.json", "items")))
 _store.register("column_values", primary_key="_pk",
-                initial_loader=lambda: _coerce_column_values(_load("column_values.csv", "column_values")))
+                initial_loader=lambda: _coerce_column_values(_load("column_values.json", "column_values")))
 _store.register("users", primary_key="user_id",
-                initial_loader=lambda: _coerce_users(_load("users.csv", "users")))
+                initial_loader=lambda: _coerce_users(_load("users.json", "users")))
 
 
 def _workspaces_rows(): return _store.table("workspaces").rows()

@@ -15,14 +15,14 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import read_csv_with_ctx, get_store
+from _mutable_store import read_json_with_ctx, get_store
 
 _store = get_store("salesforce-api")
 _API = "salesforce-api"
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):
@@ -56,10 +56,10 @@ def _coerce(rows, sobject):
 
 
 _SOBJECT_CSV = {
-    "Account": "accounts.csv",
-    "Contact": "contacts.csv",
-    "Lead": "leads.csv",
-    "Opportunity": "opportunities.csv",
+    "Account": "accounts.json",
+    "Contact": "contacts.json",
+    "Lead": "leads.json",
+    "Opportunity": "opportunities.json",
 }
 
 for _name, _csv in _SOBJECT_CSV.items():

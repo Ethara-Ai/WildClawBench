@@ -36,6 +36,11 @@ def get_account_health():
     return amazon_seller_data.get_account_health()
 
 
+@app.get("/sellers/v1/buying-notes")
+def get_buying_notes():
+    return amazon_seller_data.get_buying_notes()
+
+
 @app.get("/notifications/v1/notifications")
 def get_performance_notifications(
     severity: Optional[str] = Query(default=None),

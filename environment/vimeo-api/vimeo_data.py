@@ -14,15 +14,15 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, strict_int)
+    read_json_with_ctx, get_store, opt_csv_list, strict_int)
 
 _store = get_store("vimeo-api")
 _API = "vimeo-api"
 
 _store.register("users", primary_key="id",
-                initial_loader=lambda: _coerce_users(_load("users.csv", "users")))
+                initial_loader=lambda: _coerce_users(_load("users.json", "users")))
 _store.register("videos", primary_key="id",
-                initial_loader=lambda: _coerce_videos(_load("videos.csv", "videos")))
+                initial_loader=lambda: _coerce_videos(_load("videos.json", "videos")))
 
 
 def _users_rows():
@@ -38,7 +38,7 @@ _ME = "12000001"
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

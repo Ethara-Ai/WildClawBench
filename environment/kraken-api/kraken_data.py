@@ -15,7 +15,7 @@ DATA_DIR = Path(__file__).parent
 
 sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store,
+    read_json_with_ctx, get_store,
     strict_int,
 )
 
@@ -24,7 +24,7 @@ _API = "kraken-api"
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):
@@ -104,18 +104,18 @@ def _coerce_balances(rows):
 
 
 _store.register("tickers", primary_key="pair",
-                initial_loader=lambda: _coerce_tickers(_load("tickers.csv", "tickers")))
+                initial_loader=lambda: _coerce_tickers(_load("tickers.json", "tickers")))
 _store.register("ohlc", primary_key="_pk",
                 initial_loader=lambda: [
                     {**row, "_pk": f"{row['pair']}@{row['time']}"}
-                    for row in _coerce_ohlc(_load("ohlc.csv", "ohlc"))
+                    for row in _coerce_ohlc(_load("ohlc.json", "ohlc"))
                 ])
 _store.register("pairs", primary_key="pair",
-                initial_loader=lambda: _coerce_pairs(_load("pairs.csv", "pairs")))
+                initial_loader=lambda: _coerce_pairs(_load("pairs.json", "pairs")))
 _store.register("assets", primary_key="asset",
-                initial_loader=lambda: _coerce_assets(_load("assets.csv", "assets")))
+                initial_loader=lambda: _coerce_assets(_load("assets.json", "assets")))
 _store.register("balances", primary_key="asset",
-                initial_loader=lambda: _coerce_balances(_load("balances.csv", "balances")))
+                initial_loader=lambda: _coerce_balances(_load("balances.json", "balances")))
 
 
 def _rows(table):

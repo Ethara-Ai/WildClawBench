@@ -15,7 +15,7 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store,
+    read_json_with_ctx, get_store,
     strict_bool,
 )
 
@@ -23,15 +23,15 @@ _store = get_store("paypal-api")
 _API = "paypal-api"
 
 _store.register("orders", primary_key="id",
-                initial_loader=lambda: _coerce_orders(_load("orders.csv", "orders")))
+                initial_loader=lambda: _coerce_orders(_load("orders.json", "orders")))
 _store.register("captures", primary_key="id",
-                initial_loader=lambda: _coerce_captures(_load("captures.csv", "captures")))
+                initial_loader=lambda: _coerce_captures(_load("captures.json", "captures")))
 _store.register("invoices", primary_key="id",
-                initial_loader=lambda: _coerce_invoices(_load("invoices.csv", "invoices")))
+                initial_loader=lambda: _coerce_invoices(_load("invoices.json", "invoices")))
 _store.register("payouts", primary_key="payout_batch_id",
-                initial_loader=lambda: [{**_strip_ctx(r), 'payout_batch_id': r['batch_header']['payout_batch_id']} for r in _coerce_payouts(_load("payouts.csv", "payouts"))])
+                initial_loader=lambda: [{**_strip_ctx(r), 'payout_batch_id': r['batch_header']['payout_batch_id']} for r in _coerce_payouts(_load("payouts.json", "payouts"))])
 _store.register("refunds", primary_key="id",
-                initial_loader=lambda: _coerce_refunds(_load("refunds.csv", "refunds")))
+                initial_loader=lambda: _coerce_refunds(_load("refunds.json", "refunds")))
 
 
 def _orders_rows():
@@ -56,7 +56,7 @@ def _refunds_rows():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

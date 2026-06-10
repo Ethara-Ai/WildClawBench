@@ -7,6 +7,7 @@ dimensions and metrics, mimicking the GA4 ``runReport`` response shape.
 """
 
 import csv
+from copy import deepcopy
 import json
 from pathlib import Path
 
@@ -14,15 +15,15 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import read_csv_with_ctx, get_store, opt_int  # noqa: E402
+from _mutable_store import read_json_with_ctx, get_store, opt_int  # noqa: E402
 
 _store = get_store("google-analytics-api")
 _API = "google-analytics-api"
 
 _store.register("events", primary_key="date",
-                initial_loader=lambda: _coerce_events(_load("events.csv", "events")))
+                initial_loader=lambda: _coerce_events(_load("events.json", "events")))
 _store.register("realtime", primary_key="country",
-                initial_loader=lambda: _coerce_realtime(_load("realtime.csv", "realtime")))
+                initial_loader=lambda: _coerce_realtime(_load("realtime.json", "realtime")))
 _store.register_document("property", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "property.json", encoding="utf-8")))
 
 
@@ -40,7 +41,7 @@ def _property_doc():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

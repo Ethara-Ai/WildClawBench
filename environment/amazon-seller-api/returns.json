@@ -1,0 +1,72 @@
+[
+  {
+    "returnId": "RET-001",
+    "AmazonOrderId": "114-3941689-8772200",
+    "sellerSKU": "VE-CASE-IP15",
+    "asin": "B0EXAMPLE01",
+    "returnDate": "2026-02-18T10:00:00Z",
+    "returnReason": "DEFECTIVE",
+    "returnStatus": "Completed",
+    "returnQuantity": "1",
+    "resolution": "REFUND",
+    "refundAmount": "19.99",
+    "refundCurrency": "USD",
+    "buyerComments": "Case cracked on first drop. Not what I expected from military grade protection."
+  },
+  {
+    "returnId": "RET-002",
+    "AmazonOrderId": "114-5578234-9921100",
+    "sellerSKU": "VE-EARBUD-PRO",
+    "asin": "B0EXAMPLE06",
+    "returnDate": "2026-02-20T14:30:00Z",
+    "returnReason": "NOT_AS_DESCRIBED",
+    "returnStatus": "Completed",
+    "returnQuantity": "1",
+    "resolution": "REFUND",
+    "refundAmount": "49.99",
+    "refundCurrency": "USD",
+    "buyerComments": "ANC is not as strong as described. Can still hear traffic clearly."
+  },
+  {
+    "returnId": "RET-003",
+    "AmazonOrderId": "114-7723891-3345600",
+    "sellerSKU": "VE-CHRG-USB3",
+    "asin": "B0EXAMPLE04",
+    "returnDate": "2026-02-25T09:00:00Z",
+    "returnReason": "SWITCHEROO",
+    "returnStatus": "Authorized",
+    "returnQuantity": "1",
+    "resolution": "PENDING",
+    "refundAmount": "16.99",
+    "refundCurrency": "USD",
+    "buyerComments": "Received only one cable instead of 2-pack."
+  },
+  {
+    "returnId": "RET-004",
+    "AmazonOrderId": "114-9981234-5567800",
+    "sellerSKU": "VE-EARBUD-SPT",
+    "asin": "B0EXAMPLE07",
+    "returnDate": "2026-03-05T11:00:00Z",
+    "returnReason": "NO_LONGER_NEEDED",
+    "returnStatus": "Completed",
+    "returnQuantity": "1",
+    "resolution": "REFUND",
+    "refundAmount": "34.99",
+    "refundCurrency": "USD",
+    "buyerComments": "Changed my mind. Got a different brand."
+  },
+  {
+    "returnId": "RET-005",
+    "AmazonOrderId": "114-8890123-6789000",
+    "sellerSKU": "VE-SCRN-IP15",
+    "asin": "B0EXAMPLE03",
+    "returnDate": "2026-04-10T16:00:00Z",
+    "returnReason": "DEFECTIVE",
+    "returnStatus": "Authorized",
+    "returnQuantity": "1",
+    "resolution": "PENDING",
+    "refundAmount": "12.99",
+    "refundCurrency": "USD",
+    "buyerComments": "Screen protector has tiny bubbles that won't go away even with the alignment frame."
+  }
+]
