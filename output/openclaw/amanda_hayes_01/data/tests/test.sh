@@ -31,14 +31,46 @@ results = ctrf.get("results", {}) if isinstance(ctrf, dict) else {}
 summary = results.get("summary", {}) if isinstance(results, dict) else {}
 tests = results.get("tests", []) if isinstance(results, dict) else []
 
-passed_names = set()
+# Build passed-set in three normalized shapes so weight-key lookup matches
+# regardless of which form the per-task test_weights.json uses:
+#   - full CTRF name      (e.g. "tests/test_outputs.py::TestFoo::test_bar")
+#   - class-qualified     (e.g. "TestFoo::test_bar")
+#   - bare test name      (e.g. "test_bar")
+# This single normalisation fixes BOTH:
+#   A.1 (CTRF-FQN-vs-bare-key) — CTRF emits "tests/test_outputs.py::Class::test_x"
+#       but test_weights.json frequently holds bare "test_x"; the prior code's
+#       `n in passed_names` never matched, so pos_earned stayed 0 even when
+#       every test passed (root cause behind 27/50 vendor GRADER_BROKEN tasks).
+#   A.2 (bare-name collisions across multi-service classes) — when one bare
+#       name (e.g. "test_no_post_requests_made") appears in 4 service classes,
+#       test_weights.json can only hold one entry per bare key. A bare weight
+#       key now resolves to a class-aware multiset: it counts as PASSED iff
+#       at least one class's variant passed (treats the bare key as "any
+#       service passed this check"). Class-qualified weight keys remain
+#       precise. Tasks like chen-amazon-sales, sandeep-marathon-nutrition,
+#       megan-bbq-recap, alden-boat-closeout, angela-nanite-deck depend on
+#       this multiset semantics.
+passed_full = set()
+passed_class_qual = set()  # "TestFoo::test_bar"
+passed_bare = set()        # "test_bar" (collapses across classes)
 for t in tests:
     if not isinstance(t, dict):
         continue
     status = (t.get("status") or "").lower()
     name = t.get("name") or ""
-    if status == "passed" and name:
-        passed_names.add(name)
+    if status != "passed" or not name:
+        continue
+    passed_full.add(name)
+    parts = name.split("::")
+    if len(parts) >= 2:
+        passed_bare.add(parts[-1])
+    if len(parts) >= 3:
+        passed_class_qual.add("::".join(parts[-2:]))
+    elif len(parts) == 2:
+        # No class wrapper (module-level test) — still record bare; the
+        # class-qualified slot stays empty so only bare/full-name lookups
+        # can resolve it.
+        passed_class_qual.add(name.split("::")[-1])
 
 tests_total = int(summary.get("tests", 0) or 0)
 tests_passed = int(summary.get("passed", 0) or 0)
@@ -64,9 +96,21 @@ elif isinstance(weights, list):
         if name and isinstance(w, (int, float)):
             weights_map[str(name)] = float(w)
 
+def _key_passed(key):
+    # Resolve a test_weights.json key against the passed-name shapes.
+    # A class-qualified key MUST match precisely — falling back to the
+    # bare-multiset would let any other class's pass spuriously satisfy a
+    # different class's weight (verified by the class-qualified-precision
+    # smoke case). Only a bare key (no "::") gets the A.2 multiset semantics.
+    if key in passed_full:
+        return True
+    if "::" in key:
+        return key in passed_class_qual
+    return key in passed_bare
+
 pos_total = sum(w for w in weights_map.values() if w > 0)
-pos_earned = sum(w for n, w in weights_map.items() if w > 0 and n in passed_names)
-neg_penalty = sum(abs(w) for n, w in weights_map.items() if w < 0 and n in passed_names)
+pos_earned = sum(w for n, w in weights_map.items() if w > 0 and _key_passed(n))
+neg_penalty = sum(abs(w) for n, w in weights_map.items() if w < 0 and _key_passed(n))
 
 if pos_total > 0:
     reward = max(0.0, (pos_earned - neg_penalty) / pos_total)
@@ -77,6 +121,14 @@ else:
 
 with open(reward_path, "w") as f:
     f.write(f"{reward:.6f}\n")
+
+if isinstance(ctrf, dict) and isinstance(results, dict) and isinstance(summary, dict):
+    summary["overall_score"] = round(reward, 4)
+    summary["weighted_percentage"] = round(reward * 100.0, 2)
+    results["summary"] = summary
+    ctrf["results"] = results
+    with open(ctrf_path, "w") as f:
+        json.dump(ctrf, f, indent=2, ensure_ascii=False)
 
 print(f"reward={reward:.6f} (pos_total={pos_total} pos_earned={pos_earned} neg_penalty={neg_penalty} passed={tests_passed}/{tests_total})")
 PY

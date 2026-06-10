@@ -303,6 +303,30 @@ def reclaim_submission(course_id: str, coursework_id: str, submission_id: str):
     return result
 
 
+@app.post("/v1/courses/{course_id}/courseWork/{coursework_id}/studentSubmissions/{submission_id}:turnIn")
+def turn_in_submission(course_id: str, coursework_id: str, submission_id: str):
+    result = classroom_data.turn_in_submission(course_id, coursework_id, submission_id)
+    if "error" in result:
+        return JSONResponse(status_code=404, content=result)
+    return result
+
+
+class ModifyAttachmentsBody(BaseModel):
+    # Real Classroom sends {"addAttachments": [ {...} ]}; accept it permissively
+    # so any attachment shape the agent supplies is recorded.
+    addAttachments: Optional[List[dict]] = None
+
+
+@app.post("/v1/courses/{course_id}/courseWork/{coursework_id}/studentSubmissions/{submission_id}:modifyAttachments")
+def modify_submission_attachments(course_id: str, coursework_id: str, submission_id: str,
+                                  body: ModifyAttachmentsBody = ModifyAttachmentsBody()):
+    result = classroom_data.modify_submission_attachments(
+        course_id, coursework_id, submission_id, body.addAttachments or [])
+    if "error" in result:
+        return JSONResponse(status_code=404, content=result)
+    return result
+
+
 # --- Students ---
 
 @app.get("/v1/courses/{course_id}/students")

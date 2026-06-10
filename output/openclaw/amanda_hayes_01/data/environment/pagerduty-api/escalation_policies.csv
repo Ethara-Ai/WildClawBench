@@ -1,3 +1,0 @@
-escalation_policy_id,name,num_loops,tier1_user_id,tier2_user_id
-EP001,Platform On-Call,2,PU004,PU001
-EP002,Billing On-Call,1,PU002,PU005

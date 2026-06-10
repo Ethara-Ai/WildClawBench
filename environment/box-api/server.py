@@ -65,6 +65,18 @@ def get_file(file_id: str):
     return result
 
 
+@app.get("/2.0/files/{file_id}/content")
+def download_file(file_id: str):
+    try:
+        return box_data.download_file_content(file_id)
+    except box_data.DownloadError as e:
+        return JSONResponse(
+            status_code=e.http_status,
+            content={"type": "error", "status": e.http_status,
+                     "code": e.code, "message": e.message},
+        )
+
+
 # --- Search ---
 
 @app.get("/2.0/search")

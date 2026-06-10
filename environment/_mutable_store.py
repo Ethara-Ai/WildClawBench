@@ -781,3 +781,237 @@ def get_store(api_name: str) -> Store:
 def known_stores() -> List[str]:
     with _REGISTRY_LOCK:
         return sorted(_STORES.keys())
+
+
+# ---------------------------------------------------------------------------
+# File-blob download helper (shared by drive-like APIs: box, google-drive, dropbox)
+# ---------------------------------------------------------------------------
+#
+# The fleet's drive-shaped APIs (box-api, google-drive-api, dropbox-api) expose
+# a "download file content" endpoint that returns RAW TEXT only (the design is
+# deliberately scoped to text/markdown/PDF -- images/video/audio are out of
+# scope per WildClawBench design). Each per-API <name>_data.py owns the route's
+# business logic (file-id/path lookup against its own _store schema); this
+# helper centralizes the mime allow-list + PDF text extraction + size cap so
+# the three implementations cannot drift from each other.
+#
+# Bytes physically live INSIDE the mock container at
+# ``<api_dir>/file_blobs/<basename>`` and NEVER touch the agent's
+# /root/workspace/. The agent can only obtain content by calling the download
+# endpoint -- which tracking_middleware records -- so the rubric can grade
+# tool-use correctly.
+
+_DOWNLOAD_TEXT_MIMES = (
+    "application/json",
+    "application/xml",
+    "application/x-yaml",
+    "application/yaml",
+    "text/yaml",
+    "text/csv",
+    "application/csv",
+)
+"""MIME types treated as UTF-8 text (in addition to anything starting with
+``text/``). Decoding uses errors='replace' so a partially-corrupt fixture
+returns content with U+FFFD placeholders rather than 415-ing."""
+
+_DOWNLOAD_PDF_MIME = "application/pdf"
+"""Sentinel: served via pypdf text extraction. pypdf is a per-API runtime
+dependency (declared in each drive-API requirements.txt); ImportError at
+extraction time is surfaced as a controlled DownloadError so the route can
+return 415 rather than 500. The host-side tests/ environment imports this
+module too, so we cannot make pypdf a hard requirement at import time."""
+
+_DOWNLOAD_MAX_TEXT_BYTES_DEFAULT = 30_000_000
+"""30 MB cap on EXTRACTED text size, applied AFTER pypdf extraction so a 5 MB
+PDF that decompresses to 60 MB of text correctly 413s. Overridable per-batch
+via the WCB_DOWNLOAD_MAX_BYTES env var so DriftDirector can shrink the cap
+for adversarial tasks."""
+
+
+class DownloadError(StoreError):
+    """Raised by ``extract_file_content_text`` when a guardrail fails.
+
+    The ``http_status`` attribute carries the HTTP code the FastAPI route
+    should map this to (404 fixture-missing, 413 too-large, 415 unsupported
+    mime / extraction failure). Kept distinct from generic ``StoreError`` so
+    per-API routes can `except DownloadError` without swallowing other store
+    errors."""
+
+    def __init__(self, http_status: int, code: str, message: str) -> None:
+        super().__init__(message)
+        self.http_status = http_status
+        self.code = code
+        self.message = message
+
+
+def _is_downloadable_text_mime(mime: str) -> bool:
+    """Allow-list check. Reads two ways: (a) prefix match on ``text/`` covers
+    the bulk of authored content (text/plain, text/markdown, text/csv, etc.);
+    (b) explicit allow-list for application/* shapes that are conceptually
+    text (json/xml/yaml/csv). Anything else (image/*, video/*, audio/*,
+    application/zip, application/vnd.openxmlformats-*, etc.) is out of scope
+    per the design and 415s.
+
+    PDF is NOT included here -- it routes through a separate pypdf extraction
+    path because it's the only allow-listed mime that requires decode rather
+    than naive utf-8 read."""
+    m = (mime or "").split(";", 1)[0].strip().lower()
+    if not m:
+        return False
+    if m.startswith("text/"):
+        return True
+    return m in _DOWNLOAD_TEXT_MIMES
+
+
+def _extract_pdf_text(blob_path: Any) -> str:
+    """pypdf-backed extraction. Imported lazily so the host-side tests/
+    process does not need pypdf installed -- only mock containers do. Any
+    pypdf failure (ImportError, malformed PDF, encrypted PDF) is surfaced as
+    DownloadError(415) so the route returns Unsupported Media Type rather
+    than crashing the worker."""
+    try:
+        from pypdf import PdfReader  # type: ignore
+    except ImportError as exc:
+        raise DownloadError(
+            http_status=415,
+            code="pdf_extraction_unavailable",
+            message=f"pypdf not installed in this container: {exc}",
+        )
+
+    try:
+        reader = PdfReader(str(blob_path))
+    except Exception as exc:  # malformed PDF, encrypted, etc.
+        raise DownloadError(
+            http_status=415,
+            code="pdf_parse_failed",
+            message=f"could not parse PDF: {exc}",
+        )
+
+    parts: List[str] = []
+    for idx, page in enumerate(reader.pages, start=1):
+        try:
+            page_text = page.extract_text() or ""
+        except Exception as exc:
+            raise DownloadError(
+                http_status=415,
+                code="pdf_extract_failed",
+                message=f"page {idx} extract_text() failed: {exc}",
+            )
+        parts.append(f"--- page {idx} ---\n{page_text}".rstrip())
+    return "\n\n".join(parts)
+
+
+def extract_file_content_text(
+    blob_dir: Any,
+    basename: str,
+    mime_type: str,
+    max_text_bytes: Optional[int] = None,
+) -> str:
+    """Return the file's content as raw text, or raise DownloadError.
+
+    Contract for the three drive-API routes:
+      * ``blob_dir`` -- absolute Path to ``<api_dir>/file_blobs/`` for the
+        calling API. Caller resolves this from its own DATA_DIR so per-task
+        overlays (``input/<task>/mock_data/<api>/file_blobs/`` bind-mounted
+        on top by ``eval/run_batch.py``) work without any wiring in this
+        helper.
+      * ``basename`` -- the file basename ON DISK (typically the row's
+        ``name`` column verbatim). Path traversal guarded: any '/' or '..'
+        in ``basename`` raises DownloadError(404).
+      * ``mime_type`` -- mime as recorded in the row; allow-listed before
+        any disk I/O. Anything not text/markdown/json/xml/yaml/csv/pdf is
+        rejected with 415.
+      * ``max_text_bytes`` -- post-extraction size cap. Defaults to
+        ``WCB_DOWNLOAD_MAX_BYTES`` env or 30 MB.
+
+    Error mapping (caller turns these into HTTP responses):
+      * 404 ``fixture_missing`` -- ``<blob_dir>/<basename>`` not on disk
+      * 404 ``invalid_basename`` -- basename contains '/' or '..'
+      * 415 ``unsupported_mime`` -- mime not in allow-list
+      * 415 ``pdf_*`` -- PDF extraction failed (see ``_extract_pdf_text``)
+      * 413 ``content_too_large`` -- extracted text exceeds cap
+
+    Caller is responsible for *finding* the row (file_id -> row -> name,
+    mime) and translating DownloadError into the per-API error envelope
+    (Box: ``{type,status,code,message}``; Drive: ``{error:{...}}``;
+    Dropbox: ``{error_summary, error:{...}}``)."""
+    import os
+    from pathlib import Path as _Path
+
+    if max_text_bytes is None:
+        env_v = os.environ.get("WCB_DOWNLOAD_MAX_BYTES", "").strip()
+        try:
+            max_text_bytes = int(env_v) if env_v else _DOWNLOAD_MAX_TEXT_BYTES_DEFAULT
+        except ValueError:
+            max_text_bytes = _DOWNLOAD_MAX_TEXT_BYTES_DEFAULT
+
+    # Path-traversal guard -- basename must be a single path component. This
+    # is defensive depth-in-depth; the per-API route should be passing a
+    # value from the row, not an attacker-controlled string. But the route
+    # may be tempted to forward a user-supplied path (Dropbox does this) so
+    # we lock it down here.
+    if "/" in basename or "\\" in basename or basename in ("", ".", "..") or basename.startswith("."):
+        raise DownloadError(
+            http_status=404,
+            code="invalid_basename",
+            message=f"basename {basename!r} is not a single safe path component",
+        )
+
+    mime = (mime_type or "").split(";", 1)[0].strip().lower()
+    is_pdf = mime == _DOWNLOAD_PDF_MIME
+
+    if not is_pdf and not _is_downloadable_text_mime(mime):
+        raise DownloadError(
+            http_status=415,
+            code="unsupported_mime",
+            message=(
+                f"mime {mime!r} not supported; only text/*, "
+                "application/json|xml|yaml|csv, and application/pdf are downloadable"
+            ),
+        )
+
+    blob_path = _Path(blob_dir) / basename
+    if not blob_path.is_file():
+        # Per-task overlay fallback: per `eval/run_batch.py` the overlay
+        # collector is non-recursive (only top-level files under
+        # `input/<task>/mock_data/<api>/` bind-mount into the container at
+        # `/opt/mocks/<api>/<basename>`). Authors who want to ship a fixture
+        # for the download endpoints place it flat next to `files.csv` rather
+        # than under `file_blobs/`, so we fall back one level up from the
+        # baked-in `BLOB_DIR` before raising 404.
+        fallback_path = _Path(blob_dir).parent / basename
+        if fallback_path.is_file():
+            blob_path = fallback_path
+        else:
+            raise DownloadError(
+                http_status=404,
+                code="fixture_missing",
+                message=f"file_blob {basename!r} not found in {blob_dir}",
+            )
+
+    if is_pdf:
+        text = _extract_pdf_text(blob_path)
+    else:
+        try:
+            raw = blob_path.read_bytes()
+        except OSError as exc:
+            raise DownloadError(
+                http_status=404,
+                code="fixture_unreadable",
+                message=f"could not read {basename!r}: {exc}",
+            )
+        text = raw.decode("utf-8", errors="replace")
+
+    # Enforce cap AFTER extraction -- a 5 MB PDF that pypdf extracts to
+    # 60 MB of text should 413, not silently truncate.
+    size_bytes = len(text.encode("utf-8"))
+    if size_bytes > max_text_bytes:
+        raise DownloadError(
+            http_status=413,
+            code="content_too_large",
+            message=(
+                f"extracted text {size_bytes} bytes exceeds cap {max_text_bytes}"
+            ),
+        )
+
+    return text

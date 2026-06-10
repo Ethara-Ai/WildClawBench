@@ -8,11 +8,13 @@ from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+BLOB_DIR = DATA_DIR / "file_blobs"
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_int, opt_str, strict_bool)
+    read_csv_with_ctx, get_store, opt_int, opt_str, strict_bool,
+    DownloadError, extract_file_content_text)
 
 _store = get_store("google-drive-api")
 _API = "google-drive-api"
@@ -179,6 +181,23 @@ def get_file(file_id):
         if f["id"] == file_id:
             return _serialize_file(f)
     return {"error": f"File {file_id} not found"}
+
+
+def download_file_content(file_id):
+    row = next((f for f in _files_rows() if f["id"] == file_id), None)
+    if row is None:
+        raise DownloadError(http_status=404, code="not_found",
+                            message=f"File {file_id} not found")
+    name = row["name"]
+    mime_type = row.get("mime_type") or "application/octet-stream"
+    text = extract_file_content_text(BLOB_DIR, name, mime_type)
+    return {
+        "file_id": file_id,
+        "name": name,
+        "mime_type": mime_type,
+        "size_bytes": len(text.encode("utf-8")),
+        "content": text,
+    }
 
 
 def create_file(name, mime_type, parent_id=None, owner_email="amelia@orbit-labs.com",

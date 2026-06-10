@@ -9,15 +9,22 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, # noqa: E402
+    get_store,
+    strict_bool,
+    strict_str,
+    opt_str,
+)
 
 _store = get_store("google-calendar-api")
+_API = "google-calendar-api"
 
 _store.register("calendars", primary_key="id",
-                initial_loader=lambda: _coerce_calendars(_load("calendars.csv")))
+                initial_loader=lambda: _coerce_calendars(_load("calendars.csv", "calendars")))
 _store.register("events", primary_key="id",
-                initial_loader=lambda: _coerce_events(_load("events.csv")))
-_store.register_document("attendees", initial_loader=lambda: _coerce_attendees(_load("event_attendees.csv")))
+                initial_loader=lambda: _coerce_events(_load("events.csv", "events")))
+_store.register_document("attendees", initial_loader=lambda: _coerce_attendees(_load("event_attendees.csv", "event_attendees")))
 
 
 def _calendars_rows():
@@ -33,38 +40,43 @@ def _attendees_doc():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
     return datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
 
-def _to_bool(v):
-    return str(v).strip().lower() == "true"
-
-
 def _coerce_calendars(rows):
-    return [{**r, "primary": _to_bool(r["primary"])} for r in rows]
+    return [{**_strip_ctx(r), "primary": strict_bool(r, "primary")} for r in rows]
 
 
 def _coerce_events(rows):
-    return [{**r, "all_day": _to_bool(r["all_day"]),
-             "recurrence": [r["recurrence"]] if r["recurrence"] else []}
-            for r in rows]
+    out = []
+    for r in rows:
+        recurrence = opt_str(r, "recurrence", default="")
+        out.append({
+            **_strip_ctx(r),
+            "all_day": strict_bool(r, "all_day"),
+            "recurrence": [recurrence] if recurrence else [],
+        })
+    return out
 
 
 def _coerce_attendees(rows):
     out = {}
     for r in rows:
-        out.setdefault(r["event_id"], []).append({
-            "email": r["email"],
-            "displayName": r["display_name"],
-            "responseStatus": r["response_status"],
-            "optional": _to_bool(r["optional"]),
-            "organizer": _to_bool(r["organizer"]),
+        out.setdefault(strict_str(r, "event_id"), []).append({
+            "email": strict_str(r, "email"),
+            "displayName": strict_str(r, "display_name"),
+            "responseStatus": strict_str(r, "response_status"),
+            "optional": strict_bool(r, "optional"),
+            "organizer": strict_bool(r, "organizer"),
         })
     return out
 
@@ -249,3 +261,6 @@ def freebusy(time_min, time_max, calendar_ids):
         calendars_block[raw_id] = {"busy": busy}
     return {"kind": "calendar#freeBusy", "timeMin": time_min, "timeMax": time_max,
             "calendars": calendars_block}
+
+
+_store.eager_load()

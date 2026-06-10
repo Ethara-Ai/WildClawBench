@@ -199,8 +199,8 @@ def _coerce_pricing(rows):
 
 
 
-_next_report_id = 11
-_next_return_id = 6
+_next_report_id = 1
+_next_return_id = 1
 
 
 # ---------------------------------------------------------------------------
@@ -208,15 +208,15 @@ _next_return_id = 6
 # ---------------------------------------------------------------------------
 
 def get_seller_account():
-    return {"type": "seller_account", "seller": _seller_store}
+    return {"type": "seller_account", "seller": _seller_account_doc()}
 
 
 def get_account_health():
-    return {"type": "account_health", "accountHealth": _seller_store["accountHealth"]}
+    return {"type": "account_health", "accountHealth": _seller_account_doc()["accountHealth"]}
 
 
 def get_performance_notifications(severity=None):
-    results = list(_seller_store["performanceNotifications"])
+    results = list(_seller_account_doc()["performanceNotifications"])
     if severity:
         results = [n for n in results if n["severity"].upper() == severity.upper()]
     return {"type": "notifications", "count": len(results), "results": results}
@@ -233,7 +233,7 @@ def search_catalog_items(
     page_size=10,
     status=None,
 ):
-    results = list(_catalog_store)
+    results = _catalog_items_rows()
 
     if status:
         results = [r for r in results if r["status"].upper() == status.upper()]
@@ -290,14 +290,14 @@ def _format_catalog_item(item):
 
 
 def get_catalog_item(asin):
-    for item in _catalog_store:
+    for item in _catalog_items_rows():
         if item["asin"] == asin:
             return {"type": "catalog_item", "item": _format_catalog_item(item)}
     return {"error": f"Item with ASIN {asin} not found"}
 
 
 def get_listing_item(seller_id, sku):
-    for item in _catalog_store:
+    for item in _catalog_items_rows():
         if item["sku"] == sku and item["sellerId"] == seller_id:
             return {"type": "listing_item", "listing": {
                 "sku": item["sku"],
@@ -325,14 +325,15 @@ def get_listing_item(seller_id, sku):
 
 
 def create_listing_item(seller_id, sku, data):
-    for item in _catalog_store:
+    catalog_table = _store.table("catalog_items")
+    for item in catalog_table.rows():
         if item["sku"] == sku and item["sellerId"] == seller_id:
             return {"error": f"Listing with SKU {sku} already exists"}
 
     now = _now()
     new_item = {
         "sku": sku,
-        "asin": data.get("asin", f"B0NEW{len(_catalog_store):05d}"),
+        "asin": data.get("asin", f"B0NEW{len(catalog_table):05d}"),
         "sellerId": seller_id,
         "title": data.get("title", ""),
         "description": data.get("description", ""),
@@ -356,35 +357,40 @@ def create_listing_item(seller_id, sku, data):
         "createdDate": now,
         "lastUpdatedDate": now,
     }
-    _catalog_store.append(new_item)
+    catalog_table.upsert(new_item)
     return {"type": "listing_item", "status": "ACCEPTED", "sku": sku, "issues": []}
 
 
 def update_listing_item(seller_id, sku, data):
-    for i, item in enumerate(_catalog_store):
+    catalog_table = _store.table("catalog_items")
+    for item in catalog_table.rows():
         if item["sku"] == sku and item["sellerId"] == seller_id:
             updatable = {
                 "title", "description", "brand", "bulletPoints", "price",
                 "quantity", "fulfillmentChannel", "status", "condition",
                 "productType", "mainImageUrl", "category",
             }
+            patch = {}
             for k, v in data.items():
-                if k in updatable:
-                    if k == "price" and v is not None:
-                        _catalog_store[i][k] = float(v)
-                    elif k == "quantity" and v is not None:
-                        _catalog_store[i][k] = int(v)
-                    else:
-                        _catalog_store[i][k] = v
-            _catalog_store[i]["lastUpdatedDate"] = _now()
+                if k not in updatable:
+                    continue
+                if k == "price" and v is not None:
+                    patch[k] = float(v)
+                elif k == "quantity" and v is not None:
+                    patch[k] = int(v)
+                else:
+                    patch[k] = v
+            patch["lastUpdatedDate"] = _now()
+            catalog_table.patch(sku, patch)
             return {"type": "listing_item", "status": "ACCEPTED", "sku": sku, "issues": []}
     return {"error": f"Listing with SKU {sku} not found for seller {seller_id}"}
 
 
 def delete_listing_item(seller_id, sku):
-    for i, item in enumerate(_catalog_store):
+    catalog_table = _store.table("catalog_items")
+    for item in catalog_table.rows():
         if item["sku"] == sku and item["sellerId"] == seller_id:
-            _catalog_store.pop(i)
+            catalog_table.delete(sku)
             return {"type": "listing_item", "status": "ACCEPTED", "sku": sku, "deleted": True}
     return {"error": f"Listing with SKU {sku} not found for seller {seller_id}"}
 
@@ -505,18 +511,22 @@ def get_order_items(order_id):
 
 
 def confirm_shipment(order_id, data):
-    for i, o in enumerate(_orders_rows()):
+    orders_table = _store.table("orders")
+    order_items_table = _store.table("order_items")
+    for o in orders_table.rows():
         if o["AmazonOrderId"] == order_id:
             if o["OrderStatus"] not in ("Unshipped", "PartiallyShipped"):
                 return {"error": f"Order {order_id} cannot be shipped (status: {o['OrderStatus']})"}
-            _orders_rows()[i]["OrderStatus"] = "Shipped"
-            _orders_rows()[i]["LastUpdateDate"] = _now()
             shipped = o["NumberOfItemsShipped"] + o["NumberOfItemsUnshipped"]
-            _orders_rows()[i]["NumberOfItemsShipped"] = shipped
-            _orders_rows()[i]["NumberOfItemsUnshipped"] = 0
-            for j, oi in enumerate(_order_items_rows()):
+            orders_table.patch(order_id, {
+                "OrderStatus": "Shipped",
+                "LastUpdateDate": _now(),
+                "NumberOfItemsShipped": shipped,
+                "NumberOfItemsUnshipped": 0,
+            })
+            for oi in order_items_table.rows():
                 if oi["AmazonOrderId"] == order_id:
-                    _order_items_rows()[j]["QuantityShipped"] = oi["QuantityOrdered"]
+                    order_items_table.patch(oi["OrderItemId"], {"QuantityShipped": oi["QuantityOrdered"]})
             return {"type": "shipment_confirmation", "status": "SUCCESS", "orderId": order_id}
     return {"error": f"Order {order_id} not found"}
 
@@ -567,11 +577,14 @@ def get_inventory_summaries(
 
 
 def update_inventory(seller_sku, quantity):
-    for i, inv in enumerate(_inventory_rows()):
+    inv_table = _store.table("inventory")
+    for inv in inv_table.rows():
         if inv["sellerSku"] == seller_sku:
-            _inventory_rows()[i]["totalQuantity"] = int(quantity)
-            _inventory_rows()[i]["inStockSupplyQuantity"] = int(quantity)
-            _inventory_rows()[i]["lastUpdatedTime"] = _now()
+            inv_table.patch(inv["fnSku"], {
+                "totalQuantity": int(quantity),
+                "inStockSupplyQuantity": int(quantity),
+                "lastUpdatedTime": _now(),
+            })
             return {"type": "inventory_update", "status": "SUCCESS", "sellerSku": seller_sku}
     return {"error": f"Inventory for SKU {seller_sku} not found"}
 
@@ -640,7 +653,7 @@ def create_report(report_type, data_start_time, data_end_time):
         "processingEndTime": None,
         "reportDocumentId": None,
     }
-    _reports_rows().append(report)
+    _store.table("reports").upsert(report)
     _next_report_id += 1
     return {
         "type": "report_created",
@@ -769,22 +782,39 @@ def get_return(return_id):
 
 
 def authorize_return(return_id):
-    for i, r in enumerate(_returns_rows()):
+    returns_table = _store.table("returns")
+    for r in returns_table.rows():
         if r["returnId"] == return_id:
             if r["returnStatus"] != "Authorized":
                 return {"error": f"Return {return_id} is not in Authorized status"}
-            _returns_rows()[i]["returnStatus"] = "Completed"
-            _returns_rows()[i]["resolution"] = "REFUND"
+            returns_table.patch(return_id, {"returnStatus": "Completed", "resolution": "REFUND"})
             return {"type": "return_authorization", "status": "SUCCESS", "returnId": return_id}
     return {"error": f"Return {return_id} not found"}
 
 
 def close_return(return_id):
-    for i, r in enumerate(_returns_rows()):
+    returns_table = _store.table("returns")
+    for r in returns_table.rows():
         if r["returnId"] == return_id:
-            _returns_rows()[i]["returnStatus"] = "Closed"
-            _returns_rows()[i]["resolution"] = "CLOSED"
+            returns_table.patch(return_id, {"returnStatus": "Closed", "resolution": "CLOSED"})
             return {"type": "return_close", "status": "SUCCESS", "returnId": return_id}
     return {"error": f"Return {return_id} not found"}
 
+
 _store.eager_load()
+
+
+def _max_numeric_suffix(rows, key, prefix):
+    hi = 0
+    for r in rows:
+        v = str(r.get(key, ""))
+        if v.startswith(prefix):
+            try:
+                hi = max(hi, int(v[len(prefix):]))
+            except ValueError:
+                continue
+    return hi
+
+
+_next_report_id = _max_numeric_suffix(_store.table("reports").rows(), "reportId", "REP-") + 1
+_next_return_id = _max_numeric_suffix(_store.table("returns").rows(), "returnId", "RET-") + 1

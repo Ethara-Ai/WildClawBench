@@ -9,26 +9,28 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_csv_with_ctx, get_store, opt_float, opt_str, strict_int)
 
 _store = get_store("google-classroom-api")
+_API = "google-classroom-api"
 
 _store.register("courses", primary_key="id",
-                initial_loader=lambda: _coerce_courses(_load("courses.csv")))
+                initial_loader=lambda: _coerce_courses(_load("courses.csv", "courses")))
 _store.register("coursework", primary_key="id",
-                initial_loader=lambda: _coerce_coursework(_load("coursework.csv")))
+                initial_loader=lambda: _coerce_coursework(_load("coursework.csv", "coursework")))
 _store.register("topics", primary_key="courseId",
-                initial_loader=lambda: _coerce_topics(_load("topics.csv")))
+                initial_loader=lambda: _coerce_topics(_load("topics.csv", "topics")))
 _store.register("students", primary_key="courseId",
-                initial_loader=lambda: _coerce_students(_load("students.csv")))
+                initial_loader=lambda: _coerce_students(_load("students.csv", "students")))
 _store.register("teachers", primary_key="courseId",
-                initial_loader=lambda: _coerce_teachers(_load("teachers.csv")))
+                initial_loader=lambda: _coerce_teachers(_load("teachers.csv", "teachers")))
 _store.register("submissions", primary_key="id",
-                initial_loader=lambda: _coerce_submissions(_load("submissions.csv")))
+                initial_loader=lambda: _coerce_submissions(_load("submissions.csv", "submissions")))
 _store.register("announcements", primary_key="id",
-                initial_loader=lambda: _coerce_announcements(_load("announcements.csv")))
+                initial_loader=lambda: _coerce_announcements(_load("announcements.csv", "announcements")))
 _store.register("materials", primary_key="id",
-                initial_loader=lambda: _coerce_materials(_load("materials.csv")))
+                initial_loader=lambda: _coerce_materials(_load("materials.csv", "materials")))
 
 
 def _courses_rows():
@@ -64,9 +66,12 @@ def _materials_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -108,9 +113,9 @@ def _coerce_coursework(rows):
             "title": r["title"],
             "description": r["description"],
             "state": r["state"],
-            "maxPoints": float(r["maxPoints"]) if r["maxPoints"] else None,
+            "maxPoints": opt_float(r, "maxPoints", default=None),
             "workType": r["workType"],
-            "topicId": r["topicId"] if r["topicId"] else None,
+            "topicId": opt_str(r, "topicId", default="") or None,
             "creationTime": r["creationTime"],
             "updateTime": r["updateTime"],
             "alternateLink": r["alternateLink"],
@@ -118,16 +123,16 @@ def _coerce_coursework(rows):
         # Build dueDate and dueTime objects if present
         if r.get("dueDate_year") and r["dueDate_year"]:
             cw["dueDate"] = {
-                "year": int(r["dueDate_year"]),
-                "month": int(r["dueDate_month"]),
-                "day": int(r["dueDate_day"]),
+                "year": strict_int(r, "dueDate_year"),
+                "month": strict_int(r, "dueDate_month"),
+                "day": strict_int(r, "dueDate_day"),
             }
         else:
             cw["dueDate"] = None
         if r.get("dueTime_hours") and r["dueTime_hours"]:
             cw["dueTime"] = {
-                "hours": int(r["dueTime_hours"]),
-                "minutes": int(r["dueTime_minutes"]),
+                "hours": strict_int(r, "dueTime_hours"),
+                "minutes": strict_int(r, "dueTime_minutes"),
             }
         else:
             cw["dueTime"] = None
@@ -193,8 +198,8 @@ def _coerce_submissions(rows):
             "updateTime": r["updateTime"],
             "alternateLink": r["alternateLink"],
         }
-        sub["assignedGrade"] = float(r["assignedGrade"]) if r.get("assignedGrade") and r["assignedGrade"] else None
-        sub["draftGrade"] = float(r["draftGrade"]) if r.get("draftGrade") and r["draftGrade"] else None
+        sub["assignedGrade"] = opt_float(r, "assignedGrade", default=None)
+        sub["draftGrade"] = opt_float(r, "draftGrade", default=None)
         out.append(sub)
     return out
 
@@ -227,7 +232,7 @@ def _coerce_materials(rows):
             "creationTime": r["creationTime"],
             "updateTime": r["updateTime"],
             "creatorUserId": r["creatorUserId"],
-            "topicId": r["topicId"] if r["topicId"] else None,
+            "topicId": opt_str(r, "topicId", default="") or None,
             "alternateLink": r["alternateLink"],
             "materials": [{"link": {"url": r["materialUrl"], "title": r["title"]}}] if r.get("materialUrl") else [],
         })
@@ -595,6 +600,52 @@ def reclaim_submission(course_id, coursework_id, submission_id):
     return {"error": f"Submission {submission_id} not found"}
 
 
+def turn_in_submission(course_id, coursework_id, submission_id):
+    """Student turn-in: transition the submission to TURNED_IN.
+
+    Mirrors the real Classroom `studentSubmissions.turnIn` action. Without this,
+    a turn-in task is uncompletable (only grade/return/reclaim existed), forcing
+    agents into out-of-scope fallbacks that trip the non-submission guardrail.
+
+    Uses the store's `patch` so the state change persists (the older
+    grade/return/reclaim handlers mutate a `rows()` deepcopy and do not).
+    """
+    if not any(c["id"] == course_id for c in _courses_rows()):
+        return {"error": f"Course {course_id} not found"}
+    tbl = _store.table("submissions")
+    row = tbl.get(submission_id)
+    if (row is None or row.get("courseId") != course_id
+            or row.get("courseWorkId") != coursework_id):
+        return {"error": f"Submission {submission_id} not found"}
+    updated = tbl.patch(submission_id, {"state": "TURNED_IN", "updateTime": _now()})
+    return {"studentSubmission": updated}
+
+
+def modify_submission_attachments(course_id, coursework_id, submission_id, add_attachments):
+    """Attach materials to a student submission (Classroom `modifyAttachments`).
+
+    `add_attachments` is the list from the request body's `addAttachments`.
+    Persisted under the submission's `assignmentSubmission.attachments` so a
+    later GET reflects the attached worked-solutions document.
+    """
+    if not any(c["id"] == course_id for c in _courses_rows()):
+        return {"error": f"Course {course_id} not found"}
+    tbl = _store.table("submissions")
+    row = tbl.get(submission_id)
+    if (row is None or row.get("courseId") != course_id
+            or row.get("courseWorkId") != coursework_id):
+        return {"error": f"Submission {submission_id} not found"}
+    existing = row.get("assignmentSubmission") or {}
+    attachments = list(existing.get("attachments", []))
+    if isinstance(add_attachments, list):
+        attachments.extend(add_attachments)
+    updated = tbl.patch(
+        submission_id,
+        {"assignmentSubmission": {"attachments": attachments}, "updateTime": _now()},
+    )
+    return {"studentSubmission": updated}
+
+
 # ---------------------------------------------------------------------------
 # Students
 # ---------------------------------------------------------------------------
@@ -819,3 +870,5 @@ def create_material(course_id, data):
     _materials_rows().append(mat)
     _next_mat_id += 1
     return {"courseWorkMaterial": mat}
+
+_store.eager_load()

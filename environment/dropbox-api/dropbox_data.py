@@ -6,9 +6,11 @@ sharing/list_shared_links.
 """
 
 import csv
+import mimetypes
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+BLOB_DIR = DATA_DIR / "file_blobs"
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
@@ -16,6 +18,7 @@ from _mutable_store import (
     read_csv_with_ctx, get_store,
     strict_bool,
     opt_int,
+    DownloadError, extract_file_content_text,
 )
 
 _store = get_store("dropbox-api")
@@ -220,6 +223,34 @@ def get_metadata(path=None):
     return {
         "error_summary": "path/not_found/",
         "error": {".tag": "path", "path": {".tag": "not_found"}},
+    }
+
+
+def download_file_content(path=None):
+    if not path:
+        raise DownloadError(http_status=400, code="bad_request",
+                            message="path is required")
+    target = _norm_path(path)
+    row = next((f for f in _files_rows()
+                if f["path_lower"] == target or f["id"] == path), None)
+    if row is None:
+        raise DownloadError(http_status=404, code="not_found",
+                            message=f"path {path!r} not found")
+    if row.get("is_folder"):
+        raise DownloadError(http_status=415, code="unsupported_mime",
+                            message=f"path {path!r} is a folder")
+    name = row["name"]
+    mime_type, _ = mimetypes.guess_type(name)
+    if not mime_type:
+        mime_type = "application/octet-stream"
+    text = extract_file_content_text(BLOB_DIR, name, mime_type)
+    return {
+        "file_id": row["id"],
+        "name": name,
+        "path_display": row["path_display"],
+        "mime_type": mime_type,
+        "size_bytes": len(text.encode("utf-8")),
+        "content": text,
     }
 
 

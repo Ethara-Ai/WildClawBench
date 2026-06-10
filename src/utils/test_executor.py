@@ -340,17 +340,33 @@ def _compute_reward(results: Mapping[str, dict], weights: Mapping[str, float]) -
     """
     if not weights:
         return 0.0
-    passed_names: set[str] = set()
+    # A.1+A.2 parity with src/utils/harbor/test_sh.py + src/utils/harbor/ctrf.py:
+    # three normalized shapes (full FQN / class-qualified / bare) so a weight
+    # key in any form resolves; class-qualified keys must NOT fall through to
+    # bare-multiset (would leak A.2 loose semantics into precise lookups).
+    passed_full: set[str] = set()
+    passed_class_qual: set[str] = set()
+    passed_bare: set[str] = set()
     for full_name, res in results.items():
         if res.get("status") != "passed":
             continue
-        passed_names.add(full_name)
-        if "::" in full_name:
-            passed_names.add(full_name.split("::", 1)[-1])
+        passed_full.add(full_name)
+        parts = full_name.split("::")
+        if len(parts) >= 2:
+            passed_bare.add(parts[-1])
+        if len(parts) >= 3:
+            passed_class_qual.add("::".join(parts[-2:]))
+
+    def _key_passed(key: str) -> bool:
+        if key in passed_full:
+            return True
+        if "::" in key:
+            return key in passed_class_qual
+        return key in passed_bare
 
     pos_total = sum(float(w) for w in weights.values() if w > 0)
-    pos_earned = sum(float(w) for n, w in weights.items() if w > 0 and n in passed_names)
-    neg_penalty = sum(abs(float(w)) for n, w in weights.items() if w < 0 and n in passed_names)
+    pos_earned = sum(float(w) for n, w in weights.items() if w > 0 and _key_passed(n))
+    neg_penalty = sum(abs(float(w)) for n, w in weights.items() if w < 0 and _key_passed(n))
 
     if pos_total <= 0:
         scored = [r for r in results.values() if r.get("status") != "skipped"]
