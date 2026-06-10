@@ -141,12 +141,12 @@ class TestCheckerT1C3:
 
 
 class TestCheckerT1C4:
-    """T1 spawned at least the expected number of subagents (>=3). [checker:T1_C4] [trap:none]"""
+    """T1 spawned at least the expected number of subagents (>=3). [checker:T1_MA] [trap:none]"""
 
     def test_checker_resolved(self, state):
-        result = state.get("checkers", {}).get('T1_C4')
-        assert result is not None, f"checker T1_C4 not present in state"
-        assert result, f"checker T1_C4 failed: {result!r}"
+        result = state.get("checkers", {}).get('T1_MA')
+        assert result is not None, f"checker T1_MA not present in state"
+        assert result, f"checker T1_MA failed: {result!r}"
 
 
 class TestCheckerT2C1:
@@ -167,12 +167,12 @@ class TestCheckerT3C1:
 
 
 class TestCheckerT3C2:
-    """T3 spawned at least 2 subagents (budget extraction + narrative). [checker:T3_C2] [trap:none]"""
+    """T3 spawned at least 2 subagents (budget extraction + narrative). [checker:T3_MA] [trap:none]"""
 
     def test_checker_resolved(self, state):
-        result = state.get("checkers", {}).get('T3_C2')
-        assert result is not None, f"checker T3_C2 not present in state"
-        assert result, f"checker T3_C2 failed: {result!r}"
+        result = state.get("checkers", {}).get('T3_MA')
+        assert result is not None, f"checker T3_MA not present in state"
+        assert result, f"checker T3_MA failed: {result!r}"
 
 
 class TestCheckerT4C1:
@@ -228,12 +228,12 @@ class TestCheckerT6C3:
 
 
 class TestCheckerT6C4:
-    """T6 spawned at least 3 subagents (imagery / log reconciliation / water-use argument). [checker:T6_C4] [trap:none]"""
+    """T6 spawned at least 3 subagents (imagery / log reconciliation / water-use argument). [checker:T6_MA] [trap:none]"""
 
     def test_checker_resolved(self, state):
-        result = state.get("checkers", {}).get('T6_C4')
-        assert result is not None, f"checker T6_C4 not present in state"
-        assert result, f"checker T6_C4 failed: {result!r}"
+        result = state.get("checkers", {}).get('T6_MA')
+        assert result is not None, f"checker T6_MA not present in state"
+        assert result, f"checker T6_MA failed: {result!r}"
 
 
 class TestCheckerT7C1:
@@ -291,12 +291,12 @@ class TestCheckerT9C3:
 
 
 class TestCheckerT9C4:
-    """T9 spawned at least 2 subagents (mileage + soil computations in parallel). [checker:T9_C4] [trap:none]"""
+    """T9 spawned at least 2 subagents (mileage + soil computations in parallel). [checker:T9_MA] [trap:none]"""
 
     def test_checker_resolved(self, state):
-        result = state.get("checkers", {}).get('T9_C4')
-        assert result is not None, f"checker T9_C4 not present in state"
-        assert result, f"checker T9_C4 failed: {result!r}"
+        result = state.get("checkers", {}).get('T9_MA')
+        assert result is not None, f"checker T9_MA not present in state"
+        assert result, f"checker T9_MA failed: {result!r}"
 
 
 class TestCheckerT10C1:
@@ -352,12 +352,12 @@ class TestCheckerT12C3:
 
 
 class TestCheckerT12C4:
-    """T12 spawned at least 3 subagents for the final consolidation. [checker:T12_C4] [trap:none]"""
+    """T12 spawned at least 3 subagents for the final consolidation. [checker:T12_MA] [trap:none]"""
 
     def test_checker_resolved(self, state):
-        result = state.get("checkers", {}).get('T12_C4')
-        assert result is not None, f"checker T12_C4 not present in state"
-        assert result, f"checker T12_C4 failed: {result!r}"
+        result = state.get("checkers", {}).get('T12_MA')
+        assert result is not None, f"checker T12_MA not present in state"
+        assert result, f"checker T12_MA failed: {result!r}"
 
 
 class TestCheckerCROSSC1:
