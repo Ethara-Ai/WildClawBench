@@ -28,8 +28,10 @@ Hard rules
 * One NDJSON row per spawn. The spawn_tree row carries a *preview* of the
   child output (first 240 chars) plus a SHA-256 of the full output; the full
   transcript lives in the per-spawn file so the spawn_tree stays small.
-* Bounded. ``max_tool_calls`` and ``max_tokens`` are upper bounds; the runtime
-  layer also enforces ``timeout_seconds`` wall-clock.
+* Bounded. ``max_tool_calls`` and ``timeout_seconds`` are capped by the
+  runtime layer. ``max_tokens`` has no harness-side cap — it flows straight
+  through to the upstream ``/v1/messages`` endpoint, which enforces its own
+  per-model upper bound.
 * Turn-correlated. The spawn row carries ``turn_index`` read from
   ``/tmp_workspace/.wildclaw_current_turn`` (written by the openclaw runner
   between turns). Missing / unreadable -> ``turn_index = -1`` (still logged).
@@ -38,7 +40,6 @@ Hard rules
 from __future__ import annotations
 
 import argparse
-import dataclasses
 import hashlib
 import json
 import logging
@@ -57,10 +58,11 @@ _DEFAULT_SPAWN_TREE_PATH = Path("/tmp_workspace/spawn_tree.jsonl")
 _DEFAULT_TRANSCRIPT_DIR = Path("/tmp_workspace/subagents")
 _DEFAULT_TURN_MARKER = Path("/tmp_workspace/.wildclaw_current_turn")
 
-# Hard ceilings - even if a task_config.yaml asks for more, we clamp here so a
-# rogue parent cannot blow the budget.
+# Hard ceilings on tool calls + wall-clock prevent a rogue parent from
+# stalling the sidecar. max_tokens is intentionally NOT capped: per-task
+# tool loops may need to produce long structured answers, and the underlying
+# /v1/messages endpoint already enforces its own per-model upper bound.
 _MAX_TOOL_CALLS_CEILING = 50
-_MAX_TOKENS_CEILING = 16384
 _MAX_TIMEOUT_CEILING = 600  # seconds
 _PREVIEW_CHARS = 240
 
@@ -77,12 +79,11 @@ class SubagentSpec:
     context: str = ""
     model: str | None = None
     max_tool_calls: int = 20
-    max_tokens: int = 4096
-    timeout_seconds: int = 120
+    max_tokens: int = 32000
+    timeout_seconds: int = 300
 
     @classmethod
     def from_dict(cls, raw: Mapping[str, Any]) -> SubagentSpec:
-        # Allowed tools accepted as list/tuple; coerce to tuple of str.
         tools_raw = raw.get("allowed_tools") or ()
         if not isinstance(tools_raw, (list, tuple)):
             raise ValueError("allowed_tools must be a list of strings")
@@ -95,8 +96,8 @@ class SubagentSpec:
             context=str(raw.get("context", "")),
             model=raw.get("model"),
             max_tool_calls=int(raw.get("max_tool_calls", 20)),
-            max_tokens=int(raw.get("max_tokens", 4096)),
-            timeout_seconds=int(raw.get("timeout_seconds", 120)),
+            max_tokens=int(raw.get("max_tokens", 32000)),
+            timeout_seconds=int(raw.get("timeout_seconds", 300)),
         )
 
 
@@ -114,6 +115,11 @@ class SubagentResult:
     # ok | timeout | error | blocked
     status: str = "ok"
     error: str | None = None
+    # Per-HTTP-round capture from _drive_tool_loop. Each round is a dict
+    # {assistant_content, tool_results, usage, stop_reason} preserving the
+    # Anthropic /v1/messages content blocks so a delivery converter can
+    # reshape them into the parent's toolCall/toolResult message schema.
+    rounds: list[dict] = field(default_factory=list)
 
     def to_log_row(
         self,
@@ -196,8 +202,8 @@ def _validate_spec(spec: SubagentSpec) -> str | None:
         )
     if spec.max_tool_calls < 0 or spec.max_tool_calls > _MAX_TOOL_CALLS_CEILING:
         return f"max_tool_calls must be in [0, {_MAX_TOOL_CALLS_CEILING}]"
-    if spec.max_tokens <= 0 or spec.max_tokens > _MAX_TOKENS_CEILING:
-        return f"max_tokens must be in (0, {_MAX_TOKENS_CEILING}]"
+    if spec.max_tokens <= 0:
+        return "max_tokens must be > 0"
     if spec.timeout_seconds <= 0 or spec.timeout_seconds > _MAX_TIMEOUT_CEILING:
         return f"timeout_seconds must be in (0, {_MAX_TIMEOUT_CEILING}]"
     return None
@@ -264,6 +270,8 @@ def run_with_invoker(
             elapsed_seconds=elapsed,
         )
 
+    raw_rounds = raw.get("rounds") or []
+    rounds = [dict(r) for r in raw_rounds if isinstance(r, Mapping)]
     return SubagentResult(
         spawn_id=sid,
         role=spec.role,
@@ -273,6 +281,7 @@ def run_with_invoker(
         tokens_out=int(raw.get("tokens_out", 0) or 0),
         elapsed_seconds=elapsed,
         status="ok",
+        rounds=rounds,
     )
 
 
@@ -303,7 +312,50 @@ def append_spawn_row(
         fp.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
-def write_full_transcript(
+_STATUS_TO_COMPLETION = {
+    "ok": "completed",
+    "blocked": "partial",
+    "timeout": "partial",
+    "error": "partial",
+}
+
+
+def _anthropic_block_to_delivery(block: Mapping[str, Any]) -> dict[str, Any] | None:
+    t = block.get("type")
+    if t == "text":
+        return {"type": "text", "text": str(block.get("text", ""))}
+    if t == "thinking":
+        return {
+            "type": "thinking",
+            "thinking": str(block.get("thinking", "")),
+            "thinkingSignature": str(block.get("signature", "")),
+        }
+    if t == "tool_use":
+        inp = block.get("input") or {}
+        if not isinstance(inp, Mapping):
+            inp = {}
+        return {
+            "type": "toolCall",
+            "id": block.get("id", ""),
+            "name": str(block.get("name", "")),
+            "arguments": dict(inp),
+        }
+    return None
+
+
+def _tool_use_name_map(rounds: list[dict[str, Any]]) -> dict[str, str]:
+    names: dict[str, str] = {}
+    for rnd in rounds:
+        for blk in rnd.get("assistant_content") or []:
+            if not isinstance(blk, Mapping) or blk.get("type") != "tool_use":
+                continue
+            tu_id = blk.get("id")
+            if tu_id:
+                names[str(tu_id)] = str(blk.get("name", ""))
+    return names
+
+
+def write_subagent_delivery(
     spawn_id: str,
     *,
     spec: SubagentSpec,
@@ -312,36 +364,256 @@ def write_full_transcript(
     usr_prompt: str,
     transcript_dir: Path = _DEFAULT_TRANSCRIPT_DIR,
 ) -> Path:
+    """Write the per-spawn delivery file ``{spawn_id}.delivery.json``.
+
+    The on-disk shape mirrors the parent harness ``delivery.json``: a
+    top-level ``meta_info`` block plus a ``messages`` list whose entries
+    follow the same wrapper shape (``type='message'``, deterministic
+    ``id`` / ``parentId`` chain, ``timestamp``, ``message.role`` /
+    ``message.content``). Anthropic content blocks captured per round
+    (``text`` / ``thinking`` / ``tool_use``) are reshaped into the
+    delivery vocabulary (``text`` / ``thinking`` with ``thinkingSignature``
+    / ``toolCall`` with ``arguments``). Each tool_result block becomes its
+    own ``toolResult`` user message so the parent's ``toolCall`` \u2192
+    ``toolResult`` pairing convention holds inside the sub-agent
+    trajectory too.
+    """
     transcript_dir.mkdir(parents=True, exist_ok=True)
-    path = transcript_dir / f"{spawn_id}.jsonl"
-    rows = [
-        {"role": "system", "content": sys_prompt},
-        {"role": "user", "content": usr_prompt},
-        {
-            "role": "assistant",
-            "content": result.output,
-            "status": result.status,
-            "error": result.error,
-            "tokens_in": result.tokens_in,
-            "tokens_out": result.tokens_out,
-            "tool_calls": result.tool_calls,
-            "elapsed_seconds": result.elapsed_seconds,
-            "spec": dataclasses.asdict(spec),
-        },
-    ]
-    with path.open("w", encoding="utf-8") as fp:
-        for r in rows:
-            fp.write(json.dumps(r, ensure_ascii=False) + "\n")
+    path = transcript_dir / f"{spawn_id}.delivery.json"
+
+    rounds = list(result.rounds or [])
+    tu_names = _tool_use_name_map(rounds)
+    now_iso = _now_iso()
+
+    messages: list[dict[str, Any]] = []
+    counter = [0]
+    prev_id: str | None = None
+
+    def _next_id() -> str:
+        mid = f"{spawn_id}:m{counter[0]}"
+        counter[0] += 1
+        return mid
+
+    def _wrap(role: str, content: list[dict[str, Any]], extra: Mapping[str, Any] | None = None) -> dict[str, Any]:
+        nonlocal prev_id
+        mid = _next_id()
+        body: dict[str, Any] = {"role": role, "content": content}
+        if extra:
+            body.update(extra)
+        msg = {
+            "type": "message",
+            "id": mid,
+            "parentId": prev_id,
+            "timestamp": now_iso,
+            "message": body,
+        }
+        prev_id = mid
+        return msg
+
+    messages.append(_wrap("system", [{"type": "text", "text": sys_prompt}]))
+    messages.append(_wrap("user", [{"type": "text", "text": usr_prompt}]))
+
+    for rnd in rounds:
+        asst_blocks: list[dict[str, Any]] = []
+        for blk in rnd.get("assistant_content") or []:
+            if not isinstance(blk, Mapping):
+                continue
+            converted = _anthropic_block_to_delivery(blk)
+            if converted is not None:
+                asst_blocks.append(converted)
+        if asst_blocks:
+            messages.append(_wrap("assistant", asst_blocks))
+        for tr in rnd.get("tool_results") or []:
+            if not isinstance(tr, Mapping):
+                continue
+            tc_id = str(tr.get("tool_use_id", ""))
+            tool_name = tu_names.get(tc_id, "")
+            messages.append(_wrap(
+                "toolResult",
+                [{"type": "text", "text": str(tr.get("content", ""))}],
+                extra={
+                    "toolCallId": tc_id,
+                    "toolName": tool_name,
+                    "isError": bool(tr.get("is_error", False)),
+                },
+            ))
+
+    meta_info = {
+        "task_type": spec.role,
+        "task_description": spec.instructions[:4000],
+        "task_completion_status": _STATUS_TO_COMPLETION.get(
+            result.status, result.status,
+        ),
+        "system_prompt": sys_prompt,
+        "platform": "linux",
+    }
+
+    payload = {"meta_info": meta_info, "messages": messages}
+    path.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
     return path
 
 
-class LiteLLMInvoker:
-    """HTTP invoker that talks to the LiteLLM sidecar.
+def _now_iso() -> str:
+    import datetime as _dt
+    return _dt.datetime.now(_dt.timezone.utc).isoformat()
 
-    Uses the OpenAI-compatible ``/v1/chat/completions`` endpoint because that
-    is what the WildClawBench sidecar always exposes (Bedrock/Anthropic/etc.
-    are all proxied behind it). We do not pass a tool spec on this round —
-    v1 sub-agents return text only; tools enter in a later phase.
+
+def _import_subagent_tools():
+    # The skill copy of this file lives at
+    # /usr/lib/node_modules/openclaw/skills/spawn-subagent-connector/scripts/,
+    # with ``subagent_tools.py`` as a sibling. On the host the module is
+    # ``src.utils.subagent_tools``. Try host first, then fall back to the
+    # sibling on sys.path.
+    try:
+        from src.utils import subagent_tools as st  # type: ignore
+        return st
+    except ImportError:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import subagent_tools as st  # type: ignore[import-not-found]
+        return st
+
+
+def _drive_tool_loop(
+    *,
+    http_post: Callable[[Mapping[str, Any]], Mapping[str, Any]],
+    tool_dispatch: Callable[[str, Mapping[str, Any]], str],
+    sys_prompt: str,
+    usr_prompt: str,
+    tools_schemas: list[dict],
+    model: str,
+    max_tokens: int,
+    max_tool_calls: int,
+) -> dict[str, Any]:
+    """Drive an Anthropic ``/v1/messages`` tool-use loop until end_turn.
+
+    Pure I/O is delegated to ``http_post`` (POST one round, return parsed body)
+    and ``tool_dispatch`` (run one tool call, return its result as a string).
+    Both are injected so this function is unit-testable with no HTTP and no
+    real tool execution.
+
+    Token usage is summed across every round. ``max_tool_calls`` is a hard
+    budget across the whole spawn; once exhausted, any further ``tool_use``
+    blocks in the same assistant message are answered with an ``is_error``
+    tool_result telling the model to produce its final answer. ``max_rounds``
+    is intentionally ``max_tool_calls + 1`` so the model always has one final
+    round to emit text after exhausting its tool budget.
+    """
+    messages: list[dict[str, Any]] = [{"role": "user", "content": usr_prompt}]
+    rounds_log: list[dict[str, Any]] = []
+    total_in = 0
+    total_out = 0
+    total_tool_calls = 0
+    final_text = ""
+    max_rounds = max(1, max_tool_calls + 1)
+
+    for _ in range(max_rounds):
+        payload: dict[str, Any] = {
+            "model": model,
+            "max_tokens": max_tokens,
+            "system": sys_prompt,
+            "messages": messages,
+        }
+        if tools_schemas:
+            payload["tools"] = tools_schemas
+        body = http_post(payload)
+        if not isinstance(body, Mapping):
+            raise RuntimeError(f"non-mapping body: {type(body).__name__}")
+        usage = body.get("usage") or {}
+        round_usage = {"input_tokens": 0, "output_tokens": 0}
+        if isinstance(usage, Mapping):
+            round_usage["input_tokens"] = int(usage.get("input_tokens", 0) or 0)
+            round_usage["output_tokens"] = int(usage.get("output_tokens", 0) or 0)
+            total_in += round_usage["input_tokens"]
+            total_out += round_usage["output_tokens"]
+
+        content = body.get("content") or []
+        if not isinstance(content, list):
+            content = []
+        tool_uses = [
+            b for b in content
+            if isinstance(b, Mapping) and b.get("type") == "tool_use"
+        ]
+        text_blocks = [
+            str(b.get("text", "")) for b in content
+            if isinstance(b, Mapping) and b.get("type") == "text"
+        ]
+        messages.append({"role": "assistant", "content": list(content)})
+        stop_reason = body.get("stop_reason")
+
+        if not tool_uses:
+            final_text = "\n".join(t for t in text_blocks if t).strip()
+            rounds_log.append({
+                "assistant_content": [dict(b) for b in content if isinstance(b, Mapping)],
+                "tool_results": [],
+                "usage": round_usage,
+                "stop_reason": stop_reason,
+            })
+            break
+
+        tool_results: list[dict[str, Any]] = []
+        for tu in tool_uses:
+            tu_id = tu.get("id")
+            if total_tool_calls >= max_tool_calls:
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": tu_id,
+                    "content": "ERROR: tool-call budget exhausted; "
+                               "produce your final answer now.",
+                    "is_error": True,
+                })
+                continue
+            name = str(tu.get("name", ""))
+            tool_input = tu.get("input") or {}
+            if not isinstance(tool_input, Mapping):
+                tool_input = {}
+            try:
+                result_str = tool_dispatch(name, tool_input)
+            except Exception as exc:  # noqa: BLE001 — surface tool failure to model
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": tu_id,
+                    "content": f"ERROR: {type(exc).__name__}: {exc}",
+                    "is_error": True,
+                })
+            else:
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": tu_id,
+                    "content": str(result_str),
+                })
+            total_tool_calls += 1
+        messages.append({"role": "user", "content": tool_results})
+        rounds_log.append({
+            "assistant_content": [dict(b) for b in content if isinstance(b, Mapping)],
+            "tool_results": [dict(r) for r in tool_results],
+            "usage": round_usage,
+            "stop_reason": stop_reason,
+        })
+    else:
+        final_text = (
+            "(no final answer produced before tool-call budget exhausted)"
+        )
+
+    return {
+        "output": final_text,
+        "tool_calls": total_tool_calls,
+        "tokens_in": total_in,
+        "tokens_out": total_out,
+        "rounds": rounds_log,
+    }
+
+
+class LiteLLMInvoker:
+    """HTTP invoker that talks to the LiteLLM sidecar's ``/v1/messages``.
+
+    Drives a real Anthropic-format tool-use loop: passes the tool schemas
+    from ``subagent_tools.schemas_for(spec.allowed_tools)`` on every round,
+    dispatches each ``tool_use`` block through ``subagent_tools.dispatch``,
+    and feeds the results back as ``tool_result`` user messages until the
+    model emits a final text-only response (``stop_reason == end_turn``).
     """
 
     def __init__(
@@ -360,45 +632,50 @@ class LiteLLMInvoker:
     def __call__(
         self, sys_prompt: str, usr_prompt: str, spec: SubagentSpec
     ) -> Mapping[str, Any]:
-        # Import locally so the host-side `import subagent_director` does not
-        # require `requests` to be installed for tests / static analysis.
+        # Lazy imports: requests is a runtime dep; subagent_tools lives next
+        # to this file inside the container skill bundle.
         import requests  # type: ignore[import-not-found]
 
+        st = _import_subagent_tools()
+        tools_schemas = st.schemas_for(spec.allowed_tools)
         model = spec.model or self.default_model
-        headers: dict[str, str] = {"content-type": "application/json"}
+
+        headers: dict[str, str] = {
+            "content-type": "application/json",
+            "anthropic-version": "2023-06-01",
+        }
         if self.api_key:
             headers["authorization"] = f"Bearer {self.api_key}"
+            headers["x-api-key"] = self.api_key
 
-        payload = {
-            "model": model,
-            "max_tokens": spec.max_tokens,
-            "messages": [
-                {"role": "system", "content": sys_prompt},
-                {"role": "user", "content": usr_prompt},
-            ],
-        }
-        url = f"{self.base_url}/v1/chat/completions"
-        try:
-            resp = requests.post(
-                url, headers=headers, json=payload, timeout=spec.timeout_seconds
-            )
-        except requests.Timeout as exc:  # type: ignore[attr-defined]
-            raise TimeoutError(str(exc)) from exc
-        if resp.status_code >= 500:
-            raise RuntimeError(f"LiteLLM {resp.status_code}: {resp.text[:200]}")
-        if resp.status_code >= 400:
-            raise RuntimeError(f"LiteLLM {resp.status_code}: {resp.text[:200]}")
-        body = resp.json()
-        choice = (body.get("choices") or [{}])[0]
-        msg = choice.get("message") or {}
-        output = msg.get("content") or ""
-        usage = body.get("usage") or {}
-        return {
-            "output": output,
-            "tool_calls": 0,
-            "tokens_in": int(usage.get("prompt_tokens", 0) or 0),
-            "tokens_out": int(usage.get("completion_tokens", 0) or 0),
-        }
+        url = f"{self.base_url}/v1/messages"
+
+        def _http_post(payload: Mapping[str, Any]) -> Mapping[str, Any]:
+            try:
+                resp = requests.post(
+                    url,
+                    headers=headers,
+                    json=payload,
+                    timeout=spec.timeout_seconds,
+                )
+            except requests.Timeout as exc:  # type: ignore[attr-defined]
+                raise TimeoutError(str(exc)) from exc
+            if resp.status_code >= 400:
+                raise RuntimeError(
+                    f"LiteLLM {resp.status_code}: {resp.text[:200]}"
+                )
+            return resp.json()
+
+        return _drive_tool_loop(
+            http_post=_http_post,
+            tool_dispatch=st.dispatch,
+            sys_prompt=sys_prompt,
+            usr_prompt=usr_prompt,
+            tools_schemas=tools_schemas,
+            model=model,
+            max_tokens=spec.max_tokens,
+            max_tool_calls=spec.max_tool_calls,
+        )
 
 
 def _make_invoker_from_env() -> LiteLLMInvoker:
@@ -493,7 +770,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     try:
         append_spawn_row(row, spawn_tree_path=args.spawn_tree)
-        write_full_transcript(
+        write_subagent_delivery(
             result.spawn_id,
             spec=spec,
             result=result,
@@ -595,7 +872,7 @@ def _run_batch_main(
         )
         try:
             append_spawn_row(row, spawn_tree_path=spawn_tree)
-            write_full_transcript(
+            write_subagent_delivery(
                 result.spawn_id,
                 spec=spec,
                 result=result,

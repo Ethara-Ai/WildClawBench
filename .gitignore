@@ -50,3 +50,9 @@ logs/
 # macOS Finder duplicate-on-copy directories ("foo copy/", "foo copy 2/").
 *\ copy/
 *\ copy\ [0-9]*/
+
+# Per-run output directories used for ad-hoc validation runs (mirror "output/" exclusion above)
+output_*/
+
+# Internal planning notes (Sisyphus harness work plans)
+.sisyphus/

@@ -963,51 +963,104 @@ _SUBAGENT_SPAWN_TREE = f"{TMP_WORKSPACE}/spawn_tree.jsonl"
 
 def _render_subagent_skill_md(multi_agent_config: dict | None) -> str:
     cfg = multi_agent_config or {}
-    default_tools = cfg.get("default_allowed_tools") or []
-    tools_line = (
-        ", ".join(f"`{t}`" for t in default_tools) if default_tools else "_(none — text-only)_"
-    )
+    default_tools = cfg.get("default_allowed_tools") or [
+        "Read", "Write", "Edit", "Grep", "Glob", "Bash",
+    ]
+    tools_line = ", ".join(f"`{t}`" for t in default_tools)
+    tools_json = ", ".join(f'"{t}"' for t in default_tools)
     return (
         "---\n"
         f"name: {_SUBAGENT_SKILL_NAME}\n"
-        "description: >\n"
-        "  Spawn a bounded sub-agent that performs one focused task and returns plain text.\n"
-        "  Use it to fan work out across independent angles within a turn (e.g. parallel\n"
-        "  reconciliation, extraction, drafting). Sub-agents cannot spawn further sub-agents.\n"
+        "description: \"Spawn one or more bounded sub-agents to fan a single turn out "
+        "across independent angles in parallel. Each sub-agent runs a focused task using "
+        "its own tools and returns plain text you synthesize. Use when: (1) The current "
+        "turn header contains the literal token 'Multi-Agent' (e.g. '[TURN N (... , "
+        "Multi-Agent)]') — this is the strongest trigger and you MUST fan out, (2) The "
+        "user explicitly asks for work looked at 'from every angle' or across 2+ named "
+        "sources (e.g. workbook AND guide AND photo), (3) The task contains 2+ sub-tasks "
+        "with no data dependency between them (extraction + narrative drafting, imagery "
+        "analysis + log reconciliation + argument writing, mileage calculation + soil "
+        "averages). Do NOT use on Light/single-angle turns. Sub-agents cannot spawn "
+        "further sub-agents.\"\n"
         "metadata: {\"clawdbot\":{\"emoji\":\"🪺\"}}\n"
         "---\n"
         "\n"
         "# Spawn Sub-Agent\n"
         "\n"
-        "Run a short, bounded sub-agent and return its final text answer.\n"
+        "Run one or more short, bounded sub-agents in parallel and synthesize their final "
+        "text answers. **Each sub-agent has its own tools and MUST fetch its own data** — "
+        "do not paste raw data into `context`; point the sub-agent at a path or query and "
+        "let it Read/Grep/Bash to gather what it needs.\n"
+        "\n"
+        "## When to invoke (trigger checklist)\n"
+        "\n"
+        "Invoke this skill at the start of any turn where ANY of these is true:\n"
+        "\n"
+        "1. **The turn header line contains the literal text `Multi-Agent`** — e.g. the "
+        "user message begins with `[TURN 2 (Day 1, 08:40, Multi-Agent)]`. This is a hard "
+        "trigger: spawn one sub-agent per independent angle the prompt names.\n"
+        "2. **The prompt asks you to consider 2+ independent sources or angles** — e.g. "
+        "*'look at the workbook, the guide, AND the photo'*, *'extract budget then draft "
+        "narrative'*, *'reconcile imagery against the log AND build the argument'*. Each "
+        "named angle = one sub-agent.\n"
+        "3. **A task naturally splits into parallel sub-tasks with no data dependency** — "
+        "e.g. mileage + soil averages, image-analysis + database-query + PDF-parse.\n"
+        "\n"
+        "Do NOT invoke on turns where the header says `Light` (single-threaded by "
+        "convention) or where the request is one tight question.\n"
         "\n"
         "## How to invoke\n"
         "\n"
-        "Pipe a JSON spec to the script on stdin and read the sub-agent's final text\n"
-        "from stdout:\n"
+        "Pipe a JSON spec to the script on stdin and read the sub-agent's final text "
+        "from stdout. **Always pass `allowed_tools` and a non-zero `max_tool_calls`** so "
+        "the sub-agent can fetch its own data; otherwise it can only hallucinate from the "
+        "instructions string.\n"
         "\n"
         "```bash\n"
         "echo '{\n"
         "  \"role\": \"budget-extractor\",\n"
-        "  \"instructions\": \"Extract the five Deep Roots budget line items from /work/draft.docx.\",\n"
-        "  \"allowed_tools\": [\"read_file\"],\n"
-        "  \"context\": \"\",\n"
-        "  \"max_tool_calls\": 10\n"
+        "  \"instructions\": \"Open /tmp_workspace/deep_roots_grant_draft.docx (use Bash + python-docx or pdftotext as needed), extract the five Deep Roots budget line items with amounts in dollars, and report them as a plain-text table plus the total.\",\n"
+        f"  \"allowed_tools\": [{tools_json}],\n"
+        "  \"max_tool_calls\": 12,\n"
+        "  \"max_tokens\": 8000\n"
         "}' | python3 {baseDir}/scripts/spawn_subagent.py\n"
         "```\n"
+        "\n"
+        "Available tool names (exact strings — case sensitive):\n"
+        "\n"
+        "* `Read` — read a file. Input: `{\"path\": \"/tmp_workspace/foo.csv\"}`.\n"
+        "* `Write` — overwrite a file. Input: `{\"path\": ..., \"content\": ...}`.\n"
+        "* `Edit` — single-match string replace. Input: `{\"path\": ..., \"old_string\": ..., \"new_string\": ...}`.\n"
+        "* `Grep` — regex search in a file or directory. Input: `{\"pattern\": ..., \"path\": ...}`.\n"
+        "* `Glob` — filename pattern search. Input: `{\"pattern\": \"**/*.xlsx\", \"path\": \"/tmp_workspace\"}`.\n"
+        "* `Bash` — run a shell command. Input: `{\"command\": ..., \"timeout\": 30}`. Use this for API calls (curl), parsing (python3 -c), pdftotext, etc.\n"
+        "\n"
+        "Paths must live under `/tmp_workspace`, `/root`, or `/tmp` — anything else is rejected.\n"
         "\n"
         "## Spec fields\n"
         "\n"
         "| Field | Required | Notes |\n"
         "|-------|----------|-------|\n"
         "| `role` | yes | Short name describing the sub-agent's role. |\n"
-        "| `instructions` | yes | One concrete task for the sub-agent. |\n"
-        "| `allowed_tools` | no | Subset of your tools the child may use. Default: " + tools_line + ". |\n"
-        "| `context` | no | Extra context (file excerpts, prior findings) to seed the child. |\n"
+        "| `instructions` | yes | One concrete task. Name the file paths / API endpoints the child should hit; do NOT paraphrase data already in your context — let the child fetch it fresh. |\n"
+        "| `allowed_tools` | **strongly recommended** | List of tool names the child may use. Default: " + tools_line + ". Pass `[]` only for pure-synthesis sub-agents that need no data access. |\n"
+        "| `context` | no | Short orienting prose (objective + constraints). Do NOT dump raw file contents here — the child should Read them itself. |\n"
         "| `model` | no | Override model. Default: inherit parent's model. |\n"
-        "| `max_tool_calls` | no | Default 20, ceiling 50. |\n"
-        "| `max_tokens` | no | Default 4096, ceiling 16384. |\n"
-        "| `timeout_seconds` | no | Default 120, ceiling 600. |\n"
+        "| `max_tool_calls` | no | Default 20, ceiling 50. Set to 0 only for text-only sub-agents. |\n"
+        "| `max_tokens` | no | Default 32000. No upper cap. |\n"
+        "| `timeout_seconds` | no | Default 300, ceiling 600. |\n"
+        "\n"
+        "## Anti-patterns (do NOT do these)\n"
+        "\n"
+        "* **Pasting raw data into `context` and passing `allowed_tools: []`** — the child "
+        "will just rewrite what you handed it, often hallucinating fields. Give it tools "
+        "and a path/query instead.\n"
+        "* **`max_tool_calls: 0`** — same outcome: child cannot fetch anything, can only "
+        "produce prose from `instructions`. Use 8-20 for normal fan-out.\n"
+        "* **One sub-agent doing everything** — defeats the purpose. One angle per "
+        "sub-agent.\n"
+        "* **Sub-agents calling each other** — `spawn_subagent` is blocked inside the "
+        "child; do not put it in `allowed_tools`.\n"
         "\n"
         "## Rules\n"
         "\n"
@@ -1033,14 +1086,18 @@ def inject_subagent_tool(
     sub-agent script to correlate spawns to turns. No-op for backends other
     than openclaw; callers gate on AgentTaskSpec.multi_agent_enabled.
     """
+    utils_dir = Path(__file__).resolve().parent
     if subagent_director_src is None:
-        subagent_director_src = str(
-            Path(__file__).resolve().parent / "subagent_director.py"
-        )
+        subagent_director_src = str(utils_dir / "subagent_director.py")
     src_path = Path(subagent_director_src)
     if not src_path.is_file():
         raise RuntimeError(
             f"inject_subagent_tool: subagent_director.py not found at {src_path}"
+        )
+    tools_src = utils_dir / "subagent_tools.py"
+    if not tools_src.is_file():
+        raise RuntimeError(
+            f"inject_subagent_tool: subagent_tools.py not found at {tools_src}"
         )
 
     subprocess.run(
@@ -1060,10 +1117,13 @@ def inject_subagent_tool(
         scripts_dir.mkdir()
         entry = scripts_dir / "spawn_subagent.py"
         entry.write_bytes(src_path.read_bytes())
+        tools_entry = scripts_dir / "subagent_tools.py"
+        tools_entry.write_bytes(tools_src.read_bytes())
 
         for src_file, container_dst in (
             (skill_md, f"{_SUBAGENT_CONTAINER_ROOT}/SKILL.md"),
             (entry, f"{_SUBAGENT_CONTAINER_ROOT}/scripts/spawn_subagent.py"),
+            (tools_entry, f"{_SUBAGENT_CONTAINER_ROOT}/scripts/subagent_tools.py"),
         ):
             r = subprocess.run(
                 ["docker", "cp", str(src_file), f"{task_id}:{container_dst}"],

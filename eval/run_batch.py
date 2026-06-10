@@ -927,6 +927,25 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
             except OSError:
                 pass
 
+    # Canonical delivery schema. The harness writes the openclaw-shape
+    # output.json above (heterogeneous per backend); delivery.json reshapes
+    # it into {meta_info, messages[]} and rewrites raw `exec` sub-agent
+    # toolCalls as sessions_spawn/sessions_yield so downstream consumers
+    # get a stable shape regardless of which backend produced the run.
+    # Sidecar reads (chat.jsonl for parentId, spawn_tree.jsonl for sub-agent
+    # session_id join) degrade gracefully when missing.
+    try:
+        from src.utils.delivery_schema import write_delivery_json
+        write_delivery_json(
+            output_dir, traj,
+            score=result.get("scores"),
+            task_type=task.get("task_id"),
+            system_prompt=task.get("system_prompt") or "",
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("[%s] delivery.json conversion failed: %s",
+                       task.get("task_id"), exc)
+
     reward = (result.get("scores") or {}).get("overall_score")
     _write_pass_summary(task_bundle_dir / "trajectories" / model_type, model_type,
                         run_index, reward, scores=result.get("scores") or {})
@@ -1230,6 +1249,17 @@ def run_single_task(
             # `prompt` already carries the system-prompt prefix + workspace hint
             # for turn 0; later turns are fed verbatim from prompts.txt.
             stage_turns = tuple([prompt] + raw_turns[1:]) if raw_turns else (prompt,)
+            _max_turns_env = os.environ.get("WCB_MAX_TURNS")
+            if _max_turns_env:
+                try:
+                    _n = max(1, int(_max_turns_env))
+                    if _n < len(stage_turns):
+                        logger.warning("[%s] WCB_MAX_TURNS=%d: truncating %d turns -> %d",
+                                       task_id, _n, len(stage_turns), _n)
+                        stage_turns = stage_turns[:_n]
+                except ValueError:
+                    logger.warning("[%s] WCB_MAX_TURNS=%r is not int; ignoring",
+                                   task_id, _max_turns_env)
 
             def _inject_before_turn(turn_index: int, _is=_is, _ap=inject_applier):
                 # Agent is idle here; apply the stage whose boundary ends at this turn.

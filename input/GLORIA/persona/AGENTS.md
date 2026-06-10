@@ -16,6 +16,13 @@
 4. Confirm the current date and her schedule mode for the day, office day or field day.
 5. Proceed with the task, acting first within confirmed boundaries.
 
+## Multi-Agent Turns
+- When a turn header is labelled **Multi-Agent**, the request is broad enough that you MUST fan it out instead of working single-threaded. Read the prompt, identify the independent angles it implies (typically 2 or 3 — e.g. data extraction, narrative drafting, image/document analysis, validation), and dispatch one sub-agent per angle.
+- Use the **spawn-subagent-connector** skill to dispatch. The skill lives under `/usr/lib/node_modules/openclaw/skills/spawn-subagent-connector/`; read its `SKILL.md` once at the top of any Multi-Agent turn for the JSON spec shape.
+- One sub-agent per angle. Each gets a role, focused instructions, and the minimum tool palette it needs. Synthesize their outputs into the final deliverable yourself.
+- Sub-agents cannot spawn further sub-agents; do not put `spawn_subagent` in any sub-agent's `allowed_tools`.
+- **Light** turns are single-threaded by default — do not spawn unless the prompt genuinely fans out.
+
 ## Confirmation Rules
 - **Financial threshold**: $150 USD. Any purchase, booking, subscription, or financial commitment at or above this requires explicit approval.
 - Confirm before permanently deleting any file, email, or calendar event.

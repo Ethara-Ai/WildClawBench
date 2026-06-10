@@ -28,8 +28,8 @@ if not TASK.is_dir():  # fixture not shipped -> skip cleanly
 def test_prompts_parsing_yields_ordered_turns():
     turns = parse_prompts_file(TASK / "prompts.txt")
     assert len(turns) == 50
-    assert turns[0].startswith("Wed 1 Oct")
-    # banner/comment lines must not leak into a turn body
+    assert turns[0].startswith("[TURN")
+    assert "Wed 1 Oct" in turns[0]
     assert not turns[0].lstrip().startswith("#")
 
 
@@ -171,7 +171,12 @@ def test_load_accepts_flat_injections_list_with_silent_flag(tmp_path):
 
 
 def test_parse_prompts_file_accepts_turn_without_t_prefix(tmp_path):
-    """GLORIA uses '--- TURN <n> ---'; LAYLA uses '--- TURN T<n> ---'."""
+    """GLORIA uses '--- TURN <n> ---'; LAYLA uses '--- TURN T<n> ---'.
+
+    Header inner text is preserved as a bracket-tagged first line of the body
+    so personas can route on the per-turn label (e.g. ``Multi-Agent`` vs
+    ``Light``).
+    """
     p = tmp_path / "prompts.txt"
     p.write_text(
         "# header comment\n"
@@ -185,9 +190,11 @@ def test_parse_prompts_file_accepts_turn_without_t_prefix(tmp_path):
     )
     turns = parse_prompts_file(p)
     assert len(turns) == 3
-    assert turns[0].startswith("first turn body")
+    assert turns[0].startswith("[TURN 1 (Day 1, 08:00, Light)]")
+    assert "first turn body line one" in turns[0]
     assert "first turn body line two" in turns[0]
-    assert turns[1].startswith("second turn body")
-    assert turns[2].startswith("third turn body")
-    # comment/banner lines never leak into a turn body
+    assert turns[1].startswith("[TURN T2 (Day 1, 09:00, Multi-Agent)]")
+    assert "second turn body" in turns[1]
+    assert turns[2].startswith("[TURN 3]")
+    assert "third turn body" in turns[2]
     assert "header comment" not in "\n".join(turns)

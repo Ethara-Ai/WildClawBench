@@ -152,6 +152,23 @@ class OpenClawAgent(BaseAgent):
                     "WCB_AUDIO_TRANSCRIBE_AUTH",
                     self.litellm_master_key or "sk-litellm",
                 )
+                if spec.multi_agent_enabled:
+                    # spawn-subagent-connector's runtime
+                    # (src/utils/subagent_director.py:_make_invoker_from_env)
+                    # reads these from os.environ to build its HTTP invoker.
+                    # Without them the skill raises RuntimeError BEFORE any
+                    # HTTP call; the child exits with code 2 and empty stdout,
+                    # so the model sees an opaque failure and abandons fan-out
+                    # on every Multi-Agent turn.
+                    extra_env_dict.setdefault(
+                        "LITELLM_BASE_URL",
+                        f"http://{self.litellm_container_name}:{self.litellm_port}",
+                    )
+                    extra_env_dict.setdefault(
+                        "LITELLM_API_KEY",
+                        self.litellm_master_key or "sk-litellm",
+                    )
+                    extra_env_dict.setdefault("WILDCLAW_MODEL", spec.model)
 
             start_container(
                 spec.task_id,

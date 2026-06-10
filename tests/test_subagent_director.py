@@ -16,7 +16,7 @@ from src.utils.subagent_director import (  # noqa: E402
     append_spawn_row,
     read_current_turn,
     run_with_invoker,
-    write_full_transcript,
+    write_subagent_delivery,
 )
 
 
@@ -95,7 +95,6 @@ def test_run_with_invoker_blocks_missing_instructions():
         ("max_tool_calls", -1),
         ("max_tool_calls", 9999),
         ("max_tokens", 0),
-        ("max_tokens", 10**9),
         ("timeout_seconds", 0),
         ("timeout_seconds", 10**9),
     ],
@@ -203,19 +202,20 @@ def test_append_spawn_row_writes_ndjson(tmp_path: Path):
     assert [json.loads(l) for l in lines] == [{"a": 1}, {"b": 2}]
 
 
-def test_write_full_transcript_records_three_rows(tmp_path: Path):
-    spec = SubagentSpec(role="r", instructions="i")
+def test_write_subagent_delivery_basic_shape(tmp_path: Path):
+    spec = SubagentSpec(role="reconciler", instructions="Pull totals.")
     result = SubagentResult(
         spawn_id="spw_xyz",
-        role="r",
+        role="reconciler",
         output="done",
         tool_calls=0,
         tokens_in=1,
         tokens_out=2,
         elapsed_seconds=0.01,
         status="ok",
+        rounds=[],
     )
-    out_path = write_full_transcript(
+    out_path = write_subagent_delivery(
         "spw_xyz",
         spec=spec,
         result=result,
@@ -223,13 +223,92 @@ def test_write_full_transcript_records_three_rows(tmp_path: Path):
         usr_prompt="USR",
         transcript_dir=tmp_path,
     )
-    assert out_path.name == "spw_xyz.jsonl"
-    rows = [json.loads(l) for l in out_path.read_text().splitlines()]
-    assert [r["role"] for r in rows] == ["system", "user", "assistant"]
-    assert rows[0]["content"] == "SYS"
-    assert rows[1]["content"] == "USR"
-    assert rows[2]["content"] == "done"
-    assert rows[2]["status"] == "ok"
+    assert out_path.name == "spw_xyz.delivery.json"
+    payload = json.loads(out_path.read_text())
+    meta = payload["meta_info"]
+    assert meta["task_type"] == "reconciler"
+    assert meta["task_description"] == "Pull totals."
+    assert meta["task_completion_status"] == "completed"
+    assert meta["system_prompt"] == "SYS"
+    assert meta["platform"] == "linux"
+    msgs = payload["messages"]
+    assert msgs[0]["message"]["role"] == "system"
+    assert msgs[0]["message"]["content"][0]["text"] == "SYS"
+    assert msgs[0]["parentId"] is None
+    assert msgs[1]["message"]["role"] == "user"
+    assert msgs[1]["message"]["content"][0]["text"] == "USR"
+    assert msgs[1]["parentId"] == msgs[0]["id"]
+    assert msgs[0]["id"] == "spw_xyz:m0"
+    assert msgs[1]["id"] == "spw_xyz:m1"
+
+
+def test_write_subagent_delivery_status_to_completion_partial(tmp_path: Path):
+    spec = SubagentSpec(role="r", instructions="i")
+    result = SubagentResult(spawn_id="spw_t", role="r", output="", status="timeout")
+    out_path = write_subagent_delivery(
+        "spw_t", spec=spec, result=result,
+        sys_prompt="S", usr_prompt="U", transcript_dir=tmp_path,
+    )
+    payload = json.loads(out_path.read_text())
+    assert payload["meta_info"]["task_completion_status"] == "partial"
+
+
+def test_write_subagent_delivery_converts_rounds_into_messages(tmp_path: Path):
+    spec = SubagentSpec(role="r", instructions="i", allowed_tools=("Read",))
+    rounds = [
+        {
+            "assistant_content": [
+                {"type": "thinking", "thinking": "first I plan", "signature": "sig-abc"},
+                {"type": "tool_use", "id": "tu_1", "name": "Read", "input": {"path": "/x"}},
+            ],
+            "tool_results": [
+                {"tool_use_id": "tu_1", "content": "file contents", "is_error": False},
+            ],
+            "usage": {"input_tokens": 5, "output_tokens": 7},
+        },
+        {
+            "assistant_content": [{"type": "text", "text": "final answer"}],
+            "tool_results": [],
+            "usage": {"input_tokens": 3, "output_tokens": 4},
+        },
+    ]
+    result = SubagentResult(
+        spawn_id="spw_abc",
+        role="r",
+        output="final answer",
+        tool_calls=1,
+        status="ok",
+        rounds=rounds,
+    )
+    out_path = write_subagent_delivery(
+        "spw_abc", spec=spec, result=result,
+        sys_prompt="S", usr_prompt="U", transcript_dir=tmp_path,
+    )
+    msgs = json.loads(out_path.read_text())["messages"]
+    roles = [m["message"]["role"] for m in msgs]
+    assert roles == ["system", "user", "assistant", "toolResult", "assistant"]
+    asst1 = msgs[2]["message"]["content"]
+    assert asst1[0] == {
+        "type": "thinking",
+        "thinking": "first I plan",
+        "thinkingSignature": "sig-abc",
+    }
+    assert asst1[1] == {
+        "type": "toolCall",
+        "id": "tu_1",
+        "name": "Read",
+        "arguments": {"path": "/x"},
+    }
+    tr = msgs[3]["message"]
+    assert tr["toolCallId"] == "tu_1"
+    assert tr["toolName"] == "Read"
+    assert tr["isError"] is False
+    assert tr["content"][0]["text"] == "file contents"
+    assert msgs[4]["message"]["content"][0] == {"type": "text", "text": "final answer"}
+    parent_chain = [m["parentId"] for m in msgs]
+    assert parent_chain[0] is None
+    for i in range(1, len(msgs)):
+        assert parent_chain[i] == msgs[i - 1]["id"]
 
 
 def test_run_batch_parallel_runs_all_and_caps_at_five():
@@ -253,3 +332,133 @@ def test_run_batch_parallel_runs_all_and_caps_at_five():
 def test_run_batch_parallel_empty():
     from src.utils.subagent_director import run_batch_parallel
     assert run_batch_parallel([], _ok_invoker) == []
+
+
+def _scripted_http_post(rounds):
+    queue = list(rounds)
+
+    def _post(_payload):
+        if not queue:
+            raise AssertionError("scripted http_post: no more rounds")
+        return queue.pop(0)
+
+    return _post
+
+
+def test_drive_tool_loop_returns_text_when_no_tool_use():
+    from src.utils.subagent_director import _drive_tool_loop
+
+    body = {
+        "content": [{"type": "text", "text": "final answer"}],
+        "usage": {"input_tokens": 5, "output_tokens": 7},
+    }
+    result = _drive_tool_loop(
+        http_post=_scripted_http_post([body]),
+        tool_dispatch=lambda _n, _i: "should not be called",
+        sys_prompt="S",
+        usr_prompt="U",
+        tools_schemas=[],
+        model="m",
+        max_tokens=100,
+        max_tool_calls=5,
+    )
+    assert result["output"] == "final answer"
+    assert result["tool_calls"] == 0
+    assert result["tokens_in"] == 5
+    assert result["tokens_out"] == 7
+
+
+def test_drive_tool_loop_dispatches_tool_and_feeds_result_back():
+    from src.utils.subagent_director import _drive_tool_loop
+
+    round1 = {
+        "content": [
+            {"type": "tool_use", "id": "tu_1", "name": "Read", "input": {"path": "/x"}},
+        ],
+        "usage": {"input_tokens": 3, "output_tokens": 4},
+    }
+    round2 = {
+        "content": [{"type": "text", "text": "file says hi"}],
+        "usage": {"input_tokens": 6, "output_tokens": 8},
+    }
+    dispatched: list[tuple[str, dict]] = []
+
+    def _dispatch(name, tool_input):
+        dispatched.append((name, dict(tool_input)))
+        return "hi"
+
+    result = _drive_tool_loop(
+        http_post=_scripted_http_post([round1, round2]),
+        tool_dispatch=_dispatch,
+        sys_prompt="S",
+        usr_prompt="U",
+        tools_schemas=[{"name": "Read"}],
+        model="m",
+        max_tokens=100,
+        max_tool_calls=5,
+    )
+    assert result["output"] == "file says hi"
+    assert result["tool_calls"] == 1
+    assert dispatched == [("Read", {"path": "/x"})]
+    assert result["tokens_in"] == 9
+    assert result["tokens_out"] == 12
+
+
+def test_drive_tool_loop_budget_exhaustion_marks_error_and_continues():
+    from src.utils.subagent_director import _drive_tool_loop
+
+    round1 = {
+        "content": [
+            {"type": "tool_use", "id": "tu_1", "name": "Read", "input": {}},
+            {"type": "tool_use", "id": "tu_2", "name": "Read", "input": {}},
+        ],
+        "usage": {"input_tokens": 1, "output_tokens": 1},
+    }
+    round2 = {
+        "content": [{"type": "text", "text": "stopped"}],
+        "usage": {"input_tokens": 1, "output_tokens": 1},
+    }
+
+    result = _drive_tool_loop(
+        http_post=_scripted_http_post([round1, round2]),
+        tool_dispatch=lambda _n, _i: "ok",
+        sys_prompt="S",
+        usr_prompt="U",
+        tools_schemas=[],
+        model="m",
+        max_tokens=100,
+        max_tool_calls=1,
+    )
+    assert result["output"] == "stopped"
+    assert result["tool_calls"] == 1
+
+
+def test_drive_tool_loop_tool_exception_becomes_error_tool_result():
+    from src.utils.subagent_director import _drive_tool_loop
+
+    round1 = {
+        "content": [
+            {"type": "tool_use", "id": "tu_1", "name": "Bash", "input": {"cmd": "x"}},
+        ],
+        "usage": {"input_tokens": 1, "output_tokens": 1},
+    }
+    round2 = {
+        "content": [{"type": "text", "text": "recovered"}],
+        "usage": {"input_tokens": 0, "output_tokens": 0},
+    }
+
+    def _dispatch(_n, _i):
+        raise RuntimeError("boom")
+
+    result = _drive_tool_loop(
+        http_post=_scripted_http_post([round1, round2]),
+        tool_dispatch=_dispatch,
+        sys_prompt="S",
+        usr_prompt="U",
+        tools_schemas=[],
+        model="m",
+        max_tokens=100,
+        max_tool_calls=5,
+    )
+    assert result["output"] == "recovered"
+    assert result["tool_calls"] == 1

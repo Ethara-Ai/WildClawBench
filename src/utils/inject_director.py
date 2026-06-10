@@ -230,7 +230,7 @@ class InjectScript:
 # prompts.txt parsing (50-turn wake-up script)
 # ---------------------------------------------------------------------------
 
-_TURN_RE = re.compile(r"^---\s*TURN\s+T?(\d+)\b.*?---\s*$", re.IGNORECASE)
+_TURN_RE = re.compile(r"^---\s*(TURN\s+T?(\d+)\b.*?)\s*---\s*$", re.IGNORECASE)
 
 
 def parse_prompts_file(path: Path | str) -> List[str]:
@@ -242,6 +242,12 @@ def parse_prompts_file(path: Path | str) -> List[str]:
     next header. Leading ``#`` banner/comment lines (before the first TURN
     header, and full-line ``#`` comments) are ignored. Turns are returned
     ordered by their numeric index.
+
+    The header's inner text (e.g. ``TURN 2 (Day 1, 08:40, Multi-Agent)``) is
+    preserved as a bracket-tagged first line of each turn body so the agent
+    can see the per-turn label (e.g. ``Multi-Agent`` vs ``Light``). Personas
+    that route behavior on the label depend on this prefix being visible at
+    runtime.
     """
     text = Path(path).read_text(encoding="utf-8")
     turns: Dict[int, List[str]] = {}
@@ -249,8 +255,8 @@ def parse_prompts_file(path: Path | str) -> List[str]:
     for line in text.splitlines():
         m = _TURN_RE.match(line.strip())
         if m:
-            current = int(m.group(1))
-            turns.setdefault(current, [])
+            current = int(m.group(2))
+            turns.setdefault(current, [f"[{m.group(1).strip()}]", ""])
             continue
         if current is None:
             continue
