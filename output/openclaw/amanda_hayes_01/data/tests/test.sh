@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-mkdir -p /Users/apple/WildClawBench/test_bash/verifier
+mkdir -p /logs/verifier
 
 if ! command -v uv >/dev/null 2>&1; then
     curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -9,15 +9,15 @@ if ! command -v uv >/dev/null 2>&1; then
 fi
 
 uvx --with pytest==8.4.1 --with pytest-json-ctrf==0.3.5 --with requests \
-    pytest --ctrf /Users/apple/WildClawBench/test_bash/verifier/ctrf.json tests/test_outputs.py -rA || true
+    pytest --ctrf /logs/verifier/ctrf.json tests/test_outputs.py -rA || true
 
 python3 - <<'PY'
 import json
 import os
 
-ctrf_path = "/Users/apple/WildClawBench/test_bash/verifier/ctrf.json"
+ctrf_path = "/logs/verifier/ctrf.json"
 weights_path = "tests/test_weights.json"
-reward_path = "/Users/apple/WildClawBench/test_bash/verifier/reward.txt"
+reward_path = "/logs/verifier/reward.txt"
 
 ctrf = {}
 if os.path.exists(ctrf_path):
