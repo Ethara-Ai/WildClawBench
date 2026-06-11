@@ -1,0 +1,3 @@
+baseId,id,name,primaryFieldId,records_csv
+appWoodardParts,tblParts,Parts,fldPartName,records_parts.csv
+appWoodardParts,tblOrders,Muller Portal Orders,fldOrderId,records_orders.csv

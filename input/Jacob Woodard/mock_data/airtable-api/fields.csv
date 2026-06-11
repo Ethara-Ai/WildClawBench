@@ -1,0 +1,21 @@
+tableId,id,name,type
+tblParts,fldPartName,Part,singleLineText
+tblParts,fldMovementType,Movement type,singleLineText
+tblParts,fldPeriod,Period,singleLineText
+tblParts,fldCommission,Commission,singleLineText
+tblParts,fldSupplier,Supplier,singleLineText
+tblParts,fldUnitCostEUR,Unit cost EUR,number
+tblParts,fldLeadTime,Lead time,singleLineText
+tblParts,fldOnHand,On hand,number
+tblParts,fldLastOrdered,Last ordered,date
+tblParts,fldLastModified,Last modified,dateTime
+tblOrders,fldOrderId,Order ID,singleLineText
+tblOrders,fldClientRef,Client ref,singleLineText
+tblOrders,fldLineItem,Line item,singleLineText
+tblOrders,fldPriceEUR,Price EUR,number
+tblOrders,fldDepositEUR,Deposit EUR,number
+tblOrders,fldDepositStatus,Deposit status,singleLineText
+tblOrders,fldStatus,Status,singleLineText
+tblOrders,fldExpectedDelivery,Expected delivery,date
+tblOrders,fldLastUpdated,Last updated,dateTime
+tblOrders,fldNotifyEmail,Notify by email,checkbox

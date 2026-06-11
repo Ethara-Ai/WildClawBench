@@ -1,0 +1,2 @@
+tracking_number,service_type,service_name,ship_date,origin_zip,dest_zip,weight_lb,currency,net_charge,label_url
+FX771-KRA-029,INTERNATIONAL_PRIORITY,FedEx International Priority,,2502,31-024,2.5,EUR,,https://fedex.example.com/labels/FX771-KRA-029

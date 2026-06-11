@@ -1,0 +1,14 @@
+{
+  "user": {
+    "displayName": "Jacob Woodard",
+    "emailAddress": "jacob.woodard@Finthesiss.ai",
+    "permissionId": "perm-jacob"
+  },
+  "storageQuota": {
+    "limit": "107374182400",
+    "usage": "4129382011",
+    "usageInDrive": "4117350000",
+    "usageInDriveTrash": "12032011"
+  },
+  "maxUploadSize": "5368709120"
+}

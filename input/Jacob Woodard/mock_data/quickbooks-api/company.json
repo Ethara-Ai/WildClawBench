@@ -1,0 +1,31 @@
+{
+  "CompanyInfo": {
+    "CompanyName": "Woodard Horology",
+    "LegalName": "Woodard Horology sp. z o.o.",
+    "CompanyAddr": {
+      "Line1": "ul. Jozefa, Kazimierz",
+      "City": "Krakow",
+      "CountrySubDivisionCode": "PL-MA",
+      "PostalCode": "31-024"
+    },
+    "Email": {
+      "Address": "jacob.woodard@Finthesiss.ai"
+    },
+    "PrimaryPhone": {
+      "FreeFormNumber": "+48 12 555 0149"
+    },
+    "FiscalYearStartMonth": "January",
+    "Country": "PL",
+    "IndustryType": "Horology & Restoration",
+    "NameValue": [
+      {
+        "Name": "OwnerName",
+        "Value": "Jacob Woodard"
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2021-03-15T10:00:00+02:00",
+      "LastUpdatedTime": "2026-09-18T10:15:00+02:00"
+    }
+  }
+}

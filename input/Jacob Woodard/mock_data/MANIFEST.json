@@ -1,0 +1,185 @@
+{
+  "task_id": "JACOB_001_krasicki_delivery_crunch",
+  "generated_at_utc": "2026-10-22T18:00:00Z",
+  "timezone": "Europe/Warsaw",
+  "anchor_dates": {
+    "task_start": "2026-10-20",
+    "task_end": "2026-10-22"
+  },
+  "services": [
+    "airtable-api",
+    "box-api",
+    "calendly-api",
+    "discord-api",
+    "docusign-api",
+    "dropbox-api",
+    "fedex-api",
+    "github-api",
+    "gmail-api",
+    "google-calendar-api",
+    "google-drive-api",
+    "hubspot-api",
+    "linear-api",
+    "mailchimp-api",
+    "notion-api",
+    "outlook-api",
+    "plaid-api",
+    "quickbooks-api",
+    "slack-api",
+    "stripe-api",
+    "trello-api",
+    "webflow-api",
+    "whatsapp-api",
+    "zoom-api"
+  ],
+  "primary_services": [
+    "airtable-api",
+    "box-api",
+    "docusign-api",
+    "fedex-api",
+    "gmail-api",
+    "google-calendar-api",
+    "google-drive-api",
+    "hubspot-api",
+    "linear-api",
+    "notion-api",
+    "quickbooks-api",
+    "slack-api",
+    "whatsapp-api"
+  ],
+  "distractor_services": [
+    "calendly-api",
+    "discord-api",
+    "dropbox-api",
+    "github-api",
+    "mailchimp-api",
+    "outlook-api",
+    "plaid-api",
+    "stripe-api",
+    "trello-api",
+    "webflow-api",
+    "zoom-api"
+  ],
+  "other_services": [],
+  "files": {
+    "airtable-api": [
+      "mock_data/airtable-api/bases.csv",
+      "mock_data/airtable-api/fields.csv",
+      "mock_data/airtable-api/records_orders.csv",
+      "mock_data/airtable-api/records_parts.csv",
+      "mock_data/airtable-api/tables.csv"
+    ],
+    "box-api": [
+      "mock_data/box-api/files.csv"
+    ],
+    "calendly-api": [
+      "mock_data/calendly-api/availability.csv",
+      "mock_data/calendly-api/event_types.csv",
+      "mock_data/calendly-api/invitees.csv",
+      "mock_data/calendly-api/scheduled_events.csv",
+      "mock_data/calendly-api/user.json"
+    ],
+    "discord-api": [
+      "mock_data/discord-api/channels.csv"
+    ],
+    "docusign-api": [
+      "mock_data/docusign-api/envelopes.csv"
+    ],
+    "dropbox-api": [
+      "mock_data/dropbox-api/account.csv",
+      "mock_data/dropbox-api/files.csv",
+      "mock_data/dropbox-api/shared_links.csv"
+    ],
+    "fedex-api": [
+      "mock_data/fedex-api/shipments.csv",
+      "mock_data/fedex-api/tracking.csv"
+    ],
+    "github-api": [
+      "mock_data/github-api/comments.csv",
+      "mock_data/github-api/issues.csv",
+      "mock_data/github-api/pulls.csv",
+      "mock_data/github-api/repos.csv",
+      "mock_data/github-api/user.json"
+    ],
+    "gmail-api": [
+      "mock_data/gmail-api/drafts.csv",
+      "mock_data/gmail-api/labels.csv",
+      "mock_data/gmail-api/messages.csv",
+      "mock_data/gmail-api/profile.json"
+    ],
+    "google-calendar-api": [
+      "mock_data/google-calendar-api/calendars.csv",
+      "mock_data/google-calendar-api/event_attendees.csv",
+      "mock_data/google-calendar-api/events.csv"
+    ],
+    "google-drive-api": [
+      "mock_data/google-drive-api/about.json",
+      "mock_data/google-drive-api/files.csv",
+      "mock_data/google-drive-api/permissions.csv"
+    ],
+    "hubspot-api": [
+      "mock_data/hubspot-api/contacts.csv"
+    ],
+    "linear-api": [
+      "mock_data/linear-api/issues.csv"
+    ],
+    "mailchimp-api": [
+      "mock_data/mailchimp-api/campaigns.csv",
+      "mock_data/mailchimp-api/lists.csv",
+      "mock_data/mailchimp-api/members.csv",
+      "mock_data/mailchimp-api/reports.csv"
+    ],
+    "notion-api": [
+      "mock_data/notion-api/blocks.csv",
+      "mock_data/notion-api/comments.csv",
+      "mock_data/notion-api/databases.csv",
+      "mock_data/notion-api/page_properties.csv",
+      "mock_data/notion-api/pages.csv",
+      "mock_data/notion-api/users.csv",
+      "mock_data/notion-api/workspace.json"
+    ],
+    "outlook-api": [
+      "mock_data/outlook-api/contacts.csv",
+      "mock_data/outlook-api/events.csv",
+      "mock_data/outlook-api/messages.csv"
+    ],
+    "plaid-api": [
+      "mock_data/plaid-api/accounts.csv"
+    ],
+    "quickbooks-api": [
+      "mock_data/quickbooks-api/company.json"
+    ],
+    "slack-api": [
+      "mock_data/slack-api/channel_members.csv",
+      "mock_data/slack-api/channels.csv",
+      "mock_data/slack-api/messages.csv",
+      "mock_data/slack-api/users.csv"
+    ],
+    "stripe-api": [
+      "mock_data/stripe-api/charges.csv"
+    ],
+    "trello-api": [
+      "mock_data/trello-api/boards.csv",
+      "mock_data/trello-api/cards.csv",
+      "mock_data/trello-api/checklists.csv",
+      "mock_data/trello-api/lists.csv",
+      "mock_data/trello-api/members.csv"
+    ],
+    "webflow-api": [
+      "mock_data/webflow-api/collections.csv",
+      "mock_data/webflow-api/items.csv",
+      "mock_data/webflow-api/sites.csv"
+    ],
+    "whatsapp-api": [
+      "mock_data/whatsapp-api/contacts.csv",
+      "mock_data/whatsapp-api/messages.csv"
+    ],
+    "zoom-api": [
+      "mock_data/zoom-api/meetings.csv",
+      "mock_data/zoom-api/recordings.csv",
+      "mock_data/zoom-api/registrants.csv",
+      "mock_data/zoom-api/user.json"
+    ]
+  },
+  "skipped": {}
+}
