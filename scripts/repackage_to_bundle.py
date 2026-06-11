@@ -73,7 +73,8 @@ DESIGN CHOICES (documented, since some target fields are absent in our data)
     - importance is DERIVED: abs(weight) >= 5 -> "critically_important" else "important"
     - type and evaluation_target are emitted as "" (unknown) unless --infer-rubric-meta
       is passed, in which case light heuristics fill them (see _infer_meta).
-* pytest test name           <- "tests/test_outputs.py::" + ctrf "Class::method"
+* pytest test name           <- bare test name (last "::" segment of the ctrf
+                              name; class/module/file qualifiers are stripped)
 * pytest test weight         <- test_weights.json[method]  (default 1 if absent)
 * include_multimodal         <- True if rubric/task mentions image/document OR any
                                 input_files mime is image/* (see _detect_multimodal)
@@ -190,14 +191,19 @@ def _build_pytest_block(verifier_dir: Path) -> dict[str, Any]:
     summary = results.get("summary", {}) if isinstance(results, dict) else {}
     raw_tests = results.get("tests", []) if isinstance(results, dict) else []
 
+    # Weights keys may be bare ("test_x") or qualified ("TestFoo::test_x",
+    # "tests/test_outputs.py::TestFoo::test_x"); fold them to bare names so
+    # they resolve against the bare ctrf test names.
+    bare_weights = {_method_of(k): v for k, v in weights.items()}
+
     tests: list[dict[str, Any]] = []
     for t in raw_tests:
         name = t.get("name", "")
         method = _method_of(name)
-        weight = weights.get(method, weights.get(name, 1))
+        weight = weights.get(name, bare_weights.get(method, 1))
         tests.append(
             {
-                "name": f"tests/test_outputs.py::{name}",
+                "name": method,
                 "weight": int(weight),
                 "passed": t.get("status") == "passed",
             }

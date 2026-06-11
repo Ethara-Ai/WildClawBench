@@ -40,27 +40,6 @@ def _coerce_weights_map(weights: Any) -> Dict[str, float]:
     return out
 
 
-# Test file path inside the bundle/container; pytest node ids in the Harbor
-# test.sh CTRF are rooted here (tests/test_outputs.py::Class::test_x).
-_TEST_FILE = "tests/test_outputs.py"
-
-
-def _to_node_id(name: str) -> str:
-    """Normalize a runner-style name to the Harbor pytest node-id shape.
-
-    The in-process runner emits `TestClass::test_x` / `<module>::test_fn`,
-    while pytest-json-ctrf emits `tests/test_outputs.py::TestClass::test_x`
-    (module-level functions have no `<module>` segment). Names that already
-    carry a file segment pass through unchanged.
-    """
-    if ".py::" in name:
-        return name
-    parts = [p for p in name.split("::") if p and p != "<module>"]
-    if not parts:
-        return name
-    return "::".join([_TEST_FILE, *parts])
-
-
 def _coerce_scores_map(scores: Any) -> Dict[str, str]:
     out: Dict[str, str] = {}
     if isinstance(scores, dict):
@@ -106,7 +85,9 @@ def build_ctrf(
     if scores:
         for name, status in scores.items():
             tests.append({
-                "name": _to_node_id(name),
+                # Bare test name only — drop any "Class::" / "<module>::" /
+                # "<file>.py::" qualifiers from the runner's score key.
+                "name": name.split("::")[-1],
                 "status": status or "failed",
                 "duration": 0,
             })
@@ -122,7 +103,7 @@ def build_ctrf(
             else:
                 status = "skipped"
             tests.append({
-                "name": f"{_TEST_FILE}::test_unknown_{idx}",
+                "name": f"test_unknown_{idx}",
                 "status": status,
                 "duration": 0,
             })
