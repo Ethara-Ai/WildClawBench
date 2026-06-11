@@ -85,7 +85,9 @@ def build_ctrf(
     if scores:
         for name, status in scores.items():
             tests.append({
-                "name": name,
+                # Bare test name only — drop any "Class::" / "<module>::" /
+                # "<file>.py::" qualifiers from the runner's score key.
+                "name": name.split("::")[-1],
                 "status": status or "failed",
                 "duration": 0,
             })

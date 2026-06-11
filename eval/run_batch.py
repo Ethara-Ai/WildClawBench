@@ -1384,6 +1384,7 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
         openai_whisper_api_key=config.openai_whisper_api_key,
         enable_usage_callback=True,
         enable_headroom_callback=_agent_headroom,
+        anthropic_api_key=config.anthropic_api_key,
     )
     if not litellm_yaml:
         raise RuntimeError(
@@ -1437,6 +1438,7 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
         headroom_callback_host_path=headroom_callback_src,
         headroom_log_host_dir=headroom_log_dir_str,
         enable_headroom=_agent_headroom,
+        anthropic_api_key=config.anthropic_api_key,
     )
     cleanups.append(lambda: stop_litellm(sidecar))
     if not wait_for_litellm_healthy(sidecar):
@@ -1446,7 +1448,7 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
             f"Override budget via KENSEI_LITELLM_HEALTH_TIMEOUT env (seconds)."
         )
     probe_model = (
-        "claude-opus-4.7" if config.aws_bearer_token and config.bedrock_inference_arn
+        "claude-opus-4.7" if (config.aws_bearer_token and config.bedrock_inference_arn) or config.anthropic_api_key
         else "gpt-5.5" if config.openai_api_key
         else ""
     )

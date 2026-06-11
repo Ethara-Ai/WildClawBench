@@ -205,17 +205,21 @@ class HeadroomPreCallCompressor(CustomLogger):
         model = data.get("model", "") or ""
 
         try:
-            # Headroom defaults — for multi-turn tool-loops (agent path):
-            #   * skip_user_messages=True (default) — preserves user turns
-            #   * skip_system=True (default) — preserves system prompt
-            #   * compress_assistant_text_blocks=False (default) — preserves
-            #     assistant reasoning text
-            # i.e. ONLY tool_result content blocks compress. This matches the
-            # Headroom-recommended pattern for agent loops where tool outputs
-            # (large JSON/log/diff blobs) dominate the prompt. The judge path
-            # in `judge_litellm.py` sets compress_user_messages=True because
-            # there it's the only big block — agent path uses defaults.
+            # Headroom config knobs for agent path (verified live 2026-06-11):
+            #   * compress_user_messages=True — REQUIRED. OpenAI chat-completion
+            #     protocol routes tool_result blocks back as role=user messages
+            #     (e.g. openclaw's tool loop). With the headroom-0.24.0 default
+            #     (False), the ContentRouter marks every user message as
+            #     "router:protected:user_message" and saves zero tokens — even
+            #     when the user content is a 90KB JSON tool result. Setting
+            #     True frees the JSON compressor (smart_crusher) to do its job.
+            #     Verified: 88KB JSON array compressed from 25.3K→15.6K tokens.
+            #   * compress_system_messages=False — system prompt is verdict-
+            #     format-load-bearing (per src/utils/AGENTS.md). Skip.
+            #   * protect_recent=4 (default) — preserves the last 4 messages
+            #     verbatim so the agent's most-recent context is intact.
             cfg = _CompressConfig(  # type: ignore[misc]
+                compress_user_messages=True,
                 compress_system_messages=False,
                 protect_recent=_protect_recent(),
                 min_tokens_to_compress=_min_tokens(),

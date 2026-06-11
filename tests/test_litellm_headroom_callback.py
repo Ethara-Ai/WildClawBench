@@ -255,12 +255,14 @@ def test_compress_system_messages_is_false(monkeypatch):
         )
     )
     assert captured.get("compress_system_messages") is False
-    # compress_user_messages must NOT be passed — we rely on Headroom's default
-    # `skip_user_messages=True` for the multi-turn tool-loop pattern (only
-    # tool_result blocks compress, which is what we want for Opus 4.7 tool
-    # loops). Setting compress_user_messages=True here would mistakenly
-    # compress user turns too, which is the JUDGE path's pattern, not ours.
-    assert "compress_user_messages" not in captured
+    # compress_user_messages MUST be True — empirically verified live
+    # (2026-06-11) that OpenAI chat-completion proxies (incl. openclaw's
+    # tool loop) route tool_result blocks back as role=user messages, so
+    # leaving Headroom 0.24.0 at default compress_user_messages=False
+    # marks every user message as "router:protected:user_message" and
+    # saves zero tokens. With True, smart_crusher compresses JSON tool
+    # results (verified: 88KB JSON → 25.3K→15.6K tokens).
+    assert captured.get("compress_user_messages") is True
 
 
 # ────────────────────────────────────────────────────────────────────────────

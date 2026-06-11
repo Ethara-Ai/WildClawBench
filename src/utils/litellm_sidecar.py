@@ -21,6 +21,7 @@ def build_litellm_config_yaml(
     enable_usage_callback: bool = False,
     openai_whisper_api_key: str = "",
     enable_headroom_callback: bool = False,
+    anthropic_api_key: str = "",
 ) -> str:
     whisper_env_ref = (
         "os.environ/OPENAI_API_KEY_WHISPER"
@@ -109,6 +110,30 @@ def build_litellm_config_yaml(
         # claude-opus-4.7. Both names alias one ARN so the harness model arg and
         # the openclaw-facing id stay decoupled.
         model_blocks.append("  - model_name: claude-opus-4-6\n" + opus_params)
+    elif anthropic_api_key:
+        # Fallback upstream for opus when no Bedrock ARN is available. Routes
+        # the same claude-opus-4.7 / claude-opus-4-6 aliases through Anthropic
+        # direct using `model: anthropic/claude-opus-4-20250514`. Keeps the
+        # `cache_control_injection_points` directive and `include_usage` on
+        # stream so the per-judge usage dict shape (7-key, see grading.py
+        # header + AGENTS.md) and prompt-caching telemetry remain identical
+        # to the Bedrock path. Thinking is NOT requested here: Anthropic's
+        # `thinking:{type:adaptive}` shape is Bedrock-Converse-specific; the
+        # /v1/messages route on the direct API would 400 it. Agent behavior
+        # is unaffected because the opus model still responds correctly; only
+        # the streamed reasoning trace is absent on this fallback path.
+        opus_anthropic_params = (
+            "    litellm_params:\n"
+            "      model: anthropic/claude-opus-4-20250514\n"
+            "      api_key: os.environ/ANTHROPIC_API_KEY\n"
+            "      stream_options:\n"
+            "        include_usage: true\n"
+            + cache_marker
+            + "      input_cost_per_token: 0.000015\n"
+            "      output_cost_per_token: 0.000075"
+        )
+        model_blocks.append("  - model_name: claude-opus-4.7\n" + opus_anthropic_params)
+        model_blocks.append("  - model_name: claude-opus-4-6\n" + opus_anthropic_params)
     if bedrock_sonnet_arn:
         model_blocks.append(
             "  - model_name: claude-sonnet-4-6\n"
@@ -350,6 +375,7 @@ def start_litellm(
     headroom_callback_host_path: str = "",
     headroom_log_host_dir: str = "",
     enable_headroom: bool = False,
+    anthropic_api_key: str = "",
 ) -> None:
     env_args: list[str] = ["-e", f"LITELLM_MASTER_KEY={master_key}"]
     _litellm_log = os.environ.get("LITELLM_LOG", "").strip()
@@ -364,6 +390,8 @@ def start_litellm(
         env_args += ["-e", f"OPENAI_API_KEY={openai_api_key}"]
     if openai_whisper_api_key:
         env_args += ["-e", f"OPENAI_API_KEY_WHISPER={openai_whisper_api_key}"]
+    if anthropic_api_key:
+        env_args += ["-e", f"ANTHROPIC_API_KEY={anthropic_api_key}"]
 
     # Mount the callback module + writable log dir so UsageWriter can write
     # real provider-side usage rows from inside the sidecar. The env var name
@@ -410,7 +438,10 @@ def start_litellm(
         "--config", "/app/config.yaml",
         "--port", str(port),
     ]
-    logger.info("[%s] Starting LiteLLM sidecar on network %s", container_name, network)
+    logger.info(
+        "[%s] Starting LiteLLM sidecar on network %s using image %s",
+        container_name, network, image_to_run,
+    )
     subprocess.run(["docker", "rm", "-f", container_name], capture_output=True)
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:

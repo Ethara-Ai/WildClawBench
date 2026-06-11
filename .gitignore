@@ -50,3 +50,6 @@ logs/
 # macOS Finder duplicate-on-copy directories ("foo copy/", "foo copy 2/").
 *\ copy/
 *\ copy\ [0-9]*/
+
+# Audit deliverables (findings.json, REPORT.md, BUGS.md, REMEDIATION.md, logs/) — local-only, machine-specific.
+audit/

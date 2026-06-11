@@ -249,6 +249,7 @@ _BASELINE_SKILL_PIP_DEPS: tuple[str, ...] = (
     "opencv-python-headless",
     "openpyxl",
     "python-docx",
+    "python-pptx",
     "pandas",
     "pypdf",
 )

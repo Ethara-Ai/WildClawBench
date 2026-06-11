@@ -280,12 +280,18 @@ def call_judge_via_litellm(
     # Sanity: judges MUST NOT receive `thinking`, `reasoning_effort`,
     # `output_config`, or `response_format` — those silently change the
     # output character and break `_VERDICT_RE` parsing. Pass nothing extra.
+    # `drop_params=True` lets LiteLLM silently strip params a provider
+    # doesn't accept (verified live: Bedrock application-inference-profile
+    # ARNs for Sonnet/Kimi/GLM reject `temperature` → UnsupportedParamsError).
+    # The urllib fallback path retries-without-temperature on the same
+    # error; this is the LiteLLM-side equivalent.
     response = litellm.completion(
         model=model,
         messages=messages,
         max_tokens=max_output_tokens,
         temperature=0,
         stream=False,
+        drop_params=True,
     )
 
     # Extract text. LiteLLM normalizes to OpenAI shape across providers.

@@ -125,7 +125,7 @@ _RUNNER_SCRIPT = textwrap.dedent('''
         return req
 
     def _record(results, full, callable_fn, is_async=False):
-        print(f"[runner] running {full}", file=sys.stderr, flush=True)
+        print(f"[runner] running {full.split('::')[-1]}", file=sys.stderr, flush=True)
         signal.alarm(PER_TEST_TIMEOUT)
         try:
             res = callable_fn()
@@ -418,6 +418,10 @@ def execute_tests(
             if line.startswith("{") and line.endswith("}"):
                 try:
                     payload = json.loads(line)
+                    # The raw payload (qualified <module>::/Class:: keys) is
+                    # parsed into test_scores; keep the persisted log human-
+                    # facing only.
+                    output = output.replace(line, "[runner JSON payload omitted — parsed into test_scores]", 1)
                     break
                 except Exception:
                     continue
@@ -480,8 +484,10 @@ def execute_tests(
             "tests_errored": tests_errored,
             "tests_skipped": tests_skipped,
             "test_scores": json.dumps(scores),
+            # Artifact-facing map: bare test names (qualified keys stay only in
+            # test_scores, where weight matching needs them).
             "test_function_outputs": json.dumps({
-                k: v.get("error", "") for k, v in results.items()
+                k.split("::")[-1]: v.get("error", "") for k, v in results.items()
             }),
             "test_output": output,
             "test_code": test_code,
