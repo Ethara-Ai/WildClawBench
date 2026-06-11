@@ -192,7 +192,13 @@ class HeadroomPreCallCompressor(CustomLogger):
         data: dict,
         call_type: str,
     ) -> dict | None:
-        if call_type not in ("completion", "acompletion"):
+        # `anthropic_messages` is the call_type LiteLLM router assigns to
+        # /v1/messages (litellm/router.py: `call_type="anthropic_messages"`)
+        # — the openclaw agent's path. Without it the hook silently no-ops
+        # for every Anthropic-format request, leaving telemetry empty even
+        # when KENSEI_AGENT_HEADROOM_ENABLED=true and the image+volume mount
+        # are wired correctly.
+        if call_type not in ("completion", "acompletion", "anthropic_messages"):
             return data
         if not _enabled():
             return data

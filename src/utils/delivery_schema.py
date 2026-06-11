@@ -125,13 +125,26 @@ def _convert_content_blocks(
             command = (args.get("command") or "") if name == "exec" else ""
             if name == "exec" and _is_spawn_command(command):
                 spec = _parse_spawn_spec(command) or {}
-                # Match this spawn call to the next unconsumed spawn_tree row.
-                # Both lists are append-only in call order, so file-order
-                # cursor advance is the join key (no shared ID exposed in the
-                # parent's tool transcript itself).
-                if cursor[0] < len(spawn_rows):
-                    spawn_id_map[tool_id] = spawn_rows[cursor[0]]
+                # A single `exec` may pipe multiple spawn_subagent.py
+                # invocations (e.g. parallel `... &` chains), each emitting
+                # its own spawn_tree row. Count occurrences of the hint and
+                # consume that many rows; register every consumed row in
+                # spawn_id_map keyed by a synthetic id so `sessions_yield`
+                # rewrite finds the first one and `_load_sub_agent_trajectories`
+                # surfaces all of them.
+                count = max(1, command.count(_SPAWN_SCRIPT_HINT))
+                first_consumed = None
+                for n in range(count):
+                    if cursor[0] >= len(spawn_rows):
+                        break
+                    sr = spawn_rows[cursor[0]]
                     cursor[0] += 1
+                    if n == 0:
+                        spawn_id_map[tool_id] = sr
+                        first_consumed = sr
+                    else:
+                        sid = sr.get("spawn_id") or f"{tool_id}:n{n}"
+                        spawn_id_map[f"{tool_id}:n{n}"] = sr
                 out.append({
                     "type": "toolCall",
                     "id": tool_id,

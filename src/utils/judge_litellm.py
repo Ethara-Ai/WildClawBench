@@ -284,7 +284,6 @@ def call_judge_via_litellm(
         model=model,
         messages=messages,
         max_tokens=max_output_tokens,
-        temperature=0,
         stream=False,
     )
 
