@@ -95,6 +95,11 @@ def build_litellm_config_yaml(
             f"      aws_region_name: {aws_region or 'ap-south-1'}\n"
             # output_config.effort:high: probes showed bare adaptive can return an
             # empty/absent thinking block; +effort:high reliably populates it.
+            # Bedrock REQUIRES this {type:adaptive,display:summarized}+output_config
+            # pair on the opus ARN and 400s {type:enabled,budget_tokens} with
+            # "thinking.type.enabled is not supported... use thinking.type.adaptive
+            # and output_config.effort" (re-confirmed live 2026-06-12 on
+            # profile 0pou38ej54bo). Do NOT switch to enabled+budget_tokens.
             "      thinking: {\"type\": \"adaptive\", \"display\": \"summarized\"}\n"
             "      output_config: {\"effort\": \"high\"}\n"
             "      stream_options:\n"
@@ -154,6 +159,8 @@ def build_litellm_config_yaml(
             "      model: bedrock/converse/anthropic.claude-sonnet-4-6\n"
             f"      model_id: {bedrock_sonnet_arn}\n"
             f"      aws_region_name: {aws_region or 'ap-south-1'}\n"
+            # Same adaptive+display:summarized shape as Opus; Bedrock 400s
+            # enabled+budget_tokens here too (see opus block).
             "      thinking: {\"type\": \"adaptive\", \"display\": \"summarized\"}\n"
             "      stream_options:\n"
             "        include_usage: true\n"
@@ -219,6 +226,33 @@ def build_litellm_config_yaml(
                 "      model: openai/whisper-1\n"
                 f"      api_key: {whisper_env_ref}"
             )
+    # OpenClaw's memory tool POSTs model=text-embedding-3-small to the sidecar
+    # /v1/embeddings on session-start, on memory search, and from our explicit
+    # `openclaw memory index` step. With no embeddings route registered the
+    # proxy 400s "Invalid model name passed in model=text-embedding-3-small"
+    # (same failure class as whisper-1 above) and memory recall silently dies.
+    # Per user decision (m0476: "no need for any embedding models"), we register
+    # a MOCK route: litellm reads `mock_response` from litellm_params and short-
+    # circuits before any network call (litellm/main.py embedding -> mock_embedding),
+    # so the call returns a valid 200 OpenAI-shaped EmbeddingResponse with NO real
+    # model, NO OpenAI key dependency, and NO embedding spend. Semantic recall is
+    # intentionally non-functional (mock returns a single fixed zero vector); the
+    # plain-file persona bootstrap is unaffected (it reads MDs off disk, never
+    # hits /v1/embeddings). mode: embedding routes the id to the /embeddings
+    # handler. Alias the three current OpenAI embedding ids openclaw may emit.
+    for _emb_id in (
+        "text-embedding-3-small",
+        "text-embedding-3-large",
+        "text-embedding-ada-002",
+    ):
+        model_blocks.append(
+            f"  - model_name: {_emb_id}\n"
+            "    litellm_params:\n"
+            f"      model: openai/{_emb_id}\n"
+            "      mock_response: [0.0]\n"
+            "    model_info:\n"
+            "      mode: embedding"
+        )
     # OpenClaw's image tool falls back to built-in default model ids when its
     # own imageModel override isn't applied inside the container. The openclaw
     # 2026.3.11 dist (verified via grep of /usr/lib/node_modules/openclaw/dist)
