@@ -32,7 +32,7 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Set
 from src.utils.config import Config
 from src.utils.skills_inference import compute_distractor_skills, infer_required_apis
 from src.utils.store import Store, Task
-from .compose import discover_services, generate_harbor_compose
+from .compose import discover_services, generate_harbor_compose, runtime_env_defaults
 from .ctrf import build_ctrf, compute_test_reward
 from .dockerfile import generate_harbor_dockerfile
 from .solve_sh import generate_harbor_solve_sh
@@ -229,15 +229,24 @@ def write_bundle(
         if svc.get("port")
     ) or None
 
+    # Harbor injects [environment.env]/[verifier.env]/[solution.env] itself,
+    # so the LLM-proxy routing and CURRENT_DATE pin must live here as well as
+    # in docker-compose.yaml. LLAMA_API_KEY is compose-only (secret; resolved
+    # from the host at `docker compose up` time, never baked into task.toml).
+    runtime_env = runtime_env_defaults()
+    environment_env = {**env_vars, **runtime_env}
+    verifier_env = {**env_vars, **runtime_env, "TEST_DIR": "/tests"}
+    solution_env = {**env_vars, **runtime_env}
+
     toml_text = build_task_toml(
         task=task,
         required_skills=required_skills,
         distractor_skills=distractor_skills,
-        env_vars=env_vars,
+        env_vars=environment_env,
         dependency_tags=_dependency_tags(task),
         dimensions=_dimensions(task, bool(attachments_list)),
-        verifier_env=env_vars,
-        solution_env=env_vars,
+        verifier_env=verifier_env,
+        solution_env=solution_env,
         pass_at_k=pass_at_k,
         healthcheck_command=healthcheck_cmd,
     )
@@ -307,7 +316,11 @@ def write_bundle(
 
     (env_out / "Dockerfile").write_text(generate_harbor_dockerfile(), encoding="utf-8")
     (env_out / "docker-compose.yaml").write_text(
-        generate_harbor_compose(config.environment_dir, services=filtered_services),
+        generate_harbor_compose(
+            config.environment_dir,
+            services=filtered_services,
+            env_vars=env_vars,
+        ),
         encoding="utf-8",
     )
 
