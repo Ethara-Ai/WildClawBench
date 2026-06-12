@@ -26,6 +26,21 @@ BEDROCK_CONVERSE_STREAM_URL = (
     "https://bedrock-runtime.{region}.amazonaws.com/model/{model_id}/converse-stream"
 )
 
+# Per-token USD price for the test-gen model. Test generation runs on the same
+# Bedrock inference profile as the Opus agent (cfg.bedrock_inference_arn =
+# KENSEI_BEDROCK_MODEL_ARN), so we price it at published Claude Opus 4.6/4.7
+# rates: $5/MTok input, $25/MTok output, $0.50/MTok cache-read (0.1x),
+# $6.25/MTok cache-write (1.25x). Because this path bypasses the LiteLLM
+# sidecar by design, litellm.completion_cost never sees these calls — without
+# this, testgen tokens were real Bedrock spend recorded at $0 (gap G3).
+# (input, output, cache_read, cache_write) per token.
+TESTGEN_OPUS_RATE_PER_TOKEN = (5e-6, 25e-6, 5e-7, 6.25e-6)
+
+
+def _testgen_cost_usd(input_tokens: int, output_tokens: int, cache_read: int, cache_write: int) -> float:
+    r_in, r_out, r_cr, r_cw = TESTGEN_OPUS_RATE_PER_TOKEN
+    return input_tokens * r_in + output_tokens * r_out + cache_read * r_cr + cache_write * r_cw
+
 
 def call_bedrock_converse(
     *,
@@ -142,6 +157,9 @@ def call_bedrock_converse(
         "cache_write_tokens": cache_write,
         "total_tokens": total_tokens,
         "request_count": 1,
+        # Priced inline because test-gen bypasses the sidecar (completion_cost
+        # never sees these tokens); without it sources.testgen.cost_usd is $0.
+        "cost_usd": _testgen_cost_usd(input_tokens, output_tokens, cache_read, cache_write),
     }
 
     return response_text.strip(), usage

@@ -117,16 +117,20 @@ def _compute_testgen_cache_key(task: dict) -> str:
                 h.update(b"<unreadable>")
     mock_root = p / "mock_data"
     if mock_root.is_dir():
-        entries = []
+        # Key on each mock-data file's CONTENT, not its size. Two fixtures of
+        # identical byte-length but different content (common with fixed-width
+        # CSV rows or padded JSON) would otherwise collide and silently serve a
+        # stale test suite. We fold relpath + a content digest into the hash.
         for sub in sorted(mock_root.iterdir()):
             if sub.is_dir():
                 for child in sorted(sub.rglob("*")):
                     if child.is_file():
+                        relpath = str(child.relative_to(mock_root))
+                        h.update(f"\x00mock:{relpath}\x00".encode())
                         try:
-                            entries.append((str(child.relative_to(mock_root)), child.stat().st_size))
+                            h.update(hashlib.sha256(child.read_bytes()).digest())
                         except OSError:
-                            entries.append((str(child.relative_to(mock_root)), -1))
-        h.update(f"\x00mock_data:{entries}\x00".encode())
+                            h.update(b"<unreadable>")
     return h.hexdigest()[:32]
 
 
@@ -266,13 +270,20 @@ def save_usage(
 
     result["usage"] = out
     if out["request_count"] > 0:
+        # Include preflight in the breakdown so the sidecar-startup ping is visible
+        # (its cost IS already in the combined total via recompute_combined). NOTE:
+        # preflight is attributed to EVERY task with no time-window filter, so the same
+        # one-time ping cost is replicated across all N per-task usage.json files -- a
+        # double-count trap if you naively SUM per-task usage to get a batch total.
+        # Per-source cost_usd is logged too so a $0 source is distinguishable from a
+        # source that simply was not priced.
         breakdown_bits = []
-        for name in ("agent", "testgen", "judge"):
+        for name in ("agent", "preflight", "testgen", "judge"):
             s = sources.get(name)
             if s and s.get("request_count", 0) > 0:
                 breakdown_bits.append(
                     f"{name}(in={s.get('input_tokens',0)},out={s.get('output_tokens',0)}"
-                    f",cR={s.get('cache_read_tokens',0)})"
+                    f",cR={s.get('cache_read_tokens',0)},$ {s.get('cost_usd',0.0):.4f})"
                 )
         logger.info(
             "[%s] Token usage TOTAL - input:%d output:%d cache_read:%d cache_write:%d "

@@ -101,7 +101,13 @@ def build_litellm_config_yaml(
             "        include_usage: true\n"
             + cache_marker
             + "      input_cost_per_token: 0.000005\n"
-            "      output_cost_per_token: 0.000025"
+            "      output_cost_per_token: 0.000025\n"
+            # Opus 4.6/4.7 cache rates: read 0.1x ($0.50/MTok), write 1.25x
+            # ($6.25/MTok). Required or cache_write under-counts on Bedrock
+            # streaming (SIX_CHECK report); honored by both completion_cost and
+            # the proxy per-deployment cost path.
+            "      cache_read_input_token_cost: 0.0000005\n"
+            "      cache_creation_input_token_cost: 0.00000625"
         )
         model_blocks.append("  - model_name: claude-opus-4.7\n" + opus_params)
         # openclaw's _set_model presents the recognized id "claude-opus-4-6" to
@@ -138,14 +144,26 @@ def build_litellm_config_yaml(
         model_blocks.append(
             "  - model_name: claude-sonnet-4-6\n"
             "    litellm_params:\n"
-            f"      model: bedrock/converse/{bedrock_sonnet_arn}\n"
+            # model:/model_id: split mirrors Opus so the RECOGNIZABLE name resolves
+            # in litellm's catalog for cost (an opaque inference-profile ARN in
+            # model: raises "isn't mapped yet" -> cost falls back to the under-
+            # counting response_cost). model_id carries the real ARN for routing
+            # (get_bedrock_model_id pops it). KEEP the converse/ infix here (unlike
+            # Opus): Sonnet's reasoningContent is tolerated by the harness on
+            # Converse; do NOT switch to Invoke without re-testing thinking parsing.
+            "      model: bedrock/converse/anthropic.claude-sonnet-4-6\n"
+            f"      model_id: {bedrock_sonnet_arn}\n"
             f"      aws_region_name: {aws_region or 'ap-south-1'}\n"
             "      thinking: {\"type\": \"adaptive\", \"display\": \"summarized\"}\n"
             "      stream_options:\n"
             "        include_usage: true\n"
             + cache_marker
             + "      input_cost_per_token: 0.000003\n"
-            "      output_cost_per_token: 0.000015"
+            "      output_cost_per_token: 0.000015\n"
+            # Sonnet 4.6 cache rates: read 0.1x ($0.30/MTok), write 1.25x
+            # ($3.75/MTok). Same rationale as Opus above.
+            "      cache_read_input_token_cost: 0.0000003\n"
+            "      cache_creation_input_token_cost: 0.00000375"
         )
     if openai_api_key:
         # The dict `reasoning_effort: {effort, summary}` shape is a Responses

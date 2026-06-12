@@ -1,3 +1,0 @@
-id,name,description,state,leadId,teamIds,startDate,targetDate,createdAt,updatedAt
-PROJ-MIGRATE,Database Migration v3,Migrate legacy PostgreSQL clusters to CockroachDB with zero-downtime cutover. Amanda Hayes leading the backend migration work.,started,user-amanda,team-backend,2026-08-01,2026-11-15,2026-07-20T10:00:00,2026-09-30T14:00:00
-PROJ-AUTH,Auth Service Rewrite,Rewrite authentication service from Express to Fastify with OIDC support,started,user-raj,team-backend,2026-06-15,2026-10-30,2026-06-10T09:00:00,2026-09-28T11:00:00
