@@ -143,6 +143,20 @@ _LOG_PATH = os.environ.get(
 _LOG_LOCK = threading.Lock()
 
 
+def _has_thinking_block(message: Any) -> bool:
+    # Anthropic native shape: content is a list with a {type:"thinking"} block
+    # holding reasoning text + a Bedrock-signed thinkingSignature.
+    if not isinstance(message, dict):
+        return False
+    content = message.get("content")
+    if not isinstance(content, list):
+        return False
+    for block in content:
+        if isinstance(block, dict) and block.get("type") == "thinking":
+            return True
+    return False
+
+
 def _model_hint(model: str) -> str:
     # Headroom's tokenizer estimates token counts by string-matching the model
     # name against its internal model database. Bedrock ARNs like
@@ -226,7 +240,19 @@ class HeadroomPreCallCompressor(CustomLogger):
                 target_ratio=_target_ratio(),
             )
             hint = _model_hint(model)
-            result = _compress(messages, model=hint, config=cfg)  # type: ignore[misc]
+            # Detach thinking-bearing assistant turns so Headroom never sees
+            # them: it has no protect_thinking knob and would strip the reasoning
+            # TEXT while leaving the signed envelope, which (a) blanks the
+            # persisted trace and (b) can invalidate the Bedrock thinkingSignature
+            # on multi-turn continuations (the signature is computed over the
+            # original text) -> downstream 400s. We compress only the remainder
+            # and splice the ORIGINALS back at their indices verbatim.
+            protected = {i: m for i, m in enumerate(messages) if _has_thinking_block(m)}
+            if protected:
+                compressible = [m for i, m in enumerate(messages) if i not in protected]
+                result = _compress(compressible, model=hint, config=cfg)  # type: ignore[misc]
+            else:
+                result = _compress(messages, model=hint, config=cfg)  # type: ignore[misc]
         except Exception as exc:
             sys.stderr.write(
                 f"[litellm_headroom_callback] compress() raised, sending "
@@ -239,7 +265,20 @@ class HeadroomPreCallCompressor(CustomLogger):
             return data
 
         new_messages = getattr(result, "messages", None)
-        if not isinstance(new_messages, list) or not new_messages:
+        if not isinstance(new_messages, list):
+            return data
+        if protected:
+            compressed_iter = iter(new_messages)
+            rebuilt: list[Any] = []
+            for i in range(len(messages)):
+                if i in protected:
+                    rebuilt.append(protected[i])
+                else:
+                    rebuilt.append(next(compressed_iter, None))
+            if any(m is None for m in rebuilt):
+                return data
+            new_messages = rebuilt
+        if not new_messages:
             return data
         data["messages"] = new_messages
 

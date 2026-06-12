@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -119,6 +120,27 @@ _registered_tails: set[str] = set()
 
 def _arn_tail(model: str) -> str:
     return (model or "").rsplit("/", 1)[-1]
+
+
+_ARN_REGION_RE = re.compile(r"^arn:aws:bedrock:([a-z0-9-]+):")
+
+
+def _litellm_model_and_region(model: str) -> tuple[str, str | None]:
+    # A bare Bedrock application-inference-profile ARN has provider=None as far
+    # as litellm is concerned, so litellm.completion(model=<arn>) raises
+    # NotFoundError "Unknown provider=None ... Try calling via converse". Prefix
+    # it as bedrock/converse/<arn> so litellm routes to the Converse handler, and
+    # return the ARN's own region (GLM council member is us-east-1 while the
+    # batch default is ap-south-1) so the call hits the right regional endpoint.
+    # Non-Bedrock judges (openai/<model>, gpt-5.x) pass through unchanged.
+    m = (model or "").strip()
+    if m.startswith("bedrock/"):
+        m = m[len("bedrock/"):]
+    if m.startswith("arn:aws:bedrock:") or ":application-inference-profile/" in m:
+        match = _ARN_REGION_RE.match(m)
+        region = match.group(1) if match else None
+        return f"bedrock/converse/{m}", region
+    return model, None
 
 
 def register_judges_for_batch(members) -> None:
@@ -294,8 +316,25 @@ def call_judge_via_litellm(
             [CouncilMember(family=_cast(JudgeFamily, family), model=model)]
         )
 
+    call_model, region = _litellm_model_and_region(model)
+
+    # System-prompt caching: the council system prompt is large and IDENTICAL
+    # across all members, so marking it with cache_control lets the first member
+    # write it to Bedrock's prompt cache (~5 min TTL) and the rest read it back
+    # at the cache-read rate instead of re-paying full input. This is the litellm
+    # equivalent of the urllib path's `cachePoint` block. Gated on family caching
+    # support (Kimi/GLM 403 on cachePoint) so only Anthropic Sonnet caches; the
+    # content-list shape is required for cache_control to attach per-block.
+    from . import grading
+    if family is not None and grading._supports_prompt_caching(model, family):
+        system_content: Any = [
+            {"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}
+        ]
+    else:
+        system_content = system
+
     messages = [
-        {"role": "system", "content": system},
+        {"role": "system", "content": system_content},
         {"role": "user", "content": user},
     ]
 
@@ -310,14 +349,17 @@ def call_judge_via_litellm(
     # ARNs for Sonnet/Kimi/GLM reject `temperature` → UnsupportedParamsError).
     # The urllib fallback path retries-without-temperature on the same
     # error; this is the LiteLLM-side equivalent.
-    response = litellm.completion(
-        model=model,
-        messages=messages,
-        max_tokens=max_output_tokens,
-        temperature=0,
-        stream=False,
-        drop_params=True,
-    )
+    completion_kwargs: dict[str, Any] = {
+        "model": call_model,
+        "messages": messages,
+        "max_tokens": max_output_tokens,
+        "temperature": 0,
+        "stream": False,
+        "drop_params": True,
+    }
+    if region:
+        completion_kwargs["aws_region_name"] = region
+    response = litellm.completion(**completion_kwargs)
 
     # Extract text. LiteLLM normalizes to OpenAI shape across providers.
     try:
