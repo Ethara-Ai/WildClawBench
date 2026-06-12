@@ -1,0 +1,83 @@
+schema_version = "1.1"
+
+[task]
+name = "amanda_hayes_01"
+description = "It's the start of October and I'm finally sitting down to figure out where September's money went, because what's left in checking isn't matching the picture in my head. I dumped everything I had into this folder along with my Chase Freedom card statement. Some of what I bought I paid cash for and some ran through the debit side, so pull my checking activity, and I left myself some notes about which of those charges were shared or need to be expensed so check those too, because no single source has all of it. My September budget targets aren't in this folder — I keep them on Google Drive in a file called `September_Budget_Notes.md` (file id `file-sept-budget`). Pull that file via the Google Drive API and use those numbers exactly for the variance analysis, since they're newer than the older `budget_tracker_2026.csv` if you see it. I want an honest read on what I really spent in each of my usual budget categories last month versus what I'd set for myself and how far over I ended up, and since I've been keeping a running tally of my monthly spending all year tell me whether September came in above or below where I've been averaging. Put the write-up in report.md with the category actuals, the purchases you matched, and the total I went over, and drop anything that shouldn't count into flagged_items.csv with a quick reason for each. Don't move money around or message anyone about this, it stays with me."
+authors = []
+keywords = ["medium"]
+
+[metadata]
+category = ""
+difficulty = "medium"
+required_skills = ["google-analytics-api-connector", "google-calendar-api-connector", "google-classroom-api-connector", "google-drive-api-connector", "google-maps-api-connector", "linear-api-connector", "notion-api-connector", "plaid-api-connector", "quickbooks-api-connector", "trello-api-connector"]
+distractor_skills = []
+
+[verifier]
+timeout_sec = 600.0
+
+[verifier.env]
+GOOGLE_ANALYTICS_API_URL = "http://google-analytics-api:8068"
+GOOGLE_CALENDAR_API_URL = "http://google-calendar-api:8016"
+GOOGLE_CLASSROOM_API_URL = "http://google-classroom-api:8002"
+GOOGLE_DRIVE_API_URL = "http://google-drive-api:8018"
+GOOGLE_MAPS_API_URL = "http://google-maps-api:8033"
+LINEAR_API_URL = "http://linear-api:8004"
+NOTION_API_URL = "http://notion-api:8010"
+PLAID_API_URL = "http://plaid-api:8022"
+QUICKBOOKS_API_URL = "http://quickbooks-api:8007"
+TRELLO_API_URL = "http://trello-api:8030"
+
+[agent]
+timeout_sec = 900.0
+
+[environment]
+build_timeout_sec = 600.0
+cpus = 1
+memory_mb = 4096
+storage_mb = 10240
+allow_internet = true
+skills_dir = "skills"
+
+[environment.env]
+GOOGLE_ANALYTICS_API_URL = "http://google-analytics-api:8068"
+GOOGLE_CALENDAR_API_URL = "http://google-calendar-api:8016"
+GOOGLE_CLASSROOM_API_URL = "http://google-classroom-api:8002"
+GOOGLE_DRIVE_API_URL = "http://google-drive-api:8018"
+GOOGLE_MAPS_API_URL = "http://google-maps-api:8033"
+LINEAR_API_URL = "http://linear-api:8004"
+NOTION_API_URL = "http://notion-api:8010"
+PLAID_API_URL = "http://plaid-api:8022"
+QUICKBOOKS_API_URL = "http://quickbooks-api:8007"
+TRELLO_API_URL = "http://trello-api:8030"
+
+[environment.healthcheck]
+command = "curl -f http://localhost:8068/health && curl -f http://localhost:8016/health && curl -f http://localhost:8002/health && curl -f http://localhost:8018/health && curl -f http://localhost:8033/health && curl -f http://localhost:8004/health && curl -f http://localhost:8010/health && curl -f http://localhost:8022/health && curl -f http://localhost:8007/health && curl -f http://localhost:8030/health"
+interval_sec = 5.0
+timeout_sec = 30.0
+retries = 3
+
+[solution.env]
+GOOGLE_ANALYTICS_API_URL = "http://google-analytics-api:8068"
+GOOGLE_CALENDAR_API_URL = "http://google-calendar-api:8016"
+GOOGLE_CLASSROOM_API_URL = "http://google-classroom-api:8002"
+GOOGLE_DRIVE_API_URL = "http://google-drive-api:8018"
+GOOGLE_MAPS_API_URL = "http://google-maps-api:8033"
+LINEAR_API_URL = "http://linear-api:8004"
+NOTION_API_URL = "http://notion-api:8010"
+PLAID_API_URL = "http://plaid-api:8022"
+QUICKBOOKS_API_URL = "http://quickbooks-api:8007"
+TRELLO_API_URL = "http://trello-api:8030"
+
+[multimodal]
+dependency_tags = ["Information Synthesis", "text_analysis__with_google-drive_linear_notion_apis"]
+
+[evaluation]
+pass_at_k = 8
+
+[dimensions]
+complex = "medium"
+long_horizon = "false"
+objective = "true"
+multimodal = "false"
+cross_modal_cross_api = "false"
+asset_complexity = "low"

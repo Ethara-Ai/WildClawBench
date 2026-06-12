@@ -57,6 +57,19 @@ def get_metadata(body: Optional[dict] = Body(default=None)):
     return result
 
 
+@app.post("/2/files/download")
+def download_file(body: Optional[dict] = Body(default=None)):
+    body = body or {}
+    try:
+        return dropbox_data.download_file_content(path=body.get("path"))
+    except dropbox_data.DownloadError as e:
+        return JSONResponse(
+            status_code=e.http_status,
+            content={"error_summary": f"{e.code}/", "error": {".tag": e.code},
+                     "message": e.message},
+        )
+
+
 @app.post("/2/files/search_v2")
 def search_v2(body: Optional[dict] = Body(default=None)):
     body = body or {}

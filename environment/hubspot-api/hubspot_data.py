@@ -7,6 +7,7 @@ Mutations (created/updated contacts and deals) reset on container restart.
 
 import csv
 import uuid
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
@@ -112,9 +113,9 @@ def _coerce_stages(rows):
     return list(pipelines.values())
 
 
-_contacts = _coerce_objects(_load("contacts.csv", "contacts"), _CONTACT_PROPS)
-_companies = _coerce_objects(_load("companies.csv", "companies"), _COMPANY_PROPS)
-_deals = _coerce_objects(_load("deals.csv", "deals"), _DEAL_PROPS, extra=_deal_extra)
+_contacts_store = _coerce_objects(_load("contacts.csv", "contacts"), _CONTACT_PROPS)
+_companies_store = _coerce_objects(_load("companies.csv", "companies"), _COMPANY_PROPS)
+_deals_store = _coerce_objects(_load("deals.csv", "deals"), _DEAL_PROPS, extra=_deal_extra)
 
 
 

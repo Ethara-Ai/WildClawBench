@@ -97,8 +97,9 @@ def load_task(path: str | Path) -> dict:
     """Load a task from a .md file or a native task directory.
 
     Task content authority:
-    - Native dir = prompt.txt + rubric.json (+ persona/ + data/ + mock_data/ + tests).
-      This is the sole source of truth for prompt body, rubric, tests, and attachments.
+    - Native dir = prompt.txt + rubric.json (+ persona/ (with home/ input artifacts) +
+      mock_data/ + tests). This is the sole source of truth for prompt body, rubric,
+      tests, and attachments.
     - task.yaml (optional sidecar) carries METADATA + connector declarations ONLY:
       difficulty, modalities, l1/l2, task_type, required_apis, distractor_apis (per b3).
       It is overlaid on top of the native dict via `_overlay_yaml_metadata`; it CANNOT
@@ -287,13 +288,6 @@ def _derive_taxonomy_for_native_task(
 def _append_workspace_hint(prompt: str, attachments: list[dict]) -> str:
     if not attachments:
         return prompt
-    names = sorted({str(a.get("storedAs") or a.get("name") or "") for a in attachments if a})
-    names = [n for n in names if n]
-    if not names:
-        return prompt
-    listing = "\n".join(f"- {n}" for n in names[:30])
-    if len(names) > 30:
-        listing += f"\n- ... ({len(names) - 30} more)"
     # Output-location contract pinned to two harness-side enforcers:
     # (a) `collect_output_from_container` snapshots `/root/workspace/`
     # before the agent runs and copies every new-or-modified file out
@@ -305,8 +299,7 @@ def _append_workspace_hint(prompt: str, attachments: list[dict]) -> str:
     # may also fail the image tool at read time.
     hint = (
         "\n\n---\n"
-        "Workspace inputs (already staged on disk at `/root/workspace/`):\n"
-        f"{listing}\n"
+        "Workspace inputs (already staged on disk at `/root/workspace/home` or `/root/workspace/Home`):\n"
         "Save EVERY output artifact you produce under `/root/workspace/`. "
         "Files written anywhere else (including `/tmp/` and elsewhere "
         "under `/root/`) will NOT be collected as deliverables."
@@ -315,9 +308,12 @@ def _append_workspace_hint(prompt: str, attachments: list[dict]) -> str:
 
 
 def _load_native_task(task_dir: Path) -> dict:
-    # kensei-native task dir: prompt.txt + rubric.json + persona/ + data/ + mock_data/ + gt/.
-    # workspace_path is left empty here; run_batch stages a workspace from
-    # `attachments` so task solutions/tests under data/ are never exposed.
+    # kensei-native task dir: prompt.txt + rubric.json + persona/ + mock_data/ + gt/.
+    # Input artifacts now ship inside persona/home/ (no separate data/ folder); they
+    # reach the container through the persona injection (inject_persona_into_workspace
+    # copies persona/. -> /tmp_workspace, surfacing persona/home/ at /root/workspace/home).
+    # `attachments` is still populated below for trajectory/harbor/multimodal metadata,
+    # but the runner no longer stages it into the /app exec mount.
     prompt = (task_dir / "prompt.txt").read_text(encoding="utf-8").strip()
     try:
         rubrics = json.loads((task_dir / "rubric.json").read_text(encoding="utf-8")) or []
@@ -329,28 +325,27 @@ def _load_native_task(task_dir: Path) -> dict:
     parts = task_dir.name.split("__")
     persona = parts[0] if parts and parts[0] else "marcus"
 
+    persona_dir = task_dir / "persona"
     attachments: list[dict] = []
-    data_dir = task_dir / "data"
-    if data_dir.is_dir():
-        for f in sorted(data_dir.rglob("*")):
+    home_dir = persona_dir / "home"
+    if home_dir.is_dir():
+        for f in sorted(home_dir.rglob("*")):
             if not f.is_file() or f.name.startswith("."):
                 continue
-            # never expose graders/solutions/bundle-scaffolding to the agent workspace
-            rel = f.relative_to(data_dir).as_posix()
-            if rel.startswith(("tests/", "solution/", "environment/")) or rel in ("task.toml", "instruction.md"):
-                continue
+            # storedAs is kept relative to home/ so trajectory media metadata reflects
+            # the in-container path /root/workspace/home/<rel>.
+            rel = f.relative_to(home_dir).as_posix()
             mime = mimetypes.guess_type(f.name)[0] or "application/octet-stream"
             attachments.append({
                 "name": f.name,
                 "mimeType": mime,
                 "path": str(f.resolve()),
                 "size": f.stat().st_size,
-                "storedAs": rel,
+                "storedAs": f"home/{rel}",
                 "role": "primary",
                 "description": "",
             })
 
-    persona_dir = task_dir / "persona"
     derived_l1, derived_l2 = _derive_taxonomy_for_native_task(task_dir, rubrics, attachments)
     prompt_with_inputs = _append_workspace_hint(prompt, attachments)
     provided_test_code, provided_test_weights = _load_provided_tests(task_dir)

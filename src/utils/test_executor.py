@@ -125,7 +125,7 @@ _RUNNER_SCRIPT = textwrap.dedent('''
         return req
 
     def _record(results, full, callable_fn, is_async=False):
-        print(f"[runner] running {full}", file=sys.stderr, flush=True)
+        print(f"[runner] running {full.split('::')[-1]}", file=sys.stderr, flush=True)
         signal.alarm(PER_TEST_TIMEOUT)
         try:
             res = callable_fn()
@@ -294,17 +294,33 @@ def _compute_reward(results: Mapping[str, dict], weights: Mapping[str, float]) -
     """
     if not weights:
         return 0.0
-    passed_names: set[str] = set()
+    # A.1+A.2 parity with src/utils/harbor/test_sh.py + src/utils/harbor/ctrf.py:
+    # three normalized shapes (full FQN / class-qualified / bare) so a weight
+    # key in any form resolves; class-qualified keys must NOT fall through to
+    # bare-multiset (would leak A.2 loose semantics into precise lookups).
+    passed_full: set[str] = set()
+    passed_class_qual: set[str] = set()
+    passed_bare: set[str] = set()
     for full_name, res in results.items():
         if res.get("status") != "passed":
             continue
-        passed_names.add(full_name)
-        if "::" in full_name:
-            passed_names.add(full_name.split("::", 1)[-1])
+        passed_full.add(full_name)
+        parts = full_name.split("::")
+        if len(parts) >= 2:
+            passed_bare.add(parts[-1])
+        if len(parts) >= 3:
+            passed_class_qual.add("::".join(parts[-2:]))
+
+    def _key_passed(key: str) -> bool:
+        if key in passed_full:
+            return True
+        if "::" in key:
+            return key in passed_class_qual
+        return key in passed_bare
 
     pos_total = sum(float(w) for w in weights.values() if w > 0)
-    pos_earned = sum(float(w) for n, w in weights.items() if w > 0 and n in passed_names)
-    neg_penalty = sum(abs(float(w)) for n, w in weights.items() if w < 0 and n in passed_names)
+    pos_earned = sum(float(w) for n, w in weights.items() if w > 0 and _key_passed(n))
+    neg_penalty = sum(abs(float(w)) for n, w in weights.items() if w < 0 and _key_passed(n))
 
     if pos_total <= 0:
         scored = [r for r in results.values() if r.get("status") != "skipped"]
@@ -402,6 +418,10 @@ def execute_tests(
             if line.startswith("{") and line.endswith("}"):
                 try:
                     payload = json.loads(line)
+                    # The raw payload (qualified <module>::/Class:: keys) is
+                    # parsed into test_scores; keep the persisted log human-
+                    # facing only.
+                    output = output.replace(line, "[runner JSON payload omitted — parsed into test_scores]", 1)
                     break
                 except Exception:
                     continue
@@ -464,8 +484,10 @@ def execute_tests(
             "tests_errored": tests_errored,
             "tests_skipped": tests_skipped,
             "test_scores": json.dumps(scores),
+            # Artifact-facing map: bare test names (qualified keys stay only in
+            # test_scores, where weight matching needs them).
             "test_function_outputs": json.dumps({
-                k: v.get("error", "") for k, v in results.items()
+                k.split("::")[-1]: v.get("error", "") for k, v in results.items()
             }),
             "test_output": output,
             "test_code": test_code,

@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 LITELLM_IMAGE = "ghcr.io/berriai/litellm:main-stable"
 LITELLM_INTERNAL_PORT = 4000
+LITELLM_HEADROOM_IMAGE = "wildclawbench-litellm-headroom:v1"
 
 
 def build_litellm_config_yaml(
@@ -19,6 +20,8 @@ def build_litellm_config_yaml(
     bedrock_sonnet_arn: str = "",
     enable_usage_callback: bool = False,
     openai_whisper_api_key: str = "",
+    enable_headroom_callback: bool = False,
+    anthropic_api_key: str = "",
 ) -> str:
     whisper_env_ref = (
         "os.environ/OPENAI_API_KEY_WHISPER"
@@ -113,6 +116,30 @@ def build_litellm_config_yaml(
         # claude-opus-4.7. Both names alias one ARN so the harness model arg and
         # the openclaw-facing id stay decoupled.
         model_blocks.append("  - model_name: claude-opus-4-6\n" + opus_params)
+    elif anthropic_api_key:
+        # Fallback upstream for opus when no Bedrock ARN is available. Routes
+        # the same claude-opus-4.7 / claude-opus-4-6 aliases through Anthropic
+        # direct using `model: anthropic/claude-opus-4-20250514`. Keeps the
+        # `cache_control_injection_points` directive and `include_usage` on
+        # stream so the per-judge usage dict shape (7-key, see grading.py
+        # header + AGENTS.md) and prompt-caching telemetry remain identical
+        # to the Bedrock path. Thinking is NOT requested here: Anthropic's
+        # `thinking:{type:adaptive}` shape is Bedrock-Converse-specific; the
+        # /v1/messages route on the direct API would 400 it. Agent behavior
+        # is unaffected because the opus model still responds correctly; only
+        # the streamed reasoning trace is absent on this fallback path.
+        opus_anthropic_params = (
+            "    litellm_params:\n"
+            "      model: anthropic/claude-opus-4-20250514\n"
+            "      api_key: os.environ/ANTHROPIC_API_KEY\n"
+            "      stream_options:\n"
+            "        include_usage: true\n"
+            + cache_marker
+            + "      input_cost_per_token: 0.000015\n"
+            "      output_cost_per_token: 0.000075"
+        )
+        model_blocks.append("  - model_name: claude-opus-4.7\n" + opus_anthropic_params)
+        model_blocks.append("  - model_name: claude-opus-4-6\n" + opus_anthropic_params)
     if bedrock_sonnet_arn:
         model_blocks.append(
             "  - model_name: claude-sonnet-4-6\n"
@@ -235,10 +262,26 @@ def build_litellm_config_yaml(
     # Real per-call usage from the proxy itself (not the agent's chat.jsonl
     # which openclaw writes with all-zero usage). Loaded by the LiteLLM
     # callback file mounted at /app/litellm_usage_callback.py.
-    callback_line = (
-        '  callbacks: ["litellm_usage_callback.proxy_handler_instance"]\n'
-        if enable_usage_callback else ""
-    )
+    #
+    # When `enable_headroom_callback=True`, mount the Headroom pre-call
+    # compressor AFTER the usage callback. Ordering rationale: LiteLLM iterates
+    # `for cb in litellm.callbacks` for the pre-call dispatch. The usage
+    # callback does NOT override `async_pre_call_hook` so LiteLLM auto-skips
+    # it in that loop (litellm/proxy/utils.py skip-rule: `if cb.async_pre_call_hook
+    # != CustomLogger.async_pre_call_hook`), which means the headroom callback
+    # is effectively first in the pre-call phase regardless of list position.
+    # Post-call, the usage logger sees `kwargs["messages"]` AS COMPRESSED, so
+    # it records the post-compression token count — exactly what Bedrock/OpenAI
+    # billed — preserving the existing 11-key JSONL schema unchanged.
+    _cbs: list[str] = []
+    if enable_usage_callback:
+        _cbs.append("litellm_usage_callback.proxy_handler_instance")
+    if enable_headroom_callback:
+        _cbs.append("litellm_headroom_callback.headroom_callback_instance")
+    if _cbs:
+        callback_line = "  callbacks: [" + ", ".join(f'"{c}"' for c in _cbs) + "]\n"
+    else:
+        callback_line = ""
     return (
         "model_list:\n"
         + "\n".join(model_blocks)
@@ -347,6 +390,10 @@ def start_litellm(
     usage_callback_host_path: str = "",
     usage_log_host_dir: str = "",
     openai_whisper_api_key: str = "",
+    headroom_callback_host_path: str = "",
+    headroom_log_host_dir: str = "",
+    enable_headroom: bool = False,
+    anthropic_api_key: str = "",
 ) -> None:
     env_args: list[str] = ["-e", f"LITELLM_MASTER_KEY={master_key}"]
     _litellm_log = os.environ.get("LITELLM_LOG", "").strip()
@@ -361,6 +408,8 @@ def start_litellm(
         env_args += ["-e", f"OPENAI_API_KEY={openai_api_key}"]
     if openai_whisper_api_key:
         env_args += ["-e", f"OPENAI_API_KEY_WHISPER={openai_whisper_api_key}"]
+    if anthropic_api_key:
+        env_args += ["-e", f"ANTHROPIC_API_KEY={anthropic_api_key}"]
 
     # Mount the callback module + writable log dir so UsageWriter can write
     # real provider-side usage rows from inside the sidecar. The env var name
@@ -373,18 +422,44 @@ def start_litellm(
             "-e", "LITELLM_USAGE_LOG_PATH=/var/litellm_usage/usage.jsonl",
         ]
 
+    # Headroom pre-call compressor: writes to a SEPARATE JSONL sink
+    # (/var/litellm_headroom/headroom.jsonl). Must never collide with
+    # LITELLM_USAGE_LOG_PATH — token-tracking invariant (user m0130).
+    # LITELLM_HEADROOM_IMAGE has `headroom-ai` baked in; the stock image
+    # cannot `import headroom` at proxy startup (no egress at that point).
+    headroom_args: list[str] = []
+    image_to_run = LITELLM_IMAGE
+    if enable_headroom and headroom_callback_host_path and headroom_log_host_dir:
+        image_to_run = LITELLM_HEADROOM_IMAGE
+        headroom_args = [
+            "-v", f"{headroom_callback_host_path}:/app/litellm_headroom_callback.py:ro",
+            "-v", f"{headroom_log_host_dir}:/var/litellm_headroom",
+            "-e", "KENSEI_AGENT_HEADROOM_LOG_PATH=/var/litellm_headroom/headroom.jsonl",
+            "-e", f"KENSEI_AGENT_HEADROOM_ENABLED={os.environ.get('KENSEI_AGENT_HEADROOM_ENABLED', 'true')}",
+        ]
+        for _k in ("KENSEI_AGENT_HEADROOM_TARGET_RATIO",
+                   "KENSEI_AGENT_HEADROOM_PROTECT_RECENT",
+                   "KENSEI_AGENT_HEADROOM_MIN_TOKENS"):
+            _v = os.environ.get(_k)
+            if _v:
+                headroom_args += ["-e", f"{_k}={_v}"]
+
     cmd = [
         "docker", "run", "-d",
         "--name", container_name,
         "--network", network,
         *env_args,
         *callback_args,
+        *headroom_args,
         "-v", f"{host_config_path}:/app/config.yaml:ro",
-        LITELLM_IMAGE,
+        image_to_run,
         "--config", "/app/config.yaml",
         "--port", str(port),
     ]
-    logger.info("[%s] Starting LiteLLM sidecar on network %s", container_name, network)
+    logger.info(
+        "[%s] Starting LiteLLM sidecar on network %s using image %s",
+        container_name, network, image_to_run,
+    )
     subprocess.run(["docker", "rm", "-f", container_name], capture_output=True)
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:

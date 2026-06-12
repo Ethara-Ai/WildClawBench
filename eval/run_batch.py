@@ -337,35 +337,17 @@ def load_models_config(models_config_path: Path) -> dict:
 
 
 def _stage_native_workspace(task: dict, config) -> str:
-    """Stage a per-task workspace dir (<work>/<task_id>/exec) from a native/yaml
-    task's attachments, returning the parent dir to pass as workspace_path.
-    The openclaw runner mounts <workspace_path>/exec into the container."""
-    import shutil
+    """Create the per-task workspace dir (<work>/<task_id>/exec) the openclaw runner
+    mounts at /app, returning the parent dir to pass as workspace_path.
+
+    Input artifacts are NOT staged here anymore: they ship inside persona/home/ and
+    reach the container via the persona injection (docker_utils.inject_persona_into_workspace
+    surfaces persona/home/ at /root/workspace/home). The exec dir is created empty so the
+    /app:ro mount + `cp -r /app/.` workspace bootstrap in setup_workspace still succeeds."""
     task_id_ori = task["task_id"]
     staging = Path(config.work_dir) / re.sub(r"[^a-zA-Z0-9._-]", "_", task_id_ori)
     exec_dir = staging / "exec"
     exec_dir.mkdir(parents=True, exist_ok=True)
-    for att in task.get("attachments", []) or []:
-        src = Path(att.get("path", ""))
-        if not src.is_file():
-            continue
-        rel = att.get("storedAs") or att.get("name") or src.name
-        # Reject paths that would escape exec_dir (".." or absolute).
-        rel_path = Path(rel)
-        if rel_path.is_absolute() or any(p == ".." for p in rel_path.parts):
-            logger.warning("[%s] skipping unsafe attachment path: %s", task_id_ori, rel)
-            continue
-        dst = exec_dir / rel_path
-        try:
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            try:
-                if dst.exists():
-                    dst.unlink()
-                os.link(src, dst)
-            except OSError:
-                shutil.copy2(src, dst)
-        except OSError as exc:
-            logger.warning("[%s] attachment copy failed (%s): %s", task_id_ori, src, exc)
     return str(staging)
 
 
@@ -1400,6 +1382,8 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
     network = f"k3net-{batch_id}"
     sidecar = f"ll-{batch_id}"
 
+    _agent_headroom = (os.environ.get("KENSEI_AGENT_HEADROOM_ENABLED", "").strip().lower()
+                       in ("1", "true", "yes", "on"))
     litellm_yaml = build_litellm_config_yaml(
         bedrock_sonnet_arn=config.bedrock_sonnet_arn if config.aws_bearer_token else "",
         bedrock_arn=config.bedrock_inference_arn if config.aws_bearer_token else "",
@@ -1407,6 +1391,8 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
         openai_api_key=config.openai_api_key,
         openai_whisper_api_key=config.openai_whisper_api_key,
         enable_usage_callback=True,
+        enable_headroom_callback=_agent_headroom,
+        anthropic_api_key=config.anthropic_api_key,
     )
     if not litellm_yaml:
         raise RuntimeError(
@@ -1432,6 +1418,20 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
     except OSError:
         pass
 
+    headroom_callback_src = ""
+    headroom_log_dir_str = ""
+    if _agent_headroom:
+        headroom_callback_src = str(
+            Path(__file__).resolve().parent.parent / "src" / "utils" / "litellm_headroom_callback.py"
+        )
+        headroom_log_dir = config.work_dir / f"litellm-headroom-{batch_id}"
+        headroom_log_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            os.chmod(headroom_log_dir, 0o777)
+        except OSError:
+            pass
+        headroom_log_dir_str = str(headroom_log_dir)
+
     start_litellm(
         container_name=sidecar,
         network=network,
@@ -1443,6 +1443,10 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
         openai_whisper_api_key=config.openai_whisper_api_key,
         usage_callback_host_path=str(callback_src),
         usage_log_host_dir=str(usage_dir),
+        headroom_callback_host_path=headroom_callback_src,
+        headroom_log_host_dir=headroom_log_dir_str,
+        enable_headroom=_agent_headroom,
+        anthropic_api_key=config.anthropic_api_key,
     )
     cleanups.append(lambda: stop_litellm(sidecar))
     if not wait_for_litellm_healthy(sidecar):
@@ -1452,7 +1456,7 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
             f"Override budget via KENSEI_LITELLM_HEALTH_TIMEOUT env (seconds)."
         )
     probe_model = (
-        "claude-opus-4.7" if config.aws_bearer_token and config.bedrock_inference_arn
+        "claude-opus-4.7" if (config.aws_bearer_token and config.bedrock_inference_arn) or config.anthropic_api_key
         else "gpt-5.5" if config.openai_api_key
         else ""
     )

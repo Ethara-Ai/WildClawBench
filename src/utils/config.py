@@ -46,6 +46,13 @@ class Config:
     openai_api_key: str = ""
     openai_whisper_api_key: str = ""
 
+    # ---- Anthropic direct (alternative upstream for opus when Bedrock unavailable) ----
+    # Used by litellm_sidecar.py to emit an `anthropic/claude-opus-4-20250514`
+    # model entry for the `claude-opus-4.7` / `claude-opus-4-6` aliases when
+    # no Bedrock bearer token is available. This keeps the harness usable on
+    # machines where the Bedrock IAM access has been rotated/revoked.
+    anthropic_api_key: str = ""
+
     # ---- OpenRouter (fallback LLM routing) ----
     openrouter_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
@@ -140,6 +147,7 @@ class Config:
             s3_secret_access_key=s("KENSEI_S3_SECRET_ACCESS_KEY", "AWS_SECRET_ACCESS_KEY"),
             openai_api_key=s("KENSEI_OPENAI_API_KEY", "OPENAI_API_KEY"),
             openai_whisper_api_key=s("KENSEI_OPENAI_WHISPER_API_KEY", "OPENAI_WHISPER_API_KEY"),
+            anthropic_api_key=s("KENSEI_ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY"),
             openrouter_api_key=s("OPENROUTER_API_KEY"),
             openrouter_base_url=s("OPENROUTER_BASE_URL", default="https://openrouter.ai/api/v1"),
             brave_api_key=s("BRAVE_API_KEY", default="placeholder"),
@@ -162,6 +170,8 @@ class Config:
         if self.bedrock_inference_arn and self.aws_bearer_token:
             return True
         if self.openai_api_key:
+            return True
+        if self.anthropic_api_key:
             return True
         return False
 

@@ -85,7 +85,9 @@ def build_ctrf(
     if scores:
         for name, status in scores.items():
             tests.append({
-                "name": name,
+                # Bare test name only — drop any "Class::" / "<module>::" /
+                # "<file>.py::" qualifiers from the runner's score key.
+                "name": name.split("::")[-1],
                 "status": status or "failed",
                 "duration": 0,
             })
@@ -150,22 +152,41 @@ def compute_test_reward(
     weights = _coerce_weights_map(_parse_json(test_weights_json))
     scores = _coerce_scores_map(_parse_json(test_scores_json))
 
-    passed_names: set[str] = set()
+    # A.1+A.2 parity with src/utils/harbor/test_sh.py: build three
+    # normalized passed-name shapes (full FQN / class-qualified / bare) so a
+    # weight key in any of those forms can resolve. Bare-key lookups use a
+    # class-aware multiset (any service class's pass counts as the bare key
+    # passing); class-qualified keys require precise match (no bare-multiset
+    # fallback) so multi-service tasks don't get false credit.
+    passed_full: set[str] = set()
+    passed_class_qual: set[str] = set()
+    passed_bare: set[str] = set()
     for raw_name, status in scores.items():
         if status != "passed":
             continue
-        passed_names.add(raw_name)
-        if "::" in raw_name:
-            passed_names.add(raw_name.split("::", 1)[-1])
+        passed_full.add(raw_name)
+        parts = raw_name.split("::")
+        if len(parts) >= 2:
+            passed_bare.add(parts[-1])
+        if len(parts) >= 3:
+            passed_class_qual.add("::".join(parts[-2:]))
 
-    if not passed_names and test_output and weights:
+    if not (passed_full or passed_bare) and test_output and weights:
         for name in weights.keys():
             if re.search(re.escape(name) + r"\s+PASSED", test_output):
-                passed_names.add(name)
+                passed_full.add(name)
+                passed_bare.add(name.split("::")[-1])
+
+    def _key_passed(key: str) -> bool:
+        if key in passed_full:
+            return True
+        if "::" in key:
+            return key in passed_class_qual
+        return key in passed_bare
 
     pos_total = sum(w for w in weights.values() if w > 0)
-    pos_earned = sum(w for n, w in weights.items() if w > 0 and n in passed_names)
-    neg_penalty = sum(abs(w) for n, w in weights.items() if w < 0 and n in passed_names)
+    pos_earned = sum(w for n, w in weights.items() if w > 0 and _key_passed(n))
+    neg_penalty = sum(abs(w) for n, w in weights.items() if w < 0 and _key_passed(n))
 
     if pos_total > 0:
         return max(0.0, (pos_earned - neg_penalty) / pos_total)
