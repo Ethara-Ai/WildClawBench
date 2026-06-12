@@ -8,6 +8,7 @@ dimensions and metrics, mimicking the GA4 ``runReport`` response shape.
 
 import csv
 import json
+from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent

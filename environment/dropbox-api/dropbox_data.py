@@ -7,6 +7,7 @@ sharing/list_shared_links.
 
 import csv
 import mimetypes
+from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent

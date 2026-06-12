@@ -180,15 +180,11 @@ def _coerce_campaigns(rows):
 # Load all data at module init
 
 
-
-
-
-
-
-
+def _active_user_account():
     # user_account.json may be a single account dict or a list of accounts.
     # Use the first account as the active user.
-    _user_account = _user_account_raw[0] if isinstance(_user_account_raw, list) else _user_account_raw
+    raw = _user_account_raw_doc()
+    return raw[0] if isinstance(raw, list) else raw
 
 # Mutable in-memory stores
 
@@ -219,7 +215,7 @@ _next_pin_id = max(_extract_numeric_id(p["pin_id"], "pin_") for p in _pins_rows(
 # ---------------------------------------------------------------------------
 
 def get_user_account():
-    return {"type": "user_account", "user_account": _user_account_store}
+    return {"type": "user_account", "user_account": _active_user_account()}
 
 
 def get_user_analytics(start_date=None, end_date=None):

@@ -162,7 +162,7 @@ def get_store(store_id):
 def get_menu(store_id):
     if not any(s["store_id"] == store_id for s in _stores_rows()):
         return {"error": f"Store {store_id} not found"}
-    items = [i for i in _menu_store if i["store_id"] == store_id]
+    items = [i for i in _menu_items_rows() if i["store_id"] == store_id]
     categories = {}
     for it in items:
         categories.setdefault(it["category"], []).append(it)
@@ -177,7 +177,7 @@ def get_menu(store_id):
 
 
 def _get_item(item_id):
-    return next((i for i in _menu_store if i["item_id"] == item_id), None)
+    return next((i for i in _menu_items_rows() if i["item_id"] == item_id), None)
 
 
 # ---------------------------------------------------------------------------

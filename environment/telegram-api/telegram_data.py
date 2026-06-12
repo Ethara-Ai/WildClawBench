@@ -7,6 +7,7 @@ or {"ok": false, "error_code": int, "description": str} on failure.
 import csv
 import json
 import time
+from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
