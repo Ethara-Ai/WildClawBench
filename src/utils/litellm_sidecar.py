@@ -336,6 +336,61 @@ def pull_litellm_image(image: str = LITELLM_IMAGE) -> None:
     logger.info("LiteLLM image %s ready", image)
 
 
+# docker/litellm-headroom.Dockerfile, relative to repo root. The image is a
+# LOCAL build (headroom-ai baked into the stock LiteLLM image); it lives in no
+# registry, so `docker run` would try to PULL it and fail with access-denied on
+# a fresh host. We build it here at batch startup instead.
+_HEADROOM_DOCKERFILE = "docker/litellm-headroom.Dockerfile"
+
+
+def _repo_root() -> str:
+    # litellm_sidecar.py lives at <repo>/src/utils/; repo root is two levels up.
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def ensure_litellm_headroom_image(image: str = LITELLM_HEADROOM_IMAGE) -> None:
+    # Mirror pull_litellm_image()'s early-surface contract for the headroom
+    # image: surface a missing/un-buildable image at batch startup, not deep
+    # inside the first `docker run` where it gets misattributed to a task error.
+    # The image is local-build-only, so we auto-build from the committed
+    # Dockerfile when absent (build is deterministic + context-independent).
+    inspect = subprocess.run(
+        ["docker", "image", "inspect", image],
+        capture_output=True, text=True,
+    )
+    if inspect.returncode == 0:
+        logger.info("LiteLLM headroom image %s present", image)
+        return
+
+    repo_root = _repo_root()
+    dockerfile = os.path.join(repo_root, _HEADROOM_DOCKERFILE)
+    build_cmd = [
+        "docker", "build",
+        "-f", dockerfile,
+        "-t", image,
+        repo_root,
+    ]
+    manual = f"docker build -f {_HEADROOM_DOCKERFILE} -t {image} ."
+    if not os.path.isfile(dockerfile):
+        raise RuntimeError(
+            f"LiteLLM headroom image {image} is missing and its Dockerfile "
+            f"was not found at {dockerfile}. Build it manually from the repo "
+            f"root with: {manual}"
+        )
+    logger.info(
+        "LiteLLM headroom image %s not found locally; building from %s",
+        image, _HEADROOM_DOCKERFILE,
+    )
+    r = subprocess.run(build_cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError(
+            f"Failed to build LiteLLM headroom image {image} from {dockerfile}: "
+            f"{(r.stderr or '').strip()}\n"
+            f"Build it manually from the repo root with: {manual}"
+        )
+    logger.info("LiteLLM headroom image %s built and ready", image)
+
+
 def create_network(name: str, internal: bool = True) -> None:
     # internal=True creates an --internal bridge with no NAT to the host's
     # default route, so containers attached to ONLY this network cannot

@@ -339,25 +339,39 @@ def test_litellm_failure_falls_back_to_urllib(monkeypatch):
     assert usage["request_count"] == 1
 
 
-# ---------- Test 9: register_judges_once registers all three judges ----------
+# ---------- Test 9: register_judges_for_batch registers all three judges ----------
 
 
 def test_register_model_called_for_all_judges(monkeypatch):
-    """One register_model call per judge ARN tail with the expected
-    ctx_window, max_output_tokens, and cost rates. Drift in
-    `_JUDGE_REGISTRY` vs `_MEMBER_EVIDENCE_BUDGETS` is exactly the kind of
-    bug `test_judge_budget_invariant.py` doesn't catch (different invariant)
-    — this test guards that the LiteLLM transport sees the same numbers the
-    urllib transport does."""
+    """`register_judges_for_batch(members)` issues one `register_model` call
+    per CURRENT (rotation-aware) council ARN tail, and the registered
+    ctx-window / max-output / cost rates come straight from the family-keyed
+    source of truth in grading (`_FAMILY_EVIDENCE`, `_FAMILY_RATES`). That
+    single source is what keeps the LiteLLM transport's pricing from drifting
+    away from the urllib transport's — the bug class `test_judge_budget_invariant.py`
+    (a different invariant) can't catch. Re-keying on stable family rather than
+    the opaque, monthly-rotating profile id is the whole point of the decoupling."""
+    # Seed the three council members from env (family derived from var name).
+    monkeypatch.setenv("JUDGE_COUNCIL_SONNET_ARN", SONNET_ARN)
+    monkeypatch.setenv("JUDGE_COUNCIL_GLM_ARN", GLM_ARN)
+    monkeypatch.setenv("JUDGE_COUNCIL_KIMI_ARN", KIMI_ARN)
+    monkeypatch.delenv("JUDGE_COUNCIL_MEMBERS", raising=False)
+
+    members = grading.council_members()
+    assert {m.family for m in members} == {"sonnet", "glm", "kimi"}
+
     register_mock = mock.MagicMock()
     fake_litellm = SimpleNamespace(register_model=register_mock)
     monkeypatch.setitem(sys.modules, "litellm", fake_litellm)
 
-    judge_litellm.register_judges_once()
+    judge_litellm.register_judges_for_batch(members)
 
-    # One call per judge in the registry
-    assert register_mock.call_count == len(judge_litellm._JUDGE_REGISTRY)
+    # One register_model call per family.
+    assert register_mock.call_count == 3
 
+    # The registered tails are the *current* ARN tails (rotation-aware), and
+    # each payload's numbers match grading's family-keyed source of truth.
+    tail_to_family = {judge_litellm._arn_tail(m.model): m.family for m in members}
     registered_tails = set()
     for call in register_mock.call_args_list:
         ((payload,), _) = call
@@ -365,20 +379,25 @@ def test_register_model_called_for_all_judges(monkeypatch):
         tail = next(iter(payload.keys()))
         info = payload[tail]
         registered_tails.add(tail)
-        # canonical fields present
-        for f in (
-            "max_input_tokens", "max_output_tokens",
-            "input_cost_per_token", "output_cost_per_token",
-            "litellm_provider", "mode",
-        ):
-            assert f in info, f"register_model payload for {tail} missing {f!r}"
 
-    expected_tails = {tup[0] for tup in judge_litellm._JUDGE_REGISTRY}
-    assert registered_tails == expected_tails
+        family = tail_to_family[tail]
+        r_in, r_out, r_cr, r_cw = grading._FAMILY_RATES[family]
+        ctx, max_out = grading._FAMILY_EVIDENCE[family]
+        assert info["max_input_tokens"] == ctx
+        assert info["max_tokens"] == ctx
+        assert info["max_output_tokens"] == max_out
+        assert info["input_cost_per_token"] == r_in
+        assert info["output_cost_per_token"] == r_out
+        assert info["cache_read_input_token_cost"] == r_cr
+        assert info["cache_creation_input_token_cost"] == r_cw
+        assert info["litellm_provider"] == "bedrock_converse"
+        assert info["mode"] == "chat"
 
-    # Idempotency: second call is a no-op (no extra register_model invocations)
-    judge_litellm.register_judges_once()
-    assert register_mock.call_count == len(judge_litellm._JUDGE_REGISTRY)
+    assert registered_tails == {"is9bst5tfadh", "xx5msvho23iq", "p532c9fzmeed"}
+
+    # Idempotency: second call is a no-op (per-tail latch, no extra calls).
+    judge_litellm.register_judges_for_batch(members)
+    assert register_mock.call_count == 3
 
 
 # ---------- Test 10: ARN tokenizer hint ----------
@@ -448,11 +467,11 @@ def test_cache_control_survival_smoke():
 
     _, usage1 = judge_litellm.call_judge_via_litellm(
         model=SONNET_ARN, system=system, user=user,
-        max_output_tokens=8192, cost_fn=grading._judge_cost_usd,
+        max_output_tokens=8192, cost_fn=grading._judge_cost_usd, family="sonnet",
     )
     _, usage2 = judge_litellm.call_judge_via_litellm(
         model=SONNET_ARN, system=system, user=user,
-        max_output_tokens=8192, cost_fn=grading._judge_cost_usd,
+        max_output_tokens=8192, cost_fn=grading._judge_cost_usd, family="sonnet",
     )
 
     # First call: cache_write should be non-zero (we just primed it)

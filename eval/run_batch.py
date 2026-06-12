@@ -53,6 +53,7 @@ from src.utils.testgen import generate_task_tests
 from src.utils.litellm_sidecar import (
     build_litellm_config_yaml,
     create_network,
+    ensure_litellm_headroom_image,
     pull_litellm_image,
     remove_network,
     start_litellm,
@@ -1401,6 +1402,8 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
         )
 
     pull_litellm_image()
+    if _agent_headroom:
+        ensure_litellm_headroom_image()
     create_network(network)
     cleanups.append(lambda: remove_network(network))
     config.work_dir.mkdir(parents=True, exist_ok=True)

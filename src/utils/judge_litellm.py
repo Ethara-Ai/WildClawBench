@@ -30,9 +30,9 @@ Token tracking invariants (DO NOT BREAK)
 ----------------------------------------
 The per-judge `usage` dict shape returned by `call_judge_via_litellm()` MUST
 match the existing shape produced by `_call_judge_bedrock` / `_call_judge_openai`
-exactly (7 keys: input_tokens, output_tokens, cache_read_tokens,
-cache_write_tokens, total_tokens, request_count, cost_usd). The `headroom`
-sub-dict is purely additive and harmless to readers that don't expect it.
+exactly (8 keys: input_tokens, output_tokens, cache_read_tokens,
+cache_write_tokens, total_tokens, request_count, cost_usd, cost_priced_ok). The
+`headroom` sub-dict is purely additive and harmless to readers that don't expect it.
 
 The JSONL log at `litellm_usage_callback.py` (10-key schema) is for AGENT
 calls through the per-batch sidecar — NOT touched by this module.
@@ -356,6 +356,8 @@ def call_judge_via_litellm(
     # the "input_tokens = non-cached" invariant shared with the urllib path.
     input_excl = max(0, prompt_tok - cache_read - cache_write)
 
+    cost_usd, priced_ok = cost_fn(model, input_excl, comp_tok, cache_read, cache_write, family)
+
     usage = {
         "input_tokens": input_excl,
         "output_tokens": comp_tok,
@@ -363,7 +365,8 @@ def call_judge_via_litellm(
         "cache_write_tokens": cache_write,
         "total_tokens": input_excl + comp_tok + cache_read + cache_write,
         "request_count": 1,
-        "cost_usd": float(cost_fn(model, input_excl, comp_tok, cache_read, cache_write, family)),
+        "cost_usd": float(cost_usd),
+        "cost_priced_ok": priced_ok,
         # Additive: never read by existing code paths. New aggregator in
         # `_grade_council` collects these for `score.json.judge_council`.
         "headroom": compression_stats,
