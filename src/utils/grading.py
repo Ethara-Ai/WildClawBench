@@ -380,26 +380,61 @@ _ZERO_USAGE = {
 }
 
 
+# Per-token judge rates (input, output, cache_read, cache_write) in USD/token.
+# These MUST track real published provider list prices — the council cost line
+# in usage.json is computed directly from this table (NOT via litellm), so any
+# drift here silently mis-bills every graded task. Region matters for Bedrock:
+# each id below is keyed to the region of its default council ARN above.
 _JUDGE_RATES = {
+    # Sonnet 4.6 (ap-south-1) — $3 / $15 / $0.30 cache-read / $3.75 cache-write.
     "is9bst5tfadh": (3e-6, 1.5e-5, 3e-7, 3.75e-6),
-    "xx5msvho23iq": (0.6e-6, 2.4e-6, 0.0, 0.0),
-    "p532c9fzmeed": (0.6e-6, 2.5e-6, 0.0, 0.0),
-    "gpt-5.4": (1.25e-6, 1e-5, 1.25e-7, 0.0),
+    # GLM-5 (us-east-1) — $1.00 / $3.20 / $0.20 cache-read. Z.ai/Bedrock list.
+    "xx5msvho23iq": (1e-6, 3.2e-6, 2e-7, 0.0),
+    # Kimi K2.5 (ap-south-1) — $0.72 / $3.60. Bedrock ap-south-1 (1.2x us-east-1).
+    "p532c9fzmeed": (0.72e-6, 3.6e-6, 0.0, 0.0),
+    # GPT-5.4 (OpenAI) — $2.50 / $15 / $0.25 cached. DEFAULT JUDGE_MODEL; prior
+    # value (1.25/10/0.125) under-billed the default judge ~40-50%.
+    "gpt-5.4": (2.5e-6, 1.5e-5, 2.5e-7, 0.0),
+    # GPT-5.5 (OpenAI) — $5 / $30 / $0.50 cached.
     "gpt-5.5": (5e-6, 3e-5, 5e-7, 0.0),
 }
 
 
-def _judge_cost_usd(model: str, in_tok: int, out_tok: int, c_read: int, c_write: int) -> float:
-    rate = None
+def _judge_rate_for(model: str) -> tuple[float, float, float, float] | None:
     for key, val in _JUDGE_RATES.items():
         if key in (model or ""):
-            rate = val
-            break
+            return val
+    return None
+
+
+def _judge_cost_usd(
+    model: str, in_tok: int, out_tok: int, c_read: int, c_write: int
+) -> tuple[float, bool]:
+    # Returns (cost_usd, priced_ok). An unknown model is soft-degraded to
+    # (0.0, False) here rather than raising, so a long grading run never crashes
+    # mid-flight on a mis-configured judge. The fail-fast guarantee lives in
+    # validate_judge_pricing(), called at grade_with_rubric() startup; callers
+    # that bypass grade_with_rubric must run that validator themselves first.
+    rate = _judge_rate_for(model)
     if rate is None:
-        logger.warning("[judge_cost] unknown judge id for model=%r; cost defaulted to 0", model)
-        return 0.0
+        logger.error(
+            "[judge_cost] no rate-table entry for judge model=%r; cost recorded "
+            "as 0.0 and flagged unpriced. Add it to _JUDGE_RATES in grading.py.",
+            model,
+        )
+        return 0.0, False
     r_in, r_out, r_cached, r_cwrite = rate
-    return in_tok * r_in + c_read * r_cached + c_write * r_cwrite + out_tok * r_out
+    cost = in_tok * r_in + c_read * r_cached + c_write * r_cwrite + out_tok * r_out
+    return cost, True
+
+
+def validate_judge_pricing(models: list[str]) -> None:
+    unpriced = [m for m in models if _judge_rate_for(m) is None]
+    if unpriced:
+        raise RuntimeError(
+            "Configured judge model(s) have no _JUDGE_RATES entry and would be "
+            f"billed at $0: {unpriced}. Add per-token rates before running."
+        )
 
 
 def _call_judge_openai(model: str, system: str, user: str) -> tuple[str, dict]:
@@ -457,6 +492,7 @@ def _call_judge_openai(model: str, system: str, user: str) -> tuple[str, dict]:
     comp_tok = int(u.get("completion_tokens", 0) or 0)
     cached_tok = int(details.get("cached_tokens", 0) or 0)
     input_excl = max(0, prompt_tok - cached_tok)
+    cost_usd, priced_ok = _judge_cost_usd(model, input_excl, comp_tok, cached_tok, 0)
     usage = {
         "input_tokens": input_excl,
         "output_tokens": comp_tok,
@@ -464,7 +500,8 @@ def _call_judge_openai(model: str, system: str, user: str) -> tuple[str, dict]:
         "cache_write_tokens": 0,
         "total_tokens": input_excl + comp_tok + cached_tok,
         "request_count": 1,
-        "cost_usd": _judge_cost_usd(model, input_excl, comp_tok, cached_tok, 0),
+        "cost_usd": cost_usd,
+        "cost_priced_ok": priced_ok,
     }
     return text, usage
 
@@ -585,6 +622,7 @@ def _call_judge_bedrock(arn: str, system: str, user: str) -> tuple[str, dict]:
             or u.get("cache_creation_input_tokens")
             or 0
         )
+        cost_usd, priced_ok = _judge_cost_usd(arn, in_tok, out_tok, c_read, c_write)
         usage = {
             "input_tokens": in_tok,
             "output_tokens": out_tok,
@@ -592,7 +630,8 @@ def _call_judge_bedrock(arn: str, system: str, user: str) -> tuple[str, dict]:
             "cache_write_tokens": c_write,
             "total_tokens": in_tok + out_tok + c_read + c_write,
             "request_count": 1,
-            "cost_usd": _judge_cost_usd(arn, in_tok, out_tok, c_read, c_write),
+            "cost_usd": cost_usd,
+            "cost_priced_ok": priced_ok,
         }
         return text, usage
 
@@ -946,6 +985,13 @@ def _grade_council(
 
     overall = max(0.0, min(1.0, weighted / total_w))
     council_usage = _ZERO_USAGE.copy()
+    # Per-member usage breakdown: the flat sum below collapses all members into
+    # one cost line, hiding which model spent what. Preserve each member's own
+    # tokens/cost keyed by short profile id (matches per_member_user_chars +
+    # per-criterion `judges` keys in score.json). Rides on council_usage as a
+    # non-numeric passthrough, so recompute_combined leaves it alone and the
+    # total=in+out+cR+cW invariant is unaffected.
+    per_member: dict[str, dict] = {}
     for r in results:
         u = r.get("usage") or {}
         for k in council_usage.keys():
@@ -953,10 +999,36 @@ def _grade_council(
                 council_usage[k] = float(council_usage.get(k, 0.0)) + float(u.get(k, 0.0) or 0.0)
             else:
                 council_usage[k] = int(council_usage.get(k, 0)) + int(u.get(k, 0) or 0)
+        in_tok = int(u.get("input_tokens", 0) or 0)
+        out_tok = int(u.get("output_tokens", 0) or 0)
+        cr_tok = int(u.get("cache_read_tokens", 0) or 0)
+        cw_tok = int(u.get("cache_write_tokens", 0) or 0)
+        member_entry: dict = {
+            "input_tokens": in_tok,
+            "output_tokens": out_tok,
+            "cache_read_tokens": cr_tok,
+            "cache_write_tokens": cw_tok,
+            "total_tokens": in_tok + out_tok + cr_tok + cw_tok,
+            "request_count": int(u.get("request_count", 0) or 0),
+            "cost_usd": float(u.get("cost_usd", 0.0) or 0.0),
+            "ok": bool(r.get("ok")),
+        }
+        if "cost_priced_ok" in u:
+            member_entry["cost_priced_ok"] = bool(u.get("cost_priced_ok"))
+        if r.get("error"):
+            member_entry["error"] = str(r.get("error"))[:200]
+        # Last writer wins if two members share a short id (ARNs are distinct in
+        # practice, so collisions are not expected); use the full model string as
+        # a fallback key to avoid silently dropping a member.
+        key = _short_judge_label(r.get("model", "") or "")
+        if key in per_member:
+            key = str(r.get("model", "") or key)
+        per_member[key] = member_entry
     council_usage["total_tokens"] = (
         council_usage["input_tokens"] + council_usage["output_tokens"]
         + council_usage["cache_read_tokens"] + council_usage["cache_write_tokens"]
     )
+    council_usage["per_member"] = per_member
 
     n = len(rubrics)
     n_abstained = len(abstention_flags)
@@ -1027,6 +1099,16 @@ def grade_with_rubric(
     system = _judge_system_prompt()
 
     want_council = council_enabled() if use_council is None else bool(use_council)
+    if want_council and len(council_members()) >= 2:
+        configured_judges = council_members()
+    else:
+        configured_judges = [
+            m for m in (judge_model or JUDGE_MODEL,
+                        os.environ.get("JUDGE_MODEL_FALLBACK", "openai/gpt-5.4"))
+            if m
+        ]
+    validate_judge_pricing(configured_judges)
+
     if want_council:
         members = council_members()
         if len(members) >= 2:
@@ -1375,9 +1457,10 @@ def print_summary(results: list[dict], category: str, output_dir: Path, model_na
     print("#" * 60)
 
 _MODEL_COST_PER_TOKEN: dict[str, tuple[float, float]] = {
-    "gpt-5.5":          (0.000005,  0.00003),
-    "gpt-4o":           (0.0000025, 0.00001),
-    "claude-opus-4.7":  (0.000005,  0.000025),
+    "gpt-5.5":            (0.000005,  0.00003),
+    "gpt-4o":             (0.0000025, 0.00001),
+    "claude-opus-4.7":    (0.000005,  0.000025),
+    "claude-sonnet-4.6":  (0.000003,  0.000015),
 }
 
 
@@ -1584,6 +1667,12 @@ def extract_usage_from_jsonl(jsonl_path: Path) -> dict:
             totals["input_tokens"]  * rates[0]
             + totals["output_tokens"] * rates[1]
         )
+
+    # Mark missing-price $0 (e.g. OpenRouter-only models) so it is not read as "free".
+    if totals["cost_usd"] == 0.0 and totals["request_count"] > 0:
+        model_id = last_model.split("/")[-1] if last_model else ""
+        if model_id not in _MODEL_COST_PER_TOKEN:
+            totals["cost_unpriced"] = True
 
     totals["cost_usd"] = round(totals["cost_usd"], 6)
     return totals
