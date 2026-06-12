@@ -19,8 +19,9 @@ on (see `src/utils/AGENTS.md` and `RUNBOOK.md`):
      semantics as the urllib path (input_tokens excludes cache).
   8. On ANY LiteLLM exception the dispatcher falls back to urllib so grading
      never fails because of transport choice (user m0039 contract).
-  9. `register_judges_once()` calls `litellm.register_model` once per judge
-     ARN tail with the expected ctx-window / max-output / cost rates.
+  9. `register_judges_for_batch(members)` calls `litellm.register_model` once
+     per CURRENT (rotation-aware) judge ARN tail, pulling ctx-window / max-output
+     / cost rates from the family-keyed source of truth in `grading`.
  10. ARN tokenizer hint: when the model id contains
      `application-inference-profile`, Headroom is called with the Anthropic
      model hint so its tokenizer can do meaningful estimates.
@@ -59,10 +60,11 @@ def _clean_env_and_state(monkeypatch):
         "KENSEI_JUDGE_HEADROOM_MIN_TOKENS",
     ):
         monkeypatch.delenv(var, raising=False)
-    # Reset the idempotency latch — otherwise the first test that calls
-    # register_judges_once() flips it True and subsequent tests can't observe
-    # the registration calls.
-    judge_litellm._registered_once = False
+    # Reset the per-tail idempotency latch — otherwise the first test that
+    # registers a tail blocks subsequent tests from observing the register_model
+    # call for that same tail. Clearing keeps tests order-independent and also
+    # mirrors the monthly-rotation reality where a new tail must re-register.
+    judge_litellm._registered_tails.clear()
     yield
 
 
@@ -176,7 +178,7 @@ def test_headroom_compression_stats_recorded(monkeypatch):
 
     _, usage = judge_litellm.call_judge_via_litellm(
         model=SONNET_ARN, system="s", user="u",
-        max_output_tokens=8192, cost_fn=grading._judge_cost_usd,
+        max_output_tokens=8192, cost_fn=grading._judge_cost_usd, family="sonnet",
     )
     hr = usage["headroom"]
     assert hr["tokens_before"] == 10_000
@@ -225,15 +227,16 @@ def test_compress_system_messages_is_false(monkeypatch):
 # ---------- Test 5: max_tokens passed to litellm.completion is per-judge ----------
 
 
-@pytest.mark.parametrize("arn,expected_max", [
-    (SONNET_ARN, 8192),
-    (GLM_ARN, 16384),
-    (KIMI_ARN, 16384),
+@pytest.mark.parametrize("arn,family,expected_max", [
+    (SONNET_ARN, "sonnet", 8192),
+    (GLM_ARN, "glm", 16384),
+    (KIMI_ARN, "kimi", 16384),
 ])
-def test_judge_max_tokens_unchanged(monkeypatch, arn, expected_max):
+def test_judge_max_tokens_unchanged(monkeypatch, arn, family, expected_max):
     """Each judge keeps its production max-output ceiling. Drift here would
     truncate verdicts mid-rubric — `_parse_verdict_text` would still return a
-    list but with fewer entries, silently dropping criteria."""
+    list but with fewer entries, silently dropping criteria. The ceiling is
+    resolved by stable family, not the rotating ARN tail."""
     monkeypatch.setenv("KENSEI_JUDGE_USE_LITELLM", "true")
     monkeypatch.setenv("KENSEI_JUDGE_HEADROOM_ENABLED", "false")
 
@@ -243,8 +246,8 @@ def test_judge_max_tokens_unchanged(monkeypatch, arn, expected_max):
 
     judge_litellm.call_judge_via_litellm(
         model=arn, system="s", user="u",
-        max_output_tokens=grading._member_max_output_tokens(grading._arn_from_model(arn)),
-        cost_fn=grading._judge_cost_usd,
+        max_output_tokens=grading._member_max_output_tokens(grading._arn_from_model(arn), family),
+        cost_fn=grading._judge_cost_usd, family=family,
     )
 
     completion_mock.assert_called_once()
@@ -270,7 +273,7 @@ def test_no_thinking_field_in_litellm_call(monkeypatch):
 
     judge_litellm.call_judge_via_litellm(
         model=SONNET_ARN, system="s", user="u",
-        max_output_tokens=8192, cost_fn=grading._judge_cost_usd,
+        max_output_tokens=8192, cost_fn=grading._judge_cost_usd, family="sonnet",
     )
     _, kwargs = completion_mock.call_args
     for forbidden in ("thinking", "reasoning_effort", "output_config", "response_format"):
@@ -297,7 +300,7 @@ def test_usage_dict_shape_matches_urllib_path(monkeypatch):
 
     _, usage = judge_litellm.call_judge_via_litellm(
         model=SONNET_ARN, system="s", user="u",
-        max_output_tokens=8192, cost_fn=grading._judge_cost_usd,
+        max_output_tokens=8192, cost_fn=grading._judge_cost_usd, family="sonnet",
     )
     expected_keys = set(grading._ZERO_USAGE.keys())
     assert expected_keys.issubset(set(usage.keys())), \

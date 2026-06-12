@@ -107,27 +107,28 @@ def _headroom_min_tokens() -> int:
 # and per-model `max_input_tokens` / cost enforcement is wrong without
 # explicit registration.
 #
-# Source of truth for cost rates is `grading._JUDGE_RATES`. ctx windows match
-# `tests/test_judge_budget_invariant.py:_MEMBER_LIMITS`. Keep these in sync.
+# ROTATION-SAFE: the company rotates council ARNs monthly, so the opaque tail
+# is NOT a stable key. The registry is built per batch from the CURRENT council
+# members — each member's stable FAMILY supplies the rates (grading._FAMILY_RATES,
+# the single source of truth) and ctx/max_output (grading._FAMILY_EVIDENCE); the
+# member's current (rotated) ARN tail is what we register. This eliminates the
+# stale duplicate rate table that previously drifted from grading.py.
 
-# (arn_tail, input_cost, output_cost, cache_read_cost, cache_write_cost, ctx_window, max_output)
-_JUDGE_REGISTRY = (
-    ("is9bst5tfadh", 3e-6,    1.5e-5, 3e-7,     3.75e-6, 1_000_000, 8192),   # Sonnet 4.6
-    ("xx5msvho23iq", 0.6e-6,  2.4e-6, 0.0,      0.0,       202_752, 16384),  # GLM 5
-    ("p532c9fzmeed", 0.6e-6,  2.5e-6, 0.0,      0.0,       262_144, 16384),  # Kimi K2.5
-)
-
-_registered_once = False
+_registered_tails: set[str] = set()
 
 
-def register_judges_once() -> None:
-    """Idempotent: register each judge ARN's tail with LiteLLM exactly once
-    per Python process. Failure to register is logged and never re-raised —
-    LiteLLM will fall back to defaults, calls still succeed, but per-model
-    max_input_tokens enforcement will be loose. Always safe to call."""
-    global _registered_once
-    if _registered_once:
-        return
+def _arn_tail(model: str) -> str:
+    return (model or "").rsplit("/", 1)[-1]
+
+
+def register_judges_for_batch(members) -> None:
+    """Register each CURRENT council member's ARN tail with LiteLLM, keyed by
+    the member's stable family rates. Idempotent per tail (a rotated tail
+    re-registers fresh; an unchanged tail is skipped), so repeated calls within
+    a batch are cheap and rotations never accumulate dead pricing entries beyond
+    what LiteLLM's additive register_model leaves behind. Failure to register is
+    logged and never re-raised — LiteLLM falls back to defaults, calls still
+    succeed, per-model enforcement is merely loose. Always safe to call."""
     try:
         import litellm  # type: ignore
     except ImportError:
@@ -135,10 +136,25 @@ def register_judges_once() -> None:
             "litellm not importable; judge council cannot use LiteLLM transport "
             "(falling back to urllib path inside grading.py)"
         )
-        _registered_once = True  # don't spam on every call
         return
 
-    for tail, r_in, r_out, r_cr, r_cw, ctx, max_out in _JUDGE_REGISTRY:
+    from . import grading
+
+    for member in members:
+        tail = _arn_tail(member.model)
+        if not tail or tail in _registered_tails:
+            continue
+        rates = grading._FAMILY_RATES.get(member.family)
+        evidence = grading._FAMILY_EVIDENCE.get(member.family)
+        if rates is None or evidence is None:
+            logger.warning(
+                "no _FAMILY_RATES/_FAMILY_EVIDENCE for family=%r (member %s); "
+                "skipping registration, call will use LiteLLM defaults",
+                member.family, tail,
+            )
+            continue
+        r_in, r_out, r_cr, r_cw = rates
+        ctx, max_out = evidence
         try:
             litellm.register_model({
                 tail: {
@@ -153,12 +169,12 @@ def register_judges_once() -> None:
                     "mode": "chat",
                 }
             })
+            _registered_tails.add(tail)
         except Exception as exc:  # pragma: no cover (LiteLLM schema drift)
             logger.warning(
                 "litellm.register_model failed for %s: %s — call will use LiteLLM defaults",
                 tail, exc,
             )
-    _registered_once = True
 
 
 # ---------- Headroom compression wrapper ----------
@@ -252,6 +268,7 @@ def call_judge_via_litellm(
     user: str,
     max_output_tokens: int,
     cost_fn: Any,
+    family: str | None = None,
 ) -> tuple[str, dict]:
     """LiteLLM-backed judge call with optional Headroom compression.
 
@@ -261,13 +278,21 @@ def call_judge_via_litellm(
 
     `cost_fn` is `grading._judge_cost_usd` injected to avoid a circular
     import. `max_output_tokens` is `grading._member_max_output_tokens(arn)`.
+    `family` is the stable council family ('sonnet'/'glm'/'kimi') threaded so
+    cost resolution survives monthly ARN rotation; None for non-council judges.
 
     Raises on any LiteLLM error so `grading._call_one_judge` can fall back
     to the urllib transport. This is intentional: grading must NEVER fail
     because LiteLLM had a bad day."""
     import litellm  # type: ignore  (deliberate: ImportError surfaces as a fall-back trigger)
 
-    register_judges_once()
+    if family is not None:
+        from typing import cast as _cast
+
+        from .grading import CouncilMember, JudgeFamily
+        register_judges_for_batch(
+            [CouncilMember(family=_cast(JudgeFamily, family), model=model)]
+        )
 
     messages = [
         {"role": "system", "content": system},
@@ -338,7 +363,7 @@ def call_judge_via_litellm(
         "cache_write_tokens": cache_write,
         "total_tokens": input_excl + comp_tok + cache_read + cache_write,
         "request_count": 1,
-        "cost_usd": float(cost_fn(model, input_excl, comp_tok, cache_read, cache_write)),
+        "cost_usd": float(cost_fn(model, input_excl, comp_tok, cache_read, cache_write, family)),
         # Additive: never read by existing code paths. New aggregator in
         # `_grade_council` collects these for `score.json.judge_council`.
         "headroom": compression_stats,
