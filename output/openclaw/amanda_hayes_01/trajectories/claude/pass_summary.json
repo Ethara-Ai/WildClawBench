@@ -1,14 +1,14 @@
 {
   "model": "claude",
   "runs": 1,
-  "average_reward": 0.09900990099009901,
+  "average_reward": 0.43564356435643564,
   "per_run": [
     {
-      "run_index": 5,
+      "run_index": 2,
       "tests_total": 31,
-      "tests_passed": 7,
-      "tests_failed": 24,
-      "reward": 0.09900990099009901
+      "tests_passed": 14,
+      "tests_failed": 17,
+      "reward": 0.43564356435643564
     }
   ]
 }

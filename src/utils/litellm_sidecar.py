@@ -8,7 +8,17 @@ import time
 
 logger = logging.getLogger(__name__)
 
-LITELLM_IMAGE = "ghcr.io/berriai/litellm:main-stable"
+# Pinned by digest, NOT by floating tag. The original `:main-stable` reference
+# silently rolled forward and on EC2 2026-06-13 07:23 (darren_weston run_1)
+# produced empty thinking text on the FIRST Bedrock response despite the
+# adaptive+display:summarized+output_config:effort:high shape being correct in
+# our YAML — i.e. litellm regressed its Converse passthrough between two
+# main-stable pulls. The pinned digest below is the Mac-cached image that
+# repeatedly produced text_len 111-5230 of reasoning. To bump: pull a new
+# main-stable, smoke-test it against a known-good task end-to-end (look for
+# nonempty `thinking` in output.json), then update both this constant AND the
+# `FROM` line in docker/litellm-headroom.Dockerfile to the new digest.
+LITELLM_IMAGE = "ghcr.io/berriai/litellm@sha256:c98c9395c56a35b7abacff8269d43ff99aabacb62bbf42a04cc1514fcb9bde4a"
 LITELLM_INTERNAL_PORT = 4000
 LITELLM_HEADROOM_IMAGE = "wildclawbench-litellm-headroom:v1"
 

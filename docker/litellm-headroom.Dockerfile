@@ -41,7 +41,11 @@
 # `litellm_usage_callback.py` is today — see
 # `src/utils/litellm_sidecar.py:353`), so this Dockerfile is intentionally
 # context-independent and reproducible from any checkout.
-FROM ghcr.io/berriai/litellm:main-stable
+# Pinned by digest in lockstep with `LITELLM_IMAGE` in
+# src/utils/litellm_sidecar.py (see the comment block there). Bumping requires
+# updating BOTH; otherwise the floating `:main-stable` rolls forward here and
+# the sidecar's empty-thinking-text regression returns.
+FROM ghcr.io/berriai/litellm@sha256:c98c9395c56a35b7abacff8269d43ff99aabacb62bbf42a04cc1514fcb9bde4a
 
 # `--no-cache-dir` keeps the layer small; the wheel is small (~1MB) so caching
 # buys nothing and costs disk on every layer rebuild.
