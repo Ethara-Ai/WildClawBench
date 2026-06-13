@@ -486,18 +486,20 @@ exec_cfg["host"] = "gateway"
 # (~25x in 2026-06-02 07:43 gateway.log). tools.exec.approval is NOT
 # a recognized key per the same validator; do not add it.
 exec_cfg["security"] = "full"
-# Disable the heuristic obfuscation detector (openclaw issues #60054 /
-# #59625; PR #60709 added the config key in 2026-04). It fires on any
-# `python|perl|ruby -c` with substrings base64/decode/exec/eval/system
-# and OR's into the approval gate BEFORE security=full is consulted, so
-# the override above does not help. Symptom on EC2 2026-06-13 07:20:35
-# (darren_weston gateway.log): "obfuscation detected (gateway): Python/
-# Perl/Ruby with base64 or encoded execution" -> exec.approval.waitDecision
-# 119989ms -> INVALID_REQUEST: Channel is required. False positives
-# match common stdlib calls (sys.executable, json.decode). Setting
-# obfuscationCheck=false skips detectObfuscation() entirely; openclaw
-# falls back to the security/ask policy above (= run without prompt).
-exec_cfg["obfuscationCheck"] = False
+# Silence the inline-eval approval prefilter. EC2 2026-06-13 07:20:35
+# (darren_weston gateway.log) showed it firing in 2026.4.x as
+# "obfuscation detected (gateway): Python/Perl/Ruby with base64 or
+# encoded execution" -> exec.approval.waitDecision 119989ms ->
+# INVALID_REQUEST: Channel is required, despite security=full above
+# (openclaw issues #60054 / #59625). The first proposed config key
+# obfuscationCheck (PR #60709) was NEVER merged -- openclaw's strict
+# validator rejects it as "Unrecognized key" and disables the whole
+# config (same failure class as the 2026-06-02 megan-davis Unrecognized
+# keys incident). The SHIPPED key is `strictInlineEval` (per
+# docs.openclaw.ai/tools/exec; default true in 2026.3.31, false in
+# 2026.4.8+, but explicitly setting it false reliably silences the
+# prefilter across all 2026.4.x versions seen in the wild).
+exec_cfg["strictInlineEval"] = False
 sandbox_cfg = defaults.setdefault("sandbox", {{}})
 sandbox_cfg["mode"] = "off"
 web = tools.setdefault("web", {{}})
@@ -527,12 +529,14 @@ tools["deny"] = [
 ]
 # Mirror the LiteLLM branch: see comments there for the full rationale,
 # including why the chrome/chromium/etc. root-key writes were removed
-# and why tools.exec.obfuscationCheck=false is needed in addition to
-# security="full" (openclaw issues #60054/#59625, PR #60709).
+# and why tools.exec.strictInlineEval=false is needed in addition to
+# security="full" (openclaw issues #60054/#59625; the shipped key is
+# strictInlineEval, NOT obfuscationCheck -- the latter was an unmerged
+# PR and is rejected by the validator).
 exec_cfg = tools.setdefault("exec", {{}})
 exec_cfg["host"] = "gateway"
 exec_cfg["security"] = "full"
-exec_cfg["obfuscationCheck"] = False
+exec_cfg["strictInlineEval"] = False
 sandbox_cfg = defaults.setdefault("sandbox", {{}})
 sandbox_cfg["mode"] = "off"
 web = tools.setdefault("web", {{}})
