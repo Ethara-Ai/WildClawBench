@@ -349,6 +349,12 @@ def call_judge_via_litellm(
     # ARNs for Sonnet/Kimi/GLM reject `temperature` → UnsupportedParamsError).
     # The urllib fallback path retries-without-temperature on the same
     # error; this is the LiteLLM-side equivalent.
+    _bearer = os.environ.get("KENSEI_AWS_BEARER_TOKEN") or os.environ.get(
+        "AWS_BEARER_TOKEN_BEDROCK"
+    )
+    if _bearer:
+        os.environ["AWS_BEARER_TOKEN_BEDROCK"] = _bearer
+    
     completion_kwargs: dict[str, Any] = {
         "model": call_model,
         "messages": messages,
