@@ -1286,6 +1286,19 @@ def run_single_task(
     mock_health_logger = _start_mock_health_logger(task, task_id, output_dir)
 
     try:
+        from src.utils.workspace_snapshot import capture_workspace_snapshot as _cap_ws
+        _cap_ws(
+            output_dir,
+            phase="initial",
+            task_id=task_id,
+            host_api_to_url=drift_info.get("host_api_to_url") if drift_info else None,
+            admin_token=drift_info.get("admin_token") if drift_info else None,
+            persona_dir=task.get("persona_dir"),
+        )
+    except Exception as _snap_exc:
+        logger.warning("[%s] workspace_snapshot[initial] failed: %s", task_id, _snap_exc)
+
+    try:
         execution = backend.run_task(
             AgentTaskSpec(
                 task_id=task_id,
@@ -1309,6 +1322,18 @@ def run_single_task(
         elapsed_time = execution.elapsed_time
         if execution.error:
             result["error"] = execution.error
+
+        try:
+            from src.utils.workspace_snapshot import capture_workspace_snapshot
+            capture_workspace_snapshot(
+                output_dir,
+                phase="final",
+                task_id=task_id,
+                host_api_to_url=drift_info.get("host_api_to_url") if drift_info else None,
+                admin_token=drift_info.get("admin_token") if drift_info else None,
+            )
+        except Exception as _snap_exc:
+            logger.warning("[%s] workspace_snapshot[final] failed: %s", task_id, _snap_exc)
     except Exception as exc:
         result["error"] = str(exc)
         logger.error("[%s] Unexpected backend error: %s", task_id, exc)

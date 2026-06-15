@@ -1,0 +1,6 @@
+id,subreddit,title,author,score,num_comments,created_utc,body
+rd_001,Montreal,Plateau bike-lane consultation Oct 15 - thoughts?,plateau_resident_42,184,87,2026-10-12T18:00:00-04:00,"Mixed reactions on Rachel/St-Laurent alignment. Supportive overall; some shops worried about parking. Final consultation is Wednesday."
+rd_002,Montreal,Parc-Extension housing equity - is the city actually listening?,parc_ex_organizer,212,108,2026-10-11T20:30:00-04:00,"Encouraging that the survey ran in four languages. Skeptical of how the city protects renters from displacement once new transit lands."
+rd_003,Montreal,Cycling counts on the Plateau,bike_advocate_qc,156,52,2026-10-10T14:00:00-04:00,"The before/after projection (1,240 to 2,980) is consistent with what we see at the intercept. Parking-loss number (84) is the real political fight."
+rd_004,Montreal,Tree canopy on the Plateau is shrinking?,citoyen_plateau,98,41,2026-10-09T19:00:00-04:00,"Saw a city map showing canopy around 22 percent. Anyone know if that is the GIS layer or the design proposal? The numbers diverge."
+rd_005,UrbanPlanning,Montreal Plateau Mobilite consultation case study,urbanist_mtl,67,18,2026-10-08T11:00:00-04:00,"Curious how they balance the bike-lane political pressure with the no-position professional posture. Final round next week."

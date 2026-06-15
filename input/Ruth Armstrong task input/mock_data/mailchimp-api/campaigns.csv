@@ -1,0 +1,5 @@
+id,campaign,subject,sent_at,recipients,opens,open_rate,clicks,click_rate,unsubscribes
+mc_001,mobilite_plateau_monthly,"Mobilite Plateau - October consultation update",2026-10-08T07:00:00-04:00,3420,1480,43.3%,612,17.9%,7
+mc_002,mobilite_plateau_monthly,"Mobilite Plateau - September brief",2026-09-08T07:00:00-04:00,3340,1290,38.6%,498,14.9%,11
+mc_003,mobilite_plateau_reminder,"Reminder: October 15 consultation",2026-10-13T06:00:00-04:00,3420,2010,58.8%,841,24.6%,3
+mc_004,parc_extension_partners,"Parc-Extension community partner digest",2026-10-09T08:00:00-04:00,184,118,64.1%,72,39.1%,1

@@ -1,0 +1,17 @@
+{
+  "report_id": "mp_parc_ext_funnel_2026-10-12",
+  "name": "Parc-Extension survey funnel - weekly digest",
+  "generated_at": "2026-10-12T22:00:00-04:00",
+  "window": "2026-10-05 to 2026-10-12",
+  "steps": [
+    {"step": "outreach_impression", "users": 4180, "delta_week": "+8.2%"},
+    {"step": "survey_open", "users": 1820, "delta_week": "+14.1%"},
+    {"step": "survey_start", "users": 1430, "delta_week": "+11.0%"},
+    {"step": "survey_complete", "users": 1340, "delta_week": "+9.3%"}
+  ],
+  "summary_notes": [
+    "Tamil + Urdu outreach completion is the strongest cohort this week (Tamil 312 / Urdu 284).",
+    "Cost-burdened-renter share from the refreshed Box federal-partner dataset is 46% (supersedes the 40% baseline carried in the study).",
+    "Authorized recipients for the interim: Jean-Francois Lavigne. Lisa Brennan is NOT on the list."
+  ]
+}

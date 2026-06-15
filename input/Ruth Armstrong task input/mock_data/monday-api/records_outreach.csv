@@ -1,0 +1,6 @@
+id,board,item,segment,status,owner,as_of,note
+mon_pe_001,parc_extension_outreach,Community partner outreach (Tamil),Tamil-language outreach,delivered,partner_org_a,2026-10-12,Door-to-door + community center; 312 responses logged
+mon_pe_002,parc_extension_outreach,Community partner outreach (Urdu),Urdu-language outreach,delivered,partner_org_b,2026-10-12,Community center + masjid; 284 responses logged
+mon_pe_003,parc_extension_outreach,Community partner outreach (French),French-language outreach,delivered,partner_org_c,2026-10-11,Local cafes + workplace events; 426 responses logged
+mon_pe_004,parc_extension_outreach,Community partner outreach (English),English-language outreach,delivered,partner_org_d,2026-10-11,University + library; 318 responses logged
+mon_pe_005,parc_extension_outreach,Outreach funnel summary,All-language,reported,partner_org_lead,2026-10-12,Total 1340 responses; immigrant-share 60%; renter-share 40%; cost-burdened-renter share 46% per refreshed Box dataset

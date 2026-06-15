@@ -52,7 +52,7 @@ _DEFAULTS = {
     "healthcheck_interval_sec": 5.0,
     "healthcheck_timeout_sec": 30.0,
     "healthcheck_retries": 3,
-    "pass_at_k": 8,
+    "pass_at_k": 1,
 }
 
 _DEFAULT_DIMENSIONS = {

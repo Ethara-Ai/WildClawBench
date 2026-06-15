@@ -1,0 +1,3 @@
+event_id,email,display_name,response_status,optional,organizer
+evt_final_consult,sophie.chen.plateau@Finthesiss.ai,Sophie Chen,accepted,False,False
+evt_council_brief,d.ouellet.conseil@Finthesiss.ai,David Ouellet,needsAction,False,False

@@ -1,0 +1,8 @@
+id,project,name,assignee,status,due_date,notes,modified_at
+task_mp_001,Mobilite Plateau,Pull consultation-portal dashboards,ruth.armstrong@Finthesiss.ai,in_progress,2026-10-13,Run as part of T1 morning sweep,2026-10-12T18:00:00-04:00
+task_mp_002,Mobilite Plateau,Consultation prep: bilingual deck,ruth.armstrong@Finthesiss.ai,pending,2026-10-15,Mark ready before T13 final check,2026-10-12T18:00:00-04:00
+task_mp_003,Mobilite Plateau,Consultation prep: stakeholder briefing notes,ruth.armstrong@Finthesiss.ai,pending,2026-10-15,Bilingual; flag any Ouellet drift,2026-10-12T18:00:00-04:00
+task_mp_004,Mobilite Plateau,Consultation prep: Typeform intercept survey,ruth.armstrong@Finthesiss.ai,pending,2026-10-15,Cross-check with mailchimp engagement,2026-10-12T18:00:00-04:00
+task_mp_005,Mobilite Plateau,Walk the council brief draft,ruth.armstrong@Finthesiss.ai,not_started,2026-10-14,Reminder to be created at T2,2026-10-12T18:00:00-04:00
+task_pe_001,Parc-Extension Housing Equity,Interim report draft to Confluence,ruth.armstrong@Finthesiss.ai,in_progress,2026-10-26,Build on refreshed 46% cost-burdened (Box),2026-10-12T18:00:00-04:00
+task_climate_001,Climate Adaptation,Green-infra module draft to Teams,ruth.armstrong@Finthesiss.ai,not_started,2026-11-12,Use GIS 22.4 canopy authoritative,2026-10-12T18:00:00-04:00

@@ -182,7 +182,31 @@ class InjectScript:
                     fat = raw.get("fires_after_turn")
                     n = _turn_to_index(fat)
                     if n is None or n < 0:
-                        between = [None, None]
+                        # Talos Form B (e.g. Ruth Armstrong) carries
+                        # `fires_after_turn` on each op inside `mutations:[list]`
+                        # rather than at the stage top level. Use the earliest
+                        # boundary; heterogeneous values log a warning and fire
+                        # at min (stage is a single application unit).
+                        op_list = raw.get("mutations") or raw.get("injections")
+                        op_fires: List[int] = []
+                        if isinstance(op_list, list):
+                            for op in op_list:
+                                if not isinstance(op, dict):
+                                    continue
+                                opn = _turn_to_index(op.get("fires_after_turn"))
+                                if opn is not None and opn >= 0:
+                                    op_fires.append(opn)
+                        if op_fires:
+                            chosen = min(op_fires)
+                            if len(set(op_fires)) > 1:
+                                LOG.warning(
+                                    "inject: %s ops have heterogeneous "
+                                    "fires_after_turn=%s; firing stage at min=%d",
+                                    sd.name, sorted(set(op_fires)), chosen,
+                                )
+                            between = [chosen, chosen + 1]
+                        else:
+                            between = [None, None]
                     else:
                         between = [n, n + 1]
             from_turn = _turn_to_index(between[0]) if len(between) > 0 else None

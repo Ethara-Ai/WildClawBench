@@ -1,0 +1,7 @@
+id,parent_type,parent_id,title,created_time,last_edited_time,created_by,archived,icon,cover_url
+ouellet_position_note,database_id,db_stakeholders,David Ouellet - position,2026-09-01T10:00:00.000Z,2026-10-10T10:00:00.000Z,usr_ruth,False,Person,
+sophie_headcount_note,database_id,db_consult,Final consultation - headcount,2026-10-10T10:00:00.000Z,2026-10-12T11:30:00.000Z,usr_ruth,False,Note,
+parcex_methodology,database_id,db_consult,Parc-Extension methodology notes,2026-02-10T10:00:00.000Z,2026-10-11T10:00:00.000Z,usr_ruth,False,Book,
+parcex_cached_figures,database_id,db_consult,Parc-Ex figures (cached) - quick reference,2026-10-05T10:00:00.000Z,2026-10-12T10:00:00.000Z,usr_ruth,False,Note,
+climate_metrics_ref,database_id,db_consult,Green-infra authoritative metrics,2026-10-09T10:00:00.000Z,2026-10-11T10:00:00.000Z,usr_ruth,False,Book,
+mobilite_traffic_ref,database_id,db_consult,Mobilite Plateau - before/after counts,2026-10-08T10:00:00.000Z,2026-10-11T10:00:00.000Z,usr_ruth,False,Note,

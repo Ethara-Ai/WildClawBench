@@ -1,0 +1,5 @@
+id,product,region,date,resolution,download_path,note
+nasa_lc_2026,land_cover_classification,Plateau-Mont-Royal,2026-09-15,10m,/Drive/Climate/plateau_canopy_heatmap.png,"Tree canopy 22.4% (current authoritative GIS). Heat-island delta +2.3 C. Cooling-corridor coverage 6.2 km."
+nasa_lc_2024,land_cover_classification,Plateau-Mont-Royal,2024-09-20,10m,/Drive/Climate/plateau_canopy_2024_baseline.png,"2024 baseline (stale). Tree canopy 19.1%. Superseded by 2026 reading."
+nasa_uhi_2026,urban_heat_island_delta,Plateau-Mont-Royal,2026-08-21,30m,internal://nasa/uhi/plateau_2026,"Heat-island summer delta +2.3 C vs greater Montreal mean."
+nasa_sr_2026,surface_reflectance,Parc-Extension,2026-09-30,30m,internal://nasa/sr/parc_ex_2026,"Reference imagery for the Parc-Extension equity layer."
