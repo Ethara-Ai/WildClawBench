@@ -1200,6 +1200,43 @@ def inject_persona_into_workspace(task_id: str, persona_dir: str) -> None:
         )
 
 
+def inject_data_into_workspace(task_id: str, data_dir: str) -> None:
+    """Stage legacy `data/` input artifacts at /root/workspace/home.
+
+    Pre-23b0fc7 tasks ship their input documents in `<task>/data/` rather than
+    `persona/home/`. `inject_persona_into_workspace` only surfaces `persona/`,
+    so without this the agent never receives those documents (multimodal tasks
+    then run against an empty workspace). Mirrors the persona injection but
+    targets `TMP_WORKSPACE/home` (== /root/workspace/home, the path the workspace
+    hint promises the agent). MUST run AFTER setup_workspace + the persona inject
+    so it lands on top of the bootstrapped workspace. Best-effort: a failure is
+    logged, never raised. Only invoked when the task loader set `data_dir` (i.e.
+    the task ships input documents in <task>/data/)."""
+    home = f"{TMP_WORKSPACE}/home"
+    mk = subprocess.run(
+        ["docker", "exec", task_id, "/bin/bash", "-c", f"mkdir -p {home}"],
+        capture_output=True, text=True,
+    )
+    if mk.returncode != 0:
+        logger.error("[%s] data→workspace mkdir failed: %s", task_id, mk.stderr)
+        return
+    r = subprocess.run(
+        ["docker", "cp", f"{data_dir}/.", f"{task_id}:{home}/"],
+        capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        logger.error("[%s] data→workspace copy failed: %s", task_id, r.stderr)
+        return
+    count_r = subprocess.run(
+        ["docker", "exec", task_id, "/bin/bash", "-c",
+         f"find {home} -type f 2>/dev/null | wc -l"],
+        capture_output=True, text=True,
+    )
+    n = (count_r.stdout or "").strip() or "?"
+    logger.info("[%s] Legacy data/ staged into workspace: %s → %s/ (%s files)",
+                task_id, data_dir, home, n)
+
+
 def _copy_dir_from_container(task_id: str, src: str, dest: str) -> bool:
     r = subprocess.run(
         ["docker", "cp", f"{task_id}:{src}", dest],

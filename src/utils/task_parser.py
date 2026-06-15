@@ -97,9 +97,9 @@ def load_task(path: str | Path) -> dict:
     """Load a task from a .md file or a native task directory.
 
     Task content authority:
-    - Native dir = prompt.txt + rubric.json (+ persona/ (with home/ input artifacts) +
-      mock_data/ + tests). This is the sole source of truth for prompt body, rubric,
-      tests, and attachments.
+    - Native dir = prompt.txt + rubric.json (+ persona/ (SOUL/MEMORY/AGENTS) + data/
+      (input artifacts) + mock_data/ + tests). This is the sole source of truth for
+      prompt body, rubric, tests, and attachments.
     - task.yaml (optional sidecar) carries METADATA + connector declarations ONLY:
       difficulty, modalities, l1/l2, task_type, required_apis, distractor_apis (per b3).
       It is overlaid on top of the native dict via `_overlay_yaml_metadata`; it CANNOT
@@ -308,12 +308,12 @@ def _append_workspace_hint(prompt: str, attachments: list[dict]) -> str:
 
 
 def _load_native_task(task_dir: Path) -> dict:
-    # kensei-native task dir: prompt.txt + rubric.json + persona/ + mock_data/ + gt/.
-    # Input artifacts now ship inside persona/home/ (no separate data/ folder); they
-    # reach the container through the persona injection (inject_persona_into_workspace
-    # copies persona/. -> /tmp_workspace, surfacing persona/home/ at /root/workspace/home).
-    # `attachments` is still populated below for trajectory/harbor/multimodal metadata,
-    # but the runner no longer stages it into the /app exec mount.
+    # kensei-native task dir: prompt.txt + rubric.json + persona/ + data/ + mock_data/ + gt/.
+    # Input artifacts ship in <task>/data/ (the canonical layout for this corpus); they
+    # reach the container via inject_data_into_workspace, which copies data/. into the
+    # workspace at /root/workspace/home. `attachments` is populated from data/ below for
+    # trajectory/harbor/multimodal metadata. (persona/ still supplies SOUL/MEMORY/AGENTS
+    # via inject_persona_into_workspace; only its old `home/` input-artifact subdir is gone.)
     prompt = (task_dir / "prompt.txt").read_text(encoding="utf-8").strip()
     try:
         rubrics = json.loads((task_dir / "rubric.json").read_text(encoding="utf-8")) or []
@@ -327,14 +327,18 @@ def _load_native_task(task_dir: Path) -> dict:
 
     persona_dir = task_dir / "persona"
     attachments: list[dict] = []
-    home_dir = persona_dir / "home"
-    if home_dir.is_dir():
-        for f in sorted(home_dir.rglob("*")):
+    # Input artifacts ship in <task>/data/ — the canonical input-folder layout
+    # for this task corpus. (The older persona/home/ source format was removed
+    # 2026-06-15: every task uses data/, none had persona/home/, and reading the
+    # latter only caused confusion.) data/ is staged into the agent workspace at
+    # /root/workspace/home by inject_data_into_workspace; storedAs is kept under
+    # home/ so trajectory media metadata reflects that in-container path.
+    data_dir = task_dir / "data"
+    if data_dir.is_dir():
+        for f in sorted(data_dir.rglob("*")):
             if not f.is_file() or f.name.startswith("."):
                 continue
-            # storedAs is kept relative to home/ so trajectory media metadata reflects
-            # the in-container path /root/workspace/home/<rel>.
-            rel = f.relative_to(home_dir).as_posix()
+            rel = f.relative_to(data_dir).as_posix()
             mime = mimetypes.guess_type(f.name)[0] or "application/octet-stream"
             attachments.append({
                 "name": f.name,
@@ -358,6 +362,7 @@ def _load_native_task(task_dir: Path) -> dict:
         "test_weights": provided_test_weights,
         "persona": persona,
         "persona_dir": str(persona_dir) if persona_dir.is_dir() else "",
+        "data_dir": str(data_dir) if data_dir.is_dir() else "",
         "system_prompt": "",
         "task_description": prompt,
         "rubrics": rubrics,

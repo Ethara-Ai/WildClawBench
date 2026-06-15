@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from src.agents.base import AgentExecution, AgentTaskSpec, BaseAgent
 from src.utils.docker_utils import (
     inject_api_connectors,
+    inject_data_into_workspace,
     inject_lobster_workspace,
     inject_openclaw_models,
     inject_persona_into_workspace,
@@ -182,6 +183,14 @@ class OpenClawAgent(BaseAgent):
 
             if persona_dir:
                 inject_persona_into_workspace(spec.task_id, persona_dir)
+
+            # Stage <task>/data/ input artifacts into the workspace at
+            # /root/workspace/home (the task loader sets data_dir whenever the task
+            # has a data/ dir). Without this the agent never sees the input
+            # documents for multimodal/reconciliation tasks.
+            data_dir = spec.task.get("data_dir") if isinstance(spec.task, dict) else ""
+            if data_dir:
+                inject_data_into_workspace(spec.task_id, data_dir)
 
             setup_skills(
                 spec.task_id,

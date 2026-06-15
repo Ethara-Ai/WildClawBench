@@ -341,10 +341,10 @@ def _stage_native_workspace(task: dict, config) -> str:
     """Create the per-task workspace dir (<work>/<task_id>/exec) the openclaw runner
     mounts at /app, returning the parent dir to pass as workspace_path.
 
-    Input artifacts are NOT staged here anymore: they ship inside persona/home/ and
-    reach the container via the persona injection (docker_utils.inject_persona_into_workspace
-    surfaces persona/home/ at /root/workspace/home). The exec dir is created empty so the
-    /app:ro mount + `cp -r /app/.` workspace bootstrap in setup_workspace still succeeds."""
+    Input artifacts are NOT staged here: they ship in <task>/data/ and reach the
+    container via docker_utils.inject_data_into_workspace, which copies data/. to
+    /root/workspace/home. The exec dir is created empty so the /app:ro mount +
+    `cp -r /app/.` workspace bootstrap in setup_workspace still succeeds."""
     task_id_ori = task["task_id"]
     staging = Path(config.work_dir) / re.sub(r"[^a-zA-Z0-9._-]", "_", task_id_ori)
     exec_dir = staging / "exec"
@@ -948,6 +948,17 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
             # When src is a pytest test_result, the tests_* keys are authoritative.
             # When src is a rubric score (no real pytest ran), canonical keys are
             # criteria_*; fall back to deprecated tests_* aliases for legacy data.
+            # `canonical_reward` carries the run's authoritative reward (combined,
+            # else rubric overall) so the harbor bundler can use it when no real
+            # pytest per-test results exist — otherwise the weighted pytest scorer
+            # matches the real weight keys against zero results and emits a
+            # spurious 0 (darren-weston 2026-06-15: 15/17 criteria passed = 0.8378
+            # but reward.txt/ctrf showed 0).
+            canonical_reward = None
+            if isinstance(scores, dict):
+                canonical_reward = scores.get("combined_reward")
+                if canonical_reward is None:
+                    canonical_reward = scores.get("overall_score")
             tr_meta = {
                 "tests_total": int(src.get("tests_total", src.get("criteria_total", 0)) or 0),
                 "tests_passed": int(src.get("tests_passed", src.get("criteria_passed", 0)) or 0),
@@ -957,6 +968,7 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
                 "test_scores": src.get("test_scores", "") or "",
                 "test_output": src.get("test_output", "") or "",
                 "test_code": task.get("test_code", "") or "",
+                "canonical_reward": canonical_reward,
             }
             entry = dict(traj)
             entry["__test_result__"] = tr_meta

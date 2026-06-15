@@ -53,3 +53,6 @@ logs/
 
 # Audit deliverables (findings.json, REPORT.md, BUGS.md, REMEDIATION.md, logs/) — local-only, machine-specific.
 audit/
+
+input/darren_weston_2b2baa81-fa14-4fb6-8cd3-f15749563e77 2
+input/hdr_demo__logscan
