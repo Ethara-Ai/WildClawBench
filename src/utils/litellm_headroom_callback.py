@@ -130,10 +130,19 @@ def _protect_recent() -> int:
 
 
 def _min_tokens() -> int:
+    # PER-MESSAGE gate (headroom content_router.py:2152 skips any block whose
+    # token count is below this). The old 2000 default silently disabled the
+    # agent path: measured on a real openclaw run (darren_weston run_2), the
+    # LARGEST single message was ~1.9K tokens and every tool result was 250-1.9K,
+    # so all 27 messages routed "small" -> 0 tokens saved. The headroom library
+    # default is 250; agent_savings profiles use 120-250. 500 is the balance —
+    # it exposes the genuinely-large tool-result dumps to the crushers while
+    # leaving small results verbatim. Error outputs, system, and thinking blocks
+    # stay protected regardless of this knob. Override via the env var.
     try:
-        return int(os.environ.get("KENSEI_AGENT_HEADROOM_MIN_TOKENS", "2000"))
+        return int(os.environ.get("KENSEI_AGENT_HEADROOM_MIN_TOKENS", "500"))
     except (TypeError, ValueError):
-        return 2000
+        return 500
 
 
 _LOG_PATH = os.environ.get(
@@ -141,6 +150,54 @@ _LOG_PATH = os.environ.get(
     "/var/litellm_headroom/headroom.jsonl",
 )
 _LOG_LOCK = threading.Lock()
+
+
+def _has_thinking_block(message: Any) -> bool:
+    # Anthropic native shape: content is a list with a {type:"thinking"} block
+    # holding reasoning text + a Bedrock-signed thinkingSignature.
+    if not isinstance(message, dict):
+        return False
+    content = message.get("content")
+    if not isinstance(content, list):
+        return False
+    for block in content:
+        if isinstance(block, dict) and block.get("type") == "thinking":
+            return True
+    return False
+
+
+def _flatten_text_block_content(message: Any) -> Any:
+    """Collapse a pure-text-block message to a bare-string-content message.
+
+    openclaw drives the agent over the Anthropic Messages API, whose message
+    `content` is a LIST OF BLOCKS, not a string. Headroom's text/JSON/log
+    compressors only engage on bare-string content — they NO-OP on block-shaped
+    content (verified end-to-end 2026-06-15: the identical 18K-token prompt
+    compresses ~98% as a string and 0% as a single {"type":"text"} block, so the
+    agent path saved nothing on real openclaw traffic). Collapse a message whose
+    content is EXCLUSIVELY plain text blocks ({"type":"text","text":...} with no
+    other keys) into the joined string so the compressor can act on it.
+
+    Returned UNCHANGED (structure preserved verbatim) when content is already a
+    string, is empty, or contains ANY non-plain-text block — tool_use,
+    tool_result, image, thinking, or a text block carrying cache_control /
+    citations. Those carry structure or provider cache hints that must survive.
+    """
+    if not isinstance(message, dict):
+        return message
+    content = message.get("content")
+    if not isinstance(content, list) or not content:
+        return message
+    parts: list[str] = []
+    for block in content:
+        if not isinstance(block, dict) or block.get("type") != "text":
+            return message
+        if set(block.keys()) - {"type", "text"}:
+            return message
+        parts.append(block.get("text") or "")
+    flattened = {k: v for k, v in message.items() if k != "content"}
+    flattened["content"] = "\n".join(parts)
+    return flattened
 
 
 def _model_hint(model: str) -> str:
@@ -192,7 +249,17 @@ class HeadroomPreCallCompressor(CustomLogger):
         data: dict,
         call_type: str,
     ) -> dict | None:
-        if call_type not in ("completion", "acompletion"):
+        # openclaw drives the agent over the Anthropic Messages API, which LiteLLM
+        # routes as call_type "anthropic_messages" (litellm/types/utils.py: the
+        # "/v1/messages" route maps to CallTypes.anthropic_messages). The original
+        # allowlist had ONLY completion/acompletion, so EVERY real openclaw agent
+        # request was skipped uncompressed — verified end-to-end 2026-06-15 with a
+        # live 7-turn run: empty headroom.jsonl + an unchanged Bedrock cache prefix
+        # across all turns despite an 18K-token compressible prompt. Include the
+        # Anthropic Messages call type so the agent/trajectory path compresses.
+        # (For anthropic_messages the system prompt arrives in data["system"], not
+        # data["messages"], so it stays untouched regardless of compress_system.)
+        if call_type not in ("completion", "acompletion", "anthropic_messages"):
             return data
         if not _enabled():
             return data
@@ -226,7 +293,23 @@ class HeadroomPreCallCompressor(CustomLogger):
                 target_ratio=_target_ratio(),
             )
             hint = _model_hint(model)
-            result = _compress(messages, model=hint, config=cfg)  # type: ignore[misc]
+            # Detach thinking-bearing assistant turns so Headroom never sees
+            # them: it has no protect_thinking knob and would strip the reasoning
+            # TEXT while leaving the signed envelope, which (a) blanks the
+            # persisted trace and (b) can invalidate the Bedrock thinkingSignature
+            # on multi-turn continuations (the signature is computed over the
+            # original text) -> downstream 400s. We compress only the remainder
+            # and splice the ORIGINALS back at their indices verbatim.
+            protected = {i: m for i, m in enumerate(messages) if _has_thinking_block(m)}
+            source = [m for i, m in enumerate(messages) if i not in protected]
+            # Flatten pure-text-block content to strings ONLY for the compressor
+            # (see _flatten_text_block_content): openclaw's Anthropic-shaped block
+            # content otherwise no-ops. Tool/image/thinking/cache_control blocks
+            # are left intact, and untouched messages are restored to their
+            # original block shape after compression (below), so flattening never
+            # changes the wire shape of anything Headroom didn't actually compress.
+            flat = [_flatten_text_block_content(m) for m in source]
+            result = _compress(flat, model=hint, config=cfg)  # type: ignore[misc]
         except Exception as exc:
             sys.stderr.write(
                 f"[litellm_headroom_callback] compress() raised, sending "
@@ -239,9 +322,29 @@ class HeadroomPreCallCompressor(CustomLogger):
             return data
 
         new_messages = getattr(result, "messages", None)
-        if not isinstance(new_messages, list) or not new_messages:
+        if not isinstance(new_messages, list) or len(new_messages) != len(flat):
             return data
-        data["messages"] = new_messages
+        # Keep only what Headroom actually changed; restore the ORIGINAL
+        # (block-shaped) message wherever compression was a no-op, so the flatten
+        # above never alters the wire shape of content we did not compress.
+        merged: list[Any] = [
+            out if out != flat_in else orig
+            for orig, flat_in, out in zip(source, flat, new_messages)
+        ]
+        if protected:
+            compressed_iter = iter(merged)
+            rebuilt: list[Any] = []
+            for i in range(len(messages)):
+                if i in protected:
+                    rebuilt.append(protected[i])
+                else:
+                    rebuilt.append(next(compressed_iter, None))
+            if any(m is None for m in rebuilt):
+                return data
+            merged = rebuilt
+        if not merged:
+            return data
+        data["messages"] = merged
 
         _write_telemetry({
             "ts": datetime.now(timezone.utc).isoformat(),

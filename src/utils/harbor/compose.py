@@ -113,6 +113,41 @@ def discover_services(env_dir: Path) -> List[dict]:
     return services
 
 
+# Runtime env for the `main` (agent) container, mirroring the legacy kensei2
+# agent compose block: LLM traffic routes through the litellm-proxy sidecar
+# and CURRENT_DATE pins the environment's notion of "today" so date-relative
+# task logic is reproducible across runs.
+LLM_PROXY_URL = "http://litellm-proxy:4000"
+DEFAULT_CURRENT_DATE = "2026-05-28"
+
+
+def runtime_env_defaults() -> dict:
+    """Env vars every agent/verifier/solution container should see.
+
+    LLAMA_API_KEY is intentionally absent: it is a secret, so it is only ever
+    emitted into docker-compose.yaml as a `${LLAMA_API_KEY}` host-substitution
+    (resolved at `docker compose up` time) and never baked into task.toml.
+    """
+    return {
+        "LITELLM_BASE_URL": LLM_PROXY_URL,
+        "OPENAI_API_BASE": f"{LLM_PROXY_URL}/v1",
+        "OPENAI_API_KEY": "placeholder",
+        "CURRENT_DATE": DEFAULT_CURRENT_DATE,
+    }
+
+
+def _compose_mem(value: str) -> str:
+    """k8s quantity -> compose byte-suffix ("256Mi" -> "256M").
+
+    docker compose rejects the k8s `Ki/Mi/Gi` suffixes outright; its bare
+    `K/M/G` suffixes are already binary multiples, so the conversion is exact.
+    """
+    v = value.strip()
+    if v.lower().endswith(("ki", "mi", "gi")):
+        return v[:-1]
+    return v
+
+
 def _healthcheck_cmd(port: int, path: str) -> str:
     return (
         "python3 -c \"import urllib.request,sys; "
@@ -122,14 +157,26 @@ def _healthcheck_cmd(port: int, path: str) -> str:
 
 
 def generate_harbor_compose(env_dir: Path,
-                            services: Optional[Iterable[Mapping]] = None) -> str:
+                            services: Optional[Iterable[Mapping]] = None,
+                            env_vars: Optional[Mapping[str, str]] = None) -> str:
     """Render the Harbor `data/environment/docker-compose.yaml`.
 
-    The `main` service waits for every mock service to become healthy.
+    The `main` service waits for every mock service to become healthy and
+    carries the agent runtime contract: per-service API URL env vars,
+    litellm-proxy LLM routing, CURRENT_DATE, TEST_DIR, verifier/agent log
+    mounts, and CPU/memory limits (all host-overridable via `${VAR:-default}`
+    compose substitution).
     """
     if services is None:
         services = discover_services(env_dir)
     svc_list = list(services)
+
+    if env_vars is None:
+        env_vars = {
+            svc["env_var_name"]: f"http://{svc['name']}:{svc['port']}"
+            for svc in svc_list
+            if svc.get("env_var_name")
+        }
 
     lines: List[str] = ["services:"]
 
@@ -138,6 +185,25 @@ def generate_harbor_compose(env_dir: Path,
     lines.append("      context: .")
     lines.append("    image: harbor-main:local")
     lines.append("    command: [\"sleep\", \"infinity\"]")
+    lines.append("    environment:")
+    for key, value in env_vars.items():
+        lines.append(f"      - {key}={value}")
+    runtime_env = runtime_env_defaults()
+    lines.append(f"      - LITELLM_BASE_URL={runtime_env['LITELLM_BASE_URL']}")
+    lines.append(f"      - OPENAI_API_BASE={runtime_env['OPENAI_API_BASE']}")
+    lines.append(f"      - OPENAI_API_KEY={runtime_env['OPENAI_API_KEY']}")
+    # Secret stays a host substitution; see runtime_env_defaults.
+    lines.append("      - LLAMA_API_KEY=${LLAMA_API_KEY}")
+    lines.append(f"      - CURRENT_DATE={runtime_env['CURRENT_DATE']}")
+    lines.append("      - TEST_DIR=${TEST_DIR:-/tests}")
+    lines.append("    volumes:")
+    lines.append("      - ${HOST_VERIFIER_LOGS_PATH:-./logs/verifier}:${ENV_VERIFIER_LOGS_PATH:-/logs/verifier}")
+    lines.append("      - ${HOST_AGENT_LOGS_PATH:-./logs/agent}:${ENV_AGENT_LOGS_PATH:-/logs/agent}")
+    lines.append("    deploy:")
+    lines.append("      resources:")
+    lines.append("        limits:")
+    lines.append("          cpus: \"${CPUS:-1}\"")
+    lines.append("          memory: \"${MEMORY:-4096M}\"")
     if svc_list:
         lines.append("    depends_on:")
         for svc in svc_list:
@@ -169,6 +235,6 @@ def generate_harbor_compose(env_dir: Path,
             lines.append("    deploy:")
             lines.append("      resources:")
             lines.append("        limits:")
-            lines.append(f"          memory: {mem_limit}")
+            lines.append(f"          memory: {_compose_mem(mem_limit)}")
 
     return "\n".join(lines) + "\n"

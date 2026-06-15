@@ -410,34 +410,6 @@ PUT /v1/user/water/{date}
 
 ---
 
-## Scenario Profile
-
-### Get scenario user profile
-
-Returns the scenario-specific user profile used to seed the current task — including dietary limits and recent health markers. Takes no parameters.
-
-```
-GET /v1/user/scenario-profile
-```
-
-This endpoint takes no parameters.
-
-**Response**
-
-```json
-{
-  "user_profile": {
-    "user_id": "maryam_stafford_md",
-    "daily_carb_limit_g": 150,
-    "current_day_total_carbs": 0,
-    "last_a1c": 6.9,
-    "time_zone": "America/New_York"
-  }
-}
-```
-
----
-
 ## Errors
 
 Error responses follow this format:

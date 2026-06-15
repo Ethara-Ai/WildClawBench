@@ -695,6 +695,11 @@ PY"""
         return None
 
     def _estimate_cost(self, totals: dict[str, Any]) -> float:
+        # Prices input_tokens in full (no cache subtraction): Claude Code's usage
+        # already reports input_tokens cache-exclusive, with cache_read/cache_write
+        # broken out separately. (Codex's estimator subtracts cache first because its
+        # input field is cache-inclusive.) Rates default to 0 -> $0 if unset; see
+        # CLAUDECODE_*_PRICE_PER_MTOK in .env.example.
         input_price = float(os.environ.get("CLAUDECODE_INPUT_PRICE_PER_MTOK", "0"))
         output_price = float(os.environ.get("CLAUDECODE_OUTPUT_PRICE_PER_MTOK", "0"))
         cache_read_price = float(os.environ.get("CLAUDECODE_CACHE_READ_PRICE_PER_MTOK", "0"))

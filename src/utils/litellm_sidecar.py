@@ -8,9 +8,19 @@ import time
 
 logger = logging.getLogger(__name__)
 
-LITELLM_IMAGE = "ghcr.io/berriai/litellm:main-stable"
+# Pinned by digest, NOT by floating tag. The original `:main-stable` reference
+# silently rolled forward and on EC2 2026-06-13 07:23 (darren_weston run_1)
+# produced empty thinking text on the FIRST Bedrock response despite the
+# adaptive+display:summarized+output_config:effort:high shape being correct in
+# our YAML — i.e. litellm regressed its Converse passthrough between two
+# main-stable pulls. The pinned digest below is the Mac-cached image that
+# repeatedly produced text_len 111-5230 of reasoning. To bump: pull a new
+# main-stable, smoke-test it against a known-good task end-to-end (look for
+# nonempty `thinking` in output.json), then update both this constant AND the
+# `FROM` line in docker/litellm-headroom.Dockerfile to the new digest.
+LITELLM_IMAGE = "ghcr.io/berriai/litellm@sha256:c98c9395c56a35b7abacff8269d43ff99aabacb62bbf42a04cc1514fcb9bde4a"
 LITELLM_INTERNAL_PORT = 4000
-LITELLM_HEADROOM_IMAGE = "wildclawbench-litellm-headroom:v1"
+LITELLM_HEADROOM_IMAGE = "wildclawbench-litellm-headroom:v2"
 
 
 def build_litellm_config_yaml(
@@ -95,13 +105,24 @@ def build_litellm_config_yaml(
             f"      aws_region_name: {aws_region or 'ap-south-1'}\n"
             # output_config.effort:high: probes showed bare adaptive can return an
             # empty/absent thinking block; +effort:high reliably populates it.
+            # Bedrock REQUIRES this {type:adaptive,display:summarized}+output_config
+            # pair on the opus ARN and 400s {type:enabled,budget_tokens} with
+            # "thinking.type.enabled is not supported... use thinking.type.adaptive
+            # and output_config.effort" (re-confirmed live 2026-06-12 on
+            # profile 0pou38ej54bo). Do NOT switch to enabled+budget_tokens.
             "      thinking: {\"type\": \"adaptive\", \"display\": \"summarized\"}\n"
             "      output_config: {\"effort\": \"high\"}\n"
             "      stream_options:\n"
             "        include_usage: true\n"
             + cache_marker
             + "      input_cost_per_token: 0.000005\n"
-            "      output_cost_per_token: 0.000025"
+            "      output_cost_per_token: 0.000025\n"
+            # Opus 4.6/4.7 cache rates: read 0.1x ($0.50/MTok), write 1.25x
+            # ($6.25/MTok). Required or cache_write under-counts on Bedrock
+            # streaming (SIX_CHECK report); honored by both completion_cost and
+            # the proxy per-deployment cost path.
+            "      cache_read_input_token_cost: 0.0000005\n"
+            "      cache_creation_input_token_cost: 0.00000625"
         )
         model_blocks.append("  - model_name: claude-opus-4.7\n" + opus_params)
         # openclaw's _set_model presents the recognized id "claude-opus-4-6" to
@@ -138,14 +159,28 @@ def build_litellm_config_yaml(
         model_blocks.append(
             "  - model_name: claude-sonnet-4-6\n"
             "    litellm_params:\n"
-            f"      model: bedrock/converse/{bedrock_sonnet_arn}\n"
+            # model:/model_id: split mirrors Opus so the RECOGNIZABLE name resolves
+            # in litellm's catalog for cost (an opaque inference-profile ARN in
+            # model: raises "isn't mapped yet" -> cost falls back to the under-
+            # counting response_cost). model_id carries the real ARN for routing
+            # (get_bedrock_model_id pops it). KEEP the converse/ infix here (unlike
+            # Opus): Sonnet's reasoningContent is tolerated by the harness on
+            # Converse; do NOT switch to Invoke without re-testing thinking parsing.
+            "      model: bedrock/converse/anthropic.claude-sonnet-4-6\n"
+            f"      model_id: {bedrock_sonnet_arn}\n"
             f"      aws_region_name: {aws_region or 'ap-south-1'}\n"
+            # Same adaptive+display:summarized shape as Opus; Bedrock 400s
+            # enabled+budget_tokens here too (see opus block).
             "      thinking: {\"type\": \"adaptive\", \"display\": \"summarized\"}\n"
             "      stream_options:\n"
             "        include_usage: true\n"
             + cache_marker
             + "      input_cost_per_token: 0.000003\n"
-            "      output_cost_per_token: 0.000015"
+            "      output_cost_per_token: 0.000015\n"
+            # Sonnet 4.6 cache rates: read 0.1x ($0.30/MTok), write 1.25x
+            # ($3.75/MTok). Same rationale as Opus above.
+            "      cache_read_input_token_cost: 0.0000003\n"
+            "      cache_creation_input_token_cost: 0.00000375"
         )
     if openai_api_key:
         # The dict `reasoning_effort: {effort, summary}` shape is a Responses
@@ -201,6 +236,33 @@ def build_litellm_config_yaml(
                 "      model: openai/whisper-1\n"
                 f"      api_key: {whisper_env_ref}"
             )
+    # OpenClaw's memory tool POSTs model=text-embedding-3-small to the sidecar
+    # /v1/embeddings on session-start, on memory search, and from our explicit
+    # `openclaw memory index` step. With no embeddings route registered the
+    # proxy 400s "Invalid model name passed in model=text-embedding-3-small"
+    # (same failure class as whisper-1 above) and memory recall silently dies.
+    # Per user decision (m0476: "no need for any embedding models"), we register
+    # a MOCK route: litellm reads `mock_response` from litellm_params and short-
+    # circuits before any network call (litellm/main.py embedding -> mock_embedding),
+    # so the call returns a valid 200 OpenAI-shaped EmbeddingResponse with NO real
+    # model, NO OpenAI key dependency, and NO embedding spend. Semantic recall is
+    # intentionally non-functional (mock returns a single fixed zero vector); the
+    # plain-file persona bootstrap is unaffected (it reads MDs off disk, never
+    # hits /v1/embeddings). mode: embedding routes the id to the /embeddings
+    # handler. Alias the three current OpenAI embedding ids openclaw may emit.
+    for _emb_id in (
+        "text-embedding-3-small",
+        "text-embedding-3-large",
+        "text-embedding-ada-002",
+    ):
+        model_blocks.append(
+            f"  - model_name: {_emb_id}\n"
+            "    litellm_params:\n"
+            f"      model: openai/{_emb_id}\n"
+            "      mock_response: [0.0]\n"
+            "    model_info:\n"
+            "      mode: embedding"
+        )
     # OpenClaw's image tool falls back to built-in default model ids when its
     # own imageModel override isn't applied inside the container. The openclaw
     # 2026.3.11 dist (verified via grep of /usr/lib/node_modules/openclaw/dist)
@@ -316,6 +378,61 @@ def pull_litellm_image(image: str = LITELLM_IMAGE) -> None:
             f"Failed to pull LiteLLM image {image}: {(r.stderr or '').strip()}"
         )
     logger.info("LiteLLM image %s ready", image)
+
+
+# docker/litellm-headroom.Dockerfile, relative to repo root. The image is a
+# LOCAL build (headroom-ai baked into the stock LiteLLM image); it lives in no
+# registry, so `docker run` would try to PULL it and fail with access-denied on
+# a fresh host. We build it here at batch startup instead.
+_HEADROOM_DOCKERFILE = "docker/litellm-headroom.Dockerfile"
+
+
+def _repo_root() -> str:
+    # litellm_sidecar.py lives at <repo>/src/utils/; repo root is two levels up.
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def ensure_litellm_headroom_image(image: str = LITELLM_HEADROOM_IMAGE) -> None:
+    # Mirror pull_litellm_image()'s early-surface contract for the headroom
+    # image: surface a missing/un-buildable image at batch startup, not deep
+    # inside the first `docker run` where it gets misattributed to a task error.
+    # The image is local-build-only, so we auto-build from the committed
+    # Dockerfile when absent (build is deterministic + context-independent).
+    inspect = subprocess.run(
+        ["docker", "image", "inspect", image],
+        capture_output=True, text=True,
+    )
+    if inspect.returncode == 0:
+        logger.info("LiteLLM headroom image %s present", image)
+        return
+
+    repo_root = _repo_root()
+    dockerfile = os.path.join(repo_root, _HEADROOM_DOCKERFILE)
+    build_cmd = [
+        "docker", "build",
+        "-f", dockerfile,
+        "-t", image,
+        repo_root,
+    ]
+    manual = f"docker build -f {_HEADROOM_DOCKERFILE} -t {image} ."
+    if not os.path.isfile(dockerfile):
+        raise RuntimeError(
+            f"LiteLLM headroom image {image} is missing and its Dockerfile "
+            f"was not found at {dockerfile}. Build it manually from the repo "
+            f"root with: {manual}"
+        )
+    logger.info(
+        "LiteLLM headroom image %s not found locally; building from %s",
+        image, _HEADROOM_DOCKERFILE,
+    )
+    r = subprocess.run(build_cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError(
+            f"Failed to build LiteLLM headroom image {image} from {dockerfile}: "
+            f"{(r.stderr or '').strip()}\n"
+            f"Build it manually from the repo root with: {manual}"
+        )
+    logger.info("LiteLLM headroom image %s built and ready", image)
 
 
 def create_network(name: str, internal: bool = True) -> None:

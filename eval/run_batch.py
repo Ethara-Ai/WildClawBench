@@ -53,6 +53,7 @@ from src.utils.testgen import generate_task_tests
 from src.utils.litellm_sidecar import (
     build_litellm_config_yaml,
     create_network,
+    ensure_litellm_headroom_image,
     pull_litellm_image,
     remove_network,
     start_litellm,
@@ -117,16 +118,20 @@ def _compute_testgen_cache_key(task: dict) -> str:
                 h.update(b"<unreadable>")
     mock_root = p / "mock_data"
     if mock_root.is_dir():
-        entries = []
+        # Key on each mock-data file's CONTENT, not its size. Two fixtures of
+        # identical byte-length but different content (common with fixed-width
+        # CSV rows or padded JSON) would otherwise collide and silently serve a
+        # stale test suite. We fold relpath + a content digest into the hash.
         for sub in sorted(mock_root.iterdir()):
             if sub.is_dir():
                 for child in sorted(sub.rglob("*")):
                     if child.is_file():
+                        relpath = str(child.relative_to(mock_root))
+                        h.update(f"\x00mock:{relpath}\x00".encode())
                         try:
-                            entries.append((str(child.relative_to(mock_root)), child.stat().st_size))
+                            h.update(hashlib.sha256(child.read_bytes()).digest())
                         except OSError:
-                            entries.append((str(child.relative_to(mock_root)), -1))
-        h.update(f"\x00mock_data:{entries}\x00".encode())
+                            h.update(b"<unreadable>")
     return h.hexdigest()[:32]
 
 
@@ -266,13 +271,20 @@ def save_usage(
 
     result["usage"] = out
     if out["request_count"] > 0:
+        # Include preflight in the breakdown so the sidecar-startup ping is visible
+        # (its cost IS already in the combined total via recompute_combined). NOTE:
+        # preflight is attributed to EVERY task with no time-window filter, so the same
+        # one-time ping cost is replicated across all N per-task usage.json files -- a
+        # double-count trap if you naively SUM per-task usage to get a batch total.
+        # Per-source cost_usd is logged too so a $0 source is distinguishable from a
+        # source that simply was not priced.
         breakdown_bits = []
-        for name in ("agent", "testgen", "judge"):
+        for name in ("agent", "preflight", "testgen", "judge"):
             s = sources.get(name)
             if s and s.get("request_count", 0) > 0:
                 breakdown_bits.append(
                     f"{name}(in={s.get('input_tokens',0)},out={s.get('output_tokens',0)}"
-                    f",cR={s.get('cache_read_tokens',0)})"
+                    f",cR={s.get('cache_read_tokens',0)},$ {s.get('cost_usd',0.0):.4f})"
                 )
         logger.info(
             "[%s] Token usage TOTAL - input:%d output:%d cache_read:%d cache_write:%d "
@@ -602,8 +614,9 @@ def _condense_transcript_for_judge(traj: dict, limit: int | None = None) -> str:
 
 def _project_agent_usage_top_level(agent_usage: Mapping[str, Any] | None) -> dict[str, Any]:
     if not agent_usage:
+        # return {"input_tokens": 0, "output_tokens": 0, "cached_input_tokens": 0, "cost_usd": 0.0}
         return {"input_tokens": 0, "output_tokens": 0, "cached_input_tokens": 0,
-                "cache_read_tokens": 0, "cache_write_tokens": 0, "cost_usd": 0.0}
+                    "cache_read_tokens": 0, "cache_write_tokens": 0, "cost_usd": 0.0}
     def _int(k: str) -> int:
         v = agent_usage.get(k)
         try:
@@ -935,6 +948,17 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
             # When src is a pytest test_result, the tests_* keys are authoritative.
             # When src is a rubric score (no real pytest ran), canonical keys are
             # criteria_*; fall back to deprecated tests_* aliases for legacy data.
+            # `canonical_reward` carries the run's authoritative reward (combined,
+            # else rubric overall) so the harbor bundler can use it when no real
+            # pytest per-test results exist — otherwise the weighted pytest scorer
+            # matches the real weight keys against zero results and emits a
+            # spurious 0 (darren-weston 2026-06-15: 15/17 criteria passed = 0.8378
+            # but reward.txt/ctrf showed 0).
+            canonical_reward = None
+            if isinstance(scores, dict):
+                canonical_reward = scores.get("combined_reward")
+                if canonical_reward is None:
+                    canonical_reward = scores.get("overall_score")
             tr_meta = {
                 "tests_total": int(src.get("tests_total", src.get("criteria_total", 0)) or 0),
                 "tests_passed": int(src.get("tests_passed", src.get("criteria_passed", 0)) or 0),
@@ -944,6 +968,7 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
                 "test_scores": src.get("test_scores", "") or "",
                 "test_output": src.get("test_output", "") or "",
                 "test_code": task.get("test_code", "") or "",
+                "canonical_reward": canonical_reward,
             }
             entry = dict(traj)
             entry["__test_result__"] = tr_meta
@@ -1393,6 +1418,8 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
         )
 
     pull_litellm_image()
+    if _agent_headroom:
+        ensure_litellm_headroom_image()
     create_network(network)
     cleanups.append(lambda: remove_network(network))
     config.work_dir.mkdir(parents=True, exist_ok=True)

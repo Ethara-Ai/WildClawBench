@@ -11,20 +11,29 @@ set -euo pipefail
 
 mkdir -p /logs/verifier
 
+# Honor the TEST_DIR contract (verifier env sets /tests); fall back to the
+# bundle-relative tests/ layout when the absolute mount is absent so existing
+# bundles keep working unchanged.
+TEST_DIR="${TEST_DIR:-/tests}"
+if [ ! -f "$TEST_DIR/test_outputs.py" ]; then
+    TEST_DIR="tests"
+fi
+export TEST_DIR
+
 if ! command -v uv >/dev/null 2>&1; then
     curl -LsSf https://astral.sh/uv/install.sh | sh
     export PATH="$HOME/.local/bin:$PATH"
 fi
 
 uvx --with pytest==8.4.1 --with pytest-json-ctrf==0.3.5 --with requests \
-    pytest --ctrf /logs/verifier/ctrf.json tests/test_outputs.py -rA || true
+    pytest --ctrf /logs/verifier/ctrf.json "$TEST_DIR/test_outputs.py" -rA || true
 
 python3 - <<'PY'
 import json
 import os
 
 ctrf_path = "/logs/verifier/ctrf.json"
-weights_path = "tests/test_weights.json"
+weights_path = os.path.join(os.environ.get("TEST_DIR", "tests"), "test_weights.json")
 reward_path = "/logs/verifier/reward.txt"
 
 ctrf = {}
