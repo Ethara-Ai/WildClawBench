@@ -20,7 +20,14 @@ logger = logging.getLogger(__name__)
 # `FROM` line in docker/litellm-headroom.Dockerfile to the new digest.
 LITELLM_IMAGE = "ghcr.io/berriai/litellm@sha256:c98c9395c56a35b7abacff8269d43ff99aabacb62bbf42a04cc1514fcb9bde4a"
 LITELLM_INTERNAL_PORT = 4000
-LITELLM_HEADROOM_IMAGE = "wildclawbench-litellm-headroom:v1"
+# Bumped v1 -> v2 (2026-06-13) when the Dockerfile gained the post-install
+# LiteLLM-version-restore step. The v1 tag had already been BUILT (from the
+# old Dockerfile) on hosts where `ensure_litellm_headroom_image` short-circuits
+# on a present tag, so it would never pick up the fix. A new tag forces a clean
+# rebuild. Root cause: `pip install headroom-ai` downgraded LiteLLM 1.88.1 ->
+# 1.82.3, whose Bedrock Converse passthrough drops reasoning text and yields
+# signed-but-empty thinking blocks. See docker/litellm-headroom.Dockerfile.
+LITELLM_HEADROOM_IMAGE = "wildclawbench-litellm-headroom:v2"
 
 
 def build_litellm_config_yaml(
