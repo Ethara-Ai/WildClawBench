@@ -1,0 +1,34 @@
+id,title,drive_path,mime_type,owner,created_time,modified_time,content,mutation_notes
+doc_curriculum_v1,Citizen Water-Quality Monitoring Certification - Framework v1,/Workspace/IanSalazar/Certification/curriculum_framework_v1.gdoc,application/vnd.google-apps.document,ian.salazar@voissync.ai,2026-10-12T14:00:00-06:00,2026-10-14T08:30:00-06:00,"Citizen Water-Quality Monitoring Certification - Framework v1
+Module 1: Watershed Fundamentals (6 hours)
+Module 2: Field-Sampling Protocols (10 hours)
+Module 3: Lab Analysis Basics (8 hours)
+Module 4: Community Outreach & Data Stewardship (12 hours)
+Total contact hours: 36",Module hours under review per Olivera.
+doc_draft_v07,Clearwater Environmental Trust - Draft v0.7,/Workspace/IanSalazar/Grants/Clearwater/draft_v0.7.gdoc,application/vnd.google-apps.document,ian.salazar@voissync.ai,2026-10-04T10:00:00-06:00,2026-10-04T10:00:00-06:00,"Clearwater Environmental Trust - Draft v0.7 (10/04/2026)
+Total ask: $320,000 over 3 years.
+Year 1: $112,500 (sampling + lab + outreach)
+Year 2: $108,250
+Year 3: $99,250
+Aim 1: Sustain 12-site monthly cadence Sites 1-12.
+Aim 2: Train >=20 certified citizen monitors by end Year 1.
+Aim 3: Bilingual community reporting via promotores network.",Reference document for grant linkage.
+doc_module3_lab,Module 3: Lab Analysis Basics,/Workspace/IanSalazar/Certification/module3_lab.gdoc,application/vnd.google-apps.document,ian.salazar@voissync.ai,2026-10-15T14:00:00-06:00,2026-10-15T14:15:00-06:00,"Module 3: Lab Analysis Basics (8 contact hours)
+Pre-requisites: Module 2 complete.
+Minimum participant age: 16 (with parental consent).
+Equipment: pH meter, conductivity probe, turbidimeter, DO probe, nitrate test strips.
+Insurance: covered under DACES general lab policy.",Lab safety requirements per DACES policy.
+doc_consent_en,Citizen Water-Quality Monitoring Certification - Consent Form (EN),/Workspace/IanSalazar/Certification/consent_form_EN.gdoc,application/vnd.google-apps.document,ian.salazar@voissync.ai,2026-10-16T15:15:00-06:00,2026-10-16T15:15:00-06:00,"Citizen Water-Quality Monitoring Certification - Consent Form (EN)
+1. Purpose: training in environmental sampling.
+2. Time commitment: 36 contact hours over 6 weeks.
+3. Risks: outdoor exposure, low-volume reagent handling.
+4. Benefits: certification, contribution to county data.
+5. PARTICIPANT RIGHTS: You may withdraw at any time without penalty. Your data will be anonymized in any public reporting. You may request copies of your own data at any time.
+6. Contact: ian.salazar@voissync.ai",English source version for translation reference.
+doc_consent_es,Formulario de Consentimiento - Monitoreo de Calidad del Agua (ES),/Workspace/IanSalazar/Certification/consent_form_ES.gdoc,application/vnd.google-apps.document,ian.salazar@voissync.ai,2026-10-16T15:30:00-06:00,2026-10-17T13:00:00-06:00,"Certificacion de Monitoreo Ciudadano de Calidad del Agua - Formulario de Consentimiento (ES)
+1. Proposito: capacitacion en muestreo ambiental.
+2. Compromiso de tiempo: 36 horas de contacto durante 6 semanas.
+3. Riesgos: exposicion al aire libre, manejo de reactivos en bajas cantidades.
+4. Beneficios: certificacion, contribucion a los datos del condado.
+5. DERECHOS DEL PARTICIPANTE: Sus datos seran anonimizados en cualquier reporte publico. Puede solicitar copias de sus propios datos en cualquier momento.
+6. Contacto: ian.salazar@voissync.ai",Spanish translation for community distribution.

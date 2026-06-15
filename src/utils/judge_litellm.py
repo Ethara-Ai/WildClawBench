@@ -112,9 +112,9 @@ def _headroom_min_tokens() -> int:
 
 # (arn_tail, input_cost, output_cost, cache_read_cost, cache_write_cost, ctx_window, max_output)
 _JUDGE_REGISTRY = (
-    ("is9bst5tfadh", 3e-6,    1.5e-5, 3e-7,     3.75e-6, 1_000_000, 8192),   # Sonnet 4.6
-    ("xx5msvho23iq", 0.6e-6,  2.4e-6, 0.0,      0.0,       202_752, 16384),  # GLM 5
-    ("p532c9fzmeed", 0.6e-6,  2.5e-6, 0.0,      0.0,       262_144, 16384),  # Kimi K2.5
+    ("urg0zifsjiga", 3e-6,    1.5e-5, 3e-7,     3.75e-6, 1_000_000, 8192),   # Sonnet 4.6
+    ("u4czm4f2p3ws", 0.6e-6,  2.4e-6, 0.0,      0.0,       202_752, 16384),  # GLM 5
+    ("q6g7fi6wumk3", 0.6e-6,  2.5e-6, 0.0,      0.0,       262_144, 16384),  # Kimi K2.5
 )
 
 _registered_once = False
@@ -286,6 +286,14 @@ def call_judge_via_litellm(
         max_tokens=max_output_tokens,
         temperature=0,
         stream=False,
+        # Bedrock application-inference-profiles reject `temperature` on the
+        # messages/invoke route ("bedrock does not support parameters:
+        # ['temperature']"), which otherwise raises UnsupportedParamsError and
+        # forces a full fallback to the urllib path (losing judge Headroom
+        # compression). drop_params makes LiteLLM silently drop only the params
+        # a given provider rejects, so OpenAI judges keep temperature=0 while
+        # Bedrock judges drop it and still run through the LiteLLM path.
+        drop_params=True,
     )
 
     # Extract text. LiteLLM normalizes to OpenAI shape across providers.

@@ -26,6 +26,7 @@ readonly DEFAULT_TASK="input/alden-croft_MB"
 readonly DEFAULT_MODEL="claude-opus-4.7"
 readonly DEFAULT_K=1
 readonly LOG_DIR="logs"
+readonly HEADROOM_IMAGE="wildclawbench-litellm-headroom:v1"
 
 if [[ -t 1 ]]; then
     readonly C_RED=$'\033[0;31m'
@@ -203,6 +204,34 @@ sys.exit(0 if ok else 1)
         return 1
     fi
     log_ok "Mock image built"
+}
+
+# Agent-side Headroom prompt compression defaults ON (KENSEI_AGENT_HEADROOM_ENABLED
+# unset/empty => enabled; see eval/run_batch.py). When enabled, start_litellm()
+# runs the custom sidecar image HEADROOM_IMAGE (headroom-ai baked in) instead of
+# the stock LiteLLM image. Nothing else builds it, so build it here if missing.
+# Skip entirely when Headroom is explicitly disabled in .env.
+preflight_headroom_image() {
+    log_step "Preflight: Headroom LiteLLM image ${HEADROOM_IMAGE}"
+    local hr_val
+    hr_val=$(grep -E '^KENSEI_AGENT_HEADROOM_ENABLED=' .env 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '[:space:]' | tr 'A-Z' 'a-z')
+    if [[ "$hr_val" =~ ^(0|false|no|off)$ ]]; then
+        log_info "Agent Headroom disabled in .env; stock LiteLLM image will be used (no build needed)"
+        return 0
+    fi
+    if docker image inspect "$HEADROOM_IMAGE" >/dev/null 2>&1; then
+        log_ok "Headroom image present (no rebuild needed)"
+        return 0
+    fi
+    log_warn "Headroom image absent — building from docker/litellm-headroom.Dockerfile (~1-2 min)"
+    if docker build -f docker/litellm-headroom.Dockerfile -t "$HEADROOM_IMAGE" . >/dev/null 2>&1; then
+        log_ok "Headroom image built"
+    else
+        log_err "Headroom image build failed. Build it manually:"
+        log_err "  docker build -f docker/litellm-headroom.Dockerfile -t ${HEADROOM_IMAGE} ."
+        log_err "Or disable Headroom by setting KENSEI_AGENT_HEADROOM_ENABLED=false in .env"
+        return 1
+    fi
 }
 
 preflight_env_file() {
@@ -492,6 +521,7 @@ main() {
     preflight_docker || exit 1
     preflight_agent_image || exit 1
     preflight_mock_image || exit 1
+    preflight_headroom_image || exit 1
     preflight_env_file || exit 1
     cleanup_orphans
 
@@ -570,6 +600,19 @@ main() {
             log_ok "Aggregated → output/openclaw_aggregate_summary.json"
         else
             log_warn "aggregate_runs.py failed; pass@K rollup unavailable"
+        fi
+    fi
+
+    # Publish the raw run output into the Harbor "bundle" layout
+    # (trajectories/<Pretty Model>/run_N/{report.json, output_media/}). Standalone
+    # + non-fatal: a repackage failure never fails the run.
+    if [[ -d output/openclaw ]]; then
+        log_step "Harbor bundle (repackage)"
+        if python3 scripts/repackage_to_bundle.py \
+                --source-root output/openclaw --dest-root output_bundle --all 2>&1; then
+            log_ok "Repackaged Harbor bundle → output_bundle/"
+        else
+            log_warn "repackage_to_bundle.py failed; published bundle not generated"
         fi
     fi
 

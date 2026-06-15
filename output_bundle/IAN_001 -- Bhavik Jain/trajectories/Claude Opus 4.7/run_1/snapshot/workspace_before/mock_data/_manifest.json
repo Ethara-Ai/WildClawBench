@@ -1,0 +1,162 @@
+{
+  "label": "before_injection",
+  "ts": 1781273644.420776,
+  "ts_iso": "2026-06-12T14:14:04Z",
+  "apis": {
+    "asana-api": {
+      "tables": {
+        "projects": 3,
+        "sections": 8,
+        "tasks": 12,
+        "users": 5
+      },
+      "documents": {
+        "workspace": true
+      }
+    },
+    "calendly-api": {
+      "tables": {
+        "availability": 5,
+        "event_types": 4,
+        "invitees": 4,
+        "scheduled_events": 4
+      },
+      "documents": {
+        "user": true
+      }
+    },
+    "dropbox-api": {
+      "tables": {
+        "files": 10,
+        "shared_links": 4
+      },
+      "documents": {
+        "account": true
+      }
+    },
+    "gmail-api": {
+      "tables": {
+        "drafts": 3,
+        "labels": 16,
+        "messages": 11
+      },
+      "documents": {
+        "profile": true
+      }
+    },
+    "google-calendar-api": {
+      "tables": {
+        "calendars": 1,
+        "events": 10
+      },
+      "documents": {
+        "attendees": true
+      }
+    },
+    "google-contacts-api": {
+      "tables": {
+        "contact_groups": 10,
+        "contacts": 15
+      },
+      "documents": {}
+    },
+    "google-docs-api": {
+      "tables": {
+        "documents": 5
+      },
+      "documents": {}
+    },
+    "google-drive-api": {
+      "tables": {
+        "files": 8,
+        "permissions": 9
+      },
+      "documents": {
+        "about": true
+      }
+    },
+    "google-sheets-api": {
+      "tables": {
+        "sheet_data": 174,
+        "spreadsheets": 5
+      },
+      "documents": {}
+    },
+    "instagram-api": {
+      "tables": {
+        "carousel_children": 48,
+        "comments": 152,
+        "hashtags": 9,
+        "media": 9,
+        "media_insights": 9,
+        "mentions": 22,
+        "stories": 4,
+        "users": 5
+      },
+      "documents": {}
+    },
+    "mailchimp-api": {
+      "tables": {
+        "campaigns": 4,
+        "lists": 2,
+        "members": 9,
+        "reports": 3
+      },
+      "documents": {}
+    },
+    "notion-api": {
+      "tables": {
+        "blocks": 10,
+        "comments": 4,
+        "databases": 4,
+        "pages": 11,
+        "users": 6
+      },
+      "documents": {
+        "properties": true,
+        "workspace": true
+      }
+    },
+    "outlook-api": {
+      "tables": {
+        "contacts": 7,
+        "events": 6,
+        "messages": 8
+      },
+      "documents": {}
+    },
+    "slack-api": {
+      "tables": {
+        "channel_members": 25,
+        "channels": 6,
+        "messages": 8,
+        "users": 6
+      },
+      "documents": {
+        "team": true
+      }
+    },
+    "spotify-api": {
+      "tables": {
+        "albums": 4,
+        "artists": 4,
+        "playlist_tracks": 11,
+        "playlists": 4,
+        "tracks": 10
+      },
+      "documents": {
+        "user": true
+      }
+    },
+    "zoom-api": {
+      "tables": {
+        "meetings": 6,
+        "recordings": 4,
+        "registrants": 7
+      },
+      "documents": {
+        "user": true
+      }
+    }
+  }
+}

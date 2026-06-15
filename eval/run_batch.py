@@ -15,6 +15,11 @@ from pathlib import Path
 from typing import Any, Mapping
 from dotenv import load_dotenv
 
+# Load .env BEFORE importing src.utils modules: several resolve env at import time
+# (e.g. grading._DEFAULT_COUNCIL_MEMBERS reads JUDGE_COUNCIL_*_ARN on import), so
+# .env must populate os.environ first or those overrides are silently missed.
+load_dotenv()
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from src.agents.base import AgentTaskSpec, BaseAgent
@@ -31,6 +36,7 @@ from src.utils.docker_utils import (
     remove_container,
     close_proc_log,
     collect_output_from_container,
+    snapshot_persona_and_data_from_container,
     TMP_WORKSPACE,
 )
 from src.utils.grading import (
@@ -55,12 +61,11 @@ from src.utils.litellm_sidecar import (
     verify_litellm_upstream_reachable,
     wait_for_litellm_healthy,
 )
-from src.utils.trajectory.builder import build_trajectory_from_jsonl
+from src.utils.trajectory.builder import build_published_trajectory, build_trajectory_from_jsonl
 from src.utils.trajectory.local_media import replace_inline_media_with_files
 from src.utils.store import Task as StoreTask, Store
 from src.utils.harbor.bundle import write_bundle
 
-load_dotenv()
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -199,6 +204,143 @@ def _merge_usage_source(dst: dict, src: dict) -> None:
         dst["cost_usd"] = float(dst.get("cost_usd", 0.0)) + float(src.get("cost_usd", 0.0) or 0.0)
 
 
+# Set once during batch setup to the host dir holding the agent headroom
+# telemetry sink (headroom.jsonl). save_usage reads it to surface agent
+# context-compression stats into usage.json (IAN report Pointer 3); the JSONL
+# was previously written but never read back into any artifact.
+_HEADROOM_LOG_DIR: str = ""
+
+# Set once during batch setup to the sidecar per-request usage sink
+# (usage.jsonl). _build_trajectory reads it to back-fill the per-message cost
+# blocks in output.json, which OpenClaw's chat.jsonl always writes as zero on
+# this image build (its internal LiteLLM provider doesn't populate usage).
+_USAGE_LOG_PATH: str = ""
+
+# Relative per-token price weights used ONLY to split a request's known total
+# cost across categories for the per-message breakdown (Anthropic ratios:
+# output 5x input, cache-read 0.1x, cache-write 1.25x). The summed total is the
+# real billed cost; the split is a faithful proportional apportionment.
+_COST_WEIGHTS = {"input": 1.0, "output": 5.0, "cacheRead": 0.1, "cacheWrite": 1.25}
+
+
+def _parse_iso(ts: str):
+    from datetime import datetime
+    try:
+        return datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return None
+
+
+def _backfill_per_message_cost(traj: dict, usage_log_path: str) -> int:
+    """Populate each assistant message's token + cost block in ``traj`` from the
+    sidecar per-request usage log (usage.jsonl), order-matched within the agent
+    run's time window. Returns the number of messages back-filled.
+
+    OpenClaw writes all-zero per-message usage/cost into chat.jsonl on this
+    image build (IAN report Pointer 5); the real per-request numbers live only
+    in the sidecar log. We isolate the agent's requests by the assistant
+    message timestamp window (excluding earlier testgen / later judge rows) and
+    assign rows to assistant messages in chronological order.
+    """
+    if not usage_log_path or not Path(usage_log_path).is_file():
+        return 0
+    msgs = [m for m in (traj.get("messages") or []) if isinstance(m, dict)]
+    def _inner(m):
+        return m.get("message") if isinstance(m.get("message"), dict) else m
+    assistants = [m for m in msgs if str(_inner(m).get("role", "")).lower() == "assistant"]
+    if not assistants:
+        return 0
+    # Agent window from message timestamps.
+    mts = [_parse_iso(m.get("timestamp", "")) for m in msgs]
+    mts = [t for t in mts if t is not None]
+    lo = min(mts) if mts else None
+    hi = max(mts) if mts else None
+    rows = []
+    for line in Path(usage_log_path).read_text(encoding="utf-8", errors="replace").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            r = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        rts = _parse_iso(r.get("ts", ""))
+        if rts is None:
+            continue
+        # Keep rows within the agent window (with a small margin for the final
+        # completion logged just after the last assistant message timestamp).
+        if lo is not None and hi is not None:
+            from datetime import timedelta
+            if rts < lo - timedelta(seconds=10) or rts > hi + timedelta(seconds=180):
+                continue
+        rows.append((rts, r))
+    rows.sort(key=lambda x: x[0])
+    n = 0
+    for msg, (_, r) in zip(assistants, rows):
+        inner = _inner(msg)
+        it = int(r.get("input_tokens", 0) or 0)
+        ot = int(r.get("output_tokens", 0) or 0)
+        cr = int(r.get("cache_read_tokens", 0) or 0)
+        cw = int(r.get("cache_write_tokens", 0) or 0)
+        total_cost = float(r.get("cost_usd", 0.0) or 0.0)
+        toks = {"input": it, "output": ot, "cacheRead": cr, "cacheWrite": cw}
+        wsum = sum(_COST_WEIGHTS[k] * toks[k] for k in toks) or 1.0
+        cost = {k: round(total_cost * (_COST_WEIGHTS[k] * toks[k]) / wsum, 8) for k in toks}
+        cost["total"] = round(total_cost, 8)
+        usage = inner.get("usage") if isinstance(inner.get("usage"), dict) else {}
+        usage.update({
+            "input": it, "output": ot, "cacheRead": cr, "cacheWrite": cw,
+            "totalTokens": int(r.get("total_tokens", it + ot) or (it + ot)),
+            "cost": cost,
+        })
+        inner["usage"] = usage
+        n += 1
+    return n
+
+
+def _aggregate_headroom(log_dir: str) -> dict | None:
+    """Aggregate the agent headroom telemetry (headroom.jsonl) into a compact
+    summary: whether compression ran, how many requests it touched, and the
+    tokens it saved. Returns None when headroom was disabled / produced no rows.
+    """
+    if not log_dir:
+        return None
+    path = Path(log_dir) / "headroom.jsonl"
+    if not path.is_file():
+        return None
+    events = 0
+    tokens_before = tokens_after = tokens_saved = 0
+    try:
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            events += 1
+            tokens_before += int(row.get("tokens_before", 0) or 0)
+            tokens_after += int(row.get("tokens_after", 0) or 0)
+            tokens_saved += int(row.get("tokens_saved", 0) or 0)
+    except OSError:
+        return None
+    if events == 0:
+        return None
+    ratio = round(tokens_after / tokens_before, 4) if tokens_before else 0.0
+    return {
+        "enabled": True,
+        # headroom.jsonl is the batch-wide sink; for the common one-task-per-run
+        # invocation this equals the task. Marked so a reader knows the scope.
+        "scope": "batch",
+        "compression_events": events,
+        "tokens_before_total": tokens_before,
+        "tokens_after_total": tokens_after,
+        "tokens_saved_total": tokens_saved,
+        "compression_ratio": ratio,
+    }
+
+
 def save_usage(
     output_dir: Path,
     result: dict,
@@ -238,6 +380,9 @@ def save_usage(
         if k not in out and k not in _USAGE_NUMERIC_KEYS and k != "cost_usd":
             out[k] = v
 
+    _hr = _aggregate_headroom(_HEADROOM_LOG_DIR)
+    if _hr:
+        out["headroom"] = _hr
     result["usage"] = out
     if out["request_count"] > 0:
         breakdown_bits = []
@@ -279,6 +424,55 @@ def collect_task_output(
         )
     except Exception as exc:
         logger.warning("[%s] Failed to collect task output: %s", task_id, exc)
+
+
+def _snapshot_persona_and_data_before(
+    task: dict, dest_dir: Path
+) -> dict:
+    """Write the PRISTINE persona/ and data/ folders into ``dest_dir`` from the
+    on-disk task source (the exact state before turn 0 / first prompt).
+
+    persona/ is copied from ``task['persona_dir']`` (input/<task>/persona); data/
+    is copied from the staged attachments (their ``storedAs`` rel paths), which
+    already exclude graders/solutions/scaffolding. Returns counts.
+    """
+    import shutil
+
+    persona_dest = dest_dir / "persona"
+    data_dest = dest_dir / "data"
+    persona_dest.mkdir(parents=True, exist_ok=True)
+    data_dest.mkdir(parents=True, exist_ok=True)
+
+    n_persona = 0
+    persona_dir = task.get("persona_dir") or ""
+    if persona_dir and Path(persona_dir).is_dir():
+        for item in Path(persona_dir).iterdir():
+            if item.name == ".DS_Store":
+                continue
+            target = persona_dest / item.name
+            try:
+                if item.is_dir():
+                    shutil.copytree(item, target, dirs_exist_ok=True)
+                else:
+                    shutil.copy2(item, target)
+                n_persona += 1
+            except OSError as exc:
+                logger.debug("before-snapshot persona copy failed (%s): %s", item, exc)
+
+    n_data = 0
+    for att in task.get("attachments") or []:
+        src = Path(att.get("path", ""))
+        rel = att.get("storedAs") or att.get("name") or src.name
+        if not src.is_file() or rel.startswith("/") or ".." in Path(rel).parts:
+            continue
+        dst = data_dest / rel
+        try:
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dst)
+            n_data += 1
+        except OSError as exc:
+            logger.debug("before-snapshot data copy failed (%s): %s", src, exc)
+    return {"persona": n_persona, "data": n_data}
 
 
 def load_models_config(models_config_path: Path) -> dict:
@@ -332,9 +526,22 @@ def _stage_native_workspace(task: dict, config) -> str:
     return str(staging)
 
 
+def _normalize_api_name(name: str) -> str:
+    """Map a declared API name to its environment dir name (``<name>-api``).
+    'gmail' -> 'gmail-api'; 'gmail-api' -> 'gmail-api' (idempotent)."""
+    n = str(name or "").strip()
+    if not n:
+        return ""
+    return n if n.endswith("-api") else f"{n}-api"
+
+
 def _augment_task_with_mocks(task: dict, config, mock_env_dict: dict | None) -> None:
     """Populate env_dir / required_apis / env_dict on the task dict so the
-    openclaw runner injects API connectors and the shared mock-stack URLs."""
+    openclaw runner injects API connectors and the shared mock-stack URLs.
+
+    Precedence: an explicit ``required_apis``/``distractor_apis`` declaration in
+    the task file (new task.yaml format) is authoritative; only when absent do
+    we fall back to prompt inference + the deterministic distractor sampler."""
     env_dir = str(config.environment_dir) if config.environment_dir else ""
     required: set[str] = set()
     # 1) APIs inferred from the prompt text (catalog discovered from env_dir)
@@ -352,10 +559,12 @@ def _augment_task_with_mocks(task: dict, config, mock_env_dict: dict | None) -> 
     #    the generic baked dataset (course_001..005 + uscg-...), never the task's.
     task_dir = task.get("task_dir", "")
     overlays: dict[str, dict[str, str]] = {}
+    mock_data_apis: set[str] = set()
     if task_dir:
         mock_root = Path(task_dir) / "mock_data"
         if mock_root.is_dir():
-            required.update(d.name for d in mock_root.iterdir() if d.is_dir())
+            mock_data_apis = {d.name for d in mock_root.iterdir() if d.is_dir()}
+            required.update(mock_data_apis)
             overlays = {
                 api_dir.name: {
                     p.name: str(p.resolve())
@@ -364,6 +573,13 @@ def _augment_task_with_mocks(task: dict, config, mock_env_dict: dict | None) -> 
                 for api_dir in sorted(mock_root.iterdir())
                 if api_dir.is_dir() and any(p.is_file() for p in api_dir.iterdir())
             }
+    # 3) Explicit declaration (new task.yaml `required_apis:`) is authoritative.
+    #    Normalize short names to <name>-api; keep the task's own mock_data APIs
+    #    too (those ship data and must be served even if not in the list).
+    declared_required = task.get("required_apis_declared")
+    if declared_required:
+        required = {_normalize_api_name(a) for a in declared_required if a} | mock_data_apis
+        required.discard("")
     task["env_dir"] = env_dir
     task["required_apis"] = sorted(required)
     task["mock_overlays"] = overlays
@@ -374,14 +590,22 @@ def _augment_task_with_mocks(task: dict, config, mock_env_dict: dict | None) -> 
     # bundle + testgen saw them, so the live agent could not actually be
     # tempted by them. The selection is deterministic per task_id, so reruns
     # of the same task see the same distractor set.
-    try:
-        task["distractor_apis"] = list(compute_distractor_skills(
-            sorted(required),
-            task.get("task_id") or task.get("task_id_ori") or "",
-            environment_dir=config.environment_dir,
-        ))
-    except Exception:
-        task["distractor_apis"] = []
+    declared_distractor = task.get("distractor_apis_declared")
+    if declared_distractor is not None:
+        # Explicit list (may be empty = no distractors). Normalize + drop any
+        # overlap with required so the two sets stay disjoint.
+        task["distractor_apis"] = sorted(
+            {_normalize_api_name(a) for a in declared_distractor if a} - set(required) - {""}
+        )
+    else:
+        try:
+            task["distractor_apis"] = list(compute_distractor_skills(
+                sorted(required),
+                task.get("task_id") or task.get("task_id_ori") or "",
+                environment_dir=config.environment_dir,
+            ))
+        except Exception:
+            task["distractor_apis"] = []
     # Expose the shared mock-stack URLs to the task (the full service map; the
     # extra entries are inert env vars for APIs this task doesn't call).
     if mock_env_dict:
@@ -497,7 +721,8 @@ def _condense_transcript_for_judge(traj: dict, limit: int | None = None) -> str:
 
 def _project_agent_usage_top_level(agent_usage: Mapping[str, Any] | None) -> dict[str, Any]:
     if not agent_usage:
-        return {"input_tokens": 0, "output_tokens": 0, "cached_input_tokens": 0, "cost_usd": 0.0}
+        return {"input_tokens": 0, "output_tokens": 0, "cached_input_tokens": 0,
+                "cached_write_tokens": 0, "cost_usd": 0.0}
     def _int(k: str) -> int:
         v = agent_usage.get(k)
         try:
@@ -512,6 +737,7 @@ def _project_agent_usage_top_level(agent_usage: Mapping[str, Any] | None) -> dic
         "input_tokens": _int("input_tokens"),
         "output_tokens": _int("output_tokens"),
         "cached_input_tokens": _int("cache_read_tokens"),
+        "cached_write_tokens": _int("cache_write_tokens"),
         "cost_usd": round(cost, 6),
     }
 
@@ -626,6 +852,16 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
         test_code=task.get("test_code", "") or "",
         test_weights=task.get("test_weights", "") or "",
         golden_trajectory=task.get("golden_trajectory", "") or "",
+        extra={
+            # CHECKERS module + conftest for fixture-based suites; bundle.py
+            # deploys these to data/tests/task/task.py and data/tests/conftest.py
+            # so the published bundle's real-pytest test.sh can import them.
+            "checkers_code": task.get("checkers_code", "") or "",
+            "conftest_code": task.get("conftest_code", "") or "",
+            # Full multi-turn wake-up script so the bundle's instruction.md
+            # renders every turn, not just turn 0.
+            "turn_messages": list(task.get("turn_messages") or []),
+        },
     )
     artifacts_dir = task_bundle_dir / "artifacts"
 
@@ -679,10 +915,27 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
         next_idx += 1
     traj["output_artifacts"] = artifacts_list
 
+    # Back-fill real per-message token + cost numbers from the sidecar usage log
+    # (OpenClaw's chat.jsonl writes them as zero on this image build).
+    try:
+        _n = _backfill_per_message_cost(traj, _USAGE_LOG_PATH)
+        if _n:
+            logger.info("[%s] per-message cost back-filled for %d assistant message(s)",
+                        task["task_id"], _n)
+    except Exception as exc:
+        logger.warning("[%s] per-message cost back-fill failed: %s", task["task_id"], exc)
+
     _normalize_display_model(traj)
 
+    # output.json is the PUBLISHED trajectory: a slim {messages, meta_info} doc
+    # (the reference Claude_Opus_4_7.json schema). The rich `traj` dict is kept
+    # in-memory below for grading + the harbor bundle; only the on-disk/bundle
+    # form is projected. completion_status is run-level (agent finished w/o a
+    # fatal error); the rubric grade is computed later and lives in score.json.
+    completion_status = "failure" if result.get("error") else "success"
+    published = build_published_trajectory(traj, st, completion_status)
     (output_dir / "output.json").write_text(
-        json.dumps(traj, indent=2, ensure_ascii=False), encoding="utf-8",
+        json.dumps(published, indent=2, ensure_ascii=False), encoding="utf-8",
     )
     n_thinking = sum(
         1
@@ -798,6 +1051,7 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
             entry = dict(traj)
             entry["__test_result__"] = tr_meta
             entry["__run_index__"] = run_index
+            entry["__completion_status__"] = completion_status
             store_path = getattr(config, "state_db", None)
             store = Store(Path(store_path)) if store_path else Store(Path(":memory:"))
             manifest = write_bundle(
@@ -954,8 +1208,26 @@ def run_single_task(
             task["env_dict"] = merged
 
     prompt          = task["prompt"]
-    system_prompt = f"You are an expert in a restricted, non-interactive environment. Solve the task efficiently before the timeout ({timeout_seconds}s). Run all processes in the foreground without user input or background services. Provide a complete, functional solution in a single pass with no placeholders. \n"
-    prompt = system_prompt + prompt
+    # The "expert in a restricted, non-interactive environment / single pass /
+    # timeout" preamble frames the task as a one-shot solver problem. That is
+    # correct for single-turn coding-style tasks but actively contradicts the
+    # multi-turn persona tasks (inject/stages/drift + prompts.txt wake-up
+    # script), where the agent is a turn-by-turn personal assistant operating
+    # over a multi-day simulation. Prepending it there gave the agent
+    # conflicting role instructions ("solver" vs "assistant") and a false
+    # "single pass" urgency (IAN report H1/H7). Only prepend for genuinely
+    # single-pass, non-persona tasks.
+    _turns = task.get("turn_messages") or []
+    is_multiturn_persona = bool(
+        task.get("inject_path")
+        or task.get("stages_path")
+        or task.get("drift_script_path")
+        or task.get("persona_dir")
+        or len(_turns) > 1
+    )
+    if not is_multiturn_persona:
+        system_prompt = f"You are an expert in a restricted, non-interactive environment. Solve the task efficiently before the timeout ({timeout_seconds}s). Run all processes in the foreground without user input or background services. Provide a complete, functional solution in a single pass with no placeholders. \n"
+        prompt = system_prompt + prompt
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M")
     run_id = uuid.uuid4().hex[:6]
@@ -994,6 +1266,7 @@ def run_single_task(
     drift_director = None
     stage_applier = None
     inject_applier = None
+    agent_state_json: str | None = None
     stage_turns: tuple[str, ...] | None = None
     stage_before_turn = None
     # Loud guard: a task shipping an injection config but no live admin plane
@@ -1035,6 +1308,18 @@ def run_single_task(
                 copy_into_workspace=_copy_into_workspace,
             )
             inject_applier.seed(_is)
+            # INITIAL mock-data-state snapshot: capture the pristine workspace
+            # BEFORE the first prompt is injected — persona/, data/ (from the
+            # on-disk task source) and mock_data/ (the live mock-API store right
+            # after seed, before any silent mutation). Mirrored by the
+            # workspace_after snapshot taken once all turns have run.
+            _ws_before = output_dir / "snapshot" / "workspace_before"
+            try:
+                _snapshot_persona_and_data_before(task, _ws_before)
+                inject_applier.snapshot_state(
+                    _ws_before / "mock_data", label="before_injection")
+            except Exception as exc:
+                logger.warning("[%s] before-injection snapshot failed: %s", task_id, exc)
             raw_turns = list(task.get("turn_messages") or [])
             # `prompt` already carries the system-prompt prefix + workspace hint
             # for turn 0; later turns are fed verbatim from prompts.txt.
@@ -1151,6 +1436,67 @@ def run_single_task(
         except Exception as exc:
             logger.warning("[%s] Failed to collect task output: %s", task_id, exc)
 
+        # FINAL mock-data-state snapshot: once all turns have run, capture the
+        # last state of persona/, data/ (from the live agent container) and
+        # mock_data/ (the post-injection mock-API store). Must happen here while
+        # BOTH the agent container (removed below) and the per-task mock stack
+        # (stopped further down) are still alive. Paired with workspace_before.
+        if inject_applier is not None:
+            _ws_after = output_dir / "snapshot" / "workspace_after"
+            try:
+                persona_entries = []
+                _pdir = task.get("persona_dir") or ""
+                if _pdir and Path(_pdir).is_dir():
+                    persona_entries = [p.name for p in Path(_pdir).iterdir()
+                                       if p.name != ".DS_Store"]
+                data_rel = [
+                    (att.get("storedAs") or att.get("name") or "")
+                    for att in (task.get("attachments") or [])
+                ]
+                data_rel = [r for r in data_rel if r]
+                snapshot_persona_and_data_from_container(
+                    task_id, persona_entries, data_rel, _ws_after)
+                inject_applier.snapshot_state(
+                    _ws_after / "mock_data", label="after_injection")
+            except Exception as exc:
+                logger.warning("[%s] after-injection snapshot failed: %s", task_id, exc)
+
+            # Assemble the post-run agent_state.json from live artifacts (the
+            # /audit/summary feed + the after-injection mock-store snapshot +
+            # the agent transcript) so fixture-based CHECKERS have real data to
+            # evaluate instead of an empty golden-state stub (IAN Pointer 2).
+            try:
+                from src.utils.state_extractor import (
+                    build_agent_state, extract_assistant_text,
+                )
+                _audit = {}
+                try:
+                    _audit = inject_applier.audit_summary()
+                except Exception as exc:
+                    logger.debug("[%s] audit summary fetch failed: %s", task_id, exc)
+                _tpaths = []
+                for _cand in (grading_transcript_path,
+                              output_dir / "chat.jsonl",
+                              output_dir / "task_output" / "chat.jsonl"):
+                    if _cand and Path(_cand).is_file():
+                        _tpaths.append(Path(_cand))
+                _last = extract_assistant_text(_tpaths) if _tpaths else ""
+                _state = build_agent_state(
+                    audit=_audit,
+                    store_snapshot_dir=_ws_after / "mock_data",
+                    last_response=_last,
+                )
+                agent_state_json = json.dumps(_state, ensure_ascii=False, default=str)
+                # Persist alongside the run + into the tests dir the bundle ships.
+                (output_dir / "agent_state.json").write_text(
+                    agent_state_json, encoding="utf-8")
+                _tests_state_dir = output_dir / "data" / "tests"
+                _tests_state_dir.mkdir(parents=True, exist_ok=True)
+                (_tests_state_dir / "agent_state.json").write_text(
+                    agent_state_json, encoding="utf-8")
+            except Exception as exc:
+                logger.warning("[%s] agent_state build failed: %s", task_id, exc)
+
         startup_failed = isinstance(result.get("error"), str) and "Container startup failed" in result["error"]
         if startup_failed:
             logger.error(
@@ -1171,6 +1517,8 @@ def run_single_task(
                     network=network or None,
                     image=getattr(config, "docker_image", "wildclawbench-ubuntu:v1.3") if config else "wildclawbench-ubuntu:v1.3",
                     timeout=testexec_timeout,
+                    checkers_code=task.get("checkers_code"),
+                    agent_state_json=agent_state_json,
                 )
                 result["test_result"] = te
                 verifier_dir = output_dir / "task_output" / "logs" / "verifier"
@@ -1287,6 +1635,39 @@ def _run_cleanups(cleanups: list) -> None:
     cleanups.clear()
 
 
+def _collect_enabled_apis(args, config) -> "set[str] | None":
+    """Union of (required + distractor) APIs across the task(s) this invocation
+    will run, used to start the SHARED mock stack with only those services up
+    instead of all ~101. Returns None when it can't be resolved for every task
+    (safe fallback: run the full catalog, preserving prior behavior). A task
+    only ever reaches APIs in its own required+distractor set, so the batch-wide
+    union is sufficient for every task while excluding unreferenced APIs."""
+    try:
+        task_files: list[Path] = []
+        if getattr(args, "task", None):
+            tf = Path(args.task)
+            if tf.exists():
+                task_files = [tf]
+        else:
+            cats = ALL_CATEGORIES if args.category.lower() == "all" else [args.category]
+            for c in cats:
+                d = TASKS_DIR / c
+                if d.is_dir():
+                    task_files += sorted(d.glob("*task_*.md"))
+        if not task_files:
+            return None
+        enabled: set[str] = set()
+        for tf in task_files:
+            t = load_task(tf)
+            _augment_task_with_mocks(t, config, None)
+            enabled |= set(t.get("required_apis") or []) | set(t.get("distractor_apis") or [])
+        return enabled or None
+    except Exception as exc:
+        logger.warning("Could not resolve per-task API set; shared mock stack "
+                       "will run all APIs. Reason: %s", exc)
+        return None
+
+
 def _setup_litellm_and_mocks(args, config: Config, cleanups: list):
     """For the openclaw backend, optionally bring up a per-batch shared LiteLLM
     sidecar + docker network (+ mock-API stack). Returns
@@ -1302,13 +1683,21 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list):
     network = f"k3net-{batch_id}"
     sidecar = f"ll-{batch_id}"
 
-    _agent_headroom = (os.environ.get("KENSEI_AGENT_HEADROOM_ENABLED", "").strip().lower()
-                       in ("1", "true", "yes", "on"))
+    # Agent-side Headroom prompt compression defaults ON in this harness (parity
+    # with the judge Headroom switch in judge_litellm.judge_headroom_enabled).
+    # Set KENSEI_AGENT_HEADROOM_ENABLED to a falsy value (0/false/no/off) to
+    # disable; unset/empty means enabled.
+    _raw_agent_headroom = os.environ.get("KENSEI_AGENT_HEADROOM_ENABLED")
+    if _raw_agent_headroom is None or str(_raw_agent_headroom).strip() == "":
+        _agent_headroom = True
+    else:
+        _agent_headroom = str(_raw_agent_headroom).strip().lower() in ("1", "true", "yes", "on")
     litellm_yaml = build_litellm_config_yaml(
         bedrock_sonnet_arn=config.bedrock_sonnet_arn if config.aws_bearer_token else "",
         bedrock_arn=config.bedrock_inference_arn if config.aws_bearer_token else "",
         aws_region=config.bedrock_region,
         openai_api_key=config.openai_api_key,
+        openai_whisper_api_key=config.openai_whisper_api_key,
         enable_usage_callback=True,
         enable_headroom_callback=_agent_headroom,
     )
@@ -1330,6 +1719,9 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list):
     usage_dir.mkdir(parents=True, exist_ok=True)
     usage_log_path = usage_dir / "usage.jsonl"
     usage_log_path.touch(exist_ok=True)
+    # Surface to _build_trajectory so it can back-fill per-message cost blocks
+    # (chat.jsonl writes them as zero on this image build; IAN Pointer 5).
+    globals()["_USAGE_LOG_PATH"] = str(usage_log_path)
     try:
         os.chmod(usage_log_path, 0o666)
         os.chmod(usage_dir, 0o777)
@@ -1349,6 +1741,9 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list):
         except OSError:
             pass
         headroom_log_dir_str = str(headroom_log_dir)
+        # Surface this sink to save_usage so agent headroom stats land in
+        # usage.json (IAN report Pointer 3).
+        globals()["_HEADROOM_LOG_DIR"] = headroom_log_dir_str
 
     start_litellm(
         container_name=sidecar,
@@ -1358,6 +1753,7 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list):
         aws_bearer_token=config.aws_bearer_token,
         aws_region=config.bedrock_region,
         openai_api_key=config.openai_api_key,
+        openai_whisper_api_key=config.openai_whisper_api_key,
         usage_callback_host_path=str(callback_src),
         usage_log_host_dir=str(usage_dir),
         headroom_callback_host_path=headroom_callback_src,
@@ -1404,7 +1800,8 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list):
                 "without the mock stack when --mock-stack was requested."
             )
         mock_container = f"mocks-{batch_id}"
-        start_mock_stack(mock_container, network)
+        shared_enabled = _collect_enabled_apis(args, config)
+        start_mock_stack(mock_container, network, enabled_apis=shared_enabled)
         cleanups.append(lambda: stop_mock_stack(mock_container))
         if not wait_for_mock_stack_healthy(mock_container, timeout=180.0):
             raise RuntimeError(
@@ -1499,12 +1896,20 @@ def _start_task_mock_stack(task: dict, network: str, environment_dir) -> tuple[d
 
     safe_id = re.sub(r"[^a-zA-Z0-9._-]", "_", task.get("task_id", "task"))[:40]
     container = f"mocks-task-{safe_id}-{uuid.uuid4().hex[:6]}".lower()
+    # Spin up ONLY this task's APIs (required + distractor + any overlaid),
+    # not all ~101. Empty set => start_mock_stack runs the full catalog.
+    enabled_apis = (
+        set(task.get("required_apis") or [])
+        | set(task.get("distractor_apis") or [])
+        | set(overlays.keys())
+    )
     try:
         start_mock_stack(
             container, network,
             overlays=overlays,
             admin_env=admin_env,
             publish_ports=publish_ports,
+            enabled_apis=enabled_apis or None,
         )
     except Exception as exc:
         logger.error("[%s] per-task mock stack failed to start: %s", task.get("task_id"), exc)

@@ -20,6 +20,7 @@ def build_litellm_config_yaml(
     bedrock_sonnet_arn: str = "",
     enable_usage_callback: bool = False,
     enable_headroom_callback: bool = False,
+    openai_whisper_api_key: str = "",
 ) -> str:
     model_blocks: list[str] = []
     # `cache_control_injection_points` MUST live inside each model's
@@ -65,8 +66,8 @@ def build_litellm_config_yaml(
         # CRITICAL routing/detection decoupling (still required): adaptive-thinking
         # detection keys off the `model` STRING via get_base_model()->_is_opus_4_6_model()
         # substring match. Our opus access is an opaque application-inference-profile ARN
-        # (.../96j5zamnqlci); putting that ARN in `model:` makes get_base_model return
-        # "96j5zamnqlci" (split('/')[-1]) -> fails the opus-4-6 substring -> Bedrock
+        # (.../j6mdizxjngus); putting that ARN in `model:` makes get_base_model return
+        # "j6mdizxjngus" (split('/')[-1]) -> fails the opus-4-6 substring -> Bedrock
         # 400s the legacy shape. Fix: `model:` carries the RECOGNIZABLE name
         # "anthropic.claude-opus-4-6-v1"; `model_id:` (common_utils.py:get_bedrock_model_id
         # pops it, URL-encodes into the endpoint URL) carries the real ARN for routing.
@@ -148,7 +149,9 @@ def build_litellm_config_yaml(
             "  - model_name: whisper-1\n"
             "    litellm_params:\n"
             "      model: openai/whisper-1\n"
-            "      api_key: os.environ/OPENAI_API_KEY"
+            # Dedicated transcription key (KENSEI_OPENAI_WHISPER_API_KEY); start_litellm
+            # sets OPENAI_WHISPER_API_KEY = whisper key, falling back to the main key.
+            "      api_key: os.environ/OPENAI_WHISPER_API_KEY"
         )
         # OpenClaw's built-in transcribeAudio runner auto-POSTs the sidecar's
         # /v1/audio/transcriptions but its OpenAI plugin defaults to model=
@@ -168,7 +171,7 @@ def build_litellm_config_yaml(
                 f"  - model_name: {_audio_fallback_id}\n"
                 "    litellm_params:\n"
                 "      model: openai/whisper-1\n"
-                "      api_key: os.environ/OPENAI_API_KEY"
+                "      api_key: os.environ/OPENAI_WHISPER_API_KEY"
             )
     # OpenClaw's image tool falls back to built-in default model ids when its
     # own imageModel override isn't applied inside the container. The openclaw
@@ -343,6 +346,7 @@ def start_litellm(
     headroom_callback_host_path: str = "",
     headroom_log_host_dir: str = "",
     enable_headroom: bool = False,
+    openai_whisper_api_key: str = "",
 ) -> None:
     env_args: list[str] = ["-e", f"LITELLM_MASTER_KEY={master_key}"]
     _litellm_log = os.environ.get("LITELLM_LOG", "").strip()
@@ -355,6 +359,11 @@ def start_litellm(
         ]
     if openai_api_key:
         env_args += ["-e", f"OPENAI_API_KEY={openai_api_key}"]
+    # Transcription key: dedicated whisper key if provided, else reuse the main
+    # key. The whisper/audio model blocks read os.environ/OPENAI_WHISPER_API_KEY.
+    _whisper_key = openai_whisper_api_key or openai_api_key
+    if _whisper_key:
+        env_args += ["-e", f"OPENAI_WHISPER_API_KEY={_whisper_key}"]
 
     # Mount the callback module + writable log dir so UsageWriter can write
     # real provider-side usage rows from inside the sidecar. The env var name

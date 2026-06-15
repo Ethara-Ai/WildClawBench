@@ -39,6 +39,19 @@ results = ctrf.get("results", {}) if isinstance(ctrf, dict) else {}
 summary = results.get("summary", {}) if isinstance(results, dict) else {}
 tests = results.get("tests", []) if isinstance(results, dict) else []
 
+
+def _norm(name):
+    # Reduce any pytest node id / weight key to its bare test function name so
+    # the three authoring styles all match each other:
+    #   tests/test_outputs.py::TestX::test_a  (CTRF, class-wrapped)
+    #   tests/test_outputs.py::test_a         (CTRF, bare function)
+    #   TestX::test_a                         (weight key, class-prefixed)
+    #   test_a                                (weight key, bare)
+    # All collapse to "test_a". Without this, bare-function suites with
+    # class-prefixed weight keys never match and reward is always 0.
+    return str(name).rsplit("::", 1)[-1].strip()
+
+
 passed_names = set()
 for t in tests:
     if not isinstance(t, dict):
@@ -46,7 +59,7 @@ for t in tests:
     status = (t.get("status") or "").lower()
     name = t.get("name") or ""
     if status == "passed" and name:
-        passed_names.add(name)
+        passed_names.add(_norm(name))
 
 tests_total = int(summary.get("tests", 0) or 0)
 tests_passed = int(summary.get("passed", 0) or 0)
@@ -73,8 +86,8 @@ elif isinstance(weights, list):
             weights_map[str(name)] = float(w)
 
 pos_total = sum(w for w in weights_map.values() if w > 0)
-pos_earned = sum(w for n, w in weights_map.items() if w > 0 and n in passed_names)
-neg_penalty = sum(abs(w) for n, w in weights_map.items() if w < 0 and n in passed_names)
+pos_earned = sum(w for n, w in weights_map.items() if w > 0 and _norm(n) in passed_names)
+neg_penalty = sum(abs(w) for n, w in weights_map.items() if w < 0 and _norm(n) in passed_names)
 
 if pos_total > 0:
     reward = max(0.0, (pos_earned - neg_penalty) / pos_total)

@@ -1,0 +1,40 @@
+{
+  "table": "availability",
+  "rows": [
+    {
+      "owner": "user-amelia-ortega",
+      "weekday": "friday",
+      "start_time": "09:00",
+      "end_time": "12:00",
+      "timezone": "America/Los_Angeles"
+    },
+    {
+      "owner": "user-amelia-ortega",
+      "weekday": "friday",
+      "start_time": "09:00",
+      "end_time": "12:00",
+      "timezone": "America/Los_Angeles"
+    },
+    {
+      "owner": "user-amelia-ortega",
+      "weekday": "friday",
+      "start_time": "09:00",
+      "end_time": "12:00",
+      "timezone": "America/Los_Angeles"
+    },
+    {
+      "owner": "user-amelia-ortega",
+      "weekday": "friday",
+      "start_time": "09:00",
+      "end_time": "12:00",
+      "timezone": "America/Los_Angeles"
+    },
+    {
+      "owner": "user-amelia-ortega",
+      "weekday": "friday",
+      "start_time": "09:00",
+      "end_time": "12:00",
+      "timezone": "America/Los_Angeles"
+    }
+  ]
+}

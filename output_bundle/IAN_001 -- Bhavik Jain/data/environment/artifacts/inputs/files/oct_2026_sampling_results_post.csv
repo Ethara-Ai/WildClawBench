@@ -1,0 +1,13 @@
+Site,pH,Turbidity_NTU,Conductivity_uS_cm,Date,Notes
+Site 1,7.4,3.2,410,2026-10-14,Normal range
+Site 2,7.3,2.8,395,2026-10-14,Normal range
+Site 3,7.5,4.1,420,2026-10-14,Normal range
+Site 4,7.1,3.5,405,2026-10-14,Normal range
+Site 5,7.6,2.9,430,2026-10-14,Normal range
+Site 6,7.2,3.0,415,2026-10-14,Normal range
+Site 7,8.1,3.3,400,2026-10-14,Revised — lab calibration drift correction applied
+Site 8,7.4,2.7,390,2026-10-14,Normal range
+Site 9,7.3,3.6,425,2026-10-14,Normal range
+Site 10,7.5,3.1,410,2026-10-14,Normal range
+Site 11,7.1,2.5,385,2026-10-14,Normal range
+Site 12,7.6,3.4,440,2026-10-14,Normal range

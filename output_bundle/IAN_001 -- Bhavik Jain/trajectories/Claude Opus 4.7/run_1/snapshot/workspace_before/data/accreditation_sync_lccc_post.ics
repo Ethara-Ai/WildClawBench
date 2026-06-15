@@ -1,0 +1,15 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//DAC-ENV//Certification//EN
+BEGIN:VEVENT
+UID:accreditation-sync-lccc-20261015@donaanacounty.gov
+DTSTART;TZID=America/Denver:20261016T100000
+DTEND;TZID=America/Denver:20261016T110000
+SUMMARY:Las Cruces Community College - curriculum sync
+LOCATION:Conference Room B
+ORGANIZER;CN=Ian Salazar:mailto:ian.salazar@voissync.ai
+ATTENDEE;CN=Dean Martinez:mailto:e.martinez@lascrucescc.edu
+ATTENDEE;CN=Dr. L. Brennan:mailto:l.brennan@ridgemontstate.edu
+STATUS:CONFIRMED
+END:VEVENT
+END:VCALENDAR

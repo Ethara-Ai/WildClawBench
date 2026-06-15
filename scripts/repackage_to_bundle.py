@@ -176,8 +176,10 @@ def _pretty_model(harness_dirname: str) -> str:
 
 
 def _method_of(test_name: str) -> str:
-    """ctrf name is 'Class::method'; weights key is bare 'method'."""
-    return test_name.split("::")[-1]
+    """Bare test function name. ctrf names and weight keys come in any of:
+    'tests/test_outputs.py::Class::method', 'Class::method', or 'method';
+    all reduce to the trailing 'method' segment."""
+    return str(test_name).rsplit("::", 1)[-1].strip()
 
 
 def _build_pytest_block(verifier_dir: Path) -> dict[str, Any]:
@@ -187,11 +189,18 @@ def _build_pytest_block(verifier_dir: Path) -> dict[str, Any]:
     summary = results.get("summary", {}) if isinstance(results, dict) else {}
     raw_tests = results.get("tests", []) if isinstance(results, dict) else []
 
+    # Normalize weight keys to bare method name so class-prefixed weights
+    # resolve against bare-function node ids (and vice versa).
+    weights_by_method = {}
+    if isinstance(weights, dict):
+        for k, v in weights.items():
+            weights_by_method[_method_of(k)] = v
+
     tests: list[dict[str, Any]] = []
     for t in raw_tests:
         name = t.get("name", "")
         method = _method_of(name)
-        weight = weights.get(method, weights.get(name, 1))
+        weight = weights_by_method.get(method, weights.get(name, 1))
         tests.append(
             {
                 "name": f"tests/test_outputs.py::{name}",
@@ -429,6 +438,12 @@ def convert_task(
     if (task_dir / "rubric.json").exists():
         bundle.mkdir(parents=True, exist_ok=True)
         shutil.copy2(task_dir / "rubric.json", bundle / "rubric.json")
+    # golden_trajectory.json is part of the bundle skeleton (written by
+    # write_bundle into the run-output task dir). Copy it through so the
+    # published bundle carries the reference trajectory.
+    if (task_dir / "golden_trajectory.json").exists():
+        bundle.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(task_dir / "golden_trajectory.json", bundle / "golden_trajectory.json")
     if (task_dir / "data").is_dir():
         shutil.copytree(
             task_dir / "data",
@@ -480,6 +495,28 @@ def convert_task(
 
             # 3) output_media
             n_media = copy_output_media(run_dir, dest_run)
+
+            # 4) snapshot/ (workspace_before/ vs workspace_after/, each holding
+            # persona/ + data/ + mock_data/), if the run produced one. Copied
+            # as-is so the published bundle preserves the initial-vs-final state.
+            src_snap = run_dir / "snapshot"
+            if src_snap.is_dir():
+                shutil.copytree(
+                    src_snap, dest_run / "snapshot",
+                    dirs_exist_ok=True,
+                    ignore=shutil.ignore_patterns(".DS_Store"),
+                )
+
+            # 5) Trajectory costing + scoring artifacts. usage.json carries the
+            # full token/cost breakdown (input/output/cache_read/cache_write/
+            # cost_usd per source + total) and score.json the rubric/headroom
+            # detail. The repackager previously dropped both, so the published
+            # bundle shipped with zero cost data (IAN report Pointer 5). Copy
+            # them through verbatim.
+            for _fn in ("usage.json", "score.json", "inject_timeline.jsonl"):
+                _src = run_dir / _fn
+                if _src.exists():
+                    shutil.copy2(_src, dest_run / _fn)
 
             per_run_summ.append(
                 {

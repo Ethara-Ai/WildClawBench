@@ -84,9 +84,9 @@ def _make_litellm_response(text: str = "1. example [[RATIONALE: x]] [[SATISFIED:
     )
 
 
-SONNET_ARN = "bedrock/arn:aws:bedrock:ap-south-1:426628337772:application-inference-profile/is9bst5tfadh"
-GLM_ARN = "bedrock/arn:aws:bedrock:us-east-1:426628337772:application-inference-profile/xx5msvho23iq"
-KIMI_ARN = "bedrock/arn:aws:bedrock:ap-south-1:426628337772:application-inference-profile/p532c9fzmeed"
+SONNET_ARN = "bedrock/arn:aws:bedrock:ap-south-1:426628337772:application-inference-profile/urg0zifsjiga"
+GLM_ARN = "bedrock/arn:aws:bedrock:us-east-1:426628337772:application-inference-profile/u4czm4f2p3ws"
+KIMI_ARN = "bedrock/arn:aws:bedrock:ap-south-1:426628337772:application-inference-profile/q6g7fi6wumk3"
 
 
 # ---------- Test 1: litellm OFF → uses direct urllib path ----------

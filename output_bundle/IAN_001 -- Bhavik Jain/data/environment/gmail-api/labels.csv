@@ -1,0 +1,17 @@
+id,name,type,messages_total,messages_unread,threads_total,threads_unread
+INBOX,INBOX,system,312,14,198,9
+SENT,SENT,system,245,0,187,0
+DRAFT,DRAFT,system,3,0,3,0
+STARRED,STARRED,system,18,0,15,0
+TRASH,TRASH,system,7,0,6,0
+SPAM,SPAM,system,12,0,10,0
+IMPORTANT,IMPORTANT,system,89,4,67,3
+UNREAD,UNREAD,system,14,14,9,9
+Label_1,WaterQuality,user,87,3,42,2
+Label_2,Certification-Sprint,user,34,6,18,4
+Label_3,Grants/Clearwater,user,28,1,14,1
+Label_4,LCCC-Partnership,user,15,2,9,2
+Label_5,EPA-Region6,user,8,1,5,1
+Label_6,Personal,user,46,0,31,0
+Label_7,Promotores,user,12,0,8,0
+Label_8,County-Admin,user,22,1,16,1

@@ -1,0 +1,95 @@
+{
+  "table": "members",
+  "rows": [
+    {
+      "id": "0d05c30f3ef9742e1a0144755a9299b4",
+      "list_id": "list-newsletter",
+      "email_address": "mara@brightpath.io",
+      "full_name": "Mara Lindgren",
+      "status": "subscribed",
+      "timestamp_signup": "2025-09-02T08:00:00.000Z",
+      "member_rating": 4,
+      "_pk": "list-newsletter@0d05c30f3ef9742e1a0144755a9299b4"
+    },
+    {
+      "id": "e680f3f5e04d7a7de7e1d2aa788f12b6",
+      "list_id": "list-newsletter",
+      "email_address": "tomas@brightpath.io",
+      "full_name": "Tomas Vega",
+      "status": "subscribed",
+      "timestamp_signup": "2025-09-05T09:00:00.000Z",
+      "member_rating": 3,
+      "_pk": "list-newsletter@e680f3f5e04d7a7de7e1d2aa788f12b6"
+    },
+    {
+      "id": "ed7c46e4c206d77970d9cd876c7e3bfa",
+      "list_id": "list-newsletter",
+      "email_address": "yara@nimbus-co.com",
+      "full_name": "Yara Khalil",
+      "status": "unsubscribed",
+      "timestamp_signup": "2025-09-10T10:00:00.000Z",
+      "member_rating": 2,
+      "_pk": "list-newsletter@ed7c46e4c206d77970d9cd876c7e3bfa"
+    },
+    {
+      "id": "21daa82ae1d5125486cd37b49cc5bd78",
+      "list_id": "list-newsletter",
+      "email_address": "ethan@nimbus-co.com",
+      "full_name": "Ethan Walsh",
+      "status": "subscribed",
+      "timestamp_signup": "2025-09-18T11:00:00.000Z",
+      "member_rating": 5,
+      "_pk": "list-newsletter@21daa82ae1d5125486cd37b49cc5bd78"
+    },
+    {
+      "id": "05e2dd11749f3ec5bd3002eedafa4f3e",
+      "list_id": "list-newsletter",
+      "email_address": "grace@helio-labs.com",
+      "full_name": "Grace Okafor",
+      "status": "cleaned",
+      "timestamp_signup": "2025-10-01T12:00:00.000Z",
+      "member_rating": 1,
+      "_pk": "list-newsletter@05e2dd11749f3ec5bd3002eedafa4f3e"
+    },
+    {
+      "id": "f537a7c84cb96314fd693a5ed5861307",
+      "list_id": "list-product",
+      "email_address": "sven@helio-labs.com",
+      "full_name": "Sven Nyberg",
+      "status": "subscribed",
+      "timestamp_signup": "2025-09-20T08:00:00.000Z",
+      "member_rating": 4,
+      "_pk": "list-product@f537a7c84cb96314fd693a5ed5861307"
+    },
+    {
+      "id": "03b70f82243af1d1695513c4d52f37e0",
+      "list_id": "list-product",
+      "email_address": "lucia@orbit-mark.com",
+      "full_name": "Lucia Romano",
+      "status": "subscribed",
+      "timestamp_signup": "2025-09-22T09:00:00.000Z",
+      "member_rating": 3,
+      "_pk": "list-product@03b70f82243af1d1695513c4d52f37e0"
+    },
+    {
+      "id": "f7dac1ddf22604de6b28dcfa0f323857",
+      "list_id": "list-product",
+      "email_address": "kenji@orbit-mark.com",
+      "full_name": "Kenji Sato",
+      "status": "subscribed",
+      "timestamp_signup": "2025-10-05T10:00:00.000Z",
+      "member_rating": 4,
+      "_pk": "list-product@f7dac1ddf22604de6b28dcfa0f323857"
+    },
+    {
+      "id": "10f17c6b3b844733bb266b0dcfdda5b8",
+      "list_id": "list-product",
+      "email_address": "hannah@vela-tech.com",
+      "full_name": "Hannah Frost",
+      "status": "subscribed",
+      "timestamp_signup": "2025-10-12T11:00:00.000Z",
+      "member_rating": 5,
+      "_pk": "list-product@10f17c6b3b844733bb266b0dcfdda5b8"
+    }
+  ]
+}

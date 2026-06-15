@@ -82,6 +82,48 @@ _RUNNER_SCRIPT = textwrap.dedent('''
                 return False
         sys.modules["pytest"] = _PytestStub()
 
+    # ------------------------------------------------------------------ #
+    # Built-in fixtures. Persona/inject suites authored against the Talos
+    # CHECKERS contract take two pytest fixtures the no-fixture runner used to
+    # reject outright (every test -> errored, IAN report H5):
+    #   state         -> the live agent state dict (audit, per-service store,
+    #                    last_response), shipped as /tests/agent_state.json
+    #   task_checkers -> {checker_id: checker} from the sibling task.py CHECKERS
+    #                    list, shipped as /tests/task/task.py
+    # We synthesize both here so the suite runs as authored. Anything the
+    # runner cannot supply still errors (below), preserving the old behavior
+    # for genuinely unsatisfiable fixtures.
+    import os as _os
+    _FIXTURES = {}
+    try:
+        _sp = "/tests/agent_state.json"
+        if _os.path.exists(_sp):
+            with open(_sp) as _f:
+                _FIXTURES["state"] = json.load(_f)
+        else:
+            _FIXTURES["state"] = {}
+    except Exception as _e:
+        print(f"[runner] state fixture load failed: {_e}", file=sys.stderr)
+        _FIXTURES["state"] = {}
+    try:
+        if _os.path.isdir("/tests/task"):
+            sys.path.insert(0, "/tests/task")
+            import task as _taskmod  # /tests/task/task.py
+            _FIXTURES["task_checkers"] = {c["id"]: c for c in _taskmod.CHECKERS}
+    except Exception as _e:
+        print(f"[runner] task_checkers fixture load failed: {_e}", file=sys.stderr)
+
+    def _kwargs_for(req):
+        # Return (kwargs, missing). kwargs supplies every required param the
+        # runner knows how to build; missing lists the rest.
+        kwargs, missing = {}, []
+        for p in req:
+            if p in _FIXTURES:
+                kwargs[p] = _FIXTURES[p]
+            else:
+                missing.append(p)
+        return kwargs, missing
+
     def _is_skip_exc(e):
         # Recognize our stub skip, real pytest/unittest skips by class name.
         if isinstance(e, _Skipped):
@@ -124,11 +166,11 @@ _RUNNER_SCRIPT = textwrap.dedent('''
                 req.append(p.name)
         return req
 
-    def _record(results, full, callable_fn, is_async=False):
+    def _record(results, full, callable_fn, is_async=False, kwargs=None):
         print(f"[runner] running {full}", file=sys.stderr, flush=True)
         signal.alarm(PER_TEST_TIMEOUT)
         try:
-            res = callable_fn()
+            res = callable_fn(**(kwargs or {}))
             if inspect.iscoroutine(res):  # (F) async test or sync fn returning a coroutine
                 asyncio.run(res)
             results[full] = {"status": "passed"}
@@ -166,19 +208,21 @@ _RUNNER_SCRIPT = textwrap.dedent('''
         fn = getattr(inst, m)
         if not callable(fn):
             return False
-        # (D) fixture-style signature: required params we cannot supply.
+        # (D) fixture-style signature: supply known fixtures (state,
+        # task_checkers); error only on params the runner can't build.
         req = _required_param_names(fn)
-        if req:
+        kwargs, missing = _kwargs_for(req)
+        if missing:
             results[full] = {
                 "status": "errored",
-                "error": ("requires fixtures/params " + ", ".join(req)
-                          + "; the no-fixture runner cannot supply them "
+                "error": ("requires fixtures/params " + ", ".join(missing)
+                          + "; the runner cannot supply them "
                           + "(remove pytest fixtures or make the test self-contained)"),
                 "traceback": "",
             }
             return True
         is_async = inspect.iscoroutinefunction(fn)
-        _record(results, full, fn, is_async=is_async)
+        _record(results, full, fn, is_async=is_async, kwargs=kwargs)
         return True
 
     # ---- Collect & run Test* classes (incl. unittest.TestCase) ----
@@ -229,24 +273,25 @@ _RUNNER_SCRIPT = textwrap.dedent('''
                 if not callable(fn):
                     continue
                 req = _required_param_names(fn)
-                if req:
+                _kw, _missing = _kwargs_for(req)
+                if _missing:
                     out["collected"] += 1
                     out["results"][full] = {
                         "status": "errored",
-                        "error": "requires fixtures/params " + ", ".join(req),
+                        "error": "requires fixtures/params " + ", ".join(_missing),
                         "traceback": "",
                     }
                     continue
                 out["collected"] += 1
-                def _drive(_fn=fn, _inst=inst):
+                def _drive(_fn=fn, _inst=inst, **_kwargs):
                     _inst.setUp()
                     try:
-                        r = _fn()
+                        r = _fn(**_kwargs)
                         if inspect.iscoroutine(r):
                             asyncio.run(r)
                     finally:
                         _inst.tearDown()
-                _record(out["results"], full, _drive)
+                _record(out["results"], full, _drive, kwargs=_kw)
             else:
                 if _run_method(out["results"], cls, inst, cls_name, m):
                     out["collected"] += 1
@@ -266,17 +311,18 @@ _RUNNER_SCRIPT = textwrap.dedent('''
             continue
         full = f"<module>::{fn_name}"
         req = _required_param_names(fn)
-        if req:
+        kwargs, missing = _kwargs_for(req)
+        if missing:
             out["collected"] += 1
             out["results"][full] = {
                 "status": "errored",
-                "error": ("requires fixtures/params " + ", ".join(req)
-                          + "; the no-fixture runner cannot supply them"),
+                "error": ("requires fixtures/params " + ", ".join(missing)
+                          + "; the runner cannot supply them"),
                 "traceback": "",
             }
             continue
         out["collected"] += 1
-        _record(out["results"], full, fn, is_async=inspect.iscoroutinefunction(fn))
+        _record(out["results"], full, fn, is_async=inspect.iscoroutinefunction(fn), kwargs=kwargs)
 
     print(json.dumps(out))
 ''').strip()
@@ -294,17 +340,22 @@ def _compute_reward(results: Mapping[str, dict], weights: Mapping[str, float]) -
     """
     if not weights:
         return 0.0
+
+    def _norm(name: str) -> str:
+        # Collapse any node id / weight key to its bare test function name
+        # (last "::" segment) so class-wrapped and bare-function authoring
+        # styles match regardless of which side carries the class prefix.
+        return str(name).rsplit("::", 1)[-1].strip()
+
     passed_names: set[str] = set()
     for full_name, res in results.items():
         if res.get("status") != "passed":
             continue
-        passed_names.add(full_name)
-        if "::" in full_name:
-            passed_names.add(full_name.split("::", 1)[-1])
+        passed_names.add(_norm(full_name))
 
     pos_total = sum(float(w) for w in weights.values() if w > 0)
-    pos_earned = sum(float(w) for n, w in weights.items() if w > 0 and n in passed_names)
-    neg_penalty = sum(abs(float(w)) for n, w in weights.items() if w < 0 and n in passed_names)
+    pos_earned = sum(float(w) for n, w in weights.items() if w > 0 and _norm(n) in passed_names)
+    neg_penalty = sum(abs(float(w)) for n, w in weights.items() if w < 0 and _norm(n) in passed_names)
 
     if pos_total <= 0:
         scored = [r for r in results.values() if r.get("status") != "skipped"]
@@ -323,6 +374,8 @@ def execute_tests(
     network: Optional[str] = None,
     image: str = "wildclawbench-ubuntu:v1.3",
     timeout: int = 300,
+    checkers_code: Optional[str] = None,
+    agent_state_json: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Run `test_code` against the live mock stack. Returns a test_result dict.
 
@@ -331,6 +384,11 @@ def execute_tests(
     the agent's produced artifacts. `mock_env_dict` carries <SVC>_URL env vars
     pointing at the running mock-stack container hostnames; `network` is the
     docker network those containers live on.
+
+    `checkers_code` (a task.py defining a CHECKERS list) and `agent_state_json`
+    (the live agent state dict) are shipped into the sandbox so fixture-based
+    suites authored against the Talos CHECKERS contract — `def test_x(state,
+    task_checkers)` — run as authored instead of erroring on missing fixtures.
     """
     if not test_code.strip():
         return {
@@ -353,6 +411,13 @@ def execute_tests(
         (tmp / "test_outputs.py").write_text(test_code, encoding="utf-8")
         (tmp / "test_weights.json").write_text(test_weights_json or "{}", encoding="utf-8")
         (tmp / "runner.py").write_text(_RUNNER_SCRIPT, encoding="utf-8")
+        # Ship the CHECKERS module + live agent state so fixture-based suites
+        # (state, task_checkers) run as authored (see _RUNNER_SCRIPT fixtures).
+        if checkers_code and checkers_code.strip():
+            (tmp / "task").mkdir(parents=True, exist_ok=True)
+            (tmp / "task" / "task.py").write_text(checkers_code, encoding="utf-8")
+        if agent_state_json and agent_state_json.strip():
+            (tmp / "agent_state.json").write_text(agent_state_json, encoding="utf-8")
 
         ws_mount = workspace_dir if workspace_dir and workspace_dir.is_dir() else tmp
         cmd = [

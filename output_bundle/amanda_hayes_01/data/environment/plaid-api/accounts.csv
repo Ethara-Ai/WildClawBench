@@ -1,0 +1,4 @@
+account_id,name,official_name,mask,type,subtype,available,current,limit,iso_currency_code
+acc_chk_001,Everyday Checking,Chase Total Checking,4471,depository,checking,7254.49,7354.49,,USD
+acc_sav_002,Savings,Chase Savings,8830,depository,savings,21560.40,21560.40,,USD
+acc_crd_003,Chase Freedom,Chase Freedom Unlimited,1129,credit,credit card,4604.27,395.73,5000.00,USD

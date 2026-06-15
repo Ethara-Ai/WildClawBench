@@ -44,6 +44,12 @@ output_qwen.rar
 # Benchmark run output (trajectories, scores, artifacts) — large, machine-specific.
 output/
 
+# Task input data (personas, staged files) — large, machine-specific.
+input/
+
+# Local review / audit documents.
+review_docs/
+
 # Per-run telemetry written by run.sh tee — local, timestamped, machine-specific.
 logs/
 

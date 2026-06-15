@@ -1,0 +1,33 @@
+{
+  "document_id": "curriculum_framework_v1",
+  "title": "Citizen Water-Monitoring Certification — Curriculum Framework v1",
+  "owner": "ian.salazar@voissync.ai",
+  "last_modified": "2026-10-14T06:50:00-06:00",
+  "modules": [
+    {
+      "module_number": 1,
+      "module_name": "Watershed Fundamentals",
+      "hours_v0": 6,
+      "hours_v1": 6
+    },
+    {
+      "module_number": 2,
+      "module_name": "Water Chemistry Fundamentals",
+      "hours_v0": 6,
+      "hours_v1": 6
+    },
+    {
+      "module_number": 3,
+      "module_name": "Field Safety",
+      "hours_v0": 6,
+      "hours_v1": 6
+    },
+    {
+      "module_number": 4,
+      "module_name": "Community Outreach & Data Stewardship",
+      "hours_v0": 8,
+      "hours_v1": 8
+    }
+  ],
+  "total_hours": 26
+}

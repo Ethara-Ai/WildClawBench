@@ -182,6 +182,43 @@ def _load_provided_tests(task_dir: Path) -> tuple[str, str]:
     return "", ""
 
 
+def _load_checkers_and_conftest(task_dir: Path) -> tuple[str, str]:
+    """Load the deterministic CHECKERS module (task.py) and its conftest.py.
+
+    Fixture-based suites (``def test_x(state, task_checkers)``) import their
+    deterministic checkers from a sibling ``task.py`` (``CHECKERS`` list) and
+    take a ``state`` fixture from a ``conftest.py``. The harness ships task.py
+    into the test sandbox so the ``task_checkers`` fixture resolves, and writes
+    both into the published bundle's ``data/tests/`` (task/task.py + conftest).
+
+    Looked up in priority order so both the canonical layout and ALDEN's
+    ``Extra files/`` drop work:
+      tests/task/task.py, task/task.py, Extra files/task.py, tests/task.py
+    Returns ``(checkers_code, conftest_code)`` — empty strings when absent.
+    """
+    checkers_code = ""
+    for rel in ("tests/task/task.py", "task/task.py", "Extra files/task.py", "tests/task.py"):
+        cand = task_dir / rel
+        if cand.is_file():
+            try:
+                checkers_code = cand.read_text(encoding="utf-8")
+            except OSError:
+                checkers_code = ""
+            if checkers_code.strip():
+                break
+    conftest_code = ""
+    for rel in ("tests/conftest.py", "conftest.py", "Extra files/conftest.py"):
+        cand = task_dir / rel
+        if cand.is_file():
+            try:
+                conftest_code = cand.read_text(encoding="utf-8")
+            except OSError:
+                conftest_code = ""
+            if conftest_code.strip():
+                break
+    return checkers_code, conftest_code
+
+
 def _attach_drift_script(task: dict, task_dir: Path) -> dict:
     # Surface drift.yaml / drift.yml on the task dict so run_batch can start
     # a DriftDirector. Sets to None (not absent) when no script is present so
@@ -311,6 +348,22 @@ def _append_workspace_hint(prompt: str, attachments: list[dict]) -> str:
     return prompt + hint
 
 
+def _load_golden_trajectory(task_dir: Path) -> str:
+    """Return the raw JSON text of ``<task_dir>/golden_trajectory.json`` if present.
+
+    Stored verbatim on Task.golden_trajectory (a TEXT column) and emitted into the
+    Harbor bundle by write_bundle via ``_trajectory_entries`` (which json-parses
+    the string). Produced by system_prompts/generate_golden_trajectory.py.
+    """
+    p = task_dir / "golden_trajectory.json"
+    if p.is_file():
+        try:
+            return p.read_text(encoding="utf-8")
+        except OSError:
+            return ""
+    return ""
+
+
 def _load_native_task(task_dir: Path) -> dict:
     # kensei-native task dir: prompt.txt + rubric.json + persona/ + data/ + mock_data/ + gt/.
     # workspace_path is left empty here; run_batch stages a workspace from
@@ -362,12 +415,17 @@ def _load_native_task(task_dir: Path) -> dict:
     derived_l1, derived_l2 = _derive_taxonomy_for_native_task(task_dir, rubrics, attachments)
     prompt_with_inputs = _append_workspace_hint(prompt, attachments)
     provided_test_code, provided_test_weights = _load_provided_tests(task_dir)
+    checkers_code, conftest_code = _load_checkers_and_conftest(task_dir)
     return {
         "task_id": task_dir.name,
         "prompt": prompt_with_inputs,
         "initial_prompt": prompt_with_inputs,
         "test_code": provided_test_code,
         "test_weights": provided_test_weights,
+        # CHECKERS module + conftest for fixture-based suites (state,
+        # task_checkers). Shipped into the test sandbox and the bundle.
+        "checkers_code": checkers_code,
+        "conftest_code": conftest_code,
         "persona": persona,
         "persona_dir": str(persona_dir) if persona_dir.is_dir() else "",
         "system_prompt": "",
@@ -393,27 +451,89 @@ def _load_native_task(task_dir: Path) -> dict:
         # Full per-turn wake-up script for Talos inject-format tasks (empty for
         # single-prompt tasks). run_batch feeds these to the multi-turn runner.
         "turn_messages": turn_messages,
+        # Reference golden trajectory (optional). Flows to the Harbor bundle's
+        # golden_trajectory.json via write_bundle.
+        "golden_trajectory": _load_golden_trajectory(task_dir),
     }
+
+
+def _collect_data_attachments(task_dir: Path) -> list[dict]:
+    """Stage the native ``data/`` dir as agent workspace inputs, excluding
+    graders/solutions/scaffolding (same rule as the native loader)."""
+    attachments: list[dict] = []
+    data_dir = task_dir / "data"
+    if not data_dir.is_dir():
+        return attachments
+    for f in sorted(data_dir.rglob("*")):
+        if not f.is_file() or f.name.startswith("."):
+            continue
+        rel = f.relative_to(data_dir).as_posix()
+        if rel.startswith(("tests/", "solution/", "environment/")) or rel in ("task.toml", "instruction.md"):
+            continue
+        mime = mimetypes.guess_type(f.name)[0] or "application/octet-stream"
+        attachments.append({
+            "name": f.name,
+            "mimeType": mime,
+            "path": str(f.resolve()),
+            "size": f.stat().st_size,
+            "storedAs": rel,
+            "role": "primary",
+            "description": "",
+        })
+    return attachments
 
 
 def _load_yaml_task(path: Path) -> dict:
     raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     task_dir = path.parent
     task_id = str(raw.get("task_id") or task_dir.name)
-    attachments = _load_attachments_yaml(raw, task_dir)
-    prompt = str(raw.get("initial_prompt") or raw.get("prompt") or "")
     provided_test_code, provided_test_weights = _load_provided_tests(task_dir)
+    checkers_code, conftest_code = _load_checkers_and_conftest(task_dir)
+
+    # HYBRID yaml+native: the new task.yaml format carries metadata (system_prompt,
+    # required_apis, task_type) but keeps the conversation in prompts.txt, the
+    # grading rubric in rubric.json, and workspace inputs under data/. Load those
+    # from disk when task.yaml does not provide them inline.
+    prompt = str(raw.get("initial_prompt") or raw.get("prompt") or "")
+    turn_messages: list[str] = []
+    if not prompt:
+        if (task_dir / "prompt.txt").is_file():
+            prompt = (task_dir / "prompt.txt").read_text(encoding="utf-8").strip()
+        elif (task_dir / "prompts.txt").is_file():
+            # Talos inject-format: prompts.txt is the per-turn wake-up script.
+            from src.utils.inject_director import parse_prompts_file
+            turn_messages = parse_prompts_file(task_dir / "prompts.txt")
+            prompt = (turn_messages[0] if turn_messages else "").strip()
+
+    rubrics = raw.get("rubrics") or []
+    if not rubrics and (task_dir / "rubric.json").is_file():
+        try:
+            _rj = json.loads((task_dir / "rubric.json").read_text(encoding="utf-8")) or []
+            rubrics = (_rj.get("rubrics") or []) if isinstance(_rj, dict) else _rj
+        except (json.JSONDecodeError, OSError):
+            rubrics = []
+
+    attachments = _load_attachments_yaml(raw, task_dir)
+    if not attachments:
+        attachments = _collect_data_attachments(task_dir)
+    if prompt:
+        prompt = _append_workspace_hint(prompt, attachments)
     return {
         "task_id": task_id,
         "prompt": prompt,
         "initial_prompt": prompt,
         "test_code": provided_test_code,
         "test_weights": provided_test_weights,
+        "checkers_code": checkers_code,
+        "conftest_code": conftest_code,
         "persona": str(raw.get("persona") or "marcus"),
-        "persona_dir": "",
+        # Hybrid yaml+native persona tasks (IAN, ALDEN) ship a persona/ dir on
+        # disk; point at it so the workspace_before snapshot captures the
+        # persona files instead of an empty dir (IAN report Pointer 4).
+        "persona_dir": str(task_dir / "persona") if (task_dir / "persona").is_dir() else "",
         "system_prompt": str(raw.get("system_prompt") or ""),
         "task_description": str(raw.get("task_description") or ""),
-        "rubrics": raw.get("rubrics") or [],
+        "rubrics": rubrics or [],
         "automated_checks": str(raw.get("automated_checks") or ""),
         "difficulty": str(raw.get("difficulty") or "medium"),
         "l1": str(raw.get("l1") or raw.get("taxonomy_l1") or ""),
@@ -430,6 +550,18 @@ def _load_yaml_task(path: Path) -> dict:
         "skills_path": "",
         "warmup": str(raw.get("warmup") or ""),
         "env": str(raw.get("env") or ""),
+        # Explicit API declarations (new task.yaml format). Kept raw here; the
+        # mock-stack augmenter normalizes them to <name>-api dir names and uses
+        # them in preference to inference so only the task's APIs spin up.
+        "required_apis_declared": raw.get("required_apis"),
+        "distractor_apis_declared": raw.get("distractor_apis"),
+        # Per-turn wake-up script (Talos inject-format) loaded from prompts.txt;
+        # empty for single-prompt tasks. run_batch feeds these to the multi-turn
+        # runner / inject director.
+        "turn_messages": turn_messages,
+        # Reference golden trajectory (optional). Flows to the Harbor bundle's
+        # golden_trajectory.json via write_bundle.
+        "golden_trajectory": _load_golden_trajectory(task_dir),
         "format": "yaml",
     }
 

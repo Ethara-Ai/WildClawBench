@@ -3,7 +3,7 @@ from OpenClaw JSONL session files.
 """
 
 from src.utils.jsonl_reader import sanitize_jsonl_message
-from .builder import build_trajectory_from_jsonl
+from .builder import build_published_trajectory, build_trajectory_from_jsonl
 from .local_media import replace_inline_media_with_files
 from .multimodal_meta import (
     build_input_files_manifest,
@@ -17,6 +17,7 @@ __all__ = [
     "build_input_files_manifest",
     "build_multimodal_metadata",
     "build_output_artifacts",
+    "build_published_trajectory",
     "build_trajectory_from_jsonl",
     "replace_inline_media_with_files",
     "replace_inline_media_with_s3",

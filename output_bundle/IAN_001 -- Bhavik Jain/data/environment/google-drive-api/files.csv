@@ -1,0 +1,9 @@
+id,name,mime_type,parent_id,size,created_time,modified_time,owner_email,starred,trashed,web_view_link
+file_field_log_template,field_log_template.gsheet,application/vnd.google-apps.spreadsheet,,4096,2026-09-01T08:00:00-06:00,2026-10-13T16:00:00-06:00,ian.salazar@voissync.ai,false,false,https://drive.google.com/file/d/file_field_log_template/view
+file_curriculum_v1,curriculum_framework_v1.gdoc,application/vnd.google-apps.document,,8192,2026-10-12T14:00:00-06:00,2026-10-14T08:30:00-06:00,ian.salazar@voissync.ai,false,false,https://drive.google.com/file/d/file_curriculum_v1/view
+file_olivera_voice,olivera_voice_2026-10-14.m4a,audio/m4a,,187432,2026-10-14T13:15:00-06:00,2026-10-14T13:15:00-06:00,samuel.olivera@donaanacounty.gov,false,false,https://drive.google.com/file/d/file_olivera_voice/view
+file_draft_v07,draft_v0.7.gdoc,application/vnd.google-apps.document,,15360,2026-10-04T10:00:00-06:00,2026-10-04T10:00:00-06:00,ian.salazar@voissync.ai,false,false,https://drive.google.com/file/d/file_draft_v07/view
+file_v21_pdf,WAITA_curriculum_v2.1_revisions.pdf,application/pdf,,52480,2026-10-15T10:00:00-06:00,2026-10-15T10:00:00-06:00,l.brennan@ridgemontstate.edu,false,false,https://drive.google.com/file/d/file_v21_pdf/view
+file_module3_lab,module3_lab.gdoc,application/vnd.google-apps.document,,6144,2026-10-15T14:00:00-06:00,2026-10-15T14:15:00-06:00,ian.salazar@voissync.ai,false,false,https://drive.google.com/file/d/file_module3_lab/view
+file_site7_photo,site7_2026-09-23.jpg,image/jpeg,,4847616,2026-09-23T09:42:00-06:00,2026-09-23T09:42:00-06:00,ian.salazar@voissync.ai,false,false,https://drive.google.com/file/d/file_site7_photo/view
+file_consent_en,consent_form_EN.gdoc,application/vnd.google-apps.document,,5120,2026-10-16T15:15:00-06:00,2026-10-16T15:15:00-06:00,ian.salazar@voissync.ai,false,false,https://drive.google.com/file/d/file_consent_en/view

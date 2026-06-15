@@ -1,0 +1,7 @@
+sample_id	site_id	site_name	sample_date	time_mt	ph	dissolved_oxygen_mgL	turbidity_ntu	conductivity_uS_cm	nitrate_mgL	coliform_cfu_per_100mL	collector	notes
+WQ-2026-013	1	Picacho Reach upstream	2026-10-14	10:08	7.4	8.1	3.2	612	0.9		Ian Salazar	Clean cobble run, no obvious discharge.
+WQ-2026-014	2	Mesilla Diversion Dam	2026-10-14	10:55	7.5	8.3	2.8	598	0.8		Ian Salazar	
+WQ-2026-015	3	Las Cruces Wastewater outfall	2026-10-14	11:22	7.6	7.9	4.1	631	1.1		Ian Salazar	
+WQ-2026-016	4	La Mesa drain	2026-10-14	14:02	7.5	7.7	5.6	644	1.4		Ian Salazar	
+WQ-2026-017	5	Vado canal	2026-10-14	14:33	7.4	7.6	6.0	658	1.6		Ian Salazar	
+WQ-2026-018	6	Anthony NM agricultural drain	2026-10-14	15:04	7.3	7.4	6.8	671	1.9		Ian Salazar	

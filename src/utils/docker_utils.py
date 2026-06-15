@@ -878,3 +878,57 @@ def _copy_file_from_container(task_id: str, src: str, dest: Path) -> bool:
         return True
     logger.warning("[%s] Container file copy failed (%s): %s", task_id, src, r.stderr.strip())
     return False
+
+
+def snapshot_persona_and_data_from_container(
+    task_id: str,
+    persona_entries: "list[str]",
+    data_rel_paths: "list[str]",
+    dest_dir: Path,
+) -> dict:
+    """Copy the FINAL state of the persona/ and data/ folders out of the running
+    agent container into ``dest_dir/{persona,data}/``.
+
+    Used to build the post-run ``workspace_after`` snapshot. ``persona_entries``
+    are the top-level names the task's persona dir shipped (copied into ``/root/``
+    by ``inject_lobster_workspace``); ``data_rel_paths`` are the staged data
+    attachment ``storedAs`` rel paths (under ``TMP_WORKSPACE``). Best-effort: a
+    missing/edited/deleted file is skipped, not fatal. Must be called BEFORE the
+    agent container is removed.
+    """
+    persona_dest = dest_dir / "persona"
+    data_dest = dest_dir / "data"
+    persona_dest.mkdir(parents=True, exist_ok=True)
+    data_dest.mkdir(parents=True, exist_ok=True)
+    n_persona = 0
+    for name in persona_entries:
+        if not name or name.startswith("/") or ".." in Path(name).parts:
+            continue
+        # Persona files live at /root/ in the container (some are dirs: memory/, skills/).
+        if _copy_dir_from_container(task_id, f"/root/{name}", str(persona_dest)):
+            n_persona += 1
+    # Capture the FULL final workspace tree — not just the originally-staged
+    # attachment manifest. The agent writes its deliverables (draft .eml, logs,
+    # agendas, updated sheets) under /root/workspace -> TMP_WORKSPACE; replaying
+    # only the input manifest produced an after-snapshot byte-identical to
+    # before, losing every agent artifact (IAN report Pointer 4). `docker cp
+    # <c>:/tmp_workspace/. dest` copies the whole tree (original + produced).
+    n_data = 0
+    if _copy_dir_from_container(task_id, f"{TMP_WORKSPACE}/.", str(data_dest)):
+        try:
+            n_data = sum(1 for p in data_dest.rglob("*") if p.is_file())
+        except OSError:
+            n_data = -1
+    else:
+        # Fallback: per-file copy of the declared attachments if the full-tree
+        # copy failed (e.g. workspace is a symlink the daemon won't follow).
+        for rel in data_rel_paths:
+            if not rel or rel.startswith("/") or ".." in Path(rel).parts:
+                continue
+            dst = data_dest / rel
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            if _copy_file_from_container(task_id, f"{TMP_WORKSPACE}/{rel}", dst):
+                n_data += 1
+    logger.info("[%s] workspace_after: collected %d persona entr(ies), %d data file(s)",
+                task_id, n_persona, n_data)
+    return {"persona": n_persona, "data": n_data}

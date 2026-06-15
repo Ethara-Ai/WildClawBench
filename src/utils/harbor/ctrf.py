@@ -140,22 +140,26 @@ def compute_test_reward(
     weights = _coerce_weights_map(_parse_json(test_weights_json))
     scores = _coerce_scores_map(_parse_json(test_scores_json))
 
+    def _norm(name: str) -> str:
+        # Bare test function name (last "::" segment) so class-wrapped and
+        # bare-function node ids match weight keys regardless of which side
+        # carries the path/class prefix.
+        return str(name).rsplit("::", 1)[-1].strip()
+
     passed_names: set[str] = set()
     for raw_name, status in scores.items():
         if status != "passed":
             continue
-        passed_names.add(raw_name)
-        if "::" in raw_name:
-            passed_names.add(raw_name.split("::", 1)[-1])
+        passed_names.add(_norm(raw_name))
 
     if not passed_names and test_output and weights:
         for name in weights.keys():
             if re.search(re.escape(name) + r"\s+PASSED", test_output):
-                passed_names.add(name)
+                passed_names.add(_norm(name))
 
     pos_total = sum(w for w in weights.values() if w > 0)
-    pos_earned = sum(w for n, w in weights.items() if w > 0 and n in passed_names)
-    neg_penalty = sum(abs(w) for n, w in weights.items() if w < 0 and n in passed_names)
+    pos_earned = sum(w for n, w in weights.items() if w > 0 and _norm(n) in passed_names)
+    neg_penalty = sum(abs(w) for n, w in weights.items() if w < 0 and _norm(n) in passed_names)
 
     if pos_total > 0:
         return max(0.0, (pos_earned - neg_penalty) / pos_total)

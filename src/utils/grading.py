@@ -31,9 +31,9 @@ TMP_WORKSPACE = os.environ.get("TMP_WORKSPACE", "/tmp_workspace")
 JUDGE_MODEL = os.environ.get("JUDGE_MODEL", "openai/gpt-5.4")  # may be bedrock/<arn>; falls back to JUDGE_MODEL_FALLBACK
 # Smallest-member-governs evidence cap, derived from AWS Bedrock official
 # context-window numbers (2026-06-02 web-confirmed, no longer hit-and-trial):
-#   * Claude Sonnet 4.6 (is9bst5tfadh) — 1,000,000 input tokens
-#   * Kimi K2.5         (p532c9fzmeed) —   256,000 input tokens
-#   * GLM 5             (xx5msvho23iq) —   200,000 input tokens  <-- smallest
+#   * Claude Sonnet 4.6 (urg0zifsjiga) — 1,000,000 input tokens
+#   * Kimi K2.5         (q6g7fi6wumk3) —   256,000 input tokens
+#   * GLM 5             (u4czm4f2p3ws) —   200,000 input tokens  <-- smallest
 # Bedrock enforces input_tokens + max_tokens <= context_window (see LiteLLM
 # PR #22479 / issue #22478). Our maxTokens request is 4,000. Empirical chars
 # /token ratio on real WildClawBench payloads is ~2.515 (500k chars produced
@@ -89,9 +89,9 @@ _AWS_EDGE_BODY_CAP = 24_000_000
 # PR #22479. Replaces the prior trial-and-error tuning against one fixture.
 #
 # Per-model published Bedrock caps:
-#   Sonnet 4.6 (is9bst5tfadh): ctx 1,000,000  max_output 8,192   (Anthropic spec)
-#   Kimi K2.5 (p532c9fzmeed) : ctx   262,144  max_output 16,384  (AWS card)
-#   GLM 5     (xx5msvho23iq) : ctx   202,752  max_output 16,384  (AWS card lists 128K, we cap at 16K — verdicts never need more)
+#   Sonnet 4.6 (urg0zifsjiga): ctx 1,000,000  max_output 8,192   (Anthropic spec)
+#   Kimi K2.5 (q6g7fi6wumk3) : ctx   262,144  max_output 16,384  (AWS card)
+#   GLM 5     (u4czm4f2p3ws) : ctx   202,752  max_output 16,384  (AWS card lists 128K, we cap at 16K — verdicts never need more)
 #
 # Empirical chars-per-token floor measured against alden-croft run_3 fixture
 # (denser content than typical, includes 7 persona MDs + workspace dump):
@@ -110,7 +110,7 @@ _AWS_EDGE_BODY_CAP = 24_000_000
 _MEMBER_EVIDENCE_BUDGETS: tuple[tuple[str, int, int], ...] = (
     # Sonnet 4.6 — 1,000,000 ctx, 8192 max_output. cpt 1.375 measured against dispatched user_chars (evidence + ~5000-char scaffold).
     # (1_000_000 − 8192 − 3000) × 1.375 = 1,357,361 dispatched chars − 5,000 scaffold = 1,352,361 → 1_350_000 evidence budget.
-    ("is9bst5tfadh", 1_350_000, 8192),
+    ("urg0zifsjiga", 1_350_000, 8192),
     # Kimi K2.5 — 262,144 ctx, 16384 max_output. The earlier 300_000 budget was
     # probe-tuned against alden-croft PROSE (cpt 1.29). Dense financial/CSV
     # evidence tokenizes harder: amanda_hayes_01 claude/run_3 dispatched 306,639
@@ -120,13 +120,13 @@ _MEMBER_EVIDENCE_BUDGETS: tuple[tuple[str, int, int], ...] = (
     # (262,144 − 16,384 − 3000_safety) = 242,760 input tok; 242,760 × 1.15 =
     # 279,174 dispatched chars − 5,000 scaffold = 274,174 → floor to 225,000
     # evidence budget (extra margin below the 306k that failed).
-    ("p532c9fzmeed",   225_000, 16384),
+    ("q6g7fi6wumk3",   225_000, 16384),
     # GLM 5 — 202,752 ctx, 16384 max_output. Earlier 250_000 was tuned against
     # alden-croft (cpt 1.50). amanda run_3 dispatched 256,639 chars → Bedrock 400.
     # (202,752 − 16,384 − 3000) = 183,368 input tok; 183,368 × 1.15 = 210,873
     # dispatched chars − 5,000 scaffold = 205,873 → floor to 175,000 evidence
     # budget (well below the 256k that failed).
-    ("xx5msvho23iq",   175_000, 16384),
+    ("u4czm4f2p3ws",   175_000, 16384),
 )
 # Fallback for unrecognized models (single-judge OpenAI fallback, custom ARNs).
 # OpenAI auto-caches and has its own server-side enforcement; conservative.
@@ -161,23 +161,22 @@ def _member_max_output_tokens(arn: str) -> int:
 #   JUDGE_COUNCIL_DISAGREEMENT_THRESHOLD=0.30   (stddev above which a criterion
 #                                                is flagged as contested)
 _DEFAULT_COUNCIL_MEMBERS = (
-    # Sonnet 4.6 anchor — points to the operator-supplied inference profile in
-    # ap-south-1. The prior default xv71vnlzm71s is denied by EtharaKenseiPolicy
-    # at the IAM layer; is9bst5tfadh replaces it as the current working anchor.
-    # Override via JUDGE_COUNCIL_SONNET_ARN if you need a different profile.
+    # Sonnet 4.6 anchor — the operator-supplied inference profile in ap-south-1
+    # (urg0zifsjiga). Override via JUDGE_COUNCIL_SONNET_ARN if you need a
+    # different profile.
     os.environ.get(
         "JUDGE_COUNCIL_SONNET_ARN",
-        "bedrock/arn:aws:bedrock:ap-south-1:426628337772:application-inference-profile/is9bst5tfadh",
+        "bedrock/arn:aws:bedrock:ap-south-1:426628337772:application-inference-profile/urg0zifsjiga",
     ),
     # GLM 5 — us-east-1 profile.
     os.environ.get(
         "JUDGE_COUNCIL_GLM_ARN",
-        "bedrock/arn:aws:bedrock:us-east-1:426628337772:application-inference-profile/xx5msvho23iq",
+        "bedrock/arn:aws:bedrock:us-east-1:426628337772:application-inference-profile/u4czm4f2p3ws",
     ),
     # Kimi k2.5 — ap-south-1 profile.
     os.environ.get(
         "JUDGE_COUNCIL_KIMI_ARN",
-        "bedrock/arn:aws:bedrock:ap-south-1:426628337772:application-inference-profile/p532c9fzmeed",
+        "bedrock/arn:aws:bedrock:ap-south-1:426628337772:application-inference-profile/q6g7fi6wumk3",
     ),
 )
 _COUNCIL_DISAGREEMENT_THRESHOLD = float(
@@ -381,9 +380,9 @@ _ZERO_USAGE = {
 
 
 _JUDGE_RATES = {
-    "is9bst5tfadh": (3e-6, 1.5e-5, 3e-7, 3.75e-6),
-    "xx5msvho23iq": (0.6e-6, 2.4e-6, 0.0, 0.0),
-    "p532c9fzmeed": (0.6e-6, 2.5e-6, 0.0, 0.0),
+    "urg0zifsjiga": (3e-6, 1.5e-5, 3e-7, 3.75e-6),
+    "u4czm4f2p3ws": (0.6e-6, 2.4e-6, 0.0, 0.0),
+    "q6g7fi6wumk3": (0.6e-6, 2.5e-6, 0.0, 0.0),
     "gpt-5.4": (1.25e-6, 1e-5, 1.25e-7, 0.0),
     "gpt-5.5": (5e-6, 3e-5, 5e-7, 0.0),
 }
@@ -472,7 +471,7 @@ def _call_judge_openai(model: str, system: str, user: str) -> tuple[str, dict]:
 _ARN_REGION_RE = re.compile(r"^arn:aws:bedrock:([a-z0-9-]+):")
 
 # Bedrock prompt-caching support is per-model. Anthropic Claude on Bedrock
-# accepts `cachePoint` blocks; Kimi (`p532c9fzmeed`) and GLM (`xx5msvho23iq`)
+# accepts `cachePoint` blocks; Kimi (`q6g7fi6wumk3`) and GLM (`u4czm4f2p3ws`)
 # do NOT and return HTTP 403 "You invoked an unsupported model or your request
 # did not allow prompt caching." Observed in alden-croft 2026-06-02T20:20:04Z
 # gateway.log: 2-of-3 council members 403'd, quorum fell back to single-judge.
@@ -480,9 +479,8 @@ _ARN_REGION_RE = re.compile(r"^arn:aws:bedrock:([a-z0-9-]+):")
 # Anthropic Claude family models. Add a new ID here only after empirically
 # confirming the underlying model is Anthropic.
 _CACHE_SUPPORTED_PROFILE_IDS = (
-    "is9bst5tfadh",  # Sonnet 4.6 (council default, single-judge primary)
-    "xv71vnlzm71s",  # Sonnet 4.6 (alternate; IAM-denied per b34 but caches when permitted)
-    "96j5zamnqlci",  # Opus (.env KENSEI_BEDROCK_MODEL_ARN)
+    "urg0zifsjiga",  # Sonnet 4.6 (council default, single-judge primary)
+    "j6mdizxjngus",  # Opus 4.7 (.env KENSEI_BEDROCK_MODEL_ARN)
 )
 
 

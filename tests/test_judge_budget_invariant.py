@@ -31,9 +31,9 @@ SCAFFOLD_CHARS = 5000
 
 
 _MEMBER_LIMITS = {
-    "is9bst5tfadh": {"ctx_window": 1_000_000, "chars_per_token_floor": 1.375},
-    "p532c9fzmeed": {"ctx_window":   262_144, "chars_per_token_floor": 1.15},
-    "xx5msvho23iq": {"ctx_window":   202_752, "chars_per_token_floor": 1.15},
+    "urg0zifsjiga": {"ctx_window": 1_000_000, "chars_per_token_floor": 1.375},
+    "q6g7fi6wumk3": {"ctx_window":   262_144, "chars_per_token_floor": 1.15},
+    "u4czm4f2p3ws": {"ctx_window":   202_752, "chars_per_token_floor": 1.15},
 }
 
 

@@ -1,0 +1,6 @@
+date,source,description,amount,reason
+2026-08-22,IMG_4476,Trader Joe's grocery receipt,67.30,Wrong month — receipt is dated 08/22/2026 (August). Excluded from September totals.
+2026-09-14,IMG_4490,DoorDash – Cubby's reprint,88.30,Duplicate of IMG_4489 / 09/14 checking debit. Same order # DD-84729361. Counted only once.
+2026-09-13,Amazon orders CSV,Kindle Unlimited subscription,11.99,No matching debit/credit transaction in checking through 9/15 or in Sept Chase Freedom statement. Likely posts on a card we don't have a Sept statement for; left out to avoid ghost-counting.
+2026-09-21,Amazon orders CSV,Hiking Socks Merino 3-Pack,19.99,No matching debit/credit transaction found. Same reason as above.
+2026-09-25,Amazon orders CSV,Anker USB-C Cable 3-Pack,14.99,No matching debit/credit transaction found. Same reason as above.

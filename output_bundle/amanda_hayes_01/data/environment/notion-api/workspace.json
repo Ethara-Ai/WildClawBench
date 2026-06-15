@@ -1,0 +1,14 @@
+{
+  "id": "workspace-amanda-personal",
+  "name": "Amanda's Space",
+  "domain": "amanda-personal",
+  "owner_user_id": "user-amanda",
+  "plan": "plus",
+  "created_time": "2025-11-15T09:00:00.000Z",
+  "icon": "https://www.notion.so/icons/home_blue.svg",
+  "settings": {
+    "default_page_size": 50,
+    "ai_blocks_enabled": false,
+    "public_sharing_enabled": false
+  }
+}

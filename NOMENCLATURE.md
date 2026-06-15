@@ -118,7 +118,7 @@ This collapses to the user m1420 formula because `satisfied=True` on a negative-
   "satisfied_by_judge": [true, true, false],    // per-member raw verdicts (False for abstainers)
   "rationales_by_judge": ["...", "...", "(abstained — output truncated before this criterion)"],
   "truncation_affected_by_judge": [false, false, false],
-  "judges": ["is9bst5tfadh", "p532c9fzmeed", "xx5msvho23iq"],
+  "judges": ["urg0zifsjiga", "q6g7fi6wumk3", "u4czm4f2p"],
   "is_positive": true
 }
 ```

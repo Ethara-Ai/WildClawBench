@@ -1,0 +1,14 @@
+event_id,email,display_name,response_status,optional,organizer
+ev_sampling_1_6,ian.salazar@voissync.ai,Ian Salazar,accepted,false,true
+ev_amara_lunch,ian.salazar@voissync.ai,Ian Salazar,accepted,false,true
+ev_olivera_kickoff,ian.salazar@voissync.ai,Ian Salazar,accepted,false,true
+ev_olivera_kickoff,samuel.olivera@donaanacounty.gov,Samuel Olivera,accepted,false,false
+ev_carmen_call,ian.salazar@voissync.ai,Ian Salazar,accepted,false,true
+ev_cc_meeting,ian.salazar@voissync.ai,Ian Salazar,accepted,false,true
+ev_cc_meeting,e.martinez@lascrucescc.edu,Dean Martinez,accepted,false,false
+ev_carmen_call_d2,ian.salazar@voissync.ai,Ian Salazar,accepted,false,true
+ev_olivera_review,ian.salazar@voissync.ai,Ian Salazar,accepted,false,true
+ev_olivera_review,samuel.olivera@donaanacounty.gov,Samuel Olivera,accepted,false,false
+ev_carmen_call_d3,ian.salazar@voissync.ai,Ian Salazar,accepted,false,true
+ev_abuela_doctor,ian.salazar@voissync.ai,Ian Salazar,accepted,false,true
+ev_marco_asado,ian.salazar@voissync.ai,Ian Salazar,accepted,false,true

@@ -183,6 +183,7 @@ _ZERO_TOP_USAGE: dict[str, Any] = {
     "input_tokens": 0,
     "output_tokens": 0,
     "cached_input_tokens": 0,
+    "cached_write_tokens": 0,
     "cost_usd": 0.0,
 }
 
@@ -200,10 +201,13 @@ def _coerce_top_usage(src: Optional[Mapping]) -> dict[str, Any]:
         cost = float(cost_raw or 0)
     except (TypeError, ValueError):
         cost = 0.0
+    # cache-write may arrive under either spelling depending on the source.
+    cached_write = _int("cached_write_tokens") or _int("cache_write_tokens")
     return {
         "input_tokens": _int("input_tokens"),
         "output_tokens": _int("output_tokens"),
         "cached_input_tokens": _int("cached_input_tokens"),
+        "cached_write_tokens": cached_write,
         "cost_usd": round(cost, 6),
     }
 
@@ -314,6 +318,57 @@ def build_trajectory_from_jsonl(
         "messages": messages,
         "usage": _coerce_top_usage(usage_top_level),
     }
+
+
+def _task_attr(task: Any, key: str) -> str:
+    """Read a field from a Task dataclass OR a plain dict, returning "" if absent."""
+    if task is None:
+        return ""
+    if isinstance(task, Mapping):
+        val = task.get(key, "")
+    else:
+        val = getattr(task, key, "")
+    return val if isinstance(val, str) else ("" if val is None else str(val))
+
+
+def build_published_trajectory(
+    traj: Mapping[str, Any],
+    task: Any,
+    completion_status: str = "",
+) -> dict:
+    """Project the rich internal trajectory dict into the published
+    ``{"messages": [...], "meta_info": {...}}`` schema.
+
+    The internal dict (from :func:`build_trajectory_from_jsonl`) carries
+    session_id / trajectory / input_files / usage etc. for the harbor + grading
+    pipeline; this slim form is what is written to ``output.json`` on disk and
+    into the harbor bundle. ``meta_info`` holds exactly six keys:
+    conv_id, platform, system_prompt, task_completion_status, task_description,
+    task_type. Per-message ``turn_index`` (internal bookkeeping) is stripped so
+    the message shape matches the reference trajectory exactly.
+    """
+    messages: List[Any] = []
+    for m in traj.get("messages") or []:
+        if isinstance(m, dict):
+            messages.append({k: v for k, v in m.items() if k != "turn_index"})
+        else:
+            messages.append(m)
+
+    inner_meta = (traj.get("trajectory") or {}).get("meta_info") or {}
+    platform = inner_meta.get("platform") or "linux"
+    # task_type prefers the explicit field, else falls back to the L2 taxonomy
+    # slug the internal meta already computed (snake_case, e.g. research_and_analysis).
+    task_type = _task_attr(task, "task_type") or inner_meta.get("taxonomy_l2") or ""
+
+    meta_info = {
+        "conv_id": traj.get("session_id") or "",
+        "platform": platform,
+        "system_prompt": _task_attr(task, "system_prompt"),
+        "task_completion_status": completion_status or "",
+        "task_description": _task_attr(task, "task_description"),
+        "task_type": task_type,
+    }
+    return {"messages": messages, "meta_info": meta_info}
 
 
 def _count_thinking_blocks(messages) -> tuple[int, list[dict]]:

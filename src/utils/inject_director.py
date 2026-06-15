@@ -320,6 +320,75 @@ class InjectApplier:
     def close(self) -> None:
         self._session.close()
 
+    # -- full-state snapshot ------------------------------------------------
+
+    def snapshot_state(self, dest_dir: Path | str, label: str = "") -> Dict[str, Any]:
+        """Dump the FULL live state of every mock API into ``dest_dir``.
+
+        Walks each API's ``/admin/*`` plane and writes, per service, every
+        registered table's rows and every document. Used to capture a
+        before-injection and an after-injection picture of the data the agent
+        sees, so a reviewer can diff exactly what the silent mutations changed.
+
+        Layout written::
+
+            <dest_dir>/
+                _manifest.json                 # which apis/tables/docs, row counts
+                <api>/tables/<table>.json      # {"table","primary_key"?,"rows":[...]}
+                <api>/documents/<doc>.json     # the raw document value
+
+        Returns the manifest dict (also persisted as ``_manifest.json``).
+        """
+        dest = Path(dest_dir)
+        dest.mkdir(parents=True, exist_ok=True)
+        manifest: Dict[str, Any] = {
+            "label": label,
+            "ts": time.time(),
+            "ts_iso": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "apis": {},
+        }
+        for api in sorted(self._urls):
+            tbl_resp = self._admin_get(api, "/admin/tables")
+            if isinstance(tbl_resp, dict):
+                tlist = tbl_resp.get("tables", []) or []
+                dlist = tbl_resp.get("documents", []) or []
+            else:
+                tlist = tbl_resp or []
+                dlist = []
+            table_names = [t.get("name") if isinstance(t, dict) else t for t in tlist]
+            doc_names = [d.get("name") if isinstance(d, dict) else d for d in dlist]
+
+            api_entry: Dict[str, Any] = {"tables": {}, "documents": {}}
+            api_dir = dest / api
+            for table in table_names:
+                if not table:
+                    continue
+                rows = self._admin_get_rows(api, table)
+                tdir = api_dir / "tables"
+                tdir.mkdir(parents=True, exist_ok=True)
+                with open(tdir / f"{table}.json", "w", encoding="utf-8") as f:
+                    json.dump({"table": table, "rows": rows}, f, indent=2, default=str)
+                api_entry["tables"][table] = len(rows)
+            for doc in doc_names:
+                if not doc:
+                    continue
+                value = self._admin_get(api, f"/admin/doc/{doc}")
+                ddir = api_dir / "documents"
+                ddir.mkdir(parents=True, exist_ok=True)
+                with open(ddir / f"{doc}.json", "w", encoding="utf-8") as f:
+                    json.dump(value, f, indent=2, default=str)
+                api_entry["documents"][doc] = True
+            manifest["apis"][api] = api_entry
+
+        with open(dest / "_manifest.json", "w", encoding="utf-8") as f:
+            json.dump(manifest, f, indent=2, default=str)
+        self._append({"type": "inject.snapshot", "label": label,
+                      "dest": str(dest), "apis": list(manifest["apis"].keys()),
+                      "ts": time.time()})
+        LOG.info("inject snapshot '%s' written to %s (%d api(s))",
+                 label, dest, len(manifest["apis"]))
+        return manifest
+
     # -- filesystem ---------------------------------------------------------
 
     def _apply_filesystem(self, op: Dict[str, Any], stage: InjectStage) -> Dict[str, Any]:
@@ -381,6 +450,32 @@ class InjectApplier:
         except (requests.RequestException, ValueError):
             return None
         return None
+
+    def audit_summary(self) -> Dict[str, Any]:
+        """Return the agent-visible API call audit, keyed by service name:
+        ``{"<api>": {"total_requests": int, "endpoints": {"<METHOD path>":
+        {"count": int, "statuses": {...}}}}}``.
+
+        Read from each live service's ``/audit/summary`` (the same feed the
+        agent's own calls land in; silent ``/admin`` injects are excluded by
+        the tracking middleware). This is the ``state["audit"]`` the
+        deterministic CHECKERS query via ``_api_called`` / ``_api_NOT_called``.
+        """
+        audit: Dict[str, Any] = {}
+        for api in sorted(self._urls):
+            base = self._urls.get(api)
+            if not base:
+                continue
+            try:
+                r = self._session.get(base.rstrip("/") + "/audit/summary",
+                                      headers=self._headers(), timeout=5.0)
+                if r.status_code == 200:
+                    data = r.json()
+                    if isinstance(data, dict):
+                        audit[api] = data
+            except (requests.RequestException, ValueError):
+                continue
+        return audit
 
     def _admin_patch(self, api: str, table: str, pk: str, fields: Dict[str, Any]) -> Dict[str, Any]:
         base = self._urls.get(api)

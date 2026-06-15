@@ -32,6 +32,7 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Set
 from src.utils.config import Config
 from src.utils.skills_inference import compute_distractor_skills, infer_required_apis
 from src.utils.store import Store, Task
+from src.utils.trajectory.builder import build_published_trajectory
 from .compose import discover_services, generate_harbor_compose
 from .ctrf import build_ctrf, compute_test_reward
 from .dockerfile import generate_harbor_dockerfile
@@ -198,7 +199,26 @@ def write_bundle(
     (data_dir / "tests").mkdir(parents=True, exist_ok=True)
     (data_dir / "solution").mkdir(parents=True, exist_ok=True)
 
-    (data_dir / "instruction.md").write_text(prompt_text, encoding="utf-8")
+    # instruction.md documents the FULL multi-turn wake-up script (every turn),
+    # not just turn 0. The live harness feeds prompts.txt turns sequentially —
+    # instruction.md is a published-bundle artifact for review, so showing all
+    # turns gives the complete conversation the agent will receive.
+    _turns = task.extra.get("turn_messages") if isinstance(task.extra, dict) else None
+    if isinstance(_turns, list) and len(_turns) > 1:
+        _blocks = []
+        for _i, _t in enumerate(_turns):
+            # Turn 0 is shown with the workspace hint (prompt_text); later turns
+            # are the verbatim wake-up messages.
+            _body = prompt_text if _i == 0 else str(_t)
+            _blocks.append(f"## Turn {_i}\n\n{_body.strip()}\n")
+        instruction_text = (
+            f"# Task instruction ({len(_turns)} turns)\n\n"
+            "The agent receives these turns sequentially, one user message per turn.\n\n"
+            + "\n".join(_blocks)
+        )
+    else:
+        instruction_text = prompt_text
+    (data_dir / "instruction.md").write_text(instruction_text, encoding="utf-8")
 
     # `used_apis` (line 158) is the canonical required-API set computed via
     # `_discover_used_apis(task, task_dir, env_dir)` which fuses prompt-keyword
@@ -308,6 +328,20 @@ def write_bundle(
     test_weights_text = task.test_weights or "{}"
     (data_dir / "tests" / "test_weights.json").write_text(test_weights_text, encoding="utf-8")
 
+    # Deploy the CHECKERS module + conftest for fixture-based suites
+    # (def test_x(state, task_checkers)). Without task/task.py the
+    # `task_checkers` fixture's `import task` raises at collection time and the
+    # real-pytest path collects 0 tests (IAN report H5); without conftest.py the
+    # `state` fixture is undefined. Both ship via the parsed task's extra.
+    _extra = task.extra if isinstance(task.extra, dict) else {}
+    _checkers_code = _extra.get("checkers_code") or ""
+    _conftest_code = _extra.get("conftest_code") or ""
+    if _checkers_code.strip():
+        (data_dir / "tests" / "task").mkdir(parents=True, exist_ok=True)
+        (data_dir / "tests" / "task" / "task.py").write_text(_checkers_code, encoding="utf-8")
+    if _conftest_code.strip():
+        (data_dir / "tests" / "conftest.py").write_text(_conftest_code, encoding="utf-8")
+
     solve_sh = generate_harbor_solve_sh(env_vars)
     (data_dir / "solution" / "solve.sh").write_text(solve_sh, encoding="utf-8")
 
@@ -374,12 +408,17 @@ def write_bundle(
             run_dir = model_dir / f"run_{run_index}"
             run_dir.mkdir(parents=True, exist_ok=True)
 
-            clean_entry = (
-                {k: v for k, v in entry.items() if k not in ("__test_result__", "__run_index__")}
-                if isinstance(entry, dict) else entry
-            )
+            # The bundle's output.json uses the published {messages, meta_info}
+            # schema (same as the on-disk run-dir copy). The rich `entry` is
+            # still consumed below for test_result / usage / pass_summary.
+            if isinstance(entry, dict):
+                published = build_published_trajectory(
+                    entry, task, entry.get("__completion_status__", "") or "",
+                )
+            else:
+                published = entry
             (run_dir / "output.json").write_text(
-                json.dumps(clean_entry, indent=2, ensure_ascii=False), encoding="utf-8"
+                json.dumps(published, indent=2, ensure_ascii=False), encoding="utf-8"
             )
 
             tr = entry.get("__test_result__") if isinstance(entry, dict) else None
