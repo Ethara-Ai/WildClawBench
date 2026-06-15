@@ -35,7 +35,7 @@
 # the same compression semantics on both sides.
 #
 # BUILD:
-#   docker build -f docker/litellm-headroom.Dockerfile -t wildclawbench-litellm-headroom:v1 .
+#   docker build -f docker/litellm-headroom.Dockerfile -t wildclawbench-litellm-headroom:v2 .
 # The build context is the repo root; nothing from the repo is COPYed in (the
 # callback file is bind-mounted at runtime by `start_litellm` like
 # `litellm_usage_callback.py` is today — see
@@ -57,8 +57,36 @@ FROM ghcr.io/berriai/litellm@sha256:c98c9395c56a35b7abacff8269d43ff99aabacb62bbf
 # exits 127; `python -m pip` exits 1 "No module named pip"; bare `uv` exits 127).
 # Bootstrap pip into the venv via the stdlib `ensurepip` module — this is
 # Python-version-independent and doesn't require any external tooling on PATH.
+#
+# ────────────────────────────────────────────────────────────────────────────
+# CRITICAL: restore the base image's LiteLLM after installing headroom-ai.
+# ────────────────────────────────────────────────────────────────────────────
+# `headroom-ai==0.24.0` carries a HARD core pin `litellm==1.82.3` (verified:
+# `pip show headroom-ai` Requires-Dist). Installing it into the stock image
+# therefore SILENTLY DOWNGRADES LiteLLM (pinned base ships 1.88.1 -> headroom
+# pulls it back to 1.82.3). LiteLLM 1.82.3's Bedrock Converse reasoning
+# passthrough is REGRESSED: it round-trips the thinking *signature* but drops
+# the reasoning *text*, so openclaw persists a signed-but-EMPTY thinking block
+# on every turn (root cause of darren_weston run_1 2026-06-13: 12/12 thinking
+# blocks empty; the same task on the stock 1.88.1 sidecar — aaron_garcia
+# 2026-06-10 — produced 6/6 populated). The earlier `LITELLM_IMAGE` digest pin
+# did NOT fix this because the pin only protects the BASE layer; this pip
+# install clobbers LiteLLM on top of it.
+#
+# Fix: snapshot the base LiteLLM version BEFORE the headroom install, then
+# force-reinstall exactly that version with `--no-deps` afterward. Our callback
+# only uses `headroom.compress` / `CompressConfig` (NOT headroom's bundled
+# LiteLLM integration — see litellm_headroom_callback.py), and `from headroom
+# import compress, CompressConfig` is verified to still import cleanly under the
+# restored 1.88.1, so swapping LiteLLM back is safe. Snapshotting (rather than
+# hardcoding 1.88.1) keeps this correct automatically when the base digest is
+# bumped per the comment in src/utils/litellm_sidecar.py.
 RUN python -m ensurepip --upgrade \
-    && python -m pip install --no-cache-dir 'headroom-ai>=0.24,<0.25'
+    && LITELLM_BASE_VER="$(python -m pip show litellm | awk '/^Version:/{print $2}')" \
+    && echo "Base LiteLLM version: ${LITELLM_BASE_VER}" \
+    && python -m pip install --no-cache-dir 'headroom-ai>=0.24,<0.25' \
+    && python -m pip install --no-cache-dir --force-reinstall --no-deps "litellm==${LITELLM_BASE_VER}" \
+    && python -c "import importlib.metadata as m; v=m.version('litellm'); assert v=='${LITELLM_BASE_VER}', 'litellm not restored: '+v; from headroom import compress, CompressConfig; print('OK: litellm', v, '+ headroom import')"
 
 # No CMD/ENTRYPOINT override — inherits LiteLLM's stock entrypoint
 # (`litellm --config /app/config.yaml --port <port>`), which is what

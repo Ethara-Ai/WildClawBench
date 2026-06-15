@@ -42,7 +42,7 @@ from .test_sh import generate_harbor_test_sh
 
 _MODEL_DIRS = ("claude", "gpt")
 _API_REGEX = re.compile(r"\b([a-z][a-z0-9-]*-api)\b")
-_KEEP_TOP_LEVEL = {"API_DOCUMENTATION.md", "tracking_middleware.py", "sqlite_mcp_server.db", "skills"}
+_KEEP_TOP_LEVEL = {"API_DOCUMENTATION.md", "tracking_middleware.py", "sqlite_mcp_server.db", "skills", "persona", "artifacts"}
 
 
 def _discover_used_apis(task: Task, task_dir: Optional[Path], env_dir: Path) -> Set[str]:
@@ -314,7 +314,21 @@ def write_bundle(
                 except Exception:
                     pass
 
-    (env_out / "Dockerfile").write_text(generate_harbor_dockerfile(), encoding="utf-8")
+    # COPY skills / persona / artifacts/inputs/files are emitted only when those
+    # dirs actually landed in the build context above (a COPY of a missing path
+    # fails `docker build`). skills is staged conditionally above; persona /
+    # artifacts via _KEEP_TOP_LEVEL.
+    has_skills = (env_out / "skills").is_dir()
+    has_persona = (env_out / "persona").is_dir()
+    has_artifacts = (env_out / "artifacts" / "inputs" / "files").is_dir()
+    (env_out / "Dockerfile").write_text(
+        generate_harbor_dockerfile(
+            has_skills=has_skills,
+            has_persona=has_persona,
+            has_artifacts=has_artifacts,
+        ),
+        encoding="utf-8",
+    )
     (env_out / "docker-compose.yaml").write_text(
         generate_harbor_compose(
             config.environment_dir,
@@ -413,14 +427,36 @@ def write_bundle(
             test_output = (tr or {}).get("test_output", "")
             test_code = (tr or {}).get("test_code", task.test_code or "")
 
-            reward = compute_test_reward(
-                test_weights_json=test_weights_text,
-                test_scores_json=test_scores,
-                tests_total=tests_total,
-                tests_passed=tests_passed,
-                test_output=test_output,
-                test_code=test_code,
-            )
+            # Real per-test pytest results present? test_scores is populated only
+            # by the pytest runner (test_executor); a rubric-only run leaves it
+            # empty. Without this guard compute_test_reward matches the real
+            # weight keys against zero results and returns a spurious 0 even
+            # though the run scored well on the rubric (darren-weston 2026-06-15:
+            # 15/17 criteria passed = 0.8378 but reward.txt/ctrf showed 0).
+            try:
+                _parsed_scores = json.loads(test_scores) if test_scores else {}
+            except Exception:
+                _parsed_scores = {}
+            has_pytest_results = isinstance(_parsed_scores, dict) and len(_parsed_scores) > 0
+
+            if has_pytest_results:
+                reward = compute_test_reward(
+                    test_weights_json=test_weights_text,
+                    test_scores_json=test_scores,
+                    tests_total=tests_total,
+                    tests_passed=tests_passed,
+                    test_output=test_output,
+                    test_code=test_code,
+                )
+            else:
+                # Fall back to the run's canonical reward (rubric/combined) so
+                # reward.txt/ctrf reflect the real grade instead of a false 0.
+                _canonical = (tr or {}).get("canonical_reward")
+                reward = (
+                    float(_canonical)
+                    if isinstance(_canonical, (int, float)) and not isinstance(_canonical, bool)
+                    else 0.0
+                )
 
             if run_index <= 8:
                 verifier_dir = run_dir / "task_output" / "logs" / "verifier"
