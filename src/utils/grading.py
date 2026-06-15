@@ -1233,9 +1233,6 @@ def _grade_council(
         "criteria_passed": passed,
         "criteria_failed": failed,
         "criteria_abstained": n_abstained,
-        "tests_total": n,
-        "tests_passed": passed,
-        "tests_failed": failed,
         "criteria": crit_out,
         "judge_model": "council",
         "judge_council": {
