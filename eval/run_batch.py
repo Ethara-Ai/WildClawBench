@@ -614,7 +614,9 @@ def _condense_transcript_for_judge(traj: dict, limit: int | None = None) -> str:
 
 def _project_agent_usage_top_level(agent_usage: Mapping[str, Any] | None) -> dict[str, Any]:
     if not agent_usage:
-        return {"input_tokens": 0, "output_tokens": 0, "cached_input_tokens": 0, "cost_usd": 0.0}
+        # return {"input_tokens": 0, "output_tokens": 0, "cached_input_tokens": 0, "cost_usd": 0.0}
+        return {"input_tokens": 0, "output_tokens": 0, "cached_input_tokens": 0,
+                    "cache_read_tokens": 0, "cache_write_tokens": 0, "cost_usd": 0.0}
     def _int(k: str) -> int:
         v = agent_usage.get(k)
         try:
@@ -629,6 +631,8 @@ def _project_agent_usage_top_level(agent_usage: Mapping[str, Any] | None) -> dic
         "input_tokens": _int("input_tokens"),
         "output_tokens": _int("output_tokens"),
         "cached_input_tokens": _int("cache_read_tokens"),
+        "cache_read_tokens": _int("cache_read_tokens"),
+        "cache_write_tokens": _int("cache_write_tokens"),
         "cost_usd": round(cost, 6),
     }
 
