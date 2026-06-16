@@ -951,7 +951,8 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
         write_delivery_json(
             output_dir, traj,
             score=result.get("scores"),
-            task_type=task.get("task_id"),
+            task_type=task.get("task_type") or "",
+            task_description=task.get("task_description") or "",
             system_prompt=task.get("system_prompt") or "",
         )
     except Exception as exc:  # noqa: BLE001

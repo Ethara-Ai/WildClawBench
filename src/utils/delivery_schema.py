@@ -265,14 +265,40 @@ def _derive_completion_status(score: Mapping[str, Any] | None) -> str:
 def _load_sub_agent_trajectories(
     subagents_dir: Path | None,
     spawn_id_map: dict[str, dict],
+    spawn_rows: list[dict] | None = None,
 ) -> dict[str, dict]:
+    """Embed EVERY captured sub-agent, not just the ones whose parent ``exec``
+    call was detected as a spawn.
+
+    The agent often fans out via wrapper scripts (``run_all*.sh``) that call
+    ``spawn_subagent.py`` internally, so those spawns never surface as detectable
+    parent ``exec`` toolCalls (report §10) — yet they DO append a ``spawn_tree``
+    row and write a ``<spawn_id>.delivery.json``. We therefore embed by what was
+    actually recorded on disk: every spawn_tree spawn_id (in turn order) plus any
+    remaining ``*.delivery.json`` files, rather than only ``spawn_id_map``.
+    """
     if subagents_dir is None or not subagents_dir.is_dir():
         return {}
-    out: dict[str, dict] = {}
-    for sr in spawn_id_map.values():
-        spawn_id = sr.get("spawn_id")
-        if not spawn_id or spawn_id in out:
+
+    ordered_ids: list[str] = []
+    seen: set[str] = set()
+    # 1. spawn_tree order (preserves per-turn spawn sequence).
+    for r in spawn_rows or []:
+        if not isinstance(r, dict):
             continue
+        sid = r.get("spawn_id")
+        if sid and sid not in seen:
+            seen.add(sid)
+            ordered_ids.append(sid)
+    # 2. Any per-spawn delivery file on disk not already listed.
+    for f in sorted(subagents_dir.glob("*.delivery.json")):
+        sid = f.name[: -len(".delivery.json")]
+        if sid and sid not in seen:
+            seen.add(sid)
+            ordered_ids.append(sid)
+
+    out: dict[str, dict] = {}
+    for spawn_id in ordered_ids:
         f = subagents_dir / f"{spawn_id}.delivery.json"
         if not f.is_file():
             continue
@@ -293,6 +319,7 @@ def build_delivery_trajectory(
     subagents_dir: Path | None = None,
     score: Mapping[str, Any] | None = None,
     task_type: str | None = None,
+    task_description: str | None = None,
     system_prompt: str | None = None,
 ) -> dict:
     """Reshape an openclaw `output.json` dict into the delivery schema.
@@ -320,13 +347,17 @@ def build_delivery_trajectory(
 
     traj_meta = (traj.get("trajectory") or {}).get("meta_info") or {}
     meta_info = {
+        # task_type / task_description / system_prompt come from task.yaml (the
+        # authoritative authored values); fall back to taxonomy / first-user-turn
+        # only when the caller didn't supply them.
         "task_type": task_type or traj_meta.get("taxonomy_l2") or "",
-        "task_description": _derive_task_description(src_msgs),
+        "task_description": (task_description or "").strip()
+        or _derive_task_description(src_msgs),
         "task_completion_status": _derive_completion_status(score),
         "system_prompt": system_prompt or "",
         "platform": traj_meta.get("platform") or "linux",
     }
-    sub_trajs = _load_sub_agent_trajectories(subagents_dir, spawn_id_map)
+    sub_trajs = _load_sub_agent_trajectories(subagents_dir, spawn_id_map, spawn_rows)
     # Carry the agent-produced deliverables (and task input files) through to the
     # delivery schema. `output.json` already builds these via
     # multimodal_meta.build_output_artifacts / build_input_files_manifest, so we
@@ -348,6 +379,7 @@ def write_delivery_json(
     *,
     score: Mapping[str, Any] | None = None,
     task_type: str | None = None,
+    task_description: str | None = None,
     system_prompt: str | None = None,
 ) -> Path:
     """Write `delivery.json` next to `output.json` inside a run directory.
@@ -367,6 +399,7 @@ def write_delivery_json(
         subagents_dir=subagents_dir if subagents_dir.is_dir() else None,
         score=score,
         task_type=task_type,
+        task_description=task_description,
         system_prompt=system_prompt,
     )
     dest = run_dir / "delivery.json"

@@ -545,6 +545,7 @@ _YAML_METADATA_KEYS = frozenset({
     "l1", "taxonomy_l1",
     "l2", "taxonomy_l2",
     "task_type", "category",
+    "task_description", "system_prompt",
     "required_apis", "required_mock_apis",
     "distractor_apis", "distractor_mock_apis",
 })
@@ -570,10 +571,28 @@ def _overlay_yaml_metadata(base: dict, yaml_path: Path) -> dict:
     if l2:
         base["l2"] = str(l2)
 
-    task_type = raw.get("task_type") or raw.get("category")
+    task_type = raw.get("task_type")
     if task_type:
-        base["task_type"] = str(task_type)
-        base["category"] = str(task_type)
+        # task.yaml task_type may be a list of high-level types -> a clean
+        # comma-joined string (meta_info.task_type is a string field).
+        if isinstance(task_type, (list, tuple)):
+            base["task_type"] = ", ".join(str(x) for x in task_type)
+        else:
+            base["task_type"] = str(task_type)
+    category = raw.get("category")
+    if category:
+        base["category"] = str(category)
+    elif task_type and not base.get("category"):
+        base["category"] = base["task_type"]
+
+    # Authoritative authored values from task.yaml (previously dropped into
+    # _yaml_ignored_keys) -> used by the delivery meta_info + golden metadata.
+    system_prompt = raw.get("system_prompt")
+    if system_prompt:
+        base["system_prompt"] = str(system_prompt).rstrip()
+    task_description = raw.get("task_description")
+    if task_description:
+        base["task_description"] = str(task_description).strip()
 
     required = _normalize_declared_api_list(raw, "required_apis", "required_mock_apis")
     if required != _ABSENT_SENTINEL:

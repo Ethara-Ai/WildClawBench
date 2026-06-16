@@ -394,3 +394,65 @@ def test_sub_agent_trajectories_only_embeds_present_spawns(tmp_path: Path) -> No
     )
     assert set(delivery["sub_agent_trajectories"].keys()) == {"spw_have"}
     assert delivery["sub_agent_trajectories"]["spw_have"]["meta_info"]["task_type"] == "r1"
+
+
+def test_sub_agent_trajectories_embeds_all_present_even_undetected(tmp_path: Path) -> None:
+    # report §10: subagents fanned out via wrapper scripts -> NO detectable spawn
+    # exec call in the parent, but spawn_tree rows + spw delivery files exist.
+    # Delivery must embed ALL of them, not just the (zero) detected ones.
+    spawn_tree = tmp_path / "spawn_tree.jsonl"
+    spawn_tree.write_text(
+        "\n".join(
+            json.dumps({"spawn_id": s, "status": "ok", "output_preview": s})
+            for s in ("spw_a", "spw_b", "spw_c")
+        ) + "\n",
+        encoding="utf-8",
+    )
+    subagents_dir = tmp_path / "subagents"
+    subagents_dir.mkdir()
+    for s in ("spw_a", "spw_b", "spw_c"):
+        (subagents_dir / f"{s}.delivery.json").write_text(
+            json.dumps({"meta_info": {"task_name": s}, "messages": []}),
+            encoding="utf-8",
+        )
+    # a trajectory with NO spawn exec calls -> spawn_id_map would be empty
+    traj = _minimal_traj([_msg("a1", "assistant", [{"type": "text", "text": "hi"}])])
+
+    delivery = build_delivery_trajectory(
+        traj, spawn_tree_path=spawn_tree, subagents_dir=subagents_dir,
+    )
+    # all three embedded, ordered by spawn_tree appearance
+    assert list(delivery["sub_agent_trajectories"].keys()) == ["spw_a", "spw_b", "spw_c"]
+
+
+def test_sub_agent_trajectories_skips_missing_files(tmp_path: Path) -> None:
+    # a spawn_tree row whose delivery file is absent must be skipped (no crash).
+    spawn_tree = tmp_path / "spawn_tree.jsonl"
+    spawn_tree.write_text(
+        json.dumps({"spawn_id": "spw_have"}) + "\n"
+        + json.dumps({"spawn_id": "spw_gone"}) + "\n",
+        encoding="utf-8",
+    )
+    subagents_dir = tmp_path / "subagents"
+    subagents_dir.mkdir()
+    (subagents_dir / "spw_have.delivery.json").write_text(
+        json.dumps({"meta_info": {}, "messages": []}), encoding="utf-8")
+    delivery = build_delivery_trajectory(
+        _minimal_traj(), spawn_tree_path=spawn_tree, subagents_dir=subagents_dir)
+    assert set(delivery["sub_agent_trajectories"].keys()) == {"spw_have"}
+
+
+def test_meta_info_uses_passed_task_yaml_fields() -> None:
+    traj = _minimal_traj([_msg("u1", "user", [{"type": "text", "text": "hello"}])])
+    deliv = build_delivery_trajectory(
+        traj, task_type="A, B", task_description="Authored desc", system_prompt="SYS")
+    mi = deliv["meta_info"]
+    assert mi["task_type"] == "A, B"
+    assert mi["task_description"] == "Authored desc"
+    assert mi["system_prompt"] == "SYS"
+
+
+def test_meta_info_task_description_falls_back_to_derived() -> None:
+    traj = _minimal_traj([_msg("u1", "user", [{"type": "text", "text": "first user turn"}])])
+    deliv = build_delivery_trajectory(traj)  # no task_description passed
+    assert deliv["meta_info"]["task_description"] == "first user turn"

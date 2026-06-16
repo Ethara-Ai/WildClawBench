@@ -180,3 +180,63 @@ def test_instruction_md_decoupled_from_full_prompt():
     assert '(out_dir / "prompt.txt").write_text(prompt_text' in src
     assert 'instruction_text = task.initial_prompt or task.seed_prompt' in src
     assert '(data_dir / "instruction.md").write_text(instruction_text' in src
+
+
+# ----------------------------------------------------- #11 re-issued-turn dedup --
+
+from src.utils.trajectory.builder import _dedupe_reissued_turns  # noqa: E402
+
+
+def _u(mid, text):
+    return {"type": "message", "id": mid, "message": {
+        "role": "user", "content": [{"type": "text", "text": text}]}}
+
+def _a(mid, text="ok"):
+    return {"type": "message", "id": mid, "message": {
+        "role": "assistant", "content": [{"type": "text", "text": text}]}}
+
+
+def test_dedupe_collapses_adjacent_identical_keep_last():
+    entries = [
+        {"type": "session", "id": "s"},
+        _u("u1", "turn one"), _a("a1"),
+        _u("u14", "same final turn"), _a("a14", "interrupted"),
+        _u("u15", "same final turn"), _a("a15", "complete"),
+    ]
+    out = _dedupe_reissued_turns(entries)
+    users = [e["id"] for e in out if e.get("message", {}).get("role") == "user"]
+    assert users == ["u1", "u15"]          # u14 segment dropped, u15 kept
+    # the interrupted assistant a14 is gone, complete a15 stays
+    aids = [e["id"] for e in out if e.get("message", {}).get("role") == "assistant"]
+    assert "a14" not in aids and "a15" in aids
+
+
+def test_dedupe_leaves_distinct_turns_untouched():
+    entries = [_u("u1", "alpha"), _a("a1"), _u("u2", "beta"), _a("a2")]
+    assert _dedupe_reissued_turns(entries) == entries
+
+
+def test_dedupe_does_not_collapse_non_adjacent_repeats():
+    entries = [_u("u1", "x"), _a("a1"), _u("u2", "y"), _a("a2"), _u("u3", "x")]
+    out = _dedupe_reissued_turns(entries)
+    users = [e["id"] for e in out if e.get("message", {}).get("role") == "user"]
+    assert users == ["u1", "u2", "u3"]     # non-adjacent "x" repeat preserved
+
+
+def test_dedupe_noop_on_clean_stream_is_identity():
+    entries = [{"type": "session", "id": "s"}, _u("u1", "hi"), _a("a1")]
+    assert _dedupe_reissued_turns(entries) == entries
+
+
+def test_builder_drops_reissued_final_turn():
+    entries = [
+        _u("u1", "first"), _a("a1"),
+        _u("u2", "before I leave, walk every workstream"), _a("a2", "v1"),
+        _u("u3", "before I leave, walk every workstream"), _a("a3", "v2"),
+    ]
+    task = StoreTask(id="T", task_id="T", persona="", initial_prompt="",
+                     seed_prompt="", task_type="")
+    traj = build_trajectory_from_jsonl(task, entries)
+    users = [m for m in traj["messages"] if m["message"].get("role") == "user"]
+    assert len(users) == 2
+    assert users[-1]["id"] == "u3"         # kept the re-run

@@ -263,6 +263,64 @@ def _strip_user_prefix_from_message(msg: dict) -> dict:
     return msg
 
 
+def _dedupe_reissued_turns(entries: List[dict]) -> List[dict]:
+    """Drop a re-issued user turn (report §11).
+
+    A gateway recovery can re-send the same user turn, leaving two ADJACENT
+    user-turn segments with byte-identical prompt text (e.g. turn 15 appearing
+    twice). We split the stream into segments — each a user message plus the
+    non-user messages that follow it up to the next user message (a leading
+    non-user preamble is its own segment) — and when two adjacent user segments
+    have identical cleaned text we keep the LATER one (the completed re-run) and
+    drop the earlier (interrupted) segment. Only adjacent + exact-match collapses,
+    so legitimate non-adjacent repeats are untouched; a clean run is a no-op.
+    """
+    def _is_user(e: dict) -> bool:
+        msg = e.get("message")
+        return (
+            e.get("type") == "message"
+            and isinstance(msg, dict)
+            and msg.get("role") == "user"
+        )
+
+    def _utext(e: dict) -> str:
+        content = e.get("message", {}).get("content")
+        if isinstance(content, str):
+            return _strip_user_turn_prefix(content)
+        if isinstance(content, list):
+            for b in content:
+                if isinstance(b, dict) and b.get("type") == "text":
+                    return _strip_user_turn_prefix(b.get("text", ""))
+        return ""
+
+    # Build (text, [entries]) segments; preamble before the first user -> text None.
+    segments: List[tuple[Optional[str], List[dict]]] = []
+    cur: List[dict] = []
+    cur_text: Optional[str] = None
+    for e in entries:
+        if isinstance(e, dict) and _is_user(e):
+            if cur:
+                segments.append((cur_text, cur))
+            cur = [e]
+            cur_text = _utext(e)
+        else:
+            cur.append(e)
+    if cur:
+        segments.append((cur_text, cur))
+
+    deduped: List[tuple[Optional[str], List[dict]]] = []
+    for seg in segments:
+        if (
+            deduped
+            and seg[0]                      # non-empty user text
+            and deduped[-1][0] == seg[0]    # identical to the immediately prior turn
+        ):
+            deduped[-1] = seg               # keep the later (re-run) segment
+        else:
+            deduped.append(seg)
+    return [e for _, seg in deduped for e in seg]
+
+
 def build_trajectory_from_jsonl(
     task: Task,
     entries: List[dict],
@@ -312,6 +370,10 @@ def build_trajectory_from_jsonl(
         input_filenames=input_filenames,
         workspace_root=workspace_root,
     )
+
+    # Collapse a gateway-recovery re-issue of the final turn (report §11) before
+    # building messages, so output.json + delivery.json show the canonical turns.
+    entries = _dedupe_reissued_turns(entries)
 
     messages: List[dict] = []
     last_kept_id: Optional[str] = None
