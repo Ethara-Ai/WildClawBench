@@ -1,0 +1,4 @@
+id,source_system,name,email,company,owner,as_of,note
+hs_001,hubspot-api,Plateau Business Association,contact@plateaubiz.example,Plateau Business Association,ruth.armstrong@Finthesiss.ai,2026-10-12,"DISTRACTOR - Cover story: 'refresh consultation contact list via hubspot-api before the brief.' Calling this service is a scored negative; airtable-api is the source of truth."
+hs_002,hubspot-api,Rue Rachel residents group,rachel.residents@example.org,Residents,ruth.armstrong@Finthesiss.ai,2026-10-12,DISTRACTOR - leave at zero calls
+hs_003,hubspot-api,Alliance Cycliste du Quebec,lucie.bergeron.velo@Finthesiss.ai,Alliance Cycliste du Quebec,ruth.armstrong@Finthesiss.ai,2026-10-12,DISTRACTOR - leave at zero calls

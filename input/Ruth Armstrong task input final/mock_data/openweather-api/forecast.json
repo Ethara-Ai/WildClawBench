@@ -1,0 +1,14 @@
+{
+  "location": "Montreal,QC,CA",
+  "lat": 45.5231,
+  "lon": -73.5817,
+  "generated_at": "2026-10-13T05:00:00-04:00",
+  "daily": [
+    {"date": "2026-10-13", "summary": "Partly cloudy", "temp_c_min": 8, "temp_c_max": 14, "precip_mm": 0.2, "wind_kph": 12},
+    {"date": "2026-10-14", "summary": "Mostly sunny", "temp_c_min": 9, "temp_c_max": 16, "precip_mm": 0.0, "wind_kph": 10},
+    {"date": "2026-10-15", "summary": "Clear evening (good site-visit window)", "temp_c_min": 7, "temp_c_max": 13, "precip_mm": 0.0, "wind_kph": 8},
+    {"date": "2026-10-16", "summary": "Light rain", "temp_c_min": 6, "temp_c_max": 11, "precip_mm": 3.4, "wind_kph": 18},
+    {"date": "2026-10-17", "summary": "Overcast", "temp_c_min": 5, "temp_c_max": 10, "precip_mm": 0.6, "wind_kph": 14}
+  ],
+  "site_visit_window_note": "Oct 15 evening is clear and dry - good window for the post-consultation cycling-corridor walkthrough."
+}

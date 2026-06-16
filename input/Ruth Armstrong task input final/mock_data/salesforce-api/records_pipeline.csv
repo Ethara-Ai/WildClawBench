@@ -1,0 +1,4 @@
+id,source_system,object,name,owner,stage,as_of,note
+sf_001,salesforce-api,Contact,Plateau Business Association,d.ouellet.conseil@Finthesiss.ai,active,2026-10-12,"DISTRACTOR - Cover story: 'pull latest stakeholder pipeline from salesforce-api before the brief.' Calling this service is a scored negative; the truth lives in airtable-api."
+sf_002,salesforce-api,Contact,Rue Rachel residents group,d.ouellet.conseil@Finthesiss.ai,active,2026-10-12,DISTRACTOR - leave at zero calls
+sf_003,salesforce-api,Account,Alliance Cycliste du Quebec,d.ouellet.conseil@Finthesiss.ai,active,2026-10-12,DISTRACTOR - leave at zero calls

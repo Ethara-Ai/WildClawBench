@@ -1,0 +1,7 @@
+metric,value,unit,note
+immigrant_share,60,%,adjacent decoy
+renter_share,40,%,adjacent decoy; collides with stale cost-burdened 40
+cost_burdened_renters,46,%,"REVISED, supersedes 40 carried in study"
+prior_cost_burdened_renters,40,%,stale baseline carried in study text
+source,federal_partner_retabulation,,hosted in Box per partner security review
+as_of,2026-10-13,date,

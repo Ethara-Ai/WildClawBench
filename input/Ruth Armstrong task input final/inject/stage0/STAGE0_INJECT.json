@@ -1,0 +1,5 @@
+{
+  "stage": "stage0",
+  "description": "Pre-task seed. Records are seeded directly in mock_data/ (per-task), so no API mutations need to be replayed before Turn 1.",
+  "mutations": []
+}
