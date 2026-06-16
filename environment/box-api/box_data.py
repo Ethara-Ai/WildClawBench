@@ -9,8 +9,8 @@ import csv
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
-# File-content download fixtures live in `file_blobs/` next to the CSV
-# seeds; basenames must match the `name` column of `files.csv`. Bind-mount
+# File-content download fixtures live in `file_blobs/` next to the JSON
+# seeds; basenames must match the `name` column of `files.json`. Bind-mount
 # overlay path in mock_stack: /opt/mocks/box-api/file_blobs/<basename>.
 # Per-task overrides via eval/run_batch.py:393-405 staging the same
 # subpath under input/<task>/mock_data/box-api/file_blobs/<basename>.

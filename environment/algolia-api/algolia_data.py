@@ -102,8 +102,8 @@ for _meta in _indices_meta:
     _store.register(
         _records_table_name(_meta["name"]),
         primary_key="objectID",
-        initial_loader=(lambda csv_name=_meta["records_csv"], tname=_records_table_name(_meta["name"]):
-                        [_coerce_record(r) for r in _load(csv_name, tname)]),
+        initial_loader=(lambda json_name=_meta["records_json"], tname=_records_table_name(_meta["name"]):
+                        [_coerce_record(r) for r in _load(json_name, tname)]),
     )
 
 

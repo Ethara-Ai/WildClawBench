@@ -1,8 +1,8 @@
 """Data access module for the Airtable API mock service.
 
 Records are modeled generically as {id, createdTime, fields:{...}} where each
-non-id / non-createdTime CSV column becomes a field. Field value casting is
-driven by the field type declared in fields.csv (number -> float, checkbox ->
+non-id / non-createdTime column becomes a field. Field value casting is
+driven by the field type declared in fields.json (number -> float, checkbox ->
 bool); everything else stays a string.
 """
 
@@ -104,8 +104,8 @@ for _t in _tables:
     _store.register(
         _records_table_name(_t["id"]),
         primary_key="id",
-        initial_loader=(lambda tid=_t["id"], csv_name=_t["records_csv"], tname=_records_table_name(_t["id"]):
-                        _coerce_records(tid, _load(csv_name, tname))),
+        initial_loader=(lambda tid=_t["id"], json_name=_t["records_json"], tname=_records_table_name(_t["id"]):
+                        _coerce_records(tid, _load(json_name, tname))),
     )
 
 
