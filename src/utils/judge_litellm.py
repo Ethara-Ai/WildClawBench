@@ -30,9 +30,9 @@ Token tracking invariants (DO NOT BREAK)
 ----------------------------------------
 The per-judge `usage` dict shape returned by `call_judge_via_litellm()` MUST
 match the existing shape produced by `_call_judge_bedrock` / `_call_judge_openai`
-exactly (7 keys: input_tokens, output_tokens, cache_read_tokens,
-cache_write_tokens, total_tokens, request_count, cost_usd). The `headroom`
-sub-dict is purely additive and harmless to readers that don't expect it.
+exactly (8 keys: input_tokens, output_tokens, cache_read_tokens,
+cache_write_tokens, total_tokens, request_count, cost_usd, cost_priced_ok). The
+`headroom` sub-dict is purely additive and harmless to readers that don't expect it.
 
 The JSONL log at `litellm_usage_callback.py` (10-key schema) is for AGENT
 calls through the per-batch sidecar — NOT touched by this module.
@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -107,27 +108,49 @@ def _headroom_min_tokens() -> int:
 # and per-model `max_input_tokens` / cost enforcement is wrong without
 # explicit registration.
 #
-# Source of truth for cost rates is `grading._JUDGE_RATES`. ctx windows match
-# `tests/test_judge_budget_invariant.py:_MEMBER_LIMITS`. Keep these in sync.
+# ROTATION-SAFE: the company rotates council ARNs monthly, so the opaque tail
+# is NOT a stable key. The registry is built per batch from the CURRENT council
+# members — each member's stable FAMILY supplies the rates (grading._FAMILY_RATES,
+# the single source of truth) and ctx/max_output (grading._FAMILY_EVIDENCE); the
+# member's current (rotated) ARN tail is what we register. This eliminates the
+# stale duplicate rate table that previously drifted from grading.py.
 
-# (arn_tail, input_cost, output_cost, cache_read_cost, cache_write_cost, ctx_window, max_output)
-_JUDGE_REGISTRY = (
-    ("is9bst5tfadh", 3e-6,    1.5e-5, 3e-7,     3.75e-6, 1_000_000, 8192),   # Sonnet 4.6
-    ("xx5msvho23iq", 0.6e-6,  2.4e-6, 0.0,      0.0,       202_752, 16384),  # GLM 5
-    ("p532c9fzmeed", 0.6e-6,  2.5e-6, 0.0,      0.0,       262_144, 16384),  # Kimi K2.5
-)
-
-_registered_once = False
+_registered_tails: set[str] = set()
 
 
-def register_judges_once() -> None:
-    """Idempotent: register each judge ARN's tail with LiteLLM exactly once
-    per Python process. Failure to register is logged and never re-raised —
-    LiteLLM will fall back to defaults, calls still succeed, but per-model
-    max_input_tokens enforcement will be loose. Always safe to call."""
-    global _registered_once
-    if _registered_once:
-        return
+def _arn_tail(model: str) -> str:
+    return (model or "").rsplit("/", 1)[-1]
+
+
+_ARN_REGION_RE = re.compile(r"^arn:aws:bedrock:([a-z0-9-]+):")
+
+
+def _litellm_model_and_region(model: str) -> tuple[str, str | None]:
+    # A bare Bedrock application-inference-profile ARN has provider=None as far
+    # as litellm is concerned, so litellm.completion(model=<arn>) raises
+    # NotFoundError "Unknown provider=None ... Try calling via converse". Prefix
+    # it as bedrock/converse/<arn> so litellm routes to the Converse handler, and
+    # return the ARN's own region (GLM council member is us-east-1 while the
+    # batch default is ap-south-1) so the call hits the right regional endpoint.
+    # Non-Bedrock judges (openai/<model>, gpt-5.x) pass through unchanged.
+    m = (model or "").strip()
+    if m.startswith("bedrock/"):
+        m = m[len("bedrock/"):]
+    if m.startswith("arn:aws:bedrock:") or ":application-inference-profile/" in m:
+        match = _ARN_REGION_RE.match(m)
+        region = match.group(1) if match else None
+        return f"bedrock/converse/{m}", region
+    return model, None
+
+
+def register_judges_for_batch(members) -> None:
+    """Register each CURRENT council member's ARN tail with LiteLLM, keyed by
+    the member's stable family rates. Idempotent per tail (a rotated tail
+    re-registers fresh; an unchanged tail is skipped), so repeated calls within
+    a batch are cheap and rotations never accumulate dead pricing entries beyond
+    what LiteLLM's additive register_model leaves behind. Failure to register is
+    logged and never re-raised — LiteLLM falls back to defaults, calls still
+    succeed, per-model enforcement is merely loose. Always safe to call."""
     try:
         import litellm  # type: ignore
     except ImportError:
@@ -135,10 +158,25 @@ def register_judges_once() -> None:
             "litellm not importable; judge council cannot use LiteLLM transport "
             "(falling back to urllib path inside grading.py)"
         )
-        _registered_once = True  # don't spam on every call
         return
 
-    for tail, r_in, r_out, r_cr, r_cw, ctx, max_out in _JUDGE_REGISTRY:
+    from . import grading
+
+    for member in members:
+        tail = _arn_tail(member.model)
+        if not tail or tail in _registered_tails:
+            continue
+        rates = grading._FAMILY_RATES.get(member.family)
+        evidence = grading._FAMILY_EVIDENCE.get(member.family)
+        if rates is None or evidence is None:
+            logger.warning(
+                "no _FAMILY_RATES/_FAMILY_EVIDENCE for family=%r (member %s); "
+                "skipping registration, call will use LiteLLM defaults",
+                member.family, tail,
+            )
+            continue
+        r_in, r_out, r_cr, r_cw = rates
+        ctx, max_out = evidence
         try:
             litellm.register_model({
                 tail: {
@@ -153,12 +191,12 @@ def register_judges_once() -> None:
                     "mode": "chat",
                 }
             })
+            _registered_tails.add(tail)
         except Exception as exc:  # pragma: no cover (LiteLLM schema drift)
             logger.warning(
                 "litellm.register_model failed for %s: %s — call will use LiteLLM defaults",
                 tail, exc,
             )
-    _registered_once = True
 
 
 # ---------- Headroom compression wrapper ----------
@@ -252,6 +290,7 @@ def call_judge_via_litellm(
     user: str,
     max_output_tokens: int,
     cost_fn: Any,
+    family: str | None = None,
 ) -> tuple[str, dict]:
     """LiteLLM-backed judge call with optional Headroom compression.
 
@@ -261,16 +300,41 @@ def call_judge_via_litellm(
 
     `cost_fn` is `grading._judge_cost_usd` injected to avoid a circular
     import. `max_output_tokens` is `grading._member_max_output_tokens(arn)`.
+    `family` is the stable council family ('sonnet'/'glm'/'kimi') threaded so
+    cost resolution survives monthly ARN rotation; None for non-council judges.
 
     Raises on any LiteLLM error so `grading._call_one_judge` can fall back
     to the urllib transport. This is intentional: grading must NEVER fail
     because LiteLLM had a bad day."""
     import litellm  # type: ignore  (deliberate: ImportError surfaces as a fall-back trigger)
 
-    register_judges_once()
+    if family is not None:
+        from typing import cast as _cast
+
+        from .grading import CouncilMember, JudgeFamily
+        register_judges_for_batch(
+            [CouncilMember(family=_cast(JudgeFamily, family), model=model)]
+        )
+
+    call_model, region = _litellm_model_and_region(model)
+
+    # System-prompt caching: the council system prompt is large and IDENTICAL
+    # across all members, so marking it with cache_control lets the first member
+    # write it to Bedrock's prompt cache (~5 min TTL) and the rest read it back
+    # at the cache-read rate instead of re-paying full input. This is the litellm
+    # equivalent of the urllib path's `cachePoint` block. Gated on family caching
+    # support (Kimi/GLM 403 on cachePoint) so only Anthropic Sonnet caches; the
+    # content-list shape is required for cache_control to attach per-block.
+    from . import grading
+    if family is not None and grading._supports_prompt_caching(model, family):
+        system_content: Any = [
+            {"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}
+        ]
+    else:
+        system_content = system
 
     messages = [
-        {"role": "system", "content": system},
+        {"role": "system", "content": system_content},
         {"role": "user", "content": user},
     ]
 
@@ -285,14 +349,23 @@ def call_judge_via_litellm(
     # ARNs for Sonnet/Kimi/GLM reject `temperature` → UnsupportedParamsError).
     # The urllib fallback path retries-without-temperature on the same
     # error; this is the LiteLLM-side equivalent.
-    response = litellm.completion(
-        model=model,
-        messages=messages,
-        max_tokens=max_output_tokens,
-        temperature=0,
-        stream=False,
-        drop_params=True,
+    _bearer = os.environ.get("KENSEI_AWS_BEARER_TOKEN") or os.environ.get(
+        "AWS_BEARER_TOKEN_BEDROCK"
     )
+    if _bearer:
+        os.environ["AWS_BEARER_TOKEN_BEDROCK"] = _bearer
+    
+    completion_kwargs: dict[str, Any] = {
+        "model": call_model,
+        "messages": messages,
+        "max_tokens": max_output_tokens,
+        "temperature": 0,
+        "stream": False,
+        "drop_params": True,
+    }
+    if region:
+        completion_kwargs["aws_region_name"] = region
+    response = litellm.completion(**completion_kwargs)
 
     # Extract text. LiteLLM normalizes to OpenAI shape across providers.
     try:
@@ -331,6 +404,8 @@ def call_judge_via_litellm(
     # the "input_tokens = non-cached" invariant shared with the urllib path.
     input_excl = max(0, prompt_tok - cache_read - cache_write)
 
+    cost_usd, priced_ok = cost_fn(model, input_excl, comp_tok, cache_read, cache_write, family)
+
     usage = {
         "input_tokens": input_excl,
         "output_tokens": comp_tok,
@@ -338,7 +413,8 @@ def call_judge_via_litellm(
         "cache_write_tokens": cache_write,
         "total_tokens": input_excl + comp_tok + cache_read + cache_write,
         "request_count": 1,
-        "cost_usd": float(cost_fn(model, input_excl, comp_tok, cache_read, cache_write)),
+        "cost_usd": float(cost_usd),
+        "cost_priced_ok": priced_ok,
         # Additive: never read by existing code paths. New aggregator in
         # `_grade_council` collects these for `score.json.judge_council`.
         "headroom": compression_stats,

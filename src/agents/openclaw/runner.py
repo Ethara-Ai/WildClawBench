@@ -486,6 +486,30 @@ exec_cfg["host"] = "gateway"
 # (~25x in 2026-06-02 07:43 gateway.log). tools.exec.approval is NOT
 # a recognized key per the same validator; do not add it.
 exec_cfg["security"] = "full"
+# Silence the inline-eval approval prefilter -- but ONLY on openclaw
+# versions that recognize the key. The prefilter fires in 2026.4.x as
+# "obfuscation detected (gateway): Python/Perl/Ruby with base64 or
+# encoded execution" -> exec.approval.waitDecision 119989ms ->
+# INVALID_REQUEST: Channel is required, despite security=full above
+# (openclaw issues #60054 / #59625). Two earlier attempts BROKE config
+# load by writing keys the validator did not recognize, which disables
+# the WHOLE config:
+#   * obfuscationCheck (PR #60709) -- never merged upstream.
+#   * strictInlineEval -- a REAL key, but only since 2026.3.31; the EC2
+#     benchmark image ships 2026.3.11, whose validator rejected it as an
+#     "Unrecognized key" (gateway.log 2026-06-13 darren_weston) -- same
+#     failure class as the 2026-06-02 megan-davis Unrecognized-keys run.
+# So we version-gate: read the installed openclaw version and only set
+# strictInlineEval=false when >=2026.3.31 (e.g. local 2026.4.x). On older
+# builds (2026.3.11) the prefilter does not exist and security="full"
+# above already suffices, so skipping the key is both correct and safe.
+# Unreadable/unparseable version -> skip (fail safe, keep config valid).
+try:
+    _ocv = json.loads(pathlib.Path("/usr/lib/node_modules/openclaw/package.json").read_text())["version"]
+    if tuple(int(x) for x in _ocv.split(".")[:3]) >= (2026, 3, 31):
+        exec_cfg["strictInlineEval"] = False
+except Exception:
+    pass
 sandbox_cfg = defaults.setdefault("sandbox", {{}})
 sandbox_cfg["mode"] = "off"
 web = tools.setdefault("web", {{}})
@@ -514,10 +538,19 @@ tools["deny"] = [
     "browser_navigate", "browser_screenshot", "browser_eval",
 ]
 # Mirror the LiteLLM branch: see comments there for the full rationale,
-# including why the chrome/chromium/etc. root-key writes were removed.
+# including why the chrome/chromium/etc. root-key writes were removed and
+# why strictInlineEval is version-gated (it is unrecognized on the EC2
+# image's openclaw 2026.3.11 and disables the whole config if written;
+# only >=2026.3.31 accepts it). openclaw issues #60054/#59625.
 exec_cfg = tools.setdefault("exec", {{}})
 exec_cfg["host"] = "gateway"
 exec_cfg["security"] = "full"
+try:
+    _ocv = json.loads(pathlib.Path("/usr/lib/node_modules/openclaw/package.json").read_text())["version"]
+    if tuple(int(x) for x in _ocv.split(".")[:3]) >= (2026, 3, 31):
+        exec_cfg["strictInlineEval"] = False
+except Exception:
+    pass
 sandbox_cfg = defaults.setdefault("sandbox", {{}})
 sandbox_cfg["mode"] = "off"
 web = tools.setdefault("web", {{}})

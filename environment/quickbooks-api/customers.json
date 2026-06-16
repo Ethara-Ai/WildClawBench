@@ -1,223 +1,916 @@
-[
-  {
-    "Id": "1",
-    "DisplayName": "Maria Holloway",
-    "GivenName": "Maria",
-    "FamilyName": "Holloway",
-    "CompanyName": "Holloway Family",
-    "PrimaryEmailAddr": "maria.holloway@example.org",
-    "PrimaryPhone": "(315) 555-0114",
-    "BillAddr_Line1": "14 Franklin County Housing File",
-    "BillAddr_City": "Syracuse",
-    "BillAddr_CountrySubDivisionCode": "NY",
-    "BillAddr_PostalCode": "13202",
-    "Balance": "418.22",
-    "Active": "true",
-    "Job": "false",
-    "Notes": "Claim FC-2026-014 - Emergency Motel Stay - pending review; motel dates partially mismatch reimbursement form"
-  },
-  {
-    "Id": "2",
-    "DisplayName": "Daniel Perez",
-    "GivenName": "Daniel",
-    "FamilyName": "Perez",
-    "CompanyName": "Volunteer Support Team",
-    "PrimaryEmailAddr": "daniel.perez@example.org",
-    "PrimaryPhone": "(315) 555-0115",
-    "BillAddr_Line1": "15 Franklin County Volunteer File",
-    "BillAddr_City": "Syracuse",
-    "BillAddr_CountrySubDivisionCode": "NY",
-    "BillAddr_PostalCode": "13202",
-    "Balance": "0.00",
-    "Active": "true",
-    "Job": "false",
-    "Notes": "Claim FC-2026-015 - Volunteer Travel Mileage - matched and mileage total verified"
-  },
-  {
-    "Id": "3",
-    "DisplayName": "Holloway Household",
-    "GivenName": "",
-    "FamilyName": "",
-    "CompanyName": "Holloway Family",
-    "PrimaryEmailAddr": "holloway.household@example.org",
-    "PrimaryPhone": "(315) 555-0116",
-    "BillAddr_Line1": "16 Franklin County Housing File",
-    "BillAddr_City": "Syracuse",
-    "BillAddr_CountrySubDivisionCode": "NY",
-    "BillAddr_PostalCode": "13202",
-    "Balance": "152.87",
-    "Active": "true",
-    "Job": "false",
-    "Notes": "Claim FC-2026-016 - Food & Essentials - needs clarification; multiple family purchases merged into same PDF"
-  },
-  {
-    "Id": "4",
-    "DisplayName": "Rachel Turner",
-    "GivenName": "Rachel",
-    "FamilyName": "Turner",
-    "CompanyName": "Turner Household",
-    "PrimaryEmailAddr": "rachel.turner@example.org",
-    "PrimaryPhone": "(315) 555-0117",
-    "BillAddr_Line1": "17 Franklin County Housing File",
-    "BillAddr_City": "Syracuse",
-    "BillAddr_CountrySubDivisionCode": "NY",
-    "BillAddr_PostalCode": "13202",
-    "Balance": "0.00",
-    "Active": "true",
-    "Job": "false",
-    "Notes": "Claim FC-2026-017 - Temporary Housing - matched and ready for reimbursement logging"
-  },
-  {
-    "Id": "5",
-    "DisplayName": "Coalition Volunteer Group",
-    "GivenName": "",
-    "FamilyName": "",
-    "CompanyName": "Coalition Volunteer Group",
-    "PrimaryEmailAddr": "volunteers@example.org",
-    "PrimaryPhone": "(315) 555-0118",
-    "BillAddr_Line1": "18 Franklin County Volunteer File",
-    "BillAddr_City": "Syracuse",
-    "BillAddr_CountrySubDivisionCode": "NY",
-    "BillAddr_PostalCode": "13202",
-    "Balance": "204.51",
-    "Active": "true",
-    "Job": "false",
-    "Notes": "Claim FC-2026-018 - Fuel Reimbursement - duplicate flagged; potential duplicate upload found in archive folder"
-  },
-  {
-    "Id": "6",
-    "DisplayName": "Aisha Reed",
-    "GivenName": "Aisha",
-    "FamilyName": "Reed",
-    "CompanyName": "Reed Household",
-    "PrimaryEmailAddr": "aisha.reed@example.org",
-    "PrimaryPhone": "(315) 555-0119",
-    "BillAddr_Line1": "19 Franklin County Housing File",
-    "BillAddr_City": "Syracuse",
-    "BillAddr_CountrySubDivisionCode": "NY",
-    "BillAddr_PostalCode": "13202",
-    "Balance": "0.00",
-    "Active": "true",
-    "Job": "false",
-    "Notes": "Claim FC-2026-019 - Emergency Motel Stay - matched but repeats the 624.00 amount from another housing claim"
-  },
-  {
-    "Id": "7",
-    "DisplayName": "Brian Cole",
-    "GivenName": "Brian",
-    "FamilyName": "Cole",
-    "CompanyName": "Cole Household",
-    "PrimaryEmailAddr": "brian.cole@example.org",
-    "PrimaryPhone": "(315) 555-0120",
-    "BillAddr_Line1": "20 Franklin County Housing File",
-    "BillAddr_City": "Syracuse",
-    "BillAddr_CountrySubDivisionCode": "NY",
-    "BillAddr_PostalCode": "13202",
-    "Balance": "624.00",
-    "Active": "true",
-    "Job": "false",
-    "Notes": "Claim FC-2026-020 - Temporary Housing - summary total conflicts with receipt total and shares duplicate amount group DUP-624-A"
-  },
-  {
-    "Id": "8",
-    "DisplayName": "Nadia Brooks",
-    "GivenName": "Nadia",
-    "FamilyName": "Brooks",
-    "CompanyName": "Brooks Household",
-    "PrimaryEmailAddr": "nadia.brooks@example.org",
-    "PrimaryPhone": "(315) 555-0121",
-    "BillAddr_Line1": "21 Franklin County Relocation File",
-    "BillAddr_City": "Syracuse",
-    "BillAddr_CountrySubDivisionCode": "NY",
-    "BillAddr_PostalCode": "13202",
-    "Balance": "0.00",
-    "Active": "true",
-    "Job": "false",
-    "Notes": "Claim FC-2026-021 - Relocation Truck Rental - matched but linked to duplicate truck rental group DUP-TRUCK-312"
-  },
-  {
-    "Id": "9",
-    "DisplayName": "Omar Singh",
-    "GivenName": "Omar",
-    "FamilyName": "Singh",
-    "CompanyName": "Singh Household",
-    "PrimaryEmailAddr": "omar.singh@example.org",
-    "PrimaryPhone": "(315) 555-0122",
-    "BillAddr_Line1": "22 Franklin County Relocation File",
-    "BillAddr_City": "Syracuse",
-    "BillAddr_CountrySubDivisionCode": "NY",
-    "BillAddr_PostalCode": "13202",
-    "Balance": "312.45",
-    "Active": "true",
-    "Job": "false",
-    "Notes": "Claim FC-2026-022 - Relocation Truck Rental - duplicate expense entry with FC-2026-021"
-  },
-  {
-    "Id": "10",
-    "DisplayName": "Valdez Household",
-    "GivenName": "",
-    "FamilyName": "",
-    "CompanyName": "Valdez Household",
-    "PrimaryEmailAddr": "valdez.household@example.org",
-    "PrimaryPhone": "(315) 555-0123",
-    "BillAddr_Line1": "23 Franklin County Utility File",
-    "BillAddr_City": "Syracuse",
-    "BillAddr_CountrySubDivisionCode": "NY",
-    "BillAddr_PostalCode": "13202",
-    "Balance": "950.00",
-    "Active": "true",
-    "Job": "false",
-    "Notes": "Claim FC-2026-023 - Utility Deposit - exceeds 750.00 intake limit"
-  },
-  {
-    "Id": "11",
-    "DisplayName": "Chen-Rivera Household",
-    "GivenName": "",
-    "FamilyName": "",
-    "CompanyName": "Chen-Rivera Household",
-    "PrimaryEmailAddr": "chen.rivera@example.org",
-    "PrimaryPhone": "(315) 555-0124",
-    "BillAddr_Line1": "24 Franklin County Relocation File",
-    "BillAddr_City": "Syracuse",
-    "BillAddr_CountrySubDivisionCode": "NY",
-    "BillAddr_PostalCode": "13202",
-    "Balance": "1280.00",
-    "Active": "true",
-    "Job": "false",
-    "Notes": "Claim FC-2026-024 - Security Deposit - exceeds 1000.00 intake limit and mixes Chen and Rivera household records"
-  },
-  {
-    "Id": "12",
-    "DisplayName": "Priya Shah",
-    "GivenName": "Priya",
-    "FamilyName": "Shah",
-    "CompanyName": "Volunteer Support Team",
-    "PrimaryEmailAddr": "priya.shah@example.org",
-    "PrimaryPhone": "(315) 555-0125",
-    "BillAddr_Line1": "25 Franklin County Volunteer File",
-    "BillAddr_City": "Syracuse",
-    "BillAddr_CountrySubDivisionCode": "NY",
-    "BillAddr_PostalCode": "13202",
-    "Balance": "184.20",
-    "Active": "true",
-    "Job": "false",
-    "Notes": "Claim FC-2026-025 - Travel Mileage - mileage export total conflicts with reimbursement summary"
-  },
-  {
-    "Id": "13",
-    "DisplayName": "Holloway Family Intake Alias",
-    "GivenName": "",
-    "FamilyName": "",
-    "CompanyName": "Holloway Family",
-    "PrimaryEmailAddr": "holloway.alias@example.org",
-    "PrimaryPhone": "(315) 555-0126",
-    "BillAddr_Line1": "26 Franklin County Housing File",
-    "BillAddr_City": "Syracuse",
-    "BillAddr_CountrySubDivisionCode": "NY",
-    "BillAddr_PostalCode": "13202",
-    "Balance": "152.87",
-    "Active": "true",
-    "Job": "false",
-    "Notes": "Claim FC-2026-026 - Food & Essentials - duplicate of FC-2026-016 under household alias"
+{
+  "QueryResponse": {
+    "Customer": [
+      {
+        "Id": "0",
+        "DisplayName": "Multiple - See Batch Detail",
+        "PrimaryEmailAddr": null,
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Aggregate: Batch billing placeholder for multi-member invoices"
+      },
+      {
+        "Id": "1",
+        "DisplayName": "Abrams, Derek",
+        "PrimaryEmailAddr": {
+          "Address": "derek.abrams@gmail.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Kendo - M/W/F"
+      },
+      {
+        "Id": "2",
+        "DisplayName": "Alvarez, Sofia",
+        "PrimaryEmailAddr": {
+          "Address": "s.alvarez88@yahoo.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Judo - T/Th"
+      },
+      {
+        "Id": "3",
+        "DisplayName": "Anderson, Marcus",
+        "PrimaryEmailAddr": {
+          "Address": "manderson@outlook.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Kendo - M/W/F"
+      },
+      {
+        "Id": "4",
+        "DisplayName": "Bakshi, Priya",
+        "PrimaryEmailAddr": {
+          "Address": "priya.bakshi@gmail.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Judo - T/Th + Sat"
+      },
+      {
+        "Id": "5",
+        "DisplayName": "Callahan, Nate",
+        "PrimaryEmailAddr": {
+          "Address": "ncallahan@proton.me"
+        },
+        "Balance": 95,
+        "Active": true,
+        "Notes": "Kendo - M/W/F. Apr unpaid."
+      },
+      {
+        "Id": "6",
+        "DisplayName": "Chen, William",
+        "PrimaryEmailAddr": {
+          "Address": "will.chen.pdx@gmail.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Both programs - unlimited"
+      },
+      {
+        "Id": "7",
+        "DisplayName": "Cortez, Diana",
+        "PrimaryEmailAddr": {
+          "Address": "dianac@comcast.net"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Judo - T/Th"
+      },
+      {
+        "Id": "8",
+        "DisplayName": "Davenport, Greg",
+        "PrimaryEmailAddr": {
+          "Address": "greg.davenport@gmail.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Kendo - M/W/F"
+      },
+      {
+        "Id": "9",
+        "DisplayName": "Delgado, Hannah",
+        "PrimaryEmailAddr": {
+          "Address": "aaron.delgado@cedarridgemartialarts.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Youth Sat all-levels (owner family - comp)"
+      },
+      {
+        "Id": "10",
+        "DisplayName": "Eriksson, Lars",
+        "PrimaryEmailAddr": {
+          "Address": "lars.eriksson@intel.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Kendo - M/W/F"
+      },
+      {
+        "Id": "11",
+        "DisplayName": "Fernandez, Carlos",
+        "PrimaryEmailAddr": {
+          "Address": "carlos.f@hotmail.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Judo - T/Th"
+      },
+      {
+        "Id": "12",
+        "DisplayName": "Fisher, Tammy",
+        "PrimaryEmailAddr": {
+          "Address": "tammyfisher@gmail.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Kendo - M/W/F"
+      },
+      {
+        "Id": "13",
+        "DisplayName": "Graves, Alicia",
+        "PrimaryEmailAddr": {
+          "Address": "alicia.graves@nike.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Judo - T/Th + Sat"
+      },
+      {
+        "Id": "14",
+        "DisplayName": "Gutierrez, Ramon",
+        "PrimaryEmailAddr": {
+          "Address": "rgutierrez@pdx.edu"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Kendo - M/W/F"
+      },
+      {
+        "Id": "15",
+        "DisplayName": "Hammond, Steve",
+        "PrimaryEmailAddr": {
+          "Address": "steve.hammond@yahoo.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Judo - T/Th"
+      },
+      {
+        "Id": "16",
+        "DisplayName": "Harrison, Olivia",
+        "PrimaryEmailAddr": {
+          "Address": "olivia.h@gmail.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Kendo - M/W/F"
+      },
+      {
+        "Id": "17",
+        "DisplayName": "Hayashi, Kenji",
+        "PrimaryEmailAddr": {
+          "Address": "kenji.hayashi@gmail.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Both programs - unlimited"
+      },
+      {
+        "Id": "18",
+        "DisplayName": "Hoffman, Brett",
+        "PrimaryEmailAddr": {
+          "Address": "brett.hoffman@comcast.net"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Kendo - M/W/F"
+      },
+      {
+        "Id": "19",
+        "DisplayName": "Ibanez, Teresa",
+        "PrimaryEmailAddr": {
+          "Address": "teresai@outlook.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Judo - T/Th"
+      },
+      {
+        "Id": "20",
+        "DisplayName": "Jackson, Darnell",
+        "PrimaryEmailAddr": {
+          "Address": "darnellj@gmail.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Kendo - M/W/F"
+      },
+      {
+        "Id": "21",
+        "DisplayName": "Johansson, Erik",
+        "PrimaryEmailAddr": {
+          "Address": "erik.johansson@gmail.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Judo - Sat only"
+      },
+      {
+        "Id": "22",
+        "DisplayName": "Kang, Minjun",
+        "PrimaryEmailAddr": {
+          "Address": "minjun.kang@yahoo.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Kendo - M/W/F"
+      },
+      {
+        "Id": "23",
+        "DisplayName": "Keller, Jason",
+        "PrimaryEmailAddr": {
+          "Address": "jasonkeller@proton.me"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Judo - T/Th"
+      },
+      {
+        "Id": "24",
+        "DisplayName": "Kim, Soo-yeon",
+        "PrimaryEmailAddr": {
+          "Address": "sooyeon.kim@gmail.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Kendo - M/W/F"
+      },
+      {
+        "Id": "25",
+        "DisplayName": "Larson, Pete",
+        "PrimaryEmailAddr": {
+          "Address": "pete.larson@gmail.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Judo - T/Th + Sat"
+      },
+      {
+        "Id": "26",
+        "DisplayName": "Lee, Michael",
+        "PrimaryEmailAddr": {
+          "Address": "michael.lee.bvtn@gmail.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Kendo - M/W/F"
+      },
+      {
+        "Id": "27",
+        "DisplayName": "Lopez, Mariana",
+        "PrimaryEmailAddr": {
+          "Address": "mariana.lopez@yahoo.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Judo - T/Th"
+      },
+      {
+        "Id": "28",
+        "DisplayName": "Matsuda, Yuki",
+        "PrimaryEmailAddr": {
+          "Address": "yuki.matsuda@outlook.com"
+        },
+        "Balance": 95,
+        "Active": true,
+        "Notes": "Kendo - M/W/F. Apr unpaid - emailed 4/8."
+      },
+      {
+        "Id": "29",
+        "DisplayName": "Mercer, Bridget",
+        "PrimaryEmailAddr": {
+          "Address": "bridget.mercer@gmail.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Judo - T/Th"
+      },
+      {
+        "Id": "30",
+        "DisplayName": "Mitchell, Aaron T.",
+        "PrimaryEmailAddr": {
+          "Address": "at.mitchell@gmail.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Kendo - M/W/F"
+      },
+      {
+        "Id": "31",
+        "DisplayName": "Morrison, Tyler",
+        "PrimaryEmailAddr": {
+          "Address": "tyler.morrison@comcast.net"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Both programs - unlimited"
+      },
+      {
+        "Id": "32",
+        "DisplayName": "Nakamura, Ren",
+        "PrimaryEmailAddr": {
+          "Address": "ren.nakamura@gmail.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Kendo - M/W/F"
+      },
+      {
+        "Id": "33",
+        "DisplayName": "Nelson, Courtney",
+        "PrimaryEmailAddr": {
+          "Address": "courtneyN@yahoo.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Judo - T/Th"
+      },
+      {
+        "Id": "34",
+        "DisplayName": "Okafor, Chidi",
+        "PrimaryEmailAddr": {
+          "Address": "chidi.okafor@gmail.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Kendo - M/W/F"
+      },
+      {
+        "Id": "35",
+        "DisplayName": "Olsen, Katie",
+        "PrimaryEmailAddr": {
+          "Address": "katie.olsen@proton.me"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Judo - Sat only"
+      },
+      {
+        "Id": "36",
+        "DisplayName": "Park, Jisoo",
+        "PrimaryEmailAddr": {
+          "Address": "jisoo.park@gmail.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Kendo - M/W/F"
+      },
+      {
+        "Id": "37",
+        "DisplayName": "Patterson, Diane",
+        "PrimaryEmailAddr": {
+          "Address": "diane.patterson@outlook.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Judo - T/Th"
+      },
+      {
+        "Id": "38",
+        "DisplayName": "Pearson, Troy",
+        "PrimaryEmailAddr": {
+          "Address": "troypearson@gmail.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Kendo - M/W/F"
+      },
+      {
+        "Id": "39",
+        "DisplayName": "Pham, Linh",
+        "PrimaryEmailAddr": {
+          "Address": "linh.pham@yahoo.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Judo - T/Th + Sat"
+      },
+      {
+        "Id": "40",
+        "DisplayName": "Ramirez, Jesse",
+        "PrimaryEmailAddr": {
+          "Address": "jesse.ramirez@gmail.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Kendo - M/W/F"
+      },
+      {
+        "Id": "41",
+        "DisplayName": "Reeves, Sam",
+        "PrimaryEmailAddr": {
+          "Address": "sam.reeves@hotmail.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Judo - T/Th"
+      },
+      {
+        "Id": "42",
+        "DisplayName": "Rivera, Marco",
+        "PrimaryEmailAddr": {
+          "Address": "marco.rivera@gmail.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Both programs - unlimited"
+      },
+      {
+        "Id": "43",
+        "DisplayName": "Robinson, Aisha",
+        "PrimaryEmailAddr": {
+          "Address": "aisha.robinson@nike.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Kendo - M/W/F"
+      },
+      {
+        "Id": "44",
+        "DisplayName": "Rossi, Vincent",
+        "PrimaryEmailAddr": {
+          "Address": "vrossi@pdx.edu"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Judo - T/Th"
+      },
+      {
+        "Id": "45",
+        "DisplayName": "Santos, Gabriel",
+        "PrimaryEmailAddr": {
+          "Address": "gabriel.santos@gmail.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Kendo - M/W/F"
+      },
+      {
+        "Id": "46",
+        "DisplayName": "Schneider, Anna",
+        "PrimaryEmailAddr": {
+          "Address": "anna.schneider@outlook.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Judo - T/Th"
+      },
+      {
+        "Id": "47",
+        "DisplayName": "Shaw, Devin",
+        "PrimaryEmailAddr": {
+          "Address": "devinshaw@gmail.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Kendo - M/W/F"
+      },
+      {
+        "Id": "48",
+        "DisplayName": "Simmons, Jackie",
+        "PrimaryEmailAddr": {
+          "Address": "jackie.simmons@comcast.net"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Judo - T/Th"
+      },
+      {
+        "Id": "49",
+        "DisplayName": "Tanaka, Hiro",
+        "PrimaryEmailAddr": {
+          "Address": "hiro.tanaka@gmail.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Kendo - M/W/F"
+      },
+      {
+        "Id": "50",
+        "DisplayName": "Thomas, Wayne",
+        "PrimaryEmailAddr": {
+          "Address": "wayne.thomas@yahoo.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Judo - Sat only"
+      },
+      {
+        "Id": "51",
+        "DisplayName": "Torres, Miguel",
+        "PrimaryEmailAddr": {
+          "Address": "miguel.torres@gmail.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Kendo - M/W/F"
+      },
+      {
+        "Id": "52",
+        "DisplayName": "Turner, Brenda",
+        "PrimaryEmailAddr": {
+          "Address": "brenda.turner@proton.me"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Judo - T/Th"
+      },
+      {
+        "Id": "53",
+        "DisplayName": "Ueda, Takeshi",
+        "PrimaryEmailAddr": {
+          "Address": "takeshi.ueda@outlook.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Both programs - unlimited"
+      },
+      {
+        "Id": "54",
+        "DisplayName": "Vasquez, Elena",
+        "PrimaryEmailAddr": {
+          "Address": "elena.vasquez@gmail.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Kendo - M/W/F"
+      },
+      {
+        "Id": "55",
+        "DisplayName": "Volkov, Dmitri",
+        "PrimaryEmailAddr": {
+          "Address": "dmitri.volkov@intel.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Judo - T/Th"
+      },
+      {
+        "Id": "56",
+        "DisplayName": "Walker, Ben",
+        "PrimaryEmailAddr": {
+          "Address": "ben.walker@hotmail.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Kendo - M/W/F"
+      },
+      {
+        "Id": "57",
+        "DisplayName": "Whitfield, Renee",
+        "PrimaryEmailAddr": {
+          "Address": "renee.whitfield@gmail.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Judo - T/Th"
+      },
+      {
+        "Id": "58",
+        "DisplayName": "Wong, Kevin",
+        "PrimaryEmailAddr": {
+          "Address": "kevin.wong@yahoo.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Kendo - M/W/F"
+      },
+      {
+        "Id": "59",
+        "DisplayName": "Yamamoto, Sakura",
+        "PrimaryEmailAddr": {
+          "Address": "sakura.yamamoto@gmail.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Judo - T/Th + Sat"
+      },
+      {
+        "Id": "60",
+        "DisplayName": "Young, Patrick",
+        "PrimaryEmailAddr": {
+          "Address": "patrick.young@comcast.net"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Kendo - M/W/F"
+      },
+      {
+        "Id": "61",
+        "DisplayName": "Zhang, Leo",
+        "PrimaryEmailAddr": {
+          "Address": "leo.zhang@gmail.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Both programs - unlimited"
+      },
+      {
+        "Id": "62",
+        "DisplayName": "Zimmerman, Chloe",
+        "PrimaryEmailAddr": {
+          "Address": "chloe.z@outlook.com"
+        },
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Judo - T/Th"
+      },
+      {
+        "Id": "63",
+        "DisplayName": "Spring Tournament 2026 - Registrations",
+        "PrimaryEmailAddr": null,
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Aggregate: Spring tournament individual registrations (Apr 5)"
+      },
+      {
+        "Id": "64",
+        "DisplayName": "Drop-in Sessions (Walk-ins)",
+        "PrimaryEmailAddr": null,
+        "Balance": 0,
+        "Active": true,
+        "Notes": "Aggregate: Non-member drop-in fees $20/session"
+      },
+      {
+        "Id": "65",
+        "DisplayName": "Cooper, Nathan",
+        "PrimaryEmailAddr": {
+          "Address": "ncooper@gmail.com"
+        },
+        "Balance": 0,
+        "Active": false,
+        "Notes": "INACTIVE - cancelled Feb 2026. Kendo."
+      },
+      {
+        "Id": "66",
+        "DisplayName": "Huang, Mei",
+        "PrimaryEmailAddr": {
+          "Address": "mei.huang@yahoo.com"
+        },
+        "Balance": 0,
+        "Active": false,
+        "Notes": "INACTIVE - moved out of state Mar 2026. Judo."
+      },
+      {
+        "Id": "201",
+        "DisplayName": "Tunde Adeyemi",
+        "GivenName": "Tunde",
+        "FamilyName": "Adeyemi",
+        "CompanyName": "",
+        "PrimaryEmailAddr": {
+          "Address": "tunde.adeyemi@gmail.com"
+        },
+        "PrimaryPhone": {
+          "FreeFormNumber": "+234-555-0201"
+        },
+        "BillAddr": {
+          "Line1": "",
+          "City": "Lagos",
+          "CountrySubDivisionCode": "",
+          "PostalCode": ""
+        },
+        "Balance": 0.0,
+        "Active": true,
+        "MetaData": {
+          "CreateTime": "2024-01-15T10:00:00",
+          "LastUpdatedTime": "2024-06-01T10:00:00"
+        },
+        "Notes": "Beat client - Lagos Nights exclusive",
+        "Job": false
+      },
+      {
+        "Id": "202",
+        "DisplayName": "Keisha Brown",
+        "GivenName": "Keisha",
+        "FamilyName": "Brown",
+        "CompanyName": "",
+        "PrimaryEmailAddr": {
+          "Address": "keisha.b.music@gmail.com"
+        },
+        "PrimaryPhone": {
+          "FreeFormNumber": "+1-404-555-0202"
+        },
+        "BillAddr": {
+          "Line1": "",
+          "City": "Atlanta",
+          "CountrySubDivisionCode": "",
+          "PostalCode": ""
+        },
+        "Balance": 0.0,
+        "Active": true,
+        "MetaData": {
+          "CreateTime": "2024-01-15T10:00:00",
+          "LastUpdatedTime": "2024-06-01T10:00:00"
+        },
+        "Notes": "Beat client",
+        "Job": false
+      },
+      {
+        "Id": "203",
+        "DisplayName": "Marcus Webb",
+        "GivenName": "Marcus",
+        "FamilyName": "Webb",
+        "CompanyName": "TechVault Solutions Inc.",
+        "PrimaryEmailAddr": {
+          "Address": "mwebb@techvault.io"
+        },
+        "PrimaryPhone": {
+          "FreeFormNumber": "+1-919-555-0203"
+        },
+        "BillAddr": {
+          "Line1": "",
+          "City": "Durham NC",
+          "CountrySubDivisionCode": "",
+          "PostalCode": ""
+        },
+        "Balance": 1800000.0,
+        "Active": true,
+        "MetaData": {
+          "CreateTime": "2024-01-15T10:00:00",
+          "LastUpdatedTime": "2024-06-01T10:00:00"
+        },
+        "Notes": "Consulting client + beat client",
+        "Job": false
+      },
+      {
+        "Id": "204",
+        "DisplayName": "Yemi Olatunde",
+        "GivenName": "Yemi",
+        "FamilyName": "Olatunde",
+        "CompanyName": "",
+        "PrimaryEmailAddr": {
+          "Address": "yemi.ola@gmail.com"
+        },
+        "PrimaryPhone": {
+          "FreeFormNumber": "+234-555-0204"
+        },
+        "BillAddr": {
+          "Line1": "",
+          "City": "Lagos",
+          "CountrySubDivisionCode": "",
+          "PostalCode": ""
+        },
+        "Balance": 35000.0,
+        "Active": true,
+        "MetaData": {
+          "CreateTime": "2024-01-15T10:00:00",
+          "LastUpdatedTime": "2024-06-01T10:00:00"
+        },
+        "Notes": "Beat client - pending payment",
+        "Job": false
+      },
+      {
+        "Id": "205",
+        "DisplayName": "Priya Nair",
+        "GivenName": "Priya",
+        "FamilyName": "Nair",
+        "CompanyName": "",
+        "PrimaryEmailAddr": {
+          "Address": "priya.nair.music@gmail.com"
+        },
+        "PrimaryPhone": {
+          "FreeFormNumber": "+1-212-555-0205"
+        },
+        "BillAddr": {
+          "Line1": "",
+          "City": "New York",
+          "CountrySubDivisionCode": "",
+          "PostalCode": ""
+        },
+        "Balance": 0.0,
+        "Active": true,
+        "MetaData": {
+          "CreateTime": "2024-01-15T10:00:00",
+          "LastUpdatedTime": "2024-06-01T10:00:00"
+        },
+        "Notes": "Beat client",
+        "Job": false
+      },
+      {
+        "Id": "206",
+        "DisplayName": "Diego Reyes",
+        "GivenName": "Diego",
+        "FamilyName": "Reyes",
+        "CompanyName": "",
+        "PrimaryEmailAddr": {
+          "Address": "diego.reyes.beats@gmail.com"
+        },
+        "PrimaryPhone": {
+          "FreeFormNumber": "+1-305-555-0206"
+        },
+        "BillAddr": {
+          "Line1": "",
+          "City": "Miami",
+          "CountrySubDivisionCode": "",
+          "PostalCode": ""
+        },
+        "Balance": 0.0,
+        "Active": true,
+        "MetaData": {
+          "CreateTime": "2024-01-15T10:00:00",
+          "LastUpdatedTime": "2024-06-01T10:00:00"
+        },
+        "Notes": "Beat client",
+        "Job": false
+      },
+      {
+        "Id": "207",
+        "DisplayName": "SoundCloud Sync",
+        "GivenName": "",
+        "FamilyName": "",
+        "CompanyName": "SoundCloud Sync Licensing",
+        "PrimaryEmailAddr": {
+          "Address": "sync@soundcloud.com"
+        },
+        "PrimaryPhone": {
+          "FreeFormNumber": "+1-888-555-0207"
+        },
+        "BillAddr": {
+          "Line1": "",
+          "City": "Berlin",
+          "CountrySubDivisionCode": "",
+          "PostalCode": ""
+        },
+        "Balance": 0.0,
+        "Active": true,
+        "MetaData": {
+          "CreateTime": "2024-01-15T10:00:00",
+          "LastUpdatedTime": "2024-06-01T10:00:00"
+        },
+        "Notes": "Sync license",
+        "Job": false
+      },
+      {
+        "Id": "208",
+        "DisplayName": "BeatStars Free",
+        "GivenName": "",
+        "FamilyName": "",
+        "CompanyName": "BeatStars Inc",
+        "PrimaryEmailAddr": {
+          "Address": "promo@beatstars.com"
+        },
+        "PrimaryPhone": {
+          "FreeFormNumber": "+1-888-555-0208"
+        },
+        "BillAddr": {
+          "Line1": "",
+          "City": "Boca Raton",
+          "CountrySubDivisionCode": "",
+          "PostalCode": ""
+        },
+        "Balance": 0.0,
+        "Active": true,
+        "MetaData": {
+          "CreateTime": "2024-01-15T10:00:00",
+          "LastUpdatedTime": "2024-06-01T10:00:00"
+        },
+        "Notes": "Free promo",
+        "Job": false
+      },
+      {
+        "Id": "301",
+        "DisplayName": "Bar Walk-In",
+        "GivenName": "",
+        "FamilyName": "",
+        "CompanyName": "",
+        "PrimaryEmailAddr": {
+          "Address": ""
+        },
+        "PrimaryPhone": {
+          "FreeFormNumber": ""
+        },
+        "BillAddr": {
+          "Line1": "",
+          "City": "Atlanta",
+          "CountrySubDivisionCode": "GA",
+          "PostalCode": "30317"
+        },
+        "Balance": 0.0,
+        "Active": true,
+        "MetaData": {
+          "CreateTime": "2024-01-15T10:00:00",
+          "LastUpdatedTime": "2024-06-01T10:00:00"
+        },
+        "Notes": "Generic walk-in bar customer for POS bar tabs",
+        "Job": false
+      }
+    ],
+    "startPosition": 1,
+    "maxResults": 76,
+    "totalCount": 76
   }
-]
+}

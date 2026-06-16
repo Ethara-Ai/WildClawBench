@@ -6,7 +6,10 @@ import os
 import re
 import subprocess
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
+from collections.abc import Sequence
+from typing import Literal
 from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
@@ -42,7 +45,8 @@ TMP_WORKSPACE = os.environ.get("TMP_WORKSPACE", "/tmp_workspace")
 # JUDGE_MODEL / JUDGE_MODEL_FALLBACK envs are no longer consulted (m1609):
 # single-judge mode was removed and the council is the only grading path.
 # Configure council members via JUDGE_COUNCIL_MEMBERS or the per-judge
-# JUDGE_COUNCIL_SONNET_ARN / _GLM_ARN / _KIMI_ARN env vars (see _DEFAULT_COUNCIL_MEMBERS).
+# JUDGE_COUNCIL_SONNET_ARN / _GLM_ARN / _KIMI_ARN env vars (resolved live by
+# council_members(); see the FAMILY decoupling block below).
 # Smallest-member-governs evidence cap, derived from AWS Bedrock official
 # context-window numbers (2026-06-02 web-confirmed, no longer hit-and-trial):
 #   * Claude Sonnet 4.6 (is9bst5tfadh) — 1,000,000 input tokens
@@ -92,122 +96,173 @@ _JUDGE_MAX_EVIDENCE = _resolve_judge_max_evidence()
 # headroom for JSON envelope + scaffold + base64 overhead.
 _AWS_EDGE_BODY_CAP = 24_000_000
 
-# Pattern → (budget_chars, max_output_tokens). First match wins. The default
-# (None match) returns the flat _resolve_judge_max_evidence() value plus the
-# global JUDGE_MAX_OUTPUT_TOKENS fallback so single-judge calls behave
-# identically to pre-Fix-14 and OpenAI fallback gets the same conservative cap.
-#
-# 2026-06-04 RE-CALIBRATION — web-verified against AWS official model cards
-# (model-card-moonshot-ai-kimi-k2-5.html, model-card-zai-glm-5.html) and the
-# Bedrock constraint `input_tokens + max_tokens <= context_window` per LiteLLM
-# PR #22479. Replaces the prior trial-and-error tuning against one fixture.
-#
-# Per-model published Bedrock caps:
-#   Sonnet 4.6 (is9bst5tfadh): ctx 1,000,000  max_output 8,192   (Anthropic spec)
-#   Kimi K2.5 (p532c9fzmeed) : ctx   262,144  max_output 16,384  (AWS card)
-#   GLM 5     (xx5msvho23iq) : ctx   202,752  max_output 16,384  (AWS card lists 128K, we cap at 16K — verdicts never need more)
-#
-# Empirical chars-per-token floor measured against alden-croft run_3 fixture
-# (denser content than typical, includes 7 persona MDs + workspace dump):
-#   Sonnet 1.42 cpt, Kimi 2.18 cpt, GLM 1.98 cpt
-#
-# Budget formula: budget_chars = (ctx − max_output − 3000_safety) × cpt_floor,
-# then floor to nearest 25k. Honoring AWS-published max_output (not a single
-# global 4K) is what makes the math fit: Kimi at 256K ctx with 4K max_output
-# would have left 252K tokens of input budget × 2.18 = 549K chars, but Bedrock
-# enforces input + max <= ctx so the budget MUST account for the *actual*
-# maxTokens we send, not a hypothetical smaller one.
-#
-# Don't widen these without re-running probe_judge_only.py against a
-# representative trajectory. tests/test_judge_budget_invariant.py guards
-# the worst-case math against the AWS-published windows.
-_MEMBER_EVIDENCE_BUDGETS: tuple[tuple[str, int, int], ...] = (
-    # Sonnet 4.6 — 1,000,000 ctx, 8192 max_output. cpt 1.375 measured against dispatched user_chars (evidence + ~5000-char scaffold).
-    # (1_000_000 − 8192 − 3000) × 1.375 = 1,357,361 dispatched chars − 5,000 scaffold = 1,352,361 → 1_350_000 evidence budget.
-    ("is9bst5tfadh", 1_350_000, 8192),
-    # Kimi K2.5 — 262,144 ctx, 16384 max_output. The earlier 300_000 budget was
-    # probe-tuned against alden-croft PROSE (cpt 1.29). Dense financial/CSV
-    # evidence tokenizes harder: amanda_hayes_01 claude/run_3 dispatched 306,639
-    # chars and Bedrock 400'd (exceeded the 245,760 input cap = 262,144 − 16,384),
-    # so the real cpt floor on dense data is ≤ 306,639/245,760 = 1.248. Use a
-    # conservative cpt floor of 1.15 for headroom across data densities:
-    # (262,144 − 16,384 − 3000_safety) = 242,760 input tok; 242,760 × 1.15 =
-    # 279,174 dispatched chars − 5,000 scaffold = 274,174 → floor to 225,000
-    # evidence budget (extra margin below the 306k that failed).
-    ("p532c9fzmeed",   225_000, 16384),
-    # GLM 5 — 202,752 ctx, 16384 max_output. Earlier 250_000 was tuned against
-    # alden-croft (cpt 1.50). amanda run_3 dispatched 256,639 chars → Bedrock 400.
-    # (202,752 − 16,384 − 3000) = 183,368 input tok; 183,368 × 1.15 = 210,873
-    # dispatched chars − 5,000 scaffold = 205,873 → floor to 175,000 evidence
-    # budget (well below the 256k that failed).
-    ("xx5msvho23iq",   175_000, 16384),
-)
 # Fallback for unrecognized models (single-judge OpenAI fallback, custom ARNs).
 # OpenAI auto-caches and has its own server-side enforcement; conservative.
+# Per-family (budget_chars, max_output_tokens) live in _FAMILY_EVIDENCE below.
 _DEFAULT_MAX_OUTPUT_TOKENS = 4000
 
 
-def _member_evidence_budget(model: str) -> int | None:
+# ── Council member FAMILY decoupling (profile-ID rotation) ──────────────────
+# Company policy rotates the three Bedrock judge inference-profile ARNs MONTHLY,
+# which changes the opaque profile-id suffix (e.g. is9bst5tfadh) every rotation.
+# Therefore the profile id is NOT a stable key: pricing / evidence-budget /
+# cache-eligibility must be keyed by a STABLE logical *family* label instead, and
+# the rotating ARN is supplied at runtime from .env. The family of a council
+# member is derived from the FIXED env-var NAME that carries its ARN
+# (JUDGE_COUNCIL_SONNET_ARN → "sonnet", _GLM_ARN → "glm", _KIMI_ARN → "kimi"),
+# never by parsing the rotating id. See .env.example and tests/test_judge_rotation.py.
+JudgeFamily = Literal["sonnet", "glm", "kimi"]
+
+# Stable env-var → family dispatch. Order is the canonical council order.
+_FAMILY_ENV_VARS: tuple[tuple[str, str], ...] = (
+    ("sonnet", "JUDGE_COUNCIL_SONNET_ARN"),
+    ("glm", "JUDGE_COUNCIL_GLM_ARN"),
+    ("kimi", "JUDGE_COUNCIL_KIMI_ARN"),
+)
+_KNOWN_FAMILIES: frozenset[str] = frozenset(fam for fam, _ in _FAMILY_ENV_VARS)
+
+# Per-family per-token rates (input, output, cache_read, cache_write) USD/token.
+# Source of truth for council billing — web-verified against AWS published cards
+# (see _JUDGE_RATES header). judge_litellm.register_judges_for_batch imports THIS
+# table so the two transports cannot drift (was the G15 drift bug). Values must
+# track real published prices, not the (rotating) profile id.
+#   Sonnet 4.6: $3/$15/$3.75cw/$0.30cr   GLM-5: $1.00/$3.20(+$0.20cr)   Kimi K2.5: $0.72/$3.60
+_FAMILY_RATES: dict[str, tuple[float, float, float, float]] = {
+    "sonnet": (3e-6, 1.5e-5, 3e-7, 3.75e-6),
+    "glm": (1e-6, 3.2e-6, 2e-7, 0.0),
+    "kimi": (0.72e-6, 3.6e-6, 0.0, 0.0),
+}
+# Per-family (evidence_char_budget, max_output_tokens). Web-verified 2026-06-04
+# against AWS official model cards + the Bedrock constraint
+# `input_tokens + max_tokens <= context_window` (LiteLLM PR #22479).
+# Per-family published Bedrock caps:
+#   Sonnet 4.6: ctx 1,000,000  max_output 8,192   (Anthropic spec)
+#   Kimi K2.5 : ctx   262,144  max_output 16,384  (AWS card)
+#   GLM 5     : ctx   202,752  max_output 16,384  (AWS card lists 128K, capped at 16K — verdicts never need more)
+# Budget formula: budget_chars = (ctx − max_output − 3000_safety) × cpt_floor,
+# then floor to nearest 25k. Honoring the AWS-published max_output (not a single
+# global 4K) is what makes the math fit, because Bedrock enforces
+# input + max <= ctx so the budget MUST account for the actual maxTokens sent.
+# Conservative cpt floors measured on dense fixtures (amanda_hayes_01 run_3,
+# which 400'd at the old over-wide budgets): Sonnet 1.375, Kimi/GLM 1.15.
+#   Sonnet: (1,000,000 − 8192 − 3000) × 1.375 − 5000 scaffold → 1_350_000
+#   Kimi  : (262,144 − 16,384 − 3000) × 1.15  − 5000 scaffold → 225_000
+#   GLM   : (202,752 − 16,384 − 3000) × 1.15  − 5000 scaffold → 175_000
+# Don't widen without re-running probe_judge_only.py against a representative
+# trajectory; tests/test_judge_budget_invariant.py guards the worst-case math.
+_FAMILY_EVIDENCE: dict[str, tuple[int, int]] = {
+    "sonnet": (1_350_000, 8192),
+    "kimi": (225_000, 16384),
+    "glm": (175_000, 16384),
+}
+# Anthropic prompt-caching eligibility by family. Only Sonnet (Anthropic) accepts
+# a cachePoint block on Bedrock Converse; GLM/Kimi return 403 if one is present.
+_FAMILY_CACHE_SUPPORTED: dict[str, bool] = {
+    "sonnet": True,
+    "glm": False,
+    "kimi": False,
+}
+
+# OpenAI single-judge fallback rates, keyed by model NAME (NOT a council family,
+# never rotated). Used when family is None (gpt-5.4 default fallback, gpt-5.5).
+_OPENAI_JUDGE_RATES: dict[str, tuple[float, float, float, float]] = {
+    "gpt-5.4": (2.5e-6, 1.5e-5, 2.5e-7, 0.0),
+    "gpt-5.5": (5e-6, 3e-5, 5e-7, 0.0),
+}
+
+
+@dataclass(frozen=True)
+class CouncilMember:
+    """A council judge: stable `family` label + its current (rotating) `model` ARN."""
+
+    family: JudgeFamily
+    model: str
+
+
+def _family_for(model: str | None, family: str | None = None) -> str | None:
+    # Threaded family wins; else dispatch by the FIXED env-var name (read live).
+    # None => non-council (OpenAI fallback), caller uses name-keyed _OPENAI_JUDGE_RATES.
+    if family is not None:
+        return family
+    if not model:
+        return None
+    for fam, var in _FAMILY_ENV_VARS:
+        val = (os.environ.get(var) or "").strip()
+        if val and (val == model or val in model or model in val):
+            return fam
+    return None
+
+
+def _member_evidence_budget(model: str, family: str | None = None) -> int | None:
     env_raw = os.environ.get("JUDGE_MAX_EVIDENCE")
     if env_raw is not None and env_raw.strip() != "":
         return _resolve_judge_max_evidence()
-    for needle, chars, _max_out in _MEMBER_EVIDENCE_BUDGETS:
-        if needle in model:
-            return min(chars, _AWS_EDGE_BODY_CAP)
+    fam = _family_for(model, family)
+    if fam is not None and fam in _FAMILY_EVIDENCE:
+        return min(_FAMILY_EVIDENCE[fam][0], _AWS_EDGE_BODY_CAP)
     return _DEFAULT_JUDGE_MAX_EVIDENCE
 
 
-def _member_max_output_tokens(arn: str) -> int:
-    for needle, _chars, max_out in _MEMBER_EVIDENCE_BUDGETS:
-        if needle in (arn or ""):
-            return max_out
+def _member_max_output_tokens(arn: str, family: str | None = None) -> int:
+    fam = _family_for(arn, family)
+    if fam is not None and fam in _FAMILY_EVIDENCE:
+        return _FAMILY_EVIDENCE[fam][1]
     return _DEFAULT_MAX_OUTPUT_TOKENS
 
 # LLM council (opt-in). When enabled the rubric is scored by THREE judges in
-# parallel and aggregated by per-criterion mean with stddev-based disagreement
-# flags. Quorum policy: any 2 surviving judges produce a valid council score;
-# < 2 surviving judges falls through to the single-judge code path. Member
-# identifiers follow the same "<provider>/<rest>" form as JUDGE_MODEL. The
-# default roster matches the team's chosen models (Sonnet 4.6 + GLM 5 + Kimi
-# k2.5) and is overridable end-to-end via env:
+# parallel and aggregated by unanimous per-criterion verdict (m1609). Quorum
+# policy: any 2 surviving judges produce a valid council score. Each member's
+# family is fixed by the env-var NAME carrying its ARN (see the FAMILY block
+# above); the rotating ARN itself comes from .env, never hardcoded:
 #   JUDGE_COUNCIL=1
-#   JUDGE_COUNCIL_MEMBERS=bedrock/<arn1>,bedrock/<arn2>,bedrock/<arn3>
-#   JUDGE_COUNCIL_DISAGREEMENT_THRESHOLD=0.30   (stddev above which a criterion
-#                                                is flagged as contested)
-_DEFAULT_COUNCIL_MEMBERS = (
-    # Sonnet 4.6 anchor — points to the operator-supplied inference profile in
-    # ap-south-1. The prior default xv71vnlzm71s is denied by EtharaKenseiPolicy
-    # at the IAM layer; is9bst5tfadh replaces it as the current working anchor.
-    # Override via JUDGE_COUNCIL_SONNET_ARN if you need a different profile.
-    os.environ.get(
-        "JUDGE_COUNCIL_SONNET_ARN",
-        "bedrock/arn:aws:bedrock:ap-south-1:426628337772:application-inference-profile/is9bst5tfadh",
-    ),
-    # GLM 5 — us-east-1 profile.
-    os.environ.get(
-        "JUDGE_COUNCIL_GLM_ARN",
-        "bedrock/arn:aws:bedrock:us-east-1:426628337772:application-inference-profile/xx5msvho23iq",
-    ),
-    # Kimi k2.5 — ap-south-1 profile.
-    os.environ.get(
-        "JUDGE_COUNCIL_KIMI_ARN",
-        "bedrock/arn:aws:bedrock:ap-south-1:426628337772:application-inference-profile/p532c9fzmeed",
-    ),
-)
-_COUNCIL_DISAGREEMENT_THRESHOLD = float(
-    os.environ.get("JUDGE_COUNCIL_DISAGREEMENT_THRESHOLD", "0.30") or "0.30"
-)
+#   JUDGE_COUNCIL_SONNET_ARN=bedrock/<arn>   (→ family "sonnet")
+#   JUDGE_COUNCIL_GLM_ARN=bedrock/<arn>      (→ family "glm")
+#   JUDGE_COUNCIL_KIMI_ARN=bedrock/<arn>     (→ family "kimi")
+# Override roster with JUDGE_COUNCIL_MEMBERS using "family=arn" tag syntax:
+#   JUDGE_COUNCIL_MEMBERS=sonnet=bedrock/<arn1>,glm=bedrock/<arn2>,kimi=bedrock/<arn3>
+# Unset per-family vars are dropped; an unknown family tag RAISES (fail-fast,
+# symmetric with validate_judge_pricing). Vars are read LIVE per call (no
+# import-time caching) so a mid-process rotation is picked up immediately.
 
 
 def council_enabled() -> bool:
     return os.environ.get("JUDGE_COUNCIL", "").strip() in {"1", "true", "yes", "on"}
 
 
-def council_members() -> list[str]:
+def _parse_council_member_override(entry: str) -> CouncilMember:
+    """Parse one JUDGE_COUNCIL_MEMBERS CSV entry in "family=arn" tag syntax."""
+    raw = entry.strip()
+    fam, sep, arn = raw.partition("=")
+    fam = fam.strip().lower()
+    arn = arn.strip()
+    if not sep or not fam or not arn:
+        raise RuntimeError(
+            f"JUDGE_COUNCIL_MEMBERS entry {entry!r} must use 'family=arn' syntax "
+            f"(e.g. 'sonnet=bedrock/arn:...'); known families: {sorted(_KNOWN_FAMILIES)}."
+        )
+    if fam not in _KNOWN_FAMILIES:
+        raise RuntimeError(
+            f"JUDGE_COUNCIL_MEMBERS entry {entry!r} has unknown family {fam!r}; "
+            f"known families: {sorted(_KNOWN_FAMILIES)}."
+        )
+    return CouncilMember(family=fam, model=arn)  # type: ignore[arg-type]
+
+
+def council_members() -> list[CouncilMember]:
+    """Resolve the council roster as (family, ARN) pairs, reading env LIVE.
+
+    Precedence: JUDGE_COUNCIL_MEMBERS ("family=arn" CSV) overrides the per-family
+    JUDGE_COUNCIL_{SONNET,GLM,KIMI}_ARN vars. Unset per-family vars are dropped.
+    """
     raw = os.environ.get("JUDGE_COUNCIL_MEMBERS", "").strip()
     if raw:
-        return [m.strip() for m in raw.split(",") if m.strip()]
-    return [m for m in _DEFAULT_COUNCIL_MEMBERS if m]
+        return [_parse_council_member_override(m) for m in raw.split(",") if m.strip()]
+    out: list[CouncilMember] = []
+    for fam, var in _FAMILY_ENV_VARS:
+        val = (os.environ.get(var) or "").strip()
+        if val:
+            out.append(CouncilMember(family=fam, model=val))  # type: ignore[arg-type]
+    return out
 
 
 def _judge_system_prompt() -> str:
@@ -281,7 +336,7 @@ _DELIVERABLE_DIR_NAMES = ("results", "deliverables", "output", "out", "artifacts
 # judge evidence dump unmodified (UTF-8 read, errors='replace'). Adding a
 # binary extension here regresses per-member evidence parity: a 512 KB PDF
 # becomes ~512 KB of mojibake which sorts ahead of report.md and exhausts the
-# smaller council members' (Kimi 225 KB, GLM 175 KB per _MEMBER_EVIDENCE_BUDGETS)
+# smaller council members' (Kimi 225 KB, GLM 175 KB per _FAMILY_EVIDENCE)
 # truncation budget, producing "no report.md found" hallucinations. Strictly
 # text-only here.
 _DELIVERABLE_EXTS = {
@@ -431,26 +486,71 @@ _ZERO_USAGE = {
 }
 
 
-_JUDGE_RATES = {
-    "is9bst5tfadh": (3e-6, 1.5e-5, 3e-7, 3.75e-6),
-    "xx5msvho23iq": (0.6e-6, 2.4e-6, 0.0, 0.0),
-    "p532c9fzmeed": (0.6e-6, 2.5e-6, 0.0, 0.0),
-    "gpt-5.4": (1.25e-6, 1e-5, 1.25e-7, 0.0),
-    "gpt-5.5": (5e-6, 3e-5, 5e-7, 0.0),
-}
-
-
-def _judge_cost_usd(model: str, in_tok: int, out_tok: int, c_read: int, c_write: int) -> float:
-    rate = None
-    for key, val in _JUDGE_RATES.items():
+# Judge per-token rate resolution. Council members resolve via their stable
+# FAMILY (_FAMILY_RATES, rotation-proof); OpenAI single-judge fallbacks resolve
+# by model NAME (_OPENAI_JUDGE_RATES). Both tables live in the FAMILY block above
+# and MUST track real published provider list prices — the council cost line in
+# usage.json is computed directly from them (NOT via litellm), so any drift
+# silently mis-bills every graded task. There is no longer a profile-id-keyed
+# rate table: a rotating id is never a billing key.
+def _judge_rate_for(
+    model: str, family: str | None = None
+) -> tuple[float, float, float, float] | None:
+    fam = _family_for(model, family)
+    if fam is not None:
+        return _FAMILY_RATES.get(fam)
+    # Non-council (OpenAI) judge: substring-match the model name.
+    for key, val in _OPENAI_JUDGE_RATES.items():
         if key in (model or ""):
-            rate = val
-            break
+            return val
+    return None
+
+
+def _judge_cost_usd(
+    model: str, in_tok: int, out_tok: int, c_read: int, c_write: int,
+    family: str | None = None,
+) -> tuple[float, bool]:
+    # Returns (cost_usd, priced_ok). An unknown model is soft-degraded to
+    # (0.0, False) here rather than raising, so a long grading run never crashes
+    # mid-flight on a mis-configured judge. The fail-fast guarantee lives in
+    # validate_judge_pricing(), called at grade_with_rubric() startup; callers
+    # that bypass grade_with_rubric must run that validator themselves first.
+    rate = _judge_rate_for(model, family)
     if rate is None:
-        logger.warning("[judge_cost] unknown judge id for model=%r; cost defaulted to 0", model)
-        return 0.0
+        logger.error(
+            "[judge_cost] no rate for judge model=%r family=%r; cost recorded as "
+            "0.0 and flagged unpriced. Add a council family to _FAMILY_RATES or an "
+            "OpenAI model to _OPENAI_JUDGE_RATES in grading.py.",
+            model, family,
+        )
+        return 0.0, False
     r_in, r_out, r_cached, r_cwrite = rate
-    return in_tok * r_in + c_read * r_cached + c_write * r_cwrite + out_tok * r_out
+    cost = in_tok * r_in + c_read * r_cached + c_write * r_cwrite + out_tok * r_out
+    return cost, True
+
+
+def validate_judge_pricing(members: Sequence[CouncilMember | str]) -> None:
+    # Fail-fast at config boundary (grade_with_rubric startup), never mid-run.
+    # Two distinct failure modes so the operator knows which table to edit:
+    # a CouncilMember with an unpriced family vs an OpenAI judge name with no rate.
+    bad_family: list[str] = []
+    bad_openai: list[str] = []
+    for m in members:
+        if isinstance(m, CouncilMember):
+            if m.family not in _FAMILY_RATES:
+                bad_family.append(f"{m.family} ({m.model})")
+        elif _judge_rate_for(m) is None:
+            bad_openai.append(m)
+    if bad_family:
+        raise RuntimeError(
+            "Council member(s) have no _FAMILY_RATES entry and would be billed at "
+            f"$0: {bad_family}. Add the family's per-token rates before running."
+        )
+    if bad_openai:
+        raise RuntimeError(
+            "OpenAI judge model(s) have no _OPENAI_JUDGE_RATES entry and would be "
+            f"billed at $0: {bad_openai}. Add per-token rates before running."
+        )
 
 
 def _call_judge_openai(model: str, system: str, user: str) -> tuple[str, dict]:
@@ -508,6 +608,7 @@ def _call_judge_openai(model: str, system: str, user: str) -> tuple[str, dict]:
     comp_tok = int(u.get("completion_tokens", 0) or 0)
     cached_tok = int(details.get("cached_tokens", 0) or 0)
     input_excl = max(0, prompt_tok - cached_tok)
+    cost_usd, priced_ok = _judge_cost_usd(model, input_excl, comp_tok, cached_tok, 0)
     usage = {
         "input_tokens": input_excl,
         "output_tokens": comp_tok,
@@ -515,7 +616,8 @@ def _call_judge_openai(model: str, system: str, user: str) -> tuple[str, dict]:
         "cache_write_tokens": 0,
         "total_tokens": input_excl + comp_tok + cached_tok,
         "request_count": 1,
-        "cost_usd": _judge_cost_usd(model, input_excl, comp_tok, cached_tok, 0),
+        "cost_usd": cost_usd,
+        "cost_priced_ok": priced_ok,
     }
     return text, usage
 
@@ -523,22 +625,29 @@ def _call_judge_openai(model: str, system: str, user: str) -> tuple[str, dict]:
 _ARN_REGION_RE = re.compile(r"^arn:aws:bedrock:([a-z0-9-]+):")
 
 # Bedrock prompt-caching support is per-model. Anthropic Claude on Bedrock
-# accepts `cachePoint` blocks; Kimi (`p532c9fzmeed`) and GLM (`xx5msvho23iq`)
-# do NOT and return HTTP 403 "You invoked an unsupported model or your request
-# did not allow prompt caching." Observed in alden-croft 2026-06-02T20:20:04Z
-# gateway.log: 2-of-3 council members 403'd, quorum fell back to single-judge.
-# Identifiers below are the application-inference-profile IDs known to map to
-# Anthropic Claude family models. Add a new ID here only after empirically
-# confirming the underlying model is Anthropic.
-_CACHE_SUPPORTED_PROFILE_IDS = (
-    "is9bst5tfadh",  # Sonnet 4.6 (council default, single-judge primary)
+# accepts `cachePoint` blocks; Kimi and GLM do NOT and return HTTP 403 "You
+# invoked an unsupported model or your request did not allow prompt caching."
+# Observed in alden-croft 2026-06-02T20:20:04Z gateway.log: 2-of-3 council
+# members 403'd, quorum fell back to single-judge.
+#
+# TWO LAYERS, because a council member's id rotates monthly but a direct-ARN
+# (non-council) judge does not:
+#   Layer 1 — council members resolve by stable FAMILY (_FAMILY_CACHE_SUPPORTED),
+#             so caching eligibility survives ARN rotation.
+#   Layer 2 — non-council / direct-ARN paths (single-judge fallback, future
+#             judges) fall back to this substring allowlist of profile IDs known
+#             to map to Anthropic Claude. These are NOT council ids and are not
+#             rotated. Add a new ID only after confirming the model is Anthropic.
+_NON_COUNCIL_CACHE_SUPPORTED_TAILS = (
     "xv71vnlzm71s",  # Sonnet 4.6 (alternate; IAM-denied per b34 but caches when permitted)
     "96j5zamnqlci",  # Opus (.env KENSEI_BEDROCK_MODEL_ARN)
 )
 
 
-def _supports_prompt_caching(arn: str) -> bool:
-    return any(pid in (arn or "") for pid in _CACHE_SUPPORTED_PROFILE_IDS)
+def _supports_prompt_caching(arn: str, family: str | None = None) -> bool:
+    if family is not None:
+        return _FAMILY_CACHE_SUPPORTED.get(family, False)
+    return any(tail in (arn or "") for tail in _NON_COUNCIL_CACHE_SUPPORTED_TAILS)
 
 
 def _bedrock_region_for(arn: str) -> str:
@@ -548,7 +657,9 @@ def _bedrock_region_for(arn: str) -> str:
     return os.environ.get("KENSEI_AWS_REGION") or os.environ.get("AWS_REGION", "ap-south-1")
 
 
-def _call_judge_bedrock(arn: str, system: str, user: str) -> tuple[str, dict]:
+def _call_judge_bedrock(
+    arn: str, system: str, user: str, family: str | None = None
+) -> tuple[str, dict]:
     import urllib.request, urllib.parse, urllib.error
     from src.utils.bedrock_eventstream import iter_eventstream
     tok = os.environ.get("KENSEI_AWS_BEARER_TOKEN") or os.environ.get("AWS_BEARER_TOKEN_BEDROCK", "")
@@ -561,7 +672,7 @@ def _call_judge_bedrock(arn: str, system: str, user: str) -> tuple[str, dict]:
     url = f"https://bedrock-runtime.{reg}.amazonaws.com/model/{mid}/converse-stream"
 
     def _do_post(include_temperature: bool) -> tuple[str, dict]:
-        infer = {"maxTokens": _member_max_output_tokens(arn)}
+        infer = {"maxTokens": _member_max_output_tokens(arn, family)}
         if include_temperature:
             infer["temperature"] = 0
         # Bedrock prompt-caching: a `cachePoint` block marks the preceding
@@ -571,7 +682,7 @@ def _call_judge_bedrock(arn: str, system: str, user: str) -> tuple[str, dict]:
         # above). Gate emission on per-ARN allowlist; preserve b49 caching
         # win on Sonnet/Opus without re-triggering the 2-of-3 council quorum
         # collapse observed in alden-croft 2026-06-02T20:20Z gateway.log.
-        if _supports_prompt_caching(arn):
+        if _supports_prompt_caching(arn, family):
             system_blocks = [{"text": system}, {"cachePoint": {"type": "default"}}]
         else:
             system_blocks = [{"text": system}]
@@ -636,6 +747,7 @@ def _call_judge_bedrock(arn: str, system: str, user: str) -> tuple[str, dict]:
             or u.get("cache_creation_input_tokens")
             or 0
         )
+        cost_usd, priced_ok = _judge_cost_usd(arn, in_tok, out_tok, c_read, c_write, family)
         usage = {
             "input_tokens": in_tok,
             "output_tokens": out_tok,
@@ -643,7 +755,8 @@ def _call_judge_bedrock(arn: str, system: str, user: str) -> tuple[str, dict]:
             "cache_write_tokens": c_write,
             "total_tokens": in_tok + out_tok + c_read + c_write,
             "request_count": 1,
-            "cost_usd": _judge_cost_usd(arn, in_tok, out_tok, c_read, c_write),
+            "cost_usd": cost_usd,
+            "cost_priced_ok": priced_ok,
         }
         return text, usage
 
@@ -726,12 +839,16 @@ def _judge_use_litellm() -> bool:
     return v in ("1", "true", "yes", "on")
 
 
-def _call_one_judge(model: str, system: str, user: str) -> tuple[str, dict]:
+def _call_one_judge(
+    model: str, system: str, user: str, family: str | None = None
+) -> tuple[str, dict]:
     # Provider routing is CONTENT-AWARE, not naive partition("/"): a Bedrock
     # application-inference-profile ARN itself contains slashes, so a bare ARN
     # (missing the "bedrock/" prefix) would partition to provider != "bedrock" and
     # be silently misrouted to OpenAI, which 404s on the unknown model id. Detect
-    # Bedrock by shape so an ARN never reaches OpenAI.
+    # Bedrock by shape so an ARN never reaches OpenAI. `family` (when the caller is
+    # the council) carries the stable model identity so pricing/budget/cache
+    # lookups never depend on the monthly-rotating ARN profile id.
     m = (model or "").strip()
     if not m:
         raise RuntimeError("empty judge model id")
@@ -752,8 +869,9 @@ def _call_one_judge(model: str, system: str, user: str) -> tuple[str, dict]:
                 model=m,
                 system=system,
                 user=user,
-                max_output_tokens=_member_max_output_tokens(arn_tail),
+                max_output_tokens=_member_max_output_tokens(arn_tail, family),
                 cost_fn=_judge_cost_usd,
+                family=family,
             )
         except Exception as exc:  # pragma: no cover - fallback path
             logger.warning(
@@ -764,29 +882,32 @@ def _call_one_judge(model: str, system: str, user: str) -> tuple[str, dict]:
 
     head = m.partition("/")[0]
     if head == "bedrock":
-        return _call_judge_bedrock(m.partition("/")[2], system, user)
+        return _call_judge_bedrock(m.partition("/")[2], system, user, family)
     if head == "openai":
         return _call_judge_openai(m.partition("/")[2] or m, system, user)
     if m.startswith("arn:aws:bedrock:") or ":application-inference-profile/" in m:
         # Bare (unprefixed) Bedrock ARN — route to Bedrock instead of OpenAI.
-        return _call_judge_bedrock(m, system, user)
+        return _call_judge_bedrock(m, system, user, family)
     # Unknown/unprefixed id: treat as an OpenAI model name (e.g. "gpt-5.5").
     return _call_judge_openai(m, system, user)
 
 
 def _run_council(
-    members: list[str],
+    members: list[CouncilMember],
     system: str,
     user_for_member: "dict[str, str] | str",
     n_criteria: int,
 ) -> list[dict]:
     """Run every member judge in parallel and return one result dict per member:
-    {model, ok, verdicts?, usage, error?, user_chars, raw_response?}. Never raises.
+    {model, family, ok, verdicts?, usage, error?, user_chars, raw_response?}.
+    Never raises.
 
     `user_for_member` may be a single shared string (legacy) or a
     {model: user_prompt} dict so each member receives a payload sized to its
     own context window. `n_criteria` is the expected verdict count; parses
-    failing this count return `ok=False, error='parse: ...'` rather than raise."""
+    failing this count return `ok=False, error='parse: ...'` rather than raise.
+    Every result carries the member's stable `family` so downstream per-member
+    dicts key by family, not by the monthly-rotating ARN profile id."""
     from concurrent.futures import ThreadPoolExecutor
 
     def _resolve_user(model: str) -> str:
@@ -794,8 +915,10 @@ def _run_council(
             return user_for_member.get(model, "")
         return user_for_member
 
-    def _one(model: str) -> dict:
+    def _one(member: CouncilMember) -> dict:
         import time as _time
+        model = member.model
+        family = member.family
         user = _resolve_user(model)
         label = _short_judge_label(model)
         # Per-member API call telemetry: pre-call line lets operators see WHICH
@@ -805,20 +928,20 @@ def _run_council(
         # fan-out from run.sh logs alone. Mirrors run_batch.py:707
         # `Rubric judged:` summary line one level up.
         logger.info(
-            "Judge call start: model=%s user_chars=%d system_chars=%d",
-            label, len(user), len(system),
+            "Judge call start: model=%s family=%s user_chars=%d system_chars=%d",
+            label, family, len(user), len(system),
         )
         t0 = _time.monotonic()
         try:
-            raw, usage = _call_one_judge(model, system, user)
+            raw, usage = _call_one_judge(model, system, user, family)
         except Exception as exc:
             elapsed = _time.monotonic() - t0
             logger.warning(
-                "Judge call fail: model=%s elapsed=%.2fs stage=call error=%s",
-                label, elapsed, str(exc)[:200],
+                "Judge call fail: model=%s family=%s elapsed=%.2fs stage=call error=%s",
+                label, family, elapsed, str(exc)[:200],
             )
             return {
-                "model": model, "ok": False,
+                "model": model, "family": family, "ok": False,
                 "error": f"call: {exc}",
                 "usage": {**_ZERO_USAGE, "error": f"call: {exc}"},
                 "user_chars": len(user),
@@ -832,24 +955,25 @@ def _run_council(
             verdicts = _parse_verdict_text(raw, n_criteria)
         except Exception as exc:
             logger.warning(
-                "Judge call fail: model=%s elapsed=%.2fs stage=parse "
+                "Judge call fail: model=%s family=%s elapsed=%.2fs stage=parse "
                 "tokens=in:%d/out:%d/cR:%d/cW:%d error=%s",
-                label, elapsed, in_tok, out_tok, c_read, c_write, str(exc)[:200],
+                label, family, elapsed, in_tok, out_tok, c_read, c_write, str(exc)[:200],
             )
             return {
-                "model": model, "ok": False,
+                "model": model, "family": family, "ok": False,
                 "error": f"parse: {exc}", "usage": usage,
                 "user_chars": len(user),
                 "raw_response": raw[:2000] if isinstance(raw, str) else "",
             }
         logger.info(
-            "Judge call ok: model=%s elapsed=%.2fs "
+            "Judge call ok: model=%s family=%s elapsed=%.2fs "
             "tokens=in:%d/out:%d/cR:%d/cW:%d verdicts=%d/%d",
-            label, elapsed, in_tok, out_tok, c_read, c_write,
+            label, family, elapsed, in_tok, out_tok, c_read, c_write,
             len(verdicts), n_criteria,
         )
         return {
-            "model": model, "ok": True, "verdicts": verdicts, "usage": usage,
+            "model": model, "family": family, "ok": True,
+            "verdicts": verdicts, "usage": usage,
             "user_chars": len(user),
         }
 
@@ -894,7 +1018,7 @@ def _grade_council(
     rubrics: list,
     system: str,
     user_for_member: "dict[str, str] | str",
-    members: list[str],
+    members: list[CouncilMember],
 ) -> dict:
     """Council aggregation — UNANIMOUS-ONLY (m1609 2026-06-09).
 
@@ -954,7 +1078,7 @@ def _grade_council(
         per_satisfied: list[bool] = []
         per_rationale: list[str] = []
         per_truncation: list[bool] = []
-        per_label: list[str] = [_short_judge_label(m) for m in members]
+        per_label: list[str] = [m.family for m in members]
         per_voted: list[bool] = []
 
         # Build per-member vote state aligned to the full `members` list so a
@@ -962,7 +1086,7 @@ def _grade_council(
         # in the votes string, matching the truncated-mid-rubric semantics.
         survivor_lookup = {r["model"]: vs for r, vs in zip(surviving, verdicts_per_member)}
         for m in members:
-            vs = survivor_lookup.get(m)
+            vs = survivor_lookup.get(m.model)
             if vs is None:
                 per_voted.append(False)
                 per_satisfied.append(False)
@@ -1032,6 +1156,14 @@ def _grade_council(
 
     overall = max(0.0, min(1.0, weighted / total_w))
     council_usage = _ZERO_USAGE.copy()
+    # Per-member usage breakdown: the flat sum below collapses all members into
+    # one cost line, hiding which model spent what. Preserve each member's own
+    # tokens/cost keyed by stable FAMILY ('sonnet'/'glm'/'kimi'), NOT the monthly-
+    # rotating ARN profile id — so a tool reading sources.judge.per_member finds
+    # the same keys before and after an ARN rotation. Rides on council_usage as a
+    # non-numeric passthrough, so recompute_combined leaves it alone and the
+    # total=in+out+cR+cW invariant is unaffected.
+    per_member: dict[str, dict] = {}
     for r in results:
         u = r.get("usage") or {}
         for k in council_usage.keys():
@@ -1039,10 +1171,37 @@ def _grade_council(
                 council_usage[k] = float(council_usage.get(k, 0.0)) + float(u.get(k, 0.0) or 0.0)
             else:
                 council_usage[k] = int(council_usage.get(k, 0)) + int(u.get(k, 0) or 0)
+        in_tok = int(u.get("input_tokens", 0) or 0)
+        out_tok = int(u.get("output_tokens", 0) or 0)
+        cr_tok = int(u.get("cache_read_tokens", 0) or 0)
+        cw_tok = int(u.get("cache_write_tokens", 0) or 0)
+        member_entry: dict = {
+            "model": r.get("model", ""),
+            "input_tokens": in_tok,
+            "output_tokens": out_tok,
+            "cache_read_tokens": cr_tok,
+            "cache_write_tokens": cw_tok,
+            "total_tokens": in_tok + out_tok + cr_tok + cw_tok,
+            "request_count": int(u.get("request_count", 0) or 0),
+            "cost_usd": float(u.get("cost_usd", 0.0) or 0.0),
+            "ok": bool(r.get("ok")),
+        }
+        if "cost_priced_ok" in u:
+            member_entry["cost_priced_ok"] = bool(u.get("cost_priced_ok"))
+        if r.get("error"):
+            member_entry["error"] = str(r.get("error"))[:200]
+        # Key by family. Families are unique per council (one sonnet/glm/kimi
+        # each); the full ARN is retained inside member_entry["model"] for audit.
+        # Fall back to the full model string only if family is somehow absent.
+        key = r.get("family") or str(r.get("model", "") or "")
+        if key in per_member:
+            key = str(r.get("model", "") or key)
+        per_member[key] = member_entry
     council_usage["total_tokens"] = (
         council_usage["input_tokens"] + council_usage["output_tokens"]
         + council_usage["cache_read_tokens"] + council_usage["cache_write_tokens"]
     )
+    council_usage["per_member"] = per_member
 
     headroom_per_member: dict[str, dict] = {}
     headroom_tokens_saved_total = 0
@@ -1052,7 +1211,7 @@ def _grade_council(
         if not isinstance(h, dict) or not h:
             continue
         headroom_enabled = True
-        headroom_per_member[_short_judge_label(r.get("model", ""))] = h
+        headroom_per_member[r.get("family") or _short_judge_label(r.get("model", ""))] = h
         headroom_tokens_saved_total += int(h.get("tokens_saved", 0) or 0)
 
     n = len(rubrics)
@@ -1061,11 +1220,12 @@ def _grade_council(
     # Schema contract — score.json scores RUBRIC CRITERIA, not pytest tests.
     # Canonical keys: criteria_total/_passed/_failed/_abstained and
     # rubric_weights_percentage (= overall_score * 100, per user formula m1420).
-    # criteria_total = passed + failed + abstained (b82 invariant). The deprecated
-    # tests_* aliases were dropped here; the harbor pytest channel (test_result /
-    # SQLite store / ctrf.json) derives its tests_* counts from criteria_* via the
-    # tr_meta adapter at eval/run_batch.py:936-938, which already falls back to
-    # criteria_* when no real pytest ran. See NOMENCLATURE.md for the channel boundary.
+    # criteria_total = passed + failed + abstained (b82 invariant). The tests_*
+    # keys are deprecated aliases retained ONLY because run_batch.py:706-714
+    # forwards these counts into the harbor pytest channel (test_result / SQLite
+    # store / ctrf.json) when no real pytest result exists. Deleting the aliases
+    # here without first migrating that adapter will silently zero the harbor
+    # bundle's test counts. See NOMENCLATURE.md for the channel boundary.
     return {
         "overall_score": round(overall, 4),
         "rubric_weights_percentage": round(overall * 100.0, 2),
@@ -1084,10 +1244,10 @@ def _grade_council(
             ],
             "aggregation": "majority_vote_partial_coverage",
             "per_member_user_chars": {
-                r["model"]: int(r.get("user_chars", 0) or 0) for r in results
+                r["family"]: int(r.get("user_chars", 0) or 0) for r in results
             },
             "per_member_verdict_count": {
-                r["model"]: len(r["verdicts"]) for r in surviving
+                r["family"]: len(r["verdicts"]) for r in surviving
             },
             "headroom_enabled": headroom_enabled,
             "headroom_tokens_saved_total": headroom_tokens_saved_total,
@@ -1117,6 +1277,7 @@ def grade_with_rubric(
     Returns a scores dict:
     {overall_score, rubric_weights_percentage,
      criteria_total, criteria_passed, criteria_failed, criteria_abstained,
+     tests_total, tests_passed, tests_failed,   # deprecated aliases
      criteria:[...], judge_model:'council', judge_council:{...},
      truncation_flags, abstention_flags, usage}
     or {overall_score:0.0, error:...} when no rubrics or no council members
@@ -1129,15 +1290,17 @@ def grade_with_rubric(
     if not members:
         return {
             "overall_score": 0.0,
-            "error": "no judge council members configured (set JUDGE_COUNCIL_MEMBERS)",
+            "error": "no judge council members configured (set JUDGE_COUNCIL_SONNET_ARN / _GLM_ARN / _KIMI_ARN, or JUDGE_COUNCIL_MEMBERS) in .env",
             "usage": dict(_ZERO_USAGE),
         }
 
+    validate_judge_pricing(members)
+
     user_for_member: dict[str, str] = {}
     for m in members:
-        budget = _member_evidence_budget(m)
+        budget = _member_evidence_budget(m.model, m.family)
         ev = _gather_evidence(workspace_results, transcript_text, budget=budget)
-        user_for_member[m] = _judge_user_prompt(task_description, rubrics, ev)
+        user_for_member[m.model] = _judge_user_prompt(task_description, rubrics, ev)
     return _grade_council(rubrics, system, user_for_member, members)
 
 def _write_score(output_dir: Path, task_id: str, scores: dict) -> None:
@@ -1378,9 +1541,10 @@ def print_summary(results: list[dict], category: str, output_dir: Path, model_na
     print("#" * 60)
 
 _MODEL_COST_PER_TOKEN: dict[str, tuple[float, float]] = {
-    "gpt-5.5":          (0.000005,  0.00003),
-    "gpt-4o":           (0.0000025, 0.00001),
-    "claude-opus-4.7":  (0.000005,  0.000025),
+    "gpt-5.5":            (0.000005,  0.00003),
+    "gpt-4o":             (0.0000025, 0.00001),
+    "claude-opus-4.7":    (0.000005,  0.000025),
+    "claude-sonnet-4.6":  (0.000003,  0.000015),
 }
 
 
@@ -1587,6 +1751,12 @@ def extract_usage_from_jsonl(jsonl_path: Path) -> dict:
             totals["input_tokens"]  * rates[0]
             + totals["output_tokens"] * rates[1]
         )
+
+    # Mark missing-price $0 (e.g. OpenRouter-only models) so it is not read as "free".
+    if totals["cost_usd"] == 0.0 and totals["request_count"] > 0:
+        model_id = last_model.split("/")[-1] if last_model else ""
+        if model_id not in _MODEL_COST_PER_TOKEN:
+            totals["cost_unpriced"] = True
 
     totals["cost_usd"] = round(totals["cost_usd"], 6)
     return totals

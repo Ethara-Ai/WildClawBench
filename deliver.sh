@@ -1,19 +1,12 @@
 #!/usr/bin/env bash
-# One-shot deliverable pipeline:  [run] -> push RAW -> convert -> push CONVERTED
+# One-shot deliverable pipeline:  [run] -> convert -> push
 #
-#   (optional) 0. RUN      run the eval task(s) via ./run.sh  (Docker + API keys)
-#              1. PUSH RAW  push the raw run-output to the DATASETS repo
-#                           (kensei-datasets), before any conversion
-#              2. CONVERT   raw run output -> harbour CLI / "bundle" format
-#                           (scripts/repackage_to_bundle.py)
-#              3. PUSH      push converted bundles to the DELIVERY repo
-#                           (kensei-delievery)
-#
-# BOTH repos get the same layout:  <deliverable>/<YYYY-MM-DD>/<task dirs>/
-# All tasks delivered on a given day land in that day's date folder; if the
-# folder already exists in the repo it is reused (not recreated). Concurrent
-# task deliveries are conflict-safe: each push rebases on top of any push that
-# landed first and retries, so two tasks finishing together don't clobber.
+#   (optional) 0. RUN     run the eval task(s) via ./run.sh  (Docker + API keys)
+#              1. CONVERT  raw run output -> harbour CLI / "bundle" format
+#                          (scripts/repackage_to_bundle.py)
+#              2. BUNDLE   clone the delivery repo, drop output into test_deliverables/
+#                          (folder created if absent)
+#              3. PUSH     commit + push to the delivery repo's main branch
 #
 # Two modes:
 #   CONVERT-ONLY (default): packages whatever already exists under output/.
@@ -32,31 +25,25 @@
 #   ./deliver.sh --run --task input/chris_event --model claude-opus-4.7 -k 3   # override
 #
 #   --dry-run                    everything EXCEPT the final push (safe test)
-#   --date 2026-06-09            override the date folder (default: today, local)
-#   --no-raw                     skip the raw datasets push (converted only)
-#   --datasets-repo <url>        override the raw datasets repo
-#   --deliverable other_dir      push into a different top folder (default: delivery)
+#   --deliverable deliverables_3   push into a different folder (default: test_deliverables)
 #   (Git LFS is ON by default for large binaries .jpg/.png/.pdf/... )
 #   --no-lfs                     disable Git LFS, push as plain git
 #
 # Non-interactive auth (EC2 / headless / CI) — no username/password prompt:
-#   export GITHUB_TOKEN=ghp_xxx          # your PAT (repo scope; needs access to BOTH repos)
+#   export GITHUB_TOKEN=ghp_xxx          # your PAT (repo scope)
 #   ./deliver.sh --run --task input/ben_cox_... --task input/chris_murray_...
 #
-# Requires: python3, git (+ push creds for BOTH the datasets and delivery repos)
-# and git-lfs (default; brew install git-lfs / apt-get install git-lfs —
-# auto-falls back to plain git if absent). --run also needs Docker + valid .env.
+# Requires: python3, git (+ push creds for the delivery repo) and git-lfs
+# (default; brew install git-lfs / apt-get install git-lfs — auto-falls back to
+# plain git if absent). --run also needs Docker + a valid .env, like ./run.sh.
 
 set -euo pipefail
 
 # ---- configuration (override via flags) ------------------------------------
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TARGET_REPO="https://github.com/Ethara-Ai/kensei-delievery.git"   # CONVERTED bundles
-DATASETS_REPO="https://github.com/Ethara-Ai/kensei-datasets.git"  # RAW run output
+TARGET_REPO="https://github.com/Ethara-Ai/kensei-delievery.git"
 TARGET_BRANCH="main"
-DELIVERABLE_DIR="delivery"
-RUN_DATE="$(date +%F)"            # per-run date folder (YYYY-MM-DD); override with --date
-DO_RAW=1                          # push raw output to datasets repo (--no-raw to skip)
+DELIVERABLE_DIR="test_deliverables"
 SOURCE_ROOT="output/openclaw"     # raw run-output tree to convert
 INPUT_ROOT="input"                # where task dirs live (for --all-tasks)
 PERSONA=""                        # convert-only: one persona (empty => --all)
@@ -71,8 +58,6 @@ declare -a RUN_TASKS=()           # --task (repeatable)
 
 USE_LFS=1                         # default ON: track large binaries via git-lfs (--no-lfs to disable)
 LFS_EXPLICIT=0                    # set when --lfs is passed explicitly (then a missing git-lfs is fatal)
-LFS_GLOBS=("*.jpg" "*.jpeg" "*.png" "*.gif" "*.webp" "*.pdf" "*.zip" \
-           "*.m4a" "*.mp3" "*.wav" "*.mp4" "*.mov" "*.docx" "*.xlsx" "*.pptx")
 # Non-interactive auth (EC2/headless): export GITHUB_TOKEN or GH_TOKEN before running.
 GH_TOKEN_VAL="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
 
@@ -98,96 +83,6 @@ _auth_url(){
     fi
 }
 
-# Resolve which raw run-output dirs under SOURCE_ROOT match a persona selector.
-# Arg1: a persona string, or the literal "__ALL__" to take every task dir.
-# Prints one absolute dir path per line. Reuses repackage_to_bundle.persona_core
-# so the raw selection matches exactly what the convert step delivers.
-_raw_dirs_for_persona(){
-    python3 - "$REPO_ROOT/$SOURCE_ROOT" "$1" <<'PY'
-import sys, pathlib
-sys.path.insert(0, "scripts")
-from repackage_to_bundle import persona_core
-root = pathlib.Path(sys.argv[1]); sel = sys.argv[2]
-want = None if sel == "__ALL__" else persona_core(sel)
-for p in sorted(root.iterdir()):
-    if not p.is_dir():
-        continue
-    core = persona_core(p.name)
-    if want is None or core == want or (want and want in core):
-        print(p)
-PY
-}
-
-# Conflict-safe publish of a staged tree into <deliverable>/<date>/ of a repo.
-#   publish_to_repo <repo_url> <branch> <deliverable_dir> <run_date> <src_dir> <label> <count>
-# Clones fresh, (optionally) enables Git LFS, copies $src_dir/. into the dated
-# folder (reusing it if it already exists), commits, and pushes. On a rejected
-# push (a concurrent task moved the branch) it rebases on top and retries, so
-# parallel task deliveries don't clobber each other.
-publish_to_repo(){
-    local repo_url="$1" branch="$2" deliv="$3" rundate="$4" srcdir="$5" label="$6" count="$7"
-    local clone; clone="$(mktemp -d)"
-
-    info "[$label] cloning $repo_url (branch: $branch)${GH_TOKEN_VAL:+ [token auth]}"
-    if ! git clone --depth 1 --branch "$branch" "$(_auth_url "$repo_url")" "$clone" 2>/dev/null; then
-        warn "[$label] branch '$branch' not present — cloning default and creating it"
-        git clone --depth 1 "$(_auth_url "$repo_url")" "$clone" \
-            || { rm -rf "$clone"; die "[$label] clone failed (check access to $repo_url)"; }
-        git -C "$clone" checkout -B "$branch"
-    fi
-
-    (
-        cd "$clone"
-        if [[ "$USE_LFS" -eq 1 ]]; then
-            git lfs install --local >/dev/null 2>&1 || true
-            git lfs track "${LFS_GLOBS[@]}" >/dev/null 2>&1 || true
-            git add .gitattributes 2>/dev/null || true
-        fi
-
-        local dest="$clone/$deliv/$rundate"
-        mkdir -p "$dest"                       # reuse today's folder if it already exists
-        info "[$label] copying $count item(s) into $deliv/$rundate/"
-        cp -R "$srcdir"/. "$dest"/
-
-        # Raw run-output can contain an agent's own workspace as a nested git repo
-        # (.../workspace_full/.git). Left in place, `git add` aborts with "does not
-        # have a commit checked out" and the whole push silently stages nothing.
-        # Strip every embedded .git so we commit plain files, not a repo-in-repo.
-        find "$dest" -depth -name .git -exec rm -rf {} + 2>/dev/null || true
-
-        git add "$deliv"
-        if git diff --cached --quiet; then
-            warn "[$label] no changes to commit — already up to date."
-            exit 0
-        fi
-        local stamp; stamp="$(date -u '+%Y-%m-%d %H:%M:%SZ')"
-        git commit -q -m "$label $rundate ($count item(s)) — $stamp"
-
-        if [[ "$DRY_RUN" -eq 1 ]]; then
-            warn "[$label] --dry-run: committed locally in clone but NOT pushing."
-            exit 0
-        fi
-
-        # Push with rebase-on-conflict retry (safe for concurrent task deliveries).
-        local tries=0 max=6
-        until git push origin "$branch"; do
-            tries=$((tries + 1))
-            if (( tries > max )); then
-                err "[$label] push still failing after $max retries — giving up."
-                exit 1
-            fi
-            warn "[$label] push rejected (remote moved) — rebasing & retrying ($tries/$max)"
-            git fetch --depth 50 origin "$branch" 2>/dev/null || git fetch origin "$branch" || true
-            git rebase "origin/$branch" || git pull --rebase --no-edit origin "$branch" || true
-            sleep 2
-        done
-        ok "[$label] pushed $deliv/$rundate/ to $branch"
-    )
-    local rc=$?
-    rm -rf "$clone"
-    return $rc
-}
-
 # ---- args ------------------------------------------------------------------
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -203,12 +98,9 @@ while [[ $# -gt 0 ]]; do
         --persona)      PERSONA="${2:?--persona needs a value}"; shift 2 ;;
         --source-root)  SOURCE_ROOT="${2:?--source-root needs a value}"; shift 2 ;;
         --deliverable)  DELIVERABLE_DIR="${2:?--deliverable needs a value}"; shift 2 ;;
-        --date)         RUN_DATE="${2:?--date needs a value (YYYY-MM-DD)}"; shift 2 ;;
-        --no-raw)       DO_RAW=0; shift ;;
-        --datasets-repo) DATASETS_REPO="${2:?--datasets-repo needs a value}"; shift 2 ;;
         --branch)       TARGET_BRANCH="${2:?--branch needs a value}"; shift 2 ;;
         --repo)         TARGET_REPO="${2:?--repo needs a value}"; shift 2 ;;
-        -h|--help)      sed -n '2,48p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help)      sed -n '2,39p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *)              die "unknown arg: $1 (try --help)" ;;
     esac
 done
@@ -218,9 +110,9 @@ command -v git >/dev/null     || die "git not found in PATH"
 cd "$REPO_ROOT"
 
 # ---- temp workspace (cleaned on exit) --------------------------------------
-STAGING="$(mktemp -d)"          # converted bundles
-RAW_STAGING="$(mktemp -d)"      # raw run-output, selected per persona
-cleanup(){ rm -rf "$STAGING" "$RAW_STAGING"; }
+STAGING="$(mktemp -d)"
+CLONE_DIR="$(mktemp -d)"
+cleanup(){ rm -rf "$STAGING" "$CLONE_DIR"; }
 trap cleanup EXIT
 
 # ---- 0. (optional) RUN the eval to produce fresh output --------------------
@@ -280,48 +172,7 @@ fi
 
 [[ -d "$REPO_ROOT/$SOURCE_ROOT" ]] || die "source root not found: $SOURCE_ROOT (nothing to convert)"
 
-# With a token present, fail fast instead of hanging on a prompt (headless/EC2).
-[[ -n "$GH_TOKEN_VAL" ]] && export GIT_TERMINAL_PROMPT=0
-
-# Resolve Git LFS availability once; publish_to_repo honors the final USE_LFS.
-if [[ "$USE_LFS" -eq 1 ]] && ! command -v git-lfs >/dev/null; then
-    if [[ "$LFS_EXPLICIT" -eq 1 ]]; then
-        die "git-lfs not installed (macOS: brew install git-lfs ; Ubuntu/EC2: sudo apt-get install -y git-lfs)"
-    fi
-    warn "git-lfs not installed — falling back to plain git (install git-lfs to enable LFS, or pass --no-lfs to silence)"
-    USE_LFS=0
-fi
-
-# Persona selectors for this delivery — the exact set the convert step will use
-# (run-mode personas, else one --persona, else every task = __ALL__).
-declare -a SELECTORS=()
-if [[ ${#CONVERT_PERSONAS[@]} -gt 0 ]]; then SELECTORS=("${CONVERT_PERSONAS[@]}")
-elif [[ -n "$PERSONA" ]];            then SELECTORS=("$PERSONA")
-else                                      SELECTORS=("__ALL__")
-fi
-
-# ---- 1. push RAW run-output -> datasets repo (before converting) -----------
-if [[ "$DO_RAW" -eq 1 ]]; then
-    info "Staging raw run-output (source: $SOURCE_ROOT) for datasets push"
-    raw_n=0
-    for sel in "${SELECTORS[@]}"; do
-        while IFS= read -r d; do
-            [[ -n "$d" ]] || continue
-            cp -R "$d" "$RAW_STAGING/" && raw_n=$((raw_n + 1))
-        done < <(_raw_dirs_for_persona "$sel")
-    done
-    if [[ "$raw_n" -gt 0 ]]; then
-        ok "Staged $raw_n raw task dir(s)"
-        publish_to_repo "$DATASETS_REPO" "$TARGET_BRANCH" "$DELIVERABLE_DIR" "$RUN_DATE" \
-            "$RAW_STAGING" "raw-dataset" "$raw_n" || die "raw dataset push failed"
-    else
-        warn "No raw task dirs matched the selection — skipping datasets push."
-    fi
-else
-    info "--no-raw set: skipping raw datasets push."
-fi
-
-# ---- 2. convert raw output -> harbour/bundle format ------------------------
+# ---- 1. convert raw output -> harbour/bundle format ------------------------
 info "Converting output -> harbour CLI format (source: $SOURCE_ROOT)"
 if [[ "${#CONVERT_PERSONAS[@]}" -gt 0 ]]; then
     # Run mode: convert each freshly-run task individually by persona.
@@ -338,12 +189,60 @@ else
     python3 "$REPO_ROOT/scripts/repackage_to_bundle.py" "${REPACKAGE_ARGS[@]}"
 fi
 
-rm -f "$STAGING/.tasks.txt" 2>/dev/null || true   # drop temp bulk file if it lingered
 shopt -s nullglob dotglob
 converted=("$STAGING"/*)
+# Don't count the temp bulk file if it lingered.
+converted=("${converted[@]/$STAGING\/.tasks.txt}")
 [[ ${#converted[@]} -gt 0 ]] || die "conversion produced no bundles under staging dir"
 ok "Converted ${#converted[@]} bundle(s)"
 
-# ---- 3. push CONVERTED bundles -> delivery repo ----------------------------
-publish_to_repo "$TARGET_REPO" "$TARGET_BRANCH" "$DELIVERABLE_DIR" "$RUN_DATE" \
-    "$STAGING" "delivery-bundle" "${#converted[@]}" || die "delivery push failed"
+# ---- 2. clone delivery repo & stage into the deliverable folder ------------
+# With a token present, fail fast instead of hanging on a prompt (headless/EC2).
+[[ -n "$GH_TOKEN_VAL" ]] && export GIT_TERMINAL_PROMPT=0
+info "Cloning $TARGET_REPO (branch: $TARGET_BRANCH)${GH_TOKEN_VAL:+ [token auth]}"
+git clone --depth 1 --branch "$TARGET_BRANCH" "$(_auth_url "$TARGET_REPO")" "$CLONE_DIR" \
+    || die "clone failed (check access/credentials and that branch '$TARGET_BRANCH' exists)"
+
+cd "$CLONE_DIR"
+
+# Optional: route large binaries through Git LFS so git history stays lean.
+if [[ "$USE_LFS" -eq 1 ]] && ! command -v git-lfs >/dev/null; then
+    if [[ "$LFS_EXPLICIT" -eq 1 ]]; then
+        die "git-lfs not installed (macOS: brew install git-lfs ; Ubuntu/EC2: sudo apt-get install -y git-lfs)"
+    fi
+    warn "git-lfs not installed — falling back to plain git (install git-lfs to enable LFS, or pass --no-lfs to silence)"
+    USE_LFS=0
+fi
+if [[ "$USE_LFS" -eq 1 ]]; then
+    info "Enabling Git LFS for large binary artifacts"
+    git lfs install --local >/dev/null
+    git lfs track "*.jpg" "*.jpeg" "*.png" "*.gif" "*.webp" "*.pdf" "*.zip" \
+                  "*.m4a" "*.mp3" "*.wav" "*.mp4" "*.mov" "*.docx" "*.xlsx" "*.pptx" >/dev/null
+    git add .gitattributes
+fi
+
+DEST="$CLONE_DIR/$DELIVERABLE_DIR"
+mkdir -p "$DEST"            # create folder if it doesn't exist
+info "Copying converted bundles into $DELIVERABLE_DIR/"
+rm -f "$STAGING/.tasks.txt" 2>/dev/null || true
+cp -R "$STAGING"/. "$DEST"/
+
+# ---- 3. commit + push ------------------------------------------------------
+git add "$DELIVERABLE_DIR"
+if git diff --cached --quiet; then
+    warn "No changes to commit (delivery repo already up to date). Nothing to push."
+    exit 0
+fi
+
+STAMP="$(date -u '+%Y-%m-%d %H:%M:%SZ')"
+git commit -m "Add ${DELIVERABLE_DIR} (harbour CLI bundles, ${#converted[@]} item(s)) — ${STAMP}"
+
+if [[ "$DRY_RUN" -eq 1 ]]; then
+    warn "--dry-run set: committed locally in the clone but NOT pushing."
+    info "Re-run without --dry-run to push to '$TARGET_BRANCH'."
+    exit 0
+fi
+
+info "Pushing to $TARGET_REPO ($TARGET_BRANCH)"
+git push origin "$TARGET_BRANCH" || die "push failed (check push access to the delivery repo)"
+ok "Pushed ${DELIVERABLE_DIR}/ to $TARGET_BRANCH"

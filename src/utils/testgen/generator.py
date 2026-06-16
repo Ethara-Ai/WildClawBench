@@ -361,6 +361,7 @@ def generate_task_tests(
         "cache_write_tokens": 0,
         "total_tokens": 0,
         "request_count": 0,
+        "cost_usd": 0.0,
     }
     attempts_done = 0
 
@@ -402,6 +403,7 @@ def generate_task_tests(
         for _k in ("input_tokens", "output_tokens", "cache_read_tokens",
                    "cache_write_tokens", "total_tokens", "request_count"):
             total_usage[_k] += int(usage.get(_k, 0) or 0)
+        total_usage["cost_usd"] += float(usage.get("cost_usd", 0.0) or 0.0)
 
         parsed = _extract_json_object(response_text)
         if parsed is None:
