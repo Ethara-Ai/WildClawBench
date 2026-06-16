@@ -368,7 +368,7 @@ def build_published_trajectory(
         "task_description": _task_attr(task, "task_description"),
         "task_type": task_type,
     }
-    return {"messages": messages, "meta_info": meta_info}
+    return {"meta_info": meta_info, "messages": messages}
 
 
 def _count_thinking_blocks(messages) -> tuple[int, list[dict]]:

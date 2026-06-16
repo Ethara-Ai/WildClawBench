@@ -1,6 +1,0 @@
-id,name,displayName,email,avatarUrl,active,admin,teamId,createdAt,updatedAt
-user-amanda,amanda.hayes,Amanda Hayes,ahayes@ridgelinecloud.io,https://avatars.ridgelinecloud.io/amanda.png,true,false,team-backend,2023-09-01T09:00:00,2026-09-30T16:00:00
-user-raj,raj.kapoor,Raj Kapoor,rkapoor@ridgelinecloud.io,https://avatars.ridgelinecloud.io/raj.png,true,true,team-backend,2023-08-15T09:00:00,2026-09-30T16:00:00
-user-elena,elena.ross,Elena Ross,eross@ridgelinecloud.io,https://avatars.ridgelinecloud.io/elena.png,true,false,team-backend,2024-02-10T09:00:00,2026-09-30T16:00:00
-user-marcus,marcus.jeffries,Marcus Jeffries,mjeffries@ridgelinecloud.io,https://avatars.ridgelinecloud.io/marcus.png,true,true,team-backend,2023-08-15T09:00:00,2026-09-30T16:00:00
-user-sophie,sophie.chen,Sophie Chen,schen@ridgelinecloud.io,https://avatars.ridgelinecloud.io/sophie.png,true,false,team-frontend,2024-06-01T09:00:00,2026-09-30T16:00:00
