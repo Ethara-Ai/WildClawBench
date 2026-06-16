@@ -1,7 +1,7 @@
-id,form_id,form_name,respondent,submitted_at,sentiment,raw_text
-tf_001,plateau_intercept,Mobilite Plateau intercept survey,anon_001,2026-10-12T09:00:00-04:00,supportive,"Bike lane alignment looks reasonable. Parking concerns from local shops should be heard."
-tf_002,plateau_intercept,Mobilite Plateau intercept survey,anon_002,2026-10-12T10:30:00-04:00,supportive,"Cycling counts after the alignment look strong (2,980 projected). Will use this route daily."
-tf_003,plateau_intercept,Mobilite Plateau intercept survey,anon_003,2026-10-12T11:45:00-04:00,critical,"Parking spaces lost (84). Want mitigation. Otherwise neutral on the alignment itself."
-tf_004,plateau_intercept,Mobilite Plateau intercept survey,anon_004,2026-10-12T13:00:00-04:00,supportive,"Tree canopy on Rachel feels minimal. Glad to see the 22.4% GIS reading guiding the plan."
-tf_005,plateau_intercept,Mobilite Plateau intercept survey,anon_005,2026-10-12T15:30:00-04:00,critical,"Worried about displacement in Parc-Extension. Need to know how city plans protect renters."
-tf_intercept_N,plateau_intercept,Mobilite Plateau intercept survey,SUMMARY,2026-10-12T23:59:00-04:00,mixed,"Intercept N=312 total. Balanced sentiment overall. Most cited issue: parking mitigation. Most cited support: cycling-trip projections (2,980 after) and tree-canopy progress (22.4 percent)."
+response_id,form_id,submitted_time,landed_time,completed,form_name,respondent,sentiment,raw_text
+tf_001,plateau_intercept,2026-10-12T09:00:00-04:00,2026-10-12T08:55:00-04:00,true,Mobilite Plateau intercept survey,anon_001,supportive,"Bike lane alignment looks reasonable. Parking concerns from local shops should be heard."
+tf_002,plateau_intercept,2026-10-12T10:30:00-04:00,2026-10-12T10:25:00-04:00,true,Mobilite Plateau intercept survey,anon_002,supportive,"Cycling counts after the alignment look strong (2,980 projected). Will use this route daily."
+tf_003,plateau_intercept,2026-10-12T11:45:00-04:00,2026-10-12T11:40:00-04:00,true,Mobilite Plateau intercept survey,anon_003,critical,"Parking spaces lost (84). Want mitigation. Otherwise neutral on the alignment itself."
+tf_004,plateau_intercept,2026-10-12T13:00:00-04:00,2026-10-12T12:55:00-04:00,true,Mobilite Plateau intercept survey,anon_004,supportive,"Tree canopy on Rachel feels minimal. Glad to see the 22.4% GIS reading guiding the plan."
+tf_005,plateau_intercept,2026-10-12T15:30:00-04:00,2026-10-12T15:25:00-04:00,true,Mobilite Plateau intercept survey,anon_005,critical,"Worried about displacement in Parc-Extension. Need to know how city plans protect renters."
+tf_intercept_N,plateau_intercept,2026-10-12T23:59:00-04:00,2026-10-12T23:55:00-04:00,true,Mobilite Plateau intercept survey,SUMMARY,mixed,"Intercept N=312 total. Balanced sentiment overall. Most cited issue: parking mitigation. Most cited support: cycling-trip projections (2,980 after) and tree-canopy progress (22.4 percent)."

@@ -1,5 +1,5 @@
-id,campaign,subject,sent_at,recipients,opens,open_rate,clicks,click_rate,unsubscribes
-mc_001,mobilite_plateau_monthly,"Mobilite Plateau - October consultation update",2026-10-08T07:00:00-04:00,3420,1480,43.3%,612,17.9%,7
-mc_002,mobilite_plateau_monthly,"Mobilite Plateau - September brief",2026-09-08T07:00:00-04:00,3340,1290,38.6%,498,14.9%,11
-mc_003,mobilite_plateau_reminder,"Reminder: October 15 consultation",2026-10-13T06:00:00-04:00,3420,2010,58.8%,841,24.6%,3
-mc_004,parc_extension_partners,"Parc-Extension community partner digest",2026-10-09T08:00:00-04:00,184,118,64.1%,72,39.1%,1
+id,list_id,type,status,subject_line,from_name,reply_to,title,emails_sent,send_time,create_time,opens,open_rate,clicks,click_rate,unsubscribes
+mc_001,list-mobilite-newsletter,regular,sent,Mobilite Plateau - October consultation update,Ville de Montreal,communications.ville@Finthesiss.ai,Mobilite Plateau Monthly - October,3420,2026-10-08T11:00:00.000Z,2026-10-07T15:00:00.000Z,1480,43.3,612,17.9,7
+mc_002,list-mobilite-newsletter,regular,sent,Mobilite Plateau - September brief,Ville de Montreal,communications.ville@Finthesiss.ai,Mobilite Plateau Monthly - September,3340,2026-09-08T11:00:00.000Z,2026-09-07T15:00:00.000Z,1290,38.6,498,14.9,11
+mc_003,list-mobilite-newsletter,regular,sent,Reminder: October 15 consultation,Ville de Montreal,communications.ville@Finthesiss.ai,Mobilite Plateau Reminder - Oct 15,3420,2026-10-13T10:00:00.000Z,2026-10-12T22:00:00.000Z,2010,58.8,841,24.6,3
+mc_004,list-parc-extension-partners,regular,sent,Parc-Extension community partner digest,Ville de Montreal,communications.ville@Finthesiss.ai,Parc-Extension Partner Digest,184,2026-10-09T12:00:00.000Z,2026-10-08T16:00:00.000Z,118,64.1,72,39.1,1
