@@ -43,6 +43,8 @@ output_qwen.rar
 
 # Benchmark run output (trajectories, scores, artifacts) — large, machine-specific.
 output/
+# Repackaged Harbor bundle (derived from output/; large, machine-specific).
+output_bundle/
 
 # Task input data (personas, staged files) — large, machine-specific.
 input/

@@ -98,7 +98,8 @@ def main() -> int:
                      "MOCK_ADMIN_TOKEN": token}
         print(f"   starting mock stack {container} (admin allowlist={allow}) ...")
         start_mock_stack(container, net, overlays=overlays,
-                         admin_env=admin_env, publish_ports=overlaid_ports)
+                         admin_env=admin_env, publish_ports=overlaid_ports,
+                         enabled_apis=list(overlays.keys()))
         if not wait_for_ports_healthy(container, overlaid_ports, timeout=300.0):
             print("[FAIL] per-task mock stack never became healthy")
             logs = subprocess.run(["docker", "logs", "--tail", "40", container],

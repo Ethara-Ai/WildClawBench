@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 LITELLM_IMAGE = "ghcr.io/berriai/litellm:main-stable"
 LITELLM_INTERNAL_PORT = 4000
-LITELLM_HEADROOM_IMAGE = "wildclawbench-litellm-headroom:v1"
+LITELLM_HEADROOM_IMAGE = "wildclawbench-litellm-headroom:v2"
 
 
 def build_litellm_config_yaml(

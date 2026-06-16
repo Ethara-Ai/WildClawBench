@@ -10,7 +10,12 @@ fastapi
 pytest
 openai
 litellm
-headroom-ai>=0.24,<0.25
+# headroom-ai is a sidecar-container-only dependency (private package, not on
+# public PyPI). The host harness imports it only behind try/except ImportError
+# (judge_litellm.py) and never at module load, so it must NOT be a hard host
+# requirement — it broke `pip install -r requirements.txt` on fresh boxes.
+# It is installed inside the litellm-headroom Docker image, not on the host.
+# headroom-ai>=0.24,<0.25
 tomli; python_version < "3.11"
 annotated-doc==0.0.4
 annotated-types==0.7.0

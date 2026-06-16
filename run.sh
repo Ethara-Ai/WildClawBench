@@ -26,7 +26,7 @@ readonly DEFAULT_TASK="input/alden-croft_MB"
 readonly DEFAULT_MODEL="claude-opus-4.7"
 readonly DEFAULT_K=1
 readonly LOG_DIR="logs"
-readonly HEADROOM_IMAGE="wildclawbench-litellm-headroom:v1"
+readonly HEADROOM_IMAGE="wildclawbench-litellm-headroom:v2"
 
 if [[ -t 1 ]]; then
     readonly C_RED=$'\033[0;31m'

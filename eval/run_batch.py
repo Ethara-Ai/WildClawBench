@@ -606,10 +606,29 @@ def _augment_task_with_mocks(task: dict, config, mock_env_dict: dict | None) -> 
             ))
         except Exception:
             task["distractor_apis"] = []
-    # Expose the shared mock-stack URLs to the task (the full service map; the
-    # extra entries are inert env vars for APIs this task doesn't call).
+    # Expose ONLY the task's own APIs (required + distractor, which already
+    # subsumes the mock_data overlays) to the agent — not the full ~104-service
+    # catalog. The shared mock_env_dict carries a <SVC>_API_URL for every baked
+    # service; handing the agent all 104 (a) lets it call URLs whose servers
+    # this task's stack never starts, and (b) makes the mock-health logger spam
+    # "WARNING 17/104 healthy (failed: ACTIVECAMPAIGN_API_URL, ...)" every tick.
+    # Keep only the <SVC>_API_URL entries whose service is in the task set; keep
+    # all non-URL entries (admin tokens, etc.) untouched. Empty enabled set =>
+    # keep everything (safe fallback, preserves prior behavior).
+    enabled_apis = set(task.get("required_apis") or []) | set(task.get("distractor_apis") or [])
     if mock_env_dict:
-        task["env_dict"] = dict(mock_env_dict)
+        if enabled_apis:
+            filtered: dict[str, str] = {}
+            for k, v in mock_env_dict.items():
+                if k.endswith("_API_URL"):
+                    # GMAIL_API_URL -> gmail-api ; GOOGLE_CALENDAR_API_URL -> google-calendar-api
+                    api = k[:-4].lower().replace("_", "-")
+                    if api not in enabled_apis:
+                        continue
+                filtered[k] = v
+            task["env_dict"] = filtered
+        else:
+            task["env_dict"] = dict(mock_env_dict)
     else:
         task.setdefault("env_dict", {})
 
