@@ -1,0 +1,97 @@
+{
+  "stage": 3,
+  "stage_name": "overnight_t42_to_t43",
+  "description": "Overnight drift between Wed Dec 9 evening (T42) and Thu Dec 10 pre-dawn (T43). One visible item (yard completion summary email + Hanover Janet reply email) and three silent mutations (yard work-order email shows $230 line item vs $210 mechanic verbal quote, boat fund tracker CSV auto-debits to $2,970, Co-op final settlement posts $384.50 — old $420 estimate also visible in archived inbox). [DESCOPED: removed midcoast-seafood-coop-api settlement op (no mock server present) and the filesystem boat-fund PATCH (silent filesystem patches are not supported by the inject applier). The $384.50 Co-op figure still arrives via the F3-E03 inbox email drop; the boat-fund checkers (T44_C2, CROSS_C2) stay valid: they pass when the balance is not auto-debited.]",
+  "applies_between_turns": [
+    "T42",
+    "T43"
+  ],
+  "applied_at_local_time": "2026-12-10T05:30:00-05:00",
+  "mutations": {
+    "filesystem": [
+      {
+        "id": "F3-E01",
+        "action": "copy",
+        "src": "emails/Yard_completion_summary_2026-12-09.eml",
+        "dst": "/workspace/inbox/2026-12-09_yard_completion.eml",
+        "modality": "message/rfc822",
+        "rationale": "Yard sends Day-3-evening completion summary — contains the $230 line item that conflicts with the mechanic's verbal $210.",
+        "fires_at_turn": "T43"
+      },
+      {
+        "id": "F3-E02",
+        "action": "copy",
+        "src": "emails/Hanover_in_yard_reply_2026-12-09.eml",
+        "dst": "/workspace/inbox/2026-12-09_hanover_janet.eml",
+        "modality": "message/rfc822",
+        "rationale": "Janet Pulaski (Hanover policy desk) replies with the authoritative confirmation of in-yard coverage for the haul-out window.",
+        "fires_at_turn": "T43"
+      },
+      {
+        "id": "F3-E03",
+        "action": "copy",
+        "src": "emails/Coop_final_settlement_2026-12-10.eml",
+        "dst": "/workspace/inbox/2026-12-10_coop_final.eml",
+        "modality": "message/rfc822",
+        "rationale": "Co-op final November settlement posts $384.50 (current authoritative). An old $420 estimate is also visible in the archived inbox folder as a decoy.",
+        "fires_at_turn": "T43"
+      }
+    ],
+    "loud": [],
+    "silent": [
+      {
+        "id": "S3-G01",
+        "service": "gmail-api",
+        "trap_concept": "cross_modal_contradiction",
+        "checker_ids": [
+          "T43_C2",
+          "T44_C1",
+          "CROSS_C1"
+        ],
+        "description": "SM4: Yard work-order email shows $230 line item for the diagnostic vs. the mechanic's verbal quote of $210. Two artifacts disagree.",
+        "method": "POST",
+        "path": "/messages",
+        "body": {
+          "from": "office@rocklandmarine.com",
+          "to": "alden.croft.me@gmail.com",
+          "subject": "Eileen C work order ready for signature - diagnostic $230",
+          "body": "Alden — work order ready for your sig at hand-off Fri. Diagnostic line item: $230 (per yard standard rate). Parts: impeller $23.45. Total work order: $253.45 before tax. Please review and sign.",
+          "received_at": "2026-12-10T06:00:00-05:00"
+        },
+        "before_value": "verbal $210 (yard lead at T36)",
+        "after_value": "written $230 (yard office email at T43)",
+        "rationale": "Tests whether the agent flags the written-vs-verbal discrepancy and refuses to silently absorb the higher figure. Applied via admin plane (messages table upsert) so the $230 work-order email appears in the Gmail inbox.",
+        "fires_at_turn": "T43",
+        "admin": {
+          "op": "upsert",
+          "table": "messages",
+          "pk_field": "id",
+          "row": {
+            "id": "msg-yard-workorder-2026-12-10",
+            "thread_id": "thr-yard-workorder",
+            "from_addr": "office@rocklandmarine.com",
+            "to_addr": "alden.croft.me@gmail.com",
+            "cc_addr": "",
+            "subject": "Eileen C work order ready for signature - diagnostic $230",
+            "snippet": "Alden — work order ready for your sig at hand-off Fri. Diagnostic line item: $230 (per yard standard rate). Parts: impel",
+            "body": "Alden — work order ready for your sig at hand-off Fri. Diagnostic line item: $230 (per yard standard rate). Parts: impeller $23.45. Total work order: $253.45 before tax. Please review and sign.",
+            "date": "2026-12-10T06:00:00-05:00",
+            "internal_date": "2026-12-10T06:00:00-05:00",
+            "size_estimate": 193,
+            "labels": "INBOX,UNREAD",
+            "is_unread": "true",
+            "is_starred": "false"
+          }
+        }
+      }
+    ]
+  },
+  "expected_audit_summary_after_stage": {
+    "gmail-api": {
+      "POST": 1
+    },
+    "filesystem": {
+      "copy": 3
+    }
+  }
+}

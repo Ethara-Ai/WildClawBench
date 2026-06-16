@@ -1,0 +1,6 @@
+id,name,path_lower,path_display,is_folder,size,client_modified,rev
+DBX-1,Iceland_2027_itinerary.pdf,/travel/iceland_2027_itinerary.pdf,/Travel/Iceland_2027_itinerary.pdf,false,184422,2026-11-30T19:14:00Z,
+DBX-2,Aran_Islands_holiday.zip,/photos/aran_islands_holiday.zip,/Photos/Aran_Islands_holiday.zip,false,84221912,2026-10-28T22:01:00Z,
+DBX-3,qb_export_q3.xlsx,/work/qb_export_q3.xlsx,/Work/qb_export_q3.xlsx,false,28119,2026-10-09T18:42:00Z,
+DBX-4,Lease_renewal_2027.pdf,/personal/lease_renewal_2027.pdf,/Personal/Lease_renewal_2027.pdf,false,194002,2026-11-12T14:55:00Z,
+DBX-5,grandma_brown_bread.docx,/recipes/grandma_brown_bread.docx,/Recipes/grandma_brown_bread.docx,false,18244,2026-09-04T13:22:00Z,

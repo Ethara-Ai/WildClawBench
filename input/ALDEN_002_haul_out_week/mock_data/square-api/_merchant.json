@@ -1,0 +1,9 @@
+{
+  "_note_distractor": "DISTRACTOR API \u2014 Square POS account; merchant is NOT Alden Croft. Alden's lobster sales clear through midcoast-seafood-coop-api as weekly settlements, not Square transactions.",
+  "merchant_id": "MLNH1NTCFNB",
+  "business_name": "Belfast Bay Oyster Co.",
+  "country": "US",
+  "default_currency": "USD",
+  "address": "23 Searsport Ave, Belfast ME 04915",
+  "created_utc": "2023-05-11T19:04:00Z"
+}

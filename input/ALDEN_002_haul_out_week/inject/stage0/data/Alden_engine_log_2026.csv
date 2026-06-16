@@ -1,0 +1,13 @@
+date,run_description,duration_hours,cruise_rpm,coolant_temp_F,notes
+2026-05-20,Season opener trap haul,7.5,2200,182,Normal cruise temp. New season.
+2026-06-15,Trap line check outer ledges,6.8,2300,184,Hot day no issues.
+2026-07-04,Standard run Penobscot grounds,7.2,2300,183,Normal.
+2026-08-12,Long run to outer ledges,8.5,2400,184,Normal.
+2026-08-28,Run back from outer ledges,7.8,2400,194,Temp ran ~10 deg above normal cruise. Sea was flat. First time noticed.
+2026-09-10,Short run after a stand-down day,6.0,2200,182,Behaved fine.
+2026-09-22,Normal trap line,7.0,2300,183,Fine.
+2026-10-04,Long run trap retrieval prep,8.2,2300,193,Hot again ~10 deg above. Second time.
+2026-10-18,Short run,5.5,2200,182,Fine.
+2026-11-05,Cold morning run,6.5,2300,184,Fine.
+2026-11-20,Last in-season day,7.5,2300,183,Fine.
+2026-12-04,Run-up at dock for delivery to yard,0.5,2000,180,Not enough load to test.

@@ -735,6 +735,35 @@ def _augment_score_with_combined_rewards(scores: dict, result: dict) -> None:
     scores["combined_reward"] = combined_reward
 
 
+def _overlay_pytest_counts(scores: dict, result: dict) -> None:
+    """Make score.json report the REAL pytest counts, not rubric criteria.
+
+    `grade_with_rubric` aliases its rubric criteria into the `tests_*` keys
+    (see grading.py NOMENCLATURE note), so when the council abstains the whole
+    rubric (criteria 32, passed 0) score.json shows `tests_total:32,
+    tests_passed:0, tests_failed:0`. The authoritative behavioral pytest counts
+    live in `result["test_result"]` — the same source `pass_summary.json` /
+    `ctrf.json` already use. Overlay them so `tests_*` reflects pytest while the
+    rubric counts stay under `criteria_*`. Only overlays when a real pytest
+    suite ran (`test_result` with a `tests_total` key); rubric-only tasks keep
+    the legacy aliases the harbor pytest channel relies on. Must run AFTER
+    `_augment_score_with_combined_rewards`, whose reward math reads
+    `test_result["reward"]` (not `scores["tests_*"]`), so this is display-only.
+    """
+    if not isinstance(scores, dict):
+        return
+    te = (result or {}).get("test_result") or {}
+    if not isinstance(te, dict) or "tests_total" not in te:
+        return
+    for k in ("tests_total", "tests_passed", "tests_failed",
+              "tests_errored", "tests_skipped"):
+        if te.get(k) is not None:
+            try:
+                scores[k] = int(te.get(k) or 0)
+            except (TypeError, ValueError):
+                pass
+
+
 def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
                       model_type: str, run_index: int, result: dict,
                       config: Config | None = None,
@@ -874,6 +903,7 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
             if isinstance(scores, dict) and scores.get("usage"):
                 result["__judge_usage__"] = dict(scores["usage"])
             _augment_score_with_combined_rewards(scores, result)
+            _overlay_pytest_counts(scores, result)
             (output_dir / "score.json").write_text(
                 json.dumps(scores, indent=2, ensure_ascii=False), encoding="utf-8")
             logger.info("[%s] Rubric judged: overall=%.3f (%.2f%%) — %d/%d criteria passed, model=%s",
@@ -1286,17 +1316,12 @@ def run_single_task(
     mock_health_logger = _start_mock_health_logger(task, task_id, output_dir)
 
     try:
-        from src.utils.workspace_snapshot import capture_workspace_snapshot as _cap_ws
-        _cap_ws(
-            output_dir,
-            phase="initial",
-            task_id=task_id,
-            host_api_to_url=drift_info.get("host_api_to_url") if drift_info else None,
-            admin_token=drift_info.get("admin_token") if drift_info else None,
-            persona_dir=task.get("persona_dir"),
-        )
+        from src.utils.workspace_snapshot import write_workspace_initial
+        # Pre-run state == the task-input seed; materialize it as
+        # workspace_initial/{data,mock_data,persona} (verbatim input copy).
+        write_workspace_initial(output_dir, task.get("task_dir"))
     except Exception as _snap_exc:
-        logger.warning("[%s] workspace_snapshot[initial] failed: %s", task_id, _snap_exc)
+        logger.warning("[%s] workspace_initial failed: %s", task_id, _snap_exc)
 
     try:
         execution = backend.run_task(
@@ -1324,16 +1349,18 @@ def run_single_task(
             result["error"] = execution.error
 
         try:
-            from src.utils.workspace_snapshot import capture_workspace_snapshot
-            capture_workspace_snapshot(
+            from src.utils.workspace_snapshot import capture_workspace_after
+            # Post-run state -> workspace_after/{data,mock_data,persona}
+            # (data copied from input; mock_data + persona from live probes).
+            capture_workspace_after(
                 output_dir,
-                phase="final",
+                task.get("task_dir"),
                 task_id=task_id,
                 host_api_to_url=drift_info.get("host_api_to_url") if drift_info else None,
                 admin_token=drift_info.get("admin_token") if drift_info else None,
             )
         except Exception as _snap_exc:
-            logger.warning("[%s] workspace_snapshot[final] failed: %s", task_id, _snap_exc)
+            logger.warning("[%s] workspace_after failed: %s", task_id, _snap_exc)
     except Exception as exc:
         result["error"] = str(exc)
         logger.error("[%s] Unexpected backend error: %s", task_id, exc)

@@ -372,6 +372,7 @@ class OpenClawAgent(BaseAgent):
         # zero spawns — single-agent tasks must remain byte-identical.
         spawn_tree = output_dir / "task_output" / "workspace_full" / "spawn_tree.jsonl"
         sub_in = sub_out = sub_count = 0
+        sub_cost = 0.0
         if spawn_tree.is_file():
             for line in spawn_tree.read_text(encoding="utf-8", errors="replace").splitlines():
                 line = line.strip()
@@ -392,13 +393,23 @@ class OpenClawAgent(BaseAgent):
                     sub_out += int(row.get("tokens_out") or 0)
                 except (TypeError, ValueError):
                     pass
+                # Cost is present on BOTH per-spawn and "summary" rows; only sum
+                # the per-spawn rows to avoid double-counting (token fold above is
+                # already summary-safe because summaries use input_/output_tokens).
+                if row.get("kind") != "summary":
+                    try:
+                        sub_cost += float(row.get("cost_usd") or 0.0)
+                    except (TypeError, ValueError):
+                        pass
         if sub_count:
             usage["subagent_count"] = sub_count
             usage["subagent_tokens_in"] = sub_in
             usage["subagent_tokens_out"] = sub_out
+            usage["subagent_cost_usd"] = round(sub_cost, 6)
             usage["input_tokens"] = int(usage.get("input_tokens") or 0) + sub_in
             usage["output_tokens"] = int(usage.get("output_tokens") or 0) + sub_out
             usage["total_tokens"] = int(usage.get("total_tokens") or 0) + sub_in + sub_out
+            usage["cost_usd"] = round(float(usage.get("cost_usd") or 0.0) + sub_cost, 6)
 
         self._task_windows.pop(task_id, None)
         usage["elapsed_time"] = round(elapsed_time, 2)

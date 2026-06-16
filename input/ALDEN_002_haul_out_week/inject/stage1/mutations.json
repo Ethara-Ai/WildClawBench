@@ -1,0 +1,88 @@
+{
+  "stage": 1,
+  "stage_name": "overnight_t15_to_t16",
+  "description": "Overnight drift between Mon Dec 7 wrap-up (T15) and Tue Dec 8 pre-dawn (T16). Two visible items (yard final reminder email, Donna soup note) and one silent mutation (yard moves haul-out from 08:00 to 08:30 ET due to a shift change — the calendar updates silently). [DESCOPED: removed rockland-marine-yard-api companion op — no mock server present.]",
+  "applies_between_turns": [
+    "T15",
+    "T16"
+  ],
+  "applied_at_local_time": "2026-12-08T05:30:00-05:00",
+  "mutations": {
+    "filesystem": [
+      {
+        "id": "F1-E01",
+        "action": "copy",
+        "src": "emails/Yard_final_reminder_2026-12-07.eml",
+        "dst": "/workspace/inbox/2026-12-07_yard_final_reminder.eml",
+        "modality": "message/rfc822",
+        "rationale": "Yard final delivery reminder — confirms Tue 16:00 drop deadline.",
+        "fires_at_turn": "T16"
+      },
+      {
+        "id": "F1-E02",
+        "action": "copy",
+        "src": "emails/Cummins_TSB_reminder_2026-12-08.eml",
+        "dst": "/workspace/inbox/2026-12-08_cummins_tsb_reminder.eml",
+        "modality": "message/rfc822",
+        "rationale": "Cummins TSB-247B reminder triggered by Alden's earlier service registration.",
+        "fires_at_turn": "T16"
+      },
+      {
+        "id": "F1-N01",
+        "action": "copy",
+        "src": "notes/Donna_soup_note_2026-12-08.md",
+        "dst": "/workspace/inbox/2026-12-08_donna_soup_note.md",
+        "modality": "text/markdown",
+        "rationale": "Donna left soup + a note about Wednesday-night snow forecast (anchors the snow-clearing favor at T29).",
+        "fires_at_turn": "T16"
+      }
+    ],
+    "loud": [],
+    "silent": [
+      {
+        "id": "S1-C01",
+        "service": "google-calendar-api",
+        "trap_concept": "silent_mutation",
+        "checker_ids": [
+          "T17_C2",
+          "T31_C2",
+          "CROSS_C3"
+        ],
+        "description": "SM1: Yard moves haul-out from 08:00 to 08:30 ET overnight due to a shift change. Calendar updates silently — no email.",
+        "method": "PATCH",
+        "path": "/calendar/v3/calendars/primary/events/evt-haul-out-2026-12-09",
+        "body": {
+          "start": {
+            "dateTime": "2026-12-09T08:30:00-05:00",
+            "timeZone": "America/New_York"
+          },
+          "end": {
+            "dateTime": "2026-12-09T12:00:00-05:00",
+            "timeZone": "America/New_York"
+          }
+        },
+        "before_value": "2026-12-09T08:00:00-05:00",
+        "after_value": "2026-12-09T08:30:00-05:00",
+        "rationale": "Tests whether the agent re-pulls the calendar at the start of the Wed Day-3 plan rather than quoting yesterday's cached 08:00 time. Applied via admin plane (events table; flat start/end ISO columns).",
+        "fires_at_turn": "T16",
+        "admin": {
+          "op": "patch",
+          "table": "events",
+          "pk": "evt-haul-out-2026-12-09",
+          "set": {
+            "start": "2026-12-09T08:30:00-05:00",
+            "end": "2026-12-09T12:00:00-05:00"
+          }
+        }
+      }
+    ]
+  },
+  "expected_audit_summary_after_stage": {
+    "google-calendar-api": {
+      "PATCH": 1
+    },
+    "filesystem": {
+      "copy": 3
+    }
+  }
+}

@@ -593,6 +593,7 @@ def test_write_subagent_delivery_includes_usage_in_meta(tmp_path: Path):
         spawn_id="spw_u", role="r", output="done",
         tokens_in=10, tokens_out=20,
         cache_read_tokens=5, cache_write_tokens=7,
+        model="claude-opus-4-6", cost_usd=0.00075,
         status="ok",
     )
     out_path = write_subagent_delivery(
@@ -606,6 +607,7 @@ def test_write_subagent_delivery_includes_usage_in_meta(tmp_path: Path):
         "cache_read_tokens": 5,
         "cache_write_tokens": 7,
         "total_tokens": 42,
+        "cost_usd": 0.00075,
     }
 
 

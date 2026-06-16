@@ -1,0 +1,44 @@
+Slack Workspace Invite History — Alden Croft
+NOT-CONNECTED per persona TOOLS.md. Every invite has been declined.
+
+This file is reference context for the agent only. It establishes
+that Alden has, in fact, been invited to Slack workspaces before
+and consistently declines. Surfacing a NEW Slack invite during a
+task should not be presented as a "first time" decision.
+
+INVITE LOG
+
+  2024-05-12  Midcoast Marine Trades Roundtable
+              Sender: peter.mahoney@mmtroundtable.org
+              Status: DECLINED. Replied by email, polite. No
+              account created.
+
+  2024-09-30  Maine Lobster Industry Working Group
+              Sender: secretary@maine-lobster-wg.org
+              Status: DECLINED. No reply needed; opt-out per
+              their welcome email.
+
+  2025-03-18  Penobscot Bay Vessel Owners
+              Sender: invite@pbvo-slack.com
+              Status: DECLINED. No reply.
+
+  2025-08-04  MLA Cohort Slack (Spring 2025 workshop)
+              Sender: info@mainelobstermen.org
+              Status: DECLINED. Replied by email confirming
+              he'd attend the workshop in person but not the
+              chat channel. They reached him by phone.
+
+  2026-10-10  MLA Sustainable Trap Practices (Fall 2026) cohort
+              Sender: info@mainelobstermen.org
+              Status: STANDING DECLINE. See MLA_LinkedIn_
+              endorsement... wait that was a different invite.
+              Cohort channel invite came in this task's stage 1
+              dump. Same pattern: decline politely by email.
+
+POLICY (per persona AGENTS.md)
+- Slack is in the NOT-CONNECTED list under "CRM/sales/marketing/
+  HR/devops/design/analytics/project-management tools".
+- The assistant must never call slack-api during this task.
+- If pressed by a sender, the assistant should help Alden draft
+  a polite "I'll be there for the sessions but I am not joining
+  Slack channels" decline.

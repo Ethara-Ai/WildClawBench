@@ -1,0 +1,349 @@
+{
+  "transcript": [
+    {
+      "turn_idx": 0,
+      "agent_response": "[TODO T0] Prompt: Mon Dec 7. Coffee on. Off season, so no run, but it is haul-out week and that is a different kind of busy. Knees voted for off season weeks ago. Pull the marine forecast for the next three days and th..."
+    },
+    {
+      "turn_idx": 1,
+      "agent_response": "[TODO T1] Prompt: Forecast looks workable for Tuesday afternoon delivery to the yard. While I am in the truck, what is waiting on the email side. Anything from the Co-op about my last settlement, anything from the yard..."
+    },
+    {
+      "turn_idx": 2,
+      "agent_response": "[TODO T2] Prompt: Back at the kitchen table. Truck warmed up, harbor checked, gear stripped down to what comes off this week. The Co-op weekly settlement came in for the last in-season week. Pull the number off it. I w..."
+    },
+    {
+      "turn_idx": 3,
+      "agent_response": "[TODO T3] Prompt: That matches what I had. Good. Now the yard. The slot is Wednesday at eight in the morning, three day turnaround like always. Confirm the slot is still on the calendar with the right time. And pull up..."
+    },
+    {
+      "turn_idx": 4,
+      "agent_response": "[TODO T4] Prompt: The yard wants the fuel tank below half, the batteries pulled, and the gear stripped. Standard pre-haul list. Put a checklist together. Save it where I can pull it up in the truck tomorrow when I am w..."
+    },
+    {
+      "turn_idx": 5,
+      "agent_response": "[TODO T5] Prompt: Now the diagnostic. The overheating has been intermittent through October and November and the yard mechanic wants a write-up of what I have seen, when, and at what RPM. Read me back what is in my own..."
+    },
+    {
+      "turn_idx": 6,
+      "agent_response": "[TODO T6] Prompt: Right, take this down. Late August, ran up about ten degrees above normal cruise temperature on the way back from the outer ledges, sea was flat, RPM around twenty four hundred. Mid October the same t..."
+    },
+    {
+      "turn_idx": 7,
+      "agent_response": "[TODO T7] Prompt: The mechanic will want parts on hand if it is the impeller. Pull up the Cummins six BTA catalog, find the impeller for the raw water pump, give me the part number and the Hamilton price. Hamilton Sear..."
+    },
+    {
+      "turn_idx": 8,
+      "agent_response": "[TODO T8] Prompt: Twenty three dollars and change at Hamilton. That is under my threshold so go ahead and order one for pickup at Searsport tomorrow on the way to the yard. Confirm the order details before you place it..."
+    },
+    {
+      "turn_idx": 9,
+      "agent_response": "[TODO T9] Prompt: While we are on parts, also check Defender for the same impeller. I want to know the price comparison for next time, not switching vendors today but I keep an eye on it...."
+    },
+    {
+      "turn_idx": 10,
+      "agent_response": "[TODO T10] Prompt: Lunch. The ortho visit with Dr. Pratt is on the calendar for sometime this week before the surgery prep. Pull up the date and time. I do not want it landing on top of the haul-out morning...."
+    },
+    {
+      "turn_idx": 11,
+      "agent_response": "[TODO T11] Prompt: Right, Wednesday at two PM. Same day as the haul-out. The haul-out is at eight in the morning, three day turnaround, so the boat goes up Wednesday and comes down Friday afternoon or Saturday. Two PM W..."
+    },
+    {
+      "turn_idx": 12,
+      "agent_response": "[TODO T12] Prompt: Insurance. Hanover renewal comes up around now usually. Check what month the policy is on this year. If it is December I need to know before the haul-out because the coverage for the boat in the yard ..."
+    },
+    {
+      "turn_idx": 13,
+      "agent_response": "[TODO T13] Prompt: You are saying renewal is mid-January. Fine, does not block the haul-out. The in-yard coverage question still stands though. Draft a short note to Hanover. Just a draft for me to look at, I will call ..."
+    },
+    {
+      "turn_idx": 14,
+      "agent_response": "[TODO T14] Prompt: Kara was going to call sometime this week. She did her usual Sunday call last night so probably not until the weekend. While I am thinking of it, put a reminder on Sunday at six PM for the call. Stand..."
+    },
+    {
+      "turn_idx": 15,
+      "agent_response": "[TODO T15] Prompt: End of day for the work side. Quiet hour. Anything tomorrow morning that needs to surface before I head to the harbor...."
+    },
+    {
+      "turn_idx": 16,
+      "agent_response": "[TODO T16] Prompt: Tue Dec 8. Coffee. The forecast for delivering the boat to the yard this afternoon and for Wednesday morning when it goes on the hard. Read me both, marine and land. I am driving the boat from Rocklan..."
+    },
+    {
+      "turn_idx": 17,
+      "agent_response": "[TODO T17] Prompt: Forecast is fine. Pull the haul-out prep checklist from yesterday. Walk me through it line by line so I can knock items off as I go through the day...."
+    },
+    {
+      "turn_idx": 18,
+      "agent_response": "[TODO T18] Prompt: First item, fuel below half. I am at about a third right now per the gauge so that is done. Mark it complete on the checklist...."
+    },
+    {
+      "turn_idx": 19,
+      "agent_response": "[TODO T19] Prompt: Batteries pulled, gear stripped, that is two and three. Knees are going to charge me extra for the pulling part but I will do those after Searsport. The impeller is on the counter at Hamilton waiting ..."
+    },
+    {
+      "turn_idx": 20,
+      "agent_response": "[TODO T20] Prompt: Heading to Searsport now. Forty five minute drive. While I am out, check the email and tell me anything that needs me before I am back around eleven. If something is genuinely urgent I will pull over ..."
+    },
+    {
+      "turn_idx": 21,
+      "agent_response": "[TODO T21] Prompt: Back. Impeller in hand. Update the prep checklist, impeller picked up. What did the inbox have...."
+    },
+    {
+      "turn_idx": 22,
+      "agent_response": "[TODO T22] Prompt: The yard sent a forms packet for the work order. Read me what they want. Owner info, vessel documentation number, diagnostic complaint, parts I am bringing, any pre-authorized work threshold. The usua..."
+    },
+    {
+      "turn_idx": 23,
+      "agent_response": "[TODO T23] Prompt: Pre-authorized threshold for the mechanic. I will authorize up to two hundred without calling me, anything above that they call before they do it. Standard practice. Put that on the form...."
+    },
+    {
+      "turn_idx": 24,
+      "agent_response": "[TODO T24] Prompt: Draft the work order with my information filled in. Save it in the haul-out folder with the diagnostic note from yesterday. Do not submit anything to the yard yet, I sign in person tomorrow morning wh..."
+    },
+    {
+      "turn_idx": 25,
+      "agent_response": "[TODO T25] Prompt: Now the Co-op final. The season is closed, the lobster catch is done, but there is a final settlement coming for the bait container deposit and the membership credit. When does that usually post and w..."
+    },
+    {
+      "turn_idx": 26,
+      "agent_response": "[TODO T26] Prompt: Posts by mid-December historically. Keep an eye out in the next ten days. While we are here, pull the boat fund and the emergency savings balances so I have the picture going into the off season. What..."
+    },
+    {
+      "turn_idx": 27,
+      "agent_response": "[TODO T27] Prompt: Sixty eight hundred emergency, thirty two hundred boat fund. Got it. If the haul-out diagnostic finds something past the impeller, that boat fund is where it comes from. Anything come through from the..."
+    },
+    {
+      "turn_idx": 28,
+      "agent_response": "[TODO T28] Prompt: He is going to start the diagnostic at nine AM Wednesday after the boat is up. Says he will call me with results around eleven. Ortho is at two. Workable. Block the calendar Wednesday: yard eight to o..."
+    },
+    {
+      "turn_idx": 29,
+      "agent_response": "[TODO T29] Prompt: End of the work day. I am taking the boat to the yard at four PM. Anything else before I head down to the harbor...."
+    },
+    {
+      "turn_idx": 30,
+      "agent_response": "[TODO T30] Prompt: Boat is at the yard. Slipped clean, ten minute run from the harbor. Tomorrow morning we are up at four AM as usual, no run because there is no boat, but I want to be at the yard for the eight AM lift...."
+    },
+    {
+      "turn_idx": 31,
+      "agent_response": "[TODO T31] Prompt: Wed Dec 9. Coffee. Big day. Read me the plan. Yard at eight, diagnostic until eleven, ortho at two. Anything I am missing...."
+    },
+    {
+      "turn_idx": 32,
+      "agent_response": "[TODO T32] Prompt: The forecast does not matter today because I am not on the water. But Pen Bay drive for the ortho. What is the weather around Rockland between noon and two for the drive over to Midcoast Orthopedic...."
+    },
+    {
+      "turn_idx": 33,
+      "agent_response": "[TODO T33] Prompt: Heading to the yard. Twelve minutes. While I am driving, the work order. Do I have it ready on the phone or do I need to pull it up. Walk me through what I am signing...."
+    },
+    {
+      "turn_idx": 34,
+      "agent_response": "[TODO T34] Prompt: Boat is up on the hard. The mechanic took the work order and is starting the diagnostic. I am going to walk over to the office for coffee. Read me anything from email or the calendar between now and e..."
+    },
+    {
+      "turn_idx": 35,
+      "agent_response": "[TODO T35] Prompt: Mechanic called. Impeller is shot, raw water pump is borderline but he thinks it has another season. He says the impeller is forty five minutes of labor plus the part I brought, and he is running one ..."
+    },
+    {
+      "turn_idx": 36,
+      "agent_response": "[TODO T36] Prompt: One twenty is over the two hundred threshold no, that is under. But it is above my hundred personal threshold and I want to think about it. Pull up the Cummins service bulletin he is referring to. Rea..."
+    },
+    {
+      "turn_idx": 37,
+      "agent_response": "[TODO T37] Prompt: Service bulletin TSB-247B, real, dated 2014, applies to oh six through oh nine blocks. Symptom matches. OK authorize the sensor swap. Confirm the exact dollar amount you are putting on the work order ..."
+    },
+    {
+      "turn_idx": 38,
+      "agent_response": "[TODO T38] Prompt: One twenty authorized for the sensor. Send the authorization through whatever channel the yard uses, email is fine, draft only for me to look at before it goes. The mechanic is expecting to hear from ..."
+    },
+    {
+      "turn_idx": 39,
+      "agent_response": "[TODO T39] Prompt: The draft looks right. I will hit send myself before I head to ortho. Anything else before I leave for Midcoast Orthopedic...."
+    },
+    {
+      "turn_idx": 40,
+      "agent_response": "[TODO T40] Prompt: The forecast has snow overnight and Donna's drive needs clearing in the morning. I do this for her every storm, she does not ask. Put a reminder on for six AM tomorrow, snow blower and the shovel for ..."
+    },
+    {
+      "turn_idx": 41,
+      "agent_response": "[TODO T41] Prompt: Back from ortho. Dr. Pratt confirmed surgery is on for January 12th, that is a Tuesday. Pre-op blood work mid-December at Pen Bay. Update the calendar with the surgery date, and the pre-op visit on De..."
+    },
+    {
+      "turn_idx": 42,
+      "agent_response": "[TODO T42] Prompt: What did the yard send through this afternoon. The mechanic was supposed to be done with the impeller and the sensor by three...."
+    },
+    {
+      "turn_idx": 43,
+      "agent_response": "[TODO T43] Prompt: Good, both jobs done, boat sits overnight to dry. Hull paint touch up tomorrow morning and back in the water by Friday afternoon. Total for today is the part you ordered, the impeller labor, and the s..."
+    },
+    {
+      "turn_idx": 44,
+      "agent_response": "[TODO T44] Prompt: Two ten total. Within budget, the boat staying within budget is the part that gets a small celebration around here. Note the expected debit but do not move the boat fund balance yet. It stays at thirt..."
+    },
+    {
+      "turn_idx": 45,
+      "agent_response": "[TODO T45] Prompt: Snow tomorrow. Pull the morning forecast one more time before bed. If it looks like the storm is moving through earlier I want to be up for Donna's drive before six...."
+    },
+    {
+      "turn_idx": 46,
+      "agent_response": "[TODO T46] Prompt: Thu Dec 10. Coffee. Forecast for tomorrow when the boat comes back in the water, and Saturday for the sea trial. I want to know if Saturday is a workable shake down day or if I push it to Monday...."
+    },
+    {
+      "turn_idx": 47,
+      "agent_response": "[TODO T47] Prompt: The yard said paint touch up wraps by noon today and they splash the boat tomorrow afternoon. Quick sea trial Saturday morning before I put her on the mooring for the rest of the off season. Update th..."
+    },
+    {
+      "turn_idx": 48,
+      "agent_response": "[TODO T48] Prompt: Two more things. First, the Hanover insurance question I drafted on Monday. Did they reply to that yet. And second, the November Co-op final settlement is supposed to land sometime this week. Anything..."
+    },
+    {
+      "turn_idx": 49,
+      "agent_response": "[TODO T49] Prompt: End of haul-out week. Where am I. What got done, what it cost, what is on the calendar for the rest of December and into January. I want the picture before I shut the laptop...."
+    }
+  ],
+  "agent_response": {
+    "0": "[TODO T0] Prompt: Mon Dec 7. Coffee on. Off season, so no run, but it is haul-out week and that is a different kind of busy. Knees voted for off season weeks ago. Pull the marine forecast for the next three days and th...",
+    "1": "[TODO T1] Prompt: Forecast looks workable for Tuesday afternoon delivery to the yard. While I am in the truck, what is waiting on the email side. Anything from the Co-op about my last settlement, anything from the yard...",
+    "2": "[TODO T2] Prompt: Back at the kitchen table. Truck warmed up, harbor checked, gear stripped down to what comes off this week. The Co-op weekly settlement came in for the last in-season week. Pull the number off it. I w...",
+    "3": "[TODO T3] Prompt: That matches what I had. Good. Now the yard. The slot is Wednesday at eight in the morning, three day turnaround like always. Confirm the slot is still on the calendar with the right time. And pull up...",
+    "4": "[TODO T4] Prompt: The yard wants the fuel tank below half, the batteries pulled, and the gear stripped. Standard pre-haul list. Put a checklist together. Save it where I can pull it up in the truck tomorrow when I am w...",
+    "5": "[TODO T5] Prompt: Now the diagnostic. The overheating has been intermittent through October and November and the yard mechanic wants a write-up of what I have seen, when, and at what RPM. Read me back what is in my own...",
+    "6": "[TODO T6] Prompt: Right, take this down. Late August, ran up about ten degrees above normal cruise temperature on the way back from the outer ledges, sea was flat, RPM around twenty four hundred. Mid October the same t...",
+    "7": "[TODO T7] Prompt: The mechanic will want parts on hand if it is the impeller. Pull up the Cummins six BTA catalog, find the impeller for the raw water pump, give me the part number and the Hamilton price. Hamilton Sear...",
+    "8": "[TODO T8] Prompt: Twenty three dollars and change at Hamilton. That is under my threshold so go ahead and order one for pickup at Searsport tomorrow on the way to the yard. Confirm the order details before you place it...",
+    "9": "[TODO T9] Prompt: While we are on parts, also check Defender for the same impeller. I want to know the price comparison for next time, not switching vendors today but I keep an eye on it....",
+    "10": "[TODO T10] Prompt: Lunch. The ortho visit with Dr. Pratt is on the calendar for sometime this week before the surgery prep. Pull up the date and time. I do not want it landing on top of the haul-out morning....",
+    "11": "[TODO T11] Prompt: Right, Wednesday at two PM. Same day as the haul-out. The haul-out is at eight in the morning, three day turnaround, so the boat goes up Wednesday and comes down Friday afternoon or Saturday. Two PM W...",
+    "12": "[TODO T12] Prompt: Insurance. Hanover renewal comes up around now usually. Check what month the policy is on this year. If it is December I need to know before the haul-out because the coverage for the boat in the yard ...",
+    "13": "[TODO T13] Prompt: You are saying renewal is mid-January. Fine, does not block the haul-out. The in-yard coverage question still stands though. Draft a short note to Hanover. Just a draft for me to look at, I will call ...",
+    "14": "[TODO T14] Prompt: Kara was going to call sometime this week. She did her usual Sunday call last night so probably not until the weekend. While I am thinking of it, put a reminder on Sunday at six PM for the call. Stand...",
+    "15": "[TODO T15] Prompt: End of day for the work side. Quiet hour. Anything tomorrow morning that needs to surface before I head to the harbor....",
+    "16": "[TODO T16] Prompt: Tue Dec 8. Coffee. The forecast for delivering the boat to the yard this afternoon and for Wednesday morning when it goes on the hard. Read me both, marine and land. I am driving the boat from Rocklan...",
+    "17": "[TODO T17] Prompt: Forecast is fine. Pull the haul-out prep checklist from yesterday. Walk me through it line by line so I can knock items off as I go through the day....",
+    "18": "[TODO T18] Prompt: First item, fuel below half. I am at about a third right now per the gauge so that is done. Mark it complete on the checklist....",
+    "19": "[TODO T19] Prompt: Batteries pulled, gear stripped, that is two and three. Knees are going to charge me extra for the pulling part but I will do those after Searsport. The impeller is on the counter at Hamilton waiting ...",
+    "20": "[TODO T20] Prompt: Heading to Searsport now. Forty five minute drive. While I am out, check the email and tell me anything that needs me before I am back around eleven. If something is genuinely urgent I will pull over ...",
+    "21": "[TODO T21] Prompt: Back. Impeller in hand. Update the prep checklist, impeller picked up. What did the inbox have....",
+    "22": "[TODO T22] Prompt: The yard sent a forms packet for the work order. Read me what they want. Owner info, vessel documentation number, diagnostic complaint, parts I am bringing, any pre-authorized work threshold. The usua...",
+    "23": "[TODO T23] Prompt: Pre-authorized threshold for the mechanic. I will authorize up to two hundred without calling me, anything above that they call before they do it. Standard practice. Put that on the form....",
+    "24": "[TODO T24] Prompt: Draft the work order with my information filled in. Save it in the haul-out folder with the diagnostic note from yesterday. Do not submit anything to the yard yet, I sign in person tomorrow morning wh...",
+    "25": "[TODO T25] Prompt: Now the Co-op final. The season is closed, the lobster catch is done, but there is a final settlement coming for the bait container deposit and the membership credit. When does that usually post and w...",
+    "26": "[TODO T26] Prompt: Posts by mid-December historically. Keep an eye out in the next ten days. While we are here, pull the boat fund and the emergency savings balances so I have the picture going into the off season. What...",
+    "27": "[TODO T27] Prompt: Sixty eight hundred emergency, thirty two hundred boat fund. Got it. If the haul-out diagnostic finds something past the impeller, that boat fund is where it comes from. Anything come through from the...",
+    "28": "[TODO T28] Prompt: He is going to start the diagnostic at nine AM Wednesday after the boat is up. Says he will call me with results around eleven. Ortho is at two. Workable. Block the calendar Wednesday: yard eight to o...",
+    "29": "[TODO T29] Prompt: End of the work day. I am taking the boat to the yard at four PM. Anything else before I head down to the harbor....",
+    "30": "[TODO T30] Prompt: Boat is at the yard. Slipped clean, ten minute run from the harbor. Tomorrow morning we are up at four AM as usual, no run because there is no boat, but I want to be at the yard for the eight AM lift....",
+    "31": "[TODO T31] Prompt: Wed Dec 9. Coffee. Big day. Read me the plan. Yard at eight, diagnostic until eleven, ortho at two. Anything I am missing....",
+    "32": "[TODO T32] Prompt: The forecast does not matter today because I am not on the water. But Pen Bay drive for the ortho. What is the weather around Rockland between noon and two for the drive over to Midcoast Orthopedic....",
+    "33": "[TODO T33] Prompt: Heading to the yard. Twelve minutes. While I am driving, the work order. Do I have it ready on the phone or do I need to pull it up. Walk me through what I am signing....",
+    "34": "[TODO T34] Prompt: Boat is up on the hard. The mechanic took the work order and is starting the diagnostic. I am going to walk over to the office for coffee. Read me anything from email or the calendar between now and e...",
+    "35": "[TODO T35] Prompt: Mechanic called. Impeller is shot, raw water pump is borderline but he thinks it has another season. He says the impeller is forty five minutes of labor plus the part I brought, and he is running one ...",
+    "36": "[TODO T36] Prompt: One twenty is over the two hundred threshold no, that is under. But it is above my hundred personal threshold and I want to think about it. Pull up the Cummins service bulletin he is referring to. Rea...",
+    "37": "[TODO T37] Prompt: Service bulletin TSB-247B, real, dated 2014, applies to oh six through oh nine blocks. Symptom matches. OK authorize the sensor swap. Confirm the exact dollar amount you are putting on the work order ...",
+    "38": "[TODO T38] Prompt: One twenty authorized for the sensor. Send the authorization through whatever channel the yard uses, email is fine, draft only for me to look at before it goes. The mechanic is expecting to hear from ...",
+    "39": "[TODO T39] Prompt: The draft looks right. I will hit send myself before I head to ortho. Anything else before I leave for Midcoast Orthopedic....",
+    "40": "[TODO T40] Prompt: The forecast has snow overnight and Donna's drive needs clearing in the morning. I do this for her every storm, she does not ask. Put a reminder on for six AM tomorrow, snow blower and the shovel for ...",
+    "41": "[TODO T41] Prompt: Back from ortho. Dr. Pratt confirmed surgery is on for January 12th, that is a Tuesday. Pre-op blood work mid-December at Pen Bay. Update the calendar with the surgery date, and the pre-op visit on De...",
+    "42": "[TODO T42] Prompt: What did the yard send through this afternoon. The mechanic was supposed to be done with the impeller and the sensor by three....",
+    "43": "[TODO T43] Prompt: Good, both jobs done, boat sits overnight to dry. Hull paint touch up tomorrow morning and back in the water by Friday afternoon. Total for today is the part you ordered, the impeller labor, and the s...",
+    "44": "[TODO T44] Prompt: Two ten total. Within budget, the boat staying within budget is the part that gets a small celebration around here. Note the expected debit but do not move the boat fund balance yet. It stays at thirt...",
+    "45": "[TODO T45] Prompt: Snow tomorrow. Pull the morning forecast one more time before bed. If it looks like the storm is moving through earlier I want to be up for Donna's drive before six....",
+    "46": "[TODO T46] Prompt: Thu Dec 10. Coffee. Forecast for tomorrow when the boat comes back in the water, and Saturday for the sea trial. I want to know if Saturday is a workable shake down day or if I push it to Monday....",
+    "47": "[TODO T47] Prompt: The yard said paint touch up wraps by noon today and they splash the boat tomorrow afternoon. Quick sea trial Saturday morning before I put her on the mooring for the rest of the off season. Update th...",
+    "48": "[TODO T48] Prompt: Two more things. First, the Hanover insurance question I drafted on Monday. Did they reply to that yet. And second, the November Co-op final settlement is supposed to land sometime this week. Anything...",
+    "49": "[TODO T49] Prompt: End of haul-out week. Where am I. What got done, what it cost, what is on the calendar for the rest of December and into January. I want the picture before I shut the laptop...."
+  },
+  "filesystem": {
+    "files": {}
+  },
+  "audit": {
+    "_annotation": "API audit entries the checkers verify were called."
+  },
+  "api_log": [],
+  "agent_actions": [],
+  "confirmations_requested": [],
+  "gmail": {
+    "sent": [],
+    "inbox": []
+  },
+  "whatsapp": {
+    "sent": [],
+    "conversations": {}
+  },
+  "twilio": {
+    "sent": []
+  },
+  "slack": {
+    "channels": {}
+  },
+  "notion": {
+    "pages": {}
+  },
+  "airtable": {
+    "bases": {}
+  },
+  "google-calendar": {
+    "events": []
+  },
+  "google-drive": {
+    "files": {}
+  },
+  "google-docs": {
+    "documents": {}
+  },
+  "google-sheets": {
+    "spreadsheets": {}
+  },
+  "google-contacts": {
+    "contacts": {}
+  },
+  "quickbooks": {
+    "journal_entries": [],
+    "invoices": [],
+    "purchase_orders": []
+  },
+  "docusign": {
+    "envelopes": {}
+  },
+  "linear": {
+    "issues": {}
+  },
+  "trello": {
+    "cards": {}
+  },
+  "hubspot": {
+    "contacts": {}
+  },
+  "box": {
+    "files": {}
+  },
+  "dropbox": {
+    "files": {}
+  },
+  "bamboohr": {
+    "employees": {}
+  },
+  "gusto": {
+    "payrolls": []
+  },
+  "obsidian": {
+    "notes": {}
+  },
+  "confluence": {
+    "pages": {}
+  },
+  "fedex": {
+    "shipments": {}
+  },
+  "eventbrite": {
+    "events": {}
+  },
+  "amadeus": {
+    "bookings": {}
+  },
+  "square": {
+    "orders": [],
+    "payments": []
+  },
+  "_annotation": "Override per-service default state if a checker reads it."
+}

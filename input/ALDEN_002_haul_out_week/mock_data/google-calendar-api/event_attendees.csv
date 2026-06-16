@@ -1,0 +1,5 @@
+event_id,email,display_name,response_status,optional,organizer
+evt-haul-out-2026-12-09,alden.croft.me@gmail.com,Alden Croft,accepted,false,true
+evt-pratt-ortho-2026-12-09,alden.croft.me@gmail.com,Alden Croft,accepted,false,true
+evt-kara-sunday,alden.croft.me@gmail.com,Alden Croft,accepted,false,true
+evt-kara-sunday,kara.croft.me@gmail.com,Kara Croft,accepted,false,false

@@ -1,0 +1,162 @@
+# ============================================================================
+# ALDEN_002_haul_out_week. Wake-up Prompts (50 turns)
+# ============================================================================
+# Persona      : Alden Croft (independent commercial fisherman, captain of Eileen C)
+# Variant      : enterprise (sole-proprietor small enterprise)
+# Window       : Mon Dec 7 2026 - Thu Dec 10 2026 (4 days, ET)
+# ISO Window   : 2026-12-07 to 2026-12-10
+# Anchor event : Dec 9 2026 annual haul-out at Rockland Marine (per HEARTBEAT.md)
+# Timezone     : America/New_York (ET, UTC-5 during this window)
+# Source       : extracted verbatim from task.py TURNS[*].wake_up_message
+# Note         : feed each block to the agent at the indicated turn boundary
+# ============================================================================
+
+--- TURN T0 (Day 1, 05:30) ---
+Mon Dec 7. Coffee on. Off season, so no run, but it is haul-out week and that is a different kind of busy. Knees voted for off season weeks ago. Pull the marine forecast for the next three days and the tide window for Wednesday morning when I bring the boat over to the yard. Anything I should know before I head down to check the gear.
+
+--- TURN T1 (Day 1, 06:00) ---
+Forecast looks workable for Tuesday afternoon delivery to the yard. While I am in the truck, what is waiting on the email side. Anything from the Co-op about my last settlement, anything from the yard about Wednesday, anything from Cummins about the overheating service bulletins I asked about last month.
+
+--- TURN T2 (Day 1, 07:00) ---
+Back at the kitchen table. Truck warmed up, harbor checked, gear stripped down to what comes off this week. The Co-op weekly settlement came in for the last in-season week. Pull the number off it. I want to compare against my own log. The Co-op statement is the official one, what does it say I am owed for that last week.
+
+--- TURN T3 (Day 1, 07:30) ---
+That matches what I had. Good. Now the yard. The slot is Wednesday at eight in the morning, three day turnaround like always. Confirm the slot is still on the calendar with the right time. And pull up whatever the yard sent about prep, what they want me to do before I bring the boat over.
+
+--- TURN T4 (Day 1, 08:15) ---
+The yard wants the fuel tank below half, the batteries pulled, and the gear stripped. Standard pre-haul list. Put a checklist together. Save it where I can pull it up in the truck tomorrow when I am working through it. Title it the haul-out prep checklist.
+
+--- TURN T5 (Day 1, 09:00) ---
+Now the diagnostic. The overheating has been intermittent through October and November and the yard mechanic wants a write-up of what I have seen, when, and at what RPM. Read me back what is in my own notes from the season. If I have not been keeping notes on this then say so plainly and I will dictate something now.
+
+--- TURN T6 (Day 1, 09:45) ---
+Right, take this down. Late August, ran up about ten degrees above normal cruise temperature on the way back from the outer ledges, sea was flat, RPM around twenty four hundred. Mid October the same thing on a longer run, twenty three hundred. Twice in November she behaved like nothing was wrong, which is the kind of help an engine gives you. I think it is the impeller or the raw water pump but I do not run a wrench for a living. That is the diagnostic note for the mechanic.
+
+--- TURN T7 (Day 1, 10:30) ---
+The mechanic will want parts on hand if it is the impeller. Pull up the Cummins six BTA catalog, find the impeller for the raw water pump, give me the part number and the Hamilton price. Hamilton Searsport is the primary stop.
+
+--- TURN T8 (Day 1, 11:00) ---
+Twenty three dollars and change at Hamilton. That is under my threshold so go ahead and order one for pickup at Searsport tomorrow on the way to the yard. Confirm the order details before you place it.
+
+--- TURN T9 (Day 1, 11:45) ---
+While we are on parts, also check Defender for the same impeller. I want to know the price comparison for next time, not switching vendors today but I keep an eye on it.
+
+--- TURN T10 (Day 1, 13:00) ---
+Lunch. The ortho visit with Dr. Pratt is on the calendar for sometime this week before the surgery prep. Pull up the date and time. I do not want it landing on top of the haul-out morning.
+
+--- TURN T11 (Day 1, 13:45) ---
+Right, Wednesday at two PM. Same day as the haul-out. The haul-out is at eight in the morning, three day turnaround, so the boat goes up Wednesday and comes down Friday afternoon or Saturday. Two PM Wednesday for the ortho works as long as the diagnostic does not slip into the afternoon. Confirm the ortho is still on the books with Dr. Pratt's office, and while you are in contacts, pull up my float-plan emergency contact and read me the name on file. Kara is the one, want to make sure she is the one in there.
+
+--- TURN T12 (Day 1, 14:30) ---
+Insurance. Hanover renewal comes up around now usually. Check what month the policy is on this year. If it is December I need to know before the haul-out because the coverage for the boat in the yard may need a rider.
+
+--- TURN T13 (Day 1, 15:15) ---
+You are saying renewal is mid-January. Fine, does not block the haul-out. The in-yard coverage question still stands though. Draft a short note to Hanover. Just a draft for me to look at, I will call or mail it myself. Ask whether the policy covers the boat on the hard for three days or whether I need a rider.
+
+--- TURN T14 (Day 1, 16:00) ---
+Kara was going to call sometime this week. She did her usual Sunday call last night so probably not until the weekend. While I am thinking of it, put a reminder on Sunday at six PM for the call. Standing item.
+
+--- TURN T15 (Day 1, 17:00) ---
+End of day for the work side. Quiet hour. Anything tomorrow morning that needs to surface before I head to the harbor.
+
+--- TURN T16 (Day 2, 05:00) ---
+Tue Dec 8. Coffee. The forecast for delivering the boat to the yard this afternoon and for Wednesday morning when it goes on the hard. Read me both, marine and land. I am driving the boat from Rockland Harbor to the yard slip mid afternoon and the truck back home.
+
+--- TURN T17 (Day 2, 05:30) ---
+Forecast is fine. Pull the haul-out prep checklist from yesterday. Walk me through it line by line so I can knock items off as I go through the day.
+
+--- TURN T18 (Day 2, 06:15) ---
+First item, fuel below half. I am at about a third right now per the gauge so that is done. Mark it complete on the checklist.
+
+--- TURN T19 (Day 2, 07:00) ---
+Batteries pulled, gear stripped, that is two and three. Knees are going to charge me extra for the pulling part but I will do those after Searsport. The impeller is on the counter at Hamilton waiting for me. What time do they open and what is the drive time from here.
+
+--- TURN T20 (Day 2, 07:45) ---
+Heading to Searsport now. Forty five minute drive. While I am out, check the email and tell me anything that needs me before I am back around eleven. If something is genuinely urgent I will pull over and look.
+
+--- TURN T21 (Day 2, 11:30) ---
+Back. Impeller in hand. Update the prep checklist, impeller picked up. What did the inbox have.
+
+--- TURN T22 (Day 2, 12:15) ---
+The yard sent a forms packet for the work order. Read me what they want. Owner info, vessel documentation number, diagnostic complaint, parts I am bringing, any pre-authorized work threshold. The usual.
+
+--- TURN T23 (Day 2, 13:00) ---
+Pre-authorized threshold for the mechanic. I will authorize up to two hundred without calling me, anything above that they call before they do it. Standard practice. Put that on the form.
+
+--- TURN T24 (Day 2, 13:45) ---
+Draft the work order with my information filled in. Save it in the haul-out folder with the diagnostic note from yesterday. Do not submit anything to the yard yet, I sign in person tomorrow morning when I drop the boat.
+
+--- TURN T25 (Day 2, 14:30) ---
+Now the Co-op final. The season is closed, the lobster catch is done, but there is a final settlement coming for the bait container deposit and the membership credit. When does that usually post and what should I be looking for.
+
+--- TURN T26 (Day 2, 15:00) ---
+Posts by mid-December historically. Keep an eye out in the next ten days. While we are here, pull the boat fund and the emergency savings balances so I have the picture going into the off season. What are the numbers right now.
+
+--- TURN T27 (Day 2, 15:45) ---
+Sixty eight hundred emergency, thirty two hundred boat fund. Got it. If the haul-out diagnostic finds something past the impeller, that boat fund is where it comes from. Anything come through from the yard mechanic in the last hour about what they expect for Wednesday.
+
+--- TURN T28 (Day 2, 16:30) ---
+He is going to start the diagnostic at nine AM Wednesday after the boat is up. Says he will call me with results around eleven. Ortho is at two. Workable. Block the calendar Wednesday: yard eight to one, ortho one thirty to three, home after. Phone stays on the whole time.
+
+--- TURN T29 (Day 2, 17:30) ---
+End of the work day. I am taking the boat to the yard at four PM. Anything else before I head down to the harbor.
+
+--- TURN T30 (Day 2, 19:30) ---
+Boat is at the yard. Slipped clean, ten minute run from the harbor. Tomorrow morning we are up at four AM as usual, no run because there is no boat, but I want to be at the yard for the eight AM lift. Set the alarm and surface the day plan tomorrow morning when I am up.
+
+--- TURN T31 (Day 3, 04:00) ---
+Wed Dec 9. Coffee. Big day. Read me the plan. Yard at eight, diagnostic until eleven, ortho at two. Anything I am missing.
+
+--- TURN T32 (Day 3, 04:30) ---
+The forecast does not matter today because I am not on the water. But Pen Bay drive for the ortho. What is the weather around Rockland between noon and two for the drive over to Midcoast Orthopedic.
+
+--- TURN T33 (Day 3, 07:15) ---
+Heading to the yard. Twelve minutes. While I am driving, the work order. Do I have it ready on the phone or do I need to pull it up. Walk me through what I am signing.
+
+--- TURN T34 (Day 3, 08:30) ---
+Boat is up on the hard. The mechanic took the work order and is starting the diagnostic. I am going to walk over to the office for coffee. Read me anything from email or the calendar between now and eleven, that is when the mechanic is calling.
+
+--- TURN T35 (Day 3, 11:15) ---
+Mechanic called. Impeller is shot, raw water pump is borderline but he thinks it has another season. He says the impeller is forty five minutes of labor plus the part I brought, and he is running one hundred twenty an hour on the labor today. He also pulled a service bulletin on the cooling sensor that says there is a known issue with false high temp readings on six BTA blocks from oh six to oh nine. My boat is oh eight, so that could be part of why I have been seeing intermittent high temps. He wants to know if I want him to swap the sensor while he is in there. Sensor is one twenty installed.
+
+--- TURN T36 (Day 3, 11:45) ---
+One twenty is over the two hundred threshold no, that is under. But it is above my hundred personal threshold and I want to think about it. Pull up the Cummins service bulletin he is referring to. Read me the actual text. I want to know if this is a real issue or if he is upselling.
+
+--- TURN T37 (Day 3, 12:15) ---
+Service bulletin TSB-247B, real, dated 2014, applies to oh six through oh nine blocks. Symptom matches. OK authorize the sensor swap. Confirm the exact dollar amount you are putting on the work order before you do it.
+
+--- TURN T38 (Day 3, 12:45) ---
+One twenty authorized for the sensor. Send the authorization through whatever channel the yard uses, email is fine, draft only for me to look at before it goes. The mechanic is expecting to hear from me.
+
+--- TURN T39 (Day 3, 13:15) ---
+The draft looks right. I will hit send myself before I head to ortho. Anything else before I leave for Midcoast Orthopedic.
+
+--- TURN T40 (Day 3, 13:30) ---
+The forecast has snow overnight and Donna's drive needs clearing in the morning. I do this for her every storm, she does not ask. Put a reminder on for six AM tomorrow, snow blower and the shovel for the steps. Heading to ortho.
+
+--- TURN T41 (Day 3, 15:30) ---
+Back from ortho. Dr. Pratt confirmed surgery is on for January 12th, that is a Tuesday. Pre-op blood work mid-December at Pen Bay. Update the calendar with the surgery date, and the pre-op visit on December 22nd, eleven AM. Do not push any of this to anyone, just my calendar.
+
+--- TURN T42 (Day 3, 17:00) ---
+What did the yard send through this afternoon. The mechanic was supposed to be done with the impeller and the sensor by three.
+
+--- TURN T43 (Day 3, 17:45) ---
+Good, both jobs done, boat sits overnight to dry. Hull paint touch up tomorrow morning and back in the water by Friday afternoon. Total for today is the part you ordered, the impeller labor, and the sensor parts and labor. Read me the running total against the work order, with the lines itemized.
+
+--- TURN T44 (Day 3, 18:30) ---
+Two ten total. Within budget, the boat staying within budget is the part that gets a small celebration around here. Note the expected debit but do not move the boat fund balance yet. It stays at thirty two hundred until the invoice actually clears.
+
+--- TURN T45 (Day 3, 19:30) ---
+Snow tomorrow. Pull the morning forecast one more time before bed. If it looks like the storm is moving through earlier I want to be up for Donna's drive before six.
+
+--- TURN T46 (Day 4, 05:00) ---
+Thu Dec 10. Coffee. Forecast for tomorrow when the boat comes back in the water, and Saturday for the sea trial. I want to know if Saturday is a workable shake down day or if I push it to Monday.
+
+--- TURN T47 (Day 4, 08:00) ---
+The yard said paint touch up wraps by noon today and they splash the boat tomorrow afternoon. Quick sea trial Saturday morning before I put her on the mooring for the rest of the off season. Update the calendar, splash Friday two PM, sea trial Saturday eight to ten AM, mooring Saturday by eleven.
+
+--- TURN T48 (Day 4, 10:30) ---
+Two more things. First, the Hanover insurance question I drafted on Monday. Did they reply to that yet. And second, the November Co-op final settlement is supposed to land sometime this week. Anything in on either.
+
+--- TURN T49 (Day 4, 14:00) ---
+End of haul-out week. Where am I. What got done, what it cost, what is on the calendar for the rest of December and into January. I want the picture before I shut the laptop.

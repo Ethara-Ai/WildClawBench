@@ -123,6 +123,12 @@ class SubagentResult:
     cache_read_tokens: int = 0
     cache_write_tokens: int = 0
     elapsed_seconds: float = 0.0
+    # Effective model the invoker actually ran (spec.model is often unset and
+    # falls back to WILDCLAW_MODEL at runtime); captured so cost can be priced.
+    model: str | None = None
+    # USD cost of this spawn, priced from tokens via litellm. 0.0 when the model
+    # is unknown / unpriceable (see _subagent_cost_usd).
+    cost_usd: float = 0.0
     # ok | timeout | error | blocked
     status: str = "ok"
     error: str | None = None
@@ -159,7 +165,9 @@ class SubagentResult:
             "status": self.status,
             "error": self.error,
             "allowed_tools": list(spec.allowed_tools),
-            "model": spec.model,
+            # Effective model the spawn ran (resolved at runtime); falls back to
+            # the spec value when the invoker didn't report one (e.g. tests).
+            "model": self.model or spec.model,
             "max_tool_calls": spec.max_tool_calls,
             "max_tokens": spec.max_tokens,
             "timeout_seconds": spec.timeout_seconds,
@@ -175,6 +183,7 @@ class SubagentResult:
             "cache_read_tokens": self.cache_read_tokens,
             "cache_write_tokens": self.cache_write_tokens,
             "total_tokens": self.total_tokens,
+            "cost_usd": round(float(self.cost_usd or 0.0), 6),
             "elapsed_seconds": round(self.elapsed_seconds, 3),
             "output_preview": out[:_PREVIEW_CHARS],
             "output_sha256": digest,
@@ -213,6 +222,58 @@ def _extract_round_usage(usage: Any) -> dict[str, int]:
         "cache_read_tokens":  int(usage.get("cache_read_input_tokens", 0) or 0),
         "cache_write_tokens": int(usage.get("cache_creation_input_tokens", 0) or 0),
     }
+
+
+# Per-token USD rates by model-name substring: (input, output, cache_read,
+# cache_write). subagent_director runs INSIDE the agent container, which is a
+# bare Python interpreter (no litellm), so we price from a static table — the
+# same approach grading._JUDGE_RATES uses for the judge council. Cache
+# multipliers follow Anthropic's standard 0.1x (read) / 1.25x (write) of input.
+# litellm (when importable, e.g. host-side) refines an unmatched model.
+_AGENT_COST_RATES: dict[str, tuple[float, float, float, float]] = {
+    "opus":   (15e-6, 75e-6, 1.5e-6, 18.75e-6),
+    "sonnet": (3e-6,  15e-6, 0.3e-6, 3.75e-6),
+    "haiku":  (0.8e-6, 4e-6, 0.08e-6, 1.0e-6),
+}
+
+
+def _subagent_cost_usd(
+    model: str | None,
+    in_tok: int,
+    out_tok: int,
+    cache_read: int = 0,
+    cache_write: int = 0,
+) -> float:
+    """Price a sub-agent's token usage in USD. Never raises (pricing must not
+    break a spawn) → returns 0.0 when the model is unknown/unset.
+
+    Primary path is the static ``_AGENT_COST_RATES`` table (works in the bare
+    container). If the model matches no table entry, fall back to litellm's
+    price map when it happens to be importable (host-side). Otherwise 0.0.
+    """
+    if not model:
+        return 0.0
+    in_tok = int(in_tok or 0)
+    out_tok = int(out_tok or 0)
+    cache_read = int(cache_read or 0)
+    cache_write = int(cache_write or 0)
+    name = model.lower()
+    for key, (r_in, r_out, r_cr, r_cw) in _AGENT_COST_RATES.items():
+        if key in name:
+            cost = (in_tok * r_in + out_tok * r_out
+                    + cache_read * r_cr + cache_write * r_cw)
+            return round(cost, 6)
+    try:
+        import litellm  # lazy: host-only refinement; absent in the agent container
+        prompt_cost, completion_cost = litellm.cost_per_token(
+            model=model,
+            prompt_tokens=in_tok + cache_read + cache_write,
+            completion_tokens=out_tok,
+        )
+        return round(float(prompt_cost) + float(completion_cost), 6)
+    except Exception as exc:  # noqa: BLE001 — pricing must never break a spawn
+        LOG.warning("[subagent_cost] could not price model=%r: %s", model, exc)
+        return 0.0
 
 
 def _build_system_prompt(spec: SubagentSpec) -> str:
@@ -328,15 +389,25 @@ def run_with_invoker(
 
     raw_rounds = raw.get("rounds") or []
     rounds = [dict(r) for r in raw_rounds if isinstance(r, Mapping)]
+    # Effective model: invokers report the resolved model; fall back to the spec.
+    model = str(raw.get("model") or spec.model or "") or None
+    tokens_in = int(raw.get("tokens_in", 0) or 0)
+    tokens_out = int(raw.get("tokens_out", 0) or 0)
+    cache_read = int(raw.get("cache_read_tokens", 0) or 0)
+    cache_write = int(raw.get("cache_write_tokens", 0) or 0)
     return SubagentResult(
         spawn_id=sid,
         role=spec.role,
         output=str(raw.get("output", "")),
         tool_calls=int(raw.get("tool_calls", 0) or 0),
-        tokens_in=int(raw.get("tokens_in", 0) or 0),
-        tokens_out=int(raw.get("tokens_out", 0) or 0),
-        cache_read_tokens=int(raw.get("cache_read_tokens", 0) or 0),
-        cache_write_tokens=int(raw.get("cache_write_tokens", 0) or 0),
+        tokens_in=tokens_in,
+        tokens_out=tokens_out,
+        cache_read_tokens=cache_read,
+        cache_write_tokens=cache_write,
+        model=model,
+        cost_usd=_subagent_cost_usd(
+            model, tokens_in, tokens_out, cache_read, cache_write
+        ),
         elapsed_seconds=elapsed,
         status="ok",
         rounds=rounds,
@@ -392,6 +463,7 @@ def summarize_results(
     cw_tok = 0
     tool_calls = 0
     elapsed = 0.0
+    cost = 0.0
     for r in results:
         n += 1
         if r.status == "ok":
@@ -403,6 +475,7 @@ def summarize_results(
         cw_tok += int(r.cache_write_tokens or 0)
         tool_calls += int(r.tool_calls or 0)
         elapsed += float(r.elapsed_seconds or 0.0)
+        cost += float(r.cost_usd or 0.0)
     return {
         "ts": time.time(),
         "kind": "summary",
@@ -416,6 +489,7 @@ def summarize_results(
         "cache_read_tokens": cr_tok,
         "cache_write_tokens": cw_tok,
         "total_tokens": in_tok + out_tok + cr_tok + cw_tok,
+        "cost_usd": round(cost, 6),
         "elapsed_seconds": round(elapsed, 3),
     }
 
@@ -434,6 +508,7 @@ def summarize_spawn_tree(
     n = n_ok = 0
     by_status: dict[str, int] = {}
     elapsed = 0.0
+    cost = 0.0
     if not p.is_file():
         return {
             "ts": time.time(),
@@ -448,6 +523,7 @@ def summarize_spawn_tree(
             "cache_read_tokens": 0,
             "cache_write_tokens": 0,
             "total_tokens": 0,
+            "cost_usd": 0.0,
             "elapsed_seconds": 0.0,
         }
     with p.open("r", encoding="utf-8", errors="replace") as fh:
@@ -474,6 +550,7 @@ def summarize_spawn_tree(
             cw_tok += int(row.get("cache_write_tokens", 0) or 0)
             tool_calls += int(row.get("tool_calls", 0) or 0)
             elapsed += float(row.get("elapsed_seconds", 0.0) or 0.0)
+            cost += float(row.get("cost_usd", 0.0) or 0.0)
     return {
         "ts": time.time(),
         "kind": "summary",
@@ -487,6 +564,7 @@ def summarize_spawn_tree(
         "cache_read_tokens": cr_tok,
         "cache_write_tokens": cw_tok,
         "total_tokens": in_tok + out_tok + cr_tok + cw_tok,
+        "cost_usd": round(cost, 6),
         "elapsed_seconds": round(elapsed, 3),
     }
 
@@ -631,6 +709,7 @@ def write_subagent_delivery(
             "cache_read_tokens":  result.cache_read_tokens,
             "cache_write_tokens": result.cache_write_tokens,
             "total_tokens":       result.total_tokens,
+            "cost_usd":           round(float(result.cost_usd or 0.0), 6),
         },
     }
 
@@ -854,7 +933,7 @@ class LiteLLMInvoker:
                 )
             return resp.json()
 
-        return _drive_tool_loop(
+        out = dict(_drive_tool_loop(
             http_post=_http_post,
             tool_dispatch=st.dispatch,
             sys_prompt=sys_prompt,
@@ -863,7 +942,10 @@ class LiteLLMInvoker:
             model=model,
             max_tokens=spec.max_tokens,
             max_tool_calls=spec.max_tool_calls,
-        )
+        ))
+        # Report the resolved model so run_with_invoker can price the spawn.
+        out.setdefault("model", model)
+        return out
 
 
 def _make_invoker_from_env() -> LiteLLMInvoker:

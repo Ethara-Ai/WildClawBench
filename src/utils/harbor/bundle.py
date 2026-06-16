@@ -134,6 +134,26 @@ def _dimensions(task: Task, attachments_present: bool) -> Dict[str, str]:
     }
 
 
+def _resolve_bundle_prompt(task: Task, task_dir: Optional[Path]) -> str:
+    """Text for the bundle's prompt.txt.
+
+    Multi-turn tasks author the whole conversation in `prompts.txt`, but
+    `task.initial_prompt` only carries turn 0 — so prompt.txt would otherwise
+    show just the first turn. Prefer the full `prompts.txt` from the source task
+    dir when present; else fall back to the single-turn initial/seed prompt.
+    """
+    if task_dir is not None:
+        prompts_file = Path(task_dir) / "prompts.txt"
+        if prompts_file.is_file():
+            try:
+                full_prompt = prompts_file.read_text(encoding="utf-8").strip()
+                if full_prompt:
+                    return full_prompt
+            except OSError:
+                pass
+    return task.initial_prompt or task.seed_prompt or ""
+
+
 def write_bundle(
     task: Task,
     out_dir: Path,
@@ -188,7 +208,7 @@ def write_bundle(
         if env_var_name:
             env_vars[env_var_name] = f"http://{svc['name']}:{svc['port']}"
 
-    prompt_text = task.initial_prompt or task.seed_prompt or ""
+    prompt_text = _resolve_bundle_prompt(task, task_dir)
     (out_dir / "prompt.txt").write_text(prompt_text, encoding="utf-8")
 
     rubric_list = _transform_rubrics_for_export(task.rubrics_json)
@@ -206,7 +226,11 @@ def write_bundle(
     (data_dir / "tests").mkdir(parents=True, exist_ok=True)
     (data_dir / "solution").mkdir(parents=True, exist_ok=True)
 
-    (data_dir / "instruction.md").write_text(prompt_text, encoding="utf-8")
+    # instruction.md stays the single-turn task instruction (matches the
+    # reference bundle, 820 B for RUTH_001) — only prompt.txt carries the full
+    # multi-turn conversation. Do NOT reuse the multi-turn `prompt_text` here.
+    instruction_text = task.initial_prompt or task.seed_prompt or ""
+    (data_dir / "instruction.md").write_text(instruction_text, encoding="utf-8")
 
     # `used_apis` (line 158) is the canonical required-API set computed via
     # `_discover_used_apis(task, task_dir, env_dir)` which fuses prompt-keyword

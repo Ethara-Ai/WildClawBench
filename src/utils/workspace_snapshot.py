@@ -27,15 +27,17 @@ the host venv without `requests`.
 
 from __future__ import annotations
 
+import csv
 import json
 import logging
 import re
+import shutil
 import subprocess
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Mapping
 
 logger = logging.getLogger(__name__)
 
@@ -337,3 +339,188 @@ def capture_workspace_snapshot(
     except Exception as exc:  # pylint: disable=broad-except
         logger.warning("workspace_snapshot[%s]: write failed: %s", phase, exc)
         return None
+
+
+# ---------------------------------------------------------------------------
+# Directory materializers — render a snapshot into the task-input layout
+# (`<run_dir>/workspace_initial|workspace_after/{data,mock_data,persona}`)
+# instead of a flat JSON file.
+# ---------------------------------------------------------------------------
+
+_WS_SUBDIRS = ("data", "mock_data", "persona")
+
+
+def _safe_name(name: str) -> str:
+    """Make a table/file name safe as a single path segment (no traversal)."""
+    return re.sub(r"[^A-Za-z0-9._-]", "_", str(name)).strip("._") or "table"
+
+
+def _render_persona_dir(dest: Path, persona: Mapping[str, Any] | None) -> None:
+    """Write each persona key (e.g. 'AGENTS.md') as a file under `dest`."""
+    if not persona:
+        return
+    dest.mkdir(parents=True, exist_ok=True)
+    for fname, text in persona.items():
+        try:
+            (dest / _safe_name(fname)).write_text(
+                text if isinstance(text, str) else json.dumps(text, indent=2),
+                encoding="utf-8",
+            )
+        except OSError as exc:
+            logger.warning("workspace_snapshot: persona write %s failed: %s", fname, exc)
+
+
+def _csv_cell(value: Any) -> str:
+    """Scalars pass through; nested dict/list are JSON-encoded for a CSV cell."""
+    if value is None:
+        return ""
+    if isinstance(value, (str, int, float, bool)):
+        return str(value)
+    return json.dumps(value, ensure_ascii=False)
+
+
+def _write_table_csv(path: Path, rows: list) -> None:
+    """Write a list of row dicts as CSV: header = first-seen union of row keys."""
+    dict_rows = [r for r in rows if isinstance(r, Mapping)]
+    if not dict_rows:
+        # Empty or non-tabular list -> create an empty file so the table's
+        # existence is still recorded.
+        path.write_text("", encoding="utf-8")
+        return
+    header: list[str] = []
+    seen: set[str] = set()
+    for r in dict_rows:
+        for k in r.keys():
+            if k not in seen:
+                seen.add(k)
+                header.append(str(k))
+    with path.open("w", encoding="utf-8", newline="") as fh:
+        writer = csv.writer(fh)
+        writer.writerow(header)
+        for r in dict_rows:
+            writer.writerow([_csv_cell(r.get(k)) for k in header])
+
+
+def _render_mock_data_dir(dest: Path, mock_data: Mapping[str, Any] | None) -> None:
+    """Render `{api: {table: rows | _doc:name: dict}}` into per-API CSV/JSON files.
+
+    Tabular entries (`list`) -> `<table>.csv`; doc-style entries
+    (`_doc:<name>` -> dict) -> `<name>.json`. Never raises on a single bad
+    entry — logs and continues.
+    """
+    if not mock_data:
+        return
+    for api, tables in mock_data.items():
+        if not isinstance(tables, Mapping):
+            continue
+        api_dir = dest / _safe_name(api)
+        api_dir.mkdir(parents=True, exist_ok=True)
+        for table, value in tables.items():
+            try:
+                if str(table).startswith("_doc:"):
+                    name = _safe_name(str(table)[len("_doc:"):]) or "doc"
+                    (api_dir / f"{name}.json").write_text(
+                        json.dumps(value, indent=2, ensure_ascii=False),
+                        encoding="utf-8",
+                    )
+                elif isinstance(value, list):
+                    _write_table_csv(api_dir / f"{_safe_name(table)}.csv", value)
+                else:
+                    # Unexpected non-list, non-doc payload — preserve as JSON.
+                    (api_dir / f"{_safe_name(table)}.json").write_text(
+                        json.dumps(value, indent=2, ensure_ascii=False),
+                        encoding="utf-8",
+                    )
+            except OSError as exc:
+                logger.warning(
+                    "workspace_snapshot: mock_data write %s/%s failed: %s",
+                    api, table, exc,
+                )
+
+
+def _copy_input_subdir(task_dir: str | Path | None, name: str, dest: Path) -> None:
+    """Copy `task_dir/<name>/` -> `dest/<name>/` if the source exists."""
+    if not task_dir:
+        return
+    src = Path(task_dir) / name
+    if not src.is_dir():
+        return
+    try:
+        shutil.copytree(src, dest / name, dirs_exist_ok=True)
+    except OSError as exc:
+        logger.warning("workspace_snapshot: copy input %s failed: %s", name, exc)
+
+
+def write_workspace_initial(
+    run_dir: Path, task_dir: str | Path | None
+) -> Path | None:
+    """Build `<run_dir>/workspace_initial/{data,mock_data,persona}` by copying the
+    three task-input subdirs verbatim (pre-run state == input seed).
+
+    Never raises; returns the directory path on success, None on failure.
+    """
+    try:
+        out = Path(run_dir) / "workspace_initial"
+        out.mkdir(parents=True, exist_ok=True)
+        for name in _WS_SUBDIRS:
+            _copy_input_subdir(task_dir, name, out)
+        return out
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.warning("workspace_snapshot: write_workspace_initial failed: %s", exc)
+        return None
+
+
+def write_workspace_after(
+    run_dir: Path,
+    task_dir: str | Path | None,
+    *,
+    persona: Mapping[str, Any] | None,
+    mock_data: Mapping[str, Any] | None,
+) -> Path | None:
+    """Render the POST-RUN snapshot into
+    `<run_dir>/workspace_after/{data,mock_data,persona}`.
+
+    `persona` + `mock_data` are the captured post-run state; `data/` is copied
+    from the (static) task input. Never raises.
+    """
+    try:
+        out = Path(run_dir) / "workspace_after"
+        out.mkdir(parents=True, exist_ok=True)
+        _copy_input_subdir(task_dir, "data", out)
+        _render_mock_data_dir(out / "mock_data", mock_data)
+        _render_persona_dir(out / "persona", persona)
+        return out
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.warning("workspace_snapshot: write_workspace_after failed: %s", exc)
+        return None
+
+
+def capture_workspace_after(
+    run_dir: Path,
+    task_dir: str | Path | None,
+    *,
+    task_id: str,
+    host_api_to_url: dict[str, str] | None,
+    admin_token: str | None,
+) -> Path | None:
+    """Probe the post-run persona + mock_data (reusing the existing probes) and
+    materialize `<run_dir>/workspace_after/`. Convenience entry for the harness;
+    a snapshot failure never surfaces to the caller.
+    """
+    try:
+        persona = snapshot_persona(task_id)
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.warning("workspace_snapshot[after]: persona probe raised: %s", exc)
+        persona = None
+    mock_data: dict[str, dict[str, Any]] | None = None
+    if host_api_to_url:
+        try:
+            mock_data = snapshot_mock_data(
+                host_api_to_url=host_api_to_url, admin_token=admin_token,
+            )
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.warning("workspace_snapshot[after]: mock_data probe raised: %s", exc)
+            mock_data = None
+    return write_workspace_after(
+        run_dir, task_dir, persona=persona, mock_data=mock_data,
+    )

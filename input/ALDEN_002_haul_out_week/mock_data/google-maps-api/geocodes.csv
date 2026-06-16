@@ -1,0 +1,5 @@
+query,formatted_address,lat,lng,place_id,location_type
+"Rockland, ME 04841","Rockland, ME 04841",44.1037,-69.1089,geo-rockland,APPROXIMATE
+"Hamilton Marine, 155 E Main St, Searsport ME 04974","Hamilton Marine, 155 E Main St, Searsport ME 04974",44.4540,-68.9270,geo-hamilton,ROOFTOP
+"Rockland Marine Yard, slip 7","Rockland Marine Yard, slip 7",44.0990,-69.1100,geo-yard,ROOFTOP
+"Midcoast Orthopedic Associates, Rockland ME","Midcoast Orthopedic Associates, Rockland ME",44.1100,-69.1130,geo-ortho,ROOFTOP

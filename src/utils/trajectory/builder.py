@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -208,6 +209,60 @@ def _coerce_top_usage(src: Optional[Mapping]) -> dict[str, Any]:
     }
 
 
+# Harness scaffolding prepended to user messages that we must NOT surface in the
+# published output.json / delivery.json — the consumer wants the EXACT user
+# prompt only. Three layers, applied in order:
+#   1. The turn-0 boilerplate preamble (constant string; only the timeout digits
+#      vary) injected by the openclaw bootstrap.
+#   2. An optional `[<weekday date HH:MM UTC>]` wall-clock stamp (added by the
+#      openclaw binary on turns >0).
+#   3. An optional `[TURN N (...)]` header (added by
+#      inject_director.parse_prompts_file).
+# Patterns are anchored at start-of-string and match only these known tokens, so
+# arbitrary user text that merely begins with `[` is left untouched.
+_USER_PREAMBLE_RE = re.compile(
+    r"^You are an expert in a restricted, non-interactive environment\.\s*"
+    r"Solve the task efficiently before the timeout \(\d+s\)\.\s*"
+    r"Run all processes in the foreground without user input or background services\.\s*"
+    r"Provide a complete, functional solution in a single pass with no placeholders\.\s*",
+)
+_USER_UTC_PREFIX_RE = re.compile(r"^\[[^\]]*\bUTC\b[^\]]*\]\s*")
+_USER_TURN_PREFIX_RE = re.compile(r"^\[TURN\b[^\]]*\]\s*")
+
+
+def _strip_user_turn_prefix(text: str) -> str:
+    """Strip harness scaffolding from a user message, leaving the exact prompt."""
+    if not isinstance(text, str) or not text:
+        return text
+    s = _USER_PREAMBLE_RE.sub("", text, count=1)
+    s = _USER_UTC_PREFIX_RE.sub("", s, count=1)
+    s = _USER_TURN_PREFIX_RE.sub("", s, count=1)
+    if s != text:
+        s = s.lstrip("\n ")
+    return s
+
+
+def _strip_user_prefix_from_message(msg: dict) -> dict:
+    """Return a copy of `msg` with the prefix trimmed off its first text block."""
+    content = msg.get("content")
+    if isinstance(content, str):
+        out = dict(msg)
+        out["content"] = _strip_user_turn_prefix(content)
+        return out
+    if isinstance(content, list):
+        new_content = list(content)
+        for i, block in enumerate(new_content):
+            if isinstance(block, dict) and block.get("type") == "text":
+                nb = dict(block)
+                nb["text"] = _strip_user_turn_prefix(block.get("text", ""))
+                new_content[i] = nb
+                break
+        out = dict(msg)
+        out["content"] = new_content
+        return out
+    return msg
+
+
 def build_trajectory_from_jsonl(
     task: Task,
     entries: List[dict],
@@ -279,6 +334,10 @@ def build_trajectory_from_jsonl(
             continue
 
         msg = sanitize_jsonl_message(msg)
+        if role == "user":
+            # Surface the exact user prompt — drop harness scaffolding
+            # (boilerplate preamble + [UTC] / [TURN N] headers).
+            msg = _strip_user_prefix_from_message(msg)
         entry_id = entry.get("id", "")
         parent_id = last_kept_id if last_kept_id else entry.get("parentId", "")
         messages.append({

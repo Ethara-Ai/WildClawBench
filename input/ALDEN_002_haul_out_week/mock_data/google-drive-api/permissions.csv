@@ -1,0 +1,7 @@
+id,file_id,type,role,email,display_name
+perm-001,folder-eileen,user,owner,alden.croft.me@gmail.com,Alden Croft
+perm-002,folder-haul-out,user,owner,alden.croft.me@gmail.com,Alden Croft
+perm-003,folder-finance,user,owner,alden.croft.me@gmail.com,Alden Croft
+perm-004,folder-health,user,owner,alden.croft.me@gmail.com,Alden Croft
+perm-005,file-finances,user,reader,kara.croft.me@gmail.com,Kara Croft
+perm-006,file-med-tracker,user,reader,kara.croft.me@gmail.com,Kara Croft

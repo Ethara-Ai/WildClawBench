@@ -1,0 +1,5 @@
+order_id,store_id,customer_name,status,subtotal,delivery_fee,service_fee,tip,total,placed_at,dasher_name
+,,,delivered,28.40,0.00,0.00,0.00,28.40,2026-11-22T23:11:00Z,
+,,,delivered,61.25,0.00,0.00,0.00,61.25,2026-11-26T22:18:00Z,
+,,,delivered,34.00,0.00,0.00,0.00,34.00,2026-12-01T22:42:00Z,
+,,,delivered,22.95,0.00,0.00,0.00,22.95,2026-12-04T19:08:00Z,

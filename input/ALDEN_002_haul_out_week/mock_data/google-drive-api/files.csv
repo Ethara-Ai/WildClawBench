@@ -1,0 +1,12 @@
+id,name,mime_type,parent_id,size,created_time,modified_time,owner_email,starred,trashed,web_view_link
+folder-root,My Drive,application/vnd.google-apps.folder,,0,2024-12-01T00:00:00Z,2024-12-01T00:00:00Z,alden.croft.me@gmail.com,false,false,
+folder-eileen,Eileen C,application/vnd.google-apps.folder,folder-root,0,2024-12-01T10:00:00Z,2026-12-04T11:00:00Z,alden.croft.me@gmail.com,true,false,https://drive.google.com/drive/folders/folder-eileen
+folder-haul-out,Haul-out 2026,application/vnd.google-apps.folder,folder-eileen,0,2026-11-15T09:00:00Z,2026-12-07T08:00:00Z,alden.croft.me@gmail.com,false,false,https://drive.google.com/drive/folders/folder-haul-out
+folder-finance,Finance,application/vnd.google-apps.folder,folder-root,0,2024-12-01T10:00:00Z,2026-12-06T15:30:00Z,alden.croft.me@gmail.com,false,false,https://drive.google.com/drive/folders/folder-finance
+folder-health,Health,application/vnd.google-apps.folder,folder-root,0,2024-12-01T10:00:00Z,2026-11-20T08:00:00Z,alden.croft.me@gmail.com,false,false,https://drive.google.com/drive/folders/folder-health
+file-engine-log,Engine_log_2026.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,folder-eileen,18432,2026-05-20T07:00:00Z,2026-12-04T08:00:00Z,alden.croft.me@gmail.com,false,false,https://drive.google.com/file/d/file-engine-log
+file-catch-log,Catch_log_Nov-Dec_2026.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,folder-eileen,12288,2026-11-01T07:00:00Z,2026-12-06T15:30:00Z,alden.croft.me@gmail.com,false,false,https://drive.google.com/file/d/file-catch-log
+file-yard-prep-email,Yard pre-haul instructions.pdf,application/pdf,folder-haul-out,184320,2026-12-04T11:15:00Z,2026-12-04T11:15:00Z,alden.croft.me@gmail.com,false,false,https://drive.google.com/file/d/file-yard-prep-email
+file-tsb-247b,Cummins TSB-247B.pdf,application/pdf,folder-eileen,512000,2026-11-30T08:00:00Z,2026-11-30T08:00:00Z,alden.croft.me@gmail.com,false,false,https://drive.google.com/file/d/file-tsb-247b
+file-finances,Alden_finances_2026.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,folder-finance,32768,2024-12-01T10:00:00Z,2026-12-06T15:30:00Z,alden.croft.me@gmail.com,true,false,https://drive.google.com/file/d/file-finances
+file-med-tracker,Medication_tracker_Alden.gdoc,application/vnd.google-apps.document,folder-health,0,2024-10-15T09:00:00Z,2026-11-15T15:30:00Z,alden.croft.me@gmail.com,false,false,https://docs.google.com/document/d/file-med-tracker

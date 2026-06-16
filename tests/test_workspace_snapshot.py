@@ -229,3 +229,116 @@ def test_capture_final_uses_docker_exec_for_persona(tmp_path: Path):
     assert payload_json["phase"] == "final"
     assert payload_json["persona"] == {"AGENTS.md": "after"}
     assert payload_json["mock_data"] == {"airtable": {"records": []}}
+
+
+# ---------------------------------------------------------------------------
+# Directory materializers (workspace_initial / workspace_after)
+# ---------------------------------------------------------------------------
+
+import csv as _csv  # noqa: E402
+
+from src.utils.workspace_snapshot import (  # noqa: E402
+    _render_persona_dir,
+    _render_mock_data_dir,
+    write_workspace_initial,
+    write_workspace_after,
+)
+
+
+def _read_csv(path: Path) -> tuple[list[str], list[list[str]]]:
+    with path.open(encoding="utf-8", newline="") as fh:
+        rows = list(_csv.reader(fh))
+    return (rows[0] if rows else []), rows[1:]
+
+
+def test_render_persona_dir_writes_each_key(tmp_path: Path):
+    _render_persona_dir(tmp_path, {"AGENTS.md": "agent text", "SOUL.md": "soul"})
+    assert (tmp_path / "AGENTS.md").read_text() == "agent text"
+    assert (tmp_path / "SOUL.md").read_text() == "soul"
+
+
+def test_render_persona_dir_none_is_noop(tmp_path: Path):
+    _render_persona_dir(tmp_path / "p", None)
+    assert not (tmp_path / "p").exists()
+
+
+def test_render_mock_data_tabular_to_csv(tmp_path: Path):
+    md = {"airtable-api": {"bases": [
+        {"id": "a1", "name": "Base 1"},
+        {"id": "a2", "name": "Base 2", "extra": "x"},  # new col appears later
+    ]}}
+    _render_mock_data_dir(tmp_path, md)
+    csv_path = tmp_path / "airtable-api" / "bases.csv"
+    assert csv_path.is_file()
+    header, rows = _read_csv(csv_path)
+    assert header == ["id", "name", "extra"]  # first-seen union order
+    assert rows[0] == ["a1", "Base 1", ""]
+    assert rows[1] == ["a2", "Base 2", "x"]
+
+
+def test_render_mock_data_nested_cell_json_encoded(tmp_path: Path):
+    md = {"api": {"t": [{"id": "1", "tags": ["a", "b"]}]}}
+    _render_mock_data_dir(tmp_path, md)
+    header, rows = _read_csv(tmp_path / "api" / "t.csv")
+    assert header == ["id", "tags"]
+    assert rows[0][0] == "1"
+    assert json.loads(rows[0][1]) == ["a", "b"]
+
+
+def test_render_mock_data_doc_to_json(tmp_path: Path):
+    md = {"gmail-api": {"_doc:profile": {"email": "ruth@x.ai", "n": 3}}}
+    _render_mock_data_dir(tmp_path, md)
+    p = tmp_path / "gmail-api" / "profile.json"
+    assert p.is_file()
+    assert json.loads(p.read_text()) == {"email": "ruth@x.ai", "n": 3}
+
+
+def test_render_mock_data_empty_table_makes_empty_file(tmp_path: Path):
+    _render_mock_data_dir(tmp_path, {"api": {"empty": []}})
+    p = tmp_path / "api" / "empty.csv"
+    assert p.is_file() and p.read_text() == ""
+
+
+def test_write_workspace_initial_copies_input_subdirs(tmp_path: Path):
+    task_dir = tmp_path / "task"
+    for name, fn, content in [
+        ("data", "doc.md", "trap"),
+        ("mock_data", "airtable-api/bases.csv", "id\n1\n"),
+        ("persona", "AGENTS.md", "agent"),
+    ]:
+        f = task_dir / name / fn
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text(content)
+    out = write_workspace_initial(tmp_path / "run", task_dir)
+    assert out == tmp_path / "run" / "workspace_initial"
+    assert (out / "data" / "doc.md").read_text() == "trap"
+    assert (out / "mock_data" / "airtable-api" / "bases.csv").read_text() == "id\n1\n"
+    assert (out / "persona" / "AGENTS.md").read_text() == "agent"
+
+
+def test_write_workspace_after_end_to_end(tmp_path: Path):
+    task_dir = tmp_path / "task"
+    (task_dir / "data").mkdir(parents=True)
+    (task_dir / "data" / "trap.pdf").write_text("PDF")
+    out = write_workspace_after(
+        tmp_path / "run", task_dir,
+        persona={"AGENTS.md": "post-run agent"},
+        mock_data={"slack-api": {"channels": [{"id": "c1"}], "_doc:team": {"name": "T"}}},
+    )
+    assert out == tmp_path / "run" / "workspace_after"
+    # data copied from input
+    assert (out / "data" / "trap.pdf").read_text() == "PDF"
+    # persona rendered
+    assert (out / "persona" / "AGENTS.md").read_text() == "post-run agent"
+    # mock_data rendered: csv for table, json for _doc
+    assert (out / "mock_data" / "slack-api" / "channels.csv").is_file()
+    assert json.loads((out / "mock_data" / "slack-api" / "team.json").read_text()) == {"name": "T"}
+
+
+def test_write_workspace_after_never_raises_on_bad_input(tmp_path: Path):
+    # malformed mock_data / missing task_dir must not raise
+    out = write_workspace_after(
+        tmp_path / "run", None,
+        persona=None, mock_data={"api": {"t": "not-a-list-or-doc"}},
+    )
+    assert out is not None and out.is_dir()

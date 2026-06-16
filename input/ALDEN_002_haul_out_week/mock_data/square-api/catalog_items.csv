@@ -1,0 +1,5 @@
+id,type,name,description,category,variation_id,variation_name,price_amount,currency
+SQ-IT-12,ITEM,Damariscotta Pemaquid oyster (1),raw_bar,raw_bar,,Regular,2.50,USD
+SQ-IT-13,ITEM,Oyster pint,raw_bar,raw_bar,,Regular,18.50,USD
+SQ-IT-14,ITEM,Belfast Bay Lager pint,beverages,beverages,,Regular,7.00,USD
+SQ-IT-15,ITEM,Cucumber mignonette,accompaniments,accompaniments,,Regular,3.00,USD

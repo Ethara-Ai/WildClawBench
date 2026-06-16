@@ -1,0 +1,5 @@
+id,order_id,customer_id,amount,currency,status,source_type,location_id,receipt_number,created_at
+,,,42.00,USD,COMPLETED,card,,,2026-11-15T19:11:00Z
+,,,18.50,USD,COMPLETED,card,,,2026-11-17T18:48:00Z
+,,,76.50,USD,COMPLETED,card,,,2026-11-22T20:21:00Z
+,,,12.00,USD,COMPLETED,cash,,,2026-11-29T17:33:00Z

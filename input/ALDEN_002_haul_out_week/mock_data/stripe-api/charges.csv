@@ -1,0 +1,5 @@
+id,customer,amount,currency,status,paid,refunded,amount_refunded,description,payment_intent,created
+ch_3RAd1xLmTpA,,42500,usd,,true,false,0,,,2026-09-21T18:11:00Z
+ch_3RAdC8LmTpA,,67500,usd,,true,false,0,,,2026-09-28T19:42:00Z
+ch_3RAegYLmTpA,,42500,usd,,true,false,0,,,2026-10-05T17:23:00Z
+ch_3RAfA2LmTpA,,115000,usd,,true,false,0,,,2026-10-13T11:09:00Z

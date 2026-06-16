@@ -1,0 +1,14 @@
+{
+  "user": {
+    "displayName": "Alden Croft",
+    "emailAddress": "alden.croft.me@gmail.com",
+    "permissionId": "perm-alden"
+  },
+  "storageQuota": {
+    "limit": "16106127360",
+    "usage": "421000000",
+    "usageInDrive": "395000000",
+    "usageInDriveTrash": "0"
+  },
+  "maxUploadSize": "5368709120"
+}

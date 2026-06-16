@@ -327,9 +327,17 @@ def build_delivery_trajectory(
         "platform": traj_meta.get("platform") or "linux",
     }
     sub_trajs = _load_sub_agent_trajectories(subagents_dir, spawn_id_map)
+    # Carry the agent-produced deliverables (and task input files) through to the
+    # delivery schema. `output.json` already builds these via
+    # multimodal_meta.build_output_artifacts / build_input_files_manifest, so we
+    # just surface them rather than recomputing. Missing -> empty lists.
+    artifacts = list(traj.get("output_artifacts") or [])
+    input_files = list(traj.get("input_files") or [])
     return {
         "meta_info": meta_info,
         "messages": out_msgs,
+        "artifacts": artifacts,
+        "input_files": input_files,
         "sub_agent_trajectories": sub_trajs,
     }
 

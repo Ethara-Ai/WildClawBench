@@ -1,0 +1,9 @@
+{
+  "_note_distractor": "DISTRACTOR API \u2014 Stripe payments account; the merchant is NOT Alden Croft. Co-op weekly settlement and yard invoices route through midcoast-seafood-coop-api / rockland-marine-yard-api, NOT through Stripe.",
+  "account_id": "acct_1RWoVm2xEnA88",
+  "business_name": "Penobscot Coastal Charters LLC",
+  "business_type": "company",
+  "country": "US",
+  "default_currency": "usd",
+  "created_utc": "2024-03-19T14:22:00Z"
+}

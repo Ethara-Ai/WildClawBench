@@ -1,0 +1,11 @@
+id,name,type,messages_total,messages_unread,threads_total,threads_unread
+INBOX,INBOX,system,4,2,4,2
+SENT,SENT,system,0,0,0,0
+DRAFT,DRAFT,system,0,0,0,0
+STARRED,STARRED,system,0,0,0,0
+TRASH,TRASH,system,0,0,0,0
+Label_yard,Rockland Marine Yard,user,1,1,1,1
+Label_coop,Midcoast Co-op,user,2,0,2,0
+Label_cummins,Cummins,user,1,1,1,1
+Label_health,Health,user,0,0,0,0
+Label_personal,Personal/Donna,user,0,0,0,0

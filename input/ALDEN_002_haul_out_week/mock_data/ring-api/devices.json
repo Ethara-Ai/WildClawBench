@@ -1,0 +1,27 @@
+{
+  "chimes": [],
+  "doorbots": [],
+  "stickup_cams": [
+    {
+      "device_id": "ring-dev-1",
+      "model": "Doorbell Pro 2",
+      "location": "Front porch",
+      "battery_pct": 78,
+      "last_motion": "2026-12-06T17:42:00-05:00"
+    },
+    {
+      "device_id": "ring-dev-2",
+      "model": "Indoor Cam",
+      "location": "Living room",
+      "battery_pct": 92,
+      "last_motion": "2026-12-07T08:15:00-05:00"
+    },
+    {
+      "device_id": "ring-dev-3",
+      "model": "Floodlight Cam",
+      "location": "Driveway",
+      "battery_pct": 61,
+      "last_motion": "2026-12-07T02:30:00-05:00"
+    }
+  ]
+}

@@ -1,0 +1,356 @@
+{
+  "stage": 0,
+  "stage_name": "seed_initial_state",
+  "description": "Bootstrap stage. Applies BEFORE T0. Seeds mock_data baseline into the orchestrator world and places all canonical static artifacts on /workspace. Persona files, yard pre-haul instructions, Cummins TSB-247B service bulletin PDF, Hamilton order confirmation PDF, Rockland Marine work-order template DOCX, catch log / engine log / finances seed CSVs, and three seed emails (Co-op weekly settlement, Yard pre-haul, Cummins monthly bulletin summary). API seeds for Hamilton inventory, calendar events (haul-out + ortho), Cummins service bulletins, and the six existing MEMORY.md contacts. No silent drifts here — those start at stage 1. [DESCOPED: removed loud seeds for hamilton-marine-api + cummins-service-bulletins-api (no mock server present).]",
+  "applies_between_turns": [
+    null,
+    "T0"
+  ],
+  "applied_at_local_time": "2026-12-06T23:59:59-05:00",
+  "mutations": {
+    "filesystem": [
+      {
+        "id": "F0-P01",
+        "action": "copy",
+        "src": "persona/alden-croft/USER.md",
+        "dst": "/workspace/persona/alden-croft/USER.md",
+        "modality": "text/markdown",
+        "rationale": "Boot-time persona context required for the agent's operating manual.",
+        "fires_at_turn": "T0"
+      },
+      {
+        "id": "F0-P02",
+        "action": "copy",
+        "src": "persona/alden-croft/MEMORY.md",
+        "dst": "/workspace/persona/alden-croft/MEMORY.md",
+        "modality": "text/markdown",
+        "rationale": "Boot-time persona context required for the agent's operating manual.",
+        "fires_at_turn": "T0"
+      },
+      {
+        "id": "F0-P03",
+        "action": "copy",
+        "src": "persona/alden-croft/AGENTS.md",
+        "dst": "/workspace/persona/alden-croft/AGENTS.md",
+        "modality": "text/markdown",
+        "rationale": "Boot-time persona context required for the agent's operating manual.",
+        "fires_at_turn": "T0"
+      },
+      {
+        "id": "F0-P04",
+        "action": "copy",
+        "src": "persona/alden-croft/SOUL.md",
+        "dst": "/workspace/persona/alden-croft/SOUL.md",
+        "modality": "text/markdown",
+        "rationale": "Boot-time persona context required for the agent's operating manual.",
+        "fires_at_turn": "T0"
+      },
+      {
+        "id": "F0-P05",
+        "action": "copy",
+        "src": "persona/alden-croft/IDENTITY.md",
+        "dst": "/workspace/persona/alden-croft/IDENTITY.md",
+        "modality": "text/markdown",
+        "rationale": "Boot-time persona context required for the agent's operating manual.",
+        "fires_at_turn": "T0"
+      },
+      {
+        "id": "F0-P06",
+        "action": "copy",
+        "src": "persona/alden-croft/HEARTBEAT.md",
+        "dst": "/workspace/persona/alden-croft/HEARTBEAT.md",
+        "modality": "text/markdown",
+        "rationale": "Boot-time persona context required for the agent's operating manual.",
+        "fires_at_turn": "T0"
+      },
+      {
+        "id": "F0-P07",
+        "action": "copy",
+        "src": "persona/alden-croft/TOOLS.md",
+        "dst": "/workspace/persona/alden-croft/TOOLS.md",
+        "modality": "text/markdown",
+        "rationale": "Boot-time persona context required for the agent's operating manual.",
+        "fires_at_turn": "T0"
+      },
+      {
+        "id": "F0-E01",
+        "action": "copy",
+        "src": "emails/Yard_pre_haul_instructions_2026-12-04.eml",
+        "dst": "/workspace/inbox/2026-12-04_yard_pre_haul.eml",
+        "modality": "message/rfc822",
+        "rationale": "Pre-haul prep checklist from Rockland Marine. Anchors the haul-out delivery window and the 3-day turnaround assumption.",
+        "fires_at_turn": "T0"
+      },
+      {
+        "id": "F0-E02",
+        "action": "copy",
+        "src": "emails/Coop_weekly_settlement_2026-12-06.eml",
+        "dst": "/workspace/inbox/2026-12-06_coop_weekly.eml",
+        "modality": "message/rfc822",
+        "rationale": "Midcoast Co-op weekly settlement for last in-season week. Source for the $2,592.20 figure surfaced at T9.",
+        "fires_at_turn": "T0"
+      },
+      {
+        "id": "F0-E03",
+        "action": "copy",
+        "src": "emails/Cummins_monthly_bulletin_2026-11-30.eml",
+        "dst": "/workspace/inbox/2026-11-30_cummins_bulletin.eml",
+        "modality": "message/rfc822",
+        "rationale": "Monthly bulletin summary listing TSB-247B alongside two decoy bulletins. Source for T36 reference.",
+        "fires_at_turn": "T0"
+      },
+      {
+        "id": "F0-C01",
+        "action": "copy",
+        "src": "contracts/Cummins_TSB-247B.pdf",
+        "dst": "/workspace/inbox/Cummins_TSB-247B.pdf",
+        "modality": "application/pdf",
+        "rationale": "Full TSB-247B service bulletin. The serial range here (1700001-1899999) is the published one — silent mutation SM8 in stage1+ narrows it.",
+        "fires_at_turn": "T0"
+      },
+      {
+        "id": "F0-C02",
+        "action": "copy",
+        "src": "contracts/Hamilton_order_confirmation_2026-12-07.pdf",
+        "dst": "/workspace/inbox/Hamilton_order_confirmation_2026-12-07.pdf",
+        "modality": "application/pdf",
+        "rationale": "Hamilton receipt with the 'raw water sump' typo (intentional cross-modal contradiction SM7). The catalog and parts-desk both say 'pump' — only the PDF has the typo.",
+        "fires_at_turn": "T7"
+      },
+      {
+        "id": "F0-C03",
+        "action": "copy",
+        "src": "contracts/Hanover_policy_summary_2026.pdf",
+        "dst": "/workspace/inbox/Hanover_policy_summary_2026.pdf",
+        "modality": "application/pdf",
+        "rationale": "Hanover marine policy summary surfaced as background reference for the T12-T13 Hanover inquiry. Janet Pulaski reply at stage3 is the authoritative answer; this PDF is the secondary reference. Moved from stage2 to stage0 because the prompts that semantically reference it (T12-T13) happen before stage2 fires.",
+        "fires_at_turn": "T12"
+      },
+      {
+        "id": "F0-T01",
+        "action": "copy",
+        "src": "templates/Rockland_Marine_work_order_template.docx",
+        "dst": "/workspace/templates/Rockland_Marine_work_order_template.docx",
+        "modality": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "rationale": "Blank work-order DOCX. Used at T22-T24 when Alden drafts the work order before Wednesday hand-off.",
+        "fires_at_turn": "T22"
+      },
+      {
+        "id": "F0-T02",
+        "action": "copy",
+        "src": "templates/yard_prep_instructions.md",
+        "dst": "/workspace/templates/yard_prep_instructions.md",
+        "modality": "text/markdown",
+        "rationale": "Mirror of the yard pre-haul email in markdown form for easy reading.",
+        "fires_at_turn": "T0"
+      },
+      {
+        "id": "F0-D01",
+        "action": "copy",
+        "src": "data/Alden_catch_log_2026-11-30_to_12-06.csv",
+        "dst": "/workspace/data/Alden_catch_log_2026-11-30_to_12-06.csv",
+        "modality": "text/csv",
+        "rationale": "Daily catch totals for the last in-season week. Cross-references the Co-op weekly settlement.",
+        "fires_at_turn": "T0"
+      },
+      {
+        "id": "F0-D02",
+        "action": "copy",
+        "src": "data/Alden_engine_log_2026.csv",
+        "dst": "/workspace/data/Alden_engine_log_2026.csv",
+        "modality": "text/csv",
+        "rationale": "Cummins 6BTA engine logbook. Source data for the overheating diagnostic narrative at T36.",
+        "fires_at_turn": "T0"
+      },
+      {
+        "id": "F0-D03",
+        "action": "copy",
+        "src": "data/Alden_finances_seed_2026-12.csv",
+        "dst": "/workspace/data/Alden_finances_seed_2026-12.csv",
+        "modality": "text/csv",
+        "rationale": "Balance seed for boat fund ($3,200) and emergency savings ($6,800) used at T9.",
+        "fires_at_turn": "T0"
+      },
+      {
+        "id": "F0-D04",
+        "action": "copy",
+        "src": "data/Eileen_C_vessel_engine_spec.md",
+        "dst": "/workspace/data/Eileen_C_vessel_engine_spec.md",
+        "modality": "text/markdown",
+        "rationale": "Vessel & engine spec card. Provides the block serial 1815432 the agent must check against TSB-247B's serial range (Rev1 narrowing 1700001-1799999 EXCLUDES this serial, so bulletin does NOT apply after Rev1).",
+        "fires_at_turn": "T0"
+      },
+      {
+        "id": "F0-D05",
+        "action": "copy",
+        "src": "data/Alden_finances_tracker_2026.xlsx",
+        "dst": "/workspace/data/Alden_finances_tracker_2026.xlsx",
+        "modality": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "rationale": "Alden's 3-sheet Excel finance tracker (Accounts, Coop_settlements, HaulOut_budget). Richer per-line view than the seed CSV. Useful at T26 (account balances), T43-T44 (work-order line itemization vs HaulOut_budget sheet), and T49 (end-of-week wrap).",
+        "fires_at_turn": "T0"
+      }
+    ],
+    "loud": [
+      {
+        "id": "M0-G01",
+        "service": "gmail-api",
+        "method": "POST",
+        "path": "/messages",
+        "description": "Co-op weekly settlement for last in-season week (Nov 30 - Dec 6).",
+        "body": {
+          "from": "orders@midcoastseafood.com",
+          "to": "alden.croft.me@gmail.com",
+          "subject": "Weekly settlement Nov 30-Dec 6, Eileen C",
+          "body": "Member Alden Croft / Eileen C / Week ending 2026-12-06. Lobster lbs landed: 412. Boat price avg: $6.85/lb. Net to member: $2,592.20. Bait container deposit pending refund.",
+          "received_at": "2026-12-06T15:30:00-05:00"
+        },
+        "fires_at_turn": "T0"
+      },
+      {
+        "id": "M0-G02",
+        "service": "gmail-api",
+        "method": "POST",
+        "path": "/messages",
+        "description": "Yard pre-haul instructions.",
+        "body": {
+          "from": "office@rocklandmarine.com",
+          "to": "alden.croft.me@gmail.com",
+          "subject": "Eileen C haul-out Wed Dec 9 prep checklist",
+          "body": "Alden — please deliver Eileen C to the yard slip by 4 PM Tuesday Dec 8. Pre-haul: (1) fuel tank below half, (2) batteries pulled, (3) all gear stripped from deck and cabin. Lift Wed Dec 9 at 08:00 ET sharp. 3-day turnaround. Our lead diesel mechanic on the diagnostic. Bring any parts you want installed. Work order form attached.",
+          "received_at": "2026-12-04T11:15:00-05:00"
+        },
+        "fires_at_turn": "T0"
+      },
+      {
+        "id": "M0-G03",
+        "service": "gmail-api",
+        "method": "POST",
+        "path": "/messages",
+        "description": "Cummins monthly bulletin summary listing TSB-247B + two decoys.",
+        "body": {
+          "from": "service-bulletins@cumminsmarine.com",
+          "to": "alden.croft.me@gmail.com",
+          "subject": "Monthly bulletin summary - 6BTA",
+          "body": "Bulletins active for 6BTA marine series: TSB-247B (cooling sensor false high-temp on 2006-2009 blocks), TSB-251 (raw water pump impeller wear), TSB-258A (fuel-injector timing on 2009+ blocks). See your owner portal for full text.",
+          "received_at": "2026-11-30T08:00:00-05:00"
+        },
+        "fires_at_turn": "T0"
+      },
+      {
+        "id": "M0-C01",
+        "service": "google-calendar-api",
+        "method": "POST",
+        "path": "/calendar/v3/calendars/primary/events",
+        "description": "Haul-out event at Rockland Marine Yard — Wed Dec 9 08:00 ET (pre-SM1).",
+        "body": {
+          "id": "evt-haul-out-2026-12-09",
+          "summary": "Eileen C haul-out @ Rockland Marine Yard",
+          "start": {
+            "dateTime": "2026-12-09T08:00:00-05:00",
+            "timeZone": "America/New_York"
+          },
+          "end": {
+            "dateTime": "2026-12-09T11:30:00-05:00",
+            "timeZone": "America/New_York"
+          }
+        },
+        "fires_at_turn": "T0"
+      },
+      {
+        "id": "M0-C02",
+        "service": "google-calendar-api",
+        "method": "POST",
+        "path": "/calendar/v3/calendars/primary/events",
+        "description": "Dr. Pratt pre-surgery ortho visit — Wed Dec 9 14:00 ET.",
+        "body": {
+          "id": "evt-pratt-ortho-2026-12-09",
+          "summary": "Dr. Pratt pre-surgery ortho visit",
+          "start": {
+            "dateTime": "2026-12-09T14:00:00-05:00",
+            "timeZone": "America/New_York"
+          },
+          "end": {
+            "dateTime": "2026-12-09T15:00:00-05:00",
+            "timeZone": "America/New_York"
+          }
+        },
+        "fires_at_turn": "T0"
+      },
+      {
+        "id": "M0-N01",
+        "service": "google-contacts-api",
+        "method": "POST",
+        "path": "/v1/people:createContact",
+        "description": "Seed 9 pre-existing contacts from MEMORY.md (Kara, Eddie, Marv, Donna, Dr. Harrigan, Dr. Pratt, Dr. Eaton, Dr. Taniguchi, Co-op).",
+        "body": {
+          "contacts": [
+            {
+              "name": "Kara Croft",
+              "phone": "207-555-0192",
+              "email": "kara.croft.me@gmail.com"
+            },
+            {
+              "name": "Eddie Croft",
+              "phone": "207-555-0245"
+            },
+            {
+              "name": "Marv Pelletier",
+              "phone": "207-555-0318",
+              "email": "marv.pelletier.me@gmail.com"
+            },
+            {
+              "name": "Donna Winslow",
+              "phone": "207-555-0402"
+            },
+            {
+              "name": "Dr. Frank Harrigan",
+              "phone": "207-555-0700",
+              "organization": "Penobscot Bay Family Medicine"
+            },
+            {
+              "name": "Dr. Samuel Pratt",
+              "phone": "207-555-0715",
+              "organization": "Midcoast Orthopedic Associates"
+            },
+            {
+              "name": "Dr. Cheryl Eaton",
+              "phone": "207-555-0725",
+              "organization": "Rockland Dental"
+            },
+            {
+              "name": "Dr. Yuki Taniguchi",
+              "phone": "207-555-0735",
+              "organization": "Midcoast Vision"
+            },
+            {
+              "name": "Midcoast Seafood Co-op",
+              "phone": "207-555-0600",
+              "email": "orders@midcoastseafood.com"
+            }
+          ]
+        },
+        "fires_at_turn": "T0"
+      }
+    ],
+    "silent": []
+  },
+  "expected_audit_summary_after_stage": {
+    "gmail-api": {
+      "POST": 3,
+      "GET": 0
+    },
+    "google-calendar-api": {
+      "POST": 2,
+      "GET": 0
+    },
+    "google-contacts-api": {
+      "POST": 1,
+      "GET": 0
+    },
+    "filesystem": {
+      "copy": 20,
+      "delete": 0,
+      "patch": 0
+    }
+  }
+}

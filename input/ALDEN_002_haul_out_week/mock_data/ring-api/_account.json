@@ -1,0 +1,11 @@
+{
+  "account_id": "ring-acct-44829",
+  "holder_name": "Marcus DeLeon",
+  "holder_email": "m.deleon.home@gmail.com",
+  "address": "1428 Lakeview Drive, Charlotte NC 28207",
+  "plan": "Ring Protect Plus",
+  "billing_cycle": "monthly",
+  "billing_amount_usd": 10.0,
+  "created_at": "2024-03-12T09:14:00-04:00",
+  "_note": "Account holder is NOT Alden Croft. Address is Charlotte NC, not Rockland ME. No marine domain."
+}
