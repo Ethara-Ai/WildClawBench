@@ -1,0 +1,5 @@
+id,first_name,last_name,email,phone,company_id,role,owner_id
+ct_sophie,Sophie,Crawford,sophie.crawford@galeriacrawford.pl,+48 600 555 410,co_crawford,Gallery Director,owner_jacob
+ct_kaminska,Anna,Kamińska,a.kaminska@muzeum.krakow.pl,+48 12 555 0033,co_museum,Curator,owner_jacob
+ct_agnieszka,Agnieszka,Kowalczyk,agnieszka.kowalczyk@poczta.pl,+48 600 555 522,,Prospective Client,owner_jacob
+ct_mitchell,,Mitchell,prof.mitchell@uni-krakow.pl,,,Monograph Collaborator,owner_jacob

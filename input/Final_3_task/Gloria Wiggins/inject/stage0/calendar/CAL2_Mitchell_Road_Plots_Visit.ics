@@ -1,0 +1,14 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Gloria Wiggins//Deep Roots//EN
+BEGIN:VEVENT
+UID:B0A7DDFB-E14E-4EAE-A28F-C35F396B9265
+DTSTAMP:20261005T070000Z
+DTSTART;TZID=America/New_York:20261006T130000
+DTEND;TZID=America/New_York:20261006T150000
+SUMMARY:Mitchell Road Plots Visit
+LOCATION:Mitchell Road Research Plots, Piedmont County
+DESCRIPTION:Afternoon visit to Mitchell Road research plots (B-7). Check cover crop status, collect soil samples if needed. Compare field data with latest NC Ag Lab report. Bring sampling kit.
+STATUS:CONFIRMED
+END:VEVENT
+END:VCALENDAR

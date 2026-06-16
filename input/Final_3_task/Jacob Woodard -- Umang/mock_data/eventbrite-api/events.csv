@@ -1,0 +1,2 @@
+id,organization_id,name,summary,status,start_utc,end_utc,timezone,venue_id,capacity,url
+evb_wrofair,org_wrofair,Wrocław Antique Fair 2026,Annual antiques and horology fair,live,2026-10-10T07:00:00Z,2026-10-10T15:00:00Z,Europe/Warsaw,ven_wro,400,https://eventbrite.com/e/wroclaw-antique-fair-2026

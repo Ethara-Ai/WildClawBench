@@ -1,0 +1,15 @@
+row,A,B,C,D,E,F,G,H
+1,Date,Day,Status,Station,Shift Start,Shift End,OT Hours,Notes
+2,2026-10-05,Mon,ON,Station 47,06:00,06:00+1,0,
+3,2026-10-08,Thu,ON,Station 47,06:00,06:00+1,0,
+4,2026-10-11,Sun,ON,Station 47,06:00,06:00+1,0,
+5,2026-10-14,Wed,ON,Station 47,06:00,06:00+1,0,
+6,2026-10-17,Sat,ON,Station 47,06:00,06:00+1,0,
+7,2026-10-20,Tue,ON,Station 47,06:00,06:00+1,0,Day 1 — scenario start
+8,2026-10-23,Fri,ON,Station 47,06:00,06:00+1,0,
+9,2026-10-24,Sat,ON,Station 47,06:00,06:00+1,24,OT — Equipment Inspection Week
+10,2026-10-26,Mon,ON,Station 47,06:00,06:00+1,0,
+11,2026-10-29,Thu,ON,Station 47,06:00,06:00+1,0,
+12,2026-11-01,Sun,ON,Station 47,06:00,06:00+1,0,
+13,2026-11-04,Wed,ON,Station 47,06:00,06:00+1,0,
+14,2026-11-07,Sat,ON,Station 47,06:00,06:00+1,0,

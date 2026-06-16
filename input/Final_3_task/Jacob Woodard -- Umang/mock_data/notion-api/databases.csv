@@ -1,0 +1,4 @@
+id,title,parent_workspace,icon,created_time,last_edited_time
+db_commissions,Commissions,ws_woodard,clock,2024-02-02T09:00:00+02:00,2026-10-05T18:30:00+02:00
+db_parts,Parts & Inventory,ws_woodard,gear,2024-02-02T09:10:00+02:00,2026-10-05T17:50:00+02:00
+db_suppliers,Suppliers,ws_woodard,truck,2024-02-02T09:20:00+02:00,2026-09-20T11:00:00+02:00

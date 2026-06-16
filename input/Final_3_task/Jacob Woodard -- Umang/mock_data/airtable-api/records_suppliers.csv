@@ -1,0 +1,4 @@
+id,supplier_name,account_terms,primary_contact_name,primary_contact_email,active
+rec_sup_biel,Biel-Time SA,Net 30,Stefan Müller,stefan.muller@biel-time.ch,True
+rec_sup_krakow,Kraków Springs,Net 14,Workshop Desk,orders@krakow-springs.pl,True
+rec_sup_warsaw,Horological Supply Warsaw,Net 30,Sales,sales@horo-supply.pl,True

@@ -1,0 +1,3 @@
+id,name,parent_id,owner,created_at,item_count
+fld_root,Woodard Horology,0,jacob,2024-02-01T09:00:00+02:00,3
+fld_museum,Radziwiłł Museum Commission,fld_root,jacob,2026-08-15T10:00:00+02:00,2

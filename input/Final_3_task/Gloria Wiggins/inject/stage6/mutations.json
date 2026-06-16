@@ -1,0 +1,42 @@
+{
+  "stage": 6,
+  "stage_name": "before_T37",
+  "description": "Auto-rewritten from original stage2.json \u2014 applies before T37.",
+  "applies_between_turns": [
+    "T36",
+    "T37"
+  ],
+  "mutations": {
+    "silent": [
+      {
+        "id": "SM6",
+        "service": "gmail-api",
+        "silent": true,
+        "description": "Fieldstone adds evaluation rubric as mandatory appendix",
+        "admin": {
+          "op": "upsert",
+          "table": "messages",
+          "pk_field": "id",
+          "row": {
+            "id": "m_sm6_fieldstone_rubric",
+            "thread_id": "thr_sm6_fieldstone_rubric",
+            "from_addr": "Fieldstone Foundation Grants <grants@fieldstone-fdn.org>",
+            "to_addr": "Gloria Wiggins <gloria.wiggins@voissync.ai>",
+            "cc_addr": "",
+            "subject": "Additional Requirement: Evaluation Rubric",
+            "snippet": "All applicants must now include an Evaluation Rubric as a mandatory appendix to the narrative.",
+            "body": "All applicants must now include an Evaluation Rubric as a mandatory appendix to the narrative.",
+            "date": "2026-10-08T20:00:00-04:00",
+            "internal_date": "1791504000000",
+            "size_estimate": "100",
+            "labels": "INBOX",
+            "is_unread": "True",
+            "is_starred": "False"
+          }
+        }
+      }
+    ],
+    "filesystem": [],
+    "loud": []
+  }
+}

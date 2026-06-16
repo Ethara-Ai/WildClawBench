@@ -1,0 +1,30 @@
+{
+  "stage": 2,
+  "stage_name": "before_T13",
+  "description": "Auto-rewritten from original stage1.json \u2014 applies before T13.",
+  "applies_between_turns": [
+    "T12",
+    "T13"
+  ],
+  "mutations": {
+    "silent": [
+      {
+        "id": "SM2",
+        "service": "google-calendar-api",
+        "silent": true,
+        "description": "Henderson farm visit moved from 09:00 to 10:00",
+        "admin": {
+          "op": "patch",
+          "table": "events",
+          "pk": "evt_henderson_visit",
+          "set": {
+            "start": "2026-10-06T10:00:00-04:00",
+            "end": "2026-10-06T12:00:00-04:00"
+          }
+        }
+      }
+    ],
+    "filesystem": [],
+    "loud": []
+  }
+}

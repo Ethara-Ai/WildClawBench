@@ -1,0 +1,4 @@
+id,name,permission_level
+base_parts,Woodard Parts & Inventory,owner
+base_suppliers,Woodard Suppliers,owner
+base_shipping,Woodard Shipping,owner

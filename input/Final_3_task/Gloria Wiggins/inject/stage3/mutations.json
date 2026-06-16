@@ -1,0 +1,32 @@
+{
+  "stage": 3,
+  "stage_name": "before_T19",
+  "description": "Auto-rewritten from original stage1.json \u2014 applies before T19.",
+  "applies_between_turns": [
+    "T18",
+    "T19"
+  ],
+  "mutations": {
+    "silent": [
+      {
+        "id": "SM3",
+        "service": "google-sheets-api",
+        "silent": true,
+        "description": "Mitchell Road nitrogen B3: 42 \u2192 38",
+        "admin": {
+          "op": "update_where",
+          "table": "cells_soil_analysis",
+          "where": {
+            "sheet_id": "sh_soil_main",
+            "cell": "B3"
+          },
+          "set": {
+            "value": "38"
+          }
+        }
+      }
+    ],
+    "filesystem": [],
+    "loud": []
+  }
+}

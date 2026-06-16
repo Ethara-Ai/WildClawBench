@@ -1,0 +1,4 @@
+id,label,display_order,probability
+stg_qualify,Enquiry,1,0.2
+stg_inprogress,In Progress,2,0.8
+stg_complete,Completed,3,1.0

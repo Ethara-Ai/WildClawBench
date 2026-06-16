@@ -1,0 +1,15 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Gloria Wiggins//Deep Roots//EN
+BEGIN:VEVENT
+UID:8540E292-A926-4A91-8864-5DA9A3DBF7BB
+DTSTAMP:20261005T070000Z
+DTSTART;TZID=America/New_York:20261010T090000
+DTEND;TZID=America/New_York:20261010T120000
+SUMMARY:Herbalism Session with Grandma Bernice
+LOCATION:Parents' house, Durham NC
+DESCRIPTION:Weekly Saturday morning herbalism session with Grandma Bernice. Kitchen-table lessons on traditional remedies. This week: document sweetgrass remedy for joint stiffness before Harvest Day. Bring notebook and phone for audio backup. RECURRING - every Saturday.
+STATUS:CONFIRMED
+RRULE:FREQ=WEEKLY;BYDAY=SA
+END:VEVENT
+END:VCALENDAR

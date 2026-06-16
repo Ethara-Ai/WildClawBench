@@ -1,0 +1,30 @@
+Received: from mail-biel.biel-time.ch (mail-biel.biel-time.ch [185.203.112.45])
+        by mx.finthesiss.ai (Postfix) with ESMTPS id 4R8kLm2vN6z9sNB
+        for <jacob.woodard@Finthesiss.ai>; Tue,  6 Oct 2026 06:15:22 +0200 (CEST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=biel-time.ch;
+        s=mail2026; t=1791389722;
+        h=from:to:subject:date:message-id;
+        bh=abc123def456ghi789jkl012mno345pqr678stu901vwx=;
+        b=XYZabc123def456ghi789jkl012mno345pqr678stu901vwxyz
+Received: from [10.0.1.15] (workstation-stefan.internal [10.0.1.15])
+        by mail-biel.biel-time.ch (Postfix) with ESMTP id 3F9A2C0012
+        for <jacob.woodard@Finthesiss.ai>; Tue,  6 Oct 2026 06:15:00 +0200 (CEST)
+From: stefan.muller@biel-time.ch
+To: jacob.woodard@Finthesiss.ai
+Subject: Krasicki parts — QA update Oct 6
+Date: Tue, 06 Oct 2026 06:15:00 +0200
+Message-ID: <CAStefan.2026100606.biel@biel-time.ch>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 7bit
+X-Mailer: Thunderbird 115.4.1
+
+Jacob,
+
+The mainspring and balance staff are in final QA. Current window is 5
+business days from today. Expecting to ship by Oct 12-13 if all passes.
+The escapement wheel needed a minor adjustment but nothing concerning.
+Will update you Thursday.
+
+Best,
+Stefan

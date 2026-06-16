@@ -1,0 +1,13 @@
+date	day	status	station	shift_start	shift_end	overtime_hours	notes
+2026-10-12	Mon	On	Station 47	07:30	—	0	Engine 81, lead crew
+2026-10-13	Tue	On (overnight)	Station 47	—	07:30	0	—
+2026-10-14	Wed	Off	—	—	—	0	Pick up Liam 2:30; hockey 9:15
+2026-10-15	Thu	Off	—	—	—	0	Date night Marc
+2026-10-16	Fri	On	Station 47	07:30	—	0	—
+2026-10-17	Sat	On (overnight)	Station 47	—	07:30	0	—
+2026-10-18	Sun	Off	—	—	—	0	Family
+2026-10-19	Mon	Off	—	—	—	0	Lt exam study
+2026-10-20	Tue	On	Station 47	07:30	—	2	Equipment inspection prep
+2026-10-21	Wed	On (overnight)	Station 47	—	07:30	0	—
+2026-10-24	Sat	On	Station 47	07:30	—	0	Equipment inspection week begins
+2026-11-14	Sat	Off	—	—	—	0	LIEUTENANT'S EXAM (test day)

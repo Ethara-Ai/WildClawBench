@@ -103,7 +103,16 @@ class SubagentSpec:
 
 @dataclass
 class SubagentResult:
-    """Outcome of one sub-agent run."""
+    """Outcome of one sub-agent run.
+
+    Token accounting matches the project-wide 5-key shape used by
+    ``litellm_usage_callback`` / ``grading`` / ``judge_litellm``:
+    ``input_tokens`` (non-cached), ``output_tokens``, ``cache_read_tokens``,
+    ``cache_write_tokens``, and a derived ``total_tokens``. The legacy
+    ``tokens_in`` / ``tokens_out`` field names are kept on the dataclass for
+    backward compatibility with existing invokers and tests; new consumers
+    should read the canonical names off the log row / delivery JSON.
+    """
 
     spawn_id: str
     role: str
@@ -111,6 +120,8 @@ class SubagentResult:
     tool_calls: int = 0
     tokens_in: int = 0
     tokens_out: int = 0
+    cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
     elapsed_seconds: float = 0.0
     # ok | timeout | error | blocked
     status: str = "ok"
@@ -120,6 +131,15 @@ class SubagentResult:
     # Anthropic /v1/messages content blocks so a delivery converter can
     # reshape them into the parent's toolCall/toolResult message schema.
     rounds: list[dict] = field(default_factory=list)
+
+    @property
+    def total_tokens(self) -> int:
+        return (
+            int(self.tokens_in)
+            + int(self.tokens_out)
+            + int(self.cache_read_tokens)
+            + int(self.cache_write_tokens)
+        )
 
     def to_log_row(
         self,
@@ -144,8 +164,17 @@ class SubagentResult:
             "max_tokens": spec.max_tokens,
             "timeout_seconds": spec.timeout_seconds,
             "tool_calls": self.tool_calls,
+            # Legacy aliases kept for backcompat; canonical keys follow.
             "tokens_in": self.tokens_in,
             "tokens_out": self.tokens_out,
+            # Canonical 5-key cost shape (matches grading / judge / litellm
+            # usage callback). cache_* default to 0 on providers without
+            # prompt caching, so the keys are always present.
+            "input_tokens": self.tokens_in,
+            "output_tokens": self.tokens_out,
+            "cache_read_tokens": self.cache_read_tokens,
+            "cache_write_tokens": self.cache_write_tokens,
+            "total_tokens": self.total_tokens,
             "elapsed_seconds": round(self.elapsed_seconds, 3),
             "output_preview": out[:_PREVIEW_CHARS],
             "output_sha256": digest,
@@ -154,9 +183,36 @@ class SubagentResult:
 
 
 # An invoker receives a system prompt + a user prompt and returns a dict:
-#   {"output": str, "tool_calls": int, "tokens_in": int, "tokens_out": int}
+#   {"output": str, "tool_calls": int,
+#    "tokens_in": int, "tokens_out": int,
+#    "cache_read_tokens": int, "cache_write_tokens": int,
+#    "rounds": list[dict]}
+# cache_* fields default to 0 when absent, so older invokers stay compatible.
 # Tests use a FakeInvoker; production uses LiteLLMInvoker.
 InvokerCallable = Callable[[str, str, SubagentSpec], Mapping[str, Any]]
+
+
+def _extract_round_usage(usage: Any) -> dict[str, int]:
+    """Extract the canonical 4-token shape from an Anthropic ``usage`` block.
+
+    Raw Anthropic ``/v1/messages`` responses already split cache traffic from
+    non-cached input (unlike the LiteLLM-transformed prompt_tokens path that
+    ``litellm_usage_callback`` has to disentangle), so we just read the four
+    fields directly and default missing ones to 0.
+    """
+    if not isinstance(usage, Mapping):
+        return {
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "cache_read_tokens": 0,
+            "cache_write_tokens": 0,
+        }
+    return {
+        "input_tokens":       int(usage.get("input_tokens", 0) or 0),
+        "output_tokens":      int(usage.get("output_tokens", 0) or 0),
+        "cache_read_tokens":  int(usage.get("cache_read_input_tokens", 0) or 0),
+        "cache_write_tokens": int(usage.get("cache_creation_input_tokens", 0) or 0),
+    }
 
 
 def _build_system_prompt(spec: SubagentSpec) -> str:
@@ -279,6 +335,8 @@ def run_with_invoker(
         tool_calls=int(raw.get("tool_calls", 0) or 0),
         tokens_in=int(raw.get("tokens_in", 0) or 0),
         tokens_out=int(raw.get("tokens_out", 0) or 0),
+        cache_read_tokens=int(raw.get("cache_read_tokens", 0) or 0),
+        cache_write_tokens=int(raw.get("cache_write_tokens", 0) or 0),
         elapsed_seconds=elapsed,
         status="ok",
         rounds=rounds,
@@ -310,6 +368,127 @@ def append_spawn_row(
     spawn_tree_path.parent.mkdir(parents=True, exist_ok=True)
     with spawn_tree_path.open("a", encoding="utf-8") as fp:
         fp.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
+def summarize_results(
+    results: Iterable["SubagentResult"],
+    *,
+    scope: str = "batch",
+) -> dict[str, Any]:
+    """Aggregate per-spawn token usage into one summary row.
+
+    Output keys match the per-spawn ``to_log_row`` canonical names so the
+    same downstream aggregator code can sum across summary + per-spawn
+    rows without branching. ``kind`` is fixed to ``"summary"`` and there is
+    NO ``status`` field, so ``spawn_tree_checks._count_spawns_per_turn``
+    (which counts rows with ``status == "ok"``) ignores summary rows.
+    """
+    n = 0
+    n_ok = 0
+    by_status: dict[str, int] = {}
+    in_tok = 0
+    out_tok = 0
+    cr_tok = 0
+    cw_tok = 0
+    tool_calls = 0
+    elapsed = 0.0
+    for r in results:
+        n += 1
+        if r.status == "ok":
+            n_ok += 1
+        by_status[r.status] = by_status.get(r.status, 0) + 1
+        in_tok += int(r.tokens_in or 0)
+        out_tok += int(r.tokens_out or 0)
+        cr_tok += int(r.cache_read_tokens or 0)
+        cw_tok += int(r.cache_write_tokens or 0)
+        tool_calls += int(r.tool_calls or 0)
+        elapsed += float(r.elapsed_seconds or 0.0)
+    return {
+        "ts": time.time(),
+        "kind": "summary",
+        "scope": scope,
+        "n_spawns": n,
+        "n_ok": n_ok,
+        "by_status": by_status,
+        "tool_calls": tool_calls,
+        "input_tokens": in_tok,
+        "output_tokens": out_tok,
+        "cache_read_tokens": cr_tok,
+        "cache_write_tokens": cw_tok,
+        "total_tokens": in_tok + out_tok + cr_tok + cw_tok,
+        "elapsed_seconds": round(elapsed, 3),
+    }
+
+
+def summarize_spawn_tree(
+    spawn_tree_path: str | Path,
+) -> dict[str, Any]:
+    """Compute a task-level summary from every per-spawn row in the ledger.
+
+    Skips rows that look like summary rows themselves (``kind == "summary"``)
+    so re-running this against a file that already has summaries appended
+    does not double-count. Missing/unreadable files yield a zero summary.
+    """
+    p = Path(spawn_tree_path)
+    in_tok = out_tok = cr_tok = cw_tok = tool_calls = 0
+    n = n_ok = 0
+    by_status: dict[str, int] = {}
+    elapsed = 0.0
+    if not p.is_file():
+        return {
+            "ts": time.time(),
+            "kind": "summary",
+            "scope": "task",
+            "n_spawns": 0,
+            "n_ok": 0,
+            "by_status": {},
+            "tool_calls": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "cache_read_tokens": 0,
+            "cache_write_tokens": 0,
+            "total_tokens": 0,
+            "elapsed_seconds": 0.0,
+        }
+    with p.open("r", encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(row, dict):
+                continue
+            if row.get("kind") == "summary":
+                continue
+            n += 1
+            status = row.get("status")
+            if status == "ok":
+                n_ok += 1
+            by_status[str(status)] = by_status.get(str(status), 0) + 1
+            in_tok += int(row.get("input_tokens", row.get("tokens_in", 0)) or 0)
+            out_tok += int(row.get("output_tokens", row.get("tokens_out", 0)) or 0)
+            cr_tok += int(row.get("cache_read_tokens", 0) or 0)
+            cw_tok += int(row.get("cache_write_tokens", 0) or 0)
+            tool_calls += int(row.get("tool_calls", 0) or 0)
+            elapsed += float(row.get("elapsed_seconds", 0.0) or 0.0)
+    return {
+        "ts": time.time(),
+        "kind": "summary",
+        "scope": "task",
+        "n_spawns": n,
+        "n_ok": n_ok,
+        "by_status": by_status,
+        "tool_calls": tool_calls,
+        "input_tokens": in_tok,
+        "output_tokens": out_tok,
+        "cache_read_tokens": cr_tok,
+        "cache_write_tokens": cw_tok,
+        "total_tokens": in_tok + out_tok + cr_tok + cw_tok,
+        "elapsed_seconds": round(elapsed, 3),
+    }
 
 
 _STATUS_TO_COMPLETION = {
@@ -446,6 +625,13 @@ def write_subagent_delivery(
         ),
         "system_prompt": sys_prompt,
         "platform": "linux",
+        "usage": {
+            "input_tokens":       result.tokens_in,
+            "output_tokens":      result.tokens_out,
+            "cache_read_tokens":  result.cache_read_tokens,
+            "cache_write_tokens": result.cache_write_tokens,
+            "total_tokens":       result.total_tokens,
+        },
     }
 
     payload = {"meta_info": meta_info, "messages": messages}
@@ -505,6 +691,8 @@ def _drive_tool_loop(
     rounds_log: list[dict[str, Any]] = []
     total_in = 0
     total_out = 0
+    total_cache_read = 0
+    total_cache_write = 0
     total_tool_calls = 0
     final_text = ""
     max_rounds = max(1, max_tool_calls + 1)
@@ -521,13 +709,11 @@ def _drive_tool_loop(
         body = http_post(payload)
         if not isinstance(body, Mapping):
             raise RuntimeError(f"non-mapping body: {type(body).__name__}")
-        usage = body.get("usage") or {}
-        round_usage = {"input_tokens": 0, "output_tokens": 0}
-        if isinstance(usage, Mapping):
-            round_usage["input_tokens"] = int(usage.get("input_tokens", 0) or 0)
-            round_usage["output_tokens"] = int(usage.get("output_tokens", 0) or 0)
-            total_in += round_usage["input_tokens"]
-            total_out += round_usage["output_tokens"]
+        round_usage = _extract_round_usage(body.get("usage"))
+        total_in += round_usage["input_tokens"]
+        total_out += round_usage["output_tokens"]
+        total_cache_read += round_usage["cache_read_tokens"]
+        total_cache_write += round_usage["cache_write_tokens"]
 
         content = body.get("content") or []
         if not isinstance(content, list):
@@ -602,6 +788,8 @@ def _drive_tool_loop(
         "tool_calls": total_tool_calls,
         "tokens_in": total_in,
         "tokens_out": total_out,
+        "cache_read_tokens": total_cache_read,
+        "cache_write_tokens": total_cache_write,
         "rounds": rounds_log,
     }
 
@@ -770,6 +958,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     try:
         append_spawn_row(row, spawn_tree_path=args.spawn_tree)
+        append_spawn_row(
+            summarize_results([result], scope="single"),
+            spawn_tree_path=args.spawn_tree,
+        )
         write_subagent_delivery(
             result.spawn_id,
             spec=spec,
@@ -830,6 +1022,8 @@ def run_batch_parallel(
                     tool_calls=0,
                     tokens_in=0,
                     tokens_out=0,
+                    cache_read_tokens=0,
+                    cache_write_tokens=0,
                     elapsed_seconds=0.0,
                     status="error",
                     error=f"{type(exc).__name__}: {exc}",
@@ -887,6 +1081,10 @@ def _run_batch_main(
             )
         if result.status != "ok":
             any_error = True
+        # stdout stays intentionally light — parent's output.json should only
+        # see the agent response. Full token/cost telemetry lives on disk in
+        # spawn_tree.jsonl (per-spawn row + appended summary row below) and
+        # in each {spawn_id}.delivery.json meta_info.usage block.
         sys.stdout.write(json.dumps({
             "spawn_id": result.spawn_id,
             "role": result.role,
@@ -897,6 +1095,17 @@ def _run_batch_main(
             "tokens_out": result.tokens_out,
             "tool_calls": result.tool_calls,
         }) + "\n")
+
+    try:
+        append_spawn_row(
+            summarize_results(results, scope="batch"),
+            spawn_tree_path=spawn_tree,
+        )
+    except OSError as exc:
+        print(
+            f"subagent_director: batch summary write failed: {exc}",
+            file=sys.stderr,
+        )
     return 1 if any_error else 0
 
 

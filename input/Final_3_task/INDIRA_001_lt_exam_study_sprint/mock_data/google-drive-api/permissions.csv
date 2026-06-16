@@ -1,0 +1,13 @@
+file_id,permission_id,role,type,email,display_name,inherited
+drv_folder_mcfr,perm_001,owner,user,indira.hudson@voissync.ai,Indira Hudson,false
+drv_folder_ltexam,perm_002,owner,user,indira.hudson@voissync.ai,Indira Hudson,false
+drv_folder_personal,perm_003,owner,user,indira.hudson@voissync.ai,Indira Hudson,false
+drv_study_guide_v1,perm_004,owner,user,indira.hudson@voissync.ai,Indira Hudson,false
+drv_ss_practice_scores,perm_005,owner,user,indira.hudson@voissync.ai,Indira Hudson,false
+drv_ss_ce_tracker,perm_006,owner,user,indira.hudson@voissync.ai,Indira Hudson,false
+drv_ss_ce_tracker,perm_007,reader,user,mbrennan.cfd@example.org,Lt. Mike Brennan,false
+drv_ss_shift_schedule,perm_008,owner,user,indira.hudson@voissync.ai,Indira Hudson,false
+drv_ss_meal_kitty,perm_009,owner,user,indira.hudson@voissync.ai,Indira Hudson,false
+drv_ss_meal_kitty,perm_010,writer,user,eddie.v.cfd@example.org,Eddie Vasquez,false
+drv_doc_study_notes,perm_011,owner,user,indira.hudson@voissync.ai,Indira Hudson,false
+drv_doc_sop_reference,perm_012,owner,user,indira.hudson@voissync.ai,Indira Hudson,false

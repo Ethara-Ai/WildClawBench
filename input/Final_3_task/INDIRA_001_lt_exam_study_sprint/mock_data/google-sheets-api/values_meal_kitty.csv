@@ -1,0 +1,14 @@
+row,A,B,C,D,E,F
+1,Date,Shift,Cook,Contributors,Amount Per Person,Total Collected
+2,2026-10-05,A,Vasquez,"Hudson; Vasquez; Kowalski; Brennan",15.00,60.00
+3,2026-10-08,A,Kowalski,"Hudson; Vasquez; Kowalski; Brennan",15.00,60.00
+4,2026-10-11,A,Hudson,"Hudson; Vasquez; Kowalski; Brennan",15.00,60.00
+5,2026-10-14,A,Brennan,"Hudson; Vasquez; Kowalski; Brennan",15.00,60.00
+6,2026-10-17,A,Vasquez,"Hudson; Vasquez; Kowalski; Brennan; Martinez",15.00,75.00
+7,2026-10-20,A,Hudson,"Hudson; Vasquez; Kowalski; Brennan",15.00,60.00
+8,2026-10-23,A,Kowalski,"Hudson; Vasquez; Kowalski; Brennan",15.00,60.00
+9,2026-10-24,A,Vasquez,"Hudson; Vasquez; Kowalski; Brennan; Pham",15.00,75.00
+10,2026-10-26,A,Brennan,"Hudson; Vasquez; Kowalski; Brennan",15.00,60.00
+11,2026-10-29,A,Hudson,"Hudson; Vasquez; Kowalski; Brennan",15.00,60.00
+12,2026-11-01,A,Vasquez,"Hudson; Vasquez; Kowalski; Brennan",15.00,60.00
+13,2026-11-04,A,Kowalski,"Hudson; Vasquez; Kowalski; Brennan",15.00,60.00

@@ -1,0 +1,81 @@
+{
+  "stage": 3,
+  "description": "Overnight Thu→Fri (between T37 and T38): SM9 stale-data persistence across Notion/Linear/Airtable, SM10 Gniezno attribution change in Dropbox",
+  "applied_between": "T37 → T38",
+  "timing": "Overnight Thursday Oct 8 → Friday Oct 9, 2026",
+  "mutations": {
+    "silent": [
+      {
+        "id": "SM9-n",
+        "service": "notion-api",
+        "method": null,
+        "path": null,
+        "port": 8010,
+        "body": null,
+        "description": "NO MUTATION — Notion Krasicki page STILL shows Delivery: Oct 26 (stale since T0). The trap is that it was never updated after the T27 Pforzheim pivot moved delivery to ~Nov 10. Agent must detect and correct this stale date.",
+        "stale_field": "Delivery",
+        "stale_value": "2026-10-26",
+        "correct_value": "~2026-11-10 (per T27 email)",
+        "detection_window": "T38 onward — agent should audit project records and catch the stale delivery date",
+        "checker_linkage": ["SM_C9", "CROSS_C7"]
+      },
+      {
+        "id": "SM9-ln",
+        "service": "linear-api",
+        "method": null,
+        "path": null,
+        "port": 8004,
+        "body": null,
+        "description": "NO MUTATION — Linear Krasicki issue STILL shows Parts arrival: Oct 12-13 (stale since T0). The trap is that it was never updated after the T27 Pforzheim pivot moved shipping to Oct 28.",
+        "stale_field": "Parts_Arrival_ETA",
+        "stale_value": "2026-10-12",
+        "correct_value": "2026-10-28 (shipping) / ~2026-11-10 (delivery, per T27 email)",
+        "detection_window": "T38 onward — agent audits issue tracker",
+        "checker_linkage": ["SM_C9"]
+      },
+      {
+        "id": "SM9-at",
+        "service": "airtable-api",
+        "method": null,
+        "path": null,
+        "port": 8032,
+        "body": null,
+        "description": "NO MUTATION — Airtable Shipping Tracker STILL shows qa_window: 5 days and ETA: Oct 12 (stale since T0). Was never updated after SM2 (portal 5→7) or T27 Pforzheim pivot. Agent must detect and correct.",
+        "stale_fields": {
+          "qa_window": "5 days",
+          "ETA": "2026-10-12"
+        },
+        "correct_values": {
+          "qa_window": "7 days (per SM2 portal update)",
+          "ETA": "~2026-11-10 (per T27 email)"
+        },
+        "detection_window": "T38 onward — agent reviews shipping tracker",
+        "checker_linkage": ["SM_C9"]
+      },
+      {
+        "id": "SM10",
+        "service": "filesystem",
+        "method": "overwrite",
+        "path": "/workspace/monograph/ch4_sept_draft.md",
+        "port": null,
+        "body": {
+          "gniezno_attribution": "1802",
+          "schuler_attribution": "Berlin workshop"
+        },
+        "previous_value": {
+          "gniezno_attribution": "1798"
+        },
+        "description": "Prof. Mitchell updated the shared Dropbox chapter 4 draft: Gniezno longcase attribution changed from 1798 to 1802. Schuler attribution unchanged (still 'Berlin workshop'). This creates a three-way discrepancy: Dropbox=1802 (new), Obsidian=1798 (unchanged), Confluence=1800 (seed value). Agent must detect and flag the three-way conflict.",
+        "detection_window": "T47 onward — agent reviews monograph materials and detects the Dropbox change",
+        "checker_linkage": ["SM_C10", "CROSS_C8"],
+        "filesystem_artifact": "F-T47",
+        "three_way_discrepancy": {
+          "dropbox_ch4_sept_draft": "1802 (changed by Mitchell at T47)",
+          "obsidian_ch4_oct_working": "1798 (unchanged since T0)",
+          "confluence_jagiellonian": "1800 (seed value, read-only)"
+        }
+      }
+    ],
+    "loud": []
+  }
+}

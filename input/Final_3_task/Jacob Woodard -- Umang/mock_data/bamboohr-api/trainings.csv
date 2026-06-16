@@ -1,0 +1,6 @@
+id,employee_id,module,completed_date,status
+trn_1,emp_mark,Hand engraving,2026-08-12,completed
+trn_2,emp_mark,Case polishing,2026-09-15,completed
+trn_3,emp_mark,Escapement regulation,2026-09-22,completed
+trn_4,emp_mark,Mainspring winding protocol,2026-09-28,completed
+trn_5,emp_mark,Barrel arbor disassembly,2026-10-01,completed

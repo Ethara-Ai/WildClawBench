@@ -1,6 +1,6 @@
-id,Part,Movement type,Period,Commission,Supplier,Unit cost EUR,Lead time,On hand,Last ordered,Last modified
-rec_escape_krasicki,Hand-forged escape wheel,Longcase,1820s Polish,Krasicki (WH-2026-029),Stefan Muller (Muller Uhrenteile AG),645.00,4 months,0,2026-09-15,2026-09-18
-rec_escape_blackforest,Escape wheel,Longcase,1840s German,(stock - Black Forest comparable),Stefan Muller (Muller Uhrenteile AG),120.00,6 weeks,1,2026-07-02,2026-07-02
-rec_escape_radziwill,Verge escapement component,Pocket watch,1780s Polish-Lithuanian,Radziwill (WH-2026-031),bench-forged,0.00,n/a,0,,2026-08-10
-rec_balance_junghans,Balance staff,Wall clock,1930s Junghans,(personal),stock,18.00,in stock,3,2026-05-20,2026-05-20
-rec_wheel_set,Wheel set (general),Various,stock consumable,(stock),stock,32.00,in stock,2,2026-09-30,2026-10-18
+id,createdTime,Part,Movement type,Period,Commission,Supplier,Unit cost EUR,Lead time,On hand,Last ordered,Last modified
+rec_escape_krasicki,2026-09-15T00:00:00.000Z,Hand-forged escape wheel,Longcase,1820s Polish,Krasicki (WH-2026-029),Stefan Muller (Muller Uhrenteile AG),645.00,4 months,0,2026-09-15,2026-09-18
+rec_escape_blackforest,2026-07-02T00:00:00.000Z,Escape wheel,Longcase,1840s German,(stock - Black Forest comparable),Stefan Muller (Muller Uhrenteile AG),120.00,6 weeks,1,2026-07-02,2026-07-02
+rec_escape_radziwill,2026-08-10T00:00:00.000Z,Verge escapement component,Pocket watch,1780s Polish-Lithuanian,Radziwill (WH-2026-031),bench-forged,0.00,n/a,0,,2026-08-10
+rec_balance_junghans,2026-05-20T00:00:00.000Z,Balance staff,Wall clock,1930s Junghans,(personal),stock,18.00,in stock,3,2026-05-20,2026-05-20
+rec_wheel_set,2026-09-30T00:00:00.000Z,Wheel set (general),Various,stock consumable,(stock),stock,32.00,in stock,2,2026-09-30,2026-10-18

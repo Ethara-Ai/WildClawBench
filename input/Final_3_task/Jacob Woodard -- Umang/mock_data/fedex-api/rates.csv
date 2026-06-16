@@ -1,0 +1,3 @@
+service_type,currency,amount,transit_days
+INTERNATIONAL_PRIORITY,EUR,48.5,2
+INTERNATIONAL_ECONOMY,EUR,31.0,4

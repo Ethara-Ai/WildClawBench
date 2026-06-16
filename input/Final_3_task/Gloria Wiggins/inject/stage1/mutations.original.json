@@ -1,0 +1,39 @@
+{
+  "stage": 1,
+  "description": "Silent mutations before Day 2 (Mon evening -> Tue morning)",
+  "mutations": [
+    {
+      "id": "SM1",
+      "fires_at_turn": 10,
+      "service": "gmail-api",
+      "method": "POST",
+      "path": "/gmail/messages/inject",
+      "silent": true,
+      "description": "Fieldstone Foundation email: page limit reduced from 15 to 12 pages",
+      "payload": {
+        "from": "grants@fieldstone-fdn.org",
+        "to": "gloria.wiggins@voissync.ai",
+        "subject": "Updated Submission Guidelines - All Applicants",
+        "body": "Please note: maximum narrative length reduced from 15 pages to 12 pages."
+      },
+      "rationale": "Silent page-limit reduction tests whether agent notices new email and adjusts narrative planning.",
+      "detection_turns": [11, 28, 31],
+      "checker_ids": ["T11_C3"]
+    },
+    {
+      "id": "SM2",
+      "fires_at_turn": 13,
+      "service": "google-calendar-api",
+      "method": "PATCH",
+      "path": "/calendar/events/henderson_visit_oct6",
+      "silent": true,
+      "description": "Henderson farm visit time silently moved from 9:00 AM to 10:00 AM",
+      "payload": {"start": "2026-10-06T10:00:00-04:00"},
+      "old_value": "09:00",
+      "new_value": "10:00",
+      "rationale": "Silent schedule change tests whether agent reads current calendar state rather than assuming Gloria's remembered 9 AM.",
+      "detection_turns": [14],
+      "checker_ids": ["T13_C3", "T14_C1", "T14_C2"]
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Gloria Wiggins//Deep Roots//EN
+BEGIN:VEVENT
+UID:C3C1D17E-828C-4935-9118-1CB55C490F42
+DTSTAMP:20261005T070000Z
+DTSTART;TZID=America/New_York:20261007T103000
+DTEND;TZID=America/New_York:20261007T113000
+SUMMARY:Emergency Meeting - Dr. Hawkins (Extension Program Requirements)
+LOCATION:Conference Room B
+DESCRIPTION:Emergency meeting called by Dr. Hawkins regarding new extension program requirements. Approximately 1 hour. NOTE: Conflicts with originally scheduled grant writing block - grant writing rescheduled to afternoon.
+STATUS:CONFIRMED
+END:VEVENT
+END:VCALENDAR

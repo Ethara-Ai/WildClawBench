@@ -1,0 +1,14 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Gloria Wiggins//Deep Roots//EN
+BEGIN:VEVENT
+UID:293B8431-C372-4B70-8B44-00A5960A4238
+DTSTAMP:20261005T200000Z
+DTSTART;TZID=America/New_York:20261006T100000
+DTEND;TZID=America/New_York:20261006T120000
+SUMMARY:Henderson Farm Visit
+LOCATION:4521 Old Mill Rd, Durham NC 27703
+DESCRIPTION:Field visit to Henderson farm. Check eastern field (A-7) cover crop establishment, soil moisture readings, nematode inspection. Bring field notebook, moisture meter, soil auger. Contact: Henderson family.
+STATUS:CONFIRMED
+END:VEVENT
+END:VCALENDAR

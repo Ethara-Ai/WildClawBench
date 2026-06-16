@@ -1,0 +1,12 @@
+id,name,type,messageListVisibility,labelListVisibility
+Label_1,INBOX,system,show,labelShow
+Label_2,SENT,system,show,labelShow
+Label_3,DRAFT,system,show,labelShow
+Label_4,STARRED,system,show,labelShow
+Label_5,TRASH,system,hide,labelHide
+Label_10,Grants/Fieldstone,user,show,labelShow
+Label_11,Extension/Piedmont,user,show,labelShow
+Label_12,Family,user,show,labelShow
+Label_13,Community/HeritageOak,user,show,labelShow
+Label_14,Field/Visits,user,show,labelShow
+Label_15,Herbalism,user,show,labelShow

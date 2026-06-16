@@ -1,0 +1,35 @@
+Received: from mail.galeriacrawford.pl (mail.galeriacrawford.pl [91.215.68.33])
+        by mx.finthesiss.ai (Postfix) with ESMTPS id 4R0vZA2DX4z92AL
+        for <jacob.woodard@Finthesiss.ai>; Thu,  8 Oct 2026 14:45:17 +0200 (CEST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=galeriacrawford.pl;
+        s=selector1; t=1791593117;
+        h=from:to:subject:date:message-id:in-reply-to:references;
+        bh=xyz012abc345def678ghi901jkl234mno567pqr890stu123=;
+        b=VWXyz012abc345def678ghi901jkl234mno567pqr890stu
+Received: from [192.168.1.22] (sophie-macbook.local [192.168.1.22])
+        by mail.galeriacrawford.pl (Postfix) with ESMTP id 2H5E0L0245
+        for <jacob.woodard@Finthesiss.ai>; Thu,  8 Oct 2026 14:45:00 +0200 (CEST)
+From: sophie.crawford@galeriacrawford.pl
+To: jacob.woodard@Finthesiss.ai
+Subject: Re: 1840s Becker longcase — follow-up
+Date: Thu, 08 Oct 2026 14:45:00 +0200
+Message-ID: <CASophie.2026100814.gallery@galeriacrawford.pl>
+In-Reply-To: <CASophie.2026100607.gallery@galeriacrawford.pl>
+References: <CASophie.2026100607.gallery@galeriacrawford.pl>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 7bit
+X-Mailer: Apple Mail (2.3774.400.31)
+
+Jacob,
+
+Following up on my email from Tuesday about the 1840s Becker longcase.
+My client went ahead and had someone else look at it. I have now seen a
+document circulating that references a "preliminary assessment reviewed
+by Woodard Horology" — it claims the clock is circa 1840-1850, German,
+Gustave Becker workshop. I wanted to flag this with you because I know
+you declined to provide an assessment. Did you authorise this document?
+It has your workshop name on it.
+
+Best,
+Sophie

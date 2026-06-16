@@ -1,0 +1,3 @@
+id,name,real_name,email,is_admin,is_bot,tz
+U_JACOB,jacob,Jacob Woodard,jacob.woodard@Finthesiss.ai,True,False,Europe/Warsaw
+U_MARK,mark,Mark Jennings,mark.jennings@woodardhorology.pl,False,False,Europe/Warsaw

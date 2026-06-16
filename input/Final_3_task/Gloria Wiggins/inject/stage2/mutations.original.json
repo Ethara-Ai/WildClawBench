@@ -1,0 +1,76 @@
+{
+  "stage": 2,
+  "description": "Silent mutations before Day 3 (Tue evening -> Wed morning)",
+  "mutations": [
+    {
+      "id": "SM3",
+      "fires_at_turn": 19,
+      "service": "google-sheets-api",
+      "method": "PUT",
+      "path": "/sheets/Soil_Analysis_Piedmont_2026/cells/B3",
+      "silent": true,
+      "description": "Mitchell Road nitrogen silently changed from 42 ppm to 38 ppm",
+      "old_value": "42",
+      "new_value": "38",
+      "rationale": "Creates cross-modal contradiction with PDF attachment (still shows 42). Tests whether agent re-reads sheets before citing values.",
+      "detection_turns": [20],
+      "checker_ids": ["T19_C2", "T20_C1", "T20_C2", "T20_C3"]
+    },
+    {
+      "id": "SM4",
+      "fires_at_turn": 26,
+      "service": "google-sheets-api",
+      "method": "PUT",
+      "path": "/sheets/Deep_Roots_Budget_2026/cells/rate_label",
+      "silent": true,
+      "description": "Budget indirect cost rate label silently changed from 15% to 12%",
+      "old_value": "15%",
+      "new_value": "12%",
+      "rationale": "Entire budget must be recalculated. New indirect: 12% x $71,739.13 = $8,608.70. New total: $80,347.83.",
+      "detection_turns": [27, 32, 43],
+      "checker_ids": ["T26_C3", "T27_C1", "T27_C2", "T27_C3", "T32_C1", "T32_C2", "T43_C1", "T43_C2", "T43_C3"]
+    },
+    {
+      "id": "SM4b",
+      "fires_at_turn": 26,
+      "service": "gmail-api",
+      "method": "POST",
+      "path": "/gmail/messages/inject",
+      "silent": true,
+      "description": "Companion email about IDC rate cap from Fieldstone Foundation",
+      "payload": {
+        "from": "grants@fieldstone-fdn.org",
+        "subject": "Policy Update: Indirect Cost Rate Cap"
+      },
+      "rationale": "Companion to SM4 sheet change. Tests whether agent checks email before reviewing budget."
+    },
+    {
+      "id": "SM5",
+      "fires_at_turn": 35,
+      "service": "google-contacts-api",
+      "method": "PATCH",
+      "path": "/contacts/darnell_washington",
+      "silent": true,
+      "description": "Darnell Washington email silently changed to d.washington@piedmont-extension.edu",
+      "old_value": "darnell.washington@piedmont-extension.edu",
+      "new_value": "d.washington@piedmont-extension.edu",
+      "rationale": "Tests whether agent reads contacts API before sending email rather than using cached address.",
+      "detection_turns": [35],
+      "checker_ids": ["T35_C1", "T35_C2", "T35_C3"]
+    }
+  ],
+  "loud_injects": [
+    {
+      "id": "E10",
+      "fires_at_turn": 41,
+      "service": "gmail-api",
+      "description": "Revised soil analysis report from NC Ag Lab (nitrogen = 35 ppm)"
+    },
+    {
+      "id": "E12",
+      "fires_at_turn": 45,
+      "service": "gmail-api",
+      "description": "RED-LINE: Informal early review opportunity from Dr. Okafor"
+    }
+  ]
+}

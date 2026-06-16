@@ -1,0 +1,5 @@
+spreadsheet_id,title,locale,time_zone,owner,created_at,updated_at
+ss_lt_practice_scores,Lt Exam Practice Scores,en_US,America/Chicago,indira.hudson@voissync.ai,2026-08-14T19:00:00-05:00,2026-10-17T18:30:00-05:00
+ss_ce_tracker,CE Hours Tracker,en_US,America/Chicago,indira.hudson@voissync.ai,2026-01-15T10:00:00-06:00,2026-10-15T09:00:00-05:00
+ss_shift_schedule,Shift Schedule Oct-Nov,en_US,America/Chicago,indira.hudson@voissync.ai,2026-09-28T20:00:00-05:00,2026-09-29T07:00:00-05:00
+ss_meal_kitty,Station 47 Meal Kitty,en_US,America/Chicago,indira.hudson@voissync.ai,2026-10-01T06:30:00-05:00,2026-10-18T06:45:00-05:00

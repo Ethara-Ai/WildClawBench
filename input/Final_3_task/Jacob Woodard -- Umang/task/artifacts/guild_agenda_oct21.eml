@@ -1,0 +1,38 @@
+Received: from mail.guild-krakow.pl (mail.guild-krakow.pl [89.161.55.78])
+        by mx.finthesiss.ai (Postfix) with ESMTPS id 4R0aBC1AW0z80XA
+        for <jacob.woodard@Finthesiss.ai>; Mon, 29 Sep 2026 10:00:18 +0200 (CEST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=guild-krakow.pl;
+        s=gk2026; t=1790776818;
+        h=from:to:subject:date:message-id;
+        bh=def678ghi901jkl234mno567pqr890stu123vwx456yza789=;
+        b=BCDdef678ghi901jkl234mno567pqr890stu123vwx456yza
+Received: from [10.30.1.2] (secretary-office.guild-krakow.pl [10.30.1.2])
+        by mail.guild-krakow.pl (Postfix) with ESMTP id 6J7G2N0311
+        for <jacob.woodard@Finthesiss.ai>; Mon, 29 Sep 2026 10:00:00 +0200 (CEST)
+From: secretary@guild-krakow.pl
+To: jacob.woodard@Finthesiss.ai
+Subject: Guild meeting agenda — October 21
+Date: Mon, 29 Sep 2026 10:00:00 +0200
+Message-ID: <CASecretary.2026092910.guild@guild-krakow.pl>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 7bit
+X-Mailer: Roundcube Webmail/1.6.3
+
+Dear members,
+
+Please find below the agenda for our October 21 guild meeting:
+
+1. Opening remarks — Chairman Kowalski
+2. Membership renewals — 2027 dues schedule
+3. Workshop safety audit results — Inspector Nowicki
+4. Presentation: "Restoration Ethics: When Original Parts Are
+   Unavailable" — Jacob Woodard
+5. Holiday scheduling — December workshop closures
+6. Any other business
+
+Please circulate to anyone who may not have received this email.
+
+Best regards,
+Guild Secretary
+Krakow Horologists' Guild

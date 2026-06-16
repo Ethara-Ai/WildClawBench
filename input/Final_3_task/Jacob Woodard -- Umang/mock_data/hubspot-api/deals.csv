@@ -1,0 +1,3 @@
+id,name,amount_pln,stage_id,company_id,close_date,owner_id
+deal_radziwill,Radziwiłł Pocket Watch restoration,6500,stg_inprogress,co_museum,2026-12-31,owner_jacob
+deal_becker,Becker longcase authentication enquiry,0,stg_qualify,co_crawford,,owner_jacob

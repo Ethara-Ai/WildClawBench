@@ -1,0 +1,47 @@
+Received: from mx.finthesiss.ai (mx.finthesiss.ai [104.26.14.78])
+        by mail.krasicki-family.pl (Postfix) with ESMTPS id 4Q9bCD2BX1z71YB
+        for <estate@krasicki-family.pl>; Thu, 18 Sep 2026 14:30:16 +0200 (CEST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=Finthesiss.ai;
+        s=finthesiss2026; t=1789829416;
+        h=from:to:subject:date:message-id;
+        bh=ghi901jkl234mno567pqr890stu123vwx456yza789bcd012=;
+        b=EFGghi901jkl234mno567pqr890stu123vwx456yza789bcd
+Received: from [10.0.5.12] (jacob-workshop.finthesiss.internal [10.0.5.12])
+        by mx.finthesiss.ai (Postfix) with ESMTP id 8K8H3O0344
+        for <estate@krasicki-family.pl>; Thu, 18 Sep 2026 14:30:00 +0200 (CEST)
+From: jacob.woodard@Finthesiss.ai
+To: estate@krasicki-family.pl
+Subject: Krasicki Estate Clock — restoration update Sept 18
+Date: Thu, 18 Sep 2026 14:30:00 +0200
+Message-ID: <CAJacob.2026091814.wh@Finthesiss.ai>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 7bit
+X-Mailer: Thunderbird 115.3.1
+
+Dear Krasicki Family,
+
+I wanted to provide an update on the restoration of your estate clock.
+Work is progressing well. The movement has been fully disassembled,
+cleaned, and inspected. The case has been stabilised and the first round
+of conservation work on the woodwork is complete.
+
+I have ordered the replacement parts from Stefan Muller in Biel,
+Switzerland. Stefan is one of the finest precision parts suppliers in
+Europe and I have worked with him for over fifteen years. The parts
+include a new balance staff, mainspring set, and escapement wheel
+components. The total parts budget remains confirmed at PLN 2,800 as
+agreed in our original contract.
+
+Stefan expects to complete quality assurance and ship by mid-October. I
+am still targeting delivery of the restored clock to you by October 26,
+2026. I will contact you again as the delivery date approaches to
+arrange logistics.
+
+Please do not hesitate to reach out if you have any questions.
+
+With kind regards,
+Jacob Woodard
+Woodard Horology
+ulica Jozefa, Kazimierz, Krakow
++48-12-555-3400

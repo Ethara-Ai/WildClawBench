@@ -1,0 +1,22 @@
+Part_ID,Commission,Description,Qty,EUR_Unit_Price,FX_Rate,PLN_Unit_Price,PLN_Total,Supplier,Diameter_mm,Notes
+KR-001,Krasicki Estate Clock,Mainspring - longcase,3,28.00,4.32,120.96,362.88,Stefan Muller (Biel),N/A,Heavy-duty longcase grade
+KR-002,Krasicki Estate Clock,Escapement wheel,1,85.00,4.32,367.20,367.20,Stefan Muller (Biel),N/A,Dead-beat profile custom cut
+KR-003,Krasicki Estate Clock,Click spring,2,12.00,4.32,51.84,103.68,Krakow Springs,N/A,Tempered steel
+KR-004,Krasicki Estate Clock,Balance staff,1,38.00,4.32,164.16,164.16,Stefan Muller (Biel),0.85,Precision ground Biel
+KR-005,Krasicki Estate Clock,Barrel arbor,1,45.00,4.32,194.40,194.40,Stefan Muller (Biel),N/A,Hardened steel
+KR-006,Krasicki Estate Clock,Pendulum bob,1,65.00,4.32,280.80,280.80,Stefan Muller (Biel),N/A,Brass temperature-compensated
+KR-007,Krasicki Estate Clock,Suspension spring,2,8.50,4.32,36.72,73.44,Krakow Springs,N/A,Spring steel 0.05mm
+KR-008,Krasicki Estate Clock,Escape wheel pivot,2,22.00,4.32,95.04,190.08,Stefan Muller (Biel),N/A,Hardened and polished
+KR-009,Krasicki Estate Clock,Winding key,1,15.00,4.32,64.80,64.80,Horological Supply Warsaw,N/A,Size 8 brass
+KR-010,Krasicki Estate Clock,Dial feet,4,6.00,4.32,25.92,103.68,Horological Supply Warsaw,N/A,Brass threaded
+KR-011,Krasicki Estate Clock,Hands (pair),1,120.00,4.32,518.40,518.40,Stefan Muller (Biel),N/A,Blued steel serpentine
+KR-012,Krasicki Estate Clock,Bell,1,85.00,4.32,367.20,367.20,Stefan Muller (Biel),N/A,Cast bronze hour strike
+,,,,,,KRASICKI SUBTOTAL,2790.72,,,(rounded to PLN 2800 in contract)
+,,,,,,,,,,
+SC-001,St. Catherine Tower Clock,Pendulum rod,1,120.00,4.32,518.40,518.40,Stefan Muller (Biel),N/A,Compensation rod tower grade
+SC-002,St. Catherine Tower Clock,Escape wheel,1,95.00,4.32,410.40,410.40,Stefan Muller (Biel),N/A,Tower clock scale
+SC-003,St. Catherine Tower Clock,Balance staff,1,42.00,4.32,181.44,181.44,Stefan Muller (Biel),0.86,Tower clock spec
+,,,,,,,,,,
+RZ-001,Radziwill Pocket Watch,Balance cock,1,55.00,4.32,237.60,237.60,Stefan Muller (Biel),28.40,Gilt brass reproduction
+RZ-002,Radziwill Pocket Watch,Hairspring,1,35.00,4.32,151.20,151.20,Stefan Muller (Biel),N/A,Blued steel spiral
+RZ-005,Radziwill Pocket Watch,Balance staff,1,32.00,4.32,138.24,138.24,Stefan Muller (Biel),0.84,Pocket watch spec

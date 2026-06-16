@@ -1,0 +1,2 @@
+id,pay_period_start,pay_period_end,check_date,status,employee_id,hours,gross_pln
+pr_sept,2026-09-01,2026-09-30,2026-10-05,processed,ge_mark,168,4704.0

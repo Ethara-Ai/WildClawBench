@@ -1,0 +1,31 @@
+Received: from mail.galeriacrawford.pl (mail.galeriacrawford.pl [91.215.68.33])
+        by mx.finthesiss.ai (Postfix) with ESMTPS id 4R8kNp3wQ7z9tPC
+        for <jacob.woodard@Finthesiss.ai>; Tue,  6 Oct 2026 07:45:18 +0200 (CEST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=galeriacrawford.pl;
+        s=selector1; t=1791395118;
+        h=from:to:subject:date:message-id;
+        bh=def456ghi789jkl012mno345pqr678stu901vwxyz012abc=;
+        b=ABCdef456ghi789jkl012mno345pqr678stu901vwxyz012
+Received: from [192.168.1.22] (sophie-macbook.local [192.168.1.22])
+        by mail.galeriacrawford.pl (Postfix) with ESMTP id 5A1B3D0045
+        for <jacob.woodard@Finthesiss.ai>; Tue,  6 Oct 2026 07:45:00 +0200 (CEST)
+From: sophie.crawford@galeriacrawford.pl
+To: jacob.woodard@Finthesiss.ai
+Subject: Quick question — 1840s Becker longcase
+Date: Tue, 06 Oct 2026 07:45:00 +0200
+Message-ID: <CASophie.2026100607.gallery@galeriacrawford.pl>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 7bit
+X-Mailer: Apple Mail (2.3774.400.31)
+
+Jacob,
+
+A client walked into the gallery yesterday with what they believe is an
+1840s Becker longcase clock. They are looking for a written valuation
+and authenticity opinion before considering consignment. The client is
+eager and I would need it by end of week if possible. Happy to arrange
+transport to the workshop for inspection.
+
+Best,
+Sophie

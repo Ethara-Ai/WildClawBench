@@ -1,0 +1,32 @@
+Received: from mail.nowaforma.pl (mail.nowaforma.pl [178.32.44.91])
+        by mx.finthesiss.ai (Postfix) with ESMTPS id 4R8kMn2uP6z9sPB
+        for <jacob.woodard@Finthesiss.ai>; Tue,  6 Oct 2026 07:20:15 +0200 (CEST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nowaforma.pl;
+        s=nf2026; t=1791393615;
+        h=from:to:subject:date:message-id;
+        bh=ghi789jkl012mno345pqr678stu901vwxyz012abc345def=;
+        b=DEFghi789jkl012mno345pqr678stu901vwxyz012abc345
+Received: from [10.10.2.8] (katherine-laptop.nowaforma.internal [10.10.2.8])
+        by mail.nowaforma.pl (Postfix) with ESMTP id 7C2D4E0078
+        for <jacob.woodard@Finthesiss.ai>; Tue,  6 Oct 2026 07:20:00 +0200 (CEST)
+From: katherine.woodard@nowaforma.pl
+To: jacob.woodard@Finthesiss.ai
+Subject: Re: October visit
+Date: Tue, 06 Oct 2026 07:20:00 +0200
+Message-ID: <CAKatherine.2026100607.nf@nowaforma.pl>
+In-Reply-To: <CAJacob.2026092815.wh@Finthesiss.ai>
+References: <CAJacob.2026092815.wh@Finthesiss.ai>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 7bit
+X-Mailer: Thunderbird 115.3.2
+
+Hi Dad,
+
+Confirming I will arrive Oct 31 around noon. James will drive me. We
+will stay through Nov 2. Could you check if the guest room radiator is
+working? Last time it was rattling. Also, is Mom still doing her Tuesday
+piano lessons? Want to plan around that.
+
+Love,
+Katherine

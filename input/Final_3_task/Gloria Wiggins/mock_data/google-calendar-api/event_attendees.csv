@@ -1,0 +1,17 @@
+event_id,email,display_name,response_status,optional,organizer
+evt_henderson_visit,darnell.washington@piedmont-extension.edu,Darnell Washington,accepted,False,False
+evt_henderson_visit,jim.henderson@hendersonfarm.com,Jim Henderson,accepted,False,False
+evt_mitchell_visit,darnell.washington@piedmont-extension.edu,Darnell Washington,tentative,False,False
+evt_bernice_herbalism,harold.wiggins@gmail.com,Harold Wiggins,accepted,True,False
+evt_church_sun,denise.wiggins@gmail.com,Denise Wiggins,accepted,False,False
+evt_church_sun,harold.wiggins@gmail.com,Harold Wiggins,accepted,False,False
+evt_hawkins_checkin,phawkins@piedmont-extension.edu,Patricia Hawkins,accepted,False,False
+evt_extension_standup,phawkins@piedmont-extension.edu,Patricia Hawkins,accepted,False,False
+evt_extension_standup,darnell.washington@piedmont-extension.edu,Darnell Washington,accepted,False,False
+evt_homecoming,denise.wiggins@gmail.com,Denise Wiggins,accepted,False,False
+evt_homecoming,marcus.wiggins@gmail.com,Marcus Wiggins,accepted,False,False
+evt_homecoming,jasmine.wiggins@gmail.com,Jasmine Wiggins,accepted,False,False
+evt_workshop_nov7,dorothymae.jenkins@gmail.com,Dorothy Mae Jenkins,accepted,True,False
+evt_brandon_dinner,brandon.mitchell@gmail.com,Brandon Mitchell,accepted,False,False
+evt_parents_dinner,denise.wiggins@gmail.com,Denise Wiggins,accepted,False,False
+evt_tamika_hike,tamika.jefferson@gmail.com,Tamika Jefferson,tentative,False,False

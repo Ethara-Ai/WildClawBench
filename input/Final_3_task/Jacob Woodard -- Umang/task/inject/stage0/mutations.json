@@ -1,0 +1,452 @@
+{
+  "stage": 0,
+  "description": "Seed before T0: workspace files (F0-01..F0-27) + API baseline (M0-*)",
+  "mutations": {
+    "silent": [],
+    "loud": [],
+    "seed": [
+      {
+        "id": "M0-N1",
+        "service": "notion-api",
+        "method": "POST",
+        "path": "/v1/databases/workshop_projects_db/pages",
+        "port": 8010,
+        "body": {
+          "parent": { "database_id": "workshop_projects_db" },
+          "properties": {
+            "Name": { "title": [{ "text": { "content": "Krasicki Estate Clock" } }] },
+            "Status": { "select": { "name": "In Progress" } },
+            "Parts_Budget": { "number": 2800 },
+            "Delivery": { "date": { "start": "2026-10-26" } },
+            "Stefan_Contact": { "email": "stefan.muller@biel-time.ch" },
+            "QA_Status": { "select": { "name": "pending" } }
+          }
+        }
+      },
+      {
+        "id": "M0-N2",
+        "service": "notion-api",
+        "method": "POST",
+        "path": "/v1/databases/workshop_projects_db/pages",
+        "port": 8010,
+        "body": {
+          "parent": { "database_id": "workshop_projects_db" },
+          "properties": {
+            "Name": { "title": [{ "text": { "content": "St. Catherine's Tower Clock" } }] },
+            "Status": { "select": { "name": "Quarterly Service" } },
+            "Next_Service": { "date": { "start": "2026-11-30" } },
+            "Contact": { "email": "fr.newman@stkatherines.pl" }
+          }
+        },
+        "notes": "Next_Service=Nov 30 is STALE — correct after rescheduling per Newman email"
+      },
+      {
+        "id": "M0-N3",
+        "service": "notion-api",
+        "method": "POST",
+        "path": "/v1/databases/workshop_projects_db/pages",
+        "port": 8010,
+        "body": {
+          "parent": { "database_id": "workshop_projects_db" },
+          "properties": {
+            "Name": { "title": [{ "text": { "content": "Radziwill Pocket Watch" } }] },
+            "Status": { "select": { "name": "In Progress" } },
+            "Museum_Contact": { "email": "a.kaminska@muzeum.krakow.pl" },
+            "Deadline": { "date": { "start": "2026-12-31" } },
+            "Balance_Cock": { "number": 28.2 }
+          }
+        },
+        "notes": "Balance_Cock=28.2mm is STALE — correct is 28.4mm per condition report"
+      },
+      {
+        "id": "M0-N4",
+        "service": "notion-api",
+        "method": "POST",
+        "path": "/v1/databases/workshop_projects_db/pages",
+        "port": 8010,
+        "body": {
+          "parent": { "database_id": "workshop_projects_db" },
+          "properties": {
+            "Name": { "title": [{ "text": { "content": "Personal Junghans Wall Clock" } }] },
+            "Status": { "select": { "name": "Low Priority" } },
+            "Notes": { "rich_text": [{ "text": { "content": "Running 2 min fast/week" } }] }
+          }
+        }
+      },
+      {
+        "id": "M0-N5",
+        "service": "notion-api",
+        "method": "POST",
+        "path": "/v1/databases/workshop_projects_db/pages",
+        "port": 8010,
+        "body": {
+          "parent": { "database_id": "workshop_projects_db" },
+          "properties": {
+            "Name": { "title": [{ "text": { "content": "Jankowski Bracket Clock" } }] },
+            "Status": { "select": { "name": "Completed" } },
+            "Client": { "rich_text": [{ "text": { "content": "Piotr Jankowski" } }] },
+            "Item": { "rich_text": [{ "text": { "content": "English bracket clock c.1870" } }] },
+            "Completed_Date": { "date": { "start": "2026-10-03" } },
+            "Pickup": { "date": { "start": "2026-10-08" } },
+            "Total": { "number": 1200 }
+          }
+        }
+      },
+      {
+        "id": "M0-N6",
+        "service": "notion-api",
+        "method": "POST",
+        "path": "/v1/databases/workshop_projects_db/pages",
+        "port": 8010,
+        "body": {
+          "parent": { "database_id": "workshop_projects_db" },
+          "properties": {
+            "Name": { "title": [{ "text": { "content": "Mazur Mantel Clock" } }] },
+            "Status": { "select": { "name": "Completed" } },
+            "Client": { "rich_text": [{ "text": { "content": "Tomasz Mazur" } }] },
+            "Item": { "rich_text": [{ "text": { "content": "French mantel clock c.1890" } }] },
+            "Completed_Date": { "date": { "start": "2026-10-04" } },
+            "Pickup": { "date": { "start": "2026-10-08" } },
+            "Total": { "number": 950 }
+          }
+        }
+      },
+      {
+        "id": "M0-AT1",
+        "service": "airtable-api",
+        "method": "POST",
+        "path": "/v0/{base_id}/Workshop-Parts-Inventory/records",
+        "port": 8032,
+        "body": {
+          "records": [
+            { "fields": { "Part_ID": "KR-001", "Commission": "Krasicki Estate Clock", "Description": "Mainspring - longcase", "qty": 3, "EUR_Unit_Price": 28.00, "PLN_Total": 362.88, "Supplier": "Stefan Muller (Biel)" } },
+            { "fields": { "Part_ID": "KR-002", "Commission": "Krasicki Estate Clock", "Description": "Escapement wheel", "qty": 1, "EUR_Unit_Price": 85.00, "PLN_Total": 367.20, "Supplier": "Stefan Muller (Biel)" } },
+            { "fields": { "Part_ID": "KR-003", "Commission": "Krasicki Estate Clock", "Description": "Click spring", "qty": 2, "EUR_Unit_Price": 12.00, "PLN_Total": 103.68, "Supplier": "Krakow Springs" } },
+            { "fields": { "Part_ID": "KR-004", "Commission": "Krasicki Estate Clock", "Description": "Balance staff", "qty": 1, "EUR_Unit_Price": 38.00, "PLN_Total": 164.16, "Supplier": "Stefan Muller (Biel)", "balance_staff_diameter": 0.85 } },
+            { "fields": { "Part_ID": "KR-005", "Commission": "Krasicki Estate Clock", "Description": "Barrel arbor", "qty": 1, "EUR_Unit_Price": 45.00, "PLN_Total": 194.40, "Supplier": "Stefan Muller (Biel)" } },
+            { "fields": { "Part_ID": "KR-006", "Commission": "Krasicki Estate Clock", "Description": "Pendulum bob", "qty": 1, "EUR_Unit_Price": 65.00, "PLN_Total": 280.80, "Supplier": "Stefan Muller (Biel)" } },
+            { "fields": { "Part_ID": "KR-007", "Commission": "Krasicki Estate Clock", "Description": "Suspension spring", "qty": 2, "EUR_Unit_Price": 8.50, "PLN_Total": 73.44, "Supplier": "Krakow Springs" } },
+            { "fields": { "Part_ID": "KR-008", "Commission": "Krasicki Estate Clock", "Description": "Escape wheel pivot", "qty": 2, "EUR_Unit_Price": 22.00, "PLN_Total": 190.08, "Supplier": "Stefan Muller (Biel)" } },
+            { "fields": { "Part_ID": "KR-009", "Commission": "Krasicki Estate Clock", "Description": "Winding key", "qty": 1, "EUR_Unit_Price": 15.00, "PLN_Total": 64.80, "Supplier": "Horological Supply Warsaw" } },
+            { "fields": { "Part_ID": "KR-010", "Commission": "Krasicki Estate Clock", "Description": "Dial feet", "qty": 4, "EUR_Unit_Price": 6.00, "PLN_Total": 103.68, "Supplier": "Horological Supply Warsaw" } },
+            { "fields": { "Part_ID": "KR-011", "Commission": "Krasicki Estate Clock", "Description": "Hands (pair)", "qty": 1, "EUR_Unit_Price": 120.00, "PLN_Total": 518.40, "Supplier": "Stefan Muller (Biel)" } },
+            { "fields": { "Part_ID": "KR-012", "Commission": "Krasicki Estate Clock", "Description": "Bell", "qty": 1, "EUR_Unit_Price": 85.00, "PLN_Total": 367.20, "Supplier": "Stefan Muller (Biel)" } },
+            { "fields": { "Part_ID": "SC-001", "Commission": "St. Catherine Tower Clock", "Description": "Pendulum rod", "qty": 1, "EUR_Unit_Price": 120.00, "PLN_Total": 518.40, "Supplier": "Stefan Muller (Biel)" } },
+            { "fields": { "Part_ID": "SC-002", "Commission": "St. Catherine Tower Clock", "Description": "Escape wheel", "qty": 1, "EUR_Unit_Price": 95.00, "PLN_Total": 410.40, "Supplier": "Stefan Muller (Biel)" } },
+            { "fields": { "Part_ID": "SC-003", "Commission": "St. Catherine Tower Clock", "Description": "Balance staff", "qty": 1, "EUR_Unit_Price": 42.00, "PLN_Total": 181.44, "Supplier": "Stefan Muller (Biel)", "balance_staff_diameter": 0.86 } }
+          ]
+        },
+        "notes": "KR-004 diameter=0.85mm (canonical). SC-003 diameter=0.86mm (adjacent trap). RZ-005 diameter=0.84mm (adjacent trap). 15 total records across 3 commissions."
+      },
+      {
+        "id": "M0-AT2",
+        "service": "airtable-api",
+        "method": "POST",
+        "path": "/v0/{base_id}/Supplier-Contacts/records",
+        "port": 8032,
+        "body": {
+          "records": [
+            { "fields": { "Name": "Stefan Muller", "Company": "Biel-Time AG", "Location": "Biel/Bienne, Switzerland", "Email": "stefan.muller@biel-time.ch", "Specialty": "Precision parts, balance staffs, escapement wheels" } },
+            { "fields": { "Name": "Hans Weber", "Company": "Pforzheim Precision GmbH", "Location": "Pforzheim, Germany", "Email": "h.weber@pforzheim-precision.de", "Specialty": "Balance staffs, pivots" } },
+            { "fields": { "Name": "Klaus Richter", "Company": "Dresden Horological Supply", "Location": "Dresden, Germany", "Email": "k.richter@dhs-supply.de", "Specialty": "Mainsprings, barrel arbors" } },
+            { "fields": { "Name": "Fritz Hoffmann", "Company": "Schwarzwald Uhrwerke", "Location": "Furtwangen, Germany", "Email": "f.hoffmann@schwarzwald-uhr.de", "Specialty": "Cuckoo and wall clock movements" } },
+            { "fields": { "Name": "Andrzej Kowalski", "Company": "Krakow Springs", "Location": "Krakow, Poland", "Email": "a.kowalski@krakow-springs.pl", "Specialty": "Click springs, suspension springs" } },
+            { "fields": { "Name": "Marek Wisniewski", "Company": "Horological Supply Warsaw", "Location": "Warsaw, Poland", "Email": "m.wisniewski@hs-warsaw.pl", "Specialty": "Dial feet, winding keys, general consumables" } }
+          ]
+        }
+      },
+      {
+        "id": "M0-AT3",
+        "service": "airtable-api",
+        "method": "POST",
+        "path": "/v0/{base_id}/Shipping-Tracker/records",
+        "port": 8032,
+        "body": {
+          "records": [
+            { "fields": { "Order_Ref": "SM-KR-2026-042", "Supplier": "Stefan Muller (Biel)", "Commission": "Krasicki Estate Clock", "Status": "QA in progress", "Origin": "Biel/Bienne", "ETA": "2026-10-12", "Parts": "Mainspring, balance staff, escapement wheel, barrel arbor, pendulum bob, pivots, hands, bell" } }
+          ]
+        },
+        "notes": "Will become stale after T27 Pforzheim pivot — agent must update"
+      },
+      {
+        "id": "M0-GC1",
+        "service": "google-calendar-api",
+        "method": "POST",
+        "path": "/calendar/v3/calendars/primary/events",
+        "port": 8016,
+        "body": {
+          "events": [
+            { "summary": "Admin block", "recurrence": "RRULE:FREQ=WEEKLY;BYDAY=MO", "start": "09:00", "end": "13:00" },
+            { "summary": "Precision prep", "recurrence": "RRULE:FREQ=WEEKLY;BYDAY=TU", "start": "08:30", "end": "12:00" },
+            { "summary": "Corner Diner lunch", "recurrence": "RRULE:FREQ=WEEKLY;BYDAY=WE", "start": "12:30", "end": "13:30" },
+            { "summary": "Supplier calls", "recurrence": "RRULE:FREQ=WEEKLY;BYDAY=TH", "start": "09:00", "end": "10:00" },
+            { "summary": "Linden Table lunch — Henry", "recurrence": "RRULE:FREQ=WEEKLY;BYDAY=FR", "start": "12:15", "end": "13:15" },
+            { "summary": "Botanica walk — Ellen", "recurrence": "RRULE:FREQ=WEEKLY;BYDAY=SA", "start": "15:30", "end": "17:00" },
+            { "summary": "Nowak — carriage clock consultation", "start": "2026-10-06T14:00:00+02:00", "end": "2026-10-06T15:00:00+02:00" },
+            { "summary": "Guild logistics call", "start": "2026-10-07T14:00:00+02:00", "end": "2026-10-07T15:00:00+02:00" },
+            { "summary": "Client pickups: Jankowski bracket clock, Mazur mantel clock", "start": "2026-10-08T14:00:00+02:00", "end": "2026-10-08T16:00:00+02:00" },
+            { "summary": "Wroclaw Antique Fair", "start": "2026-10-10T07:15:00+02:00", "end": "2026-10-10T18:30:00+02:00", "location": "Hala Stulecia, Wroclaw" },
+            { "summary": "Guild meeting — October", "start": "2026-10-21T18:00:00+02:00", "end": "2026-10-21T20:00:00+02:00", "location": "Guild Hall, Krakow" },
+            { "summary": "Krasicki Estate Clock — delivery", "start": "2026-10-26T10:00:00+02:00", "end": "2026-10-26T14:00:00+02:00", "notes": "STALE — will need rescheduling after Pforzheim pivot" },
+            { "summary": "Katherine + James arrival", "start": "2026-10-31T12:00:00+02:00", "end": "2026-10-31T13:00:00+02:00" },
+            { "summary": "Mitchell monograph review", "start": "2026-11-14T10:00:00+02:00", "end": "2026-11-14T12:00:00+02:00" }
+          ]
+        }
+      },
+      {
+        "id": "M0-LN1",
+        "service": "linear-api",
+        "method": "POST",
+        "path": "/issues",
+        "port": 8004,
+        "body": {
+          "issues": [
+            { "title": "Krasicki — Parts QA tracking", "status": "todo", "assignee": "jacob.woodard" },
+            { "title": "Krasicki — Delivery prep", "status": "todo", "due_date": "2026-10-26", "notes": "STALE — correct delivery TBD after Pforzheim" },
+            { "title": "St. Catherine's — Nov regulation", "status": "todo", "due_date": "2026-11-30", "notes": "STALE — Newman requests rescheduling" },
+            { "title": "Mark — Barrel arbor module", "status": "done", "completed": "2026-10-01", "notes": "WRONG — correct completion date is Sept 30" },
+            { "title": "Jankowski — Bracket clock service", "status": "done", "completed": "2026-10-03" },
+            { "title": "Mazur — Mantel clock restoration", "status": "done", "completed": "2026-10-04" }
+          ]
+        }
+      },
+      {
+        "id": "M0-HB1",
+        "service": "hubspot-api",
+        "method": "POST",
+        "path": "/contacts/v1/contact",
+        "port": 8024,
+        "body": {
+          "contacts": [
+            { "firstname": "Stefan", "lastname": "Muller", "email": "stefan.muller@biel-time.ch", "company": "Biel-Time AG", "type": "supplier", "phone": "+41-32-555-0180" },
+            { "firstname": "Sophie", "lastname": "Crawford", "email": "sophie.crawford@galeriacrawford.pl", "company": "Galeria Crawford", "type": "client_gallery", "phone": "+48-12-555-3402" },
+            { "firstname": "Fr. Thomas", "lastname": "Newman", "email": "fr.newman@stkatherines.pl", "company": "St. Catherine's Parish", "type": "client", "phone": "+48-12-555-3403" },
+            { "firstname": "Krasicki", "lastname": "Estate", "email": "estate@krasicki-family.pl", "type": "client", "phone": "+48-12-555-3404" },
+            { "firstname": "Anna", "lastname": "Kaminska", "email": "a.kaminska@muzeum.krakow.pl", "company": "Krakow City Museum", "type": "client_museum", "provenance_locked": true },
+            { "firstname": "Richard", "lastname": "Mitchell", "email": "r.mitchell@jagiellonian.edu.pl", "company": "Jagiellonian University", "type": "collaborator" },
+            { "firstname": "Agnieszka", "lastname": "Kowalczyk", "email": "a.kowalczyk@prospect.pl", "type": "prospective" },
+            { "firstname": "Piotr", "lastname": "Jankowski", "email": "piotr.jankowski@poczta.pl", "type": "client", "phone": "+48-12-555-3406", "notes": "Bracket clock — completed Oct 3, pickup Oct 8" },
+            { "firstname": "Tomasz", "lastname": "Mazur", "email": "tomasz.mazur@gmail.com", "type": "client", "phone": "+48-12-555-3407", "notes": "Mantel clock — completed Oct 4, pickup Oct 8" },
+            { "firstname": "Henryk", "lastname": "Wojciechowski", "email": "henryk.wojciechowski@guild-krakow.pl", "company": "Krakow Horologists' Guild", "type": "guild_colleague" },
+            { "firstname": "Nowak", "lastname": "", "type": "prospective", "notes": "Carriage clock consultation Tue Oct 6 14:00" }
+          ]
+        }
+      },
+      {
+        "id": "M0-BHR1",
+        "service": "bamboohr-api",
+        "method": "POST",
+        "path": "/api/gateway.php/woodard/v1/employees",
+        "port": 8072,
+        "body": {
+          "firstName": "Mark",
+          "lastName": "Jennings",
+          "address": "ulica Dietla 42/3, Krakow",
+          "training_barrel_arbor_completed": "2026-10-01",
+          "rate_pln_hr": 28,
+          "hours_sept": 168,
+          "employment_start": "2025-03-15"
+        },
+        "notes": "Address is STALE (correct is Starowi\u015blna 18/7 after T24). Barrel arbor date is WRONG (correct is Sept 30)."
+      },
+      {
+        "id": "M0-TR1",
+        "service": "trello-api",
+        "method": "POST",
+        "path": "/1/cards",
+        "port": 8030,
+        "body": {
+          "board": "Apprentice Training",
+          "cards": [
+            { "name": "Pivot arbor technique", "list": "Completed", "due": null },
+            { "name": "Escapement regulation", "list": "Completed", "due": null, "completed": "2026-09-22" },
+            { "name": "Mainspring winding protocol", "list": "Completed", "due": null, "completed": "2026-09-28" },
+            { "name": "Barrel arbor disassembly", "list": "Completed", "due": null, "completed": "2026-10-01", "notes": "WRONG date — correct is Sept 30" }
+          ]
+        }
+      },
+      {
+        "id": "M0-OB1",
+        "service": "obsidian-api",
+        "method": "POST",
+        "path": "/vault/monograph/",
+        "port": 8014,
+        "body": {
+          "files": [
+            { "path": "chapters/ch4_oct_working.md", "content_ref": "artifacts/ch4_oct_working.md", "notes": "Schuler=Dresden, Gniezno=1798" },
+            { "path": "bibliography/references.md", "content": "Standard bibliography entries" },
+            { "path": "notes/research_notes.md", "content": "Working notes on regional workshop attribution" }
+          ]
+        }
+      },
+      {
+        "id": "M0-CF1",
+        "service": "confluence-api",
+        "method": "POST",
+        "path": "/wiki/rest/api/content",
+        "port": 8045,
+        "body": {
+          "type": "page",
+          "title": "Monograph Chapter 4 — Regional Workshops",
+          "space": { "key": "JAGIELLONIAN" },
+          "body": {
+            "storage": {
+              "value": "Jagiellonian shared reference copy. Schuler 1923 attribution: Berlin workshop. Gniezno longcase attribution: 1800. Read-only for Jacob.",
+              "representation": "storage"
+            }
+          }
+        },
+        "notes": "Gniezno=1800 is a THIRD value — neither 1798 (Obsidian/Dropbox) nor 1802 (Mitchell update). Creates three-way discrepancy at T47."
+      },
+      {
+        "id": "M0-BX1",
+        "service": "box-api",
+        "method": "POST",
+        "path": "/2.0/files",
+        "port": 8083,
+        "body": {
+          "folders": [
+            {
+              "name": "Radziwill",
+              "files": [
+                { "name": "radziwill_condition_report.pdf", "content_ref": "artifacts/stefan_muller_portal_oct6_SPEC.md", "notes": "Old filename — will be renamed at T16 by SM3" },
+                { "name": "radziwill_provenance_notes.md", "content_ref": "artifacts/provenance_notes.md", "notes": "Old filename — will be renamed at T16 by SM3" }
+              ]
+            },
+            {
+              "name": "Sophie Crawford",
+              "files": [],
+              "notes": "Empty initially — unauthorized assessment uploaded at T36 by SM8"
+            }
+          ]
+        }
+      },
+      {
+        "id": "M0-SL1",
+        "service": "slack-api",
+        "method": "POST",
+        "path": "/api/chat.postMessage",
+        "port": 8013,
+        "body": {
+          "channels": [
+            { "name": "#bench-notes", "messages": [
+              { "user": "jacob.woodard", "text": "Krasicki escapement wheel — waiting on Stefan's QA. Should have update by Thursday.", "ts": "2026-10-05T16:30:00+02:00" },
+              { "user": "mark.jennings", "text": "Finished barrel arbor module yesterday. Ready for next assignment.", "ts": "2026-10-05T17:00:00+02:00" }
+            ]},
+            { "name": "#admin", "messages": [
+              { "user": "jacob.woodard", "text": "Jankowski bracket clock and Mazur mantel clock both completed. Pickups scheduled Thursday Oct 8.", "ts": "2026-10-04T15:00:00+02:00" }
+            ]}
+          ]
+        }
+      },
+      {
+        "id": "M0-DS1",
+        "service": "docusign-api",
+        "method": "POST",
+        "path": "/restapi/v2.1/accounts/{accountId}/envelopes",
+        "port": 8053,
+        "body": {
+          "status": "completed",
+          "subject": "Krasicki Estate Clock — Restoration Agreement",
+          "senderEmail": "jacob.woodard@Finthesiss.ai",
+          "recipients": [{ "email": "estate@krasicki-family.pl", "name": "Krasicki Estate" }],
+          "documents": [{ "name": "krasicki_restoration_agreement_v1.pdf" }],
+          "custom_fields": {
+            "balance_staff_eur": 38,
+            "total_parts_pln": 2800,
+            "delivery_date": "2026-10-26"
+          }
+        }
+      },
+      {
+        "id": "M0-QB1",
+        "service": "quickbooks-api",
+        "method": "POST",
+        "path": "/v3/company/{companyId}/journalentry",
+        "port": 8007,
+        "body": {
+          "entries": [
+            { "category": "Building", "amount": 1200.00, "date": "2026-09-01" },
+            { "category": "Supplies", "amount": 2500.00, "date": "2026-09-05" },
+            { "category": "Groceries", "amount": 1800.00, "date": "2026-09-07" },
+            { "category": "Utilities", "amount": 900.00, "date": "2026-09-10" },
+            { "category": "Piano", "amount": 300.00, "date": "2026-09-12" },
+            { "category": "Dining", "amount": 600.00, "date": "2026-09-15" },
+            { "category": "Health", "amount": 400.00, "date": "2026-09-18" },
+            { "category": "Phone", "amount": 180.00, "date": "2026-09-20" },
+            { "category": "Transport", "amount": 500.00, "date": "2026-09-22" },
+            { "category": "Guild", "amount": 200.00, "date": "2026-09-25" },
+            { "category": "Insurance", "amount": 350.00, "date": "2026-09-27" },
+            { "category": "Misc", "amount": 600.00, "date": "2026-09-30" }
+          ],
+          "revenue": { "amount": 18000.00, "date": "2026-09-30", "description": "September commissions and consultations" },
+          "supplier_invoices": [
+            { "supplier": "Stefan Muller (Biel)", "currency": "EUR", "amount_foreign": 340.00, "fx_rate": 4.32, "amount_pln": 1468.80, "ref": "INV-SM-2026-09-340" },
+            { "supplier": "Krakow Springs", "currency": "PLN", "amount_pln": 380.00, "ref": "INV-KS-2026-09-380" },
+            { "supplier": "Horological Supply Warsaw", "currency": "PLN", "amount_pln": 220.00, "ref": "INV-HSW-2026-09-220" }
+          ],
+          "total_expenses": 9530.00,
+          "total_revenue": 18000.00,
+          "net": 8470.00
+        }
+      },
+      {
+        "id": "M0-GS1",
+        "service": "gusto-api",
+        "method": "POST",
+        "path": "/v1/employees/{employee_id}/pay_periods",
+        "port": 8074,
+        "body": {
+          "employee": "Mark Jennings",
+          "period": "2026-09",
+          "hours": 168,
+          "rate_pln_hr": 28,
+          "gross_pay_pln": 4704.00
+        }
+      },
+      {
+        "id": "M0-GM1",
+        "service": "gmail-api",
+        "method": "POST",
+        "path": "/admin/inject/message",
+        "port": 8017,
+        "body": {
+          "messages": [
+            { "type": "sent", "to": "estate@krasicki-family.pl", "subject": "Krasicki Estate Clock — restoration update Sept 18", "date": "2026-09-18T14:30:00+02:00", "content_ref": "artifacts/krasicki_family_sept18.eml" },
+            { "type": "received", "from": "secretary@guild-krakow.pl", "subject": "Guild meeting agenda — October 21", "date": "2026-09-29T10:00:00+02:00", "content_ref": "artifacts/guild_agenda_oct21.eml" }
+          ]
+        }
+      },
+      {
+        "id": "M0-FS-all",
+        "service": "filesystem",
+        "action": "mount",
+        "path": "/workspace/",
+        "body": {
+          "files": [
+            "F0-01..F0-08: persona files (jacob-woodard/README, SOUL, MEMORY, HEARTBEAT, USER, IDENTITY, AGENTS, TOOLS)",
+            "F0-09: artifacts/krasicki_parts_manifest.csv",
+            "F0-10: artifacts/stefan_muller_portal_oct6.pdf",
+            "F0-11: artifacts/ch4_sept_draft.md",
+            "F0-12: artifacts/ch4_oct_working.md",
+            "F0-13: artifacts/september_summary.csv",
+            "F0-14: artifacts/mark_training_log.md",
+            "F0-15: artifacts/condition_report.pdf (Radziwill)",
+            "F0-16: artifacts/provenance_notes.md (Radziwill CONFIDENTIAL)",
+            "F0-17: artifacts/agreement_original.pdf (Krasicki DocuSign)",
+            "F0-18: artifacts/guild_presentation_template.md",
+            "F0-19: logs/.gitkeep",
+            "F0-20: weekly/.gitkeep",
+            "F0-21: artifacts/fair_registration.json",
+            "F0-22: artifacts/spotify_bach_playlist.txt (decoy)",
+            "F0-23: artifacts/guild_agenda_oct21.eml",
+            "F0-24: artifacts/krasicki_family_sept18.eml",
+            "F0-25: artifacts/mark_timesheet_current.md",
+            "F0-26: artifacts/jankowski_bracket_clock.md",
+            "F0-27: artifacts/mazur_mantel_clock.md"
+          ]
+        }
+      }
+    ]
+  }
+}

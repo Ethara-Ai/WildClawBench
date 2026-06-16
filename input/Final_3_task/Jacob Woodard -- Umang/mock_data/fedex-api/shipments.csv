@@ -1,0 +1,2 @@
+tracking_number,service_type,ship_date,origin,dest,weight_lb,currency,net_charge,status
+794583016402,INTERNATIONAL_PRIORITY,2026-10-05,"Biel, CH","Kraków, PL",1.2,EUR,48.5,in_transit

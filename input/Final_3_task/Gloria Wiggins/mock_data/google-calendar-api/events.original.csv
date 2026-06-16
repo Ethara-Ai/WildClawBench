@@ -1,0 +1,15 @@
+id,calendar_id,summary,description,location,start_datetime,end_datetime,all_day,recurrence,status,organizer_email
+evt_henderson_visit,cal_field,Farm Visit: Henderson Farm,Cover crop check Henderson East field,4521 Old Mill Rd Durham NC,2026-10-06T09:00:00-04:00,2026-10-06T11:00:00-04:00,False,,confirmed,gloria.wiggins@voissync.ai
+evt_mitchell_visit,cal_field,Farm Visit: Mitchell Road Plots,Soil sampling + trial plot review,Mitchell Road Research Plots Durham NC,2026-10-06T13:00:00-04:00,2026-10-06T15:00:00-04:00,False,,confirmed,gloria.wiggins@voissync.ai
+evt_bernice_herbalism,cal_herbalism,Herbalism with Grandma Bernice,Saturday morning practice + plant ID,Parents house East Durham NC,2026-10-10T09:00:00-04:00,2026-10-10T12:00:00-04:00,False,RRULE:FREQ=WEEKLY;BYDAY=SA,confirmed,gloria.wiggins@voissync.ai
+evt_church_sun,cal_family,Mount Zion Baptist Church,Sunday service with family,Mount Zion Baptist Church Durham NC,2026-10-04T10:00:00-04:00,2026-10-04T12:00:00-04:00,False,RRULE:FREQ=WEEKLY;BYDAY=SU,confirmed,gloria.wiggins@voissync.ai
+evt_gullah_class,cal_family,Gullah/Geechee class,Weekly online class - Cultural Heritage Corridor,Zoom,2026-10-06T20:00:00-04:00,2026-10-06T21:00:00-04:00,False,RRULE:FREQ=WEEKLY;BYDAY=TU,confirmed,gloria.wiggins@voissync.ai
+evt_hawkins_checkin,primary,Weekly check-in with Dr. Hawkins,1:1 supervision,Piedmont Extension Office Conference Rm A,2026-10-05T15:00:00-04:00,2026-10-05T15:30:00-04:00,False,RRULE:FREQ=WEEKLY;BYDAY=MO,confirmed,gloria.wiggins@voissync.ai
+evt_extension_standup,cal_field,Extension office stand-up,Daily team huddle,Piedmont Extension Office,2026-10-05T08:30:00-04:00,2026-10-05T08:45:00-04:00,False,RRULE:FREQ=WEEKLY;BYDAY=MO\,WE\,FR,confirmed,gloria.wiggins@voissync.ai
+evt_grant_deadline,cal_grant,Fieldstone Deep Roots Submission Deadline,Final grant package submission,Online portal,2026-10-30T17:00:00-04:00,2026-10-30T17:00:00-04:00,False,,confirmed,gloria.wiggins@voissync.ai
+evt_homecoming,cal_family,Family Homecoming,Parents house,Wiggins family home Durham NC,2026-10-04T13:00:00-04:00,2026-10-04T20:00:00-04:00,False,,confirmed,gloria.wiggins@voissync.ai
+evt_workshop_nov7,cal_workshops,Soil Health Workshop,Community workshop for small farmers,Piedmont County Extension Office,2026-11-07T13:00:00-04:00,2026-11-07T16:00:00-04:00,False,,confirmed,gloria.wiggins@voissync.ai
+evt_brandon_dinner,cal_family,Dinner with Brandon,At his place,Ninth Street District Durham NC,2026-10-09T19:00:00-04:00,2026-10-09T21:30:00-04:00,False,,confirmed,gloria.wiggins@voissync.ai
+evt_parents_dinner,cal_family,Dinner at parents,Wednesday family dinner,Wiggins family home Durham NC,2026-10-07T18:00:00-04:00,2026-10-07T20:00:00-04:00,False,,confirmed,gloria.wiggins@voissync.ai
+evt_dental_cleaning,primary,Dental cleaning - Dr. Thompson,Routine 6-month cleaning,Durham Family Dental,2026-10-22T10:00:00-04:00,2026-10-22T11:00:00-04:00,False,,confirmed,gloria.wiggins@voissync.ai
+evt_tamika_hike,cal_family,Hike with Tamika,Pilot Mountain TBD,Pilot Mountain State Park,2026-10-11T08:00:00-04:00,2026-10-11T15:00:00-04:00,False,,tentative,gloria.wiggins@voissync.ai

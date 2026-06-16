@@ -1,0 +1,3 @@
+id,identifier,title,description,priority,estimate,state_id,assignee_id,team_id,project_id,due_date,created_at,updated_at
+iss_kr_reassemble,WH-101,Krasicki - reassemble movement,Pending mainspring + escapement wheel from Biel,1,5,st_todo,usr_jacob,team_wh,prj_krasicki,2026-10-20,2026-09-16T09:00:00+02:00,2026-10-05T18:00:00+02:00
+iss_train_arbor,WH-088,Mark training - Barrel arbor disassembly,Module sign-off,2,1,st_prog,usr_mark,team_wh,prj_training,2026-10-01,2026-09-25T09:00:00+02:00,2026-09-30T17:00:00+02:00

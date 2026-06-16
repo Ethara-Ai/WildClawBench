@@ -1,0 +1,89 @@
+{
+  "stage": 0,
+  "stage_name": "seed_initial_state",
+  "description": "Stage 0 mutations for FIRE_EDU_001. Applied between Day 0 and Day 1.",
+  "applies_between_turns": [
+    null,
+    "T0"
+  ],
+  "task_id": "FIRE_EDU_001",
+  "persona": "Indira Hudson",
+  "mutations": {
+    "filesystem": [
+      {
+        "id": "F0-01",
+        "action": "copy",
+        "src": "../../../Personas/Indira Hudson/indira-hudson/README.md",
+        "dst": "/workspace/persona/indira-hudson/README.md"
+      },
+      {
+        "id": "F0-02",
+        "action": "copy",
+        "src": "../../../Personas/Indira Hudson/indira-hudson/SOUL.md",
+        "dst": "/workspace/persona/indira-hudson/SOUL.md"
+      },
+      {
+        "id": "F0-03",
+        "action": "copy",
+        "src": "../../../Personas/Indira Hudson/indira-hudson/MEMORY.md",
+        "dst": "/workspace/persona/indira-hudson/MEMORY.md"
+      },
+      {
+        "id": "F0-04",
+        "action": "copy",
+        "src": "../../../Personas/Indira Hudson/indira-hudson/HEARTBEAT.md",
+        "dst": "/workspace/persona/indira-hudson/HEARTBEAT.md"
+      },
+      {
+        "id": "F0-05",
+        "action": "copy",
+        "src": "../../../Personas/Indira Hudson/indira-hudson/USER.md",
+        "dst": "/workspace/persona/indira-hudson/USER.md"
+      },
+      {
+        "id": "F0-06",
+        "action": "copy",
+        "src": "../../../Personas/Indira Hudson/indira-hudson/IDENTITY.md",
+        "dst": "/workspace/persona/indira-hudson/IDENTITY.md"
+      },
+      {
+        "id": "F0-07",
+        "action": "copy",
+        "src": "../../../Personas/Indira Hudson/indira-hudson/AGENTS.md",
+        "dst": "/workspace/persona/indira-hudson/AGENTS.md"
+      },
+      {
+        "id": "F0-08",
+        "action": "copy",
+        "src": "../../../Personas/Indira Hudson/indira-hudson/TOOLS.md",
+        "dst": "/workspace/persona/indira-hudson/TOOLS.md"
+      }
+    ],
+    "api": [
+      {
+        "id": "M0-01",
+        "service": "gmail-api",
+        "method": "POST",
+        "path": "/v1/health-init",
+        "description": "Initialise gmail-api session for stage 0",
+        "expected_response": 200
+      },
+      {
+        "id": "M0-02",
+        "service": "google-calendar-api",
+        "method": "POST",
+        "path": "/v1/health-init",
+        "description": "Initialise google-calendar-api session for stage 0",
+        "expected_response": 200
+      },
+      {
+        "id": "M0-03",
+        "service": "google-drive-api",
+        "method": "POST",
+        "path": "/v1/health-init",
+        "description": "Initialise google-drive-api session for stage 0",
+        "expected_response": 200
+      }
+    ]
+  }
+}

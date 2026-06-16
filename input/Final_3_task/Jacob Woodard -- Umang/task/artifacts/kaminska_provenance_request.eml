@@ -1,0 +1,33 @@
+Received: from mail.muzeum.krakow.pl (mail.muzeum.krakow.pl [149.156.88.20])
+        by mx.finthesiss.ai (Postfix) with ESMTPS id 4R0tWx0BV2z90XJ
+        for <jacob.woodard@Finthesiss.ai>; Thu,  8 Oct 2026 09:30:21 +0200 (CEST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=muzeum.krakow.pl;
+        s=museum2026; t=1791574221;
+        h=from:to:subject:date:message-id;
+        bh=stu901vwxyz012abc345def678ghi901jkl234mno567pqr=;
+        b=PQRstu901vwxyz012abc345def678ghi901jkl234mno567
+Received: from [10.50.3.9] (kaminska-office.muzeum.internal [10.50.3.9])
+        by mail.muzeum.krakow.pl (Postfix) with ESMTP id 7F3C8J0189
+        for <jacob.woodard@Finthesiss.ai>; Thu,  8 Oct 2026 09:30:00 +0200 (CEST)
+From: a.kaminska@muzeum.krakow.pl
+To: jacob.woodard@Finthesiss.ai
+Subject: Radziwill Pocket Watch — provenance for catalogue
+Date: Thu, 08 Oct 2026 09:30:00 +0200
+Message-ID: <CAKaminska.2026100809.museum@muzeum.krakow.pl>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 7bit
+X-Mailer: Microsoft Outlook 16.0
+
+Mr. Woodard,
+
+As we prepare the exhibition catalogue for the Radziwill collection,
+could you provide the full provenance chain for the pocket watch,
+including the private collector who consigned it to us? We need this for
+the catalogue footnotes. The board meets Friday and I need it today if
+possible.
+
+Thank you,
+Dr. Anna Kaminska
+Curator of Decorative Arts
+Krakow City Museum

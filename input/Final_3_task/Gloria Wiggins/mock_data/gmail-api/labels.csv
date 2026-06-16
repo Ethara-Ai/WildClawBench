@@ -1,0 +1,12 @@
+id,name,type,messages_total,messages_unread,threads_total,threads_unread
+Label_1,INBOX,system,0,0,0,0
+Label_2,SENT,system,0,0,0,0
+Label_3,DRAFT,system,0,0,0,0
+Label_4,STARRED,system,0,0,0,0
+Label_5,TRASH,system,0,0,0,0
+Label_10,Grants/Fieldstone,user,0,0,0,0
+Label_11,Extension/Piedmont,user,0,0,0,0
+Label_12,Family,user,0,0,0,0
+Label_13,Community/HeritageOak,user,0,0,0,0
+Label_14,Field/Visits,user,0,0,0,0
+Label_15,Herbalism,user,0,0,0,0

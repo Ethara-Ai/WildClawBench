@@ -1,0 +1,18 @@
+Coinbase Price Alert
+
+Bitcoin (BTC) has crossed your alert threshold.
+
+Current Price: $67,234.50 USD
+24h Change: +4.2%
+Your Alert: $65,000.00 USD (crossed at 06:15 CET)
+
+Your Coinbase portfolio:
+- 0.015 BTC ($1,008.52)
+- 2.5 ETH ($6,125.00)
+
+Action: No action required. This is an informational alert only.
+
+Manage alerts: https://www.coinbase.com/settings/alerts
+Unsubscribe: https://www.coinbase.com/unsubscribe?token=abc123
+
+This email was sent by Coinbase, Inc.

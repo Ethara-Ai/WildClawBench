@@ -1,0 +1,7 @@
+spreadsheet_id,name,drive_file_id,owner_email,created_at,modified_at,locale,timeZone
+ss_budget,Deep_Roots_Budget_2026,fil_budget_2026,gloria.wiggins@voissync.ai,2026-09-22T10:00:00Z,2026-10-04T16:00:00Z,en_US,America/New_York
+ss_harvest,Harvest_Day_Oct17_Planning,fil_harvest_plan,gloria.wiggins@voissync.ai,2026-09-12T10:00:00Z,2026-10-01T18:00:00Z,en_US,America/New_York
+ss_trial_plot,Trial_Plot_Data_2026,fil_trial_plot,gloria.wiggins@voissync.ai,2026-04-01T08:00:00Z,2026-09-28T17:00:00Z,en_US,America/New_York
+ss_soil,Soil_Analysis_Piedmont_2026,fil_soil_analysis,gloria.wiggins@voissync.ai,2026-09-28T11:00:00Z,2026-09-28T11:05:00Z,en_US,America/New_York
+ss_curriculum,Workshop_Curriculum_Modules,fil_curriculum,gloria.wiggins@voissync.ai,2026-09-08T14:00:00Z,2026-09-29T17:00:00Z,en_US,America/New_York
+ss_materials,Workshop_Materials_Pricing,fil_materials,gloria.wiggins@voissync.ai,2026-09-10T10:00:00Z,2026-09-25T15:00:00Z,en_US,America/New_York

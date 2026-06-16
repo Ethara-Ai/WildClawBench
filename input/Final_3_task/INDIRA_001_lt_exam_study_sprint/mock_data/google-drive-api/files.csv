@@ -1,0 +1,11 @@
+id,name,mimeType,parents,owners,createdTime,modifiedTime,size,shared,starred,trashed
+drv_folder_mcfr,MCFR,application/vnd.google-apps.folder,root,indira.hudson@voissync.ai,2025-11-15T10:00:00-06:00,2026-10-15T09:00:00-05:00,,false,false,false
+drv_folder_ltexam,Lt Exam Prep,application/vnd.google-apps.folder,root,indira.hudson@voissync.ai,2026-08-14T19:00:00-05:00,2026-10-17T18:30:00-05:00,,false,true,false
+drv_folder_personal,Personal,application/vnd.google-apps.folder,root,indira.hudson@voissync.ai,2025-11-15T10:00:00-06:00,2026-09-20T15:00:00-05:00,,false,false,false
+drv_study_guide_v1,MCFR Lt Exam Study Guide v1.pdf,application/pdf,drv_folder_ltexam,indira.hudson@voissync.ai,2026-09-01T12:00:00-05:00,2026-09-01T12:00:00-05:00,2458624,false,true,false
+drv_ss_practice_scores,Lt Exam Practice Scores,application/vnd.google-apps.spreadsheet,drv_folder_ltexam,indira.hudson@voissync.ai,2026-08-14T19:00:00-05:00,2026-10-17T18:30:00-05:00,,false,true,false
+drv_ss_ce_tracker,CE Hours Tracker,application/vnd.google-apps.spreadsheet,drv_folder_mcfr,indira.hudson@voissync.ai,2026-01-15T10:00:00-06:00,2026-10-15T09:00:00-05:00,,false,false,false
+drv_ss_shift_schedule,Shift Schedule Oct-Nov,application/vnd.google-apps.spreadsheet,drv_folder_mcfr,indira.hudson@voissync.ai,2026-09-28T20:00:00-05:00,2026-09-29T07:00:00-05:00,,false,false,false
+drv_ss_meal_kitty,Station 47 Meal Kitty,application/vnd.google-apps.spreadsheet,drv_folder_mcfr,indira.hudson@voissync.ai,2026-10-01T06:30:00-05:00,2026-10-18T06:45:00-05:00,,false,false,false
+drv_doc_study_notes,Lt Exam Study Notes,application/vnd.google-apps.document,drv_folder_ltexam,indira.hudson@voissync.ai,2026-08-20T21:00:00-05:00,2026-10-16T22:30:00-05:00,,false,false,false
+drv_doc_sop_reference,Station 47 SOPs Quick Reference,application/vnd.google-apps.document,drv_folder_mcfr,indira.hudson@voissync.ai,2026-02-10T14:00:00-06:00,2026-09-05T11:00:00-05:00,,false,false,false

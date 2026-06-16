@@ -1,0 +1,9 @@
+sheet_id,spreadsheet_id,title,index,row_count,column_count
+sh_budget_main,ss_budget,Budget,0,18,5
+sh_harvest_main,ss_harvest,Volunteers,0,18,6
+sh_harvest_logistics,ss_harvest,Logistics,1,12,4
+sh_trial_main,ss_trial_plot,Plots,0,12,9
+sh_trial_yield,ss_trial_plot,Yield Data,1,8,5
+sh_soil_main,ss_soil,Soil Samples,0,8,6
+sh_curriculum_main,ss_curriculum,Modules,0,9,5
+sh_materials_main,ss_materials,Pricing,0,12,4

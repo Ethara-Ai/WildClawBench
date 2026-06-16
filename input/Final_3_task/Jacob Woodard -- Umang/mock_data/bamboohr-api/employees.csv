@@ -1,0 +1,3 @@
+id,first_name,last_name,work_email,department,job_title,location,hire_date,status,home_address,supervisor_id
+emp_jacob,Jacob,Woodard,jacob.woodard@Finthesiss.ai,Workshop,Master Watchmaker / Owner,Kraków,2009-01-05,Active,,
+emp_mark,Mark,Jennings,mark.jennings@woodardhorology.pl,Workshop,Apprentice Watchmaker,Kraków,2025-03-15,Active,"ulica Dietla 42/3, Kraków",emp_jacob

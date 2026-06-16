@@ -1,0 +1,51 @@
+{
+  "task_id": "GLORI_001_deep_roots_education_crunch",
+  "generated_at_utc": "2026-10-04T18:00:00+00:00",
+  "persona": "Gloria Mae Wiggins",
+  "timezone": "America/New_York",
+  "services": [
+    "gmail-api",
+    "google-calendar-api",
+    "google-drive-api",
+    "google-sheets-api",
+    "google-docs-api",
+    "google-contacts-api"
+  ],
+  "files": {
+    "gmail-api": [
+      "mock_data/gmail-api/profile.json",
+      "mock_data/gmail-api/labels.csv",
+      "mock_data/gmail-api/messages.csv"
+    ],
+    "google-calendar-api": [
+      "mock_data/google-calendar-api/calendars.csv",
+      "mock_data/google-calendar-api/events.csv",
+      "mock_data/google-calendar-api/event_attendees.csv"
+    ],
+    "google-drive-api": [
+      "mock_data/google-drive-api/folders.csv",
+      "mock_data/google-drive-api/files.csv"
+    ],
+    "google-sheets-api": [
+      "mock_data/google-sheets-api/spreadsheets.csv",
+      "mock_data/google-sheets-api/sheets.csv",
+      "mock_data/google-sheets-api/cells_budget.csv",
+      "mock_data/google-sheets-api/cells_harvest.csv",
+      "mock_data/google-sheets-api/cells_trial_plot.csv",
+      "mock_data/google-sheets-api/cells_soil_analysis.csv",
+      "mock_data/google-sheets-api/cells_curriculum.csv",
+      "mock_data/google-sheets-api/cells_materials.csv"
+    ],
+    "google-docs-api": [
+      "mock_data/google-docs-api/documents.csv"
+    ],
+    "google-contacts-api": [
+      "mock_data/google-contacts-api/contacts.csv"
+    ]
+  },
+  "skipped": {
+    "notion-api": "distractor - audit/summary.total_requests MUST equal 0",
+    "airtable-api": "distractor - audit/summary.total_requests MUST equal 0",
+    "canvas-lms-api": "NOT-CONNECTED bait - zero writes permitted"
+  }
+}

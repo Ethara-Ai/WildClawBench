@@ -1,0 +1,4 @@
+id,name,id_board,pos,closed
+lst_todo,To Do,brd_workshop,1,False
+lst_doing,Doing,brd_workshop,2,False
+lst_done,Done,brd_workshop,3,False

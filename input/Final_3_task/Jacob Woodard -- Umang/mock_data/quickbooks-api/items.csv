@@ -1,0 +1,4 @@
+id,name,category,unit_price_pln,income_account,active
+itm_restoration,Restoration labour,Service,,acct_income,True
+itm_service,Service & regulation,Service,,acct_income,True
+itm_consult,Consultation,Service,250,acct_income,True

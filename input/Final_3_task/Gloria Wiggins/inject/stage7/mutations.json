@@ -1,0 +1,39 @@
+{
+  "stage": 7,
+  "stage_name": "before_T38",
+  "description": "Auto-rewritten from original stage2.json \u2014 applies before T38.",
+  "applies_between_turns": [
+    "T37",
+    "T38"
+  ],
+  "mutations": {
+    "silent": [
+      {
+        "id": "SM7",
+        "service": "google-drive-api",
+        "silent": true,
+        "description": "V6 narrative: 3yr\u21922yr AND Piedmont\u2192Durham (scope narrowing)",
+        "admin": {
+          "op": "upsert",
+          "table": "files",
+          "pk_field": "id",
+          "row": {
+            "id": "fl_narrative_v6",
+            "name": "Deep_Roots_Narrative_V6.gdoc",
+            "mime_type": "application/vnd.google-apps.document",
+            "parent_id": "fld_narrative_drafts",
+            "size": "32100",
+            "created_time": "2026-10-08T23:00:00-04:00",
+            "modified_time": "2026-10-08T23:00:00-04:00",
+            "owner_email": "gloria.wiggins@voissync.ai",
+            "starred": "False",
+            "trashed": "False",
+            "web_view_link": "https://drive.google.com/file/d/fl_narrative_v6/view"
+          }
+        }
+      }
+    ],
+    "filesystem": [],
+    "loud": []
+  }
+}

@@ -1,0 +1,4 @@
+id,base_id,name,primary_field
+tbl_parts,base_parts,Parts Inventory,part_id
+tbl_suppliers,base_suppliers,Suppliers,supplier_name
+tbl_shipping,base_shipping,Shipping Tracker,shipment_id

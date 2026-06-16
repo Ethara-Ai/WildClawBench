@@ -1,0 +1,25 @@
+id,thread_id,from_addr,to_addr,cc_addr,subject,snippet,body,date,internal_date,size_estimate,labels,is_unread,is_starred
+msg_krasicki_sept18,thr_krasicki,jacob.woodard@Finthesiss.ai,estate@krasicki-family.pl,,Krasicki Estate Longcase - Restoration Update,"Confirming target delivery of 26 October and the agreed parts budget of PLN 2,800.","Dear Krasicki family,
+
+Thank you for entrusting Woodard Horology with the 1820s estate longcase. I am writing to confirm the restoration is progressing on schedule toward our target delivery of 26 October 2026. The agreed parts budget remains PLN 2,800; the mainspring, escapement wheel and click spring have been ordered through my supplier in Biel.
+
+Warm regards,
+Jacob Woodard
+Woodard Horology",2026-09-18T10:14:00+02:00,1758183240000,2480,"SENT,Label_commissions",False,False
+msg_stefan_order,thr_stefan,jacob.woodard@Finthesiss.ai,stefan.muller@biel-time.ch,,Order SM-KR-2026-042 - Krasicki parts,Confirming the parts order for the Krasicki longcase under reference SM-KR-2026-042.,"Stefan,
+
+Please proceed with order SM-KR-2026-042 for the Krasicki longcase: mainspring (x3), escapement wheel, and click spring. Standard QA window applies. Many thanks.
+
+Jacob",2026-09-16T08:40:00+02:00,1757997600000,1890,"SENT,Label_suppliers",False,False
+msg_stefan_ack,thr_stefan,stefan.muller@biel-time.ch,jacob.woodard@Finthesiss.ai,,Re: Order SM-KR-2026-042 - Krasicki parts,"Received, Jacob. Parts entered to the portal. Standard 5-day QA window noted.","Jacob,
+
+Received and entered to the supplier portal. Standard 5-day QA window applies. I will confirm dispatch once QA clears.
+
+Best,
+Stefan Müller
+Biel-Time SA",2026-09-16T15:22:00+02:00,1758021720000,1420,"INBOX,Label_suppliers",False,False
+msg_guild_agenda,thr_guild,secretary@guild-krakow.pl,jacob.woodard@Finthesiss.ai,,Guild Meeting 21 October - Agenda,Agenda for the 21 October guild meeting at Floriańska. Please confirm attendance.,"Dear members,
+
+Please find the agenda for the guild meeting on 21 October at the Floriańska rooms. Mr Woodard is scheduled to present on restoration ethics. Kindly confirm attendance.
+
+Guild Secretariat",2026-09-29T09:05:00+02:00,1759129500000,1650,"INBOX,Label_guild",False,False

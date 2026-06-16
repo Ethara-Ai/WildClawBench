@@ -1,0 +1,31 @@
+Received: from mail.guild-krakow.pl (mail.guild-krakow.pl [89.161.55.78])
+        by mx.finthesiss.ai (Postfix) with ESMTPS id 4R1wAB3EY5z93BM
+        for <jacob.woodard@Finthesiss.ai>; Fri,  9 Oct 2026 09:30:20 +0200 (CEST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=guild-krakow.pl;
+        s=gk2026; t=1791660620;
+        h=from:to:subject:date:message-id;
+        bh=abc345def678ghi901jkl234mno567pqr890stu123vwx456=;
+        b=YZAabc345def678ghi901jkl234mno567pqr890stu123vw
+Received: from [10.30.7.4] (wojciechowski-home.guild-krakow.pl [10.30.7.4])
+        by mail.guild-krakow.pl (Postfix) with ESMTP id 4I6F1M0278
+        for <jacob.woodard@Finthesiss.ai>; Fri,  9 Oct 2026 09:30:00 +0200 (CEST)
+From: henryk.wojciechowski@guild-krakow.pl
+To: jacob.woodard@Finthesiss.ai
+Subject: Checking in
+Date: Fri, 09 Oct 2026 09:30:00 +0200
+Message-ID: <CAWojciechowski.2026100909.guild@guild-krakow.pl>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 7bit
+X-Mailer: Thunderbird 115.3.2
+
+Jacob,
+
+I hope this finds you well. Someone at last month's guild meeting
+mentioned you looked a bit tired. I just wanted to check in and see how
+you are doing. If there is anything you need — whether it is help with
+the symposium preparations or anything else — please do not hesitate to
+ask. We look out for each other in this guild.
+
+Warm regards,
+Henryk Wojciechowski

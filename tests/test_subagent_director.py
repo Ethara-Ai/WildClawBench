@@ -462,3 +462,283 @@ def test_drive_tool_loop_tool_exception_becomes_error_tool_result():
     )
     assert result["output"] == "recovered"
     assert result["tool_calls"] == 1
+
+
+def test_extract_round_usage_pulls_anthropic_cache_fields():
+    from src.utils.subagent_director import _extract_round_usage
+
+    out = _extract_round_usage({
+        "input_tokens": 100,
+        "output_tokens": 50,
+        "cache_read_input_tokens": 1200,
+        "cache_creation_input_tokens": 800,
+    })
+    assert out == {
+        "input_tokens": 100,
+        "output_tokens": 50,
+        "cache_read_tokens": 1200,
+        "cache_write_tokens": 800,
+    }
+
+
+def test_extract_round_usage_defaults_missing_to_zero():
+    from src.utils.subagent_director import _extract_round_usage
+
+    assert _extract_round_usage(None) == {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+    }
+    assert _extract_round_usage({"input_tokens": 5}) == {
+        "input_tokens": 5,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+    }
+
+
+def test_drive_tool_loop_accumulates_cache_tokens_across_rounds():
+    from src.utils.subagent_director import _drive_tool_loop
+
+    round1 = {
+        "content": [
+            {"type": "tool_use", "id": "tu_1", "name": "Read", "input": {"path": "/x"}},
+        ],
+        "usage": {
+            "input_tokens": 3,
+            "output_tokens": 4,
+            "cache_read_input_tokens": 100,
+            "cache_creation_input_tokens": 200,
+        },
+    }
+    round2 = {
+        "content": [{"type": "text", "text": "done"}],
+        "usage": {
+            "input_tokens": 6,
+            "output_tokens": 8,
+            "cache_read_input_tokens": 50,
+            "cache_creation_input_tokens": 0,
+        },
+    }
+    result = _drive_tool_loop(
+        http_post=_scripted_http_post([round1, round2]),
+        tool_dispatch=lambda _n, _i: "ok",
+        sys_prompt="S",
+        usr_prompt="U",
+        tools_schemas=[{"name": "Read"}],
+        model="m",
+        max_tokens=100,
+        max_tool_calls=5,
+    )
+    assert result["tokens_in"] == 9
+    assert result["tokens_out"] == 12
+    assert result["cache_read_tokens"] == 150
+    assert result["cache_write_tokens"] == 200
+    assert [r["usage"] for r in result["rounds"]] == [
+        {"input_tokens": 3, "output_tokens": 4,
+         "cache_read_tokens": 100, "cache_write_tokens": 200},
+        {"input_tokens": 6, "output_tokens": 8,
+         "cache_read_tokens": 50, "cache_write_tokens": 0},
+    ]
+
+
+def test_run_with_invoker_propagates_cache_fields():
+    spec = SubagentSpec(role="r", instructions="i")
+
+    def _inv(_s, _u, _spec):
+        return {
+            "output": "ok",
+            "tokens_in": 1,
+            "tokens_out": 2,
+            "cache_read_tokens": 3,
+            "cache_write_tokens": 4,
+        }
+
+    res = run_with_invoker(spec, _inv)
+    assert res.cache_read_tokens == 3
+    assert res.cache_write_tokens == 4
+    assert res.total_tokens == 10
+
+
+def test_subagent_result_total_tokens_property():
+    r = SubagentResult(
+        spawn_id="spw_x", role="r", output="",
+        tokens_in=10, tokens_out=20,
+        cache_read_tokens=300, cache_write_tokens=400,
+    )
+    assert r.total_tokens == 730
+
+
+def test_to_log_row_includes_canonical_token_shape():
+    spec = SubagentSpec(role="r", instructions="i")
+    result = SubagentResult(
+        spawn_id="spw_y", role="r", output="x",
+        tokens_in=11, tokens_out=22,
+        cache_read_tokens=33, cache_write_tokens=44,
+    )
+    row = result.to_log_row(spec=spec, turn_index=0, parent_session_id=None)
+    assert row["input_tokens"] == 11
+    assert row["output_tokens"] == 22
+    assert row["cache_read_tokens"] == 33
+    assert row["cache_write_tokens"] == 44
+    assert row["total_tokens"] == 110
+    assert row["tokens_in"] == 11
+    assert row["tokens_out"] == 22
+
+
+def test_write_subagent_delivery_includes_usage_in_meta(tmp_path: Path):
+    spec = SubagentSpec(role="r", instructions="i")
+    result = SubagentResult(
+        spawn_id="spw_u", role="r", output="done",
+        tokens_in=10, tokens_out=20,
+        cache_read_tokens=5, cache_write_tokens=7,
+        status="ok",
+    )
+    out_path = write_subagent_delivery(
+        "spw_u", spec=spec, result=result,
+        sys_prompt="S", usr_prompt="U", transcript_dir=tmp_path,
+    )
+    meta = json.loads(out_path.read_text())["meta_info"]
+    assert meta["usage"] == {
+        "input_tokens": 10,
+        "output_tokens": 20,
+        "cache_read_tokens": 5,
+        "cache_write_tokens": 7,
+        "total_tokens": 42,
+    }
+
+
+def test_summarize_results_aggregates_and_classifies():
+    from src.utils.subagent_director import summarize_results
+
+    rs = [
+        SubagentResult(spawn_id="a", role="r", output="o",
+                       tokens_in=10, tokens_out=20,
+                       cache_read_tokens=5, cache_write_tokens=0,
+                       tool_calls=1, elapsed_seconds=0.5, status="ok"),
+        SubagentResult(spawn_id="b", role="r", output="",
+                       tokens_in=0, tokens_out=0, status="timeout",
+                       error="x"),
+        SubagentResult(spawn_id="c", role="r", output="o2",
+                       tokens_in=3, tokens_out=4,
+                       cache_write_tokens=11, tool_calls=2,
+                       elapsed_seconds=0.25, status="ok"),
+    ]
+    s = summarize_results(rs, scope="batch")
+    assert s["kind"] == "summary"
+    assert s["scope"] == "batch"
+    assert s["n_spawns"] == 3
+    assert s["n_ok"] == 2
+    assert s["by_status"] == {"ok": 2, "timeout": 1}
+    assert s["tool_calls"] == 3
+    assert s["input_tokens"] == 13
+    assert s["output_tokens"] == 24
+    assert s["cache_read_tokens"] == 5
+    assert s["cache_write_tokens"] == 11
+    assert s["total_tokens"] == 53
+    assert s["elapsed_seconds"] == 0.75
+    assert "status" not in s  # so spawn_tree_checks does not count it
+
+
+def test_summarize_results_empty():
+    from src.utils.subagent_director import summarize_results
+    s = summarize_results([], scope="batch")
+    assert s["n_spawns"] == 0
+    assert s["total_tokens"] == 0
+    assert s["by_status"] == {}
+
+
+def test_summarize_spawn_tree_reads_file_and_skips_summary_rows(tmp_path: Path):
+    from src.utils.subagent_director import summarize_spawn_tree
+
+    p = tmp_path / "spawn_tree.jsonl"
+    p.write_text(
+        json.dumps({"status": "ok", "input_tokens": 10, "output_tokens": 20,
+                    "cache_read_tokens": 3, "cache_write_tokens": 4,
+                    "tool_calls": 1, "elapsed_seconds": 0.1}) + "\n"
+        + json.dumps({"status": "error", "input_tokens": 1, "output_tokens": 2,
+                      "tool_calls": 0, "elapsed_seconds": 0.05}) + "\n"
+        + json.dumps({"kind": "summary", "input_tokens": 9999,
+                      "output_tokens": 9999}) + "\n"
+        + json.dumps({"status": "ok", "tokens_in": 5, "tokens_out": 6,
+                      "tool_calls": 1, "elapsed_seconds": 0.2}) + "\n"
+    )
+    s = summarize_spawn_tree(p)
+    assert s["n_spawns"] == 3
+    assert s["n_ok"] == 2
+    assert s["by_status"] == {"ok": 2, "error": 1}
+    assert s["input_tokens"] == 16
+    assert s["output_tokens"] == 28
+    assert s["cache_read_tokens"] == 3
+    assert s["cache_write_tokens"] == 4
+    assert s["total_tokens"] == 51
+    assert s["tool_calls"] == 2
+
+
+def test_summarize_spawn_tree_missing_file_returns_zero(tmp_path: Path):
+    from src.utils.subagent_director import summarize_spawn_tree
+    s = summarize_spawn_tree(tmp_path / "absent.jsonl")
+    assert s["n_spawns"] == 0
+    assert s["total_tokens"] == 0
+
+
+def test_run_batch_main_appends_summary_row_and_keeps_stdout_light(
+    tmp_path: Path, capsys
+):
+    from src.utils.subagent_director import _run_batch_main
+
+    def _inv(_s, _u, spec):
+        return {
+            "output": f"reply-{spec.role}",
+            "tokens_in": 10,
+            "tokens_out": 20,
+            "cache_read_tokens": 3,
+            "cache_write_tokens": 4,
+        }
+
+    spawn_tree = tmp_path / "spawn_tree.jsonl"
+    transcript_dir = tmp_path / "subagents"
+    turn_marker = tmp_path / "turn"
+
+    rc = _run_batch_main(
+        [
+            {"role": "a", "instructions": "x"},
+            {"role": "b", "instructions": "y"},
+        ],
+        invoker=_inv,
+        spawn_tree=spawn_tree,
+        transcript_dir=transcript_dir,
+        turn_marker=turn_marker,
+    )
+    assert rc == 0
+
+    stdout_lines = [
+        json.loads(l) for l in capsys.readouterr().out.strip().splitlines()
+    ]
+    assert len(stdout_lines) == 2
+    for row in stdout_lines:
+        assert set(row) == {
+            "spawn_id", "role", "status", "output", "error",
+            "tokens_in", "tokens_out", "tool_calls",
+        }
+        assert "cache_read_tokens" not in row
+        assert "cache_write_tokens" not in row
+        assert "total_tokens" not in row
+
+    file_rows = [
+        json.loads(l) for l in spawn_tree.read_text().splitlines() if l.strip()
+    ]
+    per_spawn = [r for r in file_rows if r.get("kind") != "summary"]
+    summaries = [r for r in file_rows if r.get("kind") == "summary"]
+    assert len(per_spawn) == 2
+    assert len(summaries) == 1
+    s = summaries[0]
+    assert s["scope"] == "batch"
+    assert s["n_spawns"] == 2
+    assert s["n_ok"] == 2
+    assert s["input_tokens"] == 20
+    assert s["output_tokens"] == 40
+    assert s["cache_read_tokens"] == 6
+    assert s["cache_write_tokens"] == 8
+    assert s["total_tokens"] == 74

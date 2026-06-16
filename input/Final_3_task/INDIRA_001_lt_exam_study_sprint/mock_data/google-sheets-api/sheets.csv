@@ -1,0 +1,5 @@
+spreadsheet_id,sheet_id,title,index,row_count,column_count,frozen_row_count,frozen_column_count
+ss_lt_practice_scores,0,Scores,0,20,8,1,0
+ss_ce_tracker,0,CE,0,20,7,1,0
+ss_shift_schedule,0,Schedule,0,20,8,1,0
+ss_meal_kitty,0,Kitty,0,20,6,1,0

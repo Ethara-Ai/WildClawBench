@@ -1,0 +1,30 @@
+Received: from mail.wroclawantiquefair.pl (mail.wroclawantiquefair.pl [212.77.100.15])
+        by mx.finthesiss.ai (Postfix) with ESMTPS id 4R0uYz1CW3z91ZK
+        for <jacob.woodard@Finthesiss.ai>; Thu,  8 Oct 2026 13:30:19 +0200 (CEST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=wroclawantiquefair.pl;
+        s=fair2026; t=1791588619;
+        h=from:to:subject:date:message-id;
+        bh=vwxyz012abc345def678ghi901jkl234mno567pqr890stu=;
+        b=STUvwxyz012abc345def678ghi901jkl234mno567pqr890
+Received: from [172.16.0.5] (admin-desk.wroclawantiquefair.internal [172.16.0.5])
+        by mail.wroclawantiquefair.pl (Postfix) with ESMTP id 9G4D9K0212
+        for <jacob.woodard@Finthesiss.ai>; Thu,  8 Oct 2026 13:30:00 +0200 (CEST)
+From: info@wroclawantiquefair.pl
+To: jacob.woodard@Finthesiss.ai
+Subject: Table reassignment — Wroclaw Antique Fair Oct 10
+Date: Thu, 08 Oct 2026 13:30:00 +0200
+Message-ID: <CAFair.2026100813.admin@wroclawantiquefair.pl>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 7bit
+X-Mailer: Roundcube Webmail/1.6.3
+
+Dear Mr. Woodard,
+
+Due to a layout change in Hall B, your table has been reassigned from
+table 14 to table 41. The new location is in the east wing near the
+entrance. All other details remain the same. Please update your records.
+
+Regards,
+Fair Administration
+Wroclaw Antique Fair

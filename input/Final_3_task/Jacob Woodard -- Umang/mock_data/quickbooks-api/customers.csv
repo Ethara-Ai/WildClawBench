@@ -1,0 +1,6 @@
+id,display_name,company_name,primary_email,primary_phone,billing_address,terms,active
+cust_krasicki,Krasicki Family Estate,Krasicki Family Estate,estate@krasicki-family.pl,+48 12 555 0190,"Rynek Główny 8, Kraków",Net 30,True
+cust_stcatherine,St. Catherine's Parish,St. Catherine's Church,fr.newman@stkatherines.pl,+48 12 555 0177,"ul. Augustiańska 7, Kraków",Net 30,True
+cust_museum,Muzeum Krakowskie,Muzeum Krakowskie,a.kaminska@muzeum.krakow.pl,+48 12 555 0033,"ul. Senacka 3, Kraków",Net 45,True
+cust_jankowski,Piotr Jankowski,,piotr.jankowski@poczta.pl,+48 600 555 201,"ul. Długa 22, Kraków",Due on receipt,True
+cust_mazur,Tomasz Mazur,,tomasz.mazur@gmail.com,+48 600 555 318,"ul. Karmelicka 4, Kraków",Due on receipt,True

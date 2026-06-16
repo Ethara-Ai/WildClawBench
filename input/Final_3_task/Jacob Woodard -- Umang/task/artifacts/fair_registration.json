@@ -1,0 +1,44 @@
+{
+  "registration_id": "WRO-2026-EXH-0847",
+  "event_name": "Wroclaw Antique Fair 2026",
+  "event_date": "2026-10-10",
+  "event_location": "Hala Stulecia, Wroclaw, Poland",
+  "exhibitor": {
+    "name": "Woodard Horology",
+    "contact": "Jacob Woodard",
+    "email": "jacob.woodard@Finthesiss.ai",
+    "phone": "+48-12-555-3400",
+    "category": "Horological Instruments & Restoration"
+  },
+  "table_assignment": 14,
+  "hall": "B",
+  "section": "West wing, near coffee area",
+  "setup_time": "07:00",
+  "event_hours": "09:00-17:00",
+  "breakdown_time": "17:00-18:30",
+  "travel": {
+    "train_departure": "07:15",
+    "train_station": "Krakow Glowny",
+    "train_arrival": "10:45",
+    "train_station_arrival": "Wroclaw Glowny",
+    "return_train": "18:30",
+    "booking_reference": "PKP-2026-1010-WRO-0234"
+  },
+  "fees": {
+    "table_fee": "PLN 350",
+    "insurance_surcharge": "PLN 50",
+    "total": "PLN 400",
+    "payment_status": "paid",
+    "payment_date": "2026-09-15",
+    "payment_reference": "TXN-WRO-2026-0847"
+  },
+  "items_registered": [
+    "Restored pocket watches (display only)",
+    "Workshop tools demonstration set",
+    "Monograph preview materials",
+    "Business cards and commission inquiry forms"
+  ],
+  "notes": "Exhibitor requests power outlet for spotlight. Confirmed by organiser Sept 20.",
+  "confirmation_sent": "2026-09-16T10:30:00+02:00",
+  "last_updated": "2026-09-20T14:15:00+02:00"
+}

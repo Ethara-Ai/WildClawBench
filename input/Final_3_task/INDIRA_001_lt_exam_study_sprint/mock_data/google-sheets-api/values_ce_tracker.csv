@@ -1,0 +1,8 @@
+row,A,B,C,D,E,F,G
+1,Course Name,Provider,Hours,Date Completed,Status,CE Category,Notes
+2,Basic Hazmat Awareness,IFSI,4,2026-03-15,completed,Hazmat,Required for Hazmat Ops prereq
+3,EMS Basics Refresher,IFSI,4,2026-04-22,completed,EMS,
+4,Fire Behavior & Combustion,IFSI,4,2026-06-10,completed,Fire Science,
+5,EMS Protocols Update,IFSI,4,2026-07-18,completed,EMS,
+6,Rope Rescue Awareness,MCFR Training Div,2,2026-08-05,completed,Technical Rescue,
+7,ACLS Refresher,IFSI,8,—,pending,EMS,Registered — awaiting completion confirmation

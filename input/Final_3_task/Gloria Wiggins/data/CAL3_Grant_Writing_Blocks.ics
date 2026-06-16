@@ -1,0 +1,15 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Gloria Wiggins//Deep Roots//EN
+BEGIN:VEVENT
+UID:7618E9B6-2638-4509-B249-994EBC27DD6E
+DTSTAMP:20261005T070000Z
+DTSTART;TZID=America/New_York:20261006T080000
+DTEND;TZID=America/New_York:20261006T100000
+SUMMARY:Grant Writing Block - Deep Roots
+LOCATION:Home office / Extension office
+DESCRIPTION:Dedicated grant writing time for Deep Roots Fieldstone Foundation application. Focus: narrative drafting, budget review, milestone tracking. Block Oct 6-8, 8-10 AM each morning.
+STATUS:CONFIRMED
+RRULE:FREQ=DAILY;COUNT=3
+END:VEVENT
+END:VCALENDAR

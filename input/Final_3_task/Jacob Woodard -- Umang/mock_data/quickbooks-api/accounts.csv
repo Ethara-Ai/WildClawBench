@@ -1,0 +1,6 @@
+id,name,account_type,active
+acct_income,Restoration Income,Income,True
+acct_parts,Parts & Materials,Expense,True
+acct_supplies,Workshop Supplies,Expense,True
+acct_utilities,Utilities,Expense,True
+acct_checking,Business Checking,Bank,True

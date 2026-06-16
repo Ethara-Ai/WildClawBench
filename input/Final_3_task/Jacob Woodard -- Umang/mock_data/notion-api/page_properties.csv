@@ -1,0 +1,20 @@
+page_id,property_name,property_type,value
+pg_krasicki,Status,select,In Progress
+pg_krasicki,Parts Budget,number,2800
+pg_krasicki,Delivery Date,date,2026-10-26
+pg_krasicki,Client,text,Krasicki Family Estate
+pg_krasicki,Supplier Ref,text,SM-KR-2026-042
+pg_stcatherine,Status,select,Maintenance
+pg_stcatherine,Next Service,date,2026-11-30
+pg_stcatherine,Last Service,date,2026-08-28
+pg_stcatherine,Contact,text,Fr. Thomas Newman
+pg_radziwill,Status,select,In Progress
+pg_radziwill,Balance Cock Width,text,28.2 mm
+pg_radziwill,Deadline,date,2026-12-31
+pg_radziwill,Confidential,checkbox,true
+pg_jankowski,Status,select,Completed
+pg_jankowski,Total,number,1200
+pg_jankowski,Pickup,date,2026-10-08
+pg_mazur,Status,select,Completed
+pg_mazur,Total,number,950
+pg_mazur,Pickup,date,2026-10-08

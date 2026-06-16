@@ -1,0 +1,14 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Gloria Wiggins//Deep Roots//EN
+BEGIN:VEVENT
+UID:E71E4AAD-20E5-4288-BFE7-5456826A75F7
+DTSTAMP:20261005T070000Z
+DTSTART;TZID=America/New_York:20261010T083000
+DTEND;TZID=America/New_York:20261010T090000
+SUMMARY:REMINDER: Document Sweetgrass Remedy with Grandma Bernice
+LOCATION:Parents' house, Durham NC
+DESCRIPTION:Reminder before herbalism session: Write down Grandma Bernice's sweetgrass remedy for joint stiffness. Bring notebook, phone for audio. This needs to happen before Harvest Day (Oct 17). See doc: Bernice Sweetgrass Remedy Notes.
+STATUS:CONFIRMED
+END:VEVENT
+END:VCALENDAR

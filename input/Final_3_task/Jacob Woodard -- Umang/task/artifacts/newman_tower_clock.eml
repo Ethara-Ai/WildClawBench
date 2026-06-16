@@ -1,0 +1,33 @@
+Received: from mail.stkatherines.pl (mail.stkatherines.pl [195.116.201.12])
+        by mx.finthesiss.ai (Postfix) with ESMTPS id 4R8pQr5yS8z9vRD
+        for <jacob.woodard@Finthesiss.ai>; Tue,  6 Oct 2026 12:30:22 +0200 (CEST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=stkatherines.pl;
+        s=parish2026; t=1791412222;
+        h=from:to:subject:date:message-id;
+        bh=jkl012mno345pqr678stu901vwxyz012abc345def678ghi=;
+        b=GHIjkl012mno345pqr678stu901vwxyz012abc345def678
+Received: from [192.168.0.5] (parish-office.stkatherines.internal [192.168.0.5])
+        by mail.stkatherines.pl (Postfix) with ESMTP id 9E3F5G0091
+        for <jacob.woodard@Finthesiss.ai>; Tue,  6 Oct 2026 12:30:00 +0200 (CEST)
+From: fr.newman@stkatherines.pl
+To: jacob.woodard@Finthesiss.ai
+Subject: St. Catherine's tower clock — quarterly service
+Date: Tue, 06 Oct 2026 12:30:00 +0200
+Message-ID: <CANewman.2026100612.parish@stkatherines.pl>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 7bit
+X-Mailer: Microsoft Outlook 16.0
+
+Dear Jacob,
+
+I hope you are well. I am writing about the quarterly service for the
+tower clock. We have a parish event in late November that week and I am
+concerned about the timing. The last service was August 28 and we had
+originally scheduled the next one for November 30. Would it be possible
+to move it earlier in the month to avoid the conflict? Perhaps the week
+of November 17? Let me know what works for your schedule.
+
+God bless,
+Fr. Thomas Newman
+St. Catherine's Parish

@@ -1,0 +1,12 @@
+resource_name,given_name,family_name,display_name,email,phone,organization,job_title,notes,group_memberships,updated_at
+people/c1001,Kyle,Hudson,Kyle Hudson,kyle.hudson.rn@example.org,773-555-0134,Lakeshore General Hospital,ER Nurse,Husband,Family,2026-08-12T10:00:00-05:00
+people/c1002,Diane,Hudson,Diane Hudson,diane.hudson@example.org,630-555-0158,,Retired Teacher,Mother,Family,2026-07-20T14:00:00-05:00
+people/c1003,Sean,Hudson,Sean Hudson,sean.hudson.ibew@example.org,773-555-0172,IBEW Local 134,Electrician,Brother,Family,2026-09-05T09:00:00-05:00
+people/c1004,Mike,Brennan,Lt. Mike Brennan,mbrennan.cfd@example.org,773-555-0189,MCFR — Station 47,Lieutenant,Mentor — Lt exam prep,MCFR,2026-10-01T08:00:00-05:00
+people/c1005,Eddie,Vasquez,Eddie Vasquez,eddie.v.cfd@example.org,773-555-0196,MCFR — Station 47 Engine 81,FF/Paramedic,Partner E81 — 8 years,MCFR,2026-09-18T11:00:00-05:00
+people/c1006,Alejandro,Torres,Dr. A. Torres,atorres@example.org,773-555-0203,MCFR,Battalion Physician,,MCFR,2026-06-15T13:00:00-05:00
+people/c1007,Sarah,Kim,Dr. Sarah Kim,info@example.org,773-555-0217,Jefferson Park Pediatrics,Pediatrician,Liam + Nora,Personal,2026-04-22T10:00:00-05:00
+people/c1008,Maria,Gonzalez,Maria Gonzalez,maria.g.nanny@example.org,773-555-0228,,Nanny / Childcare,Nora primary — Liam after-school,Personal,2026-08-30T09:00:00-05:00
+people/c1009,Pete,Andersen,Coach Pete Andersen,pete@example.org,312-555-0234,Chicago Adult Hockey League,Coach / Captain,Wednesday league,Personal,2026-10-02T19:00:00-05:00
+people/c1010,Julio,Martinez,Julio Martinez,j.martinez.cfd@example.org,773-555-0241,MCFR — Station 12,FF/Paramedic,Study group,MCFR;Study Group,2026-10-10T07:00:00-05:00
+people/c1011,Ryan,Pham,Ryan Pham,r.pham.cfd@example.org,773-555-0255,MCFR — Station 23,FF/Paramedic,Study group,MCFR;Study Group,2026-10-10T07:00:00-05:00

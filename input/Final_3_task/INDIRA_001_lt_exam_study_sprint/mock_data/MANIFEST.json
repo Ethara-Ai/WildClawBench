@@ -1,0 +1,44 @@
+{
+  "task_id": "INDIRA_001_lt_exam_study_sprint",
+  "generated_at_utc": "2026-10-19T22:00:00+00:00",
+  "services": [
+    "gmail-api",
+    "google-calendar-api",
+    "google-sheets-api",
+    "google-docs-api",
+    "google-drive-api",
+    "google-contacts-api"
+  ],
+  "files": {
+    "gmail-api": [
+      "mock_data/gmail-api/profile.json",
+      "mock_data/gmail-api/labels.csv",
+      "mock_data/gmail-api/messages.csv",
+      "mock_data/gmail-api/drafts.csv"
+    ],
+    "google-calendar-api": [
+      "mock_data/google-calendar-api/calendars.csv",
+      "mock_data/google-calendar-api/events.csv",
+      "mock_data/google-calendar-api/event_attendees.csv"
+    ],
+    "google-sheets-api": [
+      "mock_data/google-sheets-api/spreadsheets.csv",
+      "mock_data/google-sheets-api/sheets.csv",
+      "mock_data/google-sheets-api/values_practice_scores.csv",
+      "mock_data/google-sheets-api/values_ce_tracker.csv",
+      "mock_data/google-sheets-api/values_shift_schedule.csv",
+      "mock_data/google-sheets-api/values_meal_kitty.csv"
+    ],
+    "google-docs-api": [
+      "mock_data/google-docs-api/documents.csv"
+    ],
+    "google-drive-api": [
+      "mock_data/google-drive-api/files.csv",
+      "mock_data/google-drive-api/permissions.csv"
+    ],
+    "google-contacts-api": [
+      "mock_data/google-contacts-api/contacts.csv"
+    ]
+  },
+  "skipped": {}
+}

@@ -1,6 +1,6 @@
-id,name,project,owner,modified_at,description
-fig_poster_01,Consultation Poster - FR,Mobilite Plateau Outreach,communications.team@Finthesiss.ai,2026-10-11T16:00:00-04:00,French-language consultation poster v3 - Centre communautaire du Plateau Oct 15
-fig_poster_02,Consultation Poster - EN,Mobilite Plateau Outreach,communications.team@Finthesiss.ai,2026-10-11T16:30:00-04:00,English-language consultation poster v3 - Centre communautaire du Plateau Oct 15
-fig_poster_03,Consultation Poster - Tamil,Mobilite Plateau Outreach,communications.team@Finthesiss.ai,2026-10-12T09:00:00-04:00,Tamil-language consultation poster v3
-fig_poster_04,Consultation Poster - Urdu,Mobilite Plateau Outreach,communications.team@Finthesiss.ai,2026-10-12T09:30:00-04:00,Urdu-language consultation poster v3
-fig_deck_01,Council Brief Deck - bilingual,Council Brief,ruth.armstrong@Finthesiss.ai,2026-10-12T17:00:00-04:00,Bilingual council brief deck (DRAFT) - draft only until Ruth approves
+file_key,project_id,name,thumbnail_url,last_modified,version,role,editor_type,description
+FK_poster_FR,proj-mobilite-outreach,Consultation Poster - FR,https://figma-thumbs.example.com/FK_poster_FR.png,2026-10-11T16:00:00Z,1001,owner,figma,French-language consultation poster v3 - Centre communautaire du Plateau Oct 15
+FK_poster_EN,proj-mobilite-outreach,Consultation Poster - EN,https://figma-thumbs.example.com/FK_poster_EN.png,2026-10-11T16:30:00Z,1002,owner,figma,English-language consultation poster v3 - Centre communautaire du Plateau Oct 15
+FK_poster_TA,proj-mobilite-outreach,Consultation Poster - Tamil,https://figma-thumbs.example.com/FK_poster_TA.png,2026-10-12T09:00:00Z,1003,owner,figma,Tamil-language consultation poster v3
+FK_poster_UR,proj-mobilite-outreach,Consultation Poster - Urdu,https://figma-thumbs.example.com/FK_poster_UR.png,2026-10-12T09:30:00Z,1004,owner,figma,Urdu-language consultation poster v3
+FK_deck_council,proj-council-brief,Council Brief Deck - bilingual,https://figma-thumbs.example.com/FK_deck_council.png,2026-10-12T17:00:00Z,1005,owner,figma,Bilingual council brief deck (DRAFT) - draft only until Ruth approves

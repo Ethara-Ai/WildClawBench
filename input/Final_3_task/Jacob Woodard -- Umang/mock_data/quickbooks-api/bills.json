@@ -1,0 +1,31 @@
+[
+  {
+    "id": "bill_stefan",
+    "vendor": "Biel-Time SA",
+    "doc_number": "BT-2026-204",
+    "txn_date": "2026-09-22",
+    "currency": "EUR",
+    "amount_eur": 340.0,
+    "fx_rate": 4.32,
+    "amount_pln": 1468.8,
+    "memo": "Krasicki parts order SM-KR-2026-042"
+  },
+  {
+    "id": "bill_krakow",
+    "vendor": "Kraków Springs",
+    "doc_number": "KS-2026-588",
+    "txn_date": "2026-09-19",
+    "currency": "PLN",
+    "amount_pln": 380.0,
+    "memo": "Springs and consumables"
+  },
+  {
+    "id": "bill_warsaw",
+    "vendor": "Horological Supply Warsaw",
+    "doc_number": "HS-2026-330",
+    "txn_date": "2026-09-12",
+    "currency": "PLN",
+    "amount_pln": 220.0,
+    "memo": "Escape wheel and pendulum rod"
+  }
+]

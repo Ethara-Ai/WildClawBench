@@ -1,0 +1,10 @@
+event_id,email,display_name,response_status,optional,organizer
+evt_study_group_oct24,indira.hudson@voissync.ai,Indira Hudson,accepted,false,true
+evt_study_group_oct24,j.martinez.cfd@example.org,Julio Martinez,accepted,false,false
+evt_study_group_oct24,r.pham.cfd@example.org,Ryan Pham,accepted,false,false
+evt_lt_exam_nov14,indira.hudson@voissync.ai,Indira Hudson,accepted,false,false
+evt_recert_nov20,indira.hudson@voissync.ai,Indira Hudson,accepted,false,false
+evt_hockey,pete@example.org,Coach Pete Andersen,accepted,false,true
+evt_hockey,indira.hudson@voissync.ai,Indira Hudson,accepted,false,false
+evt_liam_showcase,indira.hudson@voissync.ai,Indira Hudson,accepted,false,false
+evt_liam_showcase,kyle.hudson.rn@example.org,Kyle Hudson,accepted,false,false

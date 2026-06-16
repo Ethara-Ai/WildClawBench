@@ -1,0 +1,3 @@
+id,conversation_id,direction,from_wa,to_wa,body,timestamp,status
+wam_1,conv_mark,inbound,48600555201x,48600555100x,Locked up the workshop. Mazur casing done.,2026-10-05T17:40:00+02:00,read
+wam_2,conv_ellen,inbound,48600555010x,48600555100x,Don't forget Henry's lunch on Friday.,2026-10-05T19:10:00+02:00,read

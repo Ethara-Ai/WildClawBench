@@ -1,0 +1,73 @@
+id,thread_id,from_addr,to_addr,cc_addr,subject,snippet,body,date,internal_date,size_estimate,labels,is_unread,is_starred
+msg_bg_001,thd_bg_001,newsletter@ifsi.edu,indira.hudson@voissync.ai,,Fall 2026 CE Deadline Reminder,This is a reminder that the 2026 CE reporting deadline is December 31 2026...,"Dear IFSI Participant,
+
+This is a reminder that the 2026 CE reporting deadline is December 31, 2026. All Illinois fire service personnel must complete their required continuing education hours by this date.
+
+Visit the IFSI portal to verify your current CE hour balance and browse our Fall 2026 course catalog.
+
+Questions? Contact ce-help@ifsi.edu or call (217) 555-0100.
+
+IFSI Continuing Education Office",2026-10-08T10:00:00-05:00,1791471600,2845,INBOX,false,false
+msg_bg_002,thd_bg_002,pete@example.org,indira.hudson@voissync.ai,,Season schedule — Wednesday league,Wednesday schedule for the rest of October...,"Hey Indira,
+
+Wednesday schedule for the rest of October:
+- Oct 14: vs. Fire & Ice, 9:15 PM, Rink B
+- Oct 21: vs. Northside Blades, 9:15 PM, Rink A
+- Oct 28: vs. Lake Effect, 9:15 PM, Rink B
+
+Bring dark and light jerseys both nights. Let me know if you can't make any of these.
+
+Pete",2026-10-09T19:15:00-05:00,1791591300,1920,INBOX,false,false
+msg_bg_003,thd_bg_003,mbrennan.cfd@example.org,indira.hudson@voissync.ai,,Checking in — Nov exam prep,How's the studying coming along? Saw your results...,"Indira,
+
+How's the studying coming along? Saw your recent results — solid work but you've got room to grow. Keep grinding.
+
+Heads up — I heard they're releasing an updated study guide based on the new NFPA edition sometime soon. Might want to hold off on too much memorization from the current one until we see it.
+
+I'll reach out about some extra study sessions soon. Nov 14 will be here before you know it.
+
+— Brennan",2026-10-12T09:30:00-05:00,1791815400,2340,"INBOX,Label_LtExam",false,true
+msg_bg_004,thd_bg_004,kyle.hudson.rn@example.org,indira.hudson@voissync.ai,,"Liam's showcase — Nov 6",Holy Cross sent the details for Liam's fall showcase...,"Hey,
+
+Holy Cross sent the details for Liam's fall showcase. It's November 6th at 6:00 PM in the parish hall. Each kid does a short presentation about their favorite animal. He picked the fire truck. I told him that's not an animal but he's committed.
+
+Can you make sure you're off that day? I'll ask Maria to watch Nora.
+
+- K",2026-10-13T15:00:00-05:00,1791921600,1680,"INBOX,Label_Family",false,false
+msg_bg_005,thd_bg_004,indira.hudson@voissync.ai,kyle.hudson.rn@example.org,,"RE: Liam's showcase — Nov 6",I'll check the schedule but Nov 6 should be a day off...,"Ha, that tracks. I'll check the schedule but Nov 6 should be a day off for me. I'll confirm.
+
+Tell Liam the fire truck is definitely an animal. It eats diesel and growls.
+
+- I",2026-10-13T18:00:00-05:00,1791932400,890,SENT,false,false
+msg_bg_006,thd_bg_005,communications@holycross.example.org,indira.hudson@voissync.ai,,Parent-Teacher Conference — November Schedule,Parent-Teacher Conferences for the Pre-K program will be held...,"Dear Parents and Guardians,
+
+Parent-Teacher Conferences for the Pre-K program will be held the week of November 9-13, 2026. Please contact your child's teacher to schedule a 15-minute session.
+
+Conference hours: 8:00 AM - 12:00 PM and 3:00 PM - 6:00 PM daily.
+
+Holy Cross Academy
+4541 N Lavergne Ave, Chicago, IL 60630
+(773) 555-0300",2026-10-14T11:00:00-05:00,1791993600,1540,"INBOX,Label_Family",false,false
+msg_bg_007,thd_bg_006,hr@mcfr.gov,indira.hudson@voissync.ai,,Q4 Equipment Inspection Week — Oct 24-30,The Q4 Equipment Inspection Week is scheduled for October 24-30...,"All Station 47 Personnel,
+
+The Q4 Equipment Inspection Week is scheduled for October 24-30, 2026. All apparatus, SCBA units, PPE, and medical equipment must pass inspection. Engine 81 and Truck 27 are scheduled for full NFPA 1911 inspection.
+
+Key requirements:
+- All pump testing completed by Oct 27
+- SCBA flow tests Oct 24-25
+- PPE inventory due to Battalion by Oct 29
+
+Overtime shifts may be required during this period. See your Captain for scheduling details.
+
+MCFR Human Resources
+Division of Training & Safety",2026-10-15T08:30:00-05:00,1792071000,3120,"INBOX,Label_MCFR",false,false
+msg_bg_008,thd_bg_007,eddie.v.cfd@example.org,indira.hudson@voissync.ai,,Thursday shift?,You on Thursday? I was thinking about swapping with Kowalski...,"Hey Hudson,
+
+You on Thursday? I was thinking about swapping with Kowalski so I can take my kid to the dentist. But only if you're on — don't want to ride with a fill-in.
+
+Let me know.
+
+Eddie",2026-10-16T14:00:00-05:00,1792177200,1120,"INBOX,Label_MCFR",false,false
+msg_bg_009,thd_bg_007,indira.hudson@voissync.ai,eddie.v.cfd@example.org,,RE: Thursday shift?,Yeah I'm on Thursday. Go ahead and swap...,"Yeah I'm on Thursday. Go ahead and swap, I'll hold the fort.
+
+Tell Kowalski he better not touch my seat adjustment.",2026-10-16T16:30:00-05:00,1792186200,640,SENT,false,false

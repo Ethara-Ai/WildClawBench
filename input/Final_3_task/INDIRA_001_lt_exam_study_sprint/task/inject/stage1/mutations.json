@@ -1,0 +1,40 @@
+{
+  "stage": 1,
+  "stage_name": "day1_to_day2",
+  "description": "Stage 1 mutations for FIRE_EDU_001. Applied between Day 1 and Day 2.",
+  "applies_between_turns": [
+    "T12",
+    "T13"
+  ],
+  "task_id": "FIRE_EDU_001",
+  "persona": "Indira Hudson",
+  "mutations": {
+    "filesystem": [],
+    "api": [
+      {
+        "id": "M1-01",
+        "service": "gmail-api",
+        "method": "POST",
+        "path": "/v1/health-init",
+        "description": "Initialise gmail-api session for stage 1",
+        "expected_response": 200
+      },
+      {
+        "id": "M1-02",
+        "service": "google-calendar-api",
+        "method": "POST",
+        "path": "/v1/health-init",
+        "description": "Initialise google-calendar-api session for stage 1",
+        "expected_response": 200
+      },
+      {
+        "id": "M1-03",
+        "service": "google-drive-api",
+        "method": "POST",
+        "path": "/v1/health-init",
+        "description": "Initialise google-drive-api session for stage 1",
+        "expected_response": 200
+      }
+    ]
+  }
+}

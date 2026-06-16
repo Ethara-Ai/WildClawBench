@@ -1,0 +1,40 @@
+[
+  {
+    "id": "inv_jankowski",
+    "customer_id": "cust_jankowski",
+    "doc_number": "WH-2026-061",
+    "txn_date": "2026-10-03",
+    "due_date": "2026-10-03",
+    "status": "paid",
+    "total_amount_pln": 1200.0,
+    "memo": "English bracket clock c.1870 - full restoration",
+    "line_items": [
+      {
+        "item_id": "itm_restoration",
+        "description": "Bracket clock restoration",
+        "quantity": 1,
+        "unit_price_pln": 1200.0,
+        "amount_pln": 1200.0
+      }
+    ]
+  },
+  {
+    "id": "inv_mazur",
+    "customer_id": "cust_mazur",
+    "doc_number": "WH-2026-062",
+    "txn_date": "2026-10-04",
+    "due_date": "2026-10-04",
+    "status": "sent",
+    "total_amount_pln": 950.0,
+    "memo": "French mantel clock c.1890 - restoration",
+    "line_items": [
+      {
+        "item_id": "itm_restoration",
+        "description": "Mantel clock restoration",
+        "quantity": 1,
+        "unit_price_pln": 950.0,
+        "amount_pln": 950.0
+      }
+    ]
+  }
+]

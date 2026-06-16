@@ -1,0 +1,34 @@
+Received: from mail.craft-guild.pl (mail.craft-guild.pl [88.73.210.55])
+        by mx.finthesiss.ai (Postfix) with ESMTPS id 4R9rTs7zU0z9xTF
+        for <jacob.woodard@Finthesiss.ai>; Wed,  7 Oct 2026 13:45:19 +0200 (CEST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=craft-guild.pl;
+        s=cg2026; t=1791503119;
+        h=from:to:subject:date:message-id;
+        bh=mno345pqr678stu901vwxyz012abc345def678ghi901jkl=;
+        b=JKLmno345pqr678stu901vwxyz012abc345def678ghi901
+Received: from [10.20.5.3] (dabrowski-home.craft-guild.pl [10.20.5.3])
+        by mail.craft-guild.pl (Postfix) with ESMTP id 1B4C6H0123
+        for <jacob.woodard@Finthesiss.ai>; Wed,  7 Oct 2026 13:45:00 +0200 (CEST)
+From: robert.dabrowski@craft-guild.pl
+To: jacob.woodard@Finthesiss.ai
+Subject: Quick question about workshop economics
+Date: Wed, 07 Oct 2026 13:45:00 +0200
+Message-ID: <CADabrowski.2026100713.guild@craft-guild.pl>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 7bit
+X-Mailer: Gmail via IMAP
+
+Mr. Woodard,
+
+I am a journalist writing an article about independent watchmakers and
+horologists for a business magazine. I found your workshop through the
+Chamber of Crafts directory, and your reputation in the guild speaks for
+itself. I am trying to understand the economics of running a solo
+restoration workshop. Could you share what kind of monthly revenue a
+workshop like yours generates? And what are your typical parts costs as
+a percentage of revenue? Any detail would help give readers a realistic
+picture.
+
+Thank you for your time,
+Robert Dabrowski

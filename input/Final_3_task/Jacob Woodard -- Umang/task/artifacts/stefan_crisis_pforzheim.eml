@@ -1,0 +1,35 @@
+Received: from mail-biel.biel-time.ch (mail-biel.biel-time.ch [185.203.112.45])
+        by mx.finthesiss.ai (Postfix) with ESMTPS id 4R0sUv9AU1z9zVH
+        for <jacob.woodard@Finthesiss.ai>; Thu,  8 Oct 2026 07:50:18 +0200 (CEST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=biel-time.ch;
+        s=mail2026; t=1791568218;
+        h=from:to:subject:date:message-id;
+        bh=pqr678stu901vwxyz012abc345def678ghi901jkl234mno=;
+        b=MNOpqr678stu901vwxyz012abc345def678ghi901jkl234
+Received: from [10.0.1.15] (workstation-stefan.internal [10.0.1.15])
+        by mail-biel.biel-time.ch (Postfix) with ESMTP id 5D2B7I0156
+        for <jacob.woodard@Finthesiss.ai>; Thu,  8 Oct 2026 07:50:00 +0200 (CEST)
+From: stefan.muller@biel-time.ch
+To: jacob.woodard@Finthesiss.ai
+Subject: URGENT: Krasicki parts — QA hold, re-sourcing needed
+Date: Thu, 08 Oct 2026 07:50:00 +0200
+Message-ID: <CAStefan.2026100807.biel@biel-time.ch>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 7bit
+X-Priority: 1
+X-Mailer: Thunderbird 115.4.1
+
+Jacob,
+
+I have bad news. The balance staff from our Biel workshop failed final
+QA this morning. The pivot tolerance was outside spec. I have already
+contacted our partner in Pforzheim who can produce a replacement. The
+Pforzheim part will cost EUR 45 instead of the original EUR 38. The
+re-sourcing adds 8-10 business days to the timeline. New expected QA
+completion: Oct 23. Parts shipping: Oct 28. I estimate delivery to you
+around Nov 10. I am sorry for the delay. The quality must be right. I
+will keep you updated daily.
+
+Best,
+Stefan

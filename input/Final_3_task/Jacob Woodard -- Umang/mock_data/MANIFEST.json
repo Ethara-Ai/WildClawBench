@@ -1,0 +1,166 @@
+{
+  "task_id": "JACOB_001_krasicki_delivery_crisis",
+  "generated_at_utc": "2026-06-07T13:00:00+00:00",
+  "persona": "Jacob Woodard",
+  "scenario_window": "2026-10-06T06:00:00+02:00 / 2026-10-09T18:00:00+02:00",
+  "baseline_snapshot_time": "2026-10-06T05:59:00+02:00",
+  "services": [
+    "airtable-api",
+    "amadeus-api",
+    "bamboohr-api",
+    "box-api",
+    "confluence-api",
+    "docusign-api",
+    "dropbox-api",
+    "eventbrite-api",
+    "fedex-api",
+    "gmail-api",
+    "google-calendar-api",
+    "gusto-api",
+    "hubspot-api",
+    "linear-api",
+    "notion-api",
+    "obsidian-api",
+    "quickbooks-api",
+    "slack-api",
+    "square-api",
+    "trello-api",
+    "whatsapp-api"
+  ],
+  "files": {
+    "airtable-api": [
+      "mock_data/airtable-api/bases.csv",
+      "mock_data/airtable-api/fields.csv",
+      "mock_data/airtable-api/records_parts.csv",
+      "mock_data/airtable-api/records_shipping.csv",
+      "mock_data/airtable-api/records_suppliers.csv",
+      "mock_data/airtable-api/tables.csv"
+    ],
+    "amadeus-api": [
+      "mock_data/amadeus-api/airlines.csv",
+      "mock_data/amadeus-api/airports.csv",
+      "mock_data/amadeus-api/flight_offers.json"
+    ],
+    "bamboohr-api": [
+      "mock_data/bamboohr-api/company.json",
+      "mock_data/bamboohr-api/employees.csv",
+      "mock_data/bamboohr-api/time_off_requests.csv",
+      "mock_data/bamboohr-api/trainings.csv",
+      "mock_data/bamboohr-api/whos_out.csv"
+    ],
+    "box-api": [
+      "mock_data/box-api/files.csv",
+      "mock_data/box-api/folders.csv",
+      "mock_data/box-api/users.csv"
+    ],
+    "confluence-api": [
+      "mock_data/confluence-api/comments.csv",
+      "mock_data/confluence-api/labels.csv",
+      "mock_data/confluence-api/pages.csv",
+      "mock_data/confluence-api/spaces.csv"
+    ],
+    "docusign-api": [
+      "mock_data/docusign-api/documents.csv",
+      "mock_data/docusign-api/envelopes.csv",
+      "mock_data/docusign-api/recipients.csv",
+      "mock_data/docusign-api/templates.csv"
+    ],
+    "dropbox-api": [
+      "mock_data/dropbox-api/account.csv",
+      "mock_data/dropbox-api/files.csv",
+      "mock_data/dropbox-api/shared_links.csv"
+    ],
+    "eventbrite-api": [
+      "mock_data/eventbrite-api/attendees.csv",
+      "mock_data/eventbrite-api/events.csv",
+      "mock_data/eventbrite-api/organizations.csv",
+      "mock_data/eventbrite-api/ticket_classes.csv",
+      "mock_data/eventbrite-api/venues.csv"
+    ],
+    "fedex-api": [
+      "mock_data/fedex-api/rates.csv",
+      "mock_data/fedex-api/shipments.csv",
+      "mock_data/fedex-api/tracking.csv"
+    ],
+    "gmail-api": [
+      "mock_data/gmail-api/drafts.csv",
+      "mock_data/gmail-api/labels.csv",
+      "mock_data/gmail-api/messages.csv",
+      "mock_data/gmail-api/profile.json"
+    ],
+    "google-calendar-api": [
+      "mock_data/google-calendar-api/calendars.csv",
+      "mock_data/google-calendar-api/event_attendees.csv",
+      "mock_data/google-calendar-api/events.csv"
+    ],
+    "gusto-api": [
+      "mock_data/gusto-api/company.json",
+      "mock_data/gusto-api/compensations.csv",
+      "mock_data/gusto-api/contractors.csv",
+      "mock_data/gusto-api/employees.csv",
+      "mock_data/gusto-api/payrolls.csv"
+    ],
+    "hubspot-api": [
+      "mock_data/hubspot-api/companies.csv",
+      "mock_data/hubspot-api/contacts.csv",
+      "mock_data/hubspot-api/deals.csv",
+      "mock_data/hubspot-api/pipeline_stages.csv"
+    ],
+    "linear-api": [
+      "mock_data/linear-api/issues.csv",
+      "mock_data/linear-api/projects.csv",
+      "mock_data/linear-api/teams.csv",
+      "mock_data/linear-api/users.csv",
+      "mock_data/linear-api/workflow_states.csv"
+    ],
+    "notion-api": [
+      "mock_data/notion-api/blocks.csv",
+      "mock_data/notion-api/comments.csv",
+      "mock_data/notion-api/databases.csv",
+      "mock_data/notion-api/page_properties.csv",
+      "mock_data/notion-api/pages.csv",
+      "mock_data/notion-api/users.csv",
+      "mock_data/notion-api/workspace.json"
+    ],
+    "obsidian-api": [
+      "mock_data/obsidian-api/note_contents.csv",
+      "mock_data/obsidian-api/notes.csv",
+      "mock_data/obsidian-api/vault.json"
+    ],
+    "quickbooks-api": [
+      "mock_data/quickbooks-api/accounts.csv",
+      "mock_data/quickbooks-api/bills.json",
+      "mock_data/quickbooks-api/company.json",
+      "mock_data/quickbooks-api/customers.csv",
+      "mock_data/quickbooks-api/invoices.json",
+      "mock_data/quickbooks-api/items.csv"
+    ],
+    "slack-api": [
+      "mock_data/slack-api/channels.csv",
+      "mock_data/slack-api/messages.csv",
+      "mock_data/slack-api/team.json",
+      "mock_data/slack-api/users.csv"
+    ],
+    "square-api": [
+      "mock_data/square-api/catalog_items.csv",
+      "mock_data/square-api/customers.csv",
+      "mock_data/square-api/merchant.json",
+      "mock_data/square-api/orders.csv",
+      "mock_data/square-api/payments.csv"
+    ],
+    "trello-api": [
+      "mock_data/trello-api/boards.csv",
+      "mock_data/trello-api/cards.csv",
+      "mock_data/trello-api/lists.csv",
+      "mock_data/trello-api/members.csv"
+    ],
+    "whatsapp-api": [
+      "mock_data/whatsapp-api/business.json",
+      "mock_data/whatsapp-api/contacts.csv",
+      "mock_data/whatsapp-api/conversations.csv",
+      "mock_data/whatsapp-api/messages.csv",
+      "mock_data/whatsapp-api/templates.csv"
+    ]
+  },
+  "notes": "These files represent the PRE-mutation persona-baseline state as of 2026-10-06T05:59 CET (before Day-1 T0). Silent mutations SM1-SM10 applied by task/inject/stage1-stage3 drift specific records from these canonical values (e.g. airtable KR-001 mainspring qty 3->5, SC-003 balance staff 0.86->0.84mm, box Radziwill file renames, dropbox ch4 Gniezno 1798->1802). Loud in-turn injects are delivered via wake-up messages in task.py. Distractor service spotify-api and not-connected baits (museum-internal-db, pko-direct-banking) are intentionally absent from this directory."
+}

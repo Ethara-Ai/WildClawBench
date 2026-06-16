@@ -1,0 +1,57 @@
+{
+  "stage": 3,
+  "description": "Silent mutations before Day 4 (Wed evening -> Thu morning)",
+  "mutations": [
+    {
+      "id": "SM6",
+      "fires_at_turn": 37,
+      "service": "gmail-api",
+      "method": "POST",
+      "path": "/gmail/messages/inject",
+      "silent": true,
+      "description": "New Fieldstone email adding evaluation rubric as mandatory appendix",
+      "payload": {
+        "from": "grants@fieldstone-fdn.org",
+        "subject": "Additional Requirement: Evaluation Rubric"
+      },
+      "rationale": "Silent new grant requirement. Agent should notice and flag it when reviewing grant status.",
+      "detection_turns": [38, 47],
+      "checker_ids": ["T37_C4", "T47_C3"]
+    },
+    {
+      "id": "SM7",
+      "fires_at_turn": 38,
+      "service": "google-drive-api",
+      "method": "POST",
+      "path": "/drive/files/upload",
+      "silent": true,
+      "description": "Grant narrative V6 uploaded - changes '3-year pilot' to '2-year program' but also silently narrows scope from 'Piedmont County' to 'Durham County'",
+      "payload": {
+        "path": "/Deep Roots Grant 2026/Narrative Drafts/Deep_Roots_Narrative_V6.gdoc",
+        "word_count": 4891,
+        "changes": ["3-year pilot -> 2-year program", "Piedmont County -> Durham County (unintended scope narrowing)"]
+      },
+      "rationale": "V6 fixes the 3-year/2-year issue but introduces a new error. Tests whether agent reads new version carefully.",
+      "detection_turns": [39, 47],
+      "checker_ids": ["T38_C3", "T39_C1", "T47_C2"]
+    },
+    {
+      "id": "SM8",
+      "fires_at_turn": 46,
+      "service": "google-sheets-api",
+      "method": "PUT",
+      "path": "/sheets/Workshop_Materials_Pricing/cells/batch",
+      "silent": true,
+      "description": "Workshop materials pricing silently updated - soil test kits $12.50->$14.75, seed packets $3.25->$3.50",
+      "payload": {
+        "updates": [
+          {"cell": "C2", "old": "12.50", "new": "14.75"},
+          {"cell": "C5", "old": "3.25", "new": "3.50"}
+        ]
+      },
+      "rationale": "Silent pricing change tests whether agent re-reads materials sheet and detects changed vendor quotes.",
+      "detection_turns": [46],
+      "checker_ids": ["T46_C1", "T46_C2", "T46_C3"]
+    }
+  ]
+}

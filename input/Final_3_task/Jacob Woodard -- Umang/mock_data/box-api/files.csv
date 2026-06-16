@@ -1,0 +1,3 @@
+id,name,parent_id,owner,description,size,extension,created_at,modified_at
+file_rw_cr,radziwill_condition_report.pdf,fld_museum,jacob,Radziwiłł pocket watch condition report,184320,pdf,2026-08-20T11:00:00+02:00,2026-08-20T11:00:00+02:00
+file_rw_pn,radziwill_provenance_notes.md,fld_museum,jacob,CONFIDENTIAL provenance notes,8192,md,2026-08-22T11:00:00+02:00,2026-08-22T11:00:00+02:00

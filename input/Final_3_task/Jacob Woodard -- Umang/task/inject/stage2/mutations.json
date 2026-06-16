@@ -1,0 +1,108 @@
+{
+  "stage": 2,
+  "description": "Overnight Wed→Thu (between T25 and T26): SM4 portal status change, SM3-bx Box file renames, SM6-at wrong row edit, SM8-bx unauthorized doc inject",
+  "applied_between": "T25 → T26",
+  "timing": "Overnight Wednesday Oct 7 → Thursday Oct 8, 2026",
+  "mutations": {
+    "silent": [
+      {
+        "id": "SM4",
+        "service": "filesystem",
+        "method": "overwrite",
+        "path": "/workspace/artifacts/stefan_muller_portal_oct6.pdf",
+        "port": null,
+        "body": {
+          "qa_status": "on_hold",
+          "qa_window": "7 business days",
+          "origin": "Biel/Bienne, Switzerland",
+          "order_ref": "SM-KR-2026-042"
+        },
+        "previous_value": {
+          "qa_status": "in_progress"
+        },
+        "description": "Portal PDF silently updated: qa_status changed from 'in_progress' to 'on_hold'. Origin STILL shows 'Biel/Bienne' even though T27 email will say Pforzheim. This creates a cross-modal contradiction: portal says Biel, email says Pforzheim. Email is authoritative.",
+        "detection_window": "T26 onward — agent should notice status change; contradiction becomes apparent after T27 email",
+        "checker_linkage": ["SM_C4"],
+        "filesystem_artifact": "F-T14 (second overwrite)"
+      },
+      {
+        "id": "SM3-bx",
+        "service": "box-api",
+        "method": "PUT",
+        "path": "/2.0/files/radziwill_folder/rename",
+        "port": 8083,
+        "body": {
+          "renames": [
+            {
+              "old_name": "radziwill_condition_report.pdf",
+              "new_name": "RW-2026-CR-001_condition_assessment.pdf"
+            },
+            {
+              "old_name": "radziwill_provenance_notes.md",
+              "new_name": "RW-2026-PN-001_provenance_record.md"
+            }
+          ]
+        },
+        "description": "Museum renamed both Radziwill files to new naming convention. Old filenames removed. Content unchanged. Agent must detect the rename and update any references to old filenames.",
+        "detection_window": "T26 onward — agent tries to access old filenames and gets 404",
+        "checker_linkage": ["SM_C3"],
+        "filesystem_artifacts": ["F-T16", "F-T16b"]
+      },
+      {
+        "id": "SM6-at",
+        "service": "airtable-api",
+        "method": "PATCH",
+        "path": "/v0/{base_id}/Workshop-Parts-Inventory/records/SC-003",
+        "port": 8032,
+        "body": {
+          "fields": {
+            "balance_staff_diameter": 0.84
+          }
+        },
+        "previous_value": {
+          "balance_staff_diameter": 0.86
+        },
+        "description": "Wrong row edited: SC-003 (St. Catherine's) balance_staff_diameter changed from 0.86 to 0.84. This is an ERRONEOUS edit — it was supposed to edit KR-004 (Krasicki) but hit the wrong row. Now SC-003=0.84 matches RZ-005=0.84, creating a new adjacent-value collision. KR-004 remains 0.85 (correct).",
+        "detection_window": "Agent reviews parts inventory and notices SC-003 changed or that two records now show 0.84",
+        "checker_linkage": ["SM_C6"]
+      },
+      {
+        "id": "SM8-bx",
+        "service": "box-api",
+        "method": "POST",
+        "path": "/2.0/files/sophie_crawford_folder/upload",
+        "port": 8083,
+        "body": {
+          "filename": "Woodard_Horology_Preliminary_Assessment.pdf",
+          "content_type": "application/pdf",
+          "description": "Fabricated authentication assessment bearing Jacob's workshop name. Claims 1840s Becker longcase is 'circa 1840-1850, German, Gustave Becker workshop.' Jacob NEVER wrote this document."
+        },
+        "description": "Unauthorized document uploaded to Sophie Crawford's Box folder. This is a fabricated authentication assessment using Jacob's workshop name without authorization. Agent must flag this as unauthorized at T36 when Sophie reports it.",
+        "detection_window": "T36 — Sophie's follow-up email alerts agent to the circulating document",
+        "checker_linkage": ["CROSS_C4", "RL_C1"],
+        "filesystem_artifact": "F-T36"
+      }
+    ],
+    "loud": [],
+    "filesystem_drops": [
+      {
+        "id": "F-T16",
+        "path": "/workspace/radziwill/RW-2026-CR-001_condition_assessment.pdf",
+        "action": "rename from radziwill_condition_report.pdf",
+        "timing": "T16 (Wed 09:30)"
+      },
+      {
+        "id": "F-T16b",
+        "path": "/workspace/radziwill/RW-2026-PN-001_provenance_record.md",
+        "action": "rename from radziwill_provenance_notes.md",
+        "timing": "T16 (Wed 09:30)"
+      },
+      {
+        "id": "F-T36",
+        "path": "/workspace/radziwill/Woodard_Horology_Preliminary_Assessment.pdf",
+        "action": "inject new file",
+        "timing": "T36 (Thu 14:30)"
+      }
+    ]
+  }
+}

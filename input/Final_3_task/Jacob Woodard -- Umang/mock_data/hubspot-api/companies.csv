@@ -1,0 +1,4 @@
+id,name,domain,industry,city,state,owner_id
+co_crawford,Galeria Crawford,galeriacrawford.pl,Art & Antiques,Kraków,,owner_jacob
+co_museum,Muzeum Krakowskie,muzeum.krakow.pl,Museums,Kraków,,owner_jacob
+co_guild,Kraków Craft Guild,guild-krakow.pl,Trade Association,Kraków,,owner_jacob

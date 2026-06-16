@@ -1,0 +1,14 @@
+id,name,path,parent_id,owner_email,created_at,modified_at,shared
+fld_root,My Drive,/,,gloria.wiggins@voissync.ai,2024-08-12T00:00:00Z,2026-10-04T08:00:00Z,False
+fld_deep_roots_2026,Deep Roots Grant 2026,/Deep Roots Grant 2026,fld_root,gloria.wiggins@voissync.ai,2026-08-15T09:00:00Z,2026-10-04T08:00:00Z,True
+fld_narrative_drafts,Narrative Drafts,/Deep Roots Grant 2026/Narrative Drafts,fld_deep_roots_2026,gloria.wiggins@voissync.ai,2026-08-15T09:00:00Z,2026-10-02T17:00:00Z,True
+fld_budget_docs,Budget Documents,/Deep Roots Grant 2026/Budget Documents,fld_deep_roots_2026,gloria.wiggins@voissync.ai,2026-08-15T09:00:00Z,2026-10-04T16:00:00Z,True
+fld_letters_support,Letters of Support,/Deep Roots Grant 2026/Letters of Support,fld_deep_roots_2026,gloria.wiggins@voissync.ai,2026-08-15T09:00:00Z,2026-09-22T10:00:00Z,True
+fld_community_data,Community Data,/Deep Roots Grant 2026/Community Data,fld_deep_roots_2026,gloria.wiggins@voissync.ai,2026-08-15T09:00:00Z,2026-10-01T18:00:00Z,True
+fld_appendices,Appendices,/Deep Roots Grant 2026/Appendices,fld_deep_roots_2026,gloria.wiggins@voissync.ai,2026-08-15T09:00:00Z,2026-09-15T09:00:00Z,True
+fld_field_data,Field Data,/Field Data,fld_root,gloria.wiggins@voissync.ai,2025-03-15T08:00:00Z,2026-09-28T11:00:00Z,True
+fld_grants_archive,Grants Archive,/Grants Archive,fld_root,gloria.wiggins@voissync.ai,2025-01-10T08:00:00Z,2026-09-01T08:00:00Z,False
+fld_workshops_archive,Workshops Archive,/Workshops Archive,fld_root,gloria.wiggins@voissync.ai,2024-09-20T08:00:00Z,2026-09-15T08:00:00Z,False
+fld_herbalism_notes,Herbalism Notes,/Herbalism Notes,fld_root,gloria.wiggins@voissync.ai,2024-08-15T08:00:00Z,2026-09-22T17:00:00Z,False
+fld_extension_reports,Extension Reports,/Extension Reports,fld_root,gloria.wiggins@voissync.ai,2024-11-01T08:00:00Z,2026-09-30T08:00:00Z,False
+fld_personal_admin,Personal Admin,/Personal Admin,fld_root,gloria.wiggins@voissync.ai,2024-08-12T00:00:00Z,2026-08-12T08:00:00Z,False

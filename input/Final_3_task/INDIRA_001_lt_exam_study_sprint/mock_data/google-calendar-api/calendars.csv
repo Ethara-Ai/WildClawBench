@@ -1,0 +1,4 @@
+id,summary,description,time_zone,access_role,primary,color_id
+primary,Indira Hudson,,America/Chicago,owner,true,1
+cal_family,Hudson Family,Shared family calendar,America/Chicago,writer,false,4
+cal_mcfr,MCFR Station 47,Station schedule and events,America/Chicago,reader,false,9

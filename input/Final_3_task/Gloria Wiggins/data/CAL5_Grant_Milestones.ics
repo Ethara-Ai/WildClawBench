@@ -1,0 +1,14 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Gloria Wiggins//Deep Roots//EN
+BEGIN:VEVENT
+UID:566BCA3D-B1EE-4775-81B7-6790ED4001E8
+DTSTAMP:20261005T070000Z
+DTSTART;TZID=America/New_York:20261014T170000
+DTEND;TZID=America/New_York:20261014T173000
+SUMMARY:DEADLINE: Grant Narrative Draft to Hawkins
+LOCATION:
+DESCRIPTION:Grant milestones:\n- Oct 14: Narrative draft to Dr. Hawkins for internal review\n- Oct 14: Budget finalization\n- Oct 17: Harvest Day event\n- Oct 24: Letters of support due\n- Oct 30: Final submission deadline to Fieldstone Foundation
+STATUS:CONFIRMED
+END:VEVENT
+END:VCALENDAR

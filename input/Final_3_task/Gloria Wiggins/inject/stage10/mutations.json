@@ -1,0 +1,49 @@
+{
+  "stage": 10,
+  "stage_name": "before_T46",
+  "description": "Auto-rewritten from original stage3.json \u2014 applies before T46.",
+  "applies_between_turns": [
+    "T45",
+    "T46"
+  ],
+  "mutations": {
+    "silent": [
+      {
+        "id": "SM8",
+        "service": "google-sheets-api",
+        "silent": true,
+        "description": "Materials: C2 12.50\u219214.75 + C5 3.25\u21923.50",
+        "admin": {
+          "op": "update_where",
+          "table": "cells_materials",
+          "where": {
+            "sheet_id": "sh_materials_main",
+            "cell": "C2"
+          },
+          "set": {
+            "value": "14.75"
+          }
+        }
+      },
+      {
+        "id": "SM8b",
+        "service": "google-sheets-api",
+        "silent": true,
+        "description": "Materials: C5 3.25\u21923.50 (companion of SM8)",
+        "admin": {
+          "op": "update_where",
+          "table": "cells_materials",
+          "where": {
+            "sheet_id": "sh_materials_main",
+            "cell": "C5"
+          },
+          "set": {
+            "value": "3.50"
+          }
+        }
+      }
+    ],
+    "filesystem": [],
+    "loud": []
+  }
+}

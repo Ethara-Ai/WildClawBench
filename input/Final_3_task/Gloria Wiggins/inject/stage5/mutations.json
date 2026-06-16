@@ -1,0 +1,29 @@
+{
+  "stage": 5,
+  "stage_name": "before_T35",
+  "description": "Auto-rewritten from original stage2.json \u2014 applies before T35.",
+  "applies_between_turns": [
+    "T34",
+    "T35"
+  ],
+  "mutations": {
+    "silent": [
+      {
+        "id": "SM5",
+        "service": "google-contacts-api",
+        "silent": true,
+        "description": "Darnell email changed to d.washington@\u2026",
+        "admin": {
+          "op": "patch",
+          "table": "contacts",
+          "pk": "ct_darnell",
+          "set": {
+            "email_primary": "d.washington@piedmont-extension.edu"
+          }
+        }
+      }
+    ],
+    "filesystem": [],
+    "loud": []
+  }
+}

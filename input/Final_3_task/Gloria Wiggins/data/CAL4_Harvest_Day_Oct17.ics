@@ -1,0 +1,14 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Gloria Wiggins//Deep Roots//EN
+BEGIN:VEVENT
+UID:B86A5E07-B77E-42B7-B818-BFD1E9A64C77
+DTSTAMP:20261005T070000Z
+DTSTART;TZID=America/New_York:20261017T080000
+DTEND;TZID=America/New_York:20261017T170000
+SUMMARY:Deep Roots Harvest Day
+LOCATION:Heritage Oak Community Center - Main Pavilion
+DESCRIPTION:Annual Harvest Day celebration. 50+ volunteers expected. Setup 7 AM, program 9 AM-4 PM, cleanup 4-5 PM. Includes: welcome/land acknowledgment (Gloria), harvest demo (James Thompson), seed saving station (Patricia Sawyer), children's activity (Brandon/Eastway Middle). Community meal at noon. Coordinator: Dorothy Mae Jenkins (volunteers).
+STATUS:CONFIRMED
+END:VEVENT
+END:VCALENDAR

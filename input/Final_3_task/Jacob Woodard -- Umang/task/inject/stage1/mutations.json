@@ -1,0 +1,51 @@
+{
+  "stage": 1,
+  "description": "Overnight Tue→Wed (between T12 and T13): SM1 Airtable mainspring qty change, SM2 portal QA window change",
+  "applied_between": "T12 → T13",
+  "timing": "Overnight Tuesday Oct 6 → Wednesday Oct 7, 2026",
+  "mutations": {
+    "silent": [
+      {
+        "id": "SM1",
+        "service": "airtable-api",
+        "method": "PATCH",
+        "path": "/v0/{base_id}/Workshop-Parts-Inventory/records/KR-001",
+        "port": 8032,
+        "body": {
+          "fields": {
+            "qty": 5,
+            "last_modified_by": "mark.jennings"
+          }
+        },
+        "previous_value": {
+          "qty": 3,
+          "last_modified_by": "jacob.woodard"
+        },
+        "description": "Mark changed KR-001 (mainspring) quantity from 3 to 5 overnight without explanation. Agent must detect the discrepancy and reconcile. Original order was qty=3, parts budget PLN 2,800 assumed qty=3.",
+        "detection_window": "T13 onward — agent should notice when reviewing parts inventory or reconciling budget",
+        "checker_linkage": ["SM_C1"]
+      },
+      {
+        "id": "SM2",
+        "service": "filesystem",
+        "method": "overwrite",
+        "path": "/workspace/artifacts/stefan_muller_portal_oct6.pdf",
+        "port": null,
+        "body": {
+          "qa_window": "7 business days",
+          "qa_status": "in_progress",
+          "origin": "Biel/Bienne, Switzerland",
+          "order_ref": "SM-KR-2026-042"
+        },
+        "previous_value": {
+          "qa_window": "5 business days"
+        },
+        "description": "Portal PDF silently updated: qa_window changed from '5 business days' to '7 business days'. File timestamp NOT updated — same modification date as original. All other fields unchanged. Agent must detect the discrepancy between T1 email (5 days) and portal (now 7 days).",
+        "detection_window": "T14 onward — agent should notice when cross-referencing Stefan's T1 email (5 days) against portal",
+        "checker_linkage": ["SM_C2"],
+        "filesystem_artifact": "F-T14"
+      }
+    ],
+    "loud": []
+  }
+}

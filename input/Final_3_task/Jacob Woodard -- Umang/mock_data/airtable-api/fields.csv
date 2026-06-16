@@ -1,0 +1,11 @@
+id,table_id,name,type
+fld_p1,tbl_parts,part_id,singleLineText
+fld_p2,tbl_parts,description,singleLineText
+fld_p3,tbl_parts,commission,singleLineText
+fld_p4,tbl_parts,quantity,number
+fld_p5,tbl_parts,diameter_mm,number
+fld_p6,tbl_parts,status,singleSelect
+fld_s1,tbl_suppliers,supplier_name,singleLineText
+fld_s2,tbl_suppliers,account_terms,singleLineText
+fld_h1,tbl_shipping,shipment_id,singleLineText
+fld_h2,tbl_shipping,status,singleSelect

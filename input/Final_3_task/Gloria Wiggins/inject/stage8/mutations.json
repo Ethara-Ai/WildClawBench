@@ -1,0 +1,42 @@
+{
+  "stage": 8,
+  "stage_name": "before_T41",
+  "description": "Auto-rewritten from original stage2.json \u2014 applies before T41.",
+  "applies_between_turns": [
+    "T40",
+    "T41"
+  ],
+  "mutations": {
+    "silent": [
+      {
+        "id": "E10",
+        "service": "gmail-api",
+        "silent": true,
+        "description": "NC Ag Lab revised soil analysis (nitrogen=35 ppm)",
+        "admin": {
+          "op": "upsert",
+          "table": "messages",
+          "pk_field": "id",
+          "row": {
+            "id": "m_e10_ncaglab_revised",
+            "thread_id": "thr_e10_ncaglab",
+            "from_addr": "NC Agricultural Lab <results@ncaglab.unc.edu>",
+            "to_addr": "Gloria Wiggins <gloria.wiggins@voissync.ai>",
+            "cc_addr": "",
+            "subject": "REVISED: Soil Analysis Piedmont 2026 (corrigendum)",
+            "snippet": "Updated nitrogen value for Mitchell Road: 35 ppm (supersedes prior 42 ppm).",
+            "body": "Updated nitrogen value for Mitchell Road: 35 ppm (supersedes prior 42 ppm).",
+            "date": "2026-10-09T15:00:00-04:00",
+            "internal_date": "1791572400000",
+            "size_estimate": "100",
+            "labels": "INBOX",
+            "is_unread": "True",
+            "is_starred": "False"
+          }
+        }
+      }
+    ],
+    "filesystem": [],
+    "loud": []
+  }
+}

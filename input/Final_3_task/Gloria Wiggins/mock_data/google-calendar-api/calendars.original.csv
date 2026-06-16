@@ -1,0 +1,7 @@
+id,summary,description,timeZone,primary,accessRole
+primary,Gloria Wiggins,Gloria's primary work calendar,America/New_York,True,owner
+cal_family,Wiggins Family,Family events and gatherings,America/New_York,False,owner
+cal_field,Field Visits,Farm visits and field work,America/New_York,False,owner
+cal_grant,Deep Roots Grant,Grant milestones and deadlines,America/New_York,False,owner
+cal_herbalism,Herbalism Practice,Herbalism sessions with Grandma Bernice,America/New_York,False,owner
+cal_workshops,Workshops & Community,Heritage Oak and extension workshops,America/New_York,False,owner

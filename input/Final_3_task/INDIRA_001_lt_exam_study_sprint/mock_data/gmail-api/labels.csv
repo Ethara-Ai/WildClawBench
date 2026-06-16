@@ -1,0 +1,9 @@
+id,name,type,messages_total,messages_unread,threads_total,threads_unread
+INBOX,INBOX,system,312,8,198,5
+SENT,SENT,system,547,0,389,0
+DRAFT,DRAFT,system,2,0,2,0
+STARRED,STARRED,system,28,2,19,1
+TRASH,TRASH,system,11,0,8,0
+Label_MCFR,MCFR,user,124,3,68,2
+Label_LtExam,Lt Exam Prep,user,47,2,31,1
+Label_Family,Family,user,86,1,52,1

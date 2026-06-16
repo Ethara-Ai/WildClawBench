@@ -1,2 +1,2 @@
-id,Order ID,Client ref,Line item,Price EUR,Deposit EUR,Deposit status,Status,Expected delivery,Last updated,Notify by email
-rec_mue_2026_0918,MUE-2026-0918,WH-2026-029,"Hand-forged escape wheel, 1820s Polish longcase",668.00,322.50,paid 2026-09-18,in production - revised,2026-11-09,2026-10-21T21:40:00+02:00,false
+id,createdTime,Order ID,Client ref,Line item,Price EUR,Deposit EUR,Deposit status,Status,Expected delivery,Last updated,Notify by email
+rec_mue_2026_0918,2026-09-18T00:00:00.000Z,MUE-2026-0918,WH-2026-029,"Hand-forged escape wheel, 1820s Polish longcase",668.00,322.50,paid 2026-09-18,in production - revised,2026-11-09,2026-10-21T21:40:00+02:00,false

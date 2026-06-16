@@ -1,0 +1,8 @@
+id,calendar_id,summary,description,start,end,location,status,recurring_rule,organizer,visibility
+evt_nowak,cal_workshop,Consultation - Nowak carriage clock,"Prospective client, carriage clock consultation",2026-10-06T14:00:00+02:00,2026-10-06T15:00:00+02:00,"Woodard Horology, Kazimierz",confirmed,,jacob.woodard@Finthesiss.ai,default
+evt_jankowski,cal_workshop,Pickup - Jankowski bracket clock,"Completed restoration, total PLN 1,200",2026-10-08T10:00:00+02:00,2026-10-08T10:30:00+02:00,"Woodard Horology, Kazimierz",confirmed,,jacob.woodard@Finthesiss.ai,default
+evt_mazur,cal_workshop,Pickup - Mazur mantel clock,"Completed restoration, total PLN 950",2026-10-08T11:00:00+02:00,2026-10-08T11:30:00+02:00,"Woodard Horology, Kazimierz",confirmed,,jacob.woodard@Finthesiss.ai,default
+evt_henry,cal_jacob,Lunch with Henry,Linden Table,2026-10-09T13:00:00+02:00,2026-10-09T14:30:00+02:00,Linden Table,confirmed,,jacob.woodard@Finthesiss.ai,private
+evt_fair,cal_jacob,Wrocław Antique Fair,"Exhibitor - Woodard Horology, table 14; train 07:15 Kraków Główny",2026-10-10T09:00:00+02:00,2026-10-10T17:00:00+02:00,Wrocław,confirmed,,jacob.woodard@Finthesiss.ai,default
+evt_guild,cal_jacob,Guild Meeting - Restoration Ethics,Presentation on restoration ethics,2026-10-21T18:00:00+02:00,2026-10-21T20:00:00+02:00,"Floriańska rooms, Kraków",confirmed,,jacob.woodard@Finthesiss.ai,default
+evt_katherine,cal_jacob,Katherine visiting,"Arrives ~noon, James driving; staying through 2 November",2026-10-31T12:00:00+02:00,2026-11-02T18:00:00+02:00,Home,confirmed,,jacob.woodard@Finthesiss.ai,private

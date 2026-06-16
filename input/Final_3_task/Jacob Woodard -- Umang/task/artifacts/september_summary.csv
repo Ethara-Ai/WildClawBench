@@ -1,0 +1,26 @@
+Category,Description,Amount (PLN),Date,Reference,Notes
+Building,Workshop rent - ulica Jozefa,1200.00,2026-09-01,RENT-2026-09,Monthly lease payment
+Supplies,Horological supplies and materials,2500.00,2026-09-05,SUP-2026-09,Mainsprings barrel arbors hairsprings misc
+Groceries,Household groceries - Ellen,1800.00,2026-09-07,GRO-2026-09,Monthly household food budget
+Utilities,Gas electric water,900.00,2026-09-10,UTL-2026-09,Combined utility bills
+Piano,Ellen piano lesson - Pani Kowalska,300.00,2026-09-12,PNO-2026-09,Monthly lesson fee
+Dining,Corner Diner and Linden Table,600.00,2026-09-15,DIN-2026-09,Wed lunch Corner Diner + Fri lunch Linden Table x4
+Health,Dr Wilk consultation + pharmacy,400.00,2026-09-18,HLT-2026-09,Quarterly check-up and prescriptions
+Phone,Mobile plan - Jacob + Ellen,180.00,2026-09-20,PHN-2026-09,Two lines monthly
+Transport,Tram pass + fuel,500.00,2026-09-22,TRN-2026-09,Monthly tram pass plus occasional taxi
+Guild,Krakow Horologists Guild dues,200.00,2026-09-25,GLD-2026-09,Monthly membership fee
+Insurance,Workshop liability insurance,350.00,2026-09-27,INS-2026-09,Monthly premium
+Misc,Miscellaneous workshop and household,600.00,2026-09-30,MSC-2026-09,Odds and ends
+,,,,,,
+TOTAL EXPENSES,,,9530.00,,,Sum of 12 categories
+,,,,,,
+REVENUE,Workshop revenue - September,18000.00,2026-09-30,REV-2026-09,Commissions restorations consultations
+,,,,,,
+NET,,,8470.00,,,Revenue minus expenses
+,,,,,,
+SUPPLIER INVOICES,,,,,,
+Supplier,Description,Currency,Amount (Foreign),FX Rate,Amount (PLN),Invoice Ref
+Stefan Muller (Biel),Krasicki parts - mainspring set,EUR,340.00,4.32,1468.80,INV-SM-2026-09-340
+Krakow Springs,Click springs + suspension springs,PLN,,1.00,380.00,INV-KS-2026-09-380
+Horological Supply Warsaw,Dial feet + winding keys,PLN,,1.00,220.00,INV-HSW-2026-09-220
+,,,,TOTAL SUPPLIER,2068.80,

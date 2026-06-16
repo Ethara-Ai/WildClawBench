@@ -1,0 +1,4 @@
+id,name,type,team_id
+st_todo,Todo,unstarted,team_wh
+st_prog,In Progress,started,team_wh
+st_done,Done,completed,team_wh

@@ -1,0 +1,4 @@
+event_id,email,display_name,response_status,optional
+evt_nowak,nowak.prospect@poczta.pl,Mr Nowak,accepted,False
+evt_guild,secretary@guild-krakow.pl,Guild Secretariat,accepted,False
+evt_katherine,katherine.woodard@nowaforma.pl,Katherine Woodard,accepted,False
