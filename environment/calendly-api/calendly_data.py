@@ -22,8 +22,10 @@ _store.register("scheduled_events", primary_key="uuid",
                 initial_loader=lambda: _coerce_scheduled_events(_load("scheduled_events.json", "scheduled_events")))
 _store.register("invitees", primary_key="uuid",
                 initial_loader=lambda: _coerce_invitees(_load("invitees.json", "invitees")))
-_store.register("availability", primary_key="owner",
-                initial_loader=lambda: _coerce_availability(_load("availability.json", "availability")))
+_store.register("availability", primary_key="_pk",
+                initial_loader=lambda: [
+                    {**r, "_pk": f"{r['owner']}@{r['weekday']}@{r['start_time']}"}
+                    for r in _coerce_availability(_load("availability.json", "availability"))])
 _store.register_document("user", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "user.json", encoding="utf-8")))
 
 
@@ -40,7 +42,7 @@ def _invitees_rows():
 
 
 def _availability_rows():
-    return _store.table("availability").rows()
+    return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("availability").rows()]
 
 
 def _user_doc():

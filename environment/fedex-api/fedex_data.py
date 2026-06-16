@@ -23,8 +23,11 @@ from _mutable_store import (
 _store = get_store("fedex-api")
 _API = "fedex-api"
 
-_store.register("rates", primary_key="service_type",
-                initial_loader=lambda: _coerce_rates(_load("rates.json", "rates")))
+# rates natural key (service_type, origin_zip, dest_zip, weight_lb) -> synth composite pk
+_store.register("rates", primary_key="_pk",
+                initial_loader=lambda: [
+                    {**r, "_pk": f"{r['service_type']}@{r['origin_zip']}@{r['dest_zip']}@{r['weight_lb']}"}
+                    for r in _coerce_rates(_load("rates.json", "rates"))])
 _store.register("shipments", primary_key="tracking_number",
                 initial_loader=lambda: _coerce_shipments(_load("shipments.json", "shipments")))
 _store.register("tracking", primary_key="tracking_number",
@@ -32,7 +35,7 @@ _store.register("tracking", primary_key="tracking_number",
 
 
 def _rates_rows():
-    return _store.table("rates").rows()
+    return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("rates").rows()]
 
 
 def _shipments_rows():

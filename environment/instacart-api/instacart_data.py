@@ -22,8 +22,8 @@ _store.register("products", primary_key="product_id",
                 initial_loader=lambda: _coerce_products(_load("products.json", "products")))
 _store.register("orders", primary_key="order_id",
                 initial_loader=lambda: _coerce_orders(_load("orders.json", "orders")))
-_store.register("order_items", primary_key="order_id",
-                initial_loader=lambda: _coerce_order_items(_load("order_items.json", "order_items")))
+_store.register("order_items", primary_key="_pk",
+                initial_loader=lambda: [{**r, "_pk": f"{r['order_id']}@{r['product_id']}@{i}"} for i, r in enumerate(_coerce_order_items(_load("order_items.json", "order_items")))])
 _store.register_document("user", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "user.json", encoding="utf-8")))
 
 
@@ -40,7 +40,7 @@ def _orders_rows():
 
 
 def _order_items_rows():
-    return _store.table("order_items").rows()
+    return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("order_items").rows()]
 
 
 def _user_doc():

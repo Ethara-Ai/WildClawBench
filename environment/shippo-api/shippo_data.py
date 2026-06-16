@@ -25,8 +25,9 @@ _store.register("rates", primary_key="object_id",
                 initial_loader=lambda: _coerce_rates(_load("rates.json", "rates")))
 _store.register("transactions", primary_key="object_id",
                 initial_loader=lambda: _coerce_transactions(_load("transactions.json", "transactions")))
-_store.register("tracking", primary_key="carrier",
-                initial_loader=lambda: _coerce_tracking(_load("tracking.json", "tracking")))
+_store.register("tracking", primary_key="_pk",
+                initial_loader=lambda: [{**r, "_pk": f"{r['carrier']}@{r['tracking_number']}@{r['status_time']}"}
+                                        for r in _coerce_tracking(_load("tracking.json", "tracking"))])
 
 
 def _addresses_rows():
@@ -50,7 +51,7 @@ def _transactions_rows():
 
 
 def _tracking_rows():
-    return _store.table("tracking").rows()
+    return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("tracking").rows()]
 
 
 

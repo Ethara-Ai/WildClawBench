@@ -19,10 +19,10 @@ _store.register("users", primary_key="id",
                 initial_loader=lambda: _coerce_users(_load("users.json", "users")))
 _store.register("tweets", primary_key="id",
                 initial_loader=lambda: _coerce_tweets(_load("tweets.json", "tweets")))
-_store.register("follows", primary_key="follower_id",
-                initial_loader=lambda: [_strip_ctx(r) for r in _load("follows.json", "follows")])
-_store.register("likes", primary_key="user_id",
-                initial_loader=lambda: [_strip_ctx(r) for r in _load("likes.json", "likes")])
+_store.register("follows", primary_key="_pk",
+                initial_loader=lambda: [{**r, "_pk": f"{r['follower_id']}@{r['following_id']}"} for r in (_strip_ctx(x) for x in _load("follows.json", "follows"))])
+_store.register("likes", primary_key="_pk",
+                initial_loader=lambda: [{**r, "_pk": f"{r['user_id']}@{r['tweet_id']}"} for r in (_strip_ctx(x) for x in _load("likes.json", "likes"))])
 _store.register("retweets", primary_key="user_id",
                 initial_loader=lambda: [_strip_ctx(r) for r in _load("retweets.json", "retweets")])
 
@@ -36,11 +36,11 @@ def _tweets_rows():
 
 
 def _follows_rows():
-    return _store.table("follows").rows()
+    return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("follows").rows()]
 
 
 def _likes_rows():
-    return _store.table("likes").rows()
+    return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("likes").rows()]
 
 
 def _retweets_rows():
@@ -69,10 +69,15 @@ def _to_bool(v):
 # ---------------------------------------------------------------------------
 
 def _coerce_users(rows):
+    # The metric columns live in the seed as strings; they belong only under
+    # public_metrics (ints) per the Twitter v2 contract. Drop the raw top-level
+    # copies so a user is not emitted with the same metric in two types.
+    _metric_cols = ("followers_count", "following_count", "tweet_count")
     out = []
     for r in rows:
+        base = {k: v for k, v in _strip_ctx(r).items() if k not in _metric_cols}
         out.append({
-            **_strip_ctx(r),
+            **base,
             "verified": strict_bool(r, "verified"),
             "protected": strict_bool(r, "protected"),
             "public_metrics": {

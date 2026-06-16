@@ -53,3 +53,4 @@ logs/
 
 # Audit deliverables (findings.json, REPORT.md, BUGS.md, REMEDIATION.md, logs/) — local-only, machine-specific.
 audit/
+output_bundle2

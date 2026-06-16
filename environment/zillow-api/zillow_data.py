@@ -17,8 +17,9 @@ _API = "zillow-api"
 
 _store.register("properties", primary_key="zpid",
                 initial_loader=lambda: _coerce_properties(_load("properties.json", "properties")))
-_store.register("price_history", primary_key="zpid",
-                initial_loader=lambda: _coerce_price_history(_load("price_history.json", "price_history")))
+_store.register("price_history", primary_key="_pk",
+                initial_loader=lambda: [{**r, "_pk": f"{r['zpid']}@{r['event_date']}@{r['event']}"}
+                                        for r in _coerce_price_history(_load("price_history.json", "price_history"))])
 _store.register("agents", primary_key="agent_id",
                 initial_loader=lambda: _coerce_agents(_load("agents.json", "agents")))
 _store.register("saved_searches", primary_key="search_id",
@@ -30,7 +31,7 @@ def _properties_rows():
 
 
 def _price_history_rows():
-    return _store.table("price_history").rows()
+    return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("price_history").rows()]
 
 
 def _agents_rows():

@@ -18,12 +18,12 @@ _store.register("users", primary_key="id",
                 initial_loader=lambda: _coerce_users(_load("users.json", "users")))
 _store.register("groups", primary_key="id",
                 initial_loader=lambda: [_strip_ctx(r) for r in _load("groups.json", "groups")])
-_store.register("memberships", primary_key="group_id",
-                initial_loader=lambda: [_strip_ctx(r) for r in _load("group_memberships.json", "memberships")])
+_store.register("memberships", primary_key="_pk",
+                initial_loader=lambda: [{**_strip_ctx(r), "_pk": f"{r['group_id']}@{r['user_id']}"} for r in _load("group_memberships.json", "memberships")])
 _store.register("apps", primary_key="id",
                 initial_loader=lambda: [_strip_ctx(r) for r in _load("apps.json", "apps")])
-_store.register("app_assignments", primary_key="app_id",
-                initial_loader=lambda: [_strip_ctx(r) for r in _load("app_assignments.json", "app_assignments")])
+_store.register("app_assignments", primary_key="_pk",
+                initial_loader=lambda: [{**_strip_ctx(r), "_pk": f"{r['app_id']}@{r['user_id']}"} for r in _load("app_assignments.json", "app_assignments")])
 
 
 def _users_rows():
@@ -35,7 +35,7 @@ def _groups_rows():
 
 
 def _memberships_rows():
-    return _store.table("memberships").rows()
+    return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("memberships").rows()]
 
 
 def _apps_rows():
@@ -43,7 +43,7 @@ def _apps_rows():
 
 
 def _app_assignments_rows():
-    return _store.table("app_assignments").rows()
+    return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("app_assignments").rows()]
 
 
 

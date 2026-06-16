@@ -26,8 +26,10 @@ _store.register("tracks", primary_key="track_id",
                 initial_loader=lambda: _coerce_tracks(_load("tracks.json", "tracks")))
 _store.register("playlists", primary_key="playlist_id",
                 initial_loader=lambda: _coerce_playlists(_load("playlists.json", "playlists")))
-_store.register("playlist_tracks", primary_key="playlist_id",
-                initial_loader=lambda: _coerce_playlist_tracks(_load("playlist_tracks.json", "playlist_tracks")))
+_store.register("playlist_tracks", primary_key="_pk",
+                initial_loader=lambda: [
+                    {**r, "_pk": f"{r['playlist_id']}@{r['track_id']}"}
+                    for r in _coerce_playlist_tracks(_load("playlist_tracks.json", "playlist_tracks"))])
 _store.register_document("user", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "user.json", encoding="utf-8")))
 
 
@@ -48,7 +50,7 @@ def _playlists_rows():
 
 
 def _playlist_tracks_rows():
-    return _store.table("playlist_tracks").rows()
+    return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("playlist_tracks").rows()]
 
 
 def _user_doc():

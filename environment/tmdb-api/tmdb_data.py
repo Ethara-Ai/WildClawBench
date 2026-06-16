@@ -26,8 +26,9 @@ _store.register("movies", primary_key="id",
                 initial_loader=lambda: _coerce_movies(_load("movies.json", "movies")))
 _store.register("people", primary_key="id",
                 initial_loader=lambda: _coerce_people(_load("people.json", "people")))
-_store.register("credits", primary_key="movie_id",
-                initial_loader=lambda: _coerce_credits(_load("credits.json", "credits")))
+_store.register("credits", primary_key="_pk",
+                initial_loader=lambda: [{**r, "_pk": f"{r['movie_id']}@{r['person_id']}@{r['credit_type']}"}
+                                        for r in _coerce_credits(_load("credits.json", "credits"))])
 _store.register("tv", primary_key="id",
                 initial_loader=lambda: _coerce_tv(_load("tv.json", "tv")))
 
@@ -45,7 +46,7 @@ def _people_rows():
 
 
 def _credits_rows():
-    return _store.table("credits").rows()
+    return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("credits").rows()]
 
 
 def _tv_rows():

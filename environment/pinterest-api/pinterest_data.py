@@ -21,8 +21,8 @@ _store.register("board_sections", primary_key="section_id",
                 initial_loader=lambda: _coerce_board_sections(_load("board_sections.json", "board_sections")))
 _store.register("pins", primary_key="pin_id",
                 initial_loader=lambda: _coerce_pins(_load("pins.json", "pins")))
-_store.register("pin_analytics", primary_key="pin_id",
-                initial_loader=lambda: _coerce_pin_analytics(_load("pin_analytics.json", "pin_analytics")))
+_store.register("pin_analytics", primary_key="_pk",
+                initial_loader=lambda: [{**r, "_pk": f"{r['pin_id']}@{r['date']}"} for r in _coerce_pin_analytics(_load("pin_analytics.json", "pin_analytics"))])
 _store.register("user_analytics", primary_key="date",
                 initial_loader=lambda: _coerce_user_analytics(_load("user_analytics.json", "user_analytics")))
 _store.register("ad_accounts", primary_key="ad_account_id",
@@ -45,7 +45,7 @@ def _pins_rows():
 
 
 def _pin_analytics_rows():
-    return _store.table("pin_analytics").rows()
+    return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("pin_analytics").rows()]
 
 
 def _user_analytics_rows():

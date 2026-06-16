@@ -19,12 +19,18 @@ _store.register("courses", primary_key="id",
                 initial_loader=lambda: _coerce_courses(_load("courses.json", "courses")))
 _store.register("coursework", primary_key="id",
                 initial_loader=lambda: _coerce_coursework(_load("coursework.json", "coursework")))
-_store.register("topics", primary_key="courseId",
-                initial_loader=lambda: _coerce_topics(_load("topics.json", "topics")))
-_store.register("students", primary_key="courseId",
-                initial_loader=lambda: _coerce_students(_load("students.json", "students")))
-_store.register("teachers", primary_key="courseId",
-                initial_loader=lambda: _coerce_teachers(_load("teachers.json", "teachers")))
+_store.register("topics", primary_key="_pk",
+                initial_loader=lambda: [
+                    {**r, "_pk": f"{r['courseId']}@{r['topicId']}"}
+                    for r in _coerce_topics(_load("topics.json", "topics"))])
+_store.register("students", primary_key="_pk",
+                initial_loader=lambda: [
+                    {**r, "_pk": f"{r['courseId']}@{r['userId']}"}
+                    for r in _coerce_students(_load("students.json", "students"))])
+_store.register("teachers", primary_key="_pk",
+                initial_loader=lambda: [
+                    {**r, "_pk": f"{r['courseId']}@{r['userId']}"}
+                    for r in _coerce_teachers(_load("teachers.json", "teachers"))])
 _store.register("submissions", primary_key="id",
                 initial_loader=lambda: _coerce_submissions(_load("submissions.json", "submissions")))
 _store.register("announcements", primary_key="id",
@@ -42,15 +48,15 @@ def _coursework_rows():
 
 
 def _topics_rows():
-    return _store.table("topics").rows()
+    return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("topics").rows()]
 
 
 def _students_rows():
-    return _store.table("students").rows()
+    return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("students").rows()]
 
 
 def _teachers_rows():
-    return _store.table("teachers").rows()
+    return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("teachers").rows()]
 
 
 def _submissions_rows():
