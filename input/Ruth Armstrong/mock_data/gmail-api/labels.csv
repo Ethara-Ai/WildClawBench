@@ -1,0 +1,8 @@
+id,name,type,messages_total,messages_unread,threads_total,threads_unread
+INBOX,INBOX,system,318,12,221,9
+SENT,SENT,system,740,0,560,0
+DRAFT,DRAFT,system,3,0,3,0
+STARRED,STARRED,system,31,2,24,1
+Label_Mobilite,Mobilite Plateau,user,74,5,39,3
+Label_ParcEx,Parc-Extension,user,58,4,31,2
+Label_Council,Council,user,40,2,22,1

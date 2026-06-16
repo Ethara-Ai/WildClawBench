@@ -1,0 +1,48 @@
+task_id: DEMO_001_casey_q4_sweep
+task_name: "Casey Lee — Q4 Atlas Readiness Sweep (DEMO TEMPLATE)"
+
+# task-type — multi-label classification
+task_type:
+  - Search & Retrieval
+  - Productivity Flow
+  - Multi-Turn Robustness
+
+# task description — informational only; NOT delivered to the agent
+task_description: >
+  Single-day three-turn scenario for Casey Lee, junior analyst at Northway
+  Logistics. Casey runs a morning briefing, a multi-agent fan-out, and a
+  consolidated memo draft. One silent mutation between T1 and T2 shifts
+  the Atlas project deadline by one week (2026-12-15 -> 2026-12-22); the
+  agent must detect on T2 re-read.
+
+# Difficulty / taxonomy
+difficulty: easy
+taxonomy_l1: "Information Synthesis"
+taxonomy_l2: "Project Status Reconciliation"
+
+# Modalities — sets multimodal flag if non-text present
+modalities:
+  - text
+
+# Required APIs — mock stack starts these services
+required_apis:
+  - gmail-api
+  - airtable-api
+  - confluence-api
+  - google-drive-api
+
+# Distractor APIs — present in mock stack, agent may discover, must NOT use
+distractor_apis:
+  - slack-api
+  - twilio-api
+  - whatsapp-api
+
+# Platform — informational only; agent uses openclaw default boot prompt
+platform: WildClawBench-Demo
+
+# system_prompt — NOT honored by harness. Agent gets openclaw default boot
+# prompt. Document here for human readers; do not expect runtime effect.
+system_prompt: |
+  You are Casey Lee's assistant at Northway Logistics. Act on Casey's
+  behalf, hold the red line on drafts-only when explicitly told, and
+  re-read live sources rather than relying on cached values.

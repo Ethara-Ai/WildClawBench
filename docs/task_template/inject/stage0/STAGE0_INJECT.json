@@ -1,0 +1,5 @@
+{
+  "stage": "stage0",
+  "description": "Baseline seed. Stage 0 is always seed per loader convention; no silent ops fire. Mock-data overlays at mock_data/ already supply the loud baseline (gmail msg_001 + msg_003, airtable Atlas row with Deadline=2026-12-15). This file is intentionally near-empty - it exists to document the convention and to anchor any future loud op replays (set replay_loud=True in the loader to replay loud ops as a visible seed).",
+  "mutations": []
+}

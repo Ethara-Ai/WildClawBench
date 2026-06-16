@@ -1,0 +1,20 @@
+Atlas — kickoff notes (Priya, 2026-12-01)
+
+Owners
+- PM: Priya Mehta
+- Tech lead: Daniel Okafor
+- Analyst: Casey Lee (you)
+
+Scope
+- Customer-portal refresh, Q4 2026.
+- One vendor: Sequoia Cloud.
+
+Milestones (current as of 2026-12-01)
+- Design lock: 2026-12-08
+- Beta cut: 2026-12-15
+- GA deadline: 2026-12-15
+- Postmortem: 2027-01-05
+
+Decisions
+- No new vendor onboarding mid-quarter.
+- All client comms via Priya until GA.

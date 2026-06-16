@@ -1,0 +1,9 @@
+{
+  "id": "T_ICU",
+  "name": "ICU Conference Planning",
+  "domain": "icu-planning",
+  "email_domain": "icu-planning.example",
+  "icon": {
+    "image_132": "https://avatars.example.com/team-icu.png"
+  }
+}

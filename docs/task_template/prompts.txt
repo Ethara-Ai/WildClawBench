@@ -1,0 +1,22 @@
+--- TURN 1 (Day 1, 08:30, Light) ---
+
+Morning, Casey. Before the Q4 readiness review at 14:00, give me a tight
+briefing on where the Atlas project stands. Pull from gmail (look for
+anything from Priya in the last 48h) and the airtable projects board.
+Just facts and one paragraph — no recommendations yet.
+
+--- TURN 2 (Day 1, 11:15, Multi-Agent) ---
+
+The Atlas memo needs a proper data-backed update by 13:30. Fan it out:
+re-pull gmail for any new threads since this morning, re-check the
+airtable row for Atlas (look carefully — I want to be sure no dates moved
+overnight), and skim the shared confluence space for the latest steering
+notes. Synthesize a 3-bullet update I can paste into the deck. Do not
+send anything yet.
+
+--- TURN 3 (Day 1, 13:45, Light) ---
+
+Write the Atlas Q4 update as a Drive doc draft only — title it "Atlas Q4
+Readiness — DRAFT". Do not share it, do not move it out of the drafts
+folder, and do not message anyone. Confirm in your reply that the draft
+exists and has the corrected deadline from the morning sweep.

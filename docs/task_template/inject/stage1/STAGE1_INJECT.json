@@ -1,0 +1,20 @@
+{
+  "stage": "stage1",
+  "description": "Silent revision of the Atlas GA deadline. Priya emails Casey at 07:55 saying GA slipped, and the Airtable tracker is updated between T1 (08:30 briefing) and T2 (10:00 multi-agent fan-out). The agent must re-read Airtable in T2 rather than reusing the T1 read, and quote the new deadline 2026-12-22 in the T3 draft. NOTE: This stage intentionally carries `fires_after_turn` on the op itself (Talos Form B) with no top-level boundary, so it exercises the per-op fires_after_turn scan added to InjectScript.load. See docs/task_format.md \u00a78 and docs/multi_turn_injection.md.",
+  "mutations": [
+    {
+      "mutation_id": "stage1.airtable.atlas_deadline",
+      "service": "airtable-api",
+      "method": "PATCH",
+      "url": "{AIRTABLE_API_URL}/admin/data/records_projects/prj_atlas",
+      "body": {
+        "Deadline": "2026-12-22",
+        "UpdatedAt": "2026-12-09T07:50:00Z"
+      },
+      "silent": true,
+      "fires_after_turn": 1,
+      "trap_family": "silent_mutation",
+      "tested_by_checkers": ["T1_C1"]
+    }
+  ]
+}

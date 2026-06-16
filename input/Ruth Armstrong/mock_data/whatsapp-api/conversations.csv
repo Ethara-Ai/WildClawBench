@@ -1,0 +1,2 @@
+conversation_id,wa_id,started_at,last_message_at,origin,within_24h_window
+conv_family,15552201,2026-10-01T08:00:00-04:00,2026-10-12T21:00:00-04:00,user,True

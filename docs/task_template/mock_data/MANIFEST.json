@@ -1,0 +1,9 @@
+{
+  "task_id": "DEMO_001_casey_q4_sweep",
+  "services": [
+    "airtable-api",
+    "gmail-api",
+    "google-drive-api"
+  ],
+  "notes": "Baseline state for Casey Lee Q4 sweep. Stage1 inject revises the Atlas-7 deadline from 2026-12-15 to 2026-12-22 silently via the airtable admin plane."
+}

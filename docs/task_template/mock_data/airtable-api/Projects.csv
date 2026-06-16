@@ -1,0 +1,4 @@
+id,Name,Status,Deadline,Owner,Notes
+recATLAS7,Atlas-7 Launch,In Progress,2026-12-15,casey.lee@atlas.example,Q4 flagship robot launch. Engineering blockers tracked in Linear.
+recATLAS6,Atlas-6 Maintenance,Steady State,2027-01-30,maria.chen@atlas.example,Post-launch firmware patches.
+recATLAS8,Atlas-8 Research,Planning,2027-06-01,priya.shah@atlas.example,Next-gen prototype kickoff.

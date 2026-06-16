@@ -200,7 +200,56 @@ def test_compress_runs_on_completion_call_type(monkeypatch):
         )
     )
     assert result is data
-    assert data["messages"] is new_msgs
+    # data["messages"] is replaced with the compressed content. (It is now a
+    # freshly-merged list rather than the exact result.messages object, because
+    # the hook restores original block-shaped messages where compression no-ops
+    # — see _flatten_text_block_content — so assert by equality, not identity.)
+    assert data["messages"] == new_msgs
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# Test 3b — Anthropic block content is flattened so the compressor engages
+# ────────────────────────────────────────────────────────────────────────────
+
+
+def test_anthropic_block_content_is_flattened_for_compressor(monkeypatch):
+    """openclaw drives /v1/messages, whose content is a LIST OF BLOCKS. Headroom
+    no-ops on block content, so the hook must collapse pure-text blocks to a
+    string before compressing — while leaving tool_use / cache_control blocks
+    structurally intact. Verified end-to-end 2026-06-15 that the un-flattened
+    path saved 0 on real openclaw traffic. Capture what compress() receives.
+    Also implicitly exercises the anthropic_messages call_type allowlist."""
+    monkeypatch.setenv("KENSEI_AGENT_HEADROOM_ENABLED", "true")
+
+    seen = {}
+
+    def _capture(messages, model=None, config=None):
+        seen["messages"] = messages
+        return _make_compress_result(messages=messages)
+
+    _stub_headroom(compress_fn=_capture)
+
+    data = {
+        "model": "bedrock/anthropic.claude-opus-4-6-v1",
+        "messages": [
+            # pure text block -> MUST be flattened to a string
+            {"role": "user", "content": [{"type": "text", "text": "T" * 9000}]},
+            # tool_use block -> MUST stay a list (structure preserved verbatim)
+            {"role": "assistant", "content": [{"type": "tool_use", "id": "t1", "name": "read", "input": {}}]},
+            # text block carrying cache_control -> MUST stay a list (cache hint kept)
+            {"role": "user", "content": [{"type": "text", "text": "k", "cache_control": {"type": "ephemeral"}}]},
+        ],
+    }
+    _run(
+        hr.headroom_callback_instance.async_pre_call_hook(
+            user_api_key_dict=None, cache=None, data=data, call_type="anthropic_messages",
+        )
+    )
+    got = seen["messages"]
+    assert isinstance(got[0]["content"], str) and got[0]["content"] == "T" * 9000, \
+        "pure text-block content must flatten to a string so the compressor engages"
+    assert isinstance(got[1]["content"], list), "tool_use block must NOT be flattened"
+    assert isinstance(got[2]["content"], list), "cache_control text block must NOT be flattened"
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -255,12 +304,14 @@ def test_compress_system_messages_is_false(monkeypatch):
         )
     )
     assert captured.get("compress_system_messages") is False
-    # compress_user_messages must NOT be passed — we rely on Headroom's default
-    # `skip_user_messages=True` for the multi-turn tool-loop pattern (only
-    # tool_result blocks compress, which is what we want for Opus 4.7 tool
-    # loops). Setting compress_user_messages=True here would mistakenly
-    # compress user turns too, which is the JUDGE path's pattern, not ours.
-    assert "compress_user_messages" not in captured
+    # compress_user_messages MUST be True — empirically verified live
+    # (2026-06-11) that OpenAI chat-completion proxies (incl. openclaw's
+    # tool loop) route tool_result blocks back as role=user messages, so
+    # leaving Headroom 0.24.0 at default compress_user_messages=False
+    # marks every user message as "router:protected:user_message" and
+    # saves zero tokens. With True, smart_crusher compresses JSON tool
+    # results (verified: 88KB JSON → 25.3K→15.6K tokens).
+    assert captured.get("compress_user_messages") is True
 
 
 # ────────────────────────────────────────────────────────────────────────────
