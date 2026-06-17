@@ -1,0 +1,3 @@
+id,site_id,display_name,singular_name,slug,created_on,last_updated
+wf_coll_services,wf_site_ce_main,Services,Service,services,2024-04-12T08:00:00Z,2026-10-10T22:00:00Z
+wf_coll_projects,wf_site_ce_main,Projects,Project,projects,2024-05-01T08:00:00Z,2026-09-12T11:00:00Z

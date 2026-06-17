@@ -1,0 +1,25 @@
+{
+  "stage": "stage3",
+  "fires_after_turn": 8,
+  "description": "Fires in prompt-turn-execution order after prompts Turn 8 (Tony email, Thu Oct 15 16:00 CT) and immediately before prompts Turn 9 (Yuna movie question, Thu Oct 15 06:30 CT). IMPORTANT: Thursday turns appear out of wall-clock order — per golden_steer_flow.md Appendix A, T9 (06:30 CT) and T10 (04:00 CT) both wall-clock-PRECEDE T8 (16:00 CT), but the inject engine fires by prompt-turn index, not wall-clock. SM-05 silently flips Ryan O'Malley on the Monday board to units 13-18 (Jira HARBOR-247 stays at units 7-12 = priority inversion / CM-01). The IRS rate trap (SM-03 / DV-01 / DV-02) requires no runtime mutation: the IRS rate sheet is a static data-folder artifact (data/irs_q3_late_payment_rate.pdf) that already contains BOTH the older 8.0% Q2 block (positional visual decoy) and the current 8.5% Q3 block — a model that pattern-matches the first percentage hits 8.0%, the correct read extracts the Q3 block. The Solshine v2 PDF (data/solshine_inverter_quote_v2.pdf), the Day-3 06:30 voice memo (data/jae_voice_memo_d3_0630.mp3), and the DocuSign envelope DS-ENV-2026-1016-1120 are NOT injected here — they already exist as static artifacts in the data/ folder and mock_data/docusign-api/envelopes.csv with the correct timestamps.",
+  "mutations": [
+    {
+      "id": "SM-05",
+      "service": "Monday",
+      "description": "Silently flip Ryan O'Malley's Monday Harborview crew row from units 7-12 to units 13-18 (Jira HARBOR-247 sprint board unchanged at units 7-12; HARBOR-248 Danny+Jake still owns units 13-18 → collision/priority inversion). Target item ITM_RYAN_HARBOR in mock_data/monday-api/items.csv.",
+      "action": "patch_item",
+      "silent": true,
+      "invented": true,
+      "derived_from": "persona/MEMORY.md Ryan O'Malley lead journeyman + Harborview project + TOOLS.md Monday+Jira connected",
+      "rationale": "Cross-modal contradiction between visual crew board and authoritative sprint board. Agent must surface delta before truck rolls on D+3.",
+      "trap_family": "F1+F7",
+      "http": {
+        "method": "PATCH",
+        "url": "{MONDAY_API_URL}/v2",
+        "headers": {"Authorization": "Bearer mock", "Content-Type": "application/json"},
+        "body": {"query": "mutation { change_column_value(board_id: \"BRD_HARBOR\", item_id: \"ITM_RYAN_HARBOR\", column_id: \"COL_HARBOR_UNIT\", value: \"\\\"13-18\\\"\") { id } }"},
+        "expected_status": 200
+      }
+    }
+  ]
+}

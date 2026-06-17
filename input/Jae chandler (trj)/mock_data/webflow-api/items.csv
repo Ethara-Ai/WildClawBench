@@ -1,0 +1,4 @@
+id,collection_id,name,slug,is_draft,is_archived,summary,created_on,last_updated
+wf_item_residential,wf_coll_services,Residential service,residential,False,False,Residential service,2024-04-12T08:00:00Z,2026-03-08T08:00:00Z
+wf_item_commercial,wf_coll_services,Commercial subcontract,commercial,False,False,Commercial subcontract,2024-04-12T08:00:00Z,2025-09-20T08:00:00Z
+wf_item_solar_v1,wf_coll_services,Residential solar — 12-panel,residential-solar,True,False,Residential solar — 12-panel,2026-09-22T08:00:00Z,2026-10-10T22:00:00Z

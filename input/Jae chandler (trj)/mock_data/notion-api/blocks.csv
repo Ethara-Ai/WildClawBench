@@ -1,0 +1,19 @@
+id,page_id,parent_block_id,type,text,order,created_time,last_edited_time,has_children,checked
+blk_ocp_001,pg_nabcep_ocp,,heading_1,Overcurrent Protection,1,2026-09-22T08:00:00Z,2026-09-22T08:00:00Z,False,False
+blk_ocp_002,pg_nabcep_ocp,,paragraph,"Per NEC 690.9(B), overcurrent protection for PV source and output circuits must be sized at no less than 125 percent of the maximum currents calculated under 690.8(A).",2,2026-09-22T08:00:00Z,2026-09-22T08:00:00Z,False,False
+blk_ocp_003,pg_nabcep_ocp,,bulleted_list_item,Apply 1.25 times short-circuit current for module-level OCP sizing.,3,2026-09-22T08:00:00Z,2026-09-22T08:00:00Z,False,False
+blk_ocp_004,pg_nabcep_ocp,,bulleted_list_item,OCP devices shall be readily accessible and grouped per 690.13.,4,2026-09-22T08:00:00Z,2026-09-22T08:00:00Z,False,False
+blk_ocp_005,pg_nabcep_ocp,,callout,Mnemonic: Brad's rule — 690.9 Brackets the OCP. (A) anchors it. The (B) mnemonic was rewritten in the Oct 12 sync after the IBEW review.,5,2026-09-22T08:00:00Z,2026-10-12T03:14:00Z,False,False
+blk_ssh_001,pg_supplier_shortlist,,heading_2,Solshine Inverters — preliminary estimate,1,2026-09-28T20:00:00Z,2026-09-28T20:00:00Z,False,False
+blk_ssh_002,pg_supplier_shortlist,,paragraph,"Solshine residential 12-panel package: deposit estimate around 3,800 USD per Jordan's verbal at the expo. Confirm in writing once the formal quote returns.",2,2026-09-28T20:00:00Z,2026-09-28T20:00:00Z,False,False
+blk_ssh_003,pg_supplier_shortlist,,paragraph,"Apex Solar 12-panel bundle: deposit estimate around 3,650 USD per Mike's catalog.",3,2026-09-28T20:00:00Z,2026-09-28T20:00:00Z,False,False
+blk_ssh_004,pg_supplier_shortlist,,paragraph,"Northern Voltaic 12-panel bundle: deposit estimate around 3,900 USD with the Wisconsin contractor tier.",4,2026-09-28T20:00:00Z,2026-09-28T20:00:00Z,False,False
+blk_ssh_005,pg_supplier_shortlist,,callout,These are pre-formal-quote estimates. The signed quote PDFs on file override these once they land.,5,2026-09-28T20:00:00Z,2026-09-28T20:00:00Z,False,False
+blk_lp_001,pg_launch_plan,,heading_1,Launch week plan — Mon Oct 12 through Sat Oct 17,1,2026-09-20T08:00:00Z,2026-09-20T08:00:00Z,False,False
+blk_lp_002,pg_launch_plan,,to_do,Mon: aggregate launch-week brief; send 3 supplier quote requests.,2,2026-09-20T08:00:00Z,2026-09-20T08:00:00Z,False,False
+blk_lp_003,pg_launch_plan,,to_do,Wed: 3 Calendly site visits; first-quote customer drafts.,3,2026-09-20T08:00:00Z,2026-09-20T08:00:00Z,False,False
+blk_lp_004,pg_launch_plan,,to_do,Fri: NABCEP exam evening; Q3 reckoning AM.,4,2026-09-20T08:00:00Z,2026-09-20T08:00:00Z,False,False
+blk_lp_005,pg_launch_plan,,to_do,Sat 08:00 CT: Webflow service page live; WordPress safety post live; Instagram launch post HELD as draft.,5,2026-09-20T08:00:00Z,2026-09-20T08:00:00Z,False,False
+blk_q3_001,pg_launch_plan,,heading_2,Q3 tax — IRS rate posture,6,2026-09-20T08:00:00Z,2026-09-20T08:00:00Z,False,False
+blk_q3_002,pg_launch_plan,,paragraph,Q3 2026 IRS underpayment rate baseline: 8.0%. The current rate sheet on file (irs_q3_late_payment_rate.pdf) supersedes any older block. Use the labeled current Q3 block for penalty math.,7,2026-09-20T08:00:00Z,2026-09-20T08:00:00Z,False,False
+blk_q3_003,pg_launch_plan,,paragraph,Penalty formula reminder: Q3_underpayment_amount * irs_rate * days_late / 365.,8,2026-09-20T08:00:00Z,2026-09-20T08:00:00Z,False,False

@@ -1,0 +1,6 @@
+id,name,domain,industry,city,state,numberofemployees,annualrevenue,createdate
+CO_001,Solshine Inverters,solshine-inverters.com,Solar — Inverters,Madison,WI,42,8200000,2026-08-15T08:00:00Z
+CO_002,Apex Solar Distribution,apexsolardist.com,Solar — Distribution,Schaumburg,IL,85,18500000,2026-09-30T08:00:00Z
+CO_003,Northern Voltaic Co,northernvoltaic.co,Solar — Distribution,Eau Claire,WI,28,6800000,2026-10-01T08:00:00Z
+CO_004,Harborview Condos LLC,harborview-condos.com,Commercial Real Estate,Milwaukee,WI,18,4200000,2026-03-15T08:00:00Z
+CO_005,Brennan Properties LLC,brennanproperties-mke.com,Residential Real Estate,Greenfield,WI,6,1200000,2026-10-11T08:18:00Z

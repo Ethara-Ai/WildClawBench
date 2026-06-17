@@ -1,0 +1,7 @@
+owner,weekday,start_time,end_time,timezone
+https://api.calendly.com/users/JAE001,monday,07:00,17:00,America/Chicago
+https://api.calendly.com/users/JAE001,tuesday,07:00,17:00,America/Chicago
+https://api.calendly.com/users/JAE001,wednesday,10:00,17:00,America/Chicago
+https://api.calendly.com/users/JAE001,thursday,07:00,17:00,America/Chicago
+https://api.calendly.com/users/JAE001,friday,07:00,15:00,America/Chicago
+https://api.calendly.com/users/JAE001,saturday,08:00,12:00,America/Chicago

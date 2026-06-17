@@ -1,0 +1,110 @@
+[
+  {
+    "Id": "4001",
+    "DocNumber": "EST-2026-1014-KAP",
+    "TxnDate": "2026-10-14",
+    "ExpirationDate": "2026-11-14",
+    "CustomerRef": {
+      "value": "2",
+      "name": "Bay View Homeowner - Kapadia"
+    },
+    "Line": [
+      {
+        "Id": "1",
+        "LineNum": 1,
+        "Amount": 18500.0,
+        "DetailType": "SalesItemLineDetail",
+        "Description": "Solar package - 12-panel residential install (Kapadia, 2841 S Logan Ave)",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "value": "3",
+            "name": "Solar package - 12-panel (placeholder)"
+          },
+          "UnitPrice": 18500.0,
+          "Qty": 1
+        }
+      }
+    ],
+    "TotalAmt": 18500.0,
+    "TxnStatus": "Pending",
+    "AcceptedDate": "",
+    "LinkedTxn": [],
+    "MetaData": {
+      "CreateTime": "2026-10-14T16:30:00-05:00",
+      "LastUpdatedTime": "2026-10-14T16:30:00-05:00"
+    },
+    "SyncToken": "0"
+  },
+  {
+    "Id": "4002",
+    "DocNumber": "EST-2026-1014-BRE",
+    "TxnDate": "2026-10-14",
+    "ExpirationDate": "2026-11-14",
+    "CustomerRef": {
+      "value": "3",
+      "name": "Brennan Properties (Dale Brennan)"
+    },
+    "Line": [
+      {
+        "Id": "1",
+        "LineNum": 1,
+        "Amount": 47200.0,
+        "DetailType": "SalesItemLineDetail",
+        "Description": "Solar package - 32-panel triplex install (Brennan, 4720 W Forest Home Ave)",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "value": "3",
+            "name": "Solar package - 12-panel (placeholder)"
+          },
+          "UnitPrice": 1475.0,
+          "Qty": 32
+        }
+      }
+    ],
+    "TotalAmt": 47200.0,
+    "TxnStatus": "Pending",
+    "AcceptedDate": "",
+    "LinkedTxn": [],
+    "MetaData": {
+      "CreateTime": "2026-10-14T17:15:00-05:00",
+      "LastUpdatedTime": "2026-10-14T17:15:00-05:00"
+    },
+    "SyncToken": "0"
+  },
+  {
+    "Id": "4003",
+    "DocNumber": "EST-2026-1014-KOW",
+    "TxnDate": "2026-10-14",
+    "ExpirationDate": "2026-11-14",
+    "CustomerRef": {
+      "value": "4",
+      "name": "Kowalski - Wauwatosa"
+    },
+    "Line": [
+      {
+        "Id": "1",
+        "LineNum": 1,
+        "Amount": 14200.0,
+        "DetailType": "SalesItemLineDetail",
+        "Description": "Solar package - 10-panel budget residential (Kowalski, 7218 W Center St)",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "value": "3",
+            "name": "Solar package - 12-panel (placeholder)"
+          },
+          "UnitPrice": 1420.0,
+          "Qty": 10
+        }
+      }
+    ],
+    "TotalAmt": 14200.0,
+    "TxnStatus": "Pending",
+    "AcceptedDate": "",
+    "LinkedTxn": [],
+    "MetaData": {
+      "CreateTime": "2026-10-14T18:00:00-05:00",
+      "LastUpdatedTime": "2026-10-14T18:00:00-05:00"
+    },
+    "SyncToken": "0"
+  }
+]

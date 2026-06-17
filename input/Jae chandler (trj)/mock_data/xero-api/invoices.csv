@@ -1,0 +1,1 @@
+invoice_id,invoice_number,type,contact_id,contact_name,date,due_date,status,line_amount_types,sub_total,total_tax,total,amount_due,amount_paid,currency_code,reference

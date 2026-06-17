@@ -1,0 +1,33 @@
+{
+  "CompanyName": "Chandler Electric LLC",
+  "LegalName": "Chandler Electric LLC",
+  "CompanyAddr": {
+    "Line1": "1418 S Howell Ave Ste 4",
+    "City": "Milwaukee",
+    "CountrySubDivisionCode": "WI",
+    "PostalCode": "53207"
+  },
+  "PrimaryPhone": {
+    "FreeFormNumber": "+14145553010"
+  },
+  "Email": {
+    "Address": "jae@chandlerelectric.com"
+  },
+  "Country": "US",
+  "FiscalYearStartMonth": "January",
+  "IndustryType": "Electrical Contracting",
+  "NameValue": [
+    {
+      "Name": "OwnerName",
+      "Value": "Jae Chandler"
+    },
+    {
+      "Name": "BusinessLine",
+      "Value": "Residential Electrical / Solar"
+    }
+  ],
+  "MetaData": {
+    "CreateTime": "2024-01-15T10:00:00-06:00",
+    "LastUpdatedTime": "2026-10-12T09:00:00-05:00"
+  }
+}

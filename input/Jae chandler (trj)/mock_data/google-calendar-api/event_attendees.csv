@@ -1,0 +1,9 @@
+event_id,email,display_name,response_status,optional,organizer
+evt_yuna_concert,mina.chandler.home@gmail.com,Mina Chandler,accepted,False,True
+evt_yuna_concert,jae@chandlerelectric.com,Jae Chandler,accepted,False,False
+evt_yuna_concert,yuna.chandler.music@gmail.com,Yuna Chandler,accepted,False,False
+evt_yuna_concert,tony.rizzo.plumbing@gmail.com,Tony Rizzo,tentative,True,False
+evt_calendly_bayview,sarah.kapadia@gmail.com,Sarah Kapadia,accepted,False,False
+evt_calendly_grnfd,dbrennan@brennanproperties-mke.com,Dale Brennan,accepted,False,False
+evt_calendly_wauwa,emma.kowalski.wfh@gmail.com,Emma Kowalski,accepted,False,False
+evt_crew_ryan_w_oct12,ryan.omalley.elec@gmail.com,Ryan O'Malley,accepted,False,False

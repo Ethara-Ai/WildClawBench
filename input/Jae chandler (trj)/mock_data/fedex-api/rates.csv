@@ -1,0 +1,2 @@
+service_type,service_name,origin_zip,dest_zip,weight_lb,currency,net_charge,transit_days,delivery_day
+FEDEX_GROUND,FedEx Ground,53718,53207,42,USD,22.40,4,

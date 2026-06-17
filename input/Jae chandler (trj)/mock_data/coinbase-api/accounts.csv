@@ -1,0 +1,3 @@
+id,name,primary,type,currency_code,currency_name,balance_amount,native_balance_amount,native_currency,created_at,updated_at
+acc_jae_btc_legacy,BTC Wallet,true,wallet,BTC,Bitcoin,0.00041000,27.65,USD,2021-05-14T19:22:10Z,2022-11-08T03:14:55Z
+acc_jae_usd_dust,USD Cash,false,fiat,USD,US Dollar,3.27,3.27,USD,2021-05-14T19:22:10Z,2022-11-08T03:14:55Z

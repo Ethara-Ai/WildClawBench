@@ -1,0 +1,76 @@
+[
+  {
+    "Id": "3001",
+    "DocNumber": "SOL-DEP-V2",
+    "VendorRef": {
+      "value": "1",
+      "name": "Solshine Inverters"
+    },
+    "TxnDate": "2026-10-12",
+    "DueDate": "2026-10-26",
+    "Line": [
+      {
+        "Amount": 4650.0,
+        "Description": "Solshine inverter quote v2 - residential 12-panel package (supersedes v1 $4,200)",
+        "AccountBasedExpenseLineDetail": {
+          "AccountRef": {
+            "name": "Materials and supplies",
+            "value": "200"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 4650.0,
+    "Balance": 4650.0,
+    "PrivateNote": "Solshine v2 quote includes freight surcharge."
+  },
+  {
+    "Id": "3002",
+    "DocNumber": "MES-2026-10-09",
+    "VendorRef": {
+      "value": "4",
+      "name": "Milwaukee Electric Supply"
+    },
+    "TxnDate": "2026-10-09",
+    "DueDate": "2026-10-31",
+    "Line": [
+      {
+        "Amount": 1480.0,
+        "Description": "Wire, conduit, breakers for Harborview Phase 1 - units 7-12",
+        "AccountBasedExpenseLineDetail": {
+          "AccountRef": {
+            "name": "Materials and supplies",
+            "value": "200"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 1480.0,
+    "Balance": 1480.0
+  },
+  {
+    "Id": "3003",
+    "DocNumber": "APX-2026-10-05",
+    "VendorRef": {
+      "value": "2",
+      "name": "Apex Solar Distribution"
+    },
+    "TxnDate": "2026-10-05",
+    "DueDate": "2026-10-20",
+    "Line": [
+      {
+        "Amount": 2120.0,
+        "Description": "Solar PV mounting hardware - first inventory pull",
+        "AccountBasedExpenseLineDetail": {
+          "AccountRef": {
+            "name": "Materials and supplies",
+            "value": "200"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 2120.0,
+    "Balance": 0,
+    "PrivateNote": "Paid 2026-10-08 from solar reserve."
+  }
+]

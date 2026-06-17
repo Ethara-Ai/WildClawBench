@@ -1,0 +1,13 @@
+Id,Name,AccountType,AccountSubType,CurrentBalance,Active,Classification,Description
+100,Residential service income,Income,ServiceFeeIncome,0,True,Revenue,Residential electrical service revenue
+101,Commercial subcontract income,Income,ServiceFeeIncome,0,True,Revenue,Harborview + commercial work
+102,Solar line income (new),Income,SalesOfProductIncome,0,True,Revenue,Residential solar package income (launching)
+200,Materials and supplies,Expense,SuppliesMaterials,0,True,Expense,"Wire, conduit, breakers, fittings"
+201,Vehicle expense,Expense,Auto,0,True,Expense,F-150 fuel and maintenance
+202,Insurance — liability + GL,Expense,Insurance,0,True,Expense,Quarterly liability premium
+203,IBEW dues + continuing education,Expense,DuesSubscriptions,0,True,Expense,Local 494 dues + NABCEP exam fees
+204,Subcontractor labor,Expense,Other,0,True,Expense,Crew payroll routed via Gusto
+205,Tax penalties + interest,Expense,TaxesPaid,0,True,Expense,IRS Q3 underpayment interest accrual
+300,Business operating checking,Bank,Checking,18420.84,True,Asset,Primary operating account at Bay View Credit Union
+301,Solar line deposit reserve,Bank,Checking,8200.00,True,Asset,Earmarked for Solshine deposit + first inventory
+302,SEP-IRA business contribution,Equity,OwnerEquity,112400.00,True,Equity,Annual SEP-IRA contribution from business

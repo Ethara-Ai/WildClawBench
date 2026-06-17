@@ -1,0 +1,13 @@
+transaction_id,account_id,amount,iso_currency_code,date,name,merchant_name,category,pending,payment_channel
+TX-80001,acct_op_001,3889.38,USD,2026-09-15,Sarah Kapadia deposit,Sarah Kapadia deposit,Transfer,False,online
+TX-80002,acct_op_001,875.42,USD,2026-09-17,Brennan Properties — invoice,Brennan Properties,Transfer,False,online
+TX-80003,acct_op_001,2064.93,USD,2026-09-19,Harborview Condos GC — milestone,Harborview Condos GC,Transfer,False,online
+TX-80004,acct_op_001,-3492.03,USD,2026-09-22,Various residential aggregate,Various residential aggregate,Service,False,in store
+TX-80005,acct_op_001,-209.68,USD,2026-09-24,MES — restock charge,MES,Service,False,in store
+TX-80006,acct_op_001,2608.27,USD,2026-09-26,Solshine deposit reserve transfer,Solshine deposit reserve transfer,Transfer,False,online
+TX-80007,acct_op_001,-2250.97,USD,2026-09-29,Fuel station — Brewer's Hill,Fuel station,Service,False,in store
+TX-80008,acct_op_001,-1818.84,USD,2026-10-01,NABCEP exam fee,NABCEP exam fee,Service,False,in store
+TX-80009,acct_op_001,-1706.08,USD,2026-10-03,IBEW Local 494 dues,IBEW Local 494 dues,Service,False,in store
+TX-80010,acct_op_001,-2787.47,USD,2026-10-06,Phone bill,Phone bill,Service,False,in store
+TX-80011,acct_op_001,4167.12,USD,2026-10-08,Tony Rizzo — beer reimbursement,Tony Rizzo,Transfer,False,online
+TX-80012,acct_op_001,-2697.37,USD,2026-10-10,Lake Country Brewing,Lake Country Brewing,Service,False,in store

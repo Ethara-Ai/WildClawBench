@@ -1,0 +1,2 @@
+contact_id,name,first_name,last_name,email,is_customer,is_supplier,status,account_number
+xc_demo_001,Demo Customer (Xero),Demo,Customer,demo@example.com,true,false,ARCHIVED,DEMO-001

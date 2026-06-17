@@ -1,0 +1,10 @@
+id,name,type,messages_total,messages_unread,threads_total,threads_unread
+INBOX,INBOX,system,4218,47,2104,32
+SENT,SENT,system,1843,0,1320,0
+DRAFT,DRAFT,system,5,0,5,0
+STARRED,STARRED,system,24,2,24,2
+LBL_HARBOR,Harborview,user,38,4,21,3
+LBL_SOLAR,Solar Line,user,22,6,12,4
+LBL_NABCEP,NABCEP,user,14,1,7,1
+LBL_Q3TAX,Q3 Tax,user,7,1,4,1
+LBL_FAMILY,Family,user,41,2,28,2

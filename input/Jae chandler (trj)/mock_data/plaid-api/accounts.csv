@@ -1,0 +1,4 @@
+account_id,name,official_name,mask,type,subtype,available,current,limit,iso_currency_code
+acct_op_001,Business Operating Checking,Chandler Electric LLC — Operating,4218,depository,checking,18420.84,18420.84,,USD
+acct_solar_001,Solar Deposit Reserve,Chandler Electric LLC — Solar Deposit Reserve,8814,depository,checking,8200.00,8200.00,,USD
+acct_sep_001,SEP-IRA,Chandler Electric LLC — SEP-IRA,2901,investment,ira,112400.00,112400.00,,USD

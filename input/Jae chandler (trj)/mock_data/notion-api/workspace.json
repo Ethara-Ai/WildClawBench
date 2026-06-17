@@ -1,0 +1,14 @@
+{
+  "id": "ws_chandler_electric_2026",
+  "name": "Chandler Electric LLC",
+  "domain": "chandler-electric",
+  "owner_user_id": "usr_jae_chandler",
+  "plan": "team",
+  "created_time": "2024-01-15T10:00:00.000Z",
+  "icon": "https://www.notion.so/icons/lightning-bolt_orange.svg",
+  "settings": {
+    "default_page_size": 50,
+    "ai_blocks_enabled": true,
+    "public_sharing_enabled": false
+  }
+}

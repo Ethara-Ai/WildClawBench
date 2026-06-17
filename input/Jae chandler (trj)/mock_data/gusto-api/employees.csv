@@ -1,0 +1,5 @@
+id,company_id,first_name,last_name,email,department,job_title,rate,payment_unit,flsa_status,start_date,terminated
+EMP_001,gusto_ce_2026,Ryan,O'Malley,ryan.omalley.elec@gmail.com,Field,Lead Journeyman,52.00,hourly,Nonexempt,2020-06-04,false
+EMP_002,gusto_ce_2026,Danny,Flores,danny.flores.elec@gmail.com,Field,Journeyman,44.00,hourly,Nonexempt,2023-05-02,false
+EMP_003,gusto_ce_2026,Jake,Parsons,jake.parsons.elec@gmail.com,Field,Apprentice 4yr,32.00,hourly,Nonexempt,2022-08-15,false
+EMP_004,gusto_ce_2026,Jae,Chandler,jae@chandlerelectric.com,Owner,Owner-Operator,120000,owner_draw,Nonexempt,2014-03-01,false

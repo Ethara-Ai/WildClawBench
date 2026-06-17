@@ -1,0 +1,3 @@
+id,title,parent_page_id,created_time,last_edited_time,created_by,icon,archived
+db_supplier_leads,Supplier Leads,pg_solar_root,2026-08-20T08:00:00Z,2026-10-10T22:00:00Z,usr_jae_chandler,🏭,False
+db_homeowner_leads,First-Quote Homeowner Leads,pg_solar_root,2026-09-10T08:00:00Z,2026-10-11T08:30:00Z,usr_jae_chandler,🏠,False

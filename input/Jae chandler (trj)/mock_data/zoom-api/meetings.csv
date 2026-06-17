@@ -1,0 +1,3 @@
+id,host_id,topic,type,status,start_time,duration,timezone,join_url,agenda,created_at
+85099900001,user_jae_basic,NABCEP Recertification Webinar (attended as guest),8,finished,2025-03-12T18:00:00Z,90,America/Chicago,https://zoom.us/j/85099900001,External webinar attended as guest,2025-03-01T09:00:00Z
+85099900002,user_jae_basic,WI Solar Trade Association Q4 Town Hall,8,finished,2025-10-04T17:00:00Z,75,America/Chicago,https://zoom.us/j/85099900002,External town hall attended as guest,2025-09-20T09:00:00Z

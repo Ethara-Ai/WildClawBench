@@ -1,0 +1,74 @@
+[
+  {
+    "Id": "5001",
+    "DocNumber": "INV-2026-1001",
+    "TxnDate": "2026-10-01",
+    "DueDate": "2026-10-15",
+    "CustomerRef": {
+      "value": "1",
+      "name": "Harborview Condos GC (Greg Havlik)"
+    },
+    "Line": [
+      {
+        "Amount": 21240.0,
+        "Description": "Harborview Phase 1 - units 7-12 (6 units @ $3,540)",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Harborview unit-level subcontract"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 21240.0,
+    "Balance": 8490.0,
+    "Status": "PartiallyPaid"
+  },
+  {
+    "Id": "5002",
+    "DocNumber": "INV-2026-1008",
+    "TxnDate": "2026-10-08",
+    "DueDate": "2026-10-22",
+    "CustomerRef": {
+      "value": "5",
+      "name": "Various residential service calls"
+    },
+    "Line": [
+      {
+        "Amount": 3850.0,
+        "Description": "Residential 200A panel replacement - Bay View",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Residential panel replacement - 200A"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 3850.0,
+    "Balance": 0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "5003",
+    "DocNumber": "INV-2026-1010",
+    "TxnDate": "2026-10-10",
+    "DueDate": "2026-10-24",
+    "CustomerRef": {
+      "value": "5",
+      "name": "Various residential service calls"
+    },
+    "Line": [
+      {
+        "Amount": 580.0,
+        "Description": "Residential service calls - 4 hours @ $145",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Service call - residential (hr)"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 580.0,
+    "Balance": 580.0,
+    "Status": "Open"
+  }
+]

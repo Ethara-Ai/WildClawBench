@@ -1,0 +1,3 @@
+account_id,code,name,type,tax_type,status,description,enable_payments_to_account
+xa-demo-0000-0000-000000000001,1000,Demo Bank Account,BANK,NONE,ARCHIVED,Demo data from Xero free trial 2024-08,false
+xa-demo-0000-0000-000000000002,2000,Demo Revenue,REVENUE,OUTPUT,ARCHIVED,Trial chart of accounts; never imported real ledger,false

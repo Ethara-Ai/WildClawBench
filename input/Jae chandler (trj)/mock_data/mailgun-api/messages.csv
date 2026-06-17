@@ -1,0 +1,2 @@
+id,domain,sender,recipient,subject,body,timestamp
+mg_demo_001,mg.openclawenergy.com,welcome@mg.openclawenergy.com,jae@openclawenergy.com,Mailgun account verification,Welcome to Mailgun. Please verify your sending domain to begin.,2023-06-22T20:18:00Z

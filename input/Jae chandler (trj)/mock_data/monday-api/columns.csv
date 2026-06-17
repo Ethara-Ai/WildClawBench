@@ -1,0 +1,5 @@
+column_id,board_id,title,type,position
+COL_HARBOR_UNIT,BRD_HARBOR,Unit range,text,1
+COL_HARBOR_ASSIGN,BRD_HARBOR,Assignee,people,2
+COL_HARBOR_STATUS,BRD_HARBOR,Status,status,3
+COL_HARBOR_START,BRD_HARBOR,Start,date,4

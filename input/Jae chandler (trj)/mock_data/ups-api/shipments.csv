@@ -1,0 +1,3 @@
+tracking_number,service_code,service_name,ship_date,origin_zip,dest_zip,weight_lb,currency,total_charge,label_url
+1Z 5A1 4F1 03 9854 1234,03,UPS Ground,2026-10-09,53207,53207,48,USD,480,https://ups.com/labels/1Z 5A1 4F1 03 9854 1234.pdf
+1Z 5A1 4F1 03 9854 5678,02,UPS 2nd Day Air,2026-10-10,53207,53207,62,USD,1840,https://ups.com/labels/1Z 5A1 4F1 03 9854 5678.pdf

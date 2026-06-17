@@ -1,0 +1,3 @@
+id,company_id,pay_period_start,pay_period_end,check_date,processed,gross_pay,net_pay,employee_count
+PAY_2026Q3_M1,gusto_ce_2026,2026-09-15,2026-09-28,2026-09-30,True,9840.00,7280.50,5
+PAY_2026Q3_M2,gusto_ce_2026,2026-09-29,2026-10-12,2026-10-14,True,10120.00,7488.00,5

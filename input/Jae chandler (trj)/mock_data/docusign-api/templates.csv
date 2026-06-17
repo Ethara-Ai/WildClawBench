@@ -1,0 +1,4 @@
+template_id,name,description,shared,owner_name,created_time
+DS_TPL_001,Supplier Quote Acceptance,Standard supplier-side quote acceptance template,True,Jae Chandler,2026-08-15T08:00:00Z
+DS_TPL_002,Residential Contract — Solar,Residential solar install master contract,True,Jae Chandler,2026-09-10T08:00:00Z
+DS_TPL_003,Harborview Subcontract,Harborview Phase 1 GC subcontract template,False,Jae Chandler,2026-03-20T08:00:00Z

@@ -1,0 +1,4 @@
+item_id,board_id,group_id,name,created_at
+ITM_RYAN_HARBOR,BRD_HARBOR,GRP_HARBOR_WEEK,Ryan O'Malley — Harborview units 7-12,2026-10-11T20:30:00Z
+ITM_DJ_HARBOR,BRD_HARBOR,GRP_HARBOR_NEXT,Danny + Jake — Harborview units 13-18,2026-10-11T20:30:00Z
+ITM_RESID_WEEK,BRD_RESID,GRP_RESID_WEEK,Residential service-call rotation week of Oct 12,2026-10-11T08:00:00Z

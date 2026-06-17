@@ -1,0 +1,10 @@
+tableId,id,name,type
+tblContacts00001,fldContactNm0001,Name,singleLineText
+tblContacts00001,fldContactEml001,Email,email
+tblContacts00001,fldContactCo0001,Company,singleLineText
+tblContacts00001,fldContactRl0001,Role,singleLineText
+tblTasks00000001,fldTaskName00001,Name,singleLineText
+tblTasks00000001,fldTaskStatus001,Status,singleSelect
+tblTasks00000001,fldTaskProject01,Project,singleLineText
+tblTasks00000001,fldTaskHours0001,EstimateHours,number
+tblTasks00000001,fldTaskDone00001,Done,checkbox

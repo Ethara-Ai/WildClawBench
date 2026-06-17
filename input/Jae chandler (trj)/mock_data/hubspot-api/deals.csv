@@ -1,0 +1,5 @@
+id,dealname,pipeline,dealstage,amount,closedate,dealtype,associated_company,associated_contact,createdate,lastmodifieddate
+DEAL_001,Solshine Inverters — first supplier deal,Solar Suppliers,qualifiedtobuy,4200.00,2026-10-20T08:00:00Z,newbusiness,CO_001,CT_001,2026-09-28T08:00:00Z,2026-10-08T13:42:00Z
+DEAL_002,Apex Solar Distribution — first supplier deal,Solar Suppliers,appointmentscheduled,3650.00,2026-10-25T08:00:00Z,newbusiness,CO_002,CT_002,2026-10-01T08:00:00Z,2026-10-01T13:45:00Z
+DEAL_003,Northern Voltaic — first supplier deal,Solar Suppliers,appointmentscheduled,3900.00,2026-10-25T08:00:00Z,newbusiness,CO_003,CT_003,2026-10-01T08:00:00Z,2026-10-01T13:45:00Z
+DEAL_004,Harborview Phase 1 — $85k subcontract,Commercial,contractsent,85000.00,2026-11-04T08:00:00Z,newbusiness,CO_004,CT_007,2026-03-15T08:00:00Z,2026-10-09T16:42:00Z

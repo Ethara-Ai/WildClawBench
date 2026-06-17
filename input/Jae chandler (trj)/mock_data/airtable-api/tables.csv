@@ -1,0 +1,3 @@
+baseId,id,name,primaryFieldId,records_csv
+appCEsolarLeads2026,tblContacts00001,Solar Leads,fldContactNm0001,records_contacts.csv
+appCEcrewSched2026,tblTasks00000001,Crew Unit Assignments,fldTaskName00001,records_tasks.csv

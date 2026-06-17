@@ -1,0 +1,3 @@
+id,account_id,type,status,amount,currency,native_amount,native_currency,description,created_at
+tx_legacy_001,acc_jae_btc_legacy,buy,completed,0.00250000,BTC,150.00,USD,Initial test buy,2021-05-14T19:24:31Z
+tx_legacy_002,acc_jae_btc_legacy,sell,completed,-0.00209000,BTC,-92.40,USD,Partial sell after 6mo,2021-11-20T14:08:12Z

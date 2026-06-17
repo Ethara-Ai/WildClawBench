@@ -1,0 +1,4 @@
+id,summary,description,time_zone,access_role,primary,color_id
+cal_jae_primary,Jae Chandler (work),Primary work calendar — Chandler Electric LLC,America/Chicago,owner,True,1
+cal_chandler_family,Chandler Family,Shared with Mina + Yuna,America/Chicago,owner,False,9
+cal_crew_ops,Crew Ops (shared),"Shared with Ryan, Danny, Jake",America/Chicago,writer,False,5

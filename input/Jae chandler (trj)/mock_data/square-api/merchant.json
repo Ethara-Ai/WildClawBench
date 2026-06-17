@@ -1,0 +1,10 @@
+{
+  "id": "merchant_jae_trial",
+  "business_name": "OpenClaw Energy",
+  "country": "US",
+  "language_code": "en-US",
+  "currency": "USD",
+  "status": "TRIAL_EXPIRED",
+  "main_location_id": "LOC_TRIAL",
+  "created_at": "2025-04-17T14:22:00Z"
+}

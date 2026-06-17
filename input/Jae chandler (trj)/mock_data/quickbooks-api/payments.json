@@ -1,0 +1,44 @@
+[
+  {
+    "Id": "6001",
+    "TxnDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "1",
+      "name": "Harborview Condos GC (Greg Havlik)"
+    },
+    "TotalAmt": 12750.0,
+    "Line": [
+      {
+        "LinkedTxn": [
+          {
+            "TxnId": "5001",
+            "TxnType": "Invoice"
+          }
+        ],
+        "Amount": 12750.0
+      }
+    ],
+    "PrivateNote": "ACH from Harborview - partial Phase 1 payment."
+  },
+  {
+    "Id": "6002",
+    "TxnDate": "2026-10-12",
+    "CustomerRef": {
+      "value": "5",
+      "name": "Various residential service calls"
+    },
+    "TotalAmt": 3850.0,
+    "Line": [
+      {
+        "LinkedTxn": [
+          {
+            "TxnId": "5002",
+            "TxnType": "Invoice"
+          }
+        ],
+        "Amount": 3850.0
+      }
+    ],
+    "PrivateNote": "Check #4421"
+  }
+]

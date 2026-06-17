@@ -1,0 +1,9 @@
+id,parent_type,parent_id,title,created_time,last_edited_time,created_by,archived,icon,cover_url
+pg_nabcep_root,workspace,,NABCEP Study,2026-07-04T08:00:00Z,2026-10-10T20:00:00Z,usr_jae_chandler,False,📚,
+pg_nabcep_deck,page_id,pg_nabcep_root,Study Deck v3,2026-09-22T08:00:00Z,2026-10-10T20:00:00Z,usr_jae_chandler,False,🗂,
+pg_nabcep_ocp,page_id,pg_nabcep_deck,Overcurrent Protection,2026-09-22T08:00:00Z,2026-10-12T03:00:00Z,usr_jae_chandler,False,⚡,
+pg_nabcep_strings,page_id,pg_nabcep_deck,String sizing,2026-09-22T08:00:00Z,2026-09-22T08:00:00Z,usr_jae_chandler,False,⚡,
+pg_solar_root,workspace,,Lost Solar Line Launch,2026-08-12T08:00:00Z,2026-10-11T22:00:00Z,usr_jae_chandler,False,☀️,
+pg_supplier_shortlist,page_id,pg_solar_root,Supplier shortlist + cost notes,2026-09-28T20:00:00Z,2026-10-02T19:15:00Z,usr_jae_chandler,False,💵,
+pg_launch_plan,page_id,pg_solar_root,Launch week plan,2026-09-20T08:00:00Z,2026-10-10T21:00:00Z,usr_jae_chandler,False,🚀,
+pg_homeowner_drafts,page_id,pg_solar_root,First-quote homeowner draft notes,2026-10-05T08:00:00Z,2026-10-10T21:00:00Z,usr_jae_chandler,False,🏠,

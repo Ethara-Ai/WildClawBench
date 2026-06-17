@@ -1,0 +1,6 @@
+Id,DisplayName,GivenName,FamilyName,CompanyName,PrimaryEmailAddr,PrimaryPhone,BillAddr_Line1,BillAddr_City,BillAddr_CountrySubDivisionCode,BillAddr_PostalCode,Balance,Active,Job,Notes
+1,Harborview Condos GC (Greg Havlik),Greg,Havlik,Harborview Condos LLC,greg.havlik@harborview-condos.com,+14145558821,1801 S 1st St,Milwaukee,WI,53204,12750.00,True,Harborview Phase 1 — units 7-18,85k total contract this year. Confidential pricing sheet kept on file.
+2,Bay View Homeowner — Kapadia,Sarah,Kapadia,,sarah.kapadia@gmail.com,+14145554290,2841 S Logan Ave,Milwaukee,WI,53207,0,True,Solar — first-quote (Wed Oct 14 visit),"4-bed colonial, S-facing roof."
+3,Brennan Properties (Dale Brennan),Dale,Brennan,Brennan Properties LLC,dbrennan@brennanproperties-mke.com,+14145557110,4720 W Forest Home Ave,Greenfield,WI,53219,0,True,Solar — first-quote (Wed Oct 14 visit),"Triplex courtyard, 32-panel potential."
+4,Kowalski — Wauwatosa,Emma,Kowalski,,emma.kowalski.wfh@gmail.com,+14145552085,7218 W Center St,Wauwatosa,WI,53210,0,True,Solar — first-quote (Wed Oct 14 visit),Budget-conscious young family.
+5,Various residential service calls,,,,,,,Milwaukee,WI,53207,0,True,,Catchall residential aggregate.

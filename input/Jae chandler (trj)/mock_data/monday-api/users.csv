@@ -1,0 +1,5 @@
+user_id,name,email,title,is_admin
+USR_001,Jae Chandler,jae@chandlerelectric.com,Owner,True
+USR_002,Ryan O'Malley,ryan.omalley.elec@gmail.com,Lead Journeyman,False
+USR_003,Danny Flores,danny.flores.elec@gmail.com,Journeyman,False
+USR_004,Jake Parsons,jake.parsons.elec@gmail.com,Apprentice (4th yr),False

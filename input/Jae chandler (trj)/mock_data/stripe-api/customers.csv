@@ -1,0 +1,5 @@
+id,name,email,description,currency,delinquent,balance,created,phone
+cus_kapadia,Sarah Kapadia,sarah.kapadia@gmail.com,Bay View — solar lead,usd,false,0,1760170500,+14145554290
+cus_brennan,Dale Brennan,dbrennan@brennanproperties-mke.com,Greenfield — solar lead,usd,false,0,1760170680,+14145557110
+cus_kowalski,Emma Kowalski,emma.kowalski.wfh@gmail.com,Wauwatosa — solar lead,usd,false,0,1760170920,+14145552085
+cus_harbor,Harborview Condos LLC,greg.havlik@harborview-condos.com,Harborview GC,usd,false,0,1742068800,+14145558820

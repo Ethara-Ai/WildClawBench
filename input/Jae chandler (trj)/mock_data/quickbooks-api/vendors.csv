@@ -1,0 +1,6 @@
+Id,DisplayName,CompanyName,PrimaryEmailAddr,PrimaryPhone,BillAddr_Line1,BillAddr_City,BillAddr_CountrySubDivisionCode,BillAddr_PostalCode,Balance,Active,AcctNum,Vendor1099
+1,Solshine Inverters,Solshine Inverters Inc.,billing@solshine-inverters.com,+16085554900,412 Industrial Park Dr,Madison,WI,53718,0,True,CE-2026-SOL,False
+2,Apex Solar Distribution,Apex Solar Distribution LLC,billing@apexsolardist.com,+13125557420,1100 Apex Industrial Way,Schaumburg,IL,60173,0,True,CE-2026-APX,False
+3,Northern Voltaic Co,Northern Voltaic Co,billing@northernvoltaic.co,+17155558130,2208 Lakeshore Dr,Eau Claire,WI,54701,0,True,CE-2026-NV,False
+4,Milwaukee Electric Supply,Milwaukee Electric Supply Co.,ar@mkesupply.com,+14145559200,1801 S Pennsylvania Ave,Milwaukee,WI,53215,1480.00,True,CE-MES-0214,False
+5,IRS — federal taxes,Internal Revenue Service,,,,Kansas City,MO,64999,0,True,EIN-CE-2024,False

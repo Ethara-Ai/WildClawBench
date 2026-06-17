@@ -1,0 +1,3 @@
+board_id,workspace_id,name,description,state,board_kind
+BRD_HARBOR,WS_001,Harborview Crew Board,Live crew board for Harborview Phase 1 - visual unit assignment,active,public
+BRD_RESID,WS_001,Residential Service Calls,Weekly residential service-call rotation,active,public

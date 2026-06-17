@@ -1,0 +1,4 @@
+group_id,board_id,title,color,position
+GRP_HARBOR_WEEK,BRD_HARBOR,Week of Oct 12,#FF7800,1
+GRP_HARBOR_NEXT,BRD_HARBOR,Week of Oct 19,#0086C0,2
+GRP_RESID_WEEK,BRD_RESID,Week of Oct 12,#00C875,1

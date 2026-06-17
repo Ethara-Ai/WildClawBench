@@ -1,0 +1,3 @@
+tracking_number,service_type,service_name,ship_date,origin_zip,dest_zip,weight_lb,currency,net_charge,label_url
+770214856732,FEDEX_GROUND,FedEx Ground,2026-10-11,53207,53207,42,USD,920,https://fedex.com/labels/770214856732.pdf
+770214856801,FEDEX_2_DAY,FedEx 2Day,2026-10-12,53207,53207,28,USD,640,https://fedex.com/labels/770214856801.pdf

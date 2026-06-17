@@ -1,0 +1,4 @@
+id,user_id,caption,media_type,media_url,permalink,thumbnail_url,timestamp,like_count,comments_count,is_comment_enabled
+MEDIA_001,IG_CE_001,200A service upgrade — South Shore. Clean panel. Clean run.,IMAGE,https://cdninstagram.example/ce_001.jpg,https://instagram.com/p/CE0001,,2026-09-12T17:00:00Z,0,0,true
+MEDIA_002,IG_CE_001,Harborview Phase 1 progress shot — Ryan and the crew putting in the work.,IMAGE,https://cdninstagram.example/ce_002.jpg,https://instagram.com/p/CE0002,,2026-09-28T16:30:00Z,0,0,true
+MEDIA_003,IG_CE_001,GFCI receptacle replacements around the kitchen. Friday DIY tip in the captions.,CAROUSEL,https://cdninstagram.example/ce_003.jpg,https://instagram.com/p/CE0003,,2026-10-03T13:15:00Z,0,0,true

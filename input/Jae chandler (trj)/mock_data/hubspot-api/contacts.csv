@@ -1,0 +1,9 @@
+id,firstname,lastname,email,phone,jobtitle,company,lifecyclestage,createdate,lastmodifieddate
+CT_001,Jordan,Reyes,jordan.reyes@solshine-inverters.com,+16085554910,Midwest Regional Manager,Solshine Inverters,salesqualifiedlead,2026-08-15T08:00:00Z,2026-10-08T13:42:00Z
+CT_002,Mike,Falkenburg,sales@apexsolardist.com,+13125557420,Midwest Sales Rep,Apex Solar Distribution,salesqualifiedlead,2026-09-30T08:00:00Z,2026-09-30T09:20:00Z
+CT_003,Kareem,Johnson,kareem.johnson@northernvoltaic.co,+17155558130,Wisconsin Distributor Rep,Northern Voltaic Co,salesqualifiedlead,2026-10-01T08:00:00Z,2026-10-01T13:45:00Z
+CT_004,Sarah,Kapadia,sarah.kapadia@gmail.com,+14145554290,Homeowner — Bay View,,lead,2026-10-11T08:15:00Z,2026-10-11T08:15:00Z
+CT_005,Dale,Brennan,dbrennan@brennanproperties-mke.com,+14145557110,Property Manager,Brennan Properties LLC,lead,2026-10-11T08:18:00Z,2026-10-11T08:18:00Z
+CT_006,Emma,Kowalski,emma.kowalski.wfh@gmail.com,+14145552085,Homeowner — Wauwatosa,,lead,2026-10-11T08:22:00Z,2026-10-11T08:22:00Z
+CT_007,Greg,Havlik,greg.havlik@harborview-condos.com,+14145558821,"GC, Phase 1",Harborview Condos LLC,customer,2026-03-15T08:00:00Z,2026-10-09T16:42:00Z
+CT_008,Tony,Rizzo,tony.rizzo.plumbing@gmail.com,+14145554712,Owner,Rizzo Plumbing,other,2024-01-08T08:00:00Z,2024-01-08T08:00:00Z

@@ -1,0 +1,5 @@
+identifier,image,caption,date,centroid_lat,centroid_lon
+bay_view_53207_january,data/nasa_milwaukee_irradiance_chart.png,Bay View Milwaukee WI 53207 monthly GHI january=2.1 kWh/m^2/day; annual_average=4.5 kWh/m^2/day; cache_revision=2026-10-12; address_key=bay_view_milwaukee_wi_53207,2026-01-15,42.9883,-87.8987
+bay_view_53207_april,data/nasa_milwaukee_irradiance_chart.png,Bay View Milwaukee WI 53207 monthly GHI april=4.7 kWh/m^2/day; annual_average=4.5 kWh/m^2/day; cache_revision=2026-10-12; address_key=bay_view_milwaukee_wi_53207,2026-04-15,42.9883,-87.8987
+bay_view_53207_july,data/nasa_milwaukee_irradiance_chart.png,Bay View Milwaukee WI 53207 monthly GHI july=6.3 kWh/m^2/day; annual_average=4.5 kWh/m^2/day; cache_revision=2026-10-12; address_key=bay_view_milwaukee_wi_53207,2026-07-15,42.9883,-87.8987
+bay_view_53207_october,data/nasa_milwaukee_irradiance_chart.png,Bay View Milwaukee WI 53207 monthly GHI october=3.6 kWh/m^2/day; annual_average=4.5 kWh/m^2/day; cache_revision=2026-10-12; address_key=bay_view_milwaukee_wi_53207,2026-10-15,42.9883,-87.8987

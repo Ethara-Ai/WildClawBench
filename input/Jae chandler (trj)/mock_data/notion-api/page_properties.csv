@@ -1,0 +1,5 @@
+page_id,property_name,property_type,value
+pg_nabcep_ocp,NEC Reference,rich_text,690.9(A)
+pg_nabcep_ocp,Card Version,select,v4
+pg_supplier_shortlist,Status,select,Pre-formal-quote
+pg_supplier_shortlist,Solshine Est USD,number,3800

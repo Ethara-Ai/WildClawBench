@@ -1,0 +1,73 @@
+[
+  {
+    "Id": "5201",
+    "TxnDate": "2026-10-01",
+    "TotalAmt": 412.0,
+    "Line": [
+      {
+        "Description": "F-150 fuel + maintenance - October",
+        "Amount": 412.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-10-01T09:00:00-05:00"
+    }
+  },
+  {
+    "Id": "5202",
+    "TxnDate": "2026-10-03",
+    "TotalAmt": 285.0,
+    "Line": [
+      {
+        "Description": "NABCEP exam fee - October 16 sitting",
+        "Amount": 285.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-10-03T10:15:00-05:00"
+    }
+  },
+  {
+    "Id": "5203",
+    "TxnDate": "2026-10-05",
+    "TotalAmt": 165.0,
+    "Line": [
+      {
+        "Description": "IBEW Local 494 quarterly dues",
+        "Amount": 165.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-10-05T11:00:00-05:00"
+    }
+  },
+  {
+    "Id": "5204",
+    "TxnDate": "2026-10-08",
+    "TotalAmt": 2120.0,
+    "Line": [
+      {
+        "Description": "Apex Solar Distribution - mounting hardware (Bill 3003 paid)",
+        "Amount": 2120.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-10-08T14:30:00-05:00"
+    }
+  },
+  {
+    "Id": "5205",
+    "TxnDate": "2026-10-15",
+    "TotalAmt": 87.5,
+    "Line": [
+      {
+        "Description": "IRS Q3 underpayment interest - 8.5% rate",
+        "Amount": 87.5
+      }
+    ],
+    "PrivateNote": "Q3 2026 federal rate jumped from 8.0% (Q2) to 8.5%.",
+    "MetaData": {
+      "CreateTime": "2026-10-15T08:00:00-05:00"
+    }
+  }
+]

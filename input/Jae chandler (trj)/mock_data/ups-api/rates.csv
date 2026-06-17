@@ -1,0 +1,2 @@
+service_code,service_name,origin_zip,dest_zip,weight_lb,currency,total_charge,transit_days,delivery_date
+03,UPS Ground,53215,53207,48,USD,18.40,4,

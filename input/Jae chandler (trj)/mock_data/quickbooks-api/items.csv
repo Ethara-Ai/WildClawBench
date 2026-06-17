@@ -1,0 +1,5 @@
+Id,Name,Description,Type,UnitPrice,IncomeAccountRef_value,IncomeAccountRef_name,Active,Taxable
+1,Residential panel replacement — 200A,Full 200A panel + breakers + permit,Service,3850.00,100,Residential service income,True,True
+2,Service call — residential (hr),Hourly residential service,Service,145.00,100,Residential service income,True,True
+3,Solar package — 12-panel (placeholder),"TBD final, baseline residential 12-panel install",Service,18500.00,102,Solar line income (new),True,True
+4,Harborview unit-level subcontract,Per-unit Harborview Phase 1,Service,3540.00,101,Commercial subcontract income,True,False

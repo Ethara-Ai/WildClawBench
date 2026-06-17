@@ -1,0 +1,5 @@
+envelope_id,status,email_subject,sender_name,sender_email,created_time,sent_time,completed_time,template_id
+DS-ENV-2026-1008-1342,completed,"Solshine Inverters — quote v1 $4,200 deposit (superseded)",Jordan Reyes,jordan.reyes@solshine-inverters.com,2026-10-08T13:42:00Z,2026-10-08T13:42:00Z,2026-10-08T14:11:00Z,DS_TPL_001
+DS-ENV-2026-1016-1120,sent,"Solshine Inverters — quote v2 $4,650 deposit (freight surcharge applied +$450)",Jordan Reyes,jordan.reyes@solshine-inverters.com,2026-10-16T11:20:00Z,2026-10-16T11:20:00Z,,DS_TPL_001
+DS-ENV-2026-0903-0900,completed,Harborview Phase 1 — subcontract sign-off,Greg Havlik,greg.havlik@harborview-condos.com,2026-09-03T09:00:00Z,2026-09-03T09:00:00Z,2026-09-04T16:14:00Z,DS_TPL_003
+DS-ENV-2026-0815-1430,completed,Apex Solar Distribution — supplier baseline acknowledgement,Mike Falkenburg,sales@apexsolardist.com,2026-08-15T14:30:00Z,2026-08-15T14:30:00Z,2026-08-15T16:48:00Z,DS_TPL_001

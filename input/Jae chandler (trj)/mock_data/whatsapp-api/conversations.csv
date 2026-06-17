@@ -1,0 +1,6 @@
+conversation_id,wa_id,started_at,last_message_at,origin,within_24h_window
+CONV_001,14145555540,2024-06-04T08:00:00Z,2026-10-11T21:00:00Z,business_initiated,False
+CONV_002,14145555479,2024-02-01T08:00:00Z,2026-10-14T21:30:00Z,user_initiated,True
+CONV_003,14145554712,2024-01-08T08:00:00Z,2026-10-09T20:00:00Z,user_initiated,False
+CONV_004,14145559240,2026-10-14T14:30:00Z,2026-10-14T14:30:00Z,user_initiated,True
+CONV_005,14145558821,2026-03-15T08:00:00Z,2026-10-09T16:50:00Z,business_initiated,False

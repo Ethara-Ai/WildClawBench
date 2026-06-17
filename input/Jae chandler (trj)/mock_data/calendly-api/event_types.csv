@@ -1,0 +1,3 @@
+uuid,owner,name,slug,duration,kind,color,active,description,scheduling_url,created_at
+https://api.calendly.com/event_types/ET_SOLAR_CONSULT,https://api.calendly.com/users/JAE001,Solar consult — initial site visit,solar-consult-site-visit,60,solo,#0069ff,True,,https://calendly.com/jae-chandler/solar-consult-site-visit,2026-09-15T08:00:00Z
+https://api.calendly.com/event_types/ET_SERVICE_CALL,https://api.calendly.com/users/JAE001,Residential service call,residential-service-call,45,solo,#0069ff,True,,https://calendly.com/jae-chandler/residential-service-call,2024-04-01T08:00:00Z

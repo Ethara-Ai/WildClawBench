@@ -1,0 +1,7 @@
+message_id,conversation_id,direction,from_wa_id,to_wa_id,type,text,template_name,status,sent_at
+WMSG_001,CONV_001,outbound,14145553010,14145555540,text,Mon AM start units 7-12 confirmed. Truck rolls 06:00. Bring the new combiner kit.,,delivered,2026-10-11T21:00:00Z
+WMSG_002,CONV_001,inbound,14145555540,14145553010,text,Got it. See you 6.,,read,2026-10-11T21:02:00Z
+WMSG_010,CONV_002,inbound,14145555479,14145553010,text,Love don't forget Yuna's concert is Sat Oct 24 at 7. She has the solo.,,read,2026-10-14T21:30:00Z
+WMSG_020,CONV_003,inbound,14145554712,14145553010,text,Fish fry Friday still on?,,read,2026-10-09T20:00:00Z
+WMSG_021,CONV_003,outbound,14145553010,14145554712,text,Always.,,delivered,2026-10-09T20:01:00Z
+WMSG_030,CONV_004,inbound,14145559240,14145553010,text,"Hey Jae - this is Marcus. I manage 3 Wauwatosa rentals (Center St, Watertown Plank, 70th). Your name came up from a friend. What's your per-panel solar rate? Trying to benchmark 3 quotes today, need numbers fast.",,delivered,2026-10-14T14:30:00Z
