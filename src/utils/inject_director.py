@@ -121,10 +121,18 @@ def _coerce_mutation_buckets(raw_muts: Any) -> Tuple[list, list, list]:
             if not isinstance(op, dict):
                 continue
             bucket = op.get("bucket") or op.get("kind")
-            if op.get("silent") is True or bucket == "silent":
-                silent.append(op)
-            elif "action" in op or bucket == "filesystem":
+            # Filesystem indicators MUST be checked before the silent flag: an
+            # op can carry silent:true AND service:"filesystem", but it is still
+            # a host-side workspace mutation that has no admin-plane endpoint.
+            is_filesystem = (
+                op.get("service") == "filesystem"
+                or bucket == "filesystem"
+                or "action" in op
+            )
+            if is_filesystem:
                 fs.append(op)
+            elif op.get("silent") is True or bucket == "silent":
+                silent.append(op)
             elif op.get("service") or op.get("path"):
                 # An API op with no explicit silent flag in list form: treat as
                 # loud (visible) by default — silent must be opted into.
@@ -302,9 +310,13 @@ def parse_prompts_file(path: Path | str) -> List[str]:
 # the columns that hold a human/business key we can match a placeholder against.
 # Each entry: (candidate_table_prefixes, business_key_columns).
 _SERVICE_RESOLUTION = {
-    "airtable-api": (("records_",), ("PlotID", "plot_id", "Name", "name", "id")),
+    "airtable-api": (
+        ("records_",),
+        ("PlotID", "plot_id", "Name", "name", "SKU", "sku", "record_id", "RecordID", "id"),
+    ),
     "notion-api": (("pages",), ("title", "Name", "name", "id")),
     "confluence-api": (("pages",), ("title", "Name", "name", "id")),
+    "woocommerce-api": (("products",), ("sku", "SKU", "slug", "name", "id")),
 }
 
 
@@ -380,8 +392,11 @@ class InjectApplier:
     # -- filesystem ---------------------------------------------------------
 
     def _apply_filesystem(self, op: Dict[str, Any], stage: InjectStage) -> Dict[str, Any]:
-        action = op.get("action")
-        dst = op.get("dst")
+        # Talos export nests fs verbs under op.fs.{op,dest|target,source}; legacy stages use top-level action/dst/src.
+        fs_env = op.get("fs") if isinstance(op.get("fs"), dict) else {}
+        action = op.get("action") or fs_env.get("op")
+        dst = op.get("dst") or fs_env.get("dest") or fs_env.get("target")
+        src = op.get("src") or fs_env.get("source")
         rec = {"id": op.get("id"), "action": action, "dst": dst}
         if self._copy is None or self._inject_root is None:
             rec.update(ok=False, status="skipped", reason="no workspace copy hook")
@@ -392,7 +407,17 @@ class InjectApplier:
             rec.update(ok=bool(ok), status="mkdir")
             self._append({"type": "inject.fs", **rec, "ts": time.time()})
             return rec
-        src = op.get("src")
+        if action == "patch_csv":
+            # CSV row-patching requires read-modify-write against the workspace,
+            # which the current ``self._copy`` hook does not expose. Emit a
+            # detailed unsupported record so the missed mutation is debuggable
+            # from inject_timeline.jsonl rather than silently lost.
+            rows = fs_env.get("rows") if isinstance(fs_env.get("rows"), list) else []
+            rec.update(ok=False, status="unsupported", action="patch_csv",
+                       target=dst, rows=len(rows),
+                       reason="patch_csv requires a workspace read-modify-write hook (not implemented)")
+            self._append({"type": "inject.fs", **rec, "ts": time.time()})
+            return rec
         if not src or not dst:
             rec.update(ok=False, status="skipped", reason="missing src/dst")
             self._append({"type": "inject.fs", **rec, "ts": time.time()})
@@ -634,6 +659,8 @@ class InjectApplier:
     def _apply_api_mutation(self, op: Dict[str, Any], stage: InjectStage,
                             turn_index: int, silent: bool) -> Dict[str, Any]:
         api = op.get("service") or op.get("api")
+        if api == "filesystem":
+            return self._apply_filesystem(op, stage)
         rec = {"id": op.get("id"), "service": api, "method": op.get("method"),
                "path": op.get("path"), "silent": silent}
         if not api or api not in self._urls:
@@ -645,7 +672,8 @@ class InjectApplier:
         # and the values to set. Dispatched directly — no fuzzy path resolution.
         if isinstance(op.get("admin"), dict):
             return self._apply_admin_op(api, op["admin"], op, silent)
-        resolved = self._resolve_target(api, op)
+        diag: Dict[str, Any] = {}
+        resolved = self._resolve_target(api, op, diag=diag)
         if resolved is None:
             params = op.get("params") if isinstance(op.get("params"), dict) else None
             if params and params.get("filter") and not params.get("field_updates"):
@@ -656,7 +684,7 @@ class InjectApplier:
                           f"filter={params.get('filter')!r})")
             else:
                 reason = "could not locate target row in live store"
-            rec.update(ok=False, status="unresolved", reason=reason)
+            rec.update(ok=False, status="unresolved", reason=reason, diag=diag)
             self._append({"type": "inject.api", **rec, "ts": time.time()})
             return rec
         table, pk, fields = resolved
@@ -667,7 +695,8 @@ class InjectApplier:
         self._append({"type": "inject.api", **rec, "ts": time.time()})
         return rec
 
-    def _resolve_target(self, api: str, op: Dict[str, Any]
+    def _resolve_target(self, api: str, op: Dict[str, Any],
+                        diag: Optional[Dict[str, Any]] = None
                         ) -> Optional[Tuple[str, str, Dict[str, Any]]]:
         """Resolve a Talos REST mutation to (table, pk, fields) against live state.
 
@@ -687,20 +716,31 @@ class InjectApplier:
             single-row patch and resolve to None (logged distinctly upstream).
         """
         new_fields = self._extract_fields(op)
+        if diag is not None:
+            diag["fields_extracted"] = list(new_fields.keys())
         if not new_fields:
+            if diag is not None:
+                diag["miss"] = "no fields extracted from op envelope"
             return None
         key = self._extract_key_from_op(op)
         prefixes, key_cols = _SERVICE_RESOLUTION.get(api, ((), ("id",)))
+        if diag is not None:
+            diag.update(key=key, prefixes=list(prefixes), key_cols=list(key_cols))
         # /admin/tables returns {"tables":[{name,...}], "documents":[...]}.
         tbl_resp = self._admin_get(api, "/admin/tables")
         tlist = tbl_resp.get("tables", []) if isinstance(tbl_resp, dict) else (tbl_resp or [])
         table_names = [t.get("name") if isinstance(t, dict) else t for t in tlist]
         candidates = [t for t in table_names
                       if any(str(t).startswith(p) for p in prefixes)] or table_names
+        if diag is not None:
+            diag["candidates"] = list(candidates)
+        rows_scanned = 0
         for table in candidates:
             # /admin/data/{table} returns {"rows":[{id, ..., fields:{...}}]}.
             data = self._admin_get(api, f"/admin/data/{table}")
             rows = data.get("rows", data.get("data", [])) if isinstance(data, dict) else (data or [])
+            if isinstance(rows, list):
+                rows_scanned += len(rows)
             for row in rows:
                 if not isinstance(row, dict):
                     continue
@@ -728,6 +768,9 @@ class InjectApplier:
                 else:
                     patch_fields = mapped
                 return table, str(pk), patch_fields
+        if diag is not None:
+            diag["rows_scanned"] = rows_scanned
+            diag["miss"] = "no row matched key in any candidate table"
         return None
 
     @staticmethod
@@ -737,7 +780,11 @@ class InjectApplier:
         if isinstance(params, dict) and isinstance(params.get("field_updates"), dict):
             return {k: v for k, v in params["field_updates"].items()
                     if not str(k).startswith("_")}
-        body = op.get("body") or {}
+        body = op.get("body")
+        if not isinstance(body, dict):
+            http_env = op.get("http")
+            if isinstance(http_env, dict):
+                body = http_env.get("body")
         if not isinstance(body, dict):
             return {}
         if isinstance(body.get("fields"), dict):
@@ -764,6 +811,16 @@ class InjectApplier:
                 # record_id may itself be a store pk (recUDI007) or a business
                 # key; _bag_matches_key handles both, but strip any rec_/page_ wrap.
                 return re.sub(r"^(rec_|page_id_|id_|page_)", "", str(rid)).strip() or None
+        # Talos http envelope: real REST URL with no curly-brace placeholder, so
+        # the last path segment IS the store pk verbatim (e.g. airtable
+        # ``recInvESY00000001`` or woocommerce numeric ``2501``). Do NOT strip a
+        # ``rec`` prefix that is part of the actual record id.
+        http_env = op.get("http")
+        if isinstance(http_env, dict) and isinstance(http_env.get("url"), str):
+            url = re.sub(r"\{[A-Z][A-Z0-9_]*\}", "", http_env["url"])
+            url = url.split("?", 1)[0].split("#", 1)[0]
+            tail = url.rstrip("/").rsplit("/", 1)[-1]
+            return tail.strip() or None
         return cls._extract_key_from_path(op.get("path", ""))
 
     @staticmethod

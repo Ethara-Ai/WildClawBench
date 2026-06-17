@@ -386,6 +386,7 @@ def execute_tests(
     image: str = "wildclawbench-ubuntu:v1.3",
     timeout: int = 300,
     state: Optional[Mapping[str, Any]] = None,
+    agent_output_dir: Optional[Path] = None,
 ) -> Dict[str, Any]:
     """Run `test_code` against the live mock stack. Returns a test_result dict.
 
@@ -393,7 +394,11 @@ def execute_tests(
     `file_exists("path/file")` and `read_file("path/file")` resolve relative to
     the agent's produced artifacts. `mock_env_dict` carries <SVC>_URL env vars
     pointing at the running mock-stack container hostnames; `network` is the
-    docker network those containers live on.
+    docker network those containers live on. When `agent_output_dir` is supplied
+    and exists, it is mounted read-only at /agent_outputs and exported as
+    `AGENT_OUTPUT_DIR=/agent_outputs` so writeback-style tests can locate the
+    agent's saved reports (the test file's default of `<TASK_ROOT>/data/agent_outputs`
+    points inside the /tests mount, which is never where the agent writes).
     """
     if not test_code.strip():
         return {
@@ -426,6 +431,12 @@ def execute_tests(
             "-v", f"{ws_mount}:/tmp_workspace:ro",
             "-w", "/tmp_workspace",
         ]
+        agent_out_env: Dict[str, str] = {}
+        if agent_output_dir is not None:
+            ao_path = Path(agent_output_dir)
+            if ao_path.is_dir():
+                cmd += ["-v", f"{ao_path}:/agent_outputs:ro"]
+                agent_out_env["AGENT_OUTPUT_DIR"] = "/agent_outputs"
         if network:
             cmd += ["--network", network]
 
@@ -448,6 +459,8 @@ def execute_tests(
             "NO_PROXY": no_proxy_value,
         }
         for k, v in proxy_env.items():
+            cmd += ["-e", f"{k}={v}"]
+        for k, v in agent_out_env.items():
             cmd += ["-e", f"{k}={v}"]
 
         for k, v in (mock_env_dict or {}).items():

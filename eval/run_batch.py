@@ -1470,6 +1470,7 @@ def run_single_task(
                         ws / "spawn_tree.jsonl",
                         task.get("multi_agent_config"),
                     )
+                artifacts_dir = output_dir / "task_output" / "artifacts"
                 te = _exec_tests(
                     test_code=task["test_code"],
                     test_weights_json=task.get("test_weights") or "{}",
@@ -1479,6 +1480,7 @@ def run_single_task(
                     image=getattr(config, "docker_image", "wildclawbench-ubuntu:v1.3") if config else "wildclawbench-ubuntu:v1.3",
                     timeout=testexec_timeout,
                     state=state,
+                    agent_output_dir=artifacts_dir if artifacts_dir.is_dir() else None,
                 )
                 result["test_result"] = te
                 verifier_dir = output_dir / "task_output" / "logs" / "verifier"
@@ -1502,6 +1504,18 @@ def run_single_task(
                     encoding="utf-8")
                 (verifier_dir / "test_output.log").write_text(
                     te.get("test_output", "") or "", encoding="utf-8")
+                try:
+                    from src.utils.harness_health import summarize_inject_timeline
+                    _hh = summarize_inject_timeline(output_dir / "inject_timeline.jsonl")
+                    (verifier_dir / "harness_health.json").write_text(
+                        json.dumps(_hh, indent=2, ensure_ascii=False), encoding="utf-8")
+                    if _hh["inject"]["unresolved"] or _hh["inject"]["unsupported"]:
+                        logger.warning(
+                            "[%s] harness_health: %d unresolved / %d unsupported inject ops — see harness_health.json",
+                            task_id, _hh["inject"]["unresolved"], _hh["inject"]["unsupported"],
+                        )
+                except Exception as _hh_exc:
+                    logger.debug("[%s] harness_health emit failed: %s", task_id, _hh_exc)
                 err_suffix = ""
                 if te["tests_total"] == 0 and te.get("error"):
                     err_suffix = f" ERROR={te['error']}"

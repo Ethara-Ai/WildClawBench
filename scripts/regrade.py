@@ -129,6 +129,27 @@ def _pick_results_dir(run_dir: Path) -> Path:
     return run_dir / "task_output" / "workspace_full"
 
 
+def _restore_real_test_counts(run_dir: Path, scores: dict) -> None:
+    """Overwrite the deprecated tests_* alias with the real pytest counts from
+    the verifier's ctrf.json (written by the original run's test executor).
+    No-op if ctrf.json is missing or unreadable — leaves the alias in place."""
+    ctrf = run_dir / "task_output" / "logs" / "verifier" / "ctrf.json"
+    try:
+        summary = json.loads(ctrf.read_text(encoding="utf-8"))["results"]["summary"]
+    except (OSError, KeyError, ValueError) as exc:
+        print(f"[regrade] ctrf.json not usable ({exc}); tests_* left as criteria alias",
+              file=sys.stderr)
+        return
+    scores["tests_total"] = summary.get("tests", scores.get("tests_total"))
+    scores["tests_passed"] = summary.get("passed", scores.get("tests_passed"))
+    scores["tests_failed"] = summary.get("failed", scores.get("tests_failed"))
+    scores["tests_errored"] = summary.get("other", 0)
+    scores["tests_skipped"] = summary.get("skipped", 0)
+    print(f"[regrade] restored real pytest counts from ctrf.json: "
+          f"total={scores['tests_total']} passed={scores['tests_passed']} "
+          f"failed={scores['tests_failed']}", file=sys.stderr)
+
+
 def regrade(run_dir: Path, rubric_override: Path | None = None) -> dict:
     if not run_dir.is_dir():
         raise SystemExit(f"run_dir does not exist or is not a directory: {run_dir}")
@@ -160,6 +181,12 @@ def regrade(run_dir: Path, rubric_override: Path | None = None) -> dict:
         transcript_text=transcript_text,
         use_council=True,
     )
+
+    # grade_with_rubric sets tests_* as a deprecated alias of criteria_* (no
+    # pytest runs during a regrade). Restore the REAL pytest signal from the
+    # verifier's ctrf.json so score.json keeps the genuine test counts (e.g.
+    # 24/15/9) instead of clobbering them with the rubric criteria count.
+    _restore_real_test_counts(run_dir, scores)
 
     score_path = run_dir / "score.json"
     score_path.write_text(json.dumps(scores, indent=2, ensure_ascii=False), encoding="utf-8")
