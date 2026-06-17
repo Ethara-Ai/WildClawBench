@@ -366,3 +366,30 @@ def report_ar_aging(realm_id: str):
 @app.get("/v3/company/{realm_id}/reports/AgedPayableDetail")
 def report_ap_aging(realm_id: str):
     return quickbooks_data.accounts_payable_aging()
+
+
+# --- Supplemental documents (previously unwired seed files) ---
+
+@app.get("/v3/company/{realm_id}/company")
+def get_company_raw(realm_id: str):
+    return quickbooks_data.get_company_raw()
+
+
+@app.get("/v3/company/{realm_id}/billpayments")
+def get_bill_payments(realm_id: str):
+    return quickbooks_data.get_bill_payments()
+
+
+@app.get("/v3/company/{realm_id}/reports/BreakEvenAnalysis")
+def report_break_even(realm_id: str):
+    return quickbooks_data.get_break_even_analysis()
+
+
+@app.get("/v3/company/{realm_id}/documents/CorporateExpenseLedger")
+def get_corporate_expense_ledger(realm_id: str):
+    return quickbooks_data.get_corporate_expense_ledger()
+
+
+@app.get("/v3/company/{realm_id}/documents/ReimbursementPolicy")
+def get_reimbursement_policy(realm_id: str):
+    return quickbooks_data.get_reimbursement_policy()

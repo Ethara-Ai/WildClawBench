@@ -13,16 +13,16 @@ BLOB_DIR = DATA_DIR / "file_blobs"
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_int, opt_str, strict_bool,
+    read_seed_with_ctx, get_store, opt_int, opt_str, strict_bool,
     DownloadError, extract_file_content_text)
 
 _store = get_store("google-drive-api")
 _API = "google-drive-api"
 
 _store.register("files", primary_key="id",
-                initial_loader=lambda: _coerce_files(_load("files.csv", "files")))
+                initial_loader=lambda: _coerce_files(_load("files.json", "files")))
 _store.register("permissions", primary_key="id",
-                initial_loader=lambda: [_strip_ctx(r) for r in _load("permissions.csv", "permissions")])
+                initial_loader=lambda: [_strip_ctx(r) for r in _load("permissions.json", "permissions")])
 _store.register_document("about", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "about.json", encoding="utf-8")))
 
 
@@ -40,7 +40,7 @@ def _about_doc():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):

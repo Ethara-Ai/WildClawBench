@@ -10,13 +10,13 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_int, opt_str, strict_int)
+    read_seed_with_ctx, get_store, opt_int, opt_str, strict_int)
 _store = get_store("ring-api")
 _API = "ring-api"
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):
@@ -100,17 +100,17 @@ _store.register_document("location", initial_loader=lambda: _load_json("location
 _store.register_document("active_dings", initial_loader=lambda: _load_json("active_dings.json"))
 
 _store.register("events", primary_key="id",
-                initial_loader=lambda: _coerce_events(_load("events.csv", "events")))
+                initial_loader=lambda: _coerce_events(_load("events.json", "events")))
 _store.register("shared_users", primary_key="user_id",
-                initial_loader=lambda: _coerce_shared_users(_load("shared_users.csv", "shared_users")))
+                initial_loader=lambda: _coerce_shared_users(_load("shared_users.json", "shared_users")))
 # motion_zones natural key (device_id, zone_id) -> synth composite pk
 _store.register("motion_zones", primary_key="_pk",
                 initial_loader=lambda: [
                     {**z, "_pk": f"{z['device_id']}@{z['zone_id']}"}
-                    for z in _coerce_motion_zones(_load("motion_zones.csv", "motion_zones"))])
+                    for z in _coerce_motion_zones(_load("motion_zones.json", "motion_zones"))])
 _store.register("notification_prefs", primary_key="device_id",
                 initial_loader=lambda: _coerce_notification_prefs(
-                    _load("notification_prefs.csv", "notification_prefs")))
+                    _load("notification_prefs.json", "notification_prefs")))
 
 
 def _devices(): return _store.document("devices").get()

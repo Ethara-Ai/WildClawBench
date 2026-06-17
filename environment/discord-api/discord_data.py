@@ -15,21 +15,24 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, opt_str, strict_bool, strict_int)
+    read_seed_with_ctx, get_store, opt_csv_list, opt_str, strict_bool, strict_int)
 
 _store = get_store("discord-api")
 _API = "discord-api"
 
 _store.register("guilds", primary_key="id",
-                initial_loader=lambda: _coerce_guilds(_load("guilds.csv", "guilds")))
+                initial_loader=lambda: _coerce_guilds(_load("guilds.json", "guilds")))
 _store.register("channels", primary_key="id",
-                initial_loader=lambda: _coerce_channels(_load("channels.csv", "channels")))
+                initial_loader=lambda: _coerce_channels(_load("channels.json", "channels")))
 _store.register("messages", primary_key="id",
-                initial_loader=lambda: _coerce_messages(_load("messages.csv", "messages")))
-_store.register("members", primary_key="guild_id",
-                initial_loader=lambda: _coerce_members(_load("members.csv", "members")))
+                initial_loader=lambda: _coerce_messages(_load("messages.json", "messages")))
+# members natural key (guild_id, user_id) -> synth composite pk
+_store.register("members", primary_key="_pk",
+                initial_loader=lambda: [
+                    {**r, "_pk": f"{r['guild_id']}@{r['user']['id']}"}
+                    for r in _coerce_members(_load("members.json", "members"))])
 _store.register("roles", primary_key="id",
-                initial_loader=lambda: _coerce_roles(_load("roles.csv", "roles")))
+                initial_loader=lambda: _coerce_roles(_load("roles.json", "roles")))
 _store.register_document("me", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "me.json", encoding="utf-8")))
 
 
@@ -46,7 +49,7 @@ def _messages_rows():
 
 
 def _members_rows():
-    return _store.table("members").rows()
+    return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("members").rows()]
 
 
 def _roles_rows():
@@ -63,7 +66,7 @@ _seq = 0
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):

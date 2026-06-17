@@ -15,17 +15,17 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, opt_int, strict_bool, strict_int)
+    read_seed_with_ctx, get_store, opt_csv_list, opt_int, strict_bool, strict_int)
 
 _store = get_store("freshdesk-api")
 _API = "freshdesk-api"
 
 _store.register("tickets", primary_key="id",
-                initial_loader=lambda: _coerce_tickets(_load("tickets.csv", "tickets")))
+                initial_loader=lambda: _coerce_tickets(_load("tickets.json", "tickets")))
 _store.register("contacts", primary_key="id",
-                initial_loader=lambda: _coerce_contacts(_load("contacts.csv", "contacts")))
+                initial_loader=lambda: _coerce_contacts(_load("contacts.json", "contacts")))
 _store.register("agents", primary_key="id",
-                initial_loader=lambda: _coerce_agents(_load("agents.csv", "agents")))
+                initial_loader=lambda: _coerce_agents(_load("agents.json", "agents")))
 
 
 def _tickets_rows():
@@ -42,7 +42,7 @@ def _agents_rows():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):

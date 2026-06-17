@@ -14,7 +14,7 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store,
+    read_seed_with_ctx, get_store,
     strict_int,
     opt_float,
 )
@@ -22,16 +22,16 @@ from _mutable_store import (
 _store = get_store("ups-api")
 _API = "ups-api"
 
-_store.register("rates", primary_key="service_code",
-                initial_loader=lambda: _coerce_rates(_load("rates.csv", "rates")))
+_store.register("rates", primary_key="_pk",
+                initial_loader=lambda: [{**r, "_pk": f"{r['service_code']}@{r['origin_zip']}@{r['dest_zip']}@{r['weight_lb']}"} for r in _coerce_rates(_load("rates.json", "rates"))])
 _store.register("shipments", primary_key="tracking_number",
-                initial_loader=lambda: _coerce_shipments(_load("shipments.csv", "shipments")))
+                initial_loader=lambda: _coerce_shipments(_load("shipments.json", "shipments")))
 _store.register("tracking", primary_key="tracking_number",
-                initial_loader=lambda: _coerce_tracking(_load("tracking.csv", "tracking")))
+                initial_loader=lambda: _coerce_tracking(_load("tracking.json", "tracking")))
 
 
 def _rates_rows():
-    return _store.table("rates").rows()
+    return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("rates").rows()]
 
 
 def _shipments_rows():
@@ -44,7 +44,7 @@ def _tracking_rows():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):

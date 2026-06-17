@@ -16,14 +16,14 @@ DATA_DIR = Path(__file__).parent
 
 sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, opt_float, opt_str, strict_bool)
+    read_seed_with_ctx, get_store, opt_csv_list, opt_float, opt_str, strict_bool)
 
 _store = get_store("plaid-api")
 _API = "plaid-api"
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):
@@ -97,9 +97,9 @@ def _load_identity():
 
 
 _store.register("accounts", primary_key="account_id",
-                initial_loader=lambda: _coerce_accounts(_load("accounts.csv", "accounts")))
+                initial_loader=lambda: _coerce_accounts(_load("accounts.json", "accounts")))
 _store.register("transactions", primary_key="transaction_id",
-                initial_loader=lambda: _coerce_transactions(_load("transactions.csv", "transactions")))
+                initial_loader=lambda: _coerce_transactions(_load("transactions.json", "transactions")))
 _store.register_document("item", initial_loader=_load_item)
 _store.register_document("identity", initial_loader=_load_identity)
 

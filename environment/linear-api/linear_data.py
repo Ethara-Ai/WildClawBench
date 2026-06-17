@@ -10,7 +10,7 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, # noqa: E402
+    read_seed_with_ctx, # noqa: E402
     get_store,
     strict_int,
     strict_float,
@@ -26,21 +26,21 @@ _store = get_store("linear-api")
 _API = "linear-api"
 
 _store.register("teams", primary_key="id",
-                initial_loader=lambda: _coerce_teams(_load("teams.csv", "teams")))
+                initial_loader=lambda: _coerce_teams(_load("teams.json", "teams")))
 _store.register("users", primary_key="id",
-                initial_loader=lambda: _coerce_users(_load("users.csv", "users")))
+                initial_loader=lambda: _coerce_users(_load("users.json", "users")))
 _store.register("workflow_states", primary_key="id",
-                initial_loader=lambda: _coerce_workflow_states(_load("workflow_states.csv", "workflow_states")))
+                initial_loader=lambda: _coerce_workflow_states(_load("workflow_states.json", "workflow_states")))
 _store.register("labels", primary_key="id",
-                initial_loader=lambda: _coerce_labels(_load("labels.csv", "labels")))
+                initial_loader=lambda: _coerce_labels(_load("labels.json", "labels")))
 _store.register("projects", primary_key="id",
-                initial_loader=lambda: _coerce_projects(_load("projects.csv", "projects")))
+                initial_loader=lambda: _coerce_projects(_load("projects.json", "projects")))
 _store.register("cycles", primary_key="id",
-                initial_loader=lambda: _coerce_cycles(_load("cycles.csv", "cycles")))
+                initial_loader=lambda: _coerce_cycles(_load("cycles.json", "cycles")))
 _store.register("issues", primary_key="id",
-                initial_loader=lambda: _coerce_issues(_load("issues.csv", "issues")))
+                initial_loader=lambda: _coerce_issues(_load("issues.json", "issues")))
 _store.register("comments", primary_key="id",
-                initial_loader=lambda: _coerce_comments(_load("comments.csv", "comments")))
+                initial_loader=lambda: _coerce_comments(_load("comments.json", "comments")))
 _store.register_document("workspace", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "workspace.json", encoding="utf-8")))
 
 
@@ -82,7 +82,7 @@ def _workspace_doc():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):

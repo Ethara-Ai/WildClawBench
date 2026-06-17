@@ -10,7 +10,7 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store,
+    read_seed_with_ctx, get_store,
     strict_int,
     strict_float,
     strict_bool,
@@ -20,15 +20,15 @@ _store = get_store("eventbrite-api")
 _API = "eventbrite-api"
 
 _store.register("events", primary_key="id",
-                initial_loader=lambda: _coerce_events(_load("events.csv", "events")))
+                initial_loader=lambda: _coerce_events(_load("events.json", "events")))
 _store.register("venues", primary_key="id",
-                initial_loader=lambda: _coerce_venues(_load("venues.csv", "venues")))
+                initial_loader=lambda: _coerce_venues(_load("venues.json", "venues")))
 _store.register("ticket_classes", primary_key="id",
-                initial_loader=lambda: _coerce_ticket_classes(_load("ticket_classes.csv", "ticket_classes")))
+                initial_loader=lambda: _coerce_ticket_classes(_load("ticket_classes.json", "ticket_classes")))
 _store.register("attendees", primary_key="id",
-                initial_loader=lambda: _coerce_attendees(_load("attendees.csv", "attendees")))
+                initial_loader=lambda: _coerce_attendees(_load("attendees.json", "attendees")))
 _store.register("organizations", primary_key="id",
-                initial_loader=lambda: [_strip_ctx(r) for r in _load("organizations.csv", "organizations")])
+                initial_loader=lambda: [_strip_ctx(r) for r in _load("organizations.json", "organizations")])
 
 
 def _events_rows():
@@ -53,7 +53,7 @@ def _organizations_rows():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):

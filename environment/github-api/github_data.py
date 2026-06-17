@@ -10,19 +10,19 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, opt_str, strict_bool, strict_int)
+    read_seed_with_ctx, get_store, opt_csv_list, opt_str, strict_bool, strict_int)
 
 _store = get_store("github-api")
 _API = "github-api"
 
 _store.register("repos", primary_key="id",
-                initial_loader=lambda: _coerce_repos(_load("repos.csv", "repos")))
+                initial_loader=lambda: _coerce_repos(_load("repos.json", "repos")))
 _store.register("issues", primary_key="id",
-                initial_loader=lambda: _coerce_issues(_load("issues.csv", "issues")))
+                initial_loader=lambda: _coerce_issues(_load("issues.json", "issues")))
 _store.register("pulls", primary_key="number",
-                initial_loader=lambda: _coerce_pulls(_load("pulls.csv", "pulls")))
+                initial_loader=lambda: _coerce_pulls(_load("pulls.json", "pulls")))
 _store.register("comments", primary_key="id",
-                initial_loader=lambda: _coerce_comments(_load("comments.csv", "comments")))
+                initial_loader=lambda: _coerce_comments(_load("comments.json", "comments")))
 _store.register_document("user", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "user.json", encoding="utf-8")))
 
 
@@ -48,7 +48,7 @@ def _user_doc():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):

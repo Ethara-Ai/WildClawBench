@@ -10,19 +10,19 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_str, strict_bool, strict_int)
+    read_seed_with_ctx, get_store, opt_str, strict_bool, strict_int)
 
 _store = get_store("docusign-api")
 _API = "docusign-api"
 
 _store.register("envelopes", primary_key="envelope_id",
-                initial_loader=lambda: _coerce_envelopes(_load("envelopes.csv", "envelopes")))
+                initial_loader=lambda: _coerce_envelopes(_load("envelopes.json", "envelopes")))
 _store.register("recipients", primary_key="recipient_id",
-                initial_loader=lambda: _coerce_recipients(_load("recipients.csv", "recipients")))
+                initial_loader=lambda: _coerce_recipients(_load("recipients.json", "recipients")))
 _store.register("documents", primary_key="document_id",
-                initial_loader=lambda: _coerce_documents(_load("documents.csv", "documents")))
+                initial_loader=lambda: _coerce_documents(_load("documents.json", "documents")))
 _store.register("templates", primary_key="template_id",
-                initial_loader=lambda: _coerce_templates(_load("templates.csv", "templates")))
+                initial_loader=lambda: _coerce_templates(_load("templates.json", "templates")))
 
 
 def _envelopes_rows():
@@ -43,7 +43,7 @@ def _templates_rows():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):

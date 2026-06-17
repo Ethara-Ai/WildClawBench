@@ -10,7 +10,7 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store,
+    read_seed_with_ctx, get_store,
     strict_int,
     strict_bool,
 )
@@ -19,13 +19,14 @@ _store = get_store("typeform-api")
 _API = "typeform-api"
 
 _store.register("forms", primary_key="form_id",
-                initial_loader=lambda: _coerce_forms(_load("forms.csv", "forms")))
+                initial_loader=lambda: _coerce_forms(_load("forms.json", "forms")))
 _store.register("fields", primary_key="field_id",
-                initial_loader=lambda: _coerce_fields(_load("fields.csv", "fields")))
+                initial_loader=lambda: _coerce_fields(_load("fields.json", "fields")))
 _store.register("responses", primary_key="response_id",
-                initial_loader=lambda: _coerce_responses(_load("responses.csv", "responses")))
-_store.register("answers", primary_key="response_id",
-                initial_loader=lambda: _coerce_answers(_load("answers.csv", "answers")))
+                initial_loader=lambda: _coerce_responses(_load("responses.json", "responses")))
+_store.register("answers", primary_key="_pk",
+                initial_loader=lambda: [{**r, "_pk": f"{r['response_id']}@{r['field_id']}"}
+                                        for r in _coerce_answers(_load("answers.json", "answers"))])
 
 
 def _forms_rows():
@@ -41,12 +42,12 @@ def _responses_rows():
 
 
 def _answers_rows():
-    return _store.table("answers").rows()
+    return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("answers").rows()]
 
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):

@@ -14,17 +14,18 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_str, strict_bool)
+    read_seed_with_ctx, get_store, opt_str, strict_bool)
 
 _store = get_store("mailgun-api")
 _API = "mailgun-api"
 
 _store.register("messages", primary_key="id",
-                initial_loader=lambda: _coerce_messages(_load("messages.csv", "messages")))
+                initial_loader=lambda: _coerce_messages(_load("messages.json", "messages")))
 _store.register("events", primary_key="id",
-                initial_loader=lambda: _coerce_events(_load("events.csv", "events")))
-_store.register("members", primary_key="list_address",
-                initial_loader=lambda: _coerce_members(_load("list_members.csv", "members")))
+                initial_loader=lambda: _coerce_events(_load("events.json", "events")))
+_store.register("members", primary_key="_pk",
+                initial_loader=lambda: [{**r, "_pk": f"{r['list_address']}@{r['address']}"}
+                                        for r in _coerce_members(_load("list_members.json", "members"))])
 
 
 def _messages_rows():
@@ -36,12 +37,12 @@ def _events_rows():
 
 
 def _members_rows():
-    return _store.table("members").rows()
+    return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("members").rows()]
 
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):

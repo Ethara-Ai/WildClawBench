@@ -12,19 +12,19 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_str, strict_int)
+    read_seed_with_ctx, get_store, opt_str, strict_int)
 
 _store = get_store("openlibrary-api")
 _API = "openlibrary-api"
 
 _store.register("authors", primary_key="author_id",
-                initial_loader=lambda: _coerce_authors(_load("authors.csv", "authors")))
+                initial_loader=lambda: _coerce_authors(_load("authors.json", "authors")))
 _store.register("works", primary_key="work_id",
-                initial_loader=lambda: _coerce_works(_load("works.csv", "works")))
+                initial_loader=lambda: _coerce_works(_load("works.json", "works")))
 _store.register("editions", primary_key="edition_id",
-                initial_loader=lambda: _coerce_editions(_load("editions.csv", "editions")))
+                initial_loader=lambda: _coerce_editions(_load("editions.json", "editions")))
 _store.register("subjects", primary_key="subject",
-                initial_loader=lambda: _coerce_subjects(_load("subjects.csv", "subjects")))
+                initial_loader=lambda: _coerce_subjects(_load("subjects.json", "subjects")))
 
 
 def _authors_rows():
@@ -45,7 +45,7 @@ def _subjects_rows():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):

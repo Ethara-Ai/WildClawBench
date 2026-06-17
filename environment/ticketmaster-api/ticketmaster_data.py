@@ -13,7 +13,7 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store,
+    read_seed_with_ctx, get_store,
     opt_int,
     opt_float,
 )
@@ -22,13 +22,13 @@ _store = get_store("ticketmaster-api")
 _API = "ticketmaster-api"
 
 _store.register("classifications", primary_key="id",
-                initial_loader=lambda: _coerce_classifications(_load("classifications.csv", "classifications")))
+                initial_loader=lambda: _coerce_classifications(_load("classifications.json", "classifications")))
 _store.register("venues", primary_key="id",
-                initial_loader=lambda: _coerce_venues(_load("venues.csv", "venues")))
+                initial_loader=lambda: _coerce_venues(_load("venues.json", "venues")))
 _store.register("attractions", primary_key="id",
-                initial_loader=lambda: _coerce_attractions(_load("attractions.csv", "attractions")))
+                initial_loader=lambda: _coerce_attractions(_load("attractions.json", "attractions")))
 _store.register("events", primary_key="id",
-                initial_loader=lambda: _coerce_events(_load("events.csv", "events")))
+                initial_loader=lambda: _coerce_events(_load("events.json", "events")))
 
 
 def _classifications_rows():
@@ -49,7 +49,7 @@ def _events_rows():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):

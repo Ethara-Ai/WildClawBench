@@ -16,18 +16,18 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_float, opt_str, strict_bool)
+    read_seed_with_ctx, get_store, opt_float, opt_str, strict_bool)
 
 _store = get_store("alpaca-api")
 _API = "alpaca-api"
 
 _store.register("positions", primary_key="asset_id",
-                initial_loader=lambda: _coerce_positions(_load("positions.csv", "positions")))
+                initial_loader=lambda: _coerce_positions(_load("positions.json", "positions")))
 _store.register("orders", primary_key="id",
-                initial_loader=lambda: _coerce_orders(_load("orders.csv", "orders")))
+                initial_loader=lambda: _coerce_orders(_load("orders.json", "orders")))
 _store.register("assets", primary_key="id",
-                initial_loader=lambda: _coerce_assets(_load("assets.csv", "assets")))
-_store.register_document("quotes", initial_loader=lambda: _coerce_quotes(_load("quotes.csv", "quotes")))
+                initial_loader=lambda: _coerce_assets(_load("assets.json", "assets")))
+_store.register_document("quotes", initial_loader=lambda: _coerce_quotes(_load("quotes.json", "quotes")))
 _store.register_document("account", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "account.json", encoding="utf-8")))
 
 
@@ -53,7 +53,7 @@ def _account_doc():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):

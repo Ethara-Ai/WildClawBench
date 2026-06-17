@@ -10,7 +10,7 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store,
+    read_seed_with_ctx, get_store,
     strict_int,
     strict_float,
     strict_bool,
@@ -20,13 +20,16 @@ _store = get_store("doordash-api")
 _API = "doordash-api"
 
 _store.register("stores", primary_key="store_id",
-                initial_loader=lambda: _coerce_stores(_load("stores.csv", "stores")))
+                initial_loader=lambda: _coerce_stores(_load("stores.json", "stores")))
 _store.register("menu_items", primary_key="item_id",
-                initial_loader=lambda: _coerce_menu(_load("menu_items.csv", "menu_items")))
+                initial_loader=lambda: _coerce_menu(_load("menu_items.json", "menu_items")))
 _store.register("orders", primary_key="order_id",
-                initial_loader=lambda: _coerce_orders(_load("orders.csv", "orders")))
-_store.register("order_items", primary_key="order_id",
-                initial_loader=lambda: _coerce_order_items(_load("order_items.csv", "order_items")))
+                initial_loader=lambda: _coerce_orders(_load("orders.json", "orders")))
+# order_items natural key (order_id, item_id) -> synth composite pk
+_store.register("order_items", primary_key="_pk",
+                initial_loader=lambda: [
+                    {**r, "_pk": f"{r['order_id']}@{r['item_id']}"}
+                    for r in _coerce_order_items(_load("order_items.json", "order_items"))])
 
 
 def _stores_rows():
@@ -42,14 +45,14 @@ def _orders_rows():
 
 
 def _order_items_rows():
-    return _store.table("order_items").rows()
+    return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("order_items").rows()]
 
 
 SERVICE_FEE_PCT = 10.0  # percent of subtotal
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):

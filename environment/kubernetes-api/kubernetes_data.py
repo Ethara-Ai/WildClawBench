@@ -10,21 +10,21 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_str, strict_bool, strict_int)
+    read_seed_with_ctx, get_store, opt_str, strict_bool, strict_int)
 
 _store = get_store("kubernetes-api")
 _API = "kubernetes-api"
 
 _store.register("namespaces", primary_key="name",
-                initial_loader=lambda: _coerce_namespaces(_load("namespaces.csv", "namespaces")))
+                initial_loader=lambda: _coerce_namespaces(_load("namespaces.json", "namespaces")))
 _store.register("nodes", primary_key="name",
-                initial_loader=lambda: _coerce_nodes(_load("nodes.csv", "nodes")))
+                initial_loader=lambda: _coerce_nodes(_load("nodes.json", "nodes")))
 _store.register("pods", primary_key="name",
-                initial_loader=lambda: _coerce_pods(_load("pods.csv", "pods")))
+                initial_loader=lambda: _coerce_pods(_load("pods.json", "pods")))
 _store.register("deployments", primary_key="name",
-                initial_loader=lambda: _coerce_deployments(_load("deployments.csv", "deployments")))
+                initial_loader=lambda: _coerce_deployments(_load("deployments.json", "deployments")))
 _store.register("services", primary_key="name",
-                initial_loader=lambda: _coerce_services(_load("services.csv", "services")))
+                initial_loader=lambda: _coerce_services(_load("services.json", "services")))
 
 
 def _namespaces_rows():
@@ -49,7 +49,7 @@ def _services_rows():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):

@@ -10,7 +10,7 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, # noqa: E402
+    read_seed_with_ctx, # noqa: E402
     get_store,
     strict_bool,
     strict_str,
@@ -21,10 +21,10 @@ _store = get_store("google-calendar-api")
 _API = "google-calendar-api"
 
 _store.register("calendars", primary_key="id",
-                initial_loader=lambda: _coerce_calendars(_load("calendars.csv", "calendars")))
+                initial_loader=lambda: _coerce_calendars(_load("calendars.json", "calendars")))
 _store.register("events", primary_key="id",
-                initial_loader=lambda: _coerce_events(_load("events.csv", "events")))
-_store.register_document("attendees", initial_loader=lambda: _coerce_attendees(_load("event_attendees.csv", "event_attendees")))
+                initial_loader=lambda: _coerce_events(_load("events.json", "events")))
+_store.register_document("attendees", initial_loader=lambda: _coerce_attendees(_load("event_attendees.json", "event_attendees")))
 
 
 def _calendars_rows():
@@ -41,7 +41,7 @@ def _attendees_doc():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):

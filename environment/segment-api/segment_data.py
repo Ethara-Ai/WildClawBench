@@ -15,17 +15,17 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_str, strict_bool)
+    read_seed_with_ctx, get_store, opt_str, strict_bool)
 
 _store = get_store("segment-api")
 _API = "segment-api"
 
 _store.register("events", primary_key="messageId",
-                initial_loader=lambda: _coerce_events(_load("events.csv", "events")))
+                initial_loader=lambda: _coerce_events(_load("events.json", "events")))
 _store.register("sources", primary_key="id",
-                initial_loader=lambda: _coerce_sources(_load("sources.csv", "sources")))
+                initial_loader=lambda: _coerce_sources(_load("sources.json", "sources")))
 _store.register("destinations", primary_key="id",
-                initial_loader=lambda: _coerce_destinations(_load("destinations.csv", "destinations")))
+                initial_loader=lambda: _coerce_destinations(_load("destinations.json", "destinations")))
 
 
 def _events_rows():
@@ -42,7 +42,7 @@ def _destinations_rows():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):

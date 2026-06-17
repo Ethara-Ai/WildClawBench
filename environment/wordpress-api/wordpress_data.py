@@ -12,7 +12,7 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store,
+    read_seed_with_ctx, get_store,
     strict_int, opt_int,
 )
 
@@ -20,19 +20,19 @@ _store = get_store("wordpress-api")
 _API = "wordpress-api"
 
 _store.register("posts", primary_key="id",
-                initial_loader=lambda: _coerce_posts(_load("posts.csv", "posts")))
+                initial_loader=lambda: _coerce_posts(_load("posts.json", "posts")))
 _store.register("pages", primary_key="id",
-                initial_loader=lambda: _coerce_pages(_load("pages.csv", "pages")))
+                initial_loader=lambda: _coerce_pages(_load("pages.json", "pages")))
 _store.register("categories", primary_key="id",
-                initial_loader=lambda: _coerce_categories(_load("categories.csv", "categories")))
+                initial_loader=lambda: _coerce_categories(_load("categories.json", "categories")))
 _store.register("tags", primary_key="id",
-                initial_loader=lambda: _coerce_tags(_load("tags.csv", "tags")))
+                initial_loader=lambda: _coerce_tags(_load("tags.json", "tags")))
 _store.register("comments", primary_key="id",
-                initial_loader=lambda: _coerce_comments(_load("comments.csv", "comments")))
+                initial_loader=lambda: _coerce_comments(_load("comments.json", "comments")))
 _store.register("media", primary_key="id",
-                initial_loader=lambda: _coerce_media(_load("media.csv", "media")))
+                initial_loader=lambda: _coerce_media(_load("media.json", "media")))
 _store.register("users", primary_key="id",
-                initial_loader=lambda: _coerce_users(_load("users.csv", "users")))
+                initial_loader=lambda: _coerce_users(_load("users.json", "users")))
 
 
 def _posts_rows():
@@ -65,7 +65,7 @@ def _users_rows():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):
