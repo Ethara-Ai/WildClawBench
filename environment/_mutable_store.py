@@ -151,12 +151,36 @@ class Table:
         with self._lock:
             return [copy.deepcopy(self._rows[k]) for k in self._order if k in self._rows]
 
+    def _normalize_pk(self, pk_value: Any) -> Any:
+        # Admin-plane routes (admin_plane.py) bind ``pk`` from the URL path as
+        # ``str`` (FastAPI default), but data modules CSV-load numeric columns
+        # (id, customer_id, message_id, ...) as ``int`` before
+        # ``_store.register``. Without this coercion every numeric-pk admin
+        # call misses on dtype alone (str "2501" vs int 2501 in self._rows)
+        # and the patch 404s even though the row exists.
+        if pk_value in self._rows or not self._rows:
+            return pk_value
+        sample = next(iter(self._rows))
+        if isinstance(sample, int) and isinstance(pk_value, str):
+            try:
+                as_int = int(pk_value)
+            except (ValueError, TypeError):
+                return pk_value
+            if as_int in self._rows:
+                return as_int
+        elif isinstance(sample, str) and not isinstance(pk_value, str):
+            as_str = str(pk_value)
+            if as_str in self._rows:
+                return as_str
+        return pk_value
+
     def get(self, pk_value: Any) -> Optional[Row]:
         """Return a single row by primary key, or None.
 
         Returns a deep copy. Callers may mutate the result freely.
         """
         with self._lock:
+            pk_value = self._normalize_pk(pk_value)
             r = self._rows.get(pk_value)
             return copy.deepcopy(r) if r is not None else None
 
@@ -186,8 +210,11 @@ class Table:
             )
         pk_value = row[self._pk]
         with self._lock:
+            pk_value = self._normalize_pk(pk_value)
+            stored = copy.deepcopy(row)
+            stored[self._pk] = pk_value
             existed = pk_value in self._rows
-            self._rows[pk_value] = copy.deepcopy(row)
+            self._rows[pk_value] = stored
             if not existed:
                 self._order.append(pk_value)
             return copy.deepcopy(self._rows[pk_value])
@@ -200,6 +227,7 @@ class Table:
         delete-plus-insert, which the admin plane spells out explicitly.
         """
         with self._lock:
+            pk_value = self._normalize_pk(pk_value)
             if pk_value not in self._rows:
                 return None
             row = self._rows[pk_value]
@@ -215,6 +243,7 @@ class Table:
     def delete(self, pk_value: Any) -> bool:
         """Remove a row. Returns True if it existed."""
         with self._lock:
+            pk_value = self._normalize_pk(pk_value)
             if pk_value not in self._rows:
                 return False
             del self._rows[pk_value]
