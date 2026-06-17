@@ -88,5 +88,50 @@
     "teamId": "team-ux",
     "createdAt": "2026-01-15T09:00:00",
     "updatedAt": "2026-01-15T09:00:00"
+  },
+  {
+    "id": "label-feature",
+    "name": "Feature",
+    "color": "#26B5CE",
+    "description": "New feature work",
+    "teamId": "",
+    "createdAt": "2026-01-15T09:00:00",
+    "updatedAt": "2026-01-15T09:00:00"
+  },
+  {
+    "id": "label-api",
+    "name": "API",
+    "color": "#5E6AD2",
+    "description": "API surface changes",
+    "teamId": "team-backend",
+    "createdAt": "2026-01-15T09:00:00",
+    "updatedAt": "2026-01-15T09:00:00"
+  },
+  {
+    "id": "label-frontend",
+    "name": "Frontend",
+    "color": "#F2994A",
+    "description": "Frontend client changes",
+    "teamId": "team-frontend",
+    "createdAt": "2026-01-15T09:00:00",
+    "updatedAt": "2026-01-15T09:00:00"
+  },
+  {
+    "id": "label-performance",
+    "name": "Performance",
+    "color": "#6FCF97",
+    "description": "Performance and latency work",
+    "teamId": "",
+    "createdAt": "2026-01-15T09:00:00",
+    "updatedAt": "2026-01-15T09:00:00"
+  },
+  {
+    "id": "label-blocked",
+    "name": "Blocked",
+    "color": "#EB5757",
+    "description": "Blocked on external dependency",
+    "teamId": "",
+    "createdAt": "2026-01-15T09:00:00",
+    "updatedAt": "2026-01-15T09:00:00"
   }
 ]

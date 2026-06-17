@@ -19,7 +19,7 @@
     {"name": "create payment intent", "request": {"method": "POST", "url": "{{baseUrl}}/v1/payment_intents",
       "header": [{"key": "Content-Type", "value": "application/json"}],
       "body": {"mode": "raw", "raw": "{\"amount\": 4900, \"currency\": \"usd\", \"customer\": \"cus_Nb3Lumen\", \"confirm\": true, \"description\": \"Pro Monthly\"}"}}},
-    {"name": "get payment intent", "request": {"method": "GET", "url": "{{baseUrl}}/v1/payment_intents/pi_example"}},
+    {"name": "get payment intent (404 expected - placeholder ID)", "request": {"method": "GET", "url": "{{baseUrl}}/v1/payment_intents/pi_example"}},
     {"name": "list charges", "request": {"method": "GET", "url": "{{baseUrl}}/v1/charges?customer=cus_Nb1Aurora"}},
     {"name": "get charge", "request": {"method": "GET", "url": "{{baseUrl}}/v1/charges/ch_3Aurora01"}},
     {"name": "create charge", "request": {"method": "POST", "url": "{{baseUrl}}/v1/charges",

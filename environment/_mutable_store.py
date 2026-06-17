@@ -87,7 +87,6 @@ import copy
 import csv
 import json
 import math
-from pathlib import Path
 import threading
 import time
 import uuid
@@ -123,7 +122,10 @@ def _ctx(row: Row, column: str) -> str:
     table = row.get("__table__", "?")
     src = row.get("__file__", "?")
     idx = row.get("__row_index__", "?")
-    return f"api={api} table={table} file={src} row_index={idx} column={column!r}"
+    return (
+        f"api={api} table={table} file={src} "
+        f"row_index={idx} column={column!r}"
+    )
 
 
 def read_csv_with_ctx(path: Any, api: str, table: str) -> List[Row]:
@@ -172,10 +174,13 @@ def read_csv_with_ctx(path: Any, api: str, table: str) -> List[Row]:
         raise
     except UnicodeDecodeError as exc:
         raise CoerceError(
-            f"file is not valid UTF-8 ({exc}): api={api} table={table} file={src}"
+            f"file is not valid UTF-8 ({exc}): "
+            f"api={api} table={table} file={src}"
         )
     except csv.Error as exc:
-        raise CoerceError(f"malformed CSV ({exc}): api={api} table={table} file={src}")
+        raise CoerceError(
+            f"malformed CSV ({exc}): api={api} table={table} file={src}"
+        )
 
 
 def read_json_with_ctx(path: Any, api: str, table: str) -> List[Row]:
@@ -200,7 +205,9 @@ def read_json_with_ctx(path: Any, api: str, table: str) -> List[Row]:
             f"file is not valid UTF-8 ({exc}): api={api} table={table} file={src}"
         )
     except json.JSONDecodeError as exc:
-        raise CoerceError(f"malformed JSON ({exc}): api={api} table={table} file={src}")
+        raise CoerceError(
+            f"malformed JSON ({exc}): api={api} table={table} file={src}"
+        )
 
     if not isinstance(data, list):
         raise CoerceError(
@@ -224,30 +231,6 @@ def read_json_with_ctx(path: Any, api: str, table: str) -> List[Row]:
     return rows
 
 
-def read_seed_with_ctx(path: Any, api: str, table: str) -> List[Row]:
-    """Auto-dispatch to CSV or JSON reader based on file extension.
-
-    If *path* has an explicit ``.csv`` or ``.json`` suffix the matching reader
-    is used directly.  Otherwise the function probes for a ``.json`` file first,
-    then ``.csv``, raising :class:`CoerceError` if neither exists.
-    """
-    p = Path(path)
-    ext = p.suffix.lower()
-    if ext == ".json":
-        return read_json_with_ctx(p, api, table)
-    if ext == ".csv":
-        return read_csv_with_ctx(p, api, table)
-    json_path = p.with_suffix(".json")
-    if json_path.exists():
-        return read_json_with_ctx(json_path, api, table)
-    csv_path = p.with_suffix(".csv")
-    if csv_path.exists():
-        return read_csv_with_ctx(csv_path, api, table)
-    raise CoerceError(
-        f"seed file not found (tried .json and .csv): api={api} table={table} path={p}"
-    )
-
-
 def strict_int(row: Row, column: str) -> int:
     if column not in row:
         raise CoerceError(f"required column missing: {_ctx(row, column)}")
@@ -257,7 +240,9 @@ def strict_int(row: Row, column: str) -> int:
     try:
         return int(str(v).strip())
     except (TypeError, ValueError):
-        raise CoerceError(f"required int unparseable, got {v!r}: {_ctx(row, column)}")
+        raise CoerceError(
+            f"required int unparseable, got {v!r}: {_ctx(row, column)}"
+        )
 
 
 def strict_float(row: Row, column: str) -> float:
@@ -269,7 +254,9 @@ def strict_float(row: Row, column: str) -> float:
     try:
         f = float(str(v).strip())
     except (TypeError, ValueError):
-        raise CoerceError(f"required float unparseable, got {v!r}: {_ctx(row, column)}")
+        raise CoerceError(
+            f"required float unparseable, got {v!r}: {_ctx(row, column)}"
+        )
     if math.isnan(f) or math.isinf(f):
         raise CoerceError(
             f"required float is non-finite ({f}), got {v!r}: {_ctx(row, column)}"
@@ -320,9 +307,7 @@ def opt_int(row: Row, column: str, default: Optional[int] = None) -> Optional[in
         return default
 
 
-def opt_float(
-    row: Row, column: str, default: Optional[float] = None
-) -> Optional[float]:
+def opt_float(row: Row, column: str, default: Optional[float] = None) -> Optional[float]:
     v = row.get(column, _MISSING)
     if v is _MISSING or v is None or (isinstance(v, str) and v.strip() == ""):
         return default
@@ -380,9 +365,8 @@ class Table:
 
     __slots__ = ("_name", "_pk", "_rows", "_order", "_lock", "_parent")
 
-    def __init__(
-        self, name: str, primary_key: str, parent_lock: threading.RLock, parent: "Store"
-    ):
+    def __init__(self, name: str, primary_key: str, parent_lock: threading.RLock,
+                 parent: "Store"):
         self._name = name
         self._pk = primary_key
         self._rows: Dict[Any, Row] = {}
@@ -412,9 +396,7 @@ class Table:
     def rows(self) -> List[Row]:
         """Return all rows in insertion order, as deep copies."""
         with self._lock:
-            return [
-                copy.deepcopy(self._rows[k]) for k in self._order if k in self._rows
-            ]
+            return [copy.deepcopy(self._rows[k]) for k in self._order if k in self._rows]
 
     def get(self, pk_value: Any) -> Optional[Row]:
         """Return a single row by primary key, or None.
@@ -432,9 +414,7 @@ class Table:
         """
         with self._lock:
             order = list(self._order)
-            snapshot = {
-                k: copy.deepcopy(self._rows[k]) for k in order if k in self._rows
-            }
+            snapshot = {k: copy.deepcopy(self._rows[k]) for k in order if k in self._rows}
         return [snapshot[k] for k in order if k in snapshot and predicate(snapshot[k])]
 
     def find_one(self, predicate: Predicate) -> Optional[Row]:
@@ -720,7 +700,6 @@ class Store:
             t._order.append(stored_key)
         if collapse_count:
             import sys as _sys
-
             print(
                 f"[mutable_store] WARN: table '{self._name}.{table_name}' "
                 f"declares primary_key='{t._pk}' but {collapse_count} of "
@@ -728,9 +707,8 @@ class Store:
                 f"{first_collision!r}). Auto-suffixed colliding rows with "
                 f"'_pk' to preserve data. Fix by declaring a row-unique "
                 f"primary key (natural unique column, or synthetic '_pk' "
-                f'composite such as f"{{parent_id}}@{{child_id}}").',
-                file=_sys.stderr,
-                flush=True,
+                f"composite such as f\"{{parent_id}}@{{child_id}}\").",
+                file=_sys.stderr, flush=True,
             )
         self._initialized[table_name] = True
 
@@ -1054,12 +1032,7 @@ def extract_file_content_text(
     # value from the row, not an attacker-controlled string. But the route
     # may be tempted to forward a user-supplied path (Dropbox does this) so
     # we lock it down here.
-    if (
-        "/" in basename
-        or "\\" in basename
-        or basename in ("", ".", "..")
-        or basename.startswith(".")
-    ):
+    if "/" in basename or "\\" in basename or basename in ("", ".", "..") or basename.startswith("."):
         raise DownloadError(
             http_status=404,
             code="invalid_basename",
@@ -1118,7 +1091,9 @@ def extract_file_content_text(
         raise DownloadError(
             http_status=413,
             code="content_too_large",
-            message=(f"extracted text {size_bytes} bytes exceeds cap {max_text_bytes}"),
+            message=(
+                f"extracted text {size_bytes} bytes exceeds cap {max_text_bytes}"
+            ),
         )
 
     return text

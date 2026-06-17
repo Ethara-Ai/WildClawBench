@@ -11,7 +11,7 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_seed_with_ctx, get_store, opt_str, strict_float)
+    read_json_with_ctx, get_store, opt_str, strict_float)
 _store = get_store("quickbooks-api")
 _API = "quickbooks-api"
 
@@ -19,7 +19,7 @@ REALM_ID = "4620816365272861350"
 
 
 def _load(filename, table):
-    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):
@@ -149,13 +149,13 @@ def _coerce_accounts(rows):
 
 
 _store.register("customers", primary_key="Id",
-                initial_loader=lambda: _coerce_customers(_load("customers.json", "customers")))
+                initial_loader=lambda: _load_qbo_envelope("customers.json", "Customer"))
 _store.register("vendors", primary_key="Id",
-                initial_loader=lambda: _coerce_vendors(_load("vendors.json", "vendors")))
+                initial_loader=lambda: _load_qbo_envelope("vendors.json", "Vendor"))
 _store.register("items", primary_key="Id",
                 initial_loader=lambda: _coerce_items(_load("items.json", "items")))
 _store.register("accounts", primary_key="Id",
-                initial_loader=lambda: _coerce_accounts(_load("accounts.json", "accounts")))
+                initial_loader=lambda: _load_qbo_envelope("accounts.json", "Account"))
 _store.register("invoices", primary_key="Id",
                 initial_loader=lambda: _load_json("invoices.json"))
 _store.register("bills", primary_key="Id",
@@ -263,9 +263,16 @@ def update_customer(customer_id: str, data: dict):
     updatable = {"DisplayName", "GivenName", "FamilyName", "CompanyName",
                  "PrimaryEmailAddr", "PrimaryPhone", "BillAddr", "Active", "Notes"}
     patch = {k: v for k, v in data.items() if k in updatable}
-    meta = dict(c["MetaData"]); meta["LastUpdatedTime"] = _now()
+    existing_meta = c.get("MetaData") or {}
+    meta = dict(existing_meta) if isinstance(existing_meta, dict) else {}
+    meta.setdefault("CreateTime", _now())
+    meta["LastUpdatedTime"] = _now()
     patch["MetaData"] = meta
-    patch["SyncToken"] = str(int(c["SyncToken"]) + 1)
+    try:
+        current_sync = int(c.get("SyncToken") or 0)
+    except (TypeError, ValueError):
+        current_sync = 0
+    patch["SyncToken"] = str(current_sync + 1)
     _store.table("customers").patch(customer_id, patch)
     return {"Customer": _store.table("customers").get(customer_id)}
 
@@ -309,9 +316,16 @@ def update_vendor(vendor_id: str, data: dict):
     updatable = {"DisplayName", "CompanyName", "PrimaryEmailAddr",
                  "PrimaryPhone", "BillAddr", "Active", "AcctNum", "Vendor1099"}
     patch = {k: val for k, val in data.items() if k in updatable}
-    meta = dict(v["MetaData"]); meta["LastUpdatedTime"] = _now()
+    existing_meta = v.get("MetaData") or {}
+    meta = dict(existing_meta) if isinstance(existing_meta, dict) else {}
+    meta.setdefault("CreateTime", _now())
+    meta["LastUpdatedTime"] = _now()
     patch["MetaData"] = meta
-    patch["SyncToken"] = str(int(v["SyncToken"]) + 1)
+    try:
+        current_sync = int(v.get("SyncToken") or 0)
+    except (TypeError, ValueError):
+        current_sync = 0
+    patch["SyncToken"] = str(current_sync + 1)
     _store.table("vendors").patch(vendor_id, patch)
     return {"Vendor": _store.table("vendors").get(vendor_id)}
 
@@ -422,9 +436,16 @@ def update_invoice(invoice_id: str, data: dict):
         total = sum(l.get("Amount", 0) for l in lines if l.get("DetailType") != "SubTotalLineDetail")
         patch["TotalAmt"] = total
         patch["Balance"] = total
-    meta = dict(inv["MetaData"]); meta["LastUpdatedTime"] = _now()
+    existing_meta = inv.get("MetaData") or {}
+    meta = dict(existing_meta) if isinstance(existing_meta, dict) else {}
+    meta.setdefault("CreateTime", _now())
+    meta["LastUpdatedTime"] = _now()
     patch["MetaData"] = meta
-    patch["SyncToken"] = str(int(inv["SyncToken"]) + 1)
+    try:
+        current_sync = int(inv.get("SyncToken") or 0)
+    except (TypeError, ValueError):
+        current_sync = 0
+    patch["SyncToken"] = str(current_sync + 1)
     _store.table("invoices").patch(invoice_id, patch)
     return {"Invoice": _store.table("invoices").get(invoice_id)}
 
@@ -433,12 +454,19 @@ def void_invoice(invoice_id: str):
     inv = _store.table("invoices").get(invoice_id)
     if not inv:
         return {"error": f"Invoice {invoice_id} not found"}
-    meta = dict(inv["MetaData"]); meta["LastUpdatedTime"] = _now()
+    existing_meta = inv.get("MetaData") or {}
+    meta = dict(existing_meta) if isinstance(existing_meta, dict) else {}
+    meta.setdefault("CreateTime", _now())
+    meta["LastUpdatedTime"] = _now()
+    try:
+        current_sync = int(inv.get("SyncToken") or 0)
+    except (TypeError, ValueError):
+        current_sync = 0
     _store.table("invoices").patch(invoice_id, {
         "Status": "Voided",
         "Balance": 0.00,
         "MetaData": meta,
-        "SyncToken": str(int(inv["SyncToken"]) + 1),
+        "SyncToken": str(current_sync + 1),
     })
     return {"Invoice": _store.table("invoices").get(invoice_id)}
 
@@ -447,7 +475,10 @@ def send_invoice(invoice_id: str):
     inv = _store.table("invoices").get(invoice_id)
     if not inv:
         return {"error": f"Invoice {invoice_id} not found"}
-    meta = dict(inv["MetaData"]); meta["LastUpdatedTime"] = _now()
+    existing_meta = inv.get("MetaData") or {}
+    meta = dict(existing_meta) if isinstance(existing_meta, dict) else {}
+    meta.setdefault("CreateTime", _now())
+    meta["LastUpdatedTime"] = _now()
     _store.table("invoices").patch(invoice_id, {
         "EmailStatus": "Sent",
         "MetaData": meta,
@@ -500,12 +531,19 @@ def pay_bill(bill_id: str):
     b = _store.table("bills").get(bill_id)
     if not b:
         return {"error": f"Bill {bill_id} not found"}
-    meta = dict(b["MetaData"]); meta["LastUpdatedTime"] = _now()
+    existing_meta = b.get("MetaData") or {}
+    meta = dict(existing_meta) if isinstance(existing_meta, dict) else {}
+    meta.setdefault("CreateTime", _now())
+    meta["LastUpdatedTime"] = _now()
+    try:
+        current_sync = int(b.get("SyncToken") or 0)
+    except (TypeError, ValueError):
+        current_sync = 0
     _store.table("bills").patch(bill_id, {
         "Balance": 0.00,
         "Status": "Paid",
         "MetaData": meta,
-        "SyncToken": str(int(b["SyncToken"]) + 1),
+        "SyncToken": str(current_sync + 1),
     })
     return {"Bill": _store.table("bills").get(bill_id)}
 

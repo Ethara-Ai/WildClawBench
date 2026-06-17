@@ -10,7 +10,7 @@ DATA_DIR = Path(__file__).parent
 
 sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_seed_with_ctx, get_store, opt_csv_list, strict_bool, strict_float, strict_int)
+    read_json_with_ctx, get_store, opt_csv_list, strict_bool, strict_float, strict_int)
 
 _store = get_store("airbnb-api")
 _API = "airbnb-api"
@@ -19,7 +19,7 @@ SERVICE_FEE_PCT = 14.0  # guest service fee as percent of nightly subtotal
 
 
 def _load(filename, table):
-    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

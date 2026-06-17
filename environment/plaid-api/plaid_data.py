@@ -16,14 +16,14 @@ DATA_DIR = Path(__file__).parent
 
 sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_seed_with_ctx, get_store, opt_csv_list, opt_float, opt_str, strict_bool)
+    read_json_with_ctx, get_store, opt_csv_list, opt_float, opt_str, strict_bool)
 
 _store = get_store("plaid-api")
 _API = "plaid-api"
 
 
 def _load(filename, table):
-    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

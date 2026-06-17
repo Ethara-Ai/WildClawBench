@@ -16,7 +16,7 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_seed_with_ctx, get_store, opt_int, opt_str)
+    read_json_with_ctx, get_store, opt_int, opt_str)
 
 _store = get_store("bamboohr-api")
 _API = "bamboohr-api"
@@ -50,7 +50,7 @@ VALID_TIME_OFF_STATUS = {"requested", "approved", "denied", "canceled"}
 
 
 def _load(filename, table):
-    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

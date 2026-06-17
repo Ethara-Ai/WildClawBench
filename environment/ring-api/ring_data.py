@@ -10,13 +10,13 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_seed_with_ctx, get_store, opt_int, opt_str, strict_int)
+    read_json_with_ctx, get_store, opt_int, opt_str, strict_int)
 _store = get_store("ring-api")
 _API = "ring-api"
 
 
 def _load(filename, table):
-    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):
@@ -83,8 +83,12 @@ def _coerce_motion_zones(rows):
 def _coerce_notification_prefs(rows):
     out = []
     for r in rows:
+        device_id = strict_int(r, "device_id")
+        channel = r.get("channel") or "push"
         out.append({
-            "device_id": strict_int(r, "device_id"),
+            "_pk": f"{device_id}/{channel}",
+            "device_id": device_id,
+            "channel": channel,
             "motion_alerts": r["motion_alerts"].lower() == "true" if r["motion_alerts"] else None,
             "ding_alerts": r["ding_alerts"].lower() == "true" if r["ding_alerts"] else None,
             "person_alerts": r["person_alerts"].lower() == "true" if r["person_alerts"] else None,
@@ -108,7 +112,7 @@ _store.register("motion_zones", primary_key="_pk",
                 initial_loader=lambda: [
                     {**z, "_pk": f"{z['device_id']}@{z['zone_id']}"}
                     for z in _coerce_motion_zones(_load("motion_zones.json", "motion_zones"))])
-_store.register("notification_prefs", primary_key="device_id",
+_store.register("notification_prefs", primary_key="_pk",
                 initial_loader=lambda: _coerce_notification_prefs(
                     _load("notification_prefs.json", "notification_prefs")))
 
@@ -119,7 +123,7 @@ def _active_dings(): return _store.document("active_dings").get()
 def _events_rows(): return _store.table("events").rows()
 def _shared_users_rows(): return _store.table("shared_users").rows()
 def _motion_zones_rows(): return _store.table("motion_zones").rows()
-def _notification_prefs_rows(): return _store.table("notification_prefs").rows()
+def _notification_prefs_rows(): return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("notification_prefs").rows()]
 
 
 def _next_event_id():
@@ -402,23 +406,27 @@ def list_notification_prefs():
     return {"type": "notification_prefs", "count": len(rows), "results": rows}
 
 
-def get_notification_pref(device_id: int):
-    p = _store.table("notification_prefs").get(device_id)
+def get_notification_pref(device_id: int, channel: str = "push"):
+    pk = f"{device_id}/{channel}"
+    p = _store.table("notification_prefs").get(pk)
     if p:
-        return {"type": "notification_pref", "notification_pref": p}
+        return {"type": "notification_pref",
+                "notification_pref": {k: v for k, v in p.items() if k != "_pk"}}
     return {"error": f"Notification preferences for device {device_id} not found"}
 
 
-def update_notification_pref(device_id: int, data: dict):
-    p = _store.table("notification_prefs").get(device_id)
+def update_notification_pref(device_id: int, data: dict, channel: str = "push"):
+    pk = f"{device_id}/{channel}"
+    p = _store.table("notification_prefs").get(pk)
     if not p:
         return {"error": f"Notification preferences for device {device_id} not found"}
     updatable = {"motion_alerts", "ding_alerts", "person_alerts", "package_alerts"}
     patch = {k: v for k, v in data.items() if k in updatable}
     if patch:
-        _store.table("notification_prefs").patch(device_id, patch)
+        _store.table("notification_prefs").patch(pk, patch)
+    after = _store.table("notification_prefs").get(pk)
     return {"type": "notification_pref",
-            "notification_pref": _store.table("notification_prefs").get(device_id)}
+            "notification_pref": {k: v for k, v in after.items() if k != "_pk"}}
 
 
 def activate_siren(device_id: int, duration_seconds: int = 30):

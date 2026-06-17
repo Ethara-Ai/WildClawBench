@@ -34,6 +34,7 @@ app = FastAPI(...); install_tracker(app); install_admin_plane(app, store=<name>_
 ## CONVENTIONS
 - Each service owns a **unique port** + `env_var_name` (e.g. github-api → 8019 / `GITHUB_API_URL`)
   declared in `service.toml`. Don't collide ports across services.
+- Port 8069 is intentionally unassigned — historical artifact from an API renumbering. Do not reuse.
 - Data lives in `<name>_data.py` module-global `_store`; servers are thin route wrappers.
 - Drift = admin plane mutates `_store` mid-run so responses diverge from persona MEMORY.md;
   drift events are hidden from the agent's `/audit` view by design.

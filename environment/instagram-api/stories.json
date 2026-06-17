@@ -1,5 +1,17 @@
 [
   {
+    "id": "17950001001",
+    "user_id": "17841400123456789",
+    "media_type": "IMAGE",
+    "media_url": "https://instagram.mock/stories/17950001001.jpg",
+    "timestamp": "2026-05-04T08:00:00",
+    "expiring_at": "2026-05-05T08:00:00",
+    "caption": "Friday roast day! Costa Rica Tarrazu drops at 10am ☕ #coffee #freshroast",
+    "link": "https://brewedawakening.co/shop",
+    "poll_question": "",
+    "poll_options": ""
+  },
+  {
     "id": "17950001008",
     "user_id": "17841400123456789",
     "media_type": "IMAGE",
