@@ -1,5 +1,0 @@
-sid,phone_number,friendly_name,iso_country,sms_enabled,voice_enabled,mms_enabled,capabilities_fax,date_created
-PN_001,+2348070001234,Layla NNU lab SMS,NG,True,True,False,False,2024-03-15T08:00:00Z
-PN_002,+2348070001235,ESFES workshop hotline,NG,True,True,False,False,2024-07-15T08:00:00Z
-PN_003,+2348070001236,Grant alerts inbound,NG,True,False,False,False,2025-06-01T08:00:00Z
-PN_004,+15551234567,US fallback (Marcus),US,True,True,True,False,2024-03-12T08:00:00Z

@@ -1,9 +1,0 @@
-id,name,type,messages_total,messages_unread,threads_total,threads_unread
-INBOX,INBOX,system,412,19,287,12
-SENT,SENT,system,894,0,612,0
-DRAFT,DRAFT,system,7,0,7,0
-STARRED,STARRED,system,43,3,31,2
-TRASH,TRASH,system,18,0,14,0
-Label_WAADA,WAADA-Cassava,user,86,4,41,2
-Label_WAITA,WAITA-EACRI,user,62,2,34,1
-Label_ESFES,ESFES,user,41,3,22,2

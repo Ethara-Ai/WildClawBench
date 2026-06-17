@@ -1,4 +1,0 @@
-id,summary,description,time_zone,access_role,primary,color_id
-anita.patel@meridianux.com,Anita Patel,Primary calendar,America/New_York,owner,true,1
-team-meridian-ux@meridianux.com,Meridian UX Team,Shared team calendar,America/New_York,reader,false,9
-usability-lab@meridianux.com,Usability Lab,Lab booking calendar,America/New_York,writer,false,5

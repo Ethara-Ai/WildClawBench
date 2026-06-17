@@ -30,10 +30,11 @@ mapper does not recognize still appears under its raw table names.
 """
 from __future__ import annotations
 
+import csv
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -51,9 +52,35 @@ _TABLE_ALIASES = {
 }
 
 
+def _csv_cell(value: str) -> Any:
+    """Decode one CSV cell back to a Python value. Cells that the snapshot
+    writer JSON-encoded (nested objects/arrays) are parsed back; everything
+    else is kept as the raw string, matching the CSV-seeded store shape."""
+    if value and value[0] in "[{":
+        try:
+            return json.loads(value)
+        except (json.JSONDecodeError, ValueError):
+            return value
+    return value
+
+
+def _read_table_csv(path: Path) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    try:
+        with open(path, "r", encoding="utf-8", newline="") as f:
+            for row in csv.DictReader(f):
+                rows.append({k: _csv_cell(v) for k, v in row.items() if k is not None})
+    except OSError:
+        return []
+    return rows
+
+
 def _load_store_snapshot(snapshot_dir: Path) -> Dict[str, Dict[str, Any]]:
-    """Read a ``snapshot_state`` dump (``<api>/tables/<t>.json`` +
-    ``<api>/documents/<d>.json``) into ``{api: {tables:{...}, documents:{...}}}``."""
+    """Read a ``snapshot_state`` dump into ``{api: {tables:{...}, documents:{...}}}``.
+
+    The current layout mirrors the seed ``mock_data/`` (``<api>/<table>.csv`` +
+    ``<api>/<doc>.json``); the older nested layout (``<api>/tables/<t>.json`` +
+    ``<api>/documents/<d>.json``) is still read for backward compatibility."""
     out: Dict[str, Dict[str, Any]] = {}
     if not snapshot_dir or not snapshot_dir.is_dir():
         return out
@@ -62,6 +89,15 @@ def _load_store_snapshot(snapshot_dir: Path) -> Dict[str, Dict[str, Any]]:
             continue
         tables: Dict[str, Any] = {}
         documents: Dict[str, Any] = {}
+        # New flat layout: tables as CSV, documents as JSON, side by side.
+        for csvf in sorted(api_dir.glob("*.csv")):
+            tables[csvf.stem] = _read_table_csv(csvf)
+        for jf in sorted(api_dir.glob("*.json")):
+            try:
+                documents[jf.stem] = json.loads(jf.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+        # Legacy nested layout fallback.
         tdir = api_dir / "tables"
         if tdir.is_dir():
             for tf in sorted(tdir.glob("*.json")):

@@ -1,9 +1,0 @@
-id,parent_page_id,parent_block_id,author_id,text,created_time,resolved
-ncmt_001,page_PPR26A_gt01,,u_003,Reviewed against the full scoring rubric. This is correctly categorized now.,2026-10-02T17:00:00.000Z,false
-ncmt_002,page_PPR26A_gt02,,u_002,P12 session confirms this finding. The navigation confusion in the refill flow is clear from the recording.,2026-09-26T14:30:00.000Z,false
-ncmt_003,page_PPR26A_gt02,block_gt02_p2,u_001,CareNav reference is the strongest benchmark we have for the refill tracker. Raj is also pulling in WellSync patterns for messaging.,2026-09-27T10:15:00.000Z,false
-ncmt_004,page_PPR26A_gt03,,u_004,WellSync contextual help pattern could work for messaging. Added a note on the Figma component as well.,2026-09-29T16:00:00.000Z,false
-ncmt_005,page_filler_001,,u_003,Token scale looks good. Ready for final sign-off.,2026-08-07T09:30:00.000Z,true
-ncmt_006,page_filler_003,,u_019,Chip variant spacing needs one more pass before we lock it down.,2026-10-09T11:00:00.000Z,false
-ncmt_007,page_filler_008,,u_013,Form validation patterns doc is ready for review.,2026-09-14T10:00:00.000Z,true
-ncmt_008,page_PPR26A_q1cycle,,u_001,Closing this out. Q1 cycle items are archived. Relevant patterns carried forward to Sprint 4 audit.,2026-08-12T13:30:00.000Z,true

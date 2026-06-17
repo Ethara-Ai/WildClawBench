@@ -49,6 +49,7 @@ openclaw runner's ``before_turn`` hook.
 
 from __future__ import annotations
 
+import csv
 import json
 import logging
 import re
@@ -330,12 +331,14 @@ class InjectApplier:
         before-injection and an after-injection picture of the data the agent
         sees, so a reviewer can diff exactly what the silent mutations changed.
 
-        Layout written::
+        The on-disk layout mirrors the task's own ``mock_data/`` overlays —
+        tables as flat CSV, documents as flat JSON — so a reviewer can diff the
+        before/after snapshot against the seed data in the exact same format::
 
             <dest_dir>/
                 _manifest.json                 # which apis/tables/docs, row counts
-                <api>/tables/<table>.json      # {"table","primary_key"?,"rows":[...]}
-                <api>/documents/<doc>.json     # the raw document value
+                <api>/<table>.csv              # header row + one row per record
+                <api>/<doc>.json               # the raw document value
 
         Returns the manifest dict (also persisted as ``_manifest.json``).
         """
@@ -364,18 +367,15 @@ class InjectApplier:
                 if not table:
                     continue
                 rows = self._admin_get_rows(api, table)
-                tdir = api_dir / "tables"
-                tdir.mkdir(parents=True, exist_ok=True)
-                with open(tdir / f"{table}.json", "w", encoding="utf-8") as f:
-                    json.dump({"table": table, "rows": rows}, f, indent=2, default=str)
+                api_dir.mkdir(parents=True, exist_ok=True)
+                self._write_rows_csv(api_dir / f"{table}.csv", rows)
                 api_entry["tables"][table] = len(rows)
             for doc in doc_names:
                 if not doc:
                     continue
                 value = self._admin_get(api, f"/admin/doc/{doc}")
-                ddir = api_dir / "documents"
-                ddir.mkdir(parents=True, exist_ok=True)
-                with open(ddir / f"{doc}.json", "w", encoding="utf-8") as f:
+                api_dir.mkdir(parents=True, exist_ok=True)
+                with open(api_dir / f"{doc}.json", "w", encoding="utf-8") as f:
                     json.dump(value, f, indent=2, default=str)
                 api_entry["documents"][doc] = True
             manifest["apis"][api] = api_entry
@@ -388,6 +388,54 @@ class InjectApplier:
         LOG.info("inject snapshot '%s' written to %s (%d api(s))",
                  label, dest, len(manifest["apis"]))
         return manifest
+
+    @staticmethod
+    def _flatten_row(row: Dict[str, Any]) -> Dict[str, Any]:
+        """Flatten one store row to scalar CSV cells. Airtable-style rows nest
+        their data under ``fields``; lift those to top-level columns (alongside
+        ``id``/``createdTime``) so the CSV matches the seed ``mock_data`` shape.
+        Non-scalar values are JSON-encoded; ``None`` becomes the empty string."""
+        if not isinstance(row, dict):
+            return {"value": row}
+        flat: Dict[str, Any] = {}
+        nested = row.get("fields") if isinstance(row.get("fields"), dict) else None
+        for k, v in row.items():
+            if k == "fields" and nested is not None:
+                continue
+            flat[k] = v
+        if nested is not None:
+            flat.update(nested)
+        out: Dict[str, Any] = {}
+        for k, v in flat.items():
+            if v is None:
+                out[k] = ""
+            elif isinstance(v, (dict, list)):
+                out[k] = json.dumps(v, ensure_ascii=False, default=str)
+            elif isinstance(v, bool):
+                out[k] = str(v)
+            else:
+                out[k] = v
+        return out
+
+    @classmethod
+    def _write_rows_csv(cls, path: Path, rows: List[Dict[str, Any]]) -> None:
+        """Write ``rows`` as CSV at ``path``. The header is the union of column
+        names in first-seen order across all rows. An empty table still yields a
+        file (header-only / empty) so before/after diffs stay aligned."""
+        flat_rows = [cls._flatten_row(r) for r in (rows or [])]
+        header: List[str] = []
+        seen = set()
+        for fr in flat_rows:
+            for k in fr:
+                if k not in seen:
+                    seen.add(k)
+                    header.append(k)
+        with open(path, "w", encoding="utf-8", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=header, extrasaction="ignore")
+            if header:
+                writer.writeheader()
+            for fr in flat_rows:
+                writer.writerow(fr)
 
     # -- filesystem ---------------------------------------------------------
 

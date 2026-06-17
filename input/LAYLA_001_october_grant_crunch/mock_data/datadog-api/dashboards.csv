@@ -1,4 +1,0 @@
-id,title,description,layout_type,author,widget_count,is_read_only,created,modified
-dash_crop_sci_health,Crop Sci Lab Health,"Storage, compute, LIMS",ordered,Layla McBride,12,False,2024-09-12T08:00:00Z,2026-10-01T08:00:00Z
-dash_esfes_cms,ESFES CMS,Contentful proxy + Mailchimp,ordered,Layla McBride,6,False,2025-02-15T08:00:00Z,2026-09-28T08:00:00Z
-dash_grant_pipeline,Grant Pipeline Telemetry,Notion + Confluence write latency,ordered,Layla McBride,4,False,2026-06-01T08:00:00Z,2026-10-03T08:00:00Z

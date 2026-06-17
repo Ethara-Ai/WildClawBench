@@ -1,5 +1,0 @@
-conversation_id,wa_id,started_at,last_message_at,origin,within_24h_window
-conv_marcus,2348012340001,2024-04-12T08:00:00+01:00,2026-10-04T07:12:00+01:00,user,True
-conv_blessing,2348012340002,2024-09-02T08:00:00+01:00,2026-10-03T20:30:00+01:00,user,True
-conv_tunde,2348012340003,2024-08-12T08:00:00+01:00,2026-10-03T18:14:00+01:00,business,True
-conv_amina,254712340001,2025-04-12T08:00:00+01:00,2026-10-04T06:50:00+03:00,user,True

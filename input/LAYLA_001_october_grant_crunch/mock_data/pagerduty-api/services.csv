@@ -1,4 +1,0 @@
-service_id,name,description,status,escalation_policy_id,auto_resolve_timeout
-PS_LAB_LIMS,Lab LIMS,PostgreSQL + Jupyter notebooks,active,EP_CROPSCI,14400
-PS_CROP_STORAGE,Crop Sci Storage,MinIO field-data storage,active,EP_CROPSCI,14400
-PS_ESFES_CMS,ESFES CMS Proxy,Contentful + Mailchimp proxy,active,EP_ESFES,14400

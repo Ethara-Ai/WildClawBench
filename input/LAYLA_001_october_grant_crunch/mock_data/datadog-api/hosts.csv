@@ -1,5 +1,0 @@
-name,up,apps,sources,cpu_pct,mem_pct,last_reported
-crop-sci-storage-01,True,"minio,nginx",agent,14.2,62.4,1791098700
-crop-sci-compute-01,True,"jupyterhub,r",agent,28.1,48.7,1791098700
-lab-lims-db-01,True,postgres,agent,9.4,71.8,1791098700
-esfes-cms-01,True,contentful-proxy,agent,6.7,41.2,1791098700

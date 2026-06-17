@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -212,6 +213,35 @@ def _coerce_top_usage(src: Optional[Mapping]) -> dict[str, Any]:
     }
 
 
+# The OpenClaw agent binary prepends a wall-clock timestamp to every user turn
+# it delivers, e.g. "[Mon 2026-06-15 14:50 UTC] <prompt>". That stamp (a) uses
+# the real run date, not the persona date (IAN report H2), and (b) is harness
+# metadata, not part of the user's actual message. Strip a single leading
+# "[Ddd YYYY-MM-DD HH:MM TZ]" token from user message text so published
+# output.json shows the clean prompt the task authored.
+_TURN_TS_RE = re.compile(
+    r"^\s*\[[A-Za-z]{3}\s+\d{4}-\d{2}-\d{2}\s+\d{1,2}:\d{2}(?::\d{2})?\s+[A-Za-z]{2,5}\]\s*"
+)
+
+
+def _strip_turn_timestamp_prefix(messages: List[dict]) -> None:
+    """Remove the leading agent-stamped timestamp from user message text, in place."""
+    for entry in messages or []:
+        if not isinstance(entry, dict):
+            continue
+        msg = entry.get("message") if isinstance(entry.get("message"), dict) else entry
+        if not isinstance(msg, dict) or msg.get("role") != "user":
+            continue
+        content = msg.get("content")
+        if isinstance(content, str):
+            msg["content"] = _TURN_TS_RE.sub("", content, count=1)
+        elif isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict) and isinstance(block.get("text"), str):
+                    block["text"] = _TURN_TS_RE.sub("", block["text"], count=1)
+                    break  # only the first text block carries the prefix
+
+
 def build_trajectory_from_jsonl(
     task: Task,
     entries: List[dict],
@@ -300,6 +330,8 @@ def build_trajectory_from_jsonl(
         messages = [_wrap_trajectory_message(m) for m in messages]
     messages = _unwrap_trajectory_messages(messages)
 
+    _strip_turn_timestamp_prefix(messages)
+
     if media_handler is not None:
         messages = media_handler(messages, task.task_id or task.id)
 
@@ -318,6 +350,136 @@ def build_trajectory_from_jsonl(
         "messages": messages,
         "usage": _coerce_top_usage(usage_top_level),
     }
+
+
+# --------------------------------------------------------------------------- #
+# Published-trajectory hygiene (applied only to the slim output.json form).
+#
+# The published output.json is a deliverable that must match the canonical
+# Golden_Trajectory.json shape. Relative to the rich internal trajectory it must:
+#   * carry ONLY the canonical inner-message keys: {role, content} (+ toolCallId /
+#     toolName / isError on toolResult) — no per-turn usage/cost (lives in
+#     usage.json, IAN Pointer 5), api / provider / model / stopReason / timestamp /
+#     details operator metadata;
+#   * strip the harness routing token "[[reply_to_current]]" from assistant text;
+#   * neutralize raw infra-failure noise inside tool results (curl connection
+#     frames, pip DNS failures, tracebacks, missing-binary `sh:` errors, bare mock
+#     404/500 probe bodies, provider errors) to a short, honest marker — the
+#     failure stays visible, we do not fabricate success;
+#   * redact the internal mock pod hostname (mocks-task-<slug>-<hash>) from any
+#     tool-result text that survives.
+# The rich in-memory trajectory is left untouched so graders/judges still see
+# exactly what the agent saw. We never rewrite the model's own narrative text.
+# --------------------------------------------------------------------------- #
+
+# Canonical inner-message keys (Golden_Trajectory.json). Everything else on an
+# inner message is operator/transport metadata and is dropped on publish.
+_PUBLISHED_KEYS_COMMON = ("role", "content")
+_PUBLISHED_KEYS_TOOLRESULT = ("toolCallId", "toolName", "isError")
+
+# Harness routing/template token that prefixes assistant replies; never canonical.
+_REPLY_TOKEN_RE = re.compile(r"\[\[reply_to_current\]\]\s*")
+
+# Internal mock pod hostname: mocks-task-<task_slug>-<pod_hash>. Leaks the task
+# slug + pod hash into curl traces; redact to a stable, non-identifying alias.
+_MOCK_HOST_RE = re.compile(r"mocks-task-[a-z0-9_]+-[0-9a-f]+", re.I)
+
+# High-precision signatures of environment/infra failures in tool-result text.
+# Each maps to the neutral marker that replaces the whole noisy text block.
+_INFRA_NOISE_PATTERNS: list[tuple[re.Pattern, str]] = [
+    (re.compile(r"Connection refused|Failed to connect to|connect to .+? port \d+ failed", re.I),
+     "upstream service unavailable"),
+    (re.compile(r"Temporary failure in name resolution|"
+                r"Could not find a version that satisfies the requirement|"
+                r"ModuleNotFoundError: No module named", re.I),
+     "package/network unavailable in sandbox"),
+    (re.compile(r"^\s*sh: \d+: .+?: not found", re.M),
+     "command-line tool not installed"),
+    (re.compile(r"HTTP/1\.1 5\d\d|Internal Server Error"),
+     "upstream service error"),
+    (re.compile(r"Bedrock is unable to process your request", re.I),
+     "provider error"),
+]
+
+# A tool-result whose entire body is just repeated mock "not found" / no-result
+# probe responses (the agent blindly probing a down endpoint). Matched only when
+# NOTHING else of substance remains, so genuine API payloads are never touched.
+_PROBE_FRAGMENT_RE = re.compile(
+    r'^\s*(?:\{"detail"\s*:\s*"Not Found"\}|'
+    r'\{\s*"status"\s*:\s*"ZERO_RESULTS".*?\})\s*$',
+    re.S,
+)
+
+
+def _neutralize_infra_text(text: str) -> Optional[str]:
+    """Return a neutral marker if ``text`` is dominated by infra-failure noise,
+    else ``None`` (keep the original). Conservative by construction: only fires
+    on the high-precision signatures above or an all-probe-noise body."""
+    if not isinstance(text, str) or not text.strip():
+        return None
+    for rx, label in _INFRA_NOISE_PATTERNS:
+        if rx.search(text):
+            return f"[tool output omitted — {label}]"
+    # Split on the `---` probe delimiter only (NOT newlines), so a multi-line
+    # JSON probe body stays one fragment and matches under re.S.
+    fragments = [f for f in re.split(r"-{2,}", text) if f.strip()]
+    if fragments and all(_PROBE_FRAGMENT_RE.match(f.strip()) for f in fragments):
+        return "[tool output omitted — endpoint returned no data]"
+    return None
+
+
+def sanitize_tool_result_text(text: str) -> str:
+    """Publish-safe form of one tool-result text: neutralize infra-failure noise
+    to a short marker, else redact the internal mock pod hostname. Shared by the
+    published-trajectory emitter AND the golden generator (which copies real-run
+    tool results verbatim), so both surfaces get identical hygiene."""
+    if not isinstance(text, str) or not text:
+        return text
+    replacement = _neutralize_infra_text(text)
+    if replacement is not None:
+        return replacement
+    return _MOCK_HOST_RE.sub("mock-services", text)
+
+
+def _clean_published_text(text: str, role: str) -> str:
+    """Apply role-appropriate text hygiene to one text block, in priority order:
+    strip the assistant routing token; neutralize infra noise / redact the mock
+    hostname in tool results. Model narrative text is only ever touched to remove
+    the harness routing token — never reworded."""
+    if not isinstance(text, str) or not text:
+        return text
+    if role == "assistant":
+        return _REPLY_TOKEN_RE.sub("", text)
+    if role == "toolResult":
+        return sanitize_tool_result_text(text)
+    return text
+
+
+def _scrub_published_message(inner: dict) -> dict:
+    """Return a publish-safe copy of one inner message: keep only the canonical
+    keys for its role, then apply text hygiene to each text block. Copies only
+    what it needs so the caller's rich trajectory (kept for grading + the harbor
+    bundle) is never altered."""
+    role = inner.get("role")
+    keep = set(_PUBLISHED_KEYS_COMMON)
+    if role == "toolResult":
+        keep.update(_PUBLISHED_KEYS_TOOLRESULT)
+    out = {k: v for k, v in inner.items() if k in keep}
+
+    content = out.get("content")
+    if isinstance(content, list):
+        new_content = []
+        changed = False
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "text":
+                cleaned = _clean_published_text(block.get("text", ""), role)
+                if cleaned != block.get("text", ""):
+                    block = {**block, "text": cleaned}
+                    changed = True
+            new_content.append(block)
+        if changed:
+            out["content"] = new_content
+    return out
 
 
 def _task_attr(task: Any, key: str) -> str:
@@ -342,17 +504,40 @@ def build_published_trajectory(
     The internal dict (from :func:`build_trajectory_from_jsonl`) carries
     session_id / trajectory / input_files / usage etc. for the harbor + grading
     pipeline; this slim form is what is written to ``output.json`` on disk and
-    into the harbor bundle. ``meta_info`` holds exactly six keys:
-    conv_id, platform, system_prompt, task_completion_status, task_description,
-    task_type. Per-message ``turn_index`` (internal bookkeeping) is stripped so
-    the message shape matches the reference trajectory exactly.
+    into the harbor bundle. ``meta_info`` holds exactly five keys, in the
+    reference Golden_Trajectory.json order: task_type, task_description,
+    task_completion_status, system_prompt, platform. Per-message ``turn_index``
+    (internal bookkeeping) is stripped so the message shape matches the
+    reference trajectory exactly.
+
+    Published-only hygiene (see :func:`_scrub_published_message`): the per-turn
+    ``usage``/cost block is dropped (cost lives in usage.json), and infra-failure
+    noise inside tool results (connection-refused curl frames, pip/DNS failures,
+    tracebacks, bare mock 404/500 probe bodies) is replaced with a short neutral
+    marker. The rich in-memory ``traj`` is left untouched so grading still sees
+    the agent's real tool output.
     """
     messages: List[Any] = []
+    prev_id = ""  # root message's parentId is "" (no parent); else previous id.
     for m in traj.get("messages") or []:
-        if isinstance(m, dict):
-            messages.append({k: v for k, v in m.items() if k != "turn_index"})
-        else:
+        if not isinstance(m, dict):
             messages.append(m)
+            continue
+        # Canonical wrapper shape (Golden_Trajectory.json): type, id, parentId,
+        # timestamp, message — with parentId threaded to the previous message's
+        # id. Internal bookkeeping (turn_index) and the upstream-dropped parentId
+        # are reconstructed here so threading is well-formed regardless of source.
+        mid = m.get("id", "")
+        inner = m.get("message")
+        pm: dict[str, Any] = {
+            "type": m.get("type", "message"),
+            "id": mid,
+            "parentId": prev_id,
+            "timestamp": m.get("timestamp", ""),
+            "message": _scrub_published_message(inner) if isinstance(inner, dict) else inner,
+        }
+        prev_id = mid
+        messages.append(pm)
 
     inner_meta = (traj.get("trajectory") or {}).get("meta_info") or {}
     platform = inner_meta.get("platform") or "linux"
@@ -360,13 +545,14 @@ def build_published_trajectory(
     # slug the internal meta already computed (snake_case, e.g. research_and_analysis).
     task_type = _task_attr(task, "task_type") or inner_meta.get("taxonomy_l2") or ""
 
+    # Key order matches the reference Golden_Trajectory.json exactly:
+    # [task_type, task_description, task_completion_status, system_prompt, platform].
     meta_info = {
-        "conv_id": traj.get("session_id") or "",
-        "platform": platform,
-        "system_prompt": _task_attr(task, "system_prompt"),
-        "task_completion_status": completion_status or "",
-        "task_description": _task_attr(task, "task_description"),
         "task_type": task_type,
+        "task_description": _task_attr(task, "task_description"),
+        "task_completion_status": completion_status or "",
+        "system_prompt": _task_attr(task, "system_prompt"),
+        "platform": platform,
     }
     return {"meta_info": meta_info, "messages": messages}
 

@@ -1962,9 +1962,21 @@ def _start_task_mock_stack(task: dict, network: str, environment_dir) -> tuple[d
         stop_mock_stack(container)
         return {}, None, {}
 
-    env_dict = {ev: f"http://{container}:{port}" for ev, port in env_dict_template.items()}
-    logger.info("[%s] per-task mock stack %s ready (%d overlay APIs, ports %s, %d URLs)",
-                task.get("task_id"), container, len(overlays), overlaid_ports, len(env_dict))
+    # Expose ONLY this task's enabled APIs (required + distractor + overlays) as
+    # URLs — not the full ~104 baked catalog. The container only boots the
+    # enabled set (above), so handing the agent + health logger all 104 URLs
+    # yields 87 dead endpoints and the "17/104 healthy (failed: ...)" probe spam
+    # in mock_health.log. Empty enabled set => keep all (full-catalog fallback,
+    # matching start_mock_stack's own behavior).
+    env_dict = {
+        s["env_var_name"]: f"http://{container}:{int(s['port'])}"
+        for s in services
+        if s.get("env_var_name") and s.get("port")
+        and (not enabled_apis or s.get("name") in enabled_apis)
+    }
+    logger.info("[%s] per-task mock stack %s ready (%d overlay APIs, ports %s, %d/%d URLs enabled)",
+                task.get("task_id"), container, len(overlays), overlaid_ports,
+                len(env_dict), len(env_dict_template))
 
     drift_info: dict = {}
     if needs_admin:

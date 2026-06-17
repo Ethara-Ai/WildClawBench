@@ -1,7 +1,0 @@
-screenshot_id,competitor,page_captured,capture_date,file_reference,annotated
-SCR-001,MyHealthHub Portal,Login Page,2026-08-12,competitor_annotations.pdf p1,yes
-SCR-002,CareNav Portal,Refill Dashboard,2026-08-14,competitor_annotations.pdf p2,yes
-SCR-003,WellSync Patient Portal,Help Center,2026-08-15,competitor_annotations.pdf p3,yes
-SCR-004,MediTrack Portal,SSO Settings,2026-08-18,competitor_screenshots_full.pdf p1,yes
-SCR-005,VitalView Portal,Appointment Booking,2026-08-20,competitor_screenshots_full.pdf p2,yes
-SCR-006,HealthBridge Connect,Provider Dashboard,2026-08-22,provider_screenshots.pdf p1,no

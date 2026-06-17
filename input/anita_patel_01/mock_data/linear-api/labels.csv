@@ -1,8 +1,0 @@
-id,name,color,description,teamId,createdAt,updatedAt
-label-audit,Audit,#9b51e0,Competitive audit tasks,,2025-06-15T09:00:00,2025-06-15T09:00:00
-label-usability,Usability,#2f80ed,Usability testing tasks,,2025-06-15T09:00:00,2025-06-15T09:00:00
-label-high,High Priority,#eb5757,High severity or urgency,,2025-06-15T09:00:00,2025-06-15T09:00:00
-label-medium,Medium Priority,#f2994a,Medium severity or urgency,,2025-06-15T09:00:00,2025-06-15T09:00:00
-label-design,Design,#6fcf97,Design iteration tasks,,2025-06-15T09:00:00,2025-06-15T09:00:00
-label-finding,Finding,#56ccf2,Audit finding documentation,,2025-06-15T09:00:00,2025-06-15T09:00:00
-label-tokens,Tokens,#bb6bd9,Design system token work,team-design-sys,2025-06-15T09:00:00,2025-06-15T09:00:00

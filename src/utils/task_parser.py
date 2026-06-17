@@ -325,9 +325,10 @@ def _append_workspace_hint(prompt: str, attachments: list[dict]) -> str:
     names = [n for n in names if n]
     if not names:
         return prompt
-    listing = "\n".join(f"- {n}" for n in names[:30])
-    if len(names) > 30:
-        listing += f"\n- ... ({len(names) - 30} more)"
+    # List every staged input in full. A prior 30-item cap left a literal
+    # "... (N more)" truncation marker in the agent's first user message (and
+    # thus in the published trajectory), and hid real inputs from the agent.
+    listing = "\n".join(f"- {n}" for n in names)
     # Output-location contract pinned to two harness-side enforcers:
     # (a) `collect_output_from_container` snapshots `/root/workspace/`
     # before the agent runs and copies every new-or-modified file out

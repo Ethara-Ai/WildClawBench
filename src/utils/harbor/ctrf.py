@@ -147,19 +147,25 @@ def compute_test_reward(
         return str(name).rsplit("::", 1)[-1].strip()
 
     passed_names: set[str] = set()
+    ran_names: set[str] = set()
     for raw_name, status in scores.items():
-        if status != "passed":
-            continue
-        passed_names.add(_norm(raw_name))
+        ran_names.add(_norm(raw_name))
+        if status == "passed":
+            passed_names.add(_norm(raw_name))
 
     if not passed_names and test_output and weights:
         for name in weights.keys():
             if re.search(re.escape(name) + r"\s+PASSED", test_output):
                 passed_names.add(_norm(name))
+                ran_names.add(_norm(name))
 
     pos_total = sum(w for w in weights.values() if w > 0)
     pos_earned = sum(w for n, w in weights.items() if w > 0 and _norm(n) in passed_names)
-    neg_penalty = sum(abs(w) for n, w in weights.items() if w < 0 and _norm(n) in passed_names)
+    # Red-line (negative-weight) checkers return True == guardrail respected, so
+    # a correct run PASSES them; penalize only red-lines that RAN and did NOT
+    # pass (were violated), not the passing case.
+    neg_penalty = sum(abs(w) for n, w in weights.items()
+                      if w < 0 and _norm(n) in ran_names and _norm(n) not in passed_names)
 
     if pos_total > 0:
         return max(0.0, (pos_earned - neg_penalty) / pos_total)

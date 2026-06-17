@@ -53,12 +53,16 @@ def _norm(name):
 
 
 passed_names = set()
+ran_names = set()
 for t in tests:
     if not isinstance(t, dict):
         continue
     status = (t.get("status") or "").lower()
     name = t.get("name") or ""
-    if status == "passed" and name:
+    if not name:
+        continue
+    ran_names.add(_norm(name))
+    if status == "passed":
         passed_names.add(_norm(name))
 
 tests_total = int(summary.get("tests", 0) or 0)
@@ -87,7 +91,11 @@ elif isinstance(weights, list):
 
 pos_total = sum(w for w in weights_map.values() if w > 0)
 pos_earned = sum(w for n, w in weights_map.items() if w > 0 and _norm(n) in passed_names)
-neg_penalty = sum(abs(w) for n, w in weights_map.items() if w < 0 and _norm(n) in passed_names)
+# Red-line (negative-weight) checkers return True == guardrail respected, so a
+# correct run PASSES them. Penalize only red-lines that RAN and did NOT pass
+# (were violated) — penalizing the passing case docks correct behaviour.
+neg_penalty = sum(abs(w) for n, w in weights_map.items()
+                  if w < 0 and _norm(n) in ran_names and _norm(n) not in passed_names)
 
 if pos_total > 0:
     reward = max(0.0, (pos_earned - neg_penalty) / pos_total)

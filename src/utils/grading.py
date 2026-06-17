@@ -388,6 +388,10 @@ _JUDGE_RATES = {
 }
 
 
+# Models whose id didn't match a known rate, already warned about once.
+_UNKNOWN_JUDGE_WARNED: set[str] = set()
+
+
 def _judge_cost_usd(model: str, in_tok: int, out_tok: int, c_read: int, c_write: int) -> float:
     rate = None
     for key, val in _JUDGE_RATES.items():
@@ -395,7 +399,12 @@ def _judge_cost_usd(model: str, in_tok: int, out_tok: int, c_read: int, c_write:
             rate = val
             break
     if rate is None:
-        logger.warning("[judge_cost] unknown judge id for model=%r; cost defaulted to 0", model)
+        # Warn ONCE per unknown model id, not once per call — otherwise a 50-turn
+        # judge/golden run floods stderr with identical lines (one per LLM call).
+        if model not in _UNKNOWN_JUDGE_WARNED:
+            _UNKNOWN_JUDGE_WARNED.add(model)
+            logger.warning("[judge_cost] unknown judge id for model=%r; cost defaulted to 0 "
+                           "(suppressing further occurrences)", model)
         return 0.0
     r_in, r_out, r_cached, r_cwrite = rate
     uncached_in = max(0, in_tok - c_read)

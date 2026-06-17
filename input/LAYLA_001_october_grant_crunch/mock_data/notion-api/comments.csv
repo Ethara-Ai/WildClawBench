@@ -1,4 +1,0 @@
-id,parent_page_id,parent_block_id,author_id,text,created_time,resolved
-cmt_001,pg_cassava_y2,blk_004,usr_amina,"Layla, can we sync on plot 007 reconciliation? My numbers differ.",2026-09-28T10:14:00.000Z,False
-cmt_002,pg_deliv_d14,blk_009,usr_akpan,Will send revised assay values by EOW.,2026-09-30T16:00:00.000Z,False
-cmt_003,pg_grants_review,,usr_layla,Q3 pipeline locked. Q4 prep next week.,2026-09-29T16:00:00.000Z,True

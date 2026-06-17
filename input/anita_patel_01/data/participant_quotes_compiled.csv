@@ -1,6 +1,0 @@
-quote_id,participant,timestamp,verbatim_quote,task_area,corroborates_finding,corroborates_comment
-Q-001,P08,00:14,I keep losing my place when I switch between the medication list and the pickup options,refill,yes - Login Redesign SSO,yes - cmt_PPR26A_002
-Q-002,P12,00:18,The navigation keeps sending me back to the dashboard when I try to access my prescriptions,refill,yes - Refill Flow,no
-Q-003,P12,00:32,I wish there was a way to attach my pharmacy card photo directly in the message,messaging,no,yes - cmt_PPR26A_004
-Q-004,P03,00:31,I couldn't figure out how to go back to the main menu,navigation,yes - Login Redesign SSO,no
-Q-005,P15,00:41,The help button didn't do anything when I clicked it,support,yes - Secure Messaging,yes - cmt_PPR26A_003
