@@ -16,13 +16,13 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_json_with_ctx, get_store, opt_float, opt_int, opt_str, strict_bool)
+    read_seed_with_ctx, get_store, opt_float, opt_int, opt_str, strict_bool)
 _store = get_store("intercom-api")
 _API = "intercom-api"
 
 
 def _load(filename, table):
-    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):
