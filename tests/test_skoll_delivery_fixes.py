@@ -240,3 +240,30 @@ def test_builder_drops_reissued_final_turn():
     users = [m for m in traj["messages"] if m["message"].get("role") == "user"]
     assert len(users) == 2
     assert users[-1]["id"] == "u3"         # kept the re-run
+
+
+# ----------------------------------------------------- Bug 2: output.json meta_info --
+
+from eval.run_batch import _inject_output_meta_info  # noqa: E402
+
+
+def test_output_meta_info_inserted_after_artifacts():
+    traj = {"session_id": "s", "trajectory": {"meta_info": {"platform": "linux"}},
+            "input_files": [], "output_artifacts": [{"f": "x"}],
+            "messages": [{"m": 1}], "usage": {}}
+    task = {"task_type": "A, B", "task_description": "desc", "system_prompt": "SYS"}
+    out = _inject_output_meta_info(traj, task, {"test_result": {"reward": 0.64}})
+    keys = list(out.keys())
+    assert keys[keys.index("output_artifacts") + 1] == "meta_info"
+    mi = out["meta_info"]
+    assert mi["task_type"] == "A, B"
+    assert mi["task_description"] == "desc"
+    assert mi["system_prompt"] == "SYS"
+    assert mi["task_completion_status"] == "success"  # reward >= 0.5
+    assert mi["platform"] == "linux"
+
+
+def test_output_meta_info_partial_when_low_reward():
+    traj = {"output_artifacts": [], "messages": []}
+    out = _inject_output_meta_info(traj, {}, {"test_result": {"reward": 0.2}})
+    assert out["meta_info"]["task_completion_status"] == "partial"

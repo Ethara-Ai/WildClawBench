@@ -21,6 +21,7 @@ def build_litellm_config_yaml(
     enable_usage_callback: bool = False,
     openai_whisper_api_key: str = "",
     enable_headroom_callback: bool = False,
+    enable_thinking_callback: bool = True,
 ) -> str:
     whisper_env_ref = (
         "os.environ/OPENAI_API_KEY_WHISPER"
@@ -231,6 +232,11 @@ def build_litellm_config_yaml(
     # it records the post-compression token count — exactly what Bedrock/OpenAI
     # billed — preserving the existing 11-key JSONL schema unchanged.
     _cbs: list[str] = []
+    if enable_thinking_callback:
+        # Pre-call: force thinking:{adaptive,display:summarized} on Claude requests
+        # so Bedrock returns reasoning TEXT (openclaw's reasoning_effort:high
+        # otherwise strips `display` -> signature-only, empty thinking text).
+        _cbs.append("litellm_thinking_callback.thinking_callback_instance")
     if enable_usage_callback:
         _cbs.append("litellm_usage_callback.proxy_handler_instance")
     if enable_headroom_callback:
@@ -350,6 +356,7 @@ def start_litellm(
     headroom_callback_host_path: str = "",
     headroom_log_host_dir: str = "",
     enable_headroom: bool = False,
+    thinking_callback_host_path: str = "",
 ) -> None:
     env_args: list[str] = ["-e", f"LITELLM_MASTER_KEY={master_key}"]
     _litellm_log = os.environ.get("LITELLM_LOG", "").strip()
@@ -398,6 +405,15 @@ def start_litellm(
             if _v:
                 headroom_args += ["-e", f"{_k}={_v}"]
 
+    # Thinking-forcer pre-call hook (pure stdlib -> mounts on the stock image).
+    # Mounted whenever a host path is supplied; the config YAML references it
+    # only when enable_thinking_callback was True, so file ⟺ callback stay in sync.
+    thinking_args: list[str] = []
+    if thinking_callback_host_path:
+        thinking_args = [
+            "-v", f"{thinking_callback_host_path}:/app/litellm_thinking_callback.py:ro",
+        ]
+
     cmd = [
         "docker", "run", "-d",
         "--name", container_name,
@@ -405,6 +421,7 @@ def start_litellm(
         *env_args,
         *callback_args,
         *headroom_args,
+        *thinking_args,
         "-v", f"{host_config_path}:/app/config.yaml:ro",
         image_to_run,
         "--config", "/app/config.yaml",

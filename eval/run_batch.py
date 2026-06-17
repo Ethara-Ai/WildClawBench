@@ -764,6 +764,42 @@ def _overlay_pytest_counts(scores: dict, result: dict) -> None:
                 pass
 
 
+def _inject_output_meta_info(traj: dict, task: dict, result: dict) -> dict:
+    """Insert a top-level `meta_info` block into output.json, right after
+    `output_artifacts` (matches delivery.json's meta_info; sourced from task.yaml).
+
+    Returns a new dict preserving key order with `meta_info` positioned after
+    `output_artifacts`. completion status uses the pytest reward (rubric score is
+    not yet available at output.json write time).
+    """
+    if not isinstance(traj, dict):
+        return traj
+    te = (result or {}).get("test_result") or {}
+    reward = te.get("reward") if isinstance(te, dict) else None
+    if isinstance(reward, (int, float)) and not isinstance(reward, bool):
+        completion = "success" if reward >= 0.5 else "partial"
+    else:
+        completion = "partial"
+    platform = ((traj.get("trajectory") or {}).get("meta_info") or {}).get("platform") or "linux"
+    meta_info = {
+        "task_type": task.get("task_type") or "",
+        "task_description": task.get("task_description") or "",
+        "task_completion_status": completion,
+        "system_prompt": task.get("system_prompt") or "",
+        "platform": platform,
+    }
+    out: dict = {}
+    for k, v in traj.items():
+        if k == "meta_info":
+            continue  # avoid a duplicate if one already exists
+        out[k] = v
+        if k == "output_artifacts":
+            out["meta_info"] = meta_info
+    if "meta_info" not in out:  # no output_artifacts key -> append at end
+        out["meta_info"] = meta_info
+    return out
+
+
 def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
                       model_type: str, run_index: int, result: dict,
                       config: Config | None = None,
@@ -853,6 +889,12 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
     traj["output_artifacts"] = artifacts_list
 
     _normalize_display_model(traj)
+
+    # Bug 2: surface the same meta_info block delivery.json carries (task.yaml
+    # authored task_type / task_description / system_prompt), inserted right after
+    # output_artifacts. Rubric scoring hasn't run yet here, so completion status
+    # is derived from the pytest reward (already in result["test_result"]).
+    traj = _inject_output_meta_info(traj, task, result)
 
     (output_dir / "output.json").write_text(
         json.dumps(traj, indent=2, ensure_ascii=False), encoding="utf-8",
@@ -1573,6 +1615,12 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
 
     _agent_headroom = (os.environ.get("KENSEI_AGENT_HEADROOM_ENABLED", "").strip().lower()
                        in ("1", "true", "yes", "on"))
+    # Thinking-forcer pre-call hook: makes Bedrock return reasoning TEXT (not just
+    # signature) for the agent path. File ⟺ YAML callback kept in sync below.
+    thinking_callback_src = (
+        Path(__file__).resolve().parent.parent / "src" / "utils" / "litellm_thinking_callback.py"
+    )
+    _enable_thinking = thinking_callback_src.is_file()
     litellm_yaml = build_litellm_config_yaml(
         bedrock_sonnet_arn=config.bedrock_sonnet_arn if config.aws_bearer_token else "",
         bedrock_arn=config.bedrock_inference_arn if config.aws_bearer_token else "",
@@ -1581,6 +1629,7 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
         openai_whisper_api_key=config.openai_whisper_api_key,
         enable_usage_callback=True,
         enable_headroom_callback=_agent_headroom,
+        enable_thinking_callback=_enable_thinking,
     )
     if not litellm_yaml:
         raise RuntimeError(
@@ -1634,6 +1683,7 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
         headroom_callback_host_path=headroom_callback_src,
         headroom_log_host_dir=headroom_log_dir_str,
         enable_headroom=_agent_headroom,
+        thinking_callback_host_path=str(thinking_callback_src) if _enable_thinking else "",
     )
     cleanups.append(lambda: stop_litellm(sidecar))
     if not wait_for_litellm_healthy(sidecar):
