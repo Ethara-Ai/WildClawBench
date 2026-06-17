@@ -14,17 +14,20 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from src.utils.inject_director import (  # noqa: E402
-    InjectScript, InjectApplier, parse_prompts_file,
+    InjectScript, InjectApplier, InjectStage, parse_prompts_file,
 )
 
 TASK = ROOT / "input" / "LAYLA_001_october_grant_crunch"
 
-pytestmark = []
-if not TASK.is_dir():  # fixture not shipped -> skip cleanly
-    import pytest
-    pytestmark = pytest.mark.skip(reason="LAYLA fixture not present")
+import pytest  # noqa: E402
+
+# Scope the fixture skip to the LAYLA-dependent tests only; the unit tests below
+# that build their own InjectStage must still run without the fixture.
+layla_only = pytest.mark.skipif(
+    not TASK.is_dir(), reason="LAYLA fixture not present")
 
 
+@layla_only
 def test_prompts_parsing_yields_ordered_turns():
     turns = parse_prompts_file(TASK / "prompts.txt")
     assert len(turns) == 50
@@ -33,6 +36,7 @@ def test_prompts_parsing_yields_ordered_turns():
     assert not turns[0].lstrip().startswith("#")
 
 
+@layla_only
 def test_inject_script_stages_and_boundaries():
     sc = InjectScript.load(TASK / "inject")
     by_idx = {s.index: s for s in sc.stages}
@@ -48,6 +52,7 @@ def test_inject_script_stages_and_boundaries():
     assert by_idx[3].silent or by_idx[3].filesystem
 
 
+@layla_only
 def test_sm3_resolves_against_live_store_despite_placeholder_and_casing():
     import csv
 
@@ -75,3 +80,33 @@ def test_sm3_resolves_against_live_store_despite_placeholder_and_casing():
     assert fields.get("Yield_kg_m2") == 16.8  # yield_kg_m2 -> real column casing
     assert "_last_modified_by" not in fields  # underscore meta stripped
     assert "_last_modified_at" not in fields
+
+
+def test_mid_run_loud_op_is_applied_visibly(tmp_path):
+    """A `loud` op in a mid-run stage must fire as a VISIBLE (silent=False) API
+    mutation — not silently dropped, the pre-fix behaviour."""
+    calls = []
+
+    class RecordingApplier(InjectApplier):
+        def _apply_api_mutation(self, op, stage, turn_index, silent):
+            calls.append({"id": op.get("id"), "silent": silent})
+            return {"id": op.get("id"), "silent": silent, "ok": True, "status": "applied"}
+
+    ap = RecordingApplier({}, None, tmp_path / "timeline.jsonl")
+    stage = InjectStage(
+        index=1, name="overnight_t12_to_t13", from_turn=12, to_turn=13,
+        silent=[{"id": "S1", "service": "gmail-api"}],
+        loud=[{"id": "L1-G13", "service": "gmail-api",
+               "admin": {"table": "messages", "op": "upsert"}}],
+    )
+    ap.apply_stage(stage, turn_index=13)
+
+    by_id = {c["id"]: c["silent"] for c in calls}
+    assert by_id == {"S1": True, "L1-G13": False}, (
+        "mid-run loud op must be applied with silent=False alongside the silent op")
+
+    # timeline summary records both buckets
+    line = (tmp_path / "timeline.jsonl").read_text().strip().splitlines()[-1]
+    import json
+    entry = json.loads(line)
+    assert entry["silent_ops"] == 1 and entry["loud_ops"] == 1

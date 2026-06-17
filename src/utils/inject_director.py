@@ -21,11 +21,13 @@ Why a separate module from ``stage_director``
 Design choices
 --------------
 * **Baseline already seeded.** The task's ``mock_data/`` overlays already
-  contain the canonical pre-T0 state, so the stage0 ``loud`` API mutations are
+  contain the canonical pre-T0 state, so the *stage0* ``loud`` API mutations are
   NOT replayed by default (they would only re-assert state already present and
   would pollute the audit feed). Only stage0 ``filesystem`` drops are seeded
   (optional, requires a workspace copy hook). Set ``replay_loud=True`` to also
-  replay ``loud`` ops as visible seed history.
+  replay ``loud`` ops as visible seed history. This gating applies ONLY to the
+  seed stage; ``loud`` ops in a mid-run stage (>= 1) have no overlay redundancy
+  and ARE applied by ``apply_stage`` as visible (silent=False) mutations.
 * **Apply-time resolution.** The Talos mutations carry unresolved placeholders
   (``{rec_UDI-2026-007}``, ``{page_id_...}``) and field-name casing that may not
   match the live store columns. Rather than trust the literal path/body, the
@@ -34,9 +36,13 @@ Design choices
   before issuing a ``PATCH /admin/data/<table>/<pk>``. Anything it cannot
   resolve is logged to the timeline as ``unresolved`` rather than silently
   dropped.
-* **Silent only.** Mutations flagged ``silent: true`` (or every entry in the
-  ``silent`` array) are applied through ``/admin/*`` and are therefore invisible
-  to the agent. ``loud`` / ``filesystem`` are seed-time concerns.
+* **Silent vs loud at apply time.** Mutations flagged ``silent: true`` (or every
+  entry in the ``silent`` array) are applied through ``/admin/*`` and are
+  invisible to the agent. ``loud`` mutations in a mid-run stage go through the
+  same admin plane but are recorded silent=False (agent-visible: a new
+  email/event/row it will read through normal API calls). At the *seed* stage,
+  ``loud`` is gated by ``replay_loud`` and ``filesystem`` drops are skipped when
+  the container is not yet up (the baseline mount carries that state instead).
 
 Turn model
 ----------
@@ -303,6 +309,18 @@ class InjectApplier:
         outcomes: List[Dict[str, Any]] = []
         for op in stage.silent:
             outcomes.append(self._apply_api_mutation(op, stage, turn_index, silent=True))
+        # Mid-run `loud` ops are VISIBLE API mutations applied between turns: a new
+        # email/event/row the agent will discover through normal API reads. Unlike
+        # the stage0 (seed) loud ops — which describe pre-T0 baseline state already
+        # carried by the mock_data overlays and are therefore gated behind
+        # `replay_loud` to avoid double-application — a loud op in a stage >= 1 has
+        # no overlay redundancy, so it must fire here. Applied with silent=False so
+        # the timeline records it as agent-visible (no /admin stealth semantics).
+        # NOTE: to INSERT a brand-new row (e.g. a phishing email) the op must carry
+        # an explicit ``admin`` block with ``op: upsert``; a bare REST POST with no
+        # admin block resolves no existing target and is logged ``unresolved``.
+        for op in stage.loud:
+            outcomes.append(self._apply_api_mutation(op, stage, turn_index, silent=False))
         # list-form stages may also carry filesystem drops mid-run
         for op in stage.filesystem:
             outcomes.append(self._apply_filesystem(op, stage))
@@ -312,10 +330,11 @@ class InjectApplier:
             "stage": stage.name,
             "applied_before_turn": turn_index,
             "silent_ops": len(stage.silent),
+            "loud_ops": len(stage.loud),
             "outcomes": outcomes,
         })
-        LOG.info("inject stage '%s' applied before turn %d: %d silent op(s)",
-                 stage.name, turn_index, len(stage.silent))
+        LOG.info("inject stage '%s' applied before turn %d: %d silent op(s), %d loud op(s)",
+                 stage.name, turn_index, len(stage.silent), len(stage.loud))
         return outcomes
 
     def close(self) -> None:
