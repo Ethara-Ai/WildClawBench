@@ -1,0 +1,36 @@
+transaction_id,account_id,amount,iso_currency_code,date,name,merchant_name,category,pending,payment_channel
+txn_aldn_0001,acc_chk_001,1842.50,USD,2026-11-06,Midcoast Seafood Co-op Settlement,Midcoast Seafood Co-op,Transfer;Deposit;Co-op Settlement,false,other
+txn_aldn_0002,acc_chk_001,1100.00,USD,2026-11-01,Rent Payment - Route 1,Pinemoor Property LLC,Payment;Rent,false,online
+txn_aldn_0003,acc_chk_001,350.00,USD,2026-11-15,ME Child Support Auto-Deduct,Maine DHHS Child Support,Payment;Government,false,other
+txn_aldn_0004,acc_chk_001,295.00,USD,2026-11-15,Truck Loan Payment (F-250),Camden National Bank,Payment;Loan,false,online
+txn_aldn_0005,acc_chk_001,380.00,USD,2026-11-01,ACA Anthem Silver Premium,Anthem Blue Cross,Service;Insurance;Health,false,online
+txn_aldn_0006,acc_chk_001,90.00,USD,2026-11-01,Hanover Insurance - Auto/Boat,Hanover Insurance,Service;Insurance;Auto,false,online
+txn_aldn_0007,acc_chk_001,142.50,USD,2026-11-04,Central Maine Power,Central Maine Power,Service;Utilities;Electric,false,online
+txn_aldn_0008,acc_chk_001,178.20,USD,2026-11-11,Dead River Heating Oil Delivery,Dead River Company,Service;Utilities;Heating Oil,false,online
+txn_aldn_0009,acc_chk_001,45.00,USD,2026-11-08,Verizon Wireless,Verizon,Service;Telecom,false,online
+txn_aldn_0010,acc_chk_001,18.00,USD,2026-11-12,Netflix,Netflix,Service;Subscription,false,online
+txn_aldn_0011,acc_chk_001,72.40,USD,2026-11-02,Hannaford Supermarket,Hannaford,Food and Drink;Groceries,false,in store
+txn_aldn_0012,acc_chk_001,58.10,USD,2026-11-09,Shaw's Supermarket,Shaw's,Food and Drink;Groceries,false,in store
+txn_aldn_0013,acc_chk_001,41.85,USD,2026-11-16,Hannaford Supermarket,Hannaford,Food and Drink;Groceries,false,in store
+txn_aldn_0014,acc_chk_001,84.50,USD,2026-11-23,Hannaford Supermarket,Hannaford,Food and Drink;Groceries,false,in store
+txn_aldn_0015,acc_chk_001,38.20,USD,2026-11-30,Hannaford Supermarket,Hannaford,Food and Drink;Groceries,false,in store
+txn_aldn_0016,acc_chk_001,55.40,USD,2026-11-05,Irving Diesel - Route 1,Irving Oil,Travel;Gas Stations,false,in store
+txn_aldn_0017,acc_chk_001,48.90,USD,2026-11-19,Irving Diesel - Route 1,Irving Oil,Travel;Gas Stations,false,in store
+txn_aldn_0018,acc_chk_001,42.10,USD,2026-11-27,Cumberland Farms,Cumberland Farms,Travel;Gas Stations,false,in store
+txn_aldn_0019,acc_chk_001,27.84,USD,2026-11-15,Rite Aid Pharmacy Refill,Rite Aid,Shops;Pharmacies,false,in store
+txn_aldn_0020,acc_chk_001,18.55,USD,2026-11-15,Rite Aid Pharmacy Refill,Rite Aid,Shops;Pharmacies,false,in store
+txn_aldn_0021,acc_chk_001,22.00,USD,2026-11-13,Brass Compass Cafe,Brass Compass Cafe,Food and Drink;Restaurants,false,in store
+txn_aldn_0022,acc_chk_001,38.50,USD,2026-11-20,Archer's on the Pier,Archer's on the Pier,Food and Drink;Restaurants,false,in store
+txn_aldn_0023,acc_chk_001,16.40,USD,2026-11-07,Brass Compass Cafe,Brass Compass Cafe,Food and Drink;Restaurants,false,in store
+txn_aldn_0024,acc_chk_001,32.18,USD,2026-11-21,Renys,Renys,Shops;General Merchandise,false,in store
+txn_aldn_0025,acc_chk_001,18.99,USD,2026-11-14,Walmart - Rockland,Walmart,Shops;General Merchandise,false,in store
+txn_aldn_0026,acc_crd_004,67.40,USD,2026-11-10,Hamilton Marine - Rockland,Hamilton Marine,Shops;Marine Supply,false,in store
+txn_aldn_0027,acc_crd_004,84.25,USD,2026-11-24,Defender Marine,Defender Marine,Shops;Marine Supply;Online,false,online
+txn_aldn_0028,acc_crd_004,29.95,USD,2026-11-18,Harbor Freight - Rockland,Harbor Freight,Shops;Hardware,false,in store
+txn_aldn_0029,acc_chk_001,200.00,USD,2026-11-28,Transfer to Boat Engine Fund,Camden National Bank,Transfer;Internal,false,other
+txn_aldn_0030,acc_sav_003,200.00,USD,2026-11-28,Transfer from Checking,Camden National Bank,Transfer;Internal,false,other
+txn_aldn_0031,acc_chk_001,1986.00,USD,2026-12-04,Midcoast Seafood Co-op Settlement,Midcoast Seafood Co-op,Transfer;Deposit;Co-op Settlement,false,other
+txn_aldn_0032,acc_chk_001,1100.00,USD,2026-12-01,Rent Payment - Route 1,Pinemoor Property LLC,Payment;Rent,false,online
+txn_aldn_0033,acc_chk_001,142.10,USD,2026-12-05,Hamilton Marine - Rockland,Hamilton Marine,Shops;Marine Supply,false,in store
+txn_aldn_0034,acc_chk_001,38.90,USD,2026-12-06,Irving Diesel - Route 1,Irving Oil,Travel;Gas Stations,false,in store
+txn_aldn_0035,acc_chk_001,52.75,USD,2026-12-07,Hannaford Supermarket,Hannaford,Food and Drink;Groceries,true,in store

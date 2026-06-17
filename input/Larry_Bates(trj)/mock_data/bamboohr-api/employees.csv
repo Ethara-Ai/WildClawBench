@@ -1,0 +1,4 @@
+id,firstName,lastName,workEmail,department,jobTitle,location,hireDate,status,supervisorId
+1,Larry,Bates,larry.bates@Finthesiss.ai,Brewing,Head Brewer / Owner,Asheville NC,2009-06-01,Active,
+2,Greg,Holloway,greg.holloway.brew@gmail.com,Brewing,Assistant Head Brewer,Asheville NC,2011-03-01,Active,1
+3,Sam,Reyes,sam.reyes.brew@gmail.com,Brewing,Seasonal Brewer,Asheville NC,2025-11-01,Active,2

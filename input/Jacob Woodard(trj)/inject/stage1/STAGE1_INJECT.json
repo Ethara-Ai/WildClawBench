@@ -1,0 +1,73 @@
+{
+  "stage": 1,
+  "description": "OVERNIGHT SILENT MUTATION Day-1->Day-2 (fire after TURN_4, before TURN_5). NO email, NO notification. The Muller portal mirror in the Woodard Airtable (tblOrders / rec_mue_2026_0918) silently moves Krasicki escape-wheel delivery from 2026-10-26 to 2026-11-09 AND price from EUR 645.00 to EUR 668.00. FedEx ETA follows to 2026-11-09. Mark reconciles the Airtable wheel-set row down to on_hand 1 (matching his Day-1 Slack note). Stale Notion subtotal (PLN 2799.30), stale calendar (2026-10-26), stale Linear date, quote PDF (EUR 645) and September invoice photo (EUR 645) are intentionally LEFT UNCHANGED so the agent must detect and correct them.",
+  "fires_after_turn": 4,
+  "anchor_datetime": "2026-10-20T22:10:00+02:00",
+  "anchor_datetime_start": "2026-10-20T20:00:00+02:00",
+  "anchor_datetime_end": "2026-10-21T05:30:00+02:00",
+  "mutations": [
+    {
+      "mutation_id": "s1_muller_portal_date_price",
+      "service": "airtable-api",
+      "method": "PATCH",
+      "url": "{AIRTABLE_API_URL}/v0/appWoodardParts/Muller%20Portal%20Orders/rec_mue_2026_0918",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer {AIRTABLE_TOKEN}"
+      },
+      "body": {
+        "fields": {
+          "Price EUR": 668.0,
+          "Status": "in production - revised",
+          "Expected delivery": "2026-11-09",
+          "Last updated": "2026-10-20T21:55:00+02:00"
+        }
+      },
+      "expected_status": 200,
+      "silent": true,
+      "trap_family": "F1",
+      "rationale": "Forging slot rescheduled; material surcharge applied. Portal mirror updated silently - no email notification."
+    },
+    {
+      "mutation_id": "s1_fedex_eta_follow",
+      "service": "fedex-api",
+      "method": "PUT",
+      "url": "{FEDEX_API_URL}/track/v1/tracking/FX771-KRA-029",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "tracking_number": "FX771-KRA-029",
+        "status_code": "AD",
+        "status_description": "Awaiting dispatch - revised",
+        "estimated_delivery": "2026-11-09",
+        "latest_event": "Forging slot rescheduled; awaiting dispatch",
+        "latest_event_location": "Biel/Bienne, CH",
+        "latest_event_time": "2026-10-20T22:00:00+02:00"
+      },
+      "expected_status": 200,
+      "silent": true,
+      "trap_family": "F1",
+      "rationale": "FedEx ETA silently follows portal revision."
+    },
+    {
+      "mutation_id": "s1_airtable_wheelset_reconcile",
+      "service": "airtable-api",
+      "method": "PATCH",
+      "url": "{AIRTABLE_API_URL}/v0/appWoodardParts/Parts/rec_wheel_set",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer {AIRTABLE_TOKEN}"
+      },
+      "body": {
+        "fields": {
+          "On hand": 1,
+          "Last modified": "2026-10-20T22:10:00+02:00"
+        }
+      },
+      "expected_status": 200,
+      "silent": true,
+      "trap_family": "F1"
+    }
+  ]
+}

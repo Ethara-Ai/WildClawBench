@@ -1,0 +1,8 @@
+Id,DisplayName,CompanyName,PrimaryEmailAddr,PrimaryPhone,BillAddr_Line1,BillAddr_City,BillAddr_CountrySubDivisionCode,BillAddr_PostalCode,Balance,Active,AcctNum,Vendor1099
+1,Hamilton Marine - Rockland,Hamilton Marine Inc,counter@hamiltonmarine.example,(207) 555-2200,155 Park St,Rockland,ME,04841,142.10,true,HAM-AC-5512,false
+2,Defender Marine,Defender Industries Inc,orders@defender.example,(800) 555-7972,42 Great Cove Blvd,Waterford,CT,06385,0.00,true,DEF-RT-8821,false
+3,Hanover Insurance Group,The Hanover Insurance Group,policies@hanover.example,(800) 555-7100,440 Lincoln St,Worcester,MA,01653,0.00,true,HAN-MA-44912,false
+4,Maine Department of Marine Resources,Maine DMR,licensing@maine.gov,(207) 555-9000,21 State House Station,Augusta,ME,04333,0.00,true,DMR-AC-AC,false
+5,Midcoast Seafood Co-op,Midcoast Seafood Cooperative Inc,office@midcoastseafood.coop,(207) 555-0188,1 Co-op Wharf Rd,Rockland,ME,04841,0.00,true,COOP-MEM-AC,false
+6,Marv Pelletier (1099),,marv.pelletier@example.com,(207) 555-0144,38 Cedar St,Thomaston,ME,04861,1850.00,true,1099-MARV,true
+7,Rockland Harbor Fuel Dock,Rockland Harbor Marine Fuel,billing@rocklandfuel.example,(207) 555-2244,2 Tillson Ave,Rockland,ME,04841,0.00,true,RHF-AC-AC,false

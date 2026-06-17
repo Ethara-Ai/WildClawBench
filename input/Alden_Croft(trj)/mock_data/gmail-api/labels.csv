@@ -1,0 +1,10 @@
+id,name,type,messages_total,messages_unread,threads_total,threads_unread
+INBOX,INBOX,system,412,4,287,3
+SENT,SENT,system,198,0,142,0
+DRAFT,DRAFT,system,3,0,3,0
+STARRED,STARRED,system,18,1,15,1
+TRASH,TRASH,system,9,0,7,0
+Label_Boat,Boat,user,64,2,41,2
+Label_Health,Health,user,29,0,22,0
+Label_Coop,Co-op,user,51,0,38,0
+Label_Family,Family/Kara,user,37,1,28,1

@@ -1,0 +1,11 @@
+log_id,date,machine,task,technician,labor_hours,parts_cost_usd,notes
+LOG-2026-07-01,2026-07-03,Canning line - filler,Replace seal kit on filler head 3,Greg Holloway,1.5,84.0,Routine; seal kit at 9 months use
+LOG-2026-07-02,2026-07-10,Canning line - seamer,Clean & re-grease seamer chuck,Sam Reyes,0.8,0.0,Done between runs
+LOG-2026-07-03,2026-07-21,Canning line - depalletizer,Belt tracking adjustment,Greg Holloway,0.5,0.0,Re-tracked after Wed run
+LOG-2026-08-01,2026-08-04,Canning line - filler,CIP cycle verification (post-mash dump),Sam Reyes,2.0,0.0,All passes
+LOG-2026-08-02,2026-08-12,Canning line - labeler,Replace label glue cartridge,Sam Reyes,0.5,18.0,Cartridge swap; routine
+LOG-2026-08-03,2026-08-19,Canning line - seamer,Re-seat seamer pin alignment,Greg Holloway,1.2,0.0,Found alignment off by 0.3 mm
+LOG-2026-08-04,2026-08-28,Canning line - rinser,"Clean nozzles, anti-foam tune",Sam Reyes,1.0,0.0,Foam was high last batch
+LOG-2026-09-01,2026-09-02,Canning line - filler,"Replace O-ring set, head 1",Greg Holloway,1.0,32.0,Slight weep on head 1
+LOG-2026-09-02,2026-09-15,Canning line - depalletizer,Photo-eye sensor cleaning,Sam Reyes,0.4,0.0,Dust accumulation; quarterly
+LOG-2026-09-03,2026-09-24,Canning line - seamer,Replace seamer head bearing (right),Carolina Refrigeration,3.5,142.0,Contracted; warranty service

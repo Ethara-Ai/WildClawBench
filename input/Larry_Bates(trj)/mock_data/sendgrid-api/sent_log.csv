@@ -1,0 +1,2 @@
+message_id,to_email,from_email,subject,template_id,status,opens,clicks,sent_at
+sg_01,erin.whitfield.dist@gmail.com,larry.bates@Finthesiss.ai,Your Bates Brewing order,tpl_order,delivered,1,0,2026-09-28T10:00:00Z

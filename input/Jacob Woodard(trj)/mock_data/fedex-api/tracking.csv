@@ -1,0 +1,2 @@
+tracking_number,status_code,status_description,carrier_code,service_name,ship_date,estimated_delivery,latest_event,latest_event_location,latest_event_time
+FX771-KRA-029,LC,Label created,FDXI,FedEx International Priority,,2026-10-26,Label created,"Biel/Bienne, CH",2026-09-18T14:00:00Z

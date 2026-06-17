@@ -1,0 +1,7 @@
+id,calendar_id,summary,description,location,start,end,all_day,status,creator,organizer,recurrence,visibility
+evt_01,larry.bates@Finthesiss.ai,GABF submission deadline,Entry window closes — packet must be ready,Bates Brewing,2026-10-02T23:59:00,2026-10-02T23:59:00,False,confirmed,larry.bates@Finthesiss.ai,larry.bates@Finthesiss.ai,,default
+evt_02,larry.bates@Finthesiss.ai,Distributor window — Erin Whitfield,Blue Ridge Distribution check-in,Phone,2026-09-30T15:00:00,2026-09-30T15:30:00,False,confirmed,larry.bates@Finthesiss.ai,larry.bates@Finthesiss.ai,,default
+evt_03,larry.bates@Finthesiss.ai,Pre-bottling readings — flagship stout,Greg + Larry,Cellar,2026-09-30T08:00:00,2026-09-30T09:00:00,False,confirmed,larry.bates@Finthesiss.ai,larry.bates@Finthesiss.ai,,default
+evt_04,larry.bates@Finthesiss.ai,Batch reconciliation block,All 2026 batches into GABF window,Office,2026-10-01T06:00:00,2026-10-01T07:30:00,False,confirmed,larry.bates@Finthesiss.ai,larry.bates@Finthesiss.ai,,default
+evt_05,larry.bates@Finthesiss.ai,Tank transfer — Farmhouse Ale,,Cellar,2026-10-02T16:00:00,2026-10-02T17:00:00,False,confirmed,larry.bates@Finthesiss.ai,larry.bates@Finthesiss.ai,,default
+evt_06,larry.bates@Finthesiss.ai,Saturday morning walk with Hana,Protected,Asheville,2026-10-03T09:00:00,2026-10-03T10:00:00,False,confirmed,larry.bates@Finthesiss.ai,larry.bates@Finthesiss.ai,,default

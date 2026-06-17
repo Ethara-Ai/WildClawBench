@@ -1,0 +1,8 @@
+artist_id,name,genres,followers,popularity
+art_ccr_0001,Creedence Clearwater Revival,"classic rock,southern rock,roots rock",12450000,82
+art_springsteen_0002,Bruce Springsteen,"classic rock,heartland rock,rock",10220000,84
+art_petty_0003,Tom Petty and the Heartbreakers,"classic rock,heartland rock,rock",9870000,83
+art_seger_0004,Bob Seger,"classic rock,heartland rock,rock",6310000,79
+art_skynyrd_0005,Lynyrd Skynyrd,"southern rock,classic rock",7050000,80
+art_cash_0006,Johnny Cash,"country,outlaw country,classic country",11400000,81
+art_nelson_0007,Willie Nelson,"country,outlaw country",4980000,76

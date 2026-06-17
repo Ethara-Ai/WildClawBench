@@ -1,0 +1,62 @@
+[
+  {
+    "id": "section_aldn_001",
+    "snippet": {
+      "type": "singlePlaylist",
+      "channelId": "UC_AldenCroftWorkshop",
+      "title": "Cummins 6BTA Maintenance",
+      "position": 0
+    },
+    "contentDetails": {
+      "playlists": ["PL_aldn_001"]
+    }
+  },
+  {
+    "id": "section_aldn_002",
+    "snippet": {
+      "type": "singlePlaylist",
+      "channelId": "UC_AldenCroftWorkshop",
+      "title": "Lobster Gear Basics",
+      "position": 1
+    },
+    "contentDetails": {
+      "playlists": ["PL_aldn_002"]
+    }
+  },
+  {
+    "id": "section_aldn_003",
+    "snippet": {
+      "type": "popularUploads",
+      "channelId": "UC_AldenCroftWorkshop",
+      "title": "Most Watched",
+      "position": 2
+    },
+    "contentDetails": {
+      "playlists": []
+    }
+  },
+  {
+    "id": "section_aldn_004",
+    "snippet": {
+      "type": "singlePlaylist",
+      "channelId": "UC_AldenCroftWorkshop",
+      "title": "Off-Season Shed Projects",
+      "position": 3
+    },
+    "contentDetails": {
+      "playlists": ["PL_aldn_003"]
+    }
+  },
+  {
+    "id": "section_aldn_005",
+    "snippet": {
+      "type": "singlePlaylist",
+      "channelId": "UC_AldenCroftWorkshop",
+      "title": "Weather and the Working Day",
+      "position": 4
+    },
+    "contentDetails": {
+      "playlists": ["PL_aldn_004"]
+    }
+  }
+]

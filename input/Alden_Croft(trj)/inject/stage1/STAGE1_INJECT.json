@@ -1,0 +1,31 @@
+{
+  "stage": 1,
+  "fires_after_turn": 3,
+  "description": "T5 cross-modal evidence seeding (revised Gmail estimate). Fires between T3 and T4 so the updated email is present from T4 onward, in time for the T5 Multi-Agent reconciliation sweep. The paper estimate that Donna hand-delivered (the $1,850 D-21 leg) ships pre-seeded in the task-root data/ folder as paper_estimate_rockland_marine.txt and does not need a mid-scenario mutation.",
+  "mutations": [
+    {
+      "mutation_id": "S0_gmail_estimate_update",
+      "service": "gmail-api",
+      "method": "POST",
+      "url": "{GMAIL_API_URL}/_seed/messages",
+      "headers": {"Content-Type": "application/json"},
+      "body": {
+        "inbox": "alden.croft.me@gmail.com",
+        "messages": [
+          {
+            "id": "msg_yard_estimate_update",
+            "from": "service@rocklandmarineyard.test",
+            "to": "alden.croft.me@gmail.com",
+            "subject": "Updated estimate \u2014 Eileen C haul-out + 6BTA diagnostic",
+            "date": "2026-11-30T13:02:00-05:00",
+            "body_excerpt": "Per our walkthrough on the phone, revised line items below. New total: $2,180. WO-26-1149 unchanged. Check-in still 8:00 AM unless we tell you otherwise.",
+            "ground_truth_value_usd": 2180
+          }
+        ]
+      },
+      "expected_status": 200,
+      "silent": false,
+      "fires_after_turn": 3
+    }
+  ]
+}

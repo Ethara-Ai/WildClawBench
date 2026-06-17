@@ -1,0 +1,247 @@
+[
+  {
+    "Id": "6001",
+    "DocNumber": "HAM-2026-1014",
+    "VendorRef": {
+      "value": "1",
+      "name": "Hamilton Marine - Rockland"
+    },
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-11-13",
+    "Line": [
+      {
+        "Amount": 184.50,
+        "Description": "Sherwood raw-water impeller kit (qty 2), zinc anode pencils (qty 4)",
+        "AccountBasedExpenseLineDetail": {
+          "AccountRef": {
+            "name": "Marine Supplies",
+            "value": "8"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 184.50,
+    "Balance": 0,
+    "PrivateNote": "Net-30. Paid 11/04."
+  },
+  {
+    "Id": "6002",
+    "DocNumber": "DEF-2026-9921",
+    "VendorRef": {
+      "value": "2",
+      "name": "Defender Marine"
+    },
+    "TxnDate": "2026-10-22",
+    "DueDate": "2026-11-21",
+    "Line": [
+      {
+        "Amount": 96.40,
+        "Description": "Rudder shoe anode (qty 2), trim tab anodes (qty 2). Online order DM-9921.",
+        "AccountBasedExpenseLineDetail": {
+          "AccountRef": {
+            "name": "Marine Supplies",
+            "value": "8"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 96.40,
+    "Balance": 0
+  },
+  {
+    "Id": "6003",
+    "DocNumber": "HAN-2026-Q4",
+    "VendorRef": {
+      "value": "3",
+      "name": "Hanover Insurance Group"
+    },
+    "TxnDate": "2026-10-01",
+    "DueDate": "2026-10-15",
+    "Line": [
+      {
+        "Amount": 1240.00,
+        "Description": "Hull + P&I boat policy - Q4 2026 (Oct-Dec). Policy #HAN-MA-44912.",
+        "AccountBasedExpenseLineDetail": {
+          "AccountRef": {
+            "name": "Boat Insurance",
+            "value": "12"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 1240.00,
+    "Balance": 0,
+    "PrivateNote": "Paid 10/12. Auto-deduct from Operating Checking."
+  },
+  {
+    "Id": "6004",
+    "DocNumber": "DMR-TAG-2026",
+    "VendorRef": {
+      "value": "4",
+      "name": "Maine Department of Marine Resources"
+    },
+    "TxnDate": "2026-04-01",
+    "DueDate": "2026-04-30",
+    "Line": [
+      {
+        "Amount": 840.00,
+        "Description": "Annual trap tag renewal - 800 traps at $1.05 each. License year 2026.",
+        "AccountBasedExpenseLineDetail": {
+          "AccountRef": {
+            "name": "License & Fees",
+            "value": "11"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 840.00,
+    "Balance": 0
+  },
+  {
+    "Id": "6005",
+    "DocNumber": "COOP-MEM-2026",
+    "VendorRef": {
+      "value": "5",
+      "name": "Midcoast Seafood Co-op"
+    },
+    "TxnDate": "2026-05-01",
+    "DueDate": "2026-05-31",
+    "Line": [
+      {
+        "Amount": 320.00,
+        "Description": "Annual Co-op membership + dock fees for 2026 season.",
+        "AccountBasedExpenseLineDetail": {
+          "AccountRef": {
+            "name": "Co-op Membership & Fees",
+            "value": "13"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 320.00,
+    "Balance": 0
+  },
+  {
+    "Id": "6006",
+    "DocNumber": "MARV-2026-10",
+    "VendorRef": {
+      "value": "6",
+      "name": "Marv Pelletier (1099)"
+    },
+    "TxnDate": "2026-10-31",
+    "DueDate": "2026-11-07",
+    "Line": [
+      {
+        "Amount": 2400.00,
+        "Description": "Deckhand share - October 2026 settlement. Reconciled against Co-op weekly statements.",
+        "AccountBasedExpenseLineDetail": {
+          "AccountRef": {
+            "name": "Deckhand Wages",
+            "value": "10"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 2400.00,
+    "Balance": 0,
+    "PrivateNote": "Marv's last full month for 2026 season."
+  },
+  {
+    "Id": "6007",
+    "DocNumber": "MARV-2026-11",
+    "VendorRef": {
+      "value": "6",
+      "name": "Marv Pelletier (1099)"
+    },
+    "TxnDate": "2026-11-30",
+    "DueDate": "2026-12-07",
+    "Line": [
+      {
+        "Amount": 1850.00,
+        "Description": "Deckhand share - November 2026 partial month (season closeout). Reconciled against Co-op weekly statements.",
+        "AccountBasedExpenseLineDetail": {
+          "AccountRef": {
+            "name": "Deckhand Wages",
+            "value": "10"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 1850.00,
+    "Balance": 1850.00,
+    "PrivateNote": "Draft settlement - confirm with Marv before sending."
+  },
+  {
+    "Id": "6008",
+    "DocNumber": "HARBOR-FUEL-2026-10",
+    "VendorRef": {
+      "value": "7",
+      "name": "Rockland Harbor Fuel Dock"
+    },
+    "TxnDate": "2026-10-31",
+    "DueDate": "2026-11-15",
+    "Line": [
+      {
+        "Amount": 612.00,
+        "Description": "Boat diesel - October monthly statement (4 fill-ups).",
+        "AccountBasedExpenseLineDetail": {
+          "AccountRef": {
+            "name": "Fuel & Diesel",
+            "value": "6"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 612.00,
+    "Balance": 0
+  },
+  {
+    "Id": "6009",
+    "DocNumber": "COOP-BAIT-2026-10",
+    "VendorRef": {
+      "value": "5",
+      "name": "Midcoast Seafood Co-op"
+    },
+    "TxnDate": "2026-10-31",
+    "DueDate": "2026-11-15",
+    "Line": [
+      {
+        "Amount": 488.00,
+        "Description": "Bait dock October statement: herring (8 bushels) + redfish racks (6 bushels).",
+        "AccountBasedExpenseLineDetail": {
+          "AccountRef": {
+            "name": "Bait Expense",
+            "value": "5"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 488.00,
+    "Balance": 0
+  },
+  {
+    "Id": "6010",
+    "DocNumber": "HAM-2026-1129",
+    "VendorRef": {
+      "value": "1",
+      "name": "Hamilton Marine - Rockland"
+    },
+    "TxnDate": "2026-11-29",
+    "DueDate": "2026-12-29",
+    "Line": [
+      {
+        "Amount": 142.10,
+        "Description": "Cummins 6BTA 160F thermostat + gasket per SB-6BTA-2024-07. Counter pickup.",
+        "AccountBasedExpenseLineDetail": {
+          "AccountRef": {
+            "name": "Boat Maintenance",
+            "value": "7"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 142.10,
+    "Balance": 142.10,
+    "PrivateNote": "Open. Pre-haul-out stocking."
+  }
+]

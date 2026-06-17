@@ -1,0 +1,5 @@
+id,page_id,parent_block_id,type,text,order,created_time,last_edited_time,has_children,checked
+block_equity_1,page_equity_roadmap,,heading_1,Equity Plan Year 2: Mid Year Review,1,2026-08-15T10:00:00.000Z,2026-08-15T10:00:00.000Z,False,False
+block_equity_2,page_equity_roadmap,,paragraph,The benchmarks sheet is the authoritative source for all reported numbers. Do not substitute dashboard estimates.,2,2026-08-15T10:05:00.000Z,2026-10-11T16:30:00.000Z,False,False
+block_training_1,page_training_workstream,,paragraph,"CRP training completion is at 58 percent against the 80 percent target. Training kickoff is October 23, 2026.",1,2026-08-18T10:05:00.000Z,2026-10-10T11:00:00.000Z,False,False
+block_board_1,page_board_package,,to_do,Send internal review copy to Dr. Hernandez before the board submission,1,2026-09-20T10:00:00.000Z,2026-10-11T15:00:00.000Z,False,False

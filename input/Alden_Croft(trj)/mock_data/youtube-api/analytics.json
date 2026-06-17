@@ -1,0 +1,24 @@
+{
+  "channel": {
+    "period": "last28Days",
+    "views": 612,
+    "estimatedMinutesWatched": 3987,
+    "averageViewDuration": 391,
+    "subscribersGained": 6,
+    "subscribersLost": 1,
+    "likes": 84,
+    "dislikes": 1,
+    "comments": 11,
+    "shares": 27
+  },
+  "videos": [
+    {"videoId": "vid_aldn_001", "views": 142, "estimatedMinutesWatched": 982, "averageViewDuration": 415, "likes": 21, "dislikes": 0, "comments": 4, "shares": 8, "averageViewPercentage": 84.1},
+    {"videoId": "vid_aldn_002", "views": 96, "estimatedMinutesWatched": 712, "averageViewDuration": 445, "likes": 14, "dislikes": 0, "comments": 2, "shares": 5, "averageViewPercentage": 62.9},
+    {"videoId": "vid_aldn_003", "views": 58, "estimatedMinutesWatched": 287, "averageViewDuration": 297, "likes": 9, "dislikes": 0, "comments": 1, "shares": 3, "averageViewPercentage": 77.7},
+    {"videoId": "vid_aldn_004", "views": 31, "estimatedMinutesWatched": 89, "averageViewDuration": 172, "likes": 5, "dislikes": 0, "comments": 1, "shares": 1, "averageViewPercentage": 72.3},
+    {"videoId": "vid_aldn_005", "views": 22, "estimatedMinutesWatched": 51, "averageViewDuration": 139, "likes": 4, "dislikes": 0, "comments": 1, "shares": 2, "averageViewPercentage": 81.4},
+    {"videoId": "vid_aldn_006", "views": 19, "estimatedMinutesWatched": 178, "averageViewDuration": 562, "likes": 4, "dislikes": 0, "comments": 1, "shares": 1, "averageViewPercentage": 64.0},
+    {"videoId": "vid_aldn_007", "views": 14, "estimatedMinutesWatched": 47, "averageViewDuration": 201, "likes": 3, "dislikes": 0, "comments": 1, "shares": 1, "averageViewPercentage": 65.5},
+    {"videoId": "vid_aldn_008", "views": 230, "estimatedMinutesWatched": 1641, "averageViewDuration": 428, "likes": 24, "dislikes": 1, "comments": 0, "shares": 6, "averageViewPercentage": 97.4}
+  ]
+}

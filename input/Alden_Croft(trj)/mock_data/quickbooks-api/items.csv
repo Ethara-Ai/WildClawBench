@@ -1,0 +1,11 @@
+Id,Name,Description,Type,UnitPrice,IncomeAccountRef_value,IncomeAccountRef_name,Active,Taxable
+1,Lobster - Chix (1 lb),"Soft-shell or hard-shell chix grade, per pound (Co-op boat price)",Inventory,5.85,3,Lobster Sales Income,true,false
+2,Lobster - Selects (1.25-2 lb),"Select grade, per pound (Co-op boat price)",Inventory,6.40,3,Lobster Sales Income,true,false
+3,Lobster - Jumbos (2 lb+),"Jumbo grade, per pound (Co-op boat price)",Inventory,7.10,3,Lobster Sales Income,true,false
+4,Lobster - Cull,"Cull grade (single claw), per pound",Inventory,4.20,3,Lobster Sales Income,true,false
+5,Groundfish - Cod (per lb),Off-season cod when regs and weather allow,Inventory,2.80,4,Off-Season Groundfish Income,true,false
+6,Groundfish - Haddock (per lb),Off-season haddock when regs and weather allow,Inventory,3.40,4,Off-Season Groundfish Income,true,false
+7,Northern Shrimp (per lb),"Off-season northern shrimp, when regulations permit a season",Inventory,3.95,4,Off-Season Groundfish Income,true,false
+8,Bait - Herring (per bushel),Salted herring for bait bags - Co-op bait dock,Inventory,38.00,3,Lobster Sales Income,true,false
+9,Bait - Redfish Racks (per bushel),Redfish racks - Co-op bait dock,Inventory,32.00,3,Lobster Sales Income,true,false
+10,Trap Tag - Maine DMR,Annual trap tag fee per trap,Service,1.05,3,Lobster Sales Income,true,false

@@ -1,0 +1,2 @@
+id,name,parent_id,owner_id,description,size,extension,sha1,created_at,modified_at
+box-1810-provenance,1810_polish_longcase_provenance_notes.pdf,folder-crawford-referrals,user-jacob,Provenance working notes for an 1810 Polish longcase. Incomplete chain. NOT an authentication. For Jacob's review only.,124000,pdf,abcdef0123456789abcdef0123456789abcdef01,2026-08-01T10:00:00Z,2026-08-15T10:00:00Z

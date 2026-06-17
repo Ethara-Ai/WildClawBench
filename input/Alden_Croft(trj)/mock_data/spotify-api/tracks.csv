@@ -1,0 +1,21 @@
+track_id,name,artist_id,album_id,duration_ms,popularity,explicit,track_number
+trk_have_you_ever_001,Have You Ever Seen the Rain,art_ccr_0001,alb_chronicle_ccr_02,160000,84,false,8
+trk_fortunate_son_002,Fortunate Son,art_ccr_0001,alb_chronicle_ccr_02,140000,86,false,4
+trk_proud_mary_003,Proud Mary,art_ccr_0001,alb_chronicle_ccr_02,189000,79,false,2
+trk_who_ll_stop_004,Who'll Stop the Rain,art_ccr_0001,alb_cosmos_factory_01,149000,78,false,3
+trk_lookin_out_back_005,Lookin' Out My Back Door,art_ccr_0001,alb_cosmos_factory_01,154000,75,false,4
+trk_born_to_run_006,Born to Run,art_springsteen_0002,alb_born_to_run_03,271000,82,false,5
+trk_thunder_road_007,Thunder Road,art_springsteen_0002,alb_born_to_run_03,289000,81,false,1
+trk_the_river_008,The River,art_springsteen_0002,alb_the_river_04,300000,73,false,11
+trk_hungry_heart_009,Hungry Heart,art_springsteen_0002,alb_the_river_04,202000,76,false,15
+trk_refugee_010,Refugee,art_petty_0003,alb_damn_torpedoes_05,202000,78,false,1
+trk_here_comes_my_girl_011,Here Comes My Girl,art_petty_0003,alb_damn_torpedoes_05,265000,69,false,5
+trk_free_fallin_012,Free Fallin',art_petty_0003,alb_full_moon_fever_06,265000,87,false,1
+trk_i_won_t_back_down_013,I Won't Back Down,art_petty_0003,alb_full_moon_fever_06,172000,82,false,2
+trk_night_moves_014,Night Moves,art_seger_0004,alb_night_moves_07,332000,79,false,2
+trk_main_street_015,Mainstreet,art_seger_0004,alb_night_moves_07,225000,71,false,8
+trk_sweet_home_alabama_016,Sweet Home Alabama,art_skynyrd_0005,alb_pronounced_skynyrd_08,283000,86,false,2
+trk_simple_man_017,Simple Man,art_skynyrd_0005,alb_pronounced_skynyrd_08,355000,82,false,5
+trk_folsom_prison_blues_018,Folsom Prison Blues,art_cash_0006,alb_at_folsom_09,168000,83,false,1
+trk_ring_of_fire_019,Ring of Fire,art_cash_0006,alb_at_folsom_09,156000,80,false,9
+trk_blue_eyes_crying_020,Blue Eyes Crying in the Rain,art_nelson_0007,alb_red_headed_stranger_10,142000,72,false,8

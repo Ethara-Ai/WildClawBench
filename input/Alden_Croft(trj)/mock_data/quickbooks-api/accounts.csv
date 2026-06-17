@@ -1,0 +1,15 @@
+Id,Name,AccountType,AccountSubType,CurrentBalance,Active,Classification,Description
+1,Operating Checking,Bank,Checking,6800.00,true,Asset,Primary operating account - Camden National Bank checking ...8412
+2,Boat Engine Repair Fund,Bank,Savings,3200.00,true,Asset,Reserve for Cummins 6BTA major service - Camden National savings ...5078
+3,Lobster Sales Income,Income,SalesOfProductIncome,0.00,true,Revenue,Co-op settlements from Midcoast Seafood Co-op Rockland
+4,Off-Season Groundfish Income,Income,SalesOfProductIncome,0.00,true,Revenue,December through March groundfish and shrimp sales when regs and weather allow
+5,Bait Expense,Expense,SuppliesMaterials,0.00,true,Expense,"Herring, redfish racks, alewives - Co-op bait dock"
+6,Fuel & Diesel,Expense,FuelExpense,0.00,true,Expense,Boat diesel - Rockland Harbor fuel dock; truck diesel - Irving Route 1
+7,Boat Maintenance,Expense,RepairMaintenance,0.00,true,Expense,"Cummins 6BTA service, raw-water impellers, zincs, paint, electronics"
+8,Marine Supplies,Expense,SuppliesMaterials,0.00,true,Expense,"Hamilton Marine, Defender Marine, Harbor Freight - line, oil filters, gloves"
+9,Trap & Gear,Expense,SuppliesMaterials,0.00,true,Expense,"Wire traps, runners, escape vents, trap tags"
+10,Deckhand Wages,Expense,PayrollExpenses,0.00,true,Expense,Marv Pelletier - 1099 share May through November
+11,License & Fees,Expense,TaxesPaid,0.00,true,Expense,"Maine DMR commercial lobster license, captain's license, trap tags"
+12,Boat Insurance,Expense,Insurance,0.00,true,Expense,Hanover Insurance - hull and P&I
+13,Co-op Membership & Fees,Expense,OtherMiscellaneousServiceCost,0.00,true,Expense,Annual Midcoast Seafood Co-op membership and dock fees
+14,Self-Employment Tax Reserve,Expense,TaxesPaid,0.00,true,Expense,Quarterly federal SE tax + FICA set-aside

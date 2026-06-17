@@ -1,0 +1,4 @@
+id,name,desc,closed,id_organization,url,member_ids
+brd_tap_ops,Tap Room Weekly Ops,Front-of-house schedule + tasks,false,,https://trello.com/b/tap-ops,
+brd_events,Tap Room Events Pipeline,Eventbrite-driven events,false,,https://trello.com/b/events,
+brd_personal,Larry Personal Ops,Personal errands and household,false,,https://trello.com/b/personal-ops,

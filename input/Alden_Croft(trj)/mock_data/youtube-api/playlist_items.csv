@@ -1,0 +1,9 @@
+playlist_item_id,playlistId,videoId,channelId,title,position,publishedAt
+PLI_aldn_001,PL_aldn_001,vid_aldn_001,UC_AldenCroftWorkshop,Cummins 6BTA Overheating - What I Checked First,0,2024-02-04T15:00:00Z
+PLI_aldn_002,PL_aldn_001,vid_aldn_002,UC_AldenCroftWorkshop,Raw Water Impeller Swap - Cummins 6BTA,1,2024-03-18T16:00:00Z
+PLI_aldn_003,PL_aldn_001,vid_aldn_003,UC_AldenCroftWorkshop,Replacing Zincs Before Haul-Out,2,2024-11-22T14:00:00Z
+PLI_aldn_004,PL_aldn_001,vid_aldn_008,UC_AldenCroftWorkshop,December Haul-Out Prep Checklist,3,2025-11-29T17:00:00Z
+PLI_aldn_005,PL_aldn_002,vid_aldn_004,UC_AldenCroftWorkshop,Trap Bait Bag Setup - Quick Walk-Through,0,2024-06-08T18:30:00Z
+PLI_aldn_006,PL_aldn_002,vid_aldn_005,UC_AldenCroftWorkshop,Bowline Knot - The Way I Learned It,1,2024-04-14T13:00:00Z
+PLI_aldn_007,PL_aldn_003,vid_aldn_006,UC_AldenCroftWorkshop,Shed Workbench Build - Maine Style,0,2025-01-25T19:00:00Z
+PLI_aldn_008,PL_aldn_004,vid_aldn_007,UC_AldenCroftWorkshop,Reading the Sky - Predawn Forecast Tips,0,2025-05-04T03:30:00Z

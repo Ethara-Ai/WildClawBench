@@ -1,0 +1,26 @@
+id,post_id,parent_id,author,body,score,created_utc
+t1_aldn001,t3_aldn001,t3_aldn001,cummins_grease,Heat exchanger fouled with marine growth is a quiet one. Pull the end caps and check. Mine looked clear from outside and the tubes were half blocked.,38,1759798800
+t1_aldn002,t3_aldn001,t1_aldn001,aldencroftme,Good call. Adding it to the diagnostic ticket. Have a service bulletin in my pile that might tie in.,12,1759802400
+t1_aldn003,t3_aldn001,t3_aldn001,downeast_deckhand,Thermostat. Cheap fix and they fail open or partial. Swap before haul out and you save the diagnostic time.,22,1759806000
+t1_aldn004,t3_aldn001,t3_aldn001,rockland_yardrat,If you are bringing it in to us bring the temp log too. Saves us an hour.,18,1759809600
+t1_aldn005,t3_aldn002,t3_aldn002,cummins_grease,Running the 160F since spring. Climb stopped. Worth the swap.,15,1761094800
+t1_aldn006,t3_aldn002,t1_aldn005,aldencroftme,Appreciate it. Ordering through Hamilton Marine this week.,8,1761098400
+t1_aldn007,t3_aldn003,t3_aldn003,aldencroftme,Defender kit is fine but the rudder shoe one disappears fast on a working boat. I order a spare and tape it to the back of the cabinet.,28,1763427600
+t1_aldn008,t3_aldn003,t1_aldn007,rockland_yardrat,Same. The shoe and the trim tab both. Order two.,14,1763431200
+t1_aldn009,t3_aldn003,t3_aldn003,downeast_deckhand,Three season minimum on the hull anodes if you are not running through the Penobscot River chop every day.,9,1763434800
+t1_aldn010,t3_aldn004,t3_aldn004,midcoast_donna,Agree. Also the cinnamon roll on Friday.,42,1762822800
+t1_aldn011,t3_aldn004,t3_aldn004,aldencroftme,Three cups and quiet. Hard to beat.,27,1762826400
+t1_aldn012,t3_aldn005,t3_aldn005,shedwork_eddie,A bullpen arm and a left-handed bat. Nothing fancy.,18,1722819600
+t1_aldn013,t3_aldn005,t1_aldn012,sox_at_night,Same wishlist as 2019.,11,1722823200
+t1_aldn014,t3_aldn006,t3_aldn006,shedwork_eddie,Looks square. Lag screws will hold for ten winters easy.,21,1737834000
+t1_aldn015,t3_aldn006,t1_aldn014,aldencroftme,That is the bet.,9,1737837600
+t1_aldn016,t3_aldn006,t3_aldn006,cummins_grease,Doug fir top is the right call.,7,1737841200
+t1_aldn017,t3_aldn007,t3_aldn007,downeast_deckhand,Three strikes and they are off the list. Captains here run the same.,45,1721178000
+t1_aldn018,t3_aldn007,t3_aldn007,aldencroftme,Marv was my fourth guy in four years. Reliable beats green every time. Pay him a little more than the going rate and you sleep at night.,29,1721181600
+t1_aldn019,t3_aldn008,t3_aldn008,aldencroftme,Stub wrench and a bad word. The 6CTA is the same. Plan for two scraped knuckles.,34,1715821200
+t1_aldn020,t3_aldn008,t1_aldn019,cummins_grease,Confirmed.,18,1715824800
+t1_aldn021,t3_aldn008,t3_aldn008,rockland_yardrat,We do a lot of these. The Sherwood kit fits without trimming.,22,1715828400
+t1_aldn022,t3_aldn009,t3_aldn009,aldencroftme,Same as I told the other thread. Defender kit is fine. Just buy two and put one in the cabinet.,17,1763254800
+t1_aldn023,t3_aldn009,t1_aldn022,rockland_yardrat,Captains who buy two are the ones who never call me about a rudder shoe in February.,12,1763258400
+t1_aldn024,t3_aldn010,t3_aldn010,aldencroftme,Driveway will be clear by 7. Truck is already loaded.,15,1764550800
+t1_aldn025,t3_aldn010,t1_aldn024,midcoast_donna,Bless you Alden.,21,1764554400

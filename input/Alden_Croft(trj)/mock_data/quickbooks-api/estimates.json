@@ -1,0 +1,110 @@
+[
+  {
+    "Id": "8001",
+    "DocNumber": "E-AC-3001",
+    "TxnDate": "2026-11-01",
+    "ExpirationDate": "2026-12-31",
+    "CustomerRef": { "value": "31", "name": "Maine DMR (License Renewal)" },
+    "Line": [
+      {
+        "Id": "1",
+        "LineNum": 1,
+        "Amount": 880.00,
+        "DetailType": "SalesItemLineDetail",
+        "Description": "2027 trap tag renewal estimate - 800 traps at projected $1.10 per tag.",
+        "SalesItemLineDetail": {
+          "ItemRef": { "value": "10", "name": "Trap Tag - Maine DMR" },
+          "UnitPrice": 1.10,
+          "Qty": 800
+        }
+      }
+    ],
+    "TotalAmt": 880.00,
+    "TxnStatus": "Pending",
+    "AcceptedDate": null,
+    "LinkedTxn": [],
+    "MetaData": { "CreateTime": "2026-11-01T07:00:00-05:00", "LastUpdatedTime": "2026-11-01T07:00:00-05:00" },
+    "SyncToken": "0"
+  },
+  {
+    "Id": "8002",
+    "DocNumber": "E-AC-3002",
+    "TxnDate": "2026-11-08",
+    "ExpirationDate": "2027-01-08",
+    "CustomerRef": { "value": "32", "name": "Hanover Insurance (2027 Renewal Quote)" },
+    "Line": [
+      {
+        "Id": "1",
+        "LineNum": 1,
+        "Amount": 5020.00,
+        "DetailType": "SalesItemLineDetail",
+        "Description": "Hull + P&I boat policy renewal for 2027 - annual premium quote. Policy #HAN-MA-44912.",
+        "SalesItemLineDetail": {
+          "ItemRef": { "value": "1", "name": "Lobster - Chix (1 lb)" },
+          "UnitPrice": 5020.00,
+          "Qty": 1
+        }
+      }
+    ],
+    "TotalAmt": 5020.00,
+    "TxnStatus": "Pending",
+    "AcceptedDate": null,
+    "LinkedTxn": [],
+    "MetaData": { "CreateTime": "2026-11-08T11:00:00-05:00", "LastUpdatedTime": "2026-11-08T11:00:00-05:00" },
+    "SyncToken": "0"
+  },
+  {
+    "Id": "8003",
+    "DocNumber": "E-AC-3003",
+    "TxnDate": "2026-11-14",
+    "ExpirationDate": "2027-01-31",
+    "CustomerRef": { "value": "33", "name": "Midcoast Seafood Co-op (2027 Membership)" },
+    "Line": [
+      {
+        "Id": "1",
+        "LineNum": 1,
+        "Amount": 340.00,
+        "DetailType": "SalesItemLineDetail",
+        "Description": "2027 Co-op membership + dock fees estimate - small increase from 2026.",
+        "SalesItemLineDetail": {
+          "ItemRef": { "value": "1", "name": "Lobster - Chix (1 lb)" },
+          "UnitPrice": 340.00,
+          "Qty": 1
+        }
+      }
+    ],
+    "TotalAmt": 340.00,
+    "TxnStatus": "Pending",
+    "AcceptedDate": null,
+    "LinkedTxn": [],
+    "MetaData": { "CreateTime": "2026-11-14T09:00:00-05:00", "LastUpdatedTime": "2026-11-14T09:00:00-05:00" },
+    "SyncToken": "0"
+  },
+  {
+    "Id": "8004",
+    "DocNumber": "E-AC-3004",
+    "TxnDate": "2026-11-20",
+    "ExpirationDate": "2027-04-30",
+    "CustomerRef": { "value": "34", "name": "Marv Pelletier (2027 Season Share)" },
+    "Line": [
+      {
+        "Id": "1",
+        "LineNum": 1,
+        "Amount": 18900.00,
+        "DetailType": "SalesItemLineDetail",
+        "Description": "Projected 2027 May-November deckhand share at the agreed crew percentage - reconciled against last season's Co-op settlements.",
+        "SalesItemLineDetail": {
+          "ItemRef": { "value": "1", "name": "Lobster - Chix (1 lb)" },
+          "UnitPrice": 18900.00,
+          "Qty": 1
+        }
+      }
+    ],
+    "TotalAmt": 18900.00,
+    "TxnStatus": "Pending",
+    "AcceptedDate": null,
+    "LinkedTxn": [],
+    "MetaData": { "CreateTime": "2026-11-20T08:00:00-05:00", "LastUpdatedTime": "2026-11-20T08:00:00-05:00" },
+    "SyncToken": "0"
+  }
+]

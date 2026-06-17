@@ -1,0 +1,5 @@
+file_key,project_id,name,thumbnail_url,last_modified,version,role,editor_type
+FK001abcdefg,proj-mary-equity,equity_conference_slides,,2026-10-09T14:00:00Z,1200000000,viewer,figma
+FK002hijklmn,proj-mary-equity,equity_board_deck,,2026-10-08T11:00:00Z,1200000010,viewer,figma
+FK003opqrstu,proj-mary-equity,parent_council_one_pager,,2026-10-07T09:00:00Z,1200000020,viewer,figma
+FK004vwxyz12,proj-mary-equity,equity_brand_components,,2026-10-06T15:00:00Z,1200000030,viewer,figma

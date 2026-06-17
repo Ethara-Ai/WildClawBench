@@ -1,0 +1,5 @@
+event_id,email,display_name,response_status,optional,organizer
+evt_02,erin.whitfield.dist@gmail.com,Erin Whitfield,accepted,False,False
+evt_02,larry.bates@Finthesiss.ai,Larry Bates,accepted,False,True
+evt_03,greg.holloway.brew@gmail.com,Greg Holloway,accepted,False,False
+evt_03,larry.bates@Finthesiss.ai,Larry Bates,accepted,False,True

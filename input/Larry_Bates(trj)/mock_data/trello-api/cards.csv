@@ -1,0 +1,10 @@
+id,name,desc,id_board,id_list,pos,due,closed,member_ids,labels
+crd_tap_001,Restock pint glasses (84 -> 120),"Place order with Asheville Glass Supply, $1.85/ea.",brd_tap_ops,lst_tap_week,1024,2026-10-05,false,Maya,Inventory
+crd_tap_002,Sample Hot Chicken truck for Oct 24,"Confirm vendor agreement, send Square link.",brd_tap_ops,lst_tap_week,1024,2026-10-03,false,Maya,Vendor
+crd_tap_003,Train Daniel on growler-fill SOP,"Cover CO2, sanitiser, fill rate, label, tax.",brd_tap_ops,lst_tap_doing,1024,2026-10-08,false,"Maya,Daniel",Training
+crd_tap_004,Decide Halloween costume night promo,Margaret suggested costume judging.,brd_tap_ops,lst_tap_inbox,1024,2026-10-20,false,"Maya,Margaret",Marketing
+crd_evt_001,Brewhouse Tour - Oct 4 (14 of 16 sold),Confirm pour list with Greg; print waiver sheet.,brd_events,lst_evt_live,1024,2026-10-04,false,Maya,Tour
+crd_evt_002,Sourdough + Stout Pairing - Nov 8,Coordinate with Erin at Pie Society for sourdough order.,brd_events,lst_evt_plan,1024,2026-11-08,false,"Maya,Sarah",Pairing
+crd_personal_001,Saturday walk with Hana (bakery stop),Carrying forward - this is non-negotiable.,brd_personal,lst_personal_inbox,1024,2026-10-04,false,Larry,Family
+crd_personal_002,Boots resole at McDowell Cobbler,"Drop off Tuesday, pickup Friday.",brd_personal,lst_personal_doing,1024,2026-10-09,false,Larry,Errand
+crd_personal_003,Get oil change on the Subaru,"Hendersonville Subaru, regular interval.",brd_personal,lst_personal_inbox,1024,2026-10-12,false,Larry,Vehicle

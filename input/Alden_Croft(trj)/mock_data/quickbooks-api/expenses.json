@@ -1,0 +1,74 @@
+[
+  {
+    "Id": "9001",
+    "TxnDate": "2026-11-05",
+    "TotalAmt": 55.40,
+    "Line": [
+      {
+        "Description": "Truck diesel - run to Hamilton Marine and back",
+        "Amount": 55.40
+      }
+    ],
+    "MetaData": { "CreateTime": "2026-11-05T14:00:00-05:00" }
+  },
+  {
+    "Id": "9002",
+    "TxnDate": "2026-11-10",
+    "TotalAmt": 67.40,
+    "Line": [
+      {
+        "Description": "Buoy paint quart (qty 2), nitrile gloves (case)",
+        "Amount": 67.40
+      }
+    ],
+    "MetaData": { "CreateTime": "2026-11-10T11:30:00-05:00" }
+  },
+  {
+    "Id": "9003",
+    "TxnDate": "2026-11-18",
+    "TotalAmt": 29.95,
+    "Line": [
+      {
+        "Description": "Tarp + ratchet straps for off-season trap storage in shed",
+        "Amount": 29.95
+      }
+    ],
+    "MetaData": { "CreateTime": "2026-11-18T16:00:00-05:00" }
+  },
+  {
+    "Id": "9004",
+    "TxnDate": "2026-11-19",
+    "TotalAmt": 48.90,
+    "Line": [
+      {
+        "Description": "Truck diesel",
+        "Amount": 48.90
+      }
+    ],
+    "MetaData": { "CreateTime": "2026-11-19T07:30:00-05:00" }
+  },
+  {
+    "Id": "9005",
+    "TxnDate": "2026-11-24",
+    "TotalAmt": 84.25,
+    "Line": [
+      {
+        "Description": "Spare 1/2-inch nylon line (200 ft), galvanized shackles (qty 6)",
+        "Amount": 84.25
+      }
+    ],
+    "MetaData": { "CreateTime": "2026-11-24T13:00:00-05:00" }
+  },
+  {
+    "Id": "9006",
+    "TxnDate": "2026-12-05",
+    "TotalAmt": 142.10,
+    "Line": [
+      {
+        "Description": "Cummins 6BTA 160F thermostat + gasket per SB-6BTA-2024-07. Counter pickup for haul-out.",
+        "Amount": 142.10
+      }
+    ],
+    "MetaData": { "CreateTime": "2026-12-05T09:00:00-05:00" }
+  }
+]

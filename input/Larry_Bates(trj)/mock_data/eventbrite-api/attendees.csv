@@ -1,0 +1,7 @@
+id,event_id,ticket_class_id,name,email,status,checked_in,created
+evatt_70001,evb_3301,,Kayla Dawson,kayla.dawson@gmail.com,attending,false,
+evatt_70002,evb_3301,,Mason Reid,mreid.nc@gmail.com,attending,false,
+evatt_70003,evb_3301,,Preston Lim,preston.lim@gmail.com,attending,false,
+evatt_70004,evb_3301,,Hailey Voss,hailey.voss@gmail.com,attending,false,
+evatt_70005,evb_3302,,Rebecca Gold,rebecca.gold@gmail.com,attending,false,
+evatt_70006,evb_3302,,Devon Lim,devon.lim@gmail.com,attending,false,

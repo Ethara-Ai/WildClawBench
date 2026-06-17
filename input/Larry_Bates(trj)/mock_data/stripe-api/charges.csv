@@ -1,0 +1,8 @@
+id,customer,amount,currency,status,paid,refunded,amount_refunded,description,payment_intent,created
+ch_3OqA1n8421,cus_NWXmM5tA1,1800,usd,succeeded,true,false,0,Tap room - 2 pints + tip,,2026-09-26T19:14:08Z
+ch_3OqA1n8422,cus_NWXmM5tA2,2200,usd,succeeded,true,false,0,Tap room - flight + pint,,2026-09-26T19:32:55Z
+ch_3OqA1n8423,cus_NWXmM5tA3,1400,usd,succeeded,true,false,0,Tap room - 1 pint + sticker,,2026-09-27T17:11:02Z
+ch_3OqA1n8424,cus_NWXmM5tA4,3100,usd,succeeded,true,false,0,Tap room - growler fill,,2026-09-27T18:42:17Z
+ch_3OqA1n8425,cus_NWXmM5tA5,5200,usd,succeeded,true,false,0,Tap room - bottle share + 2 pints,,2026-09-28T16:55:39Z
+ch_3OqA1n8426,,980,usd,succeeded,true,false,0,Tap room - cash-out tip-share,,2026-09-28T17:14:08Z
+ch_3OqA1n8427,cus_NWXmM5tA1,2600,usd,succeeded,true,false,0,Tap room - 1 pint + tee,,2026-09-29T20:01:00Z

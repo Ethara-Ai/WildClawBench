@@ -1,0 +1,32 @@
+id,thread_id,from_addr,to_addr,cc_addr,subject,snippet,body,date,internal_date,size_estimate,labels,is_unread,is_starred
+msg_yard_wo_email,thr_yard_wo,service@rocklandmarineyard.test,alden.croft.me@gmail.com,,Work order — Eileen C — WO-26-1149,"Attached: work order for tomorrow's haul-out. Estimate $2,180. Check-in 8:00 AM.","Alden,
+
+Attached is the work order for tomorrow's haul-out and the Cummins 6BTA diagnostic. Estimate $2,180.00, check-in 8:00 AM at slip 4B. We'll call if anything shifts overnight.
+
+— Rockland Marine Service Yard
+
+Attachment: work_order_rockland_marine.pdf (WO-26-1149)",2026-12-05T16:20:00-05:00,1764968400000,18420,"INBOX,Label_Boat,STARRED",False,True
+msg_kara_weekend,thr_kara_weekend,kara.croft.me@gmail.com,alden.croft.me@gmail.com,,weekend?,"Hey Pop, weather's looking iffy for the drive — might bump to next weekend.","Hey Pop,
+
+Weather's looking iffy for the drive Saturday — might bump to next weekend. Will confirm by Thursday. Bean says hi.
+
+— K",2026-12-06T19:42:00-05:00,1765069320000,1820,"INBOX,Label_Family",True,False
+msg_coop_nov_settle,thr_coop_nov,settlements@midcoastseafood.com,alden.croft.me@gmail.com,,November settlement — final,"Your November settlement of $4,820.00 has been finalized.","Member: Alden Croft (M-0317)
+Vessel: Eileen C
+Period: November 2026
+LBs landed: 1,142
+Avg price/lb: $4.22
+Final settlement: $4,820.00
+Posted: 2026-12-04",2026-12-04T14:05:00-05:00,1764873900000,3120,"INBOX,Label_Coop",False,False
+msg_donna_paper_note,thr_donna_note,donna.winslow.me@gmail.com,alden.croft.me@gmail.com,,Yard letter on your counter,Took the boat-yard letter in from the mailbox so it didn't get wet.,Alden — left the boat-yard letter on your counter so it didn't get wet in the storm. — Donna,2026-11-18T09:14:00-05:00,1763472840000,1142,INBOX,False,False
+msg_riteaid_refill_due,thr_riteaid,noreply@riteaid-refill.test,alden.croft.me@gmail.com,,Refill reminder — allopurinol 300mg,Allopurinol 300mg is due for refill. Your supply is running low.,"Patient: Alden Croft
+Medication: allopurinol 300mg
+Days supply remaining: 8
+Next refill eligible: 2026-12-08
+Store: Rite Aid #10412, 295 Main St, Rockland ME",2026-12-07T10:30:00-05:00,1765122600000,2240,"INBOX,Label_Health",True,False
+msg_eddie_saturday,thr_eddie_sat,eddie.croft.me@gmail.com,alden.croft.me@gmail.com,,Coffee Sat 7am?,Brass Compass or harbor?,Alden — Saturday 7. Brass Compass or harbor? Either works for me. — E,2026-12-03T17:55:00-05:00,1764802500000,920,"INBOX,Label_Family",False,False
+msg_dmr_groundfish,thr_dmr_groundfish,notices@maine-dmr.test,alden.croft.me@gmail.com,,Groundfish Zone 1 — week of 2026-12-08,Cod possession limits unchanged. Haddock daily limit adjusted.,"Maine DMR — Groundfish notice for the week of 2026-12-08.
+Cod: possession limit unchanged.
+Haddock: daily limit adjusted to 8 fish/vessel.
+Shrimp fishery: closed for 2026-2027 season.",2026-12-07T08:00:00-05:00,1765114800000,2860,INBOX,False,False
+msg_aca_renewal,thr_aca,noreply@healthcare.gov,alden.croft.me@gmail.com,,Your 2027 plan auto-renewal notice,Your 2027 ACA plan will auto-renew unless you make changes by Dec 15.,Anthem Silver HMO — premium $384/mo for 2027. Auto-renewal proceeds on 2026-12-15 unless you log in. Kara handles enrollment — forward as needed.,2026-11-30T12:00:00-05:00,1764525600000,4120,"INBOX,Label_Health",False,False

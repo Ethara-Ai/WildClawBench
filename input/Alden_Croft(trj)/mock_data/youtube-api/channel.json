@@ -1,0 +1,39 @@
+{
+  "id": "UC_AldenCroftWorkshop",
+  "snippet": {
+    "title": "Alden's Workshop",
+    "description": "Practical notes from a working harbor in Midcoast Maine. Cummins 6BTA marine diesel, lobster gear, knots, and shed work. Recorded on an older phone in the wheelhouse and the back shed. Posted when there is time and not before.\n\nNo schedule. No music. No paid promotion.\n\nIf something here saves you a tow back to the dock, fair trade.\n\nQuestions: alden.croft.me@gmail.com",
+    "customUrl": "@aldencroftworkshop",
+    "publishedAt": "2024-01-12T18:00:00Z",
+    "thumbnails": {
+      "default": {"url": "https://yt3.ggpht.com/ytc/alden_default.jpg", "width": 88, "height": 88},
+      "medium": {"url": "https://yt3.ggpht.com/ytc/alden_medium.jpg", "width": 240, "height": 240},
+      "high": {"url": "https://yt3.ggpht.com/ytc/alden_high.jpg", "width": 800, "height": 800}
+    },
+    "country": "US"
+  },
+  "statistics": {
+    "viewCount": "8421",
+    "subscriberCount": "47",
+    "hiddenSubscriberCount": false,
+    "videoCount": "8"
+  },
+  "contentDetails": {
+    "relatedPlaylists": {
+      "likes": "LL_AldenCroftWorkshop",
+      "uploads": "UU_AldenCroftWorkshop"
+    }
+  },
+  "brandingSettings": {
+    "channel": {
+      "title": "Alden's Workshop",
+      "description": "Practical Maine lobsterman notes. Cummins 6BTA marine diesel, lobster gear, knots, and shed work.",
+      "keywords": "Cummins 6BTA marine diesel lobster trap Maine Rockland lobsterman Eileen C Downeast boat maintenance haul out raw water impeller zinc anode bowline knot shed woodworking",
+      "unsubscribedTrailer": "vid_aldn_001",
+      "country": "US"
+    },
+    "image": {
+      "bannerExternalUrl": "https://yt3.googleusercontent.com/alden_workshop_banner.jpg"
+    }
+  }
+}

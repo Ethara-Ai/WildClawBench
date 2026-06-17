@@ -1,0 +1,9 @@
+{
+  "id": "T_BATES",
+  "name": "Bates Brewing",
+  "domain": "bates-brewing",
+  "email_domain": "Finthesiss.ai",
+  "icon": {
+    "image_132": "https://avatars.example.com/team-bates.png"
+  }
+}

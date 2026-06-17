@@ -1,0 +1,3 @@
+event_id,email,display_name,response_status,optional,organizer
+evt_hernandez_briefing_review,m.vasquez@maplewoodschoolboard.ca,Mary Vasquez,accepted,False,False
+evt_hernandez_briefing_review,p.hernandez@maplewoodschoolboard.ca,Dr. Patricia Hernandez,accepted,False,True

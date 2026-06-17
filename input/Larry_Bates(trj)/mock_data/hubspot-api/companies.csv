@@ -1,0 +1,4 @@
+id,name,domain,industry,city,state,numberofemployees,annualrevenue,createdate
+co_01,Blue Ridge Distribution,blueridgedist.com,Beverage Distribution,Asheville,NC,40,12000000,2016-01-01T00:00:00Z
+co_02,British Craft Imports,britishcraftimports.co.uk,Beverage Import,London,,25,8000000,2019-01-01T00:00:00Z
+co_03,Pacific Craft Distributors,pacificcraft.sg,Beverage Distribution,Singapore,,30,9000000,2022-01-01T00:00:00Z

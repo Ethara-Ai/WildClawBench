@@ -1,0 +1,29 @@
+{
+  "location_id": "loc_croft_route1",
+  "name": "Croft Rental - Route 1",
+  "address": {
+    "street1": "412 Route 1",
+    "street2": "",
+    "city": "Rockland",
+    "state": "ME",
+    "zip": "04841",
+    "country": "US"
+  },
+  "latitude": 44.1037,
+  "longitude": -69.1089,
+  "time_zone": "America/New_York",
+  "mode": "home",
+  "owner": {
+    "id": 700001,
+    "first_name": "Alden",
+    "last_name": "Croft",
+    "email": "alden.croft.me@gmail.com"
+  },
+  "subscription": {
+    "plan": "basic",
+    "status": "active",
+    "video_history_days": 60
+  },
+  "created_at": "2025-01-18T09:30:00.000Z",
+  "updated_at": "2026-11-22T10:15:00.000Z"
+}

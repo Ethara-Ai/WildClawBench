@@ -1,0 +1,2 @@
+id,subject,organizer_name,organizer_address,location,start_date,end_date,is_all_day,is_online,attendees
+oe_01,British Craft Q3 allocation call,Nigel Forsythe,nigel@britishcraftimports.co.uk,Online,2026-10-01T13:00:00,2026-10-01T13:30:00,False,True,Larry Bates;Nigel Forsythe

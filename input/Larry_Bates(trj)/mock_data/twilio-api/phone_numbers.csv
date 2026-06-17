@@ -1,0 +1,3 @@
+sid,phone_number,friendly_name,iso_country,sms_enabled,voice_enabled,mms_enabled,capabilities_fax,date_created
+PN_main,+18285559400,Larry Bates,US,True,True,False,False,2024-01-01T00:00:00Z
+PN_sensor,+18285557788,Fermentation Sensor Gateway,US,True,False,False,False,2024-01-01T00:00:00Z

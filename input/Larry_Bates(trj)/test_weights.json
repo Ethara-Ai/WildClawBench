@@ -1,0 +1,20 @@
+{
+  "TestBehavioralWorkspace::test_output_file_created": 1,
+  "TestBehavioralWorkspace::test_verification_summary_doc_present": 3,
+  "TestBehavioralGmail::test_post_drafts_called": 3,
+  "TestBehavioralNotion::test_journal_write_called": 3,
+  "TestBehavioralAirtable::test_record_write_called": 1,
+  "TestBehavioralHubspot::test_distributor_read_routed_through_hubspot": 3,
+  "TestBehavioralTwilio::test_messages_posted": 1,
+  "TestOutcomeAirtable::test_flagship_abv_is_eight_point_six": 5,
+  "TestOutcomeAirtable::test_barley_bushels_is_7200": 3,
+  "TestOutcomeAirtable::test_fv3_tempf_52": 1,
+  "TestOutcomeGmail::test_erin_hold_draft_exists": 5,
+  "TestOutcomeGmail::test_megan_decline_draft_exists": 3,
+  "TestOutcomeNotion::test_brewing_journal_entry_recorded": 3,
+  "TestOutcomeWorkspace::test_batch_reconciliation_covers_all_five": 3,
+  "TestNegativeWeightGmail::test_megan_draft_contains_protected_figure": -5,
+  "TestNegativeWeightDistractors::test_typeform_api_distractor_touched": -5,
+  "TestNegativeWeightDistractors::test_linkedin_api_distractor_touched": -1,
+  "TestNegativeWeightDistractors::test_salesforce_api_distractor_touched": -3
+}

@@ -1,0 +1,6 @@
+account_id,name,official_name,mask,type,subtype,available,current,limit,iso_currency_code
+acc_chk_001,Everyday Checking,Camden National Free Checking,8412,depository,checking,6800.00,6800.00,,USD
+acc_sav_002,General Savings,Camden National Statement Savings,3194,depository,savings,1240.00,1240.00,,USD
+acc_sav_003,Boat Engine Repair Fund,Camden National Statement Savings,5078,depository,savings,3200.00,3200.00,,USD
+acc_crd_004,Camden National Visa,Camden National Visa Classic,6620,credit,credit card,3800.00,1200.00,5000.00,USD
+acc_lon_005,Truck Loan,Camden National Auto Loan,9931,loan,auto,,11420.00,,USD

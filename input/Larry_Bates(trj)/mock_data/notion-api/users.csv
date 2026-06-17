@@ -1,0 +1,3 @@
+id,name,email,avatar_url,type,bot,owner_workspace,created_time
+usr_larry,Larry Bates,larry.bates@Finthesiss.ai,,person,False,Bates Brewing,2024-01-01T00:00:00Z
+usr_greg,Greg Holloway,greg.holloway.brew@gmail.com,,person,False,Bates Brewing,2024-01-01T00:00:00Z

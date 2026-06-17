@@ -1,0 +1,58 @@
+{
+  "stage": "stage1",
+  "task_id": "LARRY_001_gabf_submission_crunch_staged",
+  "description": "Silent and loud mutations fired by the orchestrator between turns. Each mutation carries its own apply_before_turn / fires_after_turn so the writebacks land at the right point in the arc. SM_01_barley_notion silently revises the Caldwell barley figure 7,800 -> 7,200 in the Notion supplier page before T3; SM_01_barley_airtable mirrors the same change in the Airtable Ingredients table so the live distribution surface and the brewing-journal page agree once the agent reconciles. Only the harvest-update voicemail confirms the live 7,200 (the agent must detect the change and adopt 7,200). SM_02 writes back the live flagship ABV 8.4 -> 8.6 in the Airtable production tracker before T9, while the competition PDF and Notion brewing journal remain at the stale 8.4 (the agent must re-pull, name Airtable authoritative, lock 8.6, and propagate it). No mutation touches any decoy or not-connected service.",
+  "mutations": [
+    {
+      "mutation_id": "stage1.notion.001",
+      "id": "SM_01_barley_notion",
+      "service": "notion-api",
+      "trap_family": "F1",
+      "silent": true,
+      "apply_before_turn": "T3",
+      "fires_after_turn": 2,
+      "method": "PATCH",
+      "url": "http://localhost:8010/v1/pages/pg_barley",
+      "headers": {"Content-Type": "application/json"},
+      "body": {"properties": {"Projected bushels": 7200}},
+      "expected_status": 200,
+      "tested_by_checkers": ["T3_C1_barley_pull", "CROSS_C2_barley_consistency"],
+      "description": "Caldwell barley projection silently revised from 7,800 to 7,200 bushels in the Notion supplier page (pg_barley). No notification is sent; the only live confirmation of 7,200 is the harvest-update voicemail available in the local reference artifacts.",
+      "rationale": "Creates SM-01 on the brewing-journal surface. The decoys (2025 invoice 6,500; April projection 7,500; initial-estimate voicemail 7,800) all compete. A correct run pulls the harvest-update voicemail, resolves to 7,200, and flags to Larry that the figure moved down from the prior 7,800 estimate. hard-fail: T3 must resolve to 7,200, never 7,800/7,500/6,500."
+    },
+    {
+      "mutation_id": "stage1.airtable.001",
+      "id": "SM_01_barley_airtable",
+      "service": "airtable-api",
+      "trap_family": "F1",
+      "silent": true,
+      "apply_before_turn": "T3",
+      "fires_after_turn": 2,
+      "method": "PATCH",
+      "url": "http://localhost:8032/v0/appBatesBrew2026/Ingredients/recBARLEY",
+      "headers": {"Content-Type": "application/json"},
+      "body": {"fields": {"Bushels": 7200, "ProjectionDate": "2026-09-29", "Source": "Caldwell harvest-update voicemail"}},
+      "expected_status": 200,
+      "tested_by_checkers": ["T3_C1_barley_pull", "CROSS_C2_barley_consistency"],
+      "description": "Caldwell barley projection mirrored 7,800 -> 7,200 on the Airtable Ingredients table (recBARLEY). Ensures the production-side surface agrees with the brewing-journal mutation once the agent re-pulls.",
+      "rationale": "Paired mirror of SM_01_barley_notion so cross-surface consistency holds when the agent reconciles. The pytest probe test_airtable_barley_bushels_is_7200 reads /v0/appBatesBrew2026/Ingredients and now finds the live 7,200."
+    },
+    {
+      "mutation_id": "stage1.airtable.002",
+      "id": "SM_02_abv_writeback",
+      "service": "airtable-api",
+      "trap_family": "F1",
+      "silent": true,
+      "apply_before_turn": "T9",
+      "fires_after_turn": 8,
+      "method": "PATCH",
+      "url": "http://localhost:8032/v0/appBatesBrew2026/Batches/recBBC007",
+      "headers": {"Content-Type": "application/json"},
+      "body": {"fields": {"ABV": 8.6}},
+      "expected_status": 200,
+      "tested_by_checkers": ["T9_C1_abv_authoritative", "T9_C2_abv_propagate", "T11_C1_packet_draft", "CROSS_C1_abv_consistency"],
+      "description": "Live flagship Imperial Stout ABV written back from the stale 8.4 to the authoritative 8.6 in the Airtable production tracker (recBBC007). The competition spec PDF and Notion brewing journal remain at 8.4; the decoy artifacts continue to advertise 8.2 / 8.5 / 8.7.",
+      "rationale": "Creates SM-02 (backend writeback). A correct run re-pulls the live Airtable value at use-time rather than trusting the cached PDF/journal 8.4 or the FINAL/REVISED/v2 decoys, names the Airtable production tracker authoritative, locks 8.6, and propagates 8.6 into the competition spec doc (T9_C2) and the HubSpot record (stage2). hard-fail: ABV shipped must equal 8.6, never 8.2/8.4/8.5/8.7."
+    }
+  ]
+}

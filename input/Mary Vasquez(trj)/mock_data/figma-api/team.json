@@ -1,0 +1,26 @@
+{
+  "team": {
+    "id": "team-maplewood-equity",
+    "name": "Maplewood Equity"
+  },
+  "me": {
+    "id": "user-mary",
+    "handle": "Mary Vasquez",
+    "email": "m.vasquez@maplewoodschoolboard.ca",
+    "img_url": ""
+  },
+  "users": [
+    {
+      "id": "user-colleague",
+      "handle": "Dana Okafor",
+      "email": "d.okafor@maplewoodschoolboard.ca",
+      "img_url": ""
+    },
+    {
+      "id": "user-mary",
+      "handle": "Mary Vasquez",
+      "email": "m.vasquez@maplewoodschoolboard.ca",
+      "img_url": ""
+    }
+  ]
+}

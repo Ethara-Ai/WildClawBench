@@ -1,0 +1,11 @@
+id,name,path_lower,path_display,is_folder,size,client_modified,rev
+f_001,farmhouse_ale_label.psd,/brewery backup/label source files/farmhouse_ale_label.psd,/Brewery Backup/Label Source Files/farmhouse_ale_label.psd,false,18412221,2026-08-02T14:11:08Z,rev1101a
+f_002,pale_ale_label.psd,/brewery backup/label source files/pale_ale_label.psd,/Brewery Backup/Label Source Files/pale_ale_label.psd,false,16881214,2026-08-02T14:14:50Z,rev1102a
+f_003,Brand Guidelines 2024.pdf,/brewery backup/brand guidelines 2024.pdf,/Brewery Backup/Brand Guidelines 2024.pdf,false,2841200,2024-05-22T10:11:00Z,rev0501b
+f_004,Spring tour day 2026.zip,/brewery backup/photography/spring tour day 2026.zip,/Brewery Backup/Photography/Spring tour day 2026.zip,false,412881234,2026-05-14T19:00:00Z,rev0701c
+f_005,Brewhouse stills 2025.zip,/brewery backup/photography/brewhouse stills 2025.zip,/Brewery Backup/Photography/Brewhouse stills 2025.zip,false,318882140,2025-08-22T15:00:00Z,rev0801d
+f_006,Merch mockups 2026.fig,/brewery backup/sarah design/merch mockups 2026.fig,/Brewery Backup/Sarah Design/Merch mockups 2026.fig,false,4812210,2026-09-12T18:00:00Z,rev0901e
+f_007,Tap handle designs.fig,/brewery backup/sarah design/tap handle designs.fig,/Brewery Backup/Sarah Design/Tap handle designs.fig,false,3148021,2026-09-22T11:00:00Z,rev1002f
+f_008,Hana watercolour 2025.jpg,/brewery backup/family/hana watercolour 2025.jpg,/Brewery Backup/Family/Hana watercolour 2025.jpg,false,4812211,2025-12-22T10:00:00Z,rev1101g
+f_009,Logo Mark - vector.ai,/brewery backup/branding/logo mark - vector.ai,/Brewery Backup/Branding/Logo Mark - vector.ai,false,1218411,2023-11-08T09:00:00Z,rev1201h
+f_010,Site Archive 2022.zip,/brewery backup/old site/site archive 2022.zip,/Brewery Backup/Old Site/Site Archive 2022.zip,false,88412221,2022-12-31T23:59:00Z,rev1301i

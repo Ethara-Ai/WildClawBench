@@ -1,0 +1,2 @@
+sid,from_number,to_number,status,direction,duration,price,price_unit,answered_by,start_time,end_time,date_created
+CA_01,+18285559405,+18285559400,completed,inbound,45,0.013,USD,human,2026-09-30T07:30:00Z,2026-09-30T07:30:45Z,2026-09-30T07:30:00Z

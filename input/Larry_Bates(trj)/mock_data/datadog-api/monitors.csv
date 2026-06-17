@@ -1,0 +1,2 @@
+id,name,type,query,message,overall_state,priority,tags,created,modified
+1001,FV-3 over-temp,metric alert,brewery.ferm.temp_f{tank:fv-3} > 54,Tank FV-3 running warm,OK,2,"brewery,fermentation",2024-01-01T00:00:00Z,2026-10-01T00:00:00Z

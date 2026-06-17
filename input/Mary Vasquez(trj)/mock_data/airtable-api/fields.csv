@@ -1,0 +1,5 @@
+tableId,id,name,type
+benchmarks,fldName,Name,singleLineText
+benchmarks,fldStatus,Status,singleLineText
+benchmarks,fldOwner,Owner,singleLineText
+benchmarks,fldBudget,Budget,number

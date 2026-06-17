@@ -1,0 +1,8 @@
+id,name,id_board,pos,closed
+list_backlog,Backlog,board_wellness_2026,16384,false
+list_in_progress,In Progress,board_wellness_2026,32768,false
+list_review,Under Review,board_wellness_2026,49152,false
+list_done,Done,board_wellness_2026,65536,false
+list_pd_todo,To Do,board_pd_planning,16384,false
+list_pd_confirmed,Confirmed,board_pd_planning,32768,false
+list_pd_complete,Complete,board_pd_planning,49152,false

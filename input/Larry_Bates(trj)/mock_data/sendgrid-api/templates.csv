@@ -1,0 +1,3 @@
+id,name,generation,subject,html_content,active,updated_at
+tpl_order,Distributor Order Confirmation,dynamic,Your Bates Brewing order,<p>Order confirmed.</p>,True,2026-01-01T00:00:00Z
+tpl_comp,Competition Submission Receipt,dynamic,GABF submission received,<p>Entry received.</p>,True,2026-01-01T00:00:00Z

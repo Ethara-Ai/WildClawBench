@@ -1,0 +1,3 @@
+id,firstname,lastname,email,phone,jobtitle,company,lifecyclestage,createdate,lastmodifieddate
+201,Renee,Boateng,renee@maplewoodlibrary.ca,+14165550201,Program Director,Maplewood Public Library,customer,2026-08-16T09:00:00Z,2026-10-10T09:00:00Z
+202,Sam,Whitefeather,sam@iec.ca,+14165550202,Coordinator,Indigenous Education Circle,customer,2026-08-16T09:00:00Z,2026-10-10T09:00:00Z

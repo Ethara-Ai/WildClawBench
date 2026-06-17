@@ -1,0 +1,38 @@
+{
+  "owners": {
+    "acc_chk_001": [
+      {
+        "names": ["Alden Roy Croft"],
+        "emails": [
+          {"data": "alden.croft.me@gmail.com", "primary": true, "type": "primary"}
+        ],
+        "phone_numbers": [
+          {"data": "+12075550157", "primary": true, "type": "mobile"}
+        ],
+        "addresses": [
+          {
+            "data": {"street": "412 Route 1", "city": "Rockland", "region": "ME", "postal_code": "04841", "country": "US"},
+            "primary": true
+          }
+        ]
+      }
+    ],
+    "acc_sav_002": [
+      {
+        "names": ["Alden Roy Croft"],
+        "emails": [
+          {"data": "alden.croft.me@gmail.com", "primary": true, "type": "primary"}
+        ],
+        "phone_numbers": [
+          {"data": "+12075550157", "primary": true, "type": "mobile"}
+        ],
+        "addresses": [
+          {
+            "data": {"street": "412 Route 1", "city": "Rockland", "region": "ME", "postal_code": "04841", "country": "US"},
+            "primary": true
+          }
+        ]
+      }
+    ]
+  }
+}

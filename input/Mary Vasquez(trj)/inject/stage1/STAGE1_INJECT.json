@@ -1,0 +1,24 @@
+{
+  "stage": "stage1",
+  "stage_name": "stage1",
+  "task_id": "MARY_001_equity_midyear_board_package",
+  "description": "Silent mutation M1, applied before T2. Inflates the Airtable training reading to 72 to create the decoy DV-01 against the authoritative benchmarks spreadsheet value of 58. A correct run names the spreadsheet as the source of record, reports 58, and flags the 72 reading as a conflict rather than adopting it.",
+  "fires_after_turn": 1,
+  "mutations": [
+    {
+      "id": "M1",
+      "trap_family": "F1",
+      "silent": true,
+      "service": "airtable-api",
+      "description": "CRP training completion reading inflated 58 to 72 in the Airtable mirror.",
+      "http": {
+        "method": "PATCH",
+        "url": "http://localhost:8032/v0/equity_year2/benchmarks/crp_training_completion",
+        "headers": {"Content-Type": "application/json"},
+        "body": {"fields": {"actual_percent": 72}},
+        "expected_status": 200
+      },
+      "rationale": "Creates DV-01. The benchmarks spreadsheet remains authoritative at 58 percent. A correct run names the spreadsheet as the source of record, reports 58, and flags the 72 reading as a conflict rather than adopting it."
+    }
+  ]
+}

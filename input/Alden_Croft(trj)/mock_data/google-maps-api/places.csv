@@ -1,0 +1,11 @@
+place_id,name,formatted_address,lat,lng,rating,user_ratings_total,types,business_status,price_level
+pl_home,Alden's House,"Route 1, Rockland ME 04841",44.0915,-69.128,4.5,3,point_of_interest|establishment,OPERATIONAL,0
+pl_yard,Rockland Marine Service Yard,"395 Atlantic Hwy, Rockland ME 04841",44.0945,-69.1115,4.6,42,marina|point_of_interest|establishment,OPERATIONAL,2
+pl_riteaid,Rite Aid Rockland,"295 Main St, Rockland ME 04841",44.1037,-69.1086,3.8,156,pharmacy|store|health|point_of_interest|establishment,OPERATIONAL,2
+pl_penbay,Penobscot Bay Medical Center,"6 Glen Cove Dr, Rockport ME 04856",44.1644,-69.0876,3.9,287,hospital|health|point_of_interest|establishment,OPERATIONAL,0
+pl_brass,Brass Compass Cafe,"305 Main St, Rockland ME 04841",44.1031,-69.109,4.7,612,cafe|food|point_of_interest|establishment,OPERATIONAL,2
+pl_archers,Archer's on the Pier,"58 Ocean St, Rockland ME 04841",44.0973,-69.1042,4.5,438,restaurant|food|point_of_interest|establishment,OPERATIONAL,3
+pl_hamilton,Hamilton Marine Rockland,"100 Park Dr, Rockland ME 04841",44.098,-69.1198,4.5,231,store|point_of_interest|establishment,OPERATIONAL,2
+pl_coop,Midcoast Seafood Co-op,"12 Tillson Ave, Rockland ME 04841",44.0985,-69.1054,4.4,98,food|store|point_of_interest|establishment,OPERATIONAL,2
+pl_kara,Kara's apartment (Portland),"Munjoy Hill, Portland ME 04101",43.6671,-70.2469,4.5,2,point_of_interest|establishment,OPERATIONAL,0
+pl_eddie,Eddie's house (Thomaston),"Main St, Thomaston ME 04861",44.0731,-69.1809,4.3,5,point_of_interest|establishment,OPERATIONAL,0

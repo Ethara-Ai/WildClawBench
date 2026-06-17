@@ -1,0 +1,14 @@
+{
+  "subdomain": "batesbrewing",
+  "name": "Bates Brewing Company",
+  "employeeCount": 8,
+  "industry": "Craft Beverage Manufacturing",
+  "headquarters": "Asheville, NC",
+  "fiscalYearStart": "01-01",
+  "timeOffPolicies": [
+    "Vacation",
+    "Sick",
+    "Personal",
+    "Holiday"
+  ]
+}

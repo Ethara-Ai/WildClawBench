@@ -1,0 +1,36 @@
+item_id,column_id,text,value
+item_m001,status,Done,
+item_m001,owner,Priya Sharma,user_parent_chair
+item_m001,date,2026-09-10,
+item_m002,status,Working on it,
+item_m002,owner,Mary Vasquez,user_mary_monday
+item_m002,date,2026-10-28,
+item_m003,status,Not started,
+item_m003,owner,Mary Vasquez,user_mary_monday
+item_m003,date,2026-11-01,
+item_m004,status,Working on it,
+item_m004,owner,Priya Sharma,user_parent_chair
+item_m004,date,2026-10-25,
+item_m005,status,Not started,
+item_m005,owner,David Kim,user_parent_vol_1
+item_m005,date,2026-10-30,
+item_m006,status,Working on it,
+item_m006,owner,David Kim,user_parent_vol_1
+item_m006,date,2026-11-15,
+item_m007,status,Not started,
+item_m007,owner,Parent Vol 2,user_parent_vol_2
+item_m007,date,2026-11-20,
+item_m008,status,Done,
+item_m008,owner,Priya Sharma,user_parent_chair
+item_m008,date,2026-10-05,
+item_m009,status,Not started,
+item_m009,owner,Mary Vasquez,user_mary_monday
+item_m009,date,2026-12-01,
+item_m010,status,Not started,
+item_m010,owner,Priya Sharma,user_parent_chair
+item_m010,date,2026-10-31,
+item_m002,update_note,Gymnasium confirmed for November 4 from 6:30 PM to 9:00 PM. AV setup request submitted to facilities. Need to confirm projector compatibility.,user_mary_monday
+item_m004,update_note,Contacted Ontario Interpreting Services. They have availability for November 4 evening. Awaiting cost quote to confirm within budget.,user_parent_chair
+item_m006,update_note,Riverside confirmed they can provide collection bins and pickup on November 16. We need to set student drop-off times and post signage.,user_parent_vol_1
+item_m001,update_note,September meeting went well. 34 parents attended which is our best turnout this year. Catering from Maple Bistro was within budget.,user_parent_chair
+item_m005,update_note,Reached out to three regular childcare volunteers. Two confirmed for November 4. Still looking for a third.,user_parent_vol_1

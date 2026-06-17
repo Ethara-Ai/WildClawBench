@@ -1,0 +1,10 @@
+id,name,real_name,email,is_admin,is_bot,tz,status_text,presence
+U_MVASQUEZ,mvasquez,Mary Vasquez,m.vasquez@maplewoodschoolboard.ca,false,false,America/Toronto,,active
+U_JPARK,jpark,Janet Park,jpark@on-principals-cohort.example.com,false,false,America/Toronto,,active
+U_RDAVIS,rdavis,Ryan Davis,rdavis@on-principals-cohort.example.com,false,false,America/Toronto,,active
+U_ASINGH,asingh,Amar Singh,asingh@on-principals-cohort.example.com,false,false,America/Toronto,,active
+U_CONFCOORD,confcoord,Conference Coordinator,confcoord@on-principals-cohort.example.com,false,true,America/Toronto,,active
+U_LCHEN,lchen,Linda Chen,lchen@on-principals-cohort.example.com,false,false,America/Toronto,,active
+U_TMOREAU,tmoreau,Theresa Moreau,tmoreau@on-principals-cohort.example.com,false,false,America/Toronto,,active
+U_KWRIGHT,kwright,Kevin Wright,kwright@on-principals-cohort.example.com,false,false,America/Toronto,,active
+U_PLAMBERT,plambert,Patrice Lambert,plambert@on-principals-cohort.example.com,false,false,America/Toronto,,active

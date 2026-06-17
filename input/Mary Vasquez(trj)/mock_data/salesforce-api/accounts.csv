@@ -1,0 +1,8 @@
+Id,Name,Industry,AnnualRevenue,Phone,Website,BillingCity,BillingState,NumberOfEmployees
+001A001,Maplewood School Board,Education,50000000,+14165559300,https://maplewoodschoolboard.ca,Toronto,ON,5000
+001A002,Ontario Ministry of Education,Government,1000000000,+14165550100,https://ontario.ca/education,Toronto,ON,80000
+001A003,Lakeshore University of Education,Higher Education,200000000,+14165551200,https://lakeshoreued.ca,Toronto,ON,3000
+001A004,United Teachers of Ontario Local 47,Labor,5000000,+14165552800,,Toronto,ON,200
+001A005,Thornfield Infrastructure Group,Construction,15000000,+14165553400,,Toronto,ON,150
+001A006,Scarborough Newcomer Services,Social Services,8000000,+14165554100,https://scarboroughnewcomer.ca,Scarborough,ON,80
+001A007,Greater Toronto STEM Alliance,Education,50000000,+14165554500,https://gtastemalliance.ca,Toronto,ON,5000

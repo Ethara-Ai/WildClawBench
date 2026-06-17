@@ -1,0 +1,4 @@
+id,firstname,lastname,email,phone,jobtitle,company,lifecyclestage,createdate,lastmodifieddate
+hc_01,Erin,Whitfield,erin.whitfield.dist@gmail.com,+18285559406,Distribution Partner,Blue Ridge Distribution,customer,2016-01-01T00:00:00Z,2026-09-30T00:00:00Z
+hc_02,Nigel,Forsythe,nigel@britishcraftimports.co.uk,+447700900100,Import Manager,British Craft Imports,customer,2019-01-01T00:00:00Z,2026-09-29T00:00:00Z
+hc_03,Lena,Tan,lena.tan@pacificcraft.sg,+6565551234,Allocation Lead,Pacific Craft Distributors,opportunity,2022-01-01T00:00:00Z,2026-09-25T00:00:00Z

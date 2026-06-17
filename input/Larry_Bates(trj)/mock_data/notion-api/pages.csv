@@ -1,0 +1,5 @@
+id,parent_type,parent_id,title,created_time,last_edited_time,created_by,archived,icon,cover_url
+pg_root,workspace,ws_bates_brewing,Bates Brewing — Brewing Journal,2024-01-01T00:00:00Z,2026-10-01T10:00:00Z,usr_larry,False,📓,
+pg_stout,database_id,db_batches,BBC-2026-007 Imperial Stout (flagship),2026-02-10T08:00:00Z,2026-09-29T16:00:00Z,usr_larry,False,🍺,
+pg_farmhouse,database_id,db_batches,BBC-2026-012 Farmhouse Ale,2026-03-01T08:00:00Z,2026-09-20T16:00:00Z,usr_larry,False,🍺,
+pg_barley,database_id,db_supply,Caldwell barley — 2026 harvest,2026-08-01T08:00:00Z,2026-09-30T09:30:00Z,usr_larry,False,🌾,

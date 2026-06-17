@@ -1,0 +1,3 @@
+id,dealname,pipeline,dealstage,amount,closedate,dealtype,associated_company,associated_contact,createdate,lastmodifieddate
+dl_01,British Craft Q3 barrel-aged allocation,default,appointmentscheduled,120000,2026-10-15,newbusiness,co_02,hc_02,2026-09-20T00:00:00Z,2026-09-30T00:00:00Z
+dl_02,Blue Ridge 2026 renewal,default,contractsent,240000,2026-11-01,existingbusiness,co_01,hc_01,2026-09-01T00:00:00Z,2026-09-28T00:00:00Z

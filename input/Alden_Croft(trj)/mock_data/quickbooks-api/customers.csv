@@ -1,0 +1,8 @@
+Id,DisplayName,GivenName,FamilyName,CompanyName,PrimaryEmailAddr,PrimaryPhone,BillAddr_Line1,BillAddr_City,BillAddr_CountrySubDivisionCode,BillAddr_PostalCode,Balance,Active,Job,Notes
+1,Midcoast Seafood Co-op,,,Midcoast Seafood Cooperative Inc,settlements@midcoastseafood.coop,(207) 555-0188,1 Co-op Wharf Rd,Rockland,ME,04841,0.00,true,false,Primary buyer - weekly boat-price settlement; Brian at office handles reconciliations
+2,In Good Company,,,In Good Company Restaurant,kitchen@ingoodcompanyme.example,(207) 555-0212,415 Main St,Camden,ME,04843,0.00,true,false,Small direct buyer - 5-10 lb runs during summer
+3,Cafe Miranda,,,Cafe Miranda,kitchen@cafemiranda.example,(207) 555-0204,15 Oak St,Rockland,ME,04841,0.00,true,false,Occasional direct sale; cash on pickup
+4,Suzuki's Sushi Bar,,,Suzuki's Sushi Bar,orders@suzukisushi.example,(207) 555-0233,419 Main St,Rockland,ME,04841,0.00,true,false,Occasional - prefers select grade for sushi
+5,Dockside Cash Sales,,,Dockside Cash Sales,,(207) 555-0157,Town Wharf,Rockland,ME,04841,0.00,true,false,Walk-up dockside cash sales - tracked weekly as one line
+31,Maine DMR (License Renewal),,,Maine Department of Marine Resources,licensing@maine.gov,(207) 555-9000,21 State House Station,Augusta,ME,04333,0.00,true,false,Placeholder customer record for projected DMR license/tag cost estimates
+32,Hanover Insurance (2027 Renewal Quote),,,The Hanover Insurance Group,renewals@hanover.example,(800) 555-7100,440 Lincoln St,Worcester,MA,01653,0.00,true,false,Placeholder customer record for projected 2027 hull/P&I renewal quote

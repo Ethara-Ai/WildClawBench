@@ -1,0 +1,4 @@
+metric,scope,base_value,amplitude,unit
+brewery.ferm.temp_f,host:fermroom-1,52.0,2.0,fahrenheit
+brewery.ferm.gravity,tank:FV-3,1.018,0.002,sg
+brewery.ferm.co2_pct,host:fermroom-1,0.4,0.1,percent

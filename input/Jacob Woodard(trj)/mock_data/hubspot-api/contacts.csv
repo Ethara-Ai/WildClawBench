@@ -1,0 +1,4 @@
+id,firstname,lastname,email,phone,jobtitle,company,lifecyclestage,createdate,lastmodifieddate
+hs-sophie-crawford,Sophie,Crawford,sophie.crawford.antiques@gmail.com,555-3408,Owner,Galeria Crawford,customer,2025-03-12T09:00:00Z,2026-10-20T08:00:00Z
+hs-stefan-muller,Stefan,Muller,s.mueller@muller-uhrenteile.ch,555-3409,Supplier,Muller Uhrenteile AG,customer,2024-08-01T09:00:00Z,2026-09-18T10:15:00Z
+hs-andrew-mitchell,Andrew,Mitchell,a.mitchell@uj.edu.pl,555-3410,Horologist,Jagiellonian University,customer,2025-06-20T09:00:00Z,2026-08-15T10:00:00Z

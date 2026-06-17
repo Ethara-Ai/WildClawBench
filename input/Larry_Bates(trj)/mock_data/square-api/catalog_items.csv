@@ -1,0 +1,11 @@
+id,type,name,description,category,variation_id,variation_name,price_amount,currency
+sqi_0101,ITEM,Pint - Tap Pour,,Tap Beer,VAR_sqi_0101,Regular,700,USD
+sqi_0102,ITEM,Half Pint - Tap Pour,,Tap Beer,VAR_sqi_0102,Regular,450,USD
+sqi_0103,ITEM,Flight (4 x 4oz),,Tap Beer,VAR_sqi_0103,Regular,1200,USD
+sqi_0104,ITEM,Growler Fill - 32oz,,To-go,VAR_sqi_0104,Regular,1800,USD
+sqi_0105,ITEM,Crowler - 16oz,,To-go,VAR_sqi_0105,Regular,900,USD
+sqi_0201,ITEM,Logo T-Shirt,,Merch,VAR_sqi_0201,Regular,2200,USD
+sqi_0202,ITEM,Pint Glass - 16oz,,Merch,VAR_sqi_0202,Regular,800,USD
+sqi_0203,ITEM,Logo Sticker,,Merch,VAR_sqi_0203,Regular,300,USD
+sqi_0301,ITEM,Bottled Water,,Non-alc,VAR_sqi_0301,Regular,250,USD
+sqi_0302,ITEM,Soft pretzel,,Snacks,VAR_sqi_0302,Regular,400,USD

@@ -1,0 +1,177 @@
+{
+  "FK001abcdefg": {
+    "id": "0:0",
+    "name": "Document",
+    "type": "DOCUMENT",
+    "children": [
+      {
+        "id": "1:2",
+        "name": "Slides",
+        "type": "CANVAS",
+        "backgroundColor": {
+          "r": 1.0,
+          "g": 1.0,
+          "b": 1.0,
+          "a": 1.0
+        },
+        "children": [
+          {
+            "id": "10:2",
+            "name": "Title slide",
+            "type": "FRAME",
+            "absoluteBoundingBox": {
+              "x": 0,
+              "y": 0,
+              "width": 1280,
+              "height": 720
+            },
+            "children": [
+              {
+                "id": "10:3",
+                "name": "Session Title",
+                "type": "TEXT",
+                "characters": "Equity Plan Year 2 - Mid Year"
+              }
+            ]
+          },
+          {
+            "id": "10:5",
+            "name": "Benchmarks slide",
+            "type": "FRAME",
+            "absoluteBoundingBox": {
+              "x": 1360,
+              "y": 0,
+              "width": 1280,
+              "height": 720
+            },
+            "children": [
+              {
+                "id": "10:6",
+                "name": "Benchmark Figures",
+                "type": "TEXT",
+                "characters": "Use the authoritative benchmarks sheet."
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "FK002hijklmn": {
+    "id": "0:0",
+    "name": "Document",
+    "type": "DOCUMENT",
+    "children": [
+      {
+        "id": "1:2",
+        "name": "Board Deck",
+        "type": "CANVAS",
+        "backgroundColor": {
+          "r": 0.98,
+          "g": 0.98,
+          "b": 0.98,
+          "a": 1.0
+        },
+        "children": [
+          {
+            "id": "20:1",
+            "name": "Cover",
+            "type": "FRAME",
+            "absoluteBoundingBox": {
+              "x": 0,
+              "y": 0,
+              "width": 1280,
+              "height": 720
+            },
+            "children": [
+              {
+                "id": "20:2",
+                "name": "Cover Title",
+                "type": "TEXT",
+                "characters": "Mid Year Board Briefing"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "FK003opqrstu": {
+    "id": "0:0",
+    "name": "Document",
+    "type": "DOCUMENT",
+    "children": [
+      {
+        "id": "1:2",
+        "name": "One Pager",
+        "type": "CANVAS",
+        "backgroundColor": {
+          "r": 1.0,
+          "g": 1.0,
+          "b": 1.0,
+          "a": 1.0
+        },
+        "children": [
+          {
+            "id": "30:1",
+            "name": "Summary",
+            "type": "FRAME",
+            "absoluteBoundingBox": {
+              "x": 0,
+              "y": 0,
+              "width": 816,
+              "height": 1056
+            },
+            "children": [
+              {
+                "id": "30:2",
+                "name": "Headline",
+                "type": "TEXT",
+                "characters": "Parent Council Mid Year Update"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "FK004vwxyz12": {
+    "id": "0:0",
+    "name": "Document",
+    "type": "DOCUMENT",
+    "children": [
+      {
+        "id": "1:2",
+        "name": "Components",
+        "type": "CANVAS",
+        "backgroundColor": {
+          "r": 0.98,
+          "g": 0.98,
+          "b": 0.98,
+          "a": 1.0
+        },
+        "children": [
+          {
+            "id": "40:1",
+            "name": "Atoms",
+            "type": "FRAME",
+            "absoluteBoundingBox": {
+              "x": 0,
+              "y": 0,
+              "width": 800,
+              "height": 600
+            },
+            "children": [
+              {
+                "id": "40:2",
+                "name": "Heading / Slide",
+                "type": "COMPONENT",
+                "componentId": "comp-heading-slide"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

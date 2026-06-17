@@ -1,0 +1,272 @@
+[
+  {
+    "Id": "5001",
+    "DocNumber": "INV-AC-2026-1004",
+    "TxnDate": "2026-10-04",
+    "DueDate": "2026-10-11",
+    "CustomerRef": { "value": "1", "name": "Midcoast Seafood Co-op" },
+    "Line": [
+      {
+        "Id": "1",
+        "LineNum": 1,
+        "Amount": 2398.50,
+        "DetailType": "SalesItemLineDetail",
+        "Description": "Week ending 2026-10-04 - Lobster chix 410 lb @ $5.85 boat price",
+        "SalesItemLineDetail": {
+          "ItemRef": { "value": "1", "name": "Lobster - Chix (1 lb)" },
+          "UnitPrice": 5.85,
+          "Qty": 410
+        }
+      },
+      {
+        "Id": "2",
+        "LineNum": 2,
+        "Amount": 672.00,
+        "DetailType": "SalesItemLineDetail",
+        "Description": "Week ending 2026-10-04 - Lobster selects 105 lb @ $6.40 boat price",
+        "SalesItemLineDetail": {
+          "ItemRef": { "value": "2", "name": "Lobster - Selects (1.25-2 lb)" },
+          "UnitPrice": 6.40,
+          "Qty": 105
+        }
+      },
+      {
+        "Id": "3",
+        "LineNum": 3,
+        "Amount": 142.00,
+        "DetailType": "SalesItemLineDetail",
+        "Description": "Week ending 2026-10-04 - Lobster jumbos 20 lb @ $7.10 boat price",
+        "SalesItemLineDetail": {
+          "ItemRef": { "value": "3", "name": "Lobster - Jumbos (2 lb+)" },
+          "UnitPrice": 7.10,
+          "Qty": 20
+        }
+      },
+      { "Amount": 3212.50, "DetailType": "SubTotalLineDetail", "SubTotalLineDetail": {} }
+    ],
+    "TotalAmt": 3212.50,
+    "Balance": 0.00,
+    "PrintStatus": "NotSet",
+    "EmailStatus": "Sent",
+    "BillEmail": { "Address": "settlements@midcoastseafood.coop" },
+    "Status": "Paid",
+    "MetaData": { "CreateTime": "2026-10-04T15:00:00-04:00", "LastUpdatedTime": "2026-10-06T10:00:00-04:00" },
+    "SyncToken": "1"
+  },
+  {
+    "Id": "5002",
+    "DocNumber": "INV-AC-2026-1011",
+    "TxnDate": "2026-10-11",
+    "DueDate": "2026-10-18",
+    "CustomerRef": { "value": "1", "name": "Midcoast Seafood Co-op" },
+    "Line": [
+      {
+        "Id": "1",
+        "LineNum": 1,
+        "Amount": 2252.25,
+        "DetailType": "SalesItemLineDetail",
+        "Description": "Week ending 2026-10-11 - Lobster chix 385 lb @ $5.85 boat price",
+        "SalesItemLineDetail": {
+          "ItemRef": { "value": "1", "name": "Lobster - Chix (1 lb)" },
+          "UnitPrice": 5.85,
+          "Qty": 385
+        }
+      },
+      {
+        "Id": "2",
+        "LineNum": 2,
+        "Amount": 608.00,
+        "DetailType": "SalesItemLineDetail",
+        "Description": "Week ending 2026-10-11 - Lobster selects 95 lb @ $6.40 boat price",
+        "SalesItemLineDetail": {
+          "ItemRef": { "value": "2", "name": "Lobster - Selects (1.25-2 lb)" },
+          "UnitPrice": 6.40,
+          "Qty": 95
+        }
+      },
+      {
+        "Id": "3",
+        "LineNum": 3,
+        "Amount": 106.50,
+        "DetailType": "SalesItemLineDetail",
+        "Description": "Week ending 2026-10-11 - Lobster jumbos 15 lb @ $7.10 boat price",
+        "SalesItemLineDetail": {
+          "ItemRef": { "value": "3", "name": "Lobster - Jumbos (2 lb+)" },
+          "UnitPrice": 7.10,
+          "Qty": 15
+        }
+      },
+      { "Amount": 2966.75, "DetailType": "SubTotalLineDetail", "SubTotalLineDetail": {} }
+    ],
+    "TotalAmt": 2966.75,
+    "Balance": 0.00,
+    "PrintStatus": "NotSet",
+    "EmailStatus": "Sent",
+    "BillEmail": { "Address": "settlements@midcoastseafood.coop" },
+    "Status": "Paid",
+    "MetaData": { "CreateTime": "2026-10-11T15:00:00-04:00", "LastUpdatedTime": "2026-10-13T10:00:00-04:00" },
+    "SyncToken": "1"
+  },
+  {
+    "Id": "5003",
+    "DocNumber": "INV-AC-2026-1018",
+    "TxnDate": "2026-10-18",
+    "DueDate": "2026-10-25",
+    "CustomerRef": { "value": "1", "name": "Midcoast Seafood Co-op" },
+    "Line": [
+      {
+        "Id": "1",
+        "LineNum": 1,
+        "Amount": 2106.00,
+        "DetailType": "SalesItemLineDetail",
+        "Description": "Week ending 2026-10-18 - Lobster chix 360 lb @ $5.85 boat price",
+        "SalesItemLineDetail": {
+          "ItemRef": { "value": "1", "name": "Lobster - Chix (1 lb)" },
+          "UnitPrice": 5.85,
+          "Qty": 360
+        }
+      },
+      {
+        "Id": "2",
+        "LineNum": 2,
+        "Amount": 563.20,
+        "DetailType": "SalesItemLineDetail",
+        "Description": "Week ending 2026-10-18 - Lobster selects 88 lb @ $6.40 boat price",
+        "SalesItemLineDetail": {
+          "ItemRef": { "value": "2", "name": "Lobster - Selects (1.25-2 lb)" },
+          "UnitPrice": 6.40,
+          "Qty": 88
+        }
+      },
+      {
+        "Id": "3",
+        "LineNum": 3,
+        "Amount": 127.80,
+        "DetailType": "SalesItemLineDetail",
+        "Description": "Week ending 2026-10-18 - Lobster jumbos 18 lb @ $7.10 boat price",
+        "SalesItemLineDetail": {
+          "ItemRef": { "value": "3", "name": "Lobster - Jumbos (2 lb+)" },
+          "UnitPrice": 7.10,
+          "Qty": 18
+        }
+      },
+      { "Amount": 2797.00, "DetailType": "SubTotalLineDetail", "SubTotalLineDetail": {} }
+    ],
+    "TotalAmt": 2797.00,
+    "Balance": 0.00,
+    "PrintStatus": "NotSet",
+    "EmailStatus": "Sent",
+    "BillEmail": { "Address": "settlements@midcoastseafood.coop" },
+    "Status": "Paid",
+    "MetaData": { "CreateTime": "2026-10-18T15:00:00-04:00", "LastUpdatedTime": "2026-10-20T10:00:00-04:00" },
+    "SyncToken": "1"
+  },
+  {
+    "Id": "5004",
+    "DocNumber": "INV-AC-2026-1025",
+    "TxnDate": "2026-10-25",
+    "DueDate": "2026-11-01",
+    "CustomerRef": { "value": "1", "name": "Midcoast Seafood Co-op" },
+    "Line": [
+      {
+        "Id": "1",
+        "LineNum": 1,
+        "Amount": 1989.00,
+        "DetailType": "SalesItemLineDetail",
+        "Description": "Week ending 2026-10-25 - Lobster chix 340 lb @ $5.85 boat price",
+        "SalesItemLineDetail": {
+          "ItemRef": { "value": "1", "name": "Lobster - Chix (1 lb)" },
+          "UnitPrice": 5.85,
+          "Qty": 340
+        }
+      },
+      {
+        "Id": "2",
+        "LineNum": 2,
+        "Amount": 512.00,
+        "DetailType": "SalesItemLineDetail",
+        "Description": "Week ending 2026-10-25 - Lobster selects 80 lb @ $6.40 boat price",
+        "SalesItemLineDetail": {
+          "ItemRef": { "value": "2", "name": "Lobster - Selects (1.25-2 lb)" },
+          "UnitPrice": 6.40,
+          "Qty": 80
+        }
+      },
+      {
+        "Id": "3",
+        "LineNum": 3,
+        "Amount": 85.20,
+        "DetailType": "SalesItemLineDetail",
+        "Description": "Week ending 2026-10-25 - Lobster jumbos 12 lb @ $7.10 boat price",
+        "SalesItemLineDetail": {
+          "ItemRef": { "value": "3", "name": "Lobster - Jumbos (2 lb+)" },
+          "UnitPrice": 7.10,
+          "Qty": 12
+        }
+      },
+      { "Amount": 2586.20, "DetailType": "SubTotalLineDetail", "SubTotalLineDetail": {} }
+    ],
+    "TotalAmt": 2586.20,
+    "Balance": 0.00,
+    "PrintStatus": "NotSet",
+    "EmailStatus": "Sent",
+    "BillEmail": { "Address": "settlements@midcoastseafood.coop" },
+    "Status": "Paid",
+    "MetaData": { "CreateTime": "2026-10-25T15:00:00-04:00", "LastUpdatedTime": "2026-10-27T10:00:00-04:00" },
+    "SyncToken": "1"
+  },
+  {
+    "Id": "5005",
+    "DocNumber": "INV-AC-2026-1101",
+    "TxnDate": "2026-11-01",
+    "DueDate": "2026-11-08",
+    "CustomerRef": { "value": "1", "name": "Midcoast Seafood Co-op" },
+    "Line": [
+      {
+        "Id": "1",
+        "LineNum": 1,
+        "Amount": 1638.00,
+        "DetailType": "SalesItemLineDetail",
+        "Description": "Week ending 2026-11-01 - Lobster chix 280 lb @ $5.85 boat price (season tapering)",
+        "SalesItemLineDetail": {
+          "ItemRef": { "value": "1", "name": "Lobster - Chix (1 lb)" },
+          "UnitPrice": 5.85,
+          "Qty": 280
+        }
+      },
+      {
+        "Id": "2",
+        "LineNum": 2,
+        "Amount": 416.00,
+        "DetailType": "SalesItemLineDetail",
+        "Description": "Week ending 2026-11-01 - Lobster selects 65 lb @ $6.40 boat price",
+        "SalesItemLineDetail": {
+          "ItemRef": { "value": "2", "name": "Lobster - Selects (1.25-2 lb)" },
+          "UnitPrice": 6.40,
+          "Qty": 65
+        }
+      },
+      {
+        "Id": "3",
+        "LineNum": 3,
+        "Amount": 56.80,
+        "DetailType": "SalesItemLineDetail",
+        "Description": "Week ending 2026-11-01 - Lobster jumbos 8 lb @ $7.10 boat price",
+        "SalesItemLineDetail": {
+          "ItemRef": { "value": "3", "name": "Lobster - Jumbos (2 lb+)" },
+          "UnitPrice": 7.10,
+          "Qty": 8
+        }
+      },
+      { "Amount": 2110.80, "DetailType": "SubTotalLineDetail", "SubTotalLineDetail": {} }
+    ],
+    "TotalAmt": 2110.80,
+    "Balance": 0.00,
+    "PrintStatus": "NotSet",
+    "EmailStatus": "Sent",
+    "BillEmail": { "Address": "settlements@midcoastseafood.coop" },
+    "Status": "Paid",
+    "MetaData": { "CreateTime": "2026-11-01T15:00:00-05:00", "LastUpdatedTime": "2026-11-03T10:00:00-05:00" },
+    "SyncToken": "1"
+  }
+]

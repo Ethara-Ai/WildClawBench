@@ -1,0 +1,3 @@
+id,employeeId,type,status,start,end,amount,unit,notes,created
+tor_001,emp_greg,Vacation,approved,2026-12-20,2026-12-27,7,days,Holiday week with family,2026-09-15T10:00:00-04:00
+tor_002,emp_seasonal_03,Sick,approved,2026-09-25,2026-09-26,2,days,Flu,2026-09-25T07:30:00-04:00

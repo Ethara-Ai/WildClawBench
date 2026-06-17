@@ -1,0 +1,19 @@
+comment_id,videoId,channelId,parentId,authorDisplayName,authorChannelId,textDisplay,likeCount,publishedAt,updatedAt,moderationStatus
+cmt_aldn_001,vid_aldn_001,,,DowneastDeckhand,UC_user_aldn_001,Saved me a tow. My 6BTA ran hot off Owls Head last August and your strainer check was the first thing I tried. Eelgrass clog. Thank you.,22,2024-02-05T09:10:00Z,2024-02-05T09:10:00Z,published
+cmt_aldn_002,vid_aldn_001,,,MarvP_Rockland,UC_user_aldn_002,Cap. Going to have you walk me through the heat exchanger one of these Saturdays.,12,2024-02-05T11:45:00Z,2024-02-05T11:45:00Z,published
+cmt_aldn_003,vid_aldn_001,UC_AldenCroftWorkshop,cmt_aldn_002,Alden's Workshop,UC_AldenCroftWorkshop,Bring the coffee.,18,2024-02-05T12:30:00Z,2024-02-05T12:30:00Z,published
+cmt_aldn_004,vid_aldn_001,,,KennebunkLobsterman,UC_user_aldn_003,Plain English no fluff. Subscribed.,9,2024-02-06T07:20:00Z,2024-02-06T07:20:00Z,published
+cmt_aldn_005,vid_aldn_002,,,SternsmanSteve,UC_user_aldn_004,The bottom bolt is the worst. Same on the Cummins 6CTA. Stub wrench is the only way.,14,2024-03-19T18:40:00Z,2024-03-19T18:40:00Z,published
+cmt_aldn_006,vid_aldn_002,UC_AldenCroftWorkshop,cmt_aldn_005,Alden's Workshop,UC_AldenCroftWorkshop,Stub wrench and a bad word. Yes.,11,2024-03-19T19:15:00Z,2024-03-19T19:15:00Z,published
+cmt_aldn_007,vid_aldn_002,,,HamiltonMarineFan,UC_user_aldn_005,Which impeller kit are you running. Sherwood or Jabsco.,5,2024-03-22T10:00:00Z,2024-03-22T10:00:00Z,published
+cmt_aldn_008,vid_aldn_002,UC_AldenCroftWorkshop,cmt_aldn_007,Alden's Workshop,UC_AldenCroftWorkshop,Sherwood. Fits the 6BTA without trimming.,7,2024-03-22T11:30:00Z,2024-03-22T11:30:00Z,published
+cmt_aldn_009,vid_aldn_003,,,VinalhavenVic,UC_user_aldn_006,The one on the rudder shoe always disappears first. Every year.,8,2024-11-23T08:50:00Z,2024-11-23T08:50:00Z,published
+cmt_aldn_010,vid_aldn_003,,,WinterportWendy,UC_user_aldn_007,Defender Marine got the kit to me in three days. Thanks for the link.,6,2024-11-25T14:00:00Z,2024-11-25T14:00:00Z,published
+cmt_aldn_011,vid_aldn_004,,,YoungSternman,UC_user_aldn_008,My first season. Bait bag tip on the loop knot helped a lot. Thank you sir.,11,2024-06-09T19:00:00Z,2024-06-09T19:00:00Z,published
+cmt_aldn_012,vid_aldn_005,,,DadOnTheDock,UC_user_aldn_009,Teaching my kid this weekend. This is the version I learned too.,10,2024-04-15T12:00:00Z,2024-04-15T12:00:00Z,published
+cmt_aldn_013,vid_aldn_006,,,ThomastonEddie,UC_user_aldn_010,Looks square. Pine frame is going to creak in two winters though. Bring it inside before the wood stove.,8,2025-01-26T09:00:00Z,2025-01-26T09:00:00Z,published
+cmt_aldn_014,vid_aldn_006,UC_AldenCroftWorkshop,cmt_aldn_013,Alden's Workshop,UC_AldenCroftWorkshop,The shed is colder than the harbor. It will be fine. See you Saturday.,9,2025-01-26T10:30:00Z,2025-01-26T10:30:00Z,published
+cmt_aldn_015,vid_aldn_007,,,FirstYearCaptain,UC_user_aldn_011,The barometer at 3 AM versus the forecast at 4 AM. That part lined up with the worst day of my season.,7,2025-05-05T05:30:00Z,2025-05-05T05:30:00Z,published
+cmt_aldn_016,vid_aldn_008,,,RocklandYardManager,UC_user_aldn_012,Solid list cap. See you on the 9th.,9,2025-11-30T08:00:00Z,2025-11-30T08:00:00Z,published
+cmt_aldn_017,vid_aldn_008,,,DonnaW_Neighbor,UC_user_aldn_013,The truck will be in the driveway. I will keep an eye on things.,6,2025-11-30T16:00:00Z,2025-11-30T16:00:00Z,published
+cmt_aldn_018,vid_aldn_008,UC_AldenCroftWorkshop,cmt_aldn_017,Alden's Workshop,UC_AldenCroftWorkshop,Appreciate it Donna.,8,2025-11-30T17:00:00Z,2025-11-30T17:00:00Z,published

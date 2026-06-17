@@ -1,0 +1,4 @@
+id,page_id,parent_block_id,type,text,order,created_time,last_edited_time,has_children,checked
+blk_01,pg_stout,,heading_2,Sensory notes — barrel-aged imperial stout,1,2026-09-29T16:00:00Z,2026-09-29T16:00:00Z,False,False
+blk_02,pg_stout,,paragraph,"Roasted malt, dark chocolate, bourbon-barrel char. Final readings logged in production tracker.",2,2026-09-29T16:00:00Z,2026-09-29T16:00:00Z,False,False
+blk_03,pg_barley,,paragraph,"Caldwell harvest-update voicemail: revised projection 7,200 bushels (down from earlier 7,800).",1,2026-09-30T09:30:00Z,2026-09-30T09:30:00Z,False,False

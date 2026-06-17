@@ -1,0 +1,5 @@
+user_id,name,email,title,is_admin
+user_mary_monday,Mary Vasquez,m.vasquez@maplewoodschoolboard.ca,Workspace Owner,true
+user_parent_chair,Priya Sharma,user_parent_chair@maplewoodschoolboard.ca,Parent Council Member,false
+user_parent_vol_1,David Kim,user_parent_vol_1@maplewoodschoolboard.ca,Parent Council Member,false
+user_parent_vol_2,Parent Vol 2,user_parent_vol_2@maplewoodschoolboard.ca,Parent Council Member,false

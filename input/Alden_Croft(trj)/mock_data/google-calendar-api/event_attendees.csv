@@ -1,0 +1,5 @@
+event_id,email,display_name,response_status,optional,organizer
+evt_haul_out_2026,service@rocklandmarineyard.test,Rockland Marine Service Yard,accepted,False,False
+evt_kara_visit_authored,kara.croft.me@gmail.com,Kara Croft,tentative,False,True
+evt_kara_sun_call,kara.croft.me@gmail.com,Kara Croft,accepted,False,False
+evt_eddie_sat_coffee,eddie.croft.me@gmail.com,Eddie Croft,accepted,False,False

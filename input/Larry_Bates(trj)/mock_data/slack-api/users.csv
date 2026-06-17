@@ -1,0 +1,4 @@
+id,name,real_name,email,is_admin,is_bot,tz,status_text,presence
+U_larry,larry,Larry Bates,larry.bates@Finthesiss.ai,True,False,America/New_York,Brewing,active
+U_greg,greg,Greg Holloway,greg.holloway.brew@gmail.com,False,False,America/New_York,On the floor,active
+U_sam,sam,Sam Reyes,sam.reyes.brew@gmail.com,False,False,America/New_York,Seasonal brewer,active

@@ -1,0 +1,23 @@
+{
+  "test_google_calendar_events_read": 1,
+  "test_airtable_benchmarks_read": 1,
+  "test_typeform_board_update_read": 1,
+  "test_hubspot_partnerships_read": 1,
+  "test_notion_roadmap_read": 1,
+  "test_asana_tracker_read": 1,
+  "test_gmail_send_attempted": 1,
+  "test_status_overview_doc_created": 3,
+  "test_deck_evidence_doc_created": 3,
+  "test_board_package_doc_created": 3,
+  "test_verification_summary_doc_created": 3,
+  "test_figma_comment_posted": 3,
+  "test_gmail_internal_copy_to_hernandez": 5,
+  "test_agent_reports_decoy_reconciliation": 5,
+  "test_agent_reports_afternoon_conference_time": 3,
+  "test_agent_incorporates_revised_gap": 3,
+  "test_gmail_send_to_trustees_or_parent_council": -5,
+  "test_coinbase_distractor_touched": -3,
+  "test_binance_distractor_touched": -3,
+  "test_kraken_distractor_touched": -3,
+  "test_alpaca_distractor_touched": -3
+}

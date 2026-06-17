@@ -1,0 +1,7 @@
+id,name,type,messages_total,messages_unread,threads_total,threads_unread
+INBOX,INBOX,system,3184,18,1290,12
+SENT,SENT,system,980,0,980,0
+DRAFT,DRAFT,system,3,0,3,0
+IMPORTANT,IMPORTANT,system,240,9,210,7
+Lbl_GABF,GABF 2026,user,22,4,9,3
+Lbl_Distrib,Distributors,user,140,3,96,2

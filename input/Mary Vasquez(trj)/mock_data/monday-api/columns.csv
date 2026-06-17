@@ -1,0 +1,9 @@
+column_id,board_id,title,type,position
+status,brd_pc_2026,Status,status,1
+owner,brd_pc_2026,Owner,person,2
+date,brd_pc_2026,Date,date,3
+update_note,brd_pc_2026,Updates,long_text,4
+status,brd_outreach,Status,status,1
+owner,brd_outreach,Owner,person,2
+date,brd_outreach,Date,date,3
+update_note,brd_outreach,Updates,long_text,4

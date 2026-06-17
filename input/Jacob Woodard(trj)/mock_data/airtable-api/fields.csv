@@ -1,0 +1,14 @@
+tableId,id,name,type
+tblOrders00000001,fldOrderId000001,Order ID,singleLineText
+tblOrders00000001,fldOrderComm0001,Commission,singleLineText
+tblOrders00000001,fldOrderItem0001,Item,singleLineText
+tblOrders00000001,fldOrderPrice001,Price EUR,number
+tblOrders00000001,fldOrderStatus01,Status,singleSelect
+tblOrders00000001,fldOrderDeliv001,Expected delivery,date
+tblOrders00000001,fldOrderUpd00001,Last updated,dateTime
+tblParts000000001,fldPartName00001,Part,singleLineText
+tblParts000000001,fldPartSuppl0001,Supplier,singleLineText
+tblParts000000001,fldPartPrice0001,Price EUR,number
+tblParts000000001,fldPartOnhand001,On hand,number
+tblParts000000001,fldPartLead00001,Lead time days,number
+tblParts000000001,fldPartMod000001,Last modified,dateTime

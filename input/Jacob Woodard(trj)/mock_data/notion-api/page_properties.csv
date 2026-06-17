@@ -1,0 +1,12 @@
+page_id,property_name,property_type,value
+ntn-krasicki-029,Part price EUR,number,645.00
+ntn-krasicki-029,Parts subtotal PLN,number,2799.30
+ntn-krasicki-029,Expected delivery,date,2026-10-26
+ntn-krasicki-029,Lead time,rich_text,4 months
+ntn-krasicki-029,Commission,rich_text,Krasicki Estate Clock (1820s Polish longcase)
+ntn-krasicki-029,Status,select,In progress - awaiting escape wheel
+ntn-krasicki-029,Part on order,rich_text,Hand-forged escape wheel (Stefan Muller)
+ntn-krasicki-029,Job ID,rich_text,WH-2026-029
+ntn-krasicki-029,Deposit EUR,number,322.50
+ntn-comparables-log,Domain,select,Movement assessment
+ntn-radziwill-031,Job ID,rich_text,WH-2026-031

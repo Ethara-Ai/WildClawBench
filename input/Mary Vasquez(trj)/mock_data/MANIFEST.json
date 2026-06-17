@@ -1,0 +1,103 @@
+{
+  "task_id": "MARY_001_equity_midyear_board_package",
+  "generated_at_utc": "2026-06-11T11:16:20+00:00",
+  "services": [
+    "gmail-api",
+    "google-calendar-api",
+    "notion-api",
+    "airtable-api",
+    "asana-api",
+    "typeform-api",
+    "hubspot-api",
+    "figma-api",
+    "trello-api",
+    "slack-api",
+    "salesforce-api",
+    "confluence-api",
+    "monday-api"
+  ],
+  "files": {
+    "gmail-api": [
+      "Mock Data/gmail-api/profile.json",
+      "Mock Data/gmail-api/labels.csv",
+      "Mock Data/gmail-api/messages.csv",
+      "Mock Data/gmail-api/drafts.csv"
+    ],
+    "google-calendar-api": [
+      "Mock Data/google-calendar-api/calendars.csv",
+      "Mock Data/google-calendar-api/events.csv",
+      "Mock Data/google-calendar-api/event_attendees.csv"
+    ],
+    "notion-api": [
+      "Mock Data/notion-api/workspace.json",
+      "Mock Data/notion-api/users.csv",
+      "Mock Data/notion-api/pages.csv",
+      "Mock Data/notion-api/databases.csv",
+      "Mock Data/notion-api/blocks.csv",
+      "Mock Data/notion-api/page_properties.csv",
+      "Mock Data/notion-api/comments.csv"
+    ],
+    "airtable-api": [
+      "Mock Data/airtable-api/bases.csv",
+      "Mock Data/airtable-api/tables.csv",
+      "Mock Data/airtable-api/fields.csv",
+      "Mock Data/airtable-api/records_projects.csv"
+    ],
+    "asana-api": [
+      "Mock Data/asana-api/workspace.json",
+      "Mock Data/asana-api/users.csv",
+      "Mock Data/asana-api/projects.csv",
+      "Mock Data/asana-api/sections.csv",
+      "Mock Data/asana-api/tasks.csv"
+    ],
+    "typeform-api": [
+      "Mock Data/typeform-api/forms.csv",
+      "Mock Data/typeform-api/fields.csv",
+      "Mock Data/typeform-api/responses.csv",
+      "Mock Data/typeform-api/answers.csv"
+    ],
+    "hubspot-api": [
+      "Mock Data/hubspot-api/companies.csv",
+      "Mock Data/hubspot-api/contacts.csv",
+      "Mock Data/hubspot-api/deals.csv"
+    ],
+    "figma-api": [
+      "Mock Data/figma-api/projects.csv",
+      "Mock Data/figma-api/files.csv",
+      "Mock Data/figma-api/components.csv",
+      "Mock Data/figma-api/comments.csv",
+      "Mock Data/figma-api/team.json",
+      "Mock Data/figma-api/file_nodes.json"
+    ],
+    "trello-api": [
+      "Mock Data/trello-api/workspace.json",
+      "Mock Data/trello-api/boards.csv",
+      "Mock Data/trello-api/lists.csv",
+      "Mock Data/trello-api/cards.csv"
+    ],
+    "slack-api": [
+      "Mock Data/slack-api/workspace.json",
+      "Mock Data/slack-api/channels.csv",
+      "Mock Data/slack-api/messages.csv"
+    ],
+    "salesforce-api": [
+      "Mock Data/salesforce-api/config.json",
+      "Mock Data/salesforce-api/accounts.csv",
+      "Mock Data/salesforce-api/contacts.csv",
+      "Mock Data/salesforce-api/opportunities.csv"
+    ],
+    "confluence-api": [
+      "Mock Data/confluence-api/config.json",
+      "Mock Data/confluence-api/spaces.csv",
+      "Mock Data/confluence-api/pages.csv",
+      "Mock Data/confluence-api/content.csv"
+    ],
+    "monday-api": [
+      "Mock Data/monday-api/workspace.json",
+      "Mock Data/monday-api/boards.csv",
+      "Mock Data/monday-api/items.csv",
+      "Mock Data/monday-api/updates.csv"
+    ]
+  },
+  "skipped": {}
+}

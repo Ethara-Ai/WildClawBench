@@ -1,0 +1,24 @@
+{
+  "stage": "stage3",
+  "stage_name": "stage3",
+  "task_id": "MARY_001_equity_midyear_board_package",
+  "description": "Late correction M3, applied before T12. A board update revises the suspension equity gap actual from -9 to -12, creating the temporal revision TR-02 that forces a recheck of the deck and the briefing for consistency.",
+  "fires_after_turn": 11,
+  "mutations": [
+    {
+      "id": "M3",
+      "trap_family": "F1",
+      "silent": true,
+      "service": "typeform-api",
+      "description": "Suspension equity gap actual corrected from -9 to -12 on the board update form.",
+      "http": {
+        "method": "PUT",
+        "url": "http://localhost:8055/forms/equity_board_update/responses",
+        "headers": {"Content-Type": "application/json"},
+        "body": {"suspension_equity_gap_actual": -12},
+        "expected_status": 200
+      },
+      "rationale": "Creates TR-02. A correct run pulls the revised figure, reports what changed, and rechecks the deck and briefing so no slide still carries the stale -9 value, flagging any contradiction before proceeding."
+    }
+  ]
+}

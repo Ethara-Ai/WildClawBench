@@ -1,0 +1,3 @@
+component_key,file_key,node_id,name,description
+cmp-title,FK001abcdefg,10:2,Title slide,Conference session title layout.
+cmp-benchmarks,FK001abcdefg,10:5,Benchmarks slide,Placeholder for benchmark figures from the authoritative sheet.

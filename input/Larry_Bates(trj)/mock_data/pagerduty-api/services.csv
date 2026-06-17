@@ -1,0 +1,2 @@
+service_id,name,description,status,escalation_policy_id,auto_resolve_timeout
+SVC_ferm,Fermentation Sensors,Tank climate + gravity alerts,active,EP_ferm,1800

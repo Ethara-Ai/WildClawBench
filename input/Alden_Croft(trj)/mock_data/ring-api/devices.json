@@ -1,0 +1,44 @@
+{
+  "doorbots": [
+    {
+      "id": 700101,
+      "description": "Front Door",
+      "device_id": "doorbell_route1_front",
+      "address": "412 Route 1",
+      "kind": "lpd_v2",
+      "firmware_version": "3.22.8",
+      "battery_life": null,
+      "external_connection": true,
+      "latitude": 44.1037,
+      "longitude": -69.1089,
+      "location_id": "loc_croft_route1",
+      "time_zone": "America/New_York",
+      "alerts": {"connection": "online"},
+      "features": {
+        "motions_enabled": false,
+        "show_recordings": true,
+        "advanced_motion_enabled": false,
+        "people_only_enabled": false,
+        "shadow_correction_enabled": false,
+        "motion_message_enabled": false
+      },
+      "motion_snooze": null,
+      "ring_snooze": null,
+      "owned": true,
+      "owner": {"id": 700001, "first_name": "Alden", "last_name": "Croft"},
+      "led_status": "off",
+      "night_mode_status": "enabled",
+      "settings": {
+        "doorbell_volume": 5,
+        "chime_settings": {"type": "none", "enabled": false, "duration": 0},
+        "motion_detection_enabled": false,
+        "motion_sensitivity": 0,
+        "people_detection_enabled": false,
+        "package_detection_enabled": false
+      },
+      "created_at": "2025-01-18T11:00:00.000Z"
+    }
+  ],
+  "stickup_cams": [],
+  "chimes": []
+}

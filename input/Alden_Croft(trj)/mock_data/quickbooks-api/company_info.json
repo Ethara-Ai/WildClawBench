@@ -1,0 +1,31 @@
+{
+  "CompanyName": "Eileen C Lobstering",
+  "LegalName": "Alden R. Croft (Sole Proprietor)",
+  "CompanyAddr": {
+    "Line1": "412 Route 1",
+    "City": "Rockland",
+    "CountrySubDivisionCode": "ME",
+    "PostalCode": "04841"
+  },
+  "Email": {
+    "Address": "alden.croft.me@gmail.com"
+  },
+  "PrimaryPhone": {
+    "FreeFormNumber": "(207) 555-0157"
+  },
+  "FiscalYearStartMonth": "January",
+  "Country": "US",
+  "IndustryType": "Commercial Fishing",
+  "NameValue": [
+    { "Name": "OwnerName", "Value": "Alden Roy Croft" },
+    { "Name": "OperationType", "Value": "Sole Proprietorship" },
+    { "Name": "Vessel", "Value": "Eileen C - 38ft Downeast lobster boat, 2008 build, Cummins 6BTA" },
+    { "Name": "HomePort", "Value": "Rockland Harbor, ME" },
+    { "Name": "PrimaryBuyer", "Value": "Midcoast Seafood Co-op" },
+    { "Name": "LicenseClass", "Value": "Maine commercial lobster license, licensed zone" }
+  ],
+  "MetaData": {
+    "CreateTime": "2018-04-12T08:00:00-05:00",
+    "LastUpdatedTime": "2026-11-30T17:00:00-05:00"
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "stage": 4,
+  "fires_after_turn": 13,
+  "description": "T14 end-of-day verification trigger. Fires between T13 and T14 so the T14 Multi-Agent verification sweep has a fresh acknowledgement from Marv to reconcile against the settlement draft from T12, plus a calendar reminder for the Day-3 close-out call.",
+  "mutations": [
+    {
+      "mutation_id": "S3_marv_ack_email",
+      "service": "gmail-api",
+      "method": "POST",
+      "url": "{GMAIL_API_URL}/_seed/messages",
+      "headers": {"Content-Type": "application/json"},
+      "body": {
+        "inbox": "alden.croft.me@gmail.com",
+        "messages": [
+          {
+            "id": "msg_marv_ack",
+            "from": "marv.pelletier.me@gmail.com",
+            "to": "alden.croft.me@gmail.com",
+            "subject": "Re: December settlement",
+            "date": "2026-12-10T17:36:00-05:00",
+            "unread": true,
+            "body_excerpt": "Got the draft, no questions on the numbers. See you when the boat's back in. — Marv"
+          }
+        ]
+      },
+      "expected_status": 200,
+      "silent": false,
+      "fires_after_turn": 13
+    },
+    {
+      "mutation_id": "S3_calendar_close_out",
+      "service": "google-calendar-api",
+      "method": "POST",
+      "url": "{GCAL_API_URL}/_seed/events",
+      "headers": {"Content-Type": "application/json"},
+      "body": {
+        "calendar_id": "alden.croft.me@gmail.com",
+        "events": [
+          {
+            "id": "evt_haul_out_pickup_reminder",
+            "summary": "Eileen C — yard pickup window",
+            "start": "2026-12-12T08:00:00-05:00",
+            "end": "2026-12-12T11:00:00-05:00",
+            "location": "Rockland Marine Service Yard",
+            "description": "End of 3-day turnaround. Confirm yard before driving down."
+          }
+        ]
+      },
+      "expected_status": 200,
+      "silent": false,
+      "fires_after_turn": 13
+    }
+  ]
+}

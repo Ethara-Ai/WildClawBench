@@ -1,0 +1,3 @@
+id,summary,description,time_zone,access_role,primary,color_id
+larry.bates@Finthesiss.ai,Larry Bates,Bates Brewing — primary,America/New_York,owner,True,9
+brewhouse@Finthesiss.ai,Brewhouse Ops,Tank + crew schedule,America/New_York,writer,False,7

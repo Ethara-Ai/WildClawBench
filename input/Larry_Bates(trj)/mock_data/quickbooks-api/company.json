@@ -1,0 +1,43 @@
+{
+  "CompanyInfo": {
+    "CompanyName": "Bates Brewing Company",
+    "LegalName": "Bates Brewing Company LLC",
+    "CompanyAddr": {
+      "Line1": "142 Mill Stream Road, Asheville, NC 28801",
+      "City": "Asheville",
+      "CountrySubDivisionCode": "NC",
+      "PostalCode": "28801"
+    },
+    "Email": {
+      "Address": "larry.bates@Finthesiss.ai"
+    },
+    "PrimaryPhone": {
+      "FreeFormNumber": ""
+    },
+    "FiscalYearStartMonth": "January",
+    "Country": "US",
+    "IndustryType": "Food & Beverage",
+    "NameValue": [
+      {
+        "Name": "TaxId",
+        "Value": "EIN 56-1290118"
+      },
+      {
+        "Name": "BookKeeperEmail",
+        "Value": "bookkeeper@harrisaccounting-nc.com"
+      },
+      {
+        "Name": "AccountantContact",
+        "Value": "Marcia Harris, CPA - (828) 555-3309"
+      },
+      {
+        "Name": "DefaultCurrency",
+        "Value": "USD"
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "",
+      "LastUpdatedTime": ""
+    }
+  }
+}

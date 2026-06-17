@@ -1,0 +1,11 @@
+album_id,name,artist_id,album_type,release_date,total_tracks,label
+alb_cosmos_factory_01,Cosmo's Factory,art_ccr_0001,album,1970-07-16,11,Fantasy
+alb_chronicle_ccr_02,Chronicle: 20 Greatest Hits,art_ccr_0001,compilation,1976-01-01,20,Fantasy
+alb_born_to_run_03,Born to Run,art_springsteen_0002,album,1975-08-25,8,Columbia
+alb_the_river_04,The River,art_springsteen_0002,album,1980-10-17,20,Columbia
+alb_damn_torpedoes_05,Damn the Torpedoes,art_petty_0003,album,1979-10-19,9,Backstreet
+alb_full_moon_fever_06,Full Moon Fever,art_petty_0003,album,1989-04-24,12,MCA
+alb_night_moves_07,Night Moves,art_seger_0004,album,1976-10-22,9,Capitol
+alb_pronounced_skynyrd_08,Pronounced Leh-nerd Skin-nerd,art_skynyrd_0005,album,1973-08-13,8,MCA
+alb_at_folsom_09,At Folsom Prison,art_cash_0006,album,1968-05-01,19,Columbia
+alb_red_headed_stranger_10,Red Headed Stranger,art_nelson_0007,album,1975-05-01,15,Columbia

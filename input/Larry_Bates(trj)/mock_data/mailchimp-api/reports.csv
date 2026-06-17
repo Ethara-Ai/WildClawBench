@@ -1,0 +1,2 @@
+campaign_id,emails_sent,opens_total,unique_opens,open_rate,clicks_total,unique_clicks,click_rate,unsubscribed,bounces
+mc_01,820,410,380,0.46,120,100,0.15,3,2

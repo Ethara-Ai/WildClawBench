@@ -1,0 +1,29 @@
+Rockland Marine Service Yard
+123 Tillson Ave, Rockland, ME 04841
+
+WORK ORDER — Eileen C
+Work Order: WO-26-1149
+Customer: Alden R. Croft
+Vessel: F/V Eileen C (38' Downeast, fiberglass, 2008)
+Engine: Cummins 6BTA-5.9
+Service: Annual haul-out + Cummins 6BTA overheat diagnostic
+Issued: 12/05/2026
+Issued by: D. Lemieux, Service Writer
+
+Scheduling:
+  Haul-out date:  Wednesday, December 9, 2026
+  Check-in time:  8:00 AM ET
+  Slip:           4B
+  Turnaround:     3 days (pickup window Friday, 12/12, 8:00–11:00 AM)
+
+Scope of work:
+  - Haul-out, block-and-jack
+  - Bottom wash + zinc inspection
+  - Cummins 6BTA cooling-system diagnostic (overheating, intermittent)
+  - Parts as required (allowance line in estimate)
+
+Estimate on file: $2,180.00 (revised 11/30/2026)
+
+Notes:
+  - Final invoice may vary based on parts and labor at diagnostic.
+  - Customer to confirm any check-in time change by 6:00 AM day of.

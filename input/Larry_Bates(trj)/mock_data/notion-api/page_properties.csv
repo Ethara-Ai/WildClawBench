@@ -1,0 +1,9 @@
+page_id,property_name,property_type,value
+pg_stout,Batch ID,rich_text,BBC-2026-007
+pg_stout,ABV,number,8.4
+pg_stout,IBU,number,62
+pg_stout,Status,select,Conditioning
+pg_farmhouse,Batch ID,rich_text,BBC-2026-012
+pg_farmhouse,ABV,number,6.2
+pg_barley,Supplier,rich_text,Dave Caldwell
+pg_barley,Projected bushels,number,7200

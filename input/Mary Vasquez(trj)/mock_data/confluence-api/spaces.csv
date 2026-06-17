@@ -1,0 +1,5 @@
+id,key,name,type,status,description
+sp_policy,POLICY,Board Policies and Procedures,global,current,Official Maplewood School Board policy repository maintained by the superintendent's office
+sp_hr,HR,Human Resources,global,current,HR policies and staff handbook for all Maplewood board employees
+sp_curric,CURRIC,Curriculum and Instruction,global,current,Curriculum frameworks and instructional guidelines for Maplewood schools
+sp_facilities,FAC,Facilities and Operations,global,current,Building operations and maintenance procedures for board properties

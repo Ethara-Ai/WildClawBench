@@ -1,0 +1,11 @@
+id,name,id_board,pos,closed
+lst_tap_inbox,Inbox,brd_tap_ops,1024,false
+lst_tap_week,This week,brd_tap_ops,2048,false
+lst_tap_doing,Doing,brd_tap_ops,3072,false
+lst_tap_done,Done,brd_tap_ops,4096,false
+lst_evt_idea,Idea pool,brd_events,1024,false
+lst_evt_plan,Planning,brd_events,2048,false
+lst_evt_live,Live,brd_events,3072,false
+lst_personal_inbox,Inbox,brd_personal,1024,false
+lst_personal_doing,Doing,brd_personal,2048,false
+lst_personal_done,Done,brd_personal,4096,false

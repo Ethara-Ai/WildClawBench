@@ -1,0 +1,8 @@
+employee_id,name,role,department,salary_cad,years_experience,demographic_group,pay_equity_flag
+E-401,Janet Kim,Teacher,English,78500,12,East Asian,None
+E-402,David Osei,Teacher,Math,72100,8,Black,Under-review
+E-403,Maria Santos,Teacher,Science,81200,15,Latinx,None
+E-404,Robert Fraser,VP,Administration,98700,20,White,None
+E-405,Aisha Mohammed,Teacher,Social Studies,69800,5,Black,Flagged
+E-406,Chen Wei,Teacher,Arts,74300,10,East Asian,None
+E-407,Sarah Blackwood,Counselor,Student Services,76900,11,Indigenous,Under-review

@@ -1,0 +1,6 @@
+id,createdTime,BatchID,Name,ABV,IBU,Status,Tank
+recBBC007,2026-02-10T08:00:00.000Z,BBC-2026-007,Imperial Stout (flagship),8.6,62,Conditioning,FV-3
+recBBC012,2026-03-01T08:00:00.000Z,BBC-2026-012,Farmhouse Ale,6.2,24,Packaged,FV-7
+recBBC004,2026-02-05T08:00:00.000Z,BBC-2026-004,Pale Ale,5.4,38,Packaged,FV-1
+recBBC009,2026-02-20T08:00:00.000Z,BBC-2026-009,Hazy IPA,6.8,45,Conditioning,FV-5
+recBBC011,2026-02-28T08:00:00.000Z,BBC-2026-011,Amber Lager,5.0,22,Packaged,FV-2

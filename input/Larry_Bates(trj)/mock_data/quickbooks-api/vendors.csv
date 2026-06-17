@@ -1,0 +1,8 @@
+Id,DisplayName,CompanyName,PrimaryEmailAddr,PrimaryPhone,BillAddr_Line1,BillAddr_City,BillAddr_CountrySubDivisionCode,BillAddr_PostalCode,Balance,Active,AcctNum,Vendor1099
+1,Mountain Industrial Gases,Mountain Industrial Gases,billing@mountainindgas.com,(828) 555-7060,,,,,624.0,true,,false
+2,Carolina Refrigeration Services,Carolina Refrigeration Services,ar@carolinarefrig.com,(828) 555-9013,,,,,1219.48,true,,false
+3,Mountain Workwear Co.,Mountain Workwear Co.,orders@mountainworkwear.com,(828) 555-2418,,,,,1348.0,true,,false
+4,Pinnacle Mutual Insurance Group,Pinnacle Mutual Insurance Group,billing@pinnaclemutual.com,(828) 555-1844,,,,,0.0,true,,false
+5,Asheville Glass Supply,Asheville Glass Supply,ar@ashevilleglass.com,(828) 555-7311,,,,,412.0,true,,false
+6,Carolina Asphalt LLC,Carolina Asphalt LLC,estimates@carolinaasphalt.com,(828) 555-8881,,,,,0.0,true,,false
+7,"TapTech Solutions, Inc.","TapTech Solutions, Inc.",billing@taptechsolutions.com,(828) 555-2266,,,,,0.0,true,,false

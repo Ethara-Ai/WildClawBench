@@ -1,0 +1,5 @@
+id,summary,description,time_zone,access_role,primary,color_id
+alden.croft.me@gmail.com,Alden Croft,Primary calendar,America/New_York,owner,True,9
+cal_alden_boat,Boat / Yard,"Eileen C maintenance, haul-out, season prep",America/New_York,owner,False,11
+cal_alden_health,Health,"Doctor visits, refills, phlebotomy",America/New_York,owner,False,5
+cal_alden_family,Family,"Kara visits, Eddie coffee, birthdays",America/New_York,owner,False,10

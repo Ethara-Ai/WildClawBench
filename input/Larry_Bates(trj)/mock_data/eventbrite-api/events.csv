@@ -1,0 +1,6 @@
+id,organization_id,name,summary,status,start_utc,end_utc,timezone,venue_id,capacity,is_free,online_event,url,created
+evb_3301,org_8842116,October Brewhouse Tour + Tasting,,live,2026-10-04T15:00:00,2026-10-04T16:30:00,America/New_York,Bates Brewing Tap Room,16,false,false,,
+evb_3302,org_8842116,October Brewhouse Tour + Tasting,,live,2026-10-18T15:00:00,2026-10-18T16:30:00,America/New_York,Bates Brewing Tap Room,16,false,false,,
+evb_3303,org_8842116,Sourdough + Stout Pairing (with Pie Society),,live,2026-11-08T18:00:00,2026-11-08T20:30:00,America/New_York,Bates Brewing Tap Room,24,false,false,,
+evb_3304,org_8842116,Winter Beer Release - members only,,live,2026-11-22T16:00:00,2026-11-22T19:00:00,America/New_York,Bates Brewing Tap Room,60,false,false,,
+evb_3305,org_8842116,Holiday Beer & Cheese (with Looking Glass Creamery),,live,2026-12-13T17:00:00,2026-12-13T19:30:00,America/New_York,Bates Brewing Tap Room,24,false,false,,

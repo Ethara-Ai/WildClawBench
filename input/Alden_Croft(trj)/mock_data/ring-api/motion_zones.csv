@@ -1,0 +1,3 @@
+device_id,zone_id,zone_name,sensitivity,enabled,coordinates
+700101,zone_aldn_001,Porch Approach,0,false,"0.0,0.2,1.0,0.9"
+700101,zone_aldn_002,Driveway Edge,0,false,"0.0,0.4,1.0,0.9"

@@ -1,0 +1,12 @@
+tableId,id,name,type
+tblBatches,fldBatchId,BatchID,singleLineText
+tblBatches,fldName,Name,singleLineText
+tblBatches,fldABV,ABV,number
+tblBatches,fldIBU,IBU,number
+tblBatches,fldStatus,Status,singleSelect
+tblBatches,fldTank,Tank,singleLineText
+tblTanks,fldTankId,TankID,singleLineText
+tblTanks,fldTemp,TempF,number
+tblIngredients,fldIngId,IngredientID,singleLineText
+tblIngredients,fldSupplier,Supplier,singleLineText
+tblIngredients,fldBushels,Bushels,number

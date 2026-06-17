@@ -1,0 +1,4 @@
+baseId,id,name,primaryFieldId,records_csv
+appBatesBrew2026,tblBatches,Batches,fldBatchId,records_batches.csv
+appBatesBrew2026,tblTanks,Tanks,fldTankId,records_tanks.csv
+appBatesBrew2026,tblIngredients,Ingredients,fldIngId,records_ingredients.csv

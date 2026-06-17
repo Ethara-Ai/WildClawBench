@@ -1,0 +1,5 @@
+field_id,form_id,title,field_type,ref,required,choices,order
+fld-board-gap,equity_board_update,"Suspension equity gap (actual, percentage points)",number,suspension_equity_gap_actual,True,,1
+fld-board-crp,equity_board_update,CRP training completion (actual percent),number,crp_training_completion_actual,True,,2
+fld-sv-belonging,student_voice_survey,I feel I belong at this school,opinion_scale,belonging,True,1|2|3|4|5,1
+fld-sv-comment,student_voice_survey,What would make school more equitable?,long_text,comment,False,,2

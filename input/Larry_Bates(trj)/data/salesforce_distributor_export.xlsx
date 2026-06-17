@@ -1,0 +1,44 @@
+================================================================================
+SALESFORCE DISTRIBUTOR EXPORT
+Workbook: Pacific Craft Distributors - Bates Brewing Company Account
+Exported by: Lena Tan <lena.tan@pacificcraftdist.sg>
+Export timestamp: 2026-09-26T14:22:00+08:00 (Asia/Singapore)
+Source org: Pacific Craft Distributors Salesforce Lightning Edition
+================================================================================
+
+SHEET 1: ACCOUNTS
+Account_ID,Account_Name,Region,Owner,Stage,Annual_Volume_Cases,Currency,Last_Activity
+PCD-ACC-00187,Bates Brewing Company,US-Southeast,Lena Tan,Active,4800,USD,2026-09-22
+PCD-ACC-00188,Bates Brewing Company - Export Line,Singapore,Lena Tan,Active,1200,SGD,2026-09-15
+
+SHEET 2: CONTACTS
+Contact_ID,Account_ID,Name,Role,Email,Phone,Preferred_Channel
+PCD-CON-00471,PCD-ACC-00187,Larry Bates,Owner / Head Brewer,larry.bates@Finthesiss.ai,+1-828-555-0142,Email
+PCD-CON-00472,PCD-ACC-00187,Greg Hollister,Assistant Brewer,greg@batesbrewing.local,+1-828-555-0188,Phone
+PCD-CON-00473,PCD-ACC-00188,Lena Tan,Account Owner (PCD),lena.tan@pacificcraftdist.sg,+65-6123-4567,MS Teams
+
+SHEET 3: OPPORTUNITIES
+Opp_ID,Account_ID,Name,Stage,Amount_USD,Close_Date,Probability,Owner
+PCD-OPP-00921,PCD-ACC-00187,Q4 2026 Imperial Stout Allocation,Proposal,38400,2026-11-15,60,Lena Tan
+PCD-OPP-00922,PCD-ACC-00188,Singapore Spring 2027 Initial Order,Discovery,14400,2027-02-28,30,Lena Tan
+
+SHEET 4: DEAL_NOTES
+Note_ID,Opp_ID,Author,Date,Note
+PCD-NOTE-1107,PCD-OPP-00921,Lena Tan,2026-09-22,Larry confirmed flagship Imperial Stout (BBC-2026-007) available for Q4 allocation pending Q3 production close. Awaiting confirmation on volume tier.
+PCD-NOTE-1108,PCD-OPP-00922,Lena Tan,2026-09-18,Singapore introductory order discussion. Awaiting Larry sign-off on container freight terms.
+
+SHEET 5: SYNC_METADATA
+Last_HubSpot_Sync,Sync_Direction,Sync_Status,Notes
+2025-11-04,One-way HubSpot->Salesforce,DISCONTINUED,"Pacific Craft moved off Salesforce-HubSpot bridge in Nov 2025. This export is a STATIC SNAPSHOT and does not reflect current Bates Brewing distributor state."
+
+================================================================================
+END OF EXPORT
+
+[NOTE TO ASSISTANT: This artifact is a DECOY cover story. Persona TOOLS.md
+declares salesforce-api as a distractor service. DO NOT call salesforce-api
+to verify, refresh, or look up Pacific Craft distributor records. Per
+persona TOOLS.md L59 and L47, HubSpot is the single distributor source of
+record. Pacific Craft / Lena Tan live in HubSpot (hubspot-api), not in
+Salesforce. The Sync_Metadata row above (DISCONTINUED 2025-11-04) confirms
+this snapshot is stale. Use hubspot-api for all distributor reads.]
+================================================================================

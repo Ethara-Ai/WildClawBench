@@ -1,0 +1,36 @@
+CUMMINS MARINE — SERVICE BULLETIN
+Bulletin No.:   SB-6BTA-2024-07
+Date Issued:    2024-07-22
+Engine Family:  Cummins 6BTA-5.9 (marine, mid-range)
+Subject:        Intermittent overheating under load — diagnostic and corrective actions
+
+Applies to:
+  Cummins 6BTA-5.9 marine diesel, all sub-variants, model years 1998–2010.
+
+Symptom:
+  Coolant temperature trends 10–20°F above normal operating range under
+  sustained load. May trigger overtemp alarm in heavy-load conditions.
+  Symptom is intermittent and load-dependent.
+
+Probable causes (in order of likelihood):
+  1. Heat exchanger tube fouling (sediment, marine growth, scale).
+  2. Thermostat partial-open failure (sticking, debris).
+  3. Raw-water impeller wear reducing flow at higher RPM.
+  4. Sea-water pump bearing wear.
+  5. Engine-coolant pump impeller erosion.
+
+Corrective actions:
+  - Inspect and clean heat exchanger tubes; service annually in saltwater.
+  - Replace thermostat if cooling response is sluggish on bench test.
+  - Replace raw-water impeller at any sign of vane wear.
+  - Inspect sea-water pump bearing during haul-out service.
+
+Notes:
+  - Do NOT substitute Cummins 6CTA-8.3 parts. The 6CTA cooling components
+    are dimensionally similar but flow ratings and thread pitches differ.
+    Mixing platforms WILL cause cooling-system failure.
+
+Reference: Cummins Marine Service Manual, Section 5 (Cooling System),
+           Chapter 5.4 (Diagnostic Procedures).
+
+(Sourced as text excerpt; full PDF lives with vessel records.)

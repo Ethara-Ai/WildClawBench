@@ -1,0 +1,9 @@
+id,dealname,pipeline,dealstage,amount,closedate,dealtype,associated_company,associated_contact,createdate,lastmodifieddate
+401,Maplewood Public Library equity partnership,community_partnerships,closedwon,0,2026-09-01T00:00:00Z,newbusiness,301,,2026-08-16T09:00:00Z,2026-10-10T09:00:00Z
+402,Riverside Community Centre equity partnership,community_partnerships,closedwon,0,2026-09-01T00:00:00Z,newbusiness,302,,2026-08-16T09:00:00Z,2026-10-10T09:00:00Z
+403,Newcomer Youth Alliance equity partnership,community_partnerships,closedwon,0,2026-09-01T00:00:00Z,newbusiness,303,,2026-08-16T09:00:00Z,2026-10-10T09:00:00Z
+404,Indigenous Education Circle equity partnership,community_partnerships,closedwon,0,2026-09-01T00:00:00Z,newbusiness,304,,2026-08-16T09:00:00Z,2026-10-10T09:00:00Z
+405,Local Mentorship Network equity partnership,community_partnerships,closedwon,0,2026-09-01T00:00:00Z,newbusiness,305,,2026-08-16T09:00:00Z,2026-10-10T09:00:00Z
+406,Parents for Equity Coalition equity partnership,community_partnerships,closedwon,0,2026-09-01T00:00:00Z,newbusiness,306,,2026-08-16T09:00:00Z,2026-10-10T09:00:00Z
+407,Regional Arts Collective equity partnership,community_partnerships,qualifiedtobuy,0,,newbusiness,307,,2026-08-16T09:00:00Z,2026-10-10T09:00:00Z
+408,STEM Access Foundation equity partnership,community_partnerships,qualifiedtobuy,0,,newbusiness,308,,2026-08-16T09:00:00Z,2026-10-10T09:00:00Z

@@ -1,0 +1,6 @@
+id,createdTime,Name,Status,Owner,Budget
+crp_training_completion,2026-08-20T08:00:00.000Z,CRP training completion,"actual 58 of target 80 percent. Authoritative source equity_plan_year2_benchmarks.xlsx. Training kickoff October 23, 2026; do not use dashboard estimate.",Mary Vasquez,58
+representation,2026-08-20T08:00:00.000Z,Staff representation,actual 43 of target 40 percent. Authoritative source equity_plan_year2_benchmarks.xlsx. Above target.,Mary Vasquez,43
+suspension_equity_gap,2026-08-20T08:00:00.000Z,Suspension equity gap,actual -9 of target -20 percentage points. Authoritative source equity_plan_year2_benchmarks.xlsx. Gap measured in percentage points; closer to zero is better.,Mary Vasquez,-9
+council_seats,2026-08-20T08:00:00.000Z,Equity council seats filled,actual 10 of target 12 seats. Authoritative source equity_plan_year2_benchmarks.xlsx.,Mary Vasquez,10
+partnerships,2026-08-20T08:00:00.000Z,Community partnerships active,actual 6 of target 8 partnerships. Authoritative source equity_plan_year2_benchmarks.xlsx.,Mary Vasquez,6

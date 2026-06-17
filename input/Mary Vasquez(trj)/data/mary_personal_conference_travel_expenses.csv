@@ -1,0 +1,9 @@
+date,item,amount_cad,reimbursable,notes
+2026-10-21,Hotel - downtown Toronto,189.00,Yes,Conference eve stay
+2026-10-21,Dinner with Patricia,67.50,No,Personal
+2026-10-22,Parking - convention centre,35.00,Yes,Conference day
+2026-10-22,Coffee and snacks,12.75,No,Personal
+2026-10-22,Taxi to venue,22.00,Yes,Receipt attached
+2026-10-22,Lunch at conference,18.50,No,Cash
+2026-10-23,Eduardo school pickup gas,15.00,No,Personal - drove son to school
+TOTAL,,359.75,,Reimbursable: 246.00

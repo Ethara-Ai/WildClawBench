@@ -1,0 +1,4 @@
+pipeline_id,pipeline_label,stage_id,stage_label,display_order,probability,closed
+default,Sales Pipeline,appointmentscheduled,Appointment Scheduled,1,0.2,False
+default,Sales Pipeline,contractsent,Contract Sent,2,0.8,False
+default,Sales Pipeline,closedwon,Closed Won,3,1.0,True

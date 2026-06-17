@@ -1,0 +1,6 @@
+id,name,is_private,is_archived,topic,purpose,creator,created,num_members
+C_GENERAL,general,false,false,Ontario Principals Leadership Cohort,General discussion for cohort members,U_MVASQUEZ,1756717200,42
+C_EQUITY_CHAT,equity-chat,false,false,Equity and inclusion practitioner thread,Share resources and challenges on equity implementation across Ontario districts,U_MVASQUEZ,1757926800,28
+C_BOOK_CLUB,book-club,false,false,Current read: Leading for Change by Torres,Monthly leadership book discussion,U_MVASQUEZ,1759309200,19
+C_CONFERENCE,conference-2026,false,false,Maplewood Educational Leadership Conference Oct 2026,Conference logistics and session sharing for presenters and attendees,U_MVASQUEZ,1780304400,35
+C_MENTORSHIP,mentorship-corner,false,false,Mentoring early-career leaders,Tips and resources for principal mentorship programs,U_MVASQUEZ,1761987600,22

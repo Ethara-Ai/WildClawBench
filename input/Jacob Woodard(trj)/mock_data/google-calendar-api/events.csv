@@ -1,0 +1,4 @@
+id,calendar_id,summary,description,location,start,end,all_day,status,creator,organizer,recurrence,visibility
+gcal-krasicki-delivery,primary,Krasicki escape wheel delivery - Stefan Muller,"Critical delivery - hand-forged escape wheel, WH-2026-029. Rescheduled.",Workshop,2026-10-26,2026-10-26,true,confirmed,jacob.woodard@Finthesiss.ai,jacob.woodard@Finthesiss.ai,,default
+gcal-guild-quarterly,primary,Guild quarterly meeting (presenting on Polish escapements),Polish horologists guild quarterly. Jacob presenting.,Florianska,2026-10-21T18:30:00+02:00,2026-10-21T20:00:00+02:00,false,confirmed,jacob.woodard@Finthesiss.ai,jacob.woodard@Finthesiss.ai,,default
+gcal-radziwill-review,primary,Radziwill pocket watch progress review - Prof Mitchell,With Jagiellonian curator.,Jagiellonian U,2026-11-14,2026-11-14,true,confirmed,jacob.woodard@Finthesiss.ai,jacob.woodard@Finthesiss.ai,,default

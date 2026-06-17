@@ -1,0 +1,6 @@
+Id,Name,AccountId,StageName,Amount,Probability,CloseDate,Type
+006O001,Board-wide STEM Equipment Refresh,001A007,Prospecting,245000,10,2027-03-01,Procurement
+006O002,Lakeshore U Practicum Placement Expansion,001A003,Closed Won,0,100,2026-09-01,Partnership
+006O003,Union Collaboration on PD Framework,001A004,Negotiation,0,75,2027-01-15,Collaboration
+006O004,Ministry Equity Pilot Funding Application,001A002,Qualification,75000,25,2027-06-01,Grant
+006O005,Scarborough Newcomer Family Liaison Program,001A006,Closed Won,0,100,2026-08-15,Partnership

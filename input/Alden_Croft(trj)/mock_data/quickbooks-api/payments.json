@@ -1,0 +1,87 @@
+[
+  {
+    "Id": "4001",
+    "TxnDate": "2026-10-06",
+    "CustomerRef": { "value": "1", "name": "Midcoast Seafood Co-op" },
+    "TotalAmt": 3212.50,
+    "Line": [
+      {
+        "Amount": 3212.50,
+        "LinkedTxn": [{ "TxnId": "5001", "TxnType": "Invoice" }]
+      }
+    ],
+    "PaymentMethodRef": { "value": "1", "name": "ACH Direct Deposit" },
+    "DepositToAccountRef": { "value": "1", "name": "Operating Checking" },
+    "PrivateNote": "Co-op weekly settlement ACH deposit - week ending 2026-10-04",
+    "MetaData": { "CreateTime": "2026-10-06T14:00:00-04:00", "LastUpdatedTime": "2026-10-06T14:00:00-04:00" },
+    "SyncToken": "0"
+  },
+  {
+    "Id": "4002",
+    "TxnDate": "2026-10-13",
+    "CustomerRef": { "value": "1", "name": "Midcoast Seafood Co-op" },
+    "TotalAmt": 2966.75,
+    "Line": [
+      {
+        "Amount": 2966.75,
+        "LinkedTxn": [{ "TxnId": "5002", "TxnType": "Invoice" }]
+      }
+    ],
+    "PaymentMethodRef": { "value": "1", "name": "ACH Direct Deposit" },
+    "DepositToAccountRef": { "value": "1", "name": "Operating Checking" },
+    "PrivateNote": "Co-op weekly settlement ACH deposit - week ending 2026-10-11",
+    "MetaData": { "CreateTime": "2026-10-13T14:00:00-04:00", "LastUpdatedTime": "2026-10-13T14:00:00-04:00" },
+    "SyncToken": "0"
+  },
+  {
+    "Id": "4003",
+    "TxnDate": "2026-10-20",
+    "CustomerRef": { "value": "1", "name": "Midcoast Seafood Co-op" },
+    "TotalAmt": 2797.00,
+    "Line": [
+      {
+        "Amount": 2797.00,
+        "LinkedTxn": [{ "TxnId": "5003", "TxnType": "Invoice" }]
+      }
+    ],
+    "PaymentMethodRef": { "value": "1", "name": "ACH Direct Deposit" },
+    "DepositToAccountRef": { "value": "1", "name": "Operating Checking" },
+    "PrivateNote": "Co-op weekly settlement ACH deposit - week ending 2026-10-18",
+    "MetaData": { "CreateTime": "2026-10-20T14:00:00-04:00", "LastUpdatedTime": "2026-10-20T14:00:00-04:00" },
+    "SyncToken": "0"
+  },
+  {
+    "Id": "4004",
+    "TxnDate": "2026-10-27",
+    "CustomerRef": { "value": "1", "name": "Midcoast Seafood Co-op" },
+    "TotalAmt": 2586.20,
+    "Line": [
+      {
+        "Amount": 2586.20,
+        "LinkedTxn": [{ "TxnId": "5004", "TxnType": "Invoice" }]
+      }
+    ],
+    "PaymentMethodRef": { "value": "1", "name": "ACH Direct Deposit" },
+    "DepositToAccountRef": { "value": "1", "name": "Operating Checking" },
+    "PrivateNote": "Co-op weekly settlement ACH deposit - week ending 2026-10-25",
+    "MetaData": { "CreateTime": "2026-10-27T14:00:00-04:00", "LastUpdatedTime": "2026-10-27T14:00:00-04:00" },
+    "SyncToken": "0"
+  },
+  {
+    "Id": "4005",
+    "TxnDate": "2026-11-03",
+    "CustomerRef": { "value": "1", "name": "Midcoast Seafood Co-op" },
+    "TotalAmt": 2110.80,
+    "Line": [
+      {
+        "Amount": 2110.80,
+        "LinkedTxn": [{ "TxnId": "5005", "TxnType": "Invoice" }]
+      }
+    ],
+    "PaymentMethodRef": { "value": "1", "name": "ACH Direct Deposit" },
+    "DepositToAccountRef": { "value": "1", "name": "Operating Checking" },
+    "PrivateNote": "Co-op weekly settlement ACH deposit - week ending 2026-11-01 (season tapering)",
+    "MetaData": { "CreateTime": "2026-11-03T14:00:00-05:00", "LastUpdatedTime": "2026-11-03T14:00:00-05:00" },
+    "SyncToken": "0"
+  }
+]

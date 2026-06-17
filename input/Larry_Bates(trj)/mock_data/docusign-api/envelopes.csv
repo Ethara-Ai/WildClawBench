@@ -1,0 +1,2 @@
+envelope_id,status,email_subject,sender_name,sender_email,created_time,sent_time,completed_time,template_id
+de_01,completed,Blue Ridge Distribution — 2026 Agreement,Larry Bates,larry.bates@Finthesiss.ai,2026-01-10T00:00:00Z,2026-01-10T01:00:00Z,2026-01-12T00:00:00Z,dt_01

@@ -1,0 +1,10 @@
+{
+  "sid": "AC_bates",
+  "friendly_name": "Bates Brewing Fermentation Alerts",
+  "type": "Full",
+  "status": "active",
+  "auth_token": "REDACTED",
+  "owner_account_sid": "AC_bates",
+  "date_created": "Thu, 15 Jan 2024 10:00:00 +0000",
+  "date_updated": "Wed, 30 Sep 2026 06:00:00 +0000"
+}

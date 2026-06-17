@@ -1,0 +1,4 @@
+id,title,parent_page_id,created_time,last_edited_time,created_by,icon,archived
+db_journal,Brewing Journal,pg_root,2024-01-01T00:00:00Z,2026-10-01T10:00:00Z,usr_larry,📓,False
+db_batches,2026 Batch Log,pg_root,2024-01-01T00:00:00Z,2026-10-01T10:00:00Z,usr_larry,🍺,False
+db_supply,Ingredient Supply,pg_root,2024-01-01T00:00:00Z,2026-09-30T10:00:00Z,usr_larry,🌾,False

@@ -1,0 +1,3 @@
+id,name,is_private,is_archived,topic,purpose,creator,created,num_members
+C_brewhouse,brewhouse,False,False,Brewhouse floor,Daily brew ops,U_larry,1700000000,3
+C_gabf,gabf-2026,False,False,GABF submission,Competition prep,U_larry,1709000000,2

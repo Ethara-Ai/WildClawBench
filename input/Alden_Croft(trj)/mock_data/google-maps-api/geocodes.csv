@@ -1,0 +1,11 @@
+query,formatted_address,lat,lng,place_id,location_type
+rockland me,"Rockland, ME 04841, USA",44.1037,-69.1086,ChIJgeo_alden_001,APPROXIMATE
+rockport me,"Rockport, ME 04856, USA",44.1656,-69.0838,ChIJgeo_alden_002,APPROXIMATE
+thomaston me,"Thomaston, ME 04861, USA",44.0731,-69.1809,ChIJgeo_alden_003,APPROXIMATE
+camden me,"Camden, ME 04843, USA",44.2098,-69.0648,ChIJgeo_alden_004,APPROXIMATE
+belfast me,"Belfast, ME 04915, USA",44.4259,-69.0067,ChIJgeo_alden_005,APPROXIMATE
+portland me,"Portland, ME 04101, USA",43.6591,-70.2568,ChIJgeo_alden_006,APPROXIMATE
+penobscot bay,"Penobscot Bay, ME, USA",44.1167,-68.9167,ChIJgeo_alden_007,APPROXIMATE
+rockland marine service yard,"395 Atlantic Hwy, Rockland, ME 04841, USA",44.0945,-69.1115,ChIJgeo_alden_008,ROOFTOP
+penobscot bay medical center,"6 Glen Cove Dr, Rockport, ME 04856, USA",44.1644,-69.0876,ChIJgeo_alden_009,ROOFTOP
+hamilton marine rockland,"100 Park Dr, Rockland, ME 04841, USA",44.098,-69.1198,ChIJgeo_alden_010,ROOFTOP

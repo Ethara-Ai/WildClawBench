@@ -1,0 +1,9 @@
+id,name,type,messages_total,messages_unread,threads_total,threads_unread
+INBOX,INBOX,system,4,2,4,2
+SENT,SENT,system,0,0,0,0
+DRAFT,DRAFT,system,0,0,0,0
+STARRED,STARRED,system,1,0,1,0
+UNREAD,UNREAD,system,2,2,2,2
+IMPORTANT,IMPORTANT,system,1,1,1,1
+TRASH,TRASH,system,0,0,0,0
+Label_EquityYear2,Equity Plan Year 2,user,3,2,3,2

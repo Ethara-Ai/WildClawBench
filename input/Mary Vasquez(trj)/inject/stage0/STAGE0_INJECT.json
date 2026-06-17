@@ -1,0 +1,45 @@
+{
+  "stage": 0,
+  "stage_name": "stage0",
+  "task_id": "MARY_001_equity_midyear_board_package",
+  "description": "Seed anchor plus baseline world record. The canonical pre-T0 baseline is held by the mock_data/ overlays that are bind-mounted into each mock service, so the harness does NOT replay this loud seed (see eval/run_batch.py: the mock_data overlays already hold the canonical pre-T0 baseline, so the stage0 loud seed is not replayed; only the silent mutations fire). These ops are retained as a documentation record of the intended starting state, where the authoritative CRP training completion reads 58 percent, the conference session is at 10:30 AM before the temporal revision, the student voice survey shows 214 responses, the check in thread with p.hernandez exists, and the conference deck is a comment only file authored by a colleague.",
+  "fires_after_turn": 0,
+  "mutations": [
+    {
+      "id": "B1",
+      "service": "asana-api",
+      "description": "Baseline milestone tracker tasks. Mirrors mock_data/asana-api.",
+      "method": "POST",
+      "url": "http://localhost:8031/api/1.0/tasks",
+      "body": {"data": [{"name": "Student voice council", "completed": false, "notes": "10 of 12 seats"}, {"name": "Community partnerships", "completed": false, "notes": "6 active"}]},
+      "expected_status": 201
+    },
+    {
+      "id": "B2",
+      "service": "typeform-api",
+      "description": "Baseline student voice survey. Mirrors mock_data/typeform-api.",
+      "method": "POST",
+      "url": "http://localhost:8055/forms",
+      "body": {"forms": [{"id": "equity_student_voice", "title": "Student voice survey", "responses": 214}]},
+      "expected_status": 200
+    },
+    {
+      "id": "B3",
+      "service": "gmail-api",
+      "description": "Baseline check in thread with the parent council liaison. Mirrors mock_data/gmail-api.",
+      "method": "POST",
+      "url": "http://localhost:8017/gmail/v1/users/me/messages",
+      "body": {"threads": [{"with": "p.hernandez@maplewoodschoolboard.ca", "subject": "Equity Year 2 check in", "snippet": "Looking forward to the mid year briefing draft."}]},
+      "expected_status": 200
+    },
+    {
+      "id": "B4",
+      "service": "figma-api",
+      "description": "Baseline conference deck file owned by a colleague, comment only access. Mirrors mock_data/figma-api.",
+      "method": "POST",
+      "url": "http://localhost:8079/v1/files",
+      "body": {"name": "Leading for Equity conference deck", "owner": "colleague", "access": "comment only", "status": "colleague designed layout for review"},
+      "expected_status": 200
+    }
+  ]
+}

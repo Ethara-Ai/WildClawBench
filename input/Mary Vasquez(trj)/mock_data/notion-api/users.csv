@@ -1,0 +1,3 @@
+id,name,email,avatar_url,type,bot,owner_workspace,created_time
+user_mary,Mary Vasquez,m.vasquez@maplewoodschoolboard.ca,,person,False,True,2026-01-08T09:00:00.000Z
+user_hernandez,Dr. Patricia Hernandez,p.hernandez@maplewoodschoolboard.ca,,person,False,False,2026-01-09T09:00:00.000Z

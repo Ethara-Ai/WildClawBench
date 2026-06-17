@@ -1,0 +1,48 @@
+{
+  "stage": 2,
+  "fires_after_turn": 7,
+  "description": "Overnight silent S1 (yard reschedule from 08:00 to 07:30). Fires between T7 and T8 so the new Gmail notification is waiting when the agent opens Day 2.",
+  "mutations": [
+    {
+      "mutation_id": "S1_yard_time_change_email",
+      "service": "gmail-api",
+      "method": "POST",
+      "url": "{GMAIL_API_URL}/_seed/messages",
+      "headers": {"Content-Type": "application/json"},
+      "body": {
+        "inbox": "alden.croft.me@gmail.com",
+        "messages": [
+          {
+            "id": "msg_yard_time_change",
+            "from": "service@rocklandmarineyard.test",
+            "to": "alden.croft.me@gmail.com",
+            "subject": "Updated check-in time — Eileen C — please confirm",
+            "date": "2026-12-08T22:14:00-05:00",
+            "unread": true,
+            "body_excerpt": "Heads up — we had a tech swap and can take you in 30 minutes earlier. Please arrive 7:30 AM tomorrow. Same slip (4B). If that's a problem, call by 6 AM."
+          }
+        ]
+      },
+      "expected_status": 200,
+      "silent": true,
+      "fires_after_turn": 7,
+      "rationale": "Silent mutation: a fresh Gmail message lands overnight. The agent that scans NEW Gmail at the start of Day 2 catches the time change; an agent that relies on stale calendar state misses it."
+    },
+    {
+      "mutation_id": "S1_maps_route_seed",
+      "service": "google-maps-api",
+      "method": "POST",
+      "url": "{GMAPS_API_URL}/_seed/route",
+      "headers": {"Content-Type": "application/json"},
+      "body": {
+        "origin": "Rockland, ME 04841",
+        "destination": "Rockland Marine Service Yard, Rockland, ME",
+        "travel_time_min": 14,
+        "advisories": "light frost — pavement may be slick at boatyard apron"
+      },
+      "expected_status": 200,
+      "silent": false,
+      "fires_after_turn": 7
+    }
+  ]
+}
