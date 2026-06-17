@@ -1,0 +1,2 @@
+incident_id,incident_number,title,status,urgency,service_id,escalation_policy_id,assigned_to,created_at,resolved_at
+PI_DISTRACTOR,9999,placeholder distractor incident,resolved,low,PS_DISTRACTOR,EP_DISTRACTOR,PU_DISTRACTOR,2026-01-01T00:00:00Z,2026-01-01T00:00:00Z

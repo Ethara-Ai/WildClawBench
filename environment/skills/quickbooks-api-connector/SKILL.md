@@ -12,9 +12,9 @@ description: >
 | Variable | Purpose |
 |----------|---------|
 | `QUICKBOOKS_API_URL` | Base URL for all requests |
-| `REALM_ID` | QuickBooks company realm ID — fixed mock value: `4620816365272861350` |
+| `REALM_ID` | QuickBooks company realm ID |
 
-All paths below are relative to `QUICKBOOKS_API_URL`. Use realm ID `4620816365272861350` wherever `{realmId}` appears in a path.
+All paths below are relative to `QUICKBOOKS_API_URL`. Replace `{realmId}` with the company's realm ID.
 
 ---
 

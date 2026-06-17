@@ -1,0 +1,17 @@
+id,createdTime,Name,Status,Project,EstimateHours,Done
+recTask0000000001,2026-08-22T09:00:00.000Z,Renew COA for elderberry Q3 lot 2026-ELD-03,In progress,Elderberry Syrup Autumn Launch,4,false
+recTask0000000002,2026-08-23T10:00:00.000Z,Bottle 80 units of Elderberry Syrup,Todo,Elderberry Syrup Autumn Launch,12,false
+recTask0000000003,2026-08-25T09:30:00.000Z,Allocate Elderberry Syrup 30 retail and 50 online,Todo,Elderberry Syrup Autumn Launch,2,false
+recTask0000000004,2026-08-23T11:00:00.000Z,Confirm fire cider ingredient sourcing with Cottonwood Basin,Done,Fire Cider Autumn Launch,3,true
+recTask0000000005,2026-08-26T10:00:00.000Z,Bottle 60 units of Fire Cider,Todo,Fire Cider Autumn Launch,10,false
+recTask0000000006,2026-08-26T11:00:00.000Z,Allocate Fire Cider 25 retail and 35 online,Todo,Fire Cider Autumn Launch,2,false
+recTask0000000007,2026-08-20T09:00:00.000Z,Finalize Autumn Immune Blend Tincture formula,Done,Autumn Immune Blend Tincture Launch,8,true
+recTask0000000008,2026-08-28T10:00:00.000Z,Bottle 50 units of Autumn Immune Blend Tincture,Todo,Autumn Immune Blend Tincture Launch,8,false
+recTask0000000009,2026-08-28T11:00:00.000Z,Allocate Autumn Immune Blend Tincture 15 retail and 35 online,Todo,Autumn Immune Blend Tincture Launch,2,false
+recTask0000000010,2026-08-24T09:00:00.000Z,Source autumn tea ingredients from Cottonwood Basin Co-op,In progress,Harvest Tea Blend Autumn Launch,4,false
+recTask0000000011,2026-08-29T10:00:00.000Z,Package 70 units of Harvest Tea Blend,Todo,Harvest Tea Blend Autumn Launch,10,false
+recTask0000000012,2026-08-29T11:00:00.000Z,Allocate Harvest Tea Blend 30 retail and 40 online,Todo,Harvest Tea Blend Autumn Launch,2,false
+recTask0000000013,2026-08-20T09:00:00.000Z,Inventory SKU ESY-2509 Elderberry Syrup count 80 as of 2026-09-07T12:00:00-06:00 (initial bottling allocation),Done,Elderberry Syrup Autumn Launch,1,true
+recTask0000000014,2026-08-20T09:05:00.000Z,Inventory SKU FC-2509 Fire Cider count 60 as of 2026-09-07T12:00:00-06:00 (initial bottling allocation),Done,Fire Cider Autumn Launch,1,true
+recTask0000000015,2026-08-20T09:10:00.000Z,Inventory SKU AIBT-2509 Autumn Immune Blend Tincture count 50 as of 2026-09-07T12:00:00-06:00 (initial bottling allocation),Done,Autumn Immune Blend Tincture Launch,1,true
+recTask0000000016,2026-08-20T09:15:00.000Z,Inventory SKU HTB-2509 Harvest Tea Blend count 70 as of 2026-09-07T12:00:00-06:00 (initial bottling allocation),Done,Harvest Tea Blend Autumn Launch,1,true

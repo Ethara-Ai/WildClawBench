@@ -2,72 +2,16 @@
 
 import csv
 import json
+from copy import deepcopy
 from datetime import datetime, timedelta
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store,
-    strict_int,
-    strict_float,
-)
 
-_store = get_store("myfitnesspal-api")
-_API = "myfitnesspal-api"
-
-_store.register("foods", primary_key="food_id",
-                initial_loader=lambda: _coerce_foods(_load("foods.csv", "foods")))
-_store.register("diary_entries", primary_key="entry_id",
-                initial_loader=lambda: _coerce_diary_entries(_load("diary_entries.csv", "diary_entries")))
-_store.register("exercise_types", primary_key="exercise_type_id",
-                initial_loader=lambda: _coerce_exercise_types(_load("exercise_types.csv", "exercise_types")))
-_store.register("exercise_log", primary_key="exercise_id",
-                initial_loader=lambda: _coerce_exercise_log(_load("exercise_log.csv", "exercise_log")))
-_store.register("weight_log", primary_key="weight_id",
-                initial_loader=lambda: _coerce_weight_log(_load("weight_log.csv", "weight_log")))
-_store.register("water_log", primary_key="water_id",
-                initial_loader=lambda: _coerce_water_log(_load("water_log.csv", "water_log")))
-_store.register_document("user_profile", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "user_profile.json", encoding="utf-8")))
-
-
-def _foods_rows():
-    return _store.table("foods").rows()
-
-
-def _diary_entries_rows():
-    return _store.table("diary_entries").rows()
-
-
-def _exercise_types_rows():
-    return _store.table("exercise_types").rows()
-
-
-def _exercise_log_rows():
-    return _store.table("exercise_log").rows()
-
-
-def _weight_log_rows():
-    return _store.table("weight_log").rows()
-
-
-def _water_log_rows():
-    return _store.table("water_log").rows()
-
-
-def _user_profile_doc():
-    return _store.document("user_profile").get()
-
-
-
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _now():
@@ -82,18 +26,18 @@ def _coerce_foods(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "food_id": strict_int(r, "food_id"),
-            "calories": strict_float(r, "calories"),
-            "total_fat_g": strict_float(r, "total_fat_g"),
-            "saturated_fat_g": strict_float(r, "saturated_fat_g"),
-            "cholesterol_mg": strict_float(r, "cholesterol_mg"),
-            "sodium_mg": strict_float(r, "sodium_mg"),
-            "total_carbs_g": strict_float(r, "total_carbs_g"),
-            "dietary_fiber_g": strict_float(r, "dietary_fiber_g"),
-            "sugars_g": strict_float(r, "sugars_g"),
-            "protein_g": strict_float(r, "protein_g"),
-            "potassium_mg": strict_float(r, "potassium_mg"),
+            **r,
+            "food_id": int(r["food_id"]),
+            "calories": float(r["calories"]),
+            "total_fat_g": float(r["total_fat_g"]),
+            "saturated_fat_g": float(r["saturated_fat_g"]),
+            "cholesterol_mg": float(r["cholesterol_mg"]),
+            "sodium_mg": float(r["sodium_mg"]),
+            "total_carbs_g": float(r["total_carbs_g"]),
+            "dietary_fiber_g": float(r["dietary_fiber_g"]),
+            "sugars_g": float(r["sugars_g"]),
+            "protein_g": float(r["protein_g"]),
+            "potassium_mg": float(r["potassium_mg"]),
             "is_verified": r["is_verified"].lower() == "true",
         })
     return out
@@ -103,19 +47,19 @@ def _coerce_diary_entries(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "entry_id": strict_int(r, "entry_id"),
-            "food_id": strict_int(r, "food_id"),
-            "servings": strict_float(r, "servings"),
-            "calories": strict_float(r, "calories"),
-            "total_fat_g": strict_float(r, "total_fat_g"),
-            "saturated_fat_g": strict_float(r, "saturated_fat_g"),
-            "cholesterol_mg": strict_float(r, "cholesterol_mg"),
-            "sodium_mg": strict_float(r, "sodium_mg"),
-            "total_carbs_g": strict_float(r, "total_carbs_g"),
-            "dietary_fiber_g": strict_float(r, "dietary_fiber_g"),
-            "sugars_g": strict_float(r, "sugars_g"),
-            "protein_g": strict_float(r, "protein_g"),
+            **r,
+            "entry_id": int(r["entry_id"]),
+            "food_id": int(r["food_id"]),
+            "servings": float(r["servings"]),
+            "calories": float(r["calories"]),
+            "total_fat_g": float(r["total_fat_g"]),
+            "saturated_fat_g": float(r["saturated_fat_g"]),
+            "cholesterol_mg": float(r["cholesterol_mg"]),
+            "sodium_mg": float(r["sodium_mg"]),
+            "total_carbs_g": float(r["total_carbs_g"]),
+            "dietary_fiber_g": float(r["dietary_fiber_g"]),
+            "sugars_g": float(r["sugars_g"]),
+            "protein_g": float(r["protein_g"]),
         })
     return out
 
@@ -124,11 +68,11 @@ def _coerce_exercise_types(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "exercise_type_id": strict_int(r, "exercise_type_id"),
-            "calories_per_minute_low": strict_float(r, "calories_per_minute_low"),
-            "calories_per_minute_high": strict_float(r, "calories_per_minute_high"),
-            "met_value": strict_float(r, "met_value"),
+            **r,
+            "exercise_type_id": int(r["exercise_type_id"]),
+            "calories_per_minute_low": float(r["calories_per_minute_low"]),
+            "calories_per_minute_high": float(r["calories_per_minute_high"]),
+            "met_value": float(r["met_value"]),
         })
     return out
 
@@ -137,11 +81,11 @@ def _coerce_exercise_log(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "exercise_id": strict_int(r, "exercise_id"),
-            "exercise_type_id": strict_int(r, "exercise_type_id"),
-            "duration_minutes": strict_int(r, "duration_minutes"),
-            "calories_burned": strict_int(r, "calories_burned"),
+            **r,
+            "exercise_id": int(r["exercise_id"]),
+            "exercise_type_id": int(r["exercise_type_id"]),
+            "duration_minutes": int(r["duration_minutes"]),
+            "calories_burned": int(r["calories_burned"]),
         })
     return out
 
@@ -150,9 +94,9 @@ def _coerce_weight_log(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "weight_id": strict_int(r, "weight_id"),
-            "weight_lbs": strict_float(r, "weight_lbs"),
+            **r,
+            "weight_id": int(r["weight_id"]),
+            "weight_lbs": float(r["weight_lbs"]),
         })
     return out
 
@@ -161,34 +105,37 @@ def _coerce_water_log(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "water_id": strict_int(r, "water_id"),
-            "cups": strict_int(r, "cups"),
+            **r,
+            "water_id": int(r["water_id"]),
+            "cups": int(r["cups"]),
         })
     return out
 
 
 # Load all data at module init
+_foods = _coerce_foods(_load("foods.csv"))
+_diary_entries = _coerce_diary_entries(_load("diary_entries.csv"))
+_exercise_types = _coerce_exercise_types(_load("exercise_types.csv"))
+_exercise_log = _coerce_exercise_log(_load("exercise_log.csv"))
+_weight_log = _coerce_weight_log(_load("weight_log.csv"))
+_water_log = _coerce_water_log(_load("water_log.csv"))
 
-
-
-
-
-
+with open(DATA_DIR / "user_profile.json", encoding="utf-8") as _f:
+    _user_profile = json.load(_f)
 
 # Mutable in-memory stores
+_foods_store = deepcopy(_foods)
+_diary_entries_store = deepcopy(_diary_entries)
+_exercise_types_store = deepcopy(_exercise_types)
+_exercise_log_store = deepcopy(_exercise_log)
+_weight_log_store = deepcopy(_weight_log)
+_water_log_store = deepcopy(_water_log)
+_user_profile_store = deepcopy(_user_profile)
 
-
-
-
-
-
-
-_store.eager_load()
-_next_entry_id = max(e["entry_id"] for e in _diary_entries_rows()) + 1
-_next_exercise_id = max(e["exercise_id"] for e in _exercise_log_rows()) + 1
-_next_weight_id = max(w["weight_id"] for w in _weight_log_rows()) + 1
-_next_water_id = max(w["water_id"] for w in _water_log_rows()) + 1
+_next_entry_id = max(e["entry_id"] for e in _diary_entries_store) + 1
+_next_exercise_id = max(e["exercise_id"] for e in _exercise_log_store) + 1
+_next_weight_id = max(w["weight_id"] for w in _weight_log_store) + 1
+_next_water_id = max(w["water_id"] for w in _water_log_store) + 1
 
 
 # ---------------------------------------------------------------------------
@@ -196,7 +143,7 @@ _next_water_id = max(w["water_id"] for w in _water_log_rows()) + 1
 # ---------------------------------------------------------------------------
 
 def get_user_profile():
-    return {"type": "user_profile", "user_profile": _user_profile_doc()}
+    return {"type": "user_profile", "user_profile": _user_profile_store}
 
 
 def update_user_profile(data: dict):
@@ -206,8 +153,8 @@ def update_user_profile(data: dict):
     }
     for k, v in data.items():
         if k in updatable:
-            _user_profile_doc()[k] = v
-    return {"type": "user_profile", "user_profile": _user_profile_doc()}
+            _user_profile_store[k] = v
+    return {"type": "user_profile", "user_profile": _user_profile_store}
 
 
 # ---------------------------------------------------------------------------
@@ -218,27 +165,27 @@ def get_goals():
     return {
         "type": "goals",
         "goals": {
-            "daily_calorie_goal": _user_profile_doc()["daily_calorie_goal"],
-            "macro_goals": _user_profile_doc()["macro_goals"],
-            "nutrient_goals": _user_profile_doc()["nutrient_goals"],
-            "weekly_weight_goal_lbs": _user_profile_doc()["weekly_weight_goal_lbs"],
-            "goal_weight_lbs": _user_profile_doc()["goal_weight_lbs"],
+            "daily_calorie_goal": _user_profile_store["daily_calorie_goal"],
+            "macro_goals": _user_profile_store["macro_goals"],
+            "nutrient_goals": _user_profile_store["nutrient_goals"],
+            "weekly_weight_goal_lbs": _user_profile_store["weekly_weight_goal_lbs"],
+            "goal_weight_lbs": _user_profile_store["goal_weight_lbs"],
         },
     }
 
 
 def update_goals(data: dict):
     if "daily_calorie_goal" in data:
-        _user_profile_doc()["daily_calorie_goal"] = int(data["daily_calorie_goal"])
-        _user_profile_doc()["nutrient_goals"]["calories"] = int(data["daily_calorie_goal"])
+        _user_profile_store["daily_calorie_goal"] = int(data["daily_calorie_goal"])
+        _user_profile_store["nutrient_goals"]["calories"] = int(data["daily_calorie_goal"])
     if "macro_goals" in data:
-        _user_profile_doc()["macro_goals"].update(data["macro_goals"])
+        _user_profile_store["macro_goals"].update(data["macro_goals"])
     if "nutrient_goals" in data:
-        _user_profile_doc()["nutrient_goals"].update(data["nutrient_goals"])
+        _user_profile_store["nutrient_goals"].update(data["nutrient_goals"])
     if "weekly_weight_goal_lbs" in data:
-        _user_profile_doc()["weekly_weight_goal_lbs"] = float(data["weekly_weight_goal_lbs"])
+        _user_profile_store["weekly_weight_goal_lbs"] = float(data["weekly_weight_goal_lbs"])
     if "goal_weight_lbs" in data:
-        _user_profile_doc()["goal_weight_lbs"] = float(data["goal_weight_lbs"])
+        _user_profile_store["goal_weight_lbs"] = float(data["goal_weight_lbs"])
     return get_goals()
 
 
@@ -247,7 +194,7 @@ def update_goals(data: dict):
 # ---------------------------------------------------------------------------
 
 def search_foods(q: str = None, limit: int = 25, offset: int = 0):
-    results = list(_foods_rows())
+    results = list(_foods_store)
     if q:
         q_l = q.lower()
         results = [f for f in results if q_l in f["food_name"].lower() or q_l in f.get("brand", "").lower()]
@@ -265,7 +212,7 @@ def search_foods(q: str = None, limit: int = 25, offset: int = 0):
 
 
 def get_food(food_id: int):
-    for f in _foods_rows():
+    for f in _foods_store:
         if f["food_id"] == food_id:
             return {"type": "food", "food": f}
     return {"error": f"Food {food_id} not found"}
@@ -276,11 +223,11 @@ def get_food(food_id: int):
 # ---------------------------------------------------------------------------
 
 def get_diary(date: str, meal: str = None):
-    entries = [e for e in _diary_entries_rows() if e["date"] == date]
+    entries = [e for e in _diary_entries_store if e["date"] == date]
     if meal:
         entries = [e for e in entries if e["meal"].lower() == meal.lower()]
 
-    if not entries and not any(e["date"] == date for e in _diary_entries_rows()):
+    if not entries and not any(e["date"] == date for e in _diary_entries_store):
         return {
             "type": "diary",
             "date": date,
@@ -305,7 +252,7 @@ def get_diary(date: str, meal: str = None):
 
 def get_diary_range(start_date: str, end_date: str):
     entries = [
-        e for e in _diary_entries_rows()
+        e for e in _diary_entries_store
         if start_date <= e["date"] <= end_date
     ]
     dates = sorted(set(e["date"] for e in entries))
@@ -340,7 +287,7 @@ def create_diary_entry(data: dict):
 
     food_id = int(data["food_id"])
     food = None
-    for f in _foods_rows():
+    for f in _foods_store:
         if f["food_id"] == food_id:
             food = f
             break
@@ -369,43 +316,43 @@ def create_diary_entry(data: dict):
         "sugars_g": round(food["sugars_g"] * servings, 1),
         "protein_g": round(food["protein_g"] * servings, 1),
     }
-    _diary_entries_rows().append(entry)
+    _diary_entries_store.append(entry)
     _next_entry_id += 1
     return {"type": "diary_entry", "diary_entry": entry}
 
 
 def update_diary_entry(entry_id: int, data: dict):
-    for i, entry in enumerate(_diary_entries_rows()):
+    for i, entry in enumerate(_diary_entries_store):
         if entry["entry_id"] == entry_id:
             if "servings" in data:
                 new_servings = float(data["servings"])
                 food_id = entry["food_id"]
                 food = None
-                for f in _foods_rows():
+                for f in _foods_store:
                     if f["food_id"] == food_id:
                         food = f
                         break
                 if food:
-                    _diary_entries_rows()[i]["servings"] = new_servings
-                    _diary_entries_rows()[i]["calories"] = round(food["calories"] * new_servings, 1)
-                    _diary_entries_rows()[i]["total_fat_g"] = round(food["total_fat_g"] * new_servings, 1)
-                    _diary_entries_rows()[i]["saturated_fat_g"] = round(food["saturated_fat_g"] * new_servings, 1)
-                    _diary_entries_rows()[i]["cholesterol_mg"] = round(food["cholesterol_mg"] * new_servings, 1)
-                    _diary_entries_rows()[i]["sodium_mg"] = round(food["sodium_mg"] * new_servings, 1)
-                    _diary_entries_rows()[i]["total_carbs_g"] = round(food["total_carbs_g"] * new_servings, 1)
-                    _diary_entries_rows()[i]["dietary_fiber_g"] = round(food["dietary_fiber_g"] * new_servings, 1)
-                    _diary_entries_rows()[i]["sugars_g"] = round(food["sugars_g"] * new_servings, 1)
-                    _diary_entries_rows()[i]["protein_g"] = round(food["protein_g"] * new_servings, 1)
+                    _diary_entries_store[i]["servings"] = new_servings
+                    _diary_entries_store[i]["calories"] = round(food["calories"] * new_servings, 1)
+                    _diary_entries_store[i]["total_fat_g"] = round(food["total_fat_g"] * new_servings, 1)
+                    _diary_entries_store[i]["saturated_fat_g"] = round(food["saturated_fat_g"] * new_servings, 1)
+                    _diary_entries_store[i]["cholesterol_mg"] = round(food["cholesterol_mg"] * new_servings, 1)
+                    _diary_entries_store[i]["sodium_mg"] = round(food["sodium_mg"] * new_servings, 1)
+                    _diary_entries_store[i]["total_carbs_g"] = round(food["total_carbs_g"] * new_servings, 1)
+                    _diary_entries_store[i]["dietary_fiber_g"] = round(food["dietary_fiber_g"] * new_servings, 1)
+                    _diary_entries_store[i]["sugars_g"] = round(food["sugars_g"] * new_servings, 1)
+                    _diary_entries_store[i]["protein_g"] = round(food["protein_g"] * new_servings, 1)
             if "meal" in data:
-                _diary_entries_rows()[i]["meal"] = data["meal"]
-            return {"type": "diary_entry", "diary_entry": _diary_entries_rows()[i]}
+                _diary_entries_store[i]["meal"] = data["meal"]
+            return {"type": "diary_entry", "diary_entry": _diary_entries_store[i]}
     return {"error": f"Diary entry {entry_id} not found"}
 
 
 def delete_diary_entry(entry_id: int):
-    for i, entry in enumerate(_diary_entries_rows()):
+    for i, entry in enumerate(_diary_entries_store):
         if entry["entry_id"] == entry_id:
-            _diary_entries_rows().pop(i)
+            _diary_entries_store.pop(i)
             return {"type": "diary_entry", "deleted": True, "entry_id": entry_id}
     return {"error": f"Diary entry {entry_id} not found"}
 
@@ -440,17 +387,17 @@ def _compute_totals(entries):
 
 
 def get_daily_totals(date: str):
-    entries = [e for e in _diary_entries_rows() if e["date"] == date]
+    entries = [e for e in _diary_entries_store if e["date"] == date]
     if not entries:
         return {
             "type": "daily_totals",
             "date": date,
             "totals": _empty_totals(),
-            "goal": _user_profile_doc()["nutrient_goals"],
-            "remaining": _user_profile_doc()["nutrient_goals"].copy(),
+            "goal": _user_profile_store["nutrient_goals"],
+            "remaining": _user_profile_store["nutrient_goals"].copy(),
         }
     totals = _compute_totals(entries)
-    goal = _user_profile_doc()["nutrient_goals"]
+    goal = _user_profile_store["nutrient_goals"]
     remaining = {}
     for k in totals:
         if k in goal:
@@ -473,7 +420,7 @@ def get_weekly_summary(end_date: str):
     current = start
     while current <= end:
         d = current.strftime("%Y-%m-%d")
-        entries = [e for e in _diary_entries_rows() if e["date"] == d]
+        entries = [e for e in _diary_entries_store if e["date"] == d]
         totals = _compute_totals(entries) if entries else _empty_totals()
         days.append({"date": d, "totals": totals, "entry_count": len(entries)})
         current += timedelta(days=1)
@@ -505,10 +452,10 @@ def get_progress(days: int = 30):
     current = start
     while current <= end:
         d = current.strftime("%Y-%m-%d")
-        entries = [e for e in _diary_entries_rows() if e["date"] == d]
+        entries = [e for e in _diary_entries_store if e["date"] == d]
         totals = _compute_totals(entries) if entries else _empty_totals()
 
-        exercises = [ex for ex in _exercise_log_rows() if ex["date"] == d]
+        exercises = [ex for ex in _exercise_log_store if ex["date"] == d]
         exercise_cals = sum(ex["calories_burned"] for ex in exercises)
 
         daily_data.append({
@@ -525,7 +472,7 @@ def get_progress(days: int = 30):
     return {
         "type": "progress",
         "period_days": days,
-        "calorie_goal": _user_profile_doc()["daily_calorie_goal"],
+        "calorie_goal": _user_profile_store["daily_calorie_goal"],
         "results": daily_data,
     }
 
@@ -535,7 +482,7 @@ def get_progress(days: int = 30):
 # ---------------------------------------------------------------------------
 
 def list_exercise_types(category: str = None, limit: int = 25, offset: int = 0):
-    results = list(_exercise_types_rows())
+    results = list(_exercise_types_store)
     if category:
         results = [e for e in results if e["category"].lower() == category.lower()]
 
@@ -552,7 +499,7 @@ def list_exercise_types(category: str = None, limit: int = 25, offset: int = 0):
 
 
 def get_exercise_type(exercise_type_id: int):
-    for e in _exercise_types_rows():
+    for e in _exercise_types_store:
         if e["exercise_type_id"] == exercise_type_id:
             return {"type": "exercise_type", "exercise_type": e}
     return {"error": f"Exercise type {exercise_type_id} not found"}
@@ -563,7 +510,7 @@ def get_exercise_type(exercise_type_id: int):
 # ---------------------------------------------------------------------------
 
 def list_exercises(start_date: str = None, end_date: str = None, limit: int = 25, offset: int = 0):
-    results = list(_exercise_log_rows())
+    results = list(_exercise_log_store)
     if start_date:
         results = [e for e in results if e["date"] >= start_date]
     if end_date:
@@ -583,7 +530,7 @@ def list_exercises(start_date: str = None, end_date: str = None, limit: int = 25
 
 
 def get_exercise(exercise_id: int):
-    for e in _exercise_log_rows():
+    for e in _exercise_log_store:
         if e["exercise_id"] == exercise_id:
             return {"type": "exercise", "exercise": e}
     return {"error": f"Exercise {exercise_id} not found"}
@@ -598,7 +545,7 @@ def create_exercise(data: dict):
 
     exercise_type_id = int(data["exercise_type_id"])
     ex_type = None
-    for e in _exercise_types_rows():
+    for e in _exercise_types_store:
         if e["exercise_type_id"] == exercise_type_id:
             ex_type = e
             break
@@ -615,7 +562,7 @@ def create_exercise(data: dict):
         "calories_burned": int(data["calories_burned"]),
         "notes": data.get("notes", ""),
     }
-    _exercise_log_rows().append(exercise)
+    _exercise_log_store.append(exercise)
     _next_exercise_id += 1
     return {"type": "exercise", "exercise": exercise}
 
@@ -625,7 +572,7 @@ def create_exercise(data: dict):
 # ---------------------------------------------------------------------------
 
 def list_weight_entries(limit: int = 25, offset: int = 0):
-    results = sorted(_weight_log_rows(), key=lambda x: x["date"], reverse=True)
+    results = sorted(_weight_log_store, key=lambda x: x["date"], reverse=True)
     total = len(results)
     page_results = results[offset: offset + limit]
     return {
@@ -639,7 +586,7 @@ def list_weight_entries(limit: int = 25, offset: int = 0):
 
 
 def get_weight_entry(weight_id: int):
-    for w in _weight_log_rows():
+    for w in _weight_log_store:
         if w["weight_id"] == weight_id:
             return {"type": "weight_entry", "weight_entry": w}
     return {"error": f"Weight entry {weight_id} not found"}
@@ -658,7 +605,7 @@ def create_weight_entry(data: dict):
         "weight_lbs": float(data["weight_lbs"]),
         "notes": data.get("notes", ""),
     }
-    _weight_log_rows().append(entry)
+    _weight_log_store.append(entry)
     _next_weight_id += 1
     return {"type": "weight_entry", "weight_entry": entry}
 
@@ -668,7 +615,7 @@ def create_weight_entry(data: dict):
 # ---------------------------------------------------------------------------
 
 def get_water(date: str):
-    for w in _water_log_rows():
+    for w in _water_log_store:
         if w["date"] == date:
             return {"type": "water", "water": w}
     return {"error": f"Water entry for {date} not found"}
@@ -681,7 +628,7 @@ def create_water(data: dict):
         if f not in data or data[f] is None:
             return {"error": f"Missing required field: {f}"}
 
-    for w in _water_log_rows():
+    for w in _water_log_store:
         if w["date"] == data["date"]:
             return {"error": f"Water entry for {data['date']} already exists. Use PUT to update."}
 
@@ -691,17 +638,17 @@ def create_water(data: dict):
         "cups": int(data["cups"]),
         "notes": data.get("notes", ""),
     }
-    _water_log_rows().append(entry)
+    _water_log_store.append(entry)
     _next_water_id += 1
     return {"type": "water", "water": entry}
 
 
 def update_water(date: str, data: dict):
-    for i, w in enumerate(_water_log_rows()):
+    for i, w in enumerate(_water_log_store):
         if w["date"] == date:
             if "cups" in data:
-                _water_log_rows()[i]["cups"] = int(data["cups"])
+                _water_log_store[i]["cups"] = int(data["cups"])
             if "notes" in data:
-                _water_log_rows()[i]["notes"] = data["notes"]
-            return {"type": "water", "water": _water_log_rows()[i]}
+                _water_log_store[i]["notes"] = data["notes"]
+            return {"type": "water", "water": _water_log_store[i]}
     return {"error": f"Water entry for {date} not found"}

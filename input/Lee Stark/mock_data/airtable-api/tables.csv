@@ -1,0 +1,5 @@
+baseId,id,name,primaryFieldId,records_csv
+appNRC25090000001,tblProjects00001,Projects,fldProjName00001,records_projects.csv
+appNRC25090000001,tblTasks00000001,Tasks,fldTaskName00001,records_tasks.csv
+appNRC25090000001,tblContacts00001,Contacts,fldContactNm0001,records_contacts.csv
+appNRC25090000001,tblInventory,NRC-Inventory,fldInvSKU00000001,records_inventory.csv

@@ -5,54 +5,15 @@ ticker, 24hr ticker, order book depth, klines (candles), and account balances.
 """
 
 import csv
+from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store,
-    strict_int,
-    opt_float,
-)
 
-_store = get_store("binance-api")
-_API = "binance-api"
-
-_store.register("prices", primary_key="symbol",
-                initial_loader=lambda: _coerce_prices(_load("prices.csv", "prices")))
-_store.register("klines", primary_key="symbol",
-                initial_loader=lambda: _coerce_klines(_load("klines.csv", "klines")))
-_store.register("balances", primary_key="asset",
-                initial_loader=lambda: _coerce_balances(_load("balances.csv", "balances")))
-_store.register("depth", primary_key="symbol",
-                initial_loader=lambda: _coerce_depth(_load("depth.csv", "depth")))
-
-
-def _prices_rows():
-    return _store.table("prices").rows()
-
-
-def _klines_rows():
-    return _store.table("klines").rows()
-
-
-def _balances_rows():
-    return _store.table("balances").rows()
-
-
-def _depth_rows():
-    return _store.table("depth").rows()
-
-
-
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _to_float(v):
@@ -76,12 +37,12 @@ def _coerce_prices(rows):
     for r in rows:
         out.append({
             "symbol": r["symbol"],
-            "price": opt_float(r, "price", default=None),
-            "priceChange": opt_float(r, "priceChange", default=None),
-            "priceChangePercent": opt_float(r, "priceChangePercent", default=None),
-            "highPrice": opt_float(r, "highPrice", default=None),
-            "lowPrice": opt_float(r, "lowPrice", default=None),
-            "volume": opt_float(r, "volume", default=None),
+            "price": _to_float(r["price"]),
+            "priceChange": _to_float(r["priceChange"]),
+            "priceChangePercent": _to_float(r["priceChangePercent"]),
+            "highPrice": _to_float(r["highPrice"]),
+            "lowPrice": _to_float(r["lowPrice"]),
+            "volume": _to_float(r["volume"]),
         })
     return out
 
@@ -92,13 +53,13 @@ def _coerce_klines(rows):
         out.append({
             "symbol": r["symbol"],
             "interval": r["interval"],
-            "open_time": strict_int(r, "open_time"),
-            "open": opt_float(r, "open", default=None),
-            "high": opt_float(r, "high", default=None),
-            "low": opt_float(r, "low", default=None),
-            "close": opt_float(r, "close", default=None),
-            "volume": opt_float(r, "volume", default=None),
-            "close_time": strict_int(r, "close_time"),
+            "open_time": int(r["open_time"]),
+            "open": _to_float(r["open"]),
+            "high": _to_float(r["high"]),
+            "low": _to_float(r["low"]),
+            "close": _to_float(r["close"]),
+            "volume": _to_float(r["volume"]),
+            "close_time": int(r["close_time"]),
         })
     return out
 
@@ -108,8 +69,8 @@ def _coerce_balances(rows):
     for r in rows:
         out.append({
             "asset": r["asset"],
-            "free": opt_float(r, "free", default=None),
-            "locked": opt_float(r, "locked", default=None),
+            "free": _to_float(r["free"]),
+            "locked": _to_float(r["locked"]),
         })
     return out
 
@@ -120,18 +81,21 @@ def _coerce_depth(rows):
         out.append({
             "symbol": r["symbol"],
             "side": r["side"],
-            "price": opt_float(r, "price", default=None),
-            "qty": opt_float(r, "qty", default=None),
+            "price": _to_float(r["price"]),
+            "qty": _to_float(r["qty"]),
         })
     return out
 
 
+_prices = _coerce_prices(_load("prices.csv"))
+_klines = _coerce_klines(_load("klines.csv"))
+_balances = _coerce_balances(_load("balances.csv"))
+_depth = _coerce_depth(_load("depth.csv"))
 
-
-
-
-
-
+_prices_store = deepcopy(_prices)
+_klines_store = deepcopy(_klines)
+_balances_store = deepcopy(_balances)
+_depth_store = deepcopy(_depth)
 
 
 # ---------------------------------------------------------------------------
@@ -140,11 +104,11 @@ def _coerce_depth(rows):
 
 def get_ticker_price(symbol=None):
     if symbol:
-        p = next((x for x in _prices_rows() if x["symbol"] == symbol.upper()), None)
+        p = next((x for x in _prices_store if x["symbol"] == symbol.upper()), None)
         if not p:
             return {"error": "Invalid symbol.", "code": -1121}
         return {"symbol": p["symbol"], "price": _fmt(p["price"])}
-    return [{"symbol": p["symbol"], "price": _fmt(p["price"])} for p in _prices_rows()]
+    return [{"symbol": p["symbol"], "price": _fmt(p["price"])} for p in _prices_store]
 
 
 # ---------------------------------------------------------------------------
@@ -165,11 +129,11 @@ def _ticker_24hr_view(p):
 
 def get_ticker_24hr(symbol=None):
     if symbol:
-        p = next((x for x in _prices_rows() if x["symbol"] == symbol.upper()), None)
+        p = next((x for x in _prices_store if x["symbol"] == symbol.upper()), None)
         if not p:
             return {"error": "Invalid symbol.", "code": -1121}
         return _ticker_24hr_view(p)
-    return [_ticker_24hr_view(p) for p in _prices_rows()]
+    return [_ticker_24hr_view(p) for p in _prices_store]
 
 
 # ---------------------------------------------------------------------------
@@ -178,7 +142,7 @@ def get_ticker_24hr(symbol=None):
 
 def get_depth(symbol, limit=100):
     sym = (symbol or "").upper()
-    levels = [d for d in _depth_rows() if d["symbol"] == sym]
+    levels = [d for d in _depth_store if d["symbol"] == sym]
     if not levels:
         return {"error": "Invalid symbol.", "code": -1121}
     bids = sorted((d for d in levels if d["side"] == "bid"), key=lambda d: d["price"], reverse=True)
@@ -199,7 +163,7 @@ def get_depth(symbol, limit=100):
 def get_klines(symbol, interval="1h", limit=500):
     sym = (symbol or "").upper()
     candles = [
-        k for k in _klines_rows()
+        k for k in _klines_store
         if k["symbol"] == sym and k["interval"] == interval
     ]
     if not candles:
@@ -231,7 +195,7 @@ def get_klines(symbol, interval="1h", limit=500):
 def get_account():
     balances = [
         {"asset": b["asset"], "free": _fmt(b["free"]), "locked": _fmt(b["locked"])}
-        for b in _balances_rows()
+        for b in _balances_store
     ]
     return {
         "makerCommission": 10,
@@ -245,5 +209,3 @@ def get_account():
         "balances": balances,
         "permissions": ["SPOT"],
     }
-
-_store.eager_load()

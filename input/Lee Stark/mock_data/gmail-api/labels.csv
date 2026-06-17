@@ -1,0 +1,6 @@
+id,name,type,messages_total,messages_unread,threads_total,threads_unread
+INBOX,INBOX,system,2,2,2,2
+DRAFT,DRAFT,system,0,0,0,0
+SENT,SENT,system,0,0,0,0
+TRASH,TRASH,system,0,0,0,0
+Label_suppliers,Suppliers,user,1,1,1,1

@@ -3,59 +3,18 @@
 import csv
 import json
 import uuid
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_str, strict_bool, strict_int)
-
-_store = get_store("calendly-api")
-_API = "calendly-api"
-
-_store.register("event_types", primary_key="uuid",
-                initial_loader=lambda: _coerce_event_types(_load("event_types.csv", "event_types")))
-_store.register("scheduled_events", primary_key="uuid",
-                initial_loader=lambda: _coerce_scheduled_events(_load("scheduled_events.csv", "scheduled_events")))
-_store.register("invitees", primary_key="uuid",
-                initial_loader=lambda: _coerce_invitees(_load("invitees.csv", "invitees")))
-_store.register("availability", primary_key="owner",
-                initial_loader=lambda: _coerce_availability(_load("availability.csv", "availability")))
-_store.register_document("user", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "user.json", encoding="utf-8")))
-
-
-def _event_types_rows():
-    return _store.table("event_types").rows()
-
-
-def _scheduled_events_rows():
-    return _store.table("scheduled_events").rows()
-
-
-def _invitees_rows():
-    return _store.table("invitees").rows()
-
-
-def _availability_rows():
-    return _store.table("availability").rows()
-
-
-def _user_doc():
-    return _store.document("user").get()
-
-
 BASE_URI = "https://api.calendly.com"
 
 
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _now():
@@ -87,9 +46,9 @@ def _coerce_event_types(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "duration": strict_int(r, "duration"),
-            "active": strict_bool(r, "active"),
+            **r,
+            "duration": int(r["duration"]),
+            "active": _to_bool(r["active"]),
         })
     return out
 
@@ -98,8 +57,8 @@ def _coerce_scheduled_events(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "canceled_reason": opt_str(r, "canceled_reason", default="") or None,
+            **r,
+            "canceled_reason": r["canceled_reason"] or None,
         })
     return out
 
@@ -108,15 +67,29 @@ def _coerce_invitees(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
+            **r,
             "questions_and_answers": _parse_qa(r["questions_and_answers"]),
         })
     return out
 
 
 def _coerce_availability(rows):
-    return [{**_strip_ctx(r)} for r in rows]
+    return [{**r} for r in rows]
 
+
+with open(DATA_DIR / "user.json", encoding="utf-8") as _f:
+    _user = json.load(_f)
+
+_event_types = _coerce_event_types(_load("event_types.csv"))
+_scheduled_events = _coerce_scheduled_events(_load("scheduled_events.csv"))
+_invitees = _coerce_invitees(_load("invitees.csv"))
+_availability = _coerce_availability(_load("availability.csv"))
+
+_user_store = deepcopy(_user)
+_event_types_store = deepcopy(_event_types)
+_scheduled_events_store = deepcopy(_scheduled_events)
+_invitees_store = deepcopy(_invitees)
+_availability_store = deepcopy(_availability)
 
 
 def _new_uuid():
@@ -214,7 +187,7 @@ def _invitee_obj(inv):
 # ---------------------------------------------------------------------------
 
 def get_me():
-    return {"resource": _user_obj(_user_doc())}
+    return {"resource": _user_obj(_user_store)}
 
 
 # ---------------------------------------------------------------------------
@@ -223,7 +196,7 @@ def get_me():
 
 def list_event_types(user=None):
     owner = _strip_uri(user) if user else None
-    items = _event_types_rows()
+    items = _event_types_store
     if owner:
         items = [e for e in items if e["owner"] == owner]
     return {"collection": [_event_type_obj(e) for e in items],
@@ -232,7 +205,7 @@ def list_event_types(user=None):
 
 def get_event_type(uuid_):
     uuid_ = _strip_uri(uuid_)
-    for e in _event_types_rows():
+    for e in _event_types_store:
         if e["uuid"] == uuid_:
             return {"resource": _event_type_obj(e)}
     return {"error": f"event type {uuid_} not found"}
@@ -244,7 +217,7 @@ def get_event_type(uuid_):
 
 def list_scheduled_events(user=None, status=None):
     owner = _strip_uri(user) if user else None
-    items = _scheduled_events_rows()
+    items = _scheduled_events_store
     if owner:
         items = [ev for ev in items if ev["owner"] == owner]
     if status:
@@ -255,7 +228,7 @@ def list_scheduled_events(user=None, status=None):
 
 def get_scheduled_event(uuid_):
     uuid_ = _strip_uri(uuid_)
-    for ev in _scheduled_events_rows():
+    for ev in _scheduled_events_store:
         if ev["uuid"] == uuid_:
             return {"resource": _event_obj(ev)}
     return {"error": f"scheduled event {uuid_} not found"}
@@ -263,16 +236,16 @@ def get_scheduled_event(uuid_):
 
 def list_invitees(event_uuid):
     event_uuid = _strip_uri(event_uuid)
-    if not any(ev["uuid"] == event_uuid for ev in _scheduled_events_rows()):
+    if not any(ev["uuid"] == event_uuid for ev in _scheduled_events_store):
         return {"error": f"scheduled event {event_uuid} not found"}
-    items = [inv for inv in _invitees_rows() if inv["event"] == event_uuid]
+    items = [inv for inv in _invitees_store if inv["event"] == event_uuid]
     return {"collection": [_invitee_obj(inv) for inv in items],
             "pagination": {"count": len(items), "next_page": None}}
 
 
 def book_event(payload):
     event_type = _strip_uri(payload.get("event_type"))
-    et = next((e for e in _event_types_rows() if e["uuid"] == event_type), None)
+    et = next((e for e in _event_types_store if e["uuid"] == event_type), None)
     if et is None:
         return {"error": f"event type {event_type} not found"}
 
@@ -291,17 +264,17 @@ def book_event(payload):
         "created_at": now,
         "canceled_reason": None,
     }
-    _scheduled_events_rows().append(event)
+    _scheduled_events_store.append(event)
 
     invitee = payload.get("invitee") or {}
     if invitee.get("email"):
-        _invitees_rows().append({
+        _invitees_store.append({
             "uuid": f"inv-{_new_uuid()}",
             "event": uuid_,
             "name": invitee.get("name", ""),
             "email": invitee["email"],
             "status": "active",
-            "timezone": invitee.get("timezone", _user_doc()["timezone"]),
+            "timezone": invitee.get("timezone", _user_store["timezone"]),
             "created_at": now,
             "questions_and_answers": [],
         })
@@ -310,18 +283,16 @@ def book_event(payload):
 
 def cancel_event(uuid_, reason=None):
     uuid_ = _strip_uri(uuid_)
-    for ev in _scheduled_events_rows():
+    for ev in _scheduled_events_store:
         if ev["uuid"] == uuid_:
             ev["status"] = "canceled"
             ev["canceled_reason"] = reason or "Canceled by host"
-            for inv in _invitees_rows():
+            for inv in _invitees_store:
                 if inv["event"] == uuid_:
                     inv["status"] = "canceled"
             return {"resource": {
-                "canceled_by": _user_doc()["name"],
+                "canceled_by": _user_store["name"],
                 "reason": ev["canceled_reason"],
                 "canceler_type": "host",
             }}
     return {"error": f"scheduled event {uuid_} not found"}
-
-_store.eager_load()

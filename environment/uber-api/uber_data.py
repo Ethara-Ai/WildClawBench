@@ -4,45 +4,16 @@ import csv
 import json
 import math
 import uuid
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_str, strict_bool, strict_float, strict_int)
 
-_store = get_store("uber-api")
-_API = "uber-api"
-
-_store.register("products", primary_key="product_id",
-                initial_loader=lambda: _coerce_products(_load("products.csv", "products")))
-_store.register("trips", primary_key="request_id",
-                initial_loader=lambda: _coerce_trips(_load("trips.csv", "trips")))
-_store.register_document("rider", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "rider.json", encoding="utf-8")))
-
-
-def _products_rows():
-    return _store.table("products").rows()
-
-
-def _trips_rows():
-    return _store.table("trips").rows()
-
-
-def _rider_doc():
-    return _store.document("rider").get()
-
-
-
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _now_iso():
@@ -61,14 +32,14 @@ def _coerce_products(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "capacity": strict_int(r, "capacity"),
-            "base_fare": strict_float(r, "base_fare"),
-            "cost_per_mile": strict_float(r, "cost_per_mile"),
-            "cost_per_minute": strict_float(r, "cost_per_minute"),
-            "booking_fee": strict_float(r, "booking_fee"),
-            "minimum_fare": strict_float(r, "minimum_fare"),
-            "shared": strict_bool(r, "shared"),
+            **r,
+            "capacity": int(r["capacity"]),
+            "base_fare": float(r["base_fare"]),
+            "cost_per_mile": float(r["cost_per_mile"]),
+            "cost_per_minute": float(r["cost_per_minute"]),
+            "booking_fee": float(r["booking_fee"]),
+            "minimum_fare": float(r["minimum_fare"]),
+            "shared": _to_bool(r["shared"]),
         })
     return out
 
@@ -77,24 +48,32 @@ def _coerce_trips(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "start_latitude": strict_float(r, "start_latitude"),
-            "start_longitude": strict_float(r, "start_longitude"),
-            "end_latitude": strict_float(r, "end_latitude"),
-            "end_longitude": strict_float(r, "end_longitude"),
-            "distance_miles": strict_float(r, "distance_miles"),
-            "duration_minutes": strict_float(r, "duration_minutes"),
-            "fare": strict_float(r, "fare"),
-            "surge_multiplier": strict_float(r, "surge_multiplier"),
-            "driver_name": opt_str(r, "driver_name", default="") or None,
-            "vehicle": opt_str(r, "vehicle", default="") or None,
-            "license_plate": opt_str(r, "license_plate", default="") or None,
-            "completed_at": opt_str(r, "completed_at", default="") or None,
+            **r,
+            "start_latitude": float(r["start_latitude"]),
+            "start_longitude": float(r["start_longitude"]),
+            "end_latitude": float(r["end_latitude"]),
+            "end_longitude": float(r["end_longitude"]),
+            "distance_miles": float(r["distance_miles"]),
+            "duration_minutes": float(r["duration_minutes"]),
+            "fare": float(r["fare"]),
+            "surge_multiplier": float(r["surge_multiplier"]),
+            "driver_name": r["driver_name"] or None,
+            "vehicle": r["vehicle"] or None,
+            "license_plate": r["license_plate"] or None,
+            "completed_at": r["completed_at"] or None,
         })
     return out
 
 
+_products = _coerce_products(_load("products.csv"))
+_trips = _coerce_trips(_load("trips.csv"))
 
+with open(DATA_DIR / "rider.json", encoding="utf-8") as _f:
+    _rider = json.load(_f)
+
+_products_store = deepcopy(_products)
+_trips_store = deepcopy(_trips)
+_rider_store = deepcopy(_rider)
 
 
 def _new_id(prefix):
@@ -127,11 +106,11 @@ def _estimate_minutes(distance_miles):
 # ---------------------------------------------------------------------------
 
 def list_products(latitude=None, longitude=None):
-    return {"products": deepcopy(_products_rows())}
+    return {"products": deepcopy(_products_store)}
 
 
 def get_product(product_id):
-    for p in _products_rows():
+    for p in _products_store:
         if p["product_id"] == product_id:
             return p
     return {"error": f"Product {product_id} not found"}
@@ -146,7 +125,7 @@ def price_estimates(start_latitude, start_longitude, end_latitude, end_longitude
                                 end_latitude, end_longitude)
     duration = _estimate_minutes(distance)
     prices = []
-    for p in _products_rows():
+    for p in _products_store:
         raw = (p["base_fare"] + p["booking_fee"]
                + p["cost_per_mile"] * distance
                + p["cost_per_minute"] * duration)
@@ -168,7 +147,7 @@ def price_estimates(start_latitude, start_longitude, end_latitude, end_longitude
 
 def time_estimates(start_latitude, start_longitude, product_id=None):
     times = []
-    for p in _products_rows():
+    for p in _products_store:
         if product_id and p["product_id"] != product_id:
             continue
         # Pickup ETA scales with vehicle tier; deterministic per product.
@@ -195,7 +174,7 @@ _DRIVERS = [
 
 def create_request(product_id, start_latitude, start_longitude,
                    end_latitude=None, end_longitude=None, rider_id=None):
-    product = next((p for p in _products_rows() if p["product_id"] == product_id), None)
+    product = next((p for p in _products_store if p["product_id"] == product_id), None)
     if not product:
         return {"error": f"Product {product_id} not found"}
 
@@ -209,12 +188,12 @@ def create_request(product_id, start_latitude, start_longitude,
                + product["cost_per_minute"] * duration)
         fare = round(max(raw, product["minimum_fare"]), 2)
 
-    driver_name, vehicle, plate = _DRIVERS[len(_trips_rows()) % len(_DRIVERS)]
+    driver_name, vehicle, plate = _DRIVERS[len(_trips_store) % len(_DRIVERS)]
     trip = {
         "request_id": _new_id("req"),
         "product_id": product_id,
         "status": "processing",
-        "rider_id": rider_id or _rider_doc()["rider_id"],
+        "rider_id": rider_id or _rider_store["rider_id"],
         "driver_name": driver_name,
         "vehicle": vehicle,
         "license_plate": plate,
@@ -232,29 +211,29 @@ def create_request(product_id, start_latitude, start_longitude,
         "requested_at": _now_iso(),
         "completed_at": None,
     }
-    _trips_rows().append(trip)
+    _trips_store.append(trip)
     return trip
 
 
 def get_request(request_id):
-    for t in _trips_rows():
+    for t in _trips_store:
         if t["request_id"] == request_id:
             return t
     return {"error": f"Request {request_id} not found"}
 
 
 def cancel_request(request_id):
-    for i, t in enumerate(_trips_rows()):
+    for i, t in enumerate(_trips_store):
         if t["request_id"] == request_id:
             if t["status"] in {"completed", "canceled_rider", "canceled_driver"}:
                 return {"error": f"Request {request_id} cannot be canceled (status: {t['status']})"}
-            _trips_rows()[i]["status"] = "canceled_rider"
-            return _trips_rows()[i]
+            _trips_store[i]["status"] = "canceled_rider"
+            return _trips_store[i]
     return {"error": f"Request {request_id} not found"}
 
 
 def get_history(rider_id=None, limit=50, offset=0):
-    results = [t for t in _trips_rows() if t["completed_at"]]
+    results = [t for t in _trips_store if t["completed_at"]]
     if rider_id:
         results = [t for t in results if t["rider_id"] == rider_id]
     results.sort(key=lambda t: t["requested_at"], reverse=True)
@@ -272,6 +251,4 @@ def get_history(rider_id=None, limit=50, offset=0):
 # ---------------------------------------------------------------------------
 
 def get_me():
-    return _rider_doc()
-
-_store.eager_load()
+    return _rider_store

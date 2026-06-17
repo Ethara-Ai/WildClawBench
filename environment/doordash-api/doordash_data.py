@@ -2,58 +2,18 @@
 
 import csv
 import uuid
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store,
-    strict_int,
-    strict_float,
-    strict_bool,
-)
-
-_store = get_store("doordash-api")
-_API = "doordash-api"
-
-_store.register("stores", primary_key="store_id",
-                initial_loader=lambda: _coerce_stores(_load("stores.csv", "stores")))
-_store.register("menu_items", primary_key="item_id",
-                initial_loader=lambda: _coerce_menu(_load("menu_items.csv", "menu_items")))
-_store.register("orders", primary_key="order_id",
-                initial_loader=lambda: _coerce_orders(_load("orders.csv", "orders")))
-_store.register("order_items", primary_key="order_id",
-                initial_loader=lambda: _coerce_order_items(_load("order_items.csv", "order_items")))
-
-
-def _stores_rows():
-    return _store.table("stores").rows()
-
-
-def _menu_items_rows():
-    return _store.table("menu_items").rows()
-
-
-def _orders_rows():
-    return _store.table("orders").rows()
-
-
-def _order_items_rows():
-    return _store.table("order_items").rows()
-
-
 SERVICE_FEE_PCT = 10.0  # percent of subtotal
 
 
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _now_iso():
@@ -72,14 +32,14 @@ def _coerce_stores(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "rating": strict_float(r, "rating"),
-            "review_count": strict_int(r, "review_count"),
-            "delivery_fee": strict_float(r, "delivery_fee"),
-            "eta_minutes": strict_int(r, "eta_minutes"),
-            "latitude": strict_float(r, "latitude"),
-            "longitude": strict_float(r, "longitude"),
-            "is_open": strict_bool(r, "is_open"),
+            **r,
+            "rating": float(r["rating"]),
+            "review_count": int(r["review_count"]),
+            "delivery_fee": float(r["delivery_fee"]),
+            "eta_minutes": int(r["eta_minutes"]),
+            "latitude": float(r["latitude"]),
+            "longitude": float(r["longitude"]),
+            "is_open": _to_bool(r["is_open"]),
         })
     return out
 
@@ -88,11 +48,11 @@ def _coerce_menu(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "price": strict_float(r, "price"),
-            "calories": strict_int(r, "calories"),
-            "popular": strict_bool(r, "popular"),
-            "available": strict_bool(r, "available"),
+            **r,
+            "price": float(r["price"]),
+            "calories": int(r["calories"]),
+            "popular": _to_bool(r["popular"]),
+            "available": _to_bool(r["available"]),
         })
     return out
 
@@ -101,12 +61,12 @@ def _coerce_orders(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "subtotal": strict_float(r, "subtotal"),
-            "delivery_fee": strict_float(r, "delivery_fee"),
-            "service_fee": strict_float(r, "service_fee"),
-            "tip": strict_float(r, "tip"),
-            "total": strict_float(r, "total"),
+            **r,
+            "subtotal": float(r["subtotal"]),
+            "delivery_fee": float(r["delivery_fee"]),
+            "service_fee": float(r["service_fee"]),
+            "tip": float(r["tip"]),
+            "total": float(r["total"]),
         })
     return out
 
@@ -115,22 +75,23 @@ def _coerce_order_items(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "quantity": strict_int(r, "quantity"),
-            "unit_price": strict_float(r, "unit_price"),
-            "line_total": strict_float(r, "line_total"),
+            **r,
+            "quantity": int(r["quantity"]),
+            "unit_price": float(r["unit_price"]),
+            "line_total": float(r["line_total"]),
         })
     return out
 
 
+_stores = _coerce_stores(_load("stores.csv"))
+_menu_items = _coerce_menu(_load("menu_items.csv"))
+_orders = _coerce_orders(_load("orders.csv"))
+_order_items = _coerce_order_items(_load("order_items.csv"))
 
-
-
-
-
-
-
-
+_stores_store = deepcopy(_stores)
+_menu_store = deepcopy(_menu_items)
+_orders_store = deepcopy(_orders)
+_order_items_store = deepcopy(_order_items)
 _carts = {}  # cart_id -> {store_id, items: [{item_id, quantity}]}
 
 
@@ -143,7 +104,7 @@ def _new_id(prefix):
 # ---------------------------------------------------------------------------
 
 def list_stores(latitude=None, longitude=None, cuisine=None, open_only=False):
-    results = list(_stores_rows())
+    results = list(_stores_store)
     if cuisine:
         results = [s for s in results if s["cuisine"].lower() == cuisine.lower()]
     if open_only:
@@ -153,14 +114,14 @@ def list_stores(latitude=None, longitude=None, cuisine=None, open_only=False):
 
 
 def get_store(store_id):
-    for s in _stores_rows():
+    for s in _stores_store:
         if s["store_id"] == store_id:
             return s
     return {"error": f"Store {store_id} not found"}
 
 
 def get_menu(store_id):
-    if not any(s["store_id"] == store_id for s in _stores_rows()):
+    if not any(s["store_id"] == store_id for s in _stores_store):
         return {"error": f"Store {store_id} not found"}
     items = [i for i in _menu_store if i["store_id"] == store_id]
     categories = {}
@@ -185,7 +146,7 @@ def _get_item(item_id):
 # ---------------------------------------------------------------------------
 
 def create_cart(store_id):
-    store = next((s for s in _stores_rows() if s["store_id"] == store_id), None)
+    store = next((s for s in _stores_store if s["store_id"] == store_id), None)
     if not store:
         return {"error": f"Store {store_id} not found"}
     cart_id = _new_id("cart")
@@ -202,7 +163,7 @@ def _cart_with_totals(cart_id):
     cart = _carts.get(cart_id)
     if not cart:
         return {"error": f"Cart {cart_id} not found"}
-    store = next(s for s in _stores_rows() if s["store_id"] == cart["store_id"])
+    store = next(s for s in _stores_store if s["store_id"] == cart["store_id"])
     subtotal = 0.0
     detailed = []
     for it in cart["items"]:
@@ -273,9 +234,9 @@ def checkout(cart_id, customer_name="Guest", tip=0.0):
         "placed_at": _now_iso(),
         "dasher_name": "",
     }
-    _orders_rows().append(order)
+    _orders_store.append(order)
     for it in cart_full["items"]:
-        _order_items_rows().append({
+        _order_items_store.append({
             "order_id": order_id,
             "item_id": it["item_id"],
             "quantity": it["quantity"],
@@ -291,10 +252,8 @@ def checkout(cart_id, customer_name="Guest", tip=0.0):
 # ---------------------------------------------------------------------------
 
 def get_order(order_id):
-    for o in _orders_rows():
+    for o in _orders_store:
         if o["order_id"] == order_id:
-            items = [i for i in _order_items_rows() if i["order_id"] == order_id]
+            items = [i for i in _order_items_store if i["order_id"] == order_id]
             return {**o, "items": items}
     return {"error": f"Order {order_id} not found"}
-
-_store.eager_load()

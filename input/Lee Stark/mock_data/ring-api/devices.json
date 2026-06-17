@@ -1,0 +1,44 @@
+{
+  "doorbots": [
+    {
+      "id": 987010,
+      "description": "Studio Entrance Doorbell",
+      "device_id": "doorbell_studio",
+      "address": "Main Street Studio",
+      "kind": "doorbell_v5",
+      "firmware_version": "2.0.184",
+      "battery_life": 82,
+      "external_connection": true,
+      "latitude": 45.6770,
+      "longitude": -111.0429,
+      "location_id": "loc_stark_studio_001",
+      "time_zone": "America/Denver",
+      "alerts": {"connection": "online"},
+      "features": {
+        "motions_enabled": true,
+        "show_recordings": true,
+        "advanced_motion_enabled": true,
+        "people_only_enabled": true,
+        "shadow_correction_enabled": true,
+        "motion_message_enabled": false
+      },
+      "motion_snooze": null,
+      "ring_snooze": null,
+      "owned": true,
+      "owner": {"id": 100010, "first_name": "Lee", "last_name": "Stark"},
+      "led_status": "on",
+      "night_mode_status": "enabled",
+      "settings": {
+        "doorbell_volume": 7,
+        "chime_settings": {"type": "digital", "enabled": true, "duration": 4},
+        "motion_detection_enabled": true,
+        "motion_sensitivity": 6,
+        "people_detection_enabled": true,
+        "package_detection_enabled": true
+      },
+      "created_at": "2024-03-12T15:00:00.000Z"
+    }
+  ],
+  "stickup_cams": [],
+  "chimes": []
+}

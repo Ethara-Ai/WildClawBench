@@ -11,17 +11,14 @@ from typing import Optional, List
 import drive_data
 try:
     from tracking_middleware import install_tracker
-    from admin_plane import install_admin_plane
 except ModuleNotFoundError:  # standalone run without the shared module on sys.path
     def install_tracker(app):  # no-op fallback: audit endpoints disabled
         return None
 
-    def install_admin_plane(app, store=None, one_shot_registry=None):
-        return None
-
 app = FastAPI(title="Google Drive API (Mock)", version="v3")
 install_tracker(app)
-install_admin_plane(app, store=drive_data._store)
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -47,16 +44,7 @@ def list_files(
 
 
 @app.get("/drive/v3/files/{file_id}")
-def get_file(file_id: str, alt: Optional[str] = None):
-    if alt == "media":
-        try:
-            return drive_data.download_file_content(file_id)
-        except drive_data.DownloadError as e:
-            return JSONResponse(
-                status_code=e.http_status,
-                content={"error": {"code": e.http_status, "message": e.message,
-                                   "status": e.code.upper()}},
-            )
+def get_file(file_id: str):
     result = drive_data.get_file(file_id)
     if "error" in result:
         return JSONResponse(status_code=404, content=result)

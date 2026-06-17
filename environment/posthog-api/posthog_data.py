@@ -6,49 +6,16 @@ Captured events are held in process memory and reset on container restart.
 """
 
 import csv
+from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store,
-    strict_int,
-    strict_bool,
-)
 
-_store = get_store("posthog-api")
-_API = "posthog-api"
-
-_store.register("events", primary_key="id",
-                initial_loader=lambda: _coerce_events(_load("events.csv", "events")))
-_store.register("flags", primary_key="id",
-                initial_loader=lambda: _coerce_flags(_load("feature_flags.csv", "flags")))
-_store.register("persons", primary_key="id",
-                initial_loader=lambda: _coerce_persons(_load("persons.csv", "persons")))
-
-
-def _events_rows():
-    return _store.table("events").rows()
-
-
-def _flags_rows():
-    return _store.table("flags").rows()
-
-
-def _persons_rows():
-    return _store.table("persons").rows()
-
-
-
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _to_bool(v):
@@ -74,7 +41,7 @@ def _coerce_events(rows):
     for r in rows:
         out.append({
             "id": r["id"],
-            "project_id": strict_int(r, "project_id"),
+            "project_id": int(r["project_id"]),
             "distinct_id": r["distinct_id"],
             "event": r["event"],
             "timestamp": r["timestamp"],
@@ -88,11 +55,11 @@ def _coerce_flags(rows):
     for r in rows:
         out.append({
             "id": r["id"],
-            "project_id": strict_int(r, "project_id"),
+            "project_id": int(r["project_id"]),
             "key": r["key"],
             "name": r["name"],
-            "active": strict_bool(r, "active"),
-            "rollout_percentage": strict_int(r, "rollout_percentage"),
+            "active": _to_bool(r["active"]),
+            "rollout_percentage": int(r["rollout_percentage"]),
         })
     return out
 
@@ -102,7 +69,7 @@ def _coerce_persons(rows):
     for r in rows:
         out.append({
             "id": r["id"],
-            "project_id": strict_int(r, "project_id"),
+            "project_id": int(r["project_id"]),
             "distinct_id": r["distinct_id"],
             "name": r["name"],
             "email": r["email"],
@@ -111,10 +78,13 @@ def _coerce_persons(rows):
     return out
 
 
+_events = _coerce_events(_load("events.csv"))
+_flags = _coerce_flags(_load("feature_flags.csv"))
+_persons = _coerce_persons(_load("persons.csv"))
 
-
-
-
+_events_store = deepcopy(_events)
+_flags_store = deepcopy(_flags)
+_persons_store = deepcopy(_persons)
 
 
 # ---------------------------------------------------------------------------
@@ -150,8 +120,8 @@ def _serialize_person(p):
 # ---------------------------------------------------------------------------
 
 def capture(payload):
-    _events_rows().append({
-        "id": f"evt_{len(_events_rows()) + 1:05d}",
+    _events_store.append({
+        "id": f"evt_{len(_events_store) + 1:05d}",
         "project_id": int(payload.get("project_id") or 1),
         "distinct_id": payload.get("distinct_id"),
         "event": payload.get("event") or "$pageview",
@@ -166,7 +136,7 @@ def capture(payload):
 # ---------------------------------------------------------------------------
 
 def list_events(project_id, event=None, distinct_id=None):
-    events = [e for e in _events_rows() if e["project_id"] == int(project_id)]
+    events = [e for e in _events_store if e["project_id"] == int(project_id)]
     if event:
         events = [e for e in events if e["event"] == event]
     if distinct_id:
@@ -175,7 +145,7 @@ def list_events(project_id, event=None, distinct_id=None):
 
 
 def list_feature_flags(project_id):
-    flags = [f for f in _flags_rows() if f["project_id"] == int(project_id)]
+    flags = [f for f in _flags_store if f["project_id"] == int(project_id)]
     results = [
         {
             "id": f["id"],
@@ -190,7 +160,7 @@ def list_feature_flags(project_id):
 
 
 def list_persons(project_id):
-    persons = [p for p in _persons_rows() if p["project_id"] == int(project_id)]
+    persons = [p for p in _persons_store if p["project_id"] == int(project_id)]
     results = [_serialize_person(p) for p in persons]
     return {"results": results, "count": len(results)}
 
@@ -202,7 +172,7 @@ def list_persons(project_id):
 def decide(payload):
     distinct_id = payload.get("distinct_id")
     project_id = int(payload.get("project_id") or 1)
-    flags = [f for f in _flags_rows() if f["project_id"] == project_id]
+    flags = [f for f in _flags_store if f["project_id"] == project_id]
     enabled = {}
     for f in flags:
         enabled[f["key"]] = bool(f["active"] and f["rollout_percentage"] > 0)
@@ -210,5 +180,3 @@ def decide(payload):
         "featureFlags": enabled,
         "distinctId": distinct_id,
     }
-
-_store.eager_load()

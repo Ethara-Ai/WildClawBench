@@ -7,46 +7,16 @@ container restart.
 
 import csv
 import secrets
+from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_str, strict_bool)
 
-_store = get_store("segment-api")
-_API = "segment-api"
-
-_store.register("events", primary_key="messageId",
-                initial_loader=lambda: _coerce_events(_load("events.csv", "events")))
-_store.register("sources", primary_key="id",
-                initial_loader=lambda: _coerce_sources(_load("sources.csv", "sources")))
-_store.register("destinations", primary_key="id",
-                initial_loader=lambda: _coerce_destinations(_load("destinations.csv", "destinations")))
-
-
-def _events_rows():
-    return _store.table("events").rows()
-
-
-def _sources_rows():
-    return _store.table("sources").rows()
-
-
-def _destinations_rows():
-    return _store.table("destinations").rows()
-
-
-
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _to_bool(v):
@@ -73,8 +43,8 @@ def _coerce_events(rows):
         out.append({
             "messageId": r["messageId"],
             "type": r["type"],
-            "userId": opt_str(r, "userId", default="") or None,
-            "event": opt_str(r, "event", default="") or None,
+            "userId": r["userId"] or None,
+            "event": r["event"] or None,
             "timestamp": r["timestamp"],
             "properties": _parse_props(r["properties"]),
         })
@@ -88,7 +58,7 @@ def _coerce_sources(rows):
             "id": r["id"],
             "name": r["name"],
             "slug": r["slug"],
-            "enabled": strict_bool(r, "enabled"),
+            "enabled": _to_bool(r["enabled"]),
             "type": r["type"],
             "createdAt": r["created_at"],
         })
@@ -102,17 +72,20 @@ def _coerce_destinations(rows):
             "id": r["id"],
             "name": r["name"],
             "slug": r["slug"],
-            "enabled": strict_bool(r, "enabled"),
+            "enabled": _to_bool(r["enabled"]),
             "sourceId": r["source_id"],
             "createdAt": r["created_at"],
         })
     return out
 
 
+_events = _coerce_events(_load("events.csv"))
+_sources = _coerce_sources(_load("sources.csv"))
+_destinations = _coerce_destinations(_load("destinations.csv"))
 
-
-
-
+_events_store = deepcopy(_events)
+_sources_store = deepcopy(_sources)
+_destinations_store = deepcopy(_destinations)
 
 
 # ---------------------------------------------------------------------------
@@ -138,7 +111,7 @@ def _ingest(event_type, payload):
     }
     if event_type == "page" and payload.get("name"):
         entry["properties"].setdefault("name", payload["name"])
-    _events_rows().append(entry)
+    _events_store.append(entry)
     return entry
 
 
@@ -173,7 +146,7 @@ def batch(payload):
 # ---------------------------------------------------------------------------
 
 def list_events(event_type=None, user_id=None):
-    events = list(_events_rows())
+    events = list(_events_store)
     if event_type:
         events = [e for e in events if e["type"] == event_type]
     if user_id:
@@ -182,10 +155,8 @@ def list_events(event_type=None, user_id=None):
 
 
 def list_sources():
-    return {"sources": list(_sources_rows()), "count": len(_sources_rows())}
+    return {"sources": list(_sources_store), "count": len(_sources_store)}
 
 
 def list_destinations():
-    return {"destinations": list(_destinations_rows()), "count": len(_destinations_rows())}
-
-_store.eager_load()
+    return {"destinations": list(_destinations_store), "count": len(_destinations_store)}

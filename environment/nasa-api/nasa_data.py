@@ -5,61 +5,15 @@ and EPIC natural imagery.
 """
 
 import csv
+from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store,
-    strict_int,
-    strict_float,
-    strict_bool,
-)
 
-_store = get_store("nasa-api")
-_API = "nasa-api"
-
-_store.register("apod", primary_key="date",
-                initial_loader=lambda: _coerce_apod(_load("apod.csv", "apod")))
-_store.register("rover_photos", primary_key="id",
-                initial_loader=lambda: _coerce_rover_photos(_load("rover_photos.csv", "rover_photos")))
-_store.register("rovers", primary_key="name",
-                initial_loader=lambda: _coerce_rovers(_load("rovers.csv", "rovers")))
-_store.register("neos", primary_key="id",
-                initial_loader=lambda: _coerce_neos(_load("neos.csv", "neos")))
-_store.register("epic", primary_key="identifier",
-                initial_loader=lambda: _coerce_epic(_load("epic.csv", "epic")))
-
-
-def _apod_rows():
-    return _store.table("apod").rows()
-
-
-def _rover_photos_rows():
-    return _store.table("rover_photos").rows()
-
-
-def _rovers_rows():
-    return _store.table("rovers").rows()
-
-
-def _neos_rows():
-    return _store.table("neos").rows()
-
-
-def _epic_rows():
-    return _store.table("epic").rows()
-
-
-
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _to_bool(v):
@@ -93,9 +47,9 @@ def _coerce_rover_photos(rows):
     out = []
     for r in rows:
         out.append({
-            "id": strict_int(r, "id"),
+            "id": int(r["id"]),
             "rover": r["rover"],
-            "sol": strict_int(r, "sol"),
+            "sol": int(r["sol"]),
             "camera": r["camera"],
             "camera_full_name": r["camera_full_name"],
             "img_src": r["img_src"],
@@ -112,9 +66,9 @@ def _coerce_rovers(rows):
             "status": r["status"],
             "landing_date": r["landing_date"],
             "launch_date": r["launch_date"],
-            "max_sol": strict_int(r, "max_sol"),
+            "max_sol": int(r["max_sol"]),
             "max_date": r["max_date"],
-            "total_photos": strict_int(r, "total_photos"),
+            "total_photos": int(r["total_photos"]),
         })
     return out
 
@@ -126,12 +80,12 @@ def _coerce_neos(rows):
             "id": r["id"],
             "name": r["name"],
             "close_approach_date": r["close_approach_date"],
-            "absolute_magnitude_h": strict_float(r, "absolute_magnitude_h"),
-            "est_diameter_min_km": strict_float(r, "est_diameter_min_km"),
-            "est_diameter_max_km": strict_float(r, "est_diameter_max_km"),
-            "is_potentially_hazardous": strict_bool(r, "is_potentially_hazardous"),
-            "miss_distance_km": strict_float(r, "miss_distance_km"),
-            "relative_velocity_kph": strict_float(r, "relative_velocity_kph"),
+            "absolute_magnitude_h": float(r["absolute_magnitude_h"]),
+            "est_diameter_min_km": float(r["est_diameter_min_km"]),
+            "est_diameter_max_km": float(r["est_diameter_max_km"]),
+            "is_potentially_hazardous": _to_bool(r["is_potentially_hazardous"]),
+            "miss_distance_km": float(r["miss_distance_km"]),
+            "relative_velocity_kph": float(r["relative_velocity_kph"]),
             "orbiting_body": r["orbiting_body"],
         })
     return out
@@ -146,21 +100,24 @@ def _coerce_epic(rows):
             "caption": r["caption"],
             "date": r["date"],
             "centroid_coordinates": {
-                "lat": strict_float(r, "centroid_lat"),
-                "lon": strict_float(r, "centroid_lon"),
+                "lat": float(r["centroid_lat"]),
+                "lon": float(r["centroid_lon"]),
             },
         })
     return out
 
 
+_apod = _coerce_apod(_load("apod.csv"))
+_rover_photos = _coerce_rover_photos(_load("rover_photos.csv"))
+_rovers = _coerce_rovers(_load("rovers.csv"))
+_neos = _coerce_neos(_load("neos.csv"))
+_epic = _coerce_epic(_load("epic.csv"))
 
-
-
-
-
-
-
-
+_apod_store = deepcopy(_apod)
+_rover_photos_store = deepcopy(_rover_photos)
+_rovers_store = deepcopy(_rovers)
+_neos_store = deepcopy(_neos)
+_epic_store = deepcopy(_epic)
 
 
 # ---------------------------------------------------------------------------
@@ -169,16 +126,16 @@ def _coerce_epic(rows):
 
 def get_apod(date=None, start_date=None, end_date=None):
     if start_date or end_date:
-        lo = start_date or min(a["date"] for a in _apod_rows())
-        hi = end_date or max(a["date"] for a in _apod_rows())
-        return [a for a in _apod_rows() if lo <= a["date"] <= hi]
+        lo = start_date or min(a["date"] for a in _apod_store)
+        hi = end_date or max(a["date"] for a in _apod_store)
+        return [a for a in _apod_store if lo <= a["date"] <= hi]
     if date:
-        a = next((x for x in _apod_rows() if x["date"] == date), None)
+        a = next((x for x in _apod_store if x["date"] == date), None)
         if not a:
             return {"error": f"No APOD entry for {date}"}
         return a
     # latest
-    return max(_apod_rows(), key=lambda x: x["date"])
+    return max(_apod_store, key=lambda x: x["date"])
 
 
 # ---------------------------------------------------------------------------
@@ -186,14 +143,14 @@ def get_apod(date=None, start_date=None, end_date=None):
 # ---------------------------------------------------------------------------
 
 def _rover(name):
-    return next((r for r in _rovers_rows() if r["name"].lower() == (name or "").lower()), None)
+    return next((r for r in _rovers_store if r["name"].lower() == (name or "").lower()), None)
 
 
 def get_rover_manifest(rover):
     r = _rover(rover)
     if not r:
         return {"error": f"Rover {rover} not found"}
-    photos_for_rover = [p for p in _rover_photos_rows() if p["rover"].lower() == r["name"].lower()]
+    photos_for_rover = [p for p in _rover_photos_store if p["rover"].lower() == r["name"].lower()]
     by_sol = {}
     for p in photos_for_rover:
         by_sol.setdefault(p["sol"], {"sol": p["sol"], "earth_date": p["earth_date"], "total_photos": 0, "cameras": set()})
@@ -226,7 +183,7 @@ def get_rover_photos(rover, sol=None, camera=None, earth_date=None):
     r = _rover(rover)
     if not r:
         return {"error": f"Rover {rover} not found"}
-    photos = [p for p in _rover_photos_rows() if p["rover"].lower() == r["name"].lower()]
+    photos = [p for p in _rover_photos_store if p["rover"].lower() == r["name"].lower()]
     if sol is not None:
         photos = [p for p in photos if p["sol"] == int(sol)]
     if earth_date:
@@ -281,9 +238,9 @@ def _neo_view(n):
 
 
 def get_neo_feed(start_date=None, end_date=None):
-    lo = start_date or min(n["close_approach_date"] for n in _neos_rows())
+    lo = start_date or min(n["close_approach_date"] for n in _neos_store)
     hi = end_date or lo
-    matches = [n for n in _neos_rows() if lo <= n["close_approach_date"] <= hi]
+    matches = [n for n in _neos_store if lo <= n["close_approach_date"] <= hi]
     by_date = {}
     for n in matches:
         by_date.setdefault(n["close_approach_date"], []).append(_neo_view(n))
@@ -294,7 +251,7 @@ def get_neo_feed(start_date=None, end_date=None):
 
 
 def get_neo(neo_id):
-    n = next((x for x in _neos_rows() if x["id"] == str(neo_id)), None)
+    n = next((x for x in _neos_store if x["id"] == str(neo_id)), None)
     if not n:
         return {"error": f"NEO {neo_id} not found"}
     return _neo_view(n)
@@ -305,6 +262,4 @@ def get_neo(neo_id):
 # ---------------------------------------------------------------------------
 
 def get_epic_natural():
-    return list(_epic_rows())
-
-_store.eager_load()
+    return list(_epic_store)

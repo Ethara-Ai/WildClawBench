@@ -8,43 +8,15 @@ dimensions and metrics, mimicking the GA4 ``runReport`` response shape.
 
 import csv
 import json
+from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import read_csv_with_ctx, get_store, opt_int  # noqa: E402
 
-_store = get_store("google-analytics-api")
-_API = "google-analytics-api"
-
-_store.register("events", primary_key="date",
-                initial_loader=lambda: _coerce_events(_load("events.csv", "events")))
-_store.register("realtime", primary_key="country",
-                initial_loader=lambda: _coerce_realtime(_load("realtime.csv", "realtime")))
-_store.register_document("property", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "property.json", encoding="utf-8")))
-
-
-def _events_rows():
-    return _store.table("events").rows()
-
-
-def _realtime_rows():
-    return _store.table("realtime").rows()
-
-
-def _property_doc():
-    return _store.document("property").get()
-
-
-
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _to_int(v, default=0):
@@ -69,7 +41,7 @@ def _coerce_events(rows):
     for r in rows:
         row = {d: r[d] for d in _DIMENSIONS}
         for m in _METRICS:
-            row[m] = opt_int(r, m, default=0)
+            row[m] = _to_int(r[m])
         out.append(row)
     return out
 
@@ -79,12 +51,20 @@ def _coerce_realtime(rows):
     for r in rows:
         row = {d: r[d] for d in _REALTIME_DIMENSIONS}
         for m in _REALTIME_METRICS:
-            row[m] = opt_int(r, m, default=0)
+            row[m] = _to_int(r[m])
         out.append(row)
     return out
 
 
+_events = _coerce_events(_load("events.csv"))
+_realtime = _coerce_realtime(_load("realtime.csv"))
 
+with open(DATA_DIR / "property.json", encoding="utf-8") as _f:
+    _property = json.load(_f)
+
+_events_store = deepcopy(_events)
+_realtime_store = deepcopy(_realtime)
+_property_store = deepcopy(_property)
 
 
 # ---------------------------------------------------------------------------
@@ -128,7 +108,7 @@ def _aggregate(source_rows, dimensions, metrics, available_dims, available_metri
 
 def run_report(property_id, dimensions=None, metrics=None, date_ranges=None):
     report = _aggregate(
-        _events_rows(),
+        _events_store,
         dimensions or [],
         metrics or [],
         _DIMENSIONS,
@@ -142,7 +122,7 @@ def run_report(property_id, dimensions=None, metrics=None, date_ranges=None):
 
 def run_realtime_report(property_id, dimensions=None, metrics=None):
     report = _aggregate(
-        _realtime_rows(),
+        _realtime_store,
         dimensions or [],
         metrics or [],
         _REALTIME_DIMENSIONS,
@@ -195,6 +175,4 @@ def get_metadata(property_id):
 
 
 def get_property():
-    return deepcopy(_property_doc())
-
-_store.eager_load()
+    return deepcopy(_property_store)

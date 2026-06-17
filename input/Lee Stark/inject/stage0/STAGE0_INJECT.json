@@ -1,0 +1,22 @@
+{
+  "stage": "stage0",
+  "stage_description": "TR-01 — Revised Autumn Collection spec sheet (v2) is seeded into the working files before T1 (Day 1 morning). Supersedes v1 with new packaging (amber 2 oz → amber 4 oz w/ tamper-evident cap) and revised Autumn Immune Blend Tincture ratios. Stage 0 is always replayed as seed before turn 1.",
+  "mutations": [
+    {
+      "id": "TR-01",
+      "family": "temporal_revision",
+      "description": "Place revised Autumn Collection spec sheet v2 into the working files — supersedes v1",
+      "service": "filesystem",
+      "fs": {
+        "op": "place_file",
+        "dest": "data/Autumn_Collection_Spec_Sheet_v2_REVISED.pdf",
+        "source": "data/Autumn_Collection_Spec_Sheet_v2_REVISED.pdf",
+        "modified_time": "{D0:iso}T09:30:00-06:00",
+        "metadata": {
+          "supersedes": "Autumn_Collection_Spec_Sheet_v1.pdf",
+          "change_summary": "Packaging changed amber 2 oz → amber 4 oz tamper-evident; AIBT-2509 ratio elderberry +10% / echinacea -5%."
+        }
+      }
+    }
+  ]
+}

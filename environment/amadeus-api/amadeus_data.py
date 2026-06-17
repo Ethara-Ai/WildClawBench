@@ -7,46 +7,15 @@ reference data for locations/airports and airlines, and offer pricing.
 import csv
 import json
 import uuid
+from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store,
-    strict_float,
-)
 
-_store = get_store("amadeus-api")
-_API = "amadeus-api"
-
-_store.register("airports", primary_key="iata_code",
-                initial_loader=lambda: _coerce_airports(_load("airports.csv", "airports")))
-_store.register("airlines", primary_key="iata_code",
-                initial_loader=lambda: _coerce_airlines(_load("airlines.csv", "airlines")))
-_store.register_document("offers", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "flight_offers.json", encoding="utf-8")))
-
-
-def _airports_rows():
-    return _store.table("airports").rows()
-
-
-def _airlines_rows():
-    return _store.table("airlines").rows()
-
-
-def _offers_doc():
-    return _store.document("offers").get()
-
-
-
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 # ---------------------------------------------------------------------------
@@ -57,18 +26,26 @@ def _coerce_airports(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "latitude": strict_float(r, "latitude"),
-            "longitude": strict_float(r, "longitude"),
+            **r,
+            "latitude": float(r["latitude"]),
+            "longitude": float(r["longitude"]),
         })
     return out
 
 
 def _coerce_airlines(rows):
-    return [_strip_ctx(r) for r in rows]
+    return [dict(r) for r in rows]
 
 
+_airports = _coerce_airports(_load("airports.csv"))
+_airlines = _coerce_airlines(_load("airlines.csv"))
 
+with open(DATA_DIR / "flight_offers.json", encoding="utf-8") as _f:
+    _offers = json.load(_f)
+
+_airports_store = deepcopy(_airports)
+_airlines_store = deepcopy(_airlines)
+_offers_store = deepcopy(_offers)
 
 
 # ---------------------------------------------------------------------------
@@ -76,7 +53,7 @@ def _coerce_airlines(rows):
 # ---------------------------------------------------------------------------
 
 def _airport_by_code(code):
-    return next((a for a in _airports_rows() if a["iata_code"] == code), None)
+    return next((a for a in _airports_store if a["iata_code"] == code), None)
 
 
 def _location_id(code):
@@ -115,7 +92,7 @@ def _public_offer(offer):
 
 def search_flight_offers(origin, destination, departure_date=None, adults=1, max_results=50):
     matches = [
-        o for o in _offers_doc()
+        o for o in _offers_store
         if o["originLocationCode"] == origin and o["destinationLocationCode"] == destination
     ]
     if departure_date:
@@ -151,17 +128,17 @@ def search_flight_offers(origin, destination, departure_date=None, adults=1, max
         "meta": {"count": len(data)},
         "data": data,
         "dictionaries": {
-            "carriers": {a["iata_code"]: a["business_name"] for a in _airlines_rows()},
+            "carriers": {a["iata_code"]: a["business_name"] for a in _airlines_store},
             "locations": {
                 a["iata_code"]: {"cityCode": a["city_code"], "countryCode": a["country_code"]}
-                for a in _airports_rows()
+                for a in _airports_store
             },
         },
     }
 
 
 def get_offer(offer_id):
-    return next((o for o in _offers_doc() if o["id"] == str(offer_id)), None)
+    return next((o for o in _offers_store if o["id"] == str(offer_id)), None)
 
 
 def price_flight_offer(offer):
@@ -192,7 +169,7 @@ def price_flight_offer(offer):
 
 def search_locations(keyword=None, sub_type="AIRPORT,CITY"):
     types = [t.strip().upper() for t in (sub_type or "AIRPORT,CITY").split(",") if t.strip()]
-    pool = _airports_rows()
+    pool = _airports_store
     if keyword:
         k = keyword.lower()
         pool = [
@@ -218,7 +195,7 @@ def get_location(location_id):
     code = location_id[1:] if location_id and location_id[0] in ("A", "C") else location_id
     a = _airport_by_code(code)
     if not a:
-        a = next((x for x in _airports_rows() if x["city_code"] == code), None)
+        a = next((x for x in _airports_store if x["city_code"] == code), None)
     if not a:
         return {"error": f"Location {location_id} not found"}
     return {"data": _location_view(a)}
@@ -229,7 +206,7 @@ def get_location(location_id):
 # ---------------------------------------------------------------------------
 
 def get_airlines(airline_codes=None):
-    pool = _airlines_rows()
+    pool = _airlines_store
     if airline_codes:
         codes = {c.strip().upper() for c in airline_codes.split(",") if c.strip()}
         pool = [a for a in pool if a["iata_code"] in codes]
@@ -244,5 +221,3 @@ def get_airlines(airline_codes=None):
         for a in pool
     ]
     return {"meta": {"count": len(data)}, "data": data}
-
-_store.eager_load()

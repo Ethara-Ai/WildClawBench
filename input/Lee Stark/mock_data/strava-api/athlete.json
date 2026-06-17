@@ -1,0 +1,16 @@
+{
+  "id": 88210045,
+  "username": "lee_stark_mt",
+  "firstname": "Lee",
+  "lastname": "Stark",
+  "city": "Bozeman",
+  "state": "Montana",
+  "country": "United States",
+  "sex": "M",
+  "premium": false,
+  "weight": 78.0,
+  "ftp": null,
+  "follower_count": 38,
+  "friend_count": 42,
+  "created_at": "2019-04-12T16:20:00Z"
+}

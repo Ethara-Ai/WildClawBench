@@ -1,0 +1,15 @@
+{
+  "id": "ALPACA_DISTRACTOR",
+  "account_number": "PA0000DISTRACTOR",
+  "status": "ACTIVE",
+  "currency": "USD",
+  "cash": "0.00",
+  "portfolio_value": "0.00",
+  "buying_power": "0.00",
+  "equity": "0.00",
+  "long_market_value": "0.00",
+  "pattern_day_trader": false,
+  "trading_blocked": false,
+  "account_blocked": false,
+  "created_at": "2025-01-01T00:00:00Z"
+}

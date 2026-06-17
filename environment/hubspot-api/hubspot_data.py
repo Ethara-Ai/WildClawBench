@@ -13,33 +13,10 @@ from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store,
-    strict_int,
-    strict_bool,
-    opt_float,
-)
 
-_store = get_store("hubspot-api")
-_API = "hubspot-api"
-
-_store.register("pipelines", primary_key="id",
-                initial_loader=lambda: _coerce_stages(_load("pipeline_stages.csv", "pipelines")))
-
-
-def _pipelines_rows():
-    return _store.table("pipelines").rows()
-
-
-
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _now():
@@ -106,19 +83,22 @@ def _coerce_stages(rows):
         pipelines[pid]["stages"].append({
             "id": r["stage_id"],
             "label": r["stage_label"],
-            "displayOrder": strict_int(r, "display_order"),
-            "metadata": {"isClosed": str(strict_bool(r, "closed")).lower(),
-                         "probability": str(opt_float(r, "probability", default=0.0))},
+            "displayOrder": int(r["display_order"]),
+            "metadata": {"isClosed": str(_to_bool(r["closed"])).lower(),
+                         "probability": str(_to_float(r["probability"]))},
         })
     return list(pipelines.values())
 
 
-_contacts_store = _coerce_objects(_load("contacts.csv", "contacts"), _CONTACT_PROPS)
-_companies_store = _coerce_objects(_load("companies.csv", "companies"), _COMPANY_PROPS)
-_deals_store = _coerce_objects(_load("deals.csv", "deals"), _DEAL_PROPS, extra=_deal_extra)
+_contacts = _coerce_objects(_load("contacts.csv"), _CONTACT_PROPS)
+_companies = _coerce_objects(_load("companies.csv"), _COMPANY_PROPS)
+_deals = _coerce_objects(_load("deals.csv"), _DEAL_PROPS, extra=_deal_extra)
+_pipelines = _coerce_stages(_load("pipeline_stages.csv"))
 
-
-
+_contacts_store = deepcopy(_contacts)
+_companies_store = deepcopy(_companies)
+_deals_store = deepcopy(_deals)
+_pipelines_store = deepcopy(_pipelines)
 
 
 # ---------------------------------------------------------------------------
@@ -223,7 +203,7 @@ def get_deal(deal_id):
 
 
 def _valid_stage(pipeline_id, stage_id):
-    pipe = next((p for p in _pipelines_rows() if p["id"] == pipeline_id), None)
+    pipe = next((p for p in _pipelines_store if p["id"] == pipeline_id), None)
     if not pipe:
         return False
     return any(s["id"] == stage_id for s in pipe["stages"])
@@ -272,6 +252,4 @@ def update_deal(deal_id, properties):
 # ---------------------------------------------------------------------------
 
 def list_deal_pipelines():
-    return {"results": deepcopy(_pipelines_rows())}
-
-_store.eager_load()
+    return {"results": deepcopy(_pipelines_store)}

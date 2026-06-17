@@ -1,58 +1,16 @@
 """Data access module for the Jira API mock service."""
 
 import csv
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_int, opt_str, strict_bool, strict_int)
 
-_store = get_store("jira-api")
-_API = "jira-api"
-
-_store.register("projects", primary_key="id",
-                initial_loader=lambda: _coerce_projects(_load("projects.csv", "projects")))
-_store.register("users", primary_key="account_id",
-                initial_loader=lambda: _coerce_users(_load("users.csv", "users")))
-_store.register("boards", primary_key="id",
-                initial_loader=lambda: _coerce_boards(_load("boards.csv", "boards")))
-_store.register("sprints", primary_key="id",
-                initial_loader=lambda: _coerce_sprints(_load("sprints.csv", "sprints")))
-_store.register("issues", primary_key="id",
-                initial_loader=lambda: _coerce_issues(_load("issues.csv", "issues")))
-
-
-def _projects_rows():
-    return _store.table("projects").rows()
-
-
-def _users_rows():
-    return _store.table("users").rows()
-
-
-def _boards_rows():
-    return _store.table("boards").rows()
-
-
-def _sprints_rows():
-    return _store.table("sprints").rows()
-
-
-def _issues_rows():
-    return _store.table("issues").rows()
-
-
-
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _now():
@@ -89,26 +47,26 @@ _STATUS_CATEGORY = {
 # ---------------------------------------------------------------------------
 
 def _coerce_projects(rows):
-    return [{**_strip_ctx(r), "id": r["id"]} for r in rows]
+    return [{**r, "id": r["id"]} for r in rows]
 
 
 def _coerce_users(rows):
-    return [{**_strip_ctx(r), "active": strict_bool(r, "active")} for r in rows]
+    return [{**r, "active": _to_bool(r["active"])} for r in rows]
 
 
 def _coerce_boards(rows):
-    return [{**_strip_ctx(r), "id": strict_int(r, "id")} for r in rows]
+    return [{**r, "id": int(r["id"])} for r in rows]
 
 
 def _coerce_sprints(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "id": strict_int(r, "id"),
-            "board_id": strict_int(r, "board_id"),
-            "start_date": opt_str(r, "start_date", default="") or None,
-            "end_date": opt_str(r, "end_date", default="") or None,
+            **r,
+            "id": int(r["id"]),
+            "board_id": int(r["board_id"]),
+            "start_date": r["start_date"] or None,
+            "end_date": r["end_date"] or None,
         })
     return out
 
@@ -117,23 +75,26 @@ def _coerce_issues(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
+            **r,
             "id": r["id"],
-            "sprint_id": opt_int(r, "sprint_id", default=0),
-            "story_points": opt_int(r, "story_points", default=0),
-            "assignee": opt_str(r, "assignee", default="") or None,
+            "sprint_id": _to_int(r["sprint_id"]),
+            "story_points": _to_int(r["story_points"]),
+            "assignee": r["assignee"] or None,
         })
     return out
 
 
+_projects = _coerce_projects(_load("projects.csv"))
+_users = _coerce_users(_load("users.csv"))
+_boards = _coerce_boards(_load("boards.csv"))
+_sprints = _coerce_sprints(_load("sprints.csv"))
+_issues = _coerce_issues(_load("issues.csv"))
 
-
-
-
-
-
-
-
+_projects_store = deepcopy(_projects)
+_users_store = deepcopy(_users)
+_boards_store = deepcopy(_boards)
+_sprints_store = deepcopy(_sprints)
+_issues_store = deepcopy(_issues)
 
 
 # ---------------------------------------------------------------------------
@@ -141,7 +102,7 @@ def _coerce_issues(rows):
 # ---------------------------------------------------------------------------
 
 def _user_obj(account_id):
-    u = next((x for x in _users_rows() if x["account_id"] == account_id), None)
+    u = next((x for x in _users_store if x["account_id"] == account_id), None)
     if not u:
         return None
     return {
@@ -186,7 +147,7 @@ def _serialize_project(p):
 
 def _next_issue_key(project_key):
     nums = []
-    for i in _issues_rows():
+    for i in _issues_store:
         if i["project_key"] == project_key and "-" in i["key"]:
             try:
                 nums.append(int(i["key"].split("-")[1]))
@@ -200,7 +161,7 @@ def _next_issue_key(project_key):
 # ---------------------------------------------------------------------------
 
 def list_projects():
-    return [_serialize_project(p) for p in _projects_rows()]
+    return [_serialize_project(p) for p in _projects_store]
 
 
 # ---------------------------------------------------------------------------
@@ -208,7 +169,7 @@ def list_projects():
 # ---------------------------------------------------------------------------
 
 def get_issue(issue_key):
-    for i in _issues_rows():
+    for i in _issues_store:
         if i["key"] == issue_key:
             return _serialize_issue(i)
     return {"errorMessages": [f"Issue {issue_key} does not exist"], "errors": {}}
@@ -216,13 +177,13 @@ def get_issue(issue_key):
 
 def create_issue(project_key, summary, issue_type="Task", description="",
                  priority="Medium", assignee=None, reporter="user-amelia"):
-    proj = next((p for p in _projects_rows() if p["key"] == project_key), None)
+    proj = next((p for p in _projects_store if p["key"] == project_key), None)
     if not proj:
         return {"errorMessages": [f"Project {project_key} not found"], "errors": {}}
-    if assignee and not any(u["account_id"] == assignee for u in _users_rows()):
+    if assignee and not any(u["account_id"] == assignee for u in _users_store):
         return {"errorMessages": [], "errors": {"assignee": "Invalid assignee"}}
     key = _next_issue_key(project_key)
-    new_id = str(max(int(i["id"]) for i in _issues_rows()) + 1)
+    new_id = str(max(int(i["id"]) for i in _issues_store) + 1)
     issue = {
         "id": new_id,
         "key": key,
@@ -239,28 +200,28 @@ def create_issue(project_key, summary, issue_type="Task", description="",
         "created": _now(),
         "updated": _now(),
     }
-    _issues_rows().append(issue)
+    _issues_store.append(issue)
     return {"id": new_id, "key": key, "self": f"/rest/api/3/issue/{new_id}"}
 
 
 def update_issue(issue_key, summary=None, description=None, priority=None, assignee=None):
-    for i, issue in enumerate(_issues_rows()):
+    for i, issue in enumerate(_issues_store):
         if issue["key"] == issue_key:
             if summary is not None:
-                _issues_rows()[i]["summary"] = summary
+                _issues_store[i]["summary"] = summary
             if description is not None:
-                _issues_rows()[i]["description"] = description
+                _issues_store[i]["description"] = description
             if priority is not None:
-                _issues_rows()[i]["priority"] = priority
+                _issues_store[i]["priority"] = priority
             if assignee is not None:
-                _issues_rows()[i]["assignee"] = assignee or None
-            _issues_rows()[i]["updated"] = _now()
+                _issues_store[i]["assignee"] = assignee or None
+            _issues_store[i]["updated"] = _now()
             return {"key": issue_key, "updated": True}
     return {"errorMessages": [f"Issue {issue_key} does not exist"], "errors": {}}
 
 
 def get_transitions(issue_key):
-    issue = next((i for i in _issues_rows() if i["key"] == issue_key), None)
+    issue = next((i for i in _issues_store if i["key"] == issue_key), None)
     if not issue:
         return {"errorMessages": [f"Issue {issue_key} does not exist"], "errors": {}}
     transitions = []
@@ -270,19 +231,19 @@ def get_transitions(issue_key):
 
 
 def transition_issue(issue_key, transition_id):
-    for i, issue in enumerate(_issues_rows()):
+    for i, issue in enumerate(_issues_store):
         if issue["key"] == issue_key:
             allowed = _WORKFLOW.get(issue["status"], {})
             if transition_id not in allowed:
                 return {"errorMessages": [f"Transition {transition_id} not valid from {issue['status']}"], "errors": {}}
-            _issues_rows()[i]["status"] = allowed[transition_id]
-            _issues_rows()[i]["updated"] = _now()
+            _issues_store[i]["status"] = allowed[transition_id]
+            _issues_store[i]["updated"] = _now()
             return {"key": issue_key, "status": allowed[transition_id], "transitioned": True}
     return {"errorMessages": [f"Issue {issue_key} does not exist"], "errors": {}}
 
 
 def search(jql=None, max_results=50):
-    results = list(_issues_rows())
+    results = list(_issues_store)
     project = None
     status = None
     if jql:
@@ -320,19 +281,19 @@ def list_boards():
     return {
         "maxResults": 50,
         "startAt": 0,
-        "total": len(_boards_rows()),
+        "total": len(_boards_store),
         "values": [
             {"id": b["id"], "name": b["name"], "type": b["type"],
              "location": {"projectKey": b["project_key"]}}
-            for b in _boards_rows()
+            for b in _boards_store
         ],
     }
 
 
 def list_sprints(board_id, state=None):
-    if not any(b["id"] == board_id for b in _boards_rows()):
+    if not any(b["id"] == board_id for b in _boards_store):
         return {"errorMessages": [f"Board {board_id} not found"], "errors": {}}
-    sprints = [s for s in _sprints_rows() if s["board_id"] == board_id]
+    sprints = [s for s in _sprints_store if s["board_id"] == board_id]
     if state:
         sprints = [s for s in sprints if s["state"] == state]
     return {
@@ -346,5 +307,3 @@ def list_sprints(board_id, state=None):
             for s in sprints
         ],
     }
-
-_store.eager_load()

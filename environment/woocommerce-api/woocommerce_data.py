@@ -5,45 +5,15 @@ customers. Returns bare arrays/objects like the real API.
 """
 
 import csv
+from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, opt_float, opt_int, strict_bool)
 
-_store = get_store("woocommerce-api")
-_API = "woocommerce-api"
-
-_store.register("products", primary_key="id",
-                initial_loader=lambda: _coerce_products(_load("products.csv", "products")))
-_store.register("customers", primary_key="id",
-                initial_loader=lambda: _coerce_customers(_load("customers.csv", "customers")))
-_store.register("orders", primary_key="id",
-                initial_loader=lambda: _coerce_orders(_load("orders.csv", "orders")))
-
-
-def _products_rows():
-    return _store.table("products").rows()
-
-
-def _customers_rows():
-    return _store.table("customers").rows()
-
-
-def _orders_rows():
-    return _store.table("orders").rows()
-
-
-
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _to_bool(v):
@@ -72,20 +42,20 @@ def _coerce_products(rows):
     out = []
     for r in rows:
         out.append({
-            "id": opt_int(r, "id", default=0),
+            "id": _to_int(r["id"]),
             "name": r["name"],
             "slug": r["slug"],
             "sku": r["sku"],
             "type": r["type"],
             "status": r["status"],
-            "price": opt_float(r, "price", default=None),
-            "regular_price": opt_float(r, "regular_price", default=None),
-            "sale_price": opt_float(r, "sale_price", default=None),
-            "on_sale": strict_bool(r, "on_sale"),
-            "stock_quantity": opt_int(r, "stock_quantity", default=0),
+            "price": _to_float(r["price"]),
+            "regular_price": _to_float(r["regular_price"]),
+            "sale_price": _to_float(r["sale_price"]),
+            "on_sale": _to_bool(r["on_sale"]),
+            "stock_quantity": _to_int(r["stock_quantity"]),
             "stock_status": r["stock_status"],
-            "manage_stock": strict_bool(r, "manage_stock"),
-            "categories": [c for c in opt_csv_list(r, "categories", sep=";") if c],
+            "manage_stock": _to_bool(r["manage_stock"]),
+            "categories": [c for c in r["categories"].split(";") if c],
             "description": r["description"],
             "date_created": r["date_created"],
         })
@@ -96,7 +66,7 @@ def _coerce_customers(rows):
     out = []
     for r in rows:
         out.append({
-            "id": opt_int(r, "id", default=0),
+            "id": _to_int(r["id"]),
             "first_name": r["first_name"],
             "last_name": r["last_name"],
             "email": r["email"],
@@ -104,7 +74,7 @@ def _coerce_customers(rows):
             "role": r["role"],
             "billing_city": r["billing_city"],
             "billing_country": r["billing_country"],
-            "is_paying_customer": strict_bool(r, "is_paying_customer"),
+            "is_paying_customer": _to_bool(r["is_paying_customer"]),
             "date_created": r["date_created"],
         })
     return out
@@ -114,14 +84,14 @@ def _coerce_orders(rows):
     out = []
     for r in rows:
         out.append({
-            "id": opt_int(r, "id", default=0),
+            "id": _to_int(r["id"]),
             "number": r["number"],
-            "customer_id": opt_int(r, "customer_id", default=0),
+            "customer_id": _to_int(r["customer_id"]),
             "status": r["status"],
             "currency": r["currency"],
-            "total": opt_float(r, "total", default=None),
-            "subtotal": opt_float(r, "subtotal", default=None),
-            "total_tax": opt_float(r, "total_tax", default=None),
+            "total": _to_float(r["total"]),
+            "subtotal": _to_float(r["subtotal"]),
+            "total_tax": _to_float(r["total_tax"]),
             "payment_method": r["payment_method"],
             "payment_method_title": r["payment_method_title"],
             "billing_first_name": r["billing_first_name"],
@@ -132,10 +102,13 @@ def _coerce_orders(rows):
     return out
 
 
+_products = _coerce_products(_load("products.csv"))
+_customers = _coerce_customers(_load("customers.csv"))
+_orders = _coerce_orders(_load("orders.csv"))
 
-
-
-
+_products_store = deepcopy(_products)
+_customers_store = deepcopy(_customers)
+_orders_store = deepcopy(_orders)
 
 
 # ---------------------------------------------------------------------------
@@ -204,7 +177,7 @@ def _serialize_order(o):
 # ---------------------------------------------------------------------------
 
 def list_products(search=None, sku=None, status=None, page=1, per_page=10):
-    items = _products_rows()
+    items = _products_store
     if search:
         items = [p for p in items if search.lower() in p["name"].lower()]
     if sku:
@@ -217,7 +190,7 @@ def list_products(search=None, sku=None, status=None, page=1, per_page=10):
 
 
 def get_product(product_id):
-    p = next((x for x in _products_rows() if x["id"] == int(product_id)), None)
+    p = next((x for x in _products_store if x["id"] == int(product_id)), None)
     if not p:
         return {"error": "woocommerce_rest_product_invalid_id", "status": 404,
                 "message": f"Invalid product ID: {product_id}"}
@@ -229,7 +202,7 @@ def get_product(product_id):
 # ---------------------------------------------------------------------------
 
 def list_orders(customer=None, status=None, page=1, per_page=10):
-    items = _orders_rows()
+    items = _orders_store
     if customer is not None:
         items = [o for o in items if o["customer_id"] == int(customer)]
     if status:
@@ -240,7 +213,7 @@ def list_orders(customer=None, status=None, page=1, per_page=10):
 
 
 def get_order(order_id):
-    o = next((x for x in _orders_rows() if x["id"] == int(order_id)), None)
+    o = next((x for x in _orders_store if x["id"] == int(order_id)), None)
     if not o:
         return {"error": "woocommerce_rest_shop_order_invalid_id", "status": 404,
                 "message": f"Invalid order ID: {order_id}"}
@@ -252,10 +225,10 @@ def create_order(customer_id=0, status="pending", currency="USD",
                  billing=None, line_items=None):
     billing = billing or {}
     line_items = line_items or []
-    next_id = max((o["id"] for o in _orders_rows()), default=400) + 1
+    next_id = max((o["id"] for o in _orders_store), default=400) + 1
     subtotal = 0.0
     for line in line_items:
-        prod = next((p for p in _products_rows()
+        prod = next((p for p in _products_store
                      if p["id"] == int(line.get("product_id", 0))), None)
         qty = int(line.get("quantity", 1))
         price = prod["price"] if prod else 0.0
@@ -277,7 +250,7 @@ def create_order(customer_id=0, status="pending", currency="USD",
         "billing_email": billing.get("email", ""),
         "date_created": "2026-05-28T00:00:00",
     }
-    _orders_rows().append(order)
+    _orders_store.append(order)
     return _serialize_order(order)
 
 
@@ -286,7 +259,7 @@ def create_order(customer_id=0, status="pending", currency="USD",
 # ---------------------------------------------------------------------------
 
 def list_customers(search=None, email=None, page=1, per_page=10):
-    items = _customers_rows()
+    items = _customers_store
     if email:
         items = [c for c in items if email.lower() in c["email"].lower()]
     if search:
@@ -296,5 +269,3 @@ def list_customers(search=None, email=None, page=1, per_page=10):
     start = (page - 1) * per_page
     page_items = items[start:start + per_page]
     return [_serialize_customer(c) for c in page_items]
-
-_store.eager_load()

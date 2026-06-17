@@ -2,76 +2,16 @@
 
 import csv
 import json
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_float, opt_str, strict_int)
 
-_store = get_store("google-classroom-api")
-_API = "google-classroom-api"
-
-_store.register("courses", primary_key="id",
-                initial_loader=lambda: _coerce_courses(_load("courses.csv", "courses")))
-_store.register("coursework", primary_key="id",
-                initial_loader=lambda: _coerce_coursework(_load("coursework.csv", "coursework")))
-_store.register("topics", primary_key="courseId",
-                initial_loader=lambda: _coerce_topics(_load("topics.csv", "topics")))
-_store.register("students", primary_key="courseId",
-                initial_loader=lambda: _coerce_students(_load("students.csv", "students")))
-_store.register("teachers", primary_key="courseId",
-                initial_loader=lambda: _coerce_teachers(_load("teachers.csv", "teachers")))
-_store.register("submissions", primary_key="id",
-                initial_loader=lambda: _coerce_submissions(_load("submissions.csv", "submissions")))
-_store.register("announcements", primary_key="id",
-                initial_loader=lambda: _coerce_announcements(_load("announcements.csv", "announcements")))
-_store.register("materials", primary_key="id",
-                initial_loader=lambda: _coerce_materials(_load("materials.csv", "materials")))
-
-
-def _courses_rows():
-    return _store.table("courses").rows()
-
-
-def _coursework_rows():
-    return _store.table("coursework").rows()
-
-
-def _topics_rows():
-    return _store.table("topics").rows()
-
-
-def _students_rows():
-    return _store.table("students").rows()
-
-
-def _teachers_rows():
-    return _store.table("teachers").rows()
-
-
-def _submissions_rows():
-    return _store.table("submissions").rows()
-
-
-def _announcements_rows():
-    return _store.table("announcements").rows()
-
-
-def _materials_rows():
-    return _store.table("materials").rows()
-
-
-
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _now():
@@ -113,9 +53,9 @@ def _coerce_coursework(rows):
             "title": r["title"],
             "description": r["description"],
             "state": r["state"],
-            "maxPoints": opt_float(r, "maxPoints", default=None),
+            "maxPoints": float(r["maxPoints"]) if r["maxPoints"] else None,
             "workType": r["workType"],
-            "topicId": opt_str(r, "topicId", default="") or None,
+            "topicId": r["topicId"] if r["topicId"] else None,
             "creationTime": r["creationTime"],
             "updateTime": r["updateTime"],
             "alternateLink": r["alternateLink"],
@@ -123,16 +63,16 @@ def _coerce_coursework(rows):
         # Build dueDate and dueTime objects if present
         if r.get("dueDate_year") and r["dueDate_year"]:
             cw["dueDate"] = {
-                "year": strict_int(r, "dueDate_year"),
-                "month": strict_int(r, "dueDate_month"),
-                "day": strict_int(r, "dueDate_day"),
+                "year": int(r["dueDate_year"]),
+                "month": int(r["dueDate_month"]),
+                "day": int(r["dueDate_day"]),
             }
         else:
             cw["dueDate"] = None
         if r.get("dueTime_hours") and r["dueTime_hours"]:
             cw["dueTime"] = {
-                "hours": strict_int(r, "dueTime_hours"),
-                "minutes": strict_int(r, "dueTime_minutes"),
+                "hours": int(r["dueTime_hours"]),
+                "minutes": int(r["dueTime_minutes"]),
             }
         else:
             cw["dueTime"] = None
@@ -198,8 +138,8 @@ def _coerce_submissions(rows):
             "updateTime": r["updateTime"],
             "alternateLink": r["alternateLink"],
         }
-        sub["assignedGrade"] = opt_float(r, "assignedGrade", default=None)
-        sub["draftGrade"] = opt_float(r, "draftGrade", default=None)
+        sub["assignedGrade"] = float(r["assignedGrade"]) if r.get("assignedGrade") and r["assignedGrade"] else None
+        sub["draftGrade"] = float(r["draftGrade"]) if r.get("draftGrade") and r["draftGrade"] else None
         out.append(sub)
     return out
 
@@ -232,7 +172,7 @@ def _coerce_materials(rows):
             "creationTime": r["creationTime"],
             "updateTime": r["updateTime"],
             "creatorUserId": r["creatorUserId"],
-            "topicId": opt_str(r, "topicId", default="") or None,
+            "topicId": r["topicId"] if r["topicId"] else None,
             "alternateLink": r["alternateLink"],
             "materials": [{"link": {"url": r["materialUrl"], "title": r["title"]}}] if r.get("materialUrl") else [],
         })
@@ -240,22 +180,24 @@ def _coerce_materials(rows):
 
 
 # Load all data at module init
-
-
-
-
-
-
-
+_courses = _coerce_courses(_load("courses.csv"))
+_coursework = _coerce_coursework(_load("coursework.csv"))
+_topics = _coerce_topics(_load("topics.csv"))
+_students = _coerce_students(_load("students.csv"))
+_teachers = _coerce_teachers(_load("teachers.csv"))
+_submissions = _coerce_submissions(_load("submissions.csv"))
+_announcements = _coerce_announcements(_load("announcements.csv"))
+_materials = _coerce_materials(_load("materials.csv"))
 
 # Mutable in-memory stores
-
-
-
-
-
-
-
+_courses_store = deepcopy(_courses)
+_coursework_store = deepcopy(_coursework)
+_topics_store = deepcopy(_topics)
+_students_store = deepcopy(_students)
+_teachers_store = deepcopy(_teachers)
+_submissions_store = deepcopy(_submissions)
+_announcements_store = deepcopy(_announcements)
+_materials_store = deepcopy(_materials)
 
 _next_course_id = 5
 _next_cw_id = 400
@@ -270,7 +212,7 @@ _next_mat_id = 10
 # ---------------------------------------------------------------------------
 
 def list_courses(course_states=None, page_size=20, page_token=0):
-    results = list(_courses_rows())
+    results = list(_courses_store)
     if course_states:
         states = [s.strip().upper() for s in course_states.split(",")]
         results = [c for c in results if c["courseState"] in states]
@@ -286,7 +228,7 @@ def list_courses(course_states=None, page_size=20, page_token=0):
 
 
 def get_course(course_id):
-    for c in _courses_rows():
+    for c in _courses_store:
         if c["id"] == course_id:
             return {"course": c}
     return {"error": f"Course {course_id} not found"}
@@ -316,30 +258,30 @@ def create_course(data):
         "guardiansEnabled": False,
         "calendarId": f"calendar_{_next_course_id:03d}",
     }
-    _courses_rows().append(course)
+    _courses_store.append(course)
     _next_course_id += 1
     return {"course": course}
 
 
 def update_course(course_id, data):
-    for i, c in enumerate(_courses_rows()):
+    for i, c in enumerate(_courses_store):
         if c["id"] == course_id:
             updatable = {"name", "section", "descriptionHeading", "description",
                          "room", "courseState", "guardiansEnabled"}
             for k, v in data.items():
                 if k in updatable:
-                    _courses_rows()[i][k] = v
-            _courses_rows()[i]["updateTime"] = _now()
-            return {"course": _courses_rows()[i]}
+                    _courses_store[i][k] = v
+            _courses_store[i]["updateTime"] = _now()
+            return {"course": _courses_store[i]}
     return {"error": f"Course {course_id} not found"}
 
 
 def archive_course(course_id):
-    for i, c in enumerate(_courses_rows()):
+    for i, c in enumerate(_courses_store):
         if c["id"] == course_id:
-            _courses_rows()[i]["courseState"] = "ARCHIVED"
-            _courses_rows()[i]["updateTime"] = _now()
-            return {"course": _courses_rows()[i]}
+            _courses_store[i]["courseState"] = "ARCHIVED"
+            _courses_store[i]["updateTime"] = _now()
+            return {"course": _courses_store[i]}
     return {"error": f"Course {course_id} not found"}
 
 
@@ -350,10 +292,10 @@ def archive_course(course_id):
 def list_coursework(course_id, topic_id=None, course_work_states=None,
                     order_by=None, page_size=20, page_token=0):
     # Check course exists
-    if not any(c["id"] == course_id for c in _courses_rows()):
+    if not any(c["id"] == course_id for c in _courses_store):
         return {"error": f"Course {course_id} not found"}
 
-    results = [cw for cw in _coursework_rows() if cw["courseId"] == course_id]
+    results = [cw for cw in _coursework_store if cw["courseId"] == course_id]
 
     if topic_id:
         results = [cw for cw in results if cw["topicId"] == topic_id]
@@ -384,9 +326,9 @@ def list_coursework(course_id, topic_id=None, course_work_states=None,
 
 
 def get_coursework(course_id, coursework_id):
-    if not any(c["id"] == course_id for c in _courses_rows()):
+    if not any(c["id"] == course_id for c in _courses_store):
         return {"error": f"Course {course_id} not found"}
-    for cw in _coursework_rows():
+    for cw in _coursework_store:
         if cw["courseId"] == course_id and cw["id"] == coursework_id:
             return {"courseWork": cw}
     return {"error": f"CourseWork {coursework_id} not found in course {course_id}"}
@@ -394,7 +336,7 @@ def get_coursework(course_id, coursework_id):
 
 def create_coursework(course_id, data):
     global _next_cw_id
-    if not any(c["id"] == course_id for c in _courses_rows()):
+    if not any(c["id"] == course_id for c in _courses_store):
         return {"error": f"Course {course_id} not found"}
 
     required = ["title", "workType"]
@@ -418,35 +360,35 @@ def create_coursework(course_id, data):
         "dueTime": data.get("dueTime"),
         "alternateLink": f"https://classroom.google.com/c/{course_id}/a/cw_{_next_cw_id}",
     }
-    _coursework_rows().append(cw)
+    _coursework_store.append(cw)
     _next_cw_id += 1
     return {"courseWork": cw}
 
 
 def update_coursework(course_id, coursework_id, data):
-    if not any(c["id"] == course_id for c in _courses_rows()):
+    if not any(c["id"] == course_id for c in _courses_store):
         return {"error": f"Course {course_id} not found"}
-    for i, cw in enumerate(_coursework_rows()):
+    for i, cw in enumerate(_coursework_store):
         if cw["courseId"] == course_id and cw["id"] == coursework_id:
             updatable = {"title", "description", "state", "maxPoints",
                          "dueDate", "dueTime", "topicId"}
             for k, v in data.items():
                 if k in updatable:
                     if k == "maxPoints" and v is not None:
-                        _coursework_rows()[i][k] = float(v)
+                        _coursework_store[i][k] = float(v)
                     else:
-                        _coursework_rows()[i][k] = v
-            _coursework_rows()[i]["updateTime"] = _now()
-            return {"courseWork": _coursework_rows()[i]}
+                        _coursework_store[i][k] = v
+            _coursework_store[i]["updateTime"] = _now()
+            return {"courseWork": _coursework_store[i]}
     return {"error": f"CourseWork {coursework_id} not found in course {course_id}"}
 
 
 def delete_coursework(course_id, coursework_id):
-    if not any(c["id"] == course_id for c in _courses_rows()):
+    if not any(c["id"] == course_id for c in _courses_store):
         return {"error": f"Course {course_id} not found"}
-    for i, cw in enumerate(_coursework_rows()):
+    for i, cw in enumerate(_coursework_store):
         if cw["courseId"] == course_id and cw["id"] == coursework_id:
-            _coursework_rows().pop(i)
+            _coursework_store.pop(i)
             return {"deleted": True}
     return {"error": f"CourseWork {coursework_id} not found in course {course_id}"}
 
@@ -456,10 +398,10 @@ def delete_coursework(course_id, coursework_id):
 # ---------------------------------------------------------------------------
 
 def list_topics(course_id, page_size=20, page_token=0):
-    if not any(c["id"] == course_id for c in _courses_rows()):
+    if not any(c["id"] == course_id for c in _courses_store):
         return {"error": f"Course {course_id} not found"}
 
-    results = [t for t in _topics_rows() if t["courseId"] == course_id]
+    results = [t for t in _topics_store if t["courseId"] == course_id]
     total = len(results)
     offset = int(page_token) if page_token else 0
     page_results = results[offset: offset + page_size]
@@ -471,9 +413,9 @@ def list_topics(course_id, page_size=20, page_token=0):
 
 
 def get_topic(course_id, topic_id):
-    if not any(c["id"] == course_id for c in _courses_rows()):
+    if not any(c["id"] == course_id for c in _courses_store):
         return {"error": f"Course {course_id} not found"}
-    for t in _topics_rows():
+    for t in _topics_store:
         if t["courseId"] == course_id and t["topicId"] == topic_id:
             return {"topic": t}
     return {"error": f"Topic {topic_id} not found in course {course_id}"}
@@ -481,7 +423,7 @@ def get_topic(course_id, topic_id):
 
 def create_topic(course_id, data):
     global _next_topic_id
-    if not any(c["id"] == course_id for c in _courses_rows()):
+    if not any(c["id"] == course_id for c in _courses_store):
         return {"error": f"Course {course_id} not found"}
 
     if "name" not in data or not data["name"]:
@@ -493,29 +435,29 @@ def create_topic(course_id, data):
         "name": data["name"],
         "updateTime": _now(),
     }
-    _topics_rows().append(topic)
+    _topics_store.append(topic)
     _next_topic_id += 1
     return {"topic": topic}
 
 
 def update_topic(course_id, topic_id, data):
-    if not any(c["id"] == course_id for c in _courses_rows()):
+    if not any(c["id"] == course_id for c in _courses_store):
         return {"error": f"Course {course_id} not found"}
-    for i, t in enumerate(_topics_rows()):
+    for i, t in enumerate(_topics_store):
         if t["courseId"] == course_id and t["topicId"] == topic_id:
             if "name" in data:
-                _topics_rows()[i]["name"] = data["name"]
-            _topics_rows()[i]["updateTime"] = _now()
-            return {"topic": _topics_rows()[i]}
+                _topics_store[i]["name"] = data["name"]
+            _topics_store[i]["updateTime"] = _now()
+            return {"topic": _topics_store[i]}
     return {"error": f"Topic {topic_id} not found in course {course_id}"}
 
 
 def delete_topic(course_id, topic_id):
-    if not any(c["id"] == course_id for c in _courses_rows()):
+    if not any(c["id"] == course_id for c in _courses_store):
         return {"error": f"Course {course_id} not found"}
-    for i, t in enumerate(_topics_rows()):
+    for i, t in enumerate(_topics_store):
         if t["courseId"] == course_id and t["topicId"] == topic_id:
-            _topics_rows().pop(i)
+            _topics_store.pop(i)
             return {"deleted": True}
     return {"error": f"Topic {topic_id} not found in course {course_id}"}
 
@@ -526,13 +468,13 @@ def delete_topic(course_id, topic_id):
 
 def list_submissions(course_id, coursework_id, states=None, late=None,
                      page_size=20, page_token=0):
-    if not any(c["id"] == course_id for c in _courses_rows()):
+    if not any(c["id"] == course_id for c in _courses_store):
         return {"error": f"Course {course_id} not found"}
     if not any(cw["courseId"] == course_id and cw["id"] == coursework_id
-               for cw in _coursework_rows()):
+               for cw in _coursework_store):
         return {"error": f"CourseWork {coursework_id} not found in course {course_id}"}
 
-    results = [s for s in _submissions_rows()
+    results = [s for s in _submissions_store
                if s["courseId"] == course_id and s["courseWorkId"] == coursework_id]
 
     if states:
@@ -552,9 +494,9 @@ def list_submissions(course_id, coursework_id, states=None, late=None,
 
 
 def get_submission(course_id, coursework_id, submission_id):
-    if not any(c["id"] == course_id for c in _courses_rows()):
+    if not any(c["id"] == course_id for c in _courses_store):
         return {"error": f"Course {course_id} not found"}
-    for s in _submissions_rows():
+    for s in _submissions_store:
         if (s["courseId"] == course_id and s["courseWorkId"] == coursework_id
                 and s["id"] == submission_id):
             return {"studentSubmission": s}
@@ -562,88 +504,42 @@ def get_submission(course_id, coursework_id, submission_id):
 
 
 def grade_submission(course_id, coursework_id, submission_id, data):
-    if not any(c["id"] == course_id for c in _courses_rows()):
+    if not any(c["id"] == course_id for c in _courses_store):
         return {"error": f"Course {course_id} not found"}
-    for i, s in enumerate(_submissions_rows()):
+    for i, s in enumerate(_submissions_store):
         if (s["courseId"] == course_id and s["courseWorkId"] == coursework_id
                 and s["id"] == submission_id):
             if "assignedGrade" in data and data["assignedGrade"] is not None:
-                _submissions_rows()[i]["assignedGrade"] = float(data["assignedGrade"])
+                _submissions_store[i]["assignedGrade"] = float(data["assignedGrade"])
             if "draftGrade" in data and data["draftGrade"] is not None:
-                _submissions_rows()[i]["draftGrade"] = float(data["draftGrade"])
-            _submissions_rows()[i]["updateTime"] = _now()
-            return {"studentSubmission": _submissions_rows()[i]}
+                _submissions_store[i]["draftGrade"] = float(data["draftGrade"])
+            _submissions_store[i]["updateTime"] = _now()
+            return {"studentSubmission": _submissions_store[i]}
     return {"error": f"Submission {submission_id} not found"}
 
 
 def return_submission(course_id, coursework_id, submission_id):
-    if not any(c["id"] == course_id for c in _courses_rows()):
+    if not any(c["id"] == course_id for c in _courses_store):
         return {"error": f"Course {course_id} not found"}
-    for i, s in enumerate(_submissions_rows()):
+    for i, s in enumerate(_submissions_store):
         if (s["courseId"] == course_id and s["courseWorkId"] == coursework_id
                 and s["id"] == submission_id):
-            _submissions_rows()[i]["state"] = "RETURNED"
-            _submissions_rows()[i]["updateTime"] = _now()
-            return {"studentSubmission": _submissions_rows()[i]}
+            _submissions_store[i]["state"] = "RETURNED"
+            _submissions_store[i]["updateTime"] = _now()
+            return {"studentSubmission": _submissions_store[i]}
     return {"error": f"Submission {submission_id} not found"}
 
 
 def reclaim_submission(course_id, coursework_id, submission_id):
-    if not any(c["id"] == course_id for c in _courses_rows()):
+    if not any(c["id"] == course_id for c in _courses_store):
         return {"error": f"Course {course_id} not found"}
-    for i, s in enumerate(_submissions_rows()):
+    for i, s in enumerate(_submissions_store):
         if (s["courseId"] == course_id and s["courseWorkId"] == coursework_id
                 and s["id"] == submission_id):
-            _submissions_rows()[i]["state"] = "RECLAIMED_BY_STUDENT"
-            _submissions_rows()[i]["updateTime"] = _now()
-            return {"studentSubmission": _submissions_rows()[i]}
+            _submissions_store[i]["state"] = "RECLAIMED_BY_STUDENT"
+            _submissions_store[i]["updateTime"] = _now()
+            return {"studentSubmission": _submissions_store[i]}
     return {"error": f"Submission {submission_id} not found"}
-
-
-def turn_in_submission(course_id, coursework_id, submission_id):
-    """Student turn-in: transition the submission to TURNED_IN.
-
-    Mirrors the real Classroom `studentSubmissions.turnIn` action. Without this,
-    a turn-in task is uncompletable (only grade/return/reclaim existed), forcing
-    agents into out-of-scope fallbacks that trip the non-submission guardrail.
-
-    Uses the store's `patch` so the state change persists (the older
-    grade/return/reclaim handlers mutate a `rows()` deepcopy and do not).
-    """
-    if not any(c["id"] == course_id for c in _courses_rows()):
-        return {"error": f"Course {course_id} not found"}
-    tbl = _store.table("submissions")
-    row = tbl.get(submission_id)
-    if (row is None or row.get("courseId") != course_id
-            or row.get("courseWorkId") != coursework_id):
-        return {"error": f"Submission {submission_id} not found"}
-    updated = tbl.patch(submission_id, {"state": "TURNED_IN", "updateTime": _now()})
-    return {"studentSubmission": updated}
-
-
-def modify_submission_attachments(course_id, coursework_id, submission_id, add_attachments):
-    """Attach materials to a student submission (Classroom `modifyAttachments`).
-
-    `add_attachments` is the list from the request body's `addAttachments`.
-    Persisted under the submission's `assignmentSubmission.attachments` so a
-    later GET reflects the attached worked-solutions document.
-    """
-    if not any(c["id"] == course_id for c in _courses_rows()):
-        return {"error": f"Course {course_id} not found"}
-    tbl = _store.table("submissions")
-    row = tbl.get(submission_id)
-    if (row is None or row.get("courseId") != course_id
-            or row.get("courseWorkId") != coursework_id):
-        return {"error": f"Submission {submission_id} not found"}
-    existing = row.get("assignmentSubmission") or {}
-    attachments = list(existing.get("attachments", []))
-    if isinstance(add_attachments, list):
-        attachments.extend(add_attachments)
-    updated = tbl.patch(
-        submission_id,
-        {"assignmentSubmission": {"attachments": attachments}, "updateTime": _now()},
-    )
-    return {"studentSubmission": updated}
 
 
 # ---------------------------------------------------------------------------
@@ -651,10 +547,10 @@ def modify_submission_attachments(course_id, coursework_id, submission_id, add_a
 # ---------------------------------------------------------------------------
 
 def list_students(course_id, page_size=30, page_token=0):
-    if not any(c["id"] == course_id for c in _courses_rows()):
+    if not any(c["id"] == course_id for c in _courses_store):
         return {"error": f"Course {course_id} not found"}
 
-    results = [s for s in _students_rows() if s["courseId"] == course_id]
+    results = [s for s in _students_store if s["courseId"] == course_id]
     total = len(results)
     offset = int(page_token) if page_token else 0
     page_results = results[offset: offset + page_size]
@@ -666,16 +562,16 @@ def list_students(course_id, page_size=30, page_token=0):
 
 
 def get_student(course_id, user_id):
-    if not any(c["id"] == course_id for c in _courses_rows()):
+    if not any(c["id"] == course_id for c in _courses_store):
         return {"error": f"Course {course_id} not found"}
-    for s in _students_rows():
+    for s in _students_store:
         if s["courseId"] == course_id and s["userId"] == user_id:
             return {"student": s}
     return {"error": f"Student {user_id} not found in course {course_id}"}
 
 
 def invite_student(course_id, data):
-    if not any(c["id"] == course_id for c in _courses_rows()):
+    if not any(c["id"] == course_id for c in _courses_store):
         return {"error": f"Course {course_id} not found"}
 
     if "emailAddress" not in data or not data["emailAddress"]:
@@ -683,12 +579,12 @@ def invite_student(course_id, data):
 
     # Check if student already enrolled
     email = data["emailAddress"]
-    for s in _students_rows():
+    for s in _students_store:
         if s["courseId"] == course_id and s["profile"]["emailAddress"] == email:
             return {"error": f"Student with email {email} already enrolled in course {course_id}"}
 
     # Generate a new student entry
-    user_id = f"student_new_{len(_students_rows()) + 1}"
+    user_id = f"student_new_{len(_students_store) + 1}"
     student = {
         "courseId": course_id,
         "userId": user_id,
@@ -699,16 +595,16 @@ def invite_student(course_id, data):
             "photoUrl": f"https://lh3.googleusercontent.com/a/{user_id}",
         },
     }
-    _students_rows().append(student)
+    _students_store.append(student)
     return {"student": student}
 
 
 def remove_student(course_id, user_id):
-    if not any(c["id"] == course_id for c in _courses_rows()):
+    if not any(c["id"] == course_id for c in _courses_store):
         return {"error": f"Course {course_id} not found"}
-    for i, s in enumerate(_students_rows()):
+    for i, s in enumerate(_students_store):
         if s["courseId"] == course_id and s["userId"] == user_id:
-            _students_rows().pop(i)
+            _students_store.pop(i)
             return {"deleted": True}
     return {"error": f"Student {user_id} not found in course {course_id}"}
 
@@ -718,17 +614,17 @@ def remove_student(course_id, user_id):
 # ---------------------------------------------------------------------------
 
 def list_teachers(course_id):
-    if not any(c["id"] == course_id for c in _courses_rows()):
+    if not any(c["id"] == course_id for c in _courses_store):
         return {"error": f"Course {course_id} not found"}
 
-    results = [t for t in _teachers_rows() if t["courseId"] == course_id]
+    results = [t for t in _teachers_store if t["courseId"] == course_id]
     return {"teachers": results}
 
 
 def get_teacher(course_id, user_id):
-    if not any(c["id"] == course_id for c in _courses_rows()):
+    if not any(c["id"] == course_id for c in _courses_store):
         return {"error": f"Course {course_id} not found"}
-    for t in _teachers_rows():
+    for t in _teachers_store:
         if t["courseId"] == course_id and t["userId"] == user_id:
             return {"teacher": t}
     return {"error": f"Teacher {user_id} not found in course {course_id}"}
@@ -739,10 +635,10 @@ def get_teacher(course_id, user_id):
 # ---------------------------------------------------------------------------
 
 def list_announcements(course_id, announcement_states=None, page_size=20, page_token=0):
-    if not any(c["id"] == course_id for c in _courses_rows()):
+    if not any(c["id"] == course_id for c in _courses_store):
         return {"error": f"Course {course_id} not found"}
 
-    results = [a for a in _announcements_rows() if a["courseId"] == course_id]
+    results = [a for a in _announcements_store if a["courseId"] == course_id]
 
     if announcement_states:
         states = [s.strip().upper() for s in announcement_states.split(",")]
@@ -761,9 +657,9 @@ def list_announcements(course_id, announcement_states=None, page_size=20, page_t
 
 
 def get_announcement(course_id, announcement_id):
-    if not any(c["id"] == course_id for c in _courses_rows()):
+    if not any(c["id"] == course_id for c in _courses_store):
         return {"error": f"Course {course_id} not found"}
-    for a in _announcements_rows():
+    for a in _announcements_store:
         if a["courseId"] == course_id and a["id"] == announcement_id:
             return {"announcement": a}
     return {"error": f"Announcement {announcement_id} not found in course {course_id}"}
@@ -771,7 +667,7 @@ def get_announcement(course_id, announcement_id):
 
 def create_announcement(course_id, data):
     global _next_ann_id
-    if not any(c["id"] == course_id for c in _courses_rows()):
+    if not any(c["id"] == course_id for c in _courses_store):
         return {"error": f"Course {course_id} not found"}
 
     if "text" not in data or not data["text"]:
@@ -788,31 +684,31 @@ def create_announcement(course_id, data):
         "creatorUserId": data.get("creatorUserId", "teacher_001"),
         "alternateLink": f"https://classroom.google.com/c/{course_id}/p/ann_{_next_ann_id:03d}",
     }
-    _announcements_rows().append(ann)
+    _announcements_store.append(ann)
     _next_ann_id += 1
     return {"announcement": ann}
 
 
 def update_announcement(course_id, announcement_id, data):
-    if not any(c["id"] == course_id for c in _courses_rows()):
+    if not any(c["id"] == course_id for c in _courses_store):
         return {"error": f"Course {course_id} not found"}
-    for i, a in enumerate(_announcements_rows()):
+    for i, a in enumerate(_announcements_store):
         if a["courseId"] == course_id and a["id"] == announcement_id:
             updatable = {"text", "state"}
             for k, v in data.items():
                 if k in updatable:
-                    _announcements_rows()[i][k] = v
-            _announcements_rows()[i]["updateTime"] = _now()
-            return {"announcement": _announcements_rows()[i]}
+                    _announcements_store[i][k] = v
+            _announcements_store[i]["updateTime"] = _now()
+            return {"announcement": _announcements_store[i]}
     return {"error": f"Announcement {announcement_id} not found in course {course_id}"}
 
 
 def delete_announcement(course_id, announcement_id):
-    if not any(c["id"] == course_id for c in _courses_rows()):
+    if not any(c["id"] == course_id for c in _courses_store):
         return {"error": f"Course {course_id} not found"}
-    for i, a in enumerate(_announcements_rows()):
+    for i, a in enumerate(_announcements_store):
         if a["courseId"] == course_id and a["id"] == announcement_id:
-            _announcements_rows().pop(i)
+            _announcements_store.pop(i)
             return {"deleted": True}
     return {"error": f"Announcement {announcement_id} not found in course {course_id}"}
 
@@ -822,10 +718,10 @@ def delete_announcement(course_id, announcement_id):
 # ---------------------------------------------------------------------------
 
 def list_materials(course_id, page_size=20, page_token=0):
-    if not any(c["id"] == course_id for c in _courses_rows()):
+    if not any(c["id"] == course_id for c in _courses_store):
         return {"error": f"Course {course_id} not found"}
 
-    results = [m for m in _materials_rows() if m["courseId"] == course_id]
+    results = [m for m in _materials_store if m["courseId"] == course_id]
     total = len(results)
     offset = int(page_token) if page_token else 0
     page_results = results[offset: offset + page_size]
@@ -837,9 +733,9 @@ def list_materials(course_id, page_size=20, page_token=0):
 
 
 def get_material(course_id, material_id):
-    if not any(c["id"] == course_id for c in _courses_rows()):
+    if not any(c["id"] == course_id for c in _courses_store):
         return {"error": f"Course {course_id} not found"}
-    for m in _materials_rows():
+    for m in _materials_store:
         if m["courseId"] == course_id and m["id"] == material_id:
             return {"courseWorkMaterial": m}
     return {"error": f"Material {material_id} not found in course {course_id}"}
@@ -847,7 +743,7 @@ def get_material(course_id, material_id):
 
 def create_material(course_id, data):
     global _next_mat_id
-    if not any(c["id"] == course_id for c in _courses_rows()):
+    if not any(c["id"] == course_id for c in _courses_store):
         return {"error": f"Course {course_id} not found"}
 
     if "title" not in data or not data["title"]:
@@ -867,8 +763,6 @@ def create_material(course_id, data):
         "alternateLink": f"https://classroom.google.com/c/{course_id}/m/mat_{_next_mat_id:03d}",
         "materials": data.get("materials", []),
     }
-    _materials_rows().append(mat)
+    _materials_store.append(mat)
     _next_mat_id += 1
     return {"courseWorkMaterial": mat}
-
-_store.eager_load()

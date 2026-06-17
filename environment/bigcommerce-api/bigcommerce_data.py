@@ -6,45 +6,15 @@ v2 responses are bare arrays/objects.
 """
 
 import csv
+from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, opt_float, opt_int, strict_bool)
 
-_store = get_store("bigcommerce-api")
-_API = "bigcommerce-api"
-
-_store.register("products", primary_key="id",
-                initial_loader=lambda: _coerce_products(_load("products.csv", "products")))
-_store.register("customers", primary_key="id",
-                initial_loader=lambda: _coerce_customers(_load("customers.csv", "customers")))
-_store.register("orders", primary_key="id",
-                initial_loader=lambda: _coerce_orders(_load("orders.csv", "orders")))
-
-
-def _products_rows():
-    return _store.table("products").rows()
-
-
-def _customers_rows():
-    return _store.table("customers").rows()
-
-
-def _orders_rows():
-    return _store.table("orders").rows()
-
-
-
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _to_bool(v):
@@ -73,19 +43,19 @@ def _coerce_products(rows):
     out = []
     for r in rows:
         out.append({
-            "id": opt_int(r, "id", default=0),
+            "id": _to_int(r["id"]),
             "name": r["name"],
             "sku": r["sku"],
             "type": r["type"],
-            "price": opt_float(r, "price", default=None),
-            "sale_price": opt_float(r, "sale_price", default=None),
-            "cost_price": opt_float(r, "cost_price", default=None),
-            "weight": opt_float(r, "weight", default=None),
-            "inventory_level": opt_int(r, "inventory_level", default=0),
+            "price": _to_float(r["price"]),
+            "sale_price": _to_float(r["sale_price"]),
+            "cost_price": _to_float(r["cost_price"]),
+            "weight": _to_float(r["weight"]),
+            "inventory_level": _to_int(r["inventory_level"]),
             "inventory_tracking": r["inventory_tracking"],
-            "is_visible": strict_bool(r, "is_visible"),
-            "brand_id": opt_int(r, "brand_id", default=0),
-            "categories": [int(c) for c in opt_csv_list(r, "categories", sep=";") if c],
+            "is_visible": _to_bool(r["is_visible"]),
+            "brand_id": _to_int(r["brand_id"]),
+            "categories": [int(c) for c in r["categories"].split(";") if c],
             "description": r["description"],
             "date_created": r["date_created"],
         })
@@ -96,13 +66,13 @@ def _coerce_customers(rows):
     out = []
     for r in rows:
         out.append({
-            "id": opt_int(r, "id", default=0),
+            "id": _to_int(r["id"]),
             "first_name": r["first_name"],
             "last_name": r["last_name"],
             "email": r["email"],
             "company": r["company"],
             "phone": r["phone"],
-            "customer_group_id": opt_int(r, "customer_group_id", default=0),
+            "customer_group_id": _to_int(r["customer_group_id"]),
             "date_created": r["date_created"],
         })
     return out
@@ -112,15 +82,15 @@ def _coerce_orders(rows):
     out = []
     for r in rows:
         out.append({
-            "id": opt_int(r, "id", default=0),
-            "customer_id": opt_int(r, "customer_id", default=0),
-            "status_id": opt_int(r, "status_id", default=0),
+            "id": _to_int(r["id"]),
+            "customer_id": _to_int(r["customer_id"]),
+            "status_id": _to_int(r["status_id"]),
             "status": r["status"],
-            "total_inc_tax": opt_float(r, "total_inc_tax", default=None),
-            "subtotal_inc_tax": opt_float(r, "subtotal_inc_tax", default=None),
+            "total_inc_tax": _to_float(r["total_inc_tax"]),
+            "subtotal_inc_tax": _to_float(r["subtotal_inc_tax"]),
             "currency_code": r["currency_code"],
             "payment_method": r["payment_method"],
-            "items_total": opt_int(r, "items_total", default=0),
+            "items_total": _to_int(r["items_total"]),
             "date_created": r["date_created"],
             "billing_first_name": r["billing_first_name"],
             "billing_last_name": r["billing_last_name"],
@@ -129,10 +99,13 @@ def _coerce_orders(rows):
     return out
 
 
+_products = _coerce_products(_load("products.csv"))
+_customers = _coerce_customers(_load("customers.csv"))
+_orders = _coerce_orders(_load("orders.csv"))
 
-
-
-
+_products_store = deepcopy(_products)
+_customers_store = deepcopy(_customers)
+_orders_store = deepcopy(_orders)
 
 
 # ---------------------------------------------------------------------------
@@ -210,7 +183,7 @@ def _meta(total, count, page, limit):
 # ---------------------------------------------------------------------------
 
 def list_products(name=None, sku=None, is_visible=None, page=1, limit=50):
-    items = _products_rows()
+    items = _products_store
     if name:
         items = [p for p in items if name.lower() in p["name"].lower()]
     if sku:
@@ -227,7 +200,7 @@ def list_products(name=None, sku=None, is_visible=None, page=1, limit=50):
 
 
 def get_product(product_id):
-    p = next((x for x in _products_rows() if x["id"] == int(product_id)), None)
+    p = next((x for x in _products_store if x["id"] == int(product_id)), None)
     if not p:
         return {"error": "Not Found", "status": 404,
                 "title": f"Product {product_id} not found"}
@@ -239,7 +212,7 @@ def get_product(product_id):
 # ---------------------------------------------------------------------------
 
 def list_orders(customer_id=None, status_id=None, page=1, limit=50):
-    items = _orders_rows()
+    items = _orders_store
     if customer_id is not None:
         items = [o for o in items if o["customer_id"] == int(customer_id)]
     if status_id is not None:
@@ -250,7 +223,7 @@ def list_orders(customer_id=None, status_id=None, page=1, limit=50):
 
 
 def get_order(order_id):
-    o = next((x for x in _orders_rows() if x["id"] == int(order_id)), None)
+    o = next((x for x in _orders_store if x["id"] == int(order_id)), None)
     if not o:
         return {"error": "Not Found", "status": 404,
                 "title": f"Order {order_id} not found"}
@@ -261,11 +234,11 @@ def create_order(customer_id=0, status_id=1, payment_method="manual",
                  currency_code="USD", billing_address=None, products=None):
     billing_address = billing_address or {}
     products = products or []
-    next_id = max((o["id"] for o in _orders_rows()), default=2000) + 1
+    next_id = max((o["id"] for o in _orders_store), default=2000) + 1
     subtotal = 0.0
     items_total = 0
     for line in products:
-        prod = next((p for p in _products_rows()
+        prod = next((p for p in _products_store
                      if p["id"] == int(line.get("product_id", 0))), None)
         qty = int(line.get("quantity", 1))
         price = prod["price"] if prod else _to_float(line.get("price_inc_tax", 0))
@@ -288,7 +261,7 @@ def create_order(customer_id=0, status_id=1, payment_method="manual",
         "billing_last_name": billing_address.get("last_name", ""),
         "billing_email": billing_address.get("email", ""),
     }
-    _orders_rows().append(order)
+    _orders_store.append(order)
     return _serialize_order(order)
 
 
@@ -297,7 +270,7 @@ def create_order(customer_id=0, status_id=1, payment_method="manual",
 # ---------------------------------------------------------------------------
 
 def list_customers(email=None, company=None, page=1, limit=50):
-    items = _customers_rows()
+    items = _customers_store
     if email:
         items = [c for c in items if email.lower() in c["email"].lower()]
     if company:
@@ -309,5 +282,3 @@ def list_customers(email=None, company=None, page=1, limit=50):
         "data": [_serialize_customer(c) for c in page_items],
         "meta": _meta(total, len(page_items), page, limit),
     }
-
-_store.eager_load()

@@ -7,55 +7,19 @@ in process memory and reset on container restart.
 
 import csv
 import uuid
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_int, opt_str)
-
-_store = get_store("greenhouse-api")
-_API = "greenhouse-api"
-
-_store.register("candidates", primary_key="id",
-                initial_loader=lambda: _coerce_candidates(_load("candidates.csv", "candidates")))
-_store.register("jobs", primary_key="id",
-                initial_loader=lambda: _coerce_jobs(_load("jobs.csv", "jobs")))
-_store.register("applications", primary_key="id",
-                initial_loader=lambda: _coerce_applications(_load("applications.csv", "applications")))
-_store.register("scorecards", primary_key="id",
-                initial_loader=lambda: _coerce_scorecards(_load("scorecards.csv", "scorecards")))
-
-
-def _candidates_rows():
-    return _store.table("candidates").rows()
-
-
-def _jobs_rows():
-    return _store.table("jobs").rows()
-
-
-def _applications_rows():
-    return _store.table("applications").rows()
-
-
-def _scorecards_rows():
-    return _store.table("scorecards").rows()
-
-
 # Ordered hiring pipeline stages used to advance applications.
 STAGES = ["Application Review", "Interview", "Offer", "Hired"]
 
 
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _now():
@@ -76,37 +40,40 @@ def _to_int(v, default=0):
 # ---------------------------------------------------------------------------
 
 def _coerce_candidates(rows):
-    return [_strip_ctx(r) for r in rows]
+    return [dict(r) for r in rows]
 
 
 def _coerce_jobs(rows):
     out = []
     for r in rows:
-        d = _strip_ctx(r)
-        d["closed_at"] = opt_str(r, "closed_at", default="") or None
+        d = dict(r)
+        d["closed_at"] = r["closed_at"] or None
         out.append(d)
     return out
 
 
 def _coerce_applications(rows):
-    return [_strip_ctx(r) for r in rows]
+    return [dict(r) for r in rows]
 
 
 def _coerce_scorecards(rows):
     out = []
     for r in rows:
-        d = _strip_ctx(r)
-        d["rating"] = opt_int(r, "rating", default=0)
+        d = dict(r)
+        d["rating"] = _to_int(r["rating"])
         out.append(d)
     return out
 
 
+_candidates = _coerce_candidates(_load("candidates.csv"))
+_jobs = _coerce_jobs(_load("jobs.csv"))
+_applications = _coerce_applications(_load("applications.csv"))
+_scorecards = _coerce_scorecards(_load("scorecards.csv"))
 
-
-
-
-
-
+_candidates_store = deepcopy(_candidates)
+_jobs_store = deepcopy(_jobs)
+_applications_store = deepcopy(_applications)
+_scorecards_store = deepcopy(_scorecards)
 
 
 # ---------------------------------------------------------------------------
@@ -126,11 +93,11 @@ def _find(store, obj_id):
 # ---------------------------------------------------------------------------
 
 def list_candidates():
-    return list(_candidates_rows())
+    return list(_candidates_store)
 
 
 def get_candidate(candidate_id):
-    c = _find(_candidates_rows(), candidate_id)
+    c = _find(_candidates_store, candidate_id)
     if not c:
         return {"error": f"Candidate {candidate_id} not found"}
     return c
@@ -151,7 +118,7 @@ def create_candidate(first_name, last_name, email=None, phone=None,
         "source": source or "API",
         "created_at": _now(),
     }
-    _candidates_rows().append(c)
+    _candidates_store.append(c)
     return c
 
 
@@ -160,14 +127,14 @@ def create_candidate(first_name, last_name, email=None, phone=None,
 # ---------------------------------------------------------------------------
 
 def list_jobs(status=None):
-    results = list(_jobs_rows())
+    results = list(_jobs_store)
     if status:
         results = [j for j in results if j["status"] == status]
     return results
 
 
 def get_job(job_id):
-    j = _find(_jobs_rows(), job_id)
+    j = _find(_jobs_store, job_id)
     if not j:
         return {"error": f"Job {job_id} not found"}
     return j
@@ -178,7 +145,7 @@ def get_job(job_id):
 # ---------------------------------------------------------------------------
 
 def list_applications(job_id=None, candidate_id=None, status=None):
-    results = list(_applications_rows())
+    results = list(_applications_store)
     if job_id:
         results = [a for a in results if a["job_id"] == job_id]
     if candidate_id:
@@ -189,14 +156,14 @@ def list_applications(job_id=None, candidate_id=None, status=None):
 
 
 def get_application(application_id):
-    a = _find(_applications_rows(), application_id)
+    a = _find(_applications_store, application_id)
     if not a:
         return {"error": f"Application {application_id} not found"}
     return a
 
 
 def advance_application(application_id):
-    a = _find(_applications_rows(), application_id)
+    a = _find(_applications_store, application_id)
     if not a:
         return {"error": f"Application {application_id} not found"}
     if a["status"] != "active":
@@ -218,7 +185,7 @@ def advance_application(application_id):
 
 
 def reject_application(application_id, reason=None):
-    a = _find(_applications_rows(), application_id)
+    a = _find(_applications_store, application_id)
     if not a:
         return {"error": f"Application {application_id} not found"}
     a["status"] = "rejected"
@@ -232,11 +199,9 @@ def reject_application(application_id, reason=None):
 # ---------------------------------------------------------------------------
 
 def list_scorecards(application_id=None, candidate_id=None):
-    results = list(_scorecards_rows())
+    results = list(_scorecards_store)
     if application_id:
         results = [s for s in results if s["application_id"] == application_id]
     if candidate_id:
         results = [s for s in results if s["candidate_id"] == candidate_id]
     return results
-
-_store.eager_load()

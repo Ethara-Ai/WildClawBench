@@ -3,44 +3,16 @@
 import csv
 import json
 import re
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, strict_int)
 
-_store = get_store("obsidian-api")
-_API = "obsidian-api"
-
-_store.register("notes", primary_key="path",
-                initial_loader=lambda: _coerce_notes(_load("notes.csv", "notes")))
-_store.register_document("contents", initial_loader=lambda: _coerce_contents(_load("note_contents.csv", "contents")))
-_store.register_document("vault", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "vault.json", encoding="utf-8")))
-
-
-def _notes_rows():
-    return _store.table("notes").rows()
-
-
-def _contents_doc():
-    return _store.document("contents").get()
-
-
-def _vault_doc():
-    return _store.document("vault").get()
-
-
-
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _now():
@@ -51,9 +23,9 @@ def _coerce_notes(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "size_bytes": strict_int(r, "size_bytes"),
-            "tags": [t.strip() for t in opt_csv_list(r, "tags", sep=";") if t.strip()],
+            **r,
+            "size_bytes": int(r["size_bytes"]),
+            "tags": [t.strip() for t in r["tags"].split(";") if t.strip()],
         })
     return out
 
@@ -66,14 +38,22 @@ def _coerce_contents(rows):
     return out
 
 
+_notes = _coerce_notes(_load("notes.csv"))
+_contents = _coerce_contents(_load("note_contents.csv"))
 
+with open(DATA_DIR / "vault.json", encoding="utf-8") as _f:
+    _vault = json.load(_f)
+
+_notes_store = deepcopy(_notes)
+_contents_store = deepcopy(_contents)
+_vault_store = deepcopy(_vault)
 
 
 _WIKILINK = re.compile(r"\[\[([^\]|#]+)(?:#[^\]|]+)?(?:\|[^\]]+)?\]\]")
 
 
 def _index_of(path):
-    for i, n in enumerate(_notes_rows()):
+    for i, n in enumerate(_notes_store):
         if n["path"] == path:
             return i
     return -1
@@ -84,7 +64,7 @@ def _index_of(path):
 # ---------------------------------------------------------------------------
 
 def get_vault():
-    return _vault_doc()
+    return _vault_store
 
 
 # ---------------------------------------------------------------------------
@@ -92,7 +72,7 @@ def get_vault():
 # ---------------------------------------------------------------------------
 
 def list_notes(folder=None, tag=None):
-    results = list(_notes_rows())
+    results = list(_notes_store)
     if folder:
         prefix = folder.rstrip("/") + "/"
         results = [n for n in results if n["path"].startswith(prefix)]
@@ -106,8 +86,8 @@ def get_note(path):
     idx = _index_of(path)
     if idx < 0:
         return {"error": f"Note {path} not found"}
-    note = dict(_notes_rows()[idx])
-    note["content"] = _contents_doc().get(path, "")
+    note = dict(_notes_store[idx])
+    note["content"] = _contents_store.get(path, "")
     return note
 
 
@@ -122,8 +102,8 @@ def create_note(path, content):
         "modified_at": _now(),
         "tags": _extract_tags(content),
     }
-    _notes_rows().append(note)
-    _contents_doc()[path] = content
+    _notes_store.append(note)
+    _contents_store[path] = content
     return {**note, "content": content}
 
 
@@ -132,24 +112,24 @@ def update_note(path, content=None, append=None):
     if idx < 0:
         return {"error": f"Note {path} not found"}
     if content is not None:
-        _contents_doc()[path] = content
+        _contents_store[path] = content
     elif append is not None:
-        _contents_doc()[path] = _contents_doc().get(path, "") + append
+        _contents_store[path] = _contents_store.get(path, "") + append
     else:
         return {"error": "Either content or append must be provided"}
-    new_body = _contents_doc()[path]
-    _notes_rows()[idx]["size_bytes"] = len(new_body.encode("utf-8"))
-    _notes_rows()[idx]["modified_at"] = _now()
-    _notes_rows()[idx]["tags"] = _extract_tags(new_body)
-    return {**_notes_rows()[idx], "content": new_body}
+    new_body = _contents_store[path]
+    _notes_store[idx]["size_bytes"] = len(new_body.encode("utf-8"))
+    _notes_store[idx]["modified_at"] = _now()
+    _notes_store[idx]["tags"] = _extract_tags(new_body)
+    return {**_notes_store[idx], "content": new_body}
 
 
 def delete_note(path):
     idx = _index_of(path)
     if idx < 0:
         return {"error": f"Note {path} not found"}
-    _notes_rows().pop(idx)
-    _contents_doc().pop(path, None)
+    _notes_store.pop(idx)
+    _contents_store.pop(path, None)
     return {"deleted": True, "path": path}
 
 
@@ -164,8 +144,8 @@ def _extract_tags(content):
 def search(query, content=False):
     q = query.lower()
     results = []
-    for n in _notes_rows():
-        body = _contents_doc().get(n["path"], "")
+    for n in _notes_store:
+        body = _contents_store.get(n["path"], "")
         title_hit = q in n["title"].lower()
         path_hit = q in n["path"].lower()
         body_hit = q in body.lower()
@@ -190,10 +170,10 @@ def search(query, content=False):
 def list_backlinks(path):
     target_title = Path(path).stem
     backlinks = []
-    for n in _notes_rows():
+    for n in _notes_store:
         if n["path"] == path:
             continue
-        body = _contents_doc().get(n["path"], "")
+        body = _contents_store.get(n["path"], "")
         for m in _WIKILINK.finditer(body):
             if m.group(1).strip() == target_title:
                 backlinks.append({"path": n["path"], "title": n["title"]})
@@ -204,5 +184,3 @@ def list_backlinks(path):
 def get_daily(date_str):
     path = f"Daily/{date_str}.md"
     return get_note(path)
-
-_store.eager_load()

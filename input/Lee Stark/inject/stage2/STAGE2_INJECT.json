@@ -1,0 +1,27 @@
+{
+  "stage": "stage2",
+  "stage_description": "SM-03 — Airtable NRC-Inventory ESY-2509 count silently updated to a different value than WooCommerce. Fires after T8.",
+  "fires_after_turn": 8,
+  "mutations": [
+    {
+      "id": "SM-03",
+      "family": "silent_mutation",
+      "silent": true,
+      "description": "Silently update Airtable NRC-Inventory ESY-2509 count to 52 (different from WooCommerce 47 after SM-02). Creates the Airtable-vs-WooCommerce gap T9 must reconcile.",
+      "service": "airtable-api",
+      "http": {
+        "method": "PATCH",
+        "url": "{AIRTABLE_API_URL}/v0/appNRC25090000001/tblInventory/recInvESY00000001",
+        "headers": { "Content-Type": "application/json" },
+        "body": {
+          "fields": {
+            "Count": 52,
+            "LastUpdated": "{D+1:iso}T13:18:00-06:00",
+            "UpdateReason": "manual co-op pull adjustment"
+          }
+        },
+        "expected_status": 200
+      }
+    }
+  ]
+}

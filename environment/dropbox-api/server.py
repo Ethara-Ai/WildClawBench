@@ -11,17 +11,14 @@ from typing import Optional
 import dropbox_data
 try:
     from tracking_middleware import install_tracker
-    from admin_plane import install_admin_plane
 except ModuleNotFoundError:  # standalone run without the shared module on sys.path
     def install_tracker(app):  # no-op fallback: audit endpoints disabled
         return None
 
-    def install_admin_plane(app, store=None, one_shot_registry=None):
-        return None
-
 app = FastAPI(title="Dropbox API v2 (Mock)", version="2")
 install_tracker(app)
-install_admin_plane(app, store=dropbox_data._store)
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -55,19 +52,6 @@ def get_metadata(body: Optional[dict] = Body(default=None)):
     if isinstance(result, dict) and "error" in result:
         return JSONResponse(status_code=409, content=result)
     return result
-
-
-@app.post("/2/files/download")
-def download_file(body: Optional[dict] = Body(default=None)):
-    body = body or {}
-    try:
-        return dropbox_data.download_file_content(path=body.get("path"))
-    except dropbox_data.DownloadError as e:
-        return JSONResponse(
-            status_code=e.http_status,
-            content={"error_summary": f"{e.code}/", "error": {".tag": e.code},
-                     "message": e.message},
-        )
 
 
 @app.post("/2/files/search_v2")

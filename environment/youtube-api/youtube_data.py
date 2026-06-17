@@ -2,41 +2,31 @@
 
 import csv
 import json
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, opt_str, strict_int)
-_store = get_store("youtube-api")
-_API = "youtube-api"
-
-# channel.json loaded before _load helper because _coerce_videos references _CHANNEL_TITLE.
+# Load channel data early so coerce functions can reference it
 with open(DATA_DIR / "channel.json", encoding="utf-8") as _f:
     _channel_raw = json.load(_f)
 _CHANNEL_ID = _channel_raw["id"]
 _CHANNEL_TITLE = _channel_raw["snippet"]["title"]
 
 
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
-
-
-def _load_json(filename):
-    with open(DATA_DIR / filename, encoding="utf-8") as f:
-        return json.load(f)
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _now():
     return datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
+
+# ---------------------------------------------------------------------------
+# Load and coerce data
+# ---------------------------------------------------------------------------
 
 def _coerce_videos(rows):
     out = []
@@ -56,7 +46,7 @@ def _coerce_videos(rows):
                     "maxres": {"url": thumb, "width": 1280, "height": 720},
                 },
                 "channelTitle": _CHANNEL_TITLE,
-                "tags": [t.strip() for t in opt_csv_list(r, "tags", sep=",")] if r.get("tags") else [],
+                "tags": [t.strip() for t in r["tags"].split(",")] if r.get("tags") else [],
                 "categoryId": r.get("categoryId") or "",
                 "liveBroadcastContent": r.get("liveBroadcastContent") or "none",
                 "defaultLanguage": r.get("defaultLanguage") or None,
@@ -110,7 +100,7 @@ def _coerce_playlists(rows):
                 "privacyStatus": r["privacyStatus"],
             },
             "contentDetails": {
-                "itemCount": strict_int(r, "itemCount"),
+                "itemCount": int(r["itemCount"]),
             },
         })
     return out
@@ -126,7 +116,7 @@ def _coerce_playlist_items(rows):
                 "channelId": r["channelId"],
                 "title": r["title"],
                 "playlistId": r["playlistId"],
-                "position": strict_int(r, "position"),
+                "position": int(r["position"]),
                 "resourceId": {
                     "kind": "youtube#video",
                     "videoId": r["videoId"],
@@ -152,18 +142,18 @@ def _coerce_comments(rows):
         out.append({
             "id": r["comment_id"],
             "videoId": r["videoId"],
-            "channelId": opt_str(r, "channelId", default="") or None,
-            "parentId": opt_str(r, "parentId", default="") or None,
+            "channelId": r["channelId"] if r["channelId"] else None,
+            "parentId": r["parentId"] if r["parentId"] else None,
             "snippet": {
                 "authorDisplayName": r["authorDisplayName"],
                 "authorChannelId": {"value": r["authorChannelId"]},
                 "textDisplay": r["textDisplay"],
                 "textOriginal": r["textDisplay"],
-                "likeCount": strict_int(r, "likeCount"),
+                "likeCount": int(r["likeCount"]),
                 "publishedAt": r["publishedAt"],
                 "updatedAt": r["updatedAt"],
                 "videoId": r["videoId"],
-                "parentId": opt_str(r, "parentId", default="") or None,
+                "parentId": r["parentId"] if r["parentId"] else None,
             },
             "moderationStatus": r["moderationStatus"],
         })
@@ -187,66 +177,64 @@ def _coerce_captions(rows):
     return out
 
 
-_store.register("videos", primary_key="id",
-                initial_loader=lambda: _coerce_videos(_load("videos.csv", "videos")))
-_store.register("playlists", primary_key="id",
-                initial_loader=lambda: _coerce_playlists(_load("playlists.csv", "playlists")))
-_store.register("playlist_items", primary_key="id",
-                initial_loader=lambda: _coerce_playlist_items(_load("playlist_items.csv", "playlist_items")))
-_store.register("comments", primary_key="id",
-                initial_loader=lambda: _coerce_comments(_load("comments.csv", "comments")))
-_store.register("captions", primary_key="id",
-                initial_loader=lambda: _coerce_captions(_load("captions.csv", "captions")))
-_store.register_document("channel", initial_loader=lambda: _channel_raw)
-_store.register_document("video_categories",
-                         initial_loader=lambda: _load_json("video_categories.json"))
-_store.register_document("channel_sections",
-                         initial_loader=lambda: _load_json("channel_sections.json"))
-_store.register_document("analytics", initial_loader=lambda: _load_json("analytics.json"))
+# Load all data at module init
+_videos = _coerce_videos(_load("videos.csv"))
+_playlists = _coerce_playlists(_load("playlists.csv"))
+_playlist_items = _coerce_playlist_items(_load("playlist_items.csv"))
+_comments = _coerce_comments(_load("comments.csv"))
+_captions = _coerce_captions(_load("captions.csv"))
+
+with open(DATA_DIR / "video_categories.json", encoding="utf-8") as _f:
+    _video_categories = json.load(_f)
+
+with open(DATA_DIR / "channel_sections.json", encoding="utf-8") as _f:
+    _channel_sections = json.load(_f)
+
+with open(DATA_DIR / "analytics.json", encoding="utf-8") as _f:
+    _analytics = json.load(_f)
+
+_videos_store = deepcopy(_videos)
+_playlists_store = deepcopy(_playlists)
+_playlist_items_store = deepcopy(_playlist_items)
+_comments_store = deepcopy(_comments)
+_captions_store = deepcopy(_captions)
+_channel_store = deepcopy(_channel_raw)
+_video_categories_store = deepcopy(_video_categories)
+_channel_sections_store = deepcopy(_channel_sections)
+_analytics_store = deepcopy(_analytics)
+
+_next_playlist_id = 11
+_next_playlist_item_id = 26
+_next_comment_id = 51
 
 
-def _videos_rows(): return _store.table("videos").rows()
-def _playlists_rows(): return _store.table("playlists").rows()
-def _playlist_items_rows(): return _store.table("playlist_items").rows()
-def _comments_rows(): return _store.table("comments").rows()
-def _captions_rows(): return _store.table("captions").rows()
-def _channel(): return _store.document("channel").get()
-def _video_categories_list(): return _store.document("video_categories").get()
-def _channel_sections_list(): return _store.document("channel_sections").get()
-def _analytics(): return _store.document("analytics").get()
-
-
-def _next_id_counter(table_name, id_prefix, fallback_start, key=lambda row: row["id"]):
-    rows = _store.table(table_name).rows()
-    max_n = fallback_start - 1
-    for r in rows:
-        try:
-            n = int(str(key(r)).split("_")[-1])
-            if n > max_n:
-                max_n = n
-        except (ValueError, IndexError):
-            continue
-    return max_n + 1
-
+# ---------------------------------------------------------------------------
+# Channels
+# ---------------------------------------------------------------------------
 
 def get_channel(channel_id: str):
-    ch = _channel()
-    if channel_id != ch["id"]:
+    if channel_id != _channel_store["id"]:
         return {"error": f"Channel {channel_id} not found"}
     return {
         "kind": "youtube#channelListResponse",
         "pageInfo": {"totalResults": 1, "resultsPerPage": 1},
-        "items": [ch],
+        "items": [_channel_store],
     }
 
 
+# ---------------------------------------------------------------------------
+# Videos
+# ---------------------------------------------------------------------------
+
 def list_videos(channel_id: str = None, video_id: str = None, max_results: int = 25, offset: int = 0):
-    results = _videos_rows()
+    results = list(_videos_store)
+
     if video_id:
         ids = [v.strip() for v in video_id.split(",")]
         results = [v for v in results if v["id"] in ids]
     elif channel_id:
         results = [v for v in results if v["snippet"]["channelId"] == channel_id]
+
     total = len(results)
     page_results = results[offset: offset + max_results]
     return {
@@ -257,55 +245,71 @@ def list_videos(channel_id: str = None, video_id: str = None, max_results: int =
 
 
 def get_video(video_id: str):
-    v = _store.table("videos").get(video_id)
-    if v:
-        return {
-            "kind": "youtube#videoListResponse",
-            "pageInfo": {"totalResults": 1, "resultsPerPage": 1},
-            "items": [v],
-        }
+    for v in _videos_store:
+        if v["id"] == video_id:
+            return {
+                "kind": "youtube#videoListResponse",
+                "pageInfo": {"totalResults": 1, "resultsPerPage": 1},
+                "items": [v],
+            }
     return {"error": f"Video {video_id} not found"}
 
 
 def update_video(video_id: str, data: dict):
-    v = _store.table("videos").get(video_id)
-    if not v:
-        return {"error": f"Video {video_id} not found"}
+    for i, v in enumerate(_videos_store):
+        if v["id"] == video_id:
+            snippet_updates = data.get("snippet", {})
+            if "title" in snippet_updates:
+                _videos_store[i]["snippet"]["title"] = snippet_updates["title"]
+            if "description" in snippet_updates:
+                _videos_store[i]["snippet"]["description"] = snippet_updates["description"]
+            if "tags" in snippet_updates:
+                _videos_store[i]["snippet"]["tags"] = snippet_updates["tags"]
+            if "categoryId" in snippet_updates:
+                _videos_store[i]["snippet"]["categoryId"] = snippet_updates["categoryId"]
+            if "defaultLanguage" in snippet_updates:
+                _videos_store[i]["snippet"]["defaultLanguage"] = snippet_updates["defaultLanguage"]
 
-    snippet_updates = data.get("snippet", {})
-    new_snippet = dict(v["snippet"])
-    for k in ("title", "description", "tags", "categoryId", "defaultLanguage"):
-        if k in snippet_updates:
-            new_snippet[k] = snippet_updates[k]
+            status_updates = data.get("status", {})
+            if "privacyStatus" in status_updates:
+                _videos_store[i]["status"]["privacyStatus"] = status_updates["privacyStatus"]
+            if "embeddable" in status_updates:
+                _videos_store[i]["status"]["embeddable"] = status_updates["embeddable"]
+            if "publishAt" in status_updates:
+                _videos_store[i]["status"]["publishAt"] = status_updates["publishAt"]
 
-    status_updates = data.get("status", {})
-    new_status = dict(v["status"])
-    for k in ("privacyStatus", "embeddable", "publishAt"):
-        if k in status_updates:
-            new_status[k] = status_updates[k]
-
-    _store.table("videos").patch(video_id, {"snippet": new_snippet, "status": new_status})
-    return {
-        "kind": "youtube#video",
-        "items": [_store.table("videos").get(video_id)],
-    }
-
-
-def delete_video(video_id: str):
-    if _store.table("videos").delete(video_id):
-        _store.table("playlist_items").delete_where(
-            lambda pi: pi["contentDetails"]["videoId"] == video_id)
-        return {"deleted": True, "videoId": video_id}
+            return {
+                "kind": "youtube#video",
+                "items": [_videos_store[i]],
+            }
     return {"error": f"Video {video_id} not found"}
 
 
+def delete_video(video_id: str):
+    for i, v in enumerate(_videos_store):
+        if v["id"] == video_id:
+            _videos_store.pop(i)
+            # Also remove from playlist items
+            global _playlist_items_store
+            _playlist_items_store = [pi for pi in _playlist_items_store
+                                     if pi["contentDetails"]["videoId"] != video_id]
+            return {"deleted": True, "videoId": video_id}
+    return {"error": f"Video {video_id} not found"}
+
+
+# ---------------------------------------------------------------------------
+# Playlists
+# ---------------------------------------------------------------------------
+
 def list_playlists(channel_id: str = None, playlist_id: str = None, max_results: int = 25, offset: int = 0):
-    results = _playlists_rows()
+    results = list(_playlists_store)
+
     if playlist_id:
         ids = [p.strip() for p in playlist_id.split(",")]
         results = [p for p in results if p["id"] in ids]
     elif channel_id:
         results = [p for p in results if p["snippet"]["channelId"] == channel_id]
+
     total = len(results)
     page_results = results[offset: offset + max_results]
     return {
@@ -316,79 +320,92 @@ def list_playlists(channel_id: str = None, playlist_id: str = None, max_results:
 
 
 def get_playlist(playlist_id: str):
-    p = _store.table("playlists").get(playlist_id)
-    if p:
-        return {
-            "kind": "youtube#playlistListResponse",
-            "pageInfo": {"totalResults": 1, "resultsPerPage": 1},
-            "items": [p],
-        }
+    for p in _playlists_store:
+        if p["id"] == playlist_id:
+            return {
+                "kind": "youtube#playlistListResponse",
+                "pageInfo": {"totalResults": 1, "resultsPerPage": 1},
+                "items": [p],
+            }
     return {"error": f"Playlist {playlist_id} not found"}
 
 
 def create_playlist(data: dict):
+    global _next_playlist_id
     snippet = data.get("snippet", {})
     if not snippet.get("title"):
         return {"error": "Missing required field: snippet.title"}
 
-    n = _next_id_counter("playlists", "PL_", 11)
     now = _now()
-    pid = f"PL_{n:03d}"
     playlist = {
-        "id": pid,
+        "id": f"PL_{_next_playlist_id:03d}",
         "snippet": {
             "publishedAt": now,
             "channelId": _CHANNEL_ID,
             "title": snippet["title"],
             "description": snippet.get("description", ""),
             "thumbnails": {
-                "default": {"url": f"https://i.ytimg.com/vi/playlist_{pid}/default.jpg", "width": 120, "height": 90},
-                "medium": {"url": f"https://i.ytimg.com/vi/playlist_{pid}/mqdefault.jpg", "width": 320, "height": 180},
-                "high": {"url": f"https://i.ytimg.com/vi/playlist_{pid}/hqdefault.jpg", "width": 480, "height": 360},
+                "default": {"url": f"https://i.ytimg.com/vi/playlist_PL_{_next_playlist_id:03d}/default.jpg", "width": 120, "height": 90},
+                "medium": {"url": f"https://i.ytimg.com/vi/playlist_PL_{_next_playlist_id:03d}/mqdefault.jpg", "width": 320, "height": 180},
+                "high": {"url": f"https://i.ytimg.com/vi/playlist_PL_{_next_playlist_id:03d}/hqdefault.jpg", "width": 480, "height": 360},
             },
             "channelTitle": _CHANNEL_TITLE,
         },
         "status": {
             "privacyStatus": data.get("status", {}).get("privacyStatus", "public"),
         },
-        "contentDetails": {"itemCount": 0},
+        "contentDetails": {
+            "itemCount": 0,
+        },
     }
-    _store.table("playlists").upsert(playlist)
-    return {"kind": "youtube#playlist", "items": [playlist]}
+    _playlists_store.append(playlist)
+    _next_playlist_id += 1
+    return {
+        "kind": "youtube#playlist",
+        "items": [playlist],
+    }
 
 
 def update_playlist(playlist_id: str, data: dict):
-    p = _store.table("playlists").get(playlist_id)
-    if not p:
-        return {"error": f"Playlist {playlist_id} not found"}
+    for i, p in enumerate(_playlists_store):
+        if p["id"] == playlist_id:
+            snippet_updates = data.get("snippet", {})
+            if "title" in snippet_updates:
+                _playlists_store[i]["snippet"]["title"] = snippet_updates["title"]
+            if "description" in snippet_updates:
+                _playlists_store[i]["snippet"]["description"] = snippet_updates["description"]
 
-    snippet_updates = data.get("snippet", {})
-    new_snippet = dict(p["snippet"])
-    for k in ("title", "description"):
-        if k in snippet_updates:
-            new_snippet[k] = snippet_updates[k]
+            status_updates = data.get("status", {})
+            if "privacyStatus" in status_updates:
+                _playlists_store[i]["status"]["privacyStatus"] = status_updates["privacyStatus"]
 
-    status_updates = data.get("status", {})
-    new_status = dict(p["status"])
-    if "privacyStatus" in status_updates:
-        new_status["privacyStatus"] = status_updates["privacyStatus"]
-
-    _store.table("playlists").patch(playlist_id, {"snippet": new_snippet, "status": new_status})
-    return {"kind": "youtube#playlist", "items": [_store.table("playlists").get(playlist_id)]}
-
-
-def delete_playlist(playlist_id: str):
-    if _store.table("playlists").delete(playlist_id):
-        _store.table("playlist_items").delete_where(
-            lambda pi: pi["snippet"]["playlistId"] == playlist_id)
-        return {"deleted": True, "playlistId": playlist_id}
+            return {
+                "kind": "youtube#playlist",
+                "items": [_playlists_store[i]],
+            }
     return {"error": f"Playlist {playlist_id} not found"}
 
 
+def delete_playlist(playlist_id: str):
+    for i, p in enumerate(_playlists_store):
+        if p["id"] == playlist_id:
+            _playlists_store.pop(i)
+            # Remove associated playlist items
+            global _playlist_items_store
+            _playlist_items_store = [pi for pi in _playlist_items_store
+                                     if pi["snippet"]["playlistId"] != playlist_id]
+            return {"deleted": True, "playlistId": playlist_id}
+    return {"error": f"Playlist {playlist_id} not found"}
+
+
+# ---------------------------------------------------------------------------
+# Playlist Items
+# ---------------------------------------------------------------------------
+
 def list_playlist_items(playlist_id: str, max_results: int = 25, offset: int = 0):
-    results = [pi for pi in _playlist_items_rows()
-               if pi["snippet"]["playlistId"] == playlist_id]
+    results = [pi for pi in _playlist_items_store if pi["snippet"]["playlistId"] == playlist_id]
     results = sorted(results, key=lambda x: x["snippet"]["position"])
+
     total = len(results)
     page_results = results[offset: offset + max_results]
     return {
@@ -399,6 +416,7 @@ def list_playlist_items(playlist_id: str, max_results: int = 25, offset: int = 0
 
 
 def insert_playlist_item(data: dict):
+    global _next_playlist_item_id
     snippet = data.get("snippet", {})
     playlist_id = snippet.get("playlistId")
     resource_id = snippet.get("resourceId", {})
@@ -407,24 +425,27 @@ def insert_playlist_item(data: dict):
     if not playlist_id or not video_id:
         return {"error": "Missing required fields: snippet.playlistId and snippet.resourceId.videoId"}
 
-    if not _store.table("playlists").get(playlist_id):
+    # Verify playlist exists
+    if not any(p["id"] == playlist_id for p in _playlists_store):
         return {"error": f"Playlist {playlist_id} not found"}
 
-    existing = [pi for pi in _playlist_items_rows()
-                if pi["snippet"]["playlistId"] == playlist_id]
+    # Get current max position
+    existing = [pi for pi in _playlist_items_store if pi["snippet"]["playlistId"] == playlist_id]
     position = snippet.get("position", len(existing))
 
-    n = _next_id_counter("playlist_items", "PLI_", 26)
     now = _now()
     item = {
-        "id": f"PLI_{n:03d}",
+        "id": f"PLI_{_next_playlist_item_id:03d}",
         "snippet": {
             "publishedAt": now,
             "channelId": _CHANNEL_ID,
             "title": "",
             "playlistId": playlist_id,
             "position": position,
-            "resourceId": {"kind": "youtube#video", "videoId": video_id},
+            "resourceId": {
+                "kind": "youtube#video",
+                "videoId": video_id,
+            },
             "thumbnails": {
                 "default": {"url": f"https://i.ytimg.com/vi/{video_id}/default.jpg", "width": 120, "height": 90},
                 "medium": {"url": f"https://i.ytimg.com/vi/{video_id}/mqdefault.jpg", "width": 320, "height": 180},
@@ -432,68 +453,86 @@ def insert_playlist_item(data: dict):
             },
             "channelTitle": _CHANNEL_TITLE,
         },
-        "contentDetails": {"videoId": video_id, "videoPublishedAt": now},
+        "contentDetails": {
+            "videoId": video_id,
+            "videoPublishedAt": now,
+        },
     }
 
-    v = _store.table("videos").get(video_id)
-    if v:
-        item["snippet"]["title"] = v["snippet"]["title"]
-        item["contentDetails"]["videoPublishedAt"] = v["snippet"]["publishedAt"]
+    # Find video title
+    for v in _videos_store:
+        if v["id"] == video_id:
+            item["snippet"]["title"] = v["snippet"]["title"]
+            item["contentDetails"]["videoPublishedAt"] = v["snippet"]["publishedAt"]
+            break
 
-    _store.table("playlist_items").upsert(item)
+    _playlist_items_store.append(item)
+    _next_playlist_item_id += 1
 
-    parent = _store.table("playlists").get(playlist_id)
-    if parent:
-        new_cd = dict(parent["contentDetails"])
-        new_cd["itemCount"] = new_cd.get("itemCount", 0) + 1
-        _store.table("playlists").patch(playlist_id, {"contentDetails": new_cd})
+    # Update playlist item count
+    for p in _playlists_store:
+        if p["id"] == playlist_id:
+            p["contentDetails"]["itemCount"] += 1
+            break
 
-    return {"kind": "youtube#playlistItem", "items": [item]}
+    return {
+        "kind": "youtube#playlistItem",
+        "items": [item],
+    }
 
 
 def delete_playlist_item(playlist_item_id: str):
-    pi = _store.table("playlist_items").get(playlist_item_id)
-    if not pi:
-        return {"error": f"Playlist item {playlist_item_id} not found"}
-    playlist_id = pi["snippet"]["playlistId"]
-    _store.table("playlist_items").delete(playlist_item_id)
-    parent = _store.table("playlists").get(playlist_id)
-    if parent:
-        new_cd = dict(parent["contentDetails"])
-        new_cd["itemCount"] = max(0, new_cd.get("itemCount", 0) - 1)
-        _store.table("playlists").patch(playlist_id, {"contentDetails": new_cd})
-    return {"deleted": True, "playlistItemId": playlist_item_id}
+    for i, pi in enumerate(_playlist_items_store):
+        if pi["id"] == playlist_item_id:
+            playlist_id = pi["snippet"]["playlistId"]
+            _playlist_items_store.pop(i)
+            # Update playlist item count
+            for p in _playlists_store:
+                if p["id"] == playlist_id:
+                    p["contentDetails"]["itemCount"] = max(0, p["contentDetails"]["itemCount"] - 1)
+                    break
+            return {"deleted": True, "playlistItemId": playlist_item_id}
+    return {"error": f"Playlist item {playlist_item_id} not found"}
 
 
 def update_playlist_item(playlist_item_id: str, data: dict):
-    pi = _store.table("playlist_items").get(playlist_item_id)
-    if not pi:
-        return {"error": f"Playlist item {playlist_item_id} not found"}
-    snippet_updates = data.get("snippet", {})
-    if "position" in snippet_updates:
-        new_snippet = dict(pi["snippet"])
-        new_snippet["position"] = int(snippet_updates["position"])
-        _store.table("playlist_items").patch(playlist_item_id, {"snippet": new_snippet})
-    return {
-        "kind": "youtube#playlistItem",
-        "items": [_store.table("playlist_items").get(playlist_item_id)],
-    }
+    for i, pi in enumerate(_playlist_items_store):
+        if pi["id"] == playlist_item_id:
+            snippet_updates = data.get("snippet", {})
+            if "position" in snippet_updates:
+                _playlist_items_store[i]["snippet"]["position"] = int(snippet_updates["position"])
+            return {
+                "kind": "youtube#playlistItem",
+                "items": [_playlist_items_store[i]],
+            }
+    return {"error": f"Playlist item {playlist_item_id} not found"}
 
+
+# ---------------------------------------------------------------------------
+# Comment Threads
+# ---------------------------------------------------------------------------
 
 def list_comment_threads(video_id: str = None, channel_id: str = None, max_results: int = 20, offset: int = 0, moderation_status: str = "published"):
-    all_comments = _comments_rows()
-    results = [c for c in all_comments if not c["parentId"]]
+    # Get top-level comments (no parentId)
+    results = [c for c in _comments_store if not c["parentId"]]
+
     if video_id:
         results = [c for c in results if c["videoId"] == video_id]
+
+    # Filter by moderation status
     results = [c for c in results if c["moderationStatus"] == moderation_status]
+
+    # Sort by published date desc
     results = sorted(results, key=lambda x: x["snippet"]["publishedAt"], reverse=True)
 
     total = len(results)
     page_results = results[offset: offset + max_results]
 
+    # Build comment thread structure
     threads = []
     for comment in page_results:
-        replies = [c for c in all_comments if c["parentId"] == comment["id"]]
+        # Find replies
+        replies = [c for c in _comments_store if c["parentId"] == comment["id"]]
         thread = {
             "kind": "youtube#commentThread",
             "id": comment["id"],
@@ -528,43 +567,43 @@ def list_comment_threads(video_id: str = None, channel_id: str = None, max_resul
 
 
 def get_comment_thread(comment_id: str):
-    c = _store.table("comments").get(comment_id)
-    if not c or c["parentId"]:
-        return {"error": f"Comment thread {comment_id} not found"}
-    all_comments = _comments_rows()
-    replies = [r for r in all_comments if r["parentId"] == comment_id]
-    thread = {
-        "kind": "youtube#commentThread",
-        "id": c["id"],
-        "snippet": {
-            "channelId": _CHANNEL_ID,
-            "videoId": c["videoId"],
-            "topLevelComment": {
-                "kind": "youtube#comment",
+    for c in _comments_store:
+        if c["id"] == comment_id and not c["parentId"]:
+            replies = [r for r in _comments_store if r["parentId"] == comment_id]
+            thread = {
+                "kind": "youtube#commentThread",
                 "id": c["id"],
-                "snippet": c["snippet"],
-            },
-            "canReply": True,
-            "totalReplyCount": len(replies),
-            "isPublic": True,
-        },
-    }
-    if replies:
-        thread["replies"] = {
-            "comments": [{
-                "kind": "youtube#comment",
-                "id": r["id"],
-                "snippet": r["snippet"],
-            } for r in replies]
-        }
-    return {
-        "kind": "youtube#commentThreadListResponse",
-        "pageInfo": {"totalResults": 1, "resultsPerPage": 1},
-        "items": [thread],
-    }
+                "snippet": {
+                    "channelId": _CHANNEL_ID,
+                    "videoId": c["videoId"],
+                    "topLevelComment": {
+                        "kind": "youtube#comment",
+                        "id": c["id"],
+                        "snippet": c["snippet"],
+                    },
+                    "canReply": True,
+                    "totalReplyCount": len(replies),
+                    "isPublic": True,
+                },
+            }
+            if replies:
+                thread["replies"] = {
+                    "comments": [{
+                        "kind": "youtube#comment",
+                        "id": r["id"],
+                        "snippet": r["snippet"],
+                    } for r in replies]
+                }
+            return {
+                "kind": "youtube#commentThreadListResponse",
+                "pageInfo": {"totalResults": 1, "resultsPerPage": 1},
+                "items": [thread],
+            }
+    return {"error": f"Comment thread {comment_id} not found"}
 
 
 def insert_comment_thread(data: dict):
+    global _next_comment_id
     snippet = data.get("snippet", {})
     video_id = snippet.get("videoId")
     text = snippet.get("topLevelComment", {}).get("snippet", {}).get("textOriginal", "")
@@ -572,9 +611,8 @@ def insert_comment_thread(data: dict):
     if not video_id or not text:
         return {"error": "Missing required fields: snippet.videoId and snippet.topLevelComment.snippet.textOriginal"}
 
-    n = _next_id_counter("comments", "cmt_", 51)
     now = _now()
-    comment_id = f"cmt_{n:03d}"
+    comment_id = f"cmt_{_next_comment_id:03d}"
     comment = {
         "id": comment_id,
         "videoId": video_id,
@@ -593,7 +631,8 @@ def insert_comment_thread(data: dict):
         },
         "moderationStatus": "published",
     }
-    _store.table("comments").upsert(comment)
+    _comments_store.append(comment)
+    _next_comment_id += 1
 
     thread = {
         "kind": "youtube#commentThread",
@@ -611,19 +650,29 @@ def insert_comment_thread(data: dict):
             "isPublic": True,
         },
     }
-    return {"kind": "youtube#commentThread", "items": [thread]}
+    return {
+        "kind": "youtube#commentThread",
+        "items": [thread],
+    }
 
+
+# ---------------------------------------------------------------------------
+# Comments
+# ---------------------------------------------------------------------------
 
 def list_comments(parent_id: str, max_results: int = 20, offset: int = 0):
-    results = [c for c in _comments_rows() if c["parentId"] == parent_id]
+    results = [c for c in _comments_store if c["parentId"] == parent_id]
     results = sorted(results, key=lambda x: x["snippet"]["publishedAt"])
+
     total = len(results)
     page_results = results[offset: offset + max_results]
+
     items = [{
         "kind": "youtube#comment",
         "id": c["id"],
         "snippet": c["snippet"],
     } for c in page_results]
+
     return {
         "kind": "youtube#commentListResponse",
         "pageInfo": {"totalResults": total, "resultsPerPage": max_results},
@@ -632,6 +681,7 @@ def list_comments(parent_id: str, max_results: int = 20, offset: int = 0):
 
 
 def insert_comment(data: dict):
+    global _next_comment_id
     snippet = data.get("snippet", {})
     parent_id = snippet.get("parentId")
     text = snippet.get("textOriginal", "")
@@ -639,14 +689,17 @@ def insert_comment(data: dict):
     if not parent_id or not text:
         return {"error": "Missing required fields: snippet.parentId and snippet.textOriginal"}
 
-    parent = _store.table("comments").get(parent_id)
-    if not parent:
+    # Find parent comment to get videoId
+    video_id = None
+    for c in _comments_store:
+        if c["id"] == parent_id:
+            video_id = c["videoId"]
+            break
+    if not video_id:
         return {"error": f"Parent comment {parent_id} not found"}
-    video_id = parent["videoId"]
 
-    n = _next_id_counter("comments", "cmt_", 51)
     now = _now()
-    comment_id = f"cmt_{n:03d}"
+    comment_id = f"cmt_{_next_comment_id:03d}"
     comment = {
         "id": comment_id,
         "videoId": video_id,
@@ -665,7 +718,8 @@ def insert_comment(data: dict):
         },
         "moderationStatus": "published",
     }
-    _store.table("comments").upsert(comment)
+    _comments_store.append(comment)
+    _next_comment_id += 1
 
     return {
         "kind": "youtube#comment",
@@ -678,51 +732,61 @@ def insert_comment(data: dict):
 
 
 def update_comment(comment_id: str, data: dict):
-    c = _store.table("comments").get(comment_id)
-    if not c:
-        return {"error": f"Comment {comment_id} not found"}
-    snippet_updates = data.get("snippet", {})
-    if "textOriginal" in snippet_updates:
-        new_snippet = dict(c["snippet"])
-        new_snippet["textOriginal"] = snippet_updates["textOriginal"]
-        new_snippet["textDisplay"] = snippet_updates["textOriginal"]
-        new_snippet["updatedAt"] = _now()
-        _store.table("comments").patch(comment_id, {"snippet": new_snippet})
-    updated = _store.table("comments").get(comment_id)
-    return {
-        "kind": "youtube#comment",
-        "items": [{
-            "kind": "youtube#comment",
-            "id": comment_id,
-            "snippet": updated["snippet"] if updated else c["snippet"],
-        }],
-    }
+    for i, c in enumerate(_comments_store):
+        if c["id"] == comment_id:
+            snippet_updates = data.get("snippet", {})
+            if "textOriginal" in snippet_updates:
+                _comments_store[i]["snippet"]["textOriginal"] = snippet_updates["textOriginal"]
+                _comments_store[i]["snippet"]["textDisplay"] = snippet_updates["textOriginal"]
+                _comments_store[i]["snippet"]["updatedAt"] = _now()
+            return {
+                "kind": "youtube#comment",
+                "items": [{
+                    "kind": "youtube#comment",
+                    "id": comment_id,
+                    "snippet": _comments_store[i]["snippet"],
+                }],
+            }
+    return {"error": f"Comment {comment_id} not found"}
 
 
 def delete_comment(comment_id: str):
-    if not _store.table("comments").get(comment_id):
-        return {"error": f"Comment {comment_id} not found"}
-    _store.table("comments").delete(comment_id)
-    _store.table("comments").delete_where(lambda r: r["parentId"] == comment_id)
-    return {"deleted": True, "commentId": comment_id}
+    for i, c in enumerate(_comments_store):
+        if c["id"] == comment_id:
+            _comments_store.pop(i)
+            # Also remove replies to this comment
+            global _next_comment_id
+            to_remove = [j for j, r in enumerate(_comments_store) if r["parentId"] == comment_id]
+            for j in reversed(to_remove):
+                _comments_store.pop(j)
+            return {"deleted": True, "commentId": comment_id}
+    return {"error": f"Comment {comment_id} not found"}
 
 
 def set_moderation_status(comment_ids: list, moderation_status: str):
     updated = []
     for cid in comment_ids:
-        c = _store.table("comments").get(cid)
-        if c:
-            _store.table("comments").patch(cid, {"moderationStatus": moderation_status})
-            updated.append(cid)
+        for i, c in enumerate(_comments_store):
+            if c["id"] == cid:
+                _comments_store[i]["moderationStatus"] = moderation_status
+                updated.append(cid)
+                break
     if not updated:
         return {"error": "No matching comments found"}
     return {"updated": updated, "moderationStatus": moderation_status}
 
 
+# ---------------------------------------------------------------------------
+# Search
+# ---------------------------------------------------------------------------
+
 def search_videos(channel_id: str = None, q: str = None, order: str = "relevance", max_results: int = 25, offset: int = 0):
-    results = _videos_rows()
+    results = list(_videos_store)
+
     if channel_id:
         results = [v for v in results if v["snippet"]["channelId"] == channel_id]
+
+    # Only show public/unlisted videos in search
     results = [v for v in results if v["status"]["privacyStatus"] in ("public", "unlisted")]
 
     if q:
@@ -743,12 +807,14 @@ def search_videos(channel_id: str = None, q: str = None, order: str = "relevance
                 scored.append((score, v))
         results = [v for _, v in sorted(scored, key=lambda x: x[0], reverse=True)]
 
+    # Sort
     if order == "date":
         results = sorted(results, key=lambda x: x["snippet"]["publishedAt"], reverse=True)
     elif order == "viewCount":
         results = sorted(results, key=lambda x: int(x["statistics"]["viewCount"]), reverse=True)
     elif order == "rating":
         results = sorted(results, key=lambda x: int(x["statistics"]["likeCount"]), reverse=True)
+    # "relevance" is default (already sorted by score if q was given)
 
     total = len(results)
     page_results = results[offset: offset + max_results]
@@ -757,7 +823,10 @@ def search_videos(channel_id: str = None, q: str = None, order: str = "relevance
     for v in page_results:
         items.append({
             "kind": "youtube#searchResult",
-            "id": {"kind": "youtube#video", "videoId": v["id"]},
+            "id": {
+                "kind": "youtube#video",
+                "videoId": v["id"],
+            },
             "snippet": {
                 "publishedAt": v["snippet"]["publishedAt"],
                 "channelId": v["snippet"]["channelId"],
@@ -776,29 +845,49 @@ def search_videos(channel_id: str = None, q: str = None, order: str = "relevance
     }
 
 
+# ---------------------------------------------------------------------------
+# Video Categories
+# ---------------------------------------------------------------------------
+
 def list_video_categories():
     items = []
-    for cat in _video_categories_list():
+    for cat in _video_categories_store:
         items.append({
             "kind": "youtube#videoCategory",
             "id": cat["id"],
             "snippet": cat["snippet"],
         })
-    return {"kind": "youtube#videoCategoryListResponse", "items": items}
+    return {
+        "kind": "youtube#videoCategoryListResponse",
+        "items": items,
+    }
 
+
+# ---------------------------------------------------------------------------
+# Captions
+# ---------------------------------------------------------------------------
 
 def list_captions(video_id: str):
-    results = [c for c in _captions_rows() if c["snippet"]["videoId"] == video_id]
+    results = [c for c in _captions_store if c["snippet"]["videoId"] == video_id]
     if not results:
-        if not _store.table("videos").get(video_id):
+        # Check if video exists
+        if not any(v["id"] == video_id for v in _videos_store):
             return {"error": f"Video {video_id} not found"}
     items = [{
         "kind": "youtube#caption",
         "id": c["id"],
         "snippet": c["snippet"],
     } for c in results]
-    return {"kind": "youtube#captionListResponse", "items": items}
 
+    return {
+        "kind": "youtube#captionListResponse",
+        "items": items,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Channel Sections
+# ---------------------------------------------------------------------------
 
 def list_channel_sections(channel_id: str):
     if channel_id != _CHANNEL_ID:
@@ -808,23 +897,29 @@ def list_channel_sections(channel_id: str):
         "id": s["id"],
         "snippet": s["snippet"],
         "contentDetails": s["contentDetails"],
-    } for s in _channel_sections_list()]
-    return {"kind": "youtube#channelSectionListResponse", "items": items}
+    } for s in _channel_sections_store]
 
+    return {
+        "kind": "youtube#channelSectionListResponse",
+        "items": items,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Analytics (simplified)
+# ---------------------------------------------------------------------------
 
 def get_channel_analytics():
-    a = _analytics()
     return {
         "kind": "youtubeAnalytics#resultTable",
         "channelId": _CHANNEL_ID,
-        "period": a["channel"]["period"],
-        "metrics": a["channel"],
+        "period": _analytics_store["channel"]["period"],
+        "metrics": _analytics_store["channel"],
     }
 
 
 def get_video_analytics(video_id: str):
-    a = _analytics()
-    for entry in a["videos"]:
+    for entry in _analytics_store["videos"]:
         if entry["videoId"] == video_id:
             return {
                 "kind": "youtubeAnalytics#resultTable",
@@ -832,5 +927,3 @@ def get_video_analytics(video_id: str):
                 "metrics": entry,
             }
     return {"error": f"Analytics for video {video_id} not found"}
-
-_store.eager_load()

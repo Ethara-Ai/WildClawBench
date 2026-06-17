@@ -4,47 +4,16 @@ import csv
 import json
 import re
 import uuid
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
-BLOB_DIR = DATA_DIR / "file_blobs"
-
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_int, opt_str, strict_bool,
-    DownloadError, extract_file_content_text)
-
-_store = get_store("google-drive-api")
-_API = "google-drive-api"
-
-_store.register("files", primary_key="id",
-                initial_loader=lambda: _coerce_files(_load("files.csv", "files")))
-_store.register("permissions", primary_key="id",
-                initial_loader=lambda: [_strip_ctx(r) for r in _load("permissions.csv", "permissions")])
-_store.register_document("about", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "about.json", encoding="utf-8")))
 
 
-def _files_rows():
-    return _store.table("files").rows()
-
-
-def _permissions_rows():
-    return _store.table("permissions").rows()
-
-
-def _about_doc():
-    return _store.document("about").get()
-
-
-
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _now():
@@ -59,16 +28,24 @@ def _coerce_files(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "size": opt_int(r, "size", default=0),
-            "starred": strict_bool(r, "starred"),
-            "trashed": strict_bool(r, "trashed"),
-            "parent_id": opt_str(r, "parent_id", default="") or None,
+            **r,
+            "size": int(r["size"]) if r["size"] else 0,
+            "starred": _to_bool(r["starred"]),
+            "trashed": _to_bool(r["trashed"]),
+            "parent_id": r["parent_id"] or None,
         })
     return out
 
 
+_files = _coerce_files(_load("files.csv"))
+_permissions = _load("permissions.csv")
 
+with open(DATA_DIR / "about.json", encoding="utf-8") as _f:
+    _about = json.load(_f)
+
+_files_store = deepcopy(_files)
+_permissions_store = deepcopy(_permissions)
+_about_store = deepcopy(_about)
 
 
 def _new_id(prefix="file"):
@@ -97,7 +74,7 @@ def _serialize_file(f):
 # ---------------------------------------------------------------------------
 
 def get_about():
-    return _about_doc()
+    return _about_store
 
 
 # ---------------------------------------------------------------------------
@@ -151,7 +128,7 @@ def _matches_query(file, q):
 
 
 def list_files(q="", page_size=100, page_token=None, order_by="modifiedTime desc"):
-    results = [f for f in _files_rows() if _matches_query(f, q)]
+    results = [f for f in _files_store if _matches_query(f, q)]
 
     if order_by:
         order_map = {
@@ -177,32 +154,15 @@ def list_files(q="", page_size=100, page_token=None, order_by="modifiedTime desc
 
 
 def get_file(file_id):
-    for f in _files_rows():
+    for f in _files_store:
         if f["id"] == file_id:
             return _serialize_file(f)
     return {"error": f"File {file_id} not found"}
 
 
-def download_file_content(file_id):
-    row = next((f for f in _files_rows() if f["id"] == file_id), None)
-    if row is None:
-        raise DownloadError(http_status=404, code="not_found",
-                            message=f"File {file_id} not found")
-    name = row["name"]
-    mime_type = row.get("mime_type") or "application/octet-stream"
-    text = extract_file_content_text(BLOB_DIR, name, mime_type)
-    return {
-        "file_id": file_id,
-        "name": name,
-        "mime_type": mime_type,
-        "size_bytes": len(text.encode("utf-8")),
-        "content": text,
-    }
-
-
 def create_file(name, mime_type, parent_id=None, owner_email="amelia@orbit-labs.com",
                 size=0):
-    if parent_id and not any(f["id"] == parent_id for f in _files_rows()):
+    if parent_id and not any(f["id"] == parent_id for f in _files_store):
         return {"error": f"Parent {parent_id} not found"}
     now = _now()
     new_file = {
@@ -218,8 +178,8 @@ def create_file(name, mime_type, parent_id=None, owner_email="amelia@orbit-labs.
         "trashed": False,
         "web_view_link": "",
     }
-    _files_rows().append(new_file)
-    _permissions_rows().append({
+    _files_store.append(new_file)
+    _permissions_store.append({
         "id": f"perm-{uuid.uuid4().hex[:6]}",
         "file_id": new_file["id"],
         "type": "user",
@@ -231,18 +191,18 @@ def create_file(name, mime_type, parent_id=None, owner_email="amelia@orbit-labs.
 
 
 def update_file(file_id, name=None, parent_id=None, starred=None, trashed=None):
-    for i, f in enumerate(_files_rows()):
+    for i, f in enumerate(_files_store):
         if f["id"] == file_id:
             if name is not None:
-                _files_rows()[i]["name"] = name
+                _files_store[i]["name"] = name
             if parent_id is not None:
-                _files_rows()[i]["parent_id"] = parent_id
+                _files_store[i]["parent_id"] = parent_id
             if starred is not None:
-                _files_rows()[i]["starred"] = bool(starred)
+                _files_store[i]["starred"] = bool(starred)
             if trashed is not None:
-                _files_rows()[i]["trashed"] = bool(trashed)
-            _files_rows()[i]["modified_time"] = _now()
-            return _serialize_file(_files_rows()[i])
+                _files_store[i]["trashed"] = bool(trashed)
+            _files_store[i]["modified_time"] = _now()
+            return _serialize_file(_files_store[i])
     return {"error": f"File {file_id} not found"}
 
 
@@ -251,10 +211,10 @@ def trash_file(file_id):
 
 
 def delete_file(file_id):
-    for i, f in enumerate(_files_rows()):
+    for i, f in enumerate(_files_store):
         if f["id"] == file_id:
-            _files_rows().pop(i)
-            _permissions_rows()[:] = [p for p in _permissions_rows() if p["file_id"] != file_id]
+            _files_store.pop(i)
+            _permissions_store[:] = [p for p in _permissions_store if p["file_id"] != file_id]
             return {"deleted": True, "id": file_id}
     return {"error": f"File {file_id} not found"}
 
@@ -264,14 +224,14 @@ def delete_file(file_id):
 # ---------------------------------------------------------------------------
 
 def list_permissions(file_id):
-    if not any(f["id"] == file_id for f in _files_rows()):
+    if not any(f["id"] == file_id for f in _files_store):
         return {"error": f"File {file_id} not found"}
-    perms = [p for p in _permissions_rows() if p["file_id"] == file_id]
+    perms = [p for p in _permissions_store if p["file_id"] == file_id]
     return {"kind": "drive#permissionList", "permissions": perms}
 
 
 def create_permission(file_id, type, role, email_address=None, display_name=None):
-    if not any(f["id"] == file_id for f in _files_rows()):
+    if not any(f["id"] == file_id for f in _files_store):
         return {"error": f"File {file_id} not found"}
     perm = {
         "id": f"perm-{uuid.uuid4().hex[:6]}",
@@ -281,15 +241,13 @@ def create_permission(file_id, type, role, email_address=None, display_name=None
         "email": email_address or "",
         "display_name": display_name or email_address or "",
     }
-    _permissions_rows().append(perm)
+    _permissions_store.append(perm)
     return perm
 
 
 def delete_permission(file_id, permission_id):
-    for i, p in enumerate(_permissions_rows()):
+    for i, p in enumerate(_permissions_store):
         if p["id"] == permission_id and p["file_id"] == file_id:
-            _permissions_rows().pop(i)
+            _permissions_store.pop(i)
             return {"deleted": True, "id": permission_id}
     return {"error": f"Permission {permission_id} not found on {file_id}"}
-
-_store.eager_load()

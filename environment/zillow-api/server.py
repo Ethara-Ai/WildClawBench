@@ -8,17 +8,14 @@ from typing import Optional
 import zillow_data
 try:
     from tracking_middleware import install_tracker
-    from admin_plane import install_admin_plane
 except ModuleNotFoundError:  # standalone run without the shared module on sys.path
     def install_tracker(app):  # no-op fallback: audit endpoints disabled
         return None
 
-    def install_admin_plane(app, store=None, one_shot_registry=None):
-        return None
-
 app = FastAPI(title="Zillow API (Mock)", version="1.0.0")
 install_tracker(app)
-install_admin_plane(app, store=zillow_data._store)
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -36,7 +33,7 @@ def search_properties(
     min_beds: Optional[int] = None,
     min_baths: Optional[float] = None,
     home_type: Optional[str] = None,
-    status: Optional[str] = None,
+    status: Optional[str] = "FOR_SALE",
     limit: int = Query(25, ge=1, le=100),
     offset: int = Query(0, ge=0),
     sort_by: str = "list_price",

@@ -10,45 +10,15 @@ import csv
 import secrets
 import string
 import time
+from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_int, opt_str)
 
-_store = get_store("klaviyo-api")
-_API = "klaviyo-api"
-
-_store.register("profiles", primary_key="id",
-                initial_loader=lambda: _coerce_profiles(_load("profiles.csv", "profiles")))
-_store.register("lists", primary_key="id",
-                initial_loader=lambda: _coerce_lists(_load("lists.csv", "lists")))
-_store.register("campaigns", primary_key="id",
-                initial_loader=lambda: _coerce_campaigns(_load("campaigns.csv", "campaigns")))
-
-
-def _profiles_rows():
-    return _store.table("profiles").rows()
-
-
-def _lists_rows():
-    return _store.table("lists").rows()
-
-
-def _campaigns_rows():
-    return _store.table("campaigns").rows()
-
-
-
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _to_int(v):
@@ -88,7 +58,7 @@ def _coerce_lists(rows):
         out.append({
             "id": r["id"],
             "name": r["name"],
-            "profile_count": opt_int(r, "profile_count", default=0),
+            "profile_count": _to_int(r["profile_count"]),
             "created": r["created"],
             "updated": r["updated"],
         })
@@ -107,17 +77,20 @@ def _coerce_campaigns(rows):
             "from_email": r["from_email"],
             "from_label": r["from_label"],
             "list_id": r["list_id"],
-            "send_time": opt_str(r, "send_time", default="") or None,
+            "send_time": r["send_time"] or None,
             "created": r["created"],
             "updated": r["updated"],
         })
     return out
 
 
+_profiles = _coerce_profiles(_load("profiles.csv"))
+_lists = _coerce_lists(_load("lists.csv"))
+_campaigns = _coerce_campaigns(_load("campaigns.csv"))
 
-
-
-
+_profiles_store = deepcopy(_profiles)
+_lists_store = deepcopy(_lists)
+_campaigns_store = deepcopy(_campaigns)
 
 
 # ---------------------------------------------------------------------------
@@ -185,14 +158,14 @@ def _serialize_campaign(c):
 # ---------------------------------------------------------------------------
 
 def list_profiles(email=None):
-    profiles = list(_profiles_rows())
+    profiles = list(_profiles_store)
     if email:
         profiles = [p for p in profiles if p["email"].lower() == email.lower()]
     return {"data": [_serialize_profile(p) for p in profiles]}
 
 
 def get_profile(profile_id):
-    for p in _profiles_rows():
+    for p in _profiles_store:
         if p["id"] == profile_id:
             return {"data": _serialize_profile(p)}
     return {"error": "profile not found", "message": f"Profile {profile_id} not found"}
@@ -207,7 +180,7 @@ def create_profile(email, first_name="", last_name="", phone_number="",
                    organization="", title="", city="", region="", country=""):
     if not email:
         return {"error": "invalid request", "message": "attributes.email is required"}
-    if any(p["email"].lower() == email.lower() for p in _profiles_rows()):
+    if any(p["email"].lower() == email.lower() for p in _profiles_store):
         return {"error": "duplicate profile", "message": f"Profile with email {email} already exists"}
     now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     profile = {
@@ -224,7 +197,7 @@ def create_profile(email, first_name="", last_name="", phone_number="",
         "created": now,
         "updated": now,
     }
-    _profiles_rows().append(profile)
+    _profiles_store.append(profile)
     return {"data": _serialize_profile(profile)}
 
 
@@ -233,7 +206,7 @@ def create_profile(email, first_name="", last_name="", phone_number="",
 # ---------------------------------------------------------------------------
 
 def list_lists():
-    return {"data": [_serialize_list(l) for l in _lists_rows()]}
+    return {"data": [_serialize_list(l) for l in _lists_store]}
 
 
 # ---------------------------------------------------------------------------
@@ -241,11 +214,9 @@ def list_lists():
 # ---------------------------------------------------------------------------
 
 def list_campaigns(status=None, channel=None):
-    campaigns = list(_campaigns_rows())
+    campaigns = list(_campaigns_store)
     if status:
         campaigns = [c for c in campaigns if c["status"].lower() == status.lower()]
     if channel:
         campaigns = [c for c in campaigns if c["channel"].lower() == channel.lower()]
     return {"data": [_serialize_campaign(c) for c in campaigns]}
-
-_store.eager_load()

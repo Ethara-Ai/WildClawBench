@@ -6,55 +6,19 @@ are held in process memory and reset on container restart.
 """
 
 import csv
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, opt_int, strict_bool)
-
-_store = get_store("zendesk-api")
-_API = "zendesk-api"
-
-_store.register("users", primary_key="id",
-                initial_loader=lambda: _coerce_users(_load("users.csv", "users")))
-_store.register("organizations", primary_key="id",
-                initial_loader=lambda: _coerce_orgs(_load("organizations.csv", "organizations")))
-_store.register("tickets", primary_key="id",
-                initial_loader=lambda: _coerce_tickets(_load("tickets.csv", "tickets")))
-_store.register("comments", primary_key="id",
-                initial_loader=lambda: _coerce_comments(_load("comments.csv", "comments")))
-
-
-def _users_rows():
-    return _store.table("users").rows()
-
-
-def _organizations_rows():
-    return _store.table("organizations").rows()
-
-
-def _tickets_rows():
-    return _store.table("tickets").rows()
-
-
-def _comments_rows():
-    return _store.table("comments").rows()
-
-
 VALID_STATUS = {"new", "open", "pending", "hold", "solved", "closed"}
 VALID_PRIORITY = {"low", "normal", "high", "urgent"}
 
 
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _now():
@@ -80,37 +44,37 @@ def _to_int(v, default=None):
 
 def _coerce_users(rows):
     return [{
-        "id": opt_int(r, "id", default=None),
+        "id": _to_int(r["id"]),
         "name": r["name"],
         "email": r["email"],
         "role": r["role"],
-        "organization_id": opt_int(r, "organization_id", default=None),
-        "active": strict_bool(r, "active"),
+        "organization_id": _to_int(r["organization_id"]),
+        "active": _to_bool(r["active"]),
         "created_at": r["created_at"],
     } for r in rows]
 
 
 def _coerce_orgs(rows):
     return [{
-        "id": opt_int(r, "id", default=None),
+        "id": _to_int(r["id"]),
         "name": r["name"],
-        "domain_names": [d for d in opt_csv_list(r, "domain_names", sep=";") if d],
+        "domain_names": [d for d in r["domain_names"].split(";") if d],
         "created_at": r["created_at"],
     } for r in rows]
 
 
 def _coerce_tickets(rows):
     return [{
-        "id": opt_int(r, "id", default=None),
+        "id": _to_int(r["id"]),
         "subject": r["subject"],
         "description": r["description"],
         "status": r["status"],
         "priority": r["priority"],
         "type": r["type"],
-        "requester_id": opt_int(r, "requester_id", default=None),
-        "assignee_id": opt_int(r, "assignee_id", default=None),
-        "organization_id": opt_int(r, "organization_id", default=None),
-        "tags": [t for t in opt_csv_list(r, "tags", sep=";") if t],
+        "requester_id": _to_int(r["requester_id"]),
+        "assignee_id": _to_int(r["assignee_id"]),
+        "organization_id": _to_int(r["organization_id"]),
+        "tags": [t for t in r["tags"].split(";") if t],
         "created_at": r["created_at"],
         "updated_at": r["updated_at"],
     } for r in rows]
@@ -118,21 +82,24 @@ def _coerce_tickets(rows):
 
 def _coerce_comments(rows):
     return [{
-        "id": opt_int(r, "id", default=None),
-        "ticket_id": opt_int(r, "ticket_id", default=None),
-        "author_id": opt_int(r, "author_id", default=None),
+        "id": _to_int(r["id"]),
+        "ticket_id": _to_int(r["ticket_id"]),
+        "author_id": _to_int(r["author_id"]),
         "body": r["body"],
-        "public": strict_bool(r, "public"),
+        "public": _to_bool(r["public"]),
         "created_at": r["created_at"],
     } for r in rows]
 
 
+_users = _coerce_users(_load("users.csv"))
+_organizations = _coerce_orgs(_load("organizations.csv"))
+_tickets = _coerce_tickets(_load("tickets.csv"))
+_comments = _coerce_comments(_load("comments.csv"))
 
-
-
-
-
-
+_users_store = deepcopy(_users)
+_organizations_store = deepcopy(_organizations)
+_tickets_store = deepcopy(_tickets)
+_comments_store = deepcopy(_comments)
 
 
 # ---------------------------------------------------------------------------
@@ -140,7 +107,7 @@ def _coerce_comments(rows):
 # ---------------------------------------------------------------------------
 
 def _next_id(store):
-    return (max((x["id"] for x in store), default=None) + 1) if store else 1
+    return (max((x["id"] for x in store), default=0) + 1) if store else 1
 
 
 def _find(store, obj_id):
@@ -153,7 +120,7 @@ def _find(store, obj_id):
 # ---------------------------------------------------------------------------
 
 def list_tickets(status=None, priority=None, assignee_id=None):
-    results = list(_tickets_rows())
+    results = list(_tickets_store)
     if status:
         results = [t for t in results if t["status"] == status]
     if priority:
@@ -165,7 +132,7 @@ def list_tickets(status=None, priority=None, assignee_id=None):
 
 
 def get_ticket(ticket_id):
-    t = _find(_tickets_rows(), ticket_id)
+    t = _find(_tickets_store, ticket_id)
     if not t:
         return {"error": f"Ticket {ticket_id} not found"}
     return {"ticket": t}
@@ -179,7 +146,7 @@ def create_ticket(subject, description=None, priority="normal", ticket_type="que
     if priority and priority not in VALID_PRIORITY:
         return {"error": f"Invalid priority: {priority}"}
     now = _now()
-    ticket_id = _next_id(_tickets_rows())
+    ticket_id = _next_id(_tickets_store)
     ticket = {
         "id": ticket_id,
         "subject": subject,
@@ -194,11 +161,11 @@ def create_ticket(subject, description=None, priority="normal", ticket_type="que
         "created_at": now,
         "updated_at": now,
     }
-    _tickets_rows().append(ticket)
+    _tickets_store.append(ticket)
     body = comment_body or description
     if body:
-        _comments_rows().append({
-            "id": _next_id(_comments_rows()),
+        _comments_store.append({
+            "id": _next_id(_comments_store),
             "ticket_id": ticket_id,
             "author_id": _to_int(requester_id),
             "body": body,
@@ -211,7 +178,7 @@ def create_ticket(subject, description=None, priority="normal", ticket_type="que
 def update_ticket(ticket_id, status=None, priority=None, assignee_id=None,
                   ticket_type=None, tags=None, comment_body=None,
                   comment_public=True, comment_author_id=None):
-    t = _find(_tickets_rows(), ticket_id)
+    t = _find(_tickets_store, ticket_id)
     if not t:
         return {"error": f"Ticket {ticket_id} not found"}
     if status is not None:
@@ -229,8 +196,8 @@ def update_ticket(ticket_id, status=None, priority=None, assignee_id=None,
     if tags is not None:
         t["tags"] = tags
     if comment_body:
-        _comments_rows().append({
-            "id": _next_id(_comments_rows()),
+        _comments_store.append({
+            "id": _next_id(_comments_store),
             "ticket_id": t["id"],
             "author_id": _to_int(comment_author_id) if comment_author_id is not None else t["assignee_id"],
             "body": comment_body,
@@ -246,29 +213,29 @@ def update_ticket(ticket_id, status=None, priority=None, assignee_id=None,
 # ---------------------------------------------------------------------------
 
 def list_comments(ticket_id):
-    if not _find(_tickets_rows(), ticket_id):
+    if not _find(_tickets_store, ticket_id):
         return {"error": f"Ticket {ticket_id} not found"}
     tid = _to_int(ticket_id)
-    comments = [c for c in _comments_rows() if c["ticket_id"] == tid]
+    comments = [c for c in _comments_store if c["ticket_id"] == tid]
     comments.sort(key=lambda c: c["created_at"])
     return {"comments": comments, "count": len(comments)}
 
 
 def create_comment(ticket_id, body, author_id=None, public=True):
-    t = _find(_tickets_rows(), ticket_id)
+    t = _find(_tickets_store, ticket_id)
     if not t:
         return {"error": f"Ticket {ticket_id} not found"}
     if not body:
         return {"error": "comment body is required"}
     comment = {
-        "id": _next_id(_comments_rows()),
+        "id": _next_id(_comments_store),
         "ticket_id": t["id"],
         "author_id": _to_int(author_id) if author_id is not None else t["assignee_id"],
         "body": body,
         "public": bool(public),
         "created_at": _now(),
     }
-    _comments_rows().append(comment)
+    _comments_store.append(comment)
     t["updated_at"] = _now()
     return {"comment": comment}
 
@@ -278,20 +245,18 @@ def create_comment(ticket_id, body, author_id=None, public=True):
 # ---------------------------------------------------------------------------
 
 def list_users(role=None):
-    results = list(_users_rows())
+    results = list(_users_store)
     if role:
         results = [u for u in results if u["role"] == role]
     return {"users": results, "count": len(results)}
 
 
 def get_user(user_id):
-    u = _find(_users_rows(), user_id)
+    u = _find(_users_store, user_id)
     if not u:
         return {"error": f"User {user_id} not found"}
     return {"user": u}
 
 
 def list_organizations():
-    return {"organizations": list(_organizations_rows()), "count": len(_organizations_rows())}
-
-_store.eager_load()
+    return {"organizations": list(_organizations_store), "count": len(_organizations_store)}

@@ -7,51 +7,15 @@ comment trees, users, and voting. Uses Reddit fullnames (t5_/t3_/t1_/t2_).
 import csv
 import time
 import uuid
+from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_str, strict_bool, strict_float, strict_int)
 
-_store = get_store("reddit-api")
-_API = "reddit-api"
-
-_store.register("subreddits", primary_key="id",
-                initial_loader=lambda: _coerce_subreddits(_load("subreddits.csv", "subreddits")))
-_store.register("posts", primary_key="id",
-                initial_loader=lambda: _coerce_posts(_load("posts.csv", "posts")))
-_store.register("comments", primary_key="id",
-                initial_loader=lambda: _coerce_comments(_load("comments.csv", "comments")))
-_store.register("users", primary_key="id",
-                initial_loader=lambda: _coerce_users(_load("users.csv", "users")))
-
-
-def _subreddits_rows():
-    return _store.table("subreddits").rows()
-
-
-def _posts_rows():
-    return _store.table("posts").rows()
-
-
-def _comments_rows():
-    return _store.table("comments").rows()
-
-
-def _users_rows():
-    return _store.table("users").rows()
-
-
-
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _to_bool(v):
@@ -70,9 +34,9 @@ def _coerce_subreddits(rows):
             "display_name": r["name"],
             "title": r["title"],
             "public_description": r["public_description"],
-            "subscribers": strict_int(r, "subscribers"),
-            "created_utc": strict_float(r, "created_utc"),
-            "over18": strict_bool(r, "over18"),
+            "subscribers": int(r["subscribers"]),
+            "created_utc": float(r["created_utc"]),
+            "over18": _to_bool(r["over18"]),
         })
     return out
 
@@ -85,13 +49,13 @@ def _coerce_posts(rows):
             "subreddit": r["subreddit"],
             "title": r["title"],
             "author": r["author"],
-            "url": opt_str(r, "url", default="") or None,
+            "url": r["url"] or None,
             "selftext": r["selftext"],
-            "score": strict_int(r, "score"),
-            "ups": strict_int(r, "score"),
-            "num_comments": strict_int(r, "num_comments"),
-            "created_utc": strict_float(r, "created_utc"),
-            "is_self": strict_bool(r, "is_self"),
+            "score": int(r["score"]),
+            "ups": int(r["score"]),
+            "num_comments": int(r["num_comments"]),
+            "created_utc": float(r["created_utc"]),
+            "is_self": _to_bool(r["is_self"]),
             "_likes": None,  # local per-process vote direction tracker
         })
     return out
@@ -106,9 +70,9 @@ def _coerce_comments(rows):
             "parent_id": r["parent_id"],
             "author": r["author"],
             "body": r["body"],
-            "score": strict_int(r, "score"),
-            "ups": strict_int(r, "score"),
-            "created_utc": strict_float(r, "created_utc"),
+            "score": int(r["score"]),
+            "ups": int(r["score"]),
+            "created_utc": float(r["created_utc"]),
         })
     return out
 
@@ -119,21 +83,24 @@ def _coerce_users(rows):
         out.append({
             "name": r["name"],
             "id": r["id"],
-            "link_karma": strict_int(r, "link_karma"),
-            "comment_karma": strict_int(r, "comment_karma"),
-            "created_utc": strict_float(r, "created_utc"),
-            "is_gold": strict_bool(r, "is_gold"),
-            "is_mod": strict_bool(r, "is_mod"),
+            "link_karma": int(r["link_karma"]),
+            "comment_karma": int(r["comment_karma"]),
+            "created_utc": float(r["created_utc"]),
+            "is_gold": _to_bool(r["is_gold"]),
+            "is_mod": _to_bool(r["is_mod"]),
         })
     return out
 
 
+_subreddits = _coerce_subreddits(_load("subreddits.csv"))
+_posts = _coerce_posts(_load("posts.csv"))
+_comments = _coerce_comments(_load("comments.csv"))
+_users = _coerce_users(_load("users.csv"))
 
-
-
-
-
-
+_subreddits_store = deepcopy(_subreddits)
+_posts_store = deepcopy(_posts)
+_comments_store = deepcopy(_comments)
+_users_store = deepcopy(_users)
 
 
 # ---------------------------------------------------------------------------
@@ -141,7 +108,7 @@ def _coerce_users(rows):
 # ---------------------------------------------------------------------------
 
 def _find_subreddit(name):
-    return next((s for s in _subreddits_rows() if s["display_name"].lower() == name.lower()), None)
+    return next((s for s in _subreddits_store if s["display_name"].lower() == name.lower()), None)
 
 
 def _post_thing(p):
@@ -174,7 +141,7 @@ def subreddit_listing(name, sort="hot", limit=25):
     s = _find_subreddit(name)
     if not s:
         return {"error": f"subreddit {name} not found"}
-    posts = [p for p in _posts_rows() if p["subreddit"].lower() == name.lower()]
+    posts = [p for p in _posts_store if p["subreddit"].lower() == name.lower()]
     if sort == "new":
         posts.sort(key=lambda p: p["created_utc"], reverse=True)
     else:  # hot: score-weighted
@@ -189,11 +156,11 @@ def subreddit_listing(name, sort="hot", limit=25):
 def post_comments(post_id):
     if not post_id.startswith("t3_"):
         post_id = f"t3_{post_id}"
-    post = next((p for p in _posts_rows() if p["id"] == post_id), None)
+    post = next((p for p in _posts_store if p["id"] == post_id), None)
     if not post:
         return {"error": f"post {post_id} not found"}
     post_listing = _listing([post], kind="t3")
-    comments = [c for c in _comments_rows() if c["post_id"] == post_id]
+    comments = [c for c in _comments_store if c["post_id"] == post_id]
     comments.sort(key=lambda c: c["score"], reverse=True)
     comment_listing = _listing(comments, kind="t1")
     return [post_listing, comment_listing]
@@ -223,7 +190,7 @@ def submit(subreddit, title, kind="self", url=None, text=None, author="devkat"):
         "is_self": kind == "self",
         "_likes": True,
     }
-    _posts_rows().append(post)
+    _posts_store.append(post)
     return {"json": {"errors": [], "data": {"id": post["id"], "name": post["id"], "url": post["url"]}}}
 
 
@@ -242,9 +209,9 @@ def vote(fullname, direction):
         return {"error": "dir must be -1, 0, or 1"}
     target = None
     if fullname.startswith("t3_"):
-        target = next((p for p in _posts_rows() if p["id"] == fullname), None)
+        target = next((p for p in _posts_store if p["id"] == fullname), None)
     elif fullname.startswith("t1_"):
-        target = next((c for c in _comments_rows() if c["id"] == fullname), None)
+        target = next((c for c in _comments_store if c["id"] == fullname), None)
         if target is not None and "_likes" not in target:
             target["_likes"] = None
     if target is None:
@@ -258,9 +225,7 @@ def vote(fullname, direction):
 # ---------------------------------------------------------------------------
 
 def user_about(username):
-    u = next((u for u in _users_rows() if u["name"].lower() == username.lower()), None)
+    u = next((u for u in _users_store if u["name"].lower() == username.lower()), None)
     if not u:
         return {"error": f"user {username} not found"}
     return {"kind": "t2", "data": u}
-
-_store.eager_load()

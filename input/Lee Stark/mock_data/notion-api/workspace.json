@@ -1,0 +1,14 @@
+{
+  "id": "workspace-nrc",
+  "name": "Northern Remedy / Cottonwood Basin",
+  "domain": "northern-remedy",
+  "owner_user_id": "user-lee",
+  "plan": "personal_pro",
+  "created_time": "2025-06-01T09:00:00.000Z",
+  "icon": "https://www.notion.so/icons/leaf_green.svg",
+  "settings": {
+    "default_page_size": 50,
+    "ai_blocks_enabled": true,
+    "public_sharing_enabled": false
+  }
+}

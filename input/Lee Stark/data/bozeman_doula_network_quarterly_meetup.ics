@@ -1,0 +1,32 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Bozeman Doula Network//Quarterly Meetup//EN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+BEGIN:VEVENT
+UID:bdn-2026-q3-meetup@bozemandoulanetwork.org
+DTSTAMP:20260901T140000Z
+DTSTART;TZID=America/Denver:20260926T180000
+DTEND;TZID=America/Denver:20260926T203000
+SUMMARY:Bozeman Doula Network — Q3 Peer Meetup
+LOCATION:The Cottonwood Room\, Bozeman Public Library\, 626 E Main St\, Bozeman\, MT 59715
+ORGANIZER;CN=Bozeman Doula Network:mailto:coordinator@bozemandoulanetwork.org
+DESCRIPTION:Quarterly peer meetup. Agenda: case-study debrief (identifiers stripped)\, updated transfer-of-care protocol walk-through from the regional MFM group\, and an informal Q&A on apprentice supervision documentation. Light potluck — bring a dish if you can.
+STATUS:CONFIRMED
+TRANSP:OPAQUE
+CATEGORIES:doula-network,peer-meetup,professional
+END:VEVENT
+BEGIN:VEVENT
+UID:bdn-2026-q4-meetup@bozemandoulanetwork.org
+DTSTAMP:20260901T140000Z
+DTSTART;TZID=America/Denver:20261212T180000
+DTEND;TZID=America/Denver:20261212T203000
+SUMMARY:Bozeman Doula Network — Q4 Peer Meetup + holiday potluck
+LOCATION:The Cottonwood Room\, Bozeman Public Library\, 626 E Main St\, Bozeman\, MT 59715
+ORGANIZER;CN=Bozeman Doula Network:mailto:coordinator@bozemandoulanetwork.org
+DESCRIPTION:Year-end peer meetup. Brief 2027 planning conversation\, then holiday potluck. RSVP through the Microsoft Teams channel.
+STATUS:CONFIRMED
+TRANSP:OPAQUE
+CATEGORIES:doula-network,peer-meetup,professional
+END:VEVENT
+END:VCALENDAR

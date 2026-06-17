@@ -4,62 +4,16 @@ import csv
 import math
 import time
 import uuid
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store,
-    strict_int,
-    strict_float,
-    strict_bool,
-)
 
-_store = get_store("datadog-api")
-_API = "datadog-api"
-
-_store.register("monitors", primary_key="id",
-                initial_loader=lambda: _coerce_monitors(_load("monitors.csv", "monitors")))
-_store.register("dashboards", primary_key="id",
-                initial_loader=lambda: _coerce_dashboards(_load("dashboards.csv", "dashboards")))
-_store.register("events", primary_key="id",
-                initial_loader=lambda: _coerce_events(_load("events.csv", "events")))
-_store.register("hosts", primary_key="name",
-                initial_loader=lambda: _coerce_hosts(_load("hosts.csv", "hosts")))
-_store.register("metrics", primary_key="metric",
-                initial_loader=lambda: _coerce_metrics(_load("metrics.csv", "metrics")))
-
-
-def _monitors_rows():
-    return _store.table("monitors").rows()
-
-
-def _dashboards_rows():
-    return _store.table("dashboards").rows()
-
-
-def _events_rows():
-    return _store.table("events").rows()
-
-
-def _hosts_rows():
-    return _store.table("hosts").rows()
-
-
-def _metrics_rows():
-    return _store.table("metrics").rows()
-
-
-
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _now_iso():
@@ -82,9 +36,9 @@ def _coerce_monitors(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "id": strict_int(r, "id"),
-            "priority": strict_int(r, "priority"),
+            **r,
+            "id": int(r["id"]),
+            "priority": int(r["priority"]),
             "tags": _split_tags(r["tags"]),
         })
     return out
@@ -94,9 +48,9 @@ def _coerce_dashboards(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "widget_count": strict_int(r, "widget_count"),
-            "is_read_only": strict_bool(r, "is_read_only"),
+            **r,
+            "widget_count": int(r["widget_count"]),
+            "is_read_only": _to_bool(r["is_read_only"]),
         })
     return out
 
@@ -105,10 +59,10 @@ def _coerce_events(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "id": strict_int(r, "id"),
+            **r,
+            "id": int(r["id"]),
             "tags": _split_tags(r["tags"]),
-            "date_happened": strict_int(r, "date_happened"),
+            "date_happened": int(r["date_happened"]),
         })
     return out
 
@@ -117,12 +71,12 @@ def _coerce_hosts(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "up": strict_bool(r, "up"),
+            **r,
+            "up": _to_bool(r["up"]),
             "apps": _split_tags(r["apps"]),
-            "cpu_pct": strict_float(r, "cpu_pct"),
-            "mem_pct": strict_float(r, "mem_pct"),
-            "last_reported": strict_int(r, "last_reported"),
+            "cpu_pct": float(r["cpu_pct"]),
+            "mem_pct": float(r["mem_pct"]),
+            "last_reported": int(r["last_reported"]),
         })
     return out
 
@@ -131,21 +85,24 @@ def _coerce_metrics(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "base_value": strict_float(r, "base_value"),
-            "amplitude": strict_float(r, "amplitude"),
+            **r,
+            "base_value": float(r["base_value"]),
+            "amplitude": float(r["amplitude"]),
         })
     return out
 
 
+_monitors = _coerce_monitors(_load("monitors.csv"))
+_dashboards = _coerce_dashboards(_load("dashboards.csv"))
+_events = _coerce_events(_load("events.csv"))
+_hosts = _coerce_hosts(_load("hosts.csv"))
+_metrics = _coerce_metrics(_load("metrics.csv"))
 
-
-
-
-
-
-
-
+_monitors_store = deepcopy(_monitors)
+_dashboards_store = deepcopy(_dashboards)
+_events_store = deepcopy(_events)
+_hosts_store = deepcopy(_hosts)
+_metrics_store = deepcopy(_metrics)
 
 
 # ---------------------------------------------------------------------------
@@ -154,7 +111,7 @@ def _coerce_metrics(rows):
 
 def _match_metric(query):
     """Find the seeded metric whose metric name appears in the query string."""
-    for m in _metrics_rows():
+    for m in _metrics_store:
         if m["metric"] in query:
             return m
     return None
@@ -212,14 +169,14 @@ def query_metrics(from_ts, to_ts, query):
 # ---------------------------------------------------------------------------
 
 def list_monitors(overall_state=None):
-    results = list(_monitors_rows())
+    results = list(_monitors_store)
     if overall_state:
         results = [m for m in results if m["overall_state"] == overall_state]
     return results
 
 
 def get_monitor(monitor_id):
-    for m in _monitors_rows():
+    for m in _monitors_store:
         if str(m["id"]) == str(monitor_id):
             return m
     return {"error": f"Monitor {monitor_id} not found"}
@@ -227,7 +184,7 @@ def get_monitor(monitor_id):
 
 def create_monitor(name, mtype, query, message="", priority=3, tags=None):
     monitor = {
-        "id": max((m["id"] for m in _monitors_rows()), default=0) + 1,
+        "id": max((m["id"] for m in _monitors_store), default=0) + 1,
         "name": name,
         "type": mtype,
         "query": query,
@@ -238,28 +195,28 @@ def create_monitor(name, mtype, query, message="", priority=3, tags=None):
         "created": _now_iso(),
         "modified": _now_iso(),
     }
-    _monitors_rows().append(monitor)
+    _monitors_store.append(monitor)
     return monitor
 
 
 def update_monitor(monitor_id, name=None, query=None, message=None,
                    overall_state=None, priority=None, tags=None):
-    for idx, m in enumerate(_monitors_rows()):
+    for idx, m in enumerate(_monitors_store):
         if str(m["id"]) == str(monitor_id):
             if name is not None:
-                _monitors_rows()[idx]["name"] = name
+                _monitors_store[idx]["name"] = name
             if query is not None:
-                _monitors_rows()[idx]["query"] = query
+                _monitors_store[idx]["query"] = query
             if message is not None:
-                _monitors_rows()[idx]["message"] = message
+                _monitors_store[idx]["message"] = message
             if overall_state is not None:
-                _monitors_rows()[idx]["overall_state"] = overall_state
+                _monitors_store[idx]["overall_state"] = overall_state
             if priority is not None:
-                _monitors_rows()[idx]["priority"] = priority
+                _monitors_store[idx]["priority"] = priority
             if tags is not None:
-                _monitors_rows()[idx]["tags"] = tags
-            _monitors_rows()[idx]["modified"] = _now_iso()
-            return _monitors_rows()[idx]
+                _monitors_store[idx]["tags"] = tags
+            _monitors_store[idx]["modified"] = _now_iso()
+            return _monitors_store[idx]
     return {"error": f"Monitor {monitor_id} not found"}
 
 
@@ -268,11 +225,11 @@ def update_monitor(monitor_id, name=None, query=None, message=None,
 # ---------------------------------------------------------------------------
 
 def list_dashboards():
-    return {"dashboards": list(_dashboards_rows())}
+    return {"dashboards": list(_dashboards_store)}
 
 
 def get_dashboard(dashboard_id):
-    for d in _dashboards_rows():
+    for d in _dashboards_store:
         if d["id"] == dashboard_id:
             return d
     return {"error": f"Dashboard {dashboard_id} not found"}
@@ -283,7 +240,7 @@ def get_dashboard(dashboard_id):
 # ---------------------------------------------------------------------------
 
 def list_events(start=None, end=None):
-    results = list(_events_rows())
+    results = list(_events_store)
     if start is not None:
         results = [e for e in results if e["date_happened"] >= int(start)]
     if end is not None:
@@ -294,7 +251,7 @@ def list_events(start=None, end=None):
 
 def create_event(title, text, alert_type="info", priority="normal", host=None, tags=None):
     event = {
-        "id": max((e["id"] for e in _events_rows()), default=0) + 1,
+        "id": max((e["id"] for e in _events_store), default=0) + 1,
         "title": title,
         "text": text,
         "alert_type": alert_type,
@@ -303,7 +260,7 @@ def create_event(title, text, alert_type="info", priority="normal", host=None, t
         "tags": tags or [],
         "date_happened": int(time.time()),
     }
-    _events_rows().append(event)
+    _events_store.append(event)
     return {"status": "ok", "event": event}
 
 
@@ -312,6 +269,4 @@ def create_event(title, text, alert_type="info", priority="normal", host=None, t
 # ---------------------------------------------------------------------------
 
 def list_hosts():
-    return {"host_list": list(_hosts_rows()), "total_returned": len(_hosts_rows())}
-
-_store.eager_load()
+    return {"host_list": list(_hosts_store), "total_returned": len(_hosts_store)}

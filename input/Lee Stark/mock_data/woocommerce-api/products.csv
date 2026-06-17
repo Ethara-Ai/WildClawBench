@@ -1,0 +1,5 @@
+id,name,slug,sku,type,status,price,regular_price,sale_price,on_sale,stock_quantity,stock_status,manage_stock,categories,description,date_created
+2501,Elderberry Syrup,elderberry-syrup-esy-2509,ESY-2509,simple,publish,28.00,28.00,,False,80,instock,True,Autumn Immunity;Syrups,"Wildcrafted elderberry syrup, amber glass 2 oz, raw honey base. Launches 2026-09-12.",2026-08-01T09:00:00
+2502,Fire Cider,fire-cider-fc-2509,FC-2509,simple,publish,24.00,24.00,,False,60,instock,True,Autumn Immunity;Tonics,"Decade-refined fire cider, amber glass 2 oz, raw apple cider vinegar base. Launches 2026-09-12.",2026-08-01T09:00:00
+2503,Autumn Immune Blend Tincture,autumn-immune-blend-tincture-aibt-2509,AIBT-2509,simple,publish,32.00,32.00,,False,50,instock,True,Autumn Immunity;Tinctures,"Autumn immune support blend, amber glass 2 oz dropper. Launches 2026-09-12.",2026-08-01T09:00:00
+2504,Harvest Tea Blend,harvest-tea-blend-htb-2509,HTB-2509,simple,publish,18.00,18.00,,False,70,instock,True,Autumn Immunity;Teas,"Loose-leaf autumn harvest tea blend, 4 oz tin. Launches 2026-09-12.",2026-08-01T09:00:00

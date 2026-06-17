@@ -1,0 +1,9 @@
+id,page_id,parent_block_id,type,text,order,created_time,last_edited_time,has_children,checked
+block-autumn-1,page-autumn-2509,,heading_2,SKUs,0,2026-07-20T10:00:00.000Z,2026-09-06T16:00:00.000Z,false,
+block-autumn-2,page-autumn-2509,,bulleted_list_item,"ESY-2509 Elderberry Syrup - count 80, lot 2026-ELD-03, launches 2026-09-12.",1,2026-07-20T10:00:00.000Z,2026-09-06T16:00:00.000Z,false,
+block-autumn-3,page-autumn-2509,,bulleted_list_item,"FC-2509 Fire Cider - count 60, lot 2026-FC-02, launches 2026-09-12.",2,2026-07-20T10:00:00.000Z,2026-09-06T16:00:00.000Z,false,
+block-autumn-4,page-autumn-2509,,bulleted_list_item,"AIBT-2509 Autumn Immune Blend Tincture - count 50, lot 2026-AIB-01, launches 2026-09-12.",3,2026-07-20T10:00:00.000Z,2026-09-06T16:00:00.000Z,false,
+block-autumn-5,page-autumn-2509,,bulleted_list_item,"HTB-2509 Harvest Tea Blend - count 70, lot 2026-HTB-04, launches 2026-09-12.",4,2026-07-20T10:00:00.000Z,2026-09-06T16:00:00.000Z,false,
+block-coop-1,page-coop-planning-q3,,paragraph,Elderflower processing block scheduled 2026-09-14 (drying shed B). Donna coordinates cross-coverage.,0,2026-07-01T10:00:00.000Z,2026-09-06T16:00:00.000Z,false,
+block-spec-1,page-autumn-2509,,paragraph,Spec sheet v1: AIBT-2509 ratio elderberry 40 / echinacea 30 / astragalus 20 / elderflower 10; amber 2oz dropper. See file-spec-v1.,5,2026-08-15T10:00:00.000Z,2026-08-15T10:00:00.000Z,false,
+block-tracker-1,page-coop-planning-q3,,paragraph,"Baseline supplier shipment tracker: Thornfield elderberry IN TRANSIT, expected arrival 2026-09-08. See file-tracker.",1,2026-08-31T12:00:00.000Z,2026-09-07T05:00:00.000Z,false,

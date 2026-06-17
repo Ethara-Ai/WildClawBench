@@ -2,25 +2,16 @@
 
 import csv
 import json
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, opt_str, strict_int)
-_store = get_store("instagram-api")
-_API = "instagram-api"
 
-
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _now():
@@ -37,14 +28,14 @@ def _coerce_media(rows):
         out.append({
             "id": r["id"],
             "user_id": r["user_id"],
-            "caption": opt_str(r, "caption", default="") or None,
+            "caption": r["caption"] if r["caption"] else None,
             "media_type": r["media_type"],
             "media_url": r["media_url"],
             "permalink": r["permalink"],
-            "thumbnail_url": opt_str(r, "thumbnail_url", default="") or None,
+            "thumbnail_url": r["thumbnail_url"] if r["thumbnail_url"] else None,
             "timestamp": r["timestamp"],
-            "like_count": strict_int(r, "like_count"),
-            "comments_count": strict_int(r, "comments_count"),
+            "like_count": int(r["like_count"]),
+            "comments_count": int(r["comments_count"]),
             "is_comment_enabled": r["is_comment_enabled"].lower() == "true",
         })
     return out
@@ -60,9 +51,9 @@ def _coerce_comments(rows):
             "username": r["username"],
             "text": r["text"],
             "timestamp": r["timestamp"],
-            "like_count": strict_int(r, "like_count"),
+            "like_count": int(r["like_count"]),
             "hidden": r["hidden"].lower() == "true",
-            "parent_id": opt_str(r, "parent_id", default="") or None,
+            "parent_id": r["parent_id"] if r["parent_id"] else None,
         })
     return out
 
@@ -77,10 +68,10 @@ def _coerce_stories(rows):
             "media_url": r["media_url"],
             "timestamp": r["timestamp"],
             "expiring_at": r["expiring_at"],
-            "caption": opt_str(r, "caption", default="") or None,
-            "link": opt_str(r, "link", default="") or None,
-            "poll_question": opt_str(r, "poll_question", default="") or None,
-            "poll_options": (opt_csv_list(r, "poll_options", sep="|") or None),
+            "caption": r["caption"] if r["caption"] else None,
+            "link": r["link"] if r["link"] else None,
+            "poll_question": r["poll_question"] if r["poll_question"] else None,
+            "poll_options": r["poll_options"].split("|") if r["poll_options"] else None,
         })
     return out
 
@@ -90,13 +81,13 @@ def _coerce_media_insights(rows):
     for r in rows:
         out.append({
             "media_id": r["media_id"],
-            "impressions": strict_int(r, "impressions"),
-            "reach": strict_int(r, "reach"),
-            "engagement": strict_int(r, "engagement"),
-            "saves": strict_int(r, "saves"),
-            "shares": strict_int(r, "shares"),
-            "profile_visits": strict_int(r, "profile_visits"),
-            "follows": strict_int(r, "follows"),
+            "impressions": int(r["impressions"]),
+            "reach": int(r["reach"]),
+            "engagement": int(r["engagement"]),
+            "saves": int(r["saves"]),
+            "shares": int(r["shares"]),
+            "profile_visits": int(r["profile_visits"]),
+            "follows": int(r["follows"]),
         })
     return out
 
@@ -120,7 +111,7 @@ def _coerce_hashtags(rows):
         out.append({
             "id": r["id"],
             "name": r["name"],
-            "media_count": strict_int(r, "media_count"),
+            "media_count": int(r["media_count"]),
         })
     return out
 
@@ -135,70 +126,35 @@ def _coerce_mentions(rows):
             "mentioned_by_username": r["mentioned_by_username"],
             "media_url": r["media_url"],
             "timestamp": r["timestamp"],
-            "caption": opt_str(r, "caption", default="") or None,
+            "caption": r["caption"] if r["caption"] else None,
         })
     return out
 
 
 # Load all data at module init
-def _load_users():
-    with open(DATA_DIR / "user.json", encoding="utf-8") as f:
-        raw = json.load(f)
-    return raw if isinstance(raw, list) else [raw]
+_media = _coerce_media(_load("media.csv"))
+_comments = _coerce_comments(_load("comments.csv"))
+_stories = _coerce_stories(_load("stories.csv"))
+_media_insights = _coerce_media_insights(_load("media_insights.csv"))
+_carousel_children = _coerce_carousel_children(_load("carousel_children.csv"))
+_hashtags = _coerce_hashtags(_load("hashtags.csv"))
+_mentions = _coerce_mentions(_load("mentions.csv"))
 
+with open(DATA_DIR / "user.json", encoding="utf-8") as _f:
+    _user_raw = json.load(_f)
+    _user_list = _user_raw if isinstance(_user_raw, list) else [_user_raw]
 
-_store.register("media", primary_key="id",
-                initial_loader=lambda: _coerce_media(_load("media.csv", "media")))
-_store.register("comments", primary_key="id",
-                initial_loader=lambda: _coerce_comments(_load("comments.csv", "comments")))
-_store.register("stories", primary_key="id",
-                initial_loader=lambda: _coerce_stories(_load("stories.csv", "stories")))
-_store.register("media_insights", primary_key="media_id",
-                initial_loader=lambda: _coerce_media_insights(_load("media_insights.csv", "media_insights")))
-_store.register("carousel_children", primary_key="id",
-                initial_loader=lambda: _coerce_carousel_children(_load("carousel_children.csv", "carousel_children")))
-_store.register("hashtags", primary_key="id",
-                initial_loader=lambda: _coerce_hashtags(_load("hashtags.csv", "hashtags")))
-_store.register("mentions", primary_key="id",
-                initial_loader=lambda: _coerce_mentions(_load("mentions.csv", "mentions")))
-_store.register("users", primary_key="id", initial_loader=_load_users)
-
-
-def _media_rows():
-    return _store.table("media").rows()
-
-
-def _comments_rows():
-    return _store.table("comments").rows()
-
-
-def _stories_rows():
-    return _store.table("stories").rows()
-
-
-def _media_insights_rows():
-    return _store.table("media_insights").rows()
-
-
-def _carousel_children_rows():
-    return _store.table("carousel_children").rows()
-
-
-def _hashtags_rows():
-    return _store.table("hashtags").rows()
-
-
-def _mentions_rows():
-    return _store.table("mentions").rows()
-
-
-def _users_dict():
-    return {u["id"]: u for u in _store.table("users").rows()}
-
-
-def _primary_user():
-    rows = _store.table("users").rows()
-    return rows[0] if rows else {}
+# Mutable in-memory stores
+_media_store = deepcopy(_media)
+_comments_store = deepcopy(_comments)
+_stories_store = deepcopy(_stories)
+_media_insights_store = deepcopy(_media_insights)
+_carousel_children_store = deepcopy(_carousel_children)
+_hashtags_store = deepcopy(_hashtags)
+_mentions_store = deepcopy(_mentions)
+_users_store = {u["id"]: deepcopy(u) for u in _user_list}
+# Keep _user_store as primary account for backward compat (publishing, etc.)
+_user_store = _users_store[_user_list[0]["id"]]
 
 _next_comment_id = 17800001051
 _next_media_id = 17900001029
@@ -210,14 +166,14 @@ _next_container_id = 17920001001
 # ---------------------------------------------------------------------------
 
 def get_user(user_id: str):
-    user = _users_dict().get(user_id)
+    user = _users_store.get(user_id)
     if not user:
         return {"error": {"message": f"User {user_id} not found", "type": "IGApiException", "code": 100}}
     return user
 
 
 def update_user(user_id: str, data: dict):
-    user = _users_dict().get(user_id)
+    user = _users_store.get(user_id)
     if not user:
         return {"error": {"message": f"User {user_id} not found", "type": "IGApiException", "code": 100}}
     updatable = {"biography", "website", "name"}
@@ -232,7 +188,7 @@ def search_users(q: str):
         return {"error": {"message": "Query parameter 'q' is required", "type": "IGApiException", "code": 100}}
     q_lower = q.strip().lower()
     results = []
-    for u in _store.table("users").rows():
+    for u in _users_store.values():
         if q_lower in u.get("username", "").lower() or q_lower in u.get("name", "").lower():
             results.append(deepcopy(u))
     return {"data": results}
@@ -243,10 +199,10 @@ def search_users(q: str):
 # ---------------------------------------------------------------------------
 
 def list_user_media(user_id: str, media_type: str = None, limit: int = 25, offset: int = 0):
-    if user_id not in _users_dict():
+    if user_id not in _users_store:
         return {"error": {"message": f"User {user_id} not found", "type": "IGApiException", "code": 100}}
 
-    results = [m for m in _media_rows() if m["user_id"] == user_id]
+    results = [m for m in _media_store if m["user_id"] == user_id]
 
     if media_type:
         results = [m for m in results if m["media_type"] == media_type.upper()]
@@ -270,15 +226,17 @@ def list_user_media(user_id: str, media_type: str = None, limit: int = 25, offse
 
 
 def get_media(media_id: str):
-    for m in _media_rows():
+    for m in _media_store:
         if m["id"] == media_id:
             return m
     return {"error": {"message": f"Media {media_id} not found", "type": "IGApiException", "code": 100}}
 
 
 def delete_media(media_id: str):
-    if _store.table("media").delete(media_id):
-        return {"success": True}
+    for i, m in enumerate(_media_store):
+        if m["id"] == media_id:
+            _media_store.pop(i)
+            return {"success": True}
     return {"error": {"message": f"Media {media_id} not found", "type": "IGApiException", "code": 100}}
 
 
@@ -289,7 +247,7 @@ def delete_media(media_id: str):
 def get_media_children(media_id: str):
     # Verify media exists and is a carousel
     media = None
-    for m in _media_rows():
+    for m in _media_store:
         if m["id"] == media_id:
             media = m
             break
@@ -298,7 +256,7 @@ def get_media_children(media_id: str):
     if media["media_type"] != "CAROUSEL_ALBUM":
         return {"error": {"message": f"Media {media_id} is not a carousel album", "type": "IGApiException", "code": 100}}
 
-    children = [c for c in _carousel_children_rows() if c["media_id"] == media_id]
+    children = [c for c in _carousel_children_store if c["media_id"] == media_id]
     return {"data": children}
 
 
@@ -308,10 +266,10 @@ def get_media_children(media_id: str):
 
 def list_media_comments(media_id: str, limit: int = 25, offset: int = 0):
     # Verify media exists
-    if not any(m["id"] == media_id for m in _media_rows()):
+    if not any(m["id"] == media_id for m in _media_store):
         return {"error": {"message": f"Media {media_id} not found", "type": "IGApiException", "code": 100}}
 
-    results = [c for c in _comments_rows() if c["media_id"] == media_id and not c["hidden"]]
+    results = [c for c in _comments_store if c["media_id"] == media_id and not c["hidden"]]
     results = sorted(results, key=lambda x: x["timestamp"], reverse=True)
 
     total = len(results)
@@ -330,17 +288,17 @@ def list_media_comments(media_id: str, limit: int = 25, offset: int = 0):
 
 
 def get_comment(comment_id: str):
-    for c in _comments_rows():
+    for c in _comments_store:
         if c["id"] == comment_id:
             return c
     return {"error": {"message": f"Comment {comment_id} not found", "type": "IGApiException", "code": 100}}
 
 
 def get_comment_replies(comment_id: str, limit: int = 25, offset: int = 0):
-    if not any(c["id"] == comment_id for c in _comments_rows()):
+    if not any(c["id"] == comment_id for c in _comments_store):
         return {"error": {"message": f"Comment {comment_id} not found", "type": "IGApiException", "code": 100}}
 
-    results = [c for c in _comments_rows() if c["parent_id"] == comment_id]
+    results = [c for c in _comments_store if c["parent_id"] == comment_id]
     results = sorted(results, key=lambda x: x["timestamp"])
 
     total = len(results)
@@ -360,32 +318,31 @@ def create_comment(media_id: str, message: str, parent_id: str = None):
     global _next_comment_id
 
     # Verify media exists
-    if not any(m["id"] == media_id for m in _media_rows()):
+    if not any(m["id"] == media_id for m in _media_store):
         return {"error": {"message": f"Media {media_id} not found", "type": "IGApiException", "code": 100}}
 
     # If replying, verify parent exists
-    if parent_id and not any(c["id"] == parent_id for c in _comments_rows()):
+    if parent_id and not any(c["id"] == parent_id for c in _comments_store):
         return {"error": {"message": f"Parent comment {parent_id} not found", "type": "IGApiException", "code": 100}}
 
     comment = {
         "id": str(_next_comment_id),
         "media_id": media_id,
-        "user_id": _primary_user()["id"],
-        "username": _primary_user()["username"],
+        "user_id": _user_store["id"],
+        "username": _user_store["username"],
         "text": message,
         "timestamp": _now(),
         "like_count": 0,
         "hidden": False,
         "parent_id": parent_id,
     }
-    _store.table("comments").upsert(comment)
+    _comments_store.append(comment)
     _next_comment_id += 1
 
     # Update comments_count on media
-    for m in _media_rows():
+    for m in _media_store:
         if m["id"] == media_id:
-            _store.table("media").patch(
-                media_id, {"comments_count": m["comments_count"] + 1})
+            m["comments_count"] += 1
             break
 
     return comment
@@ -393,16 +350,16 @@ def create_comment(media_id: str, message: str, parent_id: str = None):
 
 def delete_comment(media_id: str, comment_id: str):
     # Verify media exists
-    if not any(m["id"] == media_id for m in _media_rows()):
+    if not any(m["id"] == media_id for m in _media_store):
         return {"error": {"message": f"Media {media_id} not found", "type": "IGApiException", "code": 100}}
 
-    for c in _comments_rows():
+    for i, c in enumerate(_comments_store):
         if c["id"] == comment_id and c["media_id"] == media_id:
-            _store.table("comments").delete(comment_id)
-            for m in _media_rows():
+            _comments_store.pop(i)
+            # Update comments_count on media
+            for m in _media_store:
                 if m["id"] == media_id:
-                    _store.table("media").patch(
-                        media_id, {"comments_count": m["comments_count"] - 1})
+                    m["comments_count"] -= 1
                     break
             return {"success": True}
     return {"error": {"message": f"Comment {comment_id} not found", "type": "IGApiException", "code": 100}}
@@ -410,12 +367,12 @@ def delete_comment(media_id: str, comment_id: str):
 
 def hide_comment(media_id: str, comment_id: str, hide: bool = True):
     # Verify media exists
-    if not any(m["id"] == media_id for m in _media_rows()):
+    if not any(m["id"] == media_id for m in _media_store):
         return {"error": {"message": f"Media {media_id} not found", "type": "IGApiException", "code": 100}}
 
-    for c in _comments_rows():
+    for c in _comments_store:
         if c["id"] == comment_id and c["media_id"] == media_id:
-            _store.table("comments").patch(comment_id, {"hidden": hide})
+            c["hidden"] = hide
             return {"success": True}
     return {"error": {"message": f"Comment {comment_id} not found", "type": "IGApiException", "code": 100}}
 
@@ -425,17 +382,17 @@ def hide_comment(media_id: str, comment_id: str, hide: bool = True):
 # ---------------------------------------------------------------------------
 
 def list_user_stories(user_id: str):
-    if user_id not in _users_dict():
+    if user_id not in _users_store:
         return {"error": {"message": f"User {user_id} not found", "type": "IGApiException", "code": 100}}
 
-    results = [s for s in _stories_rows() if s["user_id"] == user_id]
+    results = [s for s in _stories_store if s["user_id"] == user_id]
     results = sorted(results, key=lambda x: x["timestamp"], reverse=True)
 
     return {"data": results}
 
 
 def get_story(story_id: str):
-    for s in _stories_rows():
+    for s in _stories_store:
         if s["id"] == story_id:
             return s
     return {"error": {"message": f"Story {story_id} not found", "type": "IGApiException", "code": 100}}
@@ -446,15 +403,15 @@ def get_story(story_id: str):
 # ---------------------------------------------------------------------------
 
 def get_user_insights(user_id: str, metric: str = None, period: str = "day"):
-    if user_id not in _users_dict():
+    if user_id not in _users_store:
         return {"error": {"message": f"User {user_id} not found", "type": "IGApiException", "code": 100}}
 
     # Aggregate from media insights for the account
-    total_impressions = sum(i["impressions"] for i in _media_insights_rows())
-    total_reach = sum(i["reach"] for i in _media_insights_rows())
-    total_engagement = sum(i["engagement"] for i in _media_insights_rows())
-    total_profile_visits = sum(i["profile_visits"] for i in _media_insights_rows())
-    total_follows = sum(i["follows"] for i in _media_insights_rows())
+    total_impressions = sum(i["impressions"] for i in _media_insights_store)
+    total_reach = sum(i["reach"] for i in _media_insights_store)
+    total_engagement = sum(i["engagement"] for i in _media_insights_store)
+    total_profile_visits = sum(i["profile_visits"] for i in _media_insights_store)
+    total_follows = sum(i["follows"] for i in _media_insights_store)
 
     all_metrics = [
         {
@@ -474,7 +431,7 @@ def get_user_insights(user_id: str, metric: str = None, period: str = "day"):
         {
             "name": "follower_count",
             "period": period,
-            "values": [{"value": _primary_user()["followers_count"], "end_time": _now()}],
+            "values": [{"value": _user_store["followers_count"], "end_time": _now()}],
             "title": "Follower Count",
             "description": "Total number of followers",
         },
@@ -505,11 +462,11 @@ def get_user_insights(user_id: str, metric: str = None, period: str = "day"):
 
 def get_media_insights(media_id: str, metric: str = None):
     # Verify media exists
-    if not any(m["id"] == media_id for m in _media_rows()):
+    if not any(m["id"] == media_id for m in _media_store):
         return {"error": {"message": f"Media {media_id} not found", "type": "IGApiException", "code": 100}}
 
     insight = None
-    for i in _media_insights_rows():
+    for i in _media_insights_store:
         if i["media_id"] == media_id:
             insight = i
             break
@@ -545,13 +502,13 @@ def search_hashtags(q: str):
         return {"error": {"message": "Query parameter is required", "type": "IGApiException", "code": 100}}
 
     q_lower = q.lower().replace("#", "")
-    results = [h for h in _hashtags_rows() if q_lower in h["name"].lower()]
+    results = [h for h in _hashtags_store if q_lower in h["name"].lower()]
 
     return {"data": results}
 
 
 def get_hashtag(hashtag_id: str):
-    for h in _hashtags_rows():
+    for h in _hashtags_store:
         if h["id"] == hashtag_id:
             return h
     return {"error": {"message": f"Hashtag {hashtag_id} not found", "type": "IGApiException", "code": 100}}
@@ -560,7 +517,7 @@ def get_hashtag(hashtag_id: str):
 def get_hashtag_recent_media(hashtag_id: str, user_id: str, limit: int = 25):
     # Verify hashtag exists
     hashtag = None
-    for h in _hashtags_rows():
+    for h in _hashtags_store:
         if h["id"] == hashtag_id:
             hashtag = h
             break
@@ -570,7 +527,7 @@ def get_hashtag_recent_media(hashtag_id: str, user_id: str, limit: int = 25):
     # Return user's media that contains this hashtag in caption
     tag_name = hashtag["name"]
     results = []
-    for m in _media_rows():
+    for m in _media_store:
         if m["user_id"] == user_id and m["caption"]:
             if f"#{tag_name}" in m["caption"].lower():
                 results.append(m)
@@ -585,10 +542,10 @@ def get_hashtag_recent_media(hashtag_id: str, user_id: str, limit: int = 25):
 # ---------------------------------------------------------------------------
 
 def list_user_mentions(user_id: str, limit: int = 25, offset: int = 0):
-    if user_id not in _users_dict():
+    if user_id not in _users_store:
         return {"error": {"message": f"User {user_id} not found", "type": "IGApiException", "code": 100}}
 
-    results = sorted(_mentions_rows(), key=lambda x: x["timestamp"], reverse=True)
+    results = sorted(_mentions_store, key=lambda x: x["timestamp"], reverse=True)
 
     total = len(results)
     page_results = results[offset: offset + limit]
@@ -615,7 +572,7 @@ def create_media_container(user_id: str, image_url: str = None, video_url: str =
                            children: list = None):
     global _next_container_id
 
-    if user_id not in _users_dict():
+    if user_id not in _users_store:
         return {"error": {"message": f"User {user_id} not found", "type": "IGApiException", "code": 100}}
 
     if media_type == "CAROUSEL_ALBUM" and not children:
@@ -640,7 +597,7 @@ def create_media_container(user_id: str, image_url: str = None, video_url: str =
 def publish_media_container(user_id: str, creation_id: str):
     global _next_media_id
 
-    if user_id not in _users_dict():
+    if user_id not in _users_store:
         return {"error": {"message": f"User {user_id} not found", "type": "IGApiException", "code": 100}}
 
     # Find the container
@@ -670,13 +627,11 @@ def publish_media_container(user_id: str, creation_id: str):
         "comments_count": 0,
         "is_comment_enabled": True,
     }
-    _store.table("media").upsert(media)
+    _media_store.insert(0, media)
     _next_media_id += 1
 
     # Update user media count
-    primary = _primary_user()
-    _store.table("users").patch(
-        primary["id"], {"media_count": primary["media_count"] + 1})
+    _user_store["media_count"] += 1
 
     # Remove the container
     _media_containers.remove(container)
@@ -689,5 +644,3 @@ def get_media_container_status(container_id: str):
         if c["id"] == container_id:
             return {"id": c["id"], "status": c["status"], "status_code": "PUBLISHED" if c["status"] == "FINISHED" else "IN_PROGRESS"}
     return {"error": {"message": f"Container {container_id} not found", "type": "IGApiException", "code": 100}}
-
-_store.eager_load()

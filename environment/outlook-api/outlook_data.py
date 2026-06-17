@@ -9,45 +9,15 @@ that resets on restart.
 import csv
 import secrets
 import time
+from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, strict_bool)
 
-_store = get_store("outlook-api")
-_API = "outlook-api"
-
-_store.register("messages", primary_key="id",
-                initial_loader=lambda: _coerce_messages(_load("messages.csv", "messages")))
-_store.register("events", primary_key="id",
-                initial_loader=lambda: _coerce_events(_load("events.csv", "events")))
-_store.register("contacts", primary_key="id",
-                initial_loader=lambda: _coerce_contacts(_load("contacts.csv", "contacts")))
-
-
-def _messages_rows():
-    return _store.table("messages").rows()
-
-
-def _events_rows():
-    return _store.table("events").rows()
-
-
-def _contacts_rows():
-    return _store.table("contacts").rows()
-
-
-
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _to_bool(v):
@@ -75,7 +45,7 @@ def _coerce_messages(rows):
             "to_address": r["to_address"],
             "bodyPreview": r["body_preview"],
             "contentType": r["content_type"],
-            "isRead": strict_bool(r, "is_read"),
+            "isRead": _to_bool(r["is_read"]),
             "importance": r["importance"],
             "receivedDateTime": r["received_date"],
         })
@@ -93,9 +63,9 @@ def _coerce_events(rows):
             "location": r["location"],
             "start": r["start_date"],
             "end": r["end_date"],
-            "isAllDay": strict_bool(r, "is_all_day"),
-            "isOnlineMeeting": strict_bool(r, "is_online"),
-            "attendees": [x for x in opt_csv_list(r, "attendees", sep=";") if x],
+            "isAllDay": _to_bool(r["is_all_day"]),
+            "isOnlineMeeting": _to_bool(r["is_online"]),
+            "attendees": [x for x in r["attendees"].split(";") if x],
         })
     return out
 
@@ -116,10 +86,13 @@ def _coerce_contacts(rows):
     return out
 
 
+_messages = _coerce_messages(_load("messages.csv"))
+_events = _coerce_events(_load("events.csv"))
+_contacts = _coerce_contacts(_load("contacts.csv"))
 
-
-
-
+_messages_store = deepcopy(_messages)
+_events_store = deepcopy(_events)
+_contacts_store = deepcopy(_contacts)
 
 
 # ---------------------------------------------------------------------------
@@ -184,7 +157,7 @@ def _serialize_contact(c):
 # ---------------------------------------------------------------------------
 
 def list_messages(is_read=None):
-    msgs = list(_messages_rows())
+    msgs = list(_messages_store)
     if is_read is not None:
         msgs = [m for m in msgs if m["isRead"] == is_read]
     msgs = sorted(msgs, key=lambda m: m["receivedDateTime"], reverse=True)
@@ -192,7 +165,7 @@ def list_messages(is_read=None):
 
 
 def get_message(message_id):
-    for m in _messages_rows():
+    for m in _messages_store:
         if m["id"] == message_id:
             return _serialize_message(m)
     return {"error": "message not found", "message": f"Message {message_id} not found"}
@@ -215,7 +188,7 @@ def send_mail(subject, content, to_recipients, content_type="HTML"):
         "importance": "normal",
         "receivedDateTime": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
-    _messages_rows().append(msg)
+    _messages_store.append(msg)
     return {"status": "accepted", "id": msg["id"]}
 
 
@@ -224,7 +197,7 @@ def send_mail(subject, content, to_recipients, content_type="HTML"):
 # ---------------------------------------------------------------------------
 
 def list_events():
-    events = sorted(_events_rows(), key=lambda e: e["start"])
+    events = sorted(_events_store, key=lambda e: e["start"])
     return {"value": [_serialize_event(e) for e in events]}
 
 
@@ -233,7 +206,5 @@ def list_events():
 # ---------------------------------------------------------------------------
 
 def list_contacts():
-    contacts = sorted(_contacts_rows(), key=lambda c: c["displayName"])
+    contacts = sorted(_contacts_store, key=lambda c: c["displayName"])
     return {"value": [_serialize_contact(c) for c in contacts]}
-
-_store.eager_load()

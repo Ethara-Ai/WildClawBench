@@ -8,17 +8,14 @@ from typing import Optional, List
 import classroom_data
 try:
     from tracking_middleware import install_tracker
-    from admin_plane import install_admin_plane
 except ModuleNotFoundError:  # standalone run without the shared module on sys.path
     def install_tracker(app):  # no-op fallback: audit endpoints disabled
         return None
 
-    def install_admin_plane(app, store=None, one_shot_registry=None):
-        return None
-
 app = FastAPI(title="Google Classroom API (Mock)", version="1.0")
 install_tracker(app)
-install_admin_plane(app, store=classroom_data._store)
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -298,30 +295,6 @@ def return_submission(course_id: str, coursework_id: str, submission_id: str):
 @app.post("/v1/courses/{course_id}/courseWork/{coursework_id}/studentSubmissions/{submission_id}:reclaim")
 def reclaim_submission(course_id: str, coursework_id: str, submission_id: str):
     result = classroom_data.reclaim_submission(course_id, coursework_id, submission_id)
-    if "error" in result:
-        return JSONResponse(status_code=404, content=result)
-    return result
-
-
-@app.post("/v1/courses/{course_id}/courseWork/{coursework_id}/studentSubmissions/{submission_id}:turnIn")
-def turn_in_submission(course_id: str, coursework_id: str, submission_id: str):
-    result = classroom_data.turn_in_submission(course_id, coursework_id, submission_id)
-    if "error" in result:
-        return JSONResponse(status_code=404, content=result)
-    return result
-
-
-class ModifyAttachmentsBody(BaseModel):
-    # Real Classroom sends {"addAttachments": [ {...} ]}; accept it permissively
-    # so any attachment shape the agent supplies is recorded.
-    addAttachments: Optional[List[dict]] = None
-
-
-@app.post("/v1/courses/{course_id}/courseWork/{coursework_id}/studentSubmissions/{submission_id}:modifyAttachments")
-def modify_submission_attachments(course_id: str, coursework_id: str, submission_id: str,
-                                  body: ModifyAttachmentsBody = ModifyAttachmentsBody()):
-    result = classroom_data.modify_submission_attachments(
-        course_id, coursework_id, submission_id, body.addAttachments or [])
     if "error" in result:
         return JSONResponse(status_code=404, content=result)
     return result

@@ -13,49 +13,12 @@ from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_int, opt_str)
-
-_store = get_store("confluence-api")
-_API = "confluence-api"
-
-_store.register("spaces", primary_key="id",
-                initial_loader=lambda: _coerce_spaces(_load("spaces.csv", "spaces")))
-_store.register("pages", primary_key="id",
-                initial_loader=lambda: _coerce_pages(_load("pages.csv", "pages")))
-_store.register("comments", primary_key="id",
-                initial_loader=lambda: _coerce_comments(_load("comments.csv", "comments")))
-_store.register("labels", primary_key="id",
-                initial_loader=lambda: _coerce_labels(_load("labels.csv", "labels")))
-
-
-def _spaces_rows():
-    return _store.table("spaces").rows()
-
-
-def _pages_rows():
-    return _store.table("pages").rows()
-
-
-def _comments_rows():
-    return _store.table("comments").rows()
-
-
-def _labels_rows():
-    return _store.table("labels").rows()
-
-
 BASE = "/wiki/rest/api"
 
 
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _now():
@@ -77,7 +40,7 @@ def _coerce_spaces(rows):
     out = []
     for r in rows:
         out.append({
-            "id": opt_int(r, "id", default=0),
+            "id": _to_int(r["id"]),
             "key": r["key"],
             "name": r["name"],
             "type": r["type"],
@@ -96,8 +59,8 @@ def _coerce_pages(rows):
             "status": r["status"],
             "title": r["title"],
             "space_key": r["space_key"],
-            "parent_id": opt_str(r, "parent_id", default="") or None,
-            "version": opt_int(r, "version", default=1),
+            "parent_id": r["parent_id"] or None,
+            "version": _to_int(r["version"], 1),
             "body": r["body"],
             "created_by": r["created_by"],
             "created_at": r["created_at"],
@@ -130,12 +93,15 @@ def _coerce_labels(rows):
     return out
 
 
+_spaces = _coerce_spaces(_load("spaces.csv"))
+_pages = _coerce_pages(_load("pages.csv"))
+_comments = _coerce_comments(_load("comments.csv"))
+_labels = _coerce_labels(_load("labels.csv"))
 
-
-
-
-
-
+_spaces_store = deepcopy(_spaces)
+_pages_store = deepcopy(_pages)
+_comments_store = deepcopy(_comments)
+_labels_store = deepcopy(_labels)
 
 
 # ---------------------------------------------------------------------------
@@ -147,11 +113,11 @@ def _new_page_id():
 
 
 def _find_page(page_id):
-    return next((p for p in _pages_rows() if p["id"] == page_id), None)
+    return next((p for p in _pages_store if p["id"] == page_id), None)
 
 
 def _find_space(space_key):
-    return next((s for s in _spaces_rows() if s["key"] == space_key), None)
+    return next((s for s in _spaces_store if s["key"] == space_key), None)
 
 
 def _content_view(page, expand_body=True):
@@ -179,8 +145,8 @@ def _content_view(page, expand_body=True):
 
 def list_spaces(limit=25):
     return {
-        "results": [deepcopy(s) for s in _spaces_rows()[:limit]],
-        "size": min(len(_spaces_rows()), limit),
+        "results": [deepcopy(s) for s in _spaces_store[:limit]],
+        "size": min(len(_spaces_store), limit),
         "_links": {"base": BASE},
     }
 
@@ -197,7 +163,7 @@ def get_space(space_key):
 # ---------------------------------------------------------------------------
 
 def list_content(type="page", space_key=None, limit=25):
-    results = [p for p in _pages_rows() if p["type"] == type]
+    results = [p for p in _pages_store if p["type"] == type]
     if space_key:
         results = [p for p in results if p["space_key"] == space_key]
     views = [_content_view(p) for p in results[:limit]]
@@ -228,7 +194,7 @@ def create_content(title, space_key, body="", parent_id=None, created_by="apiuse
         "created_by": created_by,
         "created_at": _now(),
     }
-    _pages_rows().append(page)
+    _pages_store.append(page)
     return _content_view(page)
 
 
@@ -253,7 +219,7 @@ def update_content(content_id, title=None, body=None, version_number=None):
 def list_child_pages(content_id, limit=25):
     if not _find_page(content_id):
         return {"error": f"No content with id: {content_id}"}
-    children = [p for p in _pages_rows() if p["parent_id"] == content_id and p["type"] == "page"]
+    children = [p for p in _pages_store if p["parent_id"] == content_id and p["type"] == "page"]
     views = [_content_view(c, expand_body=False) for c in children[:limit]]
     return {"results": views, "size": len(views), "_links": {"base": BASE}}
 
@@ -263,7 +229,7 @@ def list_labels(content_id):
         return {"error": f"No content with id: {content_id}"}
     labels = [
         {"id": l["id"], "name": l["name"], "prefix": l["prefix"], "label": l["name"]}
-        for l in _labels_rows() if l["page_id"] == content_id
+        for l in _labels_store if l["page_id"] == content_id
     ]
     return {"results": labels, "size": len(labels)}
 
@@ -279,7 +245,7 @@ def list_comments(content_id):
             "history": {"createdBy": {"username": c["author"]}, "createdDate": c["created_at"]},
             "body": {"storage": {"value": c["body"], "representation": "storage"}},
         }
-        for c in _comments_rows() if c["page_id"] == content_id
+        for c in _comments_store if c["page_id"] == content_id
     ]
     return {"results": comments, "size": len(comments)}
 
@@ -291,7 +257,7 @@ def list_comments(content_id):
 def search(cql):
     if not cql:
         return {"error": "cql parameter is required"}
-    results = list(_pages_rows())
+    results = list(_pages_store)
     parts = [p.strip() for p in cql.split(" AND ")]
     for part in parts:
         if part.startswith("space="):
@@ -310,5 +276,3 @@ def search(cql):
         "totalSize": len(views),
         "cqlQuery": cql,
     }
-
-_store.eager_load()

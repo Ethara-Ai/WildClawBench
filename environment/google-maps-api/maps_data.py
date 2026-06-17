@@ -7,43 +7,19 @@ envelopes.
 
 import csv
 import math
+from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
-
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, strict_float, strict_int)
-
-_store = get_store("google-maps-api")
-_API = "google-maps-api"
-
-_store.register("places", primary_key="place_id",
-                initial_loader=lambda: _coerce_places(_load("places.csv", "places")))
-_store.register("geocodes", primary_key="query",
-                initial_loader=lambda: _coerce_geocodes(_load("geocodes.csv", "geocodes")))
-
-
-def _places_rows():
-    return _store.table("places").rows()
-
-
-def _geocodes_rows():
-    return _store.table("geocodes").rows()
-
 
 EARTH_RADIUS_M = 6371000.0  # mean Earth radius in meters
 WALK_SPEED_MPS = 1.39       # ~5 km/h
 DRIVE_SPEED_MPS = 13.4      # ~48 km/h (urban average)
 
 
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 # ---------------------------------------------------------------------------
@@ -57,12 +33,12 @@ def _coerce_places(rows):
             "place_id": r["place_id"],
             "name": r["name"],
             "formatted_address": r["formatted_address"],
-            "geometry": {"location": {"lat": strict_float(r, "lat"), "lng": strict_float(r, "lng")}},
-            "rating": strict_float(r, "rating"),
-            "user_ratings_total": strict_int(r, "user_ratings_total"),
-            "types": [t for t in opt_csv_list(r, "types", sep="|") if t],
+            "geometry": {"location": {"lat": float(r["lat"]), "lng": float(r["lng"])}},
+            "rating": float(r["rating"]),
+            "user_ratings_total": int(r["user_ratings_total"]),
+            "types": [t for t in r["types"].split("|") if t],
             "business_status": r["business_status"],
-            "price_level": strict_int(r, "price_level"),
+            "price_level": int(r["price_level"]),
         })
     return out
 
@@ -73,16 +49,19 @@ def _coerce_geocodes(rows):
         out.append({
             "query": r["query"],
             "formatted_address": r["formatted_address"],
-            "lat": strict_float(r, "lat"),
-            "lng": strict_float(r, "lng"),
+            "lat": float(r["lat"]),
+            "lng": float(r["lng"]),
             "place_id": r["place_id"],
             "location_type": r["location_type"],
         })
     return out
 
 
+_places = _coerce_places(_load("places.csv"))
+_geocodes = _coerce_geocodes(_load("geocodes.csv"))
 
-
+_places_store = deepcopy(_places)
+_geocodes_store = deepcopy(_geocodes)
 
 
 # ---------------------------------------------------------------------------
@@ -123,15 +102,15 @@ def _resolve_point(value):
     if ll:
         return ll[0], ll[1], value
     v = value.strip().lower()
-    for g in _geocodes_rows():
+    for g in _geocodes_store:
         if g["query"].lower() == v or g["formatted_address"].lower() == v:
             return g["lat"], g["lng"], g["formatted_address"]
-    for p in _places_rows():
+    for p in _places_store:
         if p["place_id"] == value or p["name"].lower() == v:
             loc = p["geometry"]["location"]
             return loc["lat"], loc["lng"], p["formatted_address"]
     # partial geocode match
-    for g in _geocodes_rows():
+    for g in _geocodes_store:
         if v in g["query"].lower() or v in g["formatted_address"].lower():
             return g["lat"], g["lng"], g["formatted_address"]
     return None
@@ -153,7 +132,7 @@ def _fmt_duration(seconds):
 # ---------------------------------------------------------------------------
 
 def text_search(query):
-    results = list(_places_rows())
+    results = list(_places_store)
     if query:
         q = query.lower()
         results = [p for p in results
@@ -164,7 +143,7 @@ def text_search(query):
 
 
 def place_details(place_id):
-    for p in _places_rows():
+    for p in _places_store:
         if p["place_id"] == place_id:
             return {"status": "OK", "result": p}
     return {"status": "NOT_FOUND", "result": {}, "error": f"Place {place_id} not found"}
@@ -177,7 +156,7 @@ def nearby_search(location, radius=5000, place_type=None):
                 "error": f"Could not resolve location '{location}'"}
     lat0, lng0 = point[0], point[1]
     out = []
-    for p in _places_rows():
+    for p in _places_store:
         loc = p["geometry"]["location"]
         dist = haversine_meters(lat0, lng0, loc["lat"], loc["lng"])
         if dist <= radius and (not place_type or place_type in p["types"]):
@@ -200,7 +179,7 @@ def geocode(address):
     # find a matching place_id if we have one
     place_id = "ChIJgeo-derived"
     location_type = "APPROXIMATE"
-    for g in _geocodes_rows():
+    for g in _geocodes_store:
         if abs(g["lat"] - lat) < 1e-6 and abs(g["lng"] - lng) < 1e-6:
             place_id = g["place_id"]
             location_type = g["location_type"]
@@ -279,5 +258,3 @@ def distance_matrix(origins, destinations, mode="driving"):
         "destination_addresses": dest_addresses,
         "rows": rows,
     }
-
-_store.eager_load()

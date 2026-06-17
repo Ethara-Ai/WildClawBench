@@ -1,29 +1,19 @@
 """Data access module for the Airbnb API mock service."""
 
 import csv
-import sys
 import uuid
+from copy import deepcopy
 from datetime import datetime, date
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, strict_bool, strict_float, strict_int)
-
-_store = get_store("airbnb-api")
-_API = "airbnb-api"
-
 SERVICE_FEE_PCT = 14.0  # guest service fee as percent of nightly subtotal
 
 
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _now_iso():
@@ -51,15 +41,15 @@ def _coerce_listings(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "price_per_night": strict_float(r, "price_per_night"),
-            "cleaning_fee": strict_float(r, "cleaning_fee"),
-            "beds": strict_int(r, "beds"),
-            "baths": strict_float(r, "baths"),
-            "max_guests": strict_int(r, "max_guests"),
-            "rating": strict_float(r, "rating"),
-            "review_count": strict_int(r, "review_count"),
-            "instant_book": strict_bool(r, "instant_book"),
+            **r,
+            "price_per_night": float(r["price_per_night"]),
+            "cleaning_fee": float(r["cleaning_fee"]),
+            "beds": int(r["beds"]),
+            "baths": float(r["baths"]),
+            "max_guests": int(r["max_guests"]),
+            "rating": float(r["rating"]),
+            "review_count": int(r["review_count"]),
+            "instant_book": _to_bool(r["instant_book"]),
         })
     return out
 
@@ -68,11 +58,11 @@ def _coerce_hosts(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "superhost": strict_bool(r, "superhost"),
-            "joined_year": strict_int(r, "joined_year"),
-            "response_rate": strict_int(r, "response_rate"),
-            "languages": [x.strip() for x in opt_csv_list(r, "languages", sep=",")],
+            **r,
+            "superhost": _to_bool(r["superhost"]),
+            "joined_year": int(r["joined_year"]),
+            "response_rate": int(r["response_rate"]),
+            "languages": [x.strip() for x in r["languages"].split(",")],
         })
     return out
 
@@ -81,8 +71,8 @@ def _coerce_availability(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "available": strict_bool(r, "available"),
+            **r,
+            "available": _to_bool(r["available"]),
         })
     return out
 
@@ -91,45 +81,22 @@ def _coerce_reviews(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "rating": strict_int(r, "rating"),
+            **r,
+            "rating": int(r["rating"]),
         })
     return out
 
 
-_store.register("listings", primary_key="listing_id",
-                initial_loader=lambda: _coerce_listings(_load("listings.csv", "listings")))
-_store.register("hosts", primary_key="host_id",
-                initial_loader=lambda: _coerce_hosts(_load("hosts.csv", "hosts")))
-_store.register("availability", primary_key="_pk",
-                initial_loader=lambda: [
-                    {**row, "_pk": f"{row['listing_id']}@{row['start_date']}"}
-                    for row in _coerce_availability(_load("availability.csv", "availability"))
-                ])
-_store.register("reviews", primary_key="review_id",
-                initial_loader=lambda: _coerce_reviews(_load("reviews.csv", "reviews")))
-_store.register("reservations", primary_key="reservation_id",
-                initial_loader=lambda: [])
+_listings = _coerce_listings(_load("listings.csv"))
+_hosts = _coerce_hosts(_load("hosts.csv"))
+_availability = _coerce_availability(_load("availability.csv"))
+_reviews = _coerce_reviews(_load("reviews.csv"))
 
-
-def _listings_rows():
-    return _store.table("listings").rows()
-
-
-def _hosts_rows():
-    return _store.table("hosts").rows()
-
-
-def _availability_rows():
-    return _store.table("availability").rows()
-
-
-def _reviews_rows():
-    return _store.table("reviews").rows()
-
-
-def _reservations_rows():
-    return _store.table("reservations").rows()
+_listings_store = deepcopy(_listings)
+_hosts_store = deepcopy(_hosts)
+_availability_store = deepcopy(_availability)
+_reviews_store = deepcopy(_reviews)
+_reservations_store = []  # built up in memory
 
 
 def _new_id(prefix):
@@ -137,7 +104,7 @@ def _new_id(prefix):
 
 
 def _get_host(host_id):
-    return next((h for h in _hosts_rows() if h["host_id"] == host_id), None)
+    return next((h for h in _hosts_store if h["host_id"] == host_id), None)
 
 
 def _attach_host(listing):
@@ -152,7 +119,7 @@ def _attach_host(listing):
 
 def search_listings(location=None, checkin=None, checkout=None, guests=None,
                     min_price=None, max_price=None):
-    results = list(_listings_rows())
+    results = list(_listings_store)
     if location:
         loc = location.lower()
         results = [l for l in results if loc in l["city"].lower() or loc in l["country"].lower()]
@@ -171,30 +138,30 @@ def search_listings(location=None, checkin=None, checkout=None, guests=None,
 
 
 def get_listing(listing_id):
-    for l in _listings_rows():
+    for l in _listings_store:
         if l["listing_id"] == listing_id:
             return _attach_host(l)
     return {"error": f"Listing {listing_id} not found"}
 
 
 def get_availability(listing_id):
-    if not any(l["listing_id"] == listing_id for l in _listings_rows()):
+    if not any(l["listing_id"] == listing_id for l in _listings_store):
         return {"error": f"Listing {listing_id} not found"}
-    windows = [a for a in _availability_rows() if a["listing_id"] == listing_id]
+    windows = [a for a in _availability_store if a["listing_id"] == listing_id]
     return {"listing_id": listing_id, "windows": windows}
 
 
 def get_reviews(listing_id):
-    if not any(l["listing_id"] == listing_id for l in _listings_rows()):
+    if not any(l["listing_id"] == listing_id for l in _listings_store):
         return {"error": f"Listing {listing_id} not found"}
-    revs = [r for r in _reviews_rows() if r["listing_id"] == listing_id]
+    revs = [r for r in _reviews_store if r["listing_id"] == listing_id]
     return {"listing_id": listing_id, "count": len(revs), "reviews": revs}
 
 
 def _is_available(listing_id, checkin, checkout):
     """A stay is available when fully covered by available windows
     and not intersecting any unavailable window."""
-    windows = [a for a in _availability_rows() if a["listing_id"] == listing_id]
+    windows = [a for a in _availability_store if a["listing_id"] == listing_id]
     covered = False
     for w in windows:
         ws, we = _parse_date(w["start_date"]), _parse_date(w["end_date"])
@@ -213,7 +180,7 @@ def _is_available(listing_id, checkin, checkout):
 # ---------------------------------------------------------------------------
 
 def create_reservation(listing_id, checkin, checkout, guests, guest_name="Guest"):
-    listing = next((l for l in _listings_rows() if l["listing_id"] == listing_id), None)
+    listing = next((l for l in _listings_store if l["listing_id"] == listing_id), None)
     if not listing:
         return {"error": f"Listing {listing_id} not found"}
     ci, co = _parse_date(checkin), _parse_date(checkout)
@@ -247,24 +214,22 @@ def create_reservation(listing_id, checkin, checkout, guests, guest_name="Guest"
         "total": total,
         "created_at": _now_iso(),
     }
-    _store.table("reservations").upsert(reservation)
+    _reservations_store.append(reservation)
     return reservation
 
 
 def get_reservation(reservation_id):
-    found = _store.table("reservations").get(reservation_id)
-    if found is not None:
-        return found
+    for r in _reservations_store:
+        if r["reservation_id"] == reservation_id:
+            return r
     return {"error": f"Reservation {reservation_id} not found"}
 
 
 def cancel_reservation(reservation_id):
-    existing = _store.table("reservations").get(reservation_id)
-    if existing is None:
-        return {"error": f"Reservation {reservation_id} not found"}
-    if existing["status"] == "cancelled":
-        return {"error": f"Reservation {reservation_id} is already cancelled"}
-    _store.table("reservations").patch(reservation_id, {"status": "cancelled"})
-    return _store.table("reservations").get(reservation_id)
-
-_store.eager_load()
+    for i, r in enumerate(_reservations_store):
+        if r["reservation_id"] == reservation_id:
+            if r["status"] == "cancelled":
+                return {"error": f"Reservation {reservation_id} is already cancelled"}
+            _reservations_store[i]["status"] = "cancelled"
+            return _reservations_store[i]
+    return {"error": f"Reservation {reservation_id} not found"}

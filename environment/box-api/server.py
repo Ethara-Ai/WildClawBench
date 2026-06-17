@@ -10,17 +10,14 @@ from typing import Optional
 import box_data
 try:
     from tracking_middleware import install_tracker
-    from admin_plane import install_admin_plane
 except ModuleNotFoundError:  # standalone run without the shared module on sys.path
     def install_tracker(app):  # no-op fallback: audit endpoints disabled
         return None
 
-    def install_admin_plane(app, store=None, one_shot_registry=None):
-        return None
-
 app = FastAPI(title="Box API (Mock)", version="2.0")
 install_tracker(app)
-install_admin_plane(app, store=box_data._store)
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -63,18 +60,6 @@ def get_file(file_id: str):
     if isinstance(result, dict) and "error" in result:
         return JSONResponse(status_code=404, content=result)
     return result
-
-
-@app.get("/2.0/files/{file_id}/content")
-def download_file(file_id: str):
-    try:
-        return box_data.download_file_content(file_id)
-    except box_data.DownloadError as e:
-        return JSONResponse(
-            status_code=e.http_status,
-            content={"type": "error", "status": e.http_status,
-                     "code": e.code, "message": e.message},
-        )
 
 
 # --- Search ---

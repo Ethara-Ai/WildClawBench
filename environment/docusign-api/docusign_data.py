@@ -2,52 +2,16 @@
 
 import csv
 import uuid
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_str, strict_bool, strict_int)
 
-_store = get_store("docusign-api")
-_API = "docusign-api"
-
-_store.register("envelopes", primary_key="envelope_id",
-                initial_loader=lambda: _coerce_envelopes(_load("envelopes.csv", "envelopes")))
-_store.register("recipients", primary_key="recipient_id",
-                initial_loader=lambda: _coerce_recipients(_load("recipients.csv", "recipients")))
-_store.register("documents", primary_key="document_id",
-                initial_loader=lambda: _coerce_documents(_load("documents.csv", "documents")))
-_store.register("templates", primary_key="template_id",
-                initial_loader=lambda: _coerce_templates(_load("templates.csv", "templates")))
-
-
-def _envelopes_rows():
-    return _store.table("envelopes").rows()
-
-
-def _recipients_rows():
-    return _store.table("recipients").rows()
-
-
-def _documents_rows():
-    return _store.table("documents").rows()
-
-
-def _templates_rows():
-    return _store.table("templates").rows()
-
-
-
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _now():
@@ -66,10 +30,10 @@ def _coerce_envelopes(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "sent_time": opt_str(r, "sent_time", default="") or None,
-            "completed_time": opt_str(r, "completed_time", default="") or None,
-            "template_id": opt_str(r, "template_id", default="") or None,
+            **r,
+            "sent_time": r["sent_time"] or None,
+            "completed_time": r["completed_time"] or None,
+            "template_id": r["template_id"] or None,
         })
     return out
 
@@ -78,9 +42,9 @@ def _coerce_recipients(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "routing_order": strict_int(r, "routing_order"),
-            "signed_time": opt_str(r, "signed_time", default="") or None,
+            **r,
+            "routing_order": int(r["routing_order"]),
+            "signed_time": r["signed_time"] or None,
         })
     return out
 
@@ -89,23 +53,26 @@ def _coerce_documents(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "page_count": strict_int(r, "page_count"),
-            "order": strict_int(r, "order"),
+            **r,
+            "page_count": int(r["page_count"]),
+            "order": int(r["order"]),
         })
     return out
 
 
 def _coerce_templates(rows):
-    return [{**_strip_ctx(r), "shared": strict_bool(r, "shared")} for r in rows]
+    return [{**r, "shared": _to_bool(r["shared"])} for r in rows]
 
 
+_envelopes = _coerce_envelopes(_load("envelopes.csv"))
+_recipients = _coerce_recipients(_load("recipients.csv"))
+_documents = _coerce_documents(_load("documents.csv"))
+_templates = _coerce_templates(_load("templates.csv"))
 
-
-
-
-
-
+_envelopes_store = deepcopy(_envelopes)
+_recipients_store = deepcopy(_recipients)
+_documents_store = deepcopy(_documents)
+_templates_store = deepcopy(_templates)
 
 
 def _new_envelope_id():
@@ -163,7 +130,7 @@ def _template_obj(t):
 
 
 def _find_envelope(envelope_id):
-    return next((e for e in _envelopes_rows() if e["envelope_id"] == envelope_id), None)
+    return next((e for e in _envelopes_store if e["envelope_id"] == envelope_id), None)
 
 
 # ---------------------------------------------------------------------------
@@ -171,7 +138,7 @@ def _find_envelope(envelope_id):
 # ---------------------------------------------------------------------------
 
 def list_envelopes(status=None):
-    envs = _envelopes_rows()
+    envs = _envelopes_store
     if status:
         envs = [e for e in envs if e["status"].lower() == status.lower()]
     return {
@@ -203,10 +170,10 @@ def create_envelope(payload):
         "completed_time": None,
         "template_id": payload.get("templateId") or None,
     }
-    _envelopes_rows().append(env)
+    _envelopes_store.append(env)
 
     for i, r in enumerate(payload.get("recipients", {}).get("signers", []), start=1):
-        _recipients_rows().append({
+        _recipients_store.append({
             "recipient_id": r.get("recipientId") or str(i),
             "envelope_id": envelope_id,
             "name": r.get("name", ""),
@@ -218,7 +185,7 @@ def create_envelope(payload):
         })
 
     for i, d in enumerate(payload.get("documents", []), start=1):
-        _documents_rows().append({
+        _documents_store.append({
             "document_id": d.get("documentId") or str(i),
             "envelope_id": envelope_id,
             "name": d.get("name", f"document-{i}.pdf"),
@@ -251,7 +218,7 @@ def update_envelope(envelope_id, status):
 def list_recipients(envelope_id):
     if _find_envelope(envelope_id) is None:
         return {"error": f"envelope {envelope_id} not found"}
-    signers = [r for r in _recipients_rows() if r["envelope_id"] == envelope_id]
+    signers = [r for r in _recipients_store if r["envelope_id"] == envelope_id]
     signers = sorted(signers, key=lambda r: r["routing_order"])
     return {
         "signers": [_recipient_obj(r) for r in signers],
@@ -262,7 +229,7 @@ def list_recipients(envelope_id):
 def list_documents(envelope_id):
     if _find_envelope(envelope_id) is None:
         return {"error": f"envelope {envelope_id} not found"}
-    docs = [d for d in _documents_rows() if d["envelope_id"] == envelope_id]
+    docs = [d for d in _documents_store if d["envelope_id"] == envelope_id]
     docs = sorted(docs, key=lambda d: d["order"])
     return {"envelopeId": envelope_id,
             "envelopeDocuments": [_document_obj(d) for d in docs]}
@@ -274,8 +241,6 @@ def list_documents(envelope_id):
 
 def list_templates():
     return {
-        "resultSetSize": str(len(_templates_rows())),
-        "envelopeTemplates": [_template_obj(t) for t in _templates_rows()],
+        "resultSetSize": str(len(_templates_store)),
+        "envelopeTemplates": [_template_obj(t) for t in _templates_store],
     }
-
-_store.eager_load()

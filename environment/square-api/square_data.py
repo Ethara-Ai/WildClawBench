@@ -8,69 +8,16 @@ Mutations are held in process memory and reset on restart.
 import csv
 import json
 import uuid
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, opt_int, opt_str)
 
-_store = get_store("square-api")
-_API = "square-api"
-
-_store.register("customers", primary_key="id",
-                initial_loader=lambda: _coerce_customers(_load("customers.csv", "customers")))
-_store.register("catalog", primary_key="id",
-                initial_loader=lambda: _coerce_catalog(_load("catalog_items.csv", "catalog")))
-_store.register("inventory", primary_key="catalog_object_id",
-                initial_loader=lambda: _coerce_inventory(_load("inventory.csv", "inventory")))
-_store.register("payments", primary_key="id",
-                initial_loader=lambda: _coerce_payments(_load("payments.csv", "payments")))
-_store.register("orders", primary_key="id",
-                initial_loader=lambda: _coerce_orders(_load("orders.csv", "orders")))
-_store.register_document("merchant", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "merchant.json", encoding="utf-8")))
-_store.register("refunds", primary_key="refund_id",
-                initial_loader=lambda: [])
-
-
-def _customers_rows():
-    return _store.table("customers").rows()
-
-
-def _catalog_rows():
-    return _store.table("catalog").rows()
-
-
-def _inventory_rows():
-    return _store.table("inventory").rows()
-
-
-def _payments_rows():
-    return _store.table("payments").rows()
-
-
-def _orders_rows():
-    return _store.table("orders").rows()
-
-
-def _merchant_doc():
-    return _store.document("merchant").get()
-
-
-def _refunds_rows():
-    return _store.table("refunds").rows()
-
-
-
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _now():
@@ -103,9 +50,9 @@ def _coerce_customers(rows):
             "id": r["id"],
             "given_name": r["given_name"],
             "family_name": r["family_name"],
-            "email_address": opt_str(r, "email_address", default="") or None,
-            "phone_number": opt_str(r, "phone_number", default="") or None,
-            "company_name": opt_str(r, "company_name", default="") or None,
+            "email_address": r["email_address"] or None,
+            "phone_number": r["phone_number"] or None,
+            "company_name": r["company_name"] or None,
             "created_at": r["created_at"],
         })
     return out
@@ -140,7 +87,7 @@ def _coerce_inventory(rows):
         out.append({
             "catalog_object_id": r["catalog_object_id"],
             "location_id": r["location_id"],
-            "quantity": str(opt_int(r, "quantity", default=0)),
+            "quantity": str(_to_int(r["quantity"])),
             "state": r["state"],
         })
     return out
@@ -151,8 +98,8 @@ def _coerce_payments(rows):
     for r in rows:
         out.append({
             "id": r["id"],
-            "order_id": opt_str(r, "order_id", default="") or None,
-            "customer_id": opt_str(r, "customer_id", default="") or None,
+            "order_id": r["order_id"] or None,
+            "customer_id": r["customer_id"] or None,
             "amount_money": _money(r["amount"], r["currency"]),
             "status": r["status"],
             "source_type": r["source_type"],
@@ -167,7 +114,7 @@ def _coerce_orders(rows):
     out = []
     for r in rows:
         line_items = []
-        for chunk in [c.strip() for c in opt_csv_list(r, "line_items", sep=";") if c.strip()]:
+        for chunk in [c.strip() for c in r["line_items"].split(";") if c.strip()]:
             parts = chunk.rsplit("x", 1)
             uid = parts[0].strip()
             qty = parts[1].strip() if len(parts) > 1 else "1"
@@ -177,7 +124,7 @@ def _coerce_orders(rows):
             })
         out.append({
             "id": r["id"],
-            "customer_id": opt_str(r, "customer_id", default="") or None,
+            "customer_id": r["customer_id"] or None,
             "location_id": r["location_id"],
             "line_items": line_items,
             "total_money": _money(r["total_amount"], r["currency"]),
@@ -187,12 +134,25 @@ def _coerce_orders(rows):
     return out
 
 
+_customers = _coerce_customers(_load("customers.csv"))
+_catalog = _coerce_catalog(_load("catalog_items.csv"))
+_inventory = _coerce_inventory(_load("inventory.csv"))
+_payments = _coerce_payments(_load("payments.csv"))
+_orders = _coerce_orders(_load("orders.csv"))
+
+with open(DATA_DIR / "merchant.json", encoding="utf-8") as _f:
+    _merchant = json.load(_f)
+
+_customers_store = deepcopy(_customers)
+_catalog_store = deepcopy(_catalog)
+_inventory_store = deepcopy(_inventory)
+_payments_store = deepcopy(_payments)
+_orders_store = deepcopy(_orders)
+_refunds_store = []
+_merchant_store = deepcopy(_merchant)
 
 
-
-
-
-
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -209,14 +169,14 @@ def _find(store, obj_id):
 # ---------------------------------------------------------------------------
 
 def list_payments(location_id=None, limit=50):
-    results = list(_payments_rows())
+    results = list(_payments_store)
     if location_id:
         results = [p for p in results if p["location_id"] == location_id]
     return {"payments": results[:limit]}
 
 
 def get_payment(payment_id):
-    p = _find(_payments_rows(), payment_id)
+    p = _find(_payments_store, payment_id)
     if not p:
         return {"error": f"Payment {payment_id} not found"}
     return {"payment": p}
@@ -226,9 +186,9 @@ def create_payment(amount, currency="USD", source_id="cnon:card-nonce-ok",
                    customer_id=None, order_id=None, location_id="LOC_MAIN"):
     if amount is None or _to_int(amount) <= 0:
         return {"error": "amount_money.amount must be a positive integer (cents)"}
-    if customer_id and not _find(_customers_rows(), customer_id):
+    if customer_id and not _find(_customers_store, customer_id):
         return {"error": f"Customer {customer_id} not found"}
-    seq = len(_payments_rows()) + 1
+    seq = len(_payments_store) + 1
     payment = {
         "id": _new_id("PAY"),
         "order_id": order_id,
@@ -240,7 +200,7 @@ def create_payment(amount, currency="USD", source_id="cnon:card-nonce-ok",
         "receipt_number": f"RCP{seq:03d}",
         "created_at": _now(),
     }
-    _payments_rows().append(payment)
+    _payments_store.append(payment)
     return {"payment": payment}
 
 
@@ -249,7 +209,7 @@ def create_payment(amount, currency="USD", source_id="cnon:card-nonce-ok",
 # ---------------------------------------------------------------------------
 
 def create_refund(payment_id, amount=None, currency="USD", reason=None):
-    payment = _find(_payments_rows(), payment_id)
+    payment = _find(_payments_store, payment_id)
     if not payment:
         return {"error": f"Payment {payment_id} not found"}
     paid = payment["amount_money"]["amount"]
@@ -264,7 +224,7 @@ def create_refund(payment_id, amount=None, currency="USD", reason=None):
         "reason": reason or "Requested by customer",
         "created_at": _now(),
     }
-    _refunds_rows().append(refund)
+    _refunds_store.append(refund)
     return {"refund": refund}
 
 
@@ -273,11 +233,11 @@ def create_refund(payment_id, amount=None, currency="USD", reason=None):
 # ---------------------------------------------------------------------------
 
 def list_customers(limit=50):
-    return {"customers": list(_customers_rows())[:limit]}
+    return {"customers": list(_customers_store)[:limit]}
 
 
 def get_customer(customer_id):
-    c = _find(_customers_rows(), customer_id)
+    c = _find(_customers_store, customer_id)
     if not c:
         return {"error": f"Customer {customer_id} not found"}
     return {"customer": c}
@@ -294,7 +254,7 @@ def create_customer(given_name=None, family_name=None, email_address=None,
         "company_name": company_name,
         "created_at": _now(),
     }
-    _customers_rows().append(customer)
+    _customers_store.append(customer)
     return {"customer": customer}
 
 
@@ -303,7 +263,7 @@ def create_customer(given_name=None, family_name=None, email_address=None,
 # ---------------------------------------------------------------------------
 
 def list_catalog(types=None):
-    objects = list(_catalog_rows())
+    objects = list(_catalog_store)
     if types:
         wanted = {t.strip().upper() for t in types.split(",")}
         objects = [o for o in objects if o["type"] in wanted]
@@ -315,7 +275,7 @@ def list_catalog(types=None):
 # ---------------------------------------------------------------------------
 
 def get_order(order_id):
-    o = _find(_orders_rows(), order_id)
+    o = _find(_orders_store, order_id)
     if not o:
         return {"error": f"Order {order_id} not found"}
     return {"order": o}
@@ -329,7 +289,7 @@ def create_order(customer_id=None, location_id="LOC_MAIN", line_items=None):
         uid = li.get("catalog_object_id")
         qty = _to_int(li.get("quantity", 1), 1)
         unit_amount = 0
-        for item in _catalog_rows():
+        for item in _catalog_store:
             for var in item["item_data"]["variations"]:
                 if var["id"] == uid:
                     unit_amount = var["item_variation_data"]["price_money"]["amount"]
@@ -344,7 +304,7 @@ def create_order(customer_id=None, location_id="LOC_MAIN", line_items=None):
         "state": "OPEN",
         "created_at": _now(),
     }
-    _orders_rows().append(order)
+    _orders_store.append(order)
     return {"order": order}
 
 
@@ -353,7 +313,7 @@ def create_order(customer_id=None, location_id="LOC_MAIN", line_items=None):
 # ---------------------------------------------------------------------------
 
 def get_inventory(catalog_object_id):
-    counts = [i for i in _inventory_rows() if i["catalog_object_id"] == catalog_object_id]
+    counts = [i for i in _inventory_store if i["catalog_object_id"] == catalog_object_id]
     if not counts:
         return {"error": f"No inventory for catalog object {catalog_object_id}"}
     return {"counts": counts}
@@ -364,6 +324,4 @@ def get_inventory(catalog_object_id):
 # ---------------------------------------------------------------------------
 
 def get_merchant():
-    return {"merchant": _merchant_doc()}
-
-_store.eager_load()
+    return {"merchant": _merchant_store}

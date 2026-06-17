@@ -7,53 +7,16 @@ with a ``sys`` envelope (id/type/contentType) plus a ``fields`` payload.
 import csv
 import json
 import uuid
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store,
-    opt_int,
-)
 
-_store = get_store("contentful-api")
-_API = "contentful-api"
-
-_store.register("content_types", primary_key="id",
-                initial_loader=lambda: _coerce_content_types(_load("content_types.csv", "content_types")))
-_store.register("entries", primary_key="id",
-                initial_loader=lambda: _coerce_entries(_load("entries.csv", "entries")))
-_store.register("assets", primary_key="id",
-                initial_loader=lambda: _coerce_assets(_load("assets.csv", "assets")))
-_store.register_document("space", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "space.json", encoding="utf-8")))
-
-
-def _content_types_rows():
-    return _store.table("content_types").rows()
-
-
-def _entries_rows():
-    return _store.table("entries").rows()
-
-
-def _assets_rows():
-    return _store.table("assets").rows()
-
-
-def _space_doc():
-    return _store.document("space").get()
-
-
-
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _now():
@@ -102,7 +65,7 @@ def _coerce_entries(rows):
             "content_type": r["content_type"],
             "created_at": r["created_at"],
             "updated_at": r["updated_at"],
-            "published_version": opt_int(r, "published_version", default=0),
+            "published_version": _to_int(r["published_version"]),
             "fields": _parse_json(r["fields_json"], {}),
         })
     return out
@@ -115,19 +78,28 @@ def _coerce_assets(rows):
             "id": r["id"],
             "created_at": r["created_at"],
             "updated_at": r["updated_at"],
-            "published_version": opt_int(r, "published_version", default=0),
+            "published_version": _to_int(r["published_version"]),
             "title": r["title"],
             "description": r["description"],
             "file_url": r["file_url"],
             "content_type": r["content_type"],
             "file_name": r["file_name"],
-            "size": opt_int(r, "size", default=0),
+            "size": _to_int(r["size"]),
         })
     return out
 
 
+_content_types = _coerce_content_types(_load("content_types.csv"))
+_entries = _coerce_entries(_load("entries.csv"))
+_assets = _coerce_assets(_load("assets.csv"))
 
+with open(DATA_DIR / "space.json", encoding="utf-8") as _f:
+    _space = json.load(_f)
 
+_content_types_store = deepcopy(_content_types)
+_entries_store = deepcopy(_entries)
+_assets_store = deepcopy(_assets)
+_space_store = deepcopy(_space)
 
 
 # ---------------------------------------------------------------------------
@@ -201,12 +173,12 @@ def _collection(items):
 # ---------------------------------------------------------------------------
 
 def list_content_types():
-    items = [_content_type_obj(ct) for ct in _content_types_rows()]
+    items = [_content_type_obj(ct) for ct in _content_types_store]
     return _collection(items)
 
 
 def get_content_type(content_type_id):
-    for ct in _content_types_rows():
+    for ct in _content_types_store:
         if ct["id"] == content_type_id:
             return _content_type_obj(ct)
     return {"error": f"Content type {content_type_id} not found"}
@@ -217,7 +189,7 @@ def get_content_type(content_type_id):
 # ---------------------------------------------------------------------------
 
 def list_entries(content_type=None, field_filters=None, limit=100, skip=0):
-    entries = list(_entries_rows())
+    entries = list(_entries_store)
     if content_type:
         entries = [e for e in entries if e["content_type"] == content_type]
     if field_filters:
@@ -241,14 +213,14 @@ def list_entries(content_type=None, field_filters=None, limit=100, skip=0):
 
 
 def get_entry(entry_id):
-    for e in _entries_rows():
+    for e in _entries_store:
         if e["id"] == entry_id:
             return _entry_obj(e)
     return {"error": f"Entry {entry_id} not found"}
 
 
 def create_entry(content_type, fields):
-    if not any(ct["id"] == content_type for ct in _content_types_rows()):
+    if not any(ct["id"] == content_type for ct in _content_types_store):
         return {"error": f"Content type {content_type} not found"}
     now = _now()
     entry = {
@@ -259,12 +231,12 @@ def create_entry(content_type, fields):
         "published_version": 0,
         "fields": dict(fields or {}),
     }
-    _entries_rows().append(entry)
+    _entries_store.append(entry)
     return _entry_obj(entry)
 
 
 def update_entry(entry_id, fields):
-    for e in _entries_rows():
+    for e in _entries_store:
         if e["id"] == entry_id:
             if fields:
                 e["fields"].update(fields)
@@ -274,9 +246,9 @@ def update_entry(entry_id, fields):
 
 
 def delete_entry(entry_id):
-    for i, e in enumerate(_entries_rows()):
+    for i, e in enumerate(_entries_store):
         if e["id"] == entry_id:
-            _entries_rows().pop(i)
+            _entries_store.pop(i)
             return {"id": entry_id, "deleted": True}
     return {"error": f"Entry {entry_id} not found"}
 
@@ -286,12 +258,12 @@ def delete_entry(entry_id):
 # ---------------------------------------------------------------------------
 
 def list_assets():
-    items = [_asset_obj(a) for a in _assets_rows()]
+    items = [_asset_obj(a) for a in _assets_store]
     return _collection(items)
 
 
 def get_asset(asset_id):
-    for a in _assets_rows():
+    for a in _assets_store:
         if a["id"] == asset_id:
             return _asset_obj(a)
     return {"error": f"Asset {asset_id} not found"}
@@ -302,6 +274,4 @@ def get_asset(asset_id):
 # ---------------------------------------------------------------------------
 
 def get_space():
-    return deepcopy(_space_doc())
-
-_store.eager_load()
+    return deepcopy(_space_store)

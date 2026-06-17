@@ -2,58 +2,16 @@
 
 import csv
 import uuid
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_str, strict_bool, strict_int)
 
-_store = get_store("kubernetes-api")
-_API = "kubernetes-api"
-
-_store.register("namespaces", primary_key="name",
-                initial_loader=lambda: _coerce_namespaces(_load("namespaces.csv", "namespaces")))
-_store.register("nodes", primary_key="name",
-                initial_loader=lambda: _coerce_nodes(_load("nodes.csv", "nodes")))
-_store.register("pods", primary_key="name",
-                initial_loader=lambda: _coerce_pods(_load("pods.csv", "pods")))
-_store.register("deployments", primary_key="name",
-                initial_loader=lambda: _coerce_deployments(_load("deployments.csv", "deployments")))
-_store.register("services", primary_key="name",
-                initial_loader=lambda: _coerce_services(_load("services.csv", "services")))
-
-
-def _namespaces_rows():
-    return _store.table("namespaces").rows()
-
-
-def _nodes_rows():
-    return _store.table("nodes").rows()
-
-
-def _pods_rows():
-    return _store.table("pods").rows()
-
-
-def _deployments_rows():
-    return _store.table("deployments").rows()
-
-
-def _services_rows():
-    return _store.table("services").rows()
-
-
-
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _now():
@@ -80,22 +38,22 @@ def _labels(raw):
 # ---------------------------------------------------------------------------
 
 def _coerce_namespaces(rows):
-    return [{**_strip_ctx(r), "labels": _labels(r["labels"])} for r in rows]
+    return [{**r, "labels": _labels(r["labels"])} for r in rows]
 
 
 def _coerce_nodes(rows):
-    return [{**_strip_ctx(r)} for r in rows]
+    return [{**r} for r in rows]
 
 
 def _coerce_pods(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "restart_count": strict_int(r, "restart_count"),
-            "ready": strict_bool(r, "ready"),
-            "node": opt_str(r, "node", default="") or None,
-            "pod_ip": opt_str(r, "pod_ip", default="") or None,
+            **r,
+            "restart_count": int(r["restart_count"]),
+            "ready": _to_bool(r["ready"]),
+            "node": r["node"] or None,
+            "pod_ip": r["pod_ip"] or None,
         })
     return out
 
@@ -104,11 +62,11 @@ def _coerce_deployments(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "replicas": strict_int(r, "replicas"),
-            "available_replicas": strict_int(r, "available_replicas"),
-            "ready_replicas": strict_int(r, "ready_replicas"),
-            "updated_replicas": strict_int(r, "updated_replicas"),
+            **r,
+            "replicas": int(r["replicas"]),
+            "available_replicas": int(r["available_replicas"]),
+            "ready_replicas": int(r["ready_replicas"]),
+            "updated_replicas": int(r["updated_replicas"]),
         })
     return out
 
@@ -117,22 +75,25 @@ def _coerce_services(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "port": strict_int(r, "port"),
-            "target_port": strict_int(r, "target_port"),
-            "external_ip": opt_str(r, "external_ip", default="") or None,
+            **r,
+            "port": int(r["port"]),
+            "target_port": int(r["target_port"]),
+            "external_ip": r["external_ip"] or None,
         })
     return out
 
 
+_namespaces = _coerce_namespaces(_load("namespaces.csv"))
+_nodes = _coerce_nodes(_load("nodes.csv"))
+_pods = _coerce_pods(_load("pods.csv"))
+_deployments = _coerce_deployments(_load("deployments.csv"))
+_services = _coerce_services(_load("services.csv"))
 
-
-
-
-
-
-
-
+_namespaces_store = deepcopy(_namespaces)
+_nodes_store = deepcopy(_nodes)
+_pods_store = deepcopy(_pods)
+_deployments_store = deepcopy(_deployments)
+_services_store = deepcopy(_services)
 
 
 # ---------------------------------------------------------------------------
@@ -254,7 +215,7 @@ def _list_envelope(kind, items):
 
 
 def _ns_exists(ns):
-    return any(n["name"] == ns for n in _namespaces_rows())
+    return any(n["name"] == ns for n in _namespaces_store)
 
 
 # ---------------------------------------------------------------------------
@@ -262,7 +223,7 @@ def _ns_exists(ns):
 # ---------------------------------------------------------------------------
 
 def list_namespaces():
-    return _list_envelope("NamespaceList", [_ns_obj(n) for n in _namespaces_rows()])
+    return _list_envelope("NamespaceList", [_ns_obj(n) for n in _namespaces_store])
 
 
 # ---------------------------------------------------------------------------
@@ -272,22 +233,22 @@ def list_namespaces():
 def list_pods(namespace):
     if not _ns_exists(namespace):
         return {"error": f"namespace {namespace} not found"}
-    pods = [_pod_obj(p) for p in _pods_rows() if p["namespace"] == namespace]
+    pods = [_pod_obj(p) for p in _pods_store if p["namespace"] == namespace]
     return _list_envelope("PodList", pods)
 
 
 def get_pod(namespace, name):
-    for p in _pods_rows():
+    for p in _pods_store:
         if p["namespace"] == namespace and p["name"] == name:
             return _pod_obj(p)
     return {"error": f"pod {name} not found in namespace {namespace}"}
 
 
 def delete_pod(namespace, name):
-    for i, p in enumerate(_pods_rows()):
+    for i, p in enumerate(_pods_store):
         if p["namespace"] == namespace and p["name"] == name:
             obj = _pod_obj(p)
-            _pods_rows().pop(i)
+            _pods_store.pop(i)
             obj["status"]["phase"] = "Terminating"
             return obj
     return {"error": f"pod {name} not found in namespace {namespace}"}
@@ -300,26 +261,26 @@ def delete_pod(namespace, name):
 def list_deployments(namespace):
     if not _ns_exists(namespace):
         return {"error": f"namespace {namespace} not found"}
-    deps = [_deployment_obj(d) for d in _deployments_rows() if d["namespace"] == namespace]
+    deps = [_deployment_obj(d) for d in _deployments_store if d["namespace"] == namespace]
     return _list_envelope("DeploymentList", deps)
 
 
 def get_deployment(namespace, name):
-    for d in _deployments_rows():
+    for d in _deployments_store:
         if d["namespace"] == namespace and d["name"] == name:
             return _deployment_obj(d)
     return {"error": f"deployment {name} not found in namespace {namespace}"}
 
 
 def scale_deployment(namespace, name, replicas):
-    for i, d in enumerate(_deployments_rows()):
+    for i, d in enumerate(_deployments_store):
         if d["namespace"] == namespace and d["name"] == name:
             replicas = max(0, int(replicas))
-            _deployments_rows()[i]["replicas"] = replicas
+            _deployments_store[i]["replicas"] = replicas
             # Mock: available/ready converge to requested replica count.
-            _deployments_rows()[i]["available_replicas"] = replicas
-            _deployments_rows()[i]["ready_replicas"] = replicas
-            _deployments_rows()[i]["updated_replicas"] = replicas
+            _deployments_store[i]["available_replicas"] = replicas
+            _deployments_store[i]["ready_replicas"] = replicas
+            _deployments_store[i]["updated_replicas"] = replicas
             return {
                 "kind": "Scale",
                 "apiVersion": "autoscaling/v1",
@@ -337,7 +298,7 @@ def scale_deployment(namespace, name, replicas):
 def list_services(namespace):
     if not _ns_exists(namespace):
         return {"error": f"namespace {namespace} not found"}
-    svcs = [_service_obj(s) for s in _services_rows() if s["namespace"] == namespace]
+    svcs = [_service_obj(s) for s in _services_store if s["namespace"] == namespace]
     return _list_envelope("ServiceList", svcs)
 
 
@@ -346,6 +307,4 @@ def list_services(namespace):
 # ---------------------------------------------------------------------------
 
 def list_nodes():
-    return _list_envelope("NodeList", [_node_obj(n) for n in _nodes_rows()])
-
-_store.eager_load()
+    return _list_envelope("NodeList", [_node_obj(n) for n in _nodes_store])

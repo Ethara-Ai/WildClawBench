@@ -7,46 +7,16 @@ real v2 API.
 
 import csv
 import secrets
+from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, strict_bool)
 
-_store = get_store("webflow-api")
-_API = "webflow-api"
-
-_store.register("sites", primary_key="id",
-                initial_loader=lambda: _coerce_sites(_load("sites.csv", "sites")))
-_store.register("collections", primary_key="id",
-                initial_loader=lambda: _coerce_collections(_load("collections.csv", "collections")))
-_store.register("items", primary_key="id",
-                initial_loader=lambda: _coerce_items(_load("items.csv", "items")))
-
-
-def _sites_rows():
-    return _store.table("sites").rows()
-
-
-def _collections_rows():
-    return _store.table("collections").rows()
-
-
-def _items_rows():
-    return _store.table("items").rows()
-
-
-
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _to_bool(v):
@@ -86,7 +56,7 @@ def _coerce_sites(rows):
             "time_zone": r["time_zone"],
             "created_on": r["created_on"],
             "last_published": r["last_published"],
-            "custom_domains": [d for d in opt_csv_list(r, "custom_domains", sep=";") if d],
+            "custom_domains": [d for d in r["custom_domains"].split(";") if d],
         })
     return out
 
@@ -114,8 +84,8 @@ def _coerce_items(rows):
             "collection_id": r["collection_id"],
             "name": r["name"],
             "slug": r["slug"],
-            "is_draft": strict_bool(r, "is_draft"),
-            "is_archived": strict_bool(r, "is_archived"),
+            "is_draft": _to_bool(r["is_draft"]),
+            "is_archived": _to_bool(r["is_archived"]),
             "summary": r["summary"],
             "created_on": r["created_on"],
             "last_updated": r["last_updated"],
@@ -123,10 +93,13 @@ def _coerce_items(rows):
     return out
 
 
+_sites = _coerce_sites(_load("sites.csv"))
+_collections = _coerce_collections(_load("collections.csv"))
+_items = _coerce_items(_load("items.csv"))
 
-
-
-
+_sites_store = deepcopy(_sites)
+_collections_store = deepcopy(_collections)
+_items_store = deepcopy(_items)
 
 
 # ---------------------------------------------------------------------------
@@ -181,11 +154,11 @@ def _serialize_item(i):
 # ---------------------------------------------------------------------------
 
 def list_sites():
-    return {"sites": [_serialize_site(s) for s in _sites_rows()]}
+    return {"sites": [_serialize_site(s) for s in _sites_store]}
 
 
 def get_site(site_id):
-    s = next((x for x in _sites_rows() if x["id"] == site_id), None)
+    s = next((x for x in _sites_store if x["id"] == site_id), None)
     if not s:
         return {"error": "not_found", "message": f"Site {site_id} not found"}
     return _serialize_site(s)
@@ -196,9 +169,9 @@ def get_site(site_id):
 # ---------------------------------------------------------------------------
 
 def list_collections(site_id):
-    if not any(s["id"] == site_id for s in _sites_rows()):
+    if not any(s["id"] == site_id for s in _sites_store):
         return {"error": "not_found", "message": f"Site {site_id} not found"}
-    cols = [c for c in _collections_rows() if c["site_id"] == site_id]
+    cols = [c for c in _collections_store if c["site_id"] == site_id]
     return {"collections": [_serialize_collection(c) for c in cols]}
 
 
@@ -207,9 +180,9 @@ def list_collections(site_id):
 # ---------------------------------------------------------------------------
 
 def list_items(collection_id, limit=100, offset=0):
-    if not any(c["id"] == collection_id for c in _collections_rows()):
+    if not any(c["id"] == collection_id for c in _collections_store):
         return {"error": "not_found", "message": f"Collection {collection_id} not found"}
-    items = [i for i in _items_rows() if i["collection_id"] == collection_id]
+    items = [i for i in _items_store if i["collection_id"] == collection_id]
     total = len(items)
     window = items[offset:offset + limit]
     return {
@@ -219,7 +192,7 @@ def list_items(collection_id, limit=100, offset=0):
 
 
 def create_item(collection_id, field_data, is_draft=False, is_archived=False):
-    if not any(c["id"] == collection_id for c in _collections_rows()):
+    if not any(c["id"] == collection_id for c in _collections_store):
         return {"error": "not_found", "message": f"Collection {collection_id} not found"}
     field_data = field_data or {}
     name = field_data.get("name") or "Untitled"
@@ -236,11 +209,9 @@ def create_item(collection_id, field_data, is_draft=False, is_archived=False):
         "created_on": now,
         "last_updated": now,
     }
-    _items_rows().append(item)
+    _items_store.append(item)
     serialized = _serialize_item(item)
     # Surface any extra custom fields the caller supplied.
     for k, v in field_data.items():
         serialized["fieldData"].setdefault(k, v)
     return serialized
-
-_store.eager_load()

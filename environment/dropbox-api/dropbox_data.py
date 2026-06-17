@@ -6,50 +6,15 @@ sharing/list_shared_links.
 """
 
 import csv
-import mimetypes
+from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
-BLOB_DIR = DATA_DIR / "file_blobs"
-
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store,
-    strict_bool,
-    opt_int,
-    DownloadError, extract_file_content_text,
-)
-
-_store = get_store("dropbox-api")
-_API = "dropbox-api"
-
-_store.register_document("account", initial_loader=lambda: _coerce_account(_load("account.csv", "account")))
-_store.register("files", primary_key="id",
-                initial_loader=lambda: _coerce_files(_load("files.csv", "files")))
-_store.register("shared_links", primary_key="id",
-                initial_loader=lambda: _coerce_shared_links(_load("shared_links.csv", "shared_links")))
 
 
-def _account_doc():
-    return _store.document("account").get()
-
-
-def _files_rows():
-    return _store.table("files").rows()
-
-
-def _shared_links_rows():
-    return _store.table("shared_links").rows()
-
-
-
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _to_bool(v):
@@ -79,7 +44,7 @@ def _coerce_account(rows):
             "abbreviated_name": (r["name_given"][:1] + r["name_surname"][:1]).upper(),
         },
         "email": r["email"],
-        "email_verified": strict_bool(r, "email_verified"),
+        "email_verified": _to_bool(r["email_verified"]),
         "country": r["country"],
         "locale": r["locale"],
         "account_type": {".tag": r["account_type"]},
@@ -96,8 +61,8 @@ def _coerce_files(rows):
             "name": r["name"],
             "path_lower": r["path_lower"],
             "path_display": r["path_display"],
-            "is_folder": strict_bool(r, "is_folder"),
-            "size": opt_int(r, "size", default=0),
+            "is_folder": _to_bool(r["is_folder"]),
+            "size": _to_int(r["size"]),
             "client_modified": r["client_modified"],
             "rev": r["rev"],
         })
@@ -118,10 +83,13 @@ def _coerce_shared_links(rows):
     return out
 
 
+_account = _coerce_account(_load("account.csv"))
+_files = _coerce_files(_load("files.csv"))
+_shared_links = _coerce_shared_links(_load("shared_links.csv"))
 
-
-
-
+_account_store = deepcopy(_account)
+_files_store = deepcopy(_files)
+_shared_links_store = deepcopy(_shared_links)
 
 
 # ---------------------------------------------------------------------------
@@ -180,7 +148,7 @@ def _norm_path(path):
 # ---------------------------------------------------------------------------
 
 def get_current_account():
-    return deepcopy(_account_doc())
+    return deepcopy(_account_store)
 
 
 # ---------------------------------------------------------------------------
@@ -190,7 +158,7 @@ def get_current_account():
 def list_folder(path="", recursive=False):
     parent = _norm_path(path)
     entries = []
-    for f in _files_rows():
+    for f in _files_store:
         child = f["path_lower"]
         if child == parent:
             continue
@@ -217,40 +185,12 @@ def get_metadata(path=None):
     if not path:
         return {"error_summary": "path/not_found/", "error": {".tag": "path"}}
     target = _norm_path(path)
-    for f in _files_rows():
+    for f in _files_store:
         if f["path_lower"] == target or f["id"] == path:
             return _serialize_entry(f)
     return {
         "error_summary": "path/not_found/",
         "error": {".tag": "path", "path": {".tag": "not_found"}},
-    }
-
-
-def download_file_content(path=None):
-    if not path:
-        raise DownloadError(http_status=400, code="bad_request",
-                            message="path is required")
-    target = _norm_path(path)
-    row = next((f for f in _files_rows()
-                if f["path_lower"] == target or f["id"] == path), None)
-    if row is None:
-        raise DownloadError(http_status=404, code="not_found",
-                            message=f"path {path!r} not found")
-    if row.get("is_folder"):
-        raise DownloadError(http_status=415, code="unsupported_mime",
-                            message=f"path {path!r} is a folder")
-    name = row["name"]
-    mime_type, _ = mimetypes.guess_type(name)
-    if not mime_type:
-        mime_type = "application/octet-stream"
-    text = extract_file_content_text(BLOB_DIR, name, mime_type)
-    return {
-        "file_id": row["id"],
-        "name": name,
-        "path_display": row["path_display"],
-        "mime_type": mime_type,
-        "size_bytes": len(text.encode("utf-8")),
-        "content": text,
     }
 
 
@@ -262,7 +202,7 @@ def search_v2(query=None, path=""):
     q = (query or "").lower()
     scope = _norm_path(path)
     matches = []
-    for f in _files_rows():
+    for f in _files_store:
         if scope and not (f["path_lower"] == scope or f["path_lower"].startswith(scope + "/")):
             continue
         if q and q not in f["name"].lower():
@@ -285,7 +225,7 @@ def search_v2(query=None, path=""):
 # ---------------------------------------------------------------------------
 
 def list_shared_links(path=None):
-    links = _shared_links_rows()
+    links = _shared_links_store
     if path:
         target = _norm_path(path)
         links = [s for s in links if s["path_lower"] == target]
@@ -293,5 +233,3 @@ def list_shared_links(path=None):
         "links": [_serialize_link(s) for s in links],
         "has_more": False,
     }
-
-_store.eager_load()

@@ -4,45 +4,15 @@ Returns OpenWeather-style JSON shapes (`weather`, `main`, `wind`, `name`, etc.).
 """
 
 import csv
+from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_str, strict_float, strict_int)
 
-_store = get_store("openweather-api")
-_API = "openweather-api"
-
-_store.register("cities", primary_key="id",
-                initial_loader=lambda: _coerce_cities(_load("cities.csv", "cities")))
-_store.register("current", primary_key="city_id",
-                initial_loader=lambda: _coerce_current(_load("current_weather.csv", "current")))
-_store.register("forecast", primary_key="_pk",
-                initial_loader=lambda: _coerce_forecast(_load("forecast.csv", "forecast")))
-
-
-def _cities_rows():
-    return _store.table("cities").rows()
-
-
-def _current_rows():
-    return _store.table("current").rows()
-
-
-def _forecast_rows():
-    return _store.table("forecast").rows()
-
-
-
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 # ---------------------------------------------------------------------------
@@ -53,13 +23,13 @@ def _coerce_cities(rows):
     out = []
     for r in rows:
         out.append({
-            "id": strict_int(r, "id"),
+            "id": int(r["id"]),
             "name": r["name"],
             "country": r["country"],
-            "state": opt_str(r, "state", default="") or None,
-            "lat": strict_float(r, "lat"),
-            "lon": strict_float(r, "lon"),
-            "timezone": strict_int(r, "timezone"),
+            "state": r["state"] or None,
+            "lat": float(r["lat"]),
+            "lon": float(r["lon"]),
+            "timezone": int(r["timezone"]),
         })
     return out
 
@@ -68,22 +38,22 @@ def _coerce_current(rows):
     out = []
     for r in rows:
         out.append({
-            "city_id": strict_int(r, "city_id"),
-            "weather_id": strict_int(r, "weather_id"),
+            "city_id": int(r["city_id"]),
+            "weather_id": int(r["weather_id"]),
             "weather_main": r["weather_main"],
             "weather_description": r["weather_description"],
             "weather_icon": r["weather_icon"],
-            "temp": strict_float(r, "temp"),
-            "feels_like": strict_float(r, "feels_like"),
-            "temp_min": strict_float(r, "temp_min"),
-            "temp_max": strict_float(r, "temp_max"),
-            "pressure": strict_int(r, "pressure"),
-            "humidity": strict_int(r, "humidity"),
-            "wind_speed": strict_float(r, "wind_speed"),
-            "wind_deg": strict_int(r, "wind_deg"),
-            "clouds": strict_int(r, "clouds"),
-            "visibility": strict_int(r, "visibility"),
-            "dt": strict_int(r, "dt"),
+            "temp": float(r["temp"]),
+            "feels_like": float(r["feels_like"]),
+            "temp_min": float(r["temp_min"]),
+            "temp_max": float(r["temp_max"]),
+            "pressure": int(r["pressure"]),
+            "humidity": int(r["humidity"]),
+            "wind_speed": float(r["wind_speed"]),
+            "wind_deg": int(r["wind_deg"]),
+            "clouds": int(r["clouds"]),
+            "visibility": int(r["visibility"]),
+            "dt": int(r["dt"]),
         })
     return out
 
@@ -91,35 +61,35 @@ def _coerce_current(rows):
 def _coerce_forecast(rows):
     out = []
     for r in rows:
-        city_id = strict_int(r, "city_id")
-        dt = strict_int(r, "dt")
         out.append({
-            "_pk": f"{city_id}@{dt}",
-            "city_id": city_id,
-            "dt": dt,
+            "city_id": int(r["city_id"]),
+            "dt": int(r["dt"]),
             "dt_txt": r["dt_txt"],
-            "temp": strict_float(r, "temp"),
-            "feels_like": strict_float(r, "feels_like"),
-            "temp_min": strict_float(r, "temp_min"),
-            "temp_max": strict_float(r, "temp_max"),
-            "pressure": strict_int(r, "pressure"),
-            "humidity": strict_int(r, "humidity"),
-            "weather_id": strict_int(r, "weather_id"),
+            "temp": float(r["temp"]),
+            "feels_like": float(r["feels_like"]),
+            "temp_min": float(r["temp_min"]),
+            "temp_max": float(r["temp_max"]),
+            "pressure": int(r["pressure"]),
+            "humidity": int(r["humidity"]),
+            "weather_id": int(r["weather_id"]),
             "weather_main": r["weather_main"],
             "weather_description": r["weather_description"],
             "weather_icon": r["weather_icon"],
-            "wind_speed": strict_float(r, "wind_speed"),
-            "wind_deg": strict_int(r, "wind_deg"),
-            "clouds": strict_int(r, "clouds"),
-            "pop": strict_float(r, "pop"),
+            "wind_speed": float(r["wind_speed"]),
+            "wind_deg": int(r["wind_deg"]),
+            "clouds": int(r["clouds"]),
+            "pop": float(r["pop"]),
         })
     return out
 
 
+_cities = _coerce_cities(_load("cities.csv"))
+_current = _coerce_current(_load("current_weather.csv"))
+_forecast = _coerce_forecast(_load("forecast.csv"))
 
-
-
-
+_cities_store = deepcopy(_cities)
+_current_store = deepcopy(_current)
+_forecast_store = deepcopy(_forecast)
 
 
 # ---------------------------------------------------------------------------
@@ -131,10 +101,10 @@ def _find_city_by_name(q):
         return None
     # q may be "City" or "City,CC"
     name = q.split(",")[0].strip().lower()
-    for c in _cities_rows():
+    for c in _cities_store:
         if c["name"].lower() == name:
             return c
-    for c in _cities_rows():
+    for c in _cities_store:
         if name in c["name"].lower():
             return c
     return None
@@ -143,7 +113,7 @@ def _find_city_by_name(q):
 def _find_city_by_coords(lat, lon):
     best = None
     best_d = None
-    for c in _cities_rows():
+    for c in _cities_store:
         d = (c["lat"] - lat) ** 2 + (c["lon"] - lon) ** 2
         if best_d is None or d < best_d:
             best_d = d
@@ -152,7 +122,7 @@ def _find_city_by_coords(lat, lon):
 
 
 def _current_for(city_id):
-    for w in _current_rows():
+    for w in _current_store:
         if w["city_id"] == city_id:
             return w
     return None
@@ -243,7 +213,7 @@ def get_forecast(q=None, lat=None, lon=None):
         return {"cod": "400", "message": "Nothing to geocode"}
     if not city:
         return {"cod": "404", "message": "city not found"}
-    rows = [r for r in _forecast_rows() if r["city_id"] == city["id"]]
+    rows = [r for r in _forecast_store if r["city_id"] == city["id"]]
     rows.sort(key=lambda r: r["dt"])
     items = [_forecast_item(r) for r in rows]
     return {
@@ -267,7 +237,7 @@ def get_forecast(q=None, lat=None, lon=None):
 
 def geocode_direct(q, limit=5):
     name = (q or "").split(",")[0].strip().lower()
-    matches = [c for c in _cities_rows() if name and name in c["name"].lower()]
+    matches = [c for c in _cities_store if name and name in c["name"].lower()]
     out = []
     for c in matches[:limit]:
         out.append({
@@ -278,5 +248,3 @@ def geocode_direct(q, limit=5):
             "state": c["state"],
         })
     return out
-
-_store.eager_load()

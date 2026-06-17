@@ -8,56 +8,16 @@ memory and reset on restart.
 import csv
 import json
 import uuid
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_float, opt_str, strict_bool)
 
-_store = get_store("alpaca-api")
-_API = "alpaca-api"
-
-_store.register("positions", primary_key="asset_id",
-                initial_loader=lambda: _coerce_positions(_load("positions.csv", "positions")))
-_store.register("orders", primary_key="id",
-                initial_loader=lambda: _coerce_orders(_load("orders.csv", "orders")))
-_store.register("assets", primary_key="id",
-                initial_loader=lambda: _coerce_assets(_load("assets.csv", "assets")))
-_store.register_document("quotes", initial_loader=lambda: _coerce_quotes(_load("quotes.csv", "quotes")))
-_store.register_document("account", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "account.json", encoding="utf-8")))
-
-
-def _positions_rows():
-    return _store.table("positions").rows()
-
-
-def _orders_rows():
-    return _store.table("orders").rows()
-
-
-def _assets_rows():
-    return _store.table("assets").rows()
-
-
-def _quotes_doc():
-    return _store.document("quotes").get()
-
-
-def _account_doc():
-    return _store.document("account").get()
-
-
-
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _now():
@@ -110,11 +70,11 @@ def _coerce_orders(rows):
             "side": r["side"],
             "type": r["type"],
             "time_in_force": r["time_in_force"],
-            "limit_price": opt_str(r, "limit_price", default="") or None,
+            "limit_price": r["limit_price"] or None,
             "status": r["status"],
-            "filled_avg_price": opt_str(r, "filled_avg_price", default="") or None,
+            "filled_avg_price": r["filled_avg_price"] or None,
             "submitted_at": r["submitted_at"],
-            "filled_at": opt_str(r, "filled_at", default="") or None,
+            "filled_at": r["filled_at"] or None,
         })
     return out
 
@@ -128,8 +88,8 @@ def _coerce_assets(rows):
             "name": r["name"],
             "exchange": r["exchange"],
             "class": r["asset_class"],
-            "tradable": strict_bool(r, "tradable"),
-            "fractionable": strict_bool(r, "fractionable"),
+            "tradable": _to_bool(r["tradable"]),
+            "fractionable": _to_bool(r["fractionable"]),
             "status": "active",
         })
     return out
@@ -140,13 +100,27 @@ def _coerce_quotes(rows):
     for r in rows:
         quotes[r["symbol"]] = {
             "t": r["timestamp"],
-            "bp": opt_float(r, "bid_price", default=0.0),
-            "bs": int(opt_float(r, "bid_size", default=0.0)),
-            "ap": opt_float(r, "ask_price", default=0.0),
-            "as": int(opt_float(r, "ask_size", default=0.0)),
+            "bp": _to_float(r["bid_price"]),
+            "bs": int(_to_float(r["bid_size"])),
+            "ap": _to_float(r["ask_price"]),
+            "as": int(_to_float(r["ask_size"])),
         }
     return quotes
 
+
+with open(DATA_DIR / "account.json", encoding="utf-8") as _f:
+    _account = json.load(_f)
+
+_positions = _coerce_positions(_load("positions.csv"))
+_orders = _coerce_orders(_load("orders.csv"))
+_assets = _coerce_assets(_load("assets.csv"))
+_quotes = _coerce_quotes(_load("quotes.csv"))
+
+_account_store = deepcopy(_account)
+_positions_store = deepcopy(_positions)
+_orders_store = deepcopy(_orders)
+_assets_store = deepcopy(_assets)
+_quotes_store = deepcopy(_quotes)
 
 
 # ---------------------------------------------------------------------------
@@ -158,15 +132,15 @@ def _new_order_id():
 
 
 def _find_position(symbol):
-    return next((p for p in _positions_rows() if p["symbol"] == symbol.upper()), None)
+    return next((p for p in _positions_store if p["symbol"] == symbol.upper()), None)
 
 
 def _find_asset(symbol):
-    return next((a for a in _assets_rows() if a["symbol"] == symbol.upper()), None)
+    return next((a for a in _assets_store if a["symbol"] == symbol.upper()), None)
 
 
 def _ref_price(symbol):
-    q = _quotes_doc().get(symbol.upper())
+    q = _quotes_store.get(symbol.upper())
     if q:
         return q["ap"]
     pos = _find_position(symbol)
@@ -180,7 +154,7 @@ def _ref_price(symbol):
 # ---------------------------------------------------------------------------
 
 def get_account():
-    return _account_doc()
+    return _account_store
 
 
 # ---------------------------------------------------------------------------
@@ -188,7 +162,7 @@ def get_account():
 # ---------------------------------------------------------------------------
 
 def list_positions():
-    return list(_positions_rows())
+    return list(_positions_store)
 
 
 def get_position(symbol):
@@ -203,7 +177,7 @@ def get_position(symbol):
 # ---------------------------------------------------------------------------
 
 def list_orders(status=None):
-    results = list(_orders_rows())
+    results = list(_orders_store)
     if status and status != "all":
         if status == "open":
             results = [o for o in results if o["status"] in ("new", "accepted", "partially_filled")]
@@ -215,7 +189,7 @@ def list_orders(status=None):
 
 
 def get_order(order_id):
-    o = next((o for o in _orders_rows() if o["id"] == order_id), None)
+    o = next((o for o in _orders_store if o["id"] == order_id), None)
     if not o:
         return {"error": f"order not found: {order_id}", "code": 40410000}
     return o
@@ -239,7 +213,7 @@ def create_order(symbol, qty, side, type="market", time_in_force="day", limit_pr
 
     if side == "buy":
         cost = price * qty_f
-        buying_power = _to_float(_account_doc()["buying_power"])
+        buying_power = _to_float(_account_store["buying_power"])
         if cost > buying_power:
             return {
                 "error": f"insufficient buying power: need {cost:.2f}, have {buying_power:.2f}",
@@ -269,12 +243,12 @@ def create_order(symbol, qty, side, type="market", time_in_force="day", limit_pr
         "submitted_at": _now(),
         "filled_at": None,
     }
-    _orders_rows().append(order)
+    _orders_store.append(order)
     return order
 
 
 def cancel_order(order_id):
-    o = next((o for o in _orders_rows() if o["id"] == order_id), None)
+    o = next((o for o in _orders_store if o["id"] == order_id), None)
     if not o:
         return {"error": f"order not found: {order_id}", "code": 40410000}
     if o["status"] in ("filled", "canceled", "expired"):
@@ -288,7 +262,7 @@ def cancel_order(order_id):
 # ---------------------------------------------------------------------------
 
 def list_assets(status=None, asset_class=None):
-    results = list(_assets_rows())
+    results = list(_assets_store)
     if status:
         results = [a for a in results if a["status"] == status]
     if asset_class:
@@ -301,9 +275,7 @@ def list_assets(status=None, asset_class=None):
 # ---------------------------------------------------------------------------
 
 def get_latest_quote(symbol):
-    q = _quotes_doc().get(symbol.upper())
+    q = _quotes_store.get(symbol.upper())
     if not q:
         return {"error": f"no quote for {symbol.upper()}", "code": 40410000}
     return {"symbol": symbol.upper(), "quote": q}
-
-_store.eager_load()

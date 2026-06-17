@@ -1,0 +1,9 @@
+lot_id,supplier,sku,expected_arrival,actual_arrival,status,last_updated
+LOT-2026-E01,Thornfield Botanicals,Organic Elderberry (Bulk),2026-09-08,PENDING,IN TRANSIT,2026-09-07_14:30
+LOT-2026-F02,Thornfield Botanicals,Organic Elderflower,2026-09-03,2026-09-03,LANDED,2026-09-03_11:15
+LOT-2026-EC03,Thornfield Botanicals,Echinacea Purpurea Root,2026-09-04,2026-09-04,LANDED,2026-09-04_09:00
+LOT-2026-Y04,Thornfield Botanicals,Yarrow Cut/Sifted,2026-09-09,PENDING,IN TRANSIT,2026-09-07_08:00
+LOT-2026-A05,Thornfield Botanicals,Astragalus Root Slits,2026-09-10,PENDING,IN TRANSIT,2026-09-06_16:45
+LOT-2026-G06,Pacific Botanicals,Ginger Root Fresh,2026-09-02,2026-09-02,STAGED,2026-09-02_13:20
+LOT-2026-C07,Thornfield Botanicals,Ceylon Cinnamon Sticks,2026-09-03,2026-09-03,LANDED,2026-09-03_11:15
+LOT-2026-H08,Local Foraged Wild,Horseradish Root,2026-08-25,2026-08-25,STAGED,2026-08-25_10:00

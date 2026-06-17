@@ -1,0 +1,2 @@
+service_id,name,description,status,escalation_policy_id,auto_resolve_timeout
+PS_DISTRACTOR,Distractor Service,Placeholder service - this API is a distractor for the Lee Stark task and should not be touched by the agent.,active,EP_DISTRACTOR,14400

@@ -1,0 +1,50 @@
+{
+  "stage": "stage3",
+  "stage_description": "TR-02 — Co-op drying-shed schedule changed on Google Calendar; elderflower processing block moves +1 week, breaking the production cadence. Co-op planning Notion page mirrors the change. Fires after T10.",
+  "fires_after_turn": 10,
+  "mutations": [
+    {
+      "id": "TR-02",
+      "family": "temporal_revision",
+      "description": "Move elderflower processing block from ANCHOR+1w → ANCHOR+2w on Google Calendar. This is the change Donna mentioned at T11.",
+      "service": "google-calendar-api",
+      "http": {
+        "method": "PATCH",
+        "url": "{GOOGLE_CALENDAR_API_URL}/calendar/v3/calendars/primary/events/elderflower_block_d4",
+        "headers": { "Content-Type": "application/json" },
+        "body": {
+          "summary": "Elderflower processing block — Autumn Immunity Collection (RESCHEDULED)",
+          "start": { "date": "{ANCHOR+2w:iso}" },
+          "end": { "date": "{ANCHOR+2w:iso}" },
+          "description": "Rescheduled +1w to accommodate cross-coverage with co-op pickling block."
+        },
+        "expected_status": 200
+      }
+    },
+    {
+      "id": "TR-02-NOTION-MIRROR",
+      "family": "temporal_revision",
+      "description": "Mirror the rescheduled block onto the co-op planning Notion page",
+      "service": "notion-api",
+      "http": {
+        "method": "PATCH",
+        "url": "{NOTION_API_URL}/v1/pages/page-coop-planning-q3",
+        "headers": {
+          "Content-Type": "application/json",
+          "Notion-Version": "2022-06-28"
+        },
+        "body": {
+          "properties": {
+            "Elderflower Block": { "date": { "start": "{ANCHOR+2w:iso}" } },
+            "Schedule Notes": {
+              "rich_text": [
+                { "text": { "content": "Moved +1w {D+2:iso} — Donna" } }
+              ]
+            }
+          }
+        },
+        "expected_status": 200
+      }
+    }
+  ]
+}

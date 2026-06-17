@@ -5,51 +5,15 @@ subjects, using Open Library style keys (/works/OL...W, /authors/OL...A).
 """
 
 import csv
+from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_str, strict_int)
 
-_store = get_store("openlibrary-api")
-_API = "openlibrary-api"
-
-_store.register("authors", primary_key="author_id",
-                initial_loader=lambda: _coerce_authors(_load("authors.csv", "authors")))
-_store.register("works", primary_key="work_id",
-                initial_loader=lambda: _coerce_works(_load("works.csv", "works")))
-_store.register("editions", primary_key="edition_id",
-                initial_loader=lambda: _coerce_editions(_load("editions.csv", "editions")))
-_store.register("subjects", primary_key="subject",
-                initial_loader=lambda: _coerce_subjects(_load("subjects.csv", "subjects")))
-
-
-def _authors_rows():
-    return _store.table("authors").rows()
-
-
-def _works_rows():
-    return _store.table("works").rows()
-
-
-def _editions_rows():
-    return _store.table("editions").rows()
-
-
-def _subjects_rows():
-    return _store.table("subjects").rows()
-
-
-
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _split(s):
@@ -66,11 +30,11 @@ def _coerce_authors(rows):
         out.append({
             "author_id": r["author_id"],
             "name": r["name"],
-            "birth_date": opt_str(r, "birth_date", default="") or None,
-            "death_date": opt_str(r, "death_date", default="") or None,
+            "birth_date": r["birth_date"] or None,
+            "death_date": r["death_date"] or None,
             "bio": r["bio"],
             "top_work": r["top_work"],
-            "work_count": strict_int(r, "work_count"),
+            "work_count": int(r["work_count"]),
         })
     return out
 
@@ -82,10 +46,10 @@ def _coerce_works(rows):
             "work_id": r["work_id"],
             "title": r["title"],
             "author_id": r["author_id"],
-            "first_publish_year": strict_int(r, "first_publish_year"),
+            "first_publish_year": int(r["first_publish_year"]),
             "subjects": _split(r["subjects"]),
             "description": r["description"],
-            "edition_count": strict_int(r, "edition_count"),
+            "edition_count": int(r["edition_count"]),
         })
     return out
 
@@ -101,25 +65,27 @@ def _coerce_editions(rows):
             "isbn_10": r["isbn_10"],
             "publisher": r["publisher"],
             "publish_date": r["publish_date"],
-            "number_of_pages": strict_int(r, "number_of_pages"),
+            "number_of_pages": int(r["number_of_pages"]),
             "language": r["language"],
         })
     return out
 
 
 def _coerce_subjects(rows):
-    return [_strip_ctx(r) for r in rows]
+    return [dict(r) for r in rows]
 
 
+_authors = _coerce_authors(_load("authors.csv"))
+_works = _coerce_works(_load("works.csv"))
+_editions = _coerce_editions(_load("editions.csv"))
+_subjects = _coerce_subjects(_load("subjects.csv"))
 
+_authors_store = deepcopy(_authors)
+_works_store = deepcopy(_works)
+_editions_store = deepcopy(_editions)
+_subjects_store = deepcopy(_subjects)
 
-
-
-
-
-
-
-_authors_by_id = {a["author_id"]: a for a in _authors_rows()}
+_authors_by_id = {a["author_id"]: a for a in _authors_store}
 
 
 # ---------------------------------------------------------------------------
@@ -149,7 +115,7 @@ def _work_doc(w):
 # ---------------------------------------------------------------------------
 
 def search(q=None, author=None, title=None, page=1, limit=20):
-    matches = list(_works_rows())
+    matches = list(_works_store)
     if title:
         t = title.lower()
         matches = [w for w in matches if t in w["title"].lower()]
@@ -183,7 +149,7 @@ def search(q=None, author=None, title=None, page=1, limit=20):
 # ---------------------------------------------------------------------------
 
 def _find_work(work_id):
-    return next((w for w in _works_rows() if w["work_id"] == work_id), None)
+    return next((w for w in _works_store if w["work_id"] == work_id), None)
 
 
 def get_work(work_id):
@@ -207,7 +173,7 @@ def get_work_editions(work_id):
     w = _find_work(work_id)
     if not w:
         return {"error": f"Work {work_id} not found"}
-    eds = [e for e in _editions_rows() if e["work_id"] == work_id]
+    eds = [e for e in _editions_store if e["work_id"] == work_id]
     entries = [_edition_doc(e) for e in eds]
     return {
         "links": {"work": f"/works/{work_id}"},
@@ -237,7 +203,7 @@ def _edition_doc(e):
 
 def get_isbn(isbn):
     isbn = (isbn or "").replace("-", "")
-    e = next((x for x in _editions_rows() if x["isbn_13"] == isbn or x["isbn_10"] == isbn), None)
+    e = next((x for x in _editions_store if x["isbn_13"] == isbn or x["isbn_10"] == isbn), None)
     if not e:
         return {"error": f"No edition found for ISBN {isbn}"}
     return _edition_doc(e)
@@ -266,7 +232,7 @@ def get_author(author_id):
 def get_author_works(author_id):
     if author_id not in _authors_by_id:
         return {"error": f"Author {author_id} not found"}
-    works = [w for w in _works_rows() if w["author_id"] == author_id]
+    works = [w for w in _works_store if w["author_id"] == author_id]
     entries = []
     for w in works:
         entries.append({
@@ -285,9 +251,9 @@ def get_author_works(author_id):
 
 def get_subject(subject):
     key = (subject or "").lower().replace(" ", "_")
-    meta = next((s for s in _subjects_rows() if s["subject"] == key), None)
+    meta = next((s for s in _subjects_store if s["subject"] == key), None)
     name = meta["name"] if meta else subject.replace("_", " ").title()
-    works = [w for w in _works_rows() if key in [s.replace(" ", "_") for s in w["subjects"]]]
+    works = [w for w in _works_store if key in [s.replace(" ", "_") for s in w["subjects"]]]
     works.sort(key=lambda w: w["edition_count"], reverse=True)
     return {
         "key": f"/subjects/{key}",
@@ -305,5 +271,3 @@ def get_subject(subject):
             for w in works
         ],
     }
-
-_store.eager_load()

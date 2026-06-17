@@ -6,48 +6,16 @@ in process memory and reset on container restart.
 """
 
 import csv
+from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store,
-    strict_int,
-)
 
-_store = get_store("amplitude-api")
-_API = "amplitude-api"
-
-_store.register("events", primary_key="event_id",
-                initial_loader=lambda: _coerce_events(_load("events.csv", "events")))
-_store.register("users", primary_key="user_id",
-                initial_loader=lambda: _coerce_users(_load("users.csv", "users")))
-_store.register("segmentation", primary_key="event_type",
-                initial_loader=lambda: _coerce_segmentation(_load("segmentation.csv", "segmentation")))
-
-
-def _events_rows():
-    return _store.table("events").rows()
-
-
-def _users_rows():
-    return _store.table("users").rows()
-
-
-def _segmentation_rows():
-    return _store.table("segmentation").rows()
-
-
-
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _parse_props(raw):
@@ -99,15 +67,18 @@ def _coerce_segmentation(rows):
         out.append({
             "event_type": r["event_type"],
             "date": r["date"],
-            "count": strict_int(r, "count"),
+            "count": int(r["count"]),
         })
     return out
 
 
+_events = _coerce_events(_load("events.csv"))
+_users = _coerce_users(_load("users.csv"))
+_segmentation = _coerce_segmentation(_load("segmentation.csv"))
 
-
-
-
+_events_store = deepcopy(_events)
+_users_store = deepcopy(_users)
+_segmentation_store = deepcopy(_segmentation)
 
 
 # ---------------------------------------------------------------------------
@@ -126,8 +97,8 @@ def ingest(payload):
     raw_events = payload.get("events") or []
     ingested = 0
     for ev in raw_events:
-        _events_rows().append({
-            "event_id": ev.get("insert_id") or f"ev_{len(_events_rows()) + 1:06d}",
+        _events_store.append({
+            "event_id": ev.get("insert_id") or f"ev_{len(_events_store) + 1:06d}",
             "user_id": ev.get("user_id"),
             "device_id": ev.get("device_id"),
             "event_type": ev.get("event_type") or "unknown",
@@ -143,7 +114,7 @@ def ingest(payload):
 # ---------------------------------------------------------------------------
 
 def segmentation(event=None, start=None, end=None):
-    rows = list(_segmentation_rows())
+    rows = list(_segmentation_store)
     if event:
         rows = [r for r in rows if r["event_type"] == event]
     if start:
@@ -174,14 +145,12 @@ def segmentation(event=None, start=None, end=None):
 # ---------------------------------------------------------------------------
 
 def user_activity(user):
-    matched = next((u for u in _users_rows() if u["user_id"] == user), None)
+    matched = next((u for u in _users_store if u["user_id"] == user), None)
     if not matched:
         return {"error": f"User {user} not found"}
-    user_events = [e for e in _events_rows() if e["user_id"] == user]
+    user_events = [e for e in _events_store if e["user_id"] == user]
     user_events = sorted(user_events, key=lambda e: e["event_time"])
     return {
         "userData": matched,
         "events": user_events,
     }
-
-_store.eager_load()

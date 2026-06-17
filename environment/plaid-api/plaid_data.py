@@ -7,27 +7,17 @@ Amounts are floats in the account's currency. Mutations (none) reset on restart.
 
 import csv
 import json
-import sys
 import uuid
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, opt_float, opt_str, strict_bool)
 
-_store = get_store("plaid-api")
-_API = "plaid-api"
-
-
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _to_bool(v):
@@ -53,14 +43,14 @@ def _coerce_accounts(rows):
         out.append({
             "account_id": r["account_id"],
             "name": r["name"],
-            "official_name": opt_str(r, "official_name", default="") or None,
+            "official_name": r["official_name"] or None,
             "mask": r["mask"],
             "type": r["type"],
             "subtype": r["subtype"],
             "balances": {
-                "available": opt_float(r, "available", default=None),
-                "current": opt_float(r, "current", default=None),
-                "limit": opt_float(r, "limit", default=None),
+                "available": _to_float(r["available"]),
+                "current": _to_float(r["current"]),
+                "limit": _to_float(r["limit"]),
                 "iso_currency_code": r["iso_currency_code"],
                 "unofficial_currency_code": None,
             },
@@ -74,50 +64,30 @@ def _coerce_transactions(rows):
         out.append({
             "transaction_id": r["transaction_id"],
             "account_id": r["account_id"],
-            "amount": opt_float(r, "amount", default=None),
+            "amount": _to_float(r["amount"]),
             "iso_currency_code": r["iso_currency_code"],
             "date": r["date"],
             "name": r["name"],
-            "merchant_name": opt_str(r, "merchant_name", default="") or None,
-            "category": [c for c in opt_csv_list(r, "category", sep=";") if c],
-            "pending": strict_bool(r, "pending"),
+            "merchant_name": r["merchant_name"] or None,
+            "category": [c for c in r["category"].split(";") if c],
+            "pending": _to_bool(r["pending"]),
             "payment_channel": r["payment_channel"],
         })
     return out
 
 
-def _load_item():
-    with open(DATA_DIR / "item.json", encoding="utf-8") as f:
-        return json.load(f)
+_accounts = _coerce_accounts(_load("accounts.csv"))
+_transactions = _coerce_transactions(_load("transactions.csv"))
 
+with open(DATA_DIR / "item.json", encoding="utf-8") as _f:
+    _item = json.load(_f)
+with open(DATA_DIR / "identity.json", encoding="utf-8") as _f:
+    _identity = json.load(_f)
 
-def _load_identity():
-    with open(DATA_DIR / "identity.json", encoding="utf-8") as f:
-        return json.load(f)
-
-
-_store.register("accounts", primary_key="account_id",
-                initial_loader=lambda: _coerce_accounts(_load("accounts.csv", "accounts")))
-_store.register("transactions", primary_key="transaction_id",
-                initial_loader=lambda: _coerce_transactions(_load("transactions.csv", "transactions")))
-_store.register_document("item", initial_loader=_load_item)
-_store.register_document("identity", initial_loader=_load_identity)
-
-
-def _accounts_rows():
-    return _store.table("accounts").rows()
-
-
-def _transactions_rows():
-    return _store.table("transactions").rows()
-
-
-def _item_doc():
-    return _store.document("item").get()
-
-
-def _identity_doc():
-    return _store.document("identity").get()
+_accounts_store = deepcopy(_accounts)
+_transactions_store = deepcopy(_transactions)
+_item_store = deepcopy(_item)
+_identity_store = deepcopy(_identity)
 
 
 def _request_id():
@@ -129,13 +99,13 @@ def _request_id():
 # ---------------------------------------------------------------------------
 
 def get_accounts(account_ids=None):
-    accounts = list(_accounts_rows())
+    accounts = list(_accounts_store)
     if account_ids:
         wanted = set(account_ids)
         accounts = [a for a in accounts if a["account_id"] in wanted]
     return {
         "accounts": accounts,
-        "item": _item_doc()["item"],
+        "item": _item_store["item"],
         "request_id": _request_id(),
     }
 
@@ -151,7 +121,7 @@ def get_balances(account_ids=None):
 
 def get_transactions(start_date=None, end_date=None, account_ids=None,
                      count=100, offset=0):
-    txns = list(_transactions_rows())
+    txns = list(_transactions_store)
     if account_ids:
         wanted = set(account_ids)
         txns = [t for t in txns if t["account_id"] in wanted]
@@ -174,7 +144,7 @@ def get_transactions(start_date=None, end_date=None, account_ids=None,
         "accounts": get_accounts(account_ids=account_ids)["accounts"],
         "transactions": page,
         "total_transactions": total,
-        "item": _item_doc()["item"],
+        "item": _item_store["item"],
         "request_id": _request_id(),
     }
 
@@ -184,7 +154,7 @@ def get_transactions(start_date=None, end_date=None, account_ids=None,
 # ---------------------------------------------------------------------------
 
 def get_institution_by_id(institution_id):
-    inst = _item_doc()["institution"]
+    inst = _item_store["institution"]
     if institution_id != inst["institution_id"]:
         return {"error_code": "INSTITUTION_NOT_FOUND",
                 "error_message": f"Unknown institution {institution_id}"}
@@ -197,15 +167,13 @@ def get_institution_by_id(institution_id):
 
 def get_identity(account_ids=None):
     accounts = []
-    for a in _accounts_rows():
+    for a in _accounts_store:
         if account_ids and a["account_id"] not in set(account_ids):
             continue
-        owners = _identity_doc()["owners"].get(a["account_id"], [])
+        owners = _identity_store["owners"].get(a["account_id"], [])
         accounts.append({**a, "owners": owners})
     return {
         "accounts": accounts,
-        "item": _item_doc()["item"],
+        "item": _item_store["item"],
         "request_id": _request_id(),
     }
-
-_store.eager_load()

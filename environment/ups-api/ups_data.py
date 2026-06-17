@@ -6,49 +6,16 @@ and tracking. Responses use UPS-style `{"RateResponse": {...}}`,
 """
 
 import csv
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store,
-    strict_int,
-    opt_float,
-)
 
-_store = get_store("ups-api")
-_API = "ups-api"
-
-_store.register("rates", primary_key="service_code",
-                initial_loader=lambda: _coerce_rates(_load("rates.csv", "rates")))
-_store.register("shipments", primary_key="tracking_number",
-                initial_loader=lambda: _coerce_shipments(_load("shipments.csv", "shipments")))
-_store.register("tracking", primary_key="tracking_number",
-                initial_loader=lambda: _coerce_tracking(_load("tracking.csv", "tracking")))
-
-
-def _rates_rows():
-    return _store.table("rates").rows()
-
-
-def _shipments_rows():
-    return _store.table("shipments").rows()
-
-
-def _tracking_rows():
-    return _store.table("tracking").rows()
-
-
-
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _to_float(v):
@@ -70,10 +37,10 @@ def _coerce_rates(rows):
             "service_name": r["service_name"],
             "origin_zip": r["origin_zip"],
             "dest_zip": r["dest_zip"],
-            "weight_lb": opt_float(r, "weight_lb", default=None),
+            "weight_lb": _to_float(r["weight_lb"]),
             "currency": r["currency"],
-            "total_charge": opt_float(r, "total_charge", default=None),
-            "transit_days": strict_int(r, "transit_days"),
+            "total_charge": _to_float(r["total_charge"]),
+            "transit_days": int(r["transit_days"]),
             "delivery_date": r["delivery_date"],
         })
     return out
@@ -89,9 +56,9 @@ def _coerce_shipments(rows):
             "ship_date": r["ship_date"],
             "origin_zip": r["origin_zip"],
             "dest_zip": r["dest_zip"],
-            "weight_lb": opt_float(r, "weight_lb", default=None),
+            "weight_lb": _to_float(r["weight_lb"]),
             "currency": r["currency"],
-            "total_charge": opt_float(r, "total_charge", default=None),
+            "total_charge": _to_float(r["total_charge"]),
             "label_url": r["label_url"],
         })
     return out
@@ -115,10 +82,13 @@ def _coerce_tracking(rows):
     return out
 
 
+_rates = _coerce_rates(_load("rates.csv"))
+_shipments = _coerce_shipments(_load("shipments.csv"))
+_tracking = _coerce_tracking(_load("tracking.csv"))
 
-
-
-
+_rates_store = deepcopy(_rates)
+_shipments_store = deepcopy(_shipments)
+_tracking_store = deepcopy(_tracking)
 
 
 # ---------------------------------------------------------------------------
@@ -127,7 +97,7 @@ def _coerce_tracking(rows):
 
 def _new_tracking_number():
     base = max(
-        (int(s["tracking_number"][-7:]) for s in _shipments_rows()),
+        (int(s["tracking_number"][-7:]) for s in _shipments_store),
         default=3456784,
     )
     return f"1Z999AA101{base + 11:07d}"
@@ -143,7 +113,7 @@ def _today():
 
 def get_rate(origin_zip, dest_zip, weight_lb, service_code=None):
     matches = [
-        r for r in _rates_rows()
+        r for r in _rates_store
         if r["origin_zip"] == str(origin_zip) and r["dest_zip"] == str(dest_zip)
     ]
     if service_code:
@@ -176,7 +146,7 @@ def get_rate(origin_zip, dest_zip, weight_lb, service_code=None):
 
 def create_shipment(origin_zip, dest_zip, weight_lb, service_code="03"):
     rate = next(
-        (r for r in _rates_rows()
+        (r for r in _rates_store
          if r["origin_zip"] == str(origin_zip)
          and r["dest_zip"] == str(dest_zip)
          and r["service_code"] == service_code),
@@ -199,8 +169,8 @@ def create_shipment(origin_zip, dest_zip, weight_lb, service_code="03"):
         "total_charge": total_charge,
         "label_url": label_url,
     }
-    _shipments_rows().append(shipment)
-    _tracking_rows().append({
+    _shipments_store.append(shipment)
+    _tracking_store.append({
         "tracking_number": tracking_number,
         "status_type": "M",
         "status_code": "003",
@@ -234,7 +204,7 @@ def create_shipment(origin_zip, dest_zip, weight_lb, service_code="03"):
 # ---------------------------------------------------------------------------
 
 def track(tracking_number):
-    t = next((x for x in _tracking_rows() if x["tracking_number"] == str(tracking_number)), None)
+    t = next((x for x in _tracking_store if x["tracking_number"] == str(tracking_number)), None)
     if not t:
         return {"error": f"tracking number {tracking_number} not found"}
     return {
@@ -263,5 +233,3 @@ def track(tracking_number):
             }],
         }
     }
-
-_store.eager_load()

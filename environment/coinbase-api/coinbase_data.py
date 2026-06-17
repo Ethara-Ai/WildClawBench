@@ -8,54 +8,16 @@ resulting transactions are held in process memory and reset on restart.
 import csv
 import json
 import uuid
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store,
-    strict_bool,
-    opt_float,
-)
 
-_store = get_store("coinbase-api")
-_API = "coinbase-api"
-
-_store.register("accounts", primary_key="id",
-                initial_loader=lambda: _coerce_accounts(_load("accounts.csv", "accounts")))
-_store.register("prices", primary_key="pair",
-                initial_loader=lambda: _coerce_prices(_load("prices.csv", "prices")))
-_store.register("transactions", primary_key="id",
-                initial_loader=lambda: _coerce_transactions(_load("transactions.csv", "transactions")))
-_store.register_document("user", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "user.json", encoding="utf-8")))
-
-
-def _accounts_rows():
-    return _store.table("accounts").rows()
-
-
-def _prices_rows():
-    return _store.table("prices").rows()
-
-
-def _transactions_rows():
-    return _store.table("transactions").rows()
-
-
-def _user_doc():
-    return _store.document("user").get()
-
-
-
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _now():
@@ -83,22 +45,22 @@ def _coerce_accounts(rows):
         out.append({
             "id": r["id"],
             "name": r["name"],
-            "primary": strict_bool(r, "primary"),
+            "primary": _to_bool(r["primary"]),
             "type": r["type"],
             "currency": {"code": r["currency_code"], "name": r["currency_name"]},
             "balance": {"amount": r["balance_amount"], "currency": r["currency_code"]},
             "native_balance": {"amount": r["native_balance_amount"], "currency": r["native_currency"]},
             "created_at": r["created_at"],
             "updated_at": r["updated_at"],
-            "_balance_num": opt_float(r, "balance_amount", default=0.0),
-            "_native_num": opt_float(r, "native_balance_amount", default=0.0),
+            "_balance_num": _to_float(r["balance_amount"]),
+            "_native_num": _to_float(r["native_balance_amount"]),
         })
     return out
 
 
 def _coerce_prices(rows):
     return [{"pair": r["pair"], "base": r["base"], "currency": r["currency"],
-             "amount": r["amount"], "_amount_num": opt_float(r, "amount", default=0.0)}
+             "amount": r["amount"], "_amount_num": _to_float(r["amount"])}
             for r in rows]
 
 
@@ -119,8 +81,17 @@ def _coerce_transactions(rows):
     return out
 
 
+_accounts = _coerce_accounts(_load("accounts.csv"))
+_prices = _coerce_prices(_load("prices.csv"))
+_transactions = _coerce_transactions(_load("transactions.csv"))
 
+with open(DATA_DIR / "user.json", encoding="utf-8") as _f:
+    _user = json.load(_f)
 
+_accounts_store = deepcopy(_accounts)
+_prices_store = deepcopy(_prices)
+_transactions_store = deepcopy(_transactions)
+_user_store = deepcopy(_user)
 
 
 # ---------------------------------------------------------------------------
@@ -136,7 +107,7 @@ def _public_account(a):
 
 
 def _find_account(account_id):
-    return next((a for a in _accounts_rows() if a["id"] == account_id), None)
+    return next((a for a in _accounts_store if a["id"] == account_id), None)
 
 
 def _fmt_crypto(value):
@@ -152,7 +123,7 @@ def _fmt_fiat(value):
 # ---------------------------------------------------------------------------
 
 def list_accounts():
-    return {"data": [_public_account(a) for a in _accounts_rows()]}
+    return {"data": [_public_account(a) for a in _accounts_store]}
 
 
 def get_account(account_id):
@@ -167,14 +138,14 @@ def get_account(account_id):
 # ---------------------------------------------------------------------------
 
 def get_spot_price(pair):
-    p = next((x for x in _prices_rows() if x["pair"].upper() == pair.upper()), None)
+    p = next((x for x in _prices_store if x["pair"].upper() == pair.upper()), None)
     if not p:
         return {"error": f"No spot price for pair {pair}"}
     return {"data": {"base": p["base"], "currency": p["currency"], "amount": p["amount"]}}
 
 
 def _price_for(currency_code):
-    return next((x for x in _prices_rows()
+    return next((x for x in _prices_store
                  if x["base"] == currency_code and x["currency"] == "USD"), None)
 
 
@@ -227,7 +198,7 @@ def _trade(account_id, amount, side):
         "created_at": _now(),
         "updated_at": _now(),
     }
-    _transactions_rows().append(txn)
+    _transactions_store.append(txn)
 
     return {"data": {
         "id": _new_id(),
@@ -257,7 +228,7 @@ def create_sell(account_id, amount):
 def list_transactions(account_id):
     if not _find_account(account_id):
         return {"error": f"Account {account_id} not found"}
-    txns = [t for t in _transactions_rows() if t["account_id"] == account_id]
+    txns = [t for t in _transactions_store if t["account_id"] == account_id]
     txns.sort(key=lambda t: t["created_at"], reverse=True)
     return {"data": txns}
 
@@ -267,6 +238,4 @@ def list_transactions(account_id):
 # ---------------------------------------------------------------------------
 
 def get_user():
-    return {"data": _user_doc()}
-
-_store.eager_load()
+    return {"data": _user_store}

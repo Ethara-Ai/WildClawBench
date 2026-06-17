@@ -2,75 +2,16 @@
 
 import csv
 import json
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, opt_float, opt_str, strict_float, strict_int)
 
-_store = get_store("amazon-seller-api")
-_API = "amazon-seller-api"
-
-_store.register("catalog_items", primary_key="sku",
-                initial_loader=lambda: _coerce_catalog_items(_load("catalog_items.csv", "catalog_items")))
-_store.register("orders", primary_key="AmazonOrderId",
-                initial_loader=lambda: _coerce_orders(_load("orders.csv", "orders")))
-_store.register("order_items", primary_key="OrderItemId",
-                initial_loader=lambda: _coerce_order_items(_load("order_items.csv", "order_items")))
-_store.register("inventory", primary_key="fnSku",
-                initial_loader=lambda: _coerce_inventory(_load("inventory.csv", "inventory")))
-_store.register("returns", primary_key="returnId",
-                initial_loader=lambda: _coerce_returns(_load("returns.csv", "returns")))
-_store.register("reports", primary_key="reportId",
-                initial_loader=lambda: _coerce_reports(_load("reports.csv", "reports")))
-_store.register("pricing", primary_key="asin",
-                initial_loader=lambda: _coerce_pricing(_load("pricing.csv", "pricing")))
-_store.register_document("seller_account", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "seller_account.json", encoding="utf-8")))
-
-
-def _catalog_items_rows():
-    return _store.table("catalog_items").rows()
-
-
-def _orders_rows():
-    return _store.table("orders").rows()
-
-
-def _order_items_rows():
-    return _store.table("order_items").rows()
-
-
-def _inventory_rows():
-    return _store.table("inventory").rows()
-
-
-def _returns_rows():
-    return _store.table("returns").rows()
-
-
-def _reports_rows():
-    return _store.table("reports").rows()
-
-
-def _pricing_rows():
-    return _store.table("pricing").rows()
-
-
-def _seller_account_doc():
-    return _store.document("seller_account").get()
-
-
-
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _now():
@@ -85,14 +26,14 @@ def _coerce_catalog_items(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "price": strict_float(r, "price"),
-            "quantity": strict_int(r, "quantity"),
-            "itemWeight": opt_float(r, "itemWeight", default=None),
-            "itemLength": opt_float(r, "itemLength", default=None),
-            "itemWidth": opt_float(r, "itemWidth", default=None),
-            "itemHeight": opt_float(r, "itemHeight", default=None),
-            "bulletPoints": opt_csv_list(r, "bulletPoints", sep="|"),
+            **r,
+            "price": float(r["price"]),
+            "quantity": int(r["quantity"]),
+            "itemWeight": float(r["itemWeight"]) if r["itemWeight"] else None,
+            "itemLength": float(r["itemLength"]) if r["itemLength"] else None,
+            "itemWidth": float(r["itemWidth"]) if r["itemWidth"] else None,
+            "itemHeight": float(r["itemHeight"]) if r["itemHeight"] else None,
+            "bulletPoints": r["bulletPoints"].split("|") if r["bulletPoints"] else [],
         })
     return out
 
@@ -101,10 +42,10 @@ def _coerce_orders(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "OrderTotal_Amount": strict_float(r, "OrderTotal_Amount"),
-            "NumberOfItemsShipped": strict_int(r, "NumberOfItemsShipped"),
-            "NumberOfItemsUnshipped": strict_int(r, "NumberOfItemsUnshipped"),
+            **r,
+            "OrderTotal_Amount": float(r["OrderTotal_Amount"]),
+            "NumberOfItemsShipped": int(r["NumberOfItemsShipped"]),
+            "NumberOfItemsUnshipped": int(r["NumberOfItemsUnshipped"]),
             "IsPrime": r["IsPrime"].lower() == "true",
             "IsBusinessOrder": r["IsBusinessOrder"].lower() == "true",
             "IsSoldByAB": r["IsSoldByAB"].lower() == "true",
@@ -116,12 +57,12 @@ def _coerce_order_items(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "QuantityOrdered": strict_int(r, "QuantityOrdered"),
-            "QuantityShipped": strict_int(r, "QuantityShipped"),
-            "ItemPrice_Amount": strict_float(r, "ItemPrice_Amount"),
-            "ItemTax_Amount": strict_float(r, "ItemTax_Amount"),
-            "PromotionDiscount_Amount": strict_float(r, "PromotionDiscount_Amount"),
+            **r,
+            "QuantityOrdered": int(r["QuantityOrdered"]),
+            "QuantityShipped": int(r["QuantityShipped"]),
+            "ItemPrice_Amount": float(r["ItemPrice_Amount"]),
+            "ItemTax_Amount": float(r["ItemTax_Amount"]),
+            "PromotionDiscount_Amount": float(r["PromotionDiscount_Amount"]),
             "IsGift": r["IsGift"].lower() == "true",
         })
     return out
@@ -131,14 +72,14 @@ def _coerce_inventory(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "totalQuantity": strict_int(r, "totalQuantity"),
-            "inStockSupplyQuantity": strict_int(r, "inStockSupplyQuantity"),
-            "inboundWorkingQuantity": strict_int(r, "inboundWorkingQuantity"),
-            "inboundShippedQuantity": strict_int(r, "inboundShippedQuantity"),
-            "inboundReceivingQuantity": strict_int(r, "inboundReceivingQuantity"),
-            "reservedQuantity": strict_int(r, "reservedQuantity"),
-            "unfulfillableQuantity": strict_int(r, "unfulfillableQuantity"),
+            **r,
+            "totalQuantity": int(r["totalQuantity"]),
+            "inStockSupplyQuantity": int(r["inStockSupplyQuantity"]),
+            "inboundWorkingQuantity": int(r["inboundWorkingQuantity"]),
+            "inboundShippedQuantity": int(r["inboundShippedQuantity"]),
+            "inboundReceivingQuantity": int(r["inboundReceivingQuantity"]),
+            "reservedQuantity": int(r["reservedQuantity"]),
+            "unfulfillableQuantity": int(r["unfulfillableQuantity"]),
         })
     return out
 
@@ -147,9 +88,9 @@ def _coerce_returns(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "returnQuantity": strict_int(r, "returnQuantity"),
-            "refundAmount": strict_float(r, "refundAmount"),
+            **r,
+            "returnQuantity": int(r["returnQuantity"]),
+            "refundAmount": float(r["refundAmount"]),
         })
     return out
 
@@ -158,9 +99,9 @@ def _coerce_reports(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "processingEndTime": opt_str(r, "processingEndTime", default="") or None,
-            "reportDocumentId": opt_str(r, "reportDocumentId", default="") or None,
+            **r,
+            "processingEndTime": r["processingEndTime"] if r["processingEndTime"] else None,
+            "reportDocumentId": r["reportDocumentId"] if r["reportDocumentId"] else None,
         })
     return out
 
@@ -169,38 +110,42 @@ def _coerce_pricing(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
-            "competitivePrice_Amount": strict_float(r, "competitivePrice_Amount"),
-            "listingPrice_Amount": strict_float(r, "listingPrice_Amount"),
-            "landedPrice_Amount": strict_float(r, "landedPrice_Amount"),
-            "shipping_Amount": strict_float(r, "shipping_Amount"),
-            "numberOfOffers": strict_int(r, "numberOfOffers"),
-            "buyBoxPrice_Amount": strict_float(r, "buyBoxPrice_Amount"),
+            **r,
+            "competitivePrice_Amount": float(r["competitivePrice_Amount"]),
+            "listingPrice_Amount": float(r["listingPrice_Amount"]),
+            "landedPrice_Amount": float(r["landedPrice_Amount"]),
+            "shipping_Amount": float(r["shipping_Amount"]),
+            "numberOfOffers": int(r["numberOfOffers"]),
+            "buyBoxPrice_Amount": float(r["buyBoxPrice_Amount"]),
             "buyBoxWinner": r["buyBoxWinner"].lower() == "true",
         })
     return out
 
 
 # Load all data at module init
+_catalog_items = _coerce_catalog_items(_load("catalog_items.csv"))
+_orders = _coerce_orders(_load("orders.csv"))
+_order_items = _coerce_order_items(_load("order_items.csv"))
+_inventory = _coerce_inventory(_load("inventory.csv"))
+_returns = _coerce_returns(_load("returns.csv"))
+_reports = _coerce_reports(_load("reports.csv"))
+_pricing = _coerce_pricing(_load("pricing.csv"))
 
-
-
-
-
-
-
+with open(DATA_DIR / "seller_account.json", encoding="utf-8") as _f:
+    _seller_account = json.load(_f)
 
 # Mutable in-memory stores
+_catalog_store = deepcopy(_catalog_items)
+_orders_store = deepcopy(_orders)
+_order_items_store = deepcopy(_order_items)
+_inventory_store = deepcopy(_inventory)
+_returns_store = deepcopy(_returns)
+_reports_store = deepcopy(_reports)
+_pricing_store = deepcopy(_pricing)
+_seller_store = deepcopy(_seller_account)
 
-
-
-
-
-
-
-
-_next_report_id = 1
-_next_return_id = 1
+_next_report_id = 11
+_next_return_id = 6
 
 
 # ---------------------------------------------------------------------------
@@ -208,15 +153,15 @@ _next_return_id = 1
 # ---------------------------------------------------------------------------
 
 def get_seller_account():
-    return {"type": "seller_account", "seller": _seller_account_doc()}
+    return {"type": "seller_account", "seller": _seller_store}
 
 
 def get_account_health():
-    return {"type": "account_health", "accountHealth": _seller_account_doc()["accountHealth"]}
+    return {"type": "account_health", "accountHealth": _seller_store["accountHealth"]}
 
 
 def get_performance_notifications(severity=None):
-    results = list(_seller_account_doc()["performanceNotifications"])
+    results = list(_seller_store["performanceNotifications"])
     if severity:
         results = [n for n in results if n["severity"].upper() == severity.upper()]
     return {"type": "notifications", "count": len(results), "results": results}
@@ -233,7 +178,7 @@ def search_catalog_items(
     page_size=10,
     status=None,
 ):
-    results = _catalog_items_rows()
+    results = list(_catalog_store)
 
     if status:
         results = [r for r in results if r["status"].upper() == status.upper()]
@@ -290,14 +235,14 @@ def _format_catalog_item(item):
 
 
 def get_catalog_item(asin):
-    for item in _catalog_items_rows():
+    for item in _catalog_store:
         if item["asin"] == asin:
             return {"type": "catalog_item", "item": _format_catalog_item(item)}
     return {"error": f"Item with ASIN {asin} not found"}
 
 
 def get_listing_item(seller_id, sku):
-    for item in _catalog_items_rows():
+    for item in _catalog_store:
         if item["sku"] == sku and item["sellerId"] == seller_id:
             return {"type": "listing_item", "listing": {
                 "sku": item["sku"],
@@ -325,15 +270,14 @@ def get_listing_item(seller_id, sku):
 
 
 def create_listing_item(seller_id, sku, data):
-    catalog_table = _store.table("catalog_items")
-    for item in catalog_table.rows():
+    for item in _catalog_store:
         if item["sku"] == sku and item["sellerId"] == seller_id:
             return {"error": f"Listing with SKU {sku} already exists"}
 
     now = _now()
     new_item = {
         "sku": sku,
-        "asin": data.get("asin", f"B0NEW{len(catalog_table):05d}"),
+        "asin": data.get("asin", f"B0NEW{len(_catalog_store):05d}"),
         "sellerId": seller_id,
         "title": data.get("title", ""),
         "description": data.get("description", ""),
@@ -357,40 +301,35 @@ def create_listing_item(seller_id, sku, data):
         "createdDate": now,
         "lastUpdatedDate": now,
     }
-    catalog_table.upsert(new_item)
+    _catalog_store.append(new_item)
     return {"type": "listing_item", "status": "ACCEPTED", "sku": sku, "issues": []}
 
 
 def update_listing_item(seller_id, sku, data):
-    catalog_table = _store.table("catalog_items")
-    for item in catalog_table.rows():
+    for i, item in enumerate(_catalog_store):
         if item["sku"] == sku and item["sellerId"] == seller_id:
             updatable = {
                 "title", "description", "brand", "bulletPoints", "price",
                 "quantity", "fulfillmentChannel", "status", "condition",
                 "productType", "mainImageUrl", "category",
             }
-            patch = {}
             for k, v in data.items():
-                if k not in updatable:
-                    continue
-                if k == "price" and v is not None:
-                    patch[k] = float(v)
-                elif k == "quantity" and v is not None:
-                    patch[k] = int(v)
-                else:
-                    patch[k] = v
-            patch["lastUpdatedDate"] = _now()
-            catalog_table.patch(sku, patch)
+                if k in updatable:
+                    if k == "price" and v is not None:
+                        _catalog_store[i][k] = float(v)
+                    elif k == "quantity" and v is not None:
+                        _catalog_store[i][k] = int(v)
+                    else:
+                        _catalog_store[i][k] = v
+            _catalog_store[i]["lastUpdatedDate"] = _now()
             return {"type": "listing_item", "status": "ACCEPTED", "sku": sku, "issues": []}
     return {"error": f"Listing with SKU {sku} not found for seller {seller_id}"}
 
 
 def delete_listing_item(seller_id, sku):
-    catalog_table = _store.table("catalog_items")
-    for item in catalog_table.rows():
+    for i, item in enumerate(_catalog_store):
         if item["sku"] == sku and item["sellerId"] == seller_id:
-            catalog_table.delete(sku)
+            _catalog_store.pop(i)
             return {"type": "listing_item", "status": "ACCEPTED", "sku": sku, "deleted": True}
     return {"error": f"Listing with SKU {sku} not found for seller {seller_id}"}
 
@@ -445,7 +384,7 @@ def get_orders(
     fulfillment_channels=None,
     max_results=100,
 ):
-    results = list(_orders_rows())
+    results = list(_orders_store)
 
     if created_after:
         results = [r for r in results if r["PurchaseDate"] >= created_after]
@@ -475,16 +414,16 @@ def get_orders(
 
 
 def get_order(order_id):
-    for o in _orders_rows():
+    for o in _orders_store:
         if o["AmazonOrderId"] == order_id:
             return {"type": "order", "payload": _format_order(o)}
     return {"error": f"Order {order_id} not found"}
 
 
 def get_order_items(order_id):
-    items = [oi for oi in _order_items_rows() if oi["AmazonOrderId"] == order_id]
+    items = [oi for oi in _order_items_store if oi["AmazonOrderId"] == order_id]
     if not items:
-        if not any(o["AmazonOrderId"] == order_id for o in _orders_rows()):
+        if not any(o["AmazonOrderId"] == order_id for o in _orders_store):
             return {"error": f"Order {order_id} not found"}
     formatted = []
     for oi in items:
@@ -511,22 +450,18 @@ def get_order_items(order_id):
 
 
 def confirm_shipment(order_id, data):
-    orders_table = _store.table("orders")
-    order_items_table = _store.table("order_items")
-    for o in orders_table.rows():
+    for i, o in enumerate(_orders_store):
         if o["AmazonOrderId"] == order_id:
             if o["OrderStatus"] not in ("Unshipped", "PartiallyShipped"):
                 return {"error": f"Order {order_id} cannot be shipped (status: {o['OrderStatus']})"}
+            _orders_store[i]["OrderStatus"] = "Shipped"
+            _orders_store[i]["LastUpdateDate"] = _now()
             shipped = o["NumberOfItemsShipped"] + o["NumberOfItemsUnshipped"]
-            orders_table.patch(order_id, {
-                "OrderStatus": "Shipped",
-                "LastUpdateDate": _now(),
-                "NumberOfItemsShipped": shipped,
-                "NumberOfItemsUnshipped": 0,
-            })
-            for oi in order_items_table.rows():
+            _orders_store[i]["NumberOfItemsShipped"] = shipped
+            _orders_store[i]["NumberOfItemsUnshipped"] = 0
+            for j, oi in enumerate(_order_items_store):
                 if oi["AmazonOrderId"] == order_id:
-                    order_items_table.patch(oi["OrderItemId"], {"QuantityShipped": oi["QuantityOrdered"]})
+                    _order_items_store[j]["QuantityShipped"] = oi["QuantityOrdered"]
             return {"type": "shipment_confirmation", "status": "SUCCESS", "orderId": order_id}
     return {"error": f"Order {order_id} not found"}
 
@@ -540,7 +475,7 @@ def get_inventory_summaries(
     granularity_type="Marketplace",
     marketplace_id="ATVPDKIKX0DER",
 ):
-    results = list(_inventory_rows())
+    results = list(_inventory_store)
 
     if seller_skus:
         sku_list = [s.strip() for s in seller_skus.split(",")]
@@ -577,14 +512,11 @@ def get_inventory_summaries(
 
 
 def update_inventory(seller_sku, quantity):
-    inv_table = _store.table("inventory")
-    for inv in inv_table.rows():
+    for i, inv in enumerate(_inventory_store):
         if inv["sellerSku"] == seller_sku:
-            inv_table.patch(inv["fnSku"], {
-                "totalQuantity": int(quantity),
-                "inStockSupplyQuantity": int(quantity),
-                "lastUpdatedTime": _now(),
-            })
+            _inventory_store[i]["totalQuantity"] = int(quantity)
+            _inventory_store[i]["inStockSupplyQuantity"] = int(quantity)
+            _inventory_store[i]["lastUpdatedTime"] = _now()
             return {"type": "inventory_update", "status": "SUCCESS", "sellerSku": seller_sku}
     return {"error": f"Inventory for SKU {seller_sku} not found"}
 
@@ -594,7 +526,7 @@ def update_inventory(seller_sku, quantity):
 # ---------------------------------------------------------------------------
 
 def get_reports(report_types=None, processing_statuses=None):
-    results = list(_reports_rows())
+    results = list(_reports_store)
 
     if report_types:
         type_list = [t.strip() for t in report_types.split(",")]
@@ -622,7 +554,7 @@ def get_reports(report_types=None, processing_statuses=None):
 
 
 def get_report(report_id):
-    for r in _reports_rows():
+    for r in _reports_store:
         if r["reportId"] == report_id:
             return {
                 "type": "report",
@@ -653,7 +585,7 @@ def create_report(report_type, data_start_time, data_end_time):
         "processingEndTime": None,
         "reportDocumentId": None,
     }
-    _store.table("reports").upsert(report)
+    _reports_store.append(report)
     _next_report_id += 1
     return {
         "type": "report_created",
@@ -666,7 +598,7 @@ def create_report(report_type, data_start_time, data_end_time):
 # ---------------------------------------------------------------------------
 
 def get_competitive_pricing(asin=None, sku=None):
-    results = list(_pricing_rows())
+    results = list(_pricing_store)
 
     if asin:
         results = [r for r in results if r["asin"] == asin]
@@ -713,7 +645,7 @@ def get_competitive_pricing(asin=None, sku=None):
 
 
 def get_item_offers(asin):
-    pricing = [p for p in _pricing_rows() if p["asin"] == asin]
+    pricing = [p for p in _pricing_store if p["asin"] == asin]
     if not pricing:
         return {"error": f"Offers not found for ASIN {asin}"}
     p = pricing[0]
@@ -756,7 +688,7 @@ def get_item_offers(asin):
 # ---------------------------------------------------------------------------
 
 def get_returns(status=None, order_id=None):
-    results = list(_returns_rows())
+    results = list(_returns_store)
 
     if status:
         results = [r for r in results if r["returnStatus"].upper() == status.upper()]
@@ -775,46 +707,27 @@ def get_returns(status=None, order_id=None):
 
 
 def get_return(return_id):
-    for r in _returns_rows():
+    for r in _returns_store:
         if r["returnId"] == return_id:
             return {"type": "return", "return": r}
     return {"error": f"Return {return_id} not found"}
 
 
 def authorize_return(return_id):
-    returns_table = _store.table("returns")
-    for r in returns_table.rows():
+    for i, r in enumerate(_returns_store):
         if r["returnId"] == return_id:
             if r["returnStatus"] != "Authorized":
                 return {"error": f"Return {return_id} is not in Authorized status"}
-            returns_table.patch(return_id, {"returnStatus": "Completed", "resolution": "REFUND"})
+            _returns_store[i]["returnStatus"] = "Completed"
+            _returns_store[i]["resolution"] = "REFUND"
             return {"type": "return_authorization", "status": "SUCCESS", "returnId": return_id}
     return {"error": f"Return {return_id} not found"}
 
 
 def close_return(return_id):
-    returns_table = _store.table("returns")
-    for r in returns_table.rows():
+    for i, r in enumerate(_returns_store):
         if r["returnId"] == return_id:
-            returns_table.patch(return_id, {"returnStatus": "Closed", "resolution": "CLOSED"})
+            _returns_store[i]["returnStatus"] = "Closed"
+            _returns_store[i]["resolution"] = "CLOSED"
             return {"type": "return_close", "status": "SUCCESS", "returnId": return_id}
     return {"error": f"Return {return_id} not found"}
-
-
-_store.eager_load()
-
-
-def _max_numeric_suffix(rows, key, prefix):
-    hi = 0
-    for r in rows:
-        v = str(r.get(key, ""))
-        if v.startswith(prefix):
-            try:
-                hi = max(hi, int(v[len(prefix):]))
-            except ValueError:
-                continue
-    return hi
-
-
-_next_report_id = _max_numeric_suffix(_store.table("reports").rows(), "reportId", "REP-") + 1
-_next_return_id = _max_numeric_suffix(_store.table("returns").rows(), "returnId", "RET-") + 1

@@ -1,0 +1,60 @@
+{
+  "stage": "stage1",
+  "stage_description": "Overnight Day 1 → Day 2 mutations: SM-01 supplier tracker (working-file CSV) silently shifts elderberry arrival date, SM-02 WooCommerce stock decrement, CM-01 Donna's op-board JPG appears among the working files contradicting tracker. Fires after T5.",
+  "fires_after_turn": 5,
+  "mutations": [
+    {
+      "id": "SM-01",
+      "family": "silent_mutation",
+      "silent": true,
+      "description": "Silently shift elderberry expected_arrival in data/supplier_shipment_tracker.csv from D+1 to D+3. No notification email. Status stays IN TRANSIT. last_updated bumps to Day 2 05:00.",
+      "service": "filesystem",
+      "fs": {
+        "op": "patch_csv",
+        "target": "data/supplier_shipment_tracker.csv",
+        "rows": [
+          {
+            "row_match": { "lot_id": "LOT-2026-E01" },
+            "set": {
+              "expected_arrival": "{D+3:iso}",
+              "last_updated": "{D+1:iso}T05:00:00-06:00"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "SM-02",
+      "family": "silent_mutation",
+      "silent": true,
+      "description": "WooCommerce Elderberry Syrup stock silently decrements 80 → 47. No corresponding order in QuickBooks or Square. This is the dropped-stock silent mutation that surfaces at T9.",
+      "service": "woocommerce-api",
+      "http": {
+        "method": "PUT",
+        "url": "{WOOCOMMERCE_API_URL}/wp-json/wc/v3/products/2501",
+        "headers": { "Content-Type": "application/json" },
+        "body": {
+          "sku": "ESY-2509",
+          "stock_quantity": 47
+        },
+        "expected_status": 200
+      }
+    },
+    {
+      "id": "CM-01",
+      "family": "cross_modal",
+      "silent": true,
+      "description": "Donna's JPG photo of her handwritten note from the co-op ops board appears among the working files: 'Elderberry shipment landed Sun afternoon — checked into shed B. — D.' This contradicts SM-01 (tracker still shows IN TRANSIT). Cross-modal contradiction surfaces at T5.",
+      "service": "filesystem",
+      "fs": {
+        "op": "place_file",
+        "dest": "data/donna_opboard_note.jpg",
+        "source": "data/donna_opboard_note.jpg",
+        "metadata": {
+          "ocr_text": "Elderberry shipment landed Sun afternoon — checked into shed B. — D.",
+          "captured_at": "{D0:iso}T18:42:00-06:00"
+        }
+      }
+    }
+  ]
+}

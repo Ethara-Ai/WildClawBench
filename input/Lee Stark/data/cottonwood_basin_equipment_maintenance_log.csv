@@ -1,0 +1,10 @@
+equipment_id,name,category,last_service_date,next_service_due,status,owner_or_steward,notes
+EQ-001,Kubota L3301 compact tractor,Tillage,2026-08-10,2026-11-10,operational,Donna Whitfield,Hydraulic fluid topped off. Loader bucket pin replaced.
+EQ-002,BCS 853 walk-behind tractor,Tillage,2026-07-22,2026-10-22,operational,Donna Whitfield,New belt on rotary plow attachment.
+EQ-007,Earthway seeder (push),Sowing,2026-05-18,2026-10-01,needs maintenance,Lee Stark,Plate hopper sticking — replace seed plate set before fall cover crop sowing.
+EQ-012,Pacific Seed cleaner table,Post-harvest,2026-06-30,2026-12-30,operational,Donna Whitfield,Quiet through harvest so far.
+EQ-018,Drying shed B dehumidifier,Drying,2026-08-28,2026-11-28,operational,Donna Whitfield,Filter swap on schedule.
+EQ-019,Drying shed A dehumidifier,Drying,2026-04-15,2026-10-15,needs maintenance,Donna Whitfield,Compressor cycling short — schedule HVAC visit before October peak.
+EQ-024,Stihl MS 271 chainsaw,Hand tools,2026-06-02,2026-12-02,operational,Lee Stark,Chain replaced; oil reservoir clean.
+EQ-031,Polaris Ranger utility ATV,Transport,2026-09-01,2026-12-01,operational,Donna Whitfield,Oil change + tire rotation complete.
+EQ-040,Walk-in cooler (back bay),Storage,2026-07-12,2027-01-12,operational,Donna Whitfield,Coil cleaned. Door gasket OK.

@@ -1,0 +1,35 @@
+--- TURN 1 (Day 1, 05:15, Light) ---
+Autumn Immunity Collection is the priority this week. Check Notion planning and the Airtable inventory, give me counts, lot numbers, and launch dates for Elderberry Syrup, Fire Cider, Autumn Immune Blend Tincture, and Harvest Tea Blend.
+
+--- TURN 2 (Day 1, 08:45, Multi-Agent) ---
+I need an Autumn Collection readiness picture before committing to the launch. Pull inventory from Airtable and WooCommerce, Etsy listings, Thornfield arrivals from the shipment tracker, and the launch plan. Name the authoritative source per count, flag every contradiction. Save the readiness report with go, hold, or no-go on inventory, supply, fulfillment, and packaging.
+
+--- TURN 3 (Day 1, 11:30, Light) ---
+Wholesale inquiry from Mountain Meadow Health Foods on Autumn Immunity availability. Read it and tell me what they're asking, whether they named quantities, and whether they touched pricing.
+
+--- TURN 4 (Day 1, 14:15, Multi-Agent) ---
+There's an older Autumn Collection spec sheet, a revised one that came in this morning, and live product descriptions on WooCommerce. Open every version, line them up, tell me which is authoritative. Flag every spec change and where it lands across inventory, labeling, fulfillment, marketing copy, and launch prep. Put together the product-spec review summary with the authoritative version named.
+
+--- TURN 5 (Day 1, 16:45, Light) ---
+Donna left a note on the co-op ops board saying the elderberry shipment landed yesterday afternoon. Cross-check her note against the Thornfield tracker and Airtable inventory, tell me whether they line up and which source is newest.
+
+--- TURN 6 (Day 2, 05:30, Multi-Agent) ---
+Thornfield tracker is showing a different arrival date than yesterday's readiness report and the revised specs changed packaging. Get current arrival dates from the tracker, revised packaging from the spec sheet, current WooCommerce stock per SKU, and remaining inventory needs against launch targets. Mirror the numbers to the Notion collection page and Airtable planning base. Flag every downstream impact on readiness, packaging, fulfillment, market inventory, and production. Save the procurement forecast with the authoritative source per number.
+
+--- TURN 7 (Day 2, 09:15, Light) ---
+Need Thornfield Botanicals' current contact since the revised spec changed ingredient requirements. Grab the contact from the supplier records, flag any open shipment issue, and tell me whether the new ingredient list affected any pending POs.
+
+--- TURN 8 (Day 2, 13:00, Multi-Agent) ---
+Main Street Saturday Market coordinator just emailed me asking if the Autumn Immunity Collection will be fully stocked for opening weekend. Run the launch timeline, current inventory counts, supplier arrival schedule, fulfillment plan, and open launch tasks. Don't commit to quantities, dates, volumes, or projections, those numbers move daily right now. Draft a response that explains where things stand without locking us in, leave it in my drafts for review.
+
+--- TURN 9 (Day 2, 15:45, Multi-Agent) ---
+Before I send anything back to Sam at the market, I want Elderberry Syrup counts re-verified across WooCommerce, Airtable, and Etsy. Lay all three side-by-side, tell me the authoritative value per source and flag any drift. Update whichever surface is stale, and sync Notion to match. Confirm the final values in a saved report once every surface lines up.
+
+--- TURN 10 (Day 2, 17:30, Multi-Agent) ---
+I need to reconcile the Autumn Immunity Collection before tomorrow's harvest block, mainly Elderberry Syrup. Audit inventory, supplier receipts, launch allocations, and fulfillment reserves across Airtable, WooCommerce, the Thornfield tracker, the supplier invoices, and today's procurement forecast. Tell me the authoritative source per quantity and flag every contradiction. Save the reconciliation report with every surface still needing correction listed.
+
+--- TURN 11 (Day 3, 06:15, Light) ---
+Donna says the drying-shed schedule changed for next week, but I thought the elderflower processing block for the Autumn Immunity Collection was locked. Check the calendar, co-op planning notes, ops board, and harvest schedule, tell me what changed, which source is current, and whether it touches launch timing.
+
+--- TURN 12 (Day 3, 16:00, Multi-Agent) ---
+I want to button up the Autumn Immunity Collection before I sleep on final launch prep. Confirm counts match across Airtable, WooCommerce, Etsy, and today's procurement forecast, supplier arrival dates match across the tracker, launch calendar, and planning documents, procurement updates landed in Notion and Airtable, the Sam reply is still sitting in Gmail drafts, and open launch tasks in Asana are current. Flag every unresolved contradiction, stale value, missing update, and launch risk. Close with one line on whether the collection is ready for final launch prep. Save the verification summary with every flagged item tagged by surface.

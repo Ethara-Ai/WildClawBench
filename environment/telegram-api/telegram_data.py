@@ -7,56 +7,15 @@ or {"ok": false, "error_code": int, "description": str} on failure.
 import csv
 import json
 import time
+from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_int, opt_str, strict_bool, strict_int)
 
-_store = get_store("telegram-api")
-_API = "telegram-api"
-
-_store.register("users", primary_key="id",
-                initial_loader=lambda: _coerce_users(_load("users.csv", "users")))
-_store.register("chats", primary_key="id",
-                initial_loader=lambda: _coerce_chats(_load("chats.csv", "chats")))
-_store.register("messages", primary_key="message_id",
-                initial_loader=lambda: _coerce_messages(_load("messages.csv", "messages")))
-_store.register("members", primary_key="chat_id",
-                initial_loader=lambda: _coerce_members(_load("chat_members.csv", "members")))
-_store.register_document("bot", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "bot.json", encoding="utf-8")))
-
-
-def _users_rows():
-    return _store.table("users").rows()
-
-
-def _chats_rows():
-    return _store.table("chats").rows()
-
-
-def _messages_rows():
-    return _store.table("messages").rows()
-
-
-def _members_rows():
-    return _store.table("members").rows()
-
-
-def _bot_doc():
-    return _store.document("bot").get()
-
-
-
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _to_bool(v):
@@ -71,12 +30,12 @@ def _coerce_users(rows):
     out = []
     for r in rows:
         out.append({
-            "id": strict_int(r, "id"),
-            "is_bot": strict_bool(r, "is_bot"),
+            "id": int(r["id"]),
+            "is_bot": _to_bool(r["is_bot"]),
             "first_name": r["first_name"],
-            "last_name": opt_str(r, "last_name", default="") or None,
-            "username": opt_str(r, "username", default="") or None,
-            "language_code": opt_str(r, "language_code", default="") or None,
+            "last_name": r["last_name"] or None,
+            "username": r["username"] or None,
+            "language_code": r["language_code"] or None,
         })
     return out
 
@@ -85,7 +44,7 @@ def _coerce_chats(rows):
     out = []
     for r in rows:
         chat = {
-            "id": strict_int(r, "id"),
+            "id": int(r["id"]),
             "type": r["type"],
         }
         if r["title"]:
@@ -98,7 +57,7 @@ def _coerce_chats(rows):
             chat["last_name"] = r["last_name"]
         if r["description"]:
             chat["description"] = r["description"]
-        chat["member_count"] = strict_int(r, "member_count")
+        chat["member_count"] = int(r["member_count"])
         out.append(chat)
     return out
 
@@ -107,12 +66,12 @@ def _coerce_messages(rows):
     out = []
     for r in rows:
         out.append({
-            "message_id": strict_int(r, "message_id"),
-            "chat_id": strict_int(r, "chat_id"),
-            "from_id": strict_int(r, "from_id"),
+            "message_id": int(r["message_id"]),
+            "chat_id": int(r["chat_id"]),
+            "from_id": int(r["from_id"]),
             "text": r["text"],
-            "date": strict_int(r, "date"),
-            "reply_to_message_id": opt_int(r, "reply_to_message_id", default=None),
+            "date": int(r["date"]),
+            "reply_to_message_id": int(r["reply_to_message_id"]) if r["reply_to_message_id"] else None,
         })
     return out
 
@@ -121,21 +80,29 @@ def _coerce_members(rows):
     out = []
     for r in rows:
         out.append({
-            "chat_id": strict_int(r, "chat_id"),
-            "user_id": strict_int(r, "user_id"),
+            "chat_id": int(r["chat_id"]),
+            "user_id": int(r["user_id"]),
             "status": r["status"],
         })
     return out
 
 
+_users = _coerce_users(_load("users.csv"))
+_chats = _coerce_chats(_load("chats.csv"))
+_messages = _coerce_messages(_load("messages.csv"))
+_members = _coerce_members(_load("chat_members.csv"))
 
+with open(DATA_DIR / "bot.json", encoding="utf-8") as _f:
+    _bot = json.load(_f)
 
-
-
+_users_store = deepcopy(_users)
+_chats_store = deepcopy(_chats)
+_messages_store = deepcopy(_messages)
+_members_store = deepcopy(_members)
+_bot_store = deepcopy(_bot)
 
 # Monotonic message id counter for new messages.
-_store.eager_load()
-_next_message_id = max((m["message_id"] for m in _messages_rows()), default=0) + 1
+_next_message_id = max((m["message_id"] for m in _messages_store), default=0) + 1
 # Update offset counter for getUpdates.
 _next_update_id = 100001
 
@@ -149,11 +116,11 @@ def _err(code, description):
 
 
 def _find_user(user_id):
-    return next((u for u in _users_rows() if u["id"] == int(user_id)), None)
+    return next((u for u in _users_store if u["id"] == int(user_id)), None)
 
 
 def _find_chat(chat_id):
-    return next((c for c in _chats_rows() if c["id"] == int(chat_id)), None)
+    return next((c for c in _chats_store if c["id"] == int(chat_id)), None)
 
 
 def _from_user(user_id):
@@ -186,7 +153,7 @@ def _format_message(m):
 # ---------------------------------------------------------------------------
 
 def get_me():
-    return _ok(_bot_doc())
+    return _ok(_bot_store)
 
 
 # ---------------------------------------------------------------------------
@@ -200,13 +167,13 @@ def send_message(chat_id, text, reply_to_message_id=None):
     msg = {
         "message_id": _next_message_id,
         "chat_id": int(chat_id),
-        "from_id": _bot_doc()["id"],
+        "from_id": _bot_store["id"],
         "text": text,
         "date": int(time.time()),
         "reply_to_message_id": int(reply_to_message_id) if reply_to_message_id else None,
     }
     _next_message_id += 1
-    _messages_rows().append(msg)
+    _messages_store.append(msg)
     return _ok(_format_message(msg))
 
 
@@ -217,13 +184,13 @@ def send_photo(chat_id, photo, caption=None):
     msg = {
         "message_id": _next_message_id,
         "chat_id": int(chat_id),
-        "from_id": _bot_doc()["id"],
+        "from_id": _bot_store["id"],
         "text": caption or "",
         "date": int(time.time()),
         "reply_to_message_id": None,
     }
     _next_message_id += 1
-    _messages_rows().append(msg)
+    _messages_store.append(msg)
     formatted = _format_message(msg)
     formatted.pop("text", None)
     if caption:
@@ -233,7 +200,7 @@ def send_photo(chat_id, photo, caption=None):
 
 
 def edit_message_text(chat_id, message_id, text):
-    for m in _messages_rows():
+    for m in _messages_store:
         if m["chat_id"] == int(chat_id) and m["message_id"] == int(message_id):
             m["text"] = text
             edited = _format_message(m)
@@ -243,9 +210,9 @@ def edit_message_text(chat_id, message_id, text):
 
 
 def delete_message(chat_id, message_id):
-    for i, m in enumerate(_messages_rows()):
+    for i, m in enumerate(_messages_store):
         if m["chat_id"] == int(chat_id) and m["message_id"] == int(message_id):
-            _messages_rows().pop(i)
+            _messages_store.pop(i)
             return _ok(True)
     return _err(400, "Bad Request: message to delete not found")
 
@@ -267,7 +234,7 @@ def get_chat_member(chat_id, user_id):
     user = _find_user(user_id)
     if not user:
         return _err(400, f"Bad Request: user {user_id} not found")
-    member = next((mb for mb in _members_rows()
+    member = next((mb for mb in _members_store
                    if mb["chat_id"] == int(chat_id) and mb["user_id"] == int(user_id)), None)
     status = member["status"] if member else "left"
     return _ok({"user": _from_user(user_id), "status": status})
@@ -276,7 +243,7 @@ def get_chat_member(chat_id, user_id):
 def get_updates(offset=None, limit=100):
     updates = []
     update_id = _next_update_id
-    ordered = sorted(_messages_rows(), key=lambda m: (m["date"], m["message_id"]))
+    ordered = sorted(_messages_store, key=lambda m: (m["date"], m["message_id"]))
     for m in ordered:
         updates.append({
             "update_id": update_id,

@@ -8,57 +8,19 @@ memory and reset on container restart. Responses are wrapped by the server in
 
 import csv
 import uuid
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store,
-    strict_bool,
-)
-
-_store = get_store("servicenow-api")
-_API = "servicenow-api"
-
-_store.register("incidents", primary_key="sys_id",
-                initial_loader=lambda: _coerce_incidents(_load("incident.csv", "incidents")))
-_store.register("changes", primary_key="sys_id",
-                initial_loader=lambda: _coerce_changes(_load("change_request.csv", "changes")))
-_store.register("problems", primary_key="sys_id",
-                initial_loader=lambda: _coerce_problems(_load("problem.csv", "problems")))
-_store.register("users", primary_key="sys_id",
-                initial_loader=lambda: _coerce_users(_load("sys_user.csv", "users")))
-
-
-def _incidents_rows():
-    return _store.table("incidents").rows()
-
-
-def _changes_rows():
-    return _store.table("changes").rows()
-
-
-def _problems_rows():
-    return _store.table("problems").rows()
-
-
-def _users_rows():
-    return _store.table("users").rows()
-
-
 # state numeric codes used by the incident table
 INCIDENT_STATES = {"1": "New", "2": "In Progress", "3": "On Hold", "6": "Resolved", "7": "Closed"}
 
 
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _now():
@@ -74,32 +36,35 @@ def _to_bool(v):
 # ---------------------------------------------------------------------------
 
 def _coerce_incidents(rows):
-    return [_strip_ctx(r) for r in rows]
+    return [dict(r) for r in rows]
 
 
 def _coerce_changes(rows):
-    return [_strip_ctx(r) for r in rows]
+    return [dict(r) for r in rows]
 
 
 def _coerce_problems(rows):
-    return [_strip_ctx(r) for r in rows]
+    return [dict(r) for r in rows]
 
 
 def _coerce_users(rows):
     out = []
     for r in rows:
-        d = _strip_ctx(r)
-        d["active"] = strict_bool(r, "active")
+        d = dict(r)
+        d["active"] = _to_bool(r["active"])
         out.append(d)
     return out
 
 
+_incidents = _coerce_incidents(_load("incident.csv"))
+_changes = _coerce_changes(_load("change_request.csv"))
+_problems = _coerce_problems(_load("problem.csv"))
+_users = _coerce_users(_load("sys_user.csv"))
 
-
-
-
-
-
+_incidents_store = deepcopy(_incidents)
+_changes_store = deepcopy(_changes)
+_problems_store = deepcopy(_problems)
+_users_store = deepcopy(_users)
 
 
 # ---------------------------------------------------------------------------
@@ -151,11 +116,11 @@ def _apply_query(rows, sysparm_query, sysparm_limit=None):
 # ---------------------------------------------------------------------------
 
 def list_incidents(sysparm_query=None, sysparm_limit=None):
-    return _apply_query(_incidents_rows(), sysparm_query, sysparm_limit)
+    return _apply_query(_incidents_store, sysparm_query, sysparm_limit)
 
 
 def get_incident(sys_id):
-    rec = _find(_incidents_rows(), sys_id)
+    rec = _find(_incidents_store, sys_id)
     if not rec:
         return {"error": f"Incident {sys_id} not found"}
     return rec
@@ -166,7 +131,7 @@ def create_incident(short_description, description=None, priority="3", impact="3
     if not short_description:
         return {"error": "short_description is required"}
     now = _now()
-    seq = 1001 + len(_incidents_rows())
+    seq = 1001 + len(_incidents_store)
     rec = {
         "sys_id": _new_sys_id(),
         "number": f"INC{seq:07d}",
@@ -182,12 +147,12 @@ def create_incident(short_description, description=None, priority="3", impact="3
         "opened_at": now,
         "updated_at": now,
     }
-    _incidents_rows().append(rec)
+    _incidents_store.append(rec)
     return rec
 
 
 def update_incident(sys_id, **fields):
-    rec = _find(_incidents_rows(), sys_id)
+    rec = _find(_incidents_store, sys_id)
     if not rec:
         return {"error": f"Incident {sys_id} not found"}
     for key in ("short_description", "description", "state", "priority", "impact",
@@ -204,11 +169,11 @@ def update_incident(sys_id, **fields):
 # ---------------------------------------------------------------------------
 
 def list_change_requests(sysparm_query=None, sysparm_limit=None):
-    return _apply_query(_changes_rows(), sysparm_query, sysparm_limit)
+    return _apply_query(_changes_store, sysparm_query, sysparm_limit)
 
 
 def get_change_request(sys_id):
-    rec = _find(_changes_rows(), sys_id)
+    rec = _find(_changes_store, sys_id)
     if not rec:
         return {"error": f"Change request {sys_id} not found"}
     return rec
@@ -219,11 +184,11 @@ def get_change_request(sys_id):
 # ---------------------------------------------------------------------------
 
 def list_problems(sysparm_query=None, sysparm_limit=None):
-    return _apply_query(_problems_rows(), sysparm_query, sysparm_limit)
+    return _apply_query(_problems_store, sysparm_query, sysparm_limit)
 
 
 def get_problem(sys_id):
-    rec = _find(_problems_rows(), sys_id)
+    rec = _find(_problems_store, sys_id)
     if not rec:
         return {"error": f"Problem {sys_id} not found"}
     return rec
@@ -234,13 +199,11 @@ def get_problem(sys_id):
 # ---------------------------------------------------------------------------
 
 def list_users(sysparm_query=None, sysparm_limit=None):
-    return _apply_query(_users_rows(), sysparm_query, sysparm_limit)
+    return _apply_query(_users_store, sysparm_query, sysparm_limit)
 
 
 def get_user(sys_id):
-    rec = _find(_users_rows(), sys_id)
+    rec = _find(_users_store, sys_id)
     if not rec:
         return {"error": f"User {sys_id} not found"}
     return rec
-
-_store.eager_load()

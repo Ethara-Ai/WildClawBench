@@ -7,67 +7,20 @@ messages, members, and roles. IDs are Discord-style snowflakes (numeric strings)
 import csv
 import json
 import random
+from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
-
-import sys as _sys
-_sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, opt_str, strict_bool, strict_int)
-
-_store = get_store("discord-api")
-_API = "discord-api"
-
-_store.register("guilds", primary_key="id",
-                initial_loader=lambda: _coerce_guilds(_load("guilds.csv", "guilds")))
-_store.register("channels", primary_key="id",
-                initial_loader=lambda: _coerce_channels(_load("channels.csv", "channels")))
-_store.register("messages", primary_key="id",
-                initial_loader=lambda: _coerce_messages(_load("messages.csv", "messages")))
-_store.register("members", primary_key="guild_id",
-                initial_loader=lambda: _coerce_members(_load("members.csv", "members")))
-_store.register("roles", primary_key="id",
-                initial_loader=lambda: _coerce_roles(_load("roles.csv", "roles")))
-_store.register_document("me", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "me.json", encoding="utf-8")))
-
-
-def _guilds_rows():
-    return _store.table("guilds").rows()
-
-
-def _channels_rows():
-    return _store.table("channels").rows()
-
-
-def _messages_rows():
-    return _store.table("messages").rows()
-
-
-def _members_rows():
-    return _store.table("members").rows()
-
-
-def _roles_rows():
-    return _store.table("roles").rows()
-
-
-def _me_doc():
-    return _store.document("me").get()
-
 
 # Discord epoch (2015-01-01) in milliseconds, used for snowflake generation.
 _DISCORD_EPOCH = 1420070400000
 _seq = 0
 
 
-def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
-
-
-def _strip_ctx(r):
-    return {k: v for k, v in r.items() if not k.startswith("__")}
+def _load(filename):
+    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _now():
@@ -98,9 +51,9 @@ def _coerce_guilds(rows):
             "id": r["id"],
             "name": r["name"],
             "owner_id": r["owner_id"],
-            "approximate_member_count": strict_int(r, "member_count"),
-            "description": opt_str(r, "description", default="") or None,
-            "icon": opt_str(r, "icon", default="") or None,
+            "approximate_member_count": int(r["member_count"]),
+            "description": r["description"] or None,
+            "icon": r["icon"] or None,
             "region": r["region"],
         })
     return out
@@ -113,10 +66,10 @@ def _coerce_channels(rows):
             "id": r["id"],
             "guild_id": r["guild_id"],
             "name": r["name"],
-            "type": strict_int(r, "type"),
-            "position": strict_int(r, "position"),
-            "topic": opt_str(r, "topic", default="") or None,
-            "nsfw": strict_bool(r, "nsfw"),
+            "type": int(r["type"]),
+            "position": int(r["position"]),
+            "topic": r["topic"] or None,
+            "nsfw": _to_bool(r["nsfw"]),
         })
     return out
 
@@ -130,7 +83,7 @@ def _coerce_messages(rows):
             "author": {"id": r["author_id"], "username": r["author_username"]},
             "content": r["content"],
             "timestamp": r["timestamp"],
-            "pinned": strict_bool(r, "pinned"),
+            "pinned": _to_bool(r["pinned"]),
             "edited_timestamp": None,
         })
     return out
@@ -144,12 +97,12 @@ def _coerce_members(rows):
             "user": {
                 "id": r["user_id"],
                 "username": r["username"],
-                "global_name": opt_str(r, "global_name", default="") or None,
-                "bot": strict_bool(r, "bot"),
+                "global_name": r["global_name"] or None,
+                "bot": _to_bool(r["bot"]),
             },
-            "nick": opt_str(r, "nick", default="") or None,
+            "nick": r["nick"] or None,
             "joined_at": r["joined_at"],
-            "roles": [x for x in opt_csv_list(r, "roles", sep=";") if x],
+            "roles": [x for x in r["roles"].split(";") if x],
         })
     return out
 
@@ -161,19 +114,30 @@ def _coerce_roles(rows):
             "id": r["id"],
             "guild_id": r["guild_id"],
             "name": r["name"],
-            "color": strict_int(r, "color"),
-            "position": strict_int(r, "position"),
-            "hoist": strict_bool(r, "hoist"),
-            "mentionable": strict_bool(r, "mentionable"),
+            "color": int(r["color"]),
+            "position": int(r["position"]),
+            "hoist": _to_bool(r["hoist"]),
+            "mentionable": _to_bool(r["mentionable"]),
             "permissions": r["permissions"],
         })
     return out
 
 
+_guilds = _coerce_guilds(_load("guilds.csv"))
+_channels = _coerce_channels(_load("channels.csv"))
+_messages = _coerce_messages(_load("messages.csv"))
+_members = _coerce_members(_load("members.csv"))
+_roles = _coerce_roles(_load("roles.csv"))
 
+with open(DATA_DIR / "me.json", encoding="utf-8") as _f:
+    _me = json.load(_f)
 
-
-
+_guilds_store = deepcopy(_guilds)
+_channels_store = deepcopy(_channels)
+_messages_store = deepcopy(_messages)
+_members_store = deepcopy(_members)
+_roles_store = deepcopy(_roles)
+_me_store = deepcopy(_me)
 
 
 # ---------------------------------------------------------------------------
@@ -181,7 +145,7 @@ def _coerce_roles(rows):
 # ---------------------------------------------------------------------------
 
 def get_me():
-    return _me_doc()
+    return _me_store
 
 
 def list_my_guilds():
@@ -190,10 +154,10 @@ def list_my_guilds():
             "id": g["id"],
             "name": g["name"],
             "icon": g["icon"],
-            "owner": g["owner_id"] == _me_doc()["id"],
+            "owner": g["owner_id"] == _me_store["id"],
             "permissions": "104324673",
         }
-        for g in _guilds_rows()
+        for g in _guilds_store
     ]
 
 
@@ -202,31 +166,31 @@ def list_my_guilds():
 # ---------------------------------------------------------------------------
 
 def get_guild(guild_id):
-    for g in _guilds_rows():
+    for g in _guilds_store:
         if g["id"] == guild_id:
             return g
     return {"error": f"Unknown Guild {guild_id}", "code": 10004}
 
 
 def list_guild_channels(guild_id):
-    if not any(g["id"] == guild_id for g in _guilds_rows()):
+    if not any(g["id"] == guild_id for g in _guilds_store):
         return {"error": f"Unknown Guild {guild_id}", "code": 10004}
-    chans = [c for c in _channels_rows() if c["guild_id"] == guild_id]
+    chans = [c for c in _channels_store if c["guild_id"] == guild_id]
     chans.sort(key=lambda c: c["position"])
     return chans
 
 
 def list_guild_members(guild_id, limit=100):
-    if not any(g["id"] == guild_id for g in _guilds_rows()):
+    if not any(g["id"] == guild_id for g in _guilds_store):
         return {"error": f"Unknown Guild {guild_id}", "code": 10004}
-    members = [m for m in _members_rows() if m["guild_id"] == guild_id]
+    members = [m for m in _members_store if m["guild_id"] == guild_id]
     return members[: max(1, limit)]
 
 
 def list_guild_roles(guild_id):
-    if not any(g["id"] == guild_id for g in _guilds_rows()):
+    if not any(g["id"] == guild_id for g in _guilds_store):
         return {"error": f"Unknown Guild {guild_id}", "code": 10004}
-    roles = [r for r in _roles_rows() if r["guild_id"] == guild_id]
+    roles = [r for r in _roles_store if r["guild_id"] == guild_id]
     roles.sort(key=lambda r: r["position"], reverse=True)
     return roles
 
@@ -236,30 +200,30 @@ def list_guild_roles(guild_id):
 # ---------------------------------------------------------------------------
 
 def get_channel(channel_id):
-    for c in _channels_rows():
+    for c in _channels_store:
         if c["id"] == channel_id:
             return c
     return {"error": f"Unknown Channel {channel_id}", "code": 10003}
 
 
 def list_channel_messages(channel_id, limit=50):
-    if not any(c["id"] == channel_id for c in _channels_rows()):
+    if not any(c["id"] == channel_id for c in _channels_store):
         return {"error": f"Unknown Channel {channel_id}", "code": 10003}
-    msgs = [m for m in _messages_rows() if m["channel_id"] == channel_id]
+    msgs = [m for m in _messages_store if m["channel_id"] == channel_id]
     msgs.sort(key=lambda m: m["timestamp"], reverse=True)
     return msgs[: max(1, limit)]
 
 
 def create_message(channel_id, content, author_id=None):
-    channel = next((c for c in _channels_rows() if c["id"] == channel_id), None)
+    channel = next((c for c in _channels_store if c["id"] == channel_id), None)
     if not channel:
         return {"error": f"Unknown Channel {channel_id}", "code": 10003}
     if not content:
         return {"error": "Cannot send an empty message", "code": 50006}
-    author_id = author_id or _me_doc()["id"]
-    member = next((m for m in _members_rows()
+    author_id = author_id or _me_store["id"]
+    member = next((m for m in _members_store
                    if m["guild_id"] == channel["guild_id"] and m["user"]["id"] == author_id), None)
-    username = member["user"]["username"] if member else _me_doc()["username"]
+    username = member["user"]["username"] if member else _me_store["username"]
     msg = {
         "id": _snowflake(),
         "channel_id": channel_id,
@@ -269,7 +233,5 @@ def create_message(channel_id, content, author_id=None):
         "pinned": False,
         "edited_timestamp": None,
     }
-    _messages_rows().append(msg)
+    _messages_store.append(msg)
     return msg
-
-_store.eager_load()

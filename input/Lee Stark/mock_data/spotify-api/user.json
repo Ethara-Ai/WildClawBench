@@ -1,0 +1,11 @@
+{
+  "id": "user-lee",
+  "display_name": "Lee Stark",
+  "email": "lee.stark@voissync.ai",
+  "country": "US",
+  "product": "premium",
+  "followers": 12,
+  "images": [
+    {"url": "https://img.example.com/lee-stark.png", "height": 300, "width": 300}
+  ]
+}
