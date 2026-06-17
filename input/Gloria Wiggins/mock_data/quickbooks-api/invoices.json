@@ -1,0 +1,26 @@
+[
+  {
+    "Id": "1",
+    "DocNumber": "DR-INV-0001",
+    "TxnDate": "2026-09-10",
+    "DueDate": "2026-09-20",
+    "CustomerRef": {
+      "value": "1",
+      "name": "Fieldstone Agricultural Foundation"
+    },
+    "Line": [
+      {
+        "Amount": 0.0,
+        "Description": "Placeholder - Deep Roots grant (pending award).",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Grant Income"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 0.0,
+    "Balance": 0,
+    "Status": "Open"
+  }
+]

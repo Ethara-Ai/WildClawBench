@@ -1,0 +1,7 @@
+id,page_id,parent_block_id,type,text,order,created_time,last_edited_time,has_children,checked
+b1,pg_eugc,,to_do,Narrative (v2 current),1,2026-07-01T00:00:00Z,2026-09-30T18:00:00Z,False,True
+b2,pg_eugc,,to_do,Budget reconciliation (Vigo figure pending),2,2026-07-01T00:00:00Z,2026-09-30T18:00:00Z,False,False
+b3,pg_eugc,,to_do,Letters of support (2 of 3),3,2026-07-01T00:00:00Z,2026-09-30T18:00:00Z,False,False
+bc1,pg_consult,,to_do,Theme: traffic calming on the riverfront approach,1,2026-05-01T00:00:00Z,2026-09-30T18:00:00Z,False,False
+bc2,pg_consult,,to_do,Theme: strong support for the green corridor planting,2,2026-05-01T00:00:00Z,2026-09-30T18:00:00Z,False,False
+bc3,pg_consult,,to_do,Theme: Block C height contested by some residents,3,2026-05-01T00:00:00Z,2026-09-30T18:00:00Z,False,False

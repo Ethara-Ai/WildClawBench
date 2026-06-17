@@ -1,0 +1,2 @@
+sid,phone_number,friendly_name,iso_country,sms_enabled,voice_enabled,mms_enabled,capabilities_fax,date_created
+PN_consult,+351911550600,Consultation opt-in reminders (Grace-confirmed list),PT,True,False,False,False,2026-09-30T00:00:00Z

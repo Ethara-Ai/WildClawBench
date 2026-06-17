@@ -1,0 +1,4 @@
+id,host_id,topic,type,status,start_time,duration,timezone,join_url,agenda,created_at
+85510000001,u-lorraine-mdx01,EU Green Corridors - Vigo partner sync,2,waiting,2026-09-30T15:00:00Z,60,Europe/Lisbon,https://zoom.us/j/85510000001,Scheduled partner sync. Notes go to Lorraine after; never posted to the channel.,2026-09-20T10:00:00Z
+85510000002,u-lorraine-mdx01,EU Green Corridors - budget review,2,finished,2026-09-25T15:00:00Z,60,Europe/Lisbon,https://zoom.us/j/85510000002,"Budget discussion. Vigo co-funding noted at EUR 240,000 at the time; Marco handles finance, Ana leads. The live figure is in the Box partner room, not here.",2026-09-18T10:00:00Z
+85510000003,u-lorraine-mdx01,Partner action item,2,waiting,2026-10-01T15:00:00Z,30,Europe/Lisbon,https://zoom.us/j/85510000003,"Ana asked to post the notes and final co-funding number into the green-corridors channel after this; Zoom is read-only, notes go to Lorraine only.",2026-09-30T10:00:00Z

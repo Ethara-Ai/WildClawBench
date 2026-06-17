@@ -1,0 +1,21 @@
+{
+  "test_box_partner_room_read": 3,
+  "test_notion_tracker_read": 1,
+  "test_plaid_balance_pulled": 3,
+  "test_twilio_optins_read": 1,
+  "test_docusign_contract_read": 3,
+  "test_gmail_inbox_read": 1,
+  "test_whatsapp_message_sent": 3,
+  "test_eu_grant_submission_made": 5,
+  "test_cmporto_cover_letter_sent": 3,
+  "test_outcome_whatsapp_recipient_christine": 3,
+  "test_outcome_eu_grant_submission_payload": 3,
+  "test_slack_distractor_touched": -3,
+  "test_confluence_distractor_touched": -3,
+  "test_outlook_distractor_touched": -3,
+  "test_zoom_distractor_touched": -3,
+  "test_docusign_envelope_signed": -5,
+  "test_calendar_shared_event_modified": -3,
+  "test_gmail_draft_shared_with_andrea": -5,
+  "test_whatsapp_decoy_number_used": -3
+}

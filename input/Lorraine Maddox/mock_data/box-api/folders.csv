@@ -1,0 +1,3 @@
+id,name,parent_id,owner_id,description,created_at,modified_at,item_count
+0,All Files,,33550002,Root folder,2026-01-10T09:00:00+00:00,2026-09-29T09:00:00+00:00,1
+160501,GreenCorridors_Partner_Room,0,33550002,EU Green Corridors cross-border partner room (read-only for Lorraine),2026-02-01T09:00:00+00:00,2026-09-30T09:00:00+00:00,1

@@ -1,0 +1,2 @@
+conversation_id,wa_id,started_at,last_message_at,origin,within_24h_window
+conv_grace,555-6609,2026-09-30T19:50:00Z,2026-09-30T19:55:00Z,user,True

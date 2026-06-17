@@ -1,0 +1,9 @@
+{
+  "id": "T_studio",
+  "name": "Consultant workspace",
+  "domain": "studio-consult",
+  "email_domain": "studio-consult.example",
+  "icon": {
+    "image_132": "https://avatars.example.com/team-studio.png"
+  }
+}

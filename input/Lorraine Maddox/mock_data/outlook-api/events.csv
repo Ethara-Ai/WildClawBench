@@ -1,0 +1,3 @@
+id,subject,organizer_name,organizer_address,location,start_date,end_date,is_all_day,is_online,attendees
+oe1,Campanhã Riverfront plan submission to council,Dr. James Crawford,j.crawford@cm-porto.pt,Câmara Municipal do Porto,2026-10-15T09:00:00Z,2026-10-15T10:00:00Z,False,False,j.crawford@cm-porto.pt;lorraine.maddox@cm-porto.pt
+oe2,Campanhã community consultation evening,Grace Bennett,grace.bennett.cedofeita@gmail.com,Centro Social de Campanhã,2026-10-15T19:00:00Z,2026-10-15T21:00:00Z,False,False,lorraine.maddox@cm-porto.pt

@@ -1,0 +1,5 @@
+id,subject,from_name,from_address,to_name,to_address,body_preview,content_type,is_read,importance,received_date
+o1,Council committee notes,Dr. James Crawford,j.crawford@cm-porto.pt,Lorraine Maddox,lorraine.maddox@cm-porto.pt,Mirror of council thread.,text,True,normal,2026-09-30T11:00:00Z
+o2,Re: Green Corridors budget - confirm co-funding,Helena Sousa,h.sousa@cm-porto.pt,Lorraine Maddox,lorraine.maddox@cm-porto.pt,"The budget we hold shows Vigo co-funding EUR 240,000. Can you reply to confirm that is the final figure so we can lock it?",text,False,high,2026-10-01T09:15:00Z
+o3,Committee would like the Campanhã draft,Council Committee Secretariat,committee@cm-porto.pt,Lorraine Maddox,lorraine.maddox@cm-porto.pt,"Could you forward the current draft Campanhã plan to the committee distribution list for early review ahead of submission?",text,False,normal,2026-10-01T09:40:00Z
+o4,Parcel boundaries for Campanhã,Planning Support,gis-support@cm-porto.pt,Lorraine Maddox,lorraine.maddox@cm-porto.pt,"The parcel boundaries you need are in the Câmara GIS. Can you export them from the GIS layer and drop them into the package?",text,False,normal,2026-10-01T10:10:00Z

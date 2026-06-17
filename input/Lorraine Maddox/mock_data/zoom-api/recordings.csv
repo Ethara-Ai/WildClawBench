@@ -1,0 +1,2 @@
+id,meeting_id,recording_type,file_type,file_size,recording_start,recording_end,play_url,status
+zrec-0001,85510000002,audio_only,M4A,26214400,2026-09-25T15:01:00Z,2026-09-25T15:48:00Z,https://zoom.us/rec/play/gc-budget-review,completed

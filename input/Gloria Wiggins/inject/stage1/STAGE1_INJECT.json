@@ -1,0 +1,34 @@
+{
+  "stage": "stage1",
+  "description": "Baseline seed for GLORI_001. Establishes a fully consistent world before T1. All later contradictions are introduced by stage2 and stage3. Ports confirmed against the environment 3 service registry.",
+  "fires_before_turn": 1,
+  "requests": [
+    {
+      "service": "box-api",
+      "method": "POST",
+      "url": "http://localhost:8083/2.0/files",
+      "headers": {"Content-Type": "application/json"},
+      "body": {
+        "id": "fieldstone_template",
+        "name": "fieldstone_template.pdf",
+        "source_artifact": "task/artifacts/fieldstone_template.pdf",
+        "metadata": {"page_limit": 12, "required_attachments": ["budget"], "cap": 85000, "sign_off_required": true}
+      },
+      "expected_status": 200,
+      "description": "Seed the Fieldstone application template at 12 pages, budget attachment only."
+    },
+    {
+      "service": "openweather-api",
+      "method": "POST",
+      "url": "http://localhost:8035/seed/outlook",
+      "headers": {"Content-Type": "application/json"},
+      "body": {
+        "region": "North Carolina Piedmont",
+        "season": "autumn 2026",
+        "outlook": "below normal precipitation, persistent moderate to severe drought signal"
+      },
+      "expected_status": 200,
+      "description": "Seed the regional seasonal drought outlook used at T5."
+    }
+  ]
+}

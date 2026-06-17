@@ -1,0 +1,26 @@
+{
+  "item": {
+    "item_id": "item_lorraine_bcp",
+    "institution_id": "ins_millennium_bcp",
+    "webhook": "",
+    "available_products": [
+      "balance",
+      "transactions",
+      "identity"
+    ],
+    "billed_products": [
+      "balance"
+    ],
+    "consent_expiration_time": null,
+    "update_type": "background"
+  },
+  "institution": {
+    "institution_id": "ins_millennium_bcp",
+    "name": "Millennium BCP",
+    "products": ["balance", "transactions", "identity"],
+    "country_codes": ["PT"],
+    "url": "https://www.millenniumbcp.pt",
+    "primary_color": "#d0021b",
+    "routing_numbers": []
+  }
+}

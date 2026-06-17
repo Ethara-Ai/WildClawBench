@@ -1,0 +1,4 @@
+id,list_id,type,status,subject_line,from_name,reply_to,title,emails_sent,send_time,create_time
+camp_sept_field,aud_deeproots_farms,regular,sent,September Field Day and Soil Health Workshop,Deep Roots Initiative,gloria.wiggins@voissync.ai,September Field Day and Soil Health Workshop,210,2026-09-15T13:00:00-04:00,2026-09-10T09:00:00-04:00
+camp_harvest,aud_garden_vols,regular,sent,Community Harvest Day Volunteers Needed,Deep Roots Initiative,gloria.wiggins@voissync.ai,Community Harvest Day Volunteers Needed,94,2026-09-28T09:30:00-04:00,2026-09-22T09:00:00-04:00
+camp_oct_draft,aud_deeproots_farms,regular,draft,Deep Roots Fall Update,Deep Roots Initiative,gloria.wiggins@voissync.ai,Deep Roots Fall Update,0,,2026-10-05T09:00:00-04:00

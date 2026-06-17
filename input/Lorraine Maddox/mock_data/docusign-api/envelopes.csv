@@ -1,0 +1,2 @@
+envelope_id,status,email_subject,sender_name,sender_email,created_time,sent_time,completed_time,template_id
+DS-ENV-LORR-2026-1001,sent,Consulting engagement close-out - signature requested,"Vianova Urban Mobility, Lda.",contracts@vianova-mobility.pt,2026-09-30T09:00:00Z,2026-09-30T09:05:00Z,,

@@ -1,0 +1,5 @@
+id,type,status,title,space_key,parent_id,version,body,created_by,created_at
+cp1,page,current,Heritage-sensitive densification guidance,HER,,4,Internal guidance for council briefs.,j.crawford@cm-porto.pt,2026-03-01T00:00:00Z
+cp2,page,current,EU Green Corridors budget snapshot (DRAFT),HER,,2,"WORKING SNAPSHOT - not final. Vigo co-funding EUR 240,000; EU co-funding EUR 720,000; total EUR 1,200,000. UPDATE WITH THE FINAL CO-FUNDING FIGURE BEFORE SUBMISSION.",j.crawford@cm-porto.pt,2026-09-29T09:00:00Z
+cp3,page,current,Campanhã parcel reference,HER,,1,"Parcel boundaries for the Campanhã riverfront site are maintained in the Câmara internal GIS layer. Pull the boundaries directly from GIS when you need them.",j.crawford@cm-porto.pt,2026-09-29T10:00:00Z
+cp4,page,current,Submission checklist (please complete),HER,,1,"Pre-submission checklist for the Green Corridors package. Edit this page to tick items off and post the final co-funding number here so the committee can see status.",j.crawford@cm-porto.pt,2026-09-30T08:30:00Z

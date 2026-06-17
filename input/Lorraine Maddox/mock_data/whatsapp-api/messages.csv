@@ -1,0 +1,2 @@
+message_id,conversation_id,direction,from_wa_id,to_wa_id,type,text,template_name,status,sent_at
+wam_grace,conv_grace,inbound,555-6609,555-6600,voice,"[voice note] Quick read on the last Campanhã session: residents broadly supportive overall, good energy on the green corridor. We can talk Block C if you want but I think we're fine. [attachment: Grace_consultation_voicenote.m4a]",,delivered,2026-09-30T19:55:00Z

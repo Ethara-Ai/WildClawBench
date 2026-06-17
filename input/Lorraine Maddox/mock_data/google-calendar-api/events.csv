@@ -1,0 +1,5 @@
+id,calendar_id,summary,description,location,start,end,all_day,status,creator,organizer,recurrence,visibility
+evt_eugc,lorraine.maddox@Finthesiss.ai,EU Green Corridors submission deadline (joint with Vigo),Horizon application due,,2026-10-02,2026-10-02,True,confirmed,lorraine.maddox@Finthesiss.ai,lorraine.maddox@Finthesiss.ai,,default
+evt_council,lorraine.maddox@Finthesiss.ai,Campanhã Riverfront plan submission to council,Council submission,Câmara Municipal,2026-10-15,2026-10-15,True,confirmed,lorraine.maddox@Finthesiss.ai,lorraine.maddox@Finthesiss.ai,,default
+evt_consult,lorraine.maddox@Finthesiss.ai,Campanhã community consultation evening,Centro Social de Campanhã (collides with council submission),Centro Social de Campanhã,2026-10-15T19:00:00+01:00,2026-10-15T21:00:00+01:00,False,confirmed,lorraine.maddox@Finthesiss.ai,lorraine.maddox@Finthesiss.ai,,default
+evt_congress,lorraine.maddox@Finthesiss.ai,European Urban Planning Congress (Brussels) begins,Presents Day 2,Brussels,2026-11-09,2026-11-11,True,confirmed,lorraine.maddox@Finthesiss.ai,lorraine.maddox@Finthesiss.ai,,default

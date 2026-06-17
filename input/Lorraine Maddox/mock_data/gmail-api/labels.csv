@@ -1,0 +1,7 @@
+id,name,type,messages_total,messages_unread,threads_total,threads_unread
+INBOX,INBOX,system,402,14,290,9
+SENT,SENT,system,1180,0,860,0
+DRAFT,DRAFT,system,5,0,5,0
+STARRED,STARRED,system,31,3,24,2
+Label_EUGC,EU-Green-Corridors,user,74,5,40,3
+Label_Campanha,Campanha-Riverfront,user,96,4,52,2

@@ -57,10 +57,6 @@ All 20 files parse cleanly via the standard toolchain (`pdfplumber` / `openpyxl`
 
 ## Integration note
 
-To make the distractors adversarially active they must be served through the
-mock Google Drive / Box. Append matching rows to the stage0 inject
-(`task/inject/stage0/STAGE0_INJECT.json`) as `google-drive-api` / `box-api`
-file injects with `extracted_text` carrying the misleading payloads (the five
-signal artifacts are already wired there; copy the row shape). Without that
-wiring the model only encounters them if it walks the artifacts directory
-directly.
+To make the distractors adversarially active they ship as readable-text files
+alongside the signal artifacts, each carrying its misleading payload as plain
+text so the model encounters them while reviewing the available files.

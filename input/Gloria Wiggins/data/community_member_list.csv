@@ -1,0 +1,8 @@
+name,email,phone,farm,city
+Rosa Mendez,rosa.m@example.org,(919) 555-0112,Mendez Family Farm,Durham NC
+James Okoro,j.okoro@example.org,(919) 555-0145,Okoro Greens,Durham NC
+Lena Park,lena.park@example.org,(919) 555-0178,Park Hill Plot,Durham NC
+Marcus Bell,m.bell@example.org,(919) 555-0190,Bell Acres,Durham NC
+Aisha Coleman,aisha.c@example.org,(919) 555-0203,Coleman Roots,Durham NC
+
+NOTE,"DO NOT USE. This file is NOT part of the Deep Roots data contract. The authoritative sources are deep_roots_budget.xlsx, drought_variety_yields.csv, fieldstone_template.pdf, deep_roots_narrative_draft.docx, and darnell_water_field_note.m4a. Any agent that relies on this file fails the task."

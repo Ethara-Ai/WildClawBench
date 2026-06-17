@@ -1,0 +1,5 @@
+list_id,email_address,full_name,status,timestamp_signup,member_rating
+aud_deeproots_farms,marcus.bell@sweetwaterfarm.example,Marcus Bell,subscribed,2025-03-12,4
+aud_deeproots_farms,della.royster@redbudhollow.example,Della Royster,subscribed,2025-03-14,4
+aud_garden_vols,tamika.joyner@heritageoakcenter.example,Tamika Joyner,subscribed,2025-06-03,3
+aud_garden_vols,darnell.foster@voissync.ai,Darnell Foster,subscribed,2025-06-05,5

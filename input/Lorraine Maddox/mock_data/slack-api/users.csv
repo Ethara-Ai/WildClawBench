@@ -1,0 +1,4 @@
+id,name,real_name,email,is_admin,is_bot,tz,status_text,presence
+U_lorr,lorraine,Lorraine Maddox,lorraine.maddox@Finthesiss.ai,True,False,Europe/Lisbon,,active
+U_ana,anacastro,Ana Castro,ana.castro@vigo-urbanismo.es,False,False,Europe/Madrid,Vigo lead,active
+U_marco,marcovazquez,Marco Vazquez,marco.vazquez@vigo-urbanismo.es,False,False,Europe/Madrid,Vigo finance,away

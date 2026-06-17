@@ -1,0 +1,6 @@
+id,createdTime,Name,Status,Project,EstimateHours,Done
+recTrialCP001,2026-04-18T08:00:00.000Z,"Plot A — Cherokee Purple: yield 6.2 lbs/plant, water 3.1 gal/lb, drought index 7.4. Heirloom flavor favorite; softer set under heat.",Done,Cherokee Purple Trial,6,true
+recTrialAT002,2026-04-18T08:00:00.000Z,"Plot B — Arkansas Traveler: yield 5.8 lbs/plant, water 2.9 gal/lb, drought index 8.1. Crack-resistant heirloom; steady on low water.",Done,Arkansas Traveler Trial,6,true
+recTrialEV003,2026-04-18T08:00:00.000Z,"Plot C — Everglades: yield 7.4 lbs/plant, water 2.2 gal/lb, drought index 9.2. Top drought index. Yield here reads 7.4; comparison sheet and Darnell's field note both say 6.8. Verify before citing.",Done,Everglades Trial,6,true
+recTrialPB004,2026-04-18T08:00:00.000Z,"Plot D — Punta Banda: yield 5.1 lbs/plant, water 2.4 gal/lb, drought index 8.7. Desert-adapted; small fruit, very low water demand.",Done,Punta Banda Trial,6,true
+recTrialPO005,2026-04-18T08:00:00.000Z,"Plot E — Porter: yield 5.5 lbs/plant, water 2.7 gal/lb, drought index 8.3. Reliable Texas heat type; dependable set on the parcel.",Done,Porter Trial,6,true

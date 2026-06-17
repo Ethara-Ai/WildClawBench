@@ -1,0 +1,70 @@
+{
+  "owners": {
+    "acc_chk_001": [
+      {
+        "names": [
+          "Lorraine Maddox"
+        ],
+        "emails": [
+          {
+            "data": "lorraine.maddox@Finthesiss.ai",
+            "primary": true,
+            "type": "primary"
+          }
+        ],
+        "phone_numbers": [
+          {
+            "data": "555-6600",
+            "primary": true,
+            "type": "mobile"
+          }
+        ],
+        "addresses": [
+          {
+            "data": {
+              "street": "Cedofeita",
+              "city": "Porto",
+              "region": "Porto",
+              "postal_code": "4050",
+              "country": "PT"
+            },
+            "primary": true
+          }
+        ]
+      }
+    ],
+    "acc_sav_002": [
+      {
+        "names": [
+          "Lorraine Maddox"
+        ],
+        "emails": [
+          {
+            "data": "lorraine.maddox@Finthesiss.ai",
+            "primary": true,
+            "type": "primary"
+          }
+        ],
+        "phone_numbers": [
+          {
+            "data": "555-6600",
+            "primary": true,
+            "type": "mobile"
+          }
+        ],
+        "addresses": [
+          {
+            "data": {
+              "street": "Cedofeita",
+              "city": "Porto",
+              "region": "Porto",
+              "postal_code": "4050",
+              "country": "PT"
+            },
+            "primary": true
+          }
+        ]
+      }
+    ]
+  }
+}

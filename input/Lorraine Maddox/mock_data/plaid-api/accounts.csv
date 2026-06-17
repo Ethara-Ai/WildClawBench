@@ -1,0 +1,5 @@
+account_id,name,official_name,mask,type,subtype,available,current,limit,iso_currency_code
+acc_chk_001,Current account,Millennium BCP Conta Ordenado,0001,depository,checking,1900.0,1900.0,,EUR
+acc_sav_002,Travel fund,Millennium BCP Poupança Viagem,0002,depository,savings,900.0,900.0,,EUR
+acc_sav_003,Emergency fund,Millennium BCP Poupança,0003,depository,savings,16800.0,16800.0,,EUR
+acc_inv_004,European Sustainable Futures Fund,Nordvik Asset Management ESF,0004,investment,brokerage,4200.0,4200.0,,EUR

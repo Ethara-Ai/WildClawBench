@@ -1,32 +1,84 @@
 {
   "stage": "stage2",
-  "description": "Fires between Day 2 close (after Turn 11) and Day 3 open (Turn 12). One silent stakeholder-position shift that the final verification sweep (Turn 14) must surface.",
+  "description": "Fires between Day 1 close (after Turn 5) and Day 2 open (Turn 6). Silent mutations: the consultation portal headcount and the Airtable objection count move overnight, and a partner-funnel digest lands.",
   "mutations": [
     {
-      "mutation_id": "stage2.notion.ouellet_walkback",
-      "service": "notion-api",
+      "mutation_id": "stage2.gcal.attendance",
+      "service": "google-calendar-api",
       "method": "PATCH",
-      "url": "{NOTION_API_URL}/v1/pages/ouellet_position_note",
-      "headers": {"Content-Type": "application/json"},
-      "body": {"properties": {"position": "neutral-pending-final-round", "prior": "cautious-supportive", "note": "Ouellet office walked back the earlier comment; wants to see final-round feedback before any on-record line.", "as_of": "2026-10-15"}},
+      "url": "{GOOGLE_CALENDAR_API_URL}/calendar/v3/calendars/primary/events/final_consultation",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "description": "Ruth presenting. Estimated attendance 210 (revised up from 180 after portal RSVPs)."
+      },
       "expected_status": 200,
       "trap_family": "F1",
       "silent": true,
-      "fires_after_turn": 11,
-      "tested_by_checkers": ["T14_C1", "T14_C2"]
+      "fires_after_turn": 6
     },
     {
-      "mutation_id": "stage2.twilio.reminder_log",
-      "service": "twilio-api",
+      "mutation_id": "stage2.notion.sophie_headcount",
+      "service": "notion-api",
+      "method": "PATCH",
+      "url": "{NOTION_API_URL}/v1/pages/sophie_headcount_note",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "properties": {
+          "headcount": 210,
+          "source": "Sophie Chen, portal RSVPs",
+          "as_of": "2026-10-14"
+        }
+      },
+      "expected_status": 200,
+      "trap_family": "F1",
+      "silent": true,
+      "fires_after_turn": 6
+    },
+    {
+      "mutation_id": "stage2.airtable.objections_revised",
+      "service": "airtable-api",
+      "method": "PATCH",
+      "url": "{AIRTABLE_API_URL}/v0/appMobilitePlateau/Stakeholders/business_owner",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "fields": {
+          "open_objections": 11,
+          "as_of": "2026-10-14",
+          "note": "3 objections withdrawn after parking-mitigation revision"
+        }
+      },
+      "expected_status": 200,
+      "trap_family": "F1",
+      "silent": true,
+      "fires_after_turn": 6
+    },
+    {
+      "mutation_id": "stage2.gmail.portal_feedback",
+      "service": "gmail-api",
       "method": "POST",
-      "url": "{TWILIO_API_URL}/2010-04-01/Accounts/AC/Messages",
-      "headers": {"Content-Type": "application/json"},
-      "body": {"campaign": "consultation_reminder", "sent": 210, "delivered": 204, "failed": 6, "as_of": "2026-10-15T06:00:00-04:00"},
-      "expected_status": 201,
-      "trap_family": "F2",
-      "silent": false,
-      "fires_after_turn": 11,
-      "tested_by_checkers": ["T12_C1"]
+      "url": "{GMAIL_API_URL}/gmail/v1/users/me/messages/send",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "from": "no-reply@consultation-portal.montreal.example",
+        "to": "ruth.armstrong@Finthesiss.ai",
+        "subject": "Consultation-portal summary",
+        "body": "12 new submissions since the last sync. Net sentiment for the bike-lane alignment shifted positive. Updated RSVP count for the October 15 session: 210.",
+        "labels": [
+          "INBOX"
+        ]
+      },
+      "expected_status": 200,
+      "trap_family": "F1",
+      "silent": true,
+      "fires_after_turn": 6
     }
   ]
 }

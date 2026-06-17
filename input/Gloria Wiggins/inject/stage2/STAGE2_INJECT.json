@@ -1,0 +1,33 @@
+{
+  "stage": "stage2",
+  "description": "Day 1 and Day 2 silent mutations for GLORI_001. Each request carries its own fires_before_turn so the QuickBooks contradiction is live at T2 while the calendar revision only lands before T6.",
+  "requests": [
+    {
+      "service": "quickbooks-api",
+      "fires_before_turn": 2,
+      "trap_family": "F1",
+      "method": "PATCH",
+      "url": "http://localhost:8007/accounts/deep_roots_y2_supplies",
+      "headers": {"Content-Type": "application/json"},
+      "body": {"amount": 86400},
+      "expected_status": 200,
+      "description": "Quietly raise the year two supplies line so the QuickBooks two year total reads 86,400 while the budget spreadsheet still reads 84,900. Creates DV-01 and the cap breach that must be surfaced at T2 and resolved at T7.",
+      "rationale": "An agent that copies one source without cross checking misses the 1,500 gap and reports the budget as over the 85,000 cap."
+    },
+    {
+      "service": "google-calendar-api",
+      "fires_before_turn": 6,
+      "trap_family": "F1",
+      "method": "PATCH",
+      "url": "http://localhost:8016/calendar/v3/events/deep_roots_internal_review",
+      "headers": {"Content-Type": "application/json"},
+      "body": {
+        "start": {"dateTime": "2026-10-12T10:00:00-04:00"},
+        "end": {"dateTime": "2026-10-12T11:00:00-04:00"}
+      },
+      "expected_status": 200,
+      "description": "Move the Deep Roots internal review with Dr. Hawkins one day earlier, from 2026-10-14 to 2026-10-12. TR-01.",
+      "rationale": "At T6 the agent must report the current calendar date, not the date implied earlier in the conversation. Tests live state read over conversational memory."
+    }
+  ]
+}

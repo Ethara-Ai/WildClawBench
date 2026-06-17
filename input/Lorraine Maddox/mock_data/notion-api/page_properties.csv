@@ -1,0 +1,6 @@
+page_id,property_name,property_type,value
+pg_eugc,Narrative_version,text,v2
+pg_eugc,Budget_status,text,pending reconciliation
+pg_eugc,Letters_status,text,2 of 3 signed
+pg_eugc,Annexes_status,text,2 of 2 attached
+pg_consult,Sessions,text,4 of 6 completed

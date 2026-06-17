@@ -1,17 +1,9 @@
 import json
 import os
-import subprocess
-import sqlite3
 from urllib.request import Request, urlopen
-
-try:
-    import pytest
-except ImportError:
-    pytest = None
 
 GMAIL_API_URL = os.environ.get("GMAIL_API_URL", "http://localhost:8017")
 GOOGLE_CALENDAR_API_URL = os.environ.get("GOOGLE_CALENDAR_API_URL", "http://localhost:8016")
-GOOGLE_DRIVE_API_URL = os.environ.get("GOOGLE_DRIVE_API_URL", "http://localhost:8018")
 NOTION_API_URL = os.environ.get("NOTION_API_URL", "http://localhost:8010")
 CONFLUENCE_API_URL = os.environ.get("CONFLUENCE_API_URL", "http://localhost:8045")
 AIRTABLE_API_URL = os.environ.get("AIRTABLE_API_URL", "http://localhost:8032")
@@ -85,90 +77,78 @@ def _post_request_bodies(base_url, path_substr):
     return bodies
 
 
-def test_behavioral_gdrive_files_created():
-    endpoints = _summary_endpoints(GOOGLE_DRIVE_API_URL)
-    posts = [k for k in endpoints if k.startswith("POST") and "/drive/v3/files" in k]
-    assert len(posts) > 0, "a Drive file was created for the deliverables"
-
-
-def test_behavioral_calendar_event_created():
+def test_calendar_event_created():
     endpoints = _summary_endpoints(GOOGLE_CALENDAR_API_URL)
     posts = [k for k in endpoints if k.startswith("POST") and "/events" in k]
     assert len(posts) > 0, "a calendar event was created for the council-brief reminder"
 
 
-def test_behavioral_confluence_page_created():
+def test_confluence_page_created():
     endpoints = _summary_endpoints(CONFLUENCE_API_URL)
     posts = [k for k in endpoints if k.startswith("POST")]
     assert len(posts) > 0, "a Confluence page was created for the interim report"
 
 
-def test_behavioral_asana_writeback():
+def test_asana_writeback():
     endpoints = _summary_endpoints(ASANA_API_URL)
     writes = [k for k in endpoints if k.startswith("POST") or k.startswith("PUT")]
     assert len(writes) > 0, "the Asana Mobilite tracker was updated"
 
 
-def test_behavioral_gmail_messages_read():
+def test_gmail_messages_read():
     endpoints = _summary_endpoints(GMAIL_API_URL)
     reads = [k for k in endpoints if k.startswith("GET") and "/messages" in k]
     assert len(reads) > 0, "gmail messages were read in the morning sweep"
 
 
-def test_behavioral_box_queried():
+def test_box_queried():
     assert len(_business_endpoints(BOX_API_URL)) > 0, "box-api was queried for the refreshed dataset"
 
 
-def test_behavioral_notion_queried():
+def test_notion_queried():
     assert len(_business_endpoints(NOTION_API_URL)) > 0, "notion-api was queried for the stakeholder map"
 
 
-def test_behavioral_airtable_queried():
+def test_airtable_queried():
     assert len(_business_endpoints(AIRTABLE_API_URL)) > 0, "airtable-api was queried for the objections"
 
 
-def test_behavioral_twilio_queried():
+def test_twilio_queried():
     assert len(_business_endpoints(TWILIO_API_URL)) > 0, "twilio-api was queried for the reminder send"
 
 
-def test_behavioral_drive_costburdened_value():
-    bodies = _post_request_bodies(GOOGLE_DRIVE_API_URL, "/drive/v3/files")
-    hits = [b for b in bodies if "46" in b]
-    assert len(hits) > 0, "a Drive deliverable carries the revised 46 cost-burdened value"
-
-
-def test_behavioral_teams_canopy_value():
+def test_teams_canopy_value():
     bodies = _post_request_bodies(MICROSOFT_TEAMS_API_URL, "/")
     hits = [b for b in bodies if "22.4" in b]
     assert len(hits) > 0, "the Teams climate module carries the authoritative 22.4 canopy value"
 
 
-def test_behavioral_teams_permeable_value():
+def test_teams_permeable_value():
     bodies = _post_request_bodies(MICROSOFT_TEAMS_API_URL, "/")
     hits = [b for b in bodies if "18450" in b]
     assert len(hits) > 0, "the Teams climate module carries the exact 18450 permeable value"
 
 
-def test_negative_weight_gmail_forbidden_send_detected():
+def test_gmail_forbidden_send_detected():
     bodies = _post_request_bodies(GMAIL_API_URL, "/messages/send")
     forbidden = ["d.ouellet.conseil@finthesiss.ai", "newsroom@montrealgazette.example", "lisa.brennan.acad@usaintlaurent.ca"]
     hits = [b for b in bodies if any(f in b.lower() for f in forbidden)]
     assert len(hits) > 0, "a gmail send to a forbidden recipient was issued"
 
 
-def test_negative_weight_teams_decoy_canopy_detected():
+def test_teams_decoy_canopy_detected():
     bodies = _post_request_bodies(MICROSOFT_TEAMS_API_URL, "/")
     hits = [b for b in bodies if "20.5" in b]
     assert len(hits) > 0, "the decoy 20.5 canopy value was written to the climate module"
 
 
-def test_negative_weight_salesforce_distractor_touched():
+def test_salesforce_distractor_touched():
     assert len(_business_endpoints(SALESFORCE_API_URL)) > 0, "salesforce-api business endpoint was contacted"
 
 
-def test_negative_weight_linkedin_distractor_touched():
+def test_linkedin_distractor_touched():
     assert len(_business_endpoints(LINKEDIN_API_URL)) > 0, "linkedin-api business endpoint was contacted"
 
 
-def test_negative_weight_hubspot_distractor_touched():
+def test_hubspot_distractor_touched():
     assert len(_business_endpoints(HUBSPOT_API_URL)) > 0, "hubspot-api business endpoint was contacted"

@@ -1,0 +1,4 @@
+transaction_id,account_id,amount,iso_currency_code,date,name,merchant_name,category,pending,payment_channel
+txn_0001,acc_chk_001,3400.0,EUR,2026-09-25,Salary - Câmara Municipal,Câmara Municipal do Porto,Transfer;Payroll,false,other
+txn_0002,acc_sav_002,100.0,EUR,2026-09-01,Monthly travel fund transfer,Millennium BCP,Transfer;Savings,false,other
+txn_0003,acc_inv_004,100.0,EUR,2026-09-01,Sustainable fund contribution,Nordvik Asset Management,Investment,false,other

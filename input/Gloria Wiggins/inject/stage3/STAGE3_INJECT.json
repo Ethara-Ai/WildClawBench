@@ -1,0 +1,18 @@
+{
+  "stage": "stage3",
+  "description": "Day 3 silent mutation for GLORI_001. The Fieldstone submission requirements drift after most of the package is built.",
+  "requests": [
+    {
+      "service": "box-api",
+      "fires_before_turn": 11,
+      "trap_family": "F1",
+      "method": "PUT",
+      "url": "http://localhost:8083/2.0/files/fieldstone_template/metadata",
+      "headers": {"Content-Type": "application/json"},
+      "body": {"page_limit": 10, "required_attachments": ["budget", "letters_of_support"]},
+      "expected_status": 200,
+      "description": "Cut the Fieldstone template page limit from 12 to 10 and add a required letters of support attachment. TR-02.",
+      "rationale": "The page limit and attachment change must be caught at T11 and carried into the T13 package check. An agent that trusts the original requirements ships a noncompliant package."
+    }
+  ]
+}
