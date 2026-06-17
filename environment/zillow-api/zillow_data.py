@@ -2,11 +2,42 @@
 
 import csv
 import uuid
-from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("zillow-api")
+
+_store.register("properties", primary_key="zpid",
+                initial_loader=lambda: _coerce_properties(_load("properties.csv")))
+_store.register("price_history", primary_key="zpid",
+                initial_loader=lambda: _coerce_price_history(_load("price_history.csv")))
+_store.register("agents", primary_key="agent_id",
+                initial_loader=lambda: _coerce_agents(_load("agents.csv")))
+_store.register("saved_searches", primary_key="search_id",
+                initial_loader=lambda: _coerce_saved_searches(_load("saved_searches.csv")))
+
+
+def _properties_rows():
+    return _store.table("properties").rows()
+
+
+def _price_history_rows():
+    return _store.table("price_history").rows()
+
+
+def _agents_rows():
+    return _store.table("agents").rows()
+
+
+def _saved_searches_rows():
+    return _store.table("saved_searches").rows()
+
 
 
 def _load(filename):
@@ -78,15 +109,12 @@ def _coerce_saved_searches(rows):
     return out
 
 
-_properties = _coerce_properties(_load("properties.csv"))
-_price_history = _coerce_price_history(_load("price_history.csv"))
-_agents = _coerce_agents(_load("agents.csv"))
-_saved_searches = _coerce_saved_searches(_load("saved_searches.csv"))
 
-_properties_store = deepcopy(_properties)
-_price_history_store = deepcopy(_price_history)
-_agents_store = deepcopy(_agents)
-_saved_searches_store = deepcopy(_saved_searches)
+
+
+
+
+
 
 
 def _new_search_id():
@@ -100,7 +128,7 @@ def _new_search_id():
 def search_properties(city=None, state=None, zipcode=None, min_price=None, max_price=None,
                       min_beds=None, min_baths=None, home_type=None, status="FOR_SALE",
                       limit=25, offset=0, sort_by="list_price", sort_order="asc"):
-    results = list(_properties_store)
+    results = list(_properties_rows())
     if status:
         results = [p for p in results if p["status"].upper() == status.upper()]
     if city:
@@ -136,7 +164,7 @@ def search_properties(city=None, state=None, zipcode=None, min_price=None, max_p
 
 
 def get_property(zpid):
-    for p in _properties_store:
+    for p in _properties_rows():
         if p["zpid"] == zpid:
             return p
     return {"error": f"Property {zpid} not found"}
@@ -157,9 +185,9 @@ def get_zestimate(zpid):
 
 
 def get_price_history(zpid):
-    if not any(p["zpid"] == zpid for p in _properties_store):
+    if not any(p["zpid"] == zpid for p in _properties_rows()):
         return {"error": f"Property {zpid} not found"}
-    events = [e for e in _price_history_store if e["zpid"] == zpid]
+    events = [e for e in _price_history_rows() if e["zpid"] == zpid]
     events.sort(key=lambda e: e["event_date"], reverse=True)
     return {"zpid": zpid, "count": len(events), "history": events}
 
@@ -171,23 +199,23 @@ def get_price_history(zpid):
 def list_agents(city=None, state=None):
     # Filter by city/state via the properties they list
     if not city and not state:
-        return {"count": len(_agents_store), "agents": _agents_store}
+        return {"count": len(_agents_rows()), "agents": _agents_rows()}
 
     matching_ids = set()
-    for p in _properties_store:
+    for p in _properties_rows():
         if city and p["city"].lower() != city.lower():
             continue
         if state and p["state"].upper() != state.upper():
             continue
         matching_ids.add(p["listing_agent_id"])
-    agents = [a for a in _agents_store if a["agent_id"] in matching_ids]
+    agents = [a for a in _agents_rows() if a["agent_id"] in matching_ids]
     return {"count": len(agents), "agents": agents}
 
 
 def get_agent(agent_id):
-    for a in _agents_store:
+    for a in _agents_rows():
         if a["agent_id"] == agent_id:
-            listings = [p for p in _properties_store
+            listings = [p for p in _properties_rows()
                         if p["listing_agent_id"] == agent_id and p["status"] == "FOR_SALE"]
             return {**a, "listings": listings}
     return {"error": f"Agent {agent_id} not found"}
@@ -198,7 +226,7 @@ def get_agent(agent_id):
 # ---------------------------------------------------------------------------
 
 def list_saved_searches(user_id):
-    return [s for s in _saved_searches_store if s["user_id"] == user_id]
+    return [s for s in _saved_searches_rows() if s["user_id"] == user_id]
 
 
 def create_saved_search(user_id, name, city=None, state=None,
@@ -217,13 +245,13 @@ def create_saved_search(user_id, name, city=None, state=None,
         "home_type": home_type,
         "created_at": _now(),
     }
-    _saved_searches_store.append(search)
+    _saved_searches_rows().append(search)
     return search
 
 
 def delete_saved_search(search_id):
-    for i, s in enumerate(_saved_searches_store):
+    for i, s in enumerate(_saved_searches_rows()):
         if s["search_id"] == search_id:
-            _saved_searches_store.pop(i)
+            _saved_searches_rows().pop(i)
             return {"deleted": True, "search_id": search_id}
     return {"error": f"Saved search {search_id} not found"}

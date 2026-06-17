@@ -13,6 +13,12 @@ from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
 
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store
+
+_store = get_store("intercom-api")
+
 
 def _load(filename):
     with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
@@ -44,10 +50,6 @@ def _to_float(v, default=0.0):
     except (TypeError, ValueError):
         return default
 
-
-# ---------------------------------------------------------------------------
-# Load + coerce
-# ---------------------------------------------------------------------------
 
 def _coerce_contacts(rows):
     out = []
@@ -112,15 +114,21 @@ def _coerce_parts(rows):
     return out
 
 
-_contacts_store = deepcopy(_coerce_contacts(_load("contacts.csv")))
-_companies_store = deepcopy(_coerce_companies(_load("companies.csv")))
-_conversations_store = deepcopy(_coerce_conversations(_load("conversations.csv")))
-_parts_store = deepcopy(_coerce_parts(_load("conversation_parts.csv")))
+_store.register("contacts", primary_key="id",
+                initial_loader=lambda: _coerce_contacts(_load("contacts.csv")))
+_store.register("companies", primary_key="id",
+                initial_loader=lambda: _coerce_companies(_load("companies.csv")))
+_store.register("conversations", primary_key="id",
+                initial_loader=lambda: _coerce_conversations(_load("conversations.csv")))
+_store.register("parts", primary_key="id",
+                initial_loader=lambda: _coerce_parts(_load("conversation_parts.csv")))
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+def _contacts_rows(): return _store.table("contacts").rows()
+def _companies_rows(): return _store.table("companies").rows()
+def _conversations_rows(): return _store.table("conversations").rows()
+def _parts_rows(): return _store.table("parts").rows()
+
 
 def _new_id(prefix):
     return f"{prefix}-{uuid.uuid4().hex[:12]}"
@@ -139,7 +147,7 @@ def _conversation_obj(conv, with_parts=False):
         "admin_assignee_id": conv["assignee_id"],
     }
     if with_parts:
-        parts = [p for p in _parts_store if p["conversation_id"] == conv["id"]]
+        parts = [p for p in _parts_rows() if p["conversation_id"] == conv["id"]]
         parts = sorted(parts, key=lambda p: p["created_at"])
         obj["conversation_parts"] = {
             "type": "conversation_part.list",
@@ -149,25 +157,21 @@ def _conversation_obj(conv, with_parts=False):
     return obj
 
 
-# ---------------------------------------------------------------------------
-# Contacts
-# ---------------------------------------------------------------------------
-
 def list_contacts(role=None):
-    contacts = list(_contacts_store)
+    contacts = _contacts_rows()
     if role:
         contacts = [c for c in contacts if c["role"] == role]
     return {
         "type": "list",
-        "data": deepcopy(contacts),
+        "data": contacts,
         "total_count": len(contacts),
     }
 
 
 def get_contact(contact_id):
-    for c in _contacts_store:
-        if c["id"] == contact_id:
-            return {"type": "contact", **deepcopy(c)}
+    c = _store.table("contacts").get(contact_id)
+    if c:
+        return {"type": "contact", **c}
     return {"error": f"Contact {contact_id} not found"}
 
 
@@ -182,35 +186,28 @@ def create_contact(role="user", name="", email=None, phone=None, company_id=None
         "created_at": _now(),
         "last_seen_at": None,
     }
-    _contacts_store.append(contact)
-    return {"type": "contact", **deepcopy(contact)}
+    _store.table("contacts").upsert(contact)
+    return {"type": "contact", **contact}
 
-
-# ---------------------------------------------------------------------------
-# Companies
-# ---------------------------------------------------------------------------
 
 def list_companies():
+    rows = _companies_rows()
     return {
         "type": "list",
-        "data": deepcopy(_companies_store),
-        "total_count": len(_companies_store),
+        "data": rows,
+        "total_count": len(rows),
     }
 
 
 def get_company(company_id):
-    for c in _companies_store:
+    for c in _companies_rows():
         if c["id"] == company_id or c["company_id"] == company_id:
-            return {"type": "company", **deepcopy(c)}
+            return {"type": "company", **c}
     return {"error": f"Company {company_id} not found"}
 
 
-# ---------------------------------------------------------------------------
-# Conversations
-# ---------------------------------------------------------------------------
-
 def list_conversations(state=None):
-    convs = list(_conversations_store)
+    convs = _conversations_rows()
     if state:
         convs = [c for c in convs if c["state"] == state]
     return {
@@ -221,14 +218,14 @@ def list_conversations(state=None):
 
 
 def get_conversation(conversation_id):
-    for c in _conversations_store:
-        if c["id"] == conversation_id:
-            return _conversation_obj(c, with_parts=True)
+    c = _store.table("conversations").get(conversation_id)
+    if c:
+        return _conversation_obj(c, with_parts=True)
     return {"error": f"Conversation {conversation_id} not found"}
 
 
 def create_conversation(contact_id, body, title=""):
-    if not any(c["id"] == contact_id for c in _contacts_store):
+    if not _store.table("contacts").get(contact_id):
         return {"error": f"Contact {contact_id} not found"}
     now = _now()
     conv = {
@@ -241,7 +238,7 @@ def create_conversation(contact_id, body, title=""):
         "assignee_id": None,
         "open": True,
     }
-    _conversations_store.append(conv)
+    _store.table("conversations").upsert(conv)
     part = {
         "id": _new_id("part"),
         "conversation_id": conv["id"],
@@ -251,12 +248,12 @@ def create_conversation(contact_id, body, title=""):
         "body": body,
         "created_at": now,
     }
-    _parts_store.append(part)
+    _store.table("parts").upsert(part)
     return _conversation_obj(conv, with_parts=True)
 
 
 def _find_conversation(conversation_id):
-    return next((c for c in _conversations_store if c["id"] == conversation_id), None)
+    return _store.table("conversations").get(conversation_id)
 
 
 def reply_conversation(conversation_id, body, author_type="admin", author_id="admin-jonas"):
@@ -273,8 +270,9 @@ def reply_conversation(conversation_id, body, author_type="admin", author_id="ad
         "body": body,
         "created_at": now,
     }
-    _parts_store.append(part)
-    conv["updated_at"] = now
+    _store.table("parts").upsert(part)
+    _store.table("conversations").patch(conversation_id, {"updated_at": now})
+    conv = _find_conversation(conversation_id) or conv
     return _conversation_obj(conv, with_parts=True)
 
 
@@ -296,15 +294,17 @@ def add_part(conversation_id, message_type, body=None, author_id="admin-jonas", 
         "body": body,
         "created_at": now,
     }
-    _parts_store.append(part)
+    _store.table("parts").upsert(part)
 
+    patch: dict = {"updated_at": now}
     if message_type == "close":
-        conv["state"] = "closed"
-        conv["open"] = False
+        patch["state"] = "closed"
+        patch["open"] = False
     elif message_type == "open":
-        conv["state"] = "open"
-        conv["open"] = True
+        patch["state"] = "open"
+        patch["open"] = True
     elif message_type == "assignment":
-        conv["assignee_id"] = assignee_id or author_id
-    conv["updated_at"] = now
+        patch["assignee_id"] = assignee_id or author_id
+    _store.table("conversations").patch(conversation_id, patch)
+    conv = _find_conversation(conversation_id) or conv
     return _conversation_obj(conv, with_parts=True)

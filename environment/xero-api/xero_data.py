@@ -9,10 +9,35 @@ resets on restart.
 import csv
 import uuid
 import time
-from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("xero-api")
+
+_store.register("contacts", primary_key="ContactID",
+                initial_loader=lambda: _coerce_contacts(_load("contacts.csv")))
+_store.register("accounts", primary_key="AccountID",
+                initial_loader=lambda: _coerce_accounts(_load("accounts.csv")))
+_store.register("invoices", primary_key="InvoiceID",
+                initial_loader=lambda: _coerce_invoices(_load("invoices.csv")))
+
+
+def _contacts_rows():
+    return _store.table("contacts").rows()
+
+
+def _accounts_rows():
+    return _store.table("accounts").rows()
+
+
+def _invoices_rows():
+    return _store.table("invoices").rows()
+
 
 
 def _load(filename):
@@ -92,13 +117,10 @@ def _coerce_invoices(rows):
     return out
 
 
-_contacts = _coerce_contacts(_load("contacts.csv"))
-_accounts = _coerce_accounts(_load("accounts.csv"))
-_invoices = _coerce_invoices(_load("invoices.csv"))
 
-_contacts_store = deepcopy(_contacts)
-_accounts_store = deepcopy(_accounts)
-_invoices_store = deepcopy(_invoices)
+
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -148,7 +170,7 @@ def _serialize_invoice(inv):
 # ---------------------------------------------------------------------------
 
 def list_invoices(status=None, type_=None):
-    invoices = list(_invoices_store)
+    invoices = list(_invoices_rows())
     if status:
         invoices = [i for i in invoices if i["Status"].upper() == status.upper()]
     if type_:
@@ -157,7 +179,7 @@ def list_invoices(status=None, type_=None):
 
 
 def get_invoice(invoice_id):
-    for i in _invoices_store:
+    for i in _invoices_rows():
         if i["InvoiceID"] == invoice_id or i["InvoiceNumber"] == invoice_id:
             return {"Invoices": [_serialize_invoice(i)]}
     return {"error": "invoice not found", "message": f"Invoice {invoice_id} not found"}
@@ -166,7 +188,7 @@ def get_invoice(invoice_id):
 def create_invoice(contact_id, line_items=None, type_="ACCREC", date=None,
                    due_date=None, status="DRAFT", reference="",
                    currency_code="USD"):
-    contact = next((c for c in _contacts_store if c["ContactID"] == contact_id), None)
+    contact = next((c for c in _contacts_rows() if c["ContactID"] == contact_id), None)
     if not contact:
         return {"error": "contact not found", "message": f"Contact {contact_id} not found"}
     sub_total = 0.0
@@ -177,7 +199,7 @@ def create_invoice(contact_id, line_items=None, type_="ACCREC", date=None,
     sub_total = round(sub_total, 2)
     total_tax = round(sub_total * 0.10, 2)
     total = round(sub_total + total_tax, 2)
-    existing = [i for i in _invoices_store if i["Type"] == "ACCREC"]
+    existing = [i for i in _invoices_rows() if i["Type"] == "ACCREC"]
     next_num = 2047 + len([i for i in existing if i["InvoiceNumber"].startswith("INV-")])
     inv = {
         "InvoiceID": str(uuid.uuid4()),
@@ -197,7 +219,7 @@ def create_invoice(contact_id, line_items=None, type_="ACCREC", date=None,
         "CurrencyCode": currency_code or "USD",
         "Reference": reference or "",
     }
-    _invoices_store.append(inv)
+    _invoices_rows().append(inv)
     return {"Invoices": [_serialize_invoice(inv)]}
 
 
@@ -206,7 +228,7 @@ def create_invoice(contact_id, line_items=None, type_="ACCREC", date=None,
 # ---------------------------------------------------------------------------
 
 def list_contacts():
-    return {"Contacts": [_serialize_contact(c) for c in _contacts_store]}
+    return {"Contacts": [_serialize_contact(c) for c in _contacts_rows()]}
 
 
 # ---------------------------------------------------------------------------
@@ -214,4 +236,4 @@ def list_contacts():
 # ---------------------------------------------------------------------------
 
 def list_accounts():
-    return {"Accounts": [_serialize_account(a) for a in _accounts_store]}
+    return {"Accounts": [_serialize_account(a) for a in _accounts_rows()]}

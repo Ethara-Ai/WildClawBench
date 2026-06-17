@@ -7,11 +7,53 @@ messages, members, and roles. IDs are Discord-style snowflakes (numeric strings)
 import csv
 import json
 import random
-from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("discord-api")
+
+_store.register("guilds", primary_key="id",
+                initial_loader=lambda: _coerce_guilds(_load("guilds.csv")))
+_store.register("channels", primary_key="id",
+                initial_loader=lambda: _coerce_channels(_load("channels.csv")))
+_store.register("messages", primary_key="id",
+                initial_loader=lambda: _coerce_messages(_load("messages.csv")))
+_store.register("members", primary_key="guild_id",
+                initial_loader=lambda: _coerce_members(_load("members.csv")))
+_store.register("roles", primary_key="id",
+                initial_loader=lambda: _coerce_roles(_load("roles.csv")))
+_store.register_document("me", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "me.json", encoding="utf-8")))
+
+
+def _guilds_rows():
+    return _store.table("guilds").rows()
+
+
+def _channels_rows():
+    return _store.table("channels").rows()
+
+
+def _messages_rows():
+    return _store.table("messages").rows()
+
+
+def _members_rows():
+    return _store.table("members").rows()
+
+
+def _roles_rows():
+    return _store.table("roles").rows()
+
+
+def _me_doc():
+    return _store.document("me").get()
+
 
 # Discord epoch (2015-01-01) in milliseconds, used for snowflake generation.
 _DISCORD_EPOCH = 1420070400000
@@ -123,21 +165,10 @@ def _coerce_roles(rows):
     return out
 
 
-_guilds = _coerce_guilds(_load("guilds.csv"))
-_channels = _coerce_channels(_load("channels.csv"))
-_messages = _coerce_messages(_load("messages.csv"))
-_members = _coerce_members(_load("members.csv"))
-_roles = _coerce_roles(_load("roles.csv"))
 
-with open(DATA_DIR / "me.json", encoding="utf-8") as _f:
-    _me = json.load(_f)
 
-_guilds_store = deepcopy(_guilds)
-_channels_store = deepcopy(_channels)
-_messages_store = deepcopy(_messages)
-_members_store = deepcopy(_members)
-_roles_store = deepcopy(_roles)
-_me_store = deepcopy(_me)
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -145,7 +176,7 @@ _me_store = deepcopy(_me)
 # ---------------------------------------------------------------------------
 
 def get_me():
-    return _me_store
+    return _me_doc()
 
 
 def list_my_guilds():
@@ -154,10 +185,10 @@ def list_my_guilds():
             "id": g["id"],
             "name": g["name"],
             "icon": g["icon"],
-            "owner": g["owner_id"] == _me_store["id"],
+            "owner": g["owner_id"] == _me_doc()["id"],
             "permissions": "104324673",
         }
-        for g in _guilds_store
+        for g in _guilds_rows()
     ]
 
 
@@ -166,31 +197,31 @@ def list_my_guilds():
 # ---------------------------------------------------------------------------
 
 def get_guild(guild_id):
-    for g in _guilds_store:
+    for g in _guilds_rows():
         if g["id"] == guild_id:
             return g
     return {"error": f"Unknown Guild {guild_id}", "code": 10004}
 
 
 def list_guild_channels(guild_id):
-    if not any(g["id"] == guild_id for g in _guilds_store):
+    if not any(g["id"] == guild_id for g in _guilds_rows()):
         return {"error": f"Unknown Guild {guild_id}", "code": 10004}
-    chans = [c for c in _channels_store if c["guild_id"] == guild_id]
+    chans = [c for c in _channels_rows() if c["guild_id"] == guild_id]
     chans.sort(key=lambda c: c["position"])
     return chans
 
 
 def list_guild_members(guild_id, limit=100):
-    if not any(g["id"] == guild_id for g in _guilds_store):
+    if not any(g["id"] == guild_id for g in _guilds_rows()):
         return {"error": f"Unknown Guild {guild_id}", "code": 10004}
-    members = [m for m in _members_store if m["guild_id"] == guild_id]
+    members = [m for m in _members_rows() if m["guild_id"] == guild_id]
     return members[: max(1, limit)]
 
 
 def list_guild_roles(guild_id):
-    if not any(g["id"] == guild_id for g in _guilds_store):
+    if not any(g["id"] == guild_id for g in _guilds_rows()):
         return {"error": f"Unknown Guild {guild_id}", "code": 10004}
-    roles = [r for r in _roles_store if r["guild_id"] == guild_id]
+    roles = [r for r in _roles_rows() if r["guild_id"] == guild_id]
     roles.sort(key=lambda r: r["position"], reverse=True)
     return roles
 
@@ -200,30 +231,30 @@ def list_guild_roles(guild_id):
 # ---------------------------------------------------------------------------
 
 def get_channel(channel_id):
-    for c in _channels_store:
+    for c in _channels_rows():
         if c["id"] == channel_id:
             return c
     return {"error": f"Unknown Channel {channel_id}", "code": 10003}
 
 
 def list_channel_messages(channel_id, limit=50):
-    if not any(c["id"] == channel_id for c in _channels_store):
+    if not any(c["id"] == channel_id for c in _channels_rows()):
         return {"error": f"Unknown Channel {channel_id}", "code": 10003}
-    msgs = [m for m in _messages_store if m["channel_id"] == channel_id]
+    msgs = [m for m in _messages_rows() if m["channel_id"] == channel_id]
     msgs.sort(key=lambda m: m["timestamp"], reverse=True)
     return msgs[: max(1, limit)]
 
 
 def create_message(channel_id, content, author_id=None):
-    channel = next((c for c in _channels_store if c["id"] == channel_id), None)
+    channel = next((c for c in _channels_rows() if c["id"] == channel_id), None)
     if not channel:
         return {"error": f"Unknown Channel {channel_id}", "code": 10003}
     if not content:
         return {"error": "Cannot send an empty message", "code": 50006}
-    author_id = author_id or _me_store["id"]
-    member = next((m for m in _members_store
+    author_id = author_id or _me_doc()["id"]
+    member = next((m for m in _members_rows()
                    if m["guild_id"] == channel["guild_id"] and m["user"]["id"] == author_id), None)
-    username = member["user"]["username"] if member else _me_store["username"]
+    username = member["user"]["username"] if member else _me_doc()["username"]
     msg = {
         "id": _snowflake(),
         "channel_id": channel_id,
@@ -233,5 +264,5 @@ def create_message(channel_id, content, author_id=None):
         "pinned": False,
         "edited_timestamp": None,
     }
-    _messages_store.append(msg)
+    _messages_rows().append(msg)
     return msg

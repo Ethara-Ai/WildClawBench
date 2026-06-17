@@ -1,11 +1,48 @@
 """Data access module for the Sentry API mock service."""
 
 import csv
-from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("sentry-api")
+
+_store.register("organizations", primary_key="id",
+                initial_loader=lambda: _coerce_organizations(_load("organizations.csv")))
+_store.register("projects", primary_key="id",
+                initial_loader=lambda: _coerce_projects(_load("projects.csv")))
+_store.register("issues", primary_key="id",
+                initial_loader=lambda: _coerce_issues(_load("issues.csv")))
+_store.register("events", primary_key="event_id",
+                initial_loader=lambda: _coerce_events(_load("events.csv")))
+_store.register("releases", primary_key="version",
+                initial_loader=lambda: _coerce_releases(_load("releases.csv")))
+
+
+def _organizations_rows():
+    return _store.table("organizations").rows()
+
+
+def _projects_rows():
+    return _store.table("projects").rows()
+
+
+def _issues_rows():
+    return _store.table("issues").rows()
+
+
+def _events_rows():
+    return _store.table("events").rows()
+
+
+def _releases_rows():
+    return _store.table("releases").rows()
+
 
 
 def _load(filename):
@@ -63,17 +100,15 @@ def _coerce_releases(rows):
     return out
 
 
-_organizations = _coerce_organizations(_load("organizations.csv"))
-_projects = _coerce_projects(_load("projects.csv"))
-_issues = _coerce_issues(_load("issues.csv"))
-_events = _coerce_events(_load("events.csv"))
-_releases = _coerce_releases(_load("releases.csv"))
 
-_organizations_store = deepcopy(_organizations)
-_projects_store = deepcopy(_projects)
-_issues_store = deepcopy(_issues)
-_events_store = deepcopy(_events)
-_releases_store = deepcopy(_releases)
+
+
+
+
+
+
+
+
 
 _VALID_STATUSES = {"resolved", "ignored", "unresolved"}
 
@@ -83,7 +118,7 @@ _VALID_STATUSES = {"resolved", "ignored", "unresolved"}
 # ---------------------------------------------------------------------------
 
 def _org_exists(org_slug):
-    return any(o["slug"] == org_slug for o in _organizations_store)
+    return any(o["slug"] == org_slug for o in _organizations_rows())
 
 
 def _serialize_issue(i):
@@ -143,7 +178,7 @@ def list_org_projects(org_slug):
             "status": p["status"],
             "dateCreated": p["date_created"],
         }
-        for p in _projects_store if p["org_slug"] == org_slug
+        for p in _projects_rows() if p["org_slug"] == org_slug
     ]
 
 
@@ -154,9 +189,9 @@ def list_org_projects(org_slug):
 def list_project_issues(org_slug, project_slug, status=None, level=None):
     if not _org_exists(org_slug):
         return {"error": f"Organization {org_slug} not found"}
-    if not any(p["org_slug"] == org_slug and p["slug"] == project_slug for p in _projects_store):
+    if not any(p["org_slug"] == org_slug and p["slug"] == project_slug for p in _projects_rows()):
         return {"error": f"Project {project_slug} not found"}
-    results = [i for i in _issues_store
+    results = [i for i in _issues_rows()
                if i["org_slug"] == org_slug and i["project_slug"] == project_slug]
     if status:
         results = [i for i in results if i["status"] == status]
@@ -169,7 +204,7 @@ def list_project_issues(org_slug, project_slug, status=None, level=None):
 def get_issue(org_slug, issue_id):
     if not _org_exists(org_slug):
         return {"error": f"Organization {org_slug} not found"}
-    for i in _issues_store:
+    for i in _issues_rows():
         if i["org_slug"] == org_slug and str(i["id"]) == str(issue_id):
             return _serialize_issue(i)
     return {"error": f"Issue {issue_id} not found"}
@@ -180,20 +215,20 @@ def update_issue_status(org_slug, issue_id, status):
         return {"error": f"Organization {org_slug} not found"}
     if status not in _VALID_STATUSES:
         return {"error": f"Invalid status {status}", "valid": sorted(_VALID_STATUSES)}
-    for idx, i in enumerate(_issues_store):
+    for idx, i in enumerate(_issues_rows()):
         if i["org_slug"] == org_slug and str(i["id"]) == str(issue_id):
-            _issues_store[idx]["status"] = status
-            _issues_store[idx]["last_seen"] = _now()
-            return _serialize_issue(_issues_store[idx])
+            _issues_rows()[idx]["status"] = status
+            _issues_rows()[idx]["last_seen"] = _now()
+            return _serialize_issue(_issues_rows()[idx])
     return {"error": f"Issue {issue_id} not found"}
 
 
 def list_issue_events(org_slug, issue_id):
     if not _org_exists(org_slug):
         return {"error": f"Organization {org_slug} not found"}
-    if not any(i["org_slug"] == org_slug and str(i["id"]) == str(issue_id) for i in _issues_store):
+    if not any(i["org_slug"] == org_slug and str(i["id"]) == str(issue_id) for i in _issues_rows()):
         return {"error": f"Issue {issue_id} not found"}
-    events = [e for e in _events_store if str(e["issue_id"]) == str(issue_id)]
+    events = [e for e in _events_rows() if str(e["issue_id"]) == str(issue_id)]
     events.sort(key=lambda e: e["date_created"], reverse=True)
     return [_serialize_event(e) for e in events]
 
@@ -205,7 +240,7 @@ def list_issue_events(org_slug, issue_id):
 def list_releases(org_slug, project_slug=None):
     if not _org_exists(org_slug):
         return {"error": f"Organization {org_slug} not found"}
-    results = [r for r in _releases_store if r["org_slug"] == org_slug]
+    results = [r for r in _releases_rows() if r["org_slug"] == org_slug]
     if project_slug:
         results = [r for r in results if r["project_slug"] == project_slug]
     results.sort(key=lambda r: r["date_created"], reverse=True)

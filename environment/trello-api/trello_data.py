@@ -2,10 +2,47 @@
 
 import csv
 import secrets
-from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("trello-api")
+
+_store.register("members", primary_key="id",
+                initial_loader=lambda: _coerce_members(_load("members.csv")))
+_store.register("boards", primary_key="id",
+                initial_loader=lambda: _coerce_boards(_load("boards.csv")))
+_store.register("lists", primary_key="id",
+                initial_loader=lambda: _coerce_lists(_load("lists.csv")))
+_store.register("cards", primary_key="id",
+                initial_loader=lambda: _coerce_cards(_load("cards.csv")))
+_store.register("checklists", primary_key="id",
+                initial_loader=lambda: _coerce_checklists(_load("checklists.csv")))
+
+
+def _members_rows():
+    return _store.table("members").rows()
+
+
+def _boards_rows():
+    return _store.table("boards").rows()
+
+
+def _lists_rows():
+    return _store.table("lists").rows()
+
+
+def _cards_rows():
+    return _store.table("cards").rows()
+
+
+def _checklists_rows():
+    return _store.table("checklists").rows()
+
 
 
 def _load(filename):
@@ -96,17 +133,14 @@ def _coerce_checklists(rows):
     return out
 
 
-_members = _coerce_members(_load("members.csv"))
-_boards = _coerce_boards(_load("boards.csv"))
-_lists = _coerce_lists(_load("lists.csv"))
-_cards = _coerce_cards(_load("cards.csv"))
-_checklists = _coerce_checklists(_load("checklists.csv"))
 
-_members_store = deepcopy(_members)
-_boards_store = deepcopy(_boards)
-_lists_store = deepcopy(_lists)
-_cards_store = deepcopy(_cards)
-_checklists_store = deepcopy(_checklists)
+
+
+
+
+
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -169,12 +203,12 @@ def _serialize_checklist(cl):
 # ---------------------------------------------------------------------------
 
 def get_me():
-    me = next((m for m in _members_store if m["id"] == _ME), _members_store[0])
+    me = next((m for m in _members_rows() if m["id"] == _ME), _members_rows()[0])
     return me
 
 
 def list_my_boards():
-    boards = [b for b in _boards_store if _ME in b["member_ids"] and not b["closed"]]
+    boards = [b for b in _boards_rows() if _ME in b["member_ids"] and not b["closed"]]
     return [_serialize_board(b) for b in boards]
 
 
@@ -183,16 +217,16 @@ def list_my_boards():
 # ---------------------------------------------------------------------------
 
 def get_board(board_id):
-    for b in _boards_store:
+    for b in _boards_rows():
         if b["id"] == board_id:
             return _serialize_board(b)
     return {"error": "board not found", "message": f"Board {board_id} not found"}
 
 
 def list_board_lists(board_id):
-    if not any(b["id"] == board_id for b in _boards_store):
+    if not any(b["id"] == board_id for b in _boards_rows()):
         return {"error": "board not found", "message": f"Board {board_id} not found"}
-    lists = [l for l in _lists_store if l["id_board"] == board_id and not l["closed"]]
+    lists = [l for l in _lists_rows() if l["id_board"] == board_id and not l["closed"]]
     lists = sorted(lists, key=lambda l: l["pos"])
     return [_serialize_list(l) for l in lists]
 
@@ -202,9 +236,9 @@ def list_board_lists(board_id):
 # ---------------------------------------------------------------------------
 
 def list_cards(list_id):
-    if not any(l["id"] == list_id for l in _lists_store):
+    if not any(l["id"] == list_id for l in _lists_rows()):
         return {"error": "list not found", "message": f"List {list_id} not found"}
-    cards = [c for c in _cards_store if c["id_list"] == list_id and not c["closed"]]
+    cards = [c for c in _cards_rows() if c["id_list"] == list_id and not c["closed"]]
     cards = sorted(cards, key=lambda c: c["pos"])
     return [_serialize_card(c) for c in cards]
 
@@ -214,17 +248,17 @@ def list_cards(list_id):
 # ---------------------------------------------------------------------------
 
 def get_card(card_id):
-    for c in _cards_store:
+    for c in _cards_rows():
         if c["id"] == card_id:
             return _serialize_card(c)
     return {"error": "card not found", "message": f"Card {card_id} not found"}
 
 
 def create_card(id_list, name, desc="", due=None, member_ids=None):
-    target = next((l for l in _lists_store if l["id"] == id_list), None)
+    target = next((l for l in _lists_rows() if l["id"] == id_list), None)
     if not target:
         return {"error": "list not found", "message": f"List {id_list} not found"}
-    siblings = [c for c in _cards_store if c["id_list"] == id_list and not c["closed"]]
+    siblings = [c for c in _cards_rows() if c["id_list"] == id_list and not c["closed"]]
     next_pos = max((c["pos"] for c in siblings), default=0) + 16384
     card = {
         "id": _new_id(),
@@ -238,38 +272,38 @@ def create_card(id_list, name, desc="", due=None, member_ids=None):
         "member_ids": member_ids or [],
         "labels": [],
     }
-    _cards_store.append(card)
+    _cards_rows().append(card)
     return _serialize_card(card)
 
 
 def update_card(card_id, name=None, desc=None, id_list=None, due=None, closed=None, pos=None):
-    for i, c in enumerate(_cards_store):
+    for i, c in enumerate(_cards_rows()):
         if c["id"] == card_id:
             if name is not None:
-                _cards_store[i]["name"] = name
+                _cards_rows()[i]["name"] = name
             if desc is not None:
-                _cards_store[i]["desc"] = desc
+                _cards_rows()[i]["desc"] = desc
             if id_list is not None:
-                target = next((l for l in _lists_store if l["id"] == id_list), None)
+                target = next((l for l in _lists_rows() if l["id"] == id_list), None)
                 if not target:
                     return {"error": "list not found", "message": f"List {id_list} not found"}
-                _cards_store[i]["id_list"] = id_list
-                _cards_store[i]["id_board"] = target["id_board"]
+                _cards_rows()[i]["id_list"] = id_list
+                _cards_rows()[i]["id_board"] = target["id_board"]
             if due is not None:
-                _cards_store[i]["due"] = due or None
+                _cards_rows()[i]["due"] = due or None
             if closed is not None:
-                _cards_store[i]["closed"] = bool(closed)
+                _cards_rows()[i]["closed"] = bool(closed)
             if pos is not None:
-                _cards_store[i]["pos"] = float(pos)
-            return _serialize_card(_cards_store[i])
+                _cards_rows()[i]["pos"] = float(pos)
+            return _serialize_card(_cards_rows()[i])
     return {"error": "card not found", "message": f"Card {card_id} not found"}
 
 
 def delete_card(card_id):
-    for i, c in enumerate(_cards_store):
+    for i, c in enumerate(_cards_rows()):
         if c["id"] == card_id:
-            _cards_store.pop(i)
-            _checklists_store[:] = [cl for cl in _checklists_store if cl["id_card"] != card_id]
+            _cards_rows().pop(i)
+            _checklists_rows()[:] = [cl for cl in _checklists_rows() if cl["id_card"] != card_id]
             return {"_value": None, "deleted": True, "id": card_id}
     return {"error": "card not found", "message": f"Card {card_id} not found"}
 
@@ -279,13 +313,13 @@ def delete_card(card_id):
 # ---------------------------------------------------------------------------
 
 def list_card_checklists(card_id):
-    if not any(c["id"] == card_id for c in _cards_store):
+    if not any(c["id"] == card_id for c in _cards_rows()):
         return {"error": "card not found", "message": f"Card {card_id} not found"}
-    return [_serialize_checklist(cl) for cl in _checklists_store if cl["id_card"] == card_id]
+    return [_serialize_checklist(cl) for cl in _checklists_rows() if cl["id_card"] == card_id]
 
 
 def create_checklist(id_card, name):
-    card = next((c for c in _cards_store if c["id"] == id_card), None)
+    card = next((c for c in _cards_rows() if c["id"] == id_card), None)
     if not card:
         return {"error": "card not found", "message": f"Card {id_card} not found"}
     checklist = {
@@ -295,5 +329,5 @@ def create_checklist(id_card, name):
         "id_board": card["id_board"],
         "check_items": [],
     }
-    _checklists_store.append(checklist)
+    _checklists_rows().append(checklist)
     return _serialize_checklist(checklist)

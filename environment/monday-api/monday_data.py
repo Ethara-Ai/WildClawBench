@@ -7,11 +7,16 @@ columns, items, column values and users.
 
 import csv
 import uuid
-from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store
+
+_store = get_store("monday-api")
 
 
 def _load(filename):
@@ -26,10 +31,6 @@ def _now():
 def _to_bool(v):
     return str(v).strip().lower() == "true"
 
-
-# ---------------------------------------------------------------------------
-# Load + coerce
-# ---------------------------------------------------------------------------
 
 def _coerce_workspaces(rows):
     return [dict(r) for r in rows]
@@ -65,6 +66,8 @@ def _coerce_column_values(rows):
             "column_id": r["column_id"],
             "text": r["text"],
             "value": r["value"] or None,
+            # synthesized composite PK
+            "_pk": f"{r['item_id']}@{r['column_id']}",
         })
     return out
 
@@ -76,47 +79,58 @@ def _coerce_users(rows):
     return out
 
 
-_workspaces = _coerce_workspaces(_load("workspaces.csv"))
-_boards = _coerce_boards(_load("boards.csv"))
-_groups = _coerce_groups(_load("groups.csv"))
-_columns = _coerce_columns(_load("columns.csv"))
-_items = _coerce_items(_load("items.csv"))
-_column_values = _coerce_column_values(_load("column_values.csv"))
-_users = _coerce_users(_load("users.csv"))
+_store.register("workspaces", primary_key="workspace_id",
+                initial_loader=lambda: _coerce_workspaces(_load("workspaces.csv")))
+_store.register("boards", primary_key="board_id",
+                initial_loader=lambda: _coerce_boards(_load("boards.csv")))
+# groups have group_id but it is not unique across boards -> synth pk
+_store.register("groups", primary_key="_pk",
+                initial_loader=lambda: [
+                    {**g, "_pk": f"{g['board_id']}@{g['group_id']}"}
+                    for g in _coerce_groups(_load("groups.csv"))
+                ])
+_store.register("columns", primary_key="_pk",
+                initial_loader=lambda: [
+                    {**c, "_pk": f"{c['board_id']}@{c['column_id']}"}
+                    for c in _coerce_columns(_load("columns.csv"))
+                ])
+_store.register("items", primary_key="item_id",
+                initial_loader=lambda: _coerce_items(_load("items.csv")))
+_store.register("column_values", primary_key="_pk",
+                initial_loader=lambda: _coerce_column_values(_load("column_values.csv")))
+_store.register("users", primary_key="user_id",
+                initial_loader=lambda: _coerce_users(_load("users.csv")))
 
-_workspaces_store = deepcopy(_workspaces)
-_boards_store = deepcopy(_boards)
-_groups_store = deepcopy(_groups)
-_columns_store = deepcopy(_columns)
-_items_store = deepcopy(_items)
-_column_values_store = deepcopy(_column_values)
-_users_store = deepcopy(_users)
 
+def _workspaces_rows(): return _store.table("workspaces").rows()
+def _boards_rows(): return _store.table("boards").rows()
+def _groups_rows(): return _store.table("groups").rows()
+def _columns_rows(): return _store.table("columns").rows()
+def _items_rows(): return _store.table("items").rows()
+def _column_values_rows(): return _store.table("column_values").rows()
+def _users_rows(): return _store.table("users").rows()
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 def _find_board(board_id):
-    return next((b for b in _boards_store if b["board_id"] == board_id), None)
+    return next((b for b in _boards_rows() if b["board_id"] == board_id), None)
 
 
 def _find_item(item_id):
-    return next((i for i in _items_store if i["item_id"] == item_id), None)
+    return next((i for i in _items_rows() if i["item_id"] == item_id), None)
 
 
 def _find_group(board_id, group_id):
-    return next((g for g in _groups_store if g["board_id"] == board_id and g["group_id"] == group_id), None)
+    return next((g for g in _groups_rows() if g["board_id"] == board_id and g["group_id"] == group_id), None)
 
 
 def _board_columns(board_id):
-    cols = [c for c in _columns_store if c["board_id"] == board_id]
+    cols = [c for c in _columns_rows() if c["board_id"] == board_id]
     return sorted(cols, key=lambda c: c["position"])
 
 
 def _column_values_for(item_id):
     out = []
-    for cv in _column_values_store:
+    for cv in _column_values_rows():
         if cv["item_id"] == item_id:
             out.append({
                 "id": cv["column_id"],
@@ -137,25 +151,17 @@ def _item_view(item):
     }
 
 
-# ---------------------------------------------------------------------------
-# Workspaces
-# ---------------------------------------------------------------------------
-
 def list_workspaces():
     return {
         "workspaces": [
             {"id": w["workspace_id"], "name": w["name"], "kind": w["kind"], "description": w["description"]}
-            for w in _workspaces_store
+            for w in _workspaces_rows()
         ]
     }
 
 
-# ---------------------------------------------------------------------------
-# Boards
-# ---------------------------------------------------------------------------
-
 def list_boards(workspace_id=None):
-    boards = _boards_store
+    boards = _boards_rows()
     if workspace_id:
         boards = [b for b in boards if b["workspace_id"] == workspace_id]
     return {
@@ -178,7 +184,7 @@ def get_board(board_id):
     if not b:
         return {"error": f"Board {board_id} not found"}
     groups = sorted(
-        [g for g in _groups_store if g["board_id"] == board_id],
+        [g for g in _groups_rows() if g["board_id"] == board_id],
         key=lambda g: g["position"],
     )
     return {
@@ -202,16 +208,12 @@ def get_board(board_id):
 def get_board_items(board_id):
     if not _find_board(board_id):
         return {"error": f"Board {board_id} not found"}
-    items = [i for i in _items_store if i["board_id"] == board_id]
+    items = [i for i in _items_rows() if i["board_id"] == board_id]
     return {"items": [_item_view(i) for i in items]}
 
 
-# ---------------------------------------------------------------------------
-# Items
-# ---------------------------------------------------------------------------
-
 def list_items(board_id=None, group_id=None):
-    items = _items_store
+    items = _items_rows()
     if board_id:
         items = [i for i in items if i["board_id"] == board_id]
     if group_id:
@@ -235,7 +237,7 @@ def create_item(board_id, name, group_id=None, column_values=None):
             return {"error": f"Group {group_id} not found on board {board_id}"}
     else:
         board_groups = sorted(
-            [g for g in _groups_store if g["board_id"] == board_id],
+            [g for g in _groups_rows() if g["board_id"] == board_id],
             key=lambda g: g["position"],
         )
         if not board_groups:
@@ -249,7 +251,7 @@ def create_item(board_id, name, group_id=None, column_values=None):
         "name": name,
         "created_at": _now(),
     }
-    _items_store.append(item)
+    _store.table("items").upsert(item)
     if column_values:
         for column_id, val in column_values.items():
             if isinstance(val, dict):
@@ -258,7 +260,8 @@ def create_item(board_id, name, group_id=None, column_values=None):
             else:
                 text = str(val)
                 value = None
-            _column_values_store.append({
+            _store.table("column_values").upsert({
+                "_pk": f"{item['item_id']}@{column_id}",
                 "item_id": item["item_id"],
                 "column_id": column_id,
                 "text": text,
@@ -275,20 +278,23 @@ def update_item(item_id, column_id=None, text=None, value=None, group_id=None):
     if group_id is not None:
         if not _find_group(item["board_id"], group_id):
             return {"error": f"Group {group_id} not found on board {item['board_id']}"}
-        item["group_id"] = group_id
+        _store.table("items").patch(item_id, {"group_id": group_id})
+        item = _find_item(item_id) or item
 
     if column_id is not None:
-        existing = next(
-            (cv for cv in _column_values_store if cv["item_id"] == item_id and cv["column_id"] == column_id),
-            None,
-        )
+        pk = f"{item_id}@{column_id}"
+        existing = _store.table("column_values").get(pk)
         if existing:
+            patch = {}
             if text is not None:
-                existing["text"] = text
+                patch["text"] = text
             if value is not None:
-                existing["value"] = value
+                patch["value"] = value
+            if patch:
+                _store.table("column_values").patch(pk, patch)
         else:
-            _column_values_store.append({
+            _store.table("column_values").upsert({
+                "_pk": pk,
                 "item_id": item_id,
                 "column_id": column_id,
                 "text": text or "",
@@ -301,15 +307,10 @@ def delete_item(item_id):
     item = _find_item(item_id)
     if not item:
         return {"error": f"Item {item_id} not found"}
-    _items_store.remove(item)
-    global _column_values_store
-    _column_values_store = [cv for cv in _column_values_store if cv["item_id"] != item_id]
+    _store.table("items").delete(item_id)
+    _store.table("column_values").delete_where(lambda cv: cv["item_id"] == item_id)
     return {"id": item_id, "deleted": True}
 
-
-# ---------------------------------------------------------------------------
-# Users
-# ---------------------------------------------------------------------------
 
 def list_users():
     return {
@@ -321,6 +322,6 @@ def list_users():
                 "title": u["title"],
                 "is_admin": u["is_admin"],
             }
-            for u in _users_store
+            for u in _users_rows()
         ]
     }

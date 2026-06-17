@@ -13,13 +13,17 @@ from typing import Optional, Dict, Any
 import salesforce_data
 try:
     from tracking_middleware import install_tracker
+    from admin_plane import install_admin_plane
 except ModuleNotFoundError:  # standalone run without the shared module on sys.path
     def install_tracker(app):  # no-op fallback: audit endpoints disabled
         return None
 
+    def install_admin_plane(app, store=None, one_shot_registry=None):
+        return None
+
 app = FastAPI(title="Salesforce REST API (Mock)", version="v59.0")
 install_tracker(app)
-
+install_admin_plane(app, store=salesforce_data._store)
 BASE = "/services/data/v59.0"
 
 

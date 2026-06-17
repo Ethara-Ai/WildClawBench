@@ -8,11 +8,41 @@ resulting transactions are held in process memory and reset on restart.
 import csv
 import json
 import uuid
-from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("coinbase-api")
+
+_store.register("accounts", primary_key="id",
+                initial_loader=lambda: _coerce_accounts(_load("accounts.csv")))
+_store.register("prices", primary_key="pair",
+                initial_loader=lambda: _coerce_prices(_load("prices.csv")))
+_store.register("transactions", primary_key="id",
+                initial_loader=lambda: _coerce_transactions(_load("transactions.csv")))
+_store.register_document("user", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "user.json", encoding="utf-8")))
+
+
+def _accounts_rows():
+    return _store.table("accounts").rows()
+
+
+def _prices_rows():
+    return _store.table("prices").rows()
+
+
+def _transactions_rows():
+    return _store.table("transactions").rows()
+
+
+def _user_doc():
+    return _store.document("user").get()
+
 
 
 def _load(filename):
@@ -81,17 +111,8 @@ def _coerce_transactions(rows):
     return out
 
 
-_accounts = _coerce_accounts(_load("accounts.csv"))
-_prices = _coerce_prices(_load("prices.csv"))
-_transactions = _coerce_transactions(_load("transactions.csv"))
 
-with open(DATA_DIR / "user.json", encoding="utf-8") as _f:
-    _user = json.load(_f)
 
-_accounts_store = deepcopy(_accounts)
-_prices_store = deepcopy(_prices)
-_transactions_store = deepcopy(_transactions)
-_user_store = deepcopy(_user)
 
 
 # ---------------------------------------------------------------------------
@@ -107,7 +128,7 @@ def _public_account(a):
 
 
 def _find_account(account_id):
-    return next((a for a in _accounts_store if a["id"] == account_id), None)
+    return next((a for a in _accounts_rows() if a["id"] == account_id), None)
 
 
 def _fmt_crypto(value):
@@ -123,7 +144,7 @@ def _fmt_fiat(value):
 # ---------------------------------------------------------------------------
 
 def list_accounts():
-    return {"data": [_public_account(a) for a in _accounts_store]}
+    return {"data": [_public_account(a) for a in _accounts_rows()]}
 
 
 def get_account(account_id):
@@ -138,14 +159,14 @@ def get_account(account_id):
 # ---------------------------------------------------------------------------
 
 def get_spot_price(pair):
-    p = next((x for x in _prices_store if x["pair"].upper() == pair.upper()), None)
+    p = next((x for x in _prices_rows() if x["pair"].upper() == pair.upper()), None)
     if not p:
         return {"error": f"No spot price for pair {pair}"}
     return {"data": {"base": p["base"], "currency": p["currency"], "amount": p["amount"]}}
 
 
 def _price_for(currency_code):
-    return next((x for x in _prices_store
+    return next((x for x in _prices_rows()
                  if x["base"] == currency_code and x["currency"] == "USD"), None)
 
 
@@ -198,7 +219,7 @@ def _trade(account_id, amount, side):
         "created_at": _now(),
         "updated_at": _now(),
     }
-    _transactions_store.append(txn)
+    _transactions_rows().append(txn)
 
     return {"data": {
         "id": _new_id(),
@@ -228,7 +249,7 @@ def create_sell(account_id, amount):
 def list_transactions(account_id):
     if not _find_account(account_id):
         return {"error": f"Account {account_id} not found"}
-    txns = [t for t in _transactions_store if t["account_id"] == account_id]
+    txns = [t for t in _transactions_rows() if t["account_id"] == account_id]
     txns.sort(key=lambda t: t["created_at"], reverse=True)
     return {"data": txns}
 
@@ -238,4 +259,4 @@ def list_transactions(account_id):
 # ---------------------------------------------------------------------------
 
 def get_user():
-    return {"data": _user_store}
+    return {"data": _user_doc()}

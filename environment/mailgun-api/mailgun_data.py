@@ -6,11 +6,36 @@ messages, querying delivery events, total stats, and mailing-list members.
 
 import csv
 import secrets
-from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("mailgun-api")
+
+_store.register("messages", primary_key="id",
+                initial_loader=lambda: _coerce_messages(_load("messages.csv")))
+_store.register("events", primary_key="id",
+                initial_loader=lambda: _coerce_events(_load("events.csv")))
+_store.register("members", primary_key="list_address",
+                initial_loader=lambda: _coerce_members(_load("list_members.csv")))
+
+
+def _messages_rows():
+    return _store.table("messages").rows()
+
+
+def _events_rows():
+    return _store.table("events").rows()
+
+
+def _members_rows():
+    return _store.table("members").rows()
+
 
 
 def _load(filename):
@@ -69,13 +94,10 @@ def _coerce_members(rows):
     return out
 
 
-_messages = _coerce_messages(_load("messages.csv"))
-_events = _coerce_events(_load("events.csv"))
-_members = _coerce_members(_load("list_members.csv"))
 
-_messages_store = deepcopy(_messages)
-_events_store = deepcopy(_events)
-_members_store = deepcopy(_members)
+
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -108,8 +130,8 @@ def send_message(domain, sender, to, subject, text):
         "body": text or "",
         "timestamp": _now_iso(),
     }
-    _messages_store.append(message)
-    _events_store.append({
+    _messages_rows().append(message)
+    _events_rows().append({
         "id": f"ev_{secrets.token_hex(4)}",
         "domain": domain,
         "message_id": msg_id,
@@ -126,7 +148,7 @@ def send_message(domain, sender, to, subject, text):
 # ---------------------------------------------------------------------------
 
 def get_events(domain, event=None, recipient=None, limit=300):
-    items = [e for e in _events_store if e["domain"] == domain]
+    items = [e for e in _events_rows() if e["domain"] == domain]
     if event:
         wanted = {x.strip().lower() for x in event.split(" OR ")}
         items = [e for e in items if e["event"].lower() in wanted]
@@ -153,7 +175,7 @@ def get_events(domain, event=None, recipient=None, limit=300):
 # ---------------------------------------------------------------------------
 
 def get_stats_total(domain, event=None):
-    events_for_domain = [e for e in _events_store if e["domain"] == domain]
+    events_for_domain = [e for e in _events_rows() if e["domain"] == domain]
     wanted = ["accepted", "delivered", "failed", "opened", "clicked"]
     if event:
         wanted = [x.strip().lower() for x in event.split(",")]
@@ -174,10 +196,10 @@ def get_stats_total(domain, event=None):
 # ---------------------------------------------------------------------------
 
 def list_members(address, subscribed=None):
-    members = [m for m in _members_store if m["list_address"].lower() == (address or "").lower()]
-    if not members and not any(m["list_address"].lower() == (address or "").lower() for m in _members_store):
+    members = [m for m in _members_rows() if m["list_address"].lower() == (address or "").lower()]
+    if not members and not any(m["list_address"].lower() == (address or "").lower() for m in _members_rows()):
         # empty list is valid in Mailgun; only error if address itself unknown
-        if address not in {m["list_address"] for m in _members_store}:
+        if address not in {m["list_address"] for m in _members_rows()}:
             return {"error": f"mailing list {address} not found"}
     if subscribed is not None:
         members = [m for m in members if m["subscribed"] == subscribed]

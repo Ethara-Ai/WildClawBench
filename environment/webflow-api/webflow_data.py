@@ -7,11 +7,36 @@ real v2 API.
 
 import csv
 import secrets
-from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("webflow-api")
+
+_store.register("sites", primary_key="id",
+                initial_loader=lambda: _coerce_sites(_load("sites.csv")))
+_store.register("collections", primary_key="id",
+                initial_loader=lambda: _coerce_collections(_load("collections.csv")))
+_store.register("items", primary_key="id",
+                initial_loader=lambda: _coerce_items(_load("items.csv")))
+
+
+def _sites_rows():
+    return _store.table("sites").rows()
+
+
+def _collections_rows():
+    return _store.table("collections").rows()
+
+
+def _items_rows():
+    return _store.table("items").rows()
+
 
 
 def _load(filename):
@@ -93,13 +118,10 @@ def _coerce_items(rows):
     return out
 
 
-_sites = _coerce_sites(_load("sites.csv"))
-_collections = _coerce_collections(_load("collections.csv"))
-_items = _coerce_items(_load("items.csv"))
 
-_sites_store = deepcopy(_sites)
-_collections_store = deepcopy(_collections)
-_items_store = deepcopy(_items)
+
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -154,11 +176,11 @@ def _serialize_item(i):
 # ---------------------------------------------------------------------------
 
 def list_sites():
-    return {"sites": [_serialize_site(s) for s in _sites_store]}
+    return {"sites": [_serialize_site(s) for s in _sites_rows()]}
 
 
 def get_site(site_id):
-    s = next((x for x in _sites_store if x["id"] == site_id), None)
+    s = next((x for x in _sites_rows() if x["id"] == site_id), None)
     if not s:
         return {"error": "not_found", "message": f"Site {site_id} not found"}
     return _serialize_site(s)
@@ -169,9 +191,9 @@ def get_site(site_id):
 # ---------------------------------------------------------------------------
 
 def list_collections(site_id):
-    if not any(s["id"] == site_id for s in _sites_store):
+    if not any(s["id"] == site_id for s in _sites_rows()):
         return {"error": "not_found", "message": f"Site {site_id} not found"}
-    cols = [c for c in _collections_store if c["site_id"] == site_id]
+    cols = [c for c in _collections_rows() if c["site_id"] == site_id]
     return {"collections": [_serialize_collection(c) for c in cols]}
 
 
@@ -180,9 +202,9 @@ def list_collections(site_id):
 # ---------------------------------------------------------------------------
 
 def list_items(collection_id, limit=100, offset=0):
-    if not any(c["id"] == collection_id for c in _collections_store):
+    if not any(c["id"] == collection_id for c in _collections_rows()):
         return {"error": "not_found", "message": f"Collection {collection_id} not found"}
-    items = [i for i in _items_store if i["collection_id"] == collection_id]
+    items = [i for i in _items_rows() if i["collection_id"] == collection_id]
     total = len(items)
     window = items[offset:offset + limit]
     return {
@@ -192,7 +214,7 @@ def list_items(collection_id, limit=100, offset=0):
 
 
 def create_item(collection_id, field_data, is_draft=False, is_archived=False):
-    if not any(c["id"] == collection_id for c in _collections_store):
+    if not any(c["id"] == collection_id for c in _collections_rows()):
         return {"error": "not_found", "message": f"Collection {collection_id} not found"}
     field_data = field_data or {}
     name = field_data.get("name") or "Untitled"
@@ -209,7 +231,7 @@ def create_item(collection_id, field_data, is_draft=False, is_archived=False):
         "created_on": now,
         "last_updated": now,
     }
-    _items_store.append(item)
+    _items_rows().append(item)
     serialized = _serialize_item(item)
     # Surface any extra custom fields the caller supplied.
     for k, v in field_data.items():

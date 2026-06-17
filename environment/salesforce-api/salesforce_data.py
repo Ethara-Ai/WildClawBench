@@ -8,11 +8,16 @@ generic CRUD plus a simplified SOQL query parser. IDs use Salesforce-style
 import csv
 import re
 import uuid
-from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store
+
+_store = get_store("salesforce-api")
 
 
 def _load(filename):
@@ -46,15 +51,21 @@ def _coerce(rows, sobject):
     return out
 
 
-# Object registry: sObject name -> in-memory list of records
-_stores = {
-    "Account": deepcopy(_coerce(_load("accounts.csv"), "Account")),
-    "Contact": deepcopy(_coerce(_load("contacts.csv"), "Contact")),
-    "Lead": deepcopy(_coerce(_load("leads.csv"), "Lead")),
-    "Opportunity": deepcopy(_coerce(_load("opportunities.csv"), "Opportunity")),
+_SOBJECT_CSV = {
+    "Account": "accounts.csv",
+    "Contact": "contacts.csv",
+    "Lead": "leads.csv",
+    "Opportunity": "opportunities.csv",
 }
 
-# Salesforce ID key-prefix per object (first 3 chars of an Id)
+for _name, _csv in _SOBJECT_CSV.items():
+    _store.register(
+        _name,
+        primary_key="Id",
+        initial_loader=(lambda n=_name, c=_csv: _coerce(_load(c), n)),
+    )
+
+
 _ID_PREFIX = {
     "Account": "001",
     "Contact": "003",
@@ -63,14 +74,10 @@ _ID_PREFIX = {
 }
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 def _canonical(sobject):
     if not sobject:
         return None
-    for name in _stores:
+    for name in _SOBJECT_CSV:
         if name.lower() == sobject.lower():
             return name
     return None
@@ -81,23 +88,23 @@ def _new_id(sobject):
     return f"{prefix}{uuid.uuid4().hex[:15].upper()}"[:18]
 
 
+def _records(sobject):
+    return _store.table(sobject).rows()
+
+
 def _find(sobject, record_id):
-    return next((r for r in _stores[sobject] if r["Id"] == record_id), None)
+    return _store.table(sobject).get(record_id)
 
-
-# ---------------------------------------------------------------------------
-# CRUD
-# ---------------------------------------------------------------------------
 
 def list_records(sobject, limit=200):
     name = _canonical(sobject)
     if not name:
         return {"error": f"sObject type '{sobject}' is not supported"}
-    records = _stores[name][:limit]
+    records = _records(name)[:limit]
     return {
         "totalSize": len(records),
         "done": True,
-        "records": [deepcopy(r) for r in records],
+        "records": records,
     }
 
 
@@ -108,7 +115,7 @@ def get_record(sobject, record_id):
     rec = _find(name, record_id)
     if not rec:
         return {"error": f"Provided external ID field does not exist or is not accessible: {record_id}"}
-    return deepcopy(rec)
+    return rec
 
 
 def create_record(sobject, fields):
@@ -126,7 +133,7 @@ def create_record(sobject, fields):
         "url": f"/services/data/v59.0/sobjects/{name}/{rec_id}",
     }
     record.setdefault("CreatedDate", _now())
-    _stores[name].append(record)
+    _store.table(name).upsert(record)
     return {"id": rec_id, "success": True, "errors": []}
 
 
@@ -137,17 +144,15 @@ def update_record(sobject, record_id, fields):
     rec = _find(name, record_id)
     if not rec:
         return {"error": f"Provided external ID field does not exist or is not accessible: {record_id}"}
+    patch = {}
     for k, v in (fields or {}).items():
         if k in ("Id", "attributes"):
             continue
-        rec[k] = v
-    rec["LastModifiedDate"] = _now()
+        patch[k] = v
+    patch["LastModifiedDate"] = _now()
+    _store.table(name).patch(record_id, patch)
     return {"updated": True, "id": record_id}
 
-
-# ---------------------------------------------------------------------------
-# SOQL query
-# ---------------------------------------------------------------------------
 
 _SOQL_RE = re.compile(
     r"^\s*SELECT\s+(?P<fields>.+?)\s+FROM\s+(?P<object>\w+)"
@@ -172,7 +177,7 @@ def query(soql):
     else:
         fields = [f.strip() for f in raw_fields.split(",") if f.strip()]
 
-    records = _stores[name]
+    records = _records(name)
     where_field = m.group("field")
     where_value = m.group("value")
     if where_field:
@@ -184,7 +189,7 @@ def query(soql):
     results = []
     for rec in records:
         if fields is None:
-            results.append(deepcopy(rec))
+            results.append(rec)
         else:
             projected = {"attributes": rec["attributes"]}
             for f in fields:

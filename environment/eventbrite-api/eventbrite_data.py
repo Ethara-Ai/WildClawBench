@@ -2,11 +2,48 @@
 
 import csv
 import uuid
-from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("eventbrite-api")
+
+_store.register("events", primary_key="id",
+                initial_loader=lambda: _coerce_events(_load("events.csv")))
+_store.register("venues", primary_key="id",
+                initial_loader=lambda: _coerce_venues(_load("venues.csv")))
+_store.register("ticket_classes", primary_key="id",
+                initial_loader=lambda: _coerce_ticket_classes(_load("ticket_classes.csv")))
+_store.register("attendees", primary_key="id",
+                initial_loader=lambda: _coerce_attendees(_load("attendees.csv")))
+_store.register("organizations", primary_key="id",
+                initial_loader=lambda: _load("organizations.csv"))
+
+
+def _events_rows():
+    return _store.table("events").rows()
+
+
+def _venues_rows():
+    return _store.table("venues").rows()
+
+
+def _ticket_classes_rows():
+    return _store.table("ticket_classes").rows()
+
+
+def _attendees_rows():
+    return _store.table("attendees").rows()
+
+
+def _organizations_rows():
+    return _store.table("organizations").rows()
+
 
 
 def _load(filename):
@@ -48,17 +85,10 @@ def _coerce_attendees(rows):
     return [{**r, "checked_in": _to_bool(r["checked_in"])} for r in rows]
 
 
-_organizations = _load("organizations.csv")
-_events = _coerce_events(_load("events.csv"))
-_venues = _coerce_venues(_load("venues.csv"))
-_ticket_classes = _coerce_ticket_classes(_load("ticket_classes.csv"))
-_attendees = _coerce_attendees(_load("attendees.csv"))
 
-_organizations_store = deepcopy(_organizations)
-_events_store = deepcopy(_events)
-_venues_store = deepcopy(_venues)
-_ticket_classes_store = deepcopy(_ticket_classes)
-_attendees_store = deepcopy(_attendees)
+
+
+
 
 
 def _new_id(prefix):
@@ -66,7 +96,7 @@ def _new_id(prefix):
 
 
 def _serialize_event(e):
-    venue = next((v for v in _venues_store if v["id"] == e["venue_id"]), None)
+    venue = next((v for v in _venues_rows() if v["id"] == e["venue_id"]), None)
     return {
         **e,
         "name": {"text": e["name"], "html": f"<p>{e['name']}</p>"},
@@ -82,11 +112,11 @@ def _serialize_event(e):
 # ---------------------------------------------------------------------------
 
 def list_organizations():
-    return {"organizations": _organizations_store, "pagination": {"object_count": len(_organizations_store)}}
+    return {"organizations": _organizations_rows(), "pagination": {"object_count": len(_organizations_rows())}}
 
 
 def get_organization(org_id):
-    for o in _organizations_store:
+    for o in _organizations_rows():
         if o["id"] == org_id:
             return o
     return {"error": f"Organization {org_id} not found"}
@@ -97,7 +127,7 @@ def get_organization(org_id):
 # ---------------------------------------------------------------------------
 
 def list_events(organization_id=None, status=None, q=None, page_size=50):
-    results = list(_events_store)
+    results = list(_events_rows())
     if organization_id:
         results = [e for e in results if e["organization_id"] == organization_id]
     if status:
@@ -113,7 +143,7 @@ def list_events(organization_id=None, status=None, q=None, page_size=50):
 
 
 def get_event(event_id):
-    for e in _events_store:
+    for e in _events_rows():
         if e["id"] == event_id:
             return _serialize_event(e)
     return {"error": f"Event {event_id} not found"}
@@ -122,7 +152,7 @@ def get_event(event_id):
 def create_event(organization_id, name, summary, start_utc, end_utc,
                  timezone="America/Los_Angeles", venue_id=None, capacity=50,
                  is_free=True, online_event=False):
-    if not any(o["id"] == organization_id for o in _organizations_store):
+    if not any(o["id"] == organization_id for o in _organizations_rows()):
         return {"error": f"Organization {organization_id} not found"}
     event = {
         "id": _new_id("evt"),
@@ -140,25 +170,25 @@ def create_event(organization_id, name, summary, start_utc, end_utc,
         "url": "",
         "created": _now(),
     }
-    _events_store.append(event)
+    _events_rows().append(event)
     return _serialize_event(event)
 
 
 def publish_event(event_id):
-    for i, e in enumerate(_events_store):
+    for i, e in enumerate(_events_rows()):
         if e["id"] == event_id:
-            if not any(t["event_id"] == event_id for t in _ticket_classes_store):
+            if not any(t["event_id"] == event_id for t in _ticket_classes_rows()):
                 return {"error": "Event needs at least one ticket class before publish"}
-            _events_store[i]["status"] = "live"
-            return _serialize_event(_events_store[i])
+            _events_rows()[i]["status"] = "live"
+            return _serialize_event(_events_rows()[i])
     return {"error": f"Event {event_id} not found"}
 
 
 def cancel_event(event_id):
-    for i, e in enumerate(_events_store):
+    for i, e in enumerate(_events_rows()):
         if e["id"] == event_id:
-            _events_store[i]["status"] = "canceled"
-            return _serialize_event(_events_store[i])
+            _events_rows()[i]["status"] = "canceled"
+            return _serialize_event(_events_rows()[i])
     return {"error": f"Event {event_id} not found"}
 
 
@@ -167,11 +197,11 @@ def cancel_event(event_id):
 # ---------------------------------------------------------------------------
 
 def list_venues():
-    return {"venues": _venues_store}
+    return {"venues": _venues_rows()}
 
 
 def get_venue(venue_id):
-    for v in _venues_store:
+    for v in _venues_rows():
         if v["id"] == venue_id:
             return v
     return {"error": f"Venue {venue_id} not found"}
@@ -182,14 +212,14 @@ def get_venue(venue_id):
 # ---------------------------------------------------------------------------
 
 def list_ticket_classes(event_id):
-    if not any(e["id"] == event_id for e in _events_store):
+    if not any(e["id"] == event_id for e in _events_rows()):
         return {"error": f"Event {event_id} not found"}
-    classes = [t for t in _ticket_classes_store if t["event_id"] == event_id]
+    classes = [t for t in _ticket_classes_rows() if t["event_id"] == event_id]
     return {"ticket_classes": classes}
 
 
 def create_ticket_class(event_id, name, quantity_total, cost=0, free=True):
-    if not any(e["id"] == event_id for e in _events_store):
+    if not any(e["id"] == event_id for e in _events_rows()):
         return {"error": f"Event {event_id} not found"}
     tc = {
         "id": _new_id("tc"),
@@ -203,7 +233,7 @@ def create_ticket_class(event_id, name, quantity_total, cost=0, free=True):
         "sales_start": _now(),
         "sales_end": _now(),
     }
-    _ticket_classes_store.append(tc)
+    _ticket_classes_rows().append(tc)
     return tc
 
 
@@ -212,9 +242,9 @@ def create_ticket_class(event_id, name, quantity_total, cost=0, free=True):
 # ---------------------------------------------------------------------------
 
 def list_attendees(event_id, status=None, checked_in=None):
-    if not any(e["id"] == event_id for e in _events_store):
+    if not any(e["id"] == event_id for e in _events_rows()):
         return {"error": f"Event {event_id} not found"}
-    results = [a for a in _attendees_store if a["event_id"] == event_id]
+    results = [a for a in _attendees_rows() if a["event_id"] == event_id]
     if status:
         results = [a for a in results if a["status"].lower() == status.lower()]
     if checked_in is not None:
@@ -223,17 +253,17 @@ def list_attendees(event_id, status=None, checked_in=None):
 
 
 def check_in_attendee(attendee_id):
-    for i, a in enumerate(_attendees_store):
+    for i, a in enumerate(_attendees_rows()):
         if a["id"] == attendee_id:
-            _attendees_store[i]["checked_in"] = True
-            return _attendees_store[i]
+            _attendees_rows()[i]["checked_in"] = True
+            return _attendees_rows()[i]
     return {"error": f"Attendee {attendee_id} not found"}
 
 
 def register_attendee(event_id, ticket_class_id, name, email):
-    if not any(e["id"] == event_id for e in _events_store):
+    if not any(e["id"] == event_id for e in _events_rows()):
         return {"error": f"Event {event_id} not found"}
-    tc = next((t for t in _ticket_classes_store if t["id"] == ticket_class_id), None)
+    tc = next((t for t in _ticket_classes_rows() if t["id"] == ticket_class_id), None)
     if not tc or tc["event_id"] != event_id:
         return {"error": f"Ticket class {ticket_class_id} not found for event {event_id}"}
     if tc["quantity_sold"] >= tc["quantity_total"]:
@@ -248,8 +278,8 @@ def register_attendee(event_id, ticket_class_id, name, email):
         "checked_in": False,
         "created": _now(),
     }
-    _attendees_store.append(attendee)
-    for i, t in enumerate(_ticket_classes_store):
+    _attendees_rows().append(attendee)
+    for i, t in enumerate(_ticket_classes_rows()):
         if t["id"] == ticket_class_id:
-            _ticket_classes_store[i]["quantity_sold"] += 1
+            _ticket_classes_rows()[i]["quantity_sold"] += 1
     return attendee

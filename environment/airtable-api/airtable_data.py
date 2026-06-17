@@ -9,11 +9,16 @@ bool); everything else stays a string.
 import csv
 import re
 import uuid
-from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store
+
+_store = get_store("airtable-api")
 
 
 def _load(filename):
@@ -29,18 +34,12 @@ def _to_bool(v):
     return str(v).strip().lower() == "true"
 
 
-# ---------------------------------------------------------------------------
-# Load metadata
-# ---------------------------------------------------------------------------
-
 _bases = [dict(r) for r in _load("bases.csv")]
 _tables = [dict(r) for r in _load("tables.csv")]
 _fields_rows = [dict(r) for r in _load("fields.csv")]
 
-# table_id -> {field_name: type}
-_field_types = {}
-# table_id -> [ {id, name, type}, ... ]  (declared order)
-_field_meta = {}
+_field_types: dict[str, dict[str, str]] = {}
+_field_meta: dict[str, list[dict]] = {}
 for r in _fields_rows:
     _field_types.setdefault(r["tableId"], {})[r["name"]] = r["type"]
     _field_meta.setdefault(r["tableId"], []).append({
@@ -82,26 +81,40 @@ def _coerce_records(table_id, rows):
     return out
 
 
-# base_id+table_id -> list of records ; also index tables for name resolution
-_records_store = {}
-for t in _tables:
-    rows = _load(t["records_csv"])
-    _records_store[t["id"]] = deepcopy(_coerce_records(t["id"], rows))
-
-_bases_store = deepcopy(_bases)
-_tables_store = deepcopy(_tables)
+_store.register("bases", primary_key="id",
+                initial_loader=lambda: [dict(b) for b in _bases])
+_store.register("tables", primary_key="id",
+                initial_loader=lambda: [dict(t) for t in _tables])
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+def _records_table_name(table_id: str) -> str:
+    return f"records_{table_id}"
+
+
+# one mutable Table per airtable table_id, keyed by record id "recXXX"
+for _t in _tables:
+    _store.register(
+        _records_table_name(_t["id"]),
+        primary_key="id",
+        initial_loader=(lambda tid=_t["id"], csv_name=_t["records_csv"]:
+                        _coerce_records(tid, _load(csv_name))),
+    )
+
+
+def _records(table_id):
+    return _store.table(_records_table_name(table_id)).rows()
+
+
+def _bases_rows(): return _store.table("bases").rows()
+def _tables_rows(): return _store.table("tables").rows()
+
 
 def _new_record_id():
     return "rec" + uuid.uuid4().hex[:14]
 
 
 def _resolve_table(base_id, table_id_or_name):
-    for t in _tables_store:
+    for t in _tables_rows():
         if t["baseId"] != base_id:
             continue
         if t["id"] == table_id_or_name or t["name"].lower() == str(table_id_or_name).lower():
@@ -131,21 +144,17 @@ def _apply_formula(records, formula):
     return out
 
 
-# ---------------------------------------------------------------------------
-# Meta
-# ---------------------------------------------------------------------------
-
 def list_bases():
     return {"bases": [{
         "id": b["id"], "name": b["name"], "permissionLevel": b["permissionLevel"],
-    } for b in _bases_store]}
+    } for b in _bases_rows()]}
 
 
 def list_tables(base_id):
-    if not any(b["id"] == base_id for b in _bases_store):
+    if not _store.table("bases").get(base_id):
         return {"error": f"Base {base_id} not found"}
     tables = []
-    for t in _tables_store:
+    for t in _tables_rows():
         if t["baseId"] != base_id:
             continue
         tables.append({
@@ -157,15 +166,11 @@ def list_tables(base_id):
     return {"tables": tables}
 
 
-# ---------------------------------------------------------------------------
-# Records
-# ---------------------------------------------------------------------------
-
 def list_records(base_id, table_id_or_name, page_size=100, offset=None, filter_by_formula=None):
     table = _resolve_table(base_id, table_id_or_name)
     if not table:
         return {"error": f"Table {table_id_or_name} not found in base {base_id}"}
-    records = list(_records_store[table["id"]])
+    records = _records(table["id"])
     records = _apply_formula(records, filter_by_formula)
 
     page_size = max(1, min(int(page_size), 100))
@@ -174,7 +179,7 @@ def list_records(base_id, table_id_or_name, page_size=100, offset=None, filter_b
     except (TypeError, ValueError):
         start = 0
     page = records[start: start + page_size]
-    resp = {"records": [deepcopy(r) for r in page]}
+    resp = {"records": page}
     next_offset = start + page_size
     if next_offset < len(records):
         resp["offset"] = str(next_offset)
@@ -185,9 +190,9 @@ def get_record(base_id, table_id_or_name, record_id):
     table = _resolve_table(base_id, table_id_or_name)
     if not table:
         return {"error": f"Table {table_id_or_name} not found in base {base_id}"}
-    for rec in _records_store[table["id"]]:
-        if rec["id"] == record_id:
-            return deepcopy(rec)
+    rec = _store.table(_records_table_name(table["id"])).get(record_id)
+    if rec:
+        return rec
     return {"error": f"Record {record_id} not found"}
 
 
@@ -196,6 +201,7 @@ def create_records(base_id, table_id_or_name, records):
     if not table:
         return {"error": f"Table {table_id_or_name} not found in base {base_id}"}
     created = []
+    tbl = _store.table(_records_table_name(table["id"]))
     for item in records:
         fields = item.get("fields", {}) or {}
         rec = {
@@ -203,8 +209,8 @@ def create_records(base_id, table_id_or_name, records):
             "createdTime": _now(),
             "fields": dict(fields),
         }
-        _records_store[table["id"]].append(rec)
-        created.append(deepcopy(rec))
+        tbl.upsert(rec)
+        created.append(rec)
     return {"records": created}
 
 
@@ -212,20 +218,20 @@ def update_record(base_id, table_id_or_name, record_id, fields):
     table = _resolve_table(base_id, table_id_or_name)
     if not table:
         return {"error": f"Table {table_id_or_name} not found in base {base_id}"}
-    for rec in _records_store[table["id"]]:
-        if rec["id"] == record_id:
-            rec["fields"].update(fields or {})
-            return deepcopy(rec)
-    return {"error": f"Record {record_id} not found"}
+    tbl = _store.table(_records_table_name(table["id"]))
+    rec = tbl.get(record_id)
+    if not rec:
+        return {"error": f"Record {record_id} not found"}
+    merged = {**rec["fields"], **(fields or {})}
+    tbl.patch(record_id, {"fields": merged})
+    return tbl.get(record_id) or rec
 
 
 def delete_record(base_id, table_id_or_name, record_id):
     table = _resolve_table(base_id, table_id_or_name)
     if not table:
         return {"error": f"Table {table_id_or_name} not found in base {base_id}"}
-    bucket = _records_store[table["id"]]
-    for i, rec in enumerate(bucket):
-        if rec["id"] == record_id:
-            bucket.pop(i)
-            return {"id": record_id, "deleted": True}
+    tbl = _store.table(_records_table_name(table["id"]))
+    if tbl.delete(record_id):
+        return {"id": record_id, "deleted": True}
     return {"error": f"Record {record_id} not found"}

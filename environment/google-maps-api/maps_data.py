@@ -7,10 +7,29 @@ envelopes.
 
 import csv
 import math
-from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("google-maps-api")
+
+_store.register("places", primary_key="place_id",
+                initial_loader=lambda: _coerce_places(_load("places.csv")))
+_store.register("geocodes", primary_key="query",
+                initial_loader=lambda: _coerce_geocodes(_load("geocodes.csv")))
+
+
+def _places_rows():
+    return _store.table("places").rows()
+
+
+def _geocodes_rows():
+    return _store.table("geocodes").rows()
+
 
 EARTH_RADIUS_M = 6371000.0  # mean Earth radius in meters
 WALK_SPEED_MPS = 1.39       # ~5 km/h
@@ -57,11 +76,8 @@ def _coerce_geocodes(rows):
     return out
 
 
-_places = _coerce_places(_load("places.csv"))
-_geocodes = _coerce_geocodes(_load("geocodes.csv"))
 
-_places_store = deepcopy(_places)
-_geocodes_store = deepcopy(_geocodes)
+
 
 
 # ---------------------------------------------------------------------------
@@ -102,15 +118,15 @@ def _resolve_point(value):
     if ll:
         return ll[0], ll[1], value
     v = value.strip().lower()
-    for g in _geocodes_store:
+    for g in _geocodes_rows():
         if g["query"].lower() == v or g["formatted_address"].lower() == v:
             return g["lat"], g["lng"], g["formatted_address"]
-    for p in _places_store:
+    for p in _places_rows():
         if p["place_id"] == value or p["name"].lower() == v:
             loc = p["geometry"]["location"]
             return loc["lat"], loc["lng"], p["formatted_address"]
     # partial geocode match
-    for g in _geocodes_store:
+    for g in _geocodes_rows():
         if v in g["query"].lower() or v in g["formatted_address"].lower():
             return g["lat"], g["lng"], g["formatted_address"]
     return None
@@ -132,7 +148,7 @@ def _fmt_duration(seconds):
 # ---------------------------------------------------------------------------
 
 def text_search(query):
-    results = list(_places_store)
+    results = list(_places_rows())
     if query:
         q = query.lower()
         results = [p for p in results
@@ -143,7 +159,7 @@ def text_search(query):
 
 
 def place_details(place_id):
-    for p in _places_store:
+    for p in _places_rows():
         if p["place_id"] == place_id:
             return {"status": "OK", "result": p}
     return {"status": "NOT_FOUND", "result": {}, "error": f"Place {place_id} not found"}
@@ -156,7 +172,7 @@ def nearby_search(location, radius=5000, place_type=None):
                 "error": f"Could not resolve location '{location}'"}
     lat0, lng0 = point[0], point[1]
     out = []
-    for p in _places_store:
+    for p in _places_rows():
         loc = p["geometry"]["location"]
         dist = haversine_meters(lat0, lng0, loc["lat"], loc["lng"])
         if dist <= radius and (not place_type or place_type in p["types"]):
@@ -179,7 +195,7 @@ def geocode(address):
     # find a matching place_id if we have one
     place_id = "ChIJgeo-derived"
     location_type = "APPROXIMATE"
-    for g in _geocodes_store:
+    for g in _geocodes_rows():
         if abs(g["lat"] - lat) < 1e-6 and abs(g["lng"] - lng) < 1e-6:
             place_id = g["place_id"]
             location_type = g["location_type"]

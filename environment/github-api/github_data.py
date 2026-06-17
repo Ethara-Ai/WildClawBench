@@ -2,11 +2,47 @@
 
 import csv
 import json
-from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("github-api")
+
+_store.register("repos", primary_key="id",
+                initial_loader=lambda: _coerce_repos(_load("repos.csv")))
+_store.register("issues", primary_key="id",
+                initial_loader=lambda: _coerce_issues(_load("issues.csv")))
+_store.register("pulls", primary_key="number",
+                initial_loader=lambda: _coerce_pulls(_load("pulls.csv")))
+_store.register("comments", primary_key="id",
+                initial_loader=lambda: _coerce_comments(_load("comments.csv")))
+_store.register_document("user", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "user.json", encoding="utf-8")))
+
+
+def _repos_rows():
+    return _store.table("repos").rows()
+
+
+def _issues_rows():
+    return _store.table("issues").rows()
+
+
+def _pulls_rows():
+    return _store.table("pulls").rows()
+
+
+def _comments_rows():
+    return _store.table("comments").rows()
+
+
+def _user_doc():
+    return _store.document("user").get()
+
 
 
 def _load(filename):
@@ -71,19 +107,9 @@ def _coerce_comments(rows):
     return [{**r, "id": int(r["id"]), "issue_number": int(r["issue_number"])} for r in rows]
 
 
-_repos = _coerce_repos(_load("repos.csv"))
-_issues = _coerce_issues(_load("issues.csv"))
-_pulls = _coerce_pulls(_load("pulls.csv"))
-_comments = _coerce_comments(_load("comments.csv"))
 
-with open(DATA_DIR / "user.json", encoding="utf-8") as _f:
-    _user = json.load(_f)
 
-_repos_store = deepcopy(_repos)
-_issues_store = deepcopy(_issues)
-_pulls_store = deepcopy(_pulls)
-_comments_store = deepcopy(_comments)
-_user_store = deepcopy(_user)
+
 
 
 def _serialize_repo(r):
@@ -127,7 +153,7 @@ def _serialize_issue(i):
 # ---------------------------------------------------------------------------
 
 def get_user():
-    return _user_store
+    return _user_doc()
 
 
 # ---------------------------------------------------------------------------
@@ -135,14 +161,14 @@ def get_user():
 # ---------------------------------------------------------------------------
 
 def list_repos(owner=None):
-    results = list(_repos_store)
+    results = list(_repos_rows())
     if owner:
         results = [r for r in results if r["owner"] == owner]
     return [_serialize_repo(r) for r in results]
 
 
 def get_repo(owner, repo_name):
-    for r in _repos_store:
+    for r in _repos_rows():
         if r["owner"] == owner and r["name"] == repo_name:
             return _serialize_repo(r)
     return {"error": f"Repo {owner}/{repo_name} not found"}
@@ -154,9 +180,9 @@ def get_repo(owner, repo_name):
 
 def list_issues(owner, repo_name, state="open", labels=None, assignee=None,
                 limit=30):
-    if not any(r["owner"] == owner and r["name"] == repo_name for r in _repos_store):
+    if not any(r["owner"] == owner and r["name"] == repo_name for r in _repos_rows()):
         return {"error": f"Repo {owner}/{repo_name} not found"}
-    results = [i for i in _issues_store if i["repo"] == repo_name]
+    results = [i for i in _issues_rows() if i["repo"] == repo_name]
     if state and state != "all":
         results = [i for i in results if i["state"] == state]
     if labels:
@@ -169,24 +195,24 @@ def list_issues(owner, repo_name, state="open", labels=None, assignee=None,
 
 
 def get_issue(owner, repo_name, number):
-    for i in _issues_store:
+    for i in _issues_rows():
         if i["repo"] == repo_name and i["number"] == number:
             return _serialize_issue(i)
     return {"error": f"Issue {repo_name}#{number} not found"}
 
 
 def create_issue(owner, repo_name, title, body, assignee=None, labels=None):
-    if not any(r["owner"] == owner and r["name"] == repo_name for r in _repos_store):
+    if not any(r["owner"] == owner and r["name"] == repo_name for r in _repos_rows()):
         return {"error": f"Repo {owner}/{repo_name} not found"}
-    next_number = max((i["number"] for i in _issues_store if i["repo"] == repo_name), default=0) + 1
+    next_number = max((i["number"] for i in _issues_rows() if i["repo"] == repo_name), default=0) + 1
     issue = {
-        "id": max(i["id"] for i in _issues_store) + 1 if _issues_store else 1,
+        "id": max(i["id"] for i in _issues_rows()) + 1 if _issues_rows() else 1,
         "number": next_number,
         "repo": repo_name,
         "title": title,
         "body": body or "",
         "state": "open",
-        "user": _user_store["login"],
+        "user": _user_doc()["login"],
         "assignee": assignee or "",
         "labels": labels or [],
         "milestone": None,
@@ -195,36 +221,36 @@ def create_issue(owner, repo_name, title, body, assignee=None, labels=None):
         "closed_at": None,
         "is_pull_request": False,
     }
-    _issues_store.append(issue)
-    for j, r in enumerate(_repos_store):
+    _issues_rows().append(issue)
+    for j, r in enumerate(_repos_rows()):
         if r["owner"] == owner and r["name"] == repo_name:
-            _repos_store[j]["open_issues"] += 1
+            _repos_rows()[j]["open_issues"] += 1
     return _serialize_issue(issue)
 
 
 def update_issue(owner, repo_name, number, title=None, body=None, state=None,
                  assignee=None, labels=None):
-    for i, issue in enumerate(_issues_store):
+    for i, issue in enumerate(_issues_rows()):
         if issue["repo"] == repo_name and issue["number"] == number:
             if title is not None:
-                _issues_store[i]["title"] = title
+                _issues_rows()[i]["title"] = title
             if body is not None:
-                _issues_store[i]["body"] = body
+                _issues_rows()[i]["body"] = body
             if assignee is not None:
-                _issues_store[i]["assignee"] = assignee
+                _issues_rows()[i]["assignee"] = assignee
             if labels is not None:
-                _issues_store[i]["labels"] = labels
-            if state and state != _issues_store[i]["state"]:
-                _issues_store[i]["state"] = state
+                _issues_rows()[i]["labels"] = labels
+            if state and state != _issues_rows()[i]["state"]:
+                _issues_rows()[i]["state"] = state
                 if state == "closed":
-                    _issues_store[i]["closed_at"] = _now()
-                    for j, r in enumerate(_repos_store):
+                    _issues_rows()[i]["closed_at"] = _now()
+                    for j, r in enumerate(_repos_rows()):
                         if r["name"] == repo_name:
-                            _repos_store[j]["open_issues"] = max(0, _repos_store[j]["open_issues"] - 1)
+                            _repos_rows()[j]["open_issues"] = max(0, _repos_rows()[j]["open_issues"] - 1)
                 else:
-                    _issues_store[i]["closed_at"] = None
-            _issues_store[i]["updated_at"] = _now()
-            return _serialize_issue(_issues_store[i])
+                    _issues_rows()[i]["closed_at"] = None
+            _issues_rows()[i]["updated_at"] = _now()
+            return _serialize_issue(_issues_rows()[i])
     return {"error": f"Issue {repo_name}#{number} not found"}
 
 
@@ -233,10 +259,10 @@ def update_issue(owner, repo_name, number, title=None, body=None, state=None,
 # ---------------------------------------------------------------------------
 
 def list_pulls(owner, repo_name, state="open"):
-    if not any(r["owner"] == owner and r["name"] == repo_name for r in _repos_store):
+    if not any(r["owner"] == owner and r["name"] == repo_name for r in _repos_rows()):
         return {"error": f"Repo {owner}/{repo_name} not found"}
-    pulls = [p for p in _pulls_store if p["repo"] == repo_name]
-    issues_by_number = {i["number"]: i for i in _issues_store if i["repo"] == repo_name}
+    pulls = [p for p in _pulls_rows() if p["repo"] == repo_name]
+    issues_by_number = {i["number"]: i for i in _issues_rows() if i["repo"] == repo_name}
     out = []
     for p in pulls:
         issue = issues_by_number.get(p["number"])
@@ -249,21 +275,21 @@ def list_pulls(owner, repo_name, state="open"):
 
 
 def get_pull(owner, repo_name, number):
-    pull = next((p for p in _pulls_store if p["repo"] == repo_name and p["number"] == number), None)
-    issue = next((i for i in _issues_store if i["repo"] == repo_name and i["number"] == number), None)
+    pull = next((p for p in _pulls_rows() if p["repo"] == repo_name and p["number"] == number), None)
+    issue = next((i for i in _issues_rows() if i["repo"] == repo_name and i["number"] == number), None)
     if not pull or not issue:
         return {"error": f"Pull {repo_name}#{number} not found"}
     return {**_serialize_issue(issue), **pull}
 
 
 def merge_pull(owner, repo_name, number):
-    for i, p in enumerate(_pulls_store):
+    for i, p in enumerate(_pulls_rows()):
         if p["repo"] == repo_name and p["number"] == number:
             if not p["mergeable"]:
                 return {"error": "PR is not mergeable"}
             if p["draft"]:
                 return {"error": "PR is a draft"}
-            _pulls_store[i]["merged"] = True
+            _pulls_rows()[i]["merged"] = True
             update_issue(owner, repo_name, number, state="closed")
             return {"merged": True, "sha": "deadbeefcafe123"}
     return {"error": f"Pull {repo_name}#{number} not found"}
@@ -274,21 +300,21 @@ def merge_pull(owner, repo_name, number):
 # ---------------------------------------------------------------------------
 
 def list_comments(owner, repo_name, number):
-    if not any(i["repo"] == repo_name and i["number"] == number for i in _issues_store):
+    if not any(i["repo"] == repo_name and i["number"] == number for i in _issues_rows()):
         return {"error": f"Issue {repo_name}#{number} not found"}
-    return [c for c in _comments_store if c["repo"] == repo_name and c["issue_number"] == number]
+    return [c for c in _comments_rows() if c["repo"] == repo_name and c["issue_number"] == number]
 
 
 def create_comment(owner, repo_name, number, body):
-    if not any(i["repo"] == repo_name and i["number"] == number for i in _issues_store):
+    if not any(i["repo"] == repo_name and i["number"] == number for i in _issues_rows()):
         return {"error": f"Issue {repo_name}#{number} not found"}
     comment = {
-        "id": max(c["id"] for c in _comments_store) + 1 if _comments_store else 1,
+        "id": max(c["id"] for c in _comments_rows()) + 1 if _comments_rows() else 1,
         "issue_number": number,
         "repo": repo_name,
-        "user": _user_store["login"],
+        "user": _user_doc()["login"],
         "body": body,
         "created_at": _now(),
     }
-    _comments_store.append(comment)
+    _comments_rows().append(comment)
     return comment

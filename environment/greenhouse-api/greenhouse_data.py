@@ -7,11 +7,42 @@ in process memory and reset on container restart.
 
 import csv
 import uuid
-from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("greenhouse-api")
+
+_store.register("candidates", primary_key="id",
+                initial_loader=lambda: _coerce_candidates(_load("candidates.csv")))
+_store.register("jobs", primary_key="id",
+                initial_loader=lambda: _coerce_jobs(_load("jobs.csv")))
+_store.register("applications", primary_key="id",
+                initial_loader=lambda: _coerce_applications(_load("applications.csv")))
+_store.register("scorecards", primary_key="id",
+                initial_loader=lambda: _coerce_scorecards(_load("scorecards.csv")))
+
+
+def _candidates_rows():
+    return _store.table("candidates").rows()
+
+
+def _jobs_rows():
+    return _store.table("jobs").rows()
+
+
+def _applications_rows():
+    return _store.table("applications").rows()
+
+
+def _scorecards_rows():
+    return _store.table("scorecards").rows()
+
 
 # Ordered hiring pipeline stages used to advance applications.
 STAGES = ["Application Review", "Interview", "Offer", "Hired"]
@@ -65,15 +96,12 @@ def _coerce_scorecards(rows):
     return out
 
 
-_candidates = _coerce_candidates(_load("candidates.csv"))
-_jobs = _coerce_jobs(_load("jobs.csv"))
-_applications = _coerce_applications(_load("applications.csv"))
-_scorecards = _coerce_scorecards(_load("scorecards.csv"))
 
-_candidates_store = deepcopy(_candidates)
-_jobs_store = deepcopy(_jobs)
-_applications_store = deepcopy(_applications)
-_scorecards_store = deepcopy(_scorecards)
+
+
+
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -93,11 +121,11 @@ def _find(store, obj_id):
 # ---------------------------------------------------------------------------
 
 def list_candidates():
-    return list(_candidates_store)
+    return list(_candidates_rows())
 
 
 def get_candidate(candidate_id):
-    c = _find(_candidates_store, candidate_id)
+    c = _find(_candidates_rows(), candidate_id)
     if not c:
         return {"error": f"Candidate {candidate_id} not found"}
     return c
@@ -118,7 +146,7 @@ def create_candidate(first_name, last_name, email=None, phone=None,
         "source": source or "API",
         "created_at": _now(),
     }
-    _candidates_store.append(c)
+    _candidates_rows().append(c)
     return c
 
 
@@ -127,14 +155,14 @@ def create_candidate(first_name, last_name, email=None, phone=None,
 # ---------------------------------------------------------------------------
 
 def list_jobs(status=None):
-    results = list(_jobs_store)
+    results = list(_jobs_rows())
     if status:
         results = [j for j in results if j["status"] == status]
     return results
 
 
 def get_job(job_id):
-    j = _find(_jobs_store, job_id)
+    j = _find(_jobs_rows(), job_id)
     if not j:
         return {"error": f"Job {job_id} not found"}
     return j
@@ -145,7 +173,7 @@ def get_job(job_id):
 # ---------------------------------------------------------------------------
 
 def list_applications(job_id=None, candidate_id=None, status=None):
-    results = list(_applications_store)
+    results = list(_applications_rows())
     if job_id:
         results = [a for a in results if a["job_id"] == job_id]
     if candidate_id:
@@ -156,14 +184,14 @@ def list_applications(job_id=None, candidate_id=None, status=None):
 
 
 def get_application(application_id):
-    a = _find(_applications_store, application_id)
+    a = _find(_applications_rows(), application_id)
     if not a:
         return {"error": f"Application {application_id} not found"}
     return a
 
 
 def advance_application(application_id):
-    a = _find(_applications_store, application_id)
+    a = _find(_applications_rows(), application_id)
     if not a:
         return {"error": f"Application {application_id} not found"}
     if a["status"] != "active":
@@ -185,7 +213,7 @@ def advance_application(application_id):
 
 
 def reject_application(application_id, reason=None):
-    a = _find(_applications_store, application_id)
+    a = _find(_applications_rows(), application_id)
     if not a:
         return {"error": f"Application {application_id} not found"}
     a["status"] = "rejected"
@@ -199,7 +227,7 @@ def reject_application(application_id, reason=None):
 # ---------------------------------------------------------------------------
 
 def list_scorecards(application_id=None, candidate_id=None):
-    results = list(_scorecards_store)
+    results = list(_scorecards_rows())
     if application_id:
         results = [s for s in results if s["application_id"] == application_id]
     if candidate_id:

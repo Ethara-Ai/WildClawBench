@@ -2,11 +2,17 @@
 
 import csv
 import json
-from copy import deepcopy
+import re
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store
+
+_store = get_store("quickbooks-api")
 
 REALM_ID = "4620816365272861350"
 
@@ -24,10 +30,6 @@ def _load_json(filename):
 def _now():
     return datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S-00:00")
 
-
-# ---------------------------------------------------------------------------
-# Load and coerce data
-# ---------------------------------------------------------------------------
 
 def _coerce_customers(rows):
     out = []
@@ -120,68 +122,65 @@ def _coerce_accounts(rows):
     return out
 
 
-# Load all data at module init
-_customers = _coerce_customers(_load("customers.csv"))
-_vendors = _coerce_vendors(_load("vendors.csv"))
-_items = _coerce_items(_load("items.csv"))
-_accounts = _coerce_accounts(_load("accounts.csv"))
-_invoices = _load_json("invoices.json")
-_bills = _load_json("bills.json")
-_payments = _load_json("payments.json")
-_estimates = _load_json("estimates.json")
-_expenses = _load_json("expenses.json")
-_company_info = _load_json("company_info.json")
+_store.register("customers", primary_key="Id",
+                initial_loader=lambda: _coerce_customers(_load("customers.csv")))
+_store.register("vendors", primary_key="Id",
+                initial_loader=lambda: _coerce_vendors(_load("vendors.csv")))
+_store.register("items", primary_key="Id",
+                initial_loader=lambda: _coerce_items(_load("items.csv")))
+_store.register("accounts", primary_key="Id",
+                initial_loader=lambda: _coerce_accounts(_load("accounts.csv")))
+_store.register("invoices", primary_key="Id",
+                initial_loader=lambda: _load_json("invoices.json"))
+_store.register("bills", primary_key="Id",
+                initial_loader=lambda: _load_json("bills.json"))
+_store.register("payments", primary_key="Id",
+                initial_loader=lambda: _load_json("payments.json"))
+_store.register("estimates", primary_key="Id",
+                initial_loader=lambda: _load_json("estimates.json"))
+_store.register("expenses", primary_key="Id",
+                initial_loader=lambda: _load_json("expenses.json"))
 
-# Mutable in-memory stores
-_customers_store = deepcopy(_customers)
-_vendors_store = deepcopy(_vendors)
-_items_store = deepcopy(_items)
-_accounts_store = deepcopy(_accounts)
-_invoices_store = deepcopy(_invoices)
-_bills_store = deepcopy(_bills)
-_payments_store = deepcopy(_payments)
-_estimates_store = deepcopy(_estimates)
-_expenses_store = deepcopy(_expenses)
-_company_info_store = deepcopy(_company_info)
-
-_next_customer_id = max(int(c["Id"]) for c in _customers_store) + 1
-_next_vendor_id = max(int(v["Id"]) for v in _vendors_store) + 1
-_next_item_id = max(int(i["Id"]) for i in _items_store) + 1
-_next_invoice_id = max(int(inv["Id"]) for inv in _invoices_store) + 1
-_next_bill_id = max(int(b["Id"]) for b in _bills_store) + 1
-_next_payment_id = max(int(p["Id"]) for p in _payments_store) + 1
-_next_estimate_id = max(int(e["Id"]) for e in _estimates_store) + 1
-_next_expense_id = max(int(e["Id"]) for e in _expenses_store) + 1
+_store.register_document("company_info",
+                         initial_loader=lambda: _load_json("company_info.json"))
 
 
-# ---------------------------------------------------------------------------
-# Company Info
-# ---------------------------------------------------------------------------
+def _next_int_id(table_name: str) -> int:
+    """Monotonic int counter for QBO-style IDs: scan current IDs and return max+1.
+
+    Quickbooks uses bare integer IDs (as strings) rather than UUIDs; we must
+    recompute the next id at every write so that drift-plane upserts (which can
+    inject rows out of band) don't collide.
+    """
+    ids = []
+    for row in _store.table(table_name).rows():
+        try:
+            ids.append(int(row.get("Id", "0")))
+        except (TypeError, ValueError):
+            continue
+    return (max(ids) + 1) if ids else 1
+
 
 def get_company_info():
-    return {"CompanyInfo": _company_info_store}
+    return {"CompanyInfo": _store.document("company_info").get()}
 
-
-# ---------------------------------------------------------------------------
-# Customers
-# ---------------------------------------------------------------------------
 
 def list_customers():
-    return _customers_store
+    return _store.table("customers").rows()
 
 
 def get_customer(customer_id: str):
-    for c in _customers_store:
-        if c["Id"] == customer_id:
-            return {"Customer": c}
+    c = _store.table("customers").get(customer_id)
+    if c:
+        return {"Customer": c}
     return {"error": f"Customer {customer_id} not found"}
 
 
 def create_customer(data: dict):
-    global _next_customer_id
     now = _now()
+    new_id = str(_next_int_id("customers"))
     customer = {
-        "Id": str(_next_customer_id),
+        "Id": new_id,
         "DisplayName": data.get("DisplayName", ""),
         "GivenName": data.get("GivenName"),
         "FamilyName": data.get("FamilyName"),
@@ -196,45 +195,40 @@ def create_customer(data: dict):
         "MetaData": {"CreateTime": now, "LastUpdatedTime": now},
         "SyncToken": "0",
     }
-    _customers_store.append(customer)
-    _next_customer_id += 1
+    _store.table("customers").upsert(customer)
     return {"Customer": customer}
 
 
 def update_customer(customer_id: str, data: dict):
-    for i, c in enumerate(_customers_store):
-        if c["Id"] == customer_id:
-            updatable = {"DisplayName", "GivenName", "FamilyName", "CompanyName",
-                         "PrimaryEmailAddr", "PrimaryPhone", "BillAddr", "Active", "Notes"}
-            for k, v in data.items():
-                if k in updatable:
-                    _customers_store[i][k] = v
-            _customers_store[i]["MetaData"]["LastUpdatedTime"] = _now()
-            _customers_store[i]["SyncToken"] = str(int(_customers_store[i]["SyncToken"]) + 1)
-            return {"Customer": _customers_store[i]}
-    return {"error": f"Customer {customer_id} not found"}
+    c = _store.table("customers").get(customer_id)
+    if not c:
+        return {"error": f"Customer {customer_id} not found"}
+    updatable = {"DisplayName", "GivenName", "FamilyName", "CompanyName",
+                 "PrimaryEmailAddr", "PrimaryPhone", "BillAddr", "Active", "Notes"}
+    patch = {k: v for k, v in data.items() if k in updatable}
+    meta = dict(c["MetaData"]); meta["LastUpdatedTime"] = _now()
+    patch["MetaData"] = meta
+    patch["SyncToken"] = str(int(c["SyncToken"]) + 1)
+    _store.table("customers").patch(customer_id, patch)
+    return {"Customer": _store.table("customers").get(customer_id)}
 
-
-# ---------------------------------------------------------------------------
-# Vendors
-# ---------------------------------------------------------------------------
 
 def list_vendors():
-    return _vendors_store
+    return _store.table("vendors").rows()
 
 
 def get_vendor(vendor_id: str):
-    for v in _vendors_store:
-        if v["Id"] == vendor_id:
-            return {"Vendor": v}
+    v = _store.table("vendors").get(vendor_id)
+    if v:
+        return {"Vendor": v}
     return {"error": f"Vendor {vendor_id} not found"}
 
 
 def create_vendor(data: dict):
-    global _next_vendor_id
     now = _now()
+    new_id = str(_next_int_id("vendors"))
     vendor = {
-        "Id": str(_next_vendor_id),
+        "Id": new_id,
         "DisplayName": data.get("DisplayName", ""),
         "CompanyName": data.get("CompanyName"),
         "PrimaryEmailAddr": data.get("PrimaryEmailAddr"),
@@ -247,45 +241,40 @@ def create_vendor(data: dict):
         "MetaData": {"CreateTime": now, "LastUpdatedTime": now},
         "SyncToken": "0",
     }
-    _vendors_store.append(vendor)
-    _next_vendor_id += 1
+    _store.table("vendors").upsert(vendor)
     return {"Vendor": vendor}
 
 
 def update_vendor(vendor_id: str, data: dict):
-    for i, v in enumerate(_vendors_store):
-        if v["Id"] == vendor_id:
-            updatable = {"DisplayName", "CompanyName", "PrimaryEmailAddr",
-                         "PrimaryPhone", "BillAddr", "Active", "AcctNum", "Vendor1099"}
-            for k, val in data.items():
-                if k in updatable:
-                    _vendors_store[i][k] = val
-            _vendors_store[i]["MetaData"]["LastUpdatedTime"] = _now()
-            _vendors_store[i]["SyncToken"] = str(int(_vendors_store[i]["SyncToken"]) + 1)
-            return {"Vendor": _vendors_store[i]}
-    return {"error": f"Vendor {vendor_id} not found"}
+    v = _store.table("vendors").get(vendor_id)
+    if not v:
+        return {"error": f"Vendor {vendor_id} not found"}
+    updatable = {"DisplayName", "CompanyName", "PrimaryEmailAddr",
+                 "PrimaryPhone", "BillAddr", "Active", "AcctNum", "Vendor1099"}
+    patch = {k: val for k, val in data.items() if k in updatable}
+    meta = dict(v["MetaData"]); meta["LastUpdatedTime"] = _now()
+    patch["MetaData"] = meta
+    patch["SyncToken"] = str(int(v["SyncToken"]) + 1)
+    _store.table("vendors").patch(vendor_id, patch)
+    return {"Vendor": _store.table("vendors").get(vendor_id)}
 
-
-# ---------------------------------------------------------------------------
-# Items
-# ---------------------------------------------------------------------------
 
 def list_items():
-    return _items_store
+    return _store.table("items").rows()
 
 
 def get_item(item_id: str):
-    for item in _items_store:
-        if item["Id"] == item_id:
-            return {"Item": item}
+    it = _store.table("items").get(item_id)
+    if it:
+        return {"Item": it}
     return {"error": f"Item {item_id} not found"}
 
 
 def create_item(data: dict):
-    global _next_item_id
     now = _now()
+    new_id = str(_next_int_id("items"))
     item = {
-        "Id": str(_next_item_id),
+        "Id": new_id,
         "Name": data.get("Name", ""),
         "Description": data.get("Description"),
         "Type": data.get("Type", "Service"),
@@ -296,67 +285,58 @@ def create_item(data: dict):
         "MetaData": {"CreateTime": now, "LastUpdatedTime": now},
         "SyncToken": "0",
     }
-    _items_store.append(item)
-    _next_item_id += 1
+    _store.table("items").upsert(item)
     return {"Item": item}
 
 
 def update_item(item_id: str, data: dict):
-    for i, item in enumerate(_items_store):
-        if item["Id"] == item_id:
-            updatable = {"Name", "Description", "UnitPrice", "Active", "Taxable", "IncomeAccountRef"}
-            for k, v in data.items():
-                if k in updatable:
-                    if k == "UnitPrice":
-                        _items_store[i][k] = float(v)
-                    else:
-                        _items_store[i][k] = v
-            _items_store[i]["MetaData"]["LastUpdatedTime"] = _now()
-            _items_store[i]["SyncToken"] = str(int(_items_store[i]["SyncToken"]) + 1)
-            return {"Item": _items_store[i]}
-    return {"error": f"Item {item_id} not found"}
+    it = _store.table("items").get(item_id)
+    if not it:
+        return {"error": f"Item {item_id} not found"}
+    updatable = {"Name", "Description", "UnitPrice", "Active", "Taxable", "IncomeAccountRef"}
+    patch = {}
+    for k, v in data.items():
+        if k in updatable:
+            patch[k] = float(v) if k == "UnitPrice" else v
+    meta = dict(it["MetaData"]); meta["LastUpdatedTime"] = _now()
+    patch["MetaData"] = meta
+    patch["SyncToken"] = str(int(it["SyncToken"]) + 1)
+    _store.table("items").patch(item_id, patch)
+    return {"Item": _store.table("items").get(item_id)}
 
-
-# ---------------------------------------------------------------------------
-# Accounts
-# ---------------------------------------------------------------------------
 
 def list_accounts():
-    return _accounts_store
+    return _store.table("accounts").rows()
 
 
 def get_account(account_id: str):
-    for a in _accounts_store:
-        if a["Id"] == account_id:
-            return {"Account": a}
+    a = _store.table("accounts").get(account_id)
+    if a:
+        return {"Account": a}
     return {"error": f"Account {account_id} not found"}
 
 
-# ---------------------------------------------------------------------------
-# Invoices
-# ---------------------------------------------------------------------------
-
 def list_invoices():
-    return _invoices_store
+    return _store.table("invoices").rows()
 
 
 def get_invoice(invoice_id: str):
-    for inv in _invoices_store:
-        if inv["Id"] == invoice_id:
-            return {"Invoice": inv}
+    inv = _store.table("invoices").get(invoice_id)
+    if inv:
+        return {"Invoice": inv}
     return {"error": f"Invoice {invoice_id} not found"}
 
 
 def create_invoice(data: dict):
-    global _next_invoice_id
     now = _now()
+    new_id = str(_next_int_id("invoices"))
     lines = list(data.get("Line") or [])
     total = sum(l.get("Amount", 0) for l in lines if l.get("DetailType") != "SubTotalLineDetail")
     lines.append({"Amount": total, "DetailType": "SubTotalLineDetail", "SubTotalLineDetail": {}})
 
     invoice = {
-        "Id": str(_next_invoice_id),
-        "DocNumber": str(_next_invoice_id),
+        "Id": new_id,
+        "DocNumber": new_id,
         "TxnDate": data.get("TxnDate", _now()[:10]),
         "DueDate": data.get("DueDate", _now()[:10]),
         "CustomerRef": data.get("CustomerRef", {}),
@@ -370,79 +350,80 @@ def create_invoice(data: dict):
         "MetaData": {"CreateTime": now, "LastUpdatedTime": now},
         "SyncToken": "0",
     }
-    _invoices_store.append(invoice)
-    _next_invoice_id += 1
+    _store.table("invoices").upsert(invoice)
     return {"Invoice": invoice}
 
 
 def update_invoice(invoice_id: str, data: dict):
-    for i, inv in enumerate(_invoices_store):
-        if inv["Id"] == invoice_id:
-            updatable = {"DueDate", "CustomerRef", "Line", "BillEmail", "PrintStatus", "EmailStatus"}
-            for k, v in data.items():
-                if k in updatable:
-                    _invoices_store[i][k] = v
-            if "Line" in data:
-                lines = data["Line"]
-                total = sum(l.get("Amount", 0) for l in lines if l.get("DetailType") != "SubTotalLineDetail")
-                _invoices_store[i]["TotalAmt"] = total
-                _invoices_store[i]["Balance"] = total
-            _invoices_store[i]["MetaData"]["LastUpdatedTime"] = _now()
-            _invoices_store[i]["SyncToken"] = str(int(_invoices_store[i]["SyncToken"]) + 1)
-            return {"Invoice": _invoices_store[i]}
-    return {"error": f"Invoice {invoice_id} not found"}
+    inv = _store.table("invoices").get(invoice_id)
+    if not inv:
+        return {"error": f"Invoice {invoice_id} not found"}
+    updatable = {"DueDate", "CustomerRef", "Line", "BillEmail", "PrintStatus", "EmailStatus"}
+    patch = {k: v for k, v in data.items() if k in updatable}
+    if "Line" in data:
+        lines = data["Line"]
+        total = sum(l.get("Amount", 0) for l in lines if l.get("DetailType") != "SubTotalLineDetail")
+        patch["TotalAmt"] = total
+        patch["Balance"] = total
+    meta = dict(inv["MetaData"]); meta["LastUpdatedTime"] = _now()
+    patch["MetaData"] = meta
+    patch["SyncToken"] = str(int(inv["SyncToken"]) + 1)
+    _store.table("invoices").patch(invoice_id, patch)
+    return {"Invoice": _store.table("invoices").get(invoice_id)}
 
 
 def void_invoice(invoice_id: str):
-    for i, inv in enumerate(_invoices_store):
-        if inv["Id"] == invoice_id:
-            _invoices_store[i]["Status"] = "Voided"
-            _invoices_store[i]["Balance"] = 0.00
-            _invoices_store[i]["MetaData"]["LastUpdatedTime"] = _now()
-            _invoices_store[i]["SyncToken"] = str(int(_invoices_store[i]["SyncToken"]) + 1)
-            return {"Invoice": _invoices_store[i]}
-    return {"error": f"Invoice {invoice_id} not found"}
+    inv = _store.table("invoices").get(invoice_id)
+    if not inv:
+        return {"error": f"Invoice {invoice_id} not found"}
+    meta = dict(inv["MetaData"]); meta["LastUpdatedTime"] = _now()
+    _store.table("invoices").patch(invoice_id, {
+        "Status": "Voided",
+        "Balance": 0.00,
+        "MetaData": meta,
+        "SyncToken": str(int(inv["SyncToken"]) + 1),
+    })
+    return {"Invoice": _store.table("invoices").get(invoice_id)}
 
 
 def send_invoice(invoice_id: str):
-    for i, inv in enumerate(_invoices_store):
-        if inv["Id"] == invoice_id:
-            _invoices_store[i]["EmailStatus"] = "Sent"
-            _invoices_store[i]["MetaData"]["LastUpdatedTime"] = _now()
-            return {"Invoice": _invoices_store[i]}
-    return {"error": f"Invoice {invoice_id} not found"}
+    inv = _store.table("invoices").get(invoice_id)
+    if not inv:
+        return {"error": f"Invoice {invoice_id} not found"}
+    meta = dict(inv["MetaData"]); meta["LastUpdatedTime"] = _now()
+    _store.table("invoices").patch(invoice_id, {
+        "EmailStatus": "Sent",
+        "MetaData": meta,
+    })
+    return {"Invoice": _store.table("invoices").get(invoice_id)}
 
 
 def get_invoice_pdf(invoice_id: str):
-    for inv in _invoices_store:
-        if inv["Id"] == invoice_id:
-            return {"url": f"https://quickbooks.api.intuit.com/v3/company/{REALM_ID}/invoice/{invoice_id}/pdf"}
+    inv = _store.table("invoices").get(invoice_id)
+    if inv:
+        return {"url": f"https://quickbooks.api.intuit.com/v3/company/{REALM_ID}/invoice/{invoice_id}/pdf"}
     return {"error": f"Invoice {invoice_id} not found"}
 
 
-# ---------------------------------------------------------------------------
-# Bills
-# ---------------------------------------------------------------------------
-
 def list_bills():
-    return _bills_store
+    return _store.table("bills").rows()
 
 
 def get_bill(bill_id: str):
-    for b in _bills_store:
-        if b["Id"] == bill_id:
-            return {"Bill": b}
+    b = _store.table("bills").get(bill_id)
+    if b:
+        return {"Bill": b}
     return {"error": f"Bill {bill_id} not found"}
 
 
 def create_bill(data: dict):
-    global _next_bill_id
     now = _now()
+    new_id = str(_next_int_id("bills"))
     lines = data.get("Line", [])
     total = sum(l.get("Amount", 0) for l in lines)
 
     bill = {
-        "Id": str(_next_bill_id),
+        "Id": new_id,
         "VendorRef": data.get("VendorRef", {}),
         "TxnDate": data.get("TxnDate", _now()[:10]),
         "DueDate": data.get("DueDate", _now()[:10]),
@@ -450,48 +431,46 @@ def create_bill(data: dict):
         "Balance": total,
         "Line": lines,
         "Status": "Open",
-        "DocNumber": data.get("DocNumber", f"BILL-{_next_bill_id}"),
+        "DocNumber": data.get("DocNumber", f"BILL-{new_id}"),
         "MetaData": {"CreateTime": now, "LastUpdatedTime": now},
         "SyncToken": "0",
     }
-    _bills_store.append(bill)
-    _next_bill_id += 1
+    _store.table("bills").upsert(bill)
     return {"Bill": bill}
 
 
 def pay_bill(bill_id: str):
-    for i, b in enumerate(_bills_store):
-        if b["Id"] == bill_id:
-            _bills_store[i]["Balance"] = 0.00
-            _bills_store[i]["Status"] = "Paid"
-            _bills_store[i]["MetaData"]["LastUpdatedTime"] = _now()
-            _bills_store[i]["SyncToken"] = str(int(_bills_store[i]["SyncToken"]) + 1)
-            return {"Bill": _bills_store[i]}
-    return {"error": f"Bill {bill_id} not found"}
+    b = _store.table("bills").get(bill_id)
+    if not b:
+        return {"error": f"Bill {bill_id} not found"}
+    meta = dict(b["MetaData"]); meta["LastUpdatedTime"] = _now()
+    _store.table("bills").patch(bill_id, {
+        "Balance": 0.00,
+        "Status": "Paid",
+        "MetaData": meta,
+        "SyncToken": str(int(b["SyncToken"]) + 1),
+    })
+    return {"Bill": _store.table("bills").get(bill_id)}
 
-
-# ---------------------------------------------------------------------------
-# Payments
-# ---------------------------------------------------------------------------
 
 def list_payments():
-    return _payments_store
+    return _store.table("payments").rows()
 
 
 def get_payment(payment_id: str):
-    for p in _payments_store:
-        if p["Id"] == payment_id:
-            return {"Payment": p}
+    p = _store.table("payments").get(payment_id)
+    if p:
+        return {"Payment": p}
     return {"error": f"Payment {payment_id} not found"}
 
 
 def create_payment(data: dict):
-    global _next_payment_id
     now = _now()
+    new_id = str(_next_int_id("payments"))
     total = float(data.get("TotalAmt", 0))
 
     payment = {
-        "Id": str(_next_payment_id),
+        "Id": new_id,
         "TxnDate": data.get("TxnDate", _now()[:10]),
         "CustomerRef": data.get("CustomerRef", {}),
         "TotalAmt": total,
@@ -499,48 +478,44 @@ def create_payment(data: dict):
         "MetaData": {"CreateTime": now, "LastUpdatedTime": now},
         "SyncToken": "0",
     }
-    _payments_store.append(payment)
-    _next_payment_id += 1
+    _store.table("payments").upsert(payment)
 
-    # Apply payment to linked invoices
     for line in payment.get("Line", []):
         for linked in line.get("LinkedTxn", []):
             if linked.get("TxnType") == "Invoice":
                 inv_id = linked.get("TxnId")
-                for i, inv in enumerate(_invoices_store):
-                    if inv["Id"] == inv_id:
-                        _invoices_store[i]["Balance"] = max(0, _invoices_store[i]["Balance"] - line.get("Amount", 0))
-                        if _invoices_store[i]["Balance"] == 0:
-                            _invoices_store[i]["Status"] = "Paid"
-                        break
+                inv = _store.table("invoices").get(inv_id)
+                if not inv:
+                    continue
+                new_balance = max(0, inv["Balance"] - line.get("Amount", 0))
+                patch = {"Balance": new_balance}
+                if new_balance == 0:
+                    patch["Status"] = "Paid"
+                _store.table("invoices").patch(inv_id, patch)
 
     return {"Payment": payment}
 
 
-# ---------------------------------------------------------------------------
-# Estimates
-# ---------------------------------------------------------------------------
-
 def list_estimates():
-    return _estimates_store
+    return _store.table("estimates").rows()
 
 
 def get_estimate(estimate_id: str):
-    for e in _estimates_store:
-        if e["Id"] == estimate_id:
-            return {"Estimate": e}
+    e = _store.table("estimates").get(estimate_id)
+    if e:
+        return {"Estimate": e}
     return {"error": f"Estimate {estimate_id} not found"}
 
 
 def create_estimate(data: dict):
-    global _next_estimate_id
     now = _now()
+    new_id = str(_next_int_id("estimates"))
     lines = data.get("Line", [])
     total = sum(l.get("Amount", 0) for l in lines)
 
     estimate = {
-        "Id": str(_next_estimate_id),
-        "DocNumber": f"E-{_next_estimate_id}",
+        "Id": new_id,
+        "DocNumber": f"E-{new_id}",
         "TxnDate": data.get("TxnDate", _now()[:10]),
         "ExpirationDate": data.get("ExpirationDate"),
         "CustomerRef": data.get("CustomerRef", {}),
@@ -552,74 +527,72 @@ def create_estimate(data: dict):
         "MetaData": {"CreateTime": now, "LastUpdatedTime": now},
         "SyncToken": "0",
     }
-    _estimates_store.append(estimate)
-    _next_estimate_id += 1
+    _store.table("estimates").upsert(estimate)
     return {"Estimate": estimate}
 
 
 def convert_estimate_to_invoice(estimate_id: str):
-    global _next_invoice_id
-    for i, e in enumerate(_estimates_store):
-        if e["Id"] == estimate_id:
-            if e["TxnStatus"] not in ("Pending", "Accepted"):
-                return {"error": f"Estimate {estimate_id} cannot be converted (status: {e['TxnStatus']})"}
-            now = _now()
-            lines = [l for l in e["Line"] if l.get("DetailType") == "SalesItemLineDetail"]
-            total = sum(l.get("Amount", 0) for l in lines)
-            lines.append({"Amount": total, "DetailType": "SubTotalLineDetail", "SubTotalLineDetail": {}})
+    e = _store.table("estimates").get(estimate_id)
+    if not e:
+        return {"error": f"Estimate {estimate_id} not found"}
+    if e["TxnStatus"] not in ("Pending", "Accepted"):
+        return {"error": f"Estimate {estimate_id} cannot be converted (status: {e['TxnStatus']})"}
 
-            invoice = {
-                "Id": str(_next_invoice_id),
-                "DocNumber": str(_next_invoice_id),
-                "TxnDate": _now()[:10],
-                "DueDate": _now()[:10],
-                "CustomerRef": e["CustomerRef"],
-                "Line": lines,
-                "TotalAmt": total,
-                "Balance": total,
-                "PrintStatus": "NotSet",
-                "EmailStatus": "NotSet",
-                "BillEmail": None,
-                "Status": "Open",
-                "MetaData": {"CreateTime": now, "LastUpdatedTime": now},
-                "SyncToken": "0",
-            }
-            _invoices_store.append(invoice)
-            _next_invoice_id += 1
+    now = _now()
+    lines = [l for l in e["Line"] if l.get("DetailType") == "SalesItemLineDetail"]
+    total = sum(l.get("Amount", 0) for l in lines)
+    lines.append({"Amount": total, "DetailType": "SubTotalLineDetail", "SubTotalLineDetail": {}})
 
-            _estimates_store[i]["TxnStatus"] = "Accepted"
-            _estimates_store[i]["AcceptedDate"] = _now()[:10]
-            _estimates_store[i]["LinkedTxn"] = [{"TxnId": invoice["Id"], "TxnType": "Invoice"}]
-            _estimates_store[i]["MetaData"]["LastUpdatedTime"] = now
-            _estimates_store[i]["SyncToken"] = str(int(_estimates_store[i]["SyncToken"]) + 1)
+    new_inv_id = str(_next_int_id("invoices"))
+    invoice = {
+        "Id": new_inv_id,
+        "DocNumber": new_inv_id,
+        "TxnDate": _now()[:10],
+        "DueDate": _now()[:10],
+        "CustomerRef": e["CustomerRef"],
+        "Line": lines,
+        "TotalAmt": total,
+        "Balance": total,
+        "PrintStatus": "NotSet",
+        "EmailStatus": "NotSet",
+        "BillEmail": None,
+        "Status": "Open",
+        "MetaData": {"CreateTime": now, "LastUpdatedTime": now},
+        "SyncToken": "0",
+    }
+    _store.table("invoices").upsert(invoice)
 
-            return {"Invoice": invoice}
-    return {"error": f"Estimate {estimate_id} not found"}
+    meta = dict(e["MetaData"]); meta["LastUpdatedTime"] = now
+    _store.table("estimates").patch(estimate_id, {
+        "TxnStatus": "Accepted",
+        "AcceptedDate": _now()[:10],
+        "LinkedTxn": [{"TxnId": new_inv_id, "TxnType": "Invoice"}],
+        "MetaData": meta,
+        "SyncToken": str(int(e["SyncToken"]) + 1),
+    })
 
+    return {"Invoice": invoice}
 
-# ---------------------------------------------------------------------------
-# Expenses (Purchases)
-# ---------------------------------------------------------------------------
 
 def list_expenses():
-    return _expenses_store
+    return _store.table("expenses").rows()
 
 
 def get_expense(expense_id: str):
-    for e in _expenses_store:
-        if e["Id"] == expense_id:
-            return {"Purchase": e}
+    e = _store.table("expenses").get(expense_id)
+    if e:
+        return {"Purchase": e}
     return {"error": f"Expense {expense_id} not found"}
 
 
 def create_expense(data: dict):
-    global _next_expense_id
     now = _now()
+    new_id = str(_next_int_id("expenses"))
     lines = data.get("Line", [])
     total = sum(l.get("Amount", 0) for l in lines)
 
     expense = {
-        "Id": str(_next_expense_id),
+        "Id": new_id,
         "TxnDate": data.get("TxnDate", _now()[:10]),
         "AccountRef": data.get("AccountRef", {}),
         "PaymentType": data.get("PaymentType", "CreditCard"),
@@ -628,45 +601,37 @@ def create_expense(data: dict):
         "MetaData": {"CreateTime": now, "LastUpdatedTime": now},
         "SyncToken": "0",
     }
-    _expenses_store.append(expense)
-    _next_expense_id += 1
+    _store.table("expenses").upsert(expense)
     return {"Purchase": expense}
 
-
-# ---------------------------------------------------------------------------
-# Query Engine (simplified SQL-like)
-# ---------------------------------------------------------------------------
 
 def execute_query(query_str: str):
     """Parse simplified QuickBooks query: SELECT * FROM EntityName [WHERE field op 'value']"""
     query_str = query_str.strip()
 
-    # Parse entity name
     parts = query_str.upper().split()
     if len(parts) < 4 or parts[0] != "SELECT" or parts[2] != "FROM":
         return {"error": f"Invalid query syntax: {query_str}"}
 
     entity = query_str.split("FROM")[1].strip().split()[0].strip()
 
-    # Map entity to store
     entity_map = {
-        "Invoice": _invoices_store,
-        "Customer": _customers_store,
-        "Vendor": _vendors_store,
-        "Item": _items_store,
-        "Account": _accounts_store,
-        "Bill": _bills_store,
-        "Payment": _payments_store,
-        "Estimate": _estimates_store,
-        "Purchase": _expenses_store,
+        "Invoice": "invoices",
+        "Customer": "customers",
+        "Vendor": "vendors",
+        "Item": "items",
+        "Account": "accounts",
+        "Bill": "bills",
+        "Payment": "payments",
+        "Estimate": "estimates",
+        "Purchase": "expenses",
     }
 
     if entity not in entity_map:
         return {"error": f"Unknown entity: {entity}"}
 
-    results = list(entity_map[entity])
+    results = _store.table(entity_map[entity]).rows()
 
-    # Parse WHERE clause if present
     upper_query = query_str.upper()
     if "WHERE" in upper_query:
         where_idx = upper_query.index("WHERE") + 5
@@ -684,17 +649,10 @@ def execute_query(query_str: str):
 
 
 def _apply_where(results, where_clause):
-    """Apply simplified WHERE filtering."""
-    # Handle simple conditions: field = 'value', field > 'value', field < 'value'
-    # Also: Active = true/false, Balance > '0'
-    import re
-
-    # Split on AND (simplified - no OR support)
     conditions = re.split(r'\s+AND\s+', where_clause, flags=re.IGNORECASE)
 
     for cond in conditions:
         cond = cond.strip()
-        # Match: field operator value
         match = re.match(r"(\w+)\s*(=|!=|>|<|>=|<=|LIKE)\s*'?([^']*)'?", cond, re.IGNORECASE)
         if not match:
             continue
@@ -716,15 +674,12 @@ def _apply_where(results, where_clause):
 
 
 def _get_nested_field(item, field):
-    """Get field value, supporting dot notation and common QBO fields."""
     if field in item:
         return item[field]
-    # Handle nested refs like CustomerRef
     if field + "Ref" in item:
         ref = item[field + "Ref"]
         if isinstance(ref, dict):
             return ref.get("value")
-    # Dot notation
     parts = field.split(".")
     current = item
     for p in parts:
@@ -736,8 +691,6 @@ def _get_nested_field(item, field):
 
 
 def _compare(item_val, op, value):
-    """Compare values with type coercion."""
-    # Handle booleans
     if isinstance(item_val, bool):
         bool_val = value.lower() in ("true", "1", "yes")
         if op == "=":
@@ -746,7 +699,6 @@ def _compare(item_val, op, value):
             return item_val != bool_val
         return False
 
-    # Try numeric comparison
     try:
         num_item = float(item_val) if not isinstance(item_val, (int, float)) else item_val
         num_val = float(value)
@@ -765,7 +717,6 @@ def _compare(item_val, op, value):
     except (ValueError, TypeError):
         pass
 
-    # String comparison
     str_item = str(item_val)
     if op == "=":
         return str_item.lower() == value.lower()
@@ -778,16 +729,10 @@ def _compare(item_val, op, value):
     return False
 
 
-# ---------------------------------------------------------------------------
-# Reports
-# ---------------------------------------------------------------------------
-
 def profit_and_loss(start_date: str = None, end_date: str = None):
-    """Generate a simplified P&L report."""
-    # Filter invoices by date range for revenue
-    revenue_invoices = _invoices_store
-    expense_bills = _bills_store
-    expense_purchases = _expenses_store
+    revenue_invoices = _store.table("invoices").rows()
+    expense_bills = _store.table("bills").rows()
+    expense_purchases = _store.table("expenses").rows()
 
     if start_date:
         revenue_invoices = [inv for inv in revenue_invoices if (inv.get("TxnDate") or "") >= start_date]
@@ -798,7 +743,6 @@ def profit_and_loss(start_date: str = None, end_date: str = None):
         expense_bills = [b for b in expense_bills if (b.get("TxnDate") or "") <= end_date]
         expense_purchases = [e for e in expense_purchases if (e.get("TxnDate") or "") <= end_date]
 
-    # Only count paid invoices for revenue
     paid_invoices = [inv for inv in revenue_invoices if inv.get("Status") == "Paid"]
     total_revenue = sum(inv.get("TotalAmt", 0) for inv in paid_invoices)
     total_bill_expenses = sum(b.get("TotalAmt", 0) for b in expense_bills)
@@ -827,7 +771,6 @@ def profit_and_loss(start_date: str = None, end_date: str = None):
 
 
 def _build_expense_rows(bills, purchases):
-    """Group expenses by account for P&L detail."""
     account_totals = {}
     for b in bills:
         for line in b.get("Line", []):
@@ -847,11 +790,11 @@ def _build_expense_rows(bills, purchases):
 
 
 def balance_sheet(start_date: str = None, end_date: str = None):
-    """Generate a simplified Balance Sheet report."""
-    total_ar = sum(inv.get("Balance", 0) for inv in _invoices_store if inv.get("Status") not in ("Voided",))
-    total_ap = sum(b.get("Balance", 0) for b in _bills_store)
+    invoices = _store.table("invoices").rows()
+    bills = _store.table("bills").rows()
+    total_ar = sum(inv.get("Balance", 0) for inv in invoices if inv.get("Status") not in ("Voided",))
+    total_ap = sum(b.get("Balance", 0) for b in bills)
 
-    # Simplified balance sheet
     checking = 47250.00
     savings = 15000.00
     total_assets = checking + savings + total_ar
@@ -884,11 +827,10 @@ def balance_sheet(start_date: str = None, end_date: str = None):
 
 
 def accounts_receivable_aging():
-    """Generate AR Aging report."""
     aging_buckets = {"Current": [], "1-30": [], "31-60": [], "61-90": [], "91+": []}
     today = datetime.utcnow().strftime("%Y-%m-%d")
 
-    for inv in _invoices_store:
+    for inv in _store.table("invoices").rows():
         if inv.get("Balance", 0) <= 0 or inv.get("Status") == "Voided":
             continue
         due_date = inv.get("DueDate", today)
@@ -923,11 +865,10 @@ def accounts_receivable_aging():
 
 
 def accounts_payable_aging():
-    """Generate AP Aging report."""
     aging_buckets = {"Current": [], "1-30": [], "31-60": [], "61-90": [], "91+": []}
     today = datetime.utcnow().strftime("%Y-%m-%d")
 
-    for bill in _bills_store:
+    for bill in _store.table("bills").rows():
         if bill.get("Balance", 0) <= 0:
             continue
         due_date = bill.get("DueDate", today)
@@ -959,6 +900,3 @@ def accounts_payable_aging():
         },
         "Rows": {"Row": rows},
     }
-
-
-

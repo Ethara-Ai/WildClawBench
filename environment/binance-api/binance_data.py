@@ -5,10 +5,41 @@ ticker, 24hr ticker, order book depth, klines (candles), and account balances.
 """
 
 import csv
-from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("binance-api")
+
+_store.register("prices", primary_key="symbol",
+                initial_loader=lambda: _coerce_prices(_load("prices.csv")))
+_store.register("klines", primary_key="symbol",
+                initial_loader=lambda: _coerce_klines(_load("klines.csv")))
+_store.register("balances", primary_key="asset",
+                initial_loader=lambda: _coerce_balances(_load("balances.csv")))
+_store.register("depth", primary_key="symbol",
+                initial_loader=lambda: _coerce_depth(_load("depth.csv")))
+
+
+def _prices_rows():
+    return _store.table("prices").rows()
+
+
+def _klines_rows():
+    return _store.table("klines").rows()
+
+
+def _balances_rows():
+    return _store.table("balances").rows()
+
+
+def _depth_rows():
+    return _store.table("depth").rows()
+
 
 
 def _load(filename):
@@ -87,15 +118,12 @@ def _coerce_depth(rows):
     return out
 
 
-_prices = _coerce_prices(_load("prices.csv"))
-_klines = _coerce_klines(_load("klines.csv"))
-_balances = _coerce_balances(_load("balances.csv"))
-_depth = _coerce_depth(_load("depth.csv"))
 
-_prices_store = deepcopy(_prices)
-_klines_store = deepcopy(_klines)
-_balances_store = deepcopy(_balances)
-_depth_store = deepcopy(_depth)
+
+
+
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -104,11 +132,11 @@ _depth_store = deepcopy(_depth)
 
 def get_ticker_price(symbol=None):
     if symbol:
-        p = next((x for x in _prices_store if x["symbol"] == symbol.upper()), None)
+        p = next((x for x in _prices_rows() if x["symbol"] == symbol.upper()), None)
         if not p:
             return {"error": "Invalid symbol.", "code": -1121}
         return {"symbol": p["symbol"], "price": _fmt(p["price"])}
-    return [{"symbol": p["symbol"], "price": _fmt(p["price"])} for p in _prices_store]
+    return [{"symbol": p["symbol"], "price": _fmt(p["price"])} for p in _prices_rows()]
 
 
 # ---------------------------------------------------------------------------
@@ -129,11 +157,11 @@ def _ticker_24hr_view(p):
 
 def get_ticker_24hr(symbol=None):
     if symbol:
-        p = next((x for x in _prices_store if x["symbol"] == symbol.upper()), None)
+        p = next((x for x in _prices_rows() if x["symbol"] == symbol.upper()), None)
         if not p:
             return {"error": "Invalid symbol.", "code": -1121}
         return _ticker_24hr_view(p)
-    return [_ticker_24hr_view(p) for p in _prices_store]
+    return [_ticker_24hr_view(p) for p in _prices_rows()]
 
 
 # ---------------------------------------------------------------------------
@@ -142,7 +170,7 @@ def get_ticker_24hr(symbol=None):
 
 def get_depth(symbol, limit=100):
     sym = (symbol or "").upper()
-    levels = [d for d in _depth_store if d["symbol"] == sym]
+    levels = [d for d in _depth_rows() if d["symbol"] == sym]
     if not levels:
         return {"error": "Invalid symbol.", "code": -1121}
     bids = sorted((d for d in levels if d["side"] == "bid"), key=lambda d: d["price"], reverse=True)
@@ -163,7 +191,7 @@ def get_depth(symbol, limit=100):
 def get_klines(symbol, interval="1h", limit=500):
     sym = (symbol or "").upper()
     candles = [
-        k for k in _klines_store
+        k for k in _klines_rows()
         if k["symbol"] == sym and k["interval"] == interval
     ]
     if not candles:
@@ -195,7 +223,7 @@ def get_klines(symbol, interval="1h", limit=500):
 def get_account():
     balances = [
         {"asset": b["asset"], "free": _fmt(b["free"]), "locked": _fmt(b["locked"])}
-        for b in _balances_store
+        for b in _balances_rows()
     ]
     return {
         "makerCommission": 10,

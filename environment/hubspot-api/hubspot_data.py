@@ -7,11 +7,24 @@ Mutations (created/updated contacts and deals) reset on container restart.
 
 import csv
 import uuid
-from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("hubspot-api")
+
+_store.register("pipelines", primary_key="id",
+                initial_loader=lambda: _coerce_stages(_load("pipeline_stages.csv")))
+
+
+def _pipelines_rows():
+    return _store.table("pipelines").rows()
+
 
 
 def _load(filename):
@@ -93,12 +106,9 @@ def _coerce_stages(rows):
 _contacts = _coerce_objects(_load("contacts.csv"), _CONTACT_PROPS)
 _companies = _coerce_objects(_load("companies.csv"), _COMPANY_PROPS)
 _deals = _coerce_objects(_load("deals.csv"), _DEAL_PROPS, extra=_deal_extra)
-_pipelines = _coerce_stages(_load("pipeline_stages.csv"))
 
-_contacts_store = deepcopy(_contacts)
-_companies_store = deepcopy(_companies)
-_deals_store = deepcopy(_deals)
-_pipelines_store = deepcopy(_pipelines)
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -203,7 +213,7 @@ def get_deal(deal_id):
 
 
 def _valid_stage(pipeline_id, stage_id):
-    pipe = next((p for p in _pipelines_store if p["id"] == pipeline_id), None)
+    pipe = next((p for p in _pipelines_rows() if p["id"] == pipeline_id), None)
     if not pipe:
         return False
     return any(s["id"] == stage_id for s in pipe["stages"])
@@ -252,4 +262,4 @@ def update_deal(deal_id, properties):
 # ---------------------------------------------------------------------------
 
 def list_deal_pipelines():
-    return {"results": deepcopy(_pipelines_store)}
+    return {"results": deepcopy(_pipelines_rows())}

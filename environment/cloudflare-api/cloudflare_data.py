@@ -2,11 +2,42 @@
 
 import csv
 import uuid
-from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("cloudflare-api")
+
+_store.register("zones", primary_key="id",
+                initial_loader=lambda: _coerce_zones(_load("zones.csv")))
+_store.register("dns", primary_key="id",
+                initial_loader=lambda: _coerce_dns(_load("dns_records.csv")))
+_store.register("firewall", primary_key="id",
+                initial_loader=lambda: _coerce_firewall(_load("firewall_rules.csv")))
+_store.register("page_rules", primary_key="id",
+                initial_loader=lambda: _coerce_page_rules(_load("page_rules.csv")))
+
+
+def _zones_rows():
+    return _store.table("zones").rows()
+
+
+def _dns_rows():
+    return _store.table("dns").rows()
+
+
+def _firewall_rows():
+    return _store.table("firewall").rows()
+
+
+def _page_rules_rows():
+    return _store.table("page_rules").rows()
+
 
 
 def _load(filename):
@@ -64,15 +95,12 @@ def _coerce_page_rules(rows):
     return [{**r, "priority": int(r["priority"])} for r in rows]
 
 
-_zones = _coerce_zones(_load("zones.csv"))
-_dns = _coerce_dns(_load("dns_records.csv"))
-_firewall = _coerce_firewall(_load("firewall_rules.csv"))
-_page_rules = _coerce_page_rules(_load("page_rules.csv"))
 
-_zones_store = deepcopy(_zones)
-_dns_store = deepcopy(_dns)
-_firewall_store = deepcopy(_firewall)
-_page_rules_store = deepcopy(_page_rules)
+
+
+
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -98,7 +126,7 @@ def _new_id():
 
 
 def _zone_exists(zone_id):
-    return any(z["id"] == zone_id for z in _zones_store)
+    return any(z["id"] == zone_id for z in _zones_rows())
 
 
 def _serialize_zone(z):
@@ -147,7 +175,7 @@ def _serialize_firewall(r):
 # ---------------------------------------------------------------------------
 
 def list_zones(name=None, status=None):
-    results = list(_zones_store)
+    results = list(_zones_rows())
     if name:
         results = [z for z in results if z["name"] == name]
     if status:
@@ -156,7 +184,7 @@ def list_zones(name=None, status=None):
 
 
 def get_zone(zone_id):
-    for z in _zones_store:
+    for z in _zones_rows():
         if z["id"] == zone_id:
             return _ok(_serialize_zone(z))
     return _err(f"Zone {zone_id} not found", code=1003, status=404)
@@ -169,7 +197,7 @@ def get_zone(zone_id):
 def list_dns_records(zone_id, type=None, name=None):
     if not _zone_exists(zone_id):
         return _err(f"Zone {zone_id} not found", code=1003, status=404)
-    results = [r for r in _dns_store if r["zone_id"] == zone_id]
+    results = [r for r in _dns_rows() if r["zone_id"] == zone_id]
     if type:
         results = [r for r in results if r["type"] == type]
     if name:
@@ -180,7 +208,7 @@ def list_dns_records(zone_id, type=None, name=None):
 def get_dns_record(zone_id, record_id):
     if not _zone_exists(zone_id):
         return _err(f"Zone {zone_id} not found", code=1003, status=404)
-    for r in _dns_store:
+    for r in _dns_rows():
         if r["zone_id"] == zone_id and r["id"] == record_id:
             return _ok(_serialize_dns(r))
     return _err(f"DNS record {record_id} not found", code=81044, status=404)
@@ -201,7 +229,7 @@ def create_dns_record(zone_id, type, name, content, ttl=1, proxied=False, priori
         "created_on": _now(),
         "modified_on": _now(),
     }
-    _dns_store.append(record)
+    _dns_rows().append(record)
     return _ok(_serialize_dns(record))
 
 
@@ -209,31 +237,31 @@ def update_dns_record(zone_id, record_id, type=None, name=None, content=None,
                       ttl=None, proxied=None, priority=None):
     if not _zone_exists(zone_id):
         return _err(f"Zone {zone_id} not found", code=1003, status=404)
-    for idx, r in enumerate(_dns_store):
+    for idx, r in enumerate(_dns_rows()):
         if r["zone_id"] == zone_id and r["id"] == record_id:
             if type is not None:
-                _dns_store[idx]["type"] = type
+                _dns_rows()[idx]["type"] = type
             if name is not None:
-                _dns_store[idx]["name"] = name
+                _dns_rows()[idx]["name"] = name
             if content is not None:
-                _dns_store[idx]["content"] = content
+                _dns_rows()[idx]["content"] = content
             if ttl is not None:
-                _dns_store[idx]["ttl"] = ttl
+                _dns_rows()[idx]["ttl"] = ttl
             if proxied is not None:
-                _dns_store[idx]["proxied"] = proxied
+                _dns_rows()[idx]["proxied"] = proxied
             if priority is not None:
-                _dns_store[idx]["priority"] = priority
-            _dns_store[idx]["modified_on"] = _now()
-            return _ok(_serialize_dns(_dns_store[idx]))
+                _dns_rows()[idx]["priority"] = priority
+            _dns_rows()[idx]["modified_on"] = _now()
+            return _ok(_serialize_dns(_dns_rows()[idx]))
     return _err(f"DNS record {record_id} not found", code=81044, status=404)
 
 
 def delete_dns_record(zone_id, record_id):
     if not _zone_exists(zone_id):
         return _err(f"Zone {zone_id} not found", code=1003, status=404)
-    for idx, r in enumerate(_dns_store):
+    for idx, r in enumerate(_dns_rows()):
         if r["zone_id"] == zone_id and r["id"] == record_id:
-            _dns_store.pop(idx)
+            _dns_rows().pop(idx)
             return _ok({"id": record_id})
     return _err(f"DNS record {record_id} not found", code=81044, status=404)
 
@@ -245,6 +273,6 @@ def delete_dns_record(zone_id, record_id):
 def list_firewall_rules(zone_id):
     if not _zone_exists(zone_id):
         return _err(f"Zone {zone_id} not found", code=1003, status=404)
-    results = [r for r in _firewall_store if r["zone_id"] == zone_id]
+    results = [r for r in _firewall_rows() if r["zone_id"] == zone_id]
     results.sort(key=lambda r: r["priority"])
     return _ok([_serialize_firewall(r) for r in results])

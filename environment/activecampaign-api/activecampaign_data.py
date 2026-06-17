@@ -6,11 +6,42 @@ a top-level plural key plus a `meta` block containing the total count.
 """
 
 import csv
-from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("activecampaign-api")
+
+_store.register("contacts", primary_key="id",
+                initial_loader=lambda: _coerce_contacts(_load("contacts.csv")))
+_store.register("lists", primary_key="id",
+                initial_loader=lambda: _coerce_lists(_load("lists.csv")))
+_store.register("campaigns", primary_key="id",
+                initial_loader=lambda: _coerce_campaigns(_load("campaigns.csv")))
+_store.register("deals", primary_key="id",
+                initial_loader=lambda: _coerce_deals(_load("deals.csv")))
+
+
+def _contacts_rows():
+    return _store.table("contacts").rows()
+
+
+def _lists_rows():
+    return _store.table("lists").rows()
+
+
+def _campaigns_rows():
+    return _store.table("campaigns").rows()
+
+
+def _deals_rows():
+    return _store.table("deals").rows()
+
 
 
 def _load(filename):
@@ -94,15 +125,12 @@ def _coerce_deals(rows):
     return out
 
 
-_contacts = _coerce_contacts(_load("contacts.csv"))
-_lists = _coerce_lists(_load("lists.csv"))
-_campaigns = _coerce_campaigns(_load("campaigns.csv"))
-_deals = _coerce_deals(_load("deals.csv"))
 
-_contacts_store = deepcopy(_contacts)
-_lists_store = deepcopy(_lists)
-_campaigns_store = deepcopy(_campaigns)
-_deals_store = deepcopy(_deals)
+
+
+
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -178,7 +206,7 @@ def _meta(total, offset=0, limit=20):
 # ---------------------------------------------------------------------------
 
 def list_contacts(email=None, status=None, limit=20, offset=0):
-    contacts = _contacts_store
+    contacts = _contacts_rows()
     if email:
         contacts = [c for c in contacts if c["email"].lower() == email.lower()]
     if status is not None:
@@ -192,7 +220,7 @@ def list_contacts(email=None, status=None, limit=20, offset=0):
 
 
 def get_contact(contact_id):
-    c = next((x for x in _contacts_store if x["id"] == str(contact_id)), None)
+    c = next((x for x in _contacts_rows() if x["id"] == str(contact_id)), None)
     if not c:
         return {"error": "not_found", "message": f"Contact {contact_id} not found"}
     return {"contact": _serialize_contact(c)}
@@ -201,11 +229,11 @@ def get_contact(contact_id):
 def create_contact(email, first_name="", last_name="", phone="", status="1"):
     if not email:
         return {"error": "validation", "message": "email is required"}
-    existing = next((c for c in _contacts_store if c["email"].lower() == email.lower()), None)
+    existing = next((c for c in _contacts_rows() if c["email"].lower() == email.lower()), None)
     if existing:
         return {"error": "duplicate", "message": f"Contact with email {email} already exists"}
     now = _now_iso()
-    new_id = str(max((int(c["id"]) for c in _contacts_store), default=0) + 1)
+    new_id = str(max((int(c["id"]) for c in _contacts_rows()), default=0) + 1)
     contact = {
         "id": new_id,
         "email": email,
@@ -216,7 +244,7 @@ def create_contact(email, first_name="", last_name="", phone="", status="1"):
         "created_timestamp": now,
         "updated_timestamp": now,
     }
-    _contacts_store.append(contact)
+    _contacts_rows().append(contact)
     return {"contact": _serialize_contact(contact)}
 
 
@@ -225,8 +253,8 @@ def create_contact(email, first_name="", last_name="", phone="", status="1"):
 # ---------------------------------------------------------------------------
 
 def list_lists(limit=20, offset=0):
-    total = len(_lists_store)
-    window = _lists_store[offset:offset + limit]
+    total = len(_lists_rows())
+    window = _lists_rows()[offset:offset + limit]
     return {
         "lists": [_serialize_list(l) for l in window],
         "meta": _meta(total, offset=offset, limit=limit),
@@ -238,8 +266,8 @@ def list_lists(limit=20, offset=0):
 # ---------------------------------------------------------------------------
 
 def list_campaigns(limit=20, offset=0):
-    total = len(_campaigns_store)
-    window = _campaigns_store[offset:offset + limit]
+    total = len(_campaigns_rows())
+    window = _campaigns_rows()[offset:offset + limit]
     return {
         "campaigns": [_serialize_campaign(c) for c in window],
         "meta": _meta(total, offset=offset, limit=limit),
@@ -251,8 +279,8 @@ def list_campaigns(limit=20, offset=0):
 # ---------------------------------------------------------------------------
 
 def list_deals(limit=20, offset=0):
-    total = len(_deals_store)
-    window = _deals_store[offset:offset + limit]
+    total = len(_deals_rows())
+    window = _deals_rows()[offset:offset + limit]
     return {
         "deals": [_serialize_deal(d) for d in window],
         "meta": _meta(total, offset=offset, limit=limit),

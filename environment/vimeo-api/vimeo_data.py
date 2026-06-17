@@ -7,10 +7,29 @@ List endpoints use Vimeo's paged envelope:
 """
 
 import csv
-from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("vimeo-api")
+
+_store.register("users", primary_key="id",
+                initial_loader=lambda: _coerce_users(_load("users.csv")))
+_store.register("videos", primary_key="id",
+                initial_loader=lambda: _coerce_videos(_load("videos.csv")))
+
+
+def _users_rows():
+    return _store.table("users").rows()
+
+
+def _videos_rows():
+    return _store.table("videos").rows()
+
 
 # The user whose token is in use (the "me" of /me).
 _ME = "12000001"
@@ -63,11 +82,8 @@ def _coerce_videos(rows):
     return out
 
 
-_users = _coerce_users(_load("users.csv"))
-_videos = _coerce_videos(_load("videos.csv"))
 
-_users_store = deepcopy(_users)
-_videos_store = deepcopy(_videos)
+
 
 
 # ---------------------------------------------------------------------------
@@ -88,7 +104,7 @@ def _serialize_user(u):
             "connections": {
                 "videos": {
                     "uri": f"/users/{u['id']}/videos",
-                    "total": sum(1 for v in _videos_store if v["user_id"] == u["id"]),
+                    "total": sum(1 for v in _videos_rows() if v["user_id"] == u["id"]),
                 }
             }
         },
@@ -96,7 +112,7 @@ def _serialize_user(u):
 
 
 def _serialize_video(v):
-    owner = next((u for u in _users_store if u["id"] == v["user_id"]), None)
+    owner = next((u for u in _users_rows() if u["id"] == v["user_id"]), None)
     return {
         "uri": f"/videos/{v['id']}",
         "name": v["name"],
@@ -134,12 +150,12 @@ def _paged(items, page=1, per_page=25):
 # ---------------------------------------------------------------------------
 
 def get_me():
-    me = next((u for u in _users_store if u["id"] == _ME), _users_store[0])
+    me = next((u for u in _users_rows() if u["id"] == _ME), _users_rows()[0])
     return _serialize_user(me)
 
 
 def get_my_videos(page=1, per_page=25):
-    videos = [v for v in _videos_store if v["user_id"] == _ME]
+    videos = [v for v in _videos_rows() if v["user_id"] == _ME]
     videos = sorted(videos, key=lambda v: v["created_time"], reverse=True)
     return _paged([_serialize_video(v) for v in videos], page=page, per_page=per_page)
 
@@ -149,7 +165,7 @@ def get_my_videos(page=1, per_page=25):
 # ---------------------------------------------------------------------------
 
 def get_video(video_id):
-    v = next((x for x in _videos_store if x["id"] == str(video_id)), None)
+    v = next((x for x in _videos_rows() if x["id"] == str(video_id)), None)
     if not v:
         return {"error": f"The requested video could not be found.", "video_id": str(video_id)}
     return _serialize_video(v)
@@ -160,15 +176,15 @@ def get_video(video_id):
 # ---------------------------------------------------------------------------
 
 def get_user(user_id):
-    u = next((x for x in _users_store if x["id"] == str(user_id)), None)
+    u = next((x for x in _users_rows() if x["id"] == str(user_id)), None)
     if not u:
         return {"error": f"The requested user could not be found.", "user_id": str(user_id)}
     return _serialize_user(u)
 
 
 def get_user_videos(user_id, page=1, per_page=25):
-    if not any(u["id"] == str(user_id) for u in _users_store):
+    if not any(u["id"] == str(user_id) for u in _users_rows()):
         return {"error": f"The requested user could not be found.", "user_id": str(user_id)}
-    videos = [v for v in _videos_store if v["user_id"] == str(user_id)]
+    videos = [v for v in _videos_rows() if v["user_id"] == str(user_id)]
     videos = sorted(videos, key=lambda v: v["created_time"], reverse=True)
     return _paged([_serialize_video(v) for v in videos], page=page, per_page=per_page)

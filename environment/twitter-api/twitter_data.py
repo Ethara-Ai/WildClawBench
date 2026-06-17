@@ -2,11 +2,48 @@
 
 import csv
 import uuid
-from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("twitter-api")
+
+_store.register("users", primary_key="id",
+                initial_loader=lambda: _coerce_users(_load("users.csv")))
+_store.register("tweets", primary_key="id",
+                initial_loader=lambda: _coerce_tweets(_load("tweets.csv")))
+_store.register("follows", primary_key="follower_id",
+                initial_loader=lambda: _load("follows.csv"))
+_store.register("likes", primary_key="user_id",
+                initial_loader=lambda: _load("likes.csv"))
+_store.register("retweets", primary_key="user_id",
+                initial_loader=lambda: _load("retweets.csv"))
+
+
+def _users_rows():
+    return _store.table("users").rows()
+
+
+def _tweets_rows():
+    return _store.table("tweets").rows()
+
+
+def _follows_rows():
+    return _store.table("follows").rows()
+
+
+def _likes_rows():
+    return _store.table("likes").rows()
+
+
+def _retweets_rows():
+    return _store.table("retweets").rows()
+
 
 
 def _load(filename):
@@ -62,20 +99,18 @@ def _coerce_tweets(rows):
     return out
 
 
-_users = _coerce_users(_load("users.csv"))
-_tweets = _coerce_tweets(_load("tweets.csv"))
-_follows = _load("follows.csv")
-_likes = _load("likes.csv")
-_retweets = _load("retweets.csv")
 
-_users_store = deepcopy(_users)
-_tweets_store = deepcopy(_tweets)
-_follows_store = deepcopy(_follows)
-_likes_store = deepcopy(_likes)
-_retweets_store = deepcopy(_retweets)
+
+
+
+
+
+
+
+
 
 # The authenticated user ("me") is the first seed user.
-_ME_ID = _users_store[0]["id"]
+_ME_ID = _users_rows()[0]["id"]
 
 
 def _new_id():
@@ -92,49 +127,49 @@ def _public_user(u):
 # ---------------------------------------------------------------------------
 
 def get_me():
-    for u in _users_store:
+    for u in _users_rows():
         if u["id"] == _ME_ID:
             return {"data": _public_user(u)}
-    return {"data": _public_user(_users_store[0])}
+    return {"data": _public_user(_users_rows()[0])}
 
 
 def get_user(user_id):
-    for u in _users_store:
+    for u in _users_rows():
         if u["id"] == user_id:
             return {"data": _public_user(u)}
     return {"error": f"User {user_id} not found"}
 
 
 def get_user_by_username(username):
-    for u in _users_store:
+    for u in _users_rows():
         if u["username"].lower() == username.lower():
             return {"data": _public_user(u)}
     return {"error": f"User @{username} not found"}
 
 
 def get_user_tweets(user_id, max_results=10):
-    if not any(u["id"] == user_id for u in _users_store):
+    if not any(u["id"] == user_id for u in _users_rows()):
         return {"error": f"User {user_id} not found"}
-    tweets = [t for t in _tweets_store if t["author_id"] == user_id]
+    tweets = [t for t in _tweets_rows() if t["author_id"] == user_id]
     tweets.sort(key=lambda t: t["created_at"], reverse=True)
     sliced = tweets[:max_results]
     return {"data": sliced, "meta": {"result_count": len(sliced)}}
 
 
 def get_followers(user_id, max_results=100):
-    if not any(u["id"] == user_id for u in _users_store):
+    if not any(u["id"] == user_id for u in _users_rows()):
         return {"error": f"User {user_id} not found"}
-    follower_ids = [f["follower_id"] for f in _follows_store if f["following_id"] == user_id]
-    followers = [_public_user(u) for u in _users_store if u["id"] in follower_ids]
+    follower_ids = [f["follower_id"] for f in _follows_rows() if f["following_id"] == user_id]
+    followers = [_public_user(u) for u in _users_rows() if u["id"] in follower_ids]
     sliced = followers[:max_results]
     return {"data": sliced, "meta": {"result_count": len(sliced)}}
 
 
 def get_following(user_id, max_results=100):
-    if not any(u["id"] == user_id for u in _users_store):
+    if not any(u["id"] == user_id for u in _users_rows()):
         return {"error": f"User {user_id} not found"}
-    following_ids = [f["following_id"] for f in _follows_store if f["follower_id"] == user_id]
-    following = [_public_user(u) for u in _users_store if u["id"] in following_ids]
+    following_ids = [f["following_id"] for f in _follows_rows() if f["follower_id"] == user_id]
+    following = [_public_user(u) for u in _users_rows() if u["id"] in following_ids]
     sliced = following[:max_results]
     return {"data": sliced, "meta": {"result_count": len(sliced)}}
 
@@ -146,14 +181,14 @@ def get_following(user_id, max_results=100):
 def list_tweets(ids=None, max_results=10):
     if ids:
         wanted = {i.strip() for i in ids}
-        tweets = [t for t in _tweets_store if t["id"] in wanted]
+        tweets = [t for t in _tweets_rows() if t["id"] in wanted]
     else:
-        tweets = sorted(_tweets_store, key=lambda t: t["created_at"], reverse=True)[:max_results]
+        tweets = sorted(_tweets_rows(), key=lambda t: t["created_at"], reverse=True)[:max_results]
     return {"data": tweets, "meta": {"result_count": len(tweets)}}
 
 
 def get_tweet(tweet_id):
-    for t in _tweets_store:
+    for t in _tweets_rows():
         if t["id"] == tweet_id:
             return {"data": t}
     return {"error": f"Tweet {tweet_id} not found"}
@@ -161,9 +196,9 @@ def get_tweet(tweet_id):
 
 def create_tweet(text, author_id=None, reply_to_tweet_id=None):
     author_id = author_id or _ME_ID
-    if not any(u["id"] == author_id for u in _users_store):
+    if not any(u["id"] == author_id for u in _users_rows()):
         return {"error": f"User {author_id} not found"}
-    if reply_to_tweet_id and not any(t["id"] == reply_to_tweet_id for t in _tweets_store):
+    if reply_to_tweet_id and not any(t["id"] == reply_to_tweet_id for t in _tweets_rows()):
         return {"error": f"Tweet {reply_to_tweet_id} not found"}
     tweet = {
         "id": _new_id(),
@@ -179,25 +214,25 @@ def create_tweet(text, author_id=None, reply_to_tweet_id=None):
             "quote_count": 0,
         },
     }
-    _tweets_store.append(tweet)
+    _tweets_rows().append(tweet)
     if reply_to_tweet_id:
-        for t in _tweets_store:
+        for t in _tweets_rows():
             if t["id"] == reply_to_tweet_id:
                 t["public_metrics"]["reply_count"] += 1
     return {"data": tweet}
 
 
 def delete_tweet(tweet_id):
-    for i, t in enumerate(_tweets_store):
+    for i, t in enumerate(_tweets_rows()):
         if t["id"] == tweet_id:
-            _tweets_store.pop(i)
+            _tweets_rows().pop(i)
             return {"data": {"deleted": True}}
     return {"error": f"Tweet {tweet_id} not found"}
 
 
 def search_recent(query, max_results=10):
     q = (query or "").lower()
-    matches = [t for t in _tweets_store if q in t["text"].lower()]
+    matches = [t for t in _tweets_rows() if q in t["text"].lower()]
     matches.sort(key=lambda t: t["created_at"], reverse=True)
     sliced = matches[:max_results]
     return {"data": sliced, "meta": {"result_count": len(sliced), "query": query}}
@@ -208,24 +243,24 @@ def search_recent(query, max_results=10):
 # ---------------------------------------------------------------------------
 
 def like_tweet(user_id, tweet_id):
-    if not any(u["id"] == user_id for u in _users_store):
+    if not any(u["id"] == user_id for u in _users_rows()):
         return {"error": f"User {user_id} not found"}
-    target = next((t for t in _tweets_store if t["id"] == tweet_id), None)
+    target = next((t for t in _tweets_rows() if t["id"] == tweet_id), None)
     if not target:
         return {"error": f"Tweet {tweet_id} not found"}
-    if not any(l["user_id"] == user_id and l["tweet_id"] == tweet_id for l in _likes_store):
-        _likes_store.append({"user_id": user_id, "tweet_id": tweet_id})
+    if not any(l["user_id"] == user_id and l["tweet_id"] == tweet_id for l in _likes_rows()):
+        _likes_rows().append({"user_id": user_id, "tweet_id": tweet_id})
         target["public_metrics"]["like_count"] += 1
     return {"data": {"liked": True}}
 
 
 def retweet(user_id, tweet_id):
-    if not any(u["id"] == user_id for u in _users_store):
+    if not any(u["id"] == user_id for u in _users_rows()):
         return {"error": f"User {user_id} not found"}
-    target = next((t for t in _tweets_store if t["id"] == tweet_id), None)
+    target = next((t for t in _tweets_rows() if t["id"] == tweet_id), None)
     if not target:
         return {"error": f"Tweet {tweet_id} not found"}
-    if not any(r["user_id"] == user_id and r["tweet_id"] == tweet_id for r in _retweets_store):
-        _retweets_store.append({"user_id": user_id, "tweet_id": tweet_id})
+    if not any(r["user_id"] == user_id and r["tweet_id"] == tweet_id for r in _retweets_rows()):
+        _retweets_rows().append({"user_id": user_id, "tweet_id": tweet_id})
         target["public_metrics"]["retweet_count"] += 1
     return {"data": {"retweeted": True}}

@@ -6,11 +6,36 @@ Captured events are held in process memory and reset on container restart.
 """
 
 import csv
-from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("posthog-api")
+
+_store.register("events", primary_key="id",
+                initial_loader=lambda: _coerce_events(_load("events.csv")))
+_store.register("flags", primary_key="id",
+                initial_loader=lambda: _coerce_flags(_load("feature_flags.csv")))
+_store.register("persons", primary_key="id",
+                initial_loader=lambda: _coerce_persons(_load("persons.csv")))
+
+
+def _events_rows():
+    return _store.table("events").rows()
+
+
+def _flags_rows():
+    return _store.table("flags").rows()
+
+
+def _persons_rows():
+    return _store.table("persons").rows()
+
 
 
 def _load(filename):
@@ -78,13 +103,10 @@ def _coerce_persons(rows):
     return out
 
 
-_events = _coerce_events(_load("events.csv"))
-_flags = _coerce_flags(_load("feature_flags.csv"))
-_persons = _coerce_persons(_load("persons.csv"))
 
-_events_store = deepcopy(_events)
-_flags_store = deepcopy(_flags)
-_persons_store = deepcopy(_persons)
+
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -120,8 +142,8 @@ def _serialize_person(p):
 # ---------------------------------------------------------------------------
 
 def capture(payload):
-    _events_store.append({
-        "id": f"evt_{len(_events_store) + 1:05d}",
+    _events_rows().append({
+        "id": f"evt_{len(_events_rows()) + 1:05d}",
         "project_id": int(payload.get("project_id") or 1),
         "distinct_id": payload.get("distinct_id"),
         "event": payload.get("event") or "$pageview",
@@ -136,7 +158,7 @@ def capture(payload):
 # ---------------------------------------------------------------------------
 
 def list_events(project_id, event=None, distinct_id=None):
-    events = [e for e in _events_store if e["project_id"] == int(project_id)]
+    events = [e for e in _events_rows() if e["project_id"] == int(project_id)]
     if event:
         events = [e for e in events if e["event"] == event]
     if distinct_id:
@@ -145,7 +167,7 @@ def list_events(project_id, event=None, distinct_id=None):
 
 
 def list_feature_flags(project_id):
-    flags = [f for f in _flags_store if f["project_id"] == int(project_id)]
+    flags = [f for f in _flags_rows() if f["project_id"] == int(project_id)]
     results = [
         {
             "id": f["id"],
@@ -160,7 +182,7 @@ def list_feature_flags(project_id):
 
 
 def list_persons(project_id):
-    persons = [p for p in _persons_store if p["project_id"] == int(project_id)]
+    persons = [p for p in _persons_rows() if p["project_id"] == int(project_id)]
     results = [_serialize_person(p) for p in persons]
     return {"results": results, "count": len(results)}
 
@@ -172,7 +194,7 @@ def list_persons(project_id):
 def decide(payload):
     distinct_id = payload.get("distinct_id")
     project_id = int(payload.get("project_id") or 1)
-    flags = [f for f in _flags_store if f["project_id"] == project_id]
+    flags = [f for f in _flags_rows() if f["project_id"] == project_id]
     enabled = {}
     for f in flags:
         enabled[f["key"]] = bool(f["active"] and f["rollout_percentage"] > 0)

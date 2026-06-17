@@ -4,10 +4,35 @@ Returns OpenWeather-style JSON shapes (`weather`, `main`, `wind`, `name`, etc.).
 """
 
 import csv
-from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("openweather-api")
+
+_store.register("cities", primary_key="id",
+                initial_loader=lambda: _coerce_cities(_load("cities.csv")))
+_store.register("current", primary_key="city_id",
+                initial_loader=lambda: _coerce_current(_load("current_weather.csv")))
+_store.register("forecast", primary_key="city_id",
+                initial_loader=lambda: _coerce_forecast(_load("forecast.csv")))
+
+
+def _cities_rows():
+    return _store.table("cities").rows()
+
+
+def _current_rows():
+    return _store.table("current").rows()
+
+
+def _forecast_rows():
+    return _store.table("forecast").rows()
+
 
 
 def _load(filename):
@@ -83,13 +108,10 @@ def _coerce_forecast(rows):
     return out
 
 
-_cities = _coerce_cities(_load("cities.csv"))
-_current = _coerce_current(_load("current_weather.csv"))
-_forecast = _coerce_forecast(_load("forecast.csv"))
 
-_cities_store = deepcopy(_cities)
-_current_store = deepcopy(_current)
-_forecast_store = deepcopy(_forecast)
+
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -101,10 +123,10 @@ def _find_city_by_name(q):
         return None
     # q may be "City" or "City,CC"
     name = q.split(",")[0].strip().lower()
-    for c in _cities_store:
+    for c in _cities_rows():
         if c["name"].lower() == name:
             return c
-    for c in _cities_store:
+    for c in _cities_rows():
         if name in c["name"].lower():
             return c
     return None
@@ -113,7 +135,7 @@ def _find_city_by_name(q):
 def _find_city_by_coords(lat, lon):
     best = None
     best_d = None
-    for c in _cities_store:
+    for c in _cities_rows():
         d = (c["lat"] - lat) ** 2 + (c["lon"] - lon) ** 2
         if best_d is None or d < best_d:
             best_d = d
@@ -122,7 +144,7 @@ def _find_city_by_coords(lat, lon):
 
 
 def _current_for(city_id):
-    for w in _current_store:
+    for w in _current_rows():
         if w["city_id"] == city_id:
             return w
     return None
@@ -213,7 +235,7 @@ def get_forecast(q=None, lat=None, lon=None):
         return {"cod": "400", "message": "Nothing to geocode"}
     if not city:
         return {"cod": "404", "message": "city not found"}
-    rows = [r for r in _forecast_store if r["city_id"] == city["id"]]
+    rows = [r for r in _forecast_rows() if r["city_id"] == city["id"]]
     rows.sort(key=lambda r: r["dt"])
     items = [_forecast_item(r) for r in rows]
     return {
@@ -237,7 +259,7 @@ def get_forecast(q=None, lat=None, lon=None):
 
 def geocode_direct(q, limit=5):
     name = (q or "").split(",")[0].strip().lower()
-    matches = [c for c in _cities_store if name and name in c["name"].lower()]
+    matches = [c for c in _cities_rows() if name and name in c["name"].lower()]
     out = []
     for c in matches[:limit]:
         out.append({

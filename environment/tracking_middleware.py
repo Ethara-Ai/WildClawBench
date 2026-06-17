@@ -32,13 +32,9 @@ class RequestTracker(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         if request.url.path.startswith("/audit"):
             return await call_next(request)
-        if request.url.path == "/health":
-            return await call_next(request)
-        # Admin-plane traffic (inject_director / drift_director / mock_stack probes)
-        # MUST NOT appear in /audit/summary — agent-side distractor tests use that
-        # summary to verify zero business contact, and admin-plane bookkeeping is
-        # invisible to the agent by contract (see inject_director module docstring).
         if request.url.path.startswith("/admin"):
+            return await call_next(request)
+        if request.url.path == "/health":
             return await call_next(request)
 
         start_time = time.time()

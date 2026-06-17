@@ -2,11 +2,42 @@
 
 import csv
 import uuid
-from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("doordash-api")
+
+_store.register("stores", primary_key="store_id",
+                initial_loader=lambda: _coerce_stores(_load("stores.csv")))
+_store.register("menu_items", primary_key="item_id",
+                initial_loader=lambda: _coerce_menu(_load("menu_items.csv")))
+_store.register("orders", primary_key="order_id",
+                initial_loader=lambda: _coerce_orders(_load("orders.csv")))
+_store.register("order_items", primary_key="order_id",
+                initial_loader=lambda: _coerce_order_items(_load("order_items.csv")))
+
+
+def _stores_rows():
+    return _store.table("stores").rows()
+
+
+def _menu_items_rows():
+    return _store.table("menu_items").rows()
+
+
+def _orders_rows():
+    return _store.table("orders").rows()
+
+
+def _order_items_rows():
+    return _store.table("order_items").rows()
+
 
 SERVICE_FEE_PCT = 10.0  # percent of subtotal
 
@@ -83,15 +114,14 @@ def _coerce_order_items(rows):
     return out
 
 
-_stores = _coerce_stores(_load("stores.csv"))
-_menu_items = _coerce_menu(_load("menu_items.csv"))
-_orders = _coerce_orders(_load("orders.csv"))
-_order_items = _coerce_order_items(_load("order_items.csv"))
 
-_stores_store = deepcopy(_stores)
-_menu_store = deepcopy(_menu_items)
-_orders_store = deepcopy(_orders)
-_order_items_store = deepcopy(_order_items)
+
+
+
+
+
+
+
 _carts = {}  # cart_id -> {store_id, items: [{item_id, quantity}]}
 
 
@@ -104,7 +134,7 @@ def _new_id(prefix):
 # ---------------------------------------------------------------------------
 
 def list_stores(latitude=None, longitude=None, cuisine=None, open_only=False):
-    results = list(_stores_store)
+    results = list(_stores_rows())
     if cuisine:
         results = [s for s in results if s["cuisine"].lower() == cuisine.lower()]
     if open_only:
@@ -114,14 +144,14 @@ def list_stores(latitude=None, longitude=None, cuisine=None, open_only=False):
 
 
 def get_store(store_id):
-    for s in _stores_store:
+    for s in _stores_rows():
         if s["store_id"] == store_id:
             return s
     return {"error": f"Store {store_id} not found"}
 
 
 def get_menu(store_id):
-    if not any(s["store_id"] == store_id for s in _stores_store):
+    if not any(s["store_id"] == store_id for s in _stores_rows()):
         return {"error": f"Store {store_id} not found"}
     items = [i for i in _menu_store if i["store_id"] == store_id]
     categories = {}
@@ -146,7 +176,7 @@ def _get_item(item_id):
 # ---------------------------------------------------------------------------
 
 def create_cart(store_id):
-    store = next((s for s in _stores_store if s["store_id"] == store_id), None)
+    store = next((s for s in _stores_rows() if s["store_id"] == store_id), None)
     if not store:
         return {"error": f"Store {store_id} not found"}
     cart_id = _new_id("cart")
@@ -163,7 +193,7 @@ def _cart_with_totals(cart_id):
     cart = _carts.get(cart_id)
     if not cart:
         return {"error": f"Cart {cart_id} not found"}
-    store = next(s for s in _stores_store if s["store_id"] == cart["store_id"])
+    store = next(s for s in _stores_rows() if s["store_id"] == cart["store_id"])
     subtotal = 0.0
     detailed = []
     for it in cart["items"]:
@@ -234,9 +264,9 @@ def checkout(cart_id, customer_name="Guest", tip=0.0):
         "placed_at": _now_iso(),
         "dasher_name": "",
     }
-    _orders_store.append(order)
+    _orders_rows().append(order)
     for it in cart_full["items"]:
-        _order_items_store.append({
+        _order_items_rows().append({
             "order_id": order_id,
             "item_id": it["item_id"],
             "quantity": it["quantity"],
@@ -252,8 +282,8 @@ def checkout(cart_id, customer_name="Guest", tip=0.0):
 # ---------------------------------------------------------------------------
 
 def get_order(order_id):
-    for o in _orders_store:
+    for o in _orders_rows():
         if o["order_id"] == order_id:
-            items = [i for i in _order_items_store if i["order_id"] == order_id]
+            items = [i for i in _order_items_rows() if i["order_id"] == order_id]
             return {**o, "items": items}
     return {"error": f"Order {order_id} not found"}

@@ -2,11 +2,48 @@
 
 import csv
 import uuid
-from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("pagerduty-api")
+
+_store.register("users", primary_key="user_id",
+                initial_loader=lambda: _coerce_users(_load("users.csv")))
+_store.register("services", primary_key="service_id",
+                initial_loader=lambda: _coerce_services(_load("services.csv")))
+_store.register("incidents", primary_key="incident_id",
+                initial_loader=lambda: _coerce_incidents(_load("incidents.csv")))
+_store.register("policies", primary_key="escalation_policy_id",
+                initial_loader=lambda: _coerce_policies(_load("escalation_policies.csv")))
+_store.register("schedules", primary_key="schedule_id",
+                initial_loader=lambda: _coerce_schedules(_load("schedules.csv")))
+
+
+def _users_rows():
+    return _store.table("users").rows()
+
+
+def _services_rows():
+    return _store.table("services").rows()
+
+
+def _incidents_rows():
+    return _store.table("incidents").rows()
+
+
+def _policies_rows():
+    return _store.table("policies").rows()
+
+
+def _schedules_rows():
+    return _store.table("schedules").rows()
+
 
 VALID_STATUSES = {"triggered", "acknowledged", "resolved"}
 
@@ -64,17 +101,16 @@ def _coerce_schedules(rows):
     return [dict(r) for r in rows]
 
 
-_users = _coerce_users(_load("users.csv"))
-_services = _coerce_services(_load("services.csv"))
-_incidents = _coerce_incidents(_load("incidents.csv"))
-_policies = _coerce_policies(_load("escalation_policies.csv"))
-_schedules = _coerce_schedules(_load("schedules.csv"))
 
-_users_store = deepcopy(_users)
-_services_store = deepcopy(_services)
-_incidents_store = deepcopy(_incidents)
-_policies_store = deepcopy(_policies)
-_schedules_store = deepcopy(_schedules)
+
+
+
+
+
+
+
+
+
 _notes_store = {}  # incident_id -> [note]
 
 
@@ -87,11 +123,11 @@ def _new_id(prefix):
 # ---------------------------------------------------------------------------
 
 def list_users():
-    return {"users": deepcopy(_users_store)}
+    return {"users": deepcopy(_users_rows())}
 
 
 def _get_user(user_id):
-    return next((u for u in _users_store if u["user_id"] == user_id), None)
+    return next((u for u in _users_rows() if u["user_id"] == user_id), None)
 
 
 # ---------------------------------------------------------------------------
@@ -99,11 +135,11 @@ def _get_user(user_id):
 # ---------------------------------------------------------------------------
 
 def list_services():
-    return {"services": deepcopy(_services_store)}
+    return {"services": deepcopy(_services_rows())}
 
 
 def get_service(service_id):
-    for s in _services_store:
+    for s in _services_rows():
         if s["service_id"] == service_id:
             return s
     return {"error": f"Service {service_id} not found"}
@@ -114,7 +150,7 @@ def get_service(service_id):
 # ---------------------------------------------------------------------------
 
 def list_incidents(statuses=None, service_id=None, urgency=None):
-    results = list(_incidents_store)
+    results = list(_incidents_rows())
     if statuses:
         wanted = {s.lower() for s in statuses}
         results = [i for i in results if i["status"].lower() in wanted]
@@ -127,19 +163,19 @@ def list_incidents(statuses=None, service_id=None, urgency=None):
 
 
 def get_incident(incident_id):
-    for i in _incidents_store:
+    for i in _incidents_rows():
         if i["incident_id"] == incident_id:
             return i
     return {"error": f"Incident {incident_id} not found"}
 
 
 def create_incident(title, service_id, urgency="high", assigned_to=None):
-    service = next((s for s in _services_store if s["service_id"] == service_id), None)
+    service = next((s for s in _services_rows() if s["service_id"] == service_id), None)
     if not service:
         return {"error": f"Service {service_id} not found"}
     if assigned_to and not _get_user(assigned_to):
         return {"error": f"User {assigned_to} not found"}
-    incident_number = max((i["incident_number"] for i in _incidents_store), default=1000) + 1
+    incident_number = max((i["incident_number"] for i in _incidents_rows()), default=1000) + 1
     incident = {
         "incident_id": _new_id("PI"),
         "incident_number": incident_number,
@@ -152,26 +188,26 @@ def create_incident(title, service_id, urgency="high", assigned_to=None):
         "created_at": _now_iso(),
         "resolved_at": None,
     }
-    _incidents_store.append(incident)
+    _incidents_rows().append(incident)
     return incident
 
 
 def update_incident(incident_id, status=None, assigned_to=None):
-    for i, inc in enumerate(_incidents_store):
+    for i, inc in enumerate(_incidents_rows()):
         if inc["incident_id"] == incident_id:
             if status is not None:
                 if status.lower() not in VALID_STATUSES:
                     return {"error": f"Invalid status '{status}'"}
-                _incidents_store[i]["status"] = status.lower()
+                _incidents_rows()[i]["status"] = status.lower()
                 if status.lower() == "resolved":
-                    _incidents_store[i]["resolved_at"] = _now_iso()
+                    _incidents_rows()[i]["resolved_at"] = _now_iso()
                 else:
-                    _incidents_store[i]["resolved_at"] = None
+                    _incidents_rows()[i]["resolved_at"] = None
             if assigned_to is not None:
                 if not _get_user(assigned_to):
                     return {"error": f"User {assigned_to} not found"}
-                _incidents_store[i]["assigned_to"] = assigned_to
-            return _incidents_store[i]
+                _incidents_rows()[i]["assigned_to"] = assigned_to
+            return _incidents_rows()[i]
     return {"error": f"Incident {incident_id} not found"}
 
 
@@ -180,13 +216,13 @@ def update_incident(incident_id, status=None, assigned_to=None):
 # ---------------------------------------------------------------------------
 
 def list_notes(incident_id):
-    if not any(i["incident_id"] == incident_id for i in _incidents_store):
+    if not any(i["incident_id"] == incident_id for i in _incidents_rows()):
         return {"error": f"Incident {incident_id} not found"}
     return {"notes": _notes_store.get(incident_id, [])}
 
 
 def create_note(incident_id, content, user_id=None):
-    if not any(i["incident_id"] == incident_id for i in _incidents_store):
+    if not any(i["incident_id"] == incident_id for i in _incidents_rows()):
         return {"error": f"Incident {incident_id} not found"}
     note = {
         "note_id": _new_id("NOTE"),
@@ -205,7 +241,7 @@ def create_note(incident_id, content, user_id=None):
 
 def list_oncalls(escalation_policy_id=None):
     results = []
-    for sch in _schedules_store:
+    for sch in _schedules_rows():
         if escalation_policy_id and sch["escalation_policy_id"] != escalation_policy_id:
             continue
         user = _get_user(sch["current_oncall_user_id"])
@@ -221,8 +257,8 @@ def list_oncalls(escalation_policy_id=None):
 
 
 def list_schedules():
-    return {"schedules": deepcopy(_schedules_store)}
+    return {"schedules": deepcopy(_schedules_rows())}
 
 
 def list_escalation_policies():
-    return {"escalation_policies": deepcopy(_policies_store)}
+    return {"escalation_policies": deepcopy(_policies_rows())}

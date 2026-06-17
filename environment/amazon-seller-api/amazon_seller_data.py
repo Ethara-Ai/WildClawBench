@@ -2,11 +2,65 @@
 
 import csv
 import json
-from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("amazon-seller-api")
+
+_store.register("catalog_items", primary_key="sku",
+                initial_loader=lambda: _coerce_catalog_items(_load("catalog_items.csv")))
+_store.register("orders", primary_key="AmazonOrderId",
+                initial_loader=lambda: _coerce_orders(_load("orders.csv")))
+_store.register("order_items", primary_key="OrderItemId",
+                initial_loader=lambda: _coerce_order_items(_load("order_items.csv")))
+_store.register("inventory", primary_key="fnSku",
+                initial_loader=lambda: _coerce_inventory(_load("inventory.csv")))
+_store.register("returns", primary_key="returnId",
+                initial_loader=lambda: _coerce_returns(_load("returns.csv")))
+_store.register("reports", primary_key="reportId",
+                initial_loader=lambda: _coerce_reports(_load("reports.csv")))
+_store.register("pricing", primary_key="asin",
+                initial_loader=lambda: _coerce_pricing(_load("pricing.csv")))
+_store.register_document("seller_account", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "seller_account.json", encoding="utf-8")))
+
+
+def _catalog_items_rows():
+    return _store.table("catalog_items").rows()
+
+
+def _orders_rows():
+    return _store.table("orders").rows()
+
+
+def _order_items_rows():
+    return _store.table("order_items").rows()
+
+
+def _inventory_rows():
+    return _store.table("inventory").rows()
+
+
+def _returns_rows():
+    return _store.table("returns").rows()
+
+
+def _reports_rows():
+    return _store.table("reports").rows()
+
+
+def _pricing_rows():
+    return _store.table("pricing").rows()
+
+
+def _seller_account_doc():
+    return _store.document("seller_account").get()
+
 
 
 def _load(filename):
@@ -123,26 +177,22 @@ def _coerce_pricing(rows):
 
 
 # Load all data at module init
-_catalog_items = _coerce_catalog_items(_load("catalog_items.csv"))
-_orders = _coerce_orders(_load("orders.csv"))
-_order_items = _coerce_order_items(_load("order_items.csv"))
-_inventory = _coerce_inventory(_load("inventory.csv"))
-_returns = _coerce_returns(_load("returns.csv"))
-_reports = _coerce_reports(_load("reports.csv"))
-_pricing = _coerce_pricing(_load("pricing.csv"))
 
-with open(DATA_DIR / "seller_account.json", encoding="utf-8") as _f:
-    _seller_account = json.load(_f)
+
+
+
+
+
+
 
 # Mutable in-memory stores
-_catalog_store = deepcopy(_catalog_items)
-_orders_store = deepcopy(_orders)
-_order_items_store = deepcopy(_order_items)
-_inventory_store = deepcopy(_inventory)
-_returns_store = deepcopy(_returns)
-_reports_store = deepcopy(_reports)
-_pricing_store = deepcopy(_pricing)
-_seller_store = deepcopy(_seller_account)
+
+
+
+
+
+
+
 
 _next_report_id = 11
 _next_return_id = 6
@@ -384,7 +434,7 @@ def get_orders(
     fulfillment_channels=None,
     max_results=100,
 ):
-    results = list(_orders_store)
+    results = list(_orders_rows())
 
     if created_after:
         results = [r for r in results if r["PurchaseDate"] >= created_after]
@@ -414,16 +464,16 @@ def get_orders(
 
 
 def get_order(order_id):
-    for o in _orders_store:
+    for o in _orders_rows():
         if o["AmazonOrderId"] == order_id:
             return {"type": "order", "payload": _format_order(o)}
     return {"error": f"Order {order_id} not found"}
 
 
 def get_order_items(order_id):
-    items = [oi for oi in _order_items_store if oi["AmazonOrderId"] == order_id]
+    items = [oi for oi in _order_items_rows() if oi["AmazonOrderId"] == order_id]
     if not items:
-        if not any(o["AmazonOrderId"] == order_id for o in _orders_store):
+        if not any(o["AmazonOrderId"] == order_id for o in _orders_rows()):
             return {"error": f"Order {order_id} not found"}
     formatted = []
     for oi in items:
@@ -450,18 +500,18 @@ def get_order_items(order_id):
 
 
 def confirm_shipment(order_id, data):
-    for i, o in enumerate(_orders_store):
+    for i, o in enumerate(_orders_rows()):
         if o["AmazonOrderId"] == order_id:
             if o["OrderStatus"] not in ("Unshipped", "PartiallyShipped"):
                 return {"error": f"Order {order_id} cannot be shipped (status: {o['OrderStatus']})"}
-            _orders_store[i]["OrderStatus"] = "Shipped"
-            _orders_store[i]["LastUpdateDate"] = _now()
+            _orders_rows()[i]["OrderStatus"] = "Shipped"
+            _orders_rows()[i]["LastUpdateDate"] = _now()
             shipped = o["NumberOfItemsShipped"] + o["NumberOfItemsUnshipped"]
-            _orders_store[i]["NumberOfItemsShipped"] = shipped
-            _orders_store[i]["NumberOfItemsUnshipped"] = 0
-            for j, oi in enumerate(_order_items_store):
+            _orders_rows()[i]["NumberOfItemsShipped"] = shipped
+            _orders_rows()[i]["NumberOfItemsUnshipped"] = 0
+            for j, oi in enumerate(_order_items_rows()):
                 if oi["AmazonOrderId"] == order_id:
-                    _order_items_store[j]["QuantityShipped"] = oi["QuantityOrdered"]
+                    _order_items_rows()[j]["QuantityShipped"] = oi["QuantityOrdered"]
             return {"type": "shipment_confirmation", "status": "SUCCESS", "orderId": order_id}
     return {"error": f"Order {order_id} not found"}
 
@@ -475,7 +525,7 @@ def get_inventory_summaries(
     granularity_type="Marketplace",
     marketplace_id="ATVPDKIKX0DER",
 ):
-    results = list(_inventory_store)
+    results = list(_inventory_rows())
 
     if seller_skus:
         sku_list = [s.strip() for s in seller_skus.split(",")]
@@ -512,11 +562,11 @@ def get_inventory_summaries(
 
 
 def update_inventory(seller_sku, quantity):
-    for i, inv in enumerate(_inventory_store):
+    for i, inv in enumerate(_inventory_rows()):
         if inv["sellerSku"] == seller_sku:
-            _inventory_store[i]["totalQuantity"] = int(quantity)
-            _inventory_store[i]["inStockSupplyQuantity"] = int(quantity)
-            _inventory_store[i]["lastUpdatedTime"] = _now()
+            _inventory_rows()[i]["totalQuantity"] = int(quantity)
+            _inventory_rows()[i]["inStockSupplyQuantity"] = int(quantity)
+            _inventory_rows()[i]["lastUpdatedTime"] = _now()
             return {"type": "inventory_update", "status": "SUCCESS", "sellerSku": seller_sku}
     return {"error": f"Inventory for SKU {seller_sku} not found"}
 
@@ -526,7 +576,7 @@ def update_inventory(seller_sku, quantity):
 # ---------------------------------------------------------------------------
 
 def get_reports(report_types=None, processing_statuses=None):
-    results = list(_reports_store)
+    results = list(_reports_rows())
 
     if report_types:
         type_list = [t.strip() for t in report_types.split(",")]
@@ -554,7 +604,7 @@ def get_reports(report_types=None, processing_statuses=None):
 
 
 def get_report(report_id):
-    for r in _reports_store:
+    for r in _reports_rows():
         if r["reportId"] == report_id:
             return {
                 "type": "report",
@@ -585,7 +635,7 @@ def create_report(report_type, data_start_time, data_end_time):
         "processingEndTime": None,
         "reportDocumentId": None,
     }
-    _reports_store.append(report)
+    _reports_rows().append(report)
     _next_report_id += 1
     return {
         "type": "report_created",
@@ -598,7 +648,7 @@ def create_report(report_type, data_start_time, data_end_time):
 # ---------------------------------------------------------------------------
 
 def get_competitive_pricing(asin=None, sku=None):
-    results = list(_pricing_store)
+    results = list(_pricing_rows())
 
     if asin:
         results = [r for r in results if r["asin"] == asin]
@@ -645,7 +695,7 @@ def get_competitive_pricing(asin=None, sku=None):
 
 
 def get_item_offers(asin):
-    pricing = [p for p in _pricing_store if p["asin"] == asin]
+    pricing = [p for p in _pricing_rows() if p["asin"] == asin]
     if not pricing:
         return {"error": f"Offers not found for ASIN {asin}"}
     p = pricing[0]
@@ -688,7 +738,7 @@ def get_item_offers(asin):
 # ---------------------------------------------------------------------------
 
 def get_returns(status=None, order_id=None):
-    results = list(_returns_store)
+    results = list(_returns_rows())
 
     if status:
         results = [r for r in results if r["returnStatus"].upper() == status.upper()]
@@ -707,27 +757,27 @@ def get_returns(status=None, order_id=None):
 
 
 def get_return(return_id):
-    for r in _returns_store:
+    for r in _returns_rows():
         if r["returnId"] == return_id:
             return {"type": "return", "return": r}
     return {"error": f"Return {return_id} not found"}
 
 
 def authorize_return(return_id):
-    for i, r in enumerate(_returns_store):
+    for i, r in enumerate(_returns_rows()):
         if r["returnId"] == return_id:
             if r["returnStatus"] != "Authorized":
                 return {"error": f"Return {return_id} is not in Authorized status"}
-            _returns_store[i]["returnStatus"] = "Completed"
-            _returns_store[i]["resolution"] = "REFUND"
+            _returns_rows()[i]["returnStatus"] = "Completed"
+            _returns_rows()[i]["resolution"] = "REFUND"
             return {"type": "return_authorization", "status": "SUCCESS", "returnId": return_id}
     return {"error": f"Return {return_id} not found"}
 
 
 def close_return(return_id):
-    for i, r in enumerate(_returns_store):
+    for i, r in enumerate(_returns_rows()):
         if r["returnId"] == return_id:
-            _returns_store[i]["returnStatus"] = "Closed"
-            _returns_store[i]["resolution"] = "CLOSED"
+            _returns_rows()[i]["returnStatus"] = "Closed"
+            _returns_rows()[i]["resolution"] = "CLOSED"
             return {"type": "return_close", "status": "SUCCESS", "returnId": return_id}
     return {"error": f"Return {return_id} not found"}

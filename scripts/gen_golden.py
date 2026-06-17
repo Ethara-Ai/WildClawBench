@@ -329,16 +329,32 @@ def run_generator(
     full_text = ""
     usage_total = {"input_tokens": 0, "output_tokens": 0}
     for attempt in range(max_continuations + 1):
+        # Stream with a long timeout. A large non-streaming Bedrock call drops the
+        # connection (~"Connection timed out after None seconds") before it can emit
+        # a multi-thousand-token trajectory, while a small max_tokens truncates and
+        # forces the broken continuation path (re-emitted "=== PARENT TRAJECTORY ==="
+        # headers). Streaming keeps the socket alive for the whole generation, so one
+        # high-max_tokens call emits the complete trajectory in a single shot.
         resp = litellm.completion(
-            model=model, messages=messages, max_tokens=max_tokens, stream=False,
+            model=model, messages=messages, max_tokens=max_tokens, stream=True,
+            timeout=3600, stream_options={"include_usage": True},
         )
-        try:
-            chunk = resp.choices[0].message.content or ""
-            finish = resp.choices[0].finish_reason
-        except (AttributeError, IndexError) as exc:
-            raise RuntimeError(f"litellm response shape unexpected: {exc}") from exc
+        chunk = ""
+        finish = None
+        last_usage = None
+        for ev in resp:
+            choices = getattr(ev, "choices", None) or []
+            if choices:
+                delta = getattr(choices[0], "delta", None)
+                chunk += (getattr(delta, "content", None) or "") if delta else ""
+                fr = getattr(choices[0], "finish_reason", None)
+                if fr:
+                    finish = fr
+            u = getattr(ev, "usage", None)
+            if u:
+                last_usage = u
         full_text += chunk
-        u = getattr(resp, "usage", None) or {}
+        u = last_usage or {}
         usage_total["input_tokens"] += int(getattr(u, "prompt_tokens", 0) or 0)
         usage_total["output_tokens"] += int(getattr(u, "completion_tokens", 0) or 0)
         if finish != "length":

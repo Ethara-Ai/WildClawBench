@@ -3,11 +3,47 @@
 import csv
 import json
 import uuid
-from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("whatsapp-api")
+
+_store.register("contacts", primary_key="wa_id",
+                initial_loader=lambda: _coerce_contacts(_load("contacts.csv")))
+_store.register("conversations", primary_key="conversation_id",
+                initial_loader=lambda: _coerce_conversations(_load("conversations.csv")))
+_store.register("templates", primary_key="name",
+                initial_loader=lambda: _load("templates.csv"))
+_store.register("messages", primary_key="message_id",
+                initial_loader=lambda: _load("messages.csv"))
+_store.register_document("business", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "business.json", encoding="utf-8")))
+
+
+def _contacts_rows():
+    return _store.table("contacts").rows()
+
+
+def _conversations_rows():
+    return _store.table("conversations").rows()
+
+
+def _templates_rows():
+    return _store.table("templates").rows()
+
+
+def _messages_rows():
+    return _store.table("messages").rows()
+
+
+def _business_doc():
+    return _store.document("business").get()
+
 
 
 def _load(filename):
@@ -31,19 +67,8 @@ def _coerce_conversations(rows):
     return [{**r, "within_24h_window": _to_bool(r["within_24h_window"])} for r in rows]
 
 
-_contacts = _coerce_contacts(_load("contacts.csv"))
-_templates = _load("templates.csv")
-_conversations = _coerce_conversations(_load("conversations.csv"))
-_messages = _load("messages.csv")
 
-with open(DATA_DIR / "business.json", encoding="utf-8") as _f:
-    _business = json.load(_f)
 
-_contacts_store = deepcopy(_contacts)
-_templates_store = deepcopy(_templates)
-_conversations_store = deepcopy(_conversations)
-_messages_store = deepcopy(_messages)
-_business_store = deepcopy(_business)
 
 
 def _new_message_id():
@@ -55,7 +80,7 @@ def _new_message_id():
 # ---------------------------------------------------------------------------
 
 def get_business():
-    return _business_store
+    return _business_doc()
 
 
 # ---------------------------------------------------------------------------
@@ -63,14 +88,14 @@ def get_business():
 # ---------------------------------------------------------------------------
 
 def list_contacts(opted_in_only=False):
-    results = list(_contacts_store)
+    results = list(_contacts_rows())
     if opted_in_only:
         results = [c for c in results if c["opted_in"]]
     return {"data": results}
 
 
 def get_contact(wa_id):
-    for c in _contacts_store:
+    for c in _contacts_rows():
         if c["wa_id"] == wa_id:
             return c
     return {"error": f"Contact {wa_id} not found"}
@@ -81,14 +106,14 @@ def get_contact(wa_id):
 # ---------------------------------------------------------------------------
 
 def list_templates(status=None):
-    results = list(_templates_store)
+    results = list(_templates_rows())
     if status:
         results = [t for t in results if t["status"].upper() == status.upper()]
     return {"data": results}
 
 
 def get_template(name):
-    for t in _templates_store:
+    for t in _templates_rows():
         if t["name"] == name:
             return t
     return {"error": f"Template {name} not found"}
@@ -99,7 +124,7 @@ def get_template(name):
 # ---------------------------------------------------------------------------
 
 def list_conversations(wa_id=None):
-    results = list(_conversations_store)
+    results = list(_conversations_rows())
     if wa_id:
         results = [c for c in results if c["wa_id"] == wa_id]
     results.sort(key=lambda c: c["last_message_at"], reverse=True)
@@ -107,23 +132,23 @@ def list_conversations(wa_id=None):
 
 
 def list_messages(conversation_id=None, wa_id=None, limit=20):
-    results = list(_messages_store)
+    results = list(_messages_rows())
     if conversation_id:
         results = [m for m in results if m["conversation_id"] == conversation_id]
     elif wa_id:
-        conv_ids = {c["conversation_id"] for c in _conversations_store if c["wa_id"] == wa_id}
+        conv_ids = {c["conversation_id"] for c in _conversations_rows() if c["wa_id"] == wa_id}
         results = [m for m in results if m["conversation_id"] in conv_ids]
     results.sort(key=lambda m: m["sent_at"], reverse=True)
     return {"data": results[:limit]}
 
 
 def send_text(to_wa_id, body):
-    contact = next((c for c in _contacts_store if c["wa_id"] == to_wa_id), None)
+    contact = next((c for c in _contacts_rows() if c["wa_id"] == to_wa_id), None)
     if not contact:
         return {"error": f"Contact {to_wa_id} not found"}
     if not contact["opted_in"]:
         return {"error": "Recipient has not opted in to messages"}
-    conv = next((c for c in _conversations_store if c["wa_id"] == to_wa_id), None)
+    conv = next((c for c in _conversations_rows() if c["wa_id"] == to_wa_id), None)
     if not conv or not conv["within_24h_window"]:
         return {"error": "Outside 24-hour customer service window; use a template message"}
 
@@ -133,7 +158,7 @@ def send_text(to_wa_id, body):
         "message_id": msg_id,
         "conversation_id": conv["conversation_id"],
         "direction": "outbound",
-        "from_wa_id": _business_store["phone_number_id"].replace("PNI-", ""),
+        "from_wa_id": _business_doc()["phone_number_id"].replace("PNI-", ""),
         "to_wa_id": to_wa_id,
         "type": "text",
         "text": body,
@@ -141,24 +166,24 @@ def send_text(to_wa_id, body):
         "status": "sent",
         "sent_at": now,
     }
-    _messages_store.append(msg)
-    for i, c in enumerate(_conversations_store):
+    _messages_rows().append(msg)
+    for i, c in enumerate(_conversations_rows()):
         if c["conversation_id"] == conv["conversation_id"]:
-            _conversations_store[i]["last_message_at"] = now
+            _conversations_rows()[i]["last_message_at"] = now
     return {"messages": [{"id": msg_id, "message_status": "accepted"}]}
 
 
 def send_template(to_wa_id, template_name, components=None):
-    contact = next((c for c in _contacts_store if c["wa_id"] == to_wa_id), None)
+    contact = next((c for c in _contacts_rows() if c["wa_id"] == to_wa_id), None)
     if not contact:
         return {"error": f"Contact {to_wa_id} not found"}
-    template = next((t for t in _templates_store if t["name"] == template_name), None)
+    template = next((t for t in _templates_rows() if t["name"] == template_name), None)
     if not template:
         return {"error": f"Template {template_name} not found"}
     if template["status"].upper() != "APPROVED":
         return {"error": f"Template {template_name} is not approved (status: {template['status']})"}
 
-    conv = next((c for c in _conversations_store if c["wa_id"] == to_wa_id), None)
+    conv = next((c for c in _conversations_rows() if c["wa_id"] == to_wa_id), None)
     if not conv:
         conv = {
             "conversation_id": f"conv-{uuid.uuid4().hex[:6]}",
@@ -168,7 +193,7 @@ def send_template(to_wa_id, template_name, components=None):
             "origin": "business_initiated",
             "within_24h_window": True,
         }
-        _conversations_store.append(conv)
+        _conversations_rows().append(conv)
 
     msg_id = _new_message_id()
     now = _now()
@@ -176,7 +201,7 @@ def send_template(to_wa_id, template_name, components=None):
         "message_id": msg_id,
         "conversation_id": conv["conversation_id"],
         "direction": "outbound",
-        "from_wa_id": _business_store["phone_number_id"].replace("PNI-", ""),
+        "from_wa_id": _business_doc()["phone_number_id"].replace("PNI-", ""),
         "to_wa_id": to_wa_id,
         "type": "template",
         "text": "",
@@ -184,16 +209,16 @@ def send_template(to_wa_id, template_name, components=None):
         "status": "sent",
         "sent_at": now,
     }
-    _messages_store.append(msg)
-    for i, c in enumerate(_conversations_store):
+    _messages_rows().append(msg)
+    for i, c in enumerate(_conversations_rows()):
         if c["conversation_id"] == conv["conversation_id"]:
-            _conversations_store[i]["last_message_at"] = now
+            _conversations_rows()[i]["last_message_at"] = now
     return {"messages": [{"id": msg_id, "message_status": "accepted"}]}
 
 
 def mark_read(message_id):
-    for i, m in enumerate(_messages_store):
+    for i, m in enumerate(_messages_rows()):
         if m["message_id"] == message_id:
-            _messages_store[i]["status"] = "read"
+            _messages_rows()[i]["status"] = "read"
             return {"success": True, "message_id": message_id}
     return {"error": f"Message {message_id} not found"}

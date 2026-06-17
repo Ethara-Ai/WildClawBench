@@ -1,12 +1,17 @@
 """Data access module for the Airbnb API mock service."""
 
 import csv
+import sys
 import uuid
-from copy import deepcopy
 from datetime import datetime, date
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("airbnb-api")
 
 SERVICE_FEE_PCT = 14.0  # guest service fee as percent of nightly subtotal
 
@@ -87,16 +92,39 @@ def _coerce_reviews(rows):
     return out
 
 
-_listings = _coerce_listings(_load("listings.csv"))
-_hosts = _coerce_hosts(_load("hosts.csv"))
-_availability = _coerce_availability(_load("availability.csv"))
-_reviews = _coerce_reviews(_load("reviews.csv"))
+_store.register("listings", primary_key="listing_id",
+                initial_loader=lambda: _coerce_listings(_load("listings.csv")))
+_store.register("hosts", primary_key="host_id",
+                initial_loader=lambda: _coerce_hosts(_load("hosts.csv")))
+_store.register("availability", primary_key="_pk",
+                initial_loader=lambda: [
+                    {**row, "_pk": f"{row['listing_id']}@{row['start_date']}"}
+                    for row in _coerce_availability(_load("availability.csv"))
+                ])
+_store.register("reviews", primary_key="review_id",
+                initial_loader=lambda: _coerce_reviews(_load("reviews.csv")))
+_store.register("reservations", primary_key="reservation_id",
+                initial_loader=lambda: [])
 
-_listings_store = deepcopy(_listings)
-_hosts_store = deepcopy(_hosts)
-_availability_store = deepcopy(_availability)
-_reviews_store = deepcopy(_reviews)
-_reservations_store = []  # built up in memory
+
+def _listings_rows():
+    return _store.table("listings").rows()
+
+
+def _hosts_rows():
+    return _store.table("hosts").rows()
+
+
+def _availability_rows():
+    return _store.table("availability").rows()
+
+
+def _reviews_rows():
+    return _store.table("reviews").rows()
+
+
+def _reservations_rows():
+    return _store.table("reservations").rows()
 
 
 def _new_id(prefix):
@@ -104,7 +132,7 @@ def _new_id(prefix):
 
 
 def _get_host(host_id):
-    return next((h for h in _hosts_store if h["host_id"] == host_id), None)
+    return next((h for h in _hosts_rows() if h["host_id"] == host_id), None)
 
 
 def _attach_host(listing):
@@ -119,7 +147,7 @@ def _attach_host(listing):
 
 def search_listings(location=None, checkin=None, checkout=None, guests=None,
                     min_price=None, max_price=None):
-    results = list(_listings_store)
+    results = list(_listings_rows())
     if location:
         loc = location.lower()
         results = [l for l in results if loc in l["city"].lower() or loc in l["country"].lower()]
@@ -138,30 +166,30 @@ def search_listings(location=None, checkin=None, checkout=None, guests=None,
 
 
 def get_listing(listing_id):
-    for l in _listings_store:
+    for l in _listings_rows():
         if l["listing_id"] == listing_id:
             return _attach_host(l)
     return {"error": f"Listing {listing_id} not found"}
 
 
 def get_availability(listing_id):
-    if not any(l["listing_id"] == listing_id for l in _listings_store):
+    if not any(l["listing_id"] == listing_id for l in _listings_rows()):
         return {"error": f"Listing {listing_id} not found"}
-    windows = [a for a in _availability_store if a["listing_id"] == listing_id]
+    windows = [a for a in _availability_rows() if a["listing_id"] == listing_id]
     return {"listing_id": listing_id, "windows": windows}
 
 
 def get_reviews(listing_id):
-    if not any(l["listing_id"] == listing_id for l in _listings_store):
+    if not any(l["listing_id"] == listing_id for l in _listings_rows()):
         return {"error": f"Listing {listing_id} not found"}
-    revs = [r for r in _reviews_store if r["listing_id"] == listing_id]
+    revs = [r for r in _reviews_rows() if r["listing_id"] == listing_id]
     return {"listing_id": listing_id, "count": len(revs), "reviews": revs}
 
 
 def _is_available(listing_id, checkin, checkout):
     """A stay is available when fully covered by available windows
     and not intersecting any unavailable window."""
-    windows = [a for a in _availability_store if a["listing_id"] == listing_id]
+    windows = [a for a in _availability_rows() if a["listing_id"] == listing_id]
     covered = False
     for w in windows:
         ws, we = _parse_date(w["start_date"]), _parse_date(w["end_date"])
@@ -180,7 +208,7 @@ def _is_available(listing_id, checkin, checkout):
 # ---------------------------------------------------------------------------
 
 def create_reservation(listing_id, checkin, checkout, guests, guest_name="Guest"):
-    listing = next((l for l in _listings_store if l["listing_id"] == listing_id), None)
+    listing = next((l for l in _listings_rows() if l["listing_id"] == listing_id), None)
     if not listing:
         return {"error": f"Listing {listing_id} not found"}
     ci, co = _parse_date(checkin), _parse_date(checkout)
@@ -214,22 +242,22 @@ def create_reservation(listing_id, checkin, checkout, guests, guest_name="Guest"
         "total": total,
         "created_at": _now_iso(),
     }
-    _reservations_store.append(reservation)
+    _store.table("reservations").upsert(reservation)
     return reservation
 
 
 def get_reservation(reservation_id):
-    for r in _reservations_store:
-        if r["reservation_id"] == reservation_id:
-            return r
+    found = _store.table("reservations").get(reservation_id)
+    if found is not None:
+        return found
     return {"error": f"Reservation {reservation_id} not found"}
 
 
 def cancel_reservation(reservation_id):
-    for i, r in enumerate(_reservations_store):
-        if r["reservation_id"] == reservation_id:
-            if r["status"] == "cancelled":
-                return {"error": f"Reservation {reservation_id} is already cancelled"}
-            _reservations_store[i]["status"] = "cancelled"
-            return _reservations_store[i]
-    return {"error": f"Reservation {reservation_id} not found"}
+    existing = _store.table("reservations").get(reservation_id)
+    if existing is None:
+        return {"error": f"Reservation {reservation_id} not found"}
+    if existing["status"] == "cancelled":
+        return {"error": f"Reservation {reservation_id} is already cancelled"}
+    _store.table("reservations").patch(reservation_id, {"status": "cancelled"})
+    return _store.table("reservations").get(reservation_id)

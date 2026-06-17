@@ -7,12 +7,17 @@ Amounts are floats in the account's currency. Mutations (none) reset on restart.
 
 import csv
 import json
+import sys
 import uuid
-from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("plaid-api")
 
 
 def _load(filename):
@@ -76,18 +81,38 @@ def _coerce_transactions(rows):
     return out
 
 
-_accounts = _coerce_accounts(_load("accounts.csv"))
-_transactions = _coerce_transactions(_load("transactions.csv"))
+def _load_item():
+    with open(DATA_DIR / "item.json", encoding="utf-8") as f:
+        return json.load(f)
 
-with open(DATA_DIR / "item.json", encoding="utf-8") as _f:
-    _item = json.load(_f)
-with open(DATA_DIR / "identity.json", encoding="utf-8") as _f:
-    _identity = json.load(_f)
 
-_accounts_store = deepcopy(_accounts)
-_transactions_store = deepcopy(_transactions)
-_item_store = deepcopy(_item)
-_identity_store = deepcopy(_identity)
+def _load_identity():
+    with open(DATA_DIR / "identity.json", encoding="utf-8") as f:
+        return json.load(f)
+
+
+_store.register("accounts", primary_key="account_id",
+                initial_loader=lambda: _coerce_accounts(_load("accounts.csv")))
+_store.register("transactions", primary_key="transaction_id",
+                initial_loader=lambda: _coerce_transactions(_load("transactions.csv")))
+_store.register_document("item", initial_loader=_load_item)
+_store.register_document("identity", initial_loader=_load_identity)
+
+
+def _accounts_rows():
+    return _store.table("accounts").rows()
+
+
+def _transactions_rows():
+    return _store.table("transactions").rows()
+
+
+def _item_doc():
+    return _store.document("item").get()
+
+
+def _identity_doc():
+    return _store.document("identity").get()
 
 
 def _request_id():
@@ -99,13 +124,13 @@ def _request_id():
 # ---------------------------------------------------------------------------
 
 def get_accounts(account_ids=None):
-    accounts = list(_accounts_store)
+    accounts = list(_accounts_rows())
     if account_ids:
         wanted = set(account_ids)
         accounts = [a for a in accounts if a["account_id"] in wanted]
     return {
         "accounts": accounts,
-        "item": _item_store["item"],
+        "item": _item_doc()["item"],
         "request_id": _request_id(),
     }
 
@@ -121,7 +146,7 @@ def get_balances(account_ids=None):
 
 def get_transactions(start_date=None, end_date=None, account_ids=None,
                      count=100, offset=0):
-    txns = list(_transactions_store)
+    txns = list(_transactions_rows())
     if account_ids:
         wanted = set(account_ids)
         txns = [t for t in txns if t["account_id"] in wanted]
@@ -144,7 +169,7 @@ def get_transactions(start_date=None, end_date=None, account_ids=None,
         "accounts": get_accounts(account_ids=account_ids)["accounts"],
         "transactions": page,
         "total_transactions": total,
-        "item": _item_store["item"],
+        "item": _item_doc()["item"],
         "request_id": _request_id(),
     }
 
@@ -154,7 +179,7 @@ def get_transactions(start_date=None, end_date=None, account_ids=None,
 # ---------------------------------------------------------------------------
 
 def get_institution_by_id(institution_id):
-    inst = _item_store["institution"]
+    inst = _item_doc()["institution"]
     if institution_id != inst["institution_id"]:
         return {"error_code": "INSTITUTION_NOT_FOUND",
                 "error_message": f"Unknown institution {institution_id}"}
@@ -167,13 +192,13 @@ def get_institution_by_id(institution_id):
 
 def get_identity(account_ids=None):
     accounts = []
-    for a in _accounts_store:
+    for a in _accounts_rows():
         if account_ids and a["account_id"] not in set(account_ids):
             continue
-        owners = _identity_store["owners"].get(a["account_id"], [])
+        owners = _identity_doc()["owners"].get(a["account_id"], [])
         accounts.append({**a, "owners": owners})
     return {
         "accounts": accounts,
-        "item": _item_store["item"],
+        "item": _item_doc()["item"],
         "request_id": _request_id(),
     }

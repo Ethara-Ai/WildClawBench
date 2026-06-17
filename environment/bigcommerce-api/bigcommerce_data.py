@@ -6,10 +6,35 @@ v2 responses are bare arrays/objects.
 """
 
 import csv
-from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("bigcommerce-api")
+
+_store.register("products", primary_key="id",
+                initial_loader=lambda: _coerce_products(_load("products.csv")))
+_store.register("customers", primary_key="id",
+                initial_loader=lambda: _coerce_customers(_load("customers.csv")))
+_store.register("orders", primary_key="id",
+                initial_loader=lambda: _coerce_orders(_load("orders.csv")))
+
+
+def _products_rows():
+    return _store.table("products").rows()
+
+
+def _customers_rows():
+    return _store.table("customers").rows()
+
+
+def _orders_rows():
+    return _store.table("orders").rows()
+
 
 
 def _load(filename):
@@ -99,13 +124,10 @@ def _coerce_orders(rows):
     return out
 
 
-_products = _coerce_products(_load("products.csv"))
-_customers = _coerce_customers(_load("customers.csv"))
-_orders = _coerce_orders(_load("orders.csv"))
 
-_products_store = deepcopy(_products)
-_customers_store = deepcopy(_customers)
-_orders_store = deepcopy(_orders)
+
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -183,7 +205,7 @@ def _meta(total, count, page, limit):
 # ---------------------------------------------------------------------------
 
 def list_products(name=None, sku=None, is_visible=None, page=1, limit=50):
-    items = _products_store
+    items = _products_rows()
     if name:
         items = [p for p in items if name.lower() in p["name"].lower()]
     if sku:
@@ -200,7 +222,7 @@ def list_products(name=None, sku=None, is_visible=None, page=1, limit=50):
 
 
 def get_product(product_id):
-    p = next((x for x in _products_store if x["id"] == int(product_id)), None)
+    p = next((x for x in _products_rows() if x["id"] == int(product_id)), None)
     if not p:
         return {"error": "Not Found", "status": 404,
                 "title": f"Product {product_id} not found"}
@@ -212,7 +234,7 @@ def get_product(product_id):
 # ---------------------------------------------------------------------------
 
 def list_orders(customer_id=None, status_id=None, page=1, limit=50):
-    items = _orders_store
+    items = _orders_rows()
     if customer_id is not None:
         items = [o for o in items if o["customer_id"] == int(customer_id)]
     if status_id is not None:
@@ -223,7 +245,7 @@ def list_orders(customer_id=None, status_id=None, page=1, limit=50):
 
 
 def get_order(order_id):
-    o = next((x for x in _orders_store if x["id"] == int(order_id)), None)
+    o = next((x for x in _orders_rows() if x["id"] == int(order_id)), None)
     if not o:
         return {"error": "Not Found", "status": 404,
                 "title": f"Order {order_id} not found"}
@@ -234,11 +256,11 @@ def create_order(customer_id=0, status_id=1, payment_method="manual",
                  currency_code="USD", billing_address=None, products=None):
     billing_address = billing_address or {}
     products = products or []
-    next_id = max((o["id"] for o in _orders_store), default=2000) + 1
+    next_id = max((o["id"] for o in _orders_rows()), default=2000) + 1
     subtotal = 0.0
     items_total = 0
     for line in products:
-        prod = next((p for p in _products_store
+        prod = next((p for p in _products_rows()
                      if p["id"] == int(line.get("product_id", 0))), None)
         qty = int(line.get("quantity", 1))
         price = prod["price"] if prod else _to_float(line.get("price_inc_tax", 0))
@@ -261,7 +283,7 @@ def create_order(customer_id=0, status_id=1, payment_method="manual",
         "billing_last_name": billing_address.get("last_name", ""),
         "billing_email": billing_address.get("email", ""),
     }
-    _orders_store.append(order)
+    _orders_rows().append(order)
     return _serialize_order(order)
 
 
@@ -270,7 +292,7 @@ def create_order(customer_id=0, status_id=1, payment_method="manual",
 # ---------------------------------------------------------------------------
 
 def list_customers(email=None, company=None, page=1, limit=50):
-    items = _customers_store
+    items = _customers_rows()
     if email:
         items = [c for c in items if email.lower() in c["email"].lower()]
     if company:

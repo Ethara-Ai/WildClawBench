@@ -9,10 +9,35 @@ on restart.
 import csv
 import secrets
 import time
-from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("microsoft-teams-api")
+
+_store.register("teams", primary_key="id",
+                initial_loader=lambda: _coerce_teams(_load("teams.csv")))
+_store.register("channels", primary_key="id",
+                initial_loader=lambda: _coerce_channels(_load("channels.csv")))
+_store.register("messages", primary_key="id",
+                initial_loader=lambda: _coerce_messages(_load("messages.csv")))
+
+
+def _teams_rows():
+    return _store.table("teams").rows()
+
+
+def _channels_rows():
+    return _store.table("channels").rows()
+
+
+def _messages_rows():
+    return _store.table("messages").rows()
+
 
 
 def _load(filename):
@@ -79,13 +104,10 @@ def _coerce_messages(rows):
     return out
 
 
-_teams = _coerce_teams(_load("teams.csv"))
-_channels = _coerce_channels(_load("channels.csv"))
-_messages = _coerce_messages(_load("messages.csv"))
 
-_teams_store = deepcopy(_teams)
-_channels_store = deepcopy(_channels)
-_messages_store = deepcopy(_messages)
+
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -142,12 +164,12 @@ def _serialize_message(m):
 # ---------------------------------------------------------------------------
 
 def list_joined_teams():
-    teams = [t for t in _teams_store if _ME in t["member_ids"] and not t["isArchived"]]
+    teams = [t for t in _teams_rows() if _ME in t["member_ids"] and not t["isArchived"]]
     return {"value": [_serialize_team(t) for t in teams]}
 
 
 def get_team(team_id):
-    for t in _teams_store:
+    for t in _teams_rows():
         if t["id"] == team_id:
             return _serialize_team(t)
     return {"error": "team not found", "message": f"Team {team_id} not found"}
@@ -158,9 +180,9 @@ def get_team(team_id):
 # ---------------------------------------------------------------------------
 
 def list_channels(team_id):
-    if not any(t["id"] == team_id for t in _teams_store):
+    if not any(t["id"] == team_id for t in _teams_rows()):
         return {"error": "team not found", "message": f"Team {team_id} not found"}
-    channels = [c for c in _channels_store if c["team_id"] == team_id]
+    channels = [c for c in _channels_rows() if c["team_id"] == team_id]
     return {"value": [_serialize_channel(c) for c in channels]}
 
 
@@ -170,7 +192,7 @@ def list_channels(team_id):
 
 def _channel(team_id, channel_id):
     return next(
-        (c for c in _channels_store if c["id"] == channel_id and c["team_id"] == team_id),
+        (c for c in _channels_rows() if c["id"] == channel_id and c["team_id"] == team_id),
         None,
     )
 
@@ -179,7 +201,7 @@ def list_messages(team_id, channel_id):
     if not _channel(team_id, channel_id):
         return {"error": "channel not found", "message": f"Channel {channel_id} not found"}
     msgs = [
-        m for m in _messages_store
+        m for m in _messages_rows()
         if m["channel_id"] == channel_id and m["team_id"] == team_id
     ]
     msgs = sorted(msgs, key=lambda m: m["createdDateTime"], reverse=True)
@@ -202,5 +224,5 @@ def send_message(team_id, channel_id, content, content_type="html", importance="
         "importance": importance or "normal",
         "createdDateTime": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
-    _messages_store.append(msg)
+    _messages_rows().append(msg)
     return _serialize_message(msg)

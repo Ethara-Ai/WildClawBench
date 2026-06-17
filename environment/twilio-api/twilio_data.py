@@ -3,11 +3,41 @@
 import csv
 import json
 import uuid
-from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("twilio-api")
+
+_store.register("phone_numbers", primary_key="sid",
+                initial_loader=lambda: _coerce_phone_numbers(_load("phone_numbers.csv")))
+_store.register("messages", primary_key="sid",
+                initial_loader=lambda: _coerce_messages(_load("messages.csv")))
+_store.register("calls", primary_key="sid",
+                initial_loader=lambda: _coerce_calls(_load("calls.csv")))
+_store.register_document("account", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "account.json", encoding="utf-8")))
+
+
+def _phone_numbers_rows():
+    return _store.table("phone_numbers").rows()
+
+
+def _messages_rows():
+    return _store.table("messages").rows()
+
+
+def _calls_rows():
+    return _store.table("calls").rows()
+
+
+def _account_doc():
+    return _store.document("account").get()
+
 
 
 def _load(filename):
@@ -76,17 +106,8 @@ def _coerce_calls(rows):
     return out
 
 
-_phone_numbers = _coerce_phone_numbers(_load("phone_numbers.csv"))
-_messages = _coerce_messages(_load("messages.csv"))
-_calls = _coerce_calls(_load("calls.csv"))
 
-with open(DATA_DIR / "account.json", encoding="utf-8") as _f:
-    _account = json.load(_f)
 
-_phone_numbers_store = deepcopy(_phone_numbers)
-_messages_store = deepcopy(_messages)
-_calls_store = deepcopy(_calls)
-_account_store = deepcopy(_account)
 
 
 # ---------------------------------------------------------------------------
@@ -98,7 +119,7 @@ def _new_sid(prefix):
 
 
 def _account_sid():
-    return _account_store["sid"]
+    return _account_doc()["sid"]
 
 
 def _serialize_message(m):
@@ -161,7 +182,7 @@ def _serialize_phone_number(p):
 # ---------------------------------------------------------------------------
 
 def list_messages(to=None, from_=None, status=None, page_size=50):
-    results = list(_messages_store)
+    results = list(_messages_rows())
     if to:
         results = [m for m in results if m["to_number"] == to]
     if from_:
@@ -179,7 +200,7 @@ def list_messages(to=None, from_=None, status=None, page_size=50):
 
 
 def get_message(sid):
-    for m in _messages_store:
+    for m in _messages_rows():
         if m["sid"] == sid:
             return _serialize_message(m)
     return {"error": f"Message {sid} not found", "code": 20404, "status": 404}
@@ -203,7 +224,7 @@ def create_message(to, from_, body):
         "date_sent": None,
         "date_created": _now(),
     }
-    _messages_store.append(msg)
+    _messages_rows().append(msg)
     return _serialize_message(msg)
 
 
@@ -212,7 +233,7 @@ def create_message(to, from_, body):
 # ---------------------------------------------------------------------------
 
 def list_calls(to=None, from_=None, status=None, page_size=50):
-    results = list(_calls_store)
+    results = list(_calls_rows())
     if to:
         results = [c for c in results if c["to_number"] == to]
     if from_:
@@ -230,7 +251,7 @@ def list_calls(to=None, from_=None, status=None, page_size=50):
 
 
 def get_call(sid):
-    for c in _calls_store:
+    for c in _calls_rows():
         if c["sid"] == sid:
             return _serialize_call(c)
     return {"error": f"Call {sid} not found", "code": 20404, "status": 404}
@@ -253,7 +274,7 @@ def create_call(to, from_):
         "end_time": None,
         "date_created": _now(),
     }
-    _calls_store.append(call)
+    _calls_rows().append(call)
     return _serialize_call(call)
 
 
@@ -262,7 +283,7 @@ def create_call(to, from_):
 # ---------------------------------------------------------------------------
 
 def list_phone_numbers(phone_number=None, page_size=50):
-    results = list(_phone_numbers_store)
+    results = list(_phone_numbers_rows())
     if phone_number:
         results = [p for p in results if p["phone_number"] == phone_number]
     results = results[:page_size]
@@ -279,7 +300,7 @@ def list_phone_numbers(phone_number=None, page_size=50):
 # ---------------------------------------------------------------------------
 
 def lookup(phone_number):
-    owned = next((p for p in _phone_numbers_store if p["phone_number"] == phone_number), None)
+    owned = next((p for p in _phone_numbers_rows() if p["phone_number"] == phone_number), None)
     country = owned["iso_country"] if owned else ("GB" if phone_number.startswith("+44") else "US")
     return {
         "phone_number": phone_number,

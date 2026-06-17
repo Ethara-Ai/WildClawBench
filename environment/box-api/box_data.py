@@ -6,10 +6,35 @@ envelopes.
 """
 
 import csv
-from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("box-api")
+
+_store.register("users", primary_key="id",
+                initial_loader=lambda: _coerce_users(_load("users.csv")))
+_store.register("folders", primary_key="id",
+                initial_loader=lambda: _coerce_folders(_load("folders.csv")))
+_store.register("files", primary_key="id",
+                initial_loader=lambda: _coerce_files(_load("files.csv")))
+
+
+def _users_rows():
+    return _store.table("users").rows()
+
+
+def _folders_rows():
+    return _store.table("folders").rows()
+
+
+def _files_rows():
+    return _store.table("files").rows()
+
 
 
 def _load(filename):
@@ -87,13 +112,10 @@ def _coerce_files(rows):
     return out
 
 
-_users = _coerce_users(_load("users.csv"))
-_folders = _coerce_folders(_load("folders.csv"))
-_files = _coerce_files(_load("files.csv"))
 
-_users_store = deepcopy(_users)
-_folders_store = deepcopy(_folders)
-_files_store = deepcopy(_files)
+
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -101,14 +123,14 @@ _files_store = deepcopy(_files)
 # ---------------------------------------------------------------------------
 
 def _user_mini(user_id):
-    u = next((x for x in _users_store if x["id"] == user_id), None)
+    u = next((x for x in _users_rows() if x["id"] == user_id), None)
     if not u:
         return None
     return {"type": "user", "id": u["id"], "name": u["name"], "login": u["login"]}
 
 
 def _folder_mini(folder_id):
-    f = next((x for x in _folders_store if x["id"] == folder_id), None)
+    f = next((x for x in _folders_rows() if x["id"] == folder_id), None)
     if not f:
         return None
     return {"type": "folder", "id": f["id"], "name": f["name"]}
@@ -139,7 +161,7 @@ def _serialize_folder(f):
         "id": f["id"],
         "name": f["name"],
         "description": f["description"],
-        "size": sum(x["size"] for x in _files_store if x["parent_id"] == f["id"]),
+        "size": sum(x["size"] for x in _files_rows() if x["parent_id"] == f["id"]),
         "created_at": f["created_at"],
         "modified_at": f["modified_at"],
         "item_count": f["item_count"],
@@ -169,7 +191,7 @@ def _serialize_file(f):
 # ---------------------------------------------------------------------------
 
 def get_me():
-    u = next((x for x in _users_store if x["id"] == _ME), _users_store[0])
+    u = next((x for x in _users_rows() if x["id"] == _ME), _users_rows()[0])
     return _serialize_user(u)
 
 
@@ -178,7 +200,7 @@ def get_me():
 # ---------------------------------------------------------------------------
 
 def get_folder(folder_id):
-    f = next((x for x in _folders_store if x["id"] == str(folder_id)), None)
+    f = next((x for x in _folders_rows() if x["id"] == str(folder_id)), None)
     if not f:
         return {"error": "not_found", "type": "error", "status": 404,
                 "code": "not_found", "message": f"Folder {folder_id} not found"}
@@ -186,12 +208,12 @@ def get_folder(folder_id):
 
 
 def get_folder_items(folder_id, limit=100, offset=0):
-    if not any(x["id"] == str(folder_id) for x in _folders_store):
+    if not any(x["id"] == str(folder_id) for x in _folders_rows()):
         return {"error": "not_found", "type": "error", "status": 404,
                 "code": "not_found", "message": f"Folder {folder_id} not found"}
-    folders = [_serialize_folder(x) for x in _folders_store
+    folders = [_serialize_folder(x) for x in _folders_rows()
                if x["parent_id"] == str(folder_id)]
-    files = [_serialize_file(x) for x in _files_store
+    files = [_serialize_file(x) for x in _files_rows()
              if x["parent_id"] == str(folder_id)]
     entries = folders + files
     total = len(entries)
@@ -209,7 +231,7 @@ def get_folder_items(folder_id, limit=100, offset=0):
 # ---------------------------------------------------------------------------
 
 def get_file(file_id):
-    f = next((x for x in _files_store if x["id"] == str(file_id)), None)
+    f = next((x for x in _files_rows() if x["id"] == str(file_id)), None)
     if not f:
         return {"error": "not_found", "type": "error", "status": 404,
                 "code": "not_found", "message": f"File {file_id} not found"}
@@ -224,11 +246,11 @@ def search(query=None, type_filter=None, limit=100, offset=0):
     q = (query or "").lower()
     entries = []
     if type_filter in (None, "folder"):
-        for f in _folders_store:
+        for f in _folders_rows():
             if q in f["name"].lower():
                 entries.append(_serialize_folder(f))
     if type_filter in (None, "file"):
-        for f in _files_store:
+        for f in _files_rows():
             if q in f["name"].lower():
                 entries.append(_serialize_file(f))
     total = len(entries)

@@ -4,10 +4,47 @@ Helix collection responses wrap rows in {"data": [...]}.
 """
 
 import csv
-from copy import deepcopy
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("twitch-api")
+
+_store.register("users", primary_key="id",
+                initial_loader=lambda: _coerce_users(_load("users.csv")))
+_store.register("games", primary_key="id",
+                initial_loader=lambda: _coerce_games(_load("games.csv")))
+_store.register("channels", primary_key="broadcaster_id",
+                initial_loader=lambda: _coerce_channels(_load("channels.csv")))
+_store.register("streams", primary_key="id",
+                initial_loader=lambda: _coerce_streams(_load("streams.csv")))
+_store.register("clips", primary_key="id",
+                initial_loader=lambda: _coerce_clips(_load("clips.csv")))
+
+
+def _users_rows():
+    return _store.table("users").rows()
+
+
+def _games_rows():
+    return _store.table("games").rows()
+
+
+def _channels_rows():
+    return _store.table("channels").rows()
+
+
+def _streams_rows():
+    return _store.table("streams").rows()
+
+
+def _clips_rows():
+    return _store.table("clips").rows()
+
 
 
 def _load(filename):
@@ -84,17 +121,14 @@ def _coerce_clips(rows):
     return out
 
 
-_users = _coerce_users(_load("users.csv"))
-_games = _coerce_games(_load("games.csv"))
-_channels = _coerce_channels(_load("channels.csv"))
-_streams = _coerce_streams(_load("streams.csv"))
-_clips = _coerce_clips(_load("clips.csv"))
 
-_users_store = deepcopy(_users)
-_games_store = deepcopy(_games)
-_channels_store = deepcopy(_channels)
-_streams_store = deepcopy(_streams)
-_clips_store = deepcopy(_clips)
+
+
+
+
+
+
+
 
 
 def _wrap(rows):
@@ -106,7 +140,7 @@ def _wrap(rows):
 # ---------------------------------------------------------------------------
 
 def get_users(logins=None, ids=None):
-    results = list(_users_store)
+    results = list(_users_rows())
     if logins:
         wanted = {l.strip().lower() for l in logins}
         results = [u for u in results if u["login"].lower() in wanted]
@@ -121,7 +155,7 @@ def get_users(logins=None, ids=None):
 # ---------------------------------------------------------------------------
 
 def get_streams(user_logins=None, user_ids=None, game_id=None):
-    results = [s for s in _streams_store if s["is_live"]]
+    results = [s for s in _streams_rows() if s["is_live"]]
     if user_logins:
         wanted = {l.strip().lower() for l in user_logins}
         results = [s for s in results if s["user_login"].lower() in wanted]
@@ -140,7 +174,7 @@ def get_streams(user_logins=None, user_ids=None, game_id=None):
 
 def get_channels(broadcaster_ids):
     wanted = {i.strip() for i in broadcaster_ids}
-    results = [c for c in _channels_store if c["broadcaster_id"] in wanted]
+    results = [c for c in _channels_rows() if c["broadcaster_id"] in wanted]
     return _wrap(results)
 
 
@@ -149,12 +183,12 @@ def get_channels(broadcaster_ids):
 # ---------------------------------------------------------------------------
 
 def get_top_games(first=20):
-    results = sorted(_games_store, key=lambda g: g["rank"])[:first]
+    results = sorted(_games_rows(), key=lambda g: g["rank"])[:first]
     return _wrap(results)
 
 
 def get_games(names=None, ids=None):
-    results = list(_games_store)
+    results = list(_games_rows())
     if names:
         wanted = {n.strip().lower() for n in names}
         results = [g for g in results if g["name"].lower() in wanted]
@@ -169,7 +203,7 @@ def get_games(names=None, ids=None):
 # ---------------------------------------------------------------------------
 
 def get_clips(broadcaster_id=None, game_id=None, first=20):
-    results = list(_clips_store)
+    results = list(_clips_rows())
     if broadcaster_id:
         results = [c for c in results if c["broadcaster_id"] == broadcaster_id]
     if game_id:
@@ -183,7 +217,7 @@ def get_clips(broadcaster_id=None, game_id=None, first=20):
 # ---------------------------------------------------------------------------
 
 def get_channel_followers(broadcaster_id):
-    channel = next((c for c in _channels_store if c["broadcaster_id"] == broadcaster_id), None)
+    channel = next((c for c in _channels_rows() if c["broadcaster_id"] == broadcaster_id), None)
     if not channel:
         return {"data": [], "total": 0}
     return {"data": [], "total": channel["follower_count"]}

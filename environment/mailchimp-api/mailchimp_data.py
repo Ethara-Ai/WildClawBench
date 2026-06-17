@@ -8,11 +8,16 @@ lowercased email address, so lookups accept either the hash or the raw email.
 import csv
 import hashlib
 import uuid
-from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store
+
+_store = get_store("mailchimp-api")
 
 
 def _load(filename):
@@ -41,10 +46,6 @@ def _to_float(v, default=0.0):
 def _subscriber_hash(email):
     return hashlib.md5(email.strip().lower().encode("utf-8")).hexdigest()
 
-
-# ---------------------------------------------------------------------------
-# Load + coerce
-# ---------------------------------------------------------------------------
 
 def _coerce_lists(rows):
     out = []
@@ -75,6 +76,7 @@ def _coerce_members(rows):
             "status": r["status"],
             "timestamp_signup": r["timestamp_signup"],
             "member_rating": _to_int(r["member_rating"]),
+            "_pk": f"{r['list_id']}@{_subscriber_hash(email)}",
         })
     return out
 
@@ -102,9 +104,9 @@ def _coerce_campaigns(rows):
 
 
 def _coerce_reports(rows):
-    out = {}
+    out = []
     for r in rows:
-        out[r["campaign_id"]] = {
+        out.append({
             "id": r["campaign_id"],
             "emails_sent": _to_int(r["emails_sent"]),
             "opens": {
@@ -119,71 +121,76 @@ def _coerce_reports(rows):
             },
             "unsubscribed": _to_int(r["unsubscribed"]),
             "bounces": {"hard_bounces": _to_int(r["bounces"])},
-        }
+        })
     return out
 
 
-_lists_store = deepcopy(_coerce_lists(_load("lists.csv")))
-_members_store = deepcopy(_coerce_members(_load("members.csv")))
-_campaigns_store = deepcopy(_coerce_campaigns(_load("campaigns.csv")))
-_reports_store = deepcopy(_coerce_reports(_load("reports.csv")))
+_store.register("lists", primary_key="id",
+                initial_loader=lambda: _coerce_lists(_load("lists.csv")))
+_store.register("members", primary_key="_pk",
+                initial_loader=lambda: _coerce_members(_load("members.csv")))
+_store.register("campaigns", primary_key="id",
+                initial_loader=lambda: _coerce_campaigns(_load("campaigns.csv")))
+_store.register("reports", primary_key="id",
+                initial_loader=lambda: _coerce_reports(_load("reports.csv")))
 
 
-# ---------------------------------------------------------------------------
-# Lists / audiences
-# ---------------------------------------------------------------------------
+def _lists_rows(): return _store.table("lists").rows()
+def _members_rows(): return _store.table("members").rows()
+def _campaigns_rows(): return _store.table("campaigns").rows()
+def _reports_rows(): return _store.table("reports").rows()
+
+
+def _strip_pk(member):
+    out = {k: v for k, v in member.items() if k != "_pk"}
+    return out
+
 
 def list_lists():
-    return {"lists": deepcopy(_lists_store), "total_items": len(_lists_store)}
+    rows = _lists_rows()
+    return {"lists": rows, "total_items": len(rows)}
 
 
 def get_list(list_id):
-    for lst in _lists_store:
-        if lst["id"] == list_id:
-            return deepcopy(lst)
+    lst = _store.table("lists").get(list_id)
+    if lst:
+        return lst
     return {"error": f"List {list_id} not found"}
 
 
-# ---------------------------------------------------------------------------
-# Members
-# ---------------------------------------------------------------------------
-
 def list_members(list_id, status=None):
-    if not any(lst["id"] == list_id for lst in _lists_store):
+    if not _store.table("lists").get(list_id):
         return {"error": f"List {list_id} not found"}
-    members = [m for m in _members_store if m["list_id"] == list_id]
+    members = [_strip_pk(m) for m in _members_rows() if m["list_id"] == list_id]
     if status:
         members = [m for m in members if m["status"] == status]
     return {
-        "members": deepcopy(members),
+        "members": members,
         "list_id": list_id,
         "total_items": len(members),
     }
 
 
-def _resolve_member(list_id, subscriber_hash):
-    # subscriber_hash may be the md5 hash or the raw email address.
+def _resolve_member_pk(list_id, subscriber_hash):
     candidate = _subscriber_hash(subscriber_hash) if "@" in subscriber_hash else subscriber_hash
-    for m in _members_store:
-        if m["list_id"] == list_id and m["id"] == candidate:
-            return m
-    return None
+    return f"{list_id}@{candidate}"
 
 
 def get_member(list_id, subscriber_hash):
-    member = _resolve_member(list_id, subscriber_hash)
-    if member:
-        return deepcopy(member)
+    pk = _resolve_member_pk(list_id, subscriber_hash)
+    m = _store.table("members").get(pk)
+    if m:
+        return _strip_pk(m)
     return {"error": f"Member {subscriber_hash} not found in list {list_id}"}
 
 
 def create_member(list_id, email_address, status="subscribed", full_name="", member_rating=0):
-    lst = next((l for l in _lists_store if l["id"] == list_id), None)
+    lst = _store.table("lists").get(list_id)
     if not lst:
         return {"error": f"List {list_id} not found"}
     sub_hash = _subscriber_hash(email_address)
-    existing = next((m for m in _members_store if m["list_id"] == list_id and m["id"] == sub_hash), None)
-    if existing:
+    pk = f"{list_id}@{sub_hash}"
+    if _store.table("members").get(pk):
         return {"error": f"Member {email_address} already exists in list {list_id}"}
     member = {
         "id": sub_hash,
@@ -193,45 +200,46 @@ def create_member(list_id, email_address, status="subscribed", full_name="", mem
         "status": status,
         "timestamp_signup": _now(),
         "member_rating": _to_int(member_rating),
+        "_pk": pk,
     }
-    _members_store.append(member)
-    lst["member_count"] += 1
-    return deepcopy(member)
+    _store.table("members").upsert(member)
+    _store.table("lists").patch(list_id, {"member_count": lst["member_count"] + 1})
+    return _strip_pk(member)
 
 
 def update_member(list_id, subscriber_hash, status=None, full_name=None, member_rating=None):
-    member = _resolve_member(list_id, subscriber_hash)
+    pk = _resolve_member_pk(list_id, subscriber_hash)
+    member = _store.table("members").get(pk)
     if not member:
         return {"error": f"Member {subscriber_hash} not found in list {list_id}"}
+    patch = {}
     if status is not None:
-        member["status"] = status
+        patch["status"] = status
     if full_name is not None:
-        member["full_name"] = full_name
+        patch["full_name"] = full_name
     if member_rating is not None:
-        member["member_rating"] = _to_int(member_rating)
-    return deepcopy(member)
+        patch["member_rating"] = _to_int(member_rating)
+    if patch:
+        _store.table("members").patch(pk, patch)
+    return _strip_pk(_store.table("members").get(pk) or member)
 
-
-# ---------------------------------------------------------------------------
-# Campaigns
-# ---------------------------------------------------------------------------
 
 def list_campaigns(status=None):
-    campaigns = list(_campaigns_store)
+    campaigns = _campaigns_rows()
     if status:
         campaigns = [c for c in campaigns if c["status"] == status]
-    return {"campaigns": deepcopy(campaigns), "total_items": len(campaigns)}
+    return {"campaigns": campaigns, "total_items": len(campaigns)}
 
 
 def get_campaign(campaign_id):
-    for c in _campaigns_store:
-        if c["id"] == campaign_id:
-            return deepcopy(c)
+    c = _store.table("campaigns").get(campaign_id)
+    if c:
+        return c
     return {"error": f"Campaign {campaign_id} not found"}
 
 
 def create_campaign(list_id, subject_line, from_name, reply_to, title, type_="regular"):
-    if not any(l["id"] == list_id for l in _lists_store):
+    if not _store.table("lists").get(list_id):
         return {"error": f"List {list_id} not found"}
     campaign = {
         "id": "camp-" + uuid.uuid4().hex[:10],
@@ -249,39 +257,39 @@ def create_campaign(list_id, subject_line, from_name, reply_to, title, type_="re
             "title": title,
         },
     }
-    _campaigns_store.append(campaign)
-    return deepcopy(campaign)
+    _store.table("campaigns").upsert(campaign)
+    return campaign
 
 
 def send_campaign(campaign_id):
-    for c in _campaigns_store:
-        if c["id"] == campaign_id:
-            if c["status"] == "sent":
-                return {"error": f"Campaign {campaign_id} has already been sent"}
-            lst = next((l for l in _lists_store if l["id"] == c["list_id"]), None)
-            recipients = lst["member_count"] if lst else 0
-            c["status"] = "sent"
-            c["emails_sent"] = recipients
-            c["send_time"] = _now()
-            _reports_store.setdefault(campaign_id, {
-                "id": campaign_id,
-                "emails_sent": recipients,
-                "opens": {"opens_total": 0, "unique_opens": 0, "open_rate": 0.0},
-                "clicks": {"clicks_total": 0, "unique_clicks": 0, "click_rate": 0.0},
-                "unsubscribed": 0,
-                "bounces": {"hard_bounces": 0},
-            })
-            return {"id": campaign_id, "status": "sent", "emails_sent": recipients}
-    return {"error": f"Campaign {campaign_id} not found"}
+    c = _store.table("campaigns").get(campaign_id)
+    if not c:
+        return {"error": f"Campaign {campaign_id} not found"}
+    if c["status"] == "sent":
+        return {"error": f"Campaign {campaign_id} has already been sent"}
+    lst = _store.table("lists").get(c["list_id"])
+    recipients = lst["member_count"] if lst else 0
+    _store.table("campaigns").patch(campaign_id, {
+        "status": "sent",
+        "emails_sent": recipients,
+        "send_time": _now(),
+    })
+    if not _store.table("reports").get(campaign_id):
+        _store.table("reports").upsert({
+            "id": campaign_id,
+            "emails_sent": recipients,
+            "opens": {"opens_total": 0, "unique_opens": 0, "open_rate": 0.0},
+            "clicks": {"clicks_total": 0, "unique_clicks": 0, "click_rate": 0.0},
+            "unsubscribed": 0,
+            "bounces": {"hard_bounces": 0},
+        })
+    return {"id": campaign_id, "status": "sent", "emails_sent": recipients}
 
-
-# ---------------------------------------------------------------------------
-# Reports
-# ---------------------------------------------------------------------------
 
 def get_report(campaign_id):
-    if campaign_id in _reports_store:
-        return deepcopy(_reports_store[campaign_id])
-    if any(c["id"] == campaign_id for c in _campaigns_store):
+    r = _store.table("reports").get(campaign_id)
+    if r:
+        return r
+    if _store.table("campaigns").get(campaign_id):
         return {"error": f"No report available for campaign {campaign_id}"}
     return {"error": f"Campaign {campaign_id} not found"}

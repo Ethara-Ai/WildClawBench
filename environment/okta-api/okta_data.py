@@ -2,11 +2,48 @@
 
 import csv
 import uuid
-from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
+
+import sys as _sys
+_sys.path.insert(0, str(DATA_DIR.parent))
+from _mutable_store import get_store  # noqa: E402
+
+_store = get_store("okta-api")
+
+_store.register("users", primary_key="id",
+                initial_loader=lambda: _coerce_users(_load("users.csv")))
+_store.register("groups", primary_key="id",
+                initial_loader=lambda: _load("groups.csv"))
+_store.register("memberships", primary_key="group_id",
+                initial_loader=lambda: _load("group_memberships.csv"))
+_store.register("apps", primary_key="id",
+                initial_loader=lambda: _load("apps.csv"))
+_store.register("app_assignments", primary_key="app_id",
+                initial_loader=lambda: _load("app_assignments.csv"))
+
+
+def _users_rows():
+    return _store.table("users").rows()
+
+
+def _groups_rows():
+    return _store.table("groups").rows()
+
+
+def _memberships_rows():
+    return _store.table("memberships").rows()
+
+
+def _apps_rows():
+    return _store.table("apps").rows()
+
+
+def _app_assignments_rows():
+    return _store.table("app_assignments").rows()
+
 
 
 def _load(filename):
@@ -33,17 +70,14 @@ def _coerce_users(rows):
     return out
 
 
-_users = _coerce_users(_load("users.csv"))
-_groups = _load("groups.csv")
-_memberships = _load("group_memberships.csv")
-_apps = _load("apps.csv")
-_app_assignments = _load("app_assignments.csv")
 
-_users_store = deepcopy(_users)
-_groups_store = deepcopy(_groups)
-_memberships_store = deepcopy(_memberships)
-_apps_store = deepcopy(_apps)
-_app_assignments_store = deepcopy(_app_assignments)
+
+
+
+
+
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -90,11 +124,11 @@ def _serialize_app(a):
 
 
 def _find_user(user_id):
-    return next((u for u in _users_store if u["id"] == user_id), None)
+    return next((u for u in _users_rows() if u["id"] == user_id), None)
 
 
 def _find_group(group_id):
-    return next((g for g in _groups_store if g["id"] == group_id), None)
+    return next((g for g in _groups_rows() if g["id"] == group_id), None)
 
 
 # ---------------------------------------------------------------------------
@@ -102,7 +136,7 @@ def _find_group(group_id):
 # ---------------------------------------------------------------------------
 
 def list_users(status=None, q=None):
-    results = list(_users_store)
+    results = list(_users_rows())
     if status:
         results = [u for u in results if u["status"] == status]
     if q:
@@ -133,7 +167,7 @@ def create_user(first_name, last_name, email, login=None, activate=True):
         "activated": _now() if activate else None,
         "last_login": None,
     }
-    _users_store.append(user)
+    _users_rows().append(user)
     return _serialize_user(user)
 
 
@@ -177,7 +211,7 @@ def deactivate_user(user_id):
 # ---------------------------------------------------------------------------
 
 def list_groups(q=None):
-    results = list(_groups_store)
+    results = list(_groups_rows())
     if q:
         ql = q.lower()
         results = [g for g in results if ql in g["name"].lower()]
@@ -195,8 +229,8 @@ def list_group_users(group_id):
     g = _find_group(group_id)
     if not g:
         return {"error": f"Group {group_id} not found"}
-    member_ids = [m["user_id"] for m in _memberships_store if m["group_id"] == group_id]
-    return [_serialize_user(u) for u in _users_store if u["id"] in member_ids]
+    member_ids = [m["user_id"] for m in _memberships_rows() if m["group_id"] == group_id]
+    return [_serialize_user(u) for u in _users_rows() if u["id"] in member_ids]
 
 
 # ---------------------------------------------------------------------------
@@ -204,7 +238,7 @@ def list_group_users(group_id):
 # ---------------------------------------------------------------------------
 
 def list_apps(status=None):
-    results = list(_apps_store)
+    results = list(_apps_rows())
     if status:
         results = [a for a in results if a["status"] == status]
     return [_serialize_app(a) for a in results]
