@@ -1,0 +1,7 @@
+conversation_id,wa_id,started_at,last_message_at,origin,within_24h_window
+wa_conv_jasmine,555-7201,2025-06-01T20:00:00+02:00,2027-01-27T11:05:00+01:00,individual,True
+wa_conv_nils,555-7205,2025-08-15T10:00:00+02:00,2027-01-27T09:12:00+01:00,individual,True
+wa_conv_oskar,555-7207,2026-08-17T18:00:00+02:00,2027-01-23T18:40:00+01:00,individual,False
+wa_conv_frida,555-7210,2024-11-20T20:00:00+01:00,2027-01-26T20:14:00+01:00,individual,True
+wa_conv_tommy,555-7209,2023-12-01T18:00:00+01:00,2027-01-22T18:40:00+01:00,individual,False
+wa_conv_staff,555-7205,2026-08-17T10:00:00+02:00,2027-01-27T17:00:00+01:00,group,True

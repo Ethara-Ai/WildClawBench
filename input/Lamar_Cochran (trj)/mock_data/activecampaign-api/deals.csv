@@ -1,0 +1,2 @@
+id,title,contact_id,value,currency,status,stage,owner,created_timestamp,updated_timestamp
+deal_placeholder_lost,Placeholder pipeline test,ac_contact_seed,0,SEK,3,Lost - initiative paused,mikael.johansson@bjorkleden.se,2025-03-15T08:00:00,2025-03-21T08:00:00

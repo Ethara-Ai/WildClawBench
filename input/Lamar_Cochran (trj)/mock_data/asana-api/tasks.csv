@@ -1,0 +1,7 @@
+gid,name,project_gid,section_gid,assignee_gid,completed,due_on,notes,created_at,modified_at
+task_001,Speaker outreach - Patrik Bjork (Lulea HF),proj_symposium_2027,sec_symposium_speakers,patrik.bjork@lulea-hf.se,false,2027-02-15,Patrik will deliver opening talk on Lulea junior pipeline.,2027-01-05T08:00:00.000Z,2027-01-15T08:00:00.000Z
+task_002,Speaker outreach - Anders Strand (BJD),proj_symposium_2027,sec_symposium_speakers,lamar.cochran@finthesiss.ai,false,2027-02-20,Strand confirmed verbal interest in goalie panel.,2027-01-05T08:00:00.000Z,2027-01-05T08:00:00.000Z
+task_003,Venue tender RFQ,proj_symposium_venue,sec_symposium_logistics,lamar.cochran@finthesiss.ai,false,2027-03-15,Three Helsinki venue candidates shortlisted.,2027-01-05T08:00:00.000Z,2027-01-05T08:00:00.000Z
+task_004,Travel block - SAS group rate,proj_symposium_venue,sec_symposium_logistics,lamar.cochran@finthesiss.ai,false,2027-04-15,Get SAS group rate quote for 18 organizers.,2027-01-05T08:00:00.000Z,2027-01-05T08:00:00.000Z
+task_005,Outreach - Norra Bilcentralen (Mikael lead),proj_symposium_sponsors,sec_symposium_sponsors,mikael.johansson@bjorkleden.se,false,2027-03-31,Mikael will reach out via existing sponsor relationship.,2027-01-05T08:00:00.000Z,2027-01-05T08:00:00.000Z
+task_006,Outreach - Aurora Resor,proj_symposium_sponsors,sec_symposium_sponsors,mikael.johansson@bjorkleden.se,false,2027-04-15,Mikael will reach out.,2027-01-05T08:00:00.000Z,2027-01-05T08:00:00.000Z

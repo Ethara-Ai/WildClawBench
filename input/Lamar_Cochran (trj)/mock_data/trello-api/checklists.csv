@@ -1,0 +1,4 @@
+id,name,id_card,id_board,items
+chk_blk_a,Block A checklist,crd_blk_a_struct,brd_camp_2027,Daily timetable;Coach roster;Drill book;Daily reset huddle
+chk_ice,Ice rental checks,crd_ice_rental,brd_camp_2027,Confirm Confluence supplier v2027-01;Compute weekday vs weekend split;Flag if helg-siffra changes
+chk_brynas,Game 3 prep,crd_season_brynas,brd_season_log,PP1/PK1 video;Line combos v0.3;Morning skate stride watch (Oskar);Voice memo post-game

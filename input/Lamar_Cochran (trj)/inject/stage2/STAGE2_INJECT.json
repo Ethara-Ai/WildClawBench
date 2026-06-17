@@ -1,0 +1,37 @@
+{
+  "stage": "stage2",
+  "description": "Silent T10→T12 window. One silent mutation fires after T10 (boundary fires_after_turn=10): Notion line_combinations page is patched with FRESH_T12_CUT (previous_cut tagged YESTERDAY_CUT_DEPRECATED), new v3 forecheck pair against Brynäs J20 emphasizing weak-side reload, plus open Oskar Ek slot decision (third-pair start vs heavy middle minutes) and an updated second-period kill rotation ratio. T12_SM1 + T12_C2 verify the agent uses the fresh cut on the pre-game read instead of reciting yesterday's lines.",
+  "mutations": [
+    {
+      "mutation_id": "stage2.notion.001",
+      "service": "notion-api",
+      "method": "PATCH",
+      "url": "{NOTION_API_URL}/v1/pages/line_combinations",
+      "headers": {"Content-Type": "application/json", "Notion-Version": "2022-06-28", "Authorization": "Bearer {NOTION_TOKEN}"},
+      "body": {
+        "properties": {
+          "cut_label":     {"select": {"name": "FRESH_T12_CUT"}},
+          "previous_cut":  {"select": {"name": "YESTERDAY_CUT_DEPRECATED"}}
+        },
+        "children": [
+          {
+            "type": "paragraph",
+            "paragraph": {
+              "rich_text": [
+                {"text": {"content": "Line combinations v3 — pre-game cut updated overnight after the template revision aftermath. Forecheck pair against Brynäs J20 emphasizes weak-side reload, not the heavy F1-F2 sortie from yesterday's cut. Oskar Ek slot decision left open: third pair start vs heavy middle minutes still flagged from morning skate watch-list. Special-teams ratio adjustment for second-period kill rotation."}}
+              ]
+            }
+          }
+        ],
+        "modified_at": "{D+3:iso}T08:15:00+01:00"
+      },
+      "expected_status": 200,
+      "trap_family": "F1",
+      "silent": true,
+      "fires_after_turn": 10,
+      "invented": true,
+      "derived_from": "AGENTS.md priority 1: on-ice work; TOOLS.md: Notion video page exists for J20 gameplan",
+      "rationale": "T12 prompt explicitly says 'line combinations fresh, not yesterday's cut'. Stage1 fires after T10 (the federation template revision day) so that 'yesterday's cut' is dated to D+3 morning (post-T10, before T12 at 14:00). Tracer label FRESH_T12_CUT vs YESTERDAY_CUT_DEPRECATED is what T12_SM1 latest-value check anchors on."
+    }
+  ]
+}

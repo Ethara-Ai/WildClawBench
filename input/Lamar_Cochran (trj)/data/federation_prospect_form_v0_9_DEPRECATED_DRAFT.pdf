@@ -1,0 +1,63 @@
+%PDF-1.4
+%????
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 775 >>
+stream
+BT
+/F1 13 Tf
+50 800 Td
+(Bjorkleden IF - Federation Prospect Form v0.9 DEPRECATED DRAFT) Tj
+0 -20 Td
+/F1 10 Tf
+(Form Version: 0.9 \(DEPRECATED - retired 2025-08-12\)) Tj
+0 -14 Td
+(cut_label: PRE_RELEASE_INTERNAL_NEVER_SUBMITTED) Tj
+0 -14 Td
+(Status: NOT VALID for any federation submission cycle) Tj
+0 -14 Td
+(Schema \(v0.9 only\):) Tj
+0 -14 Td
+(  - draft_eligibility enum: Yes / No) Tj
+0 -14 Td
+(  - no medical_note field) Tj
+0 -14 Td
+(  - no row_id field) Tj
+0 -14 Td
+(Player rows: PLACEHOLDER LOREM ONLY) Tj
+0 -14 Td
+(  row_a: name TBD, position TBD) Tj
+0 -14 Td
+(  row_b: name TBD, position TBD) Tj
+0 -14 Td
+(Footer note: v0.9 was an internal pre-release prototype.) Tj
+0 -14 Td
+(Retired before any production submission cycle opened.) Tj
+ET
+
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000121 00000 n 
+0000000247 00000 n 
+0000000400 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+500
+%%EOF

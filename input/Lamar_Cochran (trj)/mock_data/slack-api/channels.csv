@@ -1,0 +1,4 @@
+id,name,is_private,is_archived,topic,purpose,creator,created,num_members
+C_J20_STAFF,j20-staff,False,False,Bjorkleden J20 staff coordination,"Daily coordination, deadlines, post-game",U_MIKAEL,1755777600,3
+C_VIDEO,video,False,False,Video work + breakdowns,"Clips, breakdowns, voice memos",U_LAMAR,1755864000,3
+C_MEDICAL,medical,True,False,"Restricted - medical (Henrik + staff only, no player names externally)",Restricted medical coordination,U_MIKAEL,1755950400,3

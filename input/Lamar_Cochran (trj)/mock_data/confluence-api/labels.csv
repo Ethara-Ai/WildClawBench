@@ -1,0 +1,9 @@
+id,page_id,name,prefix
+lbl_supplier,pg_supplier_price_2027,supplier,global
+lbl_camp,pg_camp_planning_guide,camp,global
+lbl_federation,pg_federation_protocol,federation,global
+lbl_media,pg_media_protocol,media,global
+lbl_shf,pg_shf_circular_v12,shf-circular,global
+lbl_t3,pg_practice_facility,facility,global
+lbl_inflation,pg_regional_inflation_2026,inflation,global
+lbl_camp_2027,pg_regional_inflation_2026,camp-2027,global

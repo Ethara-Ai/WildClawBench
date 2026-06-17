@@ -1,0 +1,4 @@
+name,language,category,status,body_text,header_text
+staff_pass_reminder,sv,UTILITY,approved,Pass kl {{1}} - {{2}}. Var pa is {{3}}.,Bjorkleden J20 - pass
+player_pass_reminder,sv,UTILITY,approved,Pass kl {{1}}. Var pa is {{2}}.,Bjorkleden J20
+match_day_reminder,sv,UTILITY,approved,"Matchdag {{1}}. Spelarmote {{2}}, varmning {{3}}.",Bjorkleden J20 - matchdag

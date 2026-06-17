@@ -1,0 +1,15 @@
+{
+  "id": "abc123Lamar",
+  "first_name": "Lamar",
+  "last_name": "Cochran",
+  "email": "lamar.cochran@finthesiss.ai",
+  "type": 2,
+  "role_name": "Licensed",
+  "pmi": 5550007200,
+  "timezone": "Europe/Stockholm",
+  "verified": 1,
+  "dept": "J20 Coaching Staff - Bjorkleden IF",
+  "account_id": "acct_bjorkleden_001",
+  "status": "active",
+  "created_at": "2023-09-01T08:00:00Z"
+}

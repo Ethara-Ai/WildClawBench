@@ -1,0 +1,5 @@
+id,dealname,pipeline,dealstage,amount,closedate,dealtype,associated_company,associated_contact,createdate,lastmodifieddate
+hs_dl_norra_jersey_2026_27,Norra Bilcentralen jersey arm-patch 2026-27,Sponsorship,Closed Won,85000,2026-07-15,existingbusiness,hs_co_norra_bilcentralen,hs_ct_anders_lindstrom,2026-05-12T08:00:00Z,2026-07-15T08:00:00Z
+hs_dl_umea_energi_rinkboard_2026_27,Umea Energi rink-board renewal 2026-27,Sponsorship,Closed Won,120000,2026-06-30,existingbusiness,hs_co_umea_energi,hs_ct_karin_ostlund,2026-04-22T08:00:00Z,2026-06-30T08:00:00Z
+hs_dl_ica_matchday_2026_27,ICA Maxi match-day promo 2026-27,Sponsorship,Closed Won,42000,2026-09-10,existingbusiness,hs_co_ica_maxi_umea,hs_ct_johan_lindberg,2026-08-01T08:00:00Z,2026-09-10T08:00:00Z
+hs_dl_aurora_travel_2027_renewal,Aurora Resor travel discount renewal proposal,Sponsorship,Negotiation,30000,2027-03-31,newbusiness,hs_co_aurora_resor,hs_ct_henrik_eklund,2026-12-04T08:00:00Z,2026-12-04T08:00:00Z

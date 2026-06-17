@@ -1,0 +1,61 @@
+%PDF-1.4
+%????
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 717 >>
+stream
+BT
+/F1 13 Tf
+50 800 Td
+(Bjorkleden Summer Camp 2026 - Invoice Archive) Tj
+0 -20 Td
+/F1 10 Tf
+(Archive ID: CAMP-2026-INV-ARCHIVE-Q3) Tj
+0 -14 Td
+(Camp dates: 2026-06-14 to 2026-07-11) Tj
+0 -14 Td
+(Participants: 27) Tj
+0 -14 Td
+(Total invoiced \(2026\): 408,600 SEK) Tj
+0 -14 Td
+(2026 rates as billed:) Tj
+0 -14 Td
+(  Ice rental \(2026\): 1410 SEK/hr) Tj
+0 -14 Td
+(  Off-ice space \(2026\): 360 SEK/hr) Tj
+0 -14 Td
+(  Equipment rental \(2026\): 88 SEK/p/day) Tj
+0 -14 Td
+(  Inflation band \(2026\): +5 to +7 percent regional) Tj
+0 -14 Td
+(All invoices reconciled to QuickBooks 2026-09-30.) Tj
+0 -14 Td
+(USE: closed-cycle archive; superseded by 2027 supplier price page on Confluence.) Tj
+ET
+
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000121 00000 n 
+0000000247 00000 n 
+0000000400 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+500
+%%EOF

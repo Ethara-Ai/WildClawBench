@@ -1,0 +1,6 @@
+id,firstname,lastname,email,phone,jobtitle,company,lifecyclestage,createdate,lastmodifieddate
+hs_ct_anders_lindstrom,Anders,Lindstrom,a.lindstrom@norrabilcentralen.se,+46555550101,Sponsorship lead,hs_co_norra_bilcentralen,customer,2022-06-01T08:00:00Z,2022-06-01T08:00:00Z
+hs_ct_karin_ostlund,Karin,Ostlund,karin.ostlund@umeaenergi.se,+46555550102,Community programs,hs_co_umea_energi,customer,2021-08-12T08:00:00Z,2021-08-12T08:00:00Z
+hs_ct_johan_lindberg,Johan,Lindberg,johan.lindberg@icamaxiumea.se,+46555550103,Store manager,hs_co_ica_maxi_umea,customer,2023-04-04T08:00:00Z,2023-04-04T08:00:00Z
+hs_ct_petra_andersson,Petra,Andersson,petra.andersson@norrlandbygg.se,+46555550104,Office manager,hs_co_norrland_byggservice,opportunity,2024-11-19T08:00:00Z,2024-11-19T08:00:00Z
+hs_ct_henrik_eklund,Henrik,Eklund,henrik.eklund@auroraresor.se,+46555550105,Group travel,hs_co_aurora_resor,customer,2022-10-10T08:00:00Z,2022-10-10T08:00:00Z

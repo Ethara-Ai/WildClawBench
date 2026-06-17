@@ -1,0 +1,3 @@
+id,name,stringid,subscriber_count,sender_url,sender_reminder,created_timestamp
+acl_sponsor_pipeline,Sponsorship pipeline (shelved),sponsor-pipeline-shelved,0,https://bjorkleden.se,Mirror of klaviyo list_sponsor_prospects. Never activated.,2025-03-14T08:00:00
+acl_partner_long_list,Partner long-list,partner-long-list,0,https://bjorkleden.se,Mirror long-list. Never activated.,2025-03-14T08:00:00

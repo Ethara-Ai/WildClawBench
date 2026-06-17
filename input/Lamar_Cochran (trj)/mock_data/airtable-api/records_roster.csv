@@ -1,0 +1,21 @@
+id,createdTime,name,number,position,status,year_of_birth
+rec_pl_2,2026-08-12T18:00:00.000Z,Anton Lindberg,2,D,active,2007
+rec_pl_4,2026-08-12T18:00:00.000Z,Hugo Forsberg,4,D,active,2007
+rec_pl_6,2026-08-12T18:00:00.000Z,Felix Eklund,6,D,active,2008
+rec_pl_7,2026-08-12T18:00:00.000Z,Erik Nystrom,7,C,active,2007
+rec_pl_9,2026-08-12T18:00:00.000Z,Oskar Ek,9,LW,active,2008
+rec_pl_11,2026-08-12T18:00:00.000Z,Viktor Persson,11,LW,active,2007
+rec_pl_12,2026-08-12T18:00:00.000Z,Ludwig Almqvist,12,C,active,2008
+rec_pl_14,2026-08-12T18:00:00.000Z,Mattias Sundin,14,C,active,2008
+rec_pl_17,2026-08-12T18:00:00.000Z,Filip Bergstrom,17,LW,active,2007
+rec_pl_18,2026-08-12T18:00:00.000Z,Olle Lundgren,18,RW,active,2008
+rec_pl_19,2026-08-12T18:00:00.000Z,Linus Holm,19,RD,active,2008
+rec_pl_21,2026-08-12T18:00:00.000Z,Jonatan Wikstrom,21,RW,active,2007
+rec_pl_22,2026-08-12T18:00:00.000Z,Albin Olofsson,22,LW,active,2008
+rec_pl_24,2026-08-12T18:00:00.000Z,Edvin Engstrom,24,C,active,2008
+rec_pl_26,2026-08-12T18:00:00.000Z,Wille Stenberg,26,D,active,2008
+rec_pl_27,2026-08-12T18:00:00.000Z,Theo Karlsson,27,LW,active,2008
+rec_pl_28,2026-08-12T18:00:00.000Z,Sebastian Lof,28,RW,injured,2007
+rec_pl_29,2026-08-12T18:00:00.000Z,Noel Holmberg,29,C,active,2008
+rec_pl_30,2026-08-12T18:00:00.000Z,Alvar Friberg,30,G,active,2008
+rec_pl_31,2026-08-12T18:00:00.000Z,Joel Bjork,31,G,active,2007

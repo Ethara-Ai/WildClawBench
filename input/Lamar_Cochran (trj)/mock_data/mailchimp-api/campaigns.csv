@@ -1,0 +1,4 @@
+id,list_id,type,status,subject_line,from_name,reply_to,title,emails_sent,send_time,create_time
+camp_jan_newsletter,list_j20_parents,regular,save,Home game update - February stretch,J20 Coaching Staff,j20-news@bjorkleden.se,j20_parents_2027_02_newsletter_DRAFT,0,,2027-01-18T08:00:00
+camp_dec_newsletter,list_j20_parents,regular,sent,Holiday stretch home games + winter break,J20 Coaching Staff,j20-news@bjorkleden.se,j20_parents_2026_12_newsletter,32,2026-12-12T17:00:00,2026-12-08T08:00:00
+camp_camp_2026_recap,list_camp_alumni,regular,sent,Summer Camp 2026 recap + 2027 save the date,Lamar Cochran,j20-news@bjorkleden.se,camp_2026_recap_alumni,84,2026-08-25T16:00:00,2026-08-20T08:00:00

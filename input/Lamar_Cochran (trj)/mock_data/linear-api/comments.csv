@@ -1,0 +1,5 @@
+id,body,issueId,userId,createdAt,updatedAt
+comment-01,Oskar IDP cross-link: see Notion oskar_ek_dev page block 'right-side stride load'.,iss_oskar_idp,user_lamar,2026-12-12T11:00:00,2026-12-12T11:00:00
+comment-02,Prospect_3 back-half logs - Nils will sign off on #j20-staff. Hold final draft until.,iss_prospect3_idp,user_nils,2027-01-20T16:15:00,2027-01-20T16:15:00
+comment-03,"Camp budget: ice rental 1450 SEK/hr, off-ice 380 SEK/hr, equipment 95 SEK/p/d - per Confluence supplier_price_list_2027 T6 cut. Sensitivity +6-9%.",iss_camp_proposal,user_lamar,2027-01-22T16:30:00,2027-01-22T16:30:00
+comment-04,Federation template version delta watch: schema lift v1.2 -> v1.3 possible mid-cycle; re-pull from Box before final eye-pass.,iss_fed_submission,user_lamar,2027-01-23T11:00:00,2027-01-23T11:00:00

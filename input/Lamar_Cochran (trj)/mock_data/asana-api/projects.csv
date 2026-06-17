@@ -1,0 +1,4 @@
+gid,name,workspace_gid,owner_gid,color,archived,notes,created_at
+proj_symposium_2027,Nordic Coaching Symposium 2027 (Helsinki),ws_nordic_symposium,patrik.bjork@lulea-hf.se,light-blue,false,Helsinki edition - planning runway.,2027-01-05T08:00:00.000Z
+proj_symposium_venue,Helsinki venue + hotels,ws_nordic_symposium,lamar.cochran@finthesiss.ai,dark-green,false,Venue tender and travel block.,2027-01-05T08:00:00.000Z
+proj_symposium_sponsors,Symposium sponsorship outreach,ws_nordic_symposium,patrik.bjork@lulea-hf.se,light-orange,false,Sponsor outreach for Helsinki edition.,2027-01-05T08:00:00.000Z

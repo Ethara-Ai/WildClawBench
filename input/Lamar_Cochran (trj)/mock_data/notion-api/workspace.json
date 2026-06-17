@@ -1,0 +1,14 @@
+{
+  "id": "ws_lamar_bjorkleden",
+  "name": "Bjorkleden J20 Season Log",
+  "domain": "bjorkleden",
+  "owner_user_id": "user_lamar_cochran",
+  "plan": "team",
+  "created_time": "2026-08-10T20:00:00+02:00",
+  "icon": "https://www.notion.so/icons/hockey_blue.svg",
+  "settings": {
+    "default_page_size": 50,
+    "ai_blocks_enabled": false,
+    "public_sharing_enabled": false
+  }
+}

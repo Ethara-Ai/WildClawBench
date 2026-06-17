@@ -1,0 +1,33 @@
+{
+  "stage": "stage4",
+  "description": "Silent T5→T15 window. One silent mutation fires after T5 (boundary fires_after_turn=5): Confluence supplier price list v1 → v4 — ice rental 1450 → 1525 SEK/hr, off-ice 380 → 395 SEK/hr, equipment 95 → 102 SEK/participant/day, inflation note baseline +8% for 2027 cycle, FRESH_T15_CUT tag overrides the T6_CUT_DEPRECATED snapshot used in the T6 budget v1. T15_SM1 + CROSS_C5 verify the agent surfaces the price delta and rebuilds budget v2 from the fresh values on the week-closer.",
+  "mutations": [
+    {
+      "mutation_id": "stage4.confluence.001",
+      "service": "confluence-api",
+      "method": "PUT",
+      "url": "{CONFLUENCE_API_URL}/wiki/rest/api/content/supplier_price_list_2027",
+      "headers": {"Content-Type": "application/json", "Authorization": "Basic {CONFLUENCE_TOKEN}"},
+      "body": {
+        "version": {"number": 4, "minorEdit": false},
+        "title": "Supplier price list — camp 2027",
+        "body": {
+          "storage": {
+            "value": "Ice rental: 1525 SEK/hr (was 1450, supplier window confirmed). Off-ice space: 395 SEK/hr (was 380). Equipment rental: 102 SEK/participant/day (was 95). Inflation note updated last 24h: regional index running at the upper edge of +6 to +9 percent, plan against +8 percent baseline for the 2027 cycle. Source: Mikael's office. Cut label: FRESH_T15_CUT.",
+            "representation": "storage"
+          }
+        },
+        "modified_at": "{D+4:iso}T11:50:00+01:00",
+        "modified_by": "m.johansson@bjorkleden.se",
+        "cut_label": "FRESH_T15_CUT"
+      },
+      "expected_status": 200,
+      "trap_family": "F1",
+      "silent": true,
+      "fires_after_turn": 5,
+      "invented": true,
+      "derived_from": "TOOLS.md: Confluence is read-only club operations space, Mikael's office is publishing source; HEARTBEAT.md L49 camp budget proposal due to Mikael; T6 wake-up message 6-9% regional inflation note",
+      "rationale": "T15 prompt says 'cross the supplier prices in the budget draft against any new Confluence notes from Mikael's office posted in the last 24 hours'. Stage3 fires after T6 (D+1 16:15) so the budget v1 in T6 is built on the T6_CUT_DEPRECATED prices; by T15 (D+4 16:30) the FRESH_T15_CUT lands. T15_SM1 verifies the agent surfaces the price delta and uses fresh values in budget v2 stub."
+    }
+  ]
+}

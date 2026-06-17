@@ -1,0 +1,9 @@
+id,name,id_board,pos,closed
+lst_camp_backlog,Backlog,brd_camp_2027,1,False
+lst_camp_staff,Staff,brd_camp_2027,2,False
+lst_camp_programming,Programming,brd_camp_2027,3,False
+lst_camp_accommodation,Accommodation,brd_camp_2027,4,False
+lst_camp_gear,Gear,brd_camp_2027,5,False
+lst_camp_done,Done,brd_camp_2027,6,False
+lst_season_open,Open,brd_season_log,1,False
+lst_season_done,Done,brd_season_log,2,False

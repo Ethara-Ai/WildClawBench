@@ -1,0 +1,5 @@
+id,name,login,role,status,language,timezone,space_amount,space_used,max_upload_size,job_title,phone,created_at
+11111001,Lamar Cochran,lamar.cochran@finthesiss.ai,user,active,sv,Europe/Stockholm,21474836480,1284567890,5368709120,"Head Coach, J20",555-7200,2023-09-01T08:00:00Z
+11111002,Mikael Johansson,m.johansson@bjorkleden.se,coadmin,active,sv,Europe/Stockholm,21474836480,4982134567,5368709120,Sporting Director,555-7206,2021-06-15T08:00:00Z
+11111003,Nils Bergqvist,nils.bergqvist.hockey@gmail.com,user,active,sv,Europe/Stockholm,10737418240,218765432,5368709120,"Assistant Coach, J20",555-7205,2022-07-22T08:00:00Z
+11111004,Svenska Ishockeyforbundet (SHF) - Pathway Admin,pathway-admin@swehockey.se,coadmin,active,sv,Europe/Stockholm,53687091200,12348765432,5368709120,Federation Programme Officer,,2020-01-10T08:00:00Z

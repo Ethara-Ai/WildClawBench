@@ -1,0 +1,13 @@
+id,createdTime,player,number,ice_time_per_game,draft_eligibility,shf_row,stride_flag,medical_note
+rec_sc_oskar,2026-08-12T18:00:00.000Z,Oskar Ek,9,19.4,Eligible,1,watch,
+rec_sc_prospect_2,2026-08-12T18:00:00.000Z,Mattias Sundin,14,17.8,Eligible,2,none,"rotator-cuff inflammation, ROM limited, two-week follow-up scheduled (Henrik)"
+rec_sc_prospect_3,2026-08-12T18:00:00.000Z,Linus Holm,19,16.9,Eligible,3,none,
+rec_sc_anton,2026-08-12T18:00:00.000Z,Anton Lindberg,2,14.1,Not-eligible,0,none,
+rec_sc_hugo,2026-08-12T18:00:00.000Z,Hugo Forsberg,4,15.0,Not-eligible,0,none,
+rec_sc_felix,2026-08-12T18:00:00.000Z,Felix Eklund,6,12.6,Watch-list,0,none,
+rec_sc_erik,2026-08-12T18:00:00.000Z,Erik Nystrom,7,16.5,Not-eligible,0,none,
+rec_sc_viktor,2026-08-12T18:00:00.000Z,Viktor Persson,11,14.7,Not-eligible,0,none,
+rec_sc_ludwig,2026-08-12T18:00:00.000Z,Ludwig Almqvist,12,13.2,Watch-list,0,none,
+rec_sc_filip,2026-08-12T18:00:00.000Z,Filip Bergstrom,17,12.4,Not-eligible,0,none,
+rec_sc_jonatan,2026-08-12T18:00:00.000Z,Jonatan Wikstrom,21,14.8,Not-eligible,0,none,
+rec_sc_friberg,2026-08-12T18:00:00.000Z,Alvar Friberg,30,30.0,Watch-list,0,none,

@@ -1,0 +1,5 @@
+baseId,id,name,primaryFieldId,records_csv
+appBJDJ20Lamar01,tblRoster,roster,fldRosterName,records_roster.csv
+appBJDJ20Lamar01,tblScouting,scouting_metrics,fldScoutPlayer,records_scouting_metrics.csv
+appBJDJ20Lamar01,tblOppShifts,opponent_shift_log,fldOppGame,records_opponent_shift_log.csv
+appBJDJ20Lamar01,tblCampMetrics,camp_metrics,fldCampMetric,records_camp_metrics.csv

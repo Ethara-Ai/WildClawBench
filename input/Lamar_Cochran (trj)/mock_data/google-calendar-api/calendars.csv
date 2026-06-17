@@ -1,0 +1,5 @@
+id,summary,description,time_zone,access_role,primary,color_id
+primary,Lamar Cochran,Personal,Europe/Stockholm,owner,True,1
+bjorkleden-j20,Bjorkleden J20,Team calendar (read-only for staff),Europe/Stockholm,writer,False,9
+shf-pathway,SHF Pathway,Federation seminars,Europe/Stockholm,reader,False,5
+lamar-jasmine-household,Household (Lamar+Jas),Shared with Jasmine,Europe/Stockholm,writer,False,11

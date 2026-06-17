@@ -1,0 +1,9 @@
+id,createdTime,game_id,shift_number,opp_unit,length_seconds,outcome
+rec_opp_g1_s1,2026-08-12T18:00:00.000Z,BJD_BRY_G1,1,L1 PP-RH-overload,47,shot-block
+rec_opp_g1_s2,2026-08-12T18:00:00.000Z,BJD_BRY_G1,2,L1 ES-cycle,42,clear
+rec_opp_g1_s12,2026-08-12T18:00:00.000Z,BJD_BRY_G1,12,L2 ES,38,neutral-zone-turnover
+rec_opp_g1_s17,2026-08-12T18:00:00.000Z,BJD_BRY_G1,17,PP1 RH-overload,52,PP-goal-against
+rec_opp_g2_s4,2026-08-12T18:00:00.000Z,BJD_BRY_G2,4,L1 PP-RH-overload,44,shot-block
+rec_opp_g2_s9,2026-08-12T18:00:00.000Z,BJD_BRY_G2,9,L1 ES,41,loose-puck-recovered
+rec_opp_g2_s14,2026-08-12T18:00:00.000Z,BJD_BRY_G2,14,PK1,35,PK-clear
+rec_opp_g2_s22,2026-08-12T18:00:00.000Z,BJD_BRY_G2,22,L1 PP-RH-overload,49,PP-shot-on-goal

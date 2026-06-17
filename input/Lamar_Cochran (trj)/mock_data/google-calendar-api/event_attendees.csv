@@ -1,0 +1,10 @@
+event_id,email,display_name,response_status,optional,organizer
+evt_staff_sync_2027_01_26,lamar.cochran@Finthesiss.ai,Lamar Cochran,accepted,False,True
+evt_staff_sync_2027_01_26,nils.bergqvist.hockey@gmail.com,Nils Bergqvist,accepted,False,False
+evt_tommy_zoom,lamar.cochran@Finthesiss.ai,Lamar Cochran,accepted,False,True
+evt_tommy_zoom,tommy.svensson.hockey@gmail.com,Tommy Svensson,tentative,False,False
+evt_mikael_review,m.johansson@bjorkleden.se,Mikael Johansson,accepted,,True
+evt_mikael_review,lamar.cochran@Finthesiss.ai,Lamar Cochran,accepted,False,False
+evt_brynas_game_day,lamar.cochran@Finthesiss.ai,Lamar Cochran,accepted,False,False
+evt_brynas_game_day,nils.bergqvist.hockey@gmail.com,Nils Bergqvist,accepted,False,False
+evt_brynas_game_day,h.strand@norrlandregion.se,Henrik Strand,accepted,False,False

@@ -1,0 +1,4 @@
+id,name,email,avatar_url,type,bot,owner_workspace,created_time
+user_lamar,Lamar Cochran,lamar.cochran@Finthesiss.ai,,person,False,ws_lamar_bjorkleden,2026-08-10T20:00:00+02:00
+user_nils,Nils Bergqvist,nils.bergqvist.hockey@gmail.com,,person,False,ws_lamar_bjorkleden,2026-08-10T20:00:00+02:00
+user_mikael,Mikael Johansson,m.johansson@bjorkleden.se,,person,False,ws_lamar_bjorkleden,2026-08-10T20:00:00+02:00

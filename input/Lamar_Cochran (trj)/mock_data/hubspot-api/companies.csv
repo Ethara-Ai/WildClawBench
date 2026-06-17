@@ -1,0 +1,6 @@
+id,name,domain,industry,city,state,numberofemployees,annualrevenue,createdate
+hs_co_norra_bilcentralen,Norra Bilcentralen AB,norrabilcentralen.se,Automotive,Umea,Vasterbotten,150,250000000,2022-06-01T08:00:00Z
+hs_co_umea_energi,Umea Energi AB,umeaenergi.se,Utilities,Umea,Vasterbotten,400,1200000000,2021-08-12T08:00:00Z
+hs_co_ica_maxi_umea,ICA Maxi Umea,icamaxiumea.se,Retail,Umea,Vasterbotten,180,450000000,2023-04-04T08:00:00Z
+hs_co_norrland_byggservice,Norrland Byggservice AB,norrlandbygg.se,Construction,Skelleftea,Vasterbotten,75,90000000,2024-11-19T08:00:00Z
+hs_co_aurora_resor,Aurora Resor AB,auroraresor.se,Travel,Lulea,Norrbotten,50,38000000,2022-10-10T08:00:00Z

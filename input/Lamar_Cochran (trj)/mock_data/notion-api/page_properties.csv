@@ -1,0 +1,16 @@
+page_id,property_name,property_type,value
+page_oskar,Position,select,LW
+page_oskar,Number,number,9
+page_oskar,Draft Status,select,Eligible
+page_oskar,Ice Time/G,number,19.4
+page_prospect_2,Position,select,C
+page_prospect_2,Number,number,14
+page_prospect_2,Draft Status,select,Eligible
+page_prospect_2,Medical Note,rich_text,"rotator-cuff inflammation, ROM limited, two-week follow-up scheduled (Henrik)"
+page_prospect_3,Position,select,RD
+page_prospect_3,Number,number,19
+page_prospect_3,Draft Status,select,Eligible
+page_brynas,Next Meeting,date,2027-01-29
+page_line_combinations,Version,select,v0.3 - pre-Brynas
+page_camp_2027,Due,date,2027-02-20
+page_camp_2027,Phase,select,Budget+Program draft

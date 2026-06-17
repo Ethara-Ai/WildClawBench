@@ -1,0 +1,8 @@
+message_id,conversation_id,direction,from_wa_id,to_wa_id,type,text,template_name,status,sent_at
+wa_msg_jas_oncall,wa_conv_jasmine,inbound,555-7201,555-7200,text,Ela byter med mig torsdag. Middagspass flyttas till fredag - OK?,,delivered,2027-01-27T11:05:00+01:00
+wa_msg_jas_ok,wa_conv_jasmine,outbound,555-7200,555-7201,text,OK. Jag fixar gris fredag.,,delivered,2027-01-27T11:08:00+01:00
+wa_msg_nils_stride,wa_conv_nils,inbound,555-7205,555-7200,text,Oskar laggar pa hoger sida igen. Klipp pa vag.,,delivered,2027-01-27T09:12:00+01:00
+wa_msg_oskar_ack,wa_conv_oskar,inbound,555-7207,555-7200,text,Tack for snacket igar. Vi tar h-sidan idag.,,delivered,2027-01-23T18:40:00+01:00
+wa_msg_frida_ask,wa_conv_frida,inbound,555-7210,555-7200,text,Maila om featuren? Skickade ocksa via mail men det ar lugnt om du foredrar telefonsvar.,,delivered,2027-01-26T20:14:00+01:00
+wa_msg_tommy_ack,wa_conv_tommy,inbound,555-7209,555-7200,text,Onsdag 19 - hor av dig pa zoom.,,delivered,2027-01-22T18:40:00+01:00
+wa_msg_staff_brynas,wa_conv_staff,outbound,555-7200,555-7205,text,Pass kl 15:30 imorgon - PP1/PK1 + nutralzon.,,delivered,2027-01-27T17:00:00+01:00

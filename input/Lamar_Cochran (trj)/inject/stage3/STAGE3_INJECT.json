@@ -1,0 +1,45 @@
+{
+  "stage": "stage3",
+  "description": "Loud T9→T10 window. One loud mutation fires after T9 (boundary fires_after_turn=9, silent=false, user_visible_notification set): Box federation prospect form template push v1.2 → v1.3. Adds mandatory back_half_shift_logs_confirmed + medical_status_field enum; removes free_text_medical_note (disclosure-limit compliance); expands draft_eligibility enum with Cleared (matches stage1 confluence circular footnote). T10_TR1 + T10_RL1 + MG_C1 verify the agent recognises the version delta and re-pulls/re-fills against the new schema.",
+  "mutations": [
+    {
+      "mutation_id": "stage3.box.001",
+      "service": "box-api",
+      "method": "POST",
+      "url": "{BOX_API_URL}/2.0/files/federation_prospect_form/versions",
+      "headers": {"Content-Type": "application/json", "Authorization": "Bearer {BOX_TOKEN}"},
+      "body": {
+        "folder": "federation_confidential",
+        "old_file": "federation_prospect_form_v1_2.pdf",
+        "new_file": "federation_prospect_form_v1_3.pdf",
+        "version": "1.3",
+        "uploaded_at": "{D+2:iso}T16:30:00+01:00",
+        "uploaded_by": "federation.publisher@svehockey.se",
+        "field_schema_delta": {
+          "added": [
+            {"field": "back_half_shift_logs_confirmed", "type": "boolean", "required": true},
+            {"field": "medical_status_field", "type": "enum", "values": ["cleared", "not-cleared"], "required": true}
+          ],
+          "removed": [
+            {"field": "free_text_medical_note", "reason": "replaced by enum for disclosure-limit compliance"}
+          ],
+          "modified": [
+            {"field": "draft_eligibility", "from_type": "enum[Yes|No|Pending]", "to_type": "enum[Yes|No|Pending|Cleared]"}
+          ]
+        },
+        "release_notes": "v1.3 — column-definition footnote v1.3 reflected in form fields. Mandatory back-half shift logs analytics confirmation. Medical line moves to enum-only. Free-text medical note removed (disclosure-limit compliance). Submission window closes at the standing date.",
+        "size_bytes": 192000,
+        "checksum_sha256": "stage2_v1_3_placeholder",
+        "loud": true,
+        "user_visible_notification": "Box notification fired to subscribers of federation_confidential folder."
+      },
+      "expected_status": 201,
+      "trap_family": "F4",
+      "silent": false,
+      "fires_after_turn": 9,
+      "invented": true,
+      "derived_from": "TOOLS.md: Box is federation confidential pathway folder; HEARTBEAT.md L48 federation prospect submission window; AGENTS.md priority 3 player development + federation submission",
+      "rationale": "T10 prompt explicitly says 'federation revised the prospect form template — new version pushed to the Box folder'. Stage2 is the loud temporal-revision: v1.2 → v1.3 with mandatory back-half-shift-logs analytics, medical-line enum, and the new Cleared enum value (matches stage1 confluence circular footnote). The free-text medical note removal supports the AGENTS.md medical disclosure red-line."
+    }
+  ]
+}

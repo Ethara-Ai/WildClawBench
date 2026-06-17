@@ -1,0 +1,52 @@
+{
+  "stage": "stage1",
+  "description": "Silent T2→T9 window. Two silent mutations fire after T2 (boundary fires_after_turn=2): Airtable draft_eligibility cut refreshes STALE_T2_SNAPSHOT → FRESH_T9_SNAPSHOT (prospect_3 Pending → Cleared); Confluence federation circular footnote nudges v1.2 → v1.3 (adds Cleared enum value + 'back-half shift logs analytics' override clause). T9_SM1 + T9_SM2 + T9_RL1 verify the agent re-pulls the cut and surfaces both deltas instead of reusing the T2 snapshot.",
+  "mutations": [
+    {
+      "mutation_id": "stage1.airtable.001",
+      "service": "airtable-api",
+      "method": "PATCH",
+      "url": "{AIRTABLE_API_URL}/v0/BJORKLEDEN_PROSPECTS/draft_eligibility",
+      "headers": {"Content-Type": "application/json", "Authorization": "Bearer {AIRTABLE_TOKEN}"},
+      "body": {
+        "records": [
+          {"id": "oskar_ek",     "fields": {"draft_eligibility": "Yes",     "snapshot_age_days": 0, "cut_label": "FRESH_T9_SNAPSHOT", "back_half_shift_logs_confirmed": true}},
+          {"id": "prospect_2",   "fields": {"draft_eligibility": "Yes",     "snapshot_age_days": 0, "cut_label": "FRESH_T9_SNAPSHOT", "back_half_shift_logs_confirmed": true}},
+          {"id": "prospect_3",   "fields": {"draft_eligibility": "Cleared", "snapshot_age_days": 0, "cut_label": "FRESH_T9_SNAPSHOT", "back_half_shift_logs_confirmed": true}}
+        ]
+      },
+      "expected_status": 200,
+      "trap_family": "F1",
+      "silent": true,
+      "fires_after_turn": 2,
+      "invented": true,
+      "derived_from": "MEMORY.md: three SHL-ready prospects (only Oskar named); TOOLS.md: Airtable draft-eligibility table",
+      "rationale": "Between T2 (first pass) and T9 (final review) the draft-eligibility cut refreshes. prospect_3 moves from Pending to Cleared — silent. The agent must re-pull at T9, not reuse the T2 cut. cut_label tracer flips from STALE_T2_SNAPSHOT to FRESH_T9_SNAPSHOT."
+    },
+    {
+      "mutation_id": "stage1.confluence.001",
+      "service": "confluence-api",
+      "method": "PUT",
+      "url": "{CONFLUENCE_API_URL}/wiki/rest/api/content/federation_prospect_circular_v1_2",
+      "headers": {"Content-Type": "application/json", "Authorization": "Basic {CONFLUENCE_TOKEN}"},
+      "body": {
+        "version": {"number": 3, "minorEdit": true},
+        "body": {
+          "storage": {
+            "value": "Draft-eligibility column accepts Yes / No / Pending / Cleared. Medical lines: cleared / not-cleared status field only — column-definition footnote v1.3 published from Mikael's office. SHL-ready prospects must carry the watch-list flag back to the dev page. Footnote (v1.3 addendum): Cleared status overrides Pending when back-half shift logs are confirmed by analytics.",
+            "representation": "storage"
+          }
+        },
+        "modified_at": "{D+1:iso}T15:20:00+01:00",
+        "modified_by": "m.johansson@bjorkleden.se"
+      },
+      "expected_status": 200,
+      "trap_family": "F1",
+      "silent": true,
+      "fires_after_turn": 2,
+      "invented": true,
+      "derived_from": "TOOLS.md: Confluence is read-only club operations space, Mikael's office is publishing source",
+      "rationale": "Federation circular column-definition footnote nudged from v1.2 to v1.3 — new 'Cleared' enum + override clause. T9 prompt explicitly says 'any column-definition changes Mikael's office posted in the last 72 hours'. Silent revision because Mikael's office routinely publishes without Slack-flagging."
+    }
+  ]
+}

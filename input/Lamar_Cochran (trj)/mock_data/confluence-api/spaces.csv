@@ -1,0 +1,3 @@
+id,key,name,type,status,description
+spc_bjorkleden_ops,BJD,Bjorkleden Club Operations,global,current,Read-only club ops space; published by Mikael Johansson.
+spc_shf_circulars,SHF,SHF Circulars (read),global,current,Federation circulars mirrored into club Confluence.

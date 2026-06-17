@@ -1,0 +1,4 @@
+id,name,displayName,email,avatarUrl,active,admin,teamId,createdAt,updatedAt
+user_lamar,lamar.cochran,Lamar Cochran,lamar.cochran@finthesiss.ai,,true,true,team_bjd,2023-09-01T08:00:00,2027-01-25T19:00:00
+user_nils,nils.bergqvist,Nils Bergqvist,nils.bergqvist.hockey@gmail.com,,true,false,team_bjd,2023-09-12T08:00:00,2027-01-25T19:00:00
+user_mikael,mikael.johansson,Mikael Johansson,m.johansson@bjorkleden.se,,true,false,team_bjd,2023-09-01T08:00:00,2027-01-22T17:40:00

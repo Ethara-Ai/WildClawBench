@@ -1,0 +1,6 @@
+id,name,real_name,email,is_admin,is_bot,tz,status_text,presence
+U_LAMAR,lamar.cochran,Lamar Cochran,lamar.cochran@Finthesiss.ai,False,False,Europe/Stockholm,,active
+U_NILS,nils.bergqvist,Nils Bergqvist,nils.bergqvist.hockey@gmail.com,False,False,Europe/Stockholm,,active
+U_MIKAEL,mikael.johansson,Mikael Johansson,m.johansson@bjorkleden.se,True,False,Europe/Stockholm,Sporting director,active
+U_STRAND,henrik.strand,Henrik Strand,h.strand@norrlandregion.se,False,False,Europe/Stockholm,Team physician,away
+U_VIDEO,jens.video,Jens Video,jens.video@bjorkleden.se,False,False,Europe/Stockholm,Video coordinator,active

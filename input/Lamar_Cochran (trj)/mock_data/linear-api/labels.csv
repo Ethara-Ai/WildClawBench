@@ -1,0 +1,9 @@
+id,name,color,description,teamId,createdAt,updatedAt
+lbl_fed_submission,federation-submission,#dc2626,Tied to the Swedish Hockey Federation prospect submission cycle.,team_bjd,2024-01-15T08:00:00,2027-01-25T19:00:00
+lbl_camp_2027,camp-2027,#0ea5e9,Summer development camp 2027 planning workstream.,team_bjd,2026-10-15T08:00:00,2027-01-22T14:00:00
+lbl_idp,idp,#22c55e,Individual development plan for a specific player.,team_bjd,2024-09-04T08:00:00,2027-01-23T15:20:00
+lbl_scouting,scouting-target,#a855f7,Active scouting target.,team_bjd,2024-09-04T08:00:00,2027-01-19T09:00:00
+lbl_dev_plan,development-plan,#f59e0b,Multi-step IDP execution beyond a single drill.,team_bjd,2024-09-04T08:00:00,2027-01-23T15:20:00
+lbl_deliverable,deliverable,#1e3a8a,Concrete club / federation deliverable with named owner.,team_bjd,2024-09-04T08:00:00,2027-01-25T19:00:00
+lbl_game_prep,game-prep,#64748b,"Game-day preparation task (line combos, special teams, video).",team_bjd,2024-09-04T08:00:00,2027-01-25T07:30:00
+lbl_post_game,post-game-writeback,#475569,Post-game season-log writeback and Obsidian voice memo.,team_bjd,2024-09-04T08:00:00,2027-01-25T22:50:00

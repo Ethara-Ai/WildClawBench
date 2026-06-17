@@ -1,0 +1,6 @@
+id,key,project_key,issue_type,summary,description,status,priority,assignee,reporter,sprint_id,story_points,created,updated
+issue_fed_101,FED-101,FED,Task,Module 5 coursework - Player Development Across the Pipeline,Coursework due end-Feb - separate workstream from prospect submission.,In Progress,Medium,lamar.cochran@finthesiss.ai,karin.svensson@shf.se,27001,8,2026-12-01T08:00:00Z,2027-01-15T08:00:00Z
+issue_fed_102,FED-102,FED,Task,Module 6 enrollment - Stockholm seminar,Enrollment window opens mid-March; not active this week.,Open,Low,lamar.cochran@finthesiss.ai,karin.svensson@shf.se,,3,2026-12-10T08:00:00Z,2026-12-10T08:00:00Z
+issue_fed_103,FED-103,FED,Task,Credential renewal - Hockey Canada equivalency,Renewal not due for several months.,Open,Low,lamar.cochran@finthesiss.ai,karin.svensson@shf.se,,2,2026-11-04T08:00:00Z,2026-11-04T08:00:00Z
+issue_norr_044,NORR-044,NORR,Task,First-aid refresher - Norrland region,Annual first-aid refresher; book in March.,Open,Medium,lamar.cochran@finthesiss.ai,karin.svensson@shf.se,,2,2026-12-05T08:00:00Z,2026-12-05T08:00:00Z
+issue_norr_045,NORR-045,NORR,Task,Safeguarding refresher - Norrland region,Annual safeguarding refresher.,Open,Low,lamar.cochran@finthesiss.ai,karin.svensson@shf.se,,1,2026-12-05T08:00:00Z,2026-12-05T08:00:00Z

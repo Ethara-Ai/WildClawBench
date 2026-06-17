@@ -1,0 +1,6 @@
+id,name,parent_id,owner_id,description,created_at,modified_at,item_count
+f_root_lamar,Lamar Cochran - Coaching,0,11111001,Personal root folder for Lamar Cochran's J20 coaching artefacts.,2023-09-01T08:00:00Z,2027-01-25T19:00:00Z,4
+f_fed_confidential,federation_confidential,f_root_lamar,11111004,"Swedish Hockey Federation confidential pathway folder. SHL-prospect evaluations live here; submission window closes annually on Feb 1. Access: Lamar Cochran (write), Mikael Johansson (read), Nils Bergqvist (read), SHF pathway admin (admin).",2025-12-04T08:00:00Z,2027-01-25T18:42:00Z,6
+f_scouting_dossiers,scouting_dossiers,f_root_lamar,11111001,Per-player scouting dossiers and IDP (individual development plan) drafts. Internal J20 staff only.,2024-08-12T08:00:00Z,2027-01-23T15:20:00Z,7
+f_camp_2027,summer_camp_2027,f_root_lamar,11111001,"Summer development camp 2027 planning artefacts (programme, budget, supplier quotes).",2026-10-15T08:00:00Z,2027-01-22T14:00:00Z,4
+f_archive_2025_26,archive_season_2025-26,f_root_lamar,11111001,"Closed-season archive from 2025-26 J20 season (post-season report, federation closeout, banquet AV).",2026-05-30T08:00:00Z,2026-06-15T11:00:00Z,9

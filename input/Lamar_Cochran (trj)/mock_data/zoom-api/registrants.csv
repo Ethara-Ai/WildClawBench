@@ -1,0 +1,5 @@
+id,meeting_id,email,first_name,last_name,status,join_time,create_time
+reg_tommy_2027_01_24,88011112201,tommy.svensson.hockey@gmail.com,Tommy,Svensson,approved,,2027-01-22T17:26:00Z
+reg_shf_q1_lamar,88011112204,lamar.cochran@finthesiss.ai,Lamar,Cochran,approved,,2026-12-20T08:00:00Z
+reg_scout_2027_01_15_lamar,88011112205,lamar.cochran@finthesiss.ai,Lamar,Cochran,approved,2027-01-15T13:00:00Z,2027-01-08T09:00:00Z
+reg_scout_2027_01_15_coord,88011112205,scout-coord@swehockey.se,SHF,Scout Coordinator,approved,2027-01-15T13:00:00Z,2027-01-08T09:30:00Z

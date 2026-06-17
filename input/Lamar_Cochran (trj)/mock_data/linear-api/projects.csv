@@ -1,0 +1,4 @@
+id,name,description,state,leadId,teamIds,startDate,targetDate,createdAt,updatedAt
+proj_fed_2027,Federation Prospect Submission 2027,Annual SHL-pathway prospect submission to Svenska Ishockeyforbundet. Window closes on next Feb 1. Three SHL-ready names this cycle.,started,user_lamar,team_bjd,2026-12-01,2027-02-01,2026-12-01T08:00:00,2027-01-25T19:00:00
+proj_camp_2027,Summer Development Camp 2027,Camp budget + programme proposal to Mikael for the Jul 5-16 camp block. Sensitivity range on +6-9% regional supplier inflation.,started,user_lamar,team_bjd,2026-10-15,2027-02-20,2026-10-15T08:00:00,2027-01-22T14:00:00
+proj_idp_cycle,Mid-Season IDP Cycle,Individual development plans for the three SHL-ready prospects and the four next-cycle candidates.,started,user_lamar,team_bjd,2026-09-04,2027-05-08,2026-09-04T08:00:00,2027-01-23T15:20:00

@@ -1,0 +1,12 @@
+id,name,desc,id_board,id_list,pos,due,closed,member_ids,labels
+crd_blk_a_struct,"Block A structure (Jul 5-16, development)","Three sessions/day: am skill, pm tactical, evening video. Bring Tommy in for one mentor day.",brd_camp_2027,lst_camp_programming,1,2027-02-12,False,"mbr_lamar,mbr_nils",programming
+crd_blk_b_alumni,Block B alumni-runda (Jul 19-23),Reach out to 6 alumni for Q&A sessions and on-ice cameos. Tommy + 2 former SHL.,brd_camp_2027,lst_camp_programming,2,2027-02-12,False,mbr_lamar,programming
+crd_blk_c_tryout,Block C open tryout (Jul 26-30),Open tryout for U16/U17 - max 60 invitees.,brd_camp_2027,lst_camp_programming,3,2027-02-12,False,mbr_lamar,programming
+crd_staff_counselors,Recruit Block A counselors (x6 former J20s),Six counselors needed for Block A. Pull from 2023-26 alumni list. SEK 250/day stipend each.,brd_camp_2027,lst_camp_staff,1,2027-02-19,False,"mbr_lamar,mbr_nils","staff,recruiting"
+crd_marketing,Marketing brief for parent-newsletter,DO NOT auto-send. Lamar reviews each draft before publication.,brd_camp_2027,lst_camp_staff,2,2027-02-15,False,mbr_lamar,"staff,red-line"
+crd_meals,Meals (Lunch catering),Vegetarian + halal options. Get two quotes.,brd_camp_2027,lst_camp_accommodation,1,2027-02-18,False,mbr_lamar,"accommodation,catering"
+crd_lodging,Lodging (out-of-town invitees),Block 12 rooms Hotel Aveny.,brd_camp_2027,lst_camp_accommodation,2,2027-02-18,False,mbr_lamar,accommodation
+crd_ice_rental,Ice rental (T3 Center),Use Confluence supplier_price_list_2027 v2027-01 for weekday/weekend lines.,brd_camp_2027,lst_camp_gear,1,2027-02-18,False,"mbr_lamar,mbr_mikael","gear,budget"
+crd_equipment,Equipment line (Hockey Nu AB),"Pucks, tape, water bottles per supplier list.",brd_camp_2027,lst_camp_gear,2,2027-02-18,False,mbr_lamar,"gear,budget"
+crd_camp_2026_close,Camp 2026 close-out (signed by Mikael),Close-out doc in Box archive_season_2025-26.,brd_camp_2027,lst_camp_done,1,2026-08-30,True,"mbr_lamar,mbr_mikael",done
+crd_season_brynas,Brynas H2H game 3 prep,"Pre-game notes, video, line combos, PP/PK plan.",brd_season_log,lst_season_open,1,2027-01-29,False,"mbr_lamar,mbr_nils",game-prep

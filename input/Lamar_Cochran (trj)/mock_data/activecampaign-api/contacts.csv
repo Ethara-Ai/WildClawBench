@@ -1,0 +1,2 @@
+id,email,first_name,last_name,phone,status,created_timestamp,updated_timestamp
+ac_contact_seed,seed@activecampaign.invalid,Seed,Placeholder,Internal,1,2025-03-14T08:00:00,2025-03-14T08:00:00

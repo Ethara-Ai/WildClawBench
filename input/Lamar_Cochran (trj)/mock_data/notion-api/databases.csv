@@ -1,0 +1,4 @@
+id,title,parent_page_id,created_time,last_edited_time,created_by,icon,archived
+db_players,Players,,2026-08-10T20:00:00+02:00,2027-01-27T22:30:00+01:00,user_lamar,skater,False
+db_opponents,Opponents,,2026-08-10T20:00:00+02:00,2027-01-27T22:30:00+01:00,user_lamar,bracket,False
+db_dev,Dev Projects,,2026-08-10T20:00:00+02:00,2027-01-27T17:10:00+01:00,user_lamar,wrench,False

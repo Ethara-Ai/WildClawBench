@@ -1,0 +1,7 @@
+id,name,type,color,position,teamId,description
+state_backlog,Backlog,backlog,#94a3b8,0,team_bjd,Unprioritised long-tail.
+state_todo,Todo,unstarted,#0ea5e9,1,team_bjd,"Triaged, awaiting start."
+state_inprog,In Progress,started,#f59e0b,2,team_bjd,Actively being worked.
+state_review,In Review,started,#a855f7,3,team_bjd,"Drafted, pending Mikael / Nils / Strand sign-off."
+state_done,Done,completed,#22c55e,4,team_bjd,Shipped.
+state_cancelled,Cancelled,cancelled,#ef4444,5,team_bjd,Dropped without ship.

@@ -1,0 +1,4 @@
+id,meeting_id,recording_type,file_type,file_size,recording_start,recording_end,play_url,status
+rec_tommy_2026_09_17,88011112202,shared_screen_with_speaker_view,MP4,482736480,2026-09-17T19:00:00Z,2026-09-17T20:00:00Z,https://us02web.zoom.us/rec/play/tommy20260917,completed
+rec_shf_diploma_q4,88011112203,shared_screen_with_speaker_view,MP4,712348160,2026-12-08T15:00:00Z,2026-12-08T16:30:00Z,https://us02web.zoom.us/rec/play/shfdiplomaq4,completed
+rec_scout_2027_01_15,88011112205,shared_screen_with_speaker_view,MP4,528736480,2027-01-15T13:00:00Z,2027-01-15T14:00:00Z,https://us02web.zoom.us/rec/play/scout20270115,completed

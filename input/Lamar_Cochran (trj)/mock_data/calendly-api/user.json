@@ -1,0 +1,11 @@
+{
+  "uuid": "cal_user_lamar",
+  "name": "Lamar Cochran",
+  "slug": "lamar-cochran",
+  "email": "lamar.cochran@finthesiss.ai",
+  "scheduling_url": "https://calendly.com/lamar-cochran",
+  "timezone": "Europe/Stockholm",
+  "current_organization": "org_bjorkleden_if",
+  "created_at": "2025-09-01T10:00:00.000000Z",
+  "updated_at": "2027-01-15T10:00:00.000000Z"
+}
