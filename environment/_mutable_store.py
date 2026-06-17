@@ -228,26 +228,35 @@ def read_json_with_ctx(path: Any, api: str, table: str) -> List[Row]:
 
 
 def read_seed_with_ctx(path: Any, api: str, table: str) -> List[Row]:
-    """Auto-dispatch to CSV or JSON reader based on file extension.
+    """Auto-dispatch to CSV or JSON reader, with CSV-overlay-wins semantics.
 
-    If *path* has an explicit ``.csv`` or ``.json`` suffix the matching reader
-    is used directly.  Otherwise the function probes for a ``.json`` file first,
-    then ``.csv``, raising :class:`CoerceError` if neither exists.
+    Overlay semantics (Q1 fix):
+      * If *path* has an explicit ``.json`` or ``.csv`` suffix, a sibling file
+        with the OTHER suffix is checked first; a sibling ``.csv`` ALWAYS wins
+        over a baked ``.json`` (so a bind-mounted CSV overlay shadows the
+        baked-in JSON without any callsite change).
+      * If *path* has no suffix, ``.csv`` is probed before ``.json``.
+      * :class:`CoerceError` is raised if no candidate file exists.
     """
     p = Path(path)
     ext = p.suffix.lower()
+    # CSV-overlay-wins: a sibling .csv shadows the requested .json
     if ext == ".json":
+        csv_sibling = p.with_suffix(".csv")
+        if csv_sibling.exists():
+            return read_csv_with_ctx(csv_sibling, api, table)
         return read_json_with_ctx(p, api, table)
     if ext == ".csv":
         return read_csv_with_ctx(p, api, table)
-    json_path = p.with_suffix(".json")
-    if json_path.exists():
-        return read_json_with_ctx(json_path, api, table)
+    # No suffix: probe .csv first (overlay-wins), then .json
     csv_path = p.with_suffix(".csv")
     if csv_path.exists():
         return read_csv_with_ctx(csv_path, api, table)
+    json_path = p.with_suffix(".json")
+    if json_path.exists():
+        return read_json_with_ctx(json_path, api, table)
     raise CoerceError(
-        f"seed file not found (tried .json and .csv): api={api} table={table} path={p}"
+        f"seed file not found (tried .csv and .json): api={api} table={table} path={p}"
     )
 
 

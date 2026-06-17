@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "environment"))
 
 from _mutable_store import (
+    CoerceError,
     read_csv_with_ctx,
     read_json_with_ctx,
     read_seed_with_ctx,
@@ -224,12 +225,20 @@ def test_seed_dispatcher_csv(seed_dir):
     assert _strip_file_key(rows_direct) == _strip_file_key(rows_dispatch)
 
 
-def test_seed_dispatcher_no_extension_probes_json_first(seed_dir):
+def test_seed_dispatcher_no_extension_probes_csv_first(seed_dir):
     tmp_path, json_path, csv_path = seed_dir
     no_ext = tmp_path / "widgets"
-    rows_json = read_json_with_ctx(json_path, _API, _TABLE)
+    rows_csv = read_csv_with_ctx(csv_path, _API, _TABLE)
     rows_probe = read_seed_with_ctx(no_ext, _API, _TABLE)
-    assert _strip_file_key(rows_json) == _strip_file_key(rows_probe)
+    assert _strip_file_key(rows_csv) == _strip_file_key(rows_probe)
+
+
+def test_seed_dispatcher_json_with_csv_sibling_prefers_csv(seed_dir):
+    """CSV-overlay-wins: explicit .json path with sibling .csv returns CSV rows."""
+    tmp_path, json_path, csv_path = seed_dir
+    rows_csv = read_csv_with_ctx(csv_path, _API, _TABLE)
+    rows_dispatch = read_seed_with_ctx(json_path, _API, _TABLE)
+    assert _strip_file_key(rows_csv) == _strip_file_key(rows_dispatch)
 
 
 def test_seed_dispatcher_no_extension_falls_back_to_csv(tmp_path):
@@ -246,7 +255,47 @@ def test_seed_dispatcher_no_extension_falls_back_to_csv(tmp_path):
 
 
 def test_seed_dispatcher_missing_file_raises(tmp_path):
-    from _mutable_store import CoerceError
-
+    # CoerceError is imported at module top so its identity is stable across
+    # sys.modules eviction performed by tests/mocks/_helpers.py and
+    # tests/test_drift_plane_smoke.py during the same pytest session.
     with pytest.raises(CoerceError, match="seed file not found"):
         read_seed_with_ctx(tmp_path / "nope", _API, _TABLE)
+
+
+def test_real_api_csv_overlay_shadows_baked_json(tmp_path, monkeypatch):
+    import importlib
+    import shutil
+    env_dir = Path(__file__).resolve().parents[1] / "environment"
+    sandbox = tmp_path / "figma-api"
+    shutil.copytree(env_dir / "figma-api", sandbox)
+    overlay_row = {
+        "comment_id": "E2E_OVERLAY_001", "file_key": "FK_E2E", "user_id": "u-e2e",
+        "user_handle": "E2E", "message": "from CSV", "node_id": "0:0",
+        "resolved": "false", "created_at": "2026-06-17T00:00:00Z",
+    }
+    with open(sandbox / "comments.csv", "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=list(overlay_row.keys()))
+        w.writeheader()
+        w.writerow(overlay_row)
+
+    # Self-sufficient overlay isolation - symmetric setup/teardown:
+    #  - Pop _STORES["figma-api"] so Store.register doesn't short-circuit on a
+    #    stale registration from tests/mocks/ (would otherwise return baseline).
+    #  - Pop sys.modules["figma_data"] so importlib re-binds against the sandbox.
+    #  - DO NOT evict _mutable_store; CoerceError class identity must stay
+    #    stable for test_seed_dispatcher_missing_file_raises.
+    #  - finally-block pops the sandbox-bound entries we just created so this
+    #    test does not leak a tmp_path-bound figma_data into the session.
+    import _mutable_store as _ms
+    _ms._STORES.pop("figma-api", None)
+    sys.modules.pop("figma_data", None)
+    monkeypatch.syspath_prepend(str(env_dir))
+    monkeypatch.syspath_prepend(str(sandbox))
+    try:
+        figma_data = importlib.import_module("figma_data")
+        rows = figma_data._store.table("comments").rows()
+        assert len(rows) == 1
+        assert rows[0]["comment_id"] == "E2E_OVERLAY_001"
+    finally:
+        _ms._STORES.pop("figma-api", None)
+        sys.modules.pop("figma_data", None)

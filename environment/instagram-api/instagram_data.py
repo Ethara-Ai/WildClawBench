@@ -141,11 +141,8 @@ def _coerce_mentions(rows):
     return out
 
 
-# Load all data at module init
 def _load_users():
-    with open(DATA_DIR / "user.json", encoding="utf-8") as f:
-        raw = json.load(f)
-    return raw if isinstance(raw, list) else [raw]
+    return _load("user.json", "users")
 
 
 _store.register("media", primary_key="id",

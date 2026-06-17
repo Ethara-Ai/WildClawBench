@@ -32,17 +32,6 @@ def _load_json(filename):
 
 
 def _load_qbo_envelope(filename, envelope_key):
-    # QBO-canonical seed loader, UNWIRED. Probes two on-disk shapes:
-    #   (a) Real QBO API envelope: {"QueryResponse": {"<envelope_key>": [...]}}
-    #   (b) Bare list: [...] — used by invoices/bills/payments/etc.
-    # Kept available because the authored overlay format for vendors/accounts is the FLAT
-    # CSV (lives at <task>/mock_data/quickbooks-api/{vendors,accounts}.csv and bind-mounts
-    # over the baked-in fixtures via eval/run_batch.py:393-405 + mock_stack.py:270-275).
-    # CSVs are routed through _coerce_vendors / _coerce_accounts to match the QBO row shape
-    # the API consumers expect. The bundled vendors.json/accounts.json files in this
-    # directory are NOT registered with _store and ship as reference fixtures only — if a
-    # future table needs a real-QBO-envelope JSON seed instead of a flat CSV, wire that
-    # table through this helper (mirror the invoices.json / bills.json pattern).
     raw = _load_json(filename)
     if isinstance(raw, dict):
         qr = raw.get("QueryResponse")
@@ -51,6 +40,13 @@ def _load_qbo_envelope(filename, envelope_key):
             if isinstance(inner, list):
                 return inner
     return raw
+
+
+def _load_qbo_or_csv(filename, envelope_key, csv_coercer, table):
+    csv_sibling = (DATA_DIR / filename).with_suffix(".csv")
+    if csv_sibling.exists():
+        return csv_coercer(_load(csv_sibling.name, table))
+    return _load_qbo_envelope(filename, envelope_key)
 
 
 def _now():
@@ -149,23 +145,23 @@ def _coerce_accounts(rows):
 
 
 _store.register("customers", primary_key="Id",
-                initial_loader=lambda: _load_qbo_envelope("customers.json", "Customer"))
+                initial_loader=lambda: _load_qbo_or_csv("customers.json", "Customer", _coerce_customers, "customers"))
 _store.register("vendors", primary_key="Id",
-                initial_loader=lambda: _load_qbo_envelope("vendors.json", "Vendor"))
+                initial_loader=lambda: _load_qbo_or_csv("vendors.json", "Vendor", _coerce_vendors, "vendors"))
 _store.register("items", primary_key="Id",
                 initial_loader=lambda: _coerce_items(_load("items.json", "items")))
 _store.register("accounts", primary_key="Id",
-                initial_loader=lambda: _load_qbo_envelope("accounts.json", "Account"))
+                initial_loader=lambda: _load_qbo_or_csv("accounts.json", "Account", _coerce_accounts, "accounts"))
 _store.register("invoices", primary_key="Id",
-                initial_loader=lambda: _load_json("invoices.json"))
+                initial_loader=lambda: _load("invoices.json", "invoices"))
 _store.register("bills", primary_key="Id",
-                initial_loader=lambda: _load_json("bills.json"))
+                initial_loader=lambda: _load("bills.json", "bills"))
 _store.register("payments", primary_key="Id",
-                initial_loader=lambda: _load_json("payments.json"))
+                initial_loader=lambda: _load("payments.json", "payments"))
 _store.register("estimates", primary_key="Id",
-                initial_loader=lambda: _load_json("estimates.json"))
+                initial_loader=lambda: _load("estimates.json", "estimates"))
 _store.register("expenses", primary_key="Id",
-                initial_loader=lambda: _load_json("expenses.json"))
+                initial_loader=lambda: _load("expenses.json", "expenses"))
 
 _store.register_document("company_info",
                          initial_loader=lambda: _load_json("company_info.json"))
