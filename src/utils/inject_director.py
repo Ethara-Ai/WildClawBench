@@ -124,10 +124,28 @@ def _coerce_mutation_buckets(raw_muts: Any) -> Tuple[list, list, list]:
             # Filesystem indicators MUST be checked before the silent flag: an
             # op can carry silent:true AND service:"filesystem", but it is still
             # a host-side workspace mutation that has no admin-plane endpoint.
+            # The bare `"action" in op` heuristic also catches legacy filesystem
+            # ops (`{action:"place_file", dst, src}`), but Talos export uses
+            # `action` as a service-verb tag (`patch_page_body`, `create_drafts`)
+            # on API ops alongside an `http:` envelope or top-level `url` — so
+            # only trust the heuristic when there's NO http/url and NO non-fs
+            # service, and at least one of dst/src is present.
+            service = op.get("service")
+            has_http = isinstance(op.get("http"), dict)
+            has_top_url = isinstance(op.get("url"), str)
+            fs_env = isinstance(op.get("fs"), dict)
+            service_is_fs = service == "filesystem" or service is None
             is_filesystem = (
-                op.get("service") == "filesystem"
+                service == "filesystem"
                 or bucket == "filesystem"
-                or "action" in op
+                or fs_env
+                or (
+                    "action" in op
+                    and not has_http
+                    and not has_top_url
+                    and service_is_fs
+                    and (op.get("dst") or op.get("src"))
+                )
             )
             if is_filesystem:
                 fs.append(op)
@@ -315,9 +333,76 @@ _SERVICE_RESOLUTION = {
         ("PlotID", "plot_id", "Name", "name", "SKU", "sku", "record_id", "RecordID", "id"),
     ),
     "notion-api": (("pages",), ("title", "Name", "name", "id")),
-    "confluence-api": (("pages",), ("title", "Name", "name", "id")),
+    "confluence-api": (("pages", "content"), ("title", "Name", "name", "id")),
     "woocommerce-api": (("products",), ("sku", "SKU", "slug", "name", "id")),
+    "gmail-api": (("messages", "drafts", "threads"), ("id", "message_id", "thread_id")),
+    "google-calendar-api": (("events",), ("id", "event_id", "summary")),
+    "google-maps-api": (("places",), ("id", "place_id", "name")),
+    "google-drive-api": (("files",), ("id", "name")),
+    "fedex-api": (("tracking",), ("tracking_number", "id")),
+    "slack-api": (("messages", "channels"), ("id", "channel_id", "ts")),
+    "hubspot-api": (("contacts", "deals", "companies"), ("id", "hs_object_id", "email")),
+    "box-api": (("files", "folders"), ("id", "name")),
+    "asana-api": (("tasks", "projects"), ("gid", "id", "name")),
+    "typeform-api": (("responses", "forms"), ("response_id", "id")),
+    "figma-api": (("files", "frames"), ("id", "key", "name")),
+    "docusign-api": (("envelopes",), ("envelope_id", "id")),
+    "plaid-api": (("accounts", "transactions"), ("account_id", "transaction_id", "id")),
+    "twilio-api": (("messages",), ("sid", "id")),
+    "whatsapp-api": (("messages",), ("id", "message_id")),
+    "monday-api": (("items", "boards", "columns"), ("id", "item_id")),
+    "nasa-api": (("cache",), ("id", "location_id", "cache_key")),
+    "instagram-api": (("media", "drafts"), ("id", "media_id", "draft_id")),
 }
+
+# Map Talos display-name service strings ("Notion", "Gmail", "Monday", ...) to
+# the canonical "-api" suffix form that ``self._urls`` is keyed by. Without
+# this normalization, ops from tasks that emit display names alongside an
+# `http:` envelope (e.g. Jae chandler) miss the admin URL lookup even though
+# the mock container is running and reachable.
+_SERVICE_DISPLAY_TO_API: Dict[str, str] = {
+    "gmail": "gmail-api",
+    "notion": "notion-api",
+    "monday": "monday-api",
+    "monday.com": "monday-api",
+    "nasa": "nasa-api",
+    "instagram": "instagram-api",
+    "asana": "asana-api",
+    "airtable": "airtable-api",
+    "confluence": "confluence-api",
+    "box": "box-api",
+    "google calendar": "google-calendar-api",
+    "google-calendar": "google-calendar-api",
+    "googlecalendar": "google-calendar-api",
+    "google maps": "google-maps-api",
+    "google-maps": "google-maps-api",
+    "googlemaps": "google-maps-api",
+    "google drive": "google-drive-api",
+    "google-drive": "google-drive-api",
+    "googledrive": "google-drive-api",
+    "figma": "figma-api",
+    "typeform": "typeform-api",
+    "slack": "slack-api",
+    "hubspot": "hubspot-api",
+    "fedex": "fedex-api",
+    "twilio": "twilio-api",
+    "whatsapp": "whatsapp-api",
+    "docusign": "docusign-api",
+    "plaid": "plaid-api",
+    "woocommerce": "woocommerce-api",
+}
+
+
+def _canonical_service(svc: Optional[str]) -> Optional[str]:
+    """Normalize service name to the ``-api`` form used by ``self._urls``."""
+    if not isinstance(svc, str):
+        return None
+    s = svc.strip()
+    if not s:
+        return None
+    if s.endswith("-api") or s == "filesystem":
+        return s
+    return _SERVICE_DISPLAY_TO_API.get(s.lower())
 
 
 class InjectApplier:
@@ -658,13 +743,19 @@ class InjectApplier:
 
     def _apply_api_mutation(self, op: Dict[str, Any], stage: InjectStage,
                             turn_index: int, silent: bool) -> Dict[str, Any]:
-        api = op.get("service") or op.get("api")
+        api_raw = op.get("service") or op.get("api")
+        api = _canonical_service(api_raw)
         if api == "filesystem":
             return self._apply_filesystem(op, stage)
-        rec = {"id": op.get("id"), "service": api, "method": op.get("method"),
-               "path": op.get("path"), "silent": silent}
+        env = self._http_envelope(op)
+        method = (env.get("method") or "").upper()
+        rec = {"id": op.get("id") or op.get("mutation_id"),
+               "service": api or api_raw, "method": method or op.get("method"),
+               "path": env.get("url") or op.get("path"), "silent": silent}
         if not api or api not in self._urls:
-            rec.update(ok=False, status="unresolved", reason=f"no admin URL for {api}")
+            rec.update(ok=False, status="unresolved",
+                       reason=f"no admin URL for {api_raw!r}"
+                              + ("" if api else " (unknown service alias)"))
             self._append({"type": "inject.api", **rec, "ts": time.time()})
             return rec
         # Explicit admin-op form (the unambiguous representation): the op carries
@@ -672,6 +763,43 @@ class InjectApplier:
         # and the values to set. Dispatched directly — no fuzzy path resolution.
         if isinstance(op.get("admin"), dict):
             return self._apply_admin_op(api, op["admin"], op, silent)
+        # GraphQL ops (Monday /v2 with mutation in body.query): parse the
+        # well-known ``change_column_value`` shape and reroute through the
+        # standard admin_patch. Other GraphQL mutation shapes return loudly
+        # so the timeline carries a clear unsupported reason.
+        if self._is_graphql_op(env):
+            gq = self._parse_graphql_mutation(env)
+            if gq is None:
+                rec.update(ok=False, status="unsupported",
+                           reason="graphql endpoint: only change_column_value parsed; rewrite as REST PATCH")
+                self._append({"type": "inject.api", **rec, "ts": time.time()})
+                return rec
+            table, pk, gfields = gq
+            rec.update(table=table, pk=pk, fields=list(gfields.keys()), shape="graphql")
+            result = self._admin_patch(api, table, pk, gfields)
+            rec.update(result)
+            rec["status"] = rec.get("status", "applied" if result.get("ok") else "failed")
+            self._append({"type": "inject.api", **rec, "ts": time.time()})
+            return rec
+        body = env.get("body") if isinstance(env.get("body"), dict) else {}
+        # PATCH/PUT with body.records[]: airtable-style batch (one or many rows).
+        # Emit one admin_patch per row, aggregate ok/changed counts.
+        if method in ("PATCH", "PUT") and isinstance(body.get("records"), list) and body["records"]:
+            return self._apply_batch_records(api, op, env, body["records"], silent, rec)
+        # POST with body.{records|messages|drafts|events|items}[] is a seed-
+        # insert: each list element is a row to admin_post into the inferred
+        # destination table.
+        if method == "POST":
+            seed_list = None
+            seed_key = None
+            for k in ("records", "messages", "drafts", "events", "items"):
+                v = body.get(k)
+                if isinstance(v, list) and v:
+                    seed_list = v
+                    seed_key = k
+                    break
+            if seed_list is not None:
+                return self._apply_seed_insert(api, op, env, seed_list, seed_key, silent, rec)
         diag: Dict[str, Any] = {}
         resolved = self._resolve_target(api, op, diag=diag)
         if resolved is None:
@@ -694,6 +822,133 @@ class InjectApplier:
         rec["status"] = rec.get("status", "applied" if result.get("ok") else "failed")
         self._append({"type": "inject.api", **rec, "ts": time.time()})
         return rec
+
+    def _apply_batch_records(self, api: str, op: Dict[str, Any],
+                             env: Dict[str, Any], records: list, silent: bool,
+                             rec: Dict[str, Any]) -> Dict[str, Any]:
+        table = self._infer_table_from_url(api, env.get("url") or "")
+        outcomes: List[Dict[str, Any]] = []
+        ok_count = 0
+        for r in records:
+            if not isinstance(r, dict):
+                continue
+            row_pk = r.get("id") or r.get("pk")
+            row_fields = r.get("fields") if isinstance(r.get("fields"), dict) else {
+                k: v for k, v in r.items() if k not in ("id", "pk") and not k.startswith("_")
+            }
+            if row_pk is None or not row_fields:
+                outcomes.append({"pk": row_pk, "ok": False, "reason": "missing pk or fields"})
+                continue
+            patch_fields = {"fields": row_fields} if api == "airtable-api" else row_fields
+            result = self._admin_patch(api, table or self._default_table_for(api),
+                                       str(row_pk), patch_fields)
+            outcomes.append({"pk": row_pk, "ok": bool(result.get("ok")),
+                             "status": result.get("status")})
+            if result.get("ok"):
+                ok_count += 1
+        rec.update(table=table, shape="batch_records", batch_size=len(records),
+                   ok_count=ok_count, outcomes=outcomes,
+                   ok=(ok_count == len([r for r in records if isinstance(r, dict)])))
+        rec["status"] = "applied" if rec["ok"] else (
+            "partial" if ok_count > 0 else "failed")
+        self._append({"type": "inject.api", **rec, "ts": time.time()})
+        return rec
+
+    def _apply_seed_insert(self, api: str, op: Dict[str, Any],
+                           env: Dict[str, Any], rows: list, container_key: str,
+                           silent: bool, rec: Dict[str, Any]) -> Dict[str, Any]:
+        table = self._infer_table_from_url(api, env.get("url") or "") or container_key
+        outcomes: List[Dict[str, Any]] = []
+        ok_count = 0
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            result = self._admin_post(api, f"/admin/data/{table}", {"row": row})
+            outcomes.append({"id": row.get("id"), "ok": bool(result.get("ok")),
+                             "status": result.get("status")})
+            if result.get("ok"):
+                ok_count += 1
+        rec.update(table=table, shape="seed_insert", batch_size=len(rows),
+                   ok_count=ok_count, outcomes=outcomes,
+                   ok=(ok_count == len([r for r in rows if isinstance(r, dict)])))
+        rec["status"] = "applied" if rec["ok"] else (
+            "partial" if ok_count > 0 else "failed")
+        self._append({"type": "inject.api", **rec, "ts": time.time()})
+        return rec
+
+    @staticmethod
+    def _infer_table_from_url(api: str, url: str) -> Optional[str]:
+        if not isinstance(url, str) or not url:
+            return None
+        u = re.sub(r"\{[A-Z][A-Z0-9_]*\}", "", url)
+        u = re.sub(r"^[a-z]+://[^/]+", "", u)
+        u = u.split("?", 1)[0].split("#", 1)[0].strip("/")
+        if not u:
+            return None
+        segs = [s for s in u.split("/") if s and s != "_seed"]
+        if not segs:
+            return None
+        # For airtable ``/v0/{base}/{table}/{rec_id}`` and similar, the
+        # rightmost segment is the record id; the segment before it is the
+        # table. For seed-style ``/_seed/messages``, the rightmost surviving
+        # segment IS the table.
+        if len(segs) >= 2 and not segs[-1].startswith("_"):
+            return segs[-2] if (len(segs) >= 2 and not segs[-1].lower() in
+                                ("messages", "drafts", "records", "events", "items")) else segs[-1]
+        return segs[-1]
+
+    @staticmethod
+    def _default_table_for(api: str) -> str:
+        prefixes, _ = _SERVICE_RESOLUTION.get(api, ((), ("id",)))
+        return prefixes[0] if prefixes else "records"
+
+    @staticmethod
+    def _is_graphql_op(env: Dict[str, Any]) -> bool:
+        url = env.get("url") or ""
+        body = env.get("body") or {}
+        if isinstance(url, str) and (url.rstrip("/").endswith("/v2") or "/graphql" in url):
+            return True
+        if isinstance(body, dict) and isinstance(body.get("query"), str) \
+                and "mutation" in body["query"].lower():
+            return True
+        return False
+
+    @staticmethod
+    def _parse_graphql_mutation(env: Dict[str, Any]
+                                ) -> Optional[Tuple[str, str, Dict[str, Any]]]:
+        """Extract (table, pk, fields) from a Monday change_column_value mutation.
+
+        Returns None if the GraphQL string isn't a shape we know how to parse;
+        the caller emits ``status=unsupported`` in that case.
+        """
+        body = env.get("body") or {}
+        q = body.get("query") if isinstance(body, dict) else None
+        if not isinstance(q, str):
+            return None
+        if "change_column_value" not in q:
+            return None
+        # Pull each ``key: value`` argument out of the mutation body.
+        # GraphQL values can be JSON-style: ints, quoted strings, JSON strings.
+        args: Dict[str, str] = {}
+        for m in re.finditer(r"(\w+)\s*:\s*((?:\"[^\"]*\")|(?:[\w\-\.]+))", q):
+            k, v = m.group(1), m.group(2)
+            if v.startswith("\"") and v.endswith("\""):
+                v = v[1:-1]
+            args[k] = v
+        item_id = args.get("item_id") or args.get("itemId")
+        column_id = args.get("column_id") or args.get("columnId")
+        value = args.get("value")
+        if not item_id or not column_id:
+            return None
+        # ``value`` is often a JSON-string of a dict; pass it through verbatim
+        # and let the admin plane store it. If it looks JSON, parse for clarity.
+        out_val: Any = value
+        if isinstance(value, str) and value.startswith("{") and value.endswith("}"):
+            try:
+                out_val = json.loads(value)
+            except Exception:
+                out_val = value
+        return ("items", str(item_id), {column_id: out_val})
 
     def _resolve_target(self, api: str, op: Dict[str, Any],
                         diag: Optional[Dict[str, Any]] = None
@@ -774,36 +1029,58 @@ class InjectApplier:
         return None
 
     @staticmethod
-    def _extract_fields(op: Dict[str, Any]) -> Dict[str, Any]:
+    def _http_envelope(op: Dict[str, Any]) -> Dict[str, Any]:
+        """Return a normalized ``{method,url,body,headers,params}`` from an op.
+
+        Tolerates three on-disk shapes:
+          * Talos nested:  ``op.http.{method,url,body,headers,params}``
+          * Talos flat:    top-level ``op.{method,url,body,headers,params}``
+          * Legacy api:    ``op.{method,path,body,params}`` (path becomes url)
+        Missing fields are returned as ``None``/``{}``.
+        """
+        http = op.get("http")
+        if isinstance(http, dict):
+            return {
+                "method": http.get("method"),
+                "url":    http.get("url"),
+                "body":   http.get("body"),
+                "headers": http.get("headers") or {},
+                "params": http.get("params") or {},
+            }
+        return {
+            "method": op.get("method"),
+            "url":    op.get("url") or op.get("path"),
+            "body":   op.get("body"),
+            "headers": op.get("headers") or {},
+            "params": op.get("params") or {},
+        }
+
+    @classmethod
+    def _extract_fields(cls, op: Dict[str, Any]) -> Dict[str, Any]:
         # stage3 params form: the new values live under params.field_updates.
         params = op.get("params")
         if isinstance(params, dict) and isinstance(params.get("field_updates"), dict):
             return {k: v for k, v in params["field_updates"].items()
                     if not str(k).startswith("_")}
-        body = op.get("body")
-        if not isinstance(body, dict):
-            http_env = op.get("http")
-            if isinstance(http_env, dict):
-                body = http_env.get("body")
+        body = cls._http_envelope(op).get("body")
         if not isinstance(body, dict):
             return {}
         if isinstance(body.get("fields"), dict):
-            flat = {k: v for k, v in body["fields"].items() if not k.startswith("_")}
-            return flat
+            return {k: v for k, v in body["fields"].items() if not k.startswith("_")}
         if isinstance(body.get("properties"), dict):
             # Flatten notion/confluence property shapes to leaf scalar values.
-            flat = {}
-            for k, v in body["properties"].items():
-                flat[k] = _flatten_property_value(v)
-            return flat
-        # whole-body scalar fields (rare)
+            return {k: _flatten_property_value(v) for k, v in body["properties"].items()}
+        # whole-body fields (flat tracking/etc.); preserve dicts too because
+        # confluence content nests `body.storage.value` and similar.
         return {k: v for k, v in body.items()
-                if isinstance(v, (str, int, float, bool)) and not k.startswith("_")}
+                if not str(k).startswith("_") and k not in ("records", "messages",
+                                                            "drafts", "events", "items")}
 
     @classmethod
     def _extract_key_from_op(cls, op: Dict[str, Any]) -> Optional[str]:
         """Business key for an op: stage3 ``params.record_id`` if present, else
-        the placeholder embedded in the REST path."""
+        the trailing path segment of the op's URL (Talos http/flat) or legacy
+        ``op.path`` placeholder."""
         params = op.get("params")
         if isinstance(params, dict):
             rid = params.get("record_id") or params.get("page_id") or params.get("id")
@@ -811,17 +1088,22 @@ class InjectApplier:
                 # record_id may itself be a store pk (recUDI007) or a business
                 # key; _bag_matches_key handles both, but strip any rec_/page_ wrap.
                 return re.sub(r"^(rec_|page_id_|id_|page_)", "", str(rid)).strip() or None
-        # Talos http envelope: real REST URL with no curly-brace placeholder, so
-        # the last path segment IS the store pk verbatim (e.g. airtable
-        # ``recInvESY00000001`` or woocommerce numeric ``2501``). Do NOT strip a
-        # ``rec`` prefix that is part of the actual record id.
-        http_env = op.get("http")
-        if isinstance(http_env, dict) and isinstance(http_env.get("url"), str):
-            url = re.sub(r"\{[A-Z][A-Z0-9_]*\}", "", http_env["url"])
-            url = url.split("?", 1)[0].split("#", 1)[0]
-            tail = url.rstrip("/").rsplit("/", 1)[-1]
-            return tail.strip() or None
-        return cls._extract_key_from_path(op.get("path", ""))
+        env = cls._http_envelope(op)
+        url = env.get("url")
+        if isinstance(url, str) and url:
+            # Strip Talos ``{XXX_API_URL}`` template placeholders AND any fully
+            # resolved ``scheme://host:port`` prefix (Larry Bates uses literal
+            # ``http://localhost:8010/...``). Returns the last path segment
+            # VERBATIM — do NOT strip a ``rec`` prefix that is part of the
+            # actual record id (e.g. airtable ``recInvESY00000001``).
+            u = re.sub(r"\{[A-Z][A-Z0-9_]*\}", "", url)
+            u = re.sub(r"^[a-z]+://[^/]+", "", u)
+            u = u.split("?", 1)[0].split("#", 1)[0]
+            tail = u.rstrip("/").rsplit("/", 1)[-1]
+            tail = tail.strip()
+            if tail:
+                return tail
+        return cls._extract_key_from_path(op.get("path") or "")
 
     @staticmethod
     def _extract_key_from_path(path: str) -> Optional[str]:
