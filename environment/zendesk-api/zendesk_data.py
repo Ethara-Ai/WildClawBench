@@ -189,10 +189,10 @@ def create_ticket(subject, description=None, priority="normal", ticket_type="que
         "created_at": now,
         "updated_at": now,
     }
-    _tickets_rows().append(ticket)
+    _store.table("tickets").upsert(ticket)
     body = comment_body or description
     if body:
-        _comments_rows().append({
+        _store.table("comments").upsert({
             "id": _next_id(_comments_rows()),
             "ticket_id": ticket_id,
             "author_id": _to_int(requester_id),
@@ -224,7 +224,7 @@ def update_ticket(ticket_id, status=None, priority=None, assignee_id=None,
     if tags is not None:
         t["tags"] = tags
     if comment_body:
-        _comments_rows().append({
+        _store.table("comments").upsert({
             "id": _next_id(_comments_rows()),
             "ticket_id": t["id"],
             "author_id": _to_int(comment_author_id) if comment_author_id is not None else t["assignee_id"],
@@ -263,7 +263,7 @@ def create_comment(ticket_id, body, author_id=None, public=True):
         "public": bool(public),
         "created_at": _now(),
     }
-    _comments_rows().append(comment)
+    _store.table("comments").upsert(comment)
     t["updated_at"] = _now()
     return {"comment": comment}
 

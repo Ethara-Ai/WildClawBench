@@ -200,7 +200,7 @@ def send_message(chat_id, text, reply_to_message_id=None):
         "reply_to_message_id": int(reply_to_message_id) if reply_to_message_id else None,
     }
     _next_message_id += 1
-    _messages_rows().append(msg)
+    _store.table("messages").upsert(msg)
     return _ok(_format_message(msg))
 
 
@@ -217,7 +217,7 @@ def send_photo(chat_id, photo, caption=None):
         "reply_to_message_id": None,
     }
     _next_message_id += 1
-    _messages_rows().append(msg)
+    _store.table("messages").upsert(msg)
     formatted = _format_message(msg)
     formatted.pop("text", None)
     if caption:

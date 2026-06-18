@@ -142,7 +142,7 @@ def _serialize_person(p):
 # ---------------------------------------------------------------------------
 
 def capture(payload):
-    _events_rows().append({
+    _store.table("events").upsert({
         "id": f"evt_{len(_events_rows()) + 1:05d}",
         "project_id": int(payload.get("project_id") or 1),
         "distinct_id": payload.get("distinct_id"),

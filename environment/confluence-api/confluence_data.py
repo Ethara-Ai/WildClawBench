@@ -222,7 +222,7 @@ def create_content(title, space_key, body="", parent_id=None, created_by="apiuse
         "created_by": created_by,
         "created_at": _now(),
     }
-    _pages_rows().append(page)
+    _store.table("pages").upsert(page)
     return _content_view(page)
 
 
@@ -241,6 +241,7 @@ def update_content(content_id, title=None, body=None, version_number=None):
     if body is not None:
         page["body"] = body
     page["version"] = expected
+    _store.table("pages").upsert(page)
     return _content_view(page)
 
 

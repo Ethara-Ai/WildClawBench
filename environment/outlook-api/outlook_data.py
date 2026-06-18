@@ -210,7 +210,7 @@ def send_mail(subject, content, to_recipients, content_type="HTML"):
         "importance": "normal",
         "receivedDateTime": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
-    _messages_rows().append(msg)
+    _store.table("messages").upsert(msg)
     return {"status": "accepted", "id": msg["id"]}
 
 

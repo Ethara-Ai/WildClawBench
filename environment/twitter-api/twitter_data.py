@@ -214,7 +214,7 @@ def create_tweet(text, author_id=None, reply_to_tweet_id=None):
             "quote_count": 0,
         },
     }
-    _tweets_rows().append(tweet)
+    _store.table("tweets").upsert(tweet)
     if reply_to_tweet_id:
         for t in _tweets_rows():
             if t["id"] == reply_to_tweet_id:
@@ -249,7 +249,7 @@ def like_tweet(user_id, tweet_id):
     if not target:
         return {"error": f"Tweet {tweet_id} not found"}
     if not any(l["user_id"] == user_id and l["tweet_id"] == tweet_id for l in _likes_rows()):
-        _likes_rows().append({"user_id": user_id, "tweet_id": tweet_id})
+        _store.table("likes").upsert({"user_id": user_id, "tweet_id": tweet_id})
         target["public_metrics"]["like_count"] += 1
     return {"data": {"liked": True}}
 
@@ -261,6 +261,6 @@ def retweet(user_id, tweet_id):
     if not target:
         return {"error": f"Tweet {tweet_id} not found"}
     if not any(r["user_id"] == user_id and r["tweet_id"] == tweet_id for r in _retweets_rows()):
-        _retweets_rows().append({"user_id": user_id, "tweet_id": tweet_id})
+        _store.table("retweets").upsert({"user_id": user_id, "tweet_id": tweet_id})
         target["public_metrics"]["retweet_count"] += 1
     return {"data": {"retweeted": True}}

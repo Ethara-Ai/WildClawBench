@@ -264,7 +264,7 @@ def create_order(symbol, qty, side, type="market", time_in_force="day", limit_pr
         "submitted_at": _now(),
         "filled_at": None,
     }
-    _orders_rows().append(order)
+    _store.table("orders").upsert(order)
     return order
 
 

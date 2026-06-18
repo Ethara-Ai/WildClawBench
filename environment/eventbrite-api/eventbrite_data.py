@@ -170,7 +170,7 @@ def create_event(organization_id, name, summary, start_utc, end_utc,
         "url": "",
         "created": _now(),
     }
-    _events_rows().append(event)
+    _store.table("events").upsert(event)
     return _serialize_event(event)
 
 
@@ -233,7 +233,7 @@ def create_ticket_class(event_id, name, quantity_total, cost=0, free=True):
         "sales_start": _now(),
         "sales_end": _now(),
     }
-    _ticket_classes_rows().append(tc)
+    _store.table("ticket_classes").upsert(tc)
     return tc
 
 
@@ -278,7 +278,7 @@ def register_attendee(event_id, ticket_class_id, name, email):
         "checked_in": False,
         "created": _now(),
     }
-    _attendees_rows().append(attendee)
+    _store.table("attendees").upsert(attendee)
     for i, t in enumerate(_ticket_classes_rows()):
         if t["id"] == ticket_class_id:
             _ticket_classes_rows()[i]["quantity_sold"] += 1

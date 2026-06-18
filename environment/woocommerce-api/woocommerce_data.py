@@ -272,7 +272,7 @@ def create_order(customer_id=0, status="pending", currency="USD",
         "billing_email": billing.get("email", ""),
         "date_created": "2026-05-28T00:00:00",
     }
-    _orders_rows().append(order)
+    _store.table("orders").upsert(order)
     return _serialize_order(order)
 
 

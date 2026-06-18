@@ -221,7 +221,7 @@ def create_issue(owner, repo_name, title, body, assignee=None, labels=None):
         "closed_at": None,
         "is_pull_request": False,
     }
-    _issues_rows().append(issue)
+    _store.table("issues").upsert(issue)
     for j, r in enumerate(_repos_rows()):
         if r["owner"] == owner and r["name"] == repo_name:
             _repos_rows()[j]["open_issues"] += 1
@@ -316,5 +316,5 @@ def create_comment(owner, repo_name, number, body):
         "body": body,
         "created_at": _now(),
     }
-    _comments_rows().append(comment)
+    _store.table("comments").upsert(comment)
     return comment

@@ -232,7 +232,7 @@ def create_issue(project_id, title, description="", assignee=None, labels=None):
         "updated_at": _now(),
         "closed_at": None,
     }
-    _issues_rows().append(issue)
+    _store.table("issues").upsert(issue)
     project["open_issues_count"] += 1
     return issue
 
@@ -303,7 +303,7 @@ def create_merge_request(project_id, title, source_branch, target_branch="main",
         "updated_at": _now(),
         "merged_at": None,
     }
-    _merge_requests_rows().append(mr)
+    _store.table("merge_requests").upsert(mr)
     return mr
 
 

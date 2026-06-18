@@ -167,7 +167,7 @@ def create_user(first_name, last_name, email, login=None, activate=True):
         "activated": _now() if activate else None,
         "last_login": None,
     }
-    _users_rows().append(user)
+    _store.table("users").upsert(user)
     return _serialize_user(user)
 
 

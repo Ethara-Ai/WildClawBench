@@ -231,7 +231,7 @@ def create_item(collection_id, field_data, is_draft=False, is_archived=False):
         "created_on": now,
         "last_updated": now,
     }
-    _items_rows().append(item)
+    _store.table("items").upsert(item)
     serialized = _serialize_item(item)
     # Surface any extra custom fields the caller supplied.
     for k, v in field_data.items():

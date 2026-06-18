@@ -235,7 +235,7 @@ def create_payment(amount, currency="USD", source_id="cnon:card-nonce-ok",
         "receipt_number": f"RCP{seq:03d}",
         "created_at": _now(),
     }
-    _payments_rows().append(payment)
+    _store.table("payments").upsert(payment)
     return {"payment": payment}
 
 
@@ -259,7 +259,7 @@ def create_refund(payment_id, amount=None, currency="USD", reason=None):
         "reason": reason or "Requested by customer",
         "created_at": _now(),
     }
-    _refunds_rows().append(refund)
+    _store.table("refunds").upsert(refund)
     return {"refund": refund}
 
 
@@ -289,7 +289,7 @@ def create_customer(given_name=None, family_name=None, email_address=None,
         "company_name": company_name,
         "created_at": _now(),
     }
-    _customers_rows().append(customer)
+    _store.table("customers").upsert(customer)
     return {"customer": customer}
 
 
@@ -339,7 +339,7 @@ def create_order(customer_id=None, location_id="LOC_MAIN", line_items=None):
         "state": "OPEN",
         "created_at": _now(),
     }
-    _orders_rows().append(order)
+    _store.table("orders").upsert(order)
     return {"order": order}
 
 

@@ -241,7 +241,7 @@ def create_comment(file_key, message, node_id=None, user_id="user-1001"):
         "resolved": False,
         "created_at": _now(),
     }
-    _comments_rows().append(comment)
+    _store.table("comments").upsert(comment)
     return _comment_view(comment)
 
 

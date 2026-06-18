@@ -635,7 +635,7 @@ def create_report(report_type, data_start_time, data_end_time):
         "processingEndTime": None,
         "reportDocumentId": None,
     }
-    _reports_rows().append(report)
+    _store.table("reports").upsert(report)
     _next_report_id += 1
     return {
         "type": "report_created",

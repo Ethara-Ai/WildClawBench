@@ -244,7 +244,7 @@ def create_contact(email, first_name="", last_name="", phone="", status="1"):
         "created_timestamp": now,
         "updated_timestamp": now,
     }
-    _contacts_rows().append(contact)
+    _store.table("contacts").upsert(contact)
     return {"contact": _serialize_contact(contact)}
 
 

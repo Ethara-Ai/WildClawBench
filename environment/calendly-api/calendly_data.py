@@ -286,11 +286,11 @@ def book_event(payload):
         "created_at": now,
         "canceled_reason": None,
     }
-    _scheduled_events_rows().append(event)
+    _store.table("scheduled_events").upsert(event)
 
     invitee = payload.get("invitee") or {}
     if invitee.get("email"):
-        _invitees_rows().append({
+        _store.table("invitees").upsert({
             "uuid": f"inv-{_new_uuid()}",
             "event": uuid_,
             "name": invitee.get("name", ""),

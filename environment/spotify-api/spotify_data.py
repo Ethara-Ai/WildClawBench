@@ -249,7 +249,7 @@ def create_playlist(user_id, name, description="", public=True, collaborative=Fa
         "public": bool(public),
         "collaborative": bool(collaborative),
     }
-    _playlists_rows().append(playlist)
+    _store.table("playlists").upsert(playlist)
     return _playlist_obj(playlist, with_tracks=True)
 
 
@@ -264,7 +264,7 @@ def add_tracks(playlist_id, uris):
         track_id = uri.split(":")[-1] if ":" in uri else uri
         if not any(t["track_id"] == track_id for t in _tracks_rows()):
             continue
-        _playlist_tracks_rows().append({
+        _playlist_store.table("tracks").upsert({
             "playlist_id": playlist_id,
             "track_id": track_id,
             "position": next_pos,

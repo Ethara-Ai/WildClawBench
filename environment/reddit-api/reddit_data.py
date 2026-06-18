@@ -218,7 +218,7 @@ def submit(subreddit, title, kind="self", url=None, text=None, author="devkat"):
         "is_self": kind == "self",
         "_likes": True,
     }
-    _posts_rows().append(post)
+    _store.table("posts").upsert(post)
     return {"json": {"errors": [], "data": {"id": post["id"], "name": post["id"], "url": post["url"]}}}
 
 

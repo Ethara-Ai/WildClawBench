@@ -166,7 +166,7 @@ def send_text(to_wa_id, body):
         "status": "sent",
         "sent_at": now,
     }
-    _messages_rows().append(msg)
+    _store.table("messages").upsert(msg)
     for i, c in enumerate(_conversations_rows()):
         if c["conversation_id"] == conv["conversation_id"]:
             _conversations_rows()[i]["last_message_at"] = now
@@ -193,7 +193,7 @@ def send_template(to_wa_id, template_name, components=None):
             "origin": "business_initiated",
             "within_24h_window": True,
         }
-        _conversations_rows().append(conv)
+        _store.table("conversations").upsert(conv)
 
     msg_id = _new_message_id()
     now = _now()
@@ -209,7 +209,7 @@ def send_template(to_wa_id, template_name, components=None):
         "status": "sent",
         "sent_at": now,
     }
-    _messages_rows().append(msg)
+    _store.table("messages").upsert(msg)
     for i, c in enumerate(_conversations_rows()):
         if c["conversation_id"] == conv["conversation_id"]:
             _conversations_rows()[i]["last_message_at"] = now

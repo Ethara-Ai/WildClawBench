@@ -178,7 +178,7 @@ def create_event(calendar_id, payload):
         "recurrence": payload.get("recurrence", []) or [],
         "visibility": payload.get("visibility", "default"),
     }
-    _events_rows().append(event)
+    _store.table("events").upsert(event)
     if payload.get("attendees"):
         _attendees_doc()[event["id"]] = [{
             "email": a.get("email"),
@@ -192,38 +192,41 @@ def create_event(calendar_id, payload):
 
 def update_event(calendar_id, event_id, payload):
     resolved = _resolve_calendar(calendar_id)
-    for i, e in enumerate(_events_rows()):
-        if e["calendar_id"] == resolved and e["id"] == event_id:
-            for field in ("summary", "description", "location", "status", "visibility"):
-                if field in payload:
-                    _events_rows()[i][field] = payload[field]
-            if "start" in payload:
-                s = payload["start"]
-                _events_rows()[i]["start"] = s.get("dateTime") or s.get("date") or e["start"]
-                _events_rows()[i]["all_day"] = "date" in s
-            if "end" in payload:
-                en = payload["end"]
-                _events_rows()[i]["end"] = en.get("dateTime") or en.get("date") or e["end"]
-            if "attendees" in payload:
-                _attendees_doc()[event_id] = [{
-                    "email": a.get("email"),
-                    "displayName": a.get("displayName", ""),
-                    "responseStatus": a.get("responseStatus", "needsAction"),
-                    "optional": bool(a.get("optional", False)),
-                    "organizer": bool(a.get("organizer", False)),
-                } for a in payload["attendees"]]
-            return _serialize_event(_events_rows()[i])
-    return {"error": f"Event {event_id} not found"}
+    row = _store.table("events").get(event_id)
+    if row is None or row.get("calendar_id") != resolved:
+        return {"error": f"Event {event_id} not found"}
+    for field in ("summary", "description", "location", "status", "visibility"):
+        if field in payload:
+            row[field] = payload[field]
+    if "start" in payload:
+        s = payload["start"]
+        row["start"] = s.get("dateTime") or s.get("date") or row["start"]
+        row["all_day"] = "date" in s
+    if "end" in payload:
+        en = payload["end"]
+        row["end"] = en.get("dateTime") or en.get("date") or row["end"]
+    if "attendees" in payload:
+        att_doc = _store.document("attendees").get()
+        att_doc[event_id] = [{
+            "email": a.get("email"),
+            "displayName": a.get("displayName", ""),
+            "responseStatus": a.get("responseStatus", "needsAction"),
+            "optional": bool(a.get("optional", False)),
+            "organizer": bool(a.get("organizer", False)),
+        } for a in payload["attendees"]]
+        _store.document("attendees").set(att_doc)
+    _store.table("events").upsert(row)
+    return _serialize_event(row)
 
 
 def delete_event(calendar_id, event_id):
     resolved = _resolve_calendar(calendar_id)
-    for i, e in enumerate(_events_rows()):
-        if e["calendar_id"] == resolved and e["id"] == event_id:
-            _events_rows().pop(i)
-            _attendees_doc().pop(event_id, None)
-            return {"deleted": True, "id": event_id}
-    return {"error": f"Event {event_id} not found"}
+    row = _store.table("events").get(event_id)
+    if row is None or row.get("calendar_id") != resolved:
+        return {"error": f"Event {event_id} not found"}
+    _store.table("events").delete(event_id)
+    _attendees_doc().pop(event_id, None)
+    return {"deleted": True, "id": event_id}
 
 
 # ---------------------------------------------------------------------------

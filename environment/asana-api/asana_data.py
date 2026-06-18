@@ -262,7 +262,7 @@ def create_task(name, project_gid=None, section_gid=None, assignee_gid=None,
         "created_at": now,
         "modified_at": now,
     }
-    _tasks_rows().append(task)
+    _store.table("tasks").upsert(task)
     return {"data": _task_view(task)}
 
 

@@ -224,5 +224,5 @@ def send_message(team_id, channel_id, content, content_type="html", importance="
         "importance": importance or "normal",
         "createdDateTime": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
-    _messages_rows().append(msg)
+    _store.table("messages").upsert(msg)
     return _serialize_message(msg)

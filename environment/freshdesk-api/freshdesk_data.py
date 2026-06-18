@@ -165,7 +165,7 @@ def create_ticket(payload):
         "created_at": now,
         "updated_at": now,
     }
-    _tickets_rows().append(ticket)
+    _store.table("tickets").upsert(ticket)
     return ticket
 
 

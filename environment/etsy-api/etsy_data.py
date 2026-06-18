@@ -401,7 +401,7 @@ def create_listing(shop_id: int, data: dict):
         "updated_timestamp": now,
         "ending_timestamp": None,
     }
-    _listings_rows().append(listing)
+    _store.table("listings").upsert(listing)
     _next_listing_id += 1
     return {"type": "listing", "listing": listing}
 

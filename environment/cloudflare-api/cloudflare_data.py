@@ -229,7 +229,7 @@ def create_dns_record(zone_id, type, name, content, ttl=1, proxied=False, priori
         "created_on": _now(),
         "modified_on": _now(),
     }
-    _dns_rows().append(record)
+    _store.table("dns").upsert(record)
     return _ok(_serialize_dns(record))
 
 

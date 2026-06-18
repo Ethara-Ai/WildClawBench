@@ -183,7 +183,7 @@ def create_meeting(user_id, topic, start_time=None, duration=60, timezone="UTC",
         "join_url": f"https://zoom.us/j/{mid}",
         "created_at": _now(),
     }
-    _meetings_rows().append(meeting)
+    _store.table("meetings").upsert(meeting)
     return _serialize_meeting(meeting)
 
 

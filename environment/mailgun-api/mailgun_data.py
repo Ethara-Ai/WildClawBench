@@ -130,8 +130,8 @@ def send_message(domain, sender, to, subject, text):
         "body": text or "",
         "timestamp": _now_iso(),
     }
-    _messages_rows().append(message)
-    _events_rows().append({
+    _store.table("messages").upsert(message)
+    _store.table("events").upsert({
         "id": f"ev_{secrets.token_hex(4)}",
         "domain": domain,
         "message_id": msg_id,

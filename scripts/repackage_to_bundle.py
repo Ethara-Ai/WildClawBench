@@ -438,10 +438,21 @@ def convert_task(
                 "litellm-proxy",
                 "API_DOCUMENTATION.md",
                 "sqlite_mcp_server.db",
-                "tracking_middleware.py",
                 "_meta.json",
             ),
         )
+        # Shared mock-server infra imported by every <api>/server.py
+        # (`from _mutable_store import ...`, `admin_plane`, `tracking_middleware`).
+        # The run-output snapshot only carries tracking_middleware.py; the other
+        # two live at the repo environment/ root. Copy all three into the bundle's
+        # data/environment/ so the bundled mocks are self-contained and runnable.
+        _repo_env = Path(__file__).resolve().parents[1] / "environment"
+        _bundle_env = bundle / "data" / "environment"
+        if _bundle_env.is_dir():
+            for _infra in ("_mutable_store.py", "admin_plane.py", "tracking_middleware.py"):
+                _src = _repo_env / _infra
+                if _src.exists():
+                    shutil.copy2(_src, _bundle_env / _infra)
 
     # Re-source prompt.txt, persona/ and staged input files (stripped/altered in
     # run output) from the original input task dir, fuzzy-matched by persona core.

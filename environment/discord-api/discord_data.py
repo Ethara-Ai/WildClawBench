@@ -264,5 +264,5 @@ def create_message(channel_id, content, author_id=None):
         "pinned": False,
         "edited_timestamp": None,
     }
-    _messages_rows().append(msg)
+    _store.table("messages").upsert(msg)
     return msg

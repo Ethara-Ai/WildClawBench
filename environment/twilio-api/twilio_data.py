@@ -224,7 +224,7 @@ def create_message(to, from_, body):
         "date_sent": None,
         "date_created": _now(),
     }
-    _messages_rows().append(msg)
+    _store.table("messages").upsert(msg)
     return _serialize_message(msg)
 
 
@@ -274,7 +274,7 @@ def create_call(to, from_):
         "end_time": None,
         "date_created": _now(),
     }
-    _calls_rows().append(call)
+    _store.table("calls").upsert(call)
     return _serialize_call(call)
 
 

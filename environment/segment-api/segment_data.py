@@ -133,7 +133,7 @@ def _ingest(event_type, payload):
     }
     if event_type == "page" and payload.get("name"):
         entry["properties"].setdefault("name", payload["name"])
-    _events_rows().append(entry)
+    _store.table("events").upsert(entry)
     return entry
 
 

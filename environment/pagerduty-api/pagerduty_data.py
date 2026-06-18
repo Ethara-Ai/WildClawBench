@@ -188,7 +188,7 @@ def create_incident(title, service_id, urgency="high", assigned_to=None):
         "created_at": _now_iso(),
         "resolved_at": None,
     }
-    _incidents_rows().append(incident)
+    _store.table("incidents").upsert(incident)
     return incident
 
 

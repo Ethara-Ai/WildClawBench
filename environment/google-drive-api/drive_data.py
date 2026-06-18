@@ -194,8 +194,8 @@ def create_file(name, mime_type, parent_id=None, owner_email="amelia@orbit-labs.
         "trashed": False,
         "web_view_link": "",
     }
-    _files_rows().append(new_file)
-    _permissions_rows().append({
+    _store.table("files").upsert(new_file)
+    _store.table("permissions").upsert({
         "id": f"perm-{uuid.uuid4().hex[:6]}",
         "file_id": new_file["id"],
         "type": "user",
@@ -257,7 +257,7 @@ def create_permission(file_id, type, role, email_address=None, display_name=None
         "email": email_address or "",
         "display_name": display_name or email_address or "",
     }
-    _permissions_rows().append(perm)
+    _store.table("permissions").upsert(perm)
     return perm
 
 

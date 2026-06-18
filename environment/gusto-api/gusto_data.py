@@ -217,7 +217,7 @@ def create_payroll(company_id, pay_period_start, pay_period_end, check_date=None
         "employee_count": len([e for e in _employees_rows()
                                if e["company_id"] == company_id and not e["terminated"]]),
     }
-    _payrolls_rows().append(p)
+    _store.table("payrolls").upsert(p)
     return p
 
 

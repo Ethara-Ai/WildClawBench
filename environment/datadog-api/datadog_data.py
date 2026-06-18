@@ -229,7 +229,7 @@ def create_monitor(name, mtype, query, message="", priority=3, tags=None):
         "created": _now_iso(),
         "modified": _now_iso(),
     }
-    _monitors_rows().append(monitor)
+    _store.table("monitors").upsert(monitor)
     return monitor
 
 
@@ -294,7 +294,7 @@ def create_event(title, text, alert_type="info", priority="normal", host=None, t
         "tags": tags or [],
         "date_happened": int(time.time()),
     }
-    _events_rows().append(event)
+    _store.table("events").upsert(event)
     return {"status": "ok", "event": event}
 
 

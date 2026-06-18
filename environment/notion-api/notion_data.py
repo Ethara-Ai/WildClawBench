@@ -304,7 +304,7 @@ def create_page(parent_type, parent_id, title, properties=None, created_by="user
         "icon": "",
         "cover_url": None,
     }
-    _pages_rows().append(page)
+    _store.table("pages").upsert(page)
     if properties:
         _properties_doc()[page["id"]] = {
             k: ({"type": v.get("type", "rich_text"), "value": v.get("value")}
@@ -315,22 +315,25 @@ def create_page(parent_type, parent_id, title, properties=None, created_by="user
 
 
 def update_page(page_id, title=None, archived=None, properties=None):
-    for i, p in enumerate(_pages_rows()):
-        if p["id"] == page_id:
-            if title is not None:
-                _pages_rows()[i]["title"] = title
-            if archived is not None:
-                _pages_rows()[i]["archived"] = bool(archived)
-            if properties:
-                existing = _properties_doc().setdefault(page_id, {})
-                for k, v in properties.items():
-                    if isinstance(v, dict):
-                        existing[k] = {"type": v.get("type", "rich_text"), "value": v.get("value")}
-                    else:
-                        existing[k] = {"type": existing.get(k, {}).get("type", "rich_text"), "value": v}
-            _pages_rows()[i]["last_edited_time"] = _now()
-            return _attach_properties(_pages_rows()[i])
-    return {"error": f"Page {page_id} not found"}
+    row = _store.table("pages").get(page_id)
+    if row is None:
+        return {"error": f"Page {page_id} not found"}
+    if title is not None:
+        row["title"] = title
+    if archived is not None:
+        row["archived"] = bool(archived)
+    if properties:
+        props_doc = _store.document("properties").get()
+        existing = props_doc.setdefault(page_id, {})
+        for k, v in properties.items():
+            if isinstance(v, dict):
+                existing[k] = {"type": v.get("type", "rich_text"), "value": v.get("value")}
+            else:
+                existing[k] = {"type": existing.get(k, {}).get("type", "rich_text"), "value": v}
+        _store.document("properties").set(props_doc)
+    row["last_edited_time"] = _now()
+    _store.table("pages").upsert(row)
+    return _attach_properties(row)
 
 
 def delete_page(page_id):
@@ -380,30 +383,30 @@ def append_block_children(parent_id, blocks):
             "has_children": False,
             "checked": blk.get("checked") if blk.get("type") == "to_do" else None,
         }
-        _blocks_rows().append(new_block)
+        _store.table("blocks").upsert(new_block)
         created.append(new_block)
         next_order += 1
     return {"object": "list", "results": created}
 
 
 def update_block(block_id, text=None, checked=None):
-    for i, b in enumerate(_blocks_rows()):
-        if b["id"] == block_id:
-            if text is not None:
-                _blocks_rows()[i]["text"] = text
-            if checked is not None and b["type"] == "to_do":
-                _blocks_rows()[i]["checked"] = bool(checked)
-            _blocks_rows()[i]["last_edited_time"] = _now()
-            return _blocks_rows()[i]
-    return {"error": f"Block {block_id} not found"}
+    row = _store.table("blocks").get(block_id)
+    if row is None:
+        return {"error": f"Block {block_id} not found"}
+    if text is not None:
+        row["text"] = text
+    if checked is not None and row["type"] == "to_do":
+        row["checked"] = bool(checked)
+    row["last_edited_time"] = _now()
+    _store.table("blocks").upsert(row)
+    return row
 
 
 def delete_block(block_id):
-    for i, b in enumerate(_blocks_rows()):
-        if b["id"] == block_id:
-            removed = _blocks_rows().pop(i)
-            return {"object": "block", "id": block_id, "deleted": True}
-    return {"error": f"Block {block_id} not found"}
+    if _store.table("blocks").get(block_id) is None:
+        return {"error": f"Block {block_id} not found"}
+    _store.table("blocks").delete(block_id)
+    return {"object": "block", "id": block_id, "deleted": True}
 
 
 # ---------------------------------------------------------------------------
@@ -431,5 +434,5 @@ def create_comment(parent_page_id, parent_block_id, author_id, text):
         "created_time": _now(),
         "resolved": False,
     }
-    _comments_rows().append(comment)
+    _store.table("comments").upsert(comment)
     return comment

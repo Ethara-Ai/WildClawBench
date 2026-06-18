@@ -141,7 +141,7 @@ def create_employee(firstName, lastName, workEmail=None, department=None,
         "status": "Active",
         "supervisorId": supervisorId or None,
     }
-    _employees_rows().append(emp)
+    _store.table("employees").upsert(emp)
     return emp
 
 
@@ -174,7 +174,7 @@ def create_time_off_request(employeeId, type, start, end, amount=1,
         "notes": notes or "",
         "created": _now_date(),
     }
-    _time_off_rows().append(req)
+    _store.table("time_off").upsert(req)
     return req
 
 

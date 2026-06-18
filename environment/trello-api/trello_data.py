@@ -272,7 +272,7 @@ def create_card(id_list, name, desc="", due=None, member_ids=None):
         "member_ids": member_ids or [],
         "labels": [],
     }
-    _cards_rows().append(card)
+    _store.table("cards").upsert(card)
     return _serialize_card(card)
 
 
@@ -329,5 +329,5 @@ def create_checklist(id_card, name):
         "id_board": card["id_board"],
         "check_items": [],
     }
-    _checklists_rows().append(checklist)
+    _store.table("checklists").upsert(checklist)
     return _serialize_checklist(checklist)

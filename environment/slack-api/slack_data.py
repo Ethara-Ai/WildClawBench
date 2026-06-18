@@ -209,8 +209,8 @@ def conversations_create(name, is_private=False, user_id="U01AMELIA"):
         "created": int(time.time()),
         "num_members": 1,
     }
-    _channels_rows().append(channel)
-    _channel_members_rows().append({"channel_id": channel["id"], "user_id": user_id})
+    _store.table("channels").upsert(channel)
+    _store.table("channel_members").upsert({"channel_id": channel["id"], "user_id": user_id})
     return _ok({"channel": channel})
 
 
@@ -236,7 +236,7 @@ def conversations_invite(channel_id, user_id):
         return _err("user_not_found")
     if any(m["channel_id"] == channel_id and m["user_id"] == user_id for m in _channel_members_rows()):
         return _err("already_in_channel")
-    _channel_members_rows().append({"channel_id": channel_id, "user_id": user_id})
+    _store.table("channel_members").upsert({"channel_id": channel_id, "user_id": user_id})
     for i, c in enumerate(_channels_rows()):
         if c["id"] == channel_id:
             _channels_rows()[i]["num_members"] += 1
@@ -283,7 +283,7 @@ def chat_post_message(channel_id, user_id, text, thread_ts=None):
         "reply_count": 0,
         "reactions": [],
     }
-    _messages_rows().append(msg)
+    _store.table("messages").upsert(msg)
     if thread_ts:
         for i, m in enumerate(_messages_rows()):
             if m["channel_id"] == channel_id and m["ts"] == thread_ts:

@@ -219,7 +219,7 @@ def _trade(account_id, amount, side):
         "created_at": _now(),
         "updated_at": _now(),
     }
-    _transactions_rows().append(txn)
+    _store.table("transactions").upsert(txn)
 
     return {"data": {
         "id": _new_id(),

@@ -457,7 +457,7 @@ def create_label(data: dict):
         "createdAt": now,
         "updatedAt": now,
     }
-    _labels_rows().append(label)
+    _store.table("labels").upsert(label)
     return {"type": "label", "label": label}
 
 
@@ -505,7 +505,7 @@ def create_project(data: dict):
         "createdAt": now,
         "updatedAt": now,
     }
-    _projects_rows().append(project)
+    _store.table("projects").upsert(project)
     return {"type": "project", "project": project}
 
 
@@ -596,7 +596,7 @@ def create_cycle(data: dict):
         "createdAt": now,
         "updatedAt": now,
     }
-    _cycles_rows().append(cycle)
+    _store.table("cycles").upsert(cycle)
     return {"type": "cycle", "cycle": cycle}
 
 
@@ -720,7 +720,7 @@ def create_issue(data: dict):
         "completedAt": None,
         "canceledAt": None,
     }
-    _issues_rows().append(issue)
+    _store.table("issues").upsert(issue)
     _next_issue_number += 1
     return {"type": "issue", "issue": issue}
 
@@ -845,7 +845,7 @@ def create_comment(data: dict):
         "createdAt": now,
         "updatedAt": now,
     }
-    _comments_rows().append(comment)
+    _store.table("comments").upsert(comment)
     _next_comment_id += 1
     return {"type": "comment", "comment": comment}
 

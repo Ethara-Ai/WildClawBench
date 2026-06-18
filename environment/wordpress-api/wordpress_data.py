@@ -262,7 +262,7 @@ def create_post(title, content, status="draft", author=1, excerpt="",
         "modified": now,
         "type": "post",
     }
-    _posts_rows().append(post)
+    _store.table("posts").upsert(post)
     return post
 
 
@@ -342,7 +342,7 @@ def create_comment(post, author_name, author_email, content, parent=0):
         "date": _now(),
         "parent": int(parent),
     }
-    _comments_rows().append(comment)
+    _store.table("comments").upsert(comment)
     return comment
 
 

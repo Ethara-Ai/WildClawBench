@@ -117,7 +117,7 @@ def create_note(path, content):
         "modified_at": _now(),
         "tags": _extract_tags(content),
     }
-    _notes_rows().append(note)
+    _store.table("notes").upsert(note)
     _contents_doc()[path] = content
     return {**note, "content": content}
 

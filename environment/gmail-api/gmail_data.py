@@ -153,7 +153,7 @@ def create_label(name):
         "threads_total": 0, "threadsTotal": 0,
         "threads_unread": 0, "threadsUnread": 0,
     }
-    _labels_rows().append(label)
+    _store.table("labels").upsert(label)
     return label
 
 
@@ -236,7 +236,7 @@ def send_message(to_addr, subject, body, cc=None, thread_id=None,
         "is_unread": False,
         "is_starred": False,
     }
-    _messages_rows().append(msg)
+    _store.table("messages").upsert(msg)
     return _serialize_message(msg)
 
 
@@ -318,7 +318,7 @@ def create_draft(to_addr, subject, body, cc=None, thread_id=None):
         "body": body,
         "updated_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
-    _drafts_rows().append(draft)
+    _store.table("drafts").upsert(draft)
     return draft
 
 

@@ -360,7 +360,7 @@ def create_diary_entry(data: dict):
         "sugars_g": round(food["sugars_g"] * servings, 1),
         "protein_g": round(food["protein_g"] * servings, 1),
     }
-    _diary_entries_rows().append(entry)
+    _store.table("diary_entries").upsert(entry)
     _next_entry_id += 1
     return {"type": "diary_entry", "diary_entry": entry}
 
@@ -606,7 +606,7 @@ def create_exercise(data: dict):
         "calories_burned": int(data["calories_burned"]),
         "notes": data.get("notes", ""),
     }
-    _exercise_log_rows().append(exercise)
+    _store.table("exercise_log").upsert(exercise)
     _next_exercise_id += 1
     return {"type": "exercise", "exercise": exercise}
 
@@ -649,7 +649,7 @@ def create_weight_entry(data: dict):
         "weight_lbs": float(data["weight_lbs"]),
         "notes": data.get("notes", ""),
     }
-    _weight_log_rows().append(entry)
+    _store.table("weight_log").upsert(entry)
     _next_weight_id += 1
     return {"type": "weight_entry", "weight_entry": entry}
 
@@ -682,7 +682,7 @@ def create_water(data: dict):
         "cups": int(data["cups"]),
         "notes": data.get("notes", ""),
     }
-    _water_log_rows().append(entry)
+    _store.table("water_log").upsert(entry)
     _next_water_id += 1
     return {"type": "water", "water": entry}
 

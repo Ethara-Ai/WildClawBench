@@ -119,7 +119,7 @@ def ingest(payload):
     raw_events = payload.get("events") or []
     ingested = 0
     for ev in raw_events:
-        _events_rows().append({
+        _store.table("events").upsert({
             "event_id": ev.get("insert_id") or f"ev_{len(_events_rows()) + 1:06d}",
             "user_id": ev.get("user_id"),
             "device_id": ev.get("device_id"),

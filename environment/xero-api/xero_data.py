@@ -219,7 +219,7 @@ def create_invoice(contact_id, line_items=None, type_="ACCREC", date=None,
         "CurrencyCode": currency_code or "USD",
         "Reference": reference or "",
     }
-    _invoices_rows().append(inv)
+    _store.table("invoices").upsert(inv)
     return {"Invoices": [_serialize_invoice(inv)]}
 
 

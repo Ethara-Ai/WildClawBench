@@ -213,7 +213,7 @@ def create_customer(name=None, email=None, description=None, currency="usd", pho
         "phone": phone or "",
         "created": _now(),
     }
-    _customers_rows().append(customer)
+    _store.table("customers").upsert(customer)
     return customer
 
 
@@ -256,7 +256,7 @@ def create_payment_intent(amount, currency="usd", customer=None, description=Non
     if confirm:
         charge = _record_charge(amount, currency, customer, description, pi["id"], "succeeded")
         pi["latest_charge"] = charge["id"]
-    _payment_intents_rows().append(pi)
+    _store.table("payment_intents").upsert(pi)
     return pi
 
 
@@ -280,7 +280,7 @@ def _record_charge(amount, currency, customer, description, payment_intent, stat
         "payment_intent": payment_intent,
         "created": _now(),
     }
-    _charges_rows().append(charge)
+    _store.table("charges").upsert(charge)
     return charge
 
 
@@ -326,7 +326,7 @@ def create_refund(charge=None, amount=None, reason=None):
     }
     ch["amount_refunded"] += refund_amount
     ch["refunded"] = ch["amount_refunded"] >= ch["amount"]
-    _refunds_rows().append(refund)
+    _store.table("refunds").upsert(refund)
     return refund
 
 
@@ -366,7 +366,7 @@ def create_invoice(customer=None, amount_due=None, currency="usd", subscription=
         "created": _now(),
         "due_date": None,
     }
-    _invoices_rows().append(invoice)
+    _store.table("invoices").upsert(invoice)
     return invoice
 
 
@@ -406,7 +406,7 @@ def create_subscription(customer=None, price=None, quantity=1):
         "cancel_at_period_end": False,
         "created": now,
     }
-    _subscriptions_rows().append(sub)
+    _store.table("subscriptions").upsert(sub)
     return sub
 
 

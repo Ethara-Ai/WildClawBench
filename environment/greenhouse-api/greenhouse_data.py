@@ -146,7 +146,7 @@ def create_candidate(first_name, last_name, email=None, phone=None,
         "source": source or "API",
         "created_at": _now(),
     }
-    _candidates_rows().append(c)
+    _store.table("candidates").upsert(c)
     return c
 
 

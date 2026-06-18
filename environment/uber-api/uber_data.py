@@ -227,7 +227,7 @@ def create_request(product_id, start_latitude, start_longitude,
         "requested_at": _now_iso(),
         "completed_at": None,
     }
-    _trips_rows().append(trip)
+    _store.table("trips").upsert(trip)
     return trip
 
 

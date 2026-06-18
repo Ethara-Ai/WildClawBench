@@ -234,7 +234,7 @@ def create_issue(project_key, summary, issue_type="Task", description="",
         "created": _now(),
         "updated": _now(),
     }
-    _issues_rows().append(issue)
+    _store.table("issues").upsert(issue)
     return {"id": new_id, "key": key, "self": f"/rest/api/3/issue/{new_id}"}
 
 

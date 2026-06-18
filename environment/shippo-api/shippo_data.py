@@ -197,7 +197,7 @@ def create_address(payload):
         "is_residential": bool(payload.get("is_residential", False)),
         "validated": True,
     }
-    _addresses_rows().append(addr)
+    _store.table("addresses").upsert(addr)
     return _address_obj(addr)
 
 
@@ -247,10 +247,10 @@ def create_shipment(payload):
         "status": "SUCCESS",
         "created_time": _now(),
     }
-    _shipments_rows().append(shipment)
+    _store.table("shipments").upsert(shipment)
     # Generate rates across carriers for the new shipment.
     for provider, token, name, amount, days in _DEFAULT_RATE_TEMPLATES:
-        _rates_rows().append({
+        _store.table("rates").upsert({
             "object_id": _new_id("rate"),
             "shipment": shipment["object_id"],
             "provider": provider,
@@ -274,7 +274,7 @@ def create_parcel(payload):
         "mass_unit": payload.get("mass_unit", "lb"),
         "template": payload.get("template") or None,
     }
-    _parcels_rows().append(parcel)
+    _store.table("parcels").upsert(parcel)
     return _parcel_obj(parcel)
 
 
@@ -322,8 +322,8 @@ def create_transaction(payload):
         "label_url": f"https://shippo-delivery.s3.amazonaws.com/labels/{tracking_number}.pdf",
         "created_time": _now(),
     }
-    _transactions_rows().append(txn)
-    _tracking_rows().append({
+    _store.table("transactions").upsert(txn)
+    _store.table("tracking").upsert({
         "carrier": rate["provider"],
         "tracking_number": tracking_number,
         "status": "PRE_TRANSIT",

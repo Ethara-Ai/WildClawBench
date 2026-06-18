@@ -198,10 +198,10 @@ def create_envelope(payload):
         "completed_time": None,
         "template_id": payload.get("templateId") or None,
     }
-    _envelopes_rows().append(env)
+    _store.table("envelopes").upsert(env)
 
     for i, r in enumerate(payload.get("recipients", {}).get("signers", []), start=1):
-        _recipients_rows().append({
+        _store.table("recipients").upsert({
             "recipient_id": r.get("recipientId") or str(i),
             "envelope_id": envelope_id,
             "name": r.get("name", ""),
@@ -213,7 +213,7 @@ def create_envelope(payload):
         })
 
     for i, d in enumerate(payload.get("documents", []), start=1):
-        _documents_rows().append({
+        _store.table("documents").upsert({
             "document_id": d.get("documentId") or str(i),
             "envelope_id": envelope_id,
             "name": d.get("name", f"document-{i}.pdf"),

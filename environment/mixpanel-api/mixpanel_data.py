@@ -140,7 +140,7 @@ def track(event, distinct_id, time=None, properties=None):
         "time": time or _now(),
         "properties": dict(properties or {}),
     }
-    _events_rows().append(record)
+    _store.table("events").upsert(record)
     return {"status": 1, "event_id": record["event_id"]}
 
 

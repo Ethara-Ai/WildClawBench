@@ -175,7 +175,7 @@ def create_incident(short_description, description=None, priority="3", impact="3
         "opened_at": now,
         "updated_at": now,
     }
-    _incidents_rows().append(rec)
+    _store.table("incidents").upsert(rec)
     return rec
 
 

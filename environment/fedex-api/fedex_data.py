@@ -191,8 +191,8 @@ def create_shipment(origin_zip, dest_zip, weight_lb, service_type="FEDEX_GROUND"
         "net_charge": net_charge,
         "label_url": label_url,
     }
-    _shipments_rows().append(shipment)
-    _tracking_rows().append({
+    _store.table("shipments").upsert(shipment)
+    _store.table("tracking").upsert({
         "tracking_number": tracking_number,
         "status_code": "PU",
         "status_description": "Picked up",

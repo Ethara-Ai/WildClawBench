@@ -283,7 +283,7 @@ def create_order(customer_id=0, status_id=1, payment_method="manual",
         "billing_last_name": billing_address.get("last_name", ""),
         "billing_email": billing_address.get("email", ""),
     }
-    _orders_rows().append(order)
+    _store.table("orders").upsert(order)
     return _serialize_order(order)
 
 

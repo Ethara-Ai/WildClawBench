@@ -205,7 +205,7 @@ def send_mail(personalizations, from_email, subject=None, content=None, template
                 "clicks": 0,
                 "sent_at": _now(),
             }
-            _sent_log_rows().append(entry)
+            _store.table("sent_log").upsert(entry)
             created.append(entry["message_id"])
     return {"accepted": len(created), "message_ids": created, "status": "queued"}
 
@@ -238,7 +238,7 @@ def create_template(name, generation="dynamic", subject="", html_content=""):
         "active": True,
         "updated_at": _now(),
     }
-    _templates_rows().append(tmpl)
+    _store.table("templates").upsert(tmpl)
     return _serialize_template(tmpl)
 
 
@@ -284,7 +284,7 @@ def upsert_contacts(contacts, list_ids=None):
                 "created_at": _now(),
                 "updated_at": _now(),
             }
-            _contacts_rows().append(new_c)
+            _store.table("contacts").upsert(new_c)
             upserted.append(new_c["id"])
     return {"job_id": _new_id("job"), "upserted": len(upserted), "contact_ids": upserted}
 

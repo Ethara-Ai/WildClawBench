@@ -216,9 +216,9 @@ def create_form(payload):
         "created_time": now,
         "last_updated_time": now,
     }
-    _forms_rows().append(form)
+    _store.table("forms").upsert(form)
     for i, f in enumerate(payload.get("fields", []), start=1):
-        _fields_rows().append({
+        _store.table("fields").upsert({
             "field_id": _new_id("fld"),
             "form_id": form_id,
             "title": f.get("title", ""),

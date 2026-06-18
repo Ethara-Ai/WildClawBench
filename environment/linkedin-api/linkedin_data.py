@@ -152,7 +152,7 @@ def create_post(commentary, author_id=None, visibility="PUBLIC"):
         "created_at": _now(),
         "socialDetail": {"likeCount": 0, "commentCount": 0, "shareCount": 0},
     }
-    _posts_rows().append(post)
+    _store.table("posts").upsert(post)
     return post
 
 

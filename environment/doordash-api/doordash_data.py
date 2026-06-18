@@ -264,9 +264,9 @@ def checkout(cart_id, customer_name="Guest", tip=0.0):
         "placed_at": _now_iso(),
         "dasher_name": "",
     }
-    _orders_rows().append(order)
+    _store.table("orders").upsert(order)
     for it in cart_full["items"]:
-        _order_items_rows().append({
+        _store.table("order_items").upsert({
             "order_id": order_id,
             "item_id": it["item_id"],
             "quantity": it["quantity"],

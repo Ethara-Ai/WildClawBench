@@ -277,7 +277,7 @@ def create_board(data: dict):
         "follower_count": 0,
         "collaborator_count": 0,
     }
-    _boards_rows().append(board)
+    _store.table("boards").upsert(board)
     _next_board_id += 1
     return {"type": "board", "board": board}
 
@@ -344,7 +344,7 @@ def create_board_section(board_id: str, data: dict):
         "name": data["name"],
         "pin_count": 0,
     }
-    _board_sections_rows().append(section)
+    _store.table("board_sections").upsert(section)
     _next_section_id += 1
     return {"type": "board_section", "board_section": section}
 
@@ -422,7 +422,7 @@ def create_pin(data: dict):
         "pin_metrics_saves": 0,
         "pin_metrics_clicks": 0,
     }
-    _pins_rows().append(pin)
+    _store.table("pins").upsert(pin)
     _next_pin_id += 1
     return {"type": "pin", "pin": pin}
 

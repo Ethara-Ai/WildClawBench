@@ -432,6 +432,12 @@ def execute_tests(
             "-w", "/tmp_workspace",
         ]
         agent_out_env: Dict[str, str] = {}
+        # Cause C fix: the agent's deliverables live in the workspace (mounted at
+        # /tmp_workspace). Generated tests read DATA_DIR to locate authored files;
+        # without this it defaults to the seed-input `data/` folder and the agent's
+        # docs are invisible (every *_doc_created test then fails although the doc
+        # exists). Point DATA_DIR at the mounted workspace.
+        agent_out_env["DATA_DIR"] = "/tmp_workspace"
         if agent_output_dir is not None:
             ao_path = Path(agent_output_dir)
             if ao_path.is_dir():
@@ -463,7 +469,19 @@ def execute_tests(
         for k, v in agent_out_env.items():
             cmd += ["-e", f"{k}={v}"]
 
-        for k, v in (mock_env_dict or {}).items():
+        # Cause B fix: some generated tests read short *_API_URL aliases that do not
+        # match a service's canonical env_var_name (only GCAL/GMAPS across current
+        # tasks). Export the alias alongside the real var so the test reaches the live
+        # mock instead of falling back to an unreachable localhost default.
+        _url_aliases = {
+            "GCAL_API_URL": "GOOGLE_CALENDAR_API_URL",
+            "GMAPS_API_URL": "GOOGLE_MAPS_API_URL",
+        }
+        mock_env = dict(mock_env_dict or {})
+        for _alias, _canon in _url_aliases.items():
+            if _canon in mock_env and _alias not in mock_env:
+                mock_env[_alias] = mock_env[_canon]
+        for k, v in mock_env.items():
             cmd += ["-e", f"{k}={v}"]
         cmd += [image, "python3", "/tests/runner.py"]
 

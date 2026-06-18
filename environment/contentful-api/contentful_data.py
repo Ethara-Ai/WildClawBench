@@ -252,7 +252,7 @@ def create_entry(content_type, fields):
         "published_version": 0,
         "fields": dict(fields or {}),
     }
-    _entries_rows().append(entry)
+    _store.table("entries").upsert(entry)
     return _entry_obj(entry)
 
 

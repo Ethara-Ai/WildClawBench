@@ -311,7 +311,7 @@ def create_course(data):
         "guardiansEnabled": False,
         "calendarId": f"calendar_{_next_course_id:03d}",
     }
-    _courses_rows().append(course)
+    _store.table("courses").upsert(course)
     _next_course_id += 1
     return {"course": course}
 
@@ -413,7 +413,7 @@ def create_coursework(course_id, data):
         "dueTime": data.get("dueTime"),
         "alternateLink": f"https://classroom.google.com/c/{course_id}/a/cw_{_next_cw_id}",
     }
-    _coursework_rows().append(cw)
+    _store.table("coursework").upsert(cw)
     _next_cw_id += 1
     return {"courseWork": cw}
 
@@ -488,7 +488,7 @@ def create_topic(course_id, data):
         "name": data["name"],
         "updateTime": _now(),
     }
-    _topics_rows().append(topic)
+    _store.table("topics").upsert(topic)
     _next_topic_id += 1
     return {"topic": topic}
 
@@ -648,7 +648,7 @@ def invite_student(course_id, data):
             "photoUrl": f"https://lh3.googleusercontent.com/a/{user_id}",
         },
     }
-    _students_rows().append(student)
+    _store.table("students").upsert(student)
     return {"student": student}
 
 
@@ -737,7 +737,7 @@ def create_announcement(course_id, data):
         "creatorUserId": data.get("creatorUserId", "teacher_001"),
         "alternateLink": f"https://classroom.google.com/c/{course_id}/p/ann_{_next_ann_id:03d}",
     }
-    _announcements_rows().append(ann)
+    _store.table("announcements").upsert(ann)
     _next_ann_id += 1
     return {"announcement": ann}
 
@@ -816,6 +816,6 @@ def create_material(course_id, data):
         "alternateLink": f"https://classroom.google.com/c/{course_id}/m/mat_{_next_mat_id:03d}",
         "materials": data.get("materials", []),
     }
-    _materials_rows().append(mat)
+    _store.table("materials").upsert(mat)
     _next_mat_id += 1
     return {"courseWorkMaterial": mat}

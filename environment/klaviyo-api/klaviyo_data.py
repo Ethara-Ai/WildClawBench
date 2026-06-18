@@ -219,7 +219,7 @@ def create_profile(email, first_name="", last_name="", phone_number="",
         "created": now,
         "updated": now,
     }
-    _profiles_rows().append(profile)
+    _store.table("profiles").upsert(profile)
     return {"data": _serialize_profile(profile)}
 
 

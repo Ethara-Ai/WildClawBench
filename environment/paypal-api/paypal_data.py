@@ -198,7 +198,7 @@ def create_order(intent="CAPTURE", amount_value="0.00", currency_code="USD",
         }],
         "create_time": _now(),
     }
-    _orders_rows().append(order)
+    _store.table("orders").upsert(order)
     return order
 
 
@@ -224,7 +224,7 @@ def capture_order(order_id):
         "final_capture": True,
         "create_time": _now(),
     }
-    _captures_rows().append(capture)
+    _store.table("captures").upsert(capture)
     order["status"] = "COMPLETED"
     return {
         "id": order_id,
@@ -255,7 +255,7 @@ def create_refund(capture_id, amount_value=None, currency_code="USD", note_to_pa
         "note_to_payer": note_to_payer or "",
         "create_time": _now(),
     }
-    _refunds_rows().append(refund)
+    _store.table("refunds").upsert(refund)
     return refund
 
 
@@ -294,7 +294,7 @@ def create_invoice(invoice_number=None, recipient_email=None, amount_value="0.00
         "amount": _money(amount_value, currency_code),
         "due_date": due_date,
     }
-    _invoices_rows().append(invoice)
+    _store.table("invoices").upsert(invoice)
     return invoice
 
 
@@ -317,5 +317,5 @@ def create_payout(sender_batch_id=None, amount_value="0.00", currency_code="USD"
         "recipient_email": recipient_email or "",
         "create_time": _now(),
     }
-    _payouts_rows().append(payout)
+    _store.table("payouts").upsert(payout)
     return payout

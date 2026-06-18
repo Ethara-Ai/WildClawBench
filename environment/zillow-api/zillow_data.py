@@ -245,7 +245,7 @@ def create_saved_search(user_id, name, city=None, state=None,
         "home_type": home_type,
         "created_at": _now(),
     }
-    _saved_searches_rows().append(search)
+    _store.table("saved_searches").upsert(search)
     return search
 
 
