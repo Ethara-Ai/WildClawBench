@@ -9,11 +9,15 @@
 #   ./run.sh <task-path> <model[,model2,...]>               # one task, one or more models (parallel)
 #   ./run.sh <task-path> <model[,model2,...]> <K>           # K sequential runs per model; models run in parallel
 #   ./run.sh --bulk <tasks-file> [model[,model2,...]] [K]   # bulk: tasks sequential, models parallel per task
+#   ./run.sh --bulk <tasks-file> [model] [K] --jobs 4       # bulk: run up to 4 TASKS in parallel (safe)
 #   ./run.sh --regrade <run-dir> [--rubric <path>]          # re-judge a completed run; overwrites score.json
 #
 # Exits non-zero on any preflight failure. Tees per-run logs into ./logs/.
 # Multiple models comma-separated (no spaces) run in parallel for the same task;
-# tasks always run sequentially; K runs of the same (task,model) are sequential.
+# K runs of the same (task,model) are sequential.
+# --jobs N runs up to N tasks concurrently (default 1 = sequential). Each task
+#   gets its own mock stack + k3net network, so they coexist; the orphan cleanup
+#   only touches stopped containers / empty networks, never a live run.
 # --regrade skips docker/mock preflight (no agent runs); only needs .env credentials.
 
 set -u
@@ -257,27 +261,60 @@ preflight_env_file() {
 # Removes containers and networks that survived a prior crashed batch.
 # Names match the conventions used by start_litellm/start_mock_stack/
 # _start_task_mock_stack — see (b69) for live cleanup precedent.
+#
+# CONCURRENCY-SAFE by default: only STOPPED containers (exited/created/dead) and
+# EMPTY networks (no attached containers) are removed, so a run executing in
+# parallel — in this process or a separate ./run.sh — is never touched. A
+# running mock/agent container and the populated k3net-* network it sits on are
+# both skipped. Pass "force" (or set WILDCLAW_FORCE_CLEAN=1) for the old nuclear
+# sweep that also kills running containers — use ONLY when no other run is active.
 cleanup_orphans() {
-    log_step "Cleanup: orphan containers and networks from prior runs"
+    local force="${1:-}"
+    [[ "${WILDCLAW_FORCE_CLEAN:-0}" == "1" ]] && force="force"
 
+    if [[ "$force" == "force" ]]; then
+        log_step "Cleanup: FORCE removing ALL orphan containers/networks (nuclear)"
+        local all_c
+        all_c=$(docker ps -aq --filter 'name=ll-' --filter 'name=mocks-' --filter 'name=t_' 2>/dev/null || true)
+        [[ -n "$all_c" ]] && echo "$all_c" | xargs -r docker rm -f >/dev/null 2>&1 || true
+        local all_n
+        all_n=$(docker network ls --filter 'name=k3net-' -q 2>/dev/null || true)
+        [[ -n "$all_n" ]] && echo "$all_n" | xargs -r -n1 docker network rm >/dev/null 2>&1 || true
+        log_ok "Force cleanup complete"
+        return 0
+    fi
+
+    log_step "Cleanup: orphan containers and networks (stopped/empty only — live runs preserved)"
+
+    # Only STOPPED containers are orphans. status={exited,created,dead} is AND-ed
+    # with the name filters by Docker, so a 'running' mock/agent container from a
+    # concurrent run is never matched.
     local containers
-    containers=$(docker ps -aq --filter 'name=ll-' --filter 'name=mocks-' --filter 'name=t_' 2>/dev/null || true)
+    containers=$(docker ps -aq \
+        --filter 'status=exited' --filter 'status=created' --filter 'status=dead' \
+        --filter 'name=ll-' --filter 'name=mocks-' --filter 'name=t_' 2>/dev/null || true)
     if [[ -n "$containers" ]]; then
         local count
         count=$(echo "$containers" | wc -l | tr -d ' ')
-        log_warn "Found ${count} orphan container(s) — removing"
+        log_warn "Found ${count} stopped orphan container(s) — removing"
         echo "$containers" | xargs -r docker rm -f >/dev/null 2>&1 || true
     else
-        log_info "No orphan containers"
+        log_info "No stopped orphan containers"
     fi
 
-    local networks
-    networks=$(docker network ls --filter 'name=k3net-' -q 2>/dev/null || true)
-    if [[ -n "$networks" ]]; then
-        local count
-        count=$(echo "$networks" | wc -l | tr -d ' ')
-        log_warn "Found ${count} leaked k3net-* network(s) — removing"
-        echo "$networks" | xargs -r -n1 docker network rm >/dev/null 2>&1 || true
+    # Only EMPTY k3net-* networks are orphans. A network still carrying containers
+    # belongs to a live run — skip it.
+    local removed=0 skipped=0 net attached
+    for net in $(docker network ls --filter 'name=k3net-' -q 2>/dev/null || true); do
+        attached=$(docker network inspect -f '{{len .Containers}}' "$net" 2>/dev/null || echo 0)
+        if [[ "$attached" == "0" ]]; then
+            docker network rm "$net" >/dev/null 2>&1 && removed=$(( removed + 1 )) || true
+        else
+            skipped=$(( skipped + 1 ))
+        fi
+    done
+    if (( removed > 0 || skipped > 0 )); then
+        log_info "Networks: removed ${removed} empty, skipped ${skipped} in-use k3net-*"
     else
         log_info "No leaked networks"
     fi
@@ -453,12 +490,80 @@ run_k_for_model_bg() {
     } > "$result_file"
 }
 
+# Runs every model×K for ONE task and writes a single summary file with
+# `failed=`/`recovered=`/`failure=` lines. Safe to background: it forks its own
+# per-model jobs and waits on them, and all results flow through files (no shared
+# mutable state). Reads globals `models` and `k` (read-only).
+process_task() {
+    local task="$1" task_base="$2" total="$3" summary_file="$4" tmpdir="$5"
+    local t_failed=0 t_recovered=0
+
+    if [[ ! -d "$task" && ! -f "$task" ]]; then
+        log_err "Task path not found: $task — skipping ($(( ${#models[@]} * k )) runs)"
+        {
+            printf 'failed=%d\n' "$(( ${#models[@]} * k ))"
+            printf 'recovered=0\n'
+            printf 'failure=%s\n' "$task (path missing)"
+        } > "$summary_file"
+        return 0
+    fi
+
+    log_step "Task: $(basename "$task") — fanning out to ${#models[@]} model(s)"
+
+    local pids=() result_files=() m_idx=0 m
+    for m in "${models[@]}"; do
+        local m_base=$(( task_base + m_idx * k ))
+        local rf="${tmpdir}/$(basename "$task")_${m//\//_}_${m_idx}.result"
+        result_files+=("$rf")
+        run_k_for_model_bg "$task" "$m" "$k" "$m_base" "$total" "$rf" &
+        pids+=($!)
+        m_idx=$(( m_idx + 1 ))
+    done
+
+    local pid
+    for pid in "${pids[@]}"; do
+        wait "$pid" || true
+    done
+
+    : > "$summary_file"
+    local rf key value
+    for rf in "${result_files[@]}"; do
+        [[ -f "$rf" ]] || continue
+        while IFS='=' read -r key value; do
+            case "$key" in
+                failed)    t_failed=$(( t_failed + value )) ;;
+                recovered) t_recovered=$(( t_recovered + value )) ;;
+                failure)   printf 'failure=%s\n' "$value" >> "$summary_file" ;;
+            esac
+        done < "$rf"
+    done
+    printf 'failed=%d\n' "$t_failed" >> "$summary_file"
+    printf 'recovered=%d\n' "$t_recovered" >> "$summary_file"
+}
+
 main() {
     local mode="single"
     local tasks=()
     local models=()
     local model_arg="$DEFAULT_MODEL"
     local k="$DEFAULT_K"
+    local jobs=1
+
+    # Pre-scan for --jobs/-j anywhere in the args, then strip it so the existing
+    # positional/mode parsing below is unchanged. Default 1 = sequential (old behavior).
+    local _args=()
+    while (( $# )); do
+        case "$1" in
+            --jobs|-j)  jobs="${2:-}"; shift 2 ;;
+            --jobs=*)   jobs="${1#*=}"; shift ;;
+            *)          _args+=("$1"); shift ;;
+        esac
+    done
+    set -- ${_args[@]+"${_args[@]}"}
+    if ! [[ "$jobs" =~ ^[0-9]+$ ]] || (( jobs < 1 )); then
+        log_err "--jobs must be a positive integer, got: $jobs"
+        exit 2
+    fi
 
     if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
         print_usage
@@ -513,7 +618,7 @@ main() {
 
     log_step "WildClawBench runner"
     log_info "Mode:    $mode"
-    log_info "Tasks:   ${#tasks[@]} (sequential)"
+    log_info "Tasks:   ${#tasks[@]} ($( (( jobs > 1 )) && echo "parallel, up to ${jobs} at a time" || echo 'sequential'))"
     log_info "Models:  ${models[*]} ($( (( ${#models[@]} > 1 )) && echo 'parallel' || echo 'single'))"
     log_info "K runs:  $k per (task,model) — sequential"
     log_info "Cwd:     $(pwd)"
@@ -526,7 +631,6 @@ main() {
     cleanup_orphans
 
     local total=$(( ${#tasks[@]} * ${#models[@]} * k ))
-    local current_base=0
     local failed_count=0
     local recovered_count=0
     local failed_runs=()
@@ -535,50 +639,41 @@ main() {
     tmpdir=$(mktemp -d -t wildclaw_runsh.XXXXXX)
     trap 'rm -rf "$tmpdir"' EXIT
 
+    # Per-task base offset is deterministic (task_idx × models × k), so tasks need
+    # no sequential accumulation and can run concurrently. Each task writes one
+    # summary file; we tally them after all tasks finish.
+    local per_task=$(( ${#models[@]} * k ))
+    local task_idx=0
+    local running=0
+    local task_summaries=()
     for task in "${tasks[@]}"; do
-        if [[ ! -d "$task" && ! -f "$task" ]]; then
-            log_err "Task path not found: $task — skipping ($(( ${#models[@]} * k )) runs)"
-            failed_count=$(( failed_count + ${#models[@]} * k ))
-            failed_runs+=("$task (path missing)")
-            current_base=$(( current_base + ${#models[@]} * k ))
-            continue
+        local task_base=$(( task_idx * per_task ))
+        local sfile="${tmpdir}/task_${task_idx}.summary"
+        task_summaries+=("$sfile")
+        if (( jobs > 1 )); then
+            process_task "$task" "$task_base" "$total" "$sfile" "$tmpdir" &
+            running=$(( running + 1 ))
+            if (( running >= jobs )); then
+                wait -n 2>/dev/null || true
+                running=$(( running - 1 ))
+            fi
+        else
+            process_task "$task" "$task_base" "$total" "$sfile" "$tmpdir"
         fi
+        task_idx=$(( task_idx + 1 ))
+    done
+    (( jobs > 1 )) && wait
 
-        log_step "Task: $(basename "$task") — fanning out to ${#models[@]} model(s)"
-
-        local pids=()
-        local result_files=()
-        local m_idx=0
-        for m in "${models[@]}"; do
-            local m_current_base=$(( current_base + m_idx * k ))
-            local result_file="${tmpdir}/$(basename "$task")_${m//\//_}_${m_idx}.result"
-            result_files+=("$result_file")
-            run_k_for_model_bg "$task" "$m" "$k" "$m_current_base" "$total" "$result_file" &
-            pids+=($!)
-            m_idx=$(( m_idx + 1 ))
-        done
-
-        local rc
-        for pid in "${pids[@]}"; do
-            wait "$pid" || true
-        done
-
-        for rf in "${result_files[@]}"; do
-            [[ -f "$rf" ]] || continue
-            local m_failed=0
-            local m_recovered=0
-            while IFS='=' read -r key value; do
-                case "$key" in
-                    failed)    m_failed="$value" ;;
-                    recovered) m_recovered="$value" ;;
-                    failure)   failed_runs+=("$value") ;;
-                esac
-            done < "$rf"
-            failed_count=$(( failed_count + m_failed ))
-            recovered_count=$(( recovered_count + m_recovered ))
-        done
-
-        current_base=$(( current_base + ${#models[@]} * k ))
+    local sfile key value
+    for sfile in "${task_summaries[@]}"; do
+        [[ -f "$sfile" ]] || continue
+        while IFS='=' read -r key value; do
+            case "$key" in
+                failed)    failed_count=$(( failed_count + value )) ;;
+                recovered) recovered_count=$(( recovered_count + value )) ;;
+                failure)   failed_runs+=("$value") ;;
+            esac
+        done < "$sfile"
     done
 
     log_step "Summary"
