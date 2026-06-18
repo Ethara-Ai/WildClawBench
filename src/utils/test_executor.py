@@ -370,6 +370,11 @@ def execute_tests(
         (tmp / "test_weights.json").write_text(test_weights_json or "{}", encoding="utf-8")
         (tmp / "runner.py").write_text(_RUNNER_SCRIPT, encoding="utf-8")
 
+        from src.utils.docker_utils import (
+            build_env_args,
+            _validate_docker_token,
+        )
+
         ws_mount = workspace_dir if workspace_dir and workspace_dir.is_dir() else tmp
         cmd = [
             "docker", "run", "--rm",
@@ -378,11 +383,9 @@ def execute_tests(
             "-w", "/tmp_workspace",
         ]
         if network:
+            _validate_docker_token("network", network)
             cmd += ["--network", network]
 
-        # Must mirror docker_utils.py:32-43. amd64-emulated images inherit a
-        # phantom proxy on arm64 hosts; no_proxy="*" is required or every
-        # docker-bridge HTTP call hangs to timeout.
         proxy_http = os.environ.get("HTTP_PROXY_INNER", "")
         proxy_https = os.environ.get("HTTPS_PROXY_INNER", "")
         no_proxy_value = (
@@ -390,20 +393,18 @@ def execute_tests(
             if not proxy_http
             else os.environ.get("NO_PROXY_INNER", "")
         )
-        proxy_env = {
-            "http_proxy": proxy_http,
-            "https_proxy": proxy_https,
-            "HTTP_PROXY": proxy_http,
-            "HTTPS_PROXY": proxy_https,
-            "no_proxy": no_proxy_value,
-            "NO_PROXY": no_proxy_value,
-        }
-        for k, v in proxy_env.items():
-            cmd += ["-e", f"{k}={v}"]
-
+        env_pairs: list[tuple[str, str]] = [
+            ("http_proxy", proxy_http),
+            ("https_proxy", proxy_https),
+            ("HTTP_PROXY", proxy_http),
+            ("HTTPS_PROXY", proxy_https),
+            ("no_proxy", no_proxy_value),
+            ("NO_PROXY", no_proxy_value),
+        ]
         for k, v in (mock_env_dict or {}).items():
-            cmd += ["-e", f"{k}={v}"]
-        cmd += [image, "python3", "/tests/runner.py"]
+            env_pairs.append((k, v))
+        cmd += build_env_args(env_pairs)
+        cmd += [_validate_docker_token("image", image), "python3", "/tests/runner.py"]
 
         logger.info("[testexec] docker run image=%s network=%s tests=%s",
                     image, network or "<host>", tmp / "test_outputs.py")

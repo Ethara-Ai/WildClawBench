@@ -357,6 +357,12 @@ class ClaudeCodeAgent(BaseAgent):
             logger.warning("[%s] ClaudeCode log dir copy failed: %s", task_id, r.stderr.strip())
 
     def _start_container(self, task_id: str, workspace_path: str) -> None:
+        from src.utils.docker_utils import (
+            build_env_args,
+            _validate_docker_token,
+        )
+        _validate_docker_token("task_id", task_id)
+
         proxy_http = os.environ.get("HTTP_PROXY_INNER", "")
         proxy_https = os.environ.get("HTTPS_PROXY_INNER", "")
         env_map = {
@@ -374,10 +380,10 @@ class ClaudeCodeAgent(BaseAgent):
             "HTTP_PROXY": proxy_http,
             "HTTPS_PROXY": proxy_https,
         }
-        env_args: list[str] = []
-        for key, value in env_map.items():
-            if value:
-                env_args += ["-e", f"{key}={value}"]
+        env_args = build_env_args(
+            [(k, v) for k, v in env_map.items() if v]
+        )
+        image = _validate_docker_token("image", self.image)
 
         exec_path = os.path.join(workspace_path, "exec")
         os.makedirs(exec_path, exist_ok=True)
@@ -390,7 +396,7 @@ class ClaudeCodeAgent(BaseAgent):
             *env_args,
             "-v",
             f"{exec_path}:/workspace:ro",
-            self.image,
+            image,
             "/bin/bash",
             "-c",
             "tail -f /dev/null",

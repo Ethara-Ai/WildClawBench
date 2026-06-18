@@ -494,55 +494,60 @@ def start_litellm(
     enable_headroom: bool = False,
     anthropic_api_key: str = "",
 ) -> None:
-    env_args: list[str] = ["-e", f"LITELLM_MASTER_KEY={master_key}"]
+    from src.utils.docker_utils import (
+        build_env_args,
+        _validate_docker_token,
+    )
+    _validate_docker_token("container_name", container_name)
+    _validate_docker_token("network", network)
+
+    env_pairs: list[tuple[str, str]] = [("LITELLM_MASTER_KEY", master_key)]
     _litellm_log = os.environ.get("LITELLM_LOG", "").strip()
     if _litellm_log:
-        env_args += ["-e", f"LITELLM_LOG={_litellm_log}"]
+        env_pairs.append(("LITELLM_LOG", _litellm_log))
     if aws_bearer_token:
-        env_args += [
-            "-e", f"AWS_BEARER_TOKEN_BEDROCK={aws_bearer_token}",
-            "-e", f"AWS_REGION={aws_region}",
+        env_pairs += [
+            ("AWS_BEARER_TOKEN_BEDROCK", aws_bearer_token),
+            ("AWS_REGION", aws_region),
         ]
     if openai_api_key:
-        env_args += ["-e", f"OPENAI_API_KEY={openai_api_key}"]
+        env_pairs.append(("OPENAI_API_KEY", openai_api_key))
     if openai_whisper_api_key:
-        env_args += ["-e", f"OPENAI_API_KEY_WHISPER={openai_whisper_api_key}"]
+        env_pairs.append(("OPENAI_API_KEY_WHISPER", openai_whisper_api_key))
     if anthropic_api_key:
-        env_args += ["-e", f"ANTHROPIC_API_KEY={anthropic_api_key}"]
+        env_pairs.append(("ANTHROPIC_API_KEY", anthropic_api_key))
+    env_args = build_env_args(env_pairs)
 
-    # Mount the callback module + writable log dir so UsageWriter can write
-    # real provider-side usage rows from inside the sidecar. The env var name
-    # is also read by litellm_usage_callback.py:_write_row.
     callback_args: list[str] = []
     if usage_callback_host_path and usage_log_host_dir:
         callback_args = [
             "-v", f"{usage_callback_host_path}:/app/litellm_usage_callback.py:ro",
             "-v", f"{usage_log_host_dir}:/var/litellm_usage",
-            "-e", "LITELLM_USAGE_LOG_PATH=/var/litellm_usage/usage.jsonl",
+            *build_env_args([("LITELLM_USAGE_LOG_PATH", "/var/litellm_usage/usage.jsonl")]),
         ]
 
-    # Headroom pre-call compressor: writes to a SEPARATE JSONL sink
-    # (/var/litellm_headroom/headroom.jsonl). Must never collide with
-    # LITELLM_USAGE_LOG_PATH — token-tracking invariant (user m0130).
-    # LITELLM_HEADROOM_IMAGE has `headroom-ai` baked in; the stock image
-    # cannot `import headroom` at proxy startup (no egress at that point).
     headroom_args: list[str] = []
     image_to_run = LITELLM_IMAGE
     if enable_headroom and headroom_callback_host_path and headroom_log_host_dir:
         image_to_run = LITELLM_HEADROOM_IMAGE
-        headroom_args = [
-            "-v", f"{headroom_callback_host_path}:/app/litellm_headroom_callback.py:ro",
-            "-v", f"{headroom_log_host_dir}:/var/litellm_headroom",
-            "-e", "KENSEI_AGENT_HEADROOM_LOG_PATH=/var/litellm_headroom/headroom.jsonl",
-            "-e", f"KENSEI_AGENT_HEADROOM_ENABLED={os.environ.get('KENSEI_AGENT_HEADROOM_ENABLED', 'true')}",
+        headroom_pairs: list[tuple[str, str]] = [
+            ("KENSEI_AGENT_HEADROOM_LOG_PATH", "/var/litellm_headroom/headroom.jsonl"),
+            ("KENSEI_AGENT_HEADROOM_ENABLED",
+             os.environ.get("KENSEI_AGENT_HEADROOM_ENABLED", "true")),
         ]
         for _k in ("KENSEI_AGENT_HEADROOM_TARGET_RATIO",
                    "KENSEI_AGENT_HEADROOM_PROTECT_RECENT",
                    "KENSEI_AGENT_HEADROOM_MIN_TOKENS"):
             _v = os.environ.get(_k)
             if _v:
-                headroom_args += ["-e", f"{_k}={_v}"]
+                headroom_pairs.append((_k, _v))
+        headroom_args = [
+            "-v", f"{headroom_callback_host_path}:/app/litellm_headroom_callback.py:ro",
+            "-v", f"{headroom_log_host_dir}:/var/litellm_headroom",
+            *build_env_args(headroom_pairs),
+        ]
 
+    image_to_run = _validate_docker_token("litellm image", image_to_run)
     cmd = [
         "docker", "run", "-d",
         "--name", container_name,

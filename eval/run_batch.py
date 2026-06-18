@@ -1431,11 +1431,23 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
     usage_dir.mkdir(parents=True, exist_ok=True)
     usage_log_path = usage_dir / "usage.jsonl"
     usage_log_path.touch(exist_ok=True)
+    # S-003 hardening: the LiteLLM sidecar writes back to these paths via
+    # the `/var/litellm_usage` bind mount. Previously these were 0o666/0o777
+    # (world-writable) to sidestep container-UID mismatch. The owner-only
+    # modes below assume the sidecar runs as the same UID/GID as the host
+    # batch process (cf. start_litellm). If a container-UID mismatch shows
+    # up in practice the failure surfaces in the warning log below and the
+    # follow-up is to add `--user "$(uid):$(gid)"` to start_litellm rather
+    # than re-opening the modes.
     try:
-        os.chmod(usage_log_path, 0o666)
-        os.chmod(usage_dir, 0o777)
-    except OSError:
-        pass
+        os.chmod(usage_log_path, 0o600)
+        os.chmod(usage_dir, 0o700)
+    except OSError as _chmod_err:
+        logger.warning(
+            "[%s] chmod failed on litellm usage paths (%s) — "
+            "sidecar may be unable to write usage rows",
+            batch_id, _chmod_err,
+        )
 
     headroom_callback_src = ""
     headroom_log_dir_str = ""
@@ -1446,9 +1458,13 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
         headroom_log_dir = config.work_dir / f"litellm-headroom-{batch_id}"
         headroom_log_dir.mkdir(parents=True, exist_ok=True)
         try:
-            os.chmod(headroom_log_dir, 0o777)
-        except OSError:
-            pass
+            os.chmod(headroom_log_dir, 0o700)
+        except OSError as _chmod_err:
+            logger.warning(
+                "[%s] chmod failed on litellm headroom log dir (%s) — "
+                "sidecar may be unable to write headroom rows",
+                batch_id, _chmod_err,
+            )
         headroom_log_dir_str = str(headroom_log_dir)
 
     start_litellm(

@@ -18,6 +18,105 @@ WORKSPACE_BASELINE_PATH = "/tmp/wildclaw_workspace_baseline.json"
 
 BRAVE_API_KEY = os.environ.get("BRAVE_API_KEY", "")
 
+
+# ---------------------------------------------------------------------------
+# S-001 argv-injection guards.
+#
+# Every docker-run argv in this module + src/agents/*/runner.py +
+# src/utils/litellm_sidecar.py + src/utils/test_executor.py builds env-var
+# entries as flat ['-e', 'KEY=VALUE', ...] tokens. Because subprocess.run
+# is called with a list (not shell=True), the shell-metacharacter class of
+# command-injection does not apply, but **argv-flag injection does**: a
+# VALUE that begins with '-' becomes a new docker flag (e.g. '--privileged'
+# smuggled via the '-e KEY=...' position), and a KEY containing whitespace
+# / NUL / newline can split one '-e' pair into two argv tokens. Bare
+# tokens like `image`, `network`, and `container_name` have the same
+# flag-injection risk at their own argv positions.
+#
+# These helpers fail closed on the patterns that enable injection. They
+# are deliberately strict (POSIX env-var-name regex, no leading '-',
+# no embedded control bytes, no embedded whitespace for bare tokens) so
+# that a malicious value cannot dress itself up as a docker flag.
+# ---------------------------------------------------------------------------
+
+import re as _re
+
+_ENV_KEY_RE = _re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_FORBIDDEN_VALUE_CHARS = ("\n", "\r", "\x00")
+_FORBIDDEN_TOKEN_CHARS = ("\n", "\r", "\x00", " ", "\t")
+
+
+def _validate_env_arg(key: str, value: str) -> tuple[str, str]:
+    """Validate an env-var (KEY, VALUE) pair destined for `docker run -e`.
+
+    Returns the validated pair unchanged. Raises ValueError on any pattern
+    that could become a new argv flag or split into multiple argv tokens
+    after the f'{key}={value}' join. Empty values are allowed (the proxy
+    block in start_container relies on '-e KEY=' to *unset* upstream
+    proxy env vars), but the caller is responsible for the existing
+    `if value:` guards where that semantic differs.
+    """
+    if not isinstance(key, str) or not _ENV_KEY_RE.match(key):
+        raise ValueError(f"invalid env var name: {key!r}")
+    if not isinstance(value, str):
+        raise ValueError(
+            f"env value for {key!r} must be str, got {type(value).__name__}"
+        )
+    if value.startswith("-"):
+        raise ValueError(
+            f"env value for {key!r} starts with '-' (argv-flag injection)"
+        )
+    if any(c in value for c in _FORBIDDEN_VALUE_CHARS):
+        raise ValueError(
+            f"env value for {key!r} contains a forbidden control char"
+        )
+    return key, value
+
+
+def _validate_docker_token(name: str, token: str) -> str:
+    """Validate a bare argv token (image, network, container_name, ...).
+
+    These positions never have a '-e' prefix, so a leading '-' would be
+    consumed directly as a docker flag. Whitespace would split the token
+    into multiple argv elements. NUL would terminate it.
+    """
+    if not isinstance(token, str):
+        raise ValueError(
+            f"{name} must be str, got {type(token).__name__}"
+        )
+    if not token:
+        raise ValueError(f"{name} must be a non-empty string")
+    if token.startswith("-"):
+        raise ValueError(
+            f"{name} {token!r} starts with '-' (argv-flag injection)"
+        )
+    if any(c in token for c in _FORBIDDEN_TOKEN_CHARS):
+        raise ValueError(
+            f"{name} {token!r} contains a forbidden whitespace / control char"
+        )
+    return token
+
+
+def build_env_args(pairs: list[tuple[str, str]] | dict[str, str]) -> list[str]:
+    """Build a validated ['-e', 'K=V', '-e', 'K=V', ...] list.
+
+    Accepts an ordered list of (key, value) pairs OR a dict (insertion-
+    ordered). Empty values are honored — they emit '-e KEY=' which docker
+    treats as 'set KEY to the empty string', the form the proxy-clear
+    block in start_container depends on.
+    """
+    if isinstance(pairs, dict):
+        items = list(pairs.items())
+    else:
+        items = list(pairs)
+    out: list[str] = []
+    for key, value in items:
+        _validate_env_arg(key, value)
+        out.append("-e")
+        out.append(f"{key}={value}")
+    return out
+
+
 def remove_container(name: str) -> None:
     subprocess.run(["docker", "rm", "-f", name], capture_output=True)
 
@@ -49,6 +148,10 @@ def start_container(task_id: str, workspace_path: str, extra_env: str = "",
     if not workspace.is_dir():
         raise RuntimeError(f"Workspace path does not exist or is not a directory: {workspace}")
 
+    _validate_docker_token("task_id", task_id)
+    if network:
+        _validate_docker_token("network", network)
+
     proxy_http = os.environ.get('HTTP_PROXY_INNER', '')
     proxy_https = os.environ.get('HTTPS_PROXY_INNER', '')
     # The wildclawbench-ubuntu:v1.3 image bakes in
@@ -68,32 +171,32 @@ def start_container(task_id: str, workspace_path: str, extra_env: str = "",
     # var=""` so Docker overrides the image's baked defaults with empty
     # strings (most HTTP libs treat empty as "no proxy"; coherent with the
     # --internal-bridge sandbox from (b14)).
-    env_args: list[str] = ["-e", f"BRAVE_API_KEY={BRAVE_API_KEY}"]
+    env_pairs: list[tuple[str, str]] = [("BRAVE_API_KEY", BRAVE_API_KEY)]
     if proxy_http or proxy_https:
         no_proxy_value = os.environ.get("NO_PROXY_INNER", "")
-        env_args += [
-            "-e", f"http_proxy={proxy_http}",
-            "-e", f"https_proxy={proxy_https}",
-            "-e", f"HTTP_PROXY={proxy_http}",
-            "-e", f"HTTPS_PROXY={proxy_https}",
-            "-e", f"no_proxy={no_proxy_value}",
-            "-e", f"NO_PROXY={no_proxy_value}",
+        env_pairs += [
+            ("http_proxy", proxy_http),
+            ("https_proxy", proxy_https),
+            ("HTTP_PROXY", proxy_http),
+            ("HTTPS_PROXY", proxy_https),
+            ("no_proxy", no_proxy_value),
+            ("NO_PROXY", no_proxy_value),
         ]
     else:
-        env_args += [
-            "-e", "http_proxy=",
-            "-e", "https_proxy=",
-            "-e", "HTTP_PROXY=",
-            "-e", "HTTPS_PROXY=",
-            "-e", "no_proxy=",
-            "-e", "NO_PROXY=",
+        env_pairs += [
+            ("http_proxy", ""),
+            ("https_proxy", ""),
+            ("HTTP_PROXY", ""),
+            ("HTTPS_PROXY", ""),
+            ("no_proxy", ""),
+            ("NO_PROXY", ""),
         ]
     for line in extra_env.splitlines():
         key = line.strip()
         if not key or key.startswith("#"):
             continue
         value = os.environ.get(key, "")
-        env_args += ["-e", f"{key}={value}"]
+        env_pairs.append((key, value))
         masked = (value[:4] + "***") if value else "(empty)"
         logger.info("[%s] Injecting env var: %s=%s", task_id, key, masked)
 
@@ -102,19 +205,20 @@ def start_container(task_id: str, workspace_path: str, extra_env: str = "",
         if not value:
             logger.warning("[%s] Lobster env key %s not found in environment, skipping", task_id, key)
             continue
-        env_args += ["-e", f"{key}={value}"]
+        env_pairs.append((key, value))
         masked = value[:4] + "***"
         logger.info("[%s] Injecting lobster env: %s=%s", task_id, key, masked)
 
     _injected_keys: list[str] = []
     for k, v in (extra_env_dict or {}).items():
-        env_args += ["-e", f"{k}={v}"]
+        env_pairs.append((k, v))
         _injected_keys.append(k)
     if _injected_keys:
         logger.info("[%s] Injected %d extra env vars: %s",
                     task_id, len(_injected_keys), ",".join(sorted(_injected_keys)))
 
-    image = os.environ.get("DOCKER_IMAGE", DOCKER_IMAGE)
+    env_args = build_env_args(env_pairs)
+    image = _validate_docker_token("image", os.environ.get("DOCKER_IMAGE", DOCKER_IMAGE))
     network_args = ["--network", network] if network else []
     cmd = [
         "docker", "run", "-d",
