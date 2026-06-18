@@ -9,6 +9,7 @@ Port of `_generate_harbor_docker_compose` from kensei2.py (line 3035).
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 from typing import Iterable, List, Mapping, Optional
 
@@ -113,62 +114,147 @@ def discover_services(env_dir: Path) -> List[dict]:
     return services
 
 
-def _healthcheck_cmd(port: int, path: str) -> str:
+def _healthcheck_line(port: int, path: str) -> str:
+    """skillsbench flow-sequence healthcheck: a python urllib.urlopen against /health."""
+    url = f"http://localhost:{port}{path}"
     return (
-        "python3 -c \"import urllib.request,sys; "
-        f"sys.exit(0 if urllib.request.urlopen('http://localhost:{port}{path}',timeout=3)"
-        ".status<400 else 1)\""
+        '      test: ["CMD", "python3", "-c", '
+        '"import urllib.request; urllib.request.urlopen(\'' + url + '\')"]'
     )
 
 
-def generate_harbor_compose(env_dir: Path,
-                            services: Optional[Iterable[Mapping]] = None) -> str:
-    """Render the Harbor `data/environment/docker-compose.yaml`.
+def sanitize_task_name(name: str) -> str:
+    """Lower-case, collapse non-alphanumerics to `_` (for MAIN_IMAGE_NAME default)."""
+    return re.sub(r"[^a-z0-9]+", "_", str(name).lower()).strip("_")
 
-    The `main` service waits for every mock service to become healthy.
+
+def generate_harbor_compose(env_dir: Path,
+                            services: Optional[Iterable[Mapping]] = None,
+                            *,
+                            main_image_name: str = "skillsbench-task",
+                            current_date: str = "") -> str:
+    """Render the Harbor `data/environment/docker-compose.yaml` in the skillsbench
+    delivery format: a `main` service (env + volumes + deploy limits) that depends
+    on every mock `<svc>-api` plus a built `litellm-proxy`.
     """
     if services is None:
         services = discover_services(env_dir)
     svc_list = list(services)
 
-    lines: List[str] = ["services:"]
+    L: List[str] = ["services:"]
 
-    lines.append("  main:")
-    lines.append("    build:")
-    lines.append("      context: .")
-    lines.append("    image: harbor-main:local")
-    lines.append("    command: [\"sleep\", \"infinity\"]")
-    if svc_list:
-        lines.append("    depends_on:")
-        for svc in svc_list:
-            lines.append(f"      {svc['name']}:")
-            lines.append("        condition: service_healthy")
+    # ---- main ----------------------------------------------------------------
+    L.append("  main:")
+    L.append("    build:")
+    L.append("      context: .")
+    L.append("      dockerfile: Dockerfile")
+    L.append(f"    image: ${{MAIN_IMAGE_NAME:-{main_image_name}}}")
+    L.append('    command: ["sh", "-c", "sleep infinity"]')
+    L.append("    depends_on:")
+    for svc in svc_list:
+        L.append("")
+        L.append(f"      {svc['name']}:")
+        L.append("        condition: service_healthy")
+    L.append("")
+    L.append("      litellm-proxy:")
+    L.append("        condition: service_healthy")
+    L.append("    environment:")
+    L.append("")
+    for svc in svc_list:
+        env_var = svc.get("env_var_name") or (str(svc["name"]).upper().replace("-", "_"))
+        L.append(f"      - {env_var}=http://{svc['name']}:{int(svc['port'])}")
+    L.append("")
+    L.append("      - LITELLM_BASE_URL=http://litellm-proxy:4000")
+    L.append("      - OPENAI_API_BASE=http://litellm-proxy:4000/v1")
+    L.append("      - OPENAI_API_KEY=placeholder")
+    L.append("      - LLAMA_API_KEY=${LLAMA_API_KEY}")
+    if current_date:
+        L.append(f"      - CURRENT_DATE={current_date}")
+    L.append("      - TEST_DIR=${TEST_DIR:-/tests}")
+    L.append("    volumes:")
+    L.append("      - ${HOST_VERIFIER_LOGS_PATH:-./logs/verifier}:${ENV_VERIFIER_LOGS_PATH:-/logs/verifier}")
+    L.append("      - ${HOST_AGENT_LOGS_PATH:-./logs/agent}:${ENV_AGENT_LOGS_PATH:-/logs/agent}")
+    L.append("    deploy:")
+    L.append("      resources:")
+    L.append("        limits:")
+    L.append('          cpus: "${CPUS:-1}"')
+    L.append('          memory: "${MEMORY:-4096M}"')
+    L.append("")
 
+    # ---- one entry per mock service -----------------------------------------
     for svc in svc_list:
         name = svc["name"]
         port = int(svc["port"])
         hc_path = svc.get("healthcheck_path") or "/health"
-        mem_limit = svc.get("memory_limit") or ""
-        lines.append(f"  {name}:")
-        lines.append("    build:")
-        lines.append(f"      context: ./{name}")
-        lines.append(f"    image: harbor-{name}:local")
-        lines.append("    expose:")
-        lines.append(f"      - \"{port}\"")
-        lines.append("    healthcheck:")
-        # Block-list form: keeps the cmd's embedded `"` out of YAML flow-sequence quoting.
-        lines.append("      test:")
-        lines.append("        - CMD")
-        lines.append("        - sh")
-        lines.append("        - -c")
-        lines.append(f"        - {_healthcheck_cmd(port, hc_path)}")
-        lines.append("      interval: 5s")
-        lines.append("      timeout: 5s")
-        lines.append("      retries: 12")
-        if mem_limit:
-            lines.append("    deploy:")
-            lines.append("      resources:")
-            lines.append("        limits:")
-            lines.append(f"          memory: {mem_limit}")
+        L.append("")
+        L.append(f"  {name}:")
+        L.append("    build:")
+        L.append(f"      context: ./{name}")
+        L.append("      dockerfile: Dockerfile")
+        L.append("    expose:")
+        L.append(f'      - "{port}"')
+        L.append("    healthcheck:")
+        L.append(_healthcheck_line(port, hc_path))
+        L.append("      interval: 2s")
+        L.append("      timeout: 5s")
+        L.append("      retries: 15")
+        L.append("      start_period: 5s")
 
-    return "\n".join(lines) + "\n"
+    # ---- litellm-proxy -------------------------------------------------------
+    L.append("")
+    L.append("")
+    L.append("  litellm-proxy:")
+    L.append("    build:")
+    L.append("      context: ./litellm-proxy")
+    L.append("      dockerfile: Dockerfile")
+    L.append("    expose:")
+    L.append('      - "4000"')
+    L.append("    environment:")
+    L.append("      - LLAMA_API_KEY=${LLAMA_API_KEY}")
+    L.append("    healthcheck:")
+    L.append(_healthcheck_line(4000, "/health"))
+    L.append("      interval: 2s")
+    L.append("      timeout: 5s")
+    L.append("      retries: 15")
+    L.append("      start_period: 5s")
+
+    return "\n".join(L) + "\n"
+
+
+# --------------------------------------------------------------------------- #
+# Buildable litellm-proxy/ directory (Dockerfile + config) for the bundle.
+# --------------------------------------------------------------------------- #
+
+_LITELLM_PROXY_DOCKERFILE = """\
+# Buildable LiteLLM proxy for the delivery bundle. Mirrors the harness sidecar
+# (src/utils/litellm_sidecar.py): the stock LiteLLM image started with a config
+# on :4000. The delivery pipeline supplies LLAMA_API_KEY at run time.
+FROM ghcr.io/berriai/litellm:main-stable
+COPY config.yaml /app/config.yaml
+EXPOSE 4000
+CMD ["--config", "/app/config.yaml", "--port", "4000"]
+"""
+
+_LITELLM_PROXY_CONFIG = """\
+# Minimal LiteLLM proxy config. The delivery pipeline routes model calls via the
+# LLAMA_API_KEY env var (OpenAI-compatible). Adjust model_list to the delivery
+# team's exact routing if needed.
+model_list:
+  - model_name: gpt-3.5-turbo
+    litellm_params:
+      model: openai/gpt-3.5-turbo
+      api_key: os.environ/LLAMA_API_KEY
+litellm_settings:
+  drop_params: true
+general_settings:
+  master_key: ${LITELLM_MASTER_KEY:-sk-placeholder}
+"""
+
+
+def write_litellm_proxy_dir(env_dir: Path) -> None:
+    """Write a buildable `<env_dir>/litellm-proxy/` (Dockerfile + config.yaml) so
+    the compose `litellm-proxy` service has a real build context."""
+    proxy = Path(env_dir) / "litellm-proxy"
+    proxy.mkdir(parents=True, exist_ok=True)
+    (proxy / "Dockerfile").write_text(_LITELLM_PROXY_DOCKERFILE, encoding="utf-8")
+    (proxy / "config.yaml").write_text(_LITELLM_PROXY_CONFIG, encoding="utf-8")

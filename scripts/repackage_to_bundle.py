@@ -87,6 +87,9 @@ import unicodedata
 from pathlib import Path
 from typing import Any
 
+# Repo root on path so we can reuse the harbor compose generator.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 
 # Extend as new harnesses/models are published. Default direct-Anthropic path
 # runs Opus 4.7, so "claude" -> "Claude Opus 4.7".
@@ -411,6 +414,100 @@ def stage_persona_and_artifacts(
     return n_persona, n_files
 
 
+def _existing_compose_services(compose_path: Path) -> list[str]:
+    """Top-level service keys (excluding main/litellm-proxy) from an existing compose."""
+    if not compose_path.is_file():
+        return []
+    names: list[str] = []
+    in_services = False
+    for line in compose_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+        if line.rstrip() == "services:":
+            in_services = True
+            continue
+        if in_services:
+            m = re.match(r"^  ([A-Za-z0-9._-]+):\s*$", line)
+            if m and m.group(1) not in ("main", "litellm-proxy"):
+                names.append(m.group(1))
+    return names
+
+
+def _task_apis(input_task_dir: Path | None) -> list[str]:
+    """required + distractor API names (normalized to `<svc>-api`) from task.yaml."""
+    if input_task_dir is None:
+        return []
+    ty = input_task_dir / "task.yaml"
+    if not ty.is_file():
+        return []
+    try:
+        import yaml  # type: ignore
+        doc = yaml.safe_load(ty.read_text(encoding="utf-8", errors="ignore")) or {}
+    except Exception:
+        return []
+    out: list[str] = []
+    if isinstance(doc, dict):
+        for k in ("required_apis", "required_mock_apis", "distractor_apis", "distractor_mock_apis"):
+            v = doc.get(k)
+            if not isinstance(v, list):
+                continue
+            for x in v:
+                if isinstance(x, dict):  # entries may be {name, port, purpose}
+                    nm = x.get("name") or x.get("api") or x.get("service")
+                    if nm:
+                        out.append(str(nm).strip())
+                elif str(x).strip():
+                    out.append(str(x).strip())
+    return [a if a.endswith("-api") else f"{a}-api" for a in out if a]
+
+
+def _task_anchor_date(input_task_dir: Path | None) -> str:
+    """Pull authored_anchor (YYYY-MM-DD) from the task.yaml, if present."""
+    if input_task_dir is None:
+        return ""
+    pat = re.compile(
+        r"(?:authored_anchor|anchor_date|ANCHOR_DAY1|current_date|today|anchor)\s*[:=]\s*['\"]?(\d{4}-\d{2}-\d{2})")
+    for fname in ("task.yaml", "golden_steer_flow.md"):
+        f = input_task_dir / fname
+        if f.is_file():
+            m = pat.search(f.read_text(encoding="utf-8", errors="ignore"))
+            if m:
+                return m.group(1)
+    return ""
+
+
+def _regenerate_compose(bundle: Path, task_dir: Path,
+                        input_task_dir: Path | None, verbose: bool) -> None:
+    """Rewrite the bundle's docker-compose.yaml in the skillsbench delivery format
+    and write a buildable litellm-proxy/ dir."""
+    env_dir = bundle / "data" / "environment"
+    if not env_dir.is_dir():
+        return
+    compose_path = env_dir / "docker-compose.yaml"
+    try:
+        from src.utils.harbor.compose import (
+            generate_harbor_compose, discover_services,
+            write_litellm_proxy_dir, sanitize_task_name,
+        )
+        all_svcs = {s["name"]: s for s in discover_services(env_dir)}
+        # Service set, in priority order: the existing compose's list, then the
+        # task's required+distractor APIs, then (last resort) all discovered dirs.
+        keep = _existing_compose_services(compose_path)
+        if not keep:
+            keep = [a for a in _task_apis(input_task_dir) if a in all_svcs]
+        svcs = [all_svcs[n] for n in keep if n in all_svcs] if keep else list(all_svcs.values())
+        main_image = "skillsbench-" + sanitize_task_name(task_dir.name)
+        current_date = _task_anchor_date(input_task_dir)
+        compose_path.write_text(
+            generate_harbor_compose(env_dir, services=svcs,
+                                    main_image_name=main_image, current_date=current_date),
+            encoding="utf-8",
+        )
+        write_litellm_proxy_dir(env_dir)
+        if verbose:
+            print(f"    regenerated compose ({len(svcs)} svc) + litellm-proxy/")
+    except Exception as exc:  # pragma: no cover - defensive
+        print(f"  ! compose regen failed for {task_dir.name}: {exc}", file=sys.stderr)
+
+
 def convert_task(
     task_dir: Path,
     dest_root: Path,
@@ -461,6 +558,11 @@ def convert_task(
         stage_persona_and_artifacts(input_task_dir, bundle, verbose)
     elif verbose:
         print(f"    (no input dir matched under {input_root}; persona/artifacts skipped)")
+
+    # Regenerate docker-compose.yaml in the skillsbench delivery format + add a
+    # buildable litellm-proxy/ dir. We preserve the service set the original
+    # compose enumerated (the env dir carries more svc dirs than the compose lists).
+    _regenerate_compose(bundle, task_dir, input_task_dir, verbose)
 
     # Prompt: multi-turn tasks author the full conversation in `prompts.txt`;
     # single-turn tasks use `prompt.txt`. Prefer the source `prompts.txt`, then a

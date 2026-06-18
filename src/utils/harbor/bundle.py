@@ -32,7 +32,12 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Set
 from src.utils.config import Config
 from src.utils.skills_inference import compute_distractor_skills, infer_required_apis
 from src.utils.store import Store, Task
-from .compose import discover_services, generate_harbor_compose
+from .compose import (
+    discover_services,
+    generate_harbor_compose,
+    sanitize_task_name,
+    write_litellm_proxy_dir,
+)
 from .ctrf import build_ctrf, compute_test_reward
 from .dockerfile import generate_harbor_dockerfile
 from .solve_sh import generate_harbor_solve_sh
@@ -330,10 +335,26 @@ def write_bundle(
                     pass
 
     (env_out / "Dockerfile").write_text(generate_harbor_dockerfile(), encoding="utf-8")
+    # skillsbench delivery format: parameterized image name + the task's anchor date.
+    _main_image = "skillsbench-" + sanitize_task_name(out_dir.name)
+    _current_date = ""
+    if task_dir is not None:
+        _date_pat = re.compile(
+            r"(?:authored_anchor|anchor_date|ANCHOR_DAY1|current_date|today|anchor)"
+            r"\s*[:=]\s*['\"]?(\d{4}-\d{2}-\d{2})")
+        for _fn in ("task.yaml", "golden_steer_flow.md"):
+            _f = Path(task_dir) / _fn
+            if _f.is_file():
+                _m = _date_pat.search(_f.read_text(encoding="utf-8", errors="ignore"))
+                if _m:
+                    _current_date = _m.group(1)
+                    break
     (env_out / "docker-compose.yaml").write_text(
-        generate_harbor_compose(config.environment_dir, services=filtered_services),
+        generate_harbor_compose(config.environment_dir, services=filtered_services,
+                                main_image_name=_main_image, current_date=_current_date),
         encoding="utf-8",
     )
+    write_litellm_proxy_dir(env_out)
 
     (data_dir / "tests" / "test.sh").write_text(generate_harbor_test_sh(), encoding="utf-8")
     (data_dir / "tests" / "test_outputs.py").write_text(task.test_code or "", encoding="utf-8")
