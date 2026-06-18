@@ -545,8 +545,16 @@ def convert_task(
     # run output) from the original input task dir, fuzzy-matched by persona core.
     input_task_dir = _find_input_task_dir(input_root, task_dir.name)
     if input_task_dir is not None:
-        prompt_src = input_task_dir / "prompt.txt"
-        if prompt_src.exists():
+        # The authored prompt lives under the input dir. Accept either name:
+        # "prompts.txt" (the full multi-turn wake-up script we author) is
+        # preferred; "prompt.txt" (a single first-turn prompt) is the fallback.
+        # Either is published into the bundle root as "prompt.txt".
+        prompt_src = next(
+            (input_task_dir / fn for fn in ("prompts.txt", "prompt.txt")
+             if (input_task_dir / fn).exists()),
+            None,
+        )
+        if prompt_src is not None:
             bundle.mkdir(parents=True, exist_ok=True)
             shutil.copy2(prompt_src, bundle / "prompt.txt")
         # inject/ (the per-turn injection staging tree: persona/, emails/, pdfs/,
