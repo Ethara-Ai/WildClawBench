@@ -4,7 +4,7 @@
 For every `<dest-root>/<task>/` that has a matching `<input-root>/<task>/`, assert:
   1. bundle `prompts.txt` is byte-identical to the source `prompts.txt`
      (falls back to comparing against the source `prompt.txt` for single-turn tasks);
-  2. the back-compat `prompt.txt` copy equals the bundle `prompts.txt`;
+  2. the bundle carries NO `prompt.txt` (only `prompts.txt` is wanted);
   3. the bundle `inject/` tree is byte-identical to the source `inject/`;
   4. no regression — `rubric.json`, `data/`, `trajectories/` are still present.
 
@@ -54,15 +54,11 @@ def verify_bundle(bundle: Path, src: Path) -> list[str]:
     else:
         out.append(f"  prompts.txt OK ({len(bundle_prompts.read_text(errors='ignore').splitlines())} lines)")
 
-    # 2) back-compat prompt.txt copy.
-    bp, bpp = bundle / "prompt.txt", bundle / "prompts.txt"
-    if bpp.is_file():
-        if not bp.is_file():
-            out.append("! prompt.txt back-compat copy missing")
-        elif _sha(bp) != _sha(bpp):
-            out.append("! prompt.txt differs from prompts.txt")
-        else:
-            out.append("  prompt.txt OK")
+    # 2) prompt.txt must NOT be shipped — only prompts.txt is wanted.
+    if (bundle / "prompt.txt").exists():
+        out.append("! stray prompt.txt present (bundle should carry prompts.txt only)")
+    else:
+        out.append("  no prompt.txt (correct)")
 
     # 3) inject/ tree identical to source.
     si, bi = src / "inject", bundle / "inject"

@@ -467,7 +467,7 @@ def convert_task(
     # source `prompt.txt`, then the harbor-written `prompt.txt` in the run-output
     # dir (so the prompt is never dropped — the old code looked only for a source
     # `prompt.txt`, which multi-turn tasks lack, shipping bundles with no prompt).
-    # Publish as BOTH `prompts.txt` (current spec) and `prompt.txt` (back-compat).
+    # Publish solely as `prompts.txt` (the bundle never carries a `prompt.txt`).
     prompt_candidates = []
     if input_task_dir is not None:
         prompt_candidates += [input_task_dir / "prompts.txt", input_task_dir / "prompt.txt"]
@@ -476,9 +476,12 @@ def convert_task(
     if prompt_src is not None:
         bundle.mkdir(parents=True, exist_ok=True)
         shutil.copy2(prompt_src, bundle / "prompts.txt")
-        shutil.copy2(prompt_src, bundle / "prompt.txt")
     elif verbose:
-        print(f"    (no prompt found for {task_dir.name}; prompts.txt/prompt.txt skipped)")
+        print(f"    (no prompt found for {task_dir.name}; prompts.txt skipped)")
+    # Defensive: never ship a stray prompt.txt (only prompts.txt is wanted).
+    stray = bundle / "prompt.txt"
+    if stray.exists():
+        stray.unlink()
 
     # Inject: the silent-mutation spec lives only in the source task dir (harbor
     # does not stage it into run output). Copy it verbatim so the bundle is
