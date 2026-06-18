@@ -444,7 +444,7 @@ def _call_judge_openai(model: str, system: str, user: str) -> tuple[str, dict]:
     )
     text_parts: list[str] = []
     u: dict = {}
-    with urllib.request.urlopen(req, timeout=int(os.environ.get("JUDGE_TIMEOUT", "300"))) as r:
+    with urllib.request.urlopen(req, timeout=120) as r:
         for raw_line in r:
             line = raw_line.decode("utf-8", errors="replace").rstrip("\r\n")
             if not line.startswith("data:"):
@@ -554,7 +554,7 @@ def _call_judge_bedrock(arn: str, system: str, user: str) -> tuple[str, dict]:
         text_parts: list[str] = []
         u: dict = {}
         try:
-            resp = urllib.request.urlopen(req, timeout=int(os.environ.get("JUDGE_TIMEOUT", "300")))
+            resp = urllib.request.urlopen(req, timeout=120)
         except urllib.error.HTTPError as e:
             err_body = ""
             try:
@@ -945,15 +945,10 @@ def _grade_council(
                 per_truncation.append(False)
 
         voters = sum(1 for vd in per_voted if vd)
-        # Quorum tolerance: a 3-judge council stays determinate when one member
-        # fails (e.g. a cross-region judge times out) instead of abstaining every
-        # criterion. Require a majority of `members` to be present, then apply the
-        # unanimous-or-abstain rule among the PRESENT voters only. A failed member
-        # no longer drags every criterion to Human Evaluation.
-        quorum = (n_members // 2) + 1
-        if voters >= quorum:
-            yes_votes = sum(1 for s, vd in zip(per_satisfied, per_voted) if vd and s)
-            unanimous_yes = (yes_votes == voters)
+        full_coverage = (voters == n_members)
+        if full_coverage:
+            yes_votes = sum(1 for s in per_satisfied if s)
+            unanimous_yes = (yes_votes == n_members)
             unanimous_no = (yes_votes == 0)
         else:
             unanimous_yes = False

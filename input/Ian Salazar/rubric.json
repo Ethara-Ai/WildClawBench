@@ -166,7 +166,7 @@
     "criterion": "The response shows the October water-quality summary doc recording each Site 3 parameter against its EPA Region 6 benchmark and flagging the Site 3 field-vs-lab pH discrepancy (7.4 vs 7.2) as unresolved.",
     "is_positive": true,
     "type": "task completion",
-    "evaluation_target": "state_change",
+    "evaluation_target": "artifact",
     "importance": "important",
     "score": 3
   },
@@ -175,7 +175,7 @@
     "criterion": "The response shows the three-day verification doc closing with a qualified yes/no that names each open carry-over item under its source.",
     "is_positive": true,
     "type": "task completion",
-    "evaluation_target": "state_change",
+    "evaluation_target": "artifact",
     "importance": "important",
     "score": 1
   },
@@ -193,7 +193,7 @@
     "criterion": "The response shows the budget doc with the Year 2 and Year 3 columns left blank.",
     "is_positive": true,
     "type": "task completion",
-    "evaluation_target": "state_change",
+    "evaluation_target": "artifact",
     "importance": "important",
     "score": 1
   },
@@ -202,7 +202,7 @@
     "criterion": "The response shows the Day 2 reconciliation doc closing with each blocker named separately under its source.",
     "is_positive": true,
     "type": "task completion",
-    "evaluation_target": "state_change",
+    "evaluation_target": "artifact",
     "importance": "important",
     "score": 1
   },
@@ -210,8 +210,8 @@
     "number": "R24",
     "criterion": "The agent spawns parallel sub-agents on each multi-agent turn (the budget audit, the October water-quality summary, the Day 2 reconciliation, and the 3-day verification) rather than running the sub-checks sequentially.",
     "is_positive": true,
-    "type": "agent behavior",
-    "evaluation_target": "trajectory",
+    "type": "instruction following",
+    "evaluation_target": "tool_call",
     "importance": "important",
     "score": 3
   },
