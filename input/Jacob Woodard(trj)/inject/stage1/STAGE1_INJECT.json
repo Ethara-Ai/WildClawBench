@@ -45,6 +45,19 @@
         "latest_event_location": "Biel/Bienne, CH",
         "latest_event_time": "2026-10-20T22:00:00+02:00"
       },
+      "admin": {
+        "op": "patch",
+        "table": "tracking",
+        "pk": "FX771-KRA-029",
+        "set": {
+          "status_code": "AD",
+          "status_description": "Awaiting dispatch - revised",
+          "estimated_delivery": "2026-11-09",
+          "latest_event": "Forging slot rescheduled; awaiting dispatch",
+          "latest_event_location": "Biel/Bienne, CH",
+          "latest_event_time": "2026-10-20T22:00:00+02:00"
+        }
+      },
       "expected_status": 200,
       "silent": true,
       "trap_family": "F1",

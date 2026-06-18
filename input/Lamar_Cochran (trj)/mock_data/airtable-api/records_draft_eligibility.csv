@@ -1,0 +1,4 @@
+id,createdTime,player,number,draft_eligibility,snapshot_age_days,cut_label,back_half_shift_logs_confirmed
+oskar_ek,2026-08-12T18:00:00.000Z,Oskar Ek,9,Yes,7,STALE_T2_SNAPSHOT,false
+prospect_2,2026-08-12T18:00:00.000Z,Mattias Sundin,14,Yes,7,STALE_T2_SNAPSHOT,false
+prospect_3,2026-08-12T18:00:00.000Z,Linus Holm,19,Pending,7,STALE_T2_SNAPSHOT,false

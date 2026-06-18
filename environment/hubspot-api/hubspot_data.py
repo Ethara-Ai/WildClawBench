@@ -103,9 +103,27 @@ def _coerce_stages(rows):
     return list(pipelines.values())
 
 
-_contacts = _coerce_objects(_load("contacts.csv"), _CONTACT_PROPS)
-_companies = _coerce_objects(_load("companies.csv"), _COMPANY_PROPS)
-_deals = _coerce_objects(_load("deals.csv"), _DEAL_PROPS, extra=_deal_extra)
+# CRM object tables live in the mutable store (like ``pipelines``) so the admin
+# plane can read/patch them and silent injections actually land. Loaders run
+# lazily on first access.
+_store.register("contacts", primary_key="id",
+                initial_loader=lambda: _coerce_objects(_load("contacts.csv"), _CONTACT_PROPS))
+_store.register("companies", primary_key="id",
+                initial_loader=lambda: _coerce_objects(_load("companies.csv"), _COMPANY_PROPS))
+_store.register("deals", primary_key="id",
+                initial_loader=lambda: _coerce_objects(_load("deals.csv"), _DEAL_PROPS, extra=_deal_extra))
+
+
+def _contacts_rows():
+    return _store.table("contacts").rows()
+
+
+def _companies_rows():
+    return _store.table("companies").rows()
+
+
+def _deals_rows():
+    return _store.table("deals").rows()
 
 
 
@@ -145,11 +163,11 @@ def _find(store, obj_id):
 # ---------------------------------------------------------------------------
 
 def list_contacts(limit=10, after=None):
-    return _paginate(_contacts_store, limit, after)
+    return _paginate(_contacts_rows(), limit, after)
 
 
 def get_contact(contact_id):
-    c = _find(_contacts_store, contact_id)
+    c = _find(_contacts_rows(), contact_id)
     if not c:
         return {"error": f"Contact {contact_id} not found", "category": "OBJECT_NOT_FOUND"}
     return _public(c)
@@ -168,17 +186,18 @@ def create_contact(properties):
         "updatedAt": now,
         "archived": False,
     }
-    _contacts_store.append(contact)
+    _store.table("contacts").upsert(contact)
     return _public(contact)
 
 
 def update_contact(contact_id, properties):
-    c = _find(_contacts_store, contact_id)
+    c = _find(_contacts_rows(), contact_id)
     if not c:
         return {"error": f"Contact {contact_id} not found", "category": "OBJECT_NOT_FOUND"}
     c["properties"].update({k: v for k, v in (properties or {}).items()})
     c["properties"]["lastmodifieddate"] = _now()
     c["updatedAt"] = _now()
+    _store.table("contacts").upsert(c)
     return _public(c)
 
 
@@ -187,11 +206,11 @@ def update_contact(contact_id, properties):
 # ---------------------------------------------------------------------------
 
 def list_companies(limit=10, after=None):
-    return _paginate(_companies_store, limit, after)
+    return _paginate(_companies_rows(), limit, after)
 
 
 def get_company(company_id):
-    c = _find(_companies_store, company_id)
+    c = _find(_companies_rows(), company_id)
     if not c:
         return {"error": f"Company {company_id} not found", "category": "OBJECT_NOT_FOUND"}
     return _public(c)
@@ -202,11 +221,11 @@ def get_company(company_id):
 # ---------------------------------------------------------------------------
 
 def list_deals(limit=10, after=None):
-    return _paginate(_deals_store, limit, after)
+    return _paginate(_deals_rows(), limit, after)
 
 
 def get_deal(deal_id):
-    d = _find(_deals_store, deal_id)
+    d = _find(_deals_rows(), deal_id)
     if not d:
         return {"error": f"Deal {deal_id} not found", "category": "OBJECT_NOT_FOUND"}
     return _public(d)
@@ -237,12 +256,12 @@ def create_deal(properties):
         "_company": None,
         "_contact": None,
     }
-    _deals_store.append(deal)
+    _store.table("deals").upsert(deal)
     return _public(deal)
 
 
 def update_deal(deal_id, properties):
-    d = _find(_deals_store, deal_id)
+    d = _find(_deals_rows(), deal_id)
     if not d:
         return {"error": f"Deal {deal_id} not found", "category": "OBJECT_NOT_FOUND"}
     props = properties or {}
@@ -254,6 +273,7 @@ def update_deal(deal_id, properties):
     d["properties"].update(props)
     d["properties"]["lastmodifieddate"] = _now()
     d["updatedAt"] = _now()
+    _store.table("deals").upsert(d)
     return _public(d)
 
 

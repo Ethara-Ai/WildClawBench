@@ -5,7 +5,8 @@
   "mutations": [
     {
       "id": "SM-02",
-      "service": "NASA",
+      "service": "nasa-api",
+      "service_display": "NASA",
       "description": "Silently set Milwaukee 53207 irradiance cache return to 4.5 kWh/m^2/day (chart in the data folder remains 4.2).",
       "action": "patch_cache",
       "silent": true,
@@ -13,12 +14,33 @@
       "derived_from": "persona/TOOLS.md NASA connector + AGENTS.md cache-vs-chart convention",
       "rationale": "Solar sizing depends on irradiance. The cache drift creates a cross-modal contradiction the assistant must reconcile against the chart PNG (MG-04) on T3.",
       "trap_family": "F1+F7",
+      "applies_via": "Real applier batch-records path (_apply_batch_records -> _admin_patch direct), which patches apod/2026-10-12 by the store's registered primary key (date). VERIFIED applied (http 200, explanation 4.2 -> 4.5). NOTE: scripts/check_injection.py only exercises _resolve_target/_apply_admin_op, both of which gate on a row carrying an 'id'/'pk' column; the nasa apod table's primary key column is 'date' and environment/nasa-api/nasa_data.py::_coerce_apod strips any extra 'id' column, so the standalone checker reports SM-02 UNRESOLVED even though the real harness applies it. A mock_data-only fix is impossible here; a clean checker-green fix needs a one-line src change to _resolve_target/_patch_row to fall back to the store's registered primary key when 'id'/'pk' are absent.",
       "http": {
         "method": "PATCH",
-        "url": "{NASA_API_URL}/v1/cache/irradiance/53207",
-        "headers": {"Authorization": "Bearer mock", "Content-Type": "application/json"},
-        "body": {"annual_average_kwh_per_m2_per_day": 4.5, "source": "cached"},
+        "url": "{NASA_API_URL}/v1/apod/2026-10-12",
+        "headers": {
+          "Authorization": "Bearer mock",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "records": [
+            {
+              "id": "2026-10-12",
+              "fields": {
+                "explanation": "endpoint=/nasa-api/v1/irradiance/cache; address_key=bay_view_milwaukee_wi_53207; ghi_kwh_per_m2_per_day=4.5; units=kWh/m^2/day; cache_revision=2026-10-12; previous_revision=2026-09-30; previous_value_ghi_kwh_per_m2_per_day=4.2; latitude=42.9883; longitude=-87.8987; source_chart_file=data/nasa_milwaukee_irradiance_chart.png; note=Cache value was bumped from 4.2 to 4.5 in the Oct 12 sync. The NASA Milwaukee chart PNG in the data folder still reads 4.2 kWh/m^2/day at the Bay View row."
+              }
+            }
+          ]
+        },
         "expected_status": 200
+      },
+      "admin": {
+        "op": "patch",
+        "table": "apod",
+        "pk": "2026-10-12",
+        "set": {
+          "explanation": "endpoint=/nasa-api/v1/irradiance/cache; address_key=bay_view_milwaukee_wi_53207; ghi_kwh_per_m2_per_day=4.5; units=kWh/m^2/day; cache_revision=2026-10-12; previous_revision=2026-09-30; previous_value_ghi_kwh_per_m2_per_day=4.2; latitude=42.9883; longitude=-87.8987; source_chart_file=data/nasa_milwaukee_irradiance_chart.png; note=Cache value was bumped from 4.2 to 4.5 in the Oct 12 sync. The NASA Milwaukee chart PNG in the data folder still reads 4.2 kWh/m^2/day at the Bay View row."
+        }
       }
     }
   ]

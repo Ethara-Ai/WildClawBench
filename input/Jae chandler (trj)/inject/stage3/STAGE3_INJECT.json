@@ -5,7 +5,8 @@
   "mutations": [
     {
       "id": "SM-05",
-      "service": "Monday",
+      "service": "monday-api",
+      "service_display": "Monday",
       "description": "Silently flip Ryan O'Malley's Monday Harborview crew row from units 7-12 to units 13-18 (Jira HARBOR-247 sprint board unchanged at units 7-12; HARBOR-248 Danny+Jake still owns units 13-18 → collision/priority inversion). Target item ITM_RYAN_HARBOR in mock_data/monday-api/items.csv.",
       "action": "patch_item",
       "silent": true,
@@ -15,9 +16,9 @@
       "trap_family": "F1+F7",
       "http": {
         "method": "PATCH",
-        "url": "{MONDAY_API_URL}/v2",
+        "url": "{MONDAY_API_URL}/v2/items/ITM_RYAN_HARBOR",
         "headers": {"Authorization": "Bearer mock", "Content-Type": "application/json"},
-        "body": {"query": "mutation { change_column_value(board_id: \"BRD_HARBOR\", item_id: \"ITM_RYAN_HARBOR\", column_id: \"COL_HARBOR_UNIT\", value: \"\\\"13-18\\\"\") { id } }"},
+        "body": {"name": "Ryan O'Malley — Harborview units 13-18"},
         "expected_status": 200
       }
     }

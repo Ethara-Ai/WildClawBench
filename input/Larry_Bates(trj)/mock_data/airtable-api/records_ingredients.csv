@@ -1,2 +1,2 @@
-id,createdTime,IngredientID,Supplier,Bushels
-recING1,2026-08-01T00:00:00.000Z,BARLEY-2026,Dave Caldwell,7200
+id,createdTime,IngredientID,Supplier,Bushels,ProjectionDate,Source
+recBARLEY,2026-08-01T00:00:00.000Z,BARLEY-2026,Dave Caldwell,7800,2026-09-15,Caldwell initial estimate

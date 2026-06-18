@@ -434,6 +434,7 @@ class InjectApplier:
         self._copy = copy_into_workspace
         self._replay_loud = replay_loud
         self._session = requests.Session()
+        self._pk_field_cache: Dict[Any, Optional[str]] = {}
 
     # -- public API ---------------------------------------------------------
 
@@ -612,12 +613,41 @@ class InjectApplier:
     def _row_bag(row: Dict[str, Any]) -> Dict[str, Any]:
         return row["fields"] if isinstance(row.get("fields"), dict) else row
 
+    def _table_pk_field(self, api: str, table: str) -> Optional[str]:
+        """Registered primary-key column for a store table, via ``/admin/tables``.
+        Cached per (api, table). Lets us patch tables whose primary key column is
+        not literally ``id``/``pk`` (e.g. fedex ``tracking_number``, nasa ``date``,
+        typeform ``response_id``) without an inert ``id`` alias column."""
+        key = (api, table)
+        if key not in self._pk_field_cache:
+            meta = self._admin_get(api, "/admin/tables")
+            rows = meta.get("tables", meta) if isinstance(meta, dict) else meta
+            pk_field = None
+            if isinstance(rows, list):
+                for t in rows:
+                    if isinstance(t, dict) and t.get("name") == table:
+                        pk_field = t.get("primary_key")
+                        break
+            self._pk_field_cache[key] = pk_field
+        return self._pk_field_cache[key]
+
     def _patch_row(self, api: str, table: str, row: Dict[str, Any],
-                   set_: Dict[str, Any]) -> Dict[str, Any]:
+                   set_: Dict[str, Any], pk: Any = None) -> Dict[str, Any]:
         """Patch one row, nested-``fields`` aware. The admin PATCH shallow-merges
         top-level keys, so an airtable-style nested ``fields`` object must be
-        resent whole (existing + overrides)."""
-        pk = row.get("id") or row.get("pk")
+        resent whole (existing + overrides). ``pk`` may be passed by callers that
+        already know it (e.g. an explicit admin ``patch`` block); otherwise we read
+        ``id``/``pk`` and finally fall back to the table's registered primary-key
+        column so non-``id``-keyed tables can still be patched."""
+        if pk is None:
+            pk = row.get("id") or row.get("pk")
+        if pk is None:
+            pk_field = self._table_pk_field(api, table)
+            if pk_field:
+                bag = self._row_bag(row)
+                pk = row.get(pk_field)
+                if pk is None:
+                    pk = bag.get(pk_field)
         if pk is None:
             return {"ok": False, "error": "no pk"}
         if isinstance(row.get("fields"), dict):
@@ -648,7 +678,7 @@ class InjectApplier:
                 else:
                     bag = self._row_bag(row)
                     before = {k: bag.get(k) for k in set_}
-                    res = self._patch_row(api, table, row, set_)
+                    res = self._patch_row(api, table, row, set_, pk=pk)
                     after = {k: v for k, v in set_.items()} if res.get("ok") else before
                     rec.update(table=table, pk=pk, ok=bool(res.get("ok")),
                                http=res.get("status"), before=before, after=after,

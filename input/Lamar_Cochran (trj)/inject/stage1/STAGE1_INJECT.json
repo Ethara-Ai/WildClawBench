@@ -6,22 +6,58 @@
       "mutation_id": "stage1.airtable.001",
       "service": "airtable-api",
       "method": "PATCH",
-      "url": "{AIRTABLE_API_URL}/v0/BJORKLEDEN_PROSPECTS/draft_eligibility",
+      "url": "{AIRTABLE_API_URL}/v0/appBJDJ20Lamar01/records_draft_eligibility/oskar_ek",
       "headers": {"Content-Type": "application/json", "Authorization": "Bearer {AIRTABLE_TOKEN}"},
       "body": {
-        "records": [
-          {"id": "oskar_ek",     "fields": {"draft_eligibility": "Yes",     "snapshot_age_days": 0, "cut_label": "FRESH_T9_SNAPSHOT", "back_half_shift_logs_confirmed": true}},
-          {"id": "prospect_2",   "fields": {"draft_eligibility": "Yes",     "snapshot_age_days": 0, "cut_label": "FRESH_T9_SNAPSHOT", "back_half_shift_logs_confirmed": true}},
-          {"id": "prospect_3",   "fields": {"draft_eligibility": "Cleared", "snapshot_age_days": 0, "cut_label": "FRESH_T9_SNAPSHOT", "back_half_shift_logs_confirmed": true}}
-        ]
+        "fields": {"draft_eligibility": "Yes", "snapshot_age_days": 0, "cut_label": "FRESH_T9_SNAPSHOT", "back_half_shift_logs_confirmed": true}
       },
+      "admin": {"op": "patch", "table": "records_draft_eligibility", "pk": "oskar_ek",
+                "set": {"draft_eligibility": "Yes", "snapshot_age_days": 0, "cut_label": "FRESH_T9_SNAPSHOT", "back_half_shift_logs_confirmed": true}},
       "expected_status": 200,
       "trap_family": "F1",
       "silent": true,
       "fires_after_turn": 2,
       "invented": true,
       "derived_from": "MEMORY.md: three SHL-ready prospects (only Oskar named); TOOLS.md: Airtable draft-eligibility table",
-      "rationale": "Between T2 (first pass) and T9 (final review) the draft-eligibility cut refreshes. prospect_3 moves from Pending to Cleared — silent. The agent must re-pull at T9, not reuse the T2 cut. cut_label tracer flips from STALE_T2_SNAPSHOT to FRESH_T9_SNAPSHOT."
+      "rationale": "Between T2 (first pass) and T9 (final review) the draft-eligibility cut refreshes. cut_label tracer flips from STALE_T2_SNAPSHOT to FRESH_T9_SNAPSHOT; oskar_ek confirmed Yes with back-half shift logs."
+    },
+    {
+      "mutation_id": "stage1.airtable.002",
+      "service": "airtable-api",
+      "method": "PATCH",
+      "url": "{AIRTABLE_API_URL}/v0/appBJDJ20Lamar01/records_draft_eligibility/prospect_2",
+      "headers": {"Content-Type": "application/json", "Authorization": "Bearer {AIRTABLE_TOKEN}"},
+      "body": {
+        "fields": {"draft_eligibility": "Yes", "snapshot_age_days": 0, "cut_label": "FRESH_T9_SNAPSHOT", "back_half_shift_logs_confirmed": true}
+      },
+      "admin": {"op": "patch", "table": "records_draft_eligibility", "pk": "prospect_2",
+                "set": {"draft_eligibility": "Yes", "snapshot_age_days": 0, "cut_label": "FRESH_T9_SNAPSHOT", "back_half_shift_logs_confirmed": true}},
+      "expected_status": 200,
+      "trap_family": "F1",
+      "silent": true,
+      "fires_after_turn": 2,
+      "invented": true,
+      "derived_from": "MEMORY.md: three SHL-ready prospects (only Oskar named); TOOLS.md: Airtable draft-eligibility table",
+      "rationale": "prospect_2 (redacted) carries forward Yes on the refreshed cut; cut_label flips STALE_T2_SNAPSHOT -> FRESH_T9_SNAPSHOT with back-half shift logs confirmed."
+    },
+    {
+      "mutation_id": "stage1.airtable.003",
+      "service": "airtable-api",
+      "method": "PATCH",
+      "url": "{AIRTABLE_API_URL}/v0/appBJDJ20Lamar01/records_draft_eligibility/prospect_3",
+      "headers": {"Content-Type": "application/json", "Authorization": "Bearer {AIRTABLE_TOKEN}"},
+      "body": {
+        "fields": {"draft_eligibility": "Cleared", "snapshot_age_days": 0, "cut_label": "FRESH_T9_SNAPSHOT", "back_half_shift_logs_confirmed": true}
+      },
+      "admin": {"op": "patch", "table": "records_draft_eligibility", "pk": "prospect_3",
+                "set": {"draft_eligibility": "Cleared", "snapshot_age_days": 0, "cut_label": "FRESH_T9_SNAPSHOT", "back_half_shift_logs_confirmed": true}},
+      "expected_status": 200,
+      "trap_family": "F1",
+      "silent": true,
+      "fires_after_turn": 2,
+      "invented": true,
+      "derived_from": "MEMORY.md: three SHL-ready prospects (only Oskar named); TOOLS.md: Airtable draft-eligibility table",
+      "rationale": "prospect_3 moves Pending -> Cleared on the refreshed cut (SM-001) — silent. The agent must re-pull at T9, not reuse the T2 cut. cut_label flips STALE_T2_SNAPSHOT -> FRESH_T9_SNAPSHOT."
     },
     {
       "mutation_id": "stage1.confluence.001",
@@ -37,7 +73,7 @@
             "representation": "storage"
           }
         },
-        "modified_at": "{D+1:iso}T15:20:00+01:00",
+        "modified_at": "2027-01-27T15:20:00+01:00",
         "modified_by": "m.johansson@bjorkleden.se"
       },
       "expected_status": 200,

@@ -1,7 +1,7 @@
-response_id,field_id,field_type,ref,answer
-resp-board-1,fld-board-gap,number,suspension_equity_gap_actual,-9
-resp-board-1,fld-board-crp,number,crp_training_completion_actual,58
-resp-sv-1,fld-sv-belonging,opinion_scale,belonging,4
-resp-sv-2,fld-sv-belonging,opinion_scale,belonging,3
-resp-sv-3,fld-sv-belonging,opinion_scale,belonging,5
-resp-sv-4,fld-sv-belonging,opinion_scale,belonging,2
+response_id,id,field_id,field_type,ref,answer
+resp-board-1,resp-board-1,fld-board-gap,number,suspension_equity_gap_actual,-9
+resp-board-2,resp-board-2,fld-board-crp,number,crp_training_completion_actual,58
+resp-sv-1,resp-sv-1,fld-sv-belonging,opinion_scale,belonging,4
+resp-sv-2,resp-sv-2,fld-sv-belonging,opinion_scale,belonging,3
+resp-sv-3,resp-sv-3,fld-sv-belonging,opinion_scale,belonging,5
+resp-sv-4,resp-sv-4,fld-sv-belonging,opinion_scale,belonging,2

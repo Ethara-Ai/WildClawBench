@@ -20,7 +20,8 @@
     },
     {
       "id": "SM-01",
-      "service": "Notion",
+      "service": "notion-api",
+      "service_display": "Notion",
       "description": "Silently flip NABCEP study deck card NEC overcurrent clause from 690.9(B) to 690.9(A). Targets the Notion page that lives in mock_data/notion-api/pages.csv + blocks.csv (block id blk_ocp_002 on page pg_nabcep_ocp).",
       "action": "patch_page_body",
       "silent": true,
@@ -28,6 +29,12 @@
       "derived_from": "persona/MEMORY.md NABCEP target Oct 16 2026 + AGENTS.md study-deck convention",
       "rationale": "Exam-week document drift is the strongest silent-change surface for Jae's persona; agent must catch the contradiction against the canonical NEC reference on T4 reveal.",
       "trap_family": "F1",
+      "admin": {
+        "op": "patch",
+        "table": "blocks",
+        "pk": "blk_ocp_002",
+        "set": {"text": "Per NEC 690.9(A), overcurrent protection for PV source and output circuits must be sized at no less than 125 percent of the maximum currents calculated under 690.8(A)."}
+      },
       "http": {
         "method": "PATCH",
         "url": "{NOTION_API_URL}/v1/pages/pg_nabcep_ocp",

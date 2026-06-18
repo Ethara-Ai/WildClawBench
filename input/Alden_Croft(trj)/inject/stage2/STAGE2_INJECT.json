@@ -9,6 +9,27 @@
       "method": "POST",
       "url": "{GMAIL_API_URL}/_seed/messages",
       "headers": {"Content-Type": "application/json"},
+      "admin": {
+        "op": "upsert",
+        "table": "messages",
+        "pk_field": "id",
+        "row": {
+          "id": "msg_yard_time_change",
+          "thread_id": "thr_yard_wo",
+          "from_addr": "service@rocklandmarineyard.test",
+          "to_addr": "alden.croft.me@gmail.com",
+          "cc_addr": "",
+          "subject": "Updated check-in time — Eileen C — please confirm",
+          "snippet": "Tech swap — we can take you 30 minutes earlier. Please arrive 7:30 AM tomorrow. Same slip (4B).",
+          "body": "Heads up — we had a tech swap and can take you in 30 minutes earlier. Please arrive 7:30 AM tomorrow. Same slip (4B). If that's a problem, call by 6 AM.\n\n— Rockland Marine Service Yard",
+          "date": "2026-12-08T22:14:00-05:00",
+          "internal_date": "1765250040000",
+          "size_estimate": "1980",
+          "labels": "INBOX,Label_Boat",
+          "is_unread": "True",
+          "is_starred": "False"
+        }
+      },
       "body": {
         "inbox": "alden.croft.me@gmail.com",
         "messages": [

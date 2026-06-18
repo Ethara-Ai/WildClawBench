@@ -23,7 +23,7 @@
             }
           }
         ],
-        "modified_at": "{D+3:iso}T08:15:00+01:00"
+        "modified_at": "2027-01-29T08:15:00+01:00"
       },
       "expected_status": 200,
       "trap_family": "F1",

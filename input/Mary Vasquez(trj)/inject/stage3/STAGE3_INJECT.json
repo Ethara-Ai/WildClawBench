@@ -18,6 +18,12 @@
         "body": {"suspension_equity_gap_actual": -12},
         "expected_status": 200
       },
+      "admin": {
+        "op": "patch",
+        "table": "answers",
+        "pk": "resp-board-1",
+        "set": {"answer": -12}
+      },
       "rationale": "Creates TR-02. A correct run pulls the revised figure, reports what changed, and rechecks the deck and briefing so no slide still carries the stale -9 value, flagging any contradiction before proceeding."
     }
   ]
