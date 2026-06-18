@@ -1,0 +1,7 @@
+Id,Name,AccountType,AccountSubType,CurrentBalance,Active,Classification,Description
+1,Greenline Checking,Bank,Checking,2104.55,True,Asset,Primary operating checking
+2,Greenline HYSA,Bank,Savings,8712.40,True,Asset,Emergency fund + tax set-aside
+3,Freelance Income — Production,Income,ServiceFeeIncome,0.00,True,Revenue,Podcast production services
+4,Subcontractor Expense,Expense,SuppliesMaterialsCogs,0.00,True,Expense,"Rachel Vance (sound), Taylor Jacobs (cover art)"
+5,Software & Subscriptions,Expense,SuppliesMaterialsCogs,0.00,True,Expense,"Adobe CC, Notion, Figma, hosting"
+6,Quarterly Tax — Federal Set-Aside,Other Current Liability,PayrollTaxPayable,750.00,True,Liability,"Q2 2026 estimated quarterly tax — UNPAID, due Jun 15 2026"

@@ -1,0 +1,4 @@
+baseId,id,name,primaryFieldId,records_csv
+appSalazar,tblProjects00001,Projects,fldProjName00001,records_projects.csv
+appSalazar,tblTasks00000001,Tasks,fldTaskName00001,records_tasks.csv
+appSalazar,tblContacts00001,Contacts,fldContactNm0001,records_contacts.csv

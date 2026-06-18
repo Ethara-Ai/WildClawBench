@@ -1,0 +1,5 @@
+id,firstname,lastname,email,phone,jobtitle,company,lifecyclestage,createdate,lastmodifieddate
+8001000401,Mike,Henderson,mike@hendersonranchllc.com,(541) 555-2963,Owner / Operator,Henderson Ranch,customer,2021-03-04T16:00:00Z,2026-09-22T14:30:00Z
+8001000402,Dale,Watson,dale@watson-cattle.example,(541) 555-3120,Owner,Watson Ranch,customer,2020-11-08T18:00:00Z,2026-08-20T19:00:00Z
+8001000403,Janek,Krasicki,janek@krasickiranch.example,(541) 555-2845,Owner / Operator,Krasicki Ranch,customer,2020-04-22T15:00:00Z,2026-08-27T18:00:00Z
+8001000404,Vendor,Portal (Zoetis),vendororders@zoetis.example,(800) 555-9638,Distributor Notifications,Zoetis Animal Health,vendor,2019-06-12T17:00:00Z,2026-09-18T20:00:00Z

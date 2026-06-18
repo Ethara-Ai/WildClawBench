@@ -1,0 +1,3 @@
+Id,DisplayName,CompanyName,PrimaryEmailAddr,PrimaryPhone,BillAddr_Line1,BillAddr_City,BillAddr_CountrySubDivisionCode,BillAddr_PostalCode,Balance,Active,AcctNum,Vendor1099
+20,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+21,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False

@@ -1,0 +1,14 @@
+{
+  "id": "ws_lost_frames",
+  "name": "Lost Frames",
+  "domain": "lostframes",
+  "owner_user_id": "user-helen-sexton",
+  "plan": "personal_pro",
+  "created_time": "2026-04-12T10:00:00.000Z",
+  "icon": "https://www.notion.so/icons/film_orange.svg",
+  "settings": {
+    "default_page_size": 50,
+    "ai_blocks_enabled": true,
+    "public_sharing_enabled": false
+  }
+}

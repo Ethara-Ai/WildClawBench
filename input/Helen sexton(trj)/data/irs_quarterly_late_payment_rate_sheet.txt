@@ -1,0 +1,19 @@
+IRS QUARTERLY UNDERPAYMENT / LATE-PAYMENT INTEREST RATE SHEET
+Source: Federal short-term rate plus 3 percentage points (individual underpayments)
+Prepared for: Helen Sexton — Finthesiss freelance books
+Last reviewed: 2026-04-10
+
+----------------------------------------------------------------------
+Q1 2026 (Jan 1 – Mar 31)   [PRIOR QUARTER — for reference only]
+  Federal short-term rate plus 3 percentage points.
+  Combined annualized rate: 8.0%
+----------------------------------------------------------------------
+Q2 2026 (Apr 1 – Jun 30)   [CURRENT QUARTER]
+  Federal short-term rate plus 3 percentage points.
+  Combined annualized rate: 8.0%
+----------------------------------------------------------------------
+
+Penalty math: Q2_tax * (annualized rate) * (days_late / 365).
+Always use the block labelled for the quarter you are computing; the prior
+quarter's block is retained only as a reference and must not be applied to
+the current quarter.

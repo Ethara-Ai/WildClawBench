@@ -1,0 +1,3 @@
+baseId,id,name,primaryFieldId,records_csv
+appRimrock0000001,tblVaccines000001,vaccines,fldVaccineName01,records_vaccines.csv
+appHikariMidori01,tblCompLog000001,competition_log,fldEventName0001,records_competition_log.csv

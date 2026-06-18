@@ -1,0 +1,4 @@
+Id,DisplayName,GivenName,FamilyName,CompanyName,PrimaryEmailAddr,PrimaryPhone,BillAddr_Line1,BillAddr_City,BillAddr_CountrySubDivisionCode,BillAddr_PostalCode,Balance,Active,Job,Notes
+1,The Culture Desk,Jessica,Oakes,The Culture Desk LLC,ap@theculturedesk.fm,+1-347-555-9001,412 Atlantic Ave Ste 5,Brooklyn,NY,11217,1800.00,True,False,"Weekly Wed-record. $1,800/ep full production."
+2,Builder's Block,Noah,Park,Builder's Block Media,ap@buildersblock.show,+1-415-555-9002,2200 Mission St Ste 200,San Francisco,CA,94110,0.00,True,False,"Mixed engagement. Full $1,800/ep OR edit-only $650/ep."
+3,WeatherFront Media,,,WeatherFront Media Inc,billing@weatherfront.fm,+1-212-555-9003,511 W 25th St,New York,NY,10001,0.00,True,False,"Monthly retainer. $2,200/ep."

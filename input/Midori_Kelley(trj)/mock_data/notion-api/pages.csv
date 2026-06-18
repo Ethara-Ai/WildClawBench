@@ -1,0 +1,8 @@
+id,parent_type,parent_id,title,created_time,last_edited_time,created_by,archived,icon,cover_url
+pg_personal_home,workspace,wks_midori_kelley_personal,Personal home,2024-08-04T13:22:18Z,2026-10-19T07:42:00Z,usr_self,false,,
+pg_gre_home,page,pg_personal_home,GRE 2027 plan,2026-08-04T11:18:00Z,2026-10-19T07:42:00Z,usr_self,false,,
+pg_kaze,page,pg_personal_home,"Kaze - vet, training, food",2024-08-04T13:22:18Z,2026-08-15T19:18:00Z,usr_self,false,,
+pg_kitchen,page,pg_personal_home,Kitchen + recipes,2025-09-12T01:18:00Z,2026-09-30T20:11:00Z,usr_self,false,,
+pg_p_gre_week5,database,db_gre,Week 5 - Quant review,2026-10-12T08:10:00Z,2026-10-19T07:42:00Z,usr_self,false,,
+pg_p_book_adler,database,db_books,How To Read A Book - Adler,2026-01-02T19:00:00Z,2026-10-12T08:11:18Z,usr_self,false,,
+pg_p_rec_tonkatsu,database,db_recipes,Tonkatsu - mom's,2025-11-14T05:00:00Z,2026-09-30T20:11:00Z,usr_self,false,,

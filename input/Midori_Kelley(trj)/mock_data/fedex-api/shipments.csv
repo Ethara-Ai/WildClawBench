@@ -1,0 +1,4 @@
+tracking_number,service_type,service_name,ship_date,origin_zip,dest_zip,weight_lb,currency,net_charge,label_url
+FX-HND-2026-Q4,FEDEX_GROUND,FedEx Ground,2026-10-22,66061,97756,18.4,USD,47.85,https://fedex.example.com/labels/FX-HND-2026-Q4.pdf
+FX-WAT-2026-Q3,FEDEX_GROUND,FedEx Ground,2026-08-15,66061,97756,9.2,USD,38.1,https://fedex.example.com/labels/FX-WAT-2026-Q3.pdf
+FX-KRA-2026-Q3,FEDEX_GROUND,FedEx Ground,2026-08-22,66061,97756,22.1,USD,52.4,https://fedex.example.com/labels/FX-KRA-2026-Q3.pdf

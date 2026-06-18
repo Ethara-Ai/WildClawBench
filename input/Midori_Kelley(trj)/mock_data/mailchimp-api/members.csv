@@ -1,0 +1,5 @@
+list_id,email_address,full_name,status,timestamp_signup,member_rating
+lst_mc_personal,halie.brimmer@gmail.com,Halie Brimmer,subscribed,2025-05-04T20:00:00Z,4
+lst_mc_personal,yuki.tanaka@gmail.com,Yuki Tanaka,subscribed,2025-05-04T20:00:00Z,5
+lst_mc_personal,marlene.chu@gmail.com,Marlene Chu,subscribed,2025-06-12T20:00:00Z,3
+lst_mc_personal,tess.lambert@gmail.com,Tess Lambert,unsubscribed,2025-05-04T20:00:00Z,2

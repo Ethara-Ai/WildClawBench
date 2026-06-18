@@ -1,0 +1,6 @@
+id,name,real_name,email,is_admin,is_bot,tz,status_text,presence
+U_HELEN,helen,Helen Sexton,helen.sexton@Finthesiss.ai,True,False,America/New_York,EP1 launch week 🎬,active
+U_TAYLOR,taylor,Taylor Jacobs,taylor.jacobs@taylorjacobsdesign.com,False,False,America/New_York,🎨 print queue,active
+U_RACHEL,rachel,Rachel Vance,rachel.vance@vancesound.studio,False,False,America/New_York,in studio,away
+U_JESSICA,jessica,Jessica Oakes,jessica.oakes@theculturedesk.fm,False,False,America/New_York,,active
+U_NOAH,noah,Noah Park,noah.park@buildersblock.show,False,False,America/Los_Angeles,🏗️ writing,active

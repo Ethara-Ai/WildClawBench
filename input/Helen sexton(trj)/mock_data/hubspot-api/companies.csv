@@ -1,0 +1,4 @@
+id,name,domain,industry,city,state,numberofemployees,annualrevenue,createdate
+COMP_LEGACYLENS,LegacyLens Cameras,legacylenscameras.com,Consumer Electronics,Portland,OR,45,8500000,2026-05-15T11:00:00Z
+COMP_APEX,Apex Media,apexbrandedmedia.com,Media & Branded Content,Brooklyn,NY,120,24000000,2026-06-12T09:30:00Z
+COMP_CRESCENT,Crescent Pictures,crescentpictures.com,Film & Streaming,Los Angeles,CA,68,18500000,2026-06-18T14:00:00Z

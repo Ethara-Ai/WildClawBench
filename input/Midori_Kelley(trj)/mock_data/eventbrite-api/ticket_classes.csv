@@ -1,0 +1,6 @@
+id,event_id,name,quantity_total,quantity_sold,cost,fee,free,sales_start,sales_end
+tc_madras_open4d,evt_cbra_madras_2026,Open 4D Entry,90,78,8500,320,False,2026-08-12T19:00:00Z,2026-10-18T07:00:00Z
+tc_madras_youth,evt_cbra_madras_2026,Youth Entry,60,41,6500,280,False,2026-08-12T19:00:00Z,2026-10-18T07:00:00Z
+tc_madras_spectator,evt_cbra_madras_2026,Spectator,70,54,1500,120,False,2026-09-01T19:00:00Z,2026-10-24T17:00:00Z
+tc_pendleton_open4d,evt_cbra_pendleton_2026,Open 4D Entry,90,87,8500,320,False,2026-07-01T19:00:00Z,2026-09-14T07:00:00Z
+tc_burns_open4d,evt_cbra_burns_2026,Open 4D Entry,80,72,7500,300,False,2026-05-15T19:00:00Z,2026-08-17T07:00:00Z

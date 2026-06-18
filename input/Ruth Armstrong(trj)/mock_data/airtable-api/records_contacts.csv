@@ -1,0 +1,5 @@
+id,createdTime,Name,Email,Company,Role
+recBIZ01,2026-10-13T00:00:00.000Z,Plateau Business Association,contact@plateaubiz.example,Plateau Business Association,"business_owner (14 open objections, parking-loss)"
+recRES01,2026-10-13T00:00:00.000Z,Rue Rachel residents group,rachel.residents@example.org,Residents,resident (supportive)
+recCYC01,2026-10-13T00:00:00.000Z,Alliance Cycliste du Quebec,lucie.bergeron.velo@Finthesiss.ai,Alliance Cycliste du Quebec,community_group (strongly-supportive)
+recDS01,2026-10-13T00:00:00.000Z,Stakeholder data partner,sync@partner.example,External,DISTRACTOR - refresh latest via salesforce-api before the brief

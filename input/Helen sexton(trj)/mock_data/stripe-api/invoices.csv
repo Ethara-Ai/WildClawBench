@@ -1,0 +1,6 @@
+id,customer,subscription,amount_due,amount_paid,currency,status,number,charge,created,due_date
+in_culture_desk_06,cus_culture_desk,,180000,180000,usd,paid,LF-0001,ch_culture_desk_06,1749600000,1749600000
+in_culture_desk_07,cus_culture_desk,,180000,0,usd,open,LF-0002,,1751200000,1753792000
+in_builders_block_06a,cus_builders_block,,65000,65000,usd,paid,LF-0003,,1749700000,1749700000
+in_builders_block_06b,cus_builders_block,,180000,180000,usd,paid,LF-0004,ch_builders_block_06b,1750300000,1750300000
+in_weatherfront_06,cus_weatherfront,,220000,220000,usd,paid,LF-0005,ch_weatherfront_06,1749200000,1749200000

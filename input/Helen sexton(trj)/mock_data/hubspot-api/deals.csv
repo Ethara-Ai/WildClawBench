@@ -1,0 +1,4 @@
+id,dealname,pipeline,dealstage,amount,closedate,dealtype,associated_company,associated_contact,createdate,lastmodifieddate
+DEAL_LEGACYLENS_EP1,LegacyLens — Lost Frames EP1 mid-roll sponsor,default,qualifiedtobuy,2500.00,2026-07-02T17:00:00Z,newbusiness,COMP_LEGACYLENS,CON_HOLLAND,2026-05-15T11:30:00Z,2026-06-29T10:00:00Z
+DEAL_APEX_BRANDED,Apex Media — branded podcast partnership (exploring),default,presentationscheduled,,2026-08-15T17:00:00Z,newbusiness,COMP_APEX,CON_FELD,2026-06-12T10:00:00Z,2026-06-28T14:00:00Z
+DEAL_CRESCENT_6EP,Crescent Pictures — S1 6-episode pilot package,default,presentationscheduled,21000.00,2026-07-31T17:00:00Z,newbusiness,COMP_CRESCENT,CON_KIM,2026-06-18T14:30:00Z,2026-06-29T16:00:00Z

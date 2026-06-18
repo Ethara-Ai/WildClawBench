@@ -1,0 +1,2 @@
+id,meeting_id,recording_type,file_type,file_size,recording_start,recording_end,play_url,status
+rcd_z_001,81234567890,shared_screen_with_speaker_view,MP4,284192340,2026-10-26T15:00:00Z,2026-10-26T17:00:00Z,https://zoom.us/rec/play/rcd_z_001,completed

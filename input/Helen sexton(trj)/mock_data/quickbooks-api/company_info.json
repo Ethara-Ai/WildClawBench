@@ -1,0 +1,27 @@
+{
+  "CompanyName": "Helen Sexton (sole proprietor)",
+  "LegalName": "Helen E. Sexton",
+  "CompanyAddr": {
+    "Line1": "318 Bushwick Ave Apt 3B",
+    "City": "Brooklyn",
+    "CountrySubDivisionCode": "NY",
+    "PostalCode": "11206"
+  },
+  "Email": {
+    "Address": "helen.sexton@Finthesiss.ai"
+  },
+  "PrimaryPhone": {
+    "FreeFormNumber": "(718) 555-0184"
+  },
+  "FiscalYearStartMonth": "January",
+  "Country": "US",
+  "IndustryType": "Online Audio & Video Media",
+  "NameValue": [
+    { "Name": "OwnerName", "Value": "Helen Sexton" },
+    { "Name": "BusinessType", "Value": "Sole Proprietor" }
+  ],
+  "MetaData": {
+    "CreateTime": "2026-04-01T10:00:00-04:00",
+    "LastUpdatedTime": "2026-06-30T09:15:00-04:00"
+  }
+}

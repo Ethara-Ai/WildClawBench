@@ -1,0 +1,2 @@
+message_id,conversation_id,direction,from_wa_id,to_wa_id,type,text,template_name,status,sent_at
+wam_001,conv_family,inbound,15552201,15552200,text,I can take Emile to swim tomorrow if you have the council brief.,,read,2026-10-12T20:55:00-04:00

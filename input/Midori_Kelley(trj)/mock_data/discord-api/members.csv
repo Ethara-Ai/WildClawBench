@@ -1,0 +1,6 @@
+guild_id,user_id,username,global_name,nick,bot,joined_at,roles
+G_CBRA_RIDERS_001,9871224400110055,midori.kelley,Midori K,Midori (Hikari),False,2024-03-12T18:22:00Z,R_CBRA_MEMBER;R_CBRA_OPEN_4D
+G_CBRA_RIDERS_001,U_TARA_REDHAWK,tara.redhawk,Tara R,Tara (Bullet),False,2024-01-18T20:05:00Z,R_CBRA_MEMBER;R_CBRA_OPEN_4D
+G_CBRA_RIDERS_001,U_CBRA_MOD_001,cbra.dmunro,D. Munro,Mod (Events),False,2023-08-04T15:30:00Z,R_CBRA_MOD;R_CBRA_MEMBER
+G_HORSE_HEALTH_NW,9871224400110055,midori.kelley,Midori K,Midori (Rimrock Valley),False,2023-11-02T19:14:00Z,R_VET_VERIFIED;R_VET_TECH
+G_HORSE_HEALTH_NW,U_VET_MOD_001,drchen.equine,Dr. Chen,Mod (Bovine),False,2022-04-15T16:00:00Z,R_VET_MOD;R_VET_VERIFIED;R_VET_DVM

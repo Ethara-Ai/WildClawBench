@@ -1,0 +1,4 @@
+id,firstname,lastname,email,phone,jobtitle,company,lifecyclestage,createdate,lastmodifieddate
+CON_HOLLAND,Mark,Holland,mark.holland@legacylenscameras.com,+1-503-555-7001,Brand Partnerships Lead,LegacyLens Cameras,salesqualifiedlead,2026-05-15T11:05:00Z,2026-06-22T14:30:00Z
+CON_FELD,Ryan,Feld,ryan.feld@apexbrandedmedia.com,+1-718-555-7002,Director of Branded Podcasts,Apex Media,lead,2026-06-12T09:35:00Z,2026-06-25T11:05:00Z
+CON_KIM,Sarah,Kim,sarah.kim@crescentpictures.com,+1-310-555-7003,VP Audio Partnerships,Crescent Pictures,salesqualifiedlead,2026-06-18T14:05:00Z,2026-06-26T09:30:00Z

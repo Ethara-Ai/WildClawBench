@@ -1,0 +1,27 @@
+[
+  {
+    "Id": "3001",
+    "DocNumber": "VANCE-2026-06",
+    "VendorRef": {
+      "value": "V_VANCE",
+      "name": "Rachel Vance — Vance Sound"
+    },
+    "TxnDate": "2026-06-28",
+    "DueDate": "2026-07-03",
+    "Line": [
+      {
+        "Amount": 450.0,
+        "Description": "EP1 sound design and final mix",
+        "AccountBasedExpenseLineDetail": {
+          "AccountRef": {
+            "name": "Contract Labor",
+            "value": "10"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 450.0,
+    "Balance": 450.0,
+    "PrivateNote": "Net 5. Approved by Helen."
+  }
+]

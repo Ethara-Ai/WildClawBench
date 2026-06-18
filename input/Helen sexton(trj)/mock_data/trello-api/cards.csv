@@ -1,0 +1,3 @@
+id,name,desc,id_board,id_list,pos,due,closed,member_ids,labels
+crd_tr_1,Old onboarding template,,brd_tr_1,lst_tr_c,16384,,true,trello_HELEN_DECOY,archive
+crd_tr_2,Invoice followups Q4,,brd_tr_1,lst_tr_c,32768,,true,trello_HELEN_DECOY,archive

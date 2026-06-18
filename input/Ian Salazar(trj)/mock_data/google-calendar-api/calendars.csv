@@ -1,0 +1,4 @@
+id,summary,description,time_zone,access_role,primary,color_id
+primary,Ian Salazar,Primary calendar — work + everything else,America/Denver,owner,True,1
+cal_family,Family,"Carmen, Rosa, Marco — birthdays + family gatherings",America/Denver,owner,False,11
+cal_fieldwork,Fieldwork,DAC water-quality sampling rounds + field-day blocks,America/Denver,owner,False,9

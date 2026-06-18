@@ -1,0 +1,3 @@
+id,host_id,topic,type,status,start_time,duration,timezone,join_url,agenda,created_at
+8810010101,zm_HELEN_DECOY,Quarterly check (legacy client),2,ended,2026-04-12T15:00:00-04:00,30,America/New_York,https://zoom.us/j/8810010101,Legacy client quarterly touchpoint,2026-04-01T10:00:00Z
+8810010102,zm_HELEN_DECOY,Old onboarding call,2,ended,2025-11-03T14:00:00-05:00,45,America/New_York,https://zoom.us/j/8810010102,Onboarding call for archived client engagement,2025-10-28T12:00:00Z

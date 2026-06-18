@@ -1,0 +1,4 @@
+id,media_id,user_id,username,text,timestamp,like_count,hidden,parent_id
+IGC_001,IGM_002,U_KEVIN_ATKINS,kevin.atkins,The wordmark. Chef's kiss.,2026-06-25T18:14:00-04:00,8,False,
+IGC_002,IGM_002,U_INDIE_POD_WEEKLY,indiepodweekly,Featuring this in our launch-week roundup 🙌,2026-06-25T18:42:00-04:00,22,False,
+IGC_003,IGM_003,U_RACHEL_VANCE,rachelvancesound,Cannot wait. Bringing the Tascam.,2026-06-12T12:08:00-04:00,14,False,

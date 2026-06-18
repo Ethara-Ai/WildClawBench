@@ -1,0 +1,4 @@
+id,type,status,title,space_key,parent_id,version,body,created_by,created_at
+100201,page,current,Parc-Extension survey methodology,PARCEX,,7,Four-language instrument (FR/EN/Tamil/Urdu). Cost-burdened renter = >30% of income on housing. Carried baseline 40%; federal partner refresh pending re-tabulation.,usr_ruth,2026-02-12T10:00:00Z
+100202,page,current,Interim equity report - skeleton (DRAFT),PARCEX,100201,3,"Sections: demographics, survey results, outreach funnel, policy recommendations. Due October 26. Immigrant-community data stays internal.",usr_ruth,2026-09-20T10:00:00Z
+100203,page,current,Green-infra module FINAL (cross-dept),CLIMATE,,5,FINAL cross-department reconciled. Tree canopy 20.5%. Permeable surface 18000 m2 (rounded). Use these figures for the November 12 submission.,usr_ruth,2026-10-11T10:00:00Z

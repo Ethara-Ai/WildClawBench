@@ -1,0 +1,9 @@
+place_id,name,formatted_address,lat,lng,rating,user_ratings_total,types,business_status,price_level
+place_rimrock_clinic,Rimrock Valley Veterinary Clinic,"1840 SW Quarry Ave, Redmond OR 97756",44.2701,-121.1838,4.8,87,veterinary_care;point_of_interest;establishment,OPERATIONAL,2
+place_madras_grounds,Madras Sage Rodeo Grounds,"1280 SE Fairgrounds Loop, Madras OR 97741",44.6325,-121.1232,4.6,142,stadium;point_of_interest;establishment,OPERATIONAL,0
+place_henderson_ranch,Henderson Ranch,"21450 NW Henderson Loop Rd, Terrebonne OR 97760",44.3601,-121.2089,0,0,premise;point_of_interest,OPERATIONAL,0
+place_midori_home,Tumalo property,"65880 OB Riley Rd, Tumalo OR 97701",44.1518,-121.3284,0,0,premise,OPERATIONAL,0
+place_summit_path,Summit Path Recovery,"1410 Oregon Ave, Klamath Falls OR 97601",42.2167,-121.7811,4.4,23,health;point_of_interest;establishment,OPERATIONAL,2
+place_madras_cafe,Madras Country Cafe,"275 SW 6th St, Madras OR 97741",44.6342,-121.1289,4.5,312,restaurant;food;point_of_interest;establishment,OPERATIONAL,1
+place_bend_endo,Bend Endocrinology Associates,"2275 NE Doctors Dr, Bend OR 97701",44.0606,-121.295,4.7,56,doctor;health;point_of_interest;establishment,OPERATIONAL,2
+place_kelley_ranch,Kelley family ranch,"23110 Pinehurst Rd, Bend OR 97703",44.0832,-121.3411,0,0,premise,OPERATIONAL,0

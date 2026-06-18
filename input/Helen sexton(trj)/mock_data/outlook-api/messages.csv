@@ -1,0 +1,4 @@
+id,subject,from_name,from_address,to_name,to_address,body_preview,content_type,is_read,importance,received_date
+msg_ol_1,Your Microsoft account was signed in,Microsoft Account Team,no-reply@accountprotection.microsoft.com,Helen Sexton,helen.sexton@outlook.com,Your Microsoft account was signed in from a new device.,html,true,normal,2025-11-04T03:14:00Z
+msg_ol_2,Reminder: Confirm your alternate email,Microsoft,no-reply@microsoft.com,Helen Sexton,helen.sexton@outlook.com,Please confirm your alternate email address to keep your account secure.,html,true,normal,2025-12-01T08:00:00Z
+msg_ol_3,Outlook tips for getting started,Microsoft Outlook,microsoft-noreply@microsoft.com,Helen Sexton,helen.sexton@outlook.com,Welcome to Outlook. Here are some tips to help you get started.,html,true,normal,2018-04-22T12:00:00Z

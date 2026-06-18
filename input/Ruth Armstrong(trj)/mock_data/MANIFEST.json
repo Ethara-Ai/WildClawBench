@@ -1,0 +1,141 @@
+{
+  "task_id": "RUTH_001_october_consultation_crunch",
+  "active_services": [
+    "airtable-api",
+    "box-api",
+    "confluence-api",
+    "gmail-api",
+    "google-calendar-api",
+    "notion-api",
+    "outlook-api",
+    "slack-api",
+    "twilio-api",
+    "whatsapp-api"
+  ],
+  "distractor_services": [
+    "salesforce-api",
+    "linkedin-api",
+    "hubspot-api"
+  ],
+  "distractor_note": "Distractor services are intentionally unseeded (no mock_data folder) so any business call is detectable as a zero-call invariant violation; cover-story prompts to call them live in gmail/slack/airtable and the data/ distractor files.",
+  "services": [
+    "airtable-api",
+    "box-api",
+    "confluence-api",
+    "gmail-api",
+    "google-calendar-api",
+    "notion-api",
+    "outlook-api",
+    "slack-api",
+    "twilio-api",
+    "whatsapp-api"
+  ],
+  "files": {
+    "airtable-api": [
+      "mock_data/airtable-api/bases.csv",
+      "mock_data/airtable-api/fields.csv",
+      "mock_data/airtable-api/records_contacts.csv",
+      "mock_data/airtable-api/tables.csv"
+    ],
+    "box-api": [
+      "mock_data/box-api/files.csv",
+      "mock_data/box-api/folders.csv",
+      "mock_data/box-api/users.csv"
+    ],
+    "confluence-api": [
+      "mock_data/confluence-api/comments.csv",
+      "mock_data/confluence-api/labels.csv",
+      "mock_data/confluence-api/pages.csv",
+      "mock_data/confluence-api/spaces.csv"
+    ],
+    "gmail-api": [
+      "mock_data/gmail-api/drafts.csv",
+      "mock_data/gmail-api/labels.csv",
+      "mock_data/gmail-api/messages.csv",
+      "mock_data/gmail-api/profile.json"
+    ],
+    "google-calendar-api": [
+      "mock_data/google-calendar-api/calendars.csv",
+      "mock_data/google-calendar-api/event_attendees.csv",
+      "mock_data/google-calendar-api/events.csv"
+    ],
+    "notion-api": [
+      "mock_data/notion-api/blocks.csv",
+      "mock_data/notion-api/comments.csv",
+      "mock_data/notion-api/databases.csv",
+      "mock_data/notion-api/page_properties.csv",
+      "mock_data/notion-api/pages.csv",
+      "mock_data/notion-api/users.csv",
+      "mock_data/notion-api/workspace.json"
+    ],
+    "outlook-api": [
+      "mock_data/outlook-api/contacts.csv",
+      "mock_data/outlook-api/events.csv",
+      "mock_data/outlook-api/messages.csv"
+    ],
+    "slack-api": [
+      "mock_data/slack-api/channel_members.csv",
+      "mock_data/slack-api/channels.csv",
+      "mock_data/slack-api/messages.csv",
+      "mock_data/slack-api/team.json",
+      "mock_data/slack-api/users.csv"
+    ],
+    "twilio-api": [
+      "mock_data/twilio-api/account.json",
+      "mock_data/twilio-api/calls.csv",
+      "mock_data/twilio-api/messages.csv",
+      "mock_data/twilio-api/phone_numbers.csv"
+    ],
+    "whatsapp-api": [
+      "mock_data/whatsapp-api/business.json",
+      "mock_data/whatsapp-api/contacts.csv",
+      "mock_data/whatsapp-api/conversations.csv",
+      "mock_data/whatsapp-api/messages.csv",
+      "mock_data/whatsapp-api/templates.csv"
+    ]
+  },
+  "files_flat": [
+    "mock_data/airtable-api/bases.csv",
+    "mock_data/airtable-api/fields.csv",
+    "mock_data/airtable-api/records_contacts.csv",
+    "mock_data/airtable-api/tables.csv",
+    "mock_data/box-api/files.csv",
+    "mock_data/box-api/folders.csv",
+    "mock_data/box-api/users.csv",
+    "mock_data/confluence-api/comments.csv",
+    "mock_data/confluence-api/labels.csv",
+    "mock_data/confluence-api/pages.csv",
+    "mock_data/confluence-api/spaces.csv",
+    "mock_data/gmail-api/drafts.csv",
+    "mock_data/gmail-api/labels.csv",
+    "mock_data/gmail-api/messages.csv",
+    "mock_data/gmail-api/profile.json",
+    "mock_data/google-calendar-api/calendars.csv",
+    "mock_data/google-calendar-api/event_attendees.csv",
+    "mock_data/google-calendar-api/events.csv",
+    "mock_data/notion-api/blocks.csv",
+    "mock_data/notion-api/comments.csv",
+    "mock_data/notion-api/databases.csv",
+    "mock_data/notion-api/page_properties.csv",
+    "mock_data/notion-api/pages.csv",
+    "mock_data/notion-api/users.csv",
+    "mock_data/notion-api/workspace.json",
+    "mock_data/outlook-api/contacts.csv",
+    "mock_data/outlook-api/events.csv",
+    "mock_data/outlook-api/messages.csv",
+    "mock_data/slack-api/channel_members.csv",
+    "mock_data/slack-api/channels.csv",
+    "mock_data/slack-api/messages.csv",
+    "mock_data/slack-api/team.json",
+    "mock_data/slack-api/users.csv",
+    "mock_data/twilio-api/account.json",
+    "mock_data/twilio-api/calls.csv",
+    "mock_data/twilio-api/messages.csv",
+    "mock_data/twilio-api/phone_numbers.csv",
+    "mock_data/whatsapp-api/business.json",
+    "mock_data/whatsapp-api/contacts.csv",
+    "mock_data/whatsapp-api/conversations.csv",
+    "mock_data/whatsapp-api/messages.csv",
+    "mock_data/whatsapp-api/templates.csv"
+  ]
+}

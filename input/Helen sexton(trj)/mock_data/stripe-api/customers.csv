@@ -1,0 +1,6 @@
+id,name,email,description,currency,delinquent,balance,created,phone
+cus_culture_desk,The Culture Desk,ap@theculturedesk.fm,"Weekly Wed-record podcast — $1,800/ep",usd,false,0,1737000000,+1 (347) 555-9001
+cus_builders_block,Builder's Block (Noah Park),ap@buildersblock.show,"Full $1,800/ep + edit-only $650/ep mix",usd,false,0,1739500000,+1 (415) 555-9002
+cus_weatherfront,WeatherFront Media,billing@weatherfront.fm,"Monthly retainer — $2,200/ep",usd,false,0,1742500000,+1 (212) 555-9003
+cus_member_pilot_1,Kevin Atkins,kevin.atkins@atkinsadvisory.com,Lost Frames pilot subscriber (mentor),usd,false,0,1750800000,
+cus_member_pilot_2,Taylor Jacobs,taylor.jacobs@taylorjacobsdesign.com,Lost Frames pilot subscriber (cover-art designer),usd,false,0,1750800000,

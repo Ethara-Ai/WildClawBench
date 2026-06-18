@@ -1,0 +1,6 @@
+id,employeeId,type,status,start,end,amount,unit,notes,created
+tor_001,1004,Personal,approved,2026-10-24,2026-10-24,1,days,"CBRA Madras race day — confirmed with Dr. Whitfield, Lina covering Sat PM",2026-10-08T18:24:00-07:00
+tor_002,1002,Vacation,approved,2026-10-21,2026-10-23,3,days,Family wedding in Boise,2026-08-14T11:02:00-07:00
+tor_003,1001,CE-Conference,approved,2026-11-04,2026-11-06,3,days,WVC equine seminar — Reno,2026-07-30T09:15:00-07:00
+tor_004,1004,Vacation,pending,2026-11-26,2026-11-27,2,days,Thanksgiving at family ranch in Bend,2026-10-19T19:40:00-07:00
+tor_005,1005,On-Call Comp,approved,2026-10-26,2026-10-26,1,days,Comp day for covering 10/24 Sat PM on-call,2026-10-22T15:50:00-07:00

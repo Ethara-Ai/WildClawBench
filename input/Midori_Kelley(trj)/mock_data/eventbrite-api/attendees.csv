@@ -1,0 +1,5 @@
+id,event_id,ticket_class_id,name,email,status,checked_in,created
+att_MK_2026_047,evt_cbra_madras_2026,tc_madras_open4d,Midori Kelley,midori.kelley@voissync.ai,attending,False,2026-10-12T17:42:00Z
+att_TR_2026_038,evt_cbra_madras_2026,tc_madras_open4d,Tara Redhawk,tara.redhawk@gmail.com,attending,False,2026-10-10T20:14:00Z
+att_MK_2026_044,evt_cbra_pendleton_2026,tc_pendleton_open4d,Midori Kelley,midori.kelley@voissync.ai,checked_in,True,2026-09-04T18:00:00Z
+att_MK_2026_039,evt_cbra_burns_2026,tc_burns_open4d,Midori Kelley,midori.kelley@voissync.ai,checked_in,True,2026-08-05T18:00:00Z

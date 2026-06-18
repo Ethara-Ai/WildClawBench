@@ -1,0 +1,20 @@
+{
+  "item": {
+    "item_id": "ITEM_HELEN_GREENLINE",
+    "institution_id": "ins_greenline",
+    "webhook": "https://example.com/plaid/webhook",
+    "available_products": ["transactions", "auth", "identity"],
+    "billed_products": ["transactions", "auth"],
+    "consent_expiration_time": "2027-06-30T00:00:00Z",
+    "update_type": "background"
+  },
+  "institution": {
+    "institution_id": "ins_greenline",
+    "name": "Greenline Digital Bank",
+    "products": ["transactions", "auth", "balance", "identity"],
+    "country_codes": ["US"],
+    "url": "https://www.greenline.example.com",
+    "primary_color": "#2f7a3a",
+    "routing_numbers": ["026073150"]
+  }
+}

@@ -1,0 +1,6 @@
+id,name,path_lower,path_display,is_folder,size,client_modified,rev
+id:Df_a,college_2014,/college_2014,/college_2014,true,0,2019-06-12T14:32:00Z,
+id:Df_b,family,/family,/family,true,0,2017-09-21T00:00:00Z,
+id:Df1,film_school_thesis.pdf,/college_2014/film_school_thesis.pdf,/college_2014/film_school_thesis.pdf,false,2843921,2019-06-12T14:11:00Z,0123456789abcdef
+id:Df2,short_film_export_v3.mov,/college_2014/short_film_export_v3.mov,/college_2014/short_film_export_v3.mov,false,841823922,2019-06-12T14:32:00Z,123456789abcdef0
+id:Df3,wedding_photos_2017,/family/wedding_photos_2017,/family/wedding_photos_2017,true,0,2017-09-21T00:00:00Z,

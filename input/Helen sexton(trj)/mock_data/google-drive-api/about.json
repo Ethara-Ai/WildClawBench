@@ -1,0 +1,14 @@
+{
+  "user": {
+    "displayName": "Helen Sexton",
+    "emailAddress": "helen.sexton@Finthesiss.ai",
+    "permissionId": "perm-helen-sexton"
+  },
+  "storageQuota": {
+    "limit": "16106127360",
+    "usage": "3221225472",
+    "usageInDrive": "3140000000",
+    "usageInDriveTrash": "8200000"
+  },
+  "maxUploadSize": "5368709120"
+}

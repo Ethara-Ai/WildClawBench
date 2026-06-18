@@ -1,0 +1,40 @@
+id,thread_id,from_addr,to_addr,cc_addr,subject,snippet,body,date,internal_date,size_estimate,labels,is_unread,is_starred
+m_hnd_sept_01,t_hnd_sept,Mike Henderson <mike.henderson@hendersonranch.com>,midori.kelley@voissync.ai,,Booster bolus for the herd — Q4,Hey Midori — heads up the 47 head are due for their IBR/BVD booster end of October...,"Hey Midori,
+
+Heads up the 47 head are due for their IBR/BVD booster end of October. Want to keep them on the same schedule as last fall. Let me know once Zoetis confirms the inbound date and we'll set the chute crew.
+
+— Mike
+Henderson Ranch
+(541) 555-2963","Mon, 14 Sep 2026 09:12:04 -0700",1757865124000,4218,INBOX;Label_clinic,False,True
+m_hnd_sept_02,t_hnd_sept,Midori Kelley <midori.kelley@voissync.ai>,mike.henderson@hendersonranch.com,Karen Whitfield <karen.whitfield@gmail.com>,Re: Booster bolus for the herd — Q4,"Got it Mike. Pricing Zoetis at $14.20/bolus, 47 head = $667.40. 50% deposit going out today...","Got it Mike. Pricing Zoetis at $14.20/bolus, 47 head = $667.40. 50% deposit going out today, balance on delivery. Will confirm the inbound date once their distributor portal updates.
+
+Midori","Mon, 14 Sep 2026 10:48:19 -0700",1757870899000,2891,SENT;Label_clinic,False,False
+m_zoetis_po_ack,t_zoetis_po,Zoetis Orders <orders@zoetis.com>,midori.kelley@voissync.ai,,PO HND-2026-Q4 received — 50% deposit confirmed,Your purchase order HND-2026-Q4 has been received. Deposit of $333.70 confirmed via ACH...,"Your purchase order HND-2026-Q4 has been received.
+
+Deposit of $333.70 confirmed via ACH on 2026-09-22. Balance $333.70 due on delivery.
+
+Line: IBR/BVD Booster Bolus x 47 @ $14.20 = $667.40
+Expected delivery: Tuesday, October 27, 2026
+FedEx tracking: FX-HND-2026-Q4
+
+— Zoetis Animal Health","Tue, 22 Sep 2026 14:22:01 -0700",1758576121000,3911,INBOX;Label_vendors,False,True
+m_whitfield_oncall,t_oncall,Karen Whitfield <karen.whitfield@gmail.com>,midori.kelley@voissync.ai,Rimrock Front Desk <frontdesk@rimrockvalleyvet.com>,On-call rota Fri PM / Sat AM,Midori — you're on the Friday afternoon and Saturday morning rota. Lina's covering Sat afternoon...,"Midori — you're on the Friday afternoon (Oct 23) and Saturday morning (Oct 24) on-call rota. Lina's covering Sat afternoon so you can leave for Madras after the morning shift. Keep the truck on call radio till 11am.
+
+— Dr. K","Mon, 19 Oct 2026 17:08:44 -0700",1761091724000,2418,INBOX;Label_clinic,True,False
+m_carol_holiday,t_carol_holiday,Carol Bishop <carol.bishop@rimrockvalleyvet.com>,midori.kelley@voissync.ai,,Holiday card list — quick question about your brother,Midori — putting together the staff holiday card list and saw Kenji on your emergency contact form...,"Midori — putting together the staff holiday card list and saw Kenji on your emergency contact form. What's his current mailing address? I want to send him a card from all of us.
+
+— Carol
+Rimrock Valley front desk","Wed, 21 Oct 2026 11:14:08 -0700",1761264848000,1932,INBOX;Label_clinic,True,False
+m_jake_farrier,t_jake,Jake Sorensen <jake.sorensen.farrier@gmail.com>,midori.kelley@voissync.ai,,Re: Hikari + Sage — Oct 30,"Confirmed for Friday Oct 30, 10am at your property. Bringing the rasps and the new front shoes for Hikari.","Confirmed for Friday Oct 30, 10am at your property. Bringing the rasps and the new front shoes for Hikari. Cash or Venmo as usual.
+
+— Jake
+(541) 555-8164","Sat, 17 Oct 2026 08:33:11 -0700",1760715191000,1611,INBOX;Label_personal,False,False
+m_cbra_entry_ack,t_cbra,CBRA-PNW Events <events@cbra-pnw.org>,midori.kelley@voissync.ai,,"Entry confirmed: MK-2026-047 — Madras Sage Rodeo, Oct 24","Your entry MK-2026-047 is confirmed for the Madras Sage Rodeo, Open 4D, Saturday October 24 2026.","Your entry MK-2026-047 is confirmed for the Madras Sage Rodeo, Open 4D, Saturday October 24 2026.
+Venue: Madras Sage Rodeo Grounds, 1280 SE Fairgrounds Loop, Madras OR 97741.
+Body check-in: 09:00 AM Pacific (see attached PDF for any addenda).
+
+— D. Munro, Events Coordinator
+CBRA-PNW","Thu, 15 Oct 2026 13:01:50 -0700",1760562110000,2877,INBOX;Label_rodeo,False,True
+m_tara_convoy,t_tara,Tara Redhawk <tara.redhawk@gmail.com>,midori.kelley@voissync.ai,,Convoy plan for Madras,"Hey M — thinking we leave Tumalo 6am Saturday, breakfast at the Madras Country Cafe, then load-in by 8:30...","Hey M — thinking we leave Tumalo 6am Saturday, breakfast at the Madras Country Cafe, then load-in by 8:30. Want me to swing past your place or meet at the truck stop on 97?
+
+— T","Tue, 20 Oct 2026 19:42:55 -0700",1761014575000,1782,INBOX;Label_rodeo,True,False

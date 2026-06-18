@@ -1,0 +1,5 @@
+city_id,weather_id,weather_main,weather_description,weather_icon,temp,feels_like,temp_min,temp_max,pressure,humidity,wind_speed,wind_deg,clouds,visibility,dt
+5734711,800,Clear,clear sky,01d,4.2,1.8,2.4,7.0,1024,64,3.1,280,5,16093,1761149400
+5734712,801,Clouds,few clouds,02d,5.8,3.6,3.2,8.4,1023,62,2.8,290,18,16093,1761149400
+5734713,800,Clear,clear sky,01d,5.1,2.9,2.8,7.9,1024,63,2.9,285,8,16093,1761149400
+5734714,801,Clouds,few clouds,02d,6.4,4.2,3.8,9.0,1023,60,2.6,295,22,16093,1761149400

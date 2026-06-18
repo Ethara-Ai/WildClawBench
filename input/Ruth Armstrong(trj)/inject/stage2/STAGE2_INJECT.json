@@ -1,0 +1,57 @@
+{
+  "stage": "stage2",
+  "description": "Fires between Day 2 close (after Turn 11) and Day 3 open (Turn 12). One silent stakeholder-position shift that the final verification sweep (Turn 14) must surface.",
+  "mutations": [
+    {
+      "mutation_id": "stage2.notion.ouellet_walkback",
+      "service": "notion-api",
+      "method": "PATCH",
+      "url": "{NOTION_API_URL}/v1/pages/ouellet_position_note",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "properties": {
+          "position": "neutral-pending-final-round",
+          "prior": "cautious-supportive",
+          "note": "Ouellet office walked back the earlier comment; wants to see final-round feedback before any on-record line.",
+          "as_of": "2026-10-15"
+        }
+      },
+      "admin": {
+        "op": "doc_set",
+        "document": "properties",
+        "path": [
+          "ouellet_position_note",
+          "position",
+          "value"
+        ],
+        "value": "neutral-pending-final-round"
+      },
+      "expected_status": 200,
+      "trap_family": "F1",
+      "silent": true,
+      "fires_after_turn": 12
+    },
+    {
+      "mutation_id": "stage2.twilio.reminder_log",
+      "service": "twilio-api",
+      "method": "POST",
+      "url": "{TWILIO_API_URL}/2010-04-01/Accounts/AC/Messages",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "campaign": "consultation_reminder",
+        "sent": 210,
+        "delivered": 204,
+        "failed": 6,
+        "as_of": "2026-10-15T06:00:00-04:00"
+      },
+      "expected_status": 201,
+      "trap_family": "F2",
+      "silent": false,
+      "fires_after_turn": 12
+    }
+  ]
+}

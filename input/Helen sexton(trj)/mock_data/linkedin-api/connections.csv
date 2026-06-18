@@ -1,0 +1,9 @@
+id,firstName,lastName,headline,location,industry,connectedAt,organizationId
+LI_TAYLOR,Taylor,Jacobs,Cover-art designer & music producer • Founder at Taylor Jacobs Design,"Brooklyn, NY",Design,2024-09-15T00:00:00Z,ORG_TAYLOR_JACOBS_DESIGN
+LI_KEVIN,Kevin,Atkins,Mentor & sponsor-deck reviewer • Founder at Atkins Advisory,"Manhattan, NY",Management Consulting,2023-11-02T00:00:00Z,ORG_ATKINS_ADVISORY
+LI_MARK_HOLLAND,Mark,Holland,VP Brand Partnerships at LegacyLens Cameras,"Portland, OR",Consumer Electronics,2026-05-15T00:00:00Z,ORG_LEGACYLENS
+LI_SARAH_KIM,Sarah,Kim,"Director, Sponsor Marketing at Crescent Pictures","Los Angeles, CA",Film & Streaming,2026-06-18T00:00:00Z,ORG_CRESCENT
+LI_RYAN_FELD,Ryan,Feld,"Director, Branded Partnerships at Apex Media","Brooklyn, NY",Media & Branded Content,2026-06-12T00:00:00Z,ORG_APEX
+LI_JESSICA,Jessica,Oakes,"Host & EP, The Culture Desk","Brooklyn, NY",Online Audio & Video Media,2025-01-08T00:00:00Z,ORG_CULTURE_DESK
+LI_NOAH,Noah,Park,"Founder, Builder's Block","San Francisco, CA",Online Audio & Video Media,2025-02-04T00:00:00Z,ORG_BUILDERS_BLOCK
+LI_RACHEL,Rachel,Vance,Sound designer & mix engineer • Owner at Vance Sound Studio,"Brooklyn, NY",Music,2025-05-22T00:00:00Z,ORG_VANCE_SOUND

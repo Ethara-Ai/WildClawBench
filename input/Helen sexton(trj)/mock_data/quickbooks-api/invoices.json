@@ -1,0 +1,122 @@
+[
+  {
+    "Id": "5001",
+    "DocNumber": "LF-INV-2026-0601",
+    "TxnDate": "2026-06-15",
+    "DueDate": "2026-06-25",
+    "CustomerRef": {
+      "value": "C_CULTURE_DESK",
+      "name": "The Culture Desk"
+    },
+    "Line": [
+      {
+        "Amount": 1800.0,
+        "Description": "Culture Desk EP38 — full production",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Podcast Production"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 1800.0,
+    "Balance": 0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "5002",
+    "DocNumber": "LF-INV-2026-0602",
+    "TxnDate": "2026-06-18",
+    "DueDate": "2026-06-28",
+    "CustomerRef": {
+      "value": "C_BUILDERS_BLOCK",
+      "name": "Builder's Block"
+    },
+    "Line": [
+      {
+        "Amount": 650.0,
+        "Description": "Builder's Block EP12 — edit-only",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Podcast Editing"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 650.0,
+    "Balance": 0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "5003",
+    "DocNumber": "LF-INV-2026-0603",
+    "TxnDate": "2026-06-22",
+    "DueDate": "2026-07-02",
+    "CustomerRef": {
+      "value": "C_BUILDERS_BLOCK",
+      "name": "Builder's Block"
+    },
+    "Line": [
+      {
+        "Amount": 1800.0,
+        "Description": "Builder's Block EP13 — full production",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Podcast Production"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 1800.0,
+    "Balance": 0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "5004",
+    "DocNumber": "LF-INV-2026-0604",
+    "TxnDate": "2026-06-05",
+    "DueDate": "2026-06-15",
+    "CustomerRef": {
+      "value": "C_WEATHERFRONT",
+      "name": "WeatherFront Media"
+    },
+    "Line": [
+      {
+        "Amount": 2200.0,
+        "Description": "WeatherFront monthly retainer — June 2026",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Retainer"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 2200.0,
+    "Balance": 0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "5005",
+    "DocNumber": "LF-INV-2026-0605",
+    "TxnDate": "2026-06-29",
+    "DueDate": "2026-07-13",
+    "CustomerRef": {
+      "value": "C_CULTURE_DESK",
+      "name": "The Culture Desk"
+    },
+    "Line": [
+      {
+        "Amount": 1800.0,
+        "Description": "Culture Desk EP39 — full production",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Podcast Production"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 1800.0,
+    "Balance": 1800.0,
+    "Status": "Open"
+  }
+]

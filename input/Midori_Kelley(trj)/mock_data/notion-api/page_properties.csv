@@ -1,0 +1,6 @@
+page_id,property_name,property_type,value
+pg_p_gre_week5,status,select,in progress
+pg_p_gre_week5,target_score,number,165
+pg_p_book_adler,status,select,on hold
+pg_p_rec_tonkatsu,meal,select,dinner
+pg_p_rec_tonkatsu,protein,select,pork

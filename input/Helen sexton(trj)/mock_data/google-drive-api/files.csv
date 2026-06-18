@@ -1,0 +1,19 @@
+id,name,mime_type,parent_id,size,created_time,modified_time,owner_email,starred,trashed,web_view_link
+fld_lost_frames,Lost Frames,application/vnd.google-apps.folder,fld_root_helen,,2026-04-12T10:00:00Z,2026-06-29T11:00:00Z,helen.sexton@Finthesiss.ai,True,False,https://drive.google.com/drive/folders/fld_lost_frames
+fld_clients,Clients,application/vnd.google-apps.folder,fld_root_helen,,2026-01-15T10:00:00Z,2026-06-28T17:00:00Z,helen.sexton@Finthesiss.ai,False,False,https://drive.google.com/drive/folders/fld_clients
+fld_personal,Personal,application/vnd.google-apps.folder,fld_root_helen,,2026-01-08T10:00:00Z,2026-06-15T12:00:00Z,helen.sexton@Finthesiss.ai,False,False,https://drive.google.com/drive/folders/fld_personal
+fld_lf_ep1,EP1 — In the Mood for Love,application/vnd.google-apps.folder,fld_lost_frames,,2026-05-02T11:00:00Z,2026-06-29T11:00:00Z,helen.sexton@Finthesiss.ai,False,False,https://drive.google.com/drive/folders/fld_lf_ep1
+fld_lf_ep1_audio,audio_final,application/vnd.google-apps.folder,fld_lf_ep1,,2026-06-27T15:00:00Z,2026-06-27T15:48:00Z,helen.sexton@Finthesiss.ai,False,False,https://drive.google.com/drive/folders/fld_lf_ep1_audio
+fld_lf_ep1_cover,cover_art,application/vnd.google-apps.folder,fld_lf_ep1,,2026-05-02T11:00:00Z,2026-06-24T20:14:00Z,helen.sexton@Finthesiss.ai,False,False,https://drive.google.com/drive/folders/fld_lf_ep1_cover
+fld_lf_sponsors,Sponsors,application/vnd.google-apps.folder,fld_lost_frames,,2026-05-15T10:00:00Z,2026-06-22T14:30:00Z,helen.sexton@Finthesiss.ai,False,False,https://drive.google.com/drive/folders/fld_lf_sponsors
+fld_lf_brand,Brand,application/vnd.google-apps.folder,fld_lost_frames,,2026-04-18T10:00:00Z,2026-05-30T16:00:00Z,helen.sexton@Finthesiss.ai,False,False,https://drive.google.com/drive/folders/fld_lf_brand
+f_sponsor_deck_v3,lost_frames_s1_sponsor_deck_v3.pdf,application/pdf,fld_lf_sponsors,2380441,2026-06-18T11:00:00Z,2026-06-21T17:30:00Z,helen.sexton@Finthesiss.ai,True,False,https://drive.google.com/file/d/f_sponsor_deck_v3/view
+f_brand_guide,lost_frames_brand_guide.pdf,application/pdf,fld_lf_brand,1120884,2026-04-20T14:00:00Z,2026-05-30T16:00:00Z,helen.sexton@Finthesiss.ai,False,False,https://drive.google.com/file/d/f_brand_guide/view
+f_cover_art_v3,lost_frames_cover_art_v3.png,image/png,fld_lf_ep1_cover,1840221,2026-06-24T20:14:00Z,2026-06-24T20:14:00Z,helen.sexton@Finthesiss.ai,True,False,https://drive.google.com/file/d/f_cover_art_v3/view
+f_irs_rate_sheet,irs_quarterly_late_payment_rate_sheet.txt,text/plain,fld_personal,844,2026-04-10T09:00:00Z,2026-04-10T09:00:00Z,helen.sexton@Finthesiss.ai,False,False,https://drive.google.com/file/d/f_irs_rate_sheet/view
+f_ep1_stems_wav,ep1_final_mix.wav,audio/wav,fld_lf_ep1_audio,84211000,2026-06-27T15:48:00Z,2026-06-27T15:48:00Z,helen.sexton@Finthesiss.ai,False,False,https://drive.google.com/file/d/f_ep1_stems_wav/view
+f_ep1_stems_mp3,ep1_final_mix.mp3,audio/mpeg,fld_lf_ep1_audio,9120441,2026-06-27T15:48:00Z,2026-06-27T15:48:00Z,helen.sexton@Finthesiss.ai,False,False,https://drive.google.com/file/d/f_ep1_stems_mp3/view
+f_tax_2025_return,sexton_2025_tax_return_filed.pdf,application/pdf,fld_personal,612888,2026-04-08T11:00:00Z,2026-04-08T11:00:00Z,helen.sexton@Finthesiss.ai,False,False,https://drive.google.com/file/d/f_tax_2025_return/view
+fld_client_culture_desk,The Culture Desk,application/vnd.google-apps.folder,fld_clients,,2026-01-15T10:00:00Z,2026-06-28T17:00:00Z,helen.sexton@Finthesiss.ai,False,False,
+fld_client_builders_block,Builder's Block,application/vnd.google-apps.folder,fld_clients,,2026-02-04T10:00:00Z,2026-06-28T17:00:00Z,helen.sexton@Finthesiss.ai,False,False,
+fld_client_weatherfront,WeatherFront,application/vnd.google-apps.folder,fld_clients,,2026-03-12T10:00:00Z,2026-06-25T17:00:00Z,helen.sexton@Finthesiss.ai,False,False,

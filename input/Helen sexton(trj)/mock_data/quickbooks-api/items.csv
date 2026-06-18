@@ -1,0 +1,4 @@
+Id,Name,Description,Type,UnitPrice,IncomeAccountRef_value,IncomeAccountRef_name,Active,Taxable
+1,Podcast Production — Full Episode,"Full per-episode production: script review, record, edit, mix, deliver.",Service,1800.00,3,Freelance Income — Production,True,False
+2,Podcast Production — Edit-Only,Edit-only engagement.,Service,650.00,3,Freelance Income — Production,True,False
+3,Podcast Production — Retainer Episode,Monthly retainer-billed full production episode.,Service,2200.00,3,Freelance Income — Production,True,False

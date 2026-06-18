@@ -1,0 +1,16 @@
+[
+  {
+    "Id": "5201",
+    "TxnDate": "2026-06-10",
+    "TotalAmt": 54.99,
+    "Line": [
+      {
+        "Description": "Adobe Creative Cloud — Monthly subscription",
+        "Amount": 54.99
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-06-10T09:00:00"
+    }
+  }
+]

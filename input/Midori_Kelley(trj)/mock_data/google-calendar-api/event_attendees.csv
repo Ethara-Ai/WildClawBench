@@ -1,0 +1,16 @@
+event_id,email,display_name,response_status,optional,organizer
+ev_cbra_madras,midori.kelley@voissync.ai,Midori Kelley,accepted,False,False
+ev_cbra_madras,tara.redhawk@gmail.com,Tara Redhawk,accepted,False,False
+ev_cbra_madras,events@cbra-pnw.org,CBRA-PNW Events,accepted,False,True
+ev_farrier_oct30,midori.kelley@voissync.ai,Midori Kelley,accepted,False,True
+ev_farrier_oct30,jake.sorensen.farrier@gmail.com,Jake Sorensen,accepted,False,False
+ev_zoetis_inbound,midori.kelley@voissync.ai,Midori Kelley,accepted,False,True
+ev_zoetis_inbound,karen.whitfield@gmail.com,Dr. Karen Whitfield,accepted,True,False
+ev_kenji_visit_nov,midori.kelley@voissync.ai,Midori Kelley,accepted,False,True
+ev_oncall_fri_pm,midori.kelley@voissync.ai,Midori Kelley,accepted,False,False
+ev_oncall_fri_pm,karen.whitfield@gmail.com,Dr. Karen Whitfield,accepted,False,True
+ev_oncall_sat_am,midori.kelley@voissync.ai,Midori Kelley,accepted,False,False
+ev_oncall_sat_am,lina.alvarez@rimrockvalleyvet.com,Lina Alvarez (covering Sat PM),accepted,False,False
+ev_obaa_appt_followup,sachiko.kelley@gmail.com,Sachiko Kelley,accepted,False,True
+ev_thanksgiving,sachiko.kelley@gmail.com,Sachiko Kelley,accepted,False,True
+ev_thanksgiving,midori.kelley@voissync.ai,Midori Kelley,accepted,False,False

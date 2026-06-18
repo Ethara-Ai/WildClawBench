@@ -1,0 +1,10 @@
+id,name,real_name,email,is_admin,is_bot,tz,status_text,presence
+U_MIDORI_K,midori,Midori Kelley,midori.kelley@voissync.ai,False,False,America/Los_Angeles,Madras race Sat — on-call Sat AM,active
+U_WHITFIELD_K,drwhitfield,Dr. Karen Whitfield,karen.whitfield@gmail.com,True,False,America/Los_Angeles,,active
+U_LINA_A,lina,Lina Alvarez,lina.alvarez@rimrockvalleyvet.com,False,False,America/Los_Angeles,Covering Sat PM for Midori,active
+U_CAROL_B,carol,Carol Bishop,carol.bishop@rimrockvalleyvet.com,False,False,America/Los_Angeles,Front desk,active
+U_DR_PATEL,drpatel,Dr. Anjali Patel,anjali.patel@rimrockvalleyvet.com,False,False,America/Los_Angeles,,away
+U_DR_MARSH,drmarsh,Dr. Tom Marshfield,tom.marshfield@rimrockvalleyvet.com,False,False,America/Los_Angeles,On equine surgery this AM,active
+U_TECH_BREE,bree,Bree Halvorsen,bree.halvorsen@rimrockvalleyvet.com,False,False,America/Los_Angeles,,active
+U_TECH_DANNY,danny,Danny Reyes,danny.reyes@rimrockvalleyvet.com,False,False,America/Los_Angeles,,active
+U_VENDORBOT,vendorbot,VendorBot,,False,True,America/Los_Angeles,,active

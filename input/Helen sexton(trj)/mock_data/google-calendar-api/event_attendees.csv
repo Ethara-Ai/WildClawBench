@@ -1,0 +1,6 @@
+event_id,email,display_name,response_status,optional,organizer
+evt_anchor_p1_premiere,taylor.jacobs@taylorjacobsdesign.com,Taylor Jacobs,accepted,False,False
+evt_anchor_p1_premiere,rachel.vance@vancesound.studio,Rachel Vance,accepted,False,False
+evt_anchor_p1_premiere,kevin.atkins@atkinsadvisory.com,Kevin Atkins,accepted,False,False
+evt_anchor_p1_premiere,catherine.sexton@gmail.com,Catherine Sexton,tentative,True,False
+evt_recur_culture_prep,jessica.oakes@theculturedesk.fm,Jessica Oakes,accepted,False,False

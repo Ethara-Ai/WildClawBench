@@ -1,0 +1,6 @@
+Id,Name,AccountType,AccountSubType,CurrentBalance,Active,Classification,Description
+1,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+3,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+4,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+5,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,

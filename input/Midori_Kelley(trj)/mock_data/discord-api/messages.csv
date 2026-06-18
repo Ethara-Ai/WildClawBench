@@ -1,0 +1,6 @@
+id,channel_id,author_id,author_username,content,timestamp,pinned
+M_DSC_TARA_TRAVEL_01,CH_CBRA_TRAVEL,U_TARA_REDHAWK,tara.redhawk,Anyone hauling Tumalo -> Madras early Sat? @midori.kelley I'm leaving 6am from my place if you want to convoy,2026-10-19T22:14:00Z,False
+M_DSC_MK_TRAVEL_01,CH_CBRA_TRAVEL,9871224400110055,midori.kelley,Yes please. Hikari + Sundowner 2H. I'll text you on personal. Meeting at Madras Cafe for biscuits before load-in.,2026-10-19T22:31:00Z,False
+M_DSC_MOD_MADRAS_01,CH_CBRA_MADRAS_FINAL,U_CBRA_MOD_001,cbra.dmunro,ADDENDUM 2026-10-22: gate-in moved to 09:30 AM Pacific (was 09:00). Body of confirmation PDFs is OUT OF DATE - 09:30 SUPERSEDES 09:00. Please update your printouts.,2026-10-22T15:02:00Z,True
+M_DSC_MK_MADRAS_01,CH_CBRA_MADRAS_FINAL,9871224400110055,midori.kelley,Confirmed - updated my checklist. Hauling with @tara.redhawk,2026-10-22T16:18:00Z,False
+M_DSC_VET_BVD_01,CH_VET_BOVINE_BOOSTERS,U_VET_MOD_001,drchen.equine,Reminder: vendor lead times for Zoetis fall boosters are running 5+ weeks on the IBR/BVD bolus SKU. Plan your Q4 orders accordingly. De-identified discussion only.,2026-09-04T17:40:00Z,True

@@ -1,0 +1,3 @@
+name,language,category,status,body_text,header_text
+rimrock_appt_reminder,en_US,UTILITY,APPROVED,"Hi {{1}}, this is Rimrock Valley Veterinary Clinic confirming your appointment on {{2}} at {{3}}. Reply YES to confirm or call (541) 555-6290.",Appointment reminder
+rimrock_vendor_eta_update,en_US,UTILITY,APPROVED,"Hi {{1}}, your order {{2}} updated ETA: {{3}}. Reply with questions.",Vendor ETA update

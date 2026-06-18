@@ -1,0 +1,16 @@
+[
+  {
+    "Id": "5001",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  }
+]

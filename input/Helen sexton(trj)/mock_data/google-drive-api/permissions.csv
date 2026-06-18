@@ -1,0 +1,5 @@
+id,file_id,type,role,email,display_name
+perm_taylor_cover,fld_lf_ep1_cover,user,writer,taylor.jacobs@taylorjacobsdesign.com,Taylor Jacobs
+perm_taylor_brand,fld_lf_brand,user,writer,taylor.jacobs@taylorjacobsdesign.com,Taylor Jacobs
+perm_rachel_audio,fld_lf_ep1_audio,user,writer,rachel.vance@vancesound.studio,Rachel Vance
+perm_kevin_deck,f_sponsor_deck_v3,user,commenter,kevin.atkins@atkinsadvisory.com,Kevin Atkins

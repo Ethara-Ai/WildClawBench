@@ -1,0 +1,9 @@
+id,guild_id,name,type,position,topic,nsfw
+CH_CBRA_GENERAL,G_CBRA_RIDERS_001,general,0,0,Community chat - all riders welcome,False
+CH_CBRA_RESULTS,G_CBRA_RIDERS_001,results-and-times,0,1,Post your race times here! Format: event / division / time / placement,False
+CH_CBRA_TRAVEL,G_CBRA_RIDERS_001,convoy-and-travel,0,2,"Coordinate hauls, find convoy partners, share fuel stops",False
+CH_CBRA_GEAR,G_CBRA_RIDERS_001,gear-and-tack,0,3,"Pads, boots, bits, saddle pads. No vendor spam.",False
+CH_CBRA_VET_TIPS,G_CBRA_RIDERS_001,vet-and-hoof-tips,0,4,General advice only. NO specific client/horse names from your work. NO veterinary diagnosis.,False
+CH_CBRA_MADRAS_FINAL,G_CBRA_RIDERS_001,madras-final-2026,0,5,Sat Oct 24 2026 - Madras Sage Rodeo Grounds. Gate-in 9:30 per addendum.,False
+CH_VET_GENERAL,G_HORSE_HEALTH_NW,general,0,0,NW Equine Vet Tech Forum - professional only,False
+CH_VET_BOVINE_BOOSTERS,G_HORSE_HEALTH_NW,bovine-boosters,0,1,"IBR/BVD, lepto, BRD protocols. De-identified cases ONLY.",False

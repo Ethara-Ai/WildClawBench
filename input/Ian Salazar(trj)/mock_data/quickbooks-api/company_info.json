@@ -1,0 +1,28 @@
+{
+  "CompanyName": "Salazar Leathercraft",
+  "LegalName": "Ian Salazar, sole proprietor",
+  "CompanyAddr": {
+    "Line1": "412 Avenida de Mesilla",
+    "City": "Las Cruces",
+    "CountrySubDivisionCode": "NM",
+    "PostalCode": "88005"
+  },
+  "Email": {
+    "Address": "shop@salazarleathercraft.com"
+  },
+  "PrimaryPhone": {
+    "FreeFormNumber": "(575) 555-6219"
+  },
+  "FiscalYearStartMonth": "January",
+  "Country": "US",
+  "IndustryType": "Arts & Crafts",
+  "NameValue": [
+    { "Name": "OwnerName", "Value": "Ian Salazar" },
+    { "Name": "BusinessType", "Value": "Sole Proprietor" },
+    { "Name": "EtsyShop", "Value": "salazarleathercraft" }
+  ],
+  "MetaData": {
+    "CreateTime": "2025-01-12T19:00:00-07:00",
+    "LastUpdatedTime": "2026-10-19T07:00:00-06:00"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "id": 901442,
+  "username": "ian_salazar",
+  "firstname": "Ian",
+  "lastname": "Salazar",
+  "city": "Las Cruces",
+  "state": "NM",
+  "country": "US",
+  "sex": "M",
+  "premium": false,
+  "weight": 82.0,
+  "ftp": 210,
+  "follower_count": 18,
+  "friend_count": 22,
+  "created_at": "2024-03-15T08:00:00Z"
+}

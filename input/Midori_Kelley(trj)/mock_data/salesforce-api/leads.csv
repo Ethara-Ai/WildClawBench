@@ -1,0 +1,3 @@
+Id,FirstName,LastName,Company,Email,Phone,Status,LeadSource,Industry,Rating
+00QAx0LEAD_BLAIN01,Travis,Blain,Blain Bros Cattle Co,travis@blainbros.example,(541) 555-7720,New,Referral - Whitfield,Cattle Ranching,Warm
+00QAx0LEAD_OBRIEN01,Megan,O'Brien,O'Brien Equine Boarding,megan@obrienequine.example,(541) 555-6611,Working,CBRA referral,Equine Boarding,Hot

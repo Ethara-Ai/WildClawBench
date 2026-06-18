@@ -1,0 +1,11 @@
+message_id,conversation_id,direction,from_wa_id,to_wa_id,type,text,template_name,status,sent_at
+wm_mom_001,conv_mom,inbound,12015551001,16461230099,text,Sweetie are you free Sunday? Dad found a roast recipe ❤️,,delivered,2026-06-30T09:00:00-04:00
+wm_mom_002,conv_mom,outbound,16461230099,12015551001,text,"yes! premiere is Sat night, will train up Sunday AM",,read,2026-06-30T09:02:00-04:00
+wm_taylor_001,conv_taylor,inbound,19295552010,16461230099,text,cover art v3 LOCKED. 1:1 only on the feed. say it back,,delivered,2026-06-30T11:12:00-04:00
+wm_taylor_002,conv_taylor,outbound,16461230099,19295552010,text,1:1 square only on the feed. promise 🤝,,read,2026-06-30T11:14:00-04:00
+wm_rachel_001,conv_rachel,outbound,16461230099,17185552011,text,stems are gorgeous. paying invoice friday morning,,delivered,2026-06-29T20:30:00-04:00
+wm_kevin_001,conv_kevin,inbound,13475552020,16461230099,text,Deck v3 is sharp. Slide 7 is doing too much. Loop me before you reply to Crescent's LOI.,,delivered,2026-06-25T17:30:00-04:00
+wm_kevin_002,conv_kevin,outbound,16461230099,13475552020,text,will loop. thank you 🙏,,read,2026-06-25T17:35:00-04:00
+wm_fam_001,conv_grp_family,inbound,12015551003,16461230099,text,"saw the cover art on instagram, it's stunning hen 🥹",,delivered,2026-06-29T22:18:00-04:00
+wm_lf_001,conv_grp_lf_crew,inbound,17185552011,16461230099,text,what time call on Saturday? bringing the Tascam,,delivered,2026-06-30T11:00:00-04:00
+wm_lf_002,conv_grp_lf_crew,outbound,16461230099,17185552011,text,"6pm load-in at Cobblestone. doors 6:45, show 7. bring the Tascam, mom is coming Sun",,read,2026-06-30T11:14:00-04:00

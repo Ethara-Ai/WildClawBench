@@ -1,0 +1,14 @@
+id,page_id,parent_block_id,type,text,order,created_time,last_edited_time,has_children,checked
+b_concept_h1,p_concept_doc,,heading_1,Lost Frames — a podcast about films that almost weren't,1,2026-04-12T10:15:00Z,2026-04-12T10:15:00Z,False,
+b_concept_para1,p_concept_doc,,paragraph,A weekly limited series. Each episode unpacks a single film whose final cut diverged sharply from its original vision — the lost frames left on the cutting-room floor.,2,2026-04-12T10:16:00Z,2026-04-12T10:16:00Z,False,
+b_ep1_h1,p_ep1_outline,,heading_1,EP1 — In the Mood for Love,1,2026-05-02T11:00:00Z,2026-05-02T11:00:00Z,False,
+b_ep1_logline,p_ep1_outline,,paragraph,"Wong Kar-wai (2000). 98 minutes. The discarded longer cut, the original Maggie Cheung wardrobe, and the score that was almost half Nat King Cole and half new commission.",2,2026-05-02T11:01:00Z,2026-05-02T11:01:00Z,False,
+b_ep1_sponsor_block,p_ep1_outline,,callout,"EP1 Sponsor Read: LegacyLens Cameras — mid-roll, 15s read, code LOSTFRAMES15. Sponsor confirmed via LOI in flight.",3,2026-06-20T14:00:00Z,2026-06-22T14:30:00Z,False,
+b_ep1_runtime,p_ep1_outline,,to_do,Lock runtime: 38 min target (cold-open 2 + 3 segments + sponsor + outro),4,2026-05-02T11:05:00Z,2026-06-15T15:00:00Z,False,True
+b_ep2_h1,p_ep2_outline,,heading_1,EP2 — Chungking Express,1,2026-05-10T11:00:00Z,2026-05-10T11:00:00Z,False,
+b_ep2_para,p_ep2_outline,,paragraph,"1994. Two stories, one apartment, the most famous cover of California Dreamin' in cinema history. Cut from a 9-hour shoot in 23 days.",2,2026-05-10T11:01:00Z,2026-05-10T11:01:00Z,False,
+b_ep3_h1,p_ep3_outline,,heading_1,EP3 — 2046,1,2026-05-20T11:00:00Z,2026-05-20T11:00:00Z,False,
+b_ep3_para,p_ep3_outline,,paragraph,2004. The spiritual sequel that took five years to edit. Tony Leung's monologue had nine drafts.,2,2026-05-20T11:01:00Z,2026-05-20T11:01:00Z,False,
+b_launch_h1,p_launch_plan,,heading_1,Season 1 Launch Plan,1,2026-05-25T09:00:00Z,2026-05-25T09:00:00Z,False,
+b_launch_tier_block,p_launch_plan,,callout,"Membership tier: $5/mo recurring via Stripe. Benefits: ad-free feed, bonus footnotes episode, early cover-art reveals. Do NOT raise to $7 — tested poorly with the indie-pod circle.",2,2026-05-25T09:05:00Z,2026-06-10T11:30:00Z,False,
+b_launch_windows,p_launch_plan,,bulleted_list_item,"WordPress publish window: 08:00 ET. Mailchimp send window: 08:00 ET. Premiere 7 PM Cobblestone Cinema, Bushwick.",3,2026-05-25T09:10:00Z,2026-05-25T09:10:00Z,False,

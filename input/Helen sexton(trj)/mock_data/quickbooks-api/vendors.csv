@@ -1,0 +1,4 @@
+Id,DisplayName,CompanyName,PrimaryEmailAddr,PrimaryPhone,BillAddr_Line1,BillAddr_City,BillAddr_CountrySubDivisionCode,BillAddr_PostalCode,Balance,Active,AcctNum,Vendor1099
+1,Rachel Vance — Vance Sound,Vance Sound Studio LLC,rachel.vance@vancesound.studio,+1-718-555-2011,44 Knickerbocker Ave Apt 2,Brooklyn,NY,11237,450.00,True,ACH-2233,True
+2,Taylor Jacobs Design,Taylor Jacobs Design Co,taylor.jacobs@taylorjacobsdesign.com,+1-929-555-2010,188 Tompkins Ave,Brooklyn,NY,11216,0.00,True,ACH-2244,True
+3,Adobe,Adobe Systems Inc,billing@adobe.com,,,San Jose,CA,95110,0.00,True,CC-AUTOPAY,False

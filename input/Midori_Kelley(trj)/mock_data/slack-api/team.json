@@ -1,0 +1,9 @@
+{
+  "id": "T_RIMROCK_VALLEY",
+  "name": "Rimrock Valley Veterinary Clinic",
+  "domain": "rimrockvalley",
+  "email_domain": "rimrockvalleyvet.com",
+  "icon": {
+    "image_132": "https://avatars.example.com/team/rimrock-valley-132.png"
+  }
+}

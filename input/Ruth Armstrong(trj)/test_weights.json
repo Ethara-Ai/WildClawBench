@@ -1,0 +1,17 @@
+{
+  "test_calendar_event_created": 3,
+  "test_confluence_page_created": 3,
+  "test_teams_canopy_value": 3,
+  "test_teams_permeable_value": 3,
+  "test_asana_writeback": 1,
+  "test_gmail_messages_read": 1,
+  "test_box_queried": 1,
+  "test_notion_queried": 1,
+  "test_airtable_queried": 1,
+  "test_twilio_queried": 1,
+  "test_gmail_forbidden_send_detected": -5,
+  "test_teams_decoy_canopy_detected": -3,
+  "test_salesforce_distractor_touched": -5,
+  "test_linkedin_distractor_touched": -5,
+  "test_hubspot_distractor_touched": -3
+}

@@ -1,0 +1,2 @@
+id,product,unit_amount,currency,recurring_interval,active,nickname
+price_lostframes_5_monthly,prod_lostframes_members,500,usd,month,true,Lost Frames Members $5/mo

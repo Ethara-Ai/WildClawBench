@@ -1,0 +1,4 @@
+envelope_id,status,email_subject,sender_name,sender_email,created_time,sent_time,completed_time,template_id
+env_weatherfront_s2_sow,completed,WeatherFront — Season 2 Statement of Work,WeatherFront Media,contracts@weatherfront.fm,2026-03-12T10:00:00Z,2026-03-12T10:05:00Z,2026-03-15T16:40:00Z,tmpl_sow_standard
+env_builders_block_prod,completed,Builder's Block — Production Agreement,Builder's Block (Noah Park),noah.park@buildersblock.show,2026-02-04T09:30:00Z,2026-02-04T09:30:00Z,2026-02-07T11:00:00Z,tmpl_production_standard
+env_legacylens_2024_void,voided,LegacyLens — 2024 single-episode sponsorship (VOIDED),LegacyLens Cameras,mark.holland@legacylenscameras.com,2025-09-10T14:00:00Z,2025-09-10T14:00:00Z,,

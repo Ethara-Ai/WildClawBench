@@ -1,0 +1,4 @@
+id,summary,description,time_zone,access_role,primary,color_id
+helen.sexton@Finthesiss.ai,Helen Sexton,Primary calendar,America/New_York,owner,True,1
+lost_frames@group.calendar.google.com,Lost Frames Production,"Show prep, recording, launch",America/New_York,owner,False,9
+clients@group.calendar.google.com,Client Work,Culture Desk / Builder's Block / WeatherFront,America/New_York,owner,False,6

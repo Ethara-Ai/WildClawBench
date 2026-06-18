@@ -1,0 +1,5 @@
+account_id,name,official_name,mask,type,subtype,available,current,limit,iso_currency_code
+act_ccu_check_7732,Cascade CCU Checking,Cascade Community Credit Union - Personal Checking,7732,depository,checking,5025.56,5025.56,,USD
+act_ccu_save_4188,Cascade CCU Savings,Cascade Community Credit Union - Vacation Savings,4188,depository,savings,3812.40,3812.40,,USD
+act_visa_4421,Visa Reward,Cascade CCU Visa Reward Card,4421,credit,credit card,4081.60,-918.40,5000.00,USD
+act_ford_loan,Ford Truck Loan,Ford Motor Credit - 2019 F-250,2019,loan,auto,0.00,-12184.00,,USD

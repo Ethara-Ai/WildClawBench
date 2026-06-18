@@ -1,0 +1,45 @@
+{
+  "stage": "stage3",
+  "description": "Applied between T9 (TMDB pivot) and T10 (Q2 reckoning). One silent mutation (SM-03 IRS rate bump effective D+2, applied to the IRS rate sheet in the data folder) and the Crescent LOI v1/v2 envelope landing in DocuSign. The two LOI PDFs already ship in the data folder, so no upload mutation is needed.",
+  "fires_after_turn": 9,
+  "mutations": [
+    {
+      "id": "SM-03",
+      "service": "data-folder",
+      "trap_family": "F1",
+      "silent": true,
+      "invented": true,
+      "derived_from": "AGENTS.md: 15th of each month — Quarterly tax set-aside check; USER.md: understands freelance economics including quarterly taxes",
+      "rationale": "Federal rate updates are routine; the agent must read the fresh file value rather than memorize a number, especially while Q2 is already overdue.",
+      "description": "irs_quarterly_late_payment_rate_sheet.txt in the data folder has its current-quarter (Q2 2026) block bumped from 8.0% to 8.5%, effective D+2. The prior-quarter (Q1 2026) block remains 8.0% as a positional decoy.",
+      "filesystem": {
+        "action": "overwrite",
+        "path": "data/irs_quarterly_late_payment_rate_sheet.txt",
+        "content": "IRS QUARTERLY UNDERPAYMENT / LATE-PAYMENT INTEREST RATE SHEET\nSource: Federal short-term rate plus 3 percentage points (individual underpayments)\nPrepared for: Helen Sexton — Finthesiss freelance books\nLast reviewed: 2026-06-30\n\n----------------------------------------------------------------------\nQ1 2026 (Jan 1 – Mar 31)   [PRIOR QUARTER — for reference only]\n  Federal short-term rate plus 3 percentage points.\n  Combined annualized rate: 8.0%\n----------------------------------------------------------------------\nQ2 2026 (Apr 1 – Jun 30)   [CURRENT QUARTER]\n  Federal short-term rate plus 3 percentage points.\n  Combined annualized rate: 8.5%\n----------------------------------------------------------------------\n\nPenalty math: Q2_tax * (annualized rate) * (days_late / 365).\nAlways use the block labelled for the quarter you are computing; the prior\nquarter's block is retained only as a reference and must not be applied to\nthe current quarter.\n"
+      }
+    },
+    {
+      "id": "ST3-DOCUSIGN-01",
+      "service": "docusign-api",
+      "silent": false,
+      "description": "Crescent Pictures LOI envelope landed with v1 and v2 both attached.",
+      "http": {
+        "method": "POST",
+        "url": "{DOCUSIGN_API_URL}/restapi/v2.1/accounts/mock/envelopes",
+        "headers": {"Authorization": "Bearer mock", "Content-Type": "application/json"},
+        "body": {
+          "emailSubject": "Crescent Pictures — Lost Frames S1 LOI (v1 + v2)",
+          "documents": [
+            {"name": "crescent_pictures_loi_v1.pdf", "documentId": "1", "rate_per_episode": 3500, "episodes": 6, "social_mentions": 0, "status": "superseded"},
+            {"name": "crescent_pictures_loi_v2.pdf", "documentId": "2", "rate_per_episode": 3800, "episodes": 6, "social_mentions": 1, "status": "awaiting_countersign", "supersedes": "v1"}
+          ],
+          "recipients": [
+            {"name": "Sarah Kim", "email": "sarah.kim@crescentpictures.com", "signed": true},
+            {"name": "Helen Sexton", "email": "helen.sexton@Finthesiss.ai", "signed": false}
+          ]
+        },
+        "expected_status": 201
+      }
+    }
+  ]
+}

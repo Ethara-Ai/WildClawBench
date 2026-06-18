@@ -1,0 +1,16 @@
+{
+  "subdomain": "rimrockvalleyvet",
+  "name": "Rimrock Valley Veterinary Clinic",
+  "employeeCount": 12,
+  "industry": "Veterinary",
+  "headquarters": "Redmond, OR",
+  "fiscalYearStart": "01-01",
+  "timeOffPolicies": [
+    "Vacation",
+    "Sick",
+    "Personal",
+    "CE-Conference",
+    "Bereavement",
+    "On-Call Comp"
+  ]
+}

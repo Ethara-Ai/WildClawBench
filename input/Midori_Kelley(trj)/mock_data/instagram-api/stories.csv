@@ -1,0 +1,3 @@
+id,user_id,media_type,media_url,timestamp,expiring_at,caption,link,poll_question,poll_options
+ig_s_madras_prep_01,ig_user_midori_hikari,IMAGE,https://cdn.example.com/ig/madras_prep_01.jpg,2026-10-22T15:30:00Z,2026-10-23T15:30:00Z,Trailer loaded. Sundowner is ready. T-2 to Madras.,,,
+ig_s_gate_in_change_01,ig_user_midori_hikari,IMAGE,https://cdn.example.com/ig/gate_in_change.jpg,2026-10-22T16:42:00Z,2026-10-23T16:42:00Z,HEADS UP - gate-in is 09:30 (not 09:00). Check the addendum.,,,

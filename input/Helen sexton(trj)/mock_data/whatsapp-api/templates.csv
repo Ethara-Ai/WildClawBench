@@ -1,0 +1,3 @@
+name,language,category,status,body_text,header_text
+premiere_save_the_date,en,MARKETING,APPROVED,Hi {{1}} — Lost Frames Season 1 premieres Sat 7 PM at Cobblestone Cinema in Bushwick. Free + VIP seats up: {{2}},Lost Frames S1 Premiere
+client_invoice_reminder,en,UTILITY,APPROVED,"Hi {{1}}, gentle reminder on invoice {{2}} for ${{3}}, due {{4}}. — Helen",Invoice reminder

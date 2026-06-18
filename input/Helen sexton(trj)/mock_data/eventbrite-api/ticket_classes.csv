@@ -1,0 +1,3 @@
+id,event_id,name,quantity_total,quantity_sold,cost,fee,free,sales_start,sales_end
+TC_FREE,EVT_LF_PREMIERE,Free — General Admission,250,188,0,0,True,2026-06-15T10:00:00Z,2026-07-04T22:00:00Z
+TC_VIP,EVT_LF_PREMIERE,VIP — Reserved + Q&A after-party,50,22,3500,350,False,2026-06-15T10:00:00Z,2026-07-04T22:00:00Z

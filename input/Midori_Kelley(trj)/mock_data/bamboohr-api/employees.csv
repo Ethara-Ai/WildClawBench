@@ -1,0 +1,13 @@
+id,firstName,lastName,workEmail,department,jobTitle,location,hireDate,status,supervisorId
+1001,Karen,Whitfield,karen.whitfield@gmail.com,Veterinary,"DVM, Owner-Veterinarian",Redmond OR — Clinic,2008-06-01,Active,
+1002,Anjali,Patel,anjali.patel@rimrockvalleyvet.com,Veterinary,"DVM, Associate",Redmond OR — Clinic,2017-09-11,Active,1001
+1003,Tom,Marshfield,tom.marshfield@rimrockvalleyvet.com,Veterinary,"DVM, Equine/Bovine Specialist",Redmond OR — Ambulatory,2014-03-04,Active,1001
+1004,Midori,Kelley,midori.kelley@voissync.ai,Veterinary Technicians,Senior Large-Animal Vet Tech,Redmond OR — Ambulatory,2018-08-20,Active,1001
+1005,Lina,Alvarez,lina.alvarez@rimrockvalleyvet.com,Veterinary Technicians,Vet Tech II,Redmond OR — Clinic,2021-02-15,Active,1001
+1006,Bree,Halvorsen,bree.halvorsen@rimrockvalleyvet.com,Veterinary Technicians,Vet Tech I,Redmond OR — Clinic,2024-05-13,Active,1001
+1007,Danny,Reyes,danny.reyes@rimrockvalleyvet.com,Veterinary Technicians,Vet Tech I,Redmond OR — Ambulatory,2023-10-02,Active,1001
+1008,Carol,Bishop,carol.bishop@rimrockvalleyvet.com,Operations,Front Desk Manager,Redmond OR — Clinic,2012-11-19,Active,1001
+1009,Jordan,Pham,jordan.pham@rimrockvalleyvet.com,Operations,Office Coordinator,Redmond OR — Clinic,2022-07-25,Active,1008
+1010,Mason,Reyes,mason.reyes@rimrockvalleyvet.com,Kennel,Kennel Tech,Redmond OR — Clinic,2025-01-14,Active,1008
+1011,Sara,Goodwin,sara.goodwin@rimrockvalleyvet.com,Operations,Bookkeeper,Redmond OR — Clinic,2019-04-08,Active,1001
+1012,Hiro,Tanaka,hiro.tanaka@rimrockvalleyvet.com,Kennel,Kennel Tech (PT),Redmond OR — Clinic,2025-07-21,Active,1008

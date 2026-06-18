@@ -1,0 +1,3 @@
+id,name,owner_id,member_count,description,icon,region
+G_CBRA_RIDERS_001,CBRA-PNW Riders,U_CBRA_MOD_001,184,"Pacific NW barrel racing community - season runs Mar-Oct, off-season Nov-Feb. Public results, gear chatter, travel coordination. No client/vendor business.",icon_cbra_pnw,us-west
+G_HORSE_HEALTH_NW,NW Equine Vet Tech Forum,U_VET_MOD_001,612,Professional discussion for equine vet techs across OR/WA/ID. Case studies use de-identified examples only.,icon_vet_nw,us-west

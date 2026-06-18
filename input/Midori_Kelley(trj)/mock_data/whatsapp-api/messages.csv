@@ -1,0 +1,9 @@
+message_id,conversation_id,direction,from_wa_id,to_wa_id,type,text,template_name,status,sent_at
+wam_sachiko_01,conv_sachiko,inbound,15415553841,15415554188,text,"Honey — Obaa-chan's A1c came back at 8.4. Dr. Reyes wants to add a second metformin dose at dinner. Appt is Friday 2:30 in Bend, I'm driving.",,delivered,2026-10-22T11:14:08-07:00
+wam_sachiko_02,conv_sachiko,outbound,15415554188,15415553841,text,"ok thanks for letting me know. I'm on call Fri PM so can't come but call me after. love you, give Obaa-chan a hug from me.",,read,2026-10-22T11:22:51-07:00
+wam_sachiko_03,conv_sachiko,inbound,15415553841,15415554188,text,will do. and good luck Saturday <3 tell Hikari Obaa-chan says go fast,,delivered,2026-10-22T15:48:12-07:00
+wam_tara_01,conv_tara,inbound,15415554517,15415554188,text,"ok so convoy plan: 6am out of Tumalo, Madras Country Cafe for biscuits, load-in 8:30. should be at the grounds for 9 sharp. you good?",,delivered,2026-10-22T19:42:55-07:00
+wam_tara_02,conv_tara,outbound,15415554188,15415554517,text,heads up gate-in pushed to 9:30 per the addendum on the entry PDF. still 6am out works tho. meet at the 97/Tumalo park&ride?,,delivered,2026-10-22T20:11:09-07:00
+wam_jake_01,conv_jake,inbound,15415558164,15415554188,text,Confirmed Fri Oct 30 10am at your place. Hikari front shoes + Sage rasps. Venmo ok.,,delivered,2026-10-17T08:33:11-07:00
+wam_kenji_01,conv_kenji,inbound,15415557126,15415554188,text,thanks for the call sis. talk Sunday usual time?,,delivered,2026-10-19T18:02:00-07:00
+wam_kenji_02,conv_kenji,outbound,15415554188,15415557126,text,always. 6pm. love you,,read,2026-10-19T18:03:24-07:00

@@ -1,0 +1,3 @@
+id,name,parent_id,owner_id,description,size,extension,sha1,created_at,modified_at
+boxf_census,parc_extension_census_refresh.csv,fold_parcex,box_ruth,"Refreshed census: cost-burdened renters 46% (revised, supersedes 40%). Immigrant share 60%. Renter share 40%.",412,csv,a1b2c3,2026-10-12T09:00:00Z,2026-10-12T09:00:00Z
+boxf_survey,parc_extension_survey_results.xlsx,fold_parcex,box_ruth,"Four-language survey: French 38.4%, English 35.1%, Tamil 51.2%, Urdu 48.6%.",5204,xlsx,d4e5f6,2026-10-12T09:05:00Z,2026-10-12T09:05:00Z

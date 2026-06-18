@@ -1,0 +1,7 @@
+id,page_id,name,prefix
+lbl_proto_001,pg_ibrbvd_proto,bovine,global
+lbl_proto_002,pg_ibrbvd_proto,vaccination,global
+lbl_proto_003,pg_ibrbvd_proto,zoetis,global
+lbl_vendor_001,pg_vendor_playbook,vendor,global
+lbl_oncall_001,pg_oncall_sop,on-call,global
+lbl_race_001,pg_race_checklist,rodeo,global

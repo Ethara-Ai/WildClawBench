@@ -1,0 +1,6 @@
+movie_id,person_id,credit_type,character,job,order
+843,9001,cast,Mr. Chow,,0
+843,9002,cast,Mrs. Chan,,1
+843,9003,crew,,Director,0
+11104,9001,cast,Cop 663,,0
+4138,9001,cast,Chow Mo-wan,,0

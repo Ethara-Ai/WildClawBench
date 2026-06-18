@@ -1,0 +1,4 @@
+id,name,is_private,is_archived,topic,purpose,creator,created,num_members
+C_CULTURE,culture-desk,True,False,Culture Desk weekly podcast production,"Coordinate weekly Culture Desk episodes (Wed prep, Thu record).",U_HELEN,1737000000,2
+C_BLOCK,builders-block,True,False,Builder's Block podcast production,Edit-only + full-production episodes for Noah at Builder's Block.,U_HELEN,1739500000,2
+C_LOSTFRAMES,lost-frames-internal,True,False,"Lost Frames internal — Helen, Taylor, Rachel","Cover art, sound, internal cuts. Sponsor convos NOT here.",U_HELEN,1745000000,3

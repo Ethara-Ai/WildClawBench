@@ -1,0 +1,7 @@
+id,parent_type,parent_id,title,created_time,last_edited_time,created_by,archived,icon,cover_url
+p_lost_frames_root,workspace,ws_lost_frames,Lost Frames,2026-04-12T10:05:00Z,2026-06-29T11:40:00Z,u_helen_sexton,False,🎬,
+p_concept_doc,page_id,p_lost_frames_root,Show Concept — Lost Frames,2026-04-12T10:15:00Z,2026-05-30T14:20:00Z,u_helen_sexton,False,📖,
+p_ep1_outline,page_id,p_lost_frames_root,EP1 — In the Mood for Love (2000),2026-05-02T11:00:00Z,2026-06-29T16:55:00Z,u_helen_sexton,False,🎞️,
+p_ep2_outline,page_id,p_lost_frames_root,EP2 — Chungking Express (1994),2026-05-10T11:00:00Z,2026-06-15T16:00:00Z,u_helen_sexton,False,🎞️,
+p_ep3_outline,page_id,p_lost_frames_root,EP3 — 2046 (2004),2026-05-20T11:00:00Z,2026-06-15T16:10:00Z,u_helen_sexton,False,🎞️,
+p_launch_plan,page_id,p_lost_frames_root,S1 Launch Plan,2026-05-25T09:00:00Z,2026-06-28T19:30:00Z,u_helen_sexton,False,🚀,

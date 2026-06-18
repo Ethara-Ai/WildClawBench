@@ -1,0 +1,3 @@
+account_id,name,official_name,mask,type,subtype,available,current,limit,iso_currency_code
+ACC_GL_CHK,Greenline Checking,Greenline Everyday Checking,8841,depository,checking,2104.55,2104.55,,USD
+ACC_GL_HYSA,Greenline HYSA,Greenline High-Yield Savings,2210,depository,savings,8712.40,8712.40,,USD

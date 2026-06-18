@@ -1,0 +1,14 @@
+{
+  "id": "wks_midori_kelley_personal",
+  "name": "Midori - personal",
+  "domain": "midori-kelley-personal",
+  "owner_user_id": "usr_self",
+  "plan": "free",
+  "created_time": "2024-08-04T13:22:18.000Z",
+  "icon": "https://www.notion.so/icons/cherry-blossom_pink.svg",
+  "settings": {
+    "default_page_size": 50,
+    "ai_blocks_enabled": false,
+    "public_sharing_enabled": false
+  }
+}

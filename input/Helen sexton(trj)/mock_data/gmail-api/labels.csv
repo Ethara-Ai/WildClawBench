@@ -1,0 +1,11 @@
+id,name,type,messages_total,messages_unread,threads_total,threads_unread
+INBOX,INBOX,system,12,4,10,3
+SENT,SENT,system,6,0,6,0
+DRAFT,DRAFT,system,3,0,3,0
+STARRED,STARRED,system,2,0,2,0
+Label_1,Clients,user,5,1,5,1
+Label_2,Sponsors,user,4,1,3,1
+Label_3,Lost Frames,user,4,1,4,1
+Label_4,Subcontractors,user,1,0,1,0
+Label_5,Family,user,2,0,2,0
+Label_6,Press,user,1,1,1,1

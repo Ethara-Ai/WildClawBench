@@ -1,0 +1,4 @@
+id,name,id_board,pos,closed
+lst_tr_a,Inbox,brd_tr_1,16384,true
+lst_tr_b,In progress,brd_tr_1,32768,true
+lst_tr_c,Done,brd_tr_1,49152,true

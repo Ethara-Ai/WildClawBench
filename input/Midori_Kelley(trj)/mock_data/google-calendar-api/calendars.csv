@@ -1,0 +1,5 @@
+id,summary,description,time_zone,access_role,primary,color_id
+cal_midori_primary,midori.kelley@voissync.ai,Midori personal + work calendar,America/Los_Angeles,owner,True,9
+cal_rimrock_clinic,Rimrock Valley — Clinic Ops,"Shared clinic on-call rota, surgeries, vendor inbounds",America/Los_Angeles,writer,False,5
+cal_cbra_season,CBRA — 2026 Season,CBRA-PNW barrel racing season schedule,America/Los_Angeles,reader,False,11
+cal_kelley_family,Kelley Family,"Family events, Obaa-chan appointments, Kenji visits",America/Los_Angeles,writer,False,7
