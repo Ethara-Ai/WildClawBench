@@ -458,13 +458,39 @@ def convert_task(
     # run output) from the original input task dir, fuzzy-matched by persona core.
     input_task_dir = _find_input_task_dir(input_root, task_dir.name)
     if input_task_dir is not None:
-        prompt_src = input_task_dir / "prompt.txt"
-        if prompt_src.exists():
-            bundle.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(prompt_src, bundle / "prompt.txt")
         stage_persona_and_artifacts(input_task_dir, bundle, verbose)
     elif verbose:
-        print(f"    (no input dir matched under {input_root}; prompt/persona/artifacts skipped)")
+        print(f"    (no input dir matched under {input_root}; persona/artifacts skipped)")
+
+    # Prompt: multi-turn tasks author the full conversation in `prompts.txt`;
+    # single-turn tasks use `prompt.txt`. Prefer the source `prompts.txt`, then a
+    # source `prompt.txt`, then the harbor-written `prompt.txt` in the run-output
+    # dir (so the prompt is never dropped — the old code looked only for a source
+    # `prompt.txt`, which multi-turn tasks lack, shipping bundles with no prompt).
+    # Publish as BOTH `prompts.txt` (current spec) and `prompt.txt` (back-compat).
+    prompt_candidates = []
+    if input_task_dir is not None:
+        prompt_candidates += [input_task_dir / "prompts.txt", input_task_dir / "prompt.txt"]
+    prompt_candidates.append(task_dir / "prompt.txt")
+    prompt_src = next((p for p in prompt_candidates if p.is_file()), None)
+    if prompt_src is not None:
+        bundle.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(prompt_src, bundle / "prompts.txt")
+        shutil.copy2(prompt_src, bundle / "prompt.txt")
+    elif verbose:
+        print(f"    (no prompt found for {task_dir.name}; prompts.txt/prompt.txt skipped)")
+
+    # Inject: the silent-mutation spec lives only in the source task dir (harbor
+    # does not stage it into run output). Copy it verbatim so the bundle is
+    # reproducible and gradable.
+    if input_task_dir is not None:
+        inject_src = input_task_dir / "inject"
+        if inject_src.is_dir():
+            bundle.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(inject_src, bundle / "inject", dirs_exist_ok=True)
+            if verbose:
+                n_inj = sum(1 for _ in inject_src.rglob("*") if _.is_file())
+                print(f"    staged inject/ ({n_inj} file(s))")
 
     produced_any = False
     for harness_dir in sorted(p for p in trajectories.iterdir() if p.is_dir()):
