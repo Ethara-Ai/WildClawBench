@@ -1,0 +1,6 @@
+id,subject,organizer_name,organizer_address,location,start_date,end_date,is_all_day,is_online,attendees
+out-e-101,Dental cleaning - Tumalo Family Dental,Tumalo Family Dental,front-desk@tumalofamilydental.com,Tumalo Family Dental,2026-11-17T09:00:00-08:00,2026-11-17T10:00:00-08:00,false,false,midori.kelley@voissync.ai
+out-e-102,Smith Rock hike with Halie,Midori Kelley,midori.kelley@voissync.ai,Smith Rock SP,2026-11-07T07:15:00-08:00,2026-11-07T13:30:00-08:00,false,false,halie.brimmer@gmail.com
+out-e-103,HOA Q4 meeting,Bailey Ridge HOA,board@bailey-ridge-hoa.org,Tumalo Community Center,2026-11-12T18:30:00-08:00,2026-11-12T20:00:00-08:00,false,false,midori.kelley@voissync.ai
+out-e-104,GRE practice test (timed),Midori Kelley,midori.kelley@voissync.ai,Home,2026-12-05T09:00:00-08:00,2026-12-05T13:00:00-08:00,false,false,midori.kelley@voissync.ai
+out-e-105,Bend Athletic Club - Pilates Reformer,Bend Athletic Club,classes@bendathleticclub.com,BAC,2026-10-29T09:30:00-07:00,2026-10-29T10:30:00-07:00,false,false,midori.kelley@voissync.ai

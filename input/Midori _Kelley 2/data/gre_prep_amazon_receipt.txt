@@ -1,0 +1,22 @@
+Order Confirmation
+Amazon.com #114-2873912-7741083
+Order placed: 2026-09-18
+
+Ship to:
+  Midori Kelley
+  64218 Bailey Rd
+  Tumalo, OR 97701
+
+Items:
+  Manhattan Prep 5 lb. Book of GRE Practice Problems, 4th Ed.   $26.78
+  Magoosh Math Review and Vocab for the GRE (2026)              $24.16
+  Pilot G2 0.7mm Gel Pens, Black, 12-pack                       $12.49
+  Post-it Tabs, Assorted, 60 ct                                  $8.99
+
+Subtotal:                                                       $72.42
+Shipping:                                                        $0.00  (Prime)
+Estimated tax:                                                   $0.00  (OR)
+Order total:                                                    $72.42
+
+Payment: Visa ending 4421
+Delivery: 2026-09-21 by 8 PM

@@ -1,0 +1,7 @@
+id,name,is_private,is_archived,topic,purpose,creator,created,num_members
+C_CLINIC_FLOOR,clinic-floor,False,False,"Daily floor coordination — appointments, walk-ins, shift handoff",All-staff clinic comms,U_WHITFIELD_K,1704067200,8
+C_AMBULATORY,ambulatory,False,False,"Field calls, large-animal route, truck logistics",Ambulatory team coordination,U_WHITFIELD_K,1704067200,5
+C_ONCALL,on-call,False,False,"Active on-call rota — Fri PM, Sat AM, Sat PM, Sun",On-call handoff,U_WHITFIELD_K,1704067200,6
+C_VENDOR_ORDERS,vendor-orders,False,False,Inbound vaccine + supply orders. Tag #zoetis #merck #boehringer,Vendor & inventory comms,U_MIDORI_K,1704067200,5
+C_RANDOM,random,False,False,"Coffee, jokes, dog photos",General chat,U_CAROL_B,1704067200,8
+C_DM_LINA_MIDORI,dm-lina-midori,True,False,,Direct message,U_LINA_A,1735689600,2

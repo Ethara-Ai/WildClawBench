@@ -1,0 +1,6 @@
+id,name,domain,industry,city,state,numberofemployees,annualrevenue,createdate
+5512004001,Zoetis Animal Health,zoetis.com,Veterinary Pharmaceuticals,Parsippany,NJ,11500,8100000000,2019-06-12T17:00:00Z
+5512004002,Henderson Ranch,hendersonranchllc.com,Cattle Ranching,Terrebonne,OR,4,620000,2021-03-04T16:00:00Z
+5512004003,Watson Ranch,,Cattle Ranching,Powell Butte,OR,3,410000,2020-11-08T18:00:00Z
+5512004004,Krasicki Ranch,,Cattle Ranching,Prineville,OR,5,740000,2020-04-22T15:00:00Z
+5512004005,Boehringer Ingelheim Animal Health,boehringer-ingelheim.com,Veterinary Pharmaceuticals,Duluth,GA,8400,6200000000,2019-09-18T17:00:00Z

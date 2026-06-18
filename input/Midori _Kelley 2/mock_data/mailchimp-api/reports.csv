@@ -1,0 +1,3 @@
+campaign_id,emails_sent,opens_total,unique_opens,open_rate,clicks_total,unique_clicks,click_rate,unsubscribed,bounces
+cmp_001,80,52,46,0.575,28,21,0.2625,1,0
+cmp_002,80,42,38,0.475,18,14,0.175,0,1

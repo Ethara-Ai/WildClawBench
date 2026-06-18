@@ -1,0 +1,5 @@
+event_id,email,display_name,response_status,optional,organizer
+evt_atmos_pickleball,marco.reyes@example.org,Marco Reyes,accepted,False,False
+evt_atmos_dia_muertos,carmen.salazar@example.com,Carmen Salazar,accepted,False,False
+evt_atmos_dia_muertos,rosa.salazar@example.com,Rosa Salazar,accepted,False,False
+evt_atmos_dia_muertos,marco.reyes@example.org,Marco Reyes,accepted,False,False

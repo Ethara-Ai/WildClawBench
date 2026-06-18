@@ -1,0 +1,4 @@
+id,name,email,avatar_url,type,bot,owner_workspace,created_time
+user_ian,Ian Salazar,ian.salazar@dac-env.gov,,person,False,ws_dac_env,2024-03-01T09:05:00-07:00
+user_marco,Marco Reyes,marco.reyes@example.org,,person,False,ws_salazar_leather,2025-01-12T19:10:00-07:00
+user_olivera,Dr. Sam Olivera,samuel.olivera@example.org,,person,False,ws_dac_env,2024-03-15T11:00:00-06:00

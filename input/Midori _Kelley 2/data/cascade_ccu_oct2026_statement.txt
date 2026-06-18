@@ -1,0 +1,28 @@
+CASCADE COMMUNITY CREDIT UNION
+Monthly Statement - October 2026
+Member: Midori Kelley (acct ****7732)
+Statement period: 2026-10-01 to 2026-10-31
+
+OPENING BALANCE                                          $4,128.41
+
+DEPOSITS / CREDITS
+  10/01  Direct Deposit - VOISSYNC PAY                  +$1,447.18
+  10/02  Mobile Deposit - Refund Patagonia                +$42.18
+  10/15  Direct Deposit - VOISSYNC PAY                  +$1,447.18
+  10/22  Venmo Cashout - "split dinner"                   +$36.00
+
+WITHDRAWALS / DEBITS
+  10/03  AutoPay - Sundowner Trailer Loan                -$184.22
+  10/05  POS - Newport Avenue Market                      -$87.41
+  10/09  POS - Robberson Ford Service                    -$232.30
+  10/10  AutoPay - CenturyLink Internet                   -$84.99
+  10/15  ATM Withdrawal - Tumalo Mini-Mart                -$80.00
+  10/15  AutoPay - Ford Motor Credit (truck pmt)         -$380.00
+  10/18  POS - Cascade Lakes Brewing                      -$48.55
+  10/20  POS - Bend Costco Fuel                           -$74.10
+  10/25  POS - Smith Rock State Park Day Use               -$5.00
+  10/27  Transfer to Savings                             -$200.00
+
+CLOSING BALANCE                                          $5,025.56
+
+Notes: No overdrafts. APY on checking 0.05%.

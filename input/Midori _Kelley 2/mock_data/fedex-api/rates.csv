@@ -1,0 +1,4 @@
+service_type,service_name,origin_zip,dest_zip,weight_lb,currency,net_charge,transit_days,delivery_day
+FEDEX_GROUND,FedEx Ground,66061,97756,18.4,USD,47.85,5,Tuesday
+FEDEX_2_DAY,FedEx 2Day,66061,97756,18.4,USD,142.3,2,Saturday
+FEDEX_OVERNIGHT,FedEx Priority Overnight,66061,97756,18.4,USD,284.6,1,Friday

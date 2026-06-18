@@ -1,0 +1,5 @@
+Id,Name,AccountId,StageName,Amount,Probability,CloseDate,Type
+006Ax0HND_Q4_BOOST,Henderson Q4 IBR/BVD Booster - 47 head,001Ax0HND2026Q4A1,Deposit Paid - Awaiting Delivery,667.4,95,2026-10-27,Existing Customer - Repeat
+006Ax0HND_Q1_PREG,Henderson Spring Preg-Check 2027,001Ax0HND2026Q4A1,Prospecting,1850.0,60,2027-02-15,Existing Customer - Repeat
+006Ax0WAT_Q3_RABIES,Watson Rabies Round 2026,001Ax0WAT2026Q3A1,Closed Won,248.0,100,2026-08-20,Existing Customer - Repeat
+006Ax0KRA_Q3_BOOST,Krasicki Q3 IBR/BVD Booster - 52 head,001Ax0KRA2026Q3A1,Closed Won,738.4,100,2026-08-27,Existing Customer - Repeat

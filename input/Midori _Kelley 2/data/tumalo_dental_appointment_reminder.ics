@@ -1,0 +1,19 @@
+BEGIN:VCALENDAR
+PRODID:-//Tumalo Family Dental//Patient Portal//EN
+VERSION:2.0
+BEGIN:VEVENT
+UID:appt-58821-midori-kelley@tumalofamilydental.com
+DTSTAMP:20261005T173000Z
+DTSTART;TZID=America/Los_Angeles:20261117T090000
+DTEND;TZID=America/Los_Angeles:20261117T100000
+SUMMARY:Cleaning + 6-month exam (Dr. Carter)
+LOCATION:Tumalo Family Dental, 64925 W Hwy 20, Tumalo OR 97701
+DESCRIPTION:Routine 6-month exam and prophy. Please arrive 10 minutes early.
+ORGANIZER:CN=Tumalo Family Dental:MAILTO:office@tumalofamilydental.com
+BEGIN:VALARM
+ACTION:DISPLAY
+DESCRIPTION:Dental cleaning tomorrow
+TRIGGER:-PT24H
+END:VALARM
+END:VEVENT
+END:VCALENDAR

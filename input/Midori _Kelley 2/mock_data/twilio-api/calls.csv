@@ -1,0 +1,4 @@
+sid,from_number,to_number,status,direction,duration,price,price_unit,answered_by,start_time,end_time,date_created
+CA_mom_call_01,+15415554188,+15415553841,completed,outbound-api,723,-0.0850,USD,human,2026-10-20T19:14:00-07:00,2026-10-20T19:26:03-07:00,2026-10-20T19:14:00-07:00
+CA_kenji_call_01,+15415554188,+15415557126,completed,outbound-api,1842,-0.1650,USD,human,2026-10-19T17:55:00-07:00,2026-10-19T18:25:42-07:00,2026-10-19T17:55:00-07:00
+CA_henderson_in,+15415552963,+15415556290,completed,inbound,388,-0.0850,USD,human,2026-10-15T14:18:22-07:00,2026-10-15T14:24:50-07:00,2026-10-15T14:18:22-07:00

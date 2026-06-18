@@ -1,0 +1,3 @@
+Id,DisplayName,GivenName,FamilyName,CompanyName,PrimaryEmailAddr,PrimaryPhone,BillAddr_Line1,BillAddr_City,BillAddr_CountrySubDivisionCode,BillAddr_PostalCode,Balance,Active,Job,Notes
+10,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+11,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08

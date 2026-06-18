@@ -1,0 +1,38 @@
+[
+  {
+    "Id": "4001",
+    "DocNumber": "E-CWG-2026-Q4",
+    "TxnDate": "2026-10-25",
+    "ExpirationDate": "2026-11-24",
+    "CustomerRef": {
+      "value": "1",
+      "name": "Clearwater Initiative"
+    },
+    "Line": [
+      {
+        "Id": "1",
+        "LineNum": 1,
+        "Amount": 2880.0,
+        "DetailType": "SalesItemLineDetail",
+        "Description": "Q4 2026 monitoring round - 6 sites x 2 sampling visits, analysis included.",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "value": "1",
+            "name": "DAC Sample Tracking - Quarterly"
+          },
+          "UnitPrice": 240.0,
+          "Qty": 12
+        }
+      }
+    ],
+    "TotalAmt": 2880.0,
+    "TxnStatus": "Pending",
+    "AcceptedDate": null,
+    "LinkedTxn": [],
+    "MetaData": {
+      "CreateTime": "2026-10-25T10:00:00-06:00",
+      "LastUpdatedTime": "2026-10-25T10:00:00-06:00"
+    },
+    "SyncToken": "0"
+  }
+]

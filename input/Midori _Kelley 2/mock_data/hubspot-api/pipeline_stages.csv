@@ -1,0 +1,8 @@
+pipeline_id,pipeline_label,stage_id,stage_label,display_order,probability,closed
+vendor_orders,Vendor Orders,draft,Draft,1,0.1,False
+vendor_orders,Vendor Orders,submitted,Submitted to Vendor,2,0.3,False
+vendor_orders,Vendor Orders,deposit_paid_awaiting_delivery,Deposit Paid - Awaiting Delivery,3,0.7,False
+vendor_orders,Vendor Orders,shipped_in_transit,Shipped - In Transit,4,0.85,False
+vendor_orders,Vendor Orders,delivered_invoice_pending,Delivered - Invoice Pending,5,0.95,False
+vendor_orders,Vendor Orders,delivered_invoice_paid,Delivered - Invoice Paid,6,1.0,True
+vendor_orders,Vendor Orders,cancelled,Cancelled,7,0.0,True

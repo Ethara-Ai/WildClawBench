@@ -1,0 +1,4 @@
+id,host_id,topic,type,status,start_time,duration,timezone,join_url,agenda,created_at
+81234567890,zm-user-midori-9881,GRE prep study session,2,started,2026-10-26T15:00:00Z,120,America/Los_Angeles,https://zoom.us/j/81234567890,Timed quant practice with Halie,2026-10-19T14:00:00Z
+81234567891,zm-user-midori-9881,Tonkatsu cook-along with Aunt Yuki,2,scheduled,2026-11-22T22:00:00Z,75,America/Los_Angeles,https://zoom.us/j/81234567891,Mom's tonkatsu - shared screen,2026-11-08T01:00:00Z
+81234567892,zm-user-midori-9881,GRE 1:1 with Halie,2,scheduled,2026-11-01T21:00:00Z,60,America/Los_Angeles,https://zoom.us/j/81234567892,Review week 5 errors,2026-10-26T18:00:00Z

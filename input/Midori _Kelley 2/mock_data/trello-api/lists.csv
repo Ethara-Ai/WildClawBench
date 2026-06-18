@@ -1,0 +1,8 @@
+id,name,id_board,pos,closed
+lst_q4_inbox,Inbox,brd_personal_q4,100,false
+lst_q4_thisweek,This week,brd_personal_q4,200,false
+lst_q4_doing,Doing,brd_personal_q4,300,false
+lst_q4_done,Done,brd_personal_q4,400,false
+lst_gre_backlog,Backlog,brd_gre_27,100,false
+lst_gre_thisweek,This week,brd_gre_27,200,false
+lst_gre_done,Done,brd_gre_27,300,false

@@ -1,0 +1,4 @@
+id,name,is_private,is_archived,topic,purpose,creator,created,num_members
+C_general,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_upstream,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_fieldwork,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4

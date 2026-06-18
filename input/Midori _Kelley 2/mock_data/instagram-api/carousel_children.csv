@@ -1,0 +1,5 @@
+id,media_id,media_type,media_url,timestamp
+ig_cc_summer_001,ig_m_carousel_summer,IMAGE,https://cdn.example.com/ig/summer_01.jpg,2026-09-01T18:20:00Z
+ig_cc_summer_002,ig_m_carousel_summer,IMAGE,https://cdn.example.com/ig/summer_02.jpg,2026-09-01T18:20:00Z
+ig_cc_summer_003,ig_m_carousel_summer,VIDEO,https://cdn.example.com/ig/summer_03.mp4,2026-09-01T18:20:00Z
+ig_cc_summer_004,ig_m_carousel_summer,IMAGE,https://cdn.example.com/ig/summer_04.jpg,2026-09-01T18:20:00Z

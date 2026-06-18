@@ -1,0 +1,13 @@
+id,createdTime,Name,Status,Project,EstimateHours,Done
+recTask0000000001,2026-10-07T16:22:00Z,Collect SMP-2026-1001 at Site 1,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000002,2026-10-21T16:05:00Z,Collect SMP-2026-1002 at Site 1,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000003,2026-10-07T16:48:00Z,Collect SMP-2026-1003 at Site 2,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000004,2026-10-21T16:32:00Z,Collect SMP-2026-1004 at Site 2,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000005,2026-10-07T17:14:00Z,Collect SMP-2026-1005 at Site 3,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000006,2026-10-21T17:01:00Z,Collect SMP-2026-1006 at Site 3,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000007,2026-10-08T16:10:00Z,Collect SMP-2026-1007 at Site 4,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000008,2026-10-22T16:28:00Z,Collect SMP-2026-1008 at Site 4,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000009,2026-10-08T16:55:00Z,Collect SMP-2026-1009 at Site 5,Done,Site 5 Water Quality Monitoring,2,true
+recTask0000000010,2026-10-22T16:48:00Z,Collect SMP-2026-1010 at Site 5,In progress,Site 5 Water Quality Monitoring,3,false
+recTask0000000011,2026-10-08T17:20:00Z,Collect SMP-2026-1011 at Site 6,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000012,2026-10-22T17:11:00Z,Collect SMP-2026-1012 at Site 6,Done,Site 6 Water Quality Monitoring,2,true

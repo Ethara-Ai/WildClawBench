@@ -1,0 +1,6 @@
+conversation_id,wa_id,started_at,last_message_at,origin,within_24h_window
+conv_sachiko,15415553841,2026-10-20T08:14:00-07:00,2026-10-22T15:48:12-07:00,user_initiated,True
+conv_tara,15415554517,2026-10-20T19:42:55-07:00,2026-10-22T19:42:55-07:00,user_initiated,True
+conv_jake,15415558164,2026-10-17T08:00:00-07:00,2026-10-17T08:33:11-07:00,business_initiated,False
+conv_whitfield,15415556290,2026-10-21T17:08:44-07:00,2026-10-21T17:08:44-07:00,user_initiated,False
+conv_kenji,15415557126,2026-10-19T17:55:00-07:00,2026-10-19T18:02:00-07:00,user_initiated,False

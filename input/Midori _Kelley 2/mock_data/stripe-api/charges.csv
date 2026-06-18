@@ -1,0 +1,6 @@
+id,customer,amount,currency,status,paid,refunded,amount_refunded,description,payment_intent,created
+ch_3OqW1A2eZvK,cus_midori_4421,11555,usd,succeeded,true,false,0,Bay Photo Lab order #BP-2026-9112844,pi_3OqW1A2eZvK,2026-10-17T18:01:52Z
+ch_3OqXJB2eZvK,cus_midori_4421,7242,usd,succeeded,true,false,0,Amazon - GRE prep books,pi_3OqXJB2eZvK,2026-09-18T20:14:00Z
+ch_3OqRPC2eZvK,cus_midori_4421,6500,usd,pending,false,false,0,Costco Gold Star renewal,pi_3OqRPC2eZvK,2026-11-15T08:00:00Z
+ch_3OpQQD2eZvK,cus_midori_4421,23230,usd,succeeded,true,false,0,Robberson Ford service invoice,pi_3OpQQD2eZvK,2026-10-09T14:18:08Z
+ch_3OoLLE2eZvK,cus_midori_4421,38000,usd,succeeded,true,false,0,Ford Motor Credit - truck payment Oct,pi_3OoLLE2eZvK,2026-10-15T08:00:00Z

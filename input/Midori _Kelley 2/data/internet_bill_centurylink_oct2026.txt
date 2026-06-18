@@ -1,0 +1,29 @@
+CENTURYLINK BILL - October 2026
+Account: 541-555-3007-0188-Z
+Service address: 64218 Bailey Rd, Tumalo OR 97701
+Service type: Fiber Internet 940/940 Mbps + landline
+
+Statement date:  2026-10-04
+Bill cycle:      2026-10-04 to 2026-11-03
+Due date:        2026-10-25
+Total due:       $84.99
+Auto-pay date:   2026-10-10 (Visa ending 4421)
+
+Plan:
+  Fiber Gigabit Internet                                    $74.99
+  Voice Unlimited US                                        $15.00
+  Loyalty credit                                            -$5.00
+
+Taxes & fees:
+  Federal USF                                                $0.00
+  Oregon Universal Service Fund                              $0.00
+  E911 fee                                                   $0.00 (Tumalo)
+  Total taxes & fees:                                        $0.00
+
+Usage this period:
+  Internet:  2.1 TB down / 184 GB up  (unlimited)
+  Voice:     11 outbound, 4 inbound, 0 long distance
+
+Service notes:
+  No outages in your area for this billing cycle.
+  Equipment: C5500 ONT (lease included).

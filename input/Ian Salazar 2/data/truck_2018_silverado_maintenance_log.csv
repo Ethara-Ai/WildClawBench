@@ -1,0 +1,16 @@
+date,odometer_mi,service,vendor,cost_usd,notes
+2024-03-12,82140,oil change 5W-30 + filter,Big Brand Tire Las Cruces,72.45,synthetic blend
+2024-06-04,86220,tire rotation + brake inspection,Big Brand Tire Las Cruces,35.00,front pads at 50 percent
+2024-09-19,90115,oil change + air filter,Big Brand Tire Las Cruces,89.20,
+2024-12-30,93780,front brake pads replaced,Big Brand Tire Las Cruces,318.75,squeal cleared
+2025-03-22,97402,oil change + cabin filter,Big Brand Tire Las Cruces,98.10,desert dust intake
+2025-07-15,101680,coolant flush + radiator inspection,Hatch Auto Mountain View,168.50,low pressure cap replaced
+2025-10-08,105320,oil change + rotate,Big Brand Tire Las Cruces,74.30,
+2026-02-04,109218,battery replacement,Big Brand Tire Las Cruces,212.00,old battery 4.5 yr
+2026-05-21,113140,oil change + serpentine belt,Big Brand Tire Las Cruces,182.40,belt was cracking
+2026-09-10,117062,tire rotation + alignment,Big Brand Tire Las Cruces,89.95,pull right side corrected
+
+# Notes
+# next service due ~120000 miles or 2026-12 whichever first
+# transmission fluid change overdue per Chevy schedule, budget ~250
+# Carmen's Forester is on her log file at the studio

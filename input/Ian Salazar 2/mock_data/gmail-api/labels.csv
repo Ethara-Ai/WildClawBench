@@ -1,0 +1,9 @@
+id,name,type,messages_total,messages_unread,threads_total,threads_unread
+Label_INBOX,INBOX,system,9,2,9,2
+Label_SENT,SENT,system,0,0,0,0
+Label_DRAFT,DRAFT,system,1,0,1,0
+Label_Clearwater,Clearwater,user,0,0,0,0
+Label_RSU_Brennan,RSU-Brennan,user,0,0,0,0
+Label_DAC_Olivera,DAC-Olivera,user,0,0,0,0
+Label_Etsy,Etsy,user,1,0,1,0
+Label_Family,Family,user,1,0,1,0

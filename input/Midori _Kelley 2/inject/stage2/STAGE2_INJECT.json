@@ -1,0 +1,6 @@
+{
+  "stage": "stage2",
+  "description": "No-op. The bundle declares exactly THREE silent mutations (SM-01/02/03 in stage1; phase-2 fingerprint num_silent_mutations=3), and no checker asserts a stage2-refreshed value. The former SM-04/05/06 race-day 'reaffirmations' were inert (all silent:false, so inject_director.apply_stage never applied them) and mis-targeted (openweather has no corridor entity and stores degC not degF; eventbrite has no run_order sub-resource and the real event id is evt_cbra_madras_2026; the real calendar event id is ev_cbra_madras). SM-06 in particular would have OVERWRITTEN the intentional 09:00-body / 09:30-footer CM-02 contradiction that T1 is meant to resolve, so it is removed. The race-day values the T11 briefing pulls (09:30 gate-in, corridor forecast, run order) are already materialized in the seed (eventbrite evt_cbra_madras_2026 summary, calendar ev_cbra_madras, openweather forecast). Restore individual ops here only if you also (a) set silent:true, (b) retarget to the real ids/columns/units, and (c) preserve CM-02.",
+  "fires_after_turn": 10,
+  "mutations": []
+}

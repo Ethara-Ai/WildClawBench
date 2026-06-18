@@ -1,0 +1,8 @@
+id,name,desc,id_board,id_list,pos,due,closed,member_ids,labels
+crd_q4_001,Renew Costco,Charge Nov 15,brd_personal_q4,lst_q4_thisweek,100,2026-11-15T08:00:00Z,false,mem_self,errand
+crd_q4_002,Snow tires on truck,Schedule with Robberson by Nov 1,brd_personal_q4,lst_q4_thisweek,200,2026-11-01T08:00:00Z,false,mem_self,truck
+crd_q4_003,Order shed paint stain,Sherwin-Williams superdeck cedar,brd_personal_q4,lst_q4_inbox,300,,false,mem_self,home
+crd_q4_004,Propane refill,Done Oct 14,brd_personal_q4,lst_q4_done,400,2026-10-14T08:00:00Z,true,mem_self,home
+crd_gre_001,5lb Quant 12.1-12.4,Pace at 1.5 min/Q,brd_gre_27,lst_gre_thisweek,100,2026-10-26T22:00:00Z,false,mem_self,quant
+crd_gre_002,Mag Vocab - 200 cards,Anki SRS,brd_gre_27,lst_gre_thisweek,200,2026-10-27T22:00:00Z,false,mem_self,verbal
+crd_gre_003,Schedule timed test,PowerPrep 1 - Dec 5 morning,brd_gre_27,lst_gre_backlog,300,,false,mem_self,timed

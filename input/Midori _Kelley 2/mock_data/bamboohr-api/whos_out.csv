@@ -1,0 +1,5 @@
+id,employeeId,name,type,start,end
+wo_001,1002,Anjali Patel,Vacation,2026-10-21,2026-10-23
+wo_002,1010,Mason Reyes,Sick,2026-10-22,2026-10-22
+wo_003,1004,Midori Kelley,Personal,2026-10-24,2026-10-24
+wo_004,1001,Karen Whitfield,CE-Conference,2026-11-04,2026-11-06

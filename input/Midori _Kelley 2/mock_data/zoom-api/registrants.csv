@@ -1,0 +1,4 @@
+id,meeting_id,email,first_name,last_name,status,join_time,create_time
+reg_z_001,81234567890,halie.brimmer@gmail.com,Halie,Brimmer,approved,2026-10-26T15:00:00Z,2026-10-19T15:00:00Z
+reg_z_002,81234567891,yuki.tanaka@gmail.com,Yuki,Tanaka,approved,2026-11-22T22:00:00Z,2026-11-08T03:00:00Z
+reg_z_003,81234567892,halie.brimmer@gmail.com,Halie,Brimmer,approved,2026-11-01T21:00:00Z,2026-10-27T00:00:00Z

@@ -1,0 +1,6 @@
+id,identifier,number,title,description,priority,estimate,stateId,assigneeId,teamId,projectId,cycleId,labelIds,dueDate,sortOrder,branchName,createdAt,updatedAt,startedAt,completedAt,canceledAt
+lin_001,HOME-12,12,Schedule shed paint stain,Order Sherwin-Williams superdeck cedar; book weekend,3,2,state_backlog,user_midori,team_home,,,,,100,midori/home-12-shed-stain,2026-09-04T08:00:00Z,2026-10-12T08:00:00Z,,,
+lin_002,HOME-13,13,Get firewood delivered before snow,Order 2 cords from Cascade Firewood,2,3,state_todo,user_midori,team_home,,,,,200,midori/home-13-firewood,2026-09-08T08:00:00Z,2026-10-19T08:00:00Z,,,
+lin_003,HOME-14,14,Service plow blade for F-250,Tighten hydraulics; replace cutting edge,2,2,state_todo,user_midori,team_home,,,,,300,midori/home-14-plow-blade,2026-09-18T08:00:00Z,2026-10-12T08:00:00Z,,,
+lin_004,GRE-04,4,Book test seat - March 28,Reserve ETS slot in Portland morning,1,1,state_done,user_midori,team_gre,,,,2026-03-28,400,midori/gre-04-book-seat,2026-08-12T08:00:00Z,2026-08-22T08:00:00Z,2026-08-12T09:00:00Z,2026-08-22T07:30:00Z,
+lin_005,GRE-08,8,PowerPrep 1 - timed,Sunday morning timed practice test,2,5,state_in_progress,user_midori,team_gre,,,,2026-12-05,500,midori/gre-08-powerprep-1,2026-10-04T08:00:00Z,2026-10-22T08:00:00Z,2026-10-19T07:00:00Z,,

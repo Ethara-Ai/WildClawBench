@@ -1,0 +1,14 @@
+month,orders,gross_sales_usd,etsy_fees_usd,shipping_collected_usd,shipping_paid_usd,net_payout_usd,top_item
+2025-01,4,612.00,73.44,52.00,48.20,542.36,"Bifold wallet - oxblood"
+2025-02,6,915.50,109.86,78.00,71.40,812.24,"Belt 1.5in - natural veg-tan"
+2025-03,5,748.00,89.76,65.00,59.10,664.14,"Journal cover - A5 chestnut"
+2025-04,7,1102.25,132.27,91.00,82.50,978.48,"Knife sheath - drop point"
+2025-05,8,1284.00,154.08,104.00,94.80,1139.12,"Coin pouch trio - mixed"
+2025-06,6,968.40,116.21,78.00,70.60,859.59,"Belt 1.25in - dark walnut"
+2025-07,5,825.75,99.09,65.00,58.90,732.76,"Card case - saddle tan"
+2025-08,7,1156.00,138.72,91.00,82.10,1026.18,"Apron - heavy 8oz black"
+2025-09,9,1438.50,172.62,117.00,105.70,1277.18,"Journal cover - A5 oxblood"
+2025-10,8,1322.25,158.67,104.00,93.80,1173.78,"Bifold wallet - chestnut"
+2025-11,11,1820.00,218.40,143.00,128.90,1615.70,"Holiday gift set - assorted"
+2025-12,12,2104.75,252.57,156.00,140.20,1868.18,"Custom journal cover - commissions"
+TOTAL,88,14317.40,1715.69,1144.00,1036.20,12689.91,

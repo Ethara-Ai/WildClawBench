@@ -1,0 +1,6 @@
+sid,from_number,to_number,body,status,direction,num_segments,price,price_unit,error_code,date_sent,date_created
+SM_jake_in_01,+15415558164,+15415554188,Confirmed Fri 10/30 10am at your place. Hikari fronts + Sage rasps. Cash or venmo.,delivered,inbound,1,-0.0075,USD,,2026-10-17T08:33:11-07:00,2026-10-17T08:33:11-07:00
+SM_jake_out_01,+15415554188,+15415558164,thx Jake — venmo works. see you 10am 10/30,delivered,outbound-api,1,-0.0075,USD,,2026-10-17T08:41:08-07:00,2026-10-17T08:41:08-07:00
+SM_whitfield_oncall,+15415556290,+15415554188,Rota week of 10/19: M = Fri PM + Sat AM. Lina Sat PM. Bree Sun. Calls go to clinic main.,delivered,outbound-api,1,-0.0075,USD,,2026-10-19T17:08:44-07:00,2026-10-19T17:08:44-07:00
+SM_mike_hnd_in,+15415552963,+15415554188,Midori — Zoetis confirmed for next week right? Want to lock chute crew. Same $14.20 like we agreed?,delivered,inbound,1,-0.0075,USD,,2026-10-22T08:14:32-07:00,2026-10-22T08:14:32-07:00
+SM_tara_convoy,+15415554517,+15415554188,"convoy 6am Tumalo, Madras cafe biscuits, gate-in 9:30 (per the addendum). see you at the 97 lot.",delivered,inbound,1,-0.0075,USD,,2026-10-22T20:11:09-07:00,2026-10-22T20:11:09-07:00

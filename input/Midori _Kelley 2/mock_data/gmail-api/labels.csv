@@ -1,0 +1,9 @@
+id,name,type,messages_total,messages_unread,threads_total,threads_unread
+INBOX,INBOX,system,41,7,28,6
+SENT,SENT,system,312,0,188,0
+DRAFT,DRAFT,system,3,0,3,0
+Label_clinic,Rimrock-Vet,user,184,3,96,2
+Label_vendors,Vendors,user,71,2,39,2
+Label_rodeo,Rodeo,user,33,1,21,1
+Label_family,Family,user,58,0,22,0
+Label_personal,Personal,user,24,1,12,1

@@ -1,0 +1,58 @@
+id,thread_id,from_addr,to_addr,cc_addr,subject,snippet,body,date,internal_date,size_estimate,labels,is_unread,is_starred
+msg_atmos_001,thr_atmos_001,orders@maverickleatherco.com,ian.salazar@dac-env.gov,,Your order MLC-44218 has shipped,"Shoulder, 6/7 oz vegtan, indigo edge dye — UPS tracking 1Z…","Hi Ian — your Maverick Leather Co. order MLC-44218 shipped today.
+
+Contents: 1x full shoulder, 6/7 oz vegtan, natural; 1x bottle indigo edge dye; 1x pack #4 nylon thread, natural.
+
+UPS Ground tracking: 1Z2W4U030341182946. ETA Wed Oct 14.
+
+— Maverick Leather Co.","Mon, 12 Oct 2026 09:14:00 -0600",1760281240000,3120,INBOX,False,False
+msg_atmos_002,thr_atmos_002,hr@dac-env.gov,ian.salazar@dac-env.gov,,Open enrollment — closes Oct 30,Reminder: Doña Ana County benefits open enrollment closes Friday Oct 30…,"Team — open enrollment for the 2027 plan year closes Fri Oct 30 at 17:00.
+Log in to the employee portal to review medical, dental, and HSA elections.
+
+— DAC Human Resources","Thu, 15 Oct 2026 08:02:00 -0600",1760536920000,1820,INBOX,False,False
+msg_atmos_003,thr_atmos_003,shop@etsy.com,ian.salazar@dac-env.gov,,Your shop's weekly stats (Oct 12–18),"Visits 218, favorites 14, orders 2 (1 custom)…","Salazar Leathercraft — week of Oct 12–18:
+• Visits: 218 (+12% w/w)
+• Favorites: 14
+• Orders: 2 (1 custom: A5 journal cover)
+• Revenue: $447.50
+
+Top-viewed listing: hand-tooled A5 journal cover, custom embossing.
+— Etsy Shop Stats","Mon, 19 Oct 2026 06:00:00 -0600",1761048000000,2410,"INBOX,Etsy",False,False
+msg_atmos_004,thr_atmos_004,newsletter@nmgameandfish.gov,ian.salazar@dac-env.gov,,October field biologist newsletter,"Pronghorn debrief schedule, deer survey reminders, water-quality field notes…","October update for field biologists in southern New Mexico:
+• Pronghorn debriefs are being scheduled now — see the attached form.
+• Annual deer survey window opens Nov 1.
+• Water-quality field-day reminders: keep probes serviced on a 4-week cadence.
+
+— NM Department of Game and Fish","Thu, 15 Oct 2026 13:40:00 -0600",1760556000000,2940,INBOX,False,False
+msg_atmos_005,thr_atmos_005,carmen.salazar@example.com,ian.salazar@dac-env.gov,,Receta del pozole rojo (de tu tía),"Mijo — aquí está la receta del pozole que me pediste, de tu tía Yolanda…","Mijo — aquí está la receta del pozole rojo de tu tía Yolanda. La uso para Thanksgiving. No la pierdas.
+
+Maíz pozolero (mote), espinazo, ajo, cebolla, orégano de la sierra. Te explico el chile colorado cuando hables conmigo el sábado.
+
+Te quiero, Mamá","Fri, 16 Oct 2026 20:11:00 -0600",1760753460000,1660,"INBOX,Family",False,True
+msg_atmos_006,thr_atmos_006,marco.reyes@example.org,ian.salazar@dac-env.gov,,ArtsFaire booth — table cover + display rack,"Primo — for Nov 7-8 booth, do you want me to bring the cedar display rack?","Primo — for the Nov 7-8 ArtsFaire booth, do you want me to bring the cedar display rack from my shop or do you have your folding one?
+
+Also I have the dark green table cover if you need it.
+
+— Marco","Sat, 17 Oct 2026 11:45:00 -0600",1760852700000,1410,INBOX,False,False
+msg_atmos_007,thr_atmos_007,vendors@lasrcrucesartsfaire.org,ian.salazar@dac-env.gov,,Vendor confirmation — Salazar Leathercraft (Booth E-14),"Confirmed: Salazar Leathercraft, Booth E-14, Sat Nov 7 09:00 – Sun Nov 8 17:00…","Salazar Leathercraft is confirmed for the Las Cruces Renaissance ArtsFaire.
+
+Booth: E-14 (East Lawn, near food row)
+Dates: Sat Nov 7 09:00 — Sun Nov 8 17:00
+Load-in window: Fri Nov 6 14:00–18:00
+
+Please bring the signed vendor agreement on Friday.
+
+— Las Cruces Renaissance ArtsFaire","Sun, 18 Oct 2026 10:22:00 -0600",1760934120000,2210,INBOX,False,False
+msg_atmos_008,thr_atmos_008,billing@elpasoelectric.com,ian.salazar@dac-env.gov,,Your October bill is ready,Account 7714-220331 — amount due $98.42 — auto-pay scheduled Oct 28,"Hi Ian — your October bill for account 7714-220331 is ready.
+
+Amount due: $98.42
+Auto-pay scheduled: Wed Oct 28
+Last month's usage: 412 kWh
+
+— El Paso Electric","Mon, 19 Oct 2026 07:30:00 -0600",1761053400000,1880,INBOX,True,False
+msg_atmos_009,thr_atmos_009,noreply@github.com,ian.salazar@dac-env.gov,,[iansalazar/dona-ana-water-quality] Weekly digest,"1 commit, 0 issues, 0 PRs this week…","Weekly digest for iansalazar/dona-ana-water-quality:
+• 1 commit (R/wq_validation.R touched)
+• 0 open issues
+• 0 open PRs
+
+— GitHub","Mon, 19 Oct 2026 04:00:00 -0600",1761040800000,1320,INBOX,True,False

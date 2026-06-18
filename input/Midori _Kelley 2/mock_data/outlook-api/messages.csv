@@ -1,0 +1,5 @@
+id,subject,from_name,from_address,to_name,to_address,body_preview,content_type,is_read,importance,received_date
+out-m-201,Robberson Ford - your service summary,Greg Tunney,gtunney@robbersonford.com,Midori Kelley,midori.kelley@voissync.ai,"Hi Midori - all done. Inspection was clean, tires rotated. Next service at 92,500 mi.",text,true,normal,2026-10-09T14:18:08-07:00
+out-m-202,GRE prep group - Sunday meetup,Halie Brimmer,halie.brimmer@gmail.com,Midori Kelley,midori.kelley@voissync.ai,You up for the 3-hour timed practice Sunday at the library? I will bring scratch.,text,true,normal,2026-10-18T20:02:11-07:00
+out-m-203,HOA Q4 meeting reminder,Bailey Ridge HOA,board@bailey-ridge-hoa.org,Midori Kelley,midori.kelley@voissync.ai,Friendly reminder Nov 12 at Tumalo Community Center.,text,false,normal,2026-10-28T09:14:22-07:00
+out-m-204,Subscribe & Save shipment shipped,Amazon Shipment Tracking,shipment-tracking@amazon.com,Midori Kelley,midori.kelley@voissync.ai,Your monthly Subscribe & Save delivery is on the way.,text,true,low,2026-10-05T05:18:09-07:00

@@ -1,0 +1,7 @@
+id,name,path_lower,path_display,is_folder,size,client_modified,rev
+id:DRP_TaxDocs_2025,2025,/personal/tax_docs/2025,/personal/tax_docs/2025,true,0,2026-04-12T19:18:00Z,
+id:DRP_W2_VoissyNc_2025,w2_voissync_2025.pdf,/personal/tax_docs/2025/w2_voissync_2025.pdf,/personal/tax_docs/2025/w2_voissync_2025.pdf,false,184221,2026-01-31T22:11:18Z,01f8c12
+id:DRP_FordPmtSchedule,ford_truck_pmt_schedule.xlsx,/personal/budget/ford_truck_pmt_schedule.xlsx,/personal/budget/ford_truck_pmt_schedule.xlsx,false,42188,2026-03-04T13:24:50Z,02a118c
+id:DRP_BoardingContract,bailey_rd_lease_addendum.pdf,/personal/property/bailey_rd_lease_addendum.pdf,/personal/property/bailey_rd_lease_addendum.pdf,false,622310,2024-08-29T17:02:09Z,03b110a
+id:DRP_GREJrnl2026,study_journal_2026.docx,/personal/gre/study_journal_2026.docx,/personal/gre/study_journal_2026.docx,false,79822,2026-10-19T07:42:00Z,04ef220
+id:DRP_SmithRockTrack,smith_rock_misery_loop.gpx,/personal/maps/smith_rock_misery_loop.gpx,/personal/maps/smith_rock_misery_loop.gpx,false,18820,2025-11-04T20:18:09Z,05ad119
