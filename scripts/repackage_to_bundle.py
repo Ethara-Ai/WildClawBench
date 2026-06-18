@@ -51,9 +51,10 @@ You must pass exactly one of --persona / --all.
 
 DESIGN CHOICES (documented, since some target fields are absent in our data)
 ---------------------------------------------------------------------------
-* report.json.final_reward            <- score.json.combined_reward
-  (most faithful overall reward; the reference bundle's final_reward happens to
-  equal its rubric percentage only because its test score was 100%.)
+* report.json.final_reward            <- mean(test_weights_percentage,
+  rubric_weights_percentage) on the 0-100 scale (self-consistent with those two
+  fields). NOTE: this intentionally deviates from the ben_cox reference bundle,
+  which kept final_reward on the 0-1 scale (e.g. 0.8572).
 * report.json.test_weights_percentage <- ctrf.json.results.summary.weighted_percentage
   (falls back to reward.txt * 100 when ctrf is missing)
 * report.json.rubric_weights_percentage <- score.json.rubric_weights_percentage
@@ -327,9 +328,10 @@ def build_report(
     if test_pct is None:
         test_pct = (reward_txt * 100.0) if reward_txt is not None else 0.0
     rubric_pct = score.get("rubric_weights_percentage", 0.0)
-    final_reward = score.get("combined_reward")
-    if final_reward is None:
-        final_reward = score.get("rubric_based_reward", 0.0)
+    # final_reward = mean of the two percentage fields, on the 0-100 scale (so it
+    # is self-consistent with them). NOT score.json.combined_reward, which is a
+    # 0-1 fraction and would print as e.g. 0.1825 instead of 18.25.
+    final_reward = (float(test_pct) + float(rubric_pct)) / 2.0
 
     return {
         "model": pretty_model,
@@ -337,7 +339,7 @@ def build_report(
         "include_multimodal": _detect_multimodal(task_dir, output_json),
         "pytest": pytest_block,
         "rubric": rubric_block,
-        "final_reward": round(float(final_reward), 4),
+        "final_reward": round(final_reward, 2),
         "test_weights_percentage": round(float(test_pct), 2),
         "rubric_weights_percentage": round(float(rubric_pct), 2),
     }
@@ -364,6 +366,46 @@ def copy_output_media(run_dir: Path, dest_run: Path) -> int:
             shutil.copy2(item, target)
             count += 1
     return count
+
+
+# Verifier artifacts to publish under each bundle run_N/logs/verifier/.
+VERIFIER_BUNDLE_FILES = ("ctrf.json", "test_outputs.py", "test_weights.json", "reward.txt")
+
+
+def copy_verifier_logs(run_dir: Path, dest_run: Path) -> int:
+    """Copy the verifier artifacts into <dest_run>/logs/verifier/ (the raw files
+    the report.json is derived from). Returns the count copied."""
+    src = run_dir / "task_output" / "logs" / "verifier"
+    if not src.is_dir():
+        return 0
+    dest = dest_run / "logs" / "verifier"
+    dest.mkdir(parents=True, exist_ok=True)
+    count = 0
+    for fn in VERIFIER_BUNDLE_FILES:
+        p = src / fn
+        if p.is_file():
+            shutil.copy2(p, dest / fn)
+            count += 1
+    return count
+
+
+def copy_snapshots(run_dir: Path, dest_run: Path) -> int:
+    """Copy the before/after workspace captures into <dest_run>/snapshots/.
+    The 'before' source is `workspace_before` (preferred) or the legacy
+    `workspace_initial`; it is always written as `workspace_before`."""
+    snap = dest_run / "snapshots"
+    n = 0
+    after = run_dir / "workspace_after"
+    if after.is_dir():
+        shutil.copytree(after, snap / "workspace_after", dirs_exist_ok=True)
+        n += 1
+    before = run_dir / "workspace_before"
+    if not before.is_dir():
+        before = run_dir / "workspace_initial"  # normalize legacy name
+    if before.is_dir():
+        shutil.copytree(before, snap / "workspace_before", dirs_exist_ok=True)
+        n += 1
+    return n
 
 
 def _run_index_of(run_dirname: str) -> int:
@@ -623,6 +665,19 @@ def convert_task(
             # 3) output_media
             n_media = copy_output_media(run_dir, dest_run)
 
+            # 4) verifier logs (raw ctrf/test_outputs/test_weights/reward)
+            copy_verifier_logs(run_dir, dest_run)
+
+            # 5) workspace snapshots (before/after) under snapshots/
+            copy_snapshots(run_dir, dest_run)
+
+            # 5) subagents/ — sub-agent delivery JSONs (multi-agent turns), if any
+            subagents_src = run_dir / "task_output" / "workspace_full" / "subagents"
+            n_sub = 0
+            if subagents_src.is_dir():
+                shutil.copytree(subagents_src, dest_run / "subagents", dirs_exist_ok=True)
+                n_sub = sum(1 for _ in subagents_src.rglob("*") if _.is_file())
+
             per_run_summ.append(
                 {
                     "run_index": ridx,
@@ -635,7 +690,7 @@ def convert_task(
             if verbose:
                 print(
                     f"    {pretty}/run_{ridx}: report.json + output.json "
-                    f"+ {n_media} media file(s)"
+                    f"+ {n_media} media file(s) + {n_sub} subagent file(s)"
                 )
 
         # pass_summary.json REBUILT from the runs we actually emitted.

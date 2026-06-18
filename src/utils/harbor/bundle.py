@@ -47,7 +47,12 @@ from .test_sh import generate_harbor_test_sh
 
 _MODEL_DIRS = ("claude", "gpt")
 _API_REGEX = re.compile(r"\b([a-z][a-z0-9-]*-api)\b")
-_KEEP_TOP_LEVEL = {"API_DOCUMENTATION.md", "tracking_middleware.py", "sqlite_mcp_server.db", "skills"}
+_KEEP_TOP_LEVEL = {
+    "API_DOCUMENTATION.md", "tracking_middleware.py", "sqlite_mcp_server.db", "skills",
+    # Shared mock infra imported by every <api>/server.py — keep them in every
+    # bundle's data/environment so the snapshot is self-contained/runnable.
+    "_mutable_store.py", "admin_plane.py",
+}
 
 
 def _discover_used_apis(task: Task, task_dir: Optional[Path], env_dir: Path) -> Set[str]:
