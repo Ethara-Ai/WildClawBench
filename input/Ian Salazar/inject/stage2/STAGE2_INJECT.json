@@ -26,6 +26,27 @@
         "received_at": "{D1:iso}T05:42:00-06:00",
         "body": "Ian,\n\nAnalytical confirms Site 3 pH on chain COC-2026-10-14-UC. Field strip read 7.4 in your notes; bench result is 7.2 (± 0.05, two replicates, calibrated against pH-7 buffer at 21.4°C).\n\nPlease revise the value wherever your downstream tracking lives. We are issuing COC v1.1 with the corrected reading and an amendment note — it'll come over from the lab portal later today. Do not edit the v1.0 form already in your project files; per protocol the sealed copy stays as-submitted and the new version supersedes.\n\nDO, turbidity, and coliform values for Site 3 are confirmed at the field-side numbers (DO 5.1 mg/L, turbidity 9.6 NTU, CFU/100mL 162).\n\n— RSU Analytical Services"
       },
+      "admin": {
+        "op": "upsert",
+        "table": "messages",
+        "pk_field": "id",
+        "row": {
+          "id": "msg_lab_ph_revision_001",
+          "thread_id": "thr_lab_ph_revision_001",
+          "from_addr": "ras-lab@ridgemont.edu",
+          "to_addr": "ian.salazar@dac-env.gov",
+          "cc_addr": "samuel.olivera@example.org",
+          "subject": "Site 3 pH revision — chain COC-2026-10-14-UC",
+          "snippet": "Analytical confirms Site 3 pH on chain COC-2026-10-14-UC. Field strip read 7.4 in your notes; bench result is 7.2…",
+          "body": "Ian,\n\nAnalytical confirms Site 3 pH on chain COC-2026-10-14-UC. Field strip read 7.4 in your notes; bench result is 7.2 (± 0.05, two replicates, calibrated against pH-7 buffer at 21.4°C).\n\nPlease revise the value wherever your downstream tracking lives. We are issuing COC v1.1 with the corrected reading and an amendment note — it'll come over from the lab portal later today. Do not edit the v1.0 form already in your project files; per protocol the sealed copy stays as-submitted and the new version supersedes.\n\nDO, turbidity, and coliform values for Site 3 are confirmed at the field-side numbers (DO 5.1 mg/L, turbidity 9.6 NTU, CFU/100mL 162).\n\n— RSU Analytical Services",
+          "date": "Wed, 21 Oct 2026 05:42:00 -0600",
+          "internal_date": 1761219720000,
+          "size_estimate": 2680,
+          "labels": "INBOX",
+          "is_unread": true,
+          "is_starred": false
+        }
+      },
       "expected_status": 200
     }
   ]

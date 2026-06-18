@@ -1,5 +1,5 @@
-id,createdTime,vaccine_name,client,head_count,unit_cost_usd,line_total_usd,vendor,po_number,expected_eta,order_status
-recHndIBRBVDQ4001,2026-09-15T08:00:00.000Z,IBR/BVD Booster Bolus,Henderson Ranch,47,14.2,667.4,Zoetis Animal Health,HND-2026-Q4,2026-10-27,deposit_paid
+id,createdTime,vaccine_name,client,head_count,per_bolus_cost,line_total_usd,vendor,po_number,expected_eta,order_status
+rec_henderson_ibr_bvd_booster,2026-09-15T08:00:00.000Z,IBR/BVD Booster Bolus,Henderson Ranch,47,14.2,667.4,Zoetis Animal Health,HND-2026-Q4,2026-10-27,deposit_paid
 recWatsonRabies01,2026-09-15T08:00:00.000Z,Bovine Rabies (RabVac 3),Watson Ranch,28,6.95,194.6,Boehringer Ingelheim,WAT-2026-Q3,2026-09-15,delivered
 recKrasickiBVD001,2026-09-15T08:00:00.000Z,IBR/BVD Booster Bolus,Krasicki Ranch,52,14.2,738.4,Zoetis Animal Health,KRA-2026-Q3,2026-09-30,delivered
 recClinicLepto001,2026-09-15T08:00:00.000Z,Lepto 5-way,Clinic shelf stock,200,2.85,570.0,Merck Animal Health,RV-SHELF-2026-10,2026-10-20,delivered

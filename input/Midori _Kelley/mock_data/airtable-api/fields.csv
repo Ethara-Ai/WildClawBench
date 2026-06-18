@@ -2,7 +2,7 @@ tableId,id,name,type
 tblVaccines000001,fldVaccineName01,vaccine_name,singleLineText
 tblVaccines000001,fldClient00000001,client,singleLineText
 tblVaccines000001,fldHeadCount0001,head_count,number
-tblVaccines000001,fldUnitCost000001,unit_cost_usd,currency
+tblVaccines000001,fldUnitCost000001,per_bolus_cost,currency
 tblVaccines000001,fldLineTotal0001,line_total_usd,currency
 tblVaccines000001,fldVendor00000001,vendor,singleLineText
 tblVaccines000001,fldPONumber000001,po_number,singleLineText
