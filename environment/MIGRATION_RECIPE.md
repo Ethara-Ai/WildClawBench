@@ -365,3 +365,35 @@ Three migration cohorts:
 
 Each manual migration must end with a green run of
 `scripts/verify_applied.py` and `tests/test_drift_plane_smoke.py`.
+
+---
+
+## Eager-load smoke test (mandatory pre-merge gate)
+
+Static-only audits miss runtime defects in `_store.eager_load()` paths
+(loader crashes, coerce-time KeyError on missing seed columns, stale
+data-module renames). Every PR that touches `environment/**` must pass
+this smoke test before merge.
+
+Run from repo root with Python 3.12:
+
+```bash
+for api in environment/*-api; do
+    name=$(basename "$api" | tr - _ | sed 's/_api$//')
+    python3.12 -c "
+import sys
+sys.path.insert(0, 'environment')
+sys.path.insert(0, '$api')
+__import__('${name}_data')
+print('OK: $api')
+" || echo "BROKEN: $api"
+done
+```
+
+Every line must read `OK: environment/<api>-api`. A `BROKEN:` line means
+the API's `_store.eager_load()` (or a module-level expression executed
+during import) raised an exception — a runtime defect that no static
+audit will catch. Fix the underlying loader before merging.
+
+Wire this into CI as a required check so a future loader regression is
+caught at PR time rather than at deployment.

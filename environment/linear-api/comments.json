@@ -86,5 +86,21 @@
     "userId": "user-mira",
     "createdAt": "2026-04-12T10:00:00",
     "updatedAt": "2026-04-12T10:00:00"
+  },
+  {
+    "id": "comment-01",
+    "body": "Started prototyping the token-bucket implementation. Initial benchmarks suggest 10ms p99 overhead per request, which is within budget.",
+    "issueId": "issue-01",
+    "userId": "user-01",
+    "createdAt": "2026-04-22T10:00:00",
+    "updatedAt": "2026-04-22T10:00:00"
+  },
+  {
+    "id": "comment-25",
+    "body": "Confirmed the deprecated widgets are no longer referenced in the dashboard repo. Safe to remove.",
+    "issueId": "issue-26",
+    "userId": "user-05",
+    "createdAt": "2026-04-30T15:00:00",
+    "updatedAt": "2026-04-30T15:00:00"
   }
 ]

@@ -10,7 +10,7 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_json_with_ctx, get_store, opt_str, strict_bool, strict_int)
+    read_seed_with_ctx, get_store, opt_str, strict_bool, strict_int)
 
 _store = get_store("kubernetes-api")
 _API = "kubernetes-api"
@@ -21,9 +21,9 @@ _store.register("nodes", primary_key="name",
                 initial_loader=lambda: _coerce_nodes(_load("nodes.json", "nodes")))
 _store.register("pods", primary_key="name",
                 initial_loader=lambda: _coerce_pods(_load("pods.json", "pods")))
-_store.register("deployments", primary_key="name",
+_store.register("deployments", primary_key="_pk",
                 initial_loader=lambda: _coerce_deployments(_load("deployments.json", "deployments")))
-_store.register("services", primary_key="name",
+_store.register("services", primary_key="_pk",
                 initial_loader=lambda: _coerce_services(_load("services.json", "services")))
 
 
@@ -49,7 +49,7 @@ def _services_rows():
 
 
 def _load(filename, table):
-    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):
@@ -103,8 +103,10 @@ def _coerce_pods(rows):
 def _coerce_deployments(rows):
     out = []
     for r in rows:
+        clean = _strip_ctx(r)
         out.append({
-            **_strip_ctx(r),
+            **clean,
+            "_pk": f"{clean['namespace']}/{clean['name']}",
             "replicas": strict_int(r, "replicas"),
             "available_replicas": strict_int(r, "available_replicas"),
             "ready_replicas": strict_int(r, "ready_replicas"),
@@ -116,8 +118,10 @@ def _coerce_deployments(rows):
 def _coerce_services(rows):
     out = []
     for r in rows:
+        clean = _strip_ctx(r)
         out.append({
-            **_strip_ctx(r),
+            **clean,
+            "_pk": f"{clean['namespace']}/{clean['name']}",
             "port": strict_int(r, "port"),
             "target_port": strict_int(r, "target_port"),
             "external_ip": opt_str(r, "external_ip", default="") or None,

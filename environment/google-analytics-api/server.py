@@ -1,4 +1,4 @@
-"""FastAPI server wrapping analytics_data module as REST endpoints.
+"""FastAPI server wrapping google_analytics_data module as REST endpoints.
 
 Implements a subset of the GA4 Analytics Data API (v1beta). Report endpoints
 use the ``properties/{id}:method`` colon-suffix convention.
@@ -8,11 +8,13 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 
-import analytics_data
+import google_analytics_data
 try:
     from tracking_middleware import install_tracker
     from admin_plane import install_admin_plane
-except ModuleNotFoundError:  # standalone run without the shared module on sys.path
+except ModuleNotFoundError as _shared_plane_err:  # standalone run without the shared module on sys.path
+    import logging as _logging
+    _logging.error("SHARED PLANE MISSING - audit + admin disabled: %s", _shared_plane_err)
     def install_tracker(app):  # no-op fallback: audit endpoints disabled
         return None
 
@@ -21,7 +23,7 @@ except ModuleNotFoundError:  # standalone run without the shared module on sys.p
 
 app = FastAPI(title="Google Analytics Data API (Mock)", version="v1beta")
 install_tracker(app)
-install_admin_plane(app, store=analytics_data._store)
+install_admin_plane(app, store=google_analytics_data._store)
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -51,7 +53,7 @@ class RunReportBody(BaseModel):
 
 @app.post("/v1beta/properties/{property_id}:runReport")
 def run_report(property_id: str, body: RunReportBody):
-    return analytics_data.run_report(
+    return google_analytics_data.run_report(
         property_id,
         dimensions=[d.name for d in body.dimensions],
         metrics=[m.name for m in body.metrics],
@@ -61,7 +63,7 @@ def run_report(property_id: str, body: RunReportBody):
 
 @app.post("/v1beta/properties/{property_id}:runRealtimeReport")
 def run_realtime_report(property_id: str, body: RunReportBody):
-    return analytics_data.run_realtime_report(
+    return google_analytics_data.run_realtime_report(
         property_id,
         dimensions=[d.name for d in body.dimensions],
         metrics=[m.name for m in body.metrics],
@@ -74,16 +76,16 @@ class BatchRunReportsBody(BaseModel):
 
 @app.post("/v1beta/properties/{property_id}:batchRunReports")
 def batch_run_reports(property_id: str, body: BatchRunReportsBody):
-    return analytics_data.batch_run_reports(property_id, body.requests)
+    return google_analytics_data.batch_run_reports(property_id, body.requests)
 
 
 # --- Metadata ---
 
 @app.get("/v1beta/properties/{property_id}/metadata")
 def get_metadata(property_id: str):
-    return analytics_data.get_metadata(property_id)
+    return google_analytics_data.get_metadata(property_id)
 
 
 @app.get("/v1beta/properties/{property_id}")
 def get_property(property_id: str):
-    return analytics_data.get_property()
+    return google_analytics_data.get_property()
