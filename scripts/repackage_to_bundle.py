@@ -51,9 +51,9 @@ You must pass exactly one of --persona / --all.
 
 DESIGN CHOICES (documented, since some target fields are absent in our data)
 ---------------------------------------------------------------------------
-* report.json.final_reward            <- score.json.combined_reward
-  (most faithful overall reward; the reference bundle's final_reward happens to
-  equal its rubric percentage only because its test score was 100%.)
+* report.json.final_reward            <- mean(test_weights_percentage, rubric_weights_percentage)
+  (average of the deterministic-test % and the rubric %, both 0-100. The grader
+  never emits a combined_reward, so this is computed here.)
 * report.json.test_weights_percentage <- ctrf.json.results.summary.weighted_percentage
   (falls back to reward.txt * 100 when ctrf is missing)
 * report.json.rubric_weights_percentage <- score.json.rubric_weights_percentage
@@ -86,6 +86,86 @@ import sys
 import unicodedata
 from pathlib import Path
 from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+try:
+    from src.utils.harbor.compose import discover_services, generate_harbor_compose
+except Exception:  # pragma: no cover — compose regen is best-effort
+    discover_services = None  # type: ignore
+    generate_harbor_compose = None  # type: ignore
+
+# Shared mock-framework infra files (live at the env root, imported by every API
+# server). The bundle must ship them or no API can boot.
+_REPO_ENV_DIR = Path(__file__).resolve().parent.parent / "environment"
+_INFRA_FILES = ("_mutable_store.py", "tracking_middleware.py", "admin_plane.py",
+                "API_DOCUMENTATION.md")
+
+
+def _enabled_apis(input_task_dir: Path | None, task_dir: Path) -> set[str]:
+    """The task's required + distractor API set, as `<name>-api` dir names.
+
+    mock_data/ overlays are the most reliable source (already suffixed); task.yaml
+    required_apis/distractor_apis are folded in (suffix added when missing)."""
+    enabled: set[str] = set()
+    for base in (input_task_dir, task_dir):
+        md = (base / "mock_data") if base else None
+        if md and md.is_dir():
+            enabled |= {p.name for p in md.iterdir() if p.is_dir()}
+    ty = (input_task_dir / "task.yaml") if input_task_dir else None
+    if ty and ty.is_file():
+        try:
+            import yaml  # type: ignore
+            doc = yaml.safe_load(ty.read_text(encoding="utf-8")) or {}
+            for key in ("required_apis", "distractor_apis"):
+                for a in (doc.get(key) or []):
+                    a = str(a).strip()
+                    if a:
+                        enabled.add(a if a.endswith("-api") else f"{a}-api")
+        except Exception:
+            pass
+    return enabled
+
+
+def _finalize_bundle_environment(bundle: Path, input_task_dir: Path | None,
+                                 task_dir: Path, current_date: str = "") -> None:
+    """Trim data/environment to the task's enabled APIs, guarantee the shared
+    infra files exist, and regenerate docker-compose.yaml (env block + ONLY the
+    enabled services). Best-effort; never raises into the caller."""
+    env_out = bundle / "data" / "environment"
+    if not env_out.is_dir():
+        return
+    enabled = _enabled_apis(input_task_dir, task_dir)
+    # 1) drop API dirs not in the enabled set (the catalog ships ~104).
+    if enabled:
+        for item in list(env_out.iterdir()):
+            if item.is_dir() and item.name.endswith("-api") and item.name not in enabled:
+                shutil.rmtree(item, ignore_errors=True)
+    # 2) trim skills/ to the enabled connectors + the multimodal/self-improving
+    # helpers (the catalog ships ~104 connectors). Mirrors bundle.py's filter.
+    skills_dir = env_out / "skills"
+    if skills_dir.is_dir() and enabled:
+        keep_skills = {f"{a}-connector" for a in enabled}
+        keep_skills |= {"video-frames", "pdf-extract", "audio-extract", "self-improving"}
+        for item in list(skills_dir.iterdir()):
+            if item.is_dir() and item.name not in keep_skills:
+                shutil.rmtree(item, ignore_errors=True)
+    # 3) ensure the 3 shared infra files (+ API_DOCUMENTATION) are present.
+    for fn in _INFRA_FILES:
+        dst = env_out / fn
+        if not dst.exists():
+            src = _REPO_ENV_DIR / fn
+            if src.is_file():
+                shutil.copy2(src, dst)
+    # 4) regenerate docker-compose.yaml from the (now trimmed) env dir.
+    if discover_services and generate_harbor_compose:
+        try:
+            services = discover_services(env_out)
+            (env_out / "docker-compose.yaml").write_text(
+                generate_harbor_compose(env_out, services=services,
+                                        current_date=current_date),
+                encoding="utf-8")
+        except Exception as exc:  # pragma: no cover
+            print(f"    (compose regen skipped: {exc})", file=sys.stderr)
 
 
 # Extend as new harnesses/models are published. Default direct-Anthropic path
@@ -333,9 +413,12 @@ def build_report(
     if test_pct is None:
         test_pct = (reward_txt * 100.0) if reward_txt is not None else 0.0
     rubric_pct = score.get("rubric_weights_percentage", 0.0)
-    final_reward = score.get("combined_reward")
-    if final_reward is None:
-        final_reward = score.get("rubric_based_reward", 0.0)
+    test_pct = float(test_pct)
+    rubric_pct = float(rubric_pct)
+    # final_reward = average of the deterministic-test percentage and the rubric
+    # percentage (both 0-100). Previously this read score.combined_reward /
+    # rubric_based_reward, neither of which the grader emits, so it was always 0.
+    final_reward = (test_pct + rubric_pct) / 2.0
 
     return {
         "model": pretty_model,
@@ -343,9 +426,9 @@ def build_report(
         "include_multimodal": _detect_multimodal(task_dir, output_json),
         "pytest": pytest_block,
         "rubric": rubric_block,
-        "final_reward": round(float(final_reward), 4),
-        "test_weights_percentage": round(float(test_pct), 2),
-        "rubric_weights_percentage": round(float(rubric_pct), 2),
+        "final_reward": round(final_reward, 2),
+        "test_weights_percentage": round(test_pct, 2),
+        "rubric_weights_percentage": round(rubric_pct, 2),
     }
 
 
@@ -466,9 +549,24 @@ def convert_task(
         if prompt_src.exists():
             bundle.mkdir(parents=True, exist_ok=True)
             shutil.copy2(prompt_src, bundle / "prompt.txt")
+        # inject/ (the per-turn injection staging tree: persona/, emails/, pdfs/,
+        # docs/ used by the multiturn-injection flow) is not in the run output —
+        # re-source it from the original input task dir into the bundle root.
+        inject_src = input_task_dir / "inject"
+        if inject_src.is_dir():
+            bundle.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(
+                inject_src, bundle / "inject",
+                dirs_exist_ok=True,
+                ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo"),
+            )
         stage_persona_and_artifacts(input_task_dir, bundle, verbose)
     elif verbose:
         print(f"    (no input dir matched under {input_root}; prompt/persona/artifacts skipped)")
+
+    # Trim data/environment to the task's enabled APIs, ensure shared infra files,
+    # and regenerate docker-compose.yaml (only the required + distractor services).
+    _finalize_bundle_environment(bundle, input_task_dir, task_dir)
 
     produced_any = False
     for harness_dir in sorted(p for p in trajectories.iterdir() if p.is_dir()):
@@ -496,27 +594,38 @@ def convert_task(
             # 3) output_media
             n_media = copy_output_media(run_dir, dest_run)
 
-            # 4) snapshot/ (workspace_before/ vs workspace_after/, each holding
-            # persona/ + data/ + mock_data/), if the run produced one. Copied
-            # as-is so the published bundle preserves the initial-vs-final state.
+            # The bundle run dir contains EXACTLY: output_media/, logs/verifier/,
+            # snapshots/, output.json, report.json — nothing else.
+            #
+            # 4) snapshots/ (workspace_before/ vs workspace_after/, each holding
+            # persona/ + data/ + mock_data/). Copied as-is so the bundle preserves
+            # the initial-vs-final state.
             src_snap = run_dir / "snapshot"
             if src_snap.is_dir():
                 shutil.copytree(
-                    src_snap, dest_run / "snapshot",
+                    src_snap, dest_run / "snapshots",
                     dirs_exist_ok=True,
                     ignore=shutil.ignore_patterns(".DS_Store"),
                 )
 
-            # 5) Trajectory costing + scoring artifacts. usage.json carries the
-            # full token/cost breakdown (input/output/cache_read/cache_write/
-            # cost_usd per source + total) and score.json the rubric/headroom
-            # detail. The repackager previously dropped both, so the published
-            # bundle shipped with zero cost data (IAN report Pointer 5). Copy
-            # them through verbatim.
-            for _fn in ("usage.json", "score.json", "inject_timeline.jsonl"):
-                _src = run_dir / _fn
-                if _src.exists():
-                    shutil.copy2(_src, dest_run / _fn)
+            # 5) logs/verifier/: the deterministic-test artifacts a re-grader needs
+            # (the suite, its weights, the CTRF result, and the numeric reward).
+            verifier_src = run_dir / "task_output" / "logs" / "verifier"
+            if verifier_src.is_dir():
+                lv = dest_run / "logs" / "verifier"
+                lv.mkdir(parents=True, exist_ok=True)
+                for _vf in ("test_outputs.py", "ctrf.json", "test_weights.json", "reward.txt"):
+                    _s = verifier_src / _vf
+                    if _s.exists():
+                        shutil.copy2(_s, lv / _vf)
+
+            # 6) Drop anything not in the allowed set (score/usage/timeline/old
+            # singular 'snapshot'/'logs_verifier' from prior repackages) so the
+            # run dir is exactly the layout above. Idempotent.
+            for _f in ("score.json", "usage.json", "inject_timeline.jsonl"):
+                (dest_run / _f).unlink(missing_ok=True)
+            for _d in ("snapshot", "logs_verifier"):
+                shutil.rmtree(dest_run / _d, ignore_errors=True)
 
             per_run_summ.append(
                 {
@@ -524,6 +633,10 @@ def convert_task(
                     "include_multimodal": report["include_multimodal"],
                     "test_weights_percentage": report["test_weights_percentage"],
                     "rubric_weights_percentage": report["rubric_weights_percentage"],
+                    # combined = mean(test%, rubric%) — same definition as report.final_reward
+                    "combined_score": round(
+                        (report["test_weights_percentage"]
+                         + report["rubric_weights_percentage"]) / 2.0, 2),
                 }
             )
             produced_any = True
@@ -533,16 +646,20 @@ def convert_task(
                     f"+ {n_media} media file(s)"
                 )
 
-        # pass_summary.json REBUILT from the runs we actually emitted.
+        # pass_summary.json REBUILT from the runs we actually emitted. The
+        # headline is `average_combined_score`: the mean over all runs of each
+        # run's combined (rubric+test) score.
         if per_run_summ:
             n = len(per_run_summ)
             avg_test = sum(r["test_weights_percentage"] for r in per_run_summ) / n
             avg_rub = sum(r["rubric_weights_percentage"] for r in per_run_summ) / n
+            avg_combined = sum(r["combined_score"] for r in per_run_summ) / n
             _write_json(
                 dest_model / "pass_summary.json",
                 {
                     "model": pretty,
                     "runs": n,
+                    "average_combined_score": round(avg_combined, 2),
                     "average_test_weights_percentage": round(avg_test, 2),
                     "average_rubric_weights_percentage": round(avg_rub, 2),
                     "per_run": per_run_summ,

@@ -122,10 +122,17 @@ def _healthcheck_cmd(port: int, path: str) -> str:
 
 
 def generate_harbor_compose(env_dir: Path,
-                            services: Optional[Iterable[Mapping]] = None) -> str:
+                            services: Optional[Iterable[Mapping]] = None,
+                            current_date: str = "",
+                            include_llm_env: bool = True) -> str:
     """Render the Harbor `data/environment/docker-compose.yaml`.
 
-    The `main` service waits for every mock service to become healthy.
+    The `main` service waits for every mock service to become healthy and is
+    handed an ``environment:`` block: one ``<SVC>_API_URL`` per service (so a
+    bundle re-run resolves the same endpoints the live harness injected), plus
+    the LiteLLM/OpenAI proxy vars and CURRENT_DATE. Callers pass the already
+    filtered ``services`` (task's required + distractor only), so the compose
+    lists ONLY those — not the full ~104-API catalog.
     """
     if services is None:
         services = discover_services(env_dir)
@@ -143,6 +150,21 @@ def generate_harbor_compose(env_dir: Path,
         for svc in svc_list:
             lines.append(f"      {svc['name']}:")
             lines.append("        condition: service_healthy")
+    # environment: one <SVC>_API_URL per enabled service + (optional) LLM proxy vars.
+    lines.append("    environment:")
+    for svc in svc_list:
+        ev = svc.get("env_var_name")
+        if ev:
+            lines.append(f"      - {ev}=http://{svc['name']}:{int(svc['port'])}")
+    if include_llm_env:
+        lines.append("      - LITELLM_BASE_URL=http://litellm-proxy:4000")
+        lines.append("      - OPENAI_API_BASE=http://litellm-proxy:4000/v1")
+        lines.append("      - OPENAI_API_KEY=placeholder")
+    if current_date:
+        lines.append(f"      - CURRENT_DATE={current_date}")
+    lines.append("      - TEST_DIR=${TEST_DIR:-/tests}")
+    lines.append("    volumes:")
+    lines.append("      - ${HOST_VERIFIER_LOGS_PATH:-./logs/verifier}:${ENV_VERIFIER_LOGS_PATH:-/logs/verifier}")
 
     for svc in svc_list:
         name = svc["name"]
