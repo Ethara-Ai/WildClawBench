@@ -113,6 +113,20 @@ ARTIFACTS_SCRATCH_DIRNAME = "_tmp"
 # Where staged inputs live inside the bundle's environment dir.
 ARTIFACTS_INPUTS_SUBPATH = ("artifacts", "inputs", "files")
 
+# Harness-runtime files re-sourced from the harness's own `environment/` dir
+# into every published bundle's `data/environment/`. These power the runtime
+# admin plane / mutable store / instrumentation that bundle consumers replay
+# against — keeping them in lock-step with the harness avoids drift. The path
+# is derived from this script's own location (one level up = harness root) so
+# the rule is portable across machines / checkout paths.
+HARNESS_ENV_FILES: tuple[str, ...] = (
+    "tracking_middleware.py",
+    "admin_plane.py",
+    "_mutable_store.py",
+)
+HARNESS_ROOT = Path(__file__).resolve().parent.parent
+HARNESS_ENV_DIR = HARNESS_ROOT / "environment"
+
 
 # Tokens that look like a uuid / hex hash / pure-number suffix get dropped so the
 # persona "core" survives. e.g. ben_cox_8fc24d4b-dd01-... -> "ben cox".
@@ -443,9 +457,32 @@ def stage_persona_and_artifacts(
                 shutil.copy2(item, dest_files / item.name)
                 n_files += 1
 
+    n_harness_env = _stage_harness_env_files(env_dir, verbose)
+
     if verbose:
-        print(f"    staged persona: {n_persona} file(s), input artifacts: {n_files} file(s)")
+        print(
+            f"    staged persona: {n_persona} file(s), "
+            f"input artifacts: {n_files} file(s), "
+            f"harness env: {n_harness_env} file(s)"
+        )
     return n_persona, n_files
+
+
+def _stage_harness_env_files(env_dir: Path, verbose: bool) -> int:
+    if not HARNESS_ENV_DIR.is_dir():
+        if verbose:
+            print(f"    (harness env dir not found at {HARNESS_ENV_DIR}; skipping)")
+        return 0
+    env_dir.mkdir(parents=True, exist_ok=True)
+    n = 0
+    for name in HARNESS_ENV_FILES:
+        src = HARNESS_ENV_DIR / name
+        if src.is_file():
+            shutil.copy2(src, env_dir / name)
+            n += 1
+        elif verbose:
+            print(f"    (harness env file missing: {src})")
+    return n
 
 
 def convert_task(

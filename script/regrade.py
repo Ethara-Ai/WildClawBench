@@ -5,7 +5,7 @@
 # agent, testgen, or testexec. Council mode only.
 #
 # Usage:
-#   python3 scripts/regrade.py --run output/openclaw/<task>/trajectories/<model>/run_N
+#   python3 script/regrade.py --run output/openclaw/<task>/trajectories/<model>/run_N
 #
 # Inputs read from the run dir:
 #   output.json   — for the trajectory and message stream

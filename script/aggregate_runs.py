@@ -10,10 +10,10 @@
 #   output/<backend>/<task_id>/trajectories/<model>/run_<N>/score.json
 #
 # Usage:
-#   python3 scripts/aggregate_runs.py                       # default ./output
-#   python3 scripts/aggregate_runs.py --output-root output  # explicit root
-#   python3 scripts/aggregate_runs.py --backend openclaw    # filter backend
-#   python3 scripts/aggregate_runs.py --json-only           # no stdout table
+#   python3 script/aggregate_runs.py                       # default ./output
+#   python3 script/aggregate_runs.py --output-root output  # explicit root
+#   python3 script/aggregate_runs.py --backend openclaw    # filter backend
+#   python3 script/aggregate_runs.py --json-only           # no stdout table
 
 from __future__ import annotations
 
