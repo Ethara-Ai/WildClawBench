@@ -1,0 +1,4 @@
+id,type,status,title,space_key,parent_id,version,body,created_by,created_at
+cp_kiln,page,current,Gas reduction kiln - scheduling protocol,COLL,,3,Coordinate firing slots with the kiln neighbour before booking.,collective,2026-01-10T00:00:00Z
+cp_nuka,page,current,Nuka ash glaze - firing notes,COLL,cp_kiln,1,"DISTRACTOR (stale): nuka ash glaze matures at cone 10 in reduction. Older collective note -- superseded by Margaret's latest kiln-log page (cracked at cone 9). Do not report cone 10 (T7).",collective,2025-12-02T00:00:00Z
+cp_sched,page,current,Reduction kiln - autumn availability,COLL,cp_kiln,2,"DISTRACTOR (stale): the reduction kiln is generally open this week. Conflicts with Mika's actual offer (second through fourth only) -- never commit a slot without confirming with the neighbour first (T8).",collective,2026-09-15T00:00:00Z

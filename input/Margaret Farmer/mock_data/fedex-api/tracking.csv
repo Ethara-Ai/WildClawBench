@@ -1,0 +1,2 @@
+tracking_number,status_code,status_description,carrier_code,service_name,ship_date,estimated_delivery,latest_event,latest_event_location,latest_event_time
+SHIP-GT-PARIS,QUOTED,Quoted - not yet booked,FDXE,FedEx International Priority,{ANCHOR:iso},,Quote prepared,"Kyoto, JP",{ANCHOR:iso}

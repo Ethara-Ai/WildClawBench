@@ -1,0 +1,2 @@
+baseId,id,name,primaryFieldId,records_csv
+appSeasonal,tblPieces,Pieces,fldName,records_pieces.csv

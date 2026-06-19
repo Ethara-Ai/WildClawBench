@@ -1,0 +1,5 @@
+wa_id,profile_name,phone_number,opted_in,last_seen
+555-1231,Carol Farmer,555-1231,True,{D0:iso}T13:00:00Z
+555-1232,Robert Farmer,555-1232,True,{D0:iso}T13:00:00Z
+555-4492,Mika Tanabe,555-4492,True,{D0:iso}T13:00:00Z
+555-3445,Daniel Farmer,555-3445,True,{D0:iso}T13:00:00Z

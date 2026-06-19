@@ -1,0 +1,4 @@
+id,email,phone_number,first_name,last_name,organization,title,city,region,country,created,updated
+prof_l1,lapsedA@example.com,+14155551201,Lapsed,Student A,Tempo,Student,Bend,OR,US,2025-11-02T10:00:00Z,2026-05-20T12:00:00Z
+prof_l2,lapsedC@example.com,+14155551203,Lapsed,Student C,Tempo,Student,Bend,OR,US,2025-10-15T10:00:00Z,2026-05-12T12:00:00Z
+prof_a1,activeB@example.com,+14155551202,Active,Regular B,Tempo,Student,Bend,OR,US,2025-09-15T09:30:00Z,2026-05-18T08:00:00Z

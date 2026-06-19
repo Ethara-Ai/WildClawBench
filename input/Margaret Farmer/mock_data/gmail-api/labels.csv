@@ -1,0 +1,7 @@
+id,name,type,messages_total,messages_unread,threads_total,threads_unread
+INBOX,INBOX,system,332,10,236,7
+SENT,SENT,system,720,0,520,0
+DRAFT,DRAFT,system,4,0,4,0
+STARRED,STARRED,system,26,2,20,1
+Label_Paris,Galerie Terre,user,58,3,31,2
+Label_Supply,Materials/Shipping,user,47,3,27,2

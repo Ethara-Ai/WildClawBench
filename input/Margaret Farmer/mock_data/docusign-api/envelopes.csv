@@ -1,0 +1,2 @@
+envelope_id,status,email_subject,sender_name,sender_email,created_time,sent_time,completed_time,template_id
+DS-ENV-MARGA-2026-1001,sent,Galerie Terre consignment - signature requested,Galerie Terre,jl.moreau@galerie-terre.fr,{D0:iso}T09:30:00Z,{D0:iso}T09:35:00Z,,

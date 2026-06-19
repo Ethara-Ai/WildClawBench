@@ -1,0 +1,3 @@
+pipeline_id,pipeline_label,stage_id,stage_label,display_order,probability,closed
+default,Sales Pipeline,presentationscheduled,Presentation Scheduled,2,0.6,false
+default,Sales Pipeline,closedwon,Closed Won,4,1.0,true

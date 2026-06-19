@@ -1,0 +1,6 @@
+id,calendar_id,summary,description,location,start,end,all_day,status,creator,organizer,recurrence,visibility
+evt_ship,margaret.farmer@Finthesiss.ai,Galerie Terre (Paris) shipping deadline,"8 pieces, custom crating",,{ANCHOR:iso},{ANCHOR:iso},True,confirmed,margaret.farmer@Finthesiss.ai,margaret.farmer@Finthesiss.ai,,default
+evt_prod,margaret.farmer@Finthesiss.ai,Seasonal Table production deadline (Shibui),30 pieces fired & finished,,{ANCHOR+3d:iso},{ANCHOR+3d:iso},True,confirmed,margaret.farmer@Finthesiss.ai,margaret.farmer@Finthesiss.ai,,default
+evt_open,margaret.farmer@Finthesiss.ai,Seasonal Table opening reception (Shibui),6:00 PM,"Shibui Gallery, Kyoto",{ANCHOR+8d:iso}T18:00:00+09:00,{ANCHOR+8d:iso}T20:00:00+09:00,False,confirmed,margaret.farmer@Finthesiss.ai,margaret.farmer@Finthesiss.ai,,default
+evt_paris,margaret.farmer@Finthesiss.ai,Galerie Terre 'Earth and Hand' opening (Paris),Travelling to attend,Paris,{ANCHOR+15d:iso},{ANCHOR+15d:iso},True,confirmed,margaret.farmer@Finthesiss.ai,margaret.farmer@Finthesiss.ai,,default
+evt_museum,margaret.farmer@Finthesiss.ai,Kyoto Craft Museum commission due,3 large vessels,,{ANCHOR+90d:iso},{ANCHOR+90d:iso},True,confirmed,margaret.farmer@Finthesiss.ai,margaret.farmer@Finthesiss.ai,,default

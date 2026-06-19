@@ -1,0 +1,5 @@
+page_id,property_name,property_type,value
+pg_kiln,nuka_cone_result,number,10
+pg_kiln,note,text,Digital entry from the earlier firing; check the latest handwritten kiln-log page before relying on this.
+pg_paris,insured_total_jpy,number,780000
+pg_paris,note,text,Working total from the production tracker; confirm against the FedEx crate manifest before shipping.

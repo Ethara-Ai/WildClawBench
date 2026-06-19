@@ -1,7 +1,0 @@
-id,name,desc,id_board,id_list,pos,due,closed,member_ids,labels
-card-variety,Draft variety-trial section,"Lead the narrative with the drought-resistant variety-trial evidence, then the budget (per Dr. Hawkins).",board-deep-roots,list-todo,16384.0,2026-10-14,False,5f1a000000000000000000a1,green:writing
-card-budget,Write budget narrative,"Two-year $85,000 budget broken out by category for the proposal.",board-deep-roots,list-doing,16384.0,2026-10-14,False,5f1a000000000000000000a1,yellow:budget
-card-consent,Collect water-rights consent forms,Six farms in the diversion dispute with Piedmont Agri Holdings.,board-deep-roots,list-todo,32768.0,,False,5f1a000000000000000000a1,blue:water-rights
-card-review,Internal review with Dr. Hawkins,Internal review draft due to the Director.,board-deep-roots,list-todo,49152.0,2026-10-14,False,5f1a000000000000000000a1,red:deadline
-card-submit,Submit to Fieldstone Foundation,Final submission via the Fieldstone portal -- only after internal sign-off.,board-deep-roots,list-todo,65536.0,2026-10-30,False,5f1a000000000000000000a1,red:deadline
-card-compile,Compile trial yields,Trial-plot yields aggregated from the season's records.,board-deep-roots,list-done,16384.0,,False,5f1a000000000000000000a1,green:done

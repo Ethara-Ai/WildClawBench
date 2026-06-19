@@ -1,0 +1,3 @@
+column_id,board_id,title,type,position
+insured_total,board-101,Insured total JPY,numbers,1
+ship_status,board-101,Ship status,text,2

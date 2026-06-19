@@ -1,0 +1,31 @@
+id,createdTime,Piece,Season,Glaze,Firing_status
+recP01,2026-01-15T09:00:00.000Z,ST-01,Summer,ash celadon,fired
+recP02,2026-01-15T09:00:00.000Z,ST-02,Autumn,tenmoku,fired
+recP03,2026-01-15T09:00:00.000Z,ST-03,Winter,wood-ash,fired
+recP04,2026-01-15T09:00:00.000Z,ST-04,Spring,nuka,fired
+recP05,2026-01-15T09:00:00.000Z,ST-05,Summer,ash celadon,fired
+recP06,2026-01-15T09:00:00.000Z,ST-06,Autumn,tenmoku,fired
+recP07,2026-01-15T09:00:00.000Z,ST-07,Winter,wood-ash,fired
+recP08,2026-01-15T09:00:00.000Z,ST-08,Spring,nuka,fired
+recP09,2026-01-15T09:00:00.000Z,ST-09,Summer,ash celadon,fired
+recP10,2026-01-15T09:00:00.000Z,ST-10,Autumn,tenmoku,fired
+recP11,2026-01-15T09:00:00.000Z,ST-11,Winter,wood-ash,fired
+recP12,2026-01-15T09:00:00.000Z,ST-12,Spring,nuka,fired
+recP13,2026-01-15T09:00:00.000Z,ST-13,Summer,ash celadon,fired
+recP14,2026-01-15T09:00:00.000Z,ST-14,Autumn,tenmoku,fired
+recP15,2026-01-15T09:00:00.000Z,ST-15,Winter,wood-ash,fired
+recP16,2026-01-15T09:00:00.000Z,ST-16,Spring,nuka,fired
+recP17,2026-01-15T09:00:00.000Z,ST-17,Summer,ash celadon,fired
+recP18,2026-01-15T09:00:00.000Z,ST-18,Autumn,tenmoku,fired
+recP19,2026-01-15T09:00:00.000Z,ST-19,Winter,wood-ash,fired
+recP20,2026-01-15T09:00:00.000Z,ST-20,Spring,nuka,fired
+recP21,2026-01-15T09:00:00.000Z,ST-21,Summer,ash celadon,fired
+recP22,2026-01-15T09:00:00.000Z,ST-22,Autumn,tenmoku,fired
+recP23,2026-01-15T09:00:00.000Z,ST-23,Winter,wood-ash,fired
+recP24,2026-01-15T09:00:00.000Z,ST-24,Spring,nuka,fired
+recP25,2026-01-15T09:00:00.000Z,ST-25,Summer,ash celadon,to fire
+recP26,2026-01-15T09:00:00.000Z,ST-26,Autumn,tenmoku,to fire
+recP27,2026-01-15T09:00:00.000Z,ST-27,Winter,wood-ash,to fire
+recP28,2026-01-15T09:00:00.000Z,ST-28,Spring,nuka,to fire
+recP29,2026-01-15T09:00:00.000Z,ST-29,Summer,ash celadon,to fire
+recP30,2026-01-15T09:00:00.000Z,ST-30,Autumn,tenmoku,to fire

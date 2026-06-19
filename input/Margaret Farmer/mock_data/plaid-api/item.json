@@ -1,0 +1,35 @@
+{
+  "item": {
+    "item_id": "item_marga_jp",
+    "institution_id": "ins_jp_shinkin",
+    "webhook": "https://example.com/plaid/webhook",
+    "available_products": [
+      "balance",
+      "identity"
+    ],
+    "billed_products": [
+      "transactions",
+      "auth"
+    ],
+    "consent_expiration_time": null,
+    "update_type": "background"
+  },
+  "institution": {
+    "institution_id": "ins_jp_shinkin",
+    "name": "Kyoto Shinkin Bank",
+    "products": [
+      "transactions",
+      "auth",
+      "balance",
+      "identity"
+    ],
+    "country_codes": [
+      "JP"
+    ],
+    "url": "https://www.kyoto-shinkin.example.jp",
+    "primary_color": "#2a6f3a",
+    "routing_numbers": [
+      "0000001"
+    ]
+  }
+}

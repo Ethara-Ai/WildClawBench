@@ -1,4 +1,0 @@
-id,name,id_board,pos,closed
-list-todo,To Do,board-deep-roots,16384.0,False
-list-doing,In Progress,board-deep-roots,32768.0,False
-list-done,Done,board-deep-roots,49152.0,False

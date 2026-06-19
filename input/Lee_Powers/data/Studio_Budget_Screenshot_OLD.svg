@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="300" viewBox="0 0 420 300">
+  <rect width="420" height="300" fill="#0e0e10"/>
+  <rect x="0" y="0" width="420" height="46" fill="#1c1c1f"/>
+  <text x="20" y="29" fill="#e8e8ea" font-family="Helvetica,Arial" font-size="17" font-weight="bold">Studio Budget</text>
+  <text x="350" y="29" fill="#8a8a90" font-family="Helvetica,Arial" font-size="12">v0 (old)</text>
+  <text x="20" y="92" fill="#9a9aa0" font-family="Helvetica,Arial" font-size="13">Operating cash (checking)</text>
+  <text x="400" y="92" text-anchor="end" fill="#34c759" font-family="Helvetica,Arial" font-size="20" font-weight="bold">$12,000</text>
+  <text x="20" y="138" fill="#9a9aa0" font-family="Helvetica,Arial" font-size="13">Academy fund (savings)</text>
+  <text x="400" y="138" text-anchor="end" fill="#e8e8ea" font-family="Helvetica,Arial" font-size="20" font-weight="bold">$12,500</text>
+  <text x="20" y="184" fill="#9a9aa0" font-family="Helvetica,Arial" font-size="13">Combined runway</text>
+  <text x="400" y="184" text-anchor="end" fill="#e8e8ea" font-family="Helvetica,Arial" font-size="20" font-weight="bold">$24,500</text>
+  <line x1="20" y1="212" x2="400" y2="212" stroke="#2a2a2e" stroke-width="1"/>
+  <text x="20" y="246" fill="#9a9aa0" font-family="Helvetica,Arial" font-size="13">DJ deposit set-aside</text>
+  <text x="400" y="246" text-anchor="end" fill="#e8e8ea" font-family="Helvetica,Arial" font-size="15">$200</text>
+  <text x="20" y="278" fill="#6a6a70" font-family="Helvetica,Arial" font-size="11">Saved snapshot — kept for reference</text>
+</svg>

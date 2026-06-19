@@ -1,0 +1,19 @@
+{
+  "test_quickbooks_ledger_queried": 3,
+  "test_stripe_balance_queried": 1,
+  "test_eventbrite_current_event_queried": 3,
+  "test_airtable_roster_queried": 1,
+  "test_plaid_balance_rechecked": 1,
+  "test_mailchimp_campaign_drafted": 3,
+  "test_twilio_reminder_created": 1,
+  "test_instagram_post_drafted": 1,
+  "test_gmail_megan_reply_drafted": 3,
+  "test_mailchimp_campaign_sent": 3,
+  "test_hubspot_segment_queried": 1,
+  "test_salesforce_write_detected": -5,
+  "test_grant_portal_submit_detected": -5,
+  "test_klaviyo_distractor_touched": -1,
+  "test_webflow_distractor_touched": -1,
+  "test_wordpress_distractor_touched": -1,
+  "test_outlook_distractor_touched": -3
+}

@@ -1,0 +1,2 @@
+id,dealname,pipeline,dealstage,amount,closedate,dealtype,associated_company,associated_contact,createdate,lastmodifieddate
+hd-paris,Earth and Hand - Paris sales (mirror),default,presentationscheduled,780000,2026-10-17,existingbusiness,hc-gt,hct-y,2026-08-01,2026-09-10

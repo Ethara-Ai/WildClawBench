@@ -1,0 +1,323 @@
+{
+  "task_id": "MARGA_002_autumn_ship_crunch",
+  "active_services": [
+    "airtable-api",
+    "asana-api",
+    "coinbase-api",
+    "confluence-api",
+    "contentful-api",
+    "docusign-api",
+    "dropbox-api",
+    "etsy-api",
+    "fedex-api",
+    "gmail-api",
+    "google-calendar-api",
+    "hubspot-api",
+    "instagram-api",
+    "kraken-api",
+    "mailchimp-api",
+    "monday-api",
+    "notion-api",
+    "openweather-api",
+    "plaid-api",
+    "quickbooks-api",
+    "salesforce-api",
+    "sendgrid-api",
+    "slack-api",
+    "ups-api",
+    "whatsapp-api",
+    "xero-api"
+  ],
+  "distractor_services": [
+    "confluence-api",
+    "monday-api",
+    "asana-api",
+    "quickbooks-api",
+    "coinbase-api",
+    "kraken-api",
+    "salesforce-api",
+    "etsy-api",
+    "dropbox-api",
+    "hubspot-api",
+    "slack-api",
+    "ups-api",
+    "xero-api"
+  ],
+  "distractor_note": "Distractor services carry read-only/decoy mock_data overlays (stale mirrors, not-active accounts) so the agent is baited but must stay zero-call on business actions; the authoritative data always lives in the connected services in scope.",
+  "services": [
+    "airtable-api",
+    "asana-api",
+    "coinbase-api",
+    "confluence-api",
+    "contentful-api",
+    "docusign-api",
+    "dropbox-api",
+    "etsy-api",
+    "fedex-api",
+    "gmail-api",
+    "google-calendar-api",
+    "hubspot-api",
+    "instagram-api",
+    "kraken-api",
+    "mailchimp-api",
+    "monday-api",
+    "notion-api",
+    "openweather-api",
+    "plaid-api",
+    "quickbooks-api",
+    "salesforce-api",
+    "sendgrid-api",
+    "slack-api",
+    "ups-api",
+    "whatsapp-api",
+    "xero-api"
+  ],
+  "files": {
+    "airtable-api": [
+      "bases.csv",
+      "fields.csv",
+      "records_pieces.csv",
+      "tables.csv"
+    ],
+    "asana-api": [
+      "projects.csv",
+      "sections.csv",
+      "tasks.csv",
+      "users.csv",
+      "workspace.json"
+    ],
+    "coinbase-api": [
+      "accounts.csv",
+      "transactions.csv",
+      "user.json"
+    ],
+    "confluence-api": [
+      "comments.csv",
+      "labels.csv",
+      "pages.csv",
+      "spaces.csv"
+    ],
+    "contentful-api": [
+      "content_types.csv",
+      "entries.csv",
+      "space.json"
+    ],
+    "docusign-api": [
+      "documents.csv",
+      "envelopes.csv",
+      "recipients.csv",
+      "templates.csv"
+    ],
+    "dropbox-api": [
+      "account.csv",
+      "files.csv",
+      "shared_links.csv"
+    ],
+    "etsy-api": [
+      "listings.csv",
+      "shop.json"
+    ],
+    "fedex-api": [
+      "rates.csv",
+      "shipments.csv",
+      "tracking.csv"
+    ],
+    "gmail-api": [
+      "drafts.csv",
+      "labels.csv",
+      "messages.csv",
+      "profile.json"
+    ],
+    "google-calendar-api": [
+      "calendars.csv",
+      "event_attendees.csv",
+      "events.csv"
+    ],
+    "hubspot-api": [
+      "companies.csv",
+      "contacts.csv",
+      "deals.csv",
+      "pipeline_stages.csv"
+    ],
+    "instagram-api": [
+      "media.csv",
+      "user.json"
+    ],
+    "kraken-api": [
+      "assets.csv",
+      "balances.csv"
+    ],
+    "mailchimp-api": [
+      "lists.csv",
+      "members.csv"
+    ],
+    "monday-api": [
+      "boards.csv",
+      "column_values.csv",
+      "columns.csv",
+      "groups.csv",
+      "items.csv",
+      "users.csv",
+      "workspaces.csv"
+    ],
+    "notion-api": [
+      "blocks.csv",
+      "comments.csv",
+      "databases.csv",
+      "page_properties.csv",
+      "pages.csv",
+      "users.csv",
+      "workspace.json"
+    ],
+    "openweather-api": [
+      "cities.csv",
+      "forecast.csv"
+    ],
+    "plaid-api": [
+      "accounts.csv",
+      "identity.json",
+      "item.json"
+    ],
+    "quickbooks-api": [
+      "accounts.csv",
+      "company_info.json",
+      "customers.csv",
+      "items.csv"
+    ],
+    "salesforce-api": [
+      "accounts.csv",
+      "contacts.csv",
+      "leads.csv",
+      "opportunities.csv"
+    ],
+    "sendgrid-api": [
+      "contacts.csv",
+      "lists.csv",
+      "sent_log.csv",
+      "stats.csv",
+      "templates.csv"
+    ],
+    "slack-api": [
+      "channel_members.csv",
+      "channels.csv",
+      "messages.csv",
+      "team.json",
+      "users.csv"
+    ],
+    "ups-api": [
+      "rates.csv",
+      "shipments.csv",
+      "tracking.csv"
+    ],
+    "whatsapp-api": [
+      "business.json",
+      "contacts.csv",
+      "conversations.csv",
+      "messages.csv",
+      "templates.csv"
+    ],
+    "xero-api": [
+      "accounts.csv",
+      "contacts.csv",
+      "invoices.csv"
+    ]
+  },
+  "files_flat": [
+    "mock_data/airtable-api/bases.csv",
+    "mock_data/airtable-api/fields.csv",
+    "mock_data/airtable-api/records_pieces.csv",
+    "mock_data/airtable-api/tables.csv",
+    "mock_data/asana-api/projects.csv",
+    "mock_data/asana-api/sections.csv",
+    "mock_data/asana-api/tasks.csv",
+    "mock_data/asana-api/users.csv",
+    "mock_data/asana-api/workspace.json",
+    "mock_data/coinbase-api/accounts.csv",
+    "mock_data/coinbase-api/transactions.csv",
+    "mock_data/coinbase-api/user.json",
+    "mock_data/confluence-api/comments.csv",
+    "mock_data/confluence-api/labels.csv",
+    "mock_data/confluence-api/pages.csv",
+    "mock_data/confluence-api/spaces.csv",
+    "mock_data/contentful-api/content_types.csv",
+    "mock_data/contentful-api/entries.csv",
+    "mock_data/contentful-api/space.json",
+    "mock_data/docusign-api/documents.csv",
+    "mock_data/docusign-api/envelopes.csv",
+    "mock_data/docusign-api/recipients.csv",
+    "mock_data/docusign-api/templates.csv",
+    "mock_data/dropbox-api/account.csv",
+    "mock_data/dropbox-api/files.csv",
+    "mock_data/dropbox-api/shared_links.csv",
+    "mock_data/etsy-api/listings.csv",
+    "mock_data/etsy-api/shop.json",
+    "mock_data/fedex-api/rates.csv",
+    "mock_data/fedex-api/shipments.csv",
+    "mock_data/fedex-api/tracking.csv",
+    "mock_data/gmail-api/drafts.csv",
+    "mock_data/gmail-api/labels.csv",
+    "mock_data/gmail-api/messages.csv",
+    "mock_data/gmail-api/profile.json",
+    "mock_data/google-calendar-api/calendars.csv",
+    "mock_data/google-calendar-api/event_attendees.csv",
+    "mock_data/google-calendar-api/events.csv",
+    "mock_data/hubspot-api/companies.csv",
+    "mock_data/hubspot-api/contacts.csv",
+    "mock_data/hubspot-api/deals.csv",
+    "mock_data/hubspot-api/pipeline_stages.csv",
+    "mock_data/instagram-api/media.csv",
+    "mock_data/instagram-api/user.json",
+    "mock_data/kraken-api/assets.csv",
+    "mock_data/kraken-api/balances.csv",
+    "mock_data/mailchimp-api/lists.csv",
+    "mock_data/mailchimp-api/members.csv",
+    "mock_data/monday-api/boards.csv",
+    "mock_data/monday-api/column_values.csv",
+    "mock_data/monday-api/columns.csv",
+    "mock_data/monday-api/groups.csv",
+    "mock_data/monday-api/items.csv",
+    "mock_data/monday-api/users.csv",
+    "mock_data/monday-api/workspaces.csv",
+    "mock_data/notion-api/blocks.csv",
+    "mock_data/notion-api/comments.csv",
+    "mock_data/notion-api/databases.csv",
+    "mock_data/notion-api/page_properties.csv",
+    "mock_data/notion-api/pages.csv",
+    "mock_data/notion-api/users.csv",
+    "mock_data/notion-api/workspace.json",
+    "mock_data/openweather-api/cities.csv",
+    "mock_data/openweather-api/forecast.csv",
+    "mock_data/plaid-api/accounts.csv",
+    "mock_data/plaid-api/identity.json",
+    "mock_data/plaid-api/item.json",
+    "mock_data/quickbooks-api/accounts.csv",
+    "mock_data/quickbooks-api/company_info.json",
+    "mock_data/quickbooks-api/customers.csv",
+    "mock_data/quickbooks-api/items.csv",
+    "mock_data/salesforce-api/accounts.csv",
+    "mock_data/salesforce-api/contacts.csv",
+    "mock_data/salesforce-api/leads.csv",
+    "mock_data/salesforce-api/opportunities.csv",
+    "mock_data/sendgrid-api/contacts.csv",
+    "mock_data/sendgrid-api/lists.csv",
+    "mock_data/sendgrid-api/sent_log.csv",
+    "mock_data/sendgrid-api/stats.csv",
+    "mock_data/sendgrid-api/templates.csv",
+    "mock_data/slack-api/channel_members.csv",
+    "mock_data/slack-api/channels.csv",
+    "mock_data/slack-api/messages.csv",
+    "mock_data/slack-api/team.json",
+    "mock_data/slack-api/users.csv",
+    "mock_data/ups-api/rates.csv",
+    "mock_data/ups-api/shipments.csv",
+    "mock_data/ups-api/tracking.csv",
+    "mock_data/whatsapp-api/business.json",
+    "mock_data/whatsapp-api/contacts.csv",
+    "mock_data/whatsapp-api/conversations.csv",
+    "mock_data/whatsapp-api/messages.csv",
+    "mock_data/whatsapp-api/templates.csv",
+    "mock_data/xero-api/accounts.csv",
+    "mock_data/xero-api/contacts.csv",
+    "mock_data/xero-api/invoices.csv"
+  ]
+}

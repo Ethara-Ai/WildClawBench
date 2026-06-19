@@ -1,0 +1,3 @@
+message_id,conversation_id,direction,from_wa_id,to_wa_id,type,text,template_name,status,sent_at
+wam_mika,conv_mika,inbound,555-4492,555-2019,voice,"[voice note] Margaret, it's Mika. I can give you the reduction kiln from the second through the fourth, but not before, I have a bisque load running. Let me know if that works for the Seasonal Table pieces. [attachment: Mika_kiln_voicenote.opus]",,delivered,{D0:iso}T12:55:00Z
+wam_mika_old,conv_mika,inbound,555-4492,555-2019,voice,"[voice note] Margaret, it's Mika. Earlier plan, I can only do the reduction kiln the first through the third. OLD message, check with me before relying on it. [attachment: Mika_kiln_voicenote_OLD.opus]",,delivered,{D-5:iso}T10:00:00Z

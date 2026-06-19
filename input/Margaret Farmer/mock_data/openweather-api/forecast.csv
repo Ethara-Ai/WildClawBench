@@ -1,0 +1,2 @@
+city_id,dt,dt_txt,temp,feels_like,temp_min,temp_max,pressure,humidity,weather_id,weather_main,weather_description,weather_icon,wind_speed,wind_deg,clouds,pop
+1857910,1790856000,{D+1:iso} 12:00:00,18.5,18.9,17.2,18.5,1012,78,500,Rain,light rain,10d,2.6,150,75,0.4

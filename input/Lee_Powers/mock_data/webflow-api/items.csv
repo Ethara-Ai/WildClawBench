@@ -1,0 +1,4 @@
+id,collection_id,name,slug,is_draft,is_archived,summary,created_on,last_updated
+item_home,col_pages,Home - Powers Swing Academy,home,true,false,Landing page draft.,2026-05-01T10:00:00Z,2026-05-22T09:00:00Z
+item_classes,col_pages,Classes,classes,true,false,Classes page draft.,2026-05-01T10:00:00Z,2026-05-22T09:00:00Z
+item_contact,col_pages,Contact,contact,true,false,Contact page draft.,2026-05-01T10:00:00Z,2026-05-22T09:00:00Z

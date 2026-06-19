@@ -1,0 +1,6 @@
+list_id,email_address,full_name,status,timestamp_signup,member_rating
+list_collectors,hana.collector@example.com,Hana Suzuki,subscribed,2026-01-20T08:00:00.000Z,5
+list_collectors,akira.ito@example.com,Akira Ito,subscribed,2026-01-22T11:30:00.000Z,4
+list_collectors,marie.dubois@example.com,Marie Dubois,subscribed,2026-02-01T09:15:00.000Z,4
+list_press,editor@artjournal.example.com,Yuki Tanaka,subscribed,2026-01-18T10:00:00.000Z,3
+list_press,desk@pressdaily.example.com,Sophie Laurent,subscribed,2026-01-25T14:45:00.000Z,3

@@ -1,0 +1,3 @@
+id,parent_type,parent_id,title,created_time,last_edited_time,created_by,archived,icon,cover_url
+pg_bizplan,workspace,ws_lee,Powers Swing Academy - Business Plan,2026-08-01T00:00:00Z,2026-10-18T07:00:00Z,usr_lee,False,,
+pg_launch,workspace,ws_lee,Academy Launch Checklist,2026-09-10T00:00:00Z,2026-10-19T13:00:00Z,usr_lee,False,,

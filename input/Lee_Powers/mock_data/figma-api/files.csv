@@ -1,0 +1,3 @@
+file_key,project_id,name,thumbnail_url,last_modified,version,role,editor_type
+FK001abcdefg,proj-201,Powers Swing Academy Brand,https://figma-thumbs.example.com/FK001.png,2026-05-22T14:30:00Z,4920183,owner,figma
+FK002hijklmn,proj-201,Halloween Social Poster,https://figma-thumbs.example.com/FK002.png,2026-05-24T09:12:00Z,4920455,editor,figma

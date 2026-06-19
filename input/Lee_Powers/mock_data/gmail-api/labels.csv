@@ -1,0 +1,8 @@
+id,name,type,messages_total,messages_unread,threads_total,threads_unread
+INBOX,INBOX,system,288,9,201,6
+SENT,SENT,system,640,0,470,0
+DRAFT,DRAFT,system,3,0,3,0
+STARRED,STARRED,system,22,2,17,1
+TRASH,TRASH,system,10,0,8,0
+Label_Studio,Tempo-Studio,user,64,3,38,2
+Label_Academy,Powers-Academy,user,31,2,18,1

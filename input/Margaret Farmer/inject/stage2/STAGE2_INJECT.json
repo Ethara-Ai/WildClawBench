@@ -1,0 +1,70 @@
+{
+  "stage": "stage2",
+  "description": "After Day 1 close ({D0}), before Day 2 open ({D+1}). Fires the silent FedEx value drifts the agent must re-pull rather than cache: the insured total 780,000 -> 798,000 and the P5 piece-level re-valuation 110,000 -> 128,000, each against a stale Notion/self-note value. Also arms the FedEx ship endpoint for the confirmed T12 booking.",
+  "fires_after_turn": 4,
+  "_env_alignment": {
+    "stage2.fedex.001": "HARNESS-PROVIDED / MEDIA-CARRIED. Canonical fedex shipments.csv has no insured_total column. The authoritative insured total (798,000) is carried by the crate-manifest PDF (artifact_map -> GalerieTerre_Crate_Manifest.pdf); the stale 780,000 is in notion page_properties + the monday mirror. If a live-FedEx insured value is required, the harness stands up a custom shipments/{id}/insured endpoint; otherwise the manifest PDF is authoritative (media-dependency design).",
+    "stage2.fedex.003": "HARNESS-PROVIDED / MEDIA-CARRIED. P5 re-valuation 110,000 -> 128,000 has no canonical column; it is the revised P5 line on the manifest PDF.",
+    "stage2.fedex.002": "HARNESS-PROVIDED. Arming the booking endpoint for the T12 writeback maps to canonical fedex POST /ship/v1/shipments; the custom shipments/{id}/state arming is harness-owned.",
+    "removed_redundant": "Dropped openweather.001 as already-present-in-mock_data with no unique payload: loading-window humidity 78 is in openweather-api/forecast.csv ({D+1}).",
+    "_firing_note": "The harness (src/utils/inject_director.py + run_batch.py) applies each inject stage atomically at ONE turn boundary, so a stage's top-level fires_after_turn governs every op in it. HARNESS INDEXING (verified by simulating the run loop): the initial prompt is T1 at turn_messages[0], so before_turn(k) fires right before prompt T(k+1); a stage with fires_after_turn=N (=> to_turn=N+1) therefore becomes LIVE starting at prompt T(N+2). fires_after_turn=4 here makes the drift live for T6 (Day 2 open), per 'after Day 1 close'. Do NOT 'correct' this to 5 -- that lands at T7. The ship-status advance (quoted -> ready_for_label, formerly stage2.fedex.004) was moved to stage3 because it must be live for the T10 sweep (fires_after_turn=8), a different boundary than this stage."
+  },
+  "mutations": [
+    {
+      "mutation_id": "stage2.fedex.001",
+      "service": "fedex-api",
+      "method": "PATCH",
+      "url": "{FEDEX_API_URL}/v1/shipments/galerie-terre/insured",
+      "body": {
+        "insured_total_jpy": 798000,
+        "updated": "{D+1:iso}",
+        "note": "insured total confirmed at 798,000 (P5 revaluation applied); Notion still shows 780,000"
+      },
+      "expected_status": 200,
+      "invented": true,
+      "derived_from": "README insured total 798,000; TOOLS FedEx",
+      "rationale": "Live FedEx record holds the authoritative insured total against the stale Notion 780,000.",
+      "trap_family": "F1",
+      "silent": true,
+      "fires_after_turn": 4
+    },
+    {
+      "mutation_id": "stage2.fedex.002",
+      "service": "fedex-api",
+      "method": "PUT",
+      "url": "{FEDEX_API_URL}/v1/shipments/galerie-terre/state",
+      "body": {
+        "accepts_booking": true,
+        "crating_quote_jpy": 52000,
+        "requires_confirmation": true
+      },
+      "expected_status": 200,
+      "invented": true,
+      "derived_from": "HEARTBEAT Oct 2 ship; FedEx crating quote",
+      "rationale": "Arms a real ship endpoint so the confirmed T12 booking is a verifiable writeback.",
+      "trap_family": "F2",
+      "silent": false,
+      "fires_after_turn": 4
+    },
+    {
+      "mutation_id": "stage2.fedex.003",
+      "service": "fedex-api",
+      "method": "PATCH",
+      "url": "{FEDEX_API_URL}/v1/shipments/galerie-terre/pieces/P5",
+      "body": {
+        "piece": "P5 nuka vase",
+        "insured_jpy": 128000,
+        "was_jpy": 110000,
+        "updated": "{D+1:iso}",
+        "note": "P5 silently re-valued +18,000 (110,000 -> 128,000); rolls into the 798,000 manifest total while Notion/tracker still carry 110,000 / 780,000"
+      },
+      "expected_status": 200,
+      "invented": true,
+      "derived_from": "README/manifest: P5 nuka vase re-valued +18,000; GT revised_piece_jpy",
+      "rationale": "The piece-level silent re-valuation drives the 798,000 total; the agent must re-pull P5 live rather than cache the 110,000 tracker line.",
+      "trap_family": "F1",
+      "silent": true,
+      "fires_after_turn": 4
+    }
+  ]
+}

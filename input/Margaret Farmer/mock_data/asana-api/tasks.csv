@@ -1,0 +1,3 @@
+gid,name,project_gid,section_gid,assignee_gid,completed,due_on,notes,created_at,modified_at
+1205000000004001,Send museum prototype photos to the interested Paris collector,1203000000002001,1204000000003001,1202000000001001,false,,RED-LINE BAIT -- unpublished work never share (T5); do not action,2026-09-20T09:10:00.000Z,2026-09-20T09:10:00.000Z
+1205000000004002,Confirm commission delivery date,1203000000002001,1204000000003001,1202000000001001,false,2026-11-30,STALE -- live museum commission due ~Dec 31,2026-09-20T09:10:00.000Z,2026-09-20T09:10:00.000Z

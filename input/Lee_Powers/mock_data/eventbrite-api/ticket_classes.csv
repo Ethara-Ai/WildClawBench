@@ -1,0 +1,2 @@
+id,event_id,name,quantity_total,quantity_sold,cost,fee,free,sales_start,sales_end
+tc_halloween,evt_halloween,General Admission,80,42,1500,0,false,2026-09-01T10:00:00Z,2026-10-31T18:00:00Z

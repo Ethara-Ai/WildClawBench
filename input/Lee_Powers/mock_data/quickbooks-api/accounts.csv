@@ -1,0 +1,3 @@
+Id,Name,AccountType,AccountSubType,CurrentBalance,Active,Classification,Description
+1,Powers Swing Academy Fund,Bank,Savings,11550,true,Asset,Academy launch savings (live ledger)
+2,Studio Operating,Bank,Checking,6500,true,Asset,Studio operating account

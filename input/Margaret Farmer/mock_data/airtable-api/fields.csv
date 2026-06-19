@@ -1,0 +1,5 @@
+tableId,id,name,type
+tblPieces,fldName,Piece,singleLineText
+tblPieces,fldSeason,Season,singleSelect
+tblPieces,fldGlaze,Glaze,singleLineText
+tblPieces,fldStatus,Firing_status,singleSelect

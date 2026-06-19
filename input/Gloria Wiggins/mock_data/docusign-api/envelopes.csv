@@ -1,5 +1,0 @@
-envelope_id,status,email_subject,sender_name,sender_email,created_time,sent_time,completed_time,template_id
-env_consent_001,completed,Water Rights Consent - Sweetwater Family Farm,Gloria Wiggins,gloria.wiggins@voissync.ai,2026-09-18,2026-09-18,2026-09-22,Farmer Water-Rights Consent
-env_consent_002,sent,Water Rights Consent - Redbud Hollow Growers,Gloria Wiggins,gloria.wiggins@voissync.ai,2026-10-01,2026-10-01,,Farmer Water-Rights Consent
-env_consent_003,created,Water Rights Consent - Carver Heritage Farm,Gloria Wiggins,gloria.wiggins@voissync.ai,2026-10-08,,,Farmer Water-Rights Consent
-env_grant_001,created,Fieldstone Deep Roots Grant Agreement,Gloria Wiggins,gloria.wiggins@voissync.ai,2026-10-09,,,Grant Agreement (do not sign without Dr. Hawkins sign-off)

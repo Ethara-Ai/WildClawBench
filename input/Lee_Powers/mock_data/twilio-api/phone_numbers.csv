@@ -1,0 +1,2 @@
+sid,phone_number,friendly_name,iso_country,sms_enabled,voice_enabled,mms_enabled,capabilities_fax,date_created
+PN_studio01,+15415557000,Tempo class reminders,US,True,False,True,False,2026-10-18T00:00:00Z

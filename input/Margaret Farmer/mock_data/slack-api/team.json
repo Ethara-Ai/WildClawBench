@@ -1,0 +1,9 @@
+{
+  "id": "T_GT",
+  "name": "Galerie Terre",
+  "domain": "galerie-terre",
+  "email_domain": "galerie-terre.fr",
+  "icon": {
+    "image_132": "https://avatars.example.com/team-cascade.png"
+  }
+}

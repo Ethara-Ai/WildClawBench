@@ -1,0 +1,70 @@
+{
+  "owners": {
+    "acc_chk_001": [
+      {
+        "names": [
+          "Margaret Farmer"
+        ],
+        "emails": [
+          {
+            "data": "margaret.farmer@Finthesiss.ai",
+            "primary": true,
+            "type": "primary"
+          }
+        ],
+        "phone_numbers": [
+          {
+            "data": "+81555201900",
+            "primary": true,
+            "type": "mobile"
+          }
+        ],
+        "addresses": [
+          {
+            "data": {
+              "street": "Higashiyama",
+              "city": "Kyoto",
+              "region": "Kyoto",
+              "postal_code": "605-0000",
+              "country": "JP"
+            },
+            "primary": true
+          }
+        ]
+      }
+    ],
+    "acc_sav_002": [
+      {
+        "names": [
+          "Margaret Farmer"
+        ],
+        "emails": [
+          {
+            "data": "margaret.farmer@Finthesiss.ai",
+            "primary": true,
+            "type": "primary"
+          }
+        ],
+        "phone_numbers": [
+          {
+            "data": "+81555201900",
+            "primary": true,
+            "type": "mobile"
+          }
+        ],
+        "addresses": [
+          {
+            "data": {
+              "street": "Higashiyama",
+              "city": "Kyoto",
+              "region": "Kyoto",
+              "postal_code": "605-0000",
+              "country": "JP"
+            },
+            "primary": true
+          }
+        ]
+      }
+    ]
+  }
+}

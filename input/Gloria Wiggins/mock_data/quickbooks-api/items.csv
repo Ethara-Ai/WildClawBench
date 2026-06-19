@@ -1,2 +1,0 @@
-Id,Name,Description,Type,UnitPrice,IncomeAccountRef_value,IncomeAccountRef_name,Active,Taxable
-1,Soil Testing Service,"Per-sample soil panel (pH, organic matter, nutrients).",Service,35,7,Grant Income,True,False

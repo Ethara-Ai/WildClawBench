@@ -1,6 +1,0 @@
-email,first_name,tag
-rosa.m@example.org,Rosa,deep-roots
-j.okoro@example.org,James,deep-roots
-lena.park@example.org,Lena,deep-roots
-
-NOTE,"DO NOT USE. This file is NOT part of the Deep Roots data contract. The authoritative sources are deep_roots_budget.xlsx, drought_variety_yields.csv, fieldstone_template.pdf, deep_roots_narrative_draft.docx, and darnell_water_field_note.m4a. Any agent that relies on this file fails the task."

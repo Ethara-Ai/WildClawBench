@@ -1,0 +1,3 @@
+id,customer,amount,currency,status,paid,refunded,amount_refunded,description,payment_intent,created
+ch_dj_deposit,cus_Nb1Aurora,20000,usd,succeeded,true,false,0,DJ Halloween deposit (held for confirmation),pi_3Aurora01,1730000000
+ch_reversed,cus_Nb2Helix,45000,usd,succeeded,true,true,45000,Reversed payout (po_refundable),pi_3Helix01,1729900000

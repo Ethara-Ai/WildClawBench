@@ -1,0 +1,2 @@
+service_type,service_name,origin_zip,dest_zip,weight_lb,currency,net_charge,transit_days,delivery_day
+INTL_PRIORITY,FedEx International Priority,605-0000,75001,40,JPY,52000,3,{ANCHOR:iso}

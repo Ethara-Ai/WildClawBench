@@ -1,0 +1,3 @@
+id,parent_type,parent_id,title,created_time,last_edited_time,created_by,archived,icon,cover_url
+pg_kiln,workspace,ws_marga,Kiln Firing Log (digital),2025-06-01T00:00:00Z,{D0:iso}T08:00:00Z,usr_marga,False,,
+pg_paris,workspace,ws_marga,Galerie Terre - Paris production tracker,2026-08-01T00:00:00Z,{D0:iso}T08:00:00Z,usr_marga,False,,

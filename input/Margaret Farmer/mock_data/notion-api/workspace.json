@@ -1,0 +1,14 @@
+{
+  "id": "ws_marga",
+  "name": "Margaret Farmer - Studio Notebook",
+  "domain": "margaret-farmer-studio",
+  "owner_user_id": "usr_marga",
+  "plan": "personal",
+  "created_time": "2025-06-01T00:00:00.000Z",
+  "icon": "https://www.notion.so/icons/pottery_brown.svg",
+  "settings": {
+    "default_page_size": 50,
+    "ai_blocks_enabled": true,
+    "public_sharing_enabled": false
+  }
+}

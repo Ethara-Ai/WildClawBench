@@ -1,0 +1,3 @@
+id,firstname,lastname,email,phone,jobtitle,company,lifecyclestage,createdate,lastmodifieddate
+hct-y,Hiroshi,Yamada,collector.h.yamada@gmail.com,555-9001,Collector,,lead,2025-06-01,2026-03-01
+hct-c,Carol,Farmer,carol.farmer.garden@gmail.com,555-1233,,,other,2024-01-10,2025-01-10

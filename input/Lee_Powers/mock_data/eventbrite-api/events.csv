@@ -1,0 +1,3 @@
+id,organization_id,name,summary,status,start_utc,end_utc,timezone,venue_id,capacity,is_free,online_event,url,created
+evt_halloween,org-cascade,Tempo Halloween Swing Social,"Costumes encouraged, open to the public",live,2026-10-31T19:00:00Z,2026-10-31T23:30:00Z,America/Los_Angeles,venue-tempo,80,false,false,https://eventbrite.example.com/e/tempo-halloween-social,2026-09-01T10:00:00Z
+evt_prevyear,org-cascade,Tempo Halloween Social (last year),Prior-year event,completed,2025-10-31T19:00:00Z,2025-10-31T23:00:00Z,America/Los_Angeles,venue-tempo,80,false,false,https://eventbrite.example.com/e/tempo-halloween-2025,2025-09-01T10:00:00Z

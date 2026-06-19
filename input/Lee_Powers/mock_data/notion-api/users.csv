@@ -1,0 +1,4 @@
+id,name,email,avatar_url,type,bot,owner_workspace,created_time
+usr_lee,Lee Powers,lee.powers@voissync.ai,,person,False,True,2026-01-02T00:00:00Z
+usr_karen,Karen Strickland,karen.strickland@gmail.com,,person,False,False,2026-01-02T00:00:00Z
+usr_derek,Derek Holloway,derek.holloway@gmail.com,,person,False,False,2026-01-02T00:00:00Z

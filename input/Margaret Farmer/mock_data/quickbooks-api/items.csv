@@ -1,0 +1,2 @@
+Id,Name,Description,Type,UnitPrice,IncomeAccountRef_value,IncomeAccountRef_name,Active,Taxable
+1,ST-04 nuka vase (P5),STALE -- re-valued to 128000 on the live FedEx manifest,Inventory,110000,1,Gallery Sales,true,true

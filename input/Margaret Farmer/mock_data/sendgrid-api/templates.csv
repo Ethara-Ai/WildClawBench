@@ -1,0 +1,2 @@
+id,name,generation,subject,html_content,active,updated_at
+tmpl_rsvp,Exhibition RSVP confirmation,dynamic,Your RSVP - Seasonal Table,<p>See you at the opening.</p>,true,{D0:iso}

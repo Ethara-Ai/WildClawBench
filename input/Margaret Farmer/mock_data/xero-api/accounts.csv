@@ -1,0 +1,3 @@
+account_id,code,name,type,tax_type,status,description,enable_payments_to_account
+acc-200,200,Gallery Sales,REVENUE,NONE,ACTIVE,Backup books; QuickBooks is primary. Figures may lag (here 165000 vs QB 180000).,false
+acc-310,310,Materials,EXPENSE,NONE,ACTIVE,Studio materials. Backup mirror.,false

@@ -1,0 +1,6 @@
+id,calendar_id,summary,description,location,start,end,all_day,status,creator,organizer,recurrence,visibility
+evt_hallo,lee.powers@voissync.ai,Halloween swing social @ Tempo,"Costumes encouraged, open to public",Tempo Swing Studio,2026-10-31T20:00:00-07:00,2026-10-31T23:30:00-07:00,False,confirmed,lee.powers@voissync.ai,lee.powers@voissync.ai,,default
+evt_begin,lee.powers@voissync.ai,Beginner West Coast Swing class,Tempo,Tempo Swing Studio,2026-10-19T19:00:00-07:00,2026-10-19T20:00:00-07:00,False,confirmed,lee.powers@voissync.ai,lee.powers@voissync.ai,RRULE:FREQ=WEEKLY;BYDAY=MO,default
+evt_inter,lee.powers@voissync.ai,Intermediate Swing class,Tempo,Tempo Swing Studio,2026-10-21T19:00:00-07:00,2026-10-21T20:30:00-07:00,False,confirmed,lee.powers@voissync.ai,lee.powers@voissync.ai,RRULE:FREQ=WEEKLY;BYDAY=WE,default
+evt_open,lee.powers@voissync.ai,Open-level class (Derek assists),Tempo,Tempo Swing Studio,2026-10-24T11:00:00-07:00,2026-10-24T12:30:00-07:00,False,confirmed,lee.powers@voissync.ai,lee.powers@voissync.ai,RRULE:FREQ=WEEKLY;BYDAY=SA,default
+evt_shift,lee.powers@voissync.ai,ER shift (day) - Summit View,7a-7p,Summit View Medical Center,2026-10-22T07:00:00-07:00,2026-10-22T19:00:00-07:00,False,confirmed,lee.powers@voissync.ai,lee.powers@voissync.ai,,private

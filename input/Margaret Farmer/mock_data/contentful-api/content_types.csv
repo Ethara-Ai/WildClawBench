@@ -1,0 +1,2 @@
+id,name,displayField,description,fields_json
+exhibition_page,Exhibition Page,title,"An exhibition or show page for the ceramics studio site","[{""id"":""title"",""name"":""Title"",""type"":""Symbol"",""required"":true},{""id"":""status"",""name"":""Status"",""type"":""Symbol"",""required"":false},{""id"":""note"",""name"":""Note"",""type"":""Text"",""required"":false},{""id"":""openingDate"",""name"":""Opening Date"",""type"":""Date"",""required"":false}]"

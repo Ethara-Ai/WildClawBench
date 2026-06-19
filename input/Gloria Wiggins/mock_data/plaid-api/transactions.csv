@@ -1,6 +1,0 @@
-transaction_id,account_id,amount,iso_currency_code,date,name,merchant_name,category,pending,payment_channel
-txn_0001,acc_chk_001,48.19,USD,2026-10-02,Piedmont Feed and Seed,Piedmont Feed and Seed,Shops,false,in store
-txn_0002,acc_chk_001,71.55,USD,2026-10-04,Durham Co-op Market,Durham Co-op Market,Food and Drink,false,in store
-txn_0003,acc_chk_001,39.80,USD,2026-10-06,Shell Hillsborough Rd,Shell,Travel,false,in store
-txn_0004,acc_crd_003,27.44,USD,2026-10-07,Etsy Jars and Labels,Etsy,Shops,false,online
-txn_0005,acc_chk_001,200.00,USD,2026-10-08,TCCU Transfer to Savings,Triangle Community Credit Union,Transfer,false,other

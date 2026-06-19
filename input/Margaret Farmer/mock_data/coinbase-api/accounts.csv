@@ -1,0 +1,2 @@
+id,name,primary,type,currency_code,currency_name,balance_amount,native_balance_amount,native_currency,created_at,updated_at
+acct-btc-001,BTC Wallet,true,wallet,BTC,Bitcoin,0.00000000,0.00,JPY,2025-01-10T09:00:00Z,2026-06-11T00:00:00Z

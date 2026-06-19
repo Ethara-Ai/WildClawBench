@@ -1,0 +1,3 @@
+Id,DisplayName,GivenName,FamilyName,CompanyName,PrimaryEmailAddr,PrimaryPhone,BillAddr_Line1,BillAddr_City,BillAddr_CountrySubDivisionCode,BillAddr_PostalCode,Balance,Active,Job,Notes
+1,Shibui Gallery,,,Shibui Gallery,,,,Kyoto,,,0,true,false,40% commission. Do not apply Shibui's 40% to the Paris pieces; reconcile commission from the consignment (T2)
+2,Galerie Terre,,,Galerie Terre,,,,Paris,,,0,true,false,50% commission. Paris consignment; paris pieces value (stale) 780000 JPY
