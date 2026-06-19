@@ -189,7 +189,7 @@ def compute_test_reward(
     neg_penalty = sum(abs(w) for n, w in weights.items() if w < 0 and _key_passed(n))
 
     if pos_total > 0:
-        return max(0.0, (pos_earned - neg_penalty) / pos_total)
+        return (pos_earned - neg_penalty) / pos_total
     if tests_total > 0:
         return tests_passed / tests_total
     return 0.0

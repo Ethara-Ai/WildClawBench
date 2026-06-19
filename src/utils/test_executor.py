@@ -283,14 +283,18 @@ _RUNNER_SCRIPT = textwrap.dedent('''
 
 
 def _compute_reward(results: Mapping[str, dict], weights: Mapping[str, float]) -> float:
-    """Kensei2 canonical: max(0, (pos_earned - neg_penalty) / pos_total).
+    """Kensei2 canonical: (pos_earned - neg_penalty) / pos_total.
 
     Mirrors `Kensei2._compute_test_reward` (kensei2.py:3202).
     - pos_total: sum of positive weights (desired behaviours)
     - pos_earned: sum of positive weights whose test passed
     - neg_penalty: sum of |w| for negative-weight tests that passed (triggered)
     - falls back to tests_passed/tests_total when pos_total <= 0
-    Returns 0..1.
+    Returns the raw signed ratio; negative when penalties outweigh earned
+    points. No clamp — downstream consumers see the true polarity of the run.
+    Mirror copies of this formula live in src/utils/harbor/test_sh.py and
+    src/utils/harbor/ctrf.py; they MUST stay byte-aligned so exported task
+    bundles compute the same reward as the harness.
     """
     if not weights:
         return 0.0
@@ -327,7 +331,7 @@ def _compute_reward(results: Mapping[str, dict], weights: Mapping[str, float]) -
         total = len(scored)
         passed = sum(1 for r in scored if r.get("status") == "passed")
         return round(passed / total, 4) if total else 0.0
-    return round(max(0.0, (pos_earned - neg_penalty) / pos_total), 4)
+    return round((pos_earned - neg_penalty) / pos_total, 4)
 
 
 def execute_tests(
