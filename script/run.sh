@@ -1,44 +1,744 @@
 #!/usr/bin/env bash
-set -euo pipefail
+# WildClawBench end-to-end runner. Handles docker preflight, image loading from
+# local tar, leaked-network cleanup, single-task or bulk K-run loops, and one
+# docker-error retry. Fails loud with one signal at a time.
+#
+# This header block is intentionally short. The full --help text is rendered by
+# print_help() below (USAGE / FLAGS / EXAMPLES / ADVANCED sections).
+#
+# Always operates from the repo root regardless of invocation cwd. All relative
+# paths below (Images/, logs/, environment/, eval/, script/, input/, output/)
+# resolve against the repo root.
 
-if [[ $# -lt 1 ]]; then
-  cat <<'EOF'
-Usage:
-  bash script/run.sh openclaw    [run_batch args...]
-  bash script/run.sh claudecode  [run_batch args...]
-  bash script/run.sh codex       [run_batch args...]
-  bash script/run.sh hermesagent [run_batch args...]
+set -u
+set -o pipefail
 
-Examples:
-  bash script/run.sh openclaw --category all --parallel 4 --model openrouter/openai/gpt-5.5
-  bash script/run.sh claudecode --category all --parallel 4 --model openai/gpt-5.5
-  bash script/run.sh codex --category all --parallel 4 --model openrouter/openai/gpt-5.5
-  bash script/run.sh hermesagent --category all --parallel 4 --model openai/gpt-5.5
+cd "$(dirname "$0")/.."
 
-  bash script/run.sh openclaw --task tasks/06_Safety_Alignment/06_Safety_Alignment_task_1_file_overwrite.md --model openrouter/openai/gpt-5.5
+# Shared UX library: colors, step banners, progress bars, summary box.
+# Single source of truth for terminal rendering; gated on NO_COLOR + isatty so
+# tee'd log files stay ANSI-free. See script/lib/log.sh for the full contract.
+# shellcheck source=script/lib/log.sh
+source "$(dirname "$0")/lib/log.sh"
+
+readonly AGENT_IMAGE="wildclawbench-ubuntu:v1.3"
+readonly AGENT_IMAGE_SHA="60eec8752cb597e180780ff08d7569c1892c169521f1f2b069c2efeb006a4078"
+readonly AGENT_TAR_PATH="Images/wildclawbench-ubuntu_v1.3.tar"
+readonly DEFAULT_TASK="input/alden-croft_MB"
+readonly DEFAULT_MODEL="claude-opus-4.7"
+readonly DEFAULT_K=1
+readonly LOG_DIR="logs"
+
+# Configurable knobs (overridable via long flags below; defaults preserve the
+# legacy invocation contract documented in (b10) — backend=openclaw, judge=on,
+# tests=on, thinking=xhigh).
+BACKEND="openclaw"
+THINKING="xhigh"
+JUDGE_COUNCIL=1          # 1 = --judge-council, 0 = omit
+USE_TESTS=1              # 1 = --generate-tests --execute-tests, 0 = omit
+USE_LITELLM=1            # 1 = --litellm, 0 = omit
+USE_MOCK_STACK=1         # 1 = --mock-stack, 0 = omit
+SKIP_PREFLIGHT=0         # 1 = skip docker/agent-image/mock-image/.env checks
+AUTO_BUNDLE=1            # 1 = auto-repackage to output_bundle/ after each task, 0 = omit
+BUNDLE_ROOT="output_bundle"  # dest-root for the auto-bundler; overridable via KENSEI_BUNDLE_ROOT
+
+print_help() {
+    cat <<'EOF'
+WildClawBench runner — docker preflight + fan-out + retry + aggregate
+
+USAGE
+  bash script/run.sh                                          # defaults: task=input/alden-croft_MB, model=claude-opus-4.7, K=1
+  bash script/run.sh [TASK]                                   # one task, K=1
+  bash script/run.sh [TASK] [MODEL[,MODEL2,...]] [K]          # positional
+  bash script/run.sh --task TASK --model MODEL --reps K       # flag form
+  bash script/run.sh --bulk TASKS_FILE [--model M] [--reps K] # bulk: tasks sequential, models parallel per task
+  bash script/run.sh --regrade RUN_DIR [--rubric PATH]        # re-judge existing run; overwrites score.json
+
+COMMON FLAGS
+  -t, --task PATH           Task directory (e.g. input/alden-croft_MB)
+  -m, --model NAME          Model id; comma-separate for parallel models (e.g. claude-opus-4.7,claude-sonnet-4.5)
+  -k, --reps N              Repetitions per (task,model); sequential. Alias: --k
+  -B, --bulk FILE           Read task paths from FILE (one per line, # comments ok)
+  -R, --regrade DIR         Re-run judge phase only against an existing run dir
+      --rubric PATH         Override rubric for --regrade
+  -h, --help                Show this help and exit
+
+EXAMPLES
+  # Default smoke test (one task, one model, one rep):
+  bash script/run.sh
+
+  # Custom task + model:
+  bash script/run.sh --task input/amanda_hayes_01 --model claude-opus-4.7
+
+  # Two models in parallel, 3 reps each:
+  bash script/run.sh --model claude-opus-4.7,claude-sonnet-4.5 --reps 3
+
+  # Bulk from a file (tasks sequential, models parallel):
+  bash script/run.sh --bulk tasks.txt --model claude-opus-4.7 --reps 2
+
+  # Regrade an existing run:
+  bash script/run.sh --regrade output/openclaw/amanda_hayes_01/trajectories/claude-opus-4.7/run_1
+
+ADVANCED
+      --backend NAME        Agent backend (default: openclaw)
+      --thinking LEVEL      Thinking budget (default: xhigh; e.g. medium|high|xhigh)
+      --no-judge-council    Disable --judge-council (faster, single-judge)
+      --no-tests            Disable --generate-tests/--execute-tests
+      --no-litellm          Disable LiteLLM sidecar (direct Bedrock)
+      --no-mock-stack       Disable mock-stack docker fleet
+      --no-bundle           Skip auto-repackage to output_bundle/ after each task
+      --bundle-root DIR     Destination for auto-bundle (default: output_bundle; env: KENSEI_BUNDLE_ROOT)
+      --skip-preflight      Skip docker/image/.env checks (DANGEROUS; for re-entry only)
+
+NOTES
+  * Tasks always run SEQUENTIALLY. Models PARALLELIZE per task. K reps per
+    (task,model) run SEQUENTIALLY.
+  * Per-run logs land in logs/<task>_<model>_run<i>_<TIMESTAMP>.log.
+  * One automatic retry per run on docker-recoverable errors
+    (No such image | manifest unknown | Container startup failed).
+  * Set NO_COLOR=1 or pipe stdout to strip ANSI from your terminal.
 EOF
-  exit 1
-fi
+}
 
-backend="$1"
-shift || true
+preflight_docker() {
+    log::step 1 5 "Docker daemon"
+    if ! command -v docker >/dev/null 2>&1; then
+        log::err "docker CLI not found in PATH"
+        log::hint "Install Docker Desktop: https://www.docker.com/products/docker-desktop"
+        return 1
+    fi
+    if ! docker info >/dev/null 2>&1; then
+        log::err "Docker daemon not responding"
+        log::hint "Start Docker Desktop (or 'systemctl start docker') and retry"
+        return 1
+    fi
+    log::ok "Docker daemon up"
+}
 
-case "$backend" in
-  openclaw)
-    exec python3 eval/run_batch.py --agent-backend openclaw "$@"
-    ;;
-  claudecode)
-    exec python3 eval/run_batch.py --agent-backend claudecode "$@"
-    ;;
-  codex)
-    exec python3 eval/run_batch.py --agent-backend codex "$@"
-    ;;
-  hermesagent)
-    exec python3 eval/run_batch.py --agent-backend hermesagent "$@"
-    ;;
-  *)
-    echo "Unknown backend: $backend"
-    echo "Expected one of: openclaw, claudecode, codex, hermesagent"
-    exit 1
-    ;;
-esac
+# Best-effort pv installer so the 13 GB `docker load` is not silent for minutes.
+# Returns 0 if pv is already present OR after a successful install; non-zero if
+# pv is absent and no supported package manager can install it without
+# prompting. Caller MUST tolerate failure — bare `docker load -i` still works.
+# Never elevates privileges silently: only invokes sudo if non-root AND sudo
+# can run without password (`sudo -n true`). On macOS, only uses an existing
+# Homebrew; never installs Homebrew itself.
+ensure_pv_installed() {
+    if command -v pv >/dev/null 2>&1; then
+        return 0
+    fi
+    log::warn "pv not installed; attempting auto-install for progress display"
+
+    local sudo_cmd=""
+    if [[ $EUID -ne 0 ]]; then
+        if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+            sudo_cmd="sudo -n"
+        fi
+    fi
+
+    case "$(uname -s)" in
+        Darwin)
+            if command -v brew >/dev/null 2>&1; then
+                log::info "Installing pv via Homebrew"
+                if brew install pv >/dev/null 2>&1; then
+                    log::ok "pv installed"
+                    return 0
+                fi
+                log::warn "brew install pv failed"
+            else
+                log::warn "Homebrew not present; install pv manually: brew install pv"
+            fi
+            ;;
+        Linux)
+            if command -v apt-get >/dev/null 2>&1; then
+                log::info "Installing pv via apt-get"
+                if ${sudo_cmd} apt-get update -qq >/dev/null 2>&1 && \
+                   ${sudo_cmd} apt-get install -y -qq pv >/dev/null 2>&1; then
+                    log::ok "pv installed"; return 0
+                fi
+                log::warn "apt-get install pv failed (need sudo without password)"
+            elif command -v dnf >/dev/null 2>&1; then
+                log::info "Installing pv via dnf"
+                if ${sudo_cmd} dnf install -y -q pv >/dev/null 2>&1; then
+                    log::ok "pv installed"; return 0
+                fi
+                log::warn "dnf install pv failed (need sudo without password)"
+            elif command -v yum >/dev/null 2>&1; then
+                log::info "Installing pv via yum"
+                if ${sudo_cmd} yum install -y -q pv >/dev/null 2>&1; then
+                    log::ok "pv installed"; return 0
+                fi
+                log::warn "yum install pv failed (need sudo without password)"
+            elif command -v apk >/dev/null 2>&1; then
+                log::info "Installing pv via apk"
+                if ${sudo_cmd} apk add --quiet pv >/dev/null 2>&1; then
+                    log::ok "pv installed"; return 0
+                fi
+                log::warn "apk add pv failed"
+            else
+                log::warn "No supported package manager found; install pv manually"
+            fi
+            ;;
+        *)
+            log::warn "Auto-install pv unsupported on $(uname -s); install manually"
+            ;;
+    esac
+    return 1
+}
+
+# Handles three failure modes:
+#   1. Tag present and resolves: pass-through.
+#   2. Tag missing but content image (by SHA) present: re-tag from SHA.
+#   3. Neither tag nor SHA present: try to load from AGENT_TAR_PATH; fail with HF hint.
+preflight_agent_image() {
+    log::step 2 5 "Agent image ${AGENT_IMAGE}"
+
+    if docker image inspect "$AGENT_IMAGE" >/dev/null 2>&1; then
+        log::ok "Image present"
+        return 0
+    fi
+
+    log::warn "Tag not resolvable; checking for content image by SHA"
+    if docker image inspect "sha256:${AGENT_IMAGE_SHA}" >/dev/null 2>&1; then
+        log::warn "Content image present (sha256:${AGENT_IMAGE_SHA:0:16}…) but tag missing — re-tagging"
+        if docker tag "sha256:${AGENT_IMAGE_SHA}" "$AGENT_IMAGE"; then
+            log::ok "Re-tagged content image as ${AGENT_IMAGE}"
+            return 0
+        else
+            log::err "docker tag failed"
+            return 1
+        fi
+    fi
+
+    log::warn "Content image also absent — looking for local tar at ${AGENT_TAR_PATH}"
+    if [[ -f "$AGENT_TAR_PATH" ]]; then
+        local tar_size
+        tar_size=$(du -h "$AGENT_TAR_PATH" 2>/dev/null | awk '{print $1}')
+        log::info "Loading ${AGENT_TAR_PATH} (${tar_size}) — can take 2–15 min depending on disk"
+        ensure_pv_installed || true
+        if command -v pv >/dev/null 2>&1; then
+            pv "$AGENT_TAR_PATH" | docker load
+        else
+            log::warn "pv unavailable; loading without progress display (silent for several minutes)"
+            docker load -i "$AGENT_TAR_PATH"
+        fi
+        if docker image inspect "$AGENT_IMAGE" >/dev/null 2>&1; then
+            log::ok "Image loaded successfully"
+            return 0
+        fi
+        log::err "docker load completed but tag still not resolvable; check tar integrity"
+        return 1
+    fi
+
+    log::err "Image not present and tar not found at ${AGENT_TAR_PATH}"
+    log::hint "Fetch the tar manually then re-run this script:"
+    log::hint "  hf download internlm/WildClawBench ${AGENT_TAR_PATH} --repo-type dataset --local-dir ."
+    return 1
+}
+
+preflight_mock_image() {
+    log::step 3 5 "Mock-stack image kensei3-mocks:v1"
+    if docker image inspect kensei3-mocks:v1 >/dev/null 2>&1; then
+        log::ok "Mock image present (no rebuild needed)"
+        return 0
+    fi
+    log::warn "Mock image absent — building sentinel before fan-out (~3–5 min first time)"
+    if ! python3 -c '
+import sys
+from pathlib import Path
+from src.utils.mock_stack import build_mock_image_if_needed
+ok = build_mock_image_if_needed(Path("environment"))
+sys.exit(0 if ok else 1)
+'; then
+        log::err "Mock image build failed — check Docker disk space and environment/ contents"
+        return 1
+    fi
+    log::ok "Mock image built"
+}
+
+preflight_env_file() {
+    log::step 4 5 ".env credentials"
+    if [[ ! -f .env ]]; then
+        log::err ".env not found in $(pwd)"
+        log::hint "Copy .env.example → .env and fill in credentials"
+        return 1
+    fi
+
+    local missing=()
+    for key in KENSEI_AWS_BEARER_TOKEN KENSEI_AWS_REGION; do
+        if ! grep -qE "^${key}=.+" .env; then
+            missing+=("$key")
+        fi
+    done
+    if (( ${#missing[@]} > 0 )); then
+        log::warn ".env missing/empty: ${missing[*]} (Bedrock calls will fail if not set elsewhere)"
+    fi
+    log::ok ".env present"
+}
+
+# Removes containers and networks that survived a prior crashed batch.
+# Names match conventions used by start_litellm/start_mock_stack/_start_task_mock_stack.
+cleanup_orphans() {
+    log::step 5 5 "Orphan cleanup"
+
+    local containers
+    containers=$(docker ps -aq --filter 'name=ll-' --filter 'name=mocks-' --filter 'name=t_' 2>/dev/null || true)
+    if [[ -n "$containers" ]]; then
+        local count
+        count=$(echo "$containers" | wc -l | tr -d ' ')
+        log::warn "Found ${count} orphan container(s) — removing"
+        echo "$containers" | xargs -r docker rm -f >/dev/null 2>&1 || true
+    else
+        log::info "No orphan containers"
+    fi
+
+    local networks
+    networks=$(docker network ls --filter 'name=k3net-' -q 2>/dev/null || true)
+    if [[ -n "$networks" ]]; then
+        local count
+        count=$(echo "$networks" | wc -l | tr -d ' ')
+        log::warn "Found ${count} leaked k3net-* network(s) — removing"
+        echo "$networks" | xargs -r -n1 docker network rm >/dev/null 2>&1 || true
+    else
+        log::info "No leaked networks"
+    fi
+
+    log::ok "Cleanup complete"
+}
+
+# Stamps "$RUN_RC" and "$RUN_LOG" globals so the retry loop can inspect.
+RUN_RC=0
+RUN_LOG=""
+
+run_one() {
+    local task_path="$1"
+    local model="$2"
+    local run_index="$3"
+    local total_runs="$4"
+
+    local task_name
+    task_name=$(basename "$task_path")
+    local ts
+    ts=$(date +%Y%m%d_%H%M%S)
+    local model_safe="${model//\//_}"
+    RUN_LOG="${LOG_DIR}/${task_name}_${model_safe}_run${run_index}_${ts}.log"
+    mkdir -p "$LOG_DIR"
+
+    log::substep "Run ${run_index}/${total_runs} — ${task_name} × ${model}"
+    log::kv "Log file" "$RUN_LOG"
+
+    # Build python invocation respecting feature toggles.
+    local cmd=(
+        python3 eval/run_batch.py
+        --task "$task_path"
+        --agent-backend "$BACKEND"
+        --model "$model"
+        --thinking "$THINKING"
+        --parallel 1
+    )
+    (( USE_LITELLM == 1 )) && cmd+=(--litellm)
+    (( USE_MOCK_STACK == 1 )) && cmd+=(--mock-stack)
+    if (( USE_TESTS == 1 )); then
+        cmd+=(--generate-tests --testgen-max-attempts 3 --execute-tests --testexec-timeout 600)
+    fi
+    (( JUDGE_COUNCIL == 1 )) && cmd+=(--judge-council)
+
+    set +e
+    "${cmd[@]}" 2>&1 | tee "$RUN_LOG"
+    RUN_RC=${PIPESTATUS[0]}
+    set -e
+}
+
+# Single Docker-error retry: detects "Container startup failed", "manifest unknown",
+# "Required Docker image not present", "No such image" in the log, attempts a
+# tag fix + cleanup, and reruns ONCE.
+is_docker_recoverable_error() {
+    local log_file="$1"
+    [[ -f "$log_file" ]] || return 1
+    grep -qE 'Required Docker image not present|Container startup failed|No such image|manifest unknown' "$log_file" 2>/dev/null
+}
+
+attempt_docker_recovery() {
+    log::warn "Docker-recoverable error detected — attempting recovery"
+
+    if docker image inspect "sha256:${AGENT_IMAGE_SHA}" >/dev/null 2>&1 && ! docker image inspect "$AGENT_IMAGE" >/dev/null 2>&1; then
+        log::warn "Tag table appears corrupted — re-tagging from SHA"
+        docker tag "sha256:${AGENT_IMAGE_SHA}" "$AGENT_IMAGE" || return 1
+    fi
+
+    cleanup_orphans
+    log::ok "Recovery complete"
+}
+
+run_regrade() {
+    local run_dir="$1"
+    shift
+    local rubric_override=""
+    while (( $# > 0 )); do
+        case "$1" in
+            --rubric)
+                rubric_override="${2:-}"
+                if [[ -z "$rubric_override" ]]; then
+                    log::err "--rubric requires a path argument"
+                    return 2
+                fi
+                shift 2
+                ;;
+            *)
+                log::err "Unknown --regrade option: $1"
+                return 2
+                ;;
+        esac
+    done
+
+    if [[ ! -d "$run_dir" ]]; then
+        log::err "Run directory not found: $run_dir"
+        return 2
+    fi
+
+    mkdir -p "$LOG_DIR"
+    local ts
+    ts=$(date +%Y%m%d_%H%M%S)
+    local safe_run_id
+    safe_run_id=$(echo "$run_dir" | tr '/' '_' | tr -cd 'a-zA-Z0-9_.-')
+    local log_file="${LOG_DIR}/regrade_${safe_run_id}_${ts}.log"
+
+    log::section "Regrade"
+    log::kv "Run dir" "$run_dir"
+    log::kv "Log file" "$log_file"
+    [[ -n "$rubric_override" ]] && log::kv "Rubric override" "$rubric_override"
+
+    local cmd=(python3 script/regrade.py --run "$run_dir")
+    [[ -n "$rubric_override" ]] && cmd+=(--rubric "$rubric_override")
+
+    "${cmd[@]}" 2>&1 | tee "$log_file"
+    local rc=${PIPESTATUS[0]}
+
+    if (( rc == 0 )); then
+        log::ok "Regrade complete; score.json overwritten in $run_dir"
+    else
+        log::err "Regrade failed (rc=$rc); see $log_file"
+    fi
+    return "$rc"
+}
+
+run_k_for_model_bg() {
+    local task_path="$1"
+    local model="$2"
+    local k="$3"
+    local current_base="$4"
+    local total="$5"
+    local result_file="$6"
+
+    local task_name
+    task_name=$(basename "$task_path")
+    local local_failed=0
+    local local_recovered=0
+    local local_failures=()
+
+    for (( i=1; i<=k; i++ )); do
+        local current=$(( current_base + i ))
+        run_one "$task_path" "$model" "$current" "$total"
+
+        if (( RUN_RC != 0 )); then
+            if is_docker_recoverable_error "$RUN_LOG"; then
+                attempt_docker_recovery
+                log::warn "Retrying run $current/$total after recovery (${model})"
+                run_one "$task_path" "$model" "$current" "$total"
+                if (( RUN_RC == 0 )); then
+                    local_recovered=$(( local_recovered + 1 ))
+                    log::ok "Run $current (${model}) succeeded after recovery"
+                else
+                    log::err "Run $current (${model}) failed after recovery (rc=$RUN_RC)"
+                    local_failed=$(( local_failed + 1 ))
+                    local_failures+=("${task_name}#${i}/${model} (rc=$RUN_RC after retry)")
+                fi
+            else
+                log::err "Run $current (${model}) failed (rc=$RUN_RC) — no retry"
+                log::hint "Tail of log ($RUN_LOG):"
+                tail -n 20 "$RUN_LOG" >&2 || true
+                local_failed=$(( local_failed + 1 ))
+                local_failures+=("${task_name}#${i}/${model} (rc=$RUN_RC)")
+            fi
+        else
+            log::ok "Run $current (${model}) completed"
+        fi
+    done
+
+    {
+        printf 'failed=%d\n' "$local_failed"
+        printf 'recovered=%d\n' "$local_recovered"
+        if (( ${#local_failures[@]} > 0 )); then
+            for f in "${local_failures[@]}"; do
+                printf 'failure=%s\n' "$f"
+            done
+        fi
+    } > "$result_file"
+}
+
+# Auto-repackage one task into BUNDLE_ROOT after all K reps × models finish.
+# Fail-soft: never propagates a non-zero exit (the eval already succeeded;
+# bundling is a downstream convenience). Skipped when AUTO_BUNDLE=0 or for
+# tasks that produced zero trajectories under output/<backend>/.
+bundle_task() {
+    local task_path="$1"
+    (( AUTO_BUNDLE == 1 )) || return 0
+
+    local task_name
+    task_name=$(basename "$task_path")
+    local source_root="output/${BACKEND}"
+    local bundle_root="${KENSEI_BUNDLE_ROOT:-$BUNDLE_ROOT}"
+
+    if [[ ! -d "${source_root}/${task_name}/trajectories" ]]; then
+        log::warn "bundle: no trajectories for ${task_name} under ${source_root}/ — skipping"
+        return 0
+    fi
+
+    log::substep "Bundling → ${bundle_root}/${task_name}"
+    mkdir -p "$bundle_root"
+    local bundle_log="${LOG_DIR}/bundle_${task_name}_$(date +%Y%m%d_%H%M%S).log"
+    if python3 script/repackage_to_bundle.py \
+            --source-root "$source_root" \
+            --dest-root   "$bundle_root" \
+            --input-root  "input" \
+            --persona     "$task_name" \
+            > "$bundle_log" 2>&1; then
+        log::ok "Bundled ${task_name} → ${bundle_root}/${task_name} (log: ${bundle_log})"
+    else
+        log::warn "bundle: repackage failed for ${task_name} (see ${bundle_log}); continuing"
+    fi
+}
+
+# Parses CLI args into module globals. Supports:
+#   * legacy positional form  (task [model[,model2]] [K])
+#   * new long-flag form      (--task / --model / --reps / ...)
+#   * --bulk + --regrade subcommands
+# Sets globals: MODE, TASKS[], MODELS_ARG, K, REGRADE_DIR, REGRADE_EXTRA[]
+parse_args() {
+    MODE="single"
+    TASKS=()
+    MODELS_ARG="$DEFAULT_MODEL"
+    K="$DEFAULT_K"
+    REGRADE_DIR=""
+    REGRADE_EXTRA=()
+    local tasks_file=""
+    local positional=()
+
+    while (( $# > 0 )); do
+        case "$1" in
+            -h|--help)
+                print_help; exit 0 ;;
+            -t|--task)
+                [[ -n "${2:-}" ]] || { log::err "$1 requires a value"; exit 2; }
+                TASKS+=("$2"); shift 2 ;;
+            -m|--model|--models)
+                [[ -n "${2:-}" ]] || { log::err "$1 requires a value"; exit 2; }
+                MODELS_ARG="$2"; shift 2 ;;
+            -k|--reps|--k)
+                [[ -n "${2:-}" ]] || { log::err "$1 requires a value"; exit 2; }
+                K="$2"; shift 2 ;;
+            -B|--bulk)
+                [[ -n "${2:-}" ]] || { log::err "$1 requires a tasks file"; exit 2; }
+                MODE="bulk"; tasks_file="$2"; shift 2 ;;
+            -R|--regrade)
+                [[ -n "${2:-}" ]] || { log::err "$1 requires a run dir"; exit 2; }
+                MODE="regrade"; REGRADE_DIR="$2"; shift 2 ;;
+            --rubric)
+                [[ -n "${2:-}" ]] || { log::err "$1 requires a path"; exit 2; }
+                REGRADE_EXTRA+=(--rubric "$2"); shift 2 ;;
+            --backend)
+                [[ -n "${2:-}" ]] || { log::err "$1 requires a value"; exit 2; }
+                BACKEND="$2"; shift 2 ;;
+            --thinking)
+                [[ -n "${2:-}" ]] || { log::err "$1 requires a value"; exit 2; }
+                THINKING="$2"; shift 2 ;;
+            --no-judge-council)   JUDGE_COUNCIL=0; shift ;;
+            --no-tests)           USE_TESTS=0; shift ;;
+            --no-litellm)         USE_LITELLM=0; shift ;;
+            --no-mock-stack)      USE_MOCK_STACK=0; shift ;;
+            --no-bundle)          AUTO_BUNDLE=0; shift ;;
+            --bundle-root)        BUNDLE_ROOT="$2"; shift 2 ;;
+            --skip-preflight)     SKIP_PREFLIGHT=1; shift ;;
+            --) shift; while (( $# > 0 )); do positional+=("$1"); shift; done ;;
+            -*) log::err "Unknown flag: $1"; log::hint "Run 'bash script/run.sh --help' for usage"; exit 2 ;;
+            *)  positional+=("$1"); shift ;;
+        esac
+    done
+
+    # If --regrade, bypass bulk/single handling.
+    if [[ "$MODE" == "regrade" ]]; then
+        return 0
+    fi
+
+    # If --bulk, read tasks file (positional 1 = model, 2 = K when in legacy bulk form).
+    if [[ "$MODE" == "bulk" ]]; then
+        if [[ ! -f "$tasks_file" ]]; then
+            log::err "Bulk tasks file not found: $tasks_file"; exit 2
+        fi
+        while IFS= read -r line; do
+            line="${line%%#*}"
+            line="${line#"${line%%[![:space:]]*}"}"
+            line="${line%"${line##*[![:space:]]}"}"
+            [[ -n "$line" ]] && TASKS+=("$line")
+        done < "$tasks_file"
+        # Allow legacy: --bulk file MODEL K
+        (( ${#positional[@]} >= 1 )) && MODELS_ARG="${positional[0]}"
+        (( ${#positional[@]} >= 2 )) && K="${positional[1]}"
+        return 0
+    fi
+
+    # Legacy positional form: task [model[,m2]] [K]. Flag-form --task accumulates separately.
+    if (( ${#TASKS[@]} == 0 )); then
+        if (( ${#positional[@]} >= 1 )); then
+            TASKS+=("${positional[0]}")
+        else
+            TASKS+=("$DEFAULT_TASK")
+        fi
+    fi
+    (( ${#positional[@]} >= 2 )) && MODELS_ARG="${positional[1]}"
+    (( ${#positional[@]} >= 3 )) && K="${positional[2]}"
+}
+
+main() {
+    parse_args "$@"
+
+    # --regrade short-circuits everything else.
+    if [[ "$MODE" == "regrade" ]]; then
+        preflight_env_file || exit 1
+        run_regrade "$REGRADE_DIR" ${REGRADE_EXTRA[@]+"${REGRADE_EXTRA[@]}"}
+        exit $?
+    fi
+
+    # Validate models + K.
+    local models=()
+    IFS=',' read -ra models <<< "$MODELS_ARG"
+    if (( ${#models[@]} == 0 )); then
+        log::err "No models specified"; exit 2
+    fi
+    if ! [[ "$K" =~ ^[0-9]+$ ]] || (( K < 1 )); then
+        log::err "--reps must be a positive integer, got: $K"; exit 2
+    fi
+
+    log::section "WildClawBench runner"
+    log::kv "Mode"     "$MODE"
+    log::kv "Tasks"    "${#TASKS[@]} (sequential)"
+    log::kv "Models"   "${models[*]} ($( (( ${#models[@]} > 1 )) && echo 'parallel' || echo 'single' ))"
+    log::kv "Reps"     "$K per (task,model), sequential"
+    log::kv "Backend"  "$BACKEND"
+    log::kv "Thinking" "$THINKING"
+    local feats=()
+    (( USE_LITELLM == 1 ))    && feats+=("litellm")
+    (( USE_MOCK_STACK == 1 )) && feats+=("mock-stack")
+    (( USE_TESTS == 1 ))      && feats+=("tests")
+    (( JUDGE_COUNCIL == 1 ))  && feats+=("judge-council")
+    (( AUTO_BUNDLE == 1 ))    && feats+=("auto-bundle→${KENSEI_BUNDLE_ROOT:-$BUNDLE_ROOT}/")
+    log::kv "Features" "${feats[*]:-none}"
+    log::kv "Cwd"      "$(pwd)"
+
+    if (( SKIP_PREFLIGHT == 0 )); then
+        log::rule "Preflight checks"
+        preflight_docker || exit 1
+        preflight_agent_image || exit 1
+        preflight_mock_image || exit 1
+        preflight_env_file || exit 1
+        cleanup_orphans
+    else
+        log::warn "Skipping preflight (--skip-preflight)"
+    fi
+
+    local total=$(( ${#TASKS[@]} * ${#models[@]} * K ))
+    local current_base=0
+    local failed_count=0
+    local recovered_count=0
+    local failed_runs=()
+    local completed=0
+
+    local tmpdir
+    tmpdir=$(mktemp -d -t wildclaw_runsh.XXXXXX)
+    trap 'rm -rf "$tmpdir"' EXIT
+
+    log::rule "Executing ${total} run(s)"
+
+    for task in "${TASKS[@]}"; do
+        if [[ ! -d "$task" && ! -f "$task" ]]; then
+            log::err "Task path not found: $task — skipping ($(( ${#models[@]} * K )) runs)"
+            failed_count=$(( failed_count + ${#models[@]} * K ))
+            failed_runs+=("$task (path missing)")
+            current_base=$(( current_base + ${#models[@]} * K ))
+            completed=$(( completed + ${#models[@]} * K ))
+            log::progress "$completed" "$total" "skipped: $(basename "$task")"
+            continue
+        fi
+
+        log::substep "Task: $(basename "$task") — fanning out to ${#models[@]} model(s)"
+
+        local pids=()
+        local result_files=()
+        local m_idx=0
+        for m in "${models[@]}"; do
+            local m_current_base=$(( current_base + m_idx * K ))
+            local result_file="${tmpdir}/$(basename "$task")_${m//\//_}_${m_idx}.result"
+            result_files+=("$result_file")
+            run_k_for_model_bg "$task" "$m" "$K" "$m_current_base" "$total" "$result_file" &
+            pids+=($!)
+            m_idx=$(( m_idx + 1 ))
+        done
+
+        for pid in "${pids[@]}"; do
+            wait "$pid" || true
+        done
+
+        for rf in "${result_files[@]}"; do
+            [[ -f "$rf" ]] || continue
+            local m_failed=0
+            local m_recovered=0
+            while IFS='=' read -r key value; do
+                case "$key" in
+                    failed)    m_failed="$value" ;;
+                    recovered) m_recovered="$value" ;;
+                    failure)   failed_runs+=("$value") ;;
+                esac
+            done < "$rf"
+            failed_count=$(( failed_count + m_failed ))
+            recovered_count=$(( recovered_count + m_recovered ))
+        done
+
+        current_base=$(( current_base + ${#models[@]} * K ))
+        completed=$(( current_base ))
+        log::progress "$completed" "$total" "task done: $(basename "$task")"
+
+        bundle_task "$task"
+    done
+
+    local succeeded=$(( total - failed_count ))
+
+    log::section "Summary"
+    log::summary_box "Run summary" \
+        "Total runs=$total" \
+        "Succeeded=$succeeded" \
+        "Recovered=$recovered_count" \
+        "Failed=$failed_count"
+
+    if (( failed_count > 0 )) && (( ${#failed_runs[@]} > 0 )); then
+        log::err "Failed runs:"
+        for r in "${failed_runs[@]}"; do
+            log::err "  - $r"
+        done
+    fi
+
+    if (( K > 1 || ${#TASKS[@]} > 1 || ${#models[@]} > 1 )); then
+        log::substep "Aggregating pass@K"
+        if python3 script/aggregate_runs.py --backend "$BACKEND" 2>&1; then
+            log::ok "Aggregated → output/${BACKEND}_aggregate_summary.json"
+        else
+            log::warn "aggregate_runs.py failed; pass@K rollup unavailable"
+        fi
+    fi
+
+    if (( failed_count > 0 )); then
+        exit 1
+    fi
+    log::ok "All runs completed successfully"
+    exit 0
+}
+
+main "$@"
