@@ -113,6 +113,13 @@ ARTIFACTS_SCRATCH_DIRNAME = "_tmp"
 # Where staged inputs live inside the bundle's environment dir.
 ARTIFACTS_INPUTS_SUBPATH = ("artifacts", "inputs", "files")
 
+# Input task dirs now ship the user's staged files inside the persona's mock
+# home filesystem (persona/home/{Desktop,Documents,Pictures,...}) rather than a
+# top-level data/ dir (which is now empty/legacy). We stage that whole home tree
+# into the bundle's artifacts/inputs/files, preserving its sub-folders. The
+# legacy data/ dir is still honored as a fallback for older input layouts.
+PERSONA_HOME_DIRNAME = "home"
+
 # Harness-runtime files re-sourced from the harness's own `environment/` dir
 # into every published bundle's `data/environment/`. These power the runtime
 # admin plane / mutable store / instrumentation that bundle consumers replay
@@ -433,6 +440,35 @@ def _find_input_task_dir(input_root: Path, task_dir_name: str) -> Path | None:
     return None
 
 
+def _stage_input_files(src_dir: Path, dest_files: Path) -> int:
+    """Copy a staged-input source tree into the bundle's artifacts/inputs/files.
+
+    Preserves sub-folders (Desktop/, Documents/, Pictures/, ...) so the home
+    filesystem layout the agent saw is reproduced faithfully. Skips .DS_Store
+    cruft. Returns the number of files staged. Safe to call on a missing dir.
+    """
+    if not src_dir.is_dir():
+        return 0
+    dest_files.mkdir(parents=True, exist_ok=True)
+    count = 0
+    for item in src_dir.iterdir():
+        if item.name == ".DS_Store":
+            continue
+        target = dest_files / item.name
+        if item.is_dir():
+            shutil.copytree(
+                item,
+                target,
+                dirs_exist_ok=True,
+                ignore=shutil.ignore_patterns(".DS_Store"),
+            )
+            count += sum(1 for p in target.rglob("*") if p.is_file())
+        elif item.is_file():
+            shutil.copy2(item, target)
+            count += 1
+    return count
+
+
 def stage_persona_and_artifacts(
     input_task_dir: Path, bundle: Path, verbose: bool
 ) -> tuple[int, int]:
@@ -442,20 +478,18 @@ def stage_persona_and_artifacts(
     if src_persona.is_dir():
         dest_persona = env_dir / "persona"
         dest_persona.mkdir(parents=True, exist_ok=True)
+        # Top-level persona docs (AGENTS.md, IDENTITY.md, ...) only; the home/
+        # subtree is staged separately into artifacts/inputs/files below.
         for item in src_persona.iterdir():
             if item.is_file() and item.name != ".DS_Store":
                 shutil.copy2(item, dest_persona / item.name)
                 n_persona += 1
 
-    n_files = 0
-    src_files = input_task_dir / "data"
-    if src_files.is_dir():
-        dest_files = env_dir.joinpath(*ARTIFACTS_INPUTS_SUBPATH)
-        dest_files.mkdir(parents=True, exist_ok=True)
-        for item in src_files.iterdir():
-            if item.is_file() and item.name != ".DS_Store":
-                shutil.copy2(item, dest_files / item.name)
-                n_files += 1
+    # Staged input files now live in persona/home/ (the mock home filesystem),
+    # falling back to a legacy top-level data/ dir for older input layouts.
+    dest_files = env_dir.joinpath(*ARTIFACTS_INPUTS_SUBPATH)
+    n_files = _stage_input_files(src_persona / PERSONA_HOME_DIRNAME, dest_files)
+    n_files += _stage_input_files(input_task_dir / "data", dest_files)
 
     n_harness_env = _stage_harness_env_files(env_dir, verbose)
 
