@@ -1,8 +1,8 @@
 """Data access module for Instagram Graph API simulation."""
 
 import csv
-import json
 from copy import deepcopy
+import json
 from datetime import datetime
 from pathlib import Path
 
@@ -11,13 +11,13 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, opt_str, strict_int)
+    read_seed_with_ctx, get_store, opt_csv_list, opt_str, strict_int)
 _store = get_store("instagram-api")
 _API = "instagram-api"
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):
@@ -141,27 +141,24 @@ def _coerce_mentions(rows):
     return out
 
 
-# Load all data at module init
 def _load_users():
-    with open(DATA_DIR / "user.json", encoding="utf-8") as f:
-        raw = json.load(f)
-    return raw if isinstance(raw, list) else [raw]
+    return _load("user.json", "users")
 
 
 _store.register("media", primary_key="id",
-                initial_loader=lambda: _coerce_media(_load("media.csv", "media")))
+                initial_loader=lambda: _coerce_media(_load("media.json", "media")))
 _store.register("comments", primary_key="id",
-                initial_loader=lambda: _coerce_comments(_load("comments.csv", "comments")))
+                initial_loader=lambda: _coerce_comments(_load("comments.json", "comments")))
 _store.register("stories", primary_key="id",
-                initial_loader=lambda: _coerce_stories(_load("stories.csv", "stories")))
+                initial_loader=lambda: _coerce_stories(_load("stories.json", "stories")))
 _store.register("media_insights", primary_key="media_id",
-                initial_loader=lambda: _coerce_media_insights(_load("media_insights.csv", "media_insights")))
+                initial_loader=lambda: _coerce_media_insights(_load("media_insights.json", "media_insights")))
 _store.register("carousel_children", primary_key="id",
-                initial_loader=lambda: _coerce_carousel_children(_load("carousel_children.csv", "carousel_children")))
+                initial_loader=lambda: _coerce_carousel_children(_load("carousel_children.json", "carousel_children")))
 _store.register("hashtags", primary_key="id",
-                initial_loader=lambda: _coerce_hashtags(_load("hashtags.csv", "hashtags")))
+                initial_loader=lambda: _coerce_hashtags(_load("hashtags.json", "hashtags")))
 _store.register("mentions", primary_key="id",
-                initial_loader=lambda: _coerce_mentions(_load("mentions.csv", "mentions")))
+                initial_loader=lambda: _coerce_mentions(_load("mentions.json", "mentions")))
 _store.register("users", primary_key="id", initial_loader=_load_users)
 
 

@@ -16,7 +16,7 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store,
+    read_seed_with_ctx, get_store,
     strict_bool,
     opt_float,
 )
@@ -25,11 +25,11 @@ _store = get_store("xero-api")
 _API = "xero-api"
 
 _store.register("contacts", primary_key="ContactID",
-                initial_loader=lambda: _coerce_contacts(_load("contacts.csv", "contacts")))
+                initial_loader=lambda: _coerce_contacts(_load("contacts.json", "contacts")))
 _store.register("accounts", primary_key="AccountID",
-                initial_loader=lambda: _coerce_accounts(_load("accounts.csv", "accounts")))
+                initial_loader=lambda: _coerce_accounts(_load("accounts.json", "accounts")))
 _store.register("invoices", primary_key="InvoiceID",
-                initial_loader=lambda: _coerce_invoices(_load("invoices.csv", "invoices")))
+                initial_loader=lambda: _coerce_invoices(_load("invoices.json", "invoices")))
 
 
 def _contacts_rows():
@@ -46,7 +46,7 @@ def _invoices_rows():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):

@@ -9,21 +9,21 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_int, opt_str, strict_bool, strict_int)
+    read_seed_with_ctx, get_store, opt_int, opt_str, strict_bool, strict_int)
 
 _store = get_store("jira-api")
 _API = "jira-api"
 
 _store.register("projects", primary_key="id",
-                initial_loader=lambda: _coerce_projects(_load("projects.csv", "projects")))
+                initial_loader=lambda: _coerce_projects(_load("projects.json", "projects")))
 _store.register("users", primary_key="account_id",
-                initial_loader=lambda: _coerce_users(_load("users.csv", "users")))
+                initial_loader=lambda: _coerce_users(_load("users.json", "users")))
 _store.register("boards", primary_key="id",
-                initial_loader=lambda: _coerce_boards(_load("boards.csv", "boards")))
+                initial_loader=lambda: _coerce_boards(_load("boards.json", "boards")))
 _store.register("sprints", primary_key="id",
-                initial_loader=lambda: _coerce_sprints(_load("sprints.csv", "sprints")))
+                initial_loader=lambda: _coerce_sprints(_load("sprints.json", "sprints")))
 _store.register("issues", primary_key="id",
-                initial_loader=lambda: _coerce_issues(_load("issues.csv", "issues")))
+                initial_loader=lambda: _coerce_issues(_load("issues.json", "issues")))
 
 
 def _projects_rows():
@@ -48,7 +48,7 @@ def _issues_rows():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):

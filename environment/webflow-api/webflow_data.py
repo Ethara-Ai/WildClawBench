@@ -15,17 +15,17 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, strict_bool)
+    read_seed_with_ctx, get_store, opt_csv_list, strict_bool)
 
 _store = get_store("webflow-api")
 _API = "webflow-api"
 
 _store.register("sites", primary_key="id",
-                initial_loader=lambda: _coerce_sites(_load("sites.csv", "sites")))
+                initial_loader=lambda: _coerce_sites(_load("sites.json", "sites")))
 _store.register("collections", primary_key="id",
-                initial_loader=lambda: _coerce_collections(_load("collections.csv", "collections")))
+                initial_loader=lambda: _coerce_collections(_load("collections.json", "collections")))
 _store.register("items", primary_key="id",
-                initial_loader=lambda: _coerce_items(_load("items.csv", "items")))
+                initial_loader=lambda: _coerce_items(_load("items.json", "items")))
 
 
 def _sites_rows():
@@ -42,7 +42,7 @@ def _items_rows():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):

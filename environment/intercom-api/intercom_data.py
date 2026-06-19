@@ -16,13 +16,13 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_float, opt_int, opt_str, strict_bool)
+    read_seed_with_ctx, get_store, opt_float, opt_int, opt_str, strict_bool)
 _store = get_store("intercom-api")
 _API = "intercom-api"
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):
@@ -119,13 +119,13 @@ def _coerce_parts(rows):
 
 
 _store.register("contacts", primary_key="id",
-                initial_loader=lambda: _coerce_contacts(_load("contacts.csv", "contacts")))
+                initial_loader=lambda: _coerce_contacts(_load("contacts.json", "contacts")))
 _store.register("companies", primary_key="id",
-                initial_loader=lambda: _coerce_companies(_load("companies.csv", "companies")))
+                initial_loader=lambda: _coerce_companies(_load("companies.json", "companies")))
 _store.register("conversations", primary_key="id",
-                initial_loader=lambda: _coerce_conversations(_load("conversations.csv", "conversations")))
+                initial_loader=lambda: _coerce_conversations(_load("conversations.json", "conversations")))
 _store.register("parts", primary_key="id",
-                initial_loader=lambda: _coerce_parts(_load("conversation_parts.csv", "parts")))
+                initial_loader=lambda: _coerce_parts(_load("conversation_parts.json", "parts")))
 
 
 def _contacts_rows(): return _store.table("contacts").rows()

@@ -16,7 +16,7 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store,
+    read_seed_with_ctx, get_store,
     strict_bool,
     opt_int,
     opt_float,
@@ -26,13 +26,13 @@ _store = get_store("gusto-api")
 _API = "gusto-api"
 
 _store.register("employees", primary_key="id",
-                initial_loader=lambda: _coerce_employees(_load("employees.csv", "employees")))
+                initial_loader=lambda: _coerce_employees(_load("employees.json", "employees")))
 _store.register("compensations", primary_key="id",
-                initial_loader=lambda: _coerce_compensations(_load("compensations.csv", "compensations")))
+                initial_loader=lambda: _coerce_compensations(_load("compensations.json", "compensations")))
 _store.register("payrolls", primary_key="id",
-                initial_loader=lambda: _coerce_payrolls(_load("payrolls.csv", "payrolls")))
+                initial_loader=lambda: _coerce_payrolls(_load("payrolls.json", "payrolls")))
 _store.register("contractors", primary_key="id",
-                initial_loader=lambda: _coerce_contractors(_load("contractors.csv", "contractors")))
+                initial_loader=lambda: _coerce_contractors(_load("contractors.json", "contractors")))
 _store.register_document("company", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "company.json", encoding="utf-8")))
 
 
@@ -58,7 +58,7 @@ def _company_doc():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):

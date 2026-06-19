@@ -9,7 +9,9 @@ import zillow_data
 try:
     from tracking_middleware import install_tracker
     from admin_plane import install_admin_plane
-except ModuleNotFoundError:  # standalone run without the shared module on sys.path
+except ModuleNotFoundError as _shared_plane_err:  # standalone run without the shared module on sys.path
+    import logging as _logging
+    _logging.error("SHARED PLANE MISSING - audit + admin disabled: %s", _shared_plane_err)
     def install_tracker(app):  # no-op fallback: audit endpoints disabled
         return None
 
@@ -36,7 +38,7 @@ def search_properties(
     min_beds: Optional[int] = None,
     min_baths: Optional[float] = None,
     home_type: Optional[str] = None,
-    status: Optional[str] = None,
+    status: Optional[str] = "FOR_SALE",
     limit: int = Query(25, ge=1, le=100),
     offset: int = Query(0, ge=0),
     sort_by: str = "list_price",

@@ -8,7 +8,7 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store,
+    read_seed_with_ctx, get_store,
     strict_int,
     strict_float,
     strict_bool,
@@ -18,11 +18,11 @@ _store = get_store("yelp-api")
 _API = "yelp-api"
 
 _store.register("businesses", primary_key="id",
-                initial_loader=lambda: _coerce_businesses(_load("businesses.csv", "businesses")))
+                initial_loader=lambda: _coerce_businesses(_load("businesses.json", "businesses")))
 _store.register("reviews", primary_key="id",
-                initial_loader=lambda: _coerce_reviews(_load("reviews.csv", "reviews")))
+                initial_loader=lambda: _coerce_reviews(_load("reviews.json", "reviews")))
 _store.register("categories", primary_key="alias",
-                initial_loader=lambda: _coerce_categories(_load("categories.csv", "categories")))
+                initial_loader=lambda: _coerce_categories(_load("categories.json", "categories")))
 
 
 def _businesses_rows():
@@ -42,7 +42,7 @@ _PRICE_LEVEL = {"$": 1, "$$": 2, "$$$": 3, "$$$$": 4}
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):

@@ -14,7 +14,7 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store,
+    read_seed_with_ctx, get_store,
     strict_int,
 )
 
@@ -22,11 +22,13 @@ _store = get_store("amplitude-api")
 _API = "amplitude-api"
 
 _store.register("events", primary_key="event_id",
-                initial_loader=lambda: _coerce_events(_load("events.csv", "events")))
+                initial_loader=lambda: _coerce_events(_load("events.json", "events")))
 _store.register("users", primary_key="user_id",
-                initial_loader=lambda: _coerce_users(_load("users.csv", "users")))
+                initial_loader=lambda: _coerce_users(_load("users.json", "users")))
 _store.register("segmentation", primary_key="_pk",
-                initial_loader=lambda: [{**r, "_pk": f"{r['event_type']}@{r['date']}"} for r in (_coerce_segmentation(_load("segmentation.csv", "segmentation")))])
+                initial_loader=lambda: [
+                    {**r, "_pk": f"{r['event_type']}@{r['date']}"}
+                    for r in _coerce_segmentation(_load("segmentation.json", "segmentation"))])
 
 
 def _events_rows():
@@ -43,7 +45,7 @@ def _segmentation_rows():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):

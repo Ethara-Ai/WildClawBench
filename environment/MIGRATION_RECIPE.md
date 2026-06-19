@@ -251,14 +251,14 @@ After every module's changes:
 ## Status — 101/101 migrated
 
 **All 101 mock-API modules are migrated and verified.**
-`script/verify_applied.py` reports `Total migrated: 101  ok: 101  fail: 0`.
+`scripts/verify_applied.py` reports `Total migrated: 101  ok: 101  fail: 0`.
 The end-to-end smoke test (`tests/test_drift_plane_smoke.py`) passes 6/6.
 
 Three migration cohorts:
 
 1. **Reference (3)** — `kraken-api`, `plaid-api`, `airbnb-api`. Hand-written
    first to discover the universal pattern.
-2. **Bulk via `script/migrate_to_drift_plane.py` (88)** — applied across
+2. **Bulk via `scripts/migrate_to_drift_plane.py` (88)** — applied across
    two passes. The second pass added `PER_API_PK_OVERRIDES` (xero/hubspot/
    paypal) and `FORCE_DOCUMENT_TABLES` (dropbox/google-calendar/mixpanel/
    notion/obsidian/alpaca) to bring previously-failing modules into the
@@ -364,4 +364,36 @@ Three migration cohorts:
    reports `(Nt/Md)` tables/documents so this is observable.
 
 Each manual migration must end with a green run of
-`script/verify_applied.py` and `tests/test_drift_plane_smoke.py`.
+`scripts/verify_applied.py` and `tests/test_drift_plane_smoke.py`.
+
+---
+
+## Eager-load smoke test (mandatory pre-merge gate)
+
+Static-only audits miss runtime defects in `_store.eager_load()` paths
+(loader crashes, coerce-time KeyError on missing seed columns, stale
+data-module renames). Every PR that touches `environment/**` must pass
+this smoke test before merge.
+
+Run from repo root with Python 3.12:
+
+```bash
+for api in environment/*-api; do
+    name=$(basename "$api" | tr - _ | sed 's/_api$//')
+    python3.12 -c "
+import sys
+sys.path.insert(0, 'environment')
+sys.path.insert(0, '$api')
+__import__('${name}_data')
+print('OK: $api')
+" || echo "BROKEN: $api"
+done
+```
+
+Every line must read `OK: environment/<api>-api`. A `BROKEN:` line means
+the API's `_store.eager_load()` (or a module-level expression executed
+during import) raised an exception — a runtime defect that no static
+audit will catch. Fix the underlying loader before merging.
+
+Wire this into CI as a required check so a future loader regression is
+caught at PR time rather than at deployment.

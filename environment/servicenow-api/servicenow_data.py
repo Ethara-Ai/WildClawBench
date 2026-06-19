@@ -16,7 +16,7 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store,
+    read_seed_with_ctx, get_store,
     strict_bool,
 )
 
@@ -24,13 +24,13 @@ _store = get_store("servicenow-api")
 _API = "servicenow-api"
 
 _store.register("incidents", primary_key="sys_id",
-                initial_loader=lambda: _coerce_incidents(_load("incident.csv", "incidents")))
+                initial_loader=lambda: _coerce_incidents(_load("incident.json", "incidents")))
 _store.register("changes", primary_key="sys_id",
-                initial_loader=lambda: _coerce_changes(_load("change_request.csv", "changes")))
+                initial_loader=lambda: _coerce_changes(_load("change_request.json", "changes")))
 _store.register("problems", primary_key="sys_id",
-                initial_loader=lambda: _coerce_problems(_load("problem.csv", "problems")))
+                initial_loader=lambda: _coerce_problems(_load("problem.json", "problems")))
 _store.register("users", primary_key="sys_id",
-                initial_loader=lambda: _coerce_users(_load("sys_user.csv", "users")))
+                initial_loader=lambda: _coerce_users(_load("sys_user.json", "users")))
 
 
 def _incidents_rows():
@@ -54,7 +54,7 @@ INCIDENT_STATES = {"1": "New", "2": "In Progress", "3": "On Hold", "6": "Resolve
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):

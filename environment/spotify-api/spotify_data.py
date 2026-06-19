@@ -1,10 +1,10 @@
 """Data access module for the Spotify API mock service."""
 
 import csv
+from copy import deepcopy
 import json
 import random
 import string
-from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
@@ -13,21 +13,23 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, strict_bool, strict_int)
+    read_seed_with_ctx, get_store, opt_csv_list, strict_bool, strict_int)
 
 _store = get_store("spotify-api")
 _API = "spotify-api"
 
 _store.register("artists", primary_key="artist_id",
-                initial_loader=lambda: _coerce_artists(_load("artists.csv", "artists")))
+                initial_loader=lambda: _coerce_artists(_load("artists.json", "artists")))
 _store.register("albums", primary_key="album_id",
-                initial_loader=lambda: _coerce_albums(_load("albums.csv", "albums")))
+                initial_loader=lambda: _coerce_albums(_load("albums.json", "albums")))
 _store.register("tracks", primary_key="track_id",
-                initial_loader=lambda: _coerce_tracks(_load("tracks.csv", "tracks")))
+                initial_loader=lambda: _coerce_tracks(_load("tracks.json", "tracks")))
 _store.register("playlists", primary_key="playlist_id",
-                initial_loader=lambda: _coerce_playlists(_load("playlists.csv", "playlists")))
+                initial_loader=lambda: _coerce_playlists(_load("playlists.json", "playlists")))
 _store.register("playlist_tracks", primary_key="_pk",
-                initial_loader=lambda: [{**r, "_pk": f"{r['playlist_id']}@{r['track_id']}"} for r in (_coerce_playlist_tracks(_load("playlist_tracks.csv", "playlist_tracks")))])
+                initial_loader=lambda: [
+                    {**r, "_pk": f"{r['playlist_id']}@{r['track_id']}"}
+                    for r in _coerce_playlist_tracks(_load("playlist_tracks.json", "playlist_tracks"))])
 _store.register_document("user", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "user.json", encoding="utf-8")))
 
 
@@ -59,7 +61,7 @@ _BASE62 = string.ascii_letters + string.digits
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):

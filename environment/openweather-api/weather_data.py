@@ -11,17 +11,17 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_str, strict_float, strict_int)
+    read_json_with_ctx, get_store, opt_str, strict_float, strict_int)
 
 _store = get_store("openweather-api")
 _API = "openweather-api"
 
 _store.register("cities", primary_key="id",
-                initial_loader=lambda: _coerce_cities(_load("cities.csv", "cities")))
+                initial_loader=lambda: _coerce_cities(_load("cities.json", "cities")))
 _store.register("current", primary_key="city_id",
-                initial_loader=lambda: _coerce_current(_load("current_weather.csv", "current")))
+                initial_loader=lambda: _coerce_current(_load("current_weather.json", "current")))
 _store.register("forecast", primary_key="_pk",
-                initial_loader=lambda: _coerce_forecast(_load("forecast.csv", "forecast")))
+                initial_loader=lambda: _coerce_forecast(_load("forecast.json", "forecast")))
 
 
 def _cities_rows():
@@ -38,7 +38,7 @@ def _forecast_rows():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
 
 
 def _strip_ctx(r):

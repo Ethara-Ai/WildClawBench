@@ -16,17 +16,17 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, strict_bool)
+    read_seed_with_ctx, get_store, opt_csv_list, strict_bool)
 
 _store = get_store("outlook-api")
 _API = "outlook-api"
 
 _store.register("messages", primary_key="id",
-                initial_loader=lambda: _coerce_messages(_load("messages.csv", "messages")))
+                initial_loader=lambda: _coerce_messages(_load("messages.json", "messages")))
 _store.register("events", primary_key="id",
-                initial_loader=lambda: _coerce_events(_load("events.csv", "events")))
+                initial_loader=lambda: _coerce_events(_load("events.json", "events")))
 _store.register("contacts", primary_key="id",
-                initial_loader=lambda: _coerce_contacts(_load("contacts.csv", "contacts")))
+                initial_loader=lambda: _coerce_contacts(_load("contacts.json", "contacts")))
 
 
 def _messages_rows():
@@ -43,7 +43,7 @@ def _contacts_rows():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):

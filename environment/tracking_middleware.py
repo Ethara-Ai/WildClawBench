@@ -24,6 +24,7 @@ from starlette.responses import Response, StreamingResponse
 
 _request_log: List[dict] = []
 _MAX_BODY_SIZE = 512 * 1024
+_MAX_LOG_ENTRIES = 10_000
 
 
 class RequestTracker(BaseHTTPMiddleware):
@@ -86,6 +87,8 @@ class RequestTracker(BaseHTTPMiddleware):
             "duration_ms": duration_ms,
         }
         _request_log.append(entry)
+        if len(_request_log) > _MAX_LOG_ENTRIES:
+            del _request_log[: len(_request_log) - _MAX_LOG_ENTRIES]
 
         return response
 

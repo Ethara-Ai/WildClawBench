@@ -15,19 +15,19 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_int, opt_str)
+    read_seed_with_ctx, get_store, opt_int, opt_str)
 
 _store = get_store("greenhouse-api")
 _API = "greenhouse-api"
 
 _store.register("candidates", primary_key="id",
-                initial_loader=lambda: _coerce_candidates(_load("candidates.csv", "candidates")))
+                initial_loader=lambda: _coerce_candidates(_load("candidates.json", "candidates")))
 _store.register("jobs", primary_key="id",
-                initial_loader=lambda: _coerce_jobs(_load("jobs.csv", "jobs")))
+                initial_loader=lambda: _coerce_jobs(_load("jobs.json", "jobs")))
 _store.register("applications", primary_key="id",
-                initial_loader=lambda: _coerce_applications(_load("applications.csv", "applications")))
+                initial_loader=lambda: _coerce_applications(_load("applications.json", "applications")))
 _store.register("scorecards", primary_key="id",
-                initial_loader=lambda: _coerce_scorecards(_load("scorecards.csv", "scorecards")))
+                initial_loader=lambda: _coerce_scorecards(_load("scorecards.json", "scorecards")))
 
 
 def _candidates_rows():
@@ -51,7 +51,7 @@ STAGES = ["Application Review", "Interview", "Offer", "Hired"]
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):

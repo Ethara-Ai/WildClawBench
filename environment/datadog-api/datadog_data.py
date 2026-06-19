@@ -12,7 +12,7 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store,
+    read_seed_with_ctx, get_store,
     strict_int,
     strict_float,
     strict_bool,
@@ -22,15 +22,15 @@ _store = get_store("datadog-api")
 _API = "datadog-api"
 
 _store.register("monitors", primary_key="id",
-                initial_loader=lambda: _coerce_monitors(_load("monitors.csv", "monitors")))
+                initial_loader=lambda: _coerce_monitors(_load("monitors.json", "monitors")))
 _store.register("dashboards", primary_key="id",
-                initial_loader=lambda: _coerce_dashboards(_load("dashboards.csv", "dashboards")))
+                initial_loader=lambda: _coerce_dashboards(_load("dashboards.json", "dashboards")))
 _store.register("events", primary_key="id",
-                initial_loader=lambda: _coerce_events(_load("events.csv", "events")))
+                initial_loader=lambda: _coerce_events(_load("events.json", "events")))
 _store.register("hosts", primary_key="name",
-                initial_loader=lambda: _coerce_hosts(_load("hosts.csv", "hosts")))
-_store.register("metrics", primary_key="metric",
-                initial_loader=lambda: _coerce_metrics(_load("metrics.csv", "metrics")))
+                initial_loader=lambda: _coerce_hosts(_load("hosts.json", "hosts")))
+_store.register("metrics", primary_key="_pk",
+                initial_loader=lambda: _coerce_metrics(_load("metrics.json", "metrics")))
 
 
 def _monitors_rows():
@@ -55,7 +55,7 @@ def _metrics_rows():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):
@@ -130,8 +130,15 @@ def _coerce_hosts(rows):
 def _coerce_metrics(rows):
     out = []
     for r in rows:
+        clean = _strip_ctx(r)
+        tags = clean.get("tags") or []
+        if isinstance(tags, str):
+            tags = _split_tags(tags)
+        tag_string = ",".join(sorted(tags))
         out.append({
-            **_strip_ctx(r),
+            **clean,
+            "tags": tags,
+            "_pk": f"{clean['metric']}|{tag_string}",
             "base_value": strict_float(r, "base_value"),
             "amplitude": strict_float(r, "amplitude"),
         })

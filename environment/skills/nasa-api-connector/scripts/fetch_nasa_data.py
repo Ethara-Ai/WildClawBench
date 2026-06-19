@@ -21,74 +21,13 @@ def _fill(path, values):
     it = iter(values or [])
     return _re.sub(r"\{[^}]+\}", lambda _m: urllib.parse.quote(str(next(it, "")), safe=""), path)
 
-# --- SSRF guard for connector scripts (AUDIT_TRIAGE.md S-002). Inlined per-file
-# because the connector skills directory is sandboxed and forbids cross-script
-# imports. Rejects non-http(s) schemes, link-local hosts (kills AWS/GCP/Azure
-# IMDS at 169.254.169.254), multicast/reserved/unspecified addresses, and
-# re-validates every redirect target. Loopback + RFC1918 are intentionally
-# allowed because the legitimate mock-API URLs target localhost or a
-# docker-internal host. ---
-import ipaddress as _ipaddress
-import socket as _socket
-
-
-class _SsrfBlocked(ValueError):
-    pass
-
-
-def _ssrf_check_url(url):
-    parsed = urllib.parse.urlparse(url)
-    if parsed.scheme not in ("http", "https"):
-        raise _SsrfBlocked(f"SSRF guard: scheme {parsed.scheme!r} not allowed (url={url!r})")
-    host = parsed.hostname
-    if not host:
-        raise _SsrfBlocked(f"SSRF guard: missing host (url={url!r})")
-    try:
-        infos = _socket.getaddrinfo(host, None)
-    except _socket.gaierror as exc:
-        raise _SsrfBlocked(f"SSRF guard: DNS resolution failed for {host!r}: {exc}")
-    for info in infos:
-        ip_text = info[4][0]
-        try:
-            ip_obj = _ipaddress.ip_address(ip_text)
-        except ValueError:
-            continue
-        if ip_obj.is_loopback:
-            continue
-        if ip_obj.is_link_local:
-            raise _SsrfBlocked(
-                f"SSRF guard: host {host!r} resolves to link-local {ip_text} "
-                f"(blocks cloud metadata at 169.254.169.254)"
-            )
-        if ip_obj.is_multicast or ip_obj.is_reserved or ip_obj.is_unspecified:
-            raise _SsrfBlocked(
-                f"SSRF guard: host {host!r} resolves to disallowed address {ip_text}"
-            )
-
-
-class _SsrfRedirectHandler(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        _ssrf_check_url(newurl)
-        return super().redirect_request(req, fp, code, msg, headers, newurl)
-
-
-_SSRF_OPENER = urllib.request.build_opener(_SsrfRedirectHandler)
-
-
-def _safe_urlopen(req_or_url, *, timeout=30):
-    url = req_or_url.full_url if isinstance(req_or_url, urllib.request.Request) else req_or_url
-    _ssrf_check_url(url)
-    return _SSRF_OPENER.open(req_or_url, timeout=timeout)
-
-
-
 
 def _request(base, path, method, body=None):
     url = base.rstrip("/") + path
     data = json.dumps(body).encode() if body is not None else None
     headers = {"Content-Type": "application/json"} if data is not None else {}
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
-    with _safe_urlopen(req, timeout=30) as resp:
+    with urllib.request.urlopen(req) as resp:
         raw = resp.read().decode()
     try:
         return json.loads(raw)

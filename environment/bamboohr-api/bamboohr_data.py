@@ -16,17 +16,17 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_int, opt_str)
+    read_seed_with_ctx, get_store, opt_int, opt_str)
 
 _store = get_store("bamboohr-api")
 _API = "bamboohr-api"
 
 _store.register("employees", primary_key="id",
-                initial_loader=lambda: _coerce_employees(_load("employees.csv", "employees")))
+                initial_loader=lambda: _coerce_employees(_load("employees.json", "employees")))
 _store.register("time_off", primary_key="id",
-                initial_loader=lambda: _coerce_time_off(_load("time_off_requests.csv", "time_off")))
+                initial_loader=lambda: _coerce_time_off(_load("time_off_requests.json", "time_off")))
 _store.register("whos_out", primary_key="id",
-                initial_loader=lambda: _coerce_whos_out(_load("whos_out.csv", "whos_out")))
+                initial_loader=lambda: _coerce_whos_out(_load("whos_out.json", "whos_out")))
 _store.register_document("company", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "company.json", encoding="utf-8")))
 
 
@@ -50,7 +50,7 @@ VALID_TIME_OFF_STATUS = {"requested", "approved", "denied", "canceled"}
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):

@@ -16,13 +16,13 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_float, opt_int, opt_str)
+    read_seed_with_ctx, get_store, opt_float, opt_int, opt_str)
 _store = get_store("mailchimp-api")
 _API = "mailchimp-api"
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):
@@ -130,13 +130,13 @@ def _coerce_reports(rows):
 
 
 _store.register("lists", primary_key="id",
-                initial_loader=lambda: _coerce_lists(_load("lists.csv", "lists")))
+                initial_loader=lambda: _coerce_lists(_load("lists.json", "lists")))
 _store.register("members", primary_key="_pk",
-                initial_loader=lambda: _coerce_members(_load("members.csv", "members")))
+                initial_loader=lambda: _coerce_members(_load("members.json", "members")))
 _store.register("campaigns", primary_key="id",
-                initial_loader=lambda: _coerce_campaigns(_load("campaigns.csv", "campaigns")))
+                initial_loader=lambda: _coerce_campaigns(_load("campaigns.json", "campaigns")))
 _store.register("reports", primary_key="id",
-                initial_loader=lambda: _coerce_reports(_load("reports.csv", "reports")))
+                initial_loader=lambda: _coerce_reports(_load("reports.json", "reports")))
 
 
 def _lists_rows(): return _store.table("lists").rows()

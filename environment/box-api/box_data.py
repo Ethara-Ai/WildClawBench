@@ -6,12 +6,11 @@ envelopes.
 """
 
 import csv
-import mimetypes
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent
-# File-content download fixtures live in `file_blobs/` next to the CSV
-# seeds; basenames must match the `name` column of `files.csv`. Bind-mount
+# File-content download fixtures live in `file_blobs/` next to the JSON
+# seeds; basenames must match the `name` column of `files.json`. Bind-mount
 # overlay path in mock_stack: /opt/mocks/box-api/file_blobs/<basename>.
 # Per-task overrides via eval/run_batch.py:393-405 staging the same
 # subpath under input/<task>/mock_data/box-api/file_blobs/<basename>.
@@ -20,20 +19,20 @@ BLOB_DIR = DATA_DIR / "file_blobs"
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store,
+    read_seed_with_ctx, get_store,
     opt_int,
-    DownloadError, extract_file_content_text,
+    DownloadError, extract_file_content_text, guess_download_mime,
 )
 
 _store = get_store("box-api")
 _API = "box-api"
 
 _store.register("users", primary_key="id",
-                initial_loader=lambda: _coerce_users(_load("users.csv", "users")))
+                initial_loader=lambda: _coerce_users(_load("users.json", "users")))
 _store.register("folders", primary_key="id",
-                initial_loader=lambda: _coerce_folders(_load("folders.csv", "folders")))
+                initial_loader=lambda: _coerce_folders(_load("folders.json", "folders")))
 _store.register("files", primary_key="id",
-                initial_loader=lambda: _coerce_files(_load("files.csv", "files")))
+                initial_loader=lambda: _coerce_files(_load("files.json", "files")))
 
 
 def _users_rows():
@@ -50,7 +49,7 @@ def _files_rows():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):
@@ -259,17 +258,15 @@ def download_file_content(file_id):
     Returns a dict with `{file_id, name, mime_type, size_bytes, content}` on
     success. Raises `DownloadError` on 404/415/413; the route handler
     translates the exception into a Box-style error envelope. Mime is
-    resolved via `mimetypes.guess_type(name)` because Box's `files.csv`
-    has no explicit mime column; allow-list lives in `_mutable_store.py`.
+    resolved via `guess_download_mime(name)` because Box's seed rows
+    have no explicit mime column; allow-list lives in `_mutable_store.py`.
     """
     f = next((x for x in _files_rows() if x["id"] == str(file_id)), None)
     if not f:
         raise DownloadError(http_status=404, code="not_found",
                             message=f"File {file_id} not found")
     name = f["name"]
-    mime_type, _ = mimetypes.guess_type(name)
-    if not mime_type:
-        mime_type = "application/octet-stream"
+    mime_type = guess_download_mime(name)
     text = extract_file_content_text(BLOB_DIR, name, mime_type)
     return {
         "file_id": str(file_id),

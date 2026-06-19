@@ -9,21 +9,21 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_str, strict_int)
+    read_seed_with_ctx, get_store, opt_str, strict_int)
 
 _store = get_store("sentry-api")
 _API = "sentry-api"
 
 _store.register("organizations", primary_key="id",
-                initial_loader=lambda: _coerce_organizations(_load("organizations.csv", "organizations")))
+                initial_loader=lambda: _coerce_organizations(_load("organizations.json", "organizations")))
 _store.register("projects", primary_key="id",
-                initial_loader=lambda: _coerce_projects(_load("projects.csv", "projects")))
+                initial_loader=lambda: _coerce_projects(_load("projects.json", "projects")))
 _store.register("issues", primary_key="id",
-                initial_loader=lambda: _coerce_issues(_load("issues.csv", "issues")))
+                initial_loader=lambda: _coerce_issues(_load("issues.json", "issues")))
 _store.register("events", primary_key="event_id",
-                initial_loader=lambda: _coerce_events(_load("events.csv", "events")))
+                initial_loader=lambda: _coerce_events(_load("events.json", "events")))
 _store.register("releases", primary_key="version",
-                initial_loader=lambda: _coerce_releases(_load("releases.csv", "releases")))
+                initial_loader=lambda: _coerce_releases(_load("releases.json", "releases")))
 
 
 def _organizations_rows():
@@ -48,7 +48,7 @@ def _releases_rows():
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):
