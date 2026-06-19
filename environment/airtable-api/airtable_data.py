@@ -17,14 +17,14 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store)
+    read_csv_with_ctx, read_seed_with_ctx, get_store)
 
 _store = get_store("airtable-api")
 _API = "airtable-api"
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):
@@ -99,13 +99,17 @@ def _records_table_name(table_id: str) -> str:
     return f"records_{table_id}"
 
 
-# one mutable Table per airtable table_id, keyed by record id "recXXX"
+# one mutable Table per airtable table_id, keyed by record id "recXXX".
+# Seed-pointer column is tolerated under records_csv / records_json / records
+# (extension-agnostic dispatch happens in _load -> read_seed_with_ctx).
 for _t in _tables:
+    _seed_name = _t.get("records_csv") or _t.get("records_json") or _t.get("records") \
+                 or f"records_{_t['id']}"
     _store.register(
         _records_table_name(_t["id"]),
         primary_key="id",
-        initial_loader=(lambda tid=_t["id"], csv_name=_t["records_csv"], tname=_records_table_name(_t["id"]):
-                        _coerce_records(tid, _load(csv_name, tname))),
+        initial_loader=(lambda tid=_t["id"], name=_seed_name, tname=_records_table_name(_t["id"]):
+                        _coerce_records(tid, _load(name, tname))),
     )
 
 

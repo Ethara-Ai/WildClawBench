@@ -14,14 +14,14 @@ DATA_DIR = Path(__file__).parent
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
 from _mutable_store import (
-    read_csv_with_ctx, get_store, opt_csv_list, opt_int)
+    read_csv_with_ctx, read_seed_with_ctx, get_store, opt_csv_list, opt_int)
 
 _store = get_store("algolia-api")
 _API = "algolia-api"
 
 
 def _load(filename, table):
-    return read_csv_with_ctx(DATA_DIR / filename, _API, table)
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
 
 
 def _strip_ctx(r):
@@ -97,13 +97,17 @@ _store.register(
     ],
 )
 
-# one mutable Table per algolia index, PK = objectID (camelCase, idiosyncratic)
+# one mutable Table per algolia index, PK = objectID (camelCase, idiosyncratic).
+# Seed-pointer column is tolerated under records_csv / records_json / records
+# (extension-agnostic dispatch happens in _load -> read_seed_with_ctx).
 for _meta in _indices_meta:
+    _seed_name = _meta.get("records_csv") or _meta.get("records_json") or _meta.get("records") \
+                 or f"records_{_meta['name']}"
     _store.register(
         _records_table_name(_meta["name"]),
         primary_key="objectID",
-        initial_loader=(lambda csv_name=_meta["records_csv"], tname=_records_table_name(_meta["name"]):
-                        [_coerce_record(r) for r in _load(csv_name, tname)]),
+        initial_loader=(lambda name=_seed_name, tname=_records_table_name(_meta["name"]):
+                        [_coerce_record(r) for r in _load(name, tname)]),
     )
 
 
