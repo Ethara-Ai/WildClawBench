@@ -169,6 +169,16 @@ _store.register("expenses", primary_key="Id",
 
 _store.register_document("company_info",
                          initial_loader=lambda: _load_json("company_info.json"))
+_store.register_document("company_raw",
+                         initial_loader=lambda: _load_json("company.json"))
+_store.register_document("bill_payments",
+                         initial_loader=lambda: _load_json("bill-payments.json"))
+_store.register_document("corporate_expense_ledger",
+                         initial_loader=lambda: _load_json("Corporate_Expense_Ledger.json"))
+_store.register_document("reimbursement_policy",
+                         initial_loader=lambda: _load_json("Reimbursement_Policy.json"))
+_store.register_document("break_even_analysis",
+                         initial_loader=lambda: _load_json("break-even-analysis.json"))
 
 
 def _next_int_id(table_name: str) -> int:
@@ -189,6 +199,26 @@ def _next_int_id(table_name: str) -> int:
 
 def get_company_info():
     return {"CompanyInfo": _store.document("company_info").get()}
+
+
+def get_company_raw():
+    return _store.document("company_raw").get()
+
+
+def get_bill_payments():
+    return _store.document("bill_payments").get()
+
+
+def get_break_even_analysis():
+    return _store.document("break_even_analysis").get()
+
+
+def get_corporate_expense_ledger():
+    return _store.document("corporate_expense_ledger").get()
+
+
+def get_reimbursement_policy():
+    return _store.document("reimbursement_policy").get()
 
 
 def list_customers():

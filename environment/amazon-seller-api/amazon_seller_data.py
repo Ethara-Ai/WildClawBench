@@ -30,6 +30,7 @@ _store.register("reports", primary_key="reportId",
 _store.register("pricing", primary_key="asin",
                 initial_loader=lambda: _coerce_pricing(_load("pricing.csv", "pricing")))
 _store.register_document("seller_account", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "seller_account.json", encoding="utf-8")))
+_store.register_document("buying_notes", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "buying_notes_fw26.json", encoding="utf-8")))
 
 
 def _catalog_items_rows():
@@ -213,6 +214,10 @@ def get_seller_account():
 
 def get_account_health():
     return {"type": "account_health", "accountHealth": _seller_account_doc()["accountHealth"]}
+
+
+def get_buying_notes():
+    return {"type": "buying_notes", "buyingNotes": _store.document("buying_notes").get()}
 
 
 def get_performance_notifications(severity=None):

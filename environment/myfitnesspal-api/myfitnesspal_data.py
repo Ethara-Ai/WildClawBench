@@ -31,6 +31,7 @@ _store.register("weight_log", primary_key="weight_id",
 _store.register("water_log", primary_key="water_id",
                 initial_loader=lambda: _coerce_water_log(_load("water_log.csv", "water_log")))
 _store.register_document("user_profile", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "user_profile.json", encoding="utf-8")))
+_store.register_document("scenario_user_profile", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "myfitnesspal_user_profile.json", encoding="utf-8")))
 
 
 def _foods_rows():
@@ -197,6 +198,10 @@ _next_water_id = max(w["water_id"] for w in _water_log_rows()) + 1
 
 def get_user_profile():
     return {"type": "user_profile", "user_profile": _user_profile_doc()}
+
+
+def get_scenario_user_profile():
+    return _store.document("scenario_user_profile").get()
 
 
 def update_user_profile(data: dict):
