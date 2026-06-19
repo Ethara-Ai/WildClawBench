@@ -1,0 +1,4 @@
+account_id,name,official_name,mask,type,subtype,available,current,limit,iso_currency_code
+acc_chk_001,TCCU Checking,Triangle Community Credit Union Member Checking,4471,depository,checking,2360.12,2418.66,,USD
+acc_sav_002,TCCU Savings,Triangle Community Credit Union Member Savings,8820,depository,savings,9140.07,9140.07,,USD
+acc_crd_003,TCCU Visa,Triangle Community Credit Union Rewards Visa,0316,credit,credit card,4387.60,612.40,5000.00,USD

@@ -1,0 +1,29 @@
+{
+  "stage": 3,
+  "stage_name": "before_T6",
+  "description": "Day 2 silent mutation for GLORI_001 (TR-01). Move the Deep Roots internal-review meeting with Dr. Hawkins one day earlier, from 2026-10-14 to 2026-10-12, so at T6 the agent reads live calendar state rather than the date implied earlier in the conversation.",
+  "fires_after_turn": 5,
+  "mutations": {
+    "silent": [
+      {
+        "id": "TR-01",
+        "service": "google-calendar-api",
+        "silent": true,
+        "trap_family": "F1",
+        "description": "Deep Roots internal review moved from 2026-10-14 to 2026-10-12 (10:00-11:00 ET).",
+        "rationale": "At T6 the agent must report the current calendar date, not the date implied earlier. Tests live state read over conversational memory.",
+        "admin": {
+          "op": "patch",
+          "table": "events",
+          "pk": "deep_roots_internal_review",
+          "set": {
+            "start": "2026-10-12T10:00:00-04:00",
+            "end": "2026-10-12T11:00:00-04:00"
+          }
+        }
+      }
+    ],
+    "filesystem": [],
+    "loud": []
+  }
+}

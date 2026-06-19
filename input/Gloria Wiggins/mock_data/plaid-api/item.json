@@ -1,0 +1,20 @@
+{
+  "item": {
+    "item_id": "plaid_item_tccu_01",
+    "institution_id": "ins_triangle_ccu",
+    "webhook": "https://webhook.voissync.ai/plaid",
+    "available_products": ["balance", "transactions"],
+    "billed_products": ["auth"],
+    "consent_expiration_time": "2027-01-31T00:00:00Z",
+    "update_type": "background"
+  },
+  "institution": {
+    "institution_id": "ins_triangle_ccu",
+    "name": "Triangle Community Credit Union",
+    "products": ["balance", "transactions", "auth"],
+    "country_codes": ["US"],
+    "url": "https://www.trianglecommunitycu.example.com",
+    "primary_color": "#0a6b3b",
+    "routing_numbers": ["253177049"]
+  }
+}

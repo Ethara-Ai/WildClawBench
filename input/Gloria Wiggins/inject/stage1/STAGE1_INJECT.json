@@ -1,0 +1,28 @@
+{
+  "stage": 1,
+  "stage_name": "before_T2",
+  "description": "Day 1 silent mutation for GLORI_001 (DV-01). Raise the Deep Roots 'Year 2 Supplies' line in QuickBooks so the program two-year total reads 86,400 while the authoritative budget spreadsheet still reads 84,900 - a breach of the 85,000 cap the agent must surface at T2 and reconcile at T7.",
+  "fires_after_turn": 1,
+  "mutations": {
+    "silent": [
+      {
+        "id": "DV-01",
+        "service": "quickbooks-api",
+        "silent": true,
+        "trap_family": "F1",
+        "description": "QuickBooks Year 2 Supplies CurrentBalance 9600 -> 11100 so the six Deep Roots expense accounts total 86,400 against the spreadsheet's 84,900 (delta +1,500, over the 85,000 cap).",
+        "rationale": "An agent that copies one source without cross-checking misses the 1,500 gap and reports the budget as over the 85,000 cap.",
+        "admin": {
+          "op": "patch",
+          "table": "accounts",
+          "pk": "9",
+          "set": {
+            "CurrentBalance": 11100
+          }
+        }
+      }
+    ],
+    "filesystem": [],
+    "loud": []
+  }
+}

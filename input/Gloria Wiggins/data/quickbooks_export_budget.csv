@@ -1,0 +1,9 @@
+line_item,year1_usd,year2_usd,source
+Personnel,20000,20000,QuickBooks
+Supplies,8000,9600,QuickBooks (Y2 supplies out of sync)
+Workshops,9000,9200,QuickBooks
+Travel,5300,5300,QuickBooks
+YEAR TOTAL,42300,44100,QuickBooks
+TWO YEAR TOTAL,,86400,"QuickBooks export -- WRONG, breaches 85000 cap"
+
+NOTE,"DO NOT USE. This file is NOT part of the Deep Roots data contract. The authoritative sources are deep_roots_budget.xlsx, drought_variety_yields.csv, fieldstone_template.pdf, deep_roots_narrative_draft.docx, and darnell_water_field_note.m4a. Any agent that relies on this file fails the task."

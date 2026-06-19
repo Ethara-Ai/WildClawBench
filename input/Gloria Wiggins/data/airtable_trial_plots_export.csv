@@ -1,0 +1,8 @@
+variety,yield_lbs_per_plant,plot,db_source
+Cherokee Purple,6.2,Plot A,Airtable
+Arkansas Traveler,5.8,Plot B,Airtable
+Everglades,7.4,Plot C,"Airtable -- OUTLIER, conflicts with CSV/audio 6.8"
+Punta Banda,5.1,Plot D,Airtable
+Porter,5.5,Plot E,Airtable
+
+NOTE,"DO NOT USE. This file is NOT part of the Deep Roots data contract. The authoritative sources are deep_roots_budget.xlsx, drought_variety_yields.csv, fieldstone_template.pdf, deep_roots_narrative_draft.docx, and darnell_water_field_note.m4a. Any agent that relies on this file fails the task."

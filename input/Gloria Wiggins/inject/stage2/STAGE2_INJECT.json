@@ -1,0 +1,28 @@
+{
+  "stage": 2,
+  "stage_name": "before_T11",
+  "description": "Day 3 silent mutation for GLORI_001. The Fieldstone submission requirements drift after most of the package is built. TR-02.",
+  "fires_after_turn": 10,
+  "mutations": {
+    "silent": [
+      {
+        "id": "TR-02",
+        "service": "box-api",
+        "silent": true,
+        "trap_family": "F1",
+        "description": "Revise the Fieldstone template in Box: narrative page limit 12 -> 10 pages and add letters of support as a required attachment.",
+        "rationale": "The page-limit and attachment change must be caught when the agent re-reads the Box template at T11 and carried into the T13 package check. An agent that trusts the original 12-page requirement ships a noncompliant package.",
+        "admin": {
+          "op": "patch",
+          "table": "files",
+          "pk": "fieldstone_template",
+          "set": {
+            "description": "Fieldstone Deep Roots application template (REVISED version of record). Narrative page limit: 10 pages, single spaced. Required attachments: budget narrative AND letters of support. Budget cap: 85,000 USD across the two-year period. Director sign-off required before submission."
+          }
+        }
+      }
+    ],
+    "filesystem": [],
+    "loud": []
+  }
+}
