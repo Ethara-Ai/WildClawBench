@@ -212,7 +212,7 @@ def _merge_usage_source(dst: dict, src: dict) -> None:
 def recompute_combined(sources: dict[str, dict], task_id: str = "") -> dict:
     """Sum per-source usage under the canonical Bedrock-native convention
     (input_tokens excludes cache; total_tokens == input+output+cR+cW). Shared
-    by save_usage and scripts/regrade.py; warns+overwrites if a source desyncs
+    by save_usage and script/regrade.py; warns+overwrites if a source desyncs
     the invariant. See token-accounting convention docs.
     """
     combined: dict[str, Any] = {k: 0 for k in _USAGE_NUMERIC_KEYS}

@@ -251,14 +251,14 @@ After every module's changes:
 ## Status — 101/101 migrated
 
 **All 101 mock-API modules are migrated and verified.**
-`scripts/verify_applied.py` reports `Total migrated: 101  ok: 101  fail: 0`.
+`script/verify_applied.py` reports `Total migrated: 101  ok: 101  fail: 0`.
 The end-to-end smoke test (`tests/test_drift_plane_smoke.py`) passes 6/6.
 
 Three migration cohorts:
 
 1. **Reference (3)** — `kraken-api`, `plaid-api`, `airbnb-api`. Hand-written
    first to discover the universal pattern.
-2. **Bulk via `scripts/migrate_to_drift_plane.py` (88)** — applied across
+2. **Bulk via `script/migrate_to_drift_plane.py` (88)** — applied across
    two passes. The second pass added `PER_API_PK_OVERRIDES` (xero/hubspot/
    paypal) and `FORCE_DOCUMENT_TABLES` (dropbox/google-calendar/mixpanel/
    notion/obsidian/alpaca) to bring previously-failing modules into the
@@ -364,4 +364,4 @@ Three migration cohorts:
    reports `(Nt/Md)` tables/documents so this is observable.
 
 Each manual migration must end with a green run of
-`scripts/verify_applied.py` and `tests/test_drift_plane_smoke.py`.
+`script/verify_applied.py` and `tests/test_drift_plane_smoke.py`.

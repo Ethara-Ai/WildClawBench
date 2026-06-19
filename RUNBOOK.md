@@ -19,7 +19,7 @@ WildClawBench runs an LLM agent (default: `claude-opus-4.7` via Bedrock through 
 - **~50 GB free disk** (agent image alone is 27.9 GB on disk).
 
 ### Optional but strongly recommended
-- **`pv`** — shows progress when loading the 13 GB agent tar. `run.sh` will auto-install it on first use if missing: Homebrew on macOS (only if `brew` is already present), or `apt-get` / `dnf` / `yum` / `apk` on Linux (only if `sudo` works without a password, or the script runs as root). If auto-install can't run, the load still works — it just appears silent for 2-15 minutes. Manual install: `brew install pv` (macOS) or `sudo apt-get install -y pv` (Debian/Ubuntu).
+- **`pv`** — shows progress when loading the 13 GB agent tar. `script/run.sh` will auto-install it on first use if missing: Homebrew on macOS (only if `brew` is already present), or `apt-get` / `dnf` / `yum` / `apk` on Linux (only if `sudo` works without a password, or the script runs as root). If auto-install can't run, the load still works — it just appears silent for 2-15 minutes. Manual install: `brew install pv` (macOS) or `sudo apt-get install -y pv` (Debian/Ubuntu).
 - **`huggingface_hub` CLI** (`pip install huggingface_hub[cli]`) — for downloading the agent image tar from HF.
 
 ### Credentials you must have
@@ -141,28 +141,28 @@ The harness infers which APIs the agent will need from (a) keyword matching agai
 
 ## 5. Running
 
-### 5.1 Easiest: use `run.sh`
+### 5.1 Easiest: use `script/run.sh`
 
 The wrapper handles preflight (docker daemon, image presence, tag corruption, orphan cleanup), runs the harness, and on docker errors retries once.
 
 ```bash
 # Default: input/alden-croft_MB, claude-opus-4.7, K=1
-./run.sh
+bash script/run.sh
 
 # One task, K=1
-./run.sh input/renata-voss
+bash script/run.sh input/renata-voss
 
 # One task, custom model
-./run.sh input/renata-voss gpt-5.5
+bash script/run.sh input/renata-voss gpt-5.5
 
 # pass@K — run the same task 4 times sequentially, then auto-aggregate
-./run.sh input/alden-croft_MB claude-opus-4.7 4
+bash script/run.sh input/alden-croft_MB claude-opus-4.7 4
 
 # Bulk: one task path per line in tasks.txt
-./run.sh --bulk tasks.txt claude-opus-4.7 1
+bash script/run.sh --bulk tasks.txt claude-opus-4.7 1
 
 # Help
-./run.sh --help
+bash script/run.sh --help
 ```
 
 Per-run logs land in `logs/<task>_<model>_run<N>_<ts>.log`.
@@ -253,7 +253,7 @@ Shared cache (read across runs of same task): `output/<backend>/<task>/data/test
 After K>1 runs, the wrapper auto-invokes:
 
 ```bash
-python3 scripts/aggregate_runs.py --backend openclaw
+python3 script/aggregate_runs.py --backend openclaw
 ```
 
 Emits `output/openclaw_aggregate_summary.json` with:
@@ -267,7 +267,7 @@ Manual flags: `--output-root ./output`, `--backend openclaw`, `--write <path>`, 
 After editing `input/<task>/rubric.json`, re-judge without re-running the agent:
 
 ```bash
-python3 scripts/regrade.py --run output/openclaw/<task>/trajectories/<model>/run_N
+python3 script/regrade.py --run output/openclaw/<task>/trajectories/<model>/run_N
 ```
 
 Reuses the existing `chat.jsonl` + `task_output/artifacts/` (or `workspace_full/` fallback) as evidence. Always uses the council. Overwrites `score.json` in place. ~$0.05 vs ~$6 for a full re-run.
@@ -291,7 +291,7 @@ WCB_PROMPT_NOCACHE=1 python3 eval/run_batch.py ...
 ### 7.4 Verbose LiteLLM logging
 
 ```bash
-LITELLM_LOG=DEBUG ./run.sh ...
+LITELLM_LOG=DEBUG bash script/run.sh ...
 # Then: docker logs ll-<batch_id>
 ```
 
@@ -338,7 +338,7 @@ jq -s 'group_by(.model) | map({model: .[0].model, total_saved: (map(.tokens_save
 ## 9. Troubleshooting
 
 ### `Required Docker image not present locally: wildclawbench-ubuntu:v1.3`
-Tag table corruption or image never loaded. Run `./run.sh` once — preflight will re-tag from SHA or attempt tar load. Manually:
+Tag table corruption or image never loaded. Run `script/run.sh` once — preflight will re-tag from SHA or attempt tar load. Manually:
 ```bash
 docker image ls --filter reference=wildclawbench-ubuntu
 docker tag <sha-shown> wildclawbench-ubuntu:v1.3
@@ -373,7 +373,7 @@ Container name regex was fixed in Fix at run_batch.py:776 (sanitization + `t_` p
 ### `kensei3-mocks` running stale code
 The image has a content-hash label (`kensei3.content_hash`) computed over `environment/*`. If you edited `environment/_mutable_store.py` or any `<api>_data.py` and didn't see a rebuild, force it:
 ```bash
-KENSEI_MOCK_REBUILD=1 ./run.sh ...
+KENSEI_MOCK_REBUILD=1 bash script/run.sh ...
 ```
 
 ### Cleanup orphans after a crashed run
@@ -381,7 +381,7 @@ KENSEI_MOCK_REBUILD=1 ./run.sh ...
 docker rm -f $(docker ps -aq --filter 'name=ll-' --filter 'name=mocks-' --filter 'name=t_') 2>/dev/null
 docker network ls --filter 'name=k3net-' -q | xargs -r docker network rm 2>/dev/null
 ```
-The `run.sh` preflight does this automatically.
+The `script/run.sh` preflight does this automatically.
 
 ---
 
@@ -403,7 +403,7 @@ These are non-obvious facts that protect you from cargo-culting bad behavior:
 
 | Path | Role |
 |---|---|
-| `run.sh` | Preflight + sequential runner + auto-aggregate wrapper. |
+| `script/run.sh` | Preflight + sequential runner + auto-aggregate wrapper. |
 | `eval/run_batch.py` | Orchestrator entry point. |
 | `src/agents/openclaw/runner.py` | openclaw backend dispatcher. |
 | `src/utils/docker_utils.py` | Container lifecycle: start, workspace setup, skill/connector injection, deliverable collection. |
@@ -414,8 +414,8 @@ These are non-obvious facts that protect you from cargo-culting bad behavior:
 | `src/utils/prompt_loader.py` | LRU-cached loader for `system_prompts/*.md`. |
 | `system_prompts/` | All 7 LLM-facing prompts (judge × 2 + testgen × 5). |
 | `environment/` | 101 mock API server.py + data modules + skills. Drift plane (`_mutable_store.py`, `admin_plane.py`). |
-| `scripts/aggregate_runs.py` | Cross-run pass@K rollup. |
-| `scripts/regrade.py` | Re-judge an existing run with an edited rubric. |
+| `script/aggregate_runs.py` | Cross-run pass@K rollup. |
+| `script/regrade.py` | Re-judge an existing run with an edited rubric. |
 | `tests/test_drift_plane_smoke.py` | 6-test smoke suite. Must pass before any change ships. |
 | `NOMENCLATURE.md` | Field/key glossary for output files. |
 | `Images/wildclawbench-ubuntu_v1.3.tar` | Agent image tar (13 GB, gitignored, download from HF). |
@@ -426,34 +426,34 @@ These are non-obvious facts that protect you from cargo-culting bad behavior:
 
 ### Run one task, look at the score
 ```bash
-./run.sh input/alden-croft_MB
+bash script/run.sh input/alden-croft_MB
 cat output/openclaw/alden-croft_MB/trajectories/claude-opus-4.7/run_1/score.json | python3 -m json.tool | head -40
 ls output/openclaw/alden-croft_MB/trajectories/claude-opus-4.7/run_1/task_output/artifacts/
 ```
 
 ### pass@K=4 and aggregate
 ```bash
-./run.sh input/alden-croft_MB claude-opus-4.7 4
+bash script/run.sh input/alden-croft_MB claude-opus-4.7 4
 cat output/openclaw_aggregate_summary.json | python3 -m json.tool
 ```
 
 ### A/B the same trajectory against an edited rubric
 ```bash
 # Run once
-./run.sh input/alden-croft_MB
+bash script/run.sh input/alden-croft_MB
 # Edit input/alden-croft_MB/rubric.json
-python3 scripts/regrade.py --run output/openclaw/alden-croft_MB/trajectories/claude-opus-4.7/run_1
+python3 script/regrade.py --run output/openclaw/alden-croft_MB/trajectories/claude-opus-4.7/run_1
 # Or against an alt file without overwriting the input
-python3 scripts/regrade.py \
+python3 script/regrade.py \
   --run output/openclaw/alden-croft_MB/trajectories/claude-opus-4.7/run_1 \
   --rubric input/alden-croft_MB/rubric.alt.json
 ```
 
 ### Compare two models on the same task
 ```bash
-./run.sh input/alden-croft_MB claude-opus-4.7 1
-./run.sh input/alden-croft_MB gpt-5.5 1
-python3 scripts/aggregate_runs.py --backend openclaw
+bash script/run.sh input/alden-croft_MB claude-opus-4.7 1
+bash script/run.sh input/alden-croft_MB gpt-5.5 1
+python3 script/aggregate_runs.py --backend openclaw
 ```
 
 ### Bulk run a task list
@@ -462,13 +462,13 @@ cat > tasks.txt <<EOF
 input/alden-croft_MB
 input/renata-voss
 EOF
-./run.sh --bulk tasks.txt claude-opus-4.7 1
+bash script/run.sh --bulk tasks.txt claude-opus-4.7 1
 ```
 
 ### Hot-edit a prompt without restarting Docker state
 ```bash
 # Edit system_prompts/judge_system.md
-WCB_PROMPT_NOCACHE=1 python3 scripts/regrade.py \
+WCB_PROMPT_NOCACHE=1 python3 script/regrade.py \
   --run output/openclaw/<task>/trajectories/<model>/run_N
 ```
 
@@ -478,7 +478,7 @@ WCB_PROMPT_NOCACHE=1 python3 scripts/regrade.py \
 
 In order:
 1. `pytest tests/test_drift_plane_smoke.py` — if this is red, fix it first.
-2. `docker ps -a` — any leaked `ll-`, `mocks-`, `t_` containers? `./run.sh` preflight will clean them, or do it manually (§9).
+2. `docker ps -a` — any leaked `ll-`, `mocks-`, `t_` containers? `script/run.sh` preflight will clean them, or do it manually (§9).
 3. `cat logs/<latest>.log | grep -E 'ERROR|WARNING'` — surface the real failure.
 4. `cat output/.../score.json` — if it has an `error` field, that's the proximate cause.
 5. `docker logs ll-<batch_id>` — if the run is still alive or only recently dead, sidecar logs reveal upstream failures.

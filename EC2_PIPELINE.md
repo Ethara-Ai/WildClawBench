@@ -4,7 +4,7 @@ End-to-end guide for running `deliver.sh` on a headless EC2 instance:
 **run eval → convert to harbour CLI format → push to the delivery repo.**
 
 The pipeline lives in one script: [`deliver.sh`](./deliver.sh). It orchestrates the
-existing `run.sh` (eval) and `scripts/repackage_to_bundle.py` (format conversion),
+existing `script/run.sh` (eval) and `script/repackage_to_bundle.py` (format conversion),
 then commits + pushes the converted bundles to
 [`Ethara-Ai/kensei-delievery`](https://github.com/Ethara-Ai/kensei-delievery)
 under the `test_deliverables/` folder on `main`.

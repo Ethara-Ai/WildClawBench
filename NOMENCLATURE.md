@@ -17,7 +17,7 @@ Two independent scoring channels run per task per run. Historically both used `t
 | Generated test weights | `output/<backend>/<task>/data/tests/test_weights.json` | — |
 | Per-run summary across many runs | `output/<backend>/<task>/pass_summary.json` | `runs[].rubric_weights_percentage` |
 | Aggregate average across runs of a model | same file | `average_rubric_weights_percentage` |
-| Cross-task model rollup (mean and pass@K) | run `python3 scripts/aggregate_runs.py` | `output/<backend|all>_aggregate_summary.json` |
+| Cross-task model rollup (mean and pass@K) | run `python3 script/aggregate_runs.py` | `output/<backend|all>_aggregate_summary.json` |
 | Best-of-K rollout score for one task | aggregator output | `by_task_model[].pass_at_k`, `by_task_model[].k` |
 | Eval-wide pass@K (mean of per-task best) | aggregator output | `by_model[].average_pass_at_k` |
 
@@ -184,7 +184,7 @@ The deprecated `tests_*` rubric aliases LOOK like Channel A counts but are NOT. 
 
 ## Cross-task / cross-model aggregator
 
-`scripts/aggregate_runs.py` walks `output/<backend>/*/trajectories/<model>/run_*/score.json` and emits:
+`script/aggregate_runs.py` walks `output/<backend>/*/trajectories/<model>/run_*/score.json` and emits:
 
 - `output/<backend>_aggregate_summary.json` (with `--backend openclaw`)
 - `output/all_aggregate_summary.json` (default)
@@ -243,10 +243,10 @@ average_pass_at_k(model) = mean(pass_at_k across all tasks for that model)
 | --- | --- |
 | 1 (pytest reward) | `src/utils/test_executor.py:_compute_reward` |
 | 1 (rubric overall_score) | `src/utils/grading.py:_grade_council` and single-judge — algebraically equivalent because binary scores × signed weights / positive-only denominator collapses to the user formula |
-| 2 (percentage) | `src/utils/grading.py` return dict (`rubric_weights_percentage`), `eval/run_batch.py:_write_pass_summary` (per-run), `scripts/aggregate_runs.py` (cross-run) |
-| 3 (mean over runs of a model) | `eval/run_batch.py:_write_pass_summary` (per-task `average_rubric_weights_percentage`), `scripts/aggregate_runs.py` (cross-task `by_model.average_rubric_weights_percentage`) |
-| 4 (pass@K per task) | `scripts/aggregate_runs.py` `by_task_model[].pass_at_k` (best of K runs for that task), walkthrough §4 |
-| 5 (eval-aggregate pass@K) | `scripts/aggregate_runs.py` `by_model[].average_pass_at_k` (mean of per-task best across all tasks), walkthrough §4 'eval-aggregate = mean of per-task values' |
+| 2 (percentage) | `src/utils/grading.py` return dict (`rubric_weights_percentage`), `eval/run_batch.py:_write_pass_summary` (per-run), `script/aggregate_runs.py` (cross-run) |
+| 3 (mean over runs of a model) | `eval/run_batch.py:_write_pass_summary` (per-task `average_rubric_weights_percentage`), `script/aggregate_runs.py` (cross-task `by_model.average_rubric_weights_percentage`) |
+| 4 (pass@K per task) | `script/aggregate_runs.py` `by_task_model[].pass_at_k` (best of K runs for that task), walkthrough §4 |
+| 5 (eval-aggregate pass@K) | `script/aggregate_runs.py` `by_model[].average_pass_at_k` (mean of per-task best across all tasks), walkthrough §4 'eval-aggregate = mean of per-task values' |
 
 ## Task input layout — `input/<task_id>/`
 
