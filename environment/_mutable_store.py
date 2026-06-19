@@ -85,10 +85,12 @@ from __future__ import annotations
 
 import copy
 import csv
+import json
 import math
 import threading
 import time
 import uuid
+from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional
 
 
@@ -163,6 +165,9 @@ def read_csv_with_ctx(path: Any, api: str, table: str) -> List[Row]:
                         f"in a text field. api={api} table={table} file={src} "
                         f"row_index={idx}"
                     )
+                for k in fieldnames:
+                    if r.get(k) == "":
+                        r[k] = None
                 r["__api__"] = api
                 r["__table__"] = table
                 r["__file__"] = src
@@ -180,6 +185,83 @@ def read_csv_with_ctx(path: Any, api: str, table: str) -> List[Row]:
         raise CoerceError(
             f"malformed CSV ({exc}): api={api} table={table} file={src}"
         )
+
+
+def read_json_with_ctx(path: Any, api: str, table: str) -> List[Row]:
+    """JSON-table analogue of :func:`read_csv_with_ctx`.
+
+    Seed tables are stored as a JSON **array of row objects** (cells are strings,
+    matching what the CSV reader produced, with ``null`` only where a CSV row was
+    genuinely short). This reads that array and injects the same
+    ``__api__/__table__/__file__/__row_index__`` context per row so the existing
+    coercers (which read those keys in their error paths) behave identically.
+
+    Returns ``[]`` for an empty array. Raises CoerceError on non-UTF-8, malformed
+    JSON, a non-array top level, or a non-object row -- the JSON-side equivalents
+    of the CSV reader's shape guards.
+    """
+    src = str(path)
+    try:
+        with open(src, encoding="utf-8") as f:
+            data = json.load(f)
+    except UnicodeDecodeError as exc:
+        raise CoerceError(
+            f"file is not valid UTF-8 ({exc}): api={api} table={table} file={src}"
+        )
+    except json.JSONDecodeError as exc:
+        raise CoerceError(f"malformed JSON ({exc}): api={api} table={table} file={src}")
+
+    if not isinstance(data, list):
+        raise CoerceError(
+            f"expected a JSON array of row objects, got {type(data).__name__}: "
+            f"api={api} table={table} file={src}"
+        )
+
+    rows: List[Row] = []
+    for idx, r in enumerate(data):
+        if not isinstance(r, dict):
+            raise CoerceError(
+                f"row {idx} is not an object ({type(r).__name__}): "
+                f"api={api} table={table} file={src}"
+            )
+        row = dict(r)
+        row["__api__"] = api
+        row["__table__"] = table
+        row["__file__"] = src
+        row["__row_index__"] = idx
+        rows.append(row)
+    return rows
+
+
+def read_seed_with_ctx(path: Any, api: str, table: str) -> List[Row]:
+    """Auto-dispatch to CSV or JSON reader, with CSV-overlay-wins semantics.
+
+    Overlay semantics (Q1 fix):
+      * If *path* has an explicit ``.json`` or ``.csv`` suffix, a sibling file
+        with the OTHER suffix is checked first; a sibling ``.csv`` ALWAYS wins
+        over a baked ``.json`` (so a bind-mounted CSV overlay shadows the
+        baked-in JSON without any callsite change).
+      * If *path* has no suffix, ``.csv`` is probed before ``.json``.
+      * :class:`CoerceError` is raised if no candidate file exists.
+    """
+    p = Path(path)
+    ext = p.suffix.lower()
+    if ext == ".json":
+        csv_sibling = p.with_suffix(".csv")
+        if csv_sibling.exists():
+            return read_csv_with_ctx(csv_sibling, api, table)
+        return read_json_with_ctx(p, api, table)
+    if ext == ".csv":
+        return read_csv_with_ctx(p, api, table)
+    csv_path = p.with_suffix(".csv")
+    if csv_path.exists():
+        return read_csv_with_ctx(csv_path, api, table)
+    json_path = p.with_suffix(".json")
+    if json_path.exists():
+        return read_json_with_ctx(json_path, api, table)
+    raise CoerceError(
+        f"seed file not found (tried .csv and .json): api={api} table={table} path={p}"
+    )
 
 
 def strict_int(row: Row, column: str) -> int:
@@ -861,6 +943,39 @@ def _is_downloadable_text_mime(mime: str) -> bool:
     if m.startswith("text/"):
         return True
     return m in _DOWNLOAD_TEXT_MIMES
+
+
+_DOWNLOAD_EXT_MIMES = {
+    ".md": "text/markdown",
+    ".markdown": "text/markdown",
+    ".txt": "text/plain",
+    ".csv": "text/csv",
+    ".json": "application/json",
+    ".xml": "application/xml",
+    ".yaml": "application/yaml",
+    ".yml": "application/yaml",
+    ".pdf": "application/pdf",
+}
+
+
+def guess_download_mime(name: str) -> str:
+    """Deterministic mime resolution for the download routes (box/dropbox,
+    whose seed rows carry no mime column).
+
+    ``mimetypes.guess_type`` depends on the host's mime database: python:slim
+    images ship no /etc/mime.types at all, and macOS's Apache table lacks
+    yaml -- so the 415 allow-list gate must not hinge on it. Allow-listed
+    extensions resolve from the table above first; anything else falls back
+    to ``mimetypes.guess_type``, then ``application/octet-stream`` (which the
+    allow-list rejects with 415)."""
+    import mimetypes
+    from pathlib import Path as _Path
+
+    ext = _Path(name).suffix.lower()
+    if ext in _DOWNLOAD_EXT_MIMES:
+        return _DOWNLOAD_EXT_MIMES[ext]
+    mime, _ = mimetypes.guess_type(name)
+    return mime or "application/octet-stream"
 
 
 def _extract_pdf_text(blob_path: Any) -> str:
