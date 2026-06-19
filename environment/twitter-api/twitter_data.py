@@ -19,10 +19,10 @@ _store.register("users", primary_key="id",
                 initial_loader=lambda: _coerce_users(_load("users.csv", "users")))
 _store.register("tweets", primary_key="id",
                 initial_loader=lambda: _coerce_tweets(_load("tweets.csv", "tweets")))
-_store.register("follows", primary_key="follower_id",
-                initial_loader=lambda: [_strip_ctx(r) for r in _load("follows.csv", "follows")])
-_store.register("likes", primary_key="user_id",
-                initial_loader=lambda: [_strip_ctx(r) for r in _load("likes.csv", "likes")])
+_store.register("follows", primary_key="_pk",
+                initial_loader=lambda: [{**r, "_pk": f"{r['follower_id']}@{r['following_id']}"} for r in ([_strip_ctx(r) for r in _load("follows.csv", "follows")])])
+_store.register("likes", primary_key="_pk",
+                initial_loader=lambda: [{**r, "_pk": f"{r['user_id']}@{r['tweet_id']}"} for r in ([_strip_ctx(r) for r in _load("likes.csv", "likes")])])
 _store.register("retweets", primary_key="user_id",
                 initial_loader=lambda: [_strip_ctx(r) for r in _load("retweets.csv", "retweets")])
 
@@ -36,11 +36,11 @@ def _tweets_rows():
 
 
 def _follows_rows():
-    return _store.table("follows").rows()
+    return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("follows").rows()]
 
 
 def _likes_rows():
-    return _store.table("likes").rows()
+    return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("likes").rows()]
 
 
 def _retweets_rows():

@@ -22,12 +22,12 @@ _API = "binance-api"
 
 _store.register("prices", primary_key="symbol",
                 initial_loader=lambda: _coerce_prices(_load("prices.csv", "prices")))
-_store.register("klines", primary_key="symbol",
-                initial_loader=lambda: _coerce_klines(_load("klines.csv", "klines")))
+_store.register("klines", primary_key="_pk",
+                initial_loader=lambda: [{**r, "_pk": f"{r['symbol']}@{r['interval']}@{r['open_time']}"} for r in (_coerce_klines(_load("klines.csv", "klines")))])
 _store.register("balances", primary_key="asset",
                 initial_loader=lambda: _coerce_balances(_load("balances.csv", "balances")))
-_store.register("depth", primary_key="symbol",
-                initial_loader=lambda: _coerce_depth(_load("depth.csv", "depth")))
+_store.register("depth", primary_key="_pk",
+                initial_loader=lambda: [{**r, "_pk": f"{r['symbol']}@{r['side']}@{r['price']}"} for r in (_coerce_depth(_load("depth.csv", "depth")))])
 
 
 def _prices_rows():
@@ -35,7 +35,7 @@ def _prices_rows():
 
 
 def _klines_rows():
-    return _store.table("klines").rows()
+    return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("klines").rows()]
 
 
 def _balances_rows():
@@ -43,7 +43,7 @@ def _balances_rows():
 
 
 def _depth_rows():
-    return _store.table("depth").rows()
+    return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("depth").rows()]
 
 
 

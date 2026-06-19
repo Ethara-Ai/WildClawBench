@@ -23,8 +23,8 @@ _store.register("activities", primary_key="id",
                 initial_loader=lambda: _coerce_activities(_load("activities.csv", "activities")))
 _store.register("segments", primary_key="id",
                 initial_loader=lambda: _coerce_segments(_load("segments.csv", "segments")))
-_store.register("kudoers", primary_key="activity_id",
-                initial_loader=lambda: _coerce_kudoers(_load("kudoers.csv", "kudoers")))
+_store.register("kudoers", primary_key="_pk",
+                initial_loader=lambda: [{**r, "_pk": f"{r['activity_id']}@{r['athlete_id']}"} for r in (_coerce_kudoers(_load("kudoers.csv", "kudoers")))])
 _store.register_document("athlete", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "athlete.json", encoding="utf-8")))
 
 
@@ -37,7 +37,7 @@ def _segments_rows():
 
 
 def _kudoers_rows():
-    return _store.table("kudoers").rows()
+    return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("kudoers").rows()]
 
 
 def _athlete_doc():

@@ -25,8 +25,8 @@ _store.register("menu_items", primary_key="item_id",
                 initial_loader=lambda: _coerce_menu(_load("menu_items.csv", "menu_items")))
 _store.register("orders", primary_key="order_id",
                 initial_loader=lambda: _coerce_orders(_load("orders.csv", "orders")))
-_store.register("order_items", primary_key="order_id",
-                initial_loader=lambda: _coerce_order_items(_load("order_items.csv", "order_items")))
+_store.register("order_items", primary_key="_pk",
+                initial_loader=lambda: [{**r, "_pk": f"{r['order_id']}@{r['item_id']}"} for r in (_coerce_order_items(_load("order_items.csv", "order_items")))])
 
 
 def _stores_rows():
@@ -42,7 +42,7 @@ def _orders_rows():
 
 
 def _order_items_rows():
-    return _store.table("order_items").rows()
+    return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("order_items").rows()]
 
 
 SERVICE_FEE_PCT = 10.0  # percent of subtotal

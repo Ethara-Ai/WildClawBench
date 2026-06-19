@@ -23,8 +23,8 @@ _store.register("messages", primary_key="id",
                 initial_loader=lambda: _coerce_messages(_load("messages.csv", "messages")))
 _store.register("events", primary_key="id",
                 initial_loader=lambda: _coerce_events(_load("events.csv", "events")))
-_store.register("members", primary_key="list_address",
-                initial_loader=lambda: _coerce_members(_load("list_members.csv", "members")))
+_store.register("members", primary_key="_pk",
+                initial_loader=lambda: [{**r, "_pk": f"{r['list_address']}@{r['address']}"} for r in (_coerce_members(_load("list_members.csv", "members")))])
 
 
 def _messages_rows():
@@ -36,7 +36,7 @@ def _events_rows():
 
 
 def _members_rows():
-    return _store.table("members").rows()
+    return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("members").rows()]
 
 
 

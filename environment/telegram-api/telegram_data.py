@@ -26,8 +26,8 @@ _store.register("chats", primary_key="id",
                 initial_loader=lambda: _coerce_chats(_load("chats.csv", "chats")))
 _store.register("messages", primary_key="message_id",
                 initial_loader=lambda: _coerce_messages(_load("messages.csv", "messages")))
-_store.register("members", primary_key="chat_id",
-                initial_loader=lambda: _coerce_members(_load("chat_members.csv", "members")))
+_store.register("members", primary_key="_pk",
+                initial_loader=lambda: [{**r, "_pk": f"{r['chat_id']}@{r['user_id']}"} for r in (_coerce_members(_load("chat_members.csv", "members")))])
 _store.register_document("bot", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "bot.json", encoding="utf-8")))
 
 
@@ -44,7 +44,7 @@ def _messages_rows():
 
 
 def _members_rows():
-    return _store.table("members").rows()
+    return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("members").rows()]
 
 
 def _bot_doc():

@@ -26,8 +26,8 @@ _store.register("channels", primary_key="id",
                 initial_loader=lambda: _coerce_channels(_load("channels.csv", "channels")))
 _store.register("messages", primary_key="id",
                 initial_loader=lambda: _coerce_messages(_load("messages.csv", "messages")))
-_store.register("members", primary_key="guild_id",
-                initial_loader=lambda: _coerce_members(_load("members.csv", "members")))
+_store.register("members", primary_key="_pk",
+                initial_loader=lambda: [{**r, "_pk": f"{r['guild_id']}@{r['user']['id']}"} for r in (_coerce_members(_load("members.csv", "members")))])
 _store.register("roles", primary_key="id",
                 initial_loader=lambda: _coerce_roles(_load("roles.csv", "roles")))
 _store.register_document("me", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "me.json", encoding="utf-8")))
@@ -46,7 +46,7 @@ def _messages_rows():
 
 
 def _members_rows():
-    return _store.table("members").rows()
+    return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("members").rows()]
 
 
 def _roles_rows():

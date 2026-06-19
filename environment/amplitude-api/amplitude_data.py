@@ -25,8 +25,8 @@ _store.register("events", primary_key="event_id",
                 initial_loader=lambda: _coerce_events(_load("events.csv", "events")))
 _store.register("users", primary_key="user_id",
                 initial_loader=lambda: _coerce_users(_load("users.csv", "users")))
-_store.register("segmentation", primary_key="event_type",
-                initial_loader=lambda: _coerce_segmentation(_load("segmentation.csv", "segmentation")))
+_store.register("segmentation", primary_key="_pk",
+                initial_loader=lambda: [{**r, "_pk": f"{r['event_type']}@{r['date']}"} for r in (_coerce_segmentation(_load("segmentation.csv", "segmentation")))])
 
 
 def _events_rows():
@@ -38,7 +38,7 @@ def _users_rows():
 
 
 def _segmentation_rows():
-    return _store.table("segmentation").rows()
+    return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("segmentation").rows()]
 
 
 

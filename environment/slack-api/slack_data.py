@@ -30,8 +30,8 @@ _store.register("channels", primary_key="id",
                 initial_loader=lambda: _coerce_channels(_load("channels.csv", "channels")))
 _store.register("messages", primary_key="ts",
                 initial_loader=lambda: _coerce_messages(_load("messages.csv", "messages")))
-_store.register("channel_members", primary_key="channel_id",
-                initial_loader=lambda: [_strip_ctx(r) for r in _load("channel_members.csv", "channel_members")])
+_store.register("channel_members", primary_key="_pk",
+                initial_loader=lambda: [{**r, "_pk": f"{r['channel_id']}@{r['user_id']}"} for r in ([_strip_ctx(r) for r in _load("channel_members.csv", "channel_members")])])
 _store.register_document("team", initial_loader=lambda: json.load(open(DATA_DIR / "team.json", encoding="utf-8")))
 
 
@@ -48,7 +48,7 @@ def _messages_rows():
 
 
 def _channel_members_rows():
-    return _store.table("channel_members").rows()
+    return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("channel_members").rows()]
 
 
 def _team_doc():

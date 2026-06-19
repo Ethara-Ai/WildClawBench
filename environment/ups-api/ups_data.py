@@ -22,8 +22,8 @@ from _mutable_store import (
 _store = get_store("ups-api")
 _API = "ups-api"
 
-_store.register("rates", primary_key="service_code",
-                initial_loader=lambda: _coerce_rates(_load("rates.csv", "rates")))
+_store.register("rates", primary_key="_pk",
+                initial_loader=lambda: [{**r, "_pk": f"{r['service_code']}@{r['origin_zip']}@{r['dest_zip']}@{r['weight_lb']}"} for r in (_coerce_rates(_load("rates.csv", "rates")))])
 _store.register("shipments", primary_key="tracking_number",
                 initial_loader=lambda: _coerce_shipments(_load("shipments.csv", "shipments")))
 _store.register("tracking", primary_key="tracking_number",
@@ -31,7 +31,7 @@ _store.register("tracking", primary_key="tracking_number",
 
 
 def _rates_rows():
-    return _store.table("rates").rows()
+    return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("rates").rows()]
 
 
 def _shipments_rows():
