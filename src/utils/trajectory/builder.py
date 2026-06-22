@@ -493,10 +493,81 @@ def _task_attr(task: Any, key: str) -> str:
     return val if isinstance(val, str) else ("" if val is None else str(val))
 
 
+def _load_spawn_tree(spawn_tree_path: Optional[Path]) -> list[dict]:
+    """Read the ``spawn_tree.jsonl`` ledger (one NDJSON row per sub-agent spawn).
+
+    Returns [] if the path is missing or unreadable. Mirrors the june-7
+    delivery pipeline so sub-agent trajectories embed in spawn order.
+    """
+    rows: list[dict] = []
+    if spawn_tree_path is None or not spawn_tree_path.is_file():
+        return rows
+    try:
+        with spawn_tree_path.open(encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rows.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+    except OSError:
+        pass
+    return rows
+
+
+def _load_sub_agent_trajectories(
+    subagents_dir: Optional[Path],
+    spawn_rows: list[dict] | None = None,
+) -> dict[str, dict]:
+    """Embed every captured sub-agent delivery, keyed by spawn_id.
+
+    Reads ``{spawn_id}.delivery.json`` files written by the spawn runtime
+    (``src/utils/subagent_director.py``). Ordering follows ``spawn_tree.jsonl``
+    (preserving per-turn spawn sequence), then any remaining delivery files on
+    disk. Returns {} when there are no sub-agents (so the published schema is
+    unchanged for non-multi-agent runs).
+    """
+    if subagents_dir is None or not subagents_dir.is_dir():
+        return {}
+
+    ordered_ids: list[str] = []
+    seen: set[str] = set()
+    for r in spawn_rows or []:
+        if not isinstance(r, dict):
+            continue
+        sid = r.get("spawn_id")
+        if sid and sid not in seen:
+            seen.add(sid)
+            ordered_ids.append(sid)
+    for f in sorted(subagents_dir.glob("*.delivery.json")):
+        sid = f.name[: -len(".delivery.json")]
+        if sid and sid not in seen:
+            seen.add(sid)
+            ordered_ids.append(sid)
+
+    out: dict[str, dict] = {}
+    for spawn_id in ordered_ids:
+        f = subagents_dir / f"{spawn_id}.delivery.json"
+        if not f.is_file():
+            continue
+        try:
+            data = json.loads(f.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if isinstance(data, dict):
+            out[spawn_id] = data
+    return out
+
+
 def build_published_trajectory(
     traj: Mapping[str, Any],
     task: Any,
     completion_status: str = "",
+    *,
+    subagents_dir: Optional[Path] = None,
+    spawn_tree_path: Optional[Path] = None,
 ) -> dict:
     """Project the rich internal trajectory dict into the published
     ``{"messages": [...], "meta_info": {...}}`` schema.
@@ -554,7 +625,18 @@ def build_published_trajectory(
         "system_prompt": _task_attr(task, "system_prompt"),
         "platform": platform,
     }
-    return {"meta_info": meta_info, "messages": messages}
+    published = {"meta_info": meta_info, "messages": messages}
+
+    # Multi-agent: embed captured sub-agent trajectories (keyed by spawn_id).
+    # Only attach the key when there is at least one sub-agent, so the published
+    # schema for ordinary (single-agent) runs stays byte-identical.
+    sub_trajs = _load_sub_agent_trajectories(
+        subagents_dir, _load_spawn_tree(spawn_tree_path)
+    )
+    if sub_trajs:
+        published["sub_agent_trajectories"] = sub_trajs
+
+    return published
 
 
 def _count_thinking_blocks(messages) -> tuple[int, list[dict]]:

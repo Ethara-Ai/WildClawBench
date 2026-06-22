@@ -15,12 +15,14 @@ from src.utils.docker_utils import (
     inject_api_connectors,
     inject_lobster_workspace,
     inject_openclaw_models,
+    inject_subagent_tool,
     run_background,
     run_warmup,
     setup_skills,
     setup_workspace,
     snapshot_workspace_state,
     start_container,
+    write_turn_marker,
 )
 from src.utils.grading import extract_usage_from_jsonl, extract_usage_from_litellm_log
 
@@ -125,13 +127,26 @@ class OpenClawAgent(BaseAgent):
             tmp_path = os.path.join(spec.workspace_path, "tmp")
             os.makedirs(exec_path, exist_ok=True)
 
+            # Sub-agent spawn runtime (src/utils/subagent_director.py) discovers
+            # the LiteLLM sidecar from these container env vars. Only set on the
+            # litellm path; OpenRouter runs don't expose a /v1/messages sidecar
+            # to the child. Single-agent tasks leave the env untouched.
+            extra_env_dict = dict(spec.task.get("env_dict") or {})
+            if (spec.multi_agent_enabled and self.litellm_config_yaml
+                    and self.litellm_container_name):
+                base_url = f"http://{self.litellm_container_name}:{self.litellm_port}"
+                extra_env_dict.setdefault("LITELLM_BASE_URL", base_url)
+                extra_env_dict.setdefault(
+                    "LITELLM_API_KEY", self.litellm_master_key or "sk-litellm")
+                extra_env_dict.setdefault("WILDCLAW_MODEL", spec.model)
+
             start_container(
                 spec.task_id,
                 exec_path,
                 extra_env=spec.task.get("env", ""),
                 tmp_path=tmp_path,
                 lobster_env=spec.lobster.get("env") if spec.lobster else None,
-                extra_env_dict=spec.task.get("env_dict") or None,
+                extra_env_dict=extra_env_dict or None,
                 network=self.litellm_network,
             )
 
@@ -187,6 +202,9 @@ class OpenClawAgent(BaseAgent):
             if spec.models_config:
                 inject_openclaw_models(spec.task_id, spec.models_config)
 
+            if spec.multi_agent_enabled:
+                inject_subagent_tool(spec.task_id, spec.multi_agent_config)
+
             self._set_model(spec.task_id, spec.model, thinking=spec.thinking)
             self._inject_auth(spec.task_id)
             image_model = self.image_model or spec.model
@@ -229,6 +247,9 @@ class OpenClawAgent(BaseAgent):
                     except Exception as exc:
                         logger.error("[%s] before_turn(%d) hook failed: %s",
                                      spec.task_id, turn_index, exc)
+                if spec.multi_agent_enabled:
+                    # Correlate sub-agent spawns landing in this turn to its index.
+                    write_turn_marker(spec.task_id, turn_index)
                 safe_msg = message.replace("'", "'\\''")
                 if len(turn_messages) > 1:
                     logger.info("[%s] Agent turn %d/%d starting",
@@ -307,6 +328,50 @@ class OpenClawAgent(BaseAgent):
                     "request_count": 0,
                     "usage_source": "none",
                 }
+
+        # Fold sub-agent token totals from spawn_tree.jsonl into parent usage so
+        # leaderboard cost math reflects the full call graph (not just the
+        # parent's LiteLLM hits). Missing/malformed file is silently treated as
+        # zero spawns — single-agent tasks remain byte-identical.
+        spawn_tree = output_dir / "task_output" / "workspace_full" / "spawn_tree.jsonl"
+        sub_in = sub_out = sub_count = 0
+        sub_cost = 0.0
+        if spawn_tree.is_file():
+            for line in spawn_tree.read_text(encoding="utf-8", errors="replace").splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(row, dict):
+                    continue
+                sub_count += 1
+                try:
+                    sub_in += int(row.get("tokens_in") or 0)
+                except (TypeError, ValueError):
+                    pass
+                try:
+                    sub_out += int(row.get("tokens_out") or 0)
+                except (TypeError, ValueError):
+                    pass
+                # Cost lives on BOTH per-spawn and "summary" rows; only sum the
+                # per-spawn rows to avoid double-counting.
+                if row.get("kind") != "summary":
+                    try:
+                        sub_cost += float(row.get("cost_usd") or 0.0)
+                    except (TypeError, ValueError):
+                        pass
+        if sub_count:
+            usage["subagent_count"] = sub_count
+            usage["subagent_tokens_in"] = sub_in
+            usage["subagent_tokens_out"] = sub_out
+            usage["subagent_cost_usd"] = round(sub_cost, 6)
+            usage["input_tokens"] = int(usage.get("input_tokens") or 0) + sub_in
+            usage["output_tokens"] = int(usage.get("output_tokens") or 0) + sub_out
+            usage["total_tokens"] = int(usage.get("total_tokens") or 0) + sub_in + sub_out
+            usage["cost_usd"] = round(float(usage.get("cost_usd") or 0.0) + sub_cost, 6)
 
         self._task_windows.pop(task_id, None)
         usage["elapsed_time"] = round(elapsed_time, 2)

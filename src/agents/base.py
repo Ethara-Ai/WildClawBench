@@ -29,6 +29,14 @@ class AgentTaskSpec:
     # run a single turn from ``prompt`` and ignore them.
     turns: tuple[str, ...] | None = None
     before_turn: Callable[[int], None] | None = None
+    # Multi-agent (sub-agent spawning) support. When ``multi_agent_enabled`` is
+    # set, the openclaw runner injects the spawn-subagent skill into the agent
+    # container before the turn loop, so the agent can spawn bounded sub-agent
+    # sessions. ``multi_agent_config`` carries the per-turn expectations and
+    # allowed-tools config (see ``src/utils/spawn_tree_checks.py``). Only the
+    # openclaw backend honours these fields; other backends ignore them.
+    multi_agent_enabled: bool = False
+    multi_agent_config: dict[str, Any] | None = None
 
 
 @dataclass

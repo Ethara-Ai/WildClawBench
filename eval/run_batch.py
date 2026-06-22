@@ -952,7 +952,16 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
     # form is projected. completion_status is run-level (agent finished w/o a
     # fatal error); the rubric grade is computed later and lives in score.json.
     completion_status = "failure" if result.get("error") else "success"
-    published = build_published_trajectory(traj, st, completion_status)
+    # Multi-agent: embed captured sub-agent trajectories. The spawn runtime
+    # writes these under /tmp_workspace/, collected into workspace_full/.
+    # build_published_trajectory omits the key when there are no sub-agents, so
+    # single-agent output.json stays byte-identical.
+    _ws_full = output_dir / "task_output" / "workspace_full"
+    published = build_published_trajectory(
+        traj, st, completion_status,
+        subagents_dir=_ws_full / "subagents",
+        spawn_tree_path=_ws_full / "spawn_tree.jsonl",
+    )
     (output_dir / "output.json").write_text(
         json.dumps(published, indent=2, ensure_ascii=False), encoding="utf-8",
     )
@@ -1401,6 +1410,8 @@ def run_single_task(
                 lobster=lobster,
                 turns=stage_turns,
                 before_turn=stage_before_turn,
+                multi_agent_enabled=bool(task.get("multi_agent_enabled")),
+                multi_agent_config=task.get("multi_agent_config") or None,
             )
         )
         gateway_proc = execution.gateway_proc
@@ -1505,6 +1516,23 @@ def run_single_task(
                     store_snapshot_dir=_ws_after / "mock_data",
                     last_response=_last,
                 )
+                # Multi-agent: fold per-turn spawn-tree checker results into the
+                # agent-state fixture under the standard "checkers" key, so
+                # test_outputs.py scores them via the normal `state` fixture
+                # exactly as june-7 does:
+                #   def test_ma(state): assert state["checkers"]["MA_C1"]
+                # build_checker_state returns {"checkers": {id: bool}}; merging it
+                # into the agent state composes with june-10's other state keys.
+                if task.get("multi_agent_enabled"):
+                    try:
+                        from src.utils.spawn_tree_checks import build_checker_state
+                        _state.update(build_checker_state(
+                            output_dir / "task_output" / "workspace_full" / "spawn_tree.jsonl",
+                            task.get("multi_agent_config"),
+                        ))
+                    except Exception as exc:
+                        logger.warning("[%s] multi_agent checker state failed: %s",
+                                       task_id, exc)
                 agent_state_json = json.dumps(_state, ensure_ascii=False, default=str)
                 # Persist alongside the run + into the tests dir the bundle ships.
                 (output_dir / "agent_state.json").write_text(
