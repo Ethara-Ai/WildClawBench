@@ -14,6 +14,33 @@ from _mutable_store import get_store  # noqa: E402
 
 _store = get_store("instacart-api")
 
+
+
+def _store_patch(_table, _row_or_pk, _updates):
+    """Persist field updates to a stored row (was: in-place mutation of a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
+
+def _store_delete(_table, _row_or_pk):
+    """Persist a row deletion (was: pop/remove on a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.delete(_pk)
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("retailers", primary_key="retailer_id",
                 initial_loader=lambda: _coerce_retailers(_load("retailers.csv")))
 _store.register("products", primary_key="product_id",
@@ -296,9 +323,9 @@ def checkout(cart_id, tip=0.0, delivery_window_start=None, delivery_window_end=N
         "delivery_window_end": delivery_window_end,
         "shopper_id": "",
     }
-    _orders_rows().append(order)
+    _store_insert("orders", order)
     for it in cart_full["items"]:
-        _order_items_rows().append({
+        _store_insert("order_items", {
             "order_id": order_id,
             "product_id": it["product_id"],
             "quantity": it["quantity"],
@@ -333,10 +360,12 @@ def get_order(order_id):
 
 
 def cancel_order(order_id):
-    for i, o in enumerate(_orders_rows()):
+    for o in _orders_rows():
         if o["order_id"] == order_id:
             if o["status"] in {"DELIVERED", "CANCELLED"}:
                 return {"error": f"Order {order_id} cannot be cancelled (status: {o['status']})"}
-            _orders_rows()[i]["status"] = "CANCELLED"
-            return _orders_rows()[i]
+            _changes = {"status": "CANCELLED"}
+            o.update(_changes)
+            _store_patch("orders", o, _changes)
+            return o
     return {"error": f"Order {order_id} not found"}

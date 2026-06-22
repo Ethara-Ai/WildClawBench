@@ -15,6 +15,33 @@ from _mutable_store import get_store  # noqa: E402
 
 _store = get_store("wordpress-api")
 
+
+
+def _store_patch(_table, _row_or_pk, _updates):
+    """Persist field updates to a stored row (was: in-place mutation of a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
+
+def _store_delete(_table, _row_or_pk):
+    """Persist a row deletion (was: pop/remove on a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.delete(_pk)
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("posts", primary_key="id",
                 initial_loader=lambda: _coerce_posts(_load("posts.csv")))
 _store.register("pages", primary_key="id",
@@ -262,7 +289,7 @@ def create_post(title, content, status="draft", author=1, excerpt="",
         "modified": now,
         "type": "post",
     }
-    _posts_rows().append(post)
+    _store_insert("posts", post)
     return post
 
 
@@ -270,27 +297,31 @@ def update_post(post_id, title=None, content=None, status=None, excerpt=None,
                 categories=None, tags=None):
     for p in _posts_rows():
         if p["id"] == int(post_id):
+            _changes = {}
             if title is not None:
-                p["title"] = _rendered(title)
+                _changes["title"] = _rendered(title)
             if content is not None:
-                p["content"] = _rendered(content)
+                _changes["content"] = _rendered(content)
             if excerpt is not None:
-                p["excerpt"] = _rendered(excerpt)
+                _changes["excerpt"] = _rendered(excerpt)
             if status is not None:
-                p["status"] = status
+                _changes["status"] = status
             if categories is not None:
-                p["categories"] = [int(c) for c in categories]
+                _changes["categories"] = [int(c) for c in categories]
             if tags is not None:
-                p["tags"] = [int(t) for t in tags]
-            p["modified"] = _now()
+                _changes["tags"] = [int(t) for t in tags]
+            _changes["modified"] = _now()
+            p.update(_changes)
+            _store_patch("posts", p, _changes)
             return p
     return {"error": f"Post {post_id} not found", "code": "rest_post_invalid_id"}
 
 
 def delete_post(post_id):
-    for i, p in enumerate(_posts_rows()):
+    for p in _posts_rows():
         if p["id"] == int(post_id):
-            removed = _posts_rows().pop(i)
+            removed = p
+            _store_delete("posts", p)
             return {"deleted": True, "previous": removed}
     return {"error": f"Post {post_id} not found", "code": "rest_post_invalid_id"}
 
@@ -342,7 +373,7 @@ def create_comment(post, author_name, author_email, content, parent=0):
         "date": _now(),
         "parent": int(parent),
     }
-    _comments_rows().append(comment)
+    _store_insert("comments", comment)
     return comment
 
 

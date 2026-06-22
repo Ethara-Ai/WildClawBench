@@ -13,6 +13,33 @@ from _mutable_store import get_store  # noqa: E402
 
 _store = get_store("pinterest-api")
 
+
+
+def _store_patch(_table, _row_or_pk, _updates):
+    """Persist field updates to a stored row (was: in-place mutation of a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
+
+def _store_delete(_table, _row_or_pk):
+    """Persist a row deletion (was: pop/remove on a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.delete(_pk)
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("boards", primary_key="board_id",
                 initial_loader=lambda: _coerce_boards(_load("boards.csv")))
 _store.register("board_sections", primary_key="section_id",
@@ -277,27 +304,30 @@ def create_board(data: dict):
         "follower_count": 0,
         "collaborator_count": 0,
     }
-    _boards_rows().append(board)
+    _store_insert("boards", board)
     _next_board_id += 1
     return {"type": "board", "board": board}
 
 
 def update_board(board_id: str, data: dict):
-    for i, board in enumerate(_boards_rows()):
+    for board in _boards_rows():
         if board["board_id"] == board_id:
             updatable = {"name", "description", "privacy"}
+            _changes = {}
             for k, v in data.items():
                 if k in updatable:
-                    _boards_rows()[i][k] = v
-            _boards_rows()[i]["updated_at"] = _now()
-            return {"type": "board", "board": _boards_rows()[i]}
+                    _changes[k] = v
+            _changes["updated_at"] = _now()
+            board.update(_changes)
+            _store_patch("boards", board, _changes)
+            return {"type": "board", "board": board}
     return {"error": f"Board {board_id} not found"}
 
 
 def delete_board(board_id: str):
-    for i, board in enumerate(_boards_rows()):
+    for board in _boards_rows():
         if board["board_id"] == board_id:
-            _boards_rows().pop(i)
+            _store_delete("boards", board)
             return {"type": "board", "deleted": True, "board_id": board_id}
     return {"error": f"Board {board_id} not found"}
 
@@ -344,7 +374,7 @@ def create_board_section(board_id: str, data: dict):
         "name": data["name"],
         "pin_count": 0,
     }
-    _board_sections_rows().append(section)
+    _store_insert("board_sections", section)
     _next_section_id += 1
     return {"type": "board_section", "board_section": section}
 
@@ -422,28 +452,31 @@ def create_pin(data: dict):
         "pin_metrics_saves": 0,
         "pin_metrics_clicks": 0,
     }
-    _pins_rows().append(pin)
+    _store_insert("pins", pin)
     _next_pin_id += 1
     return {"type": "pin", "pin": pin}
 
 
 def update_pin(pin_id: str, data: dict):
-    for i, pin in enumerate(_pins_rows()):
+    for pin in _pins_rows():
         if pin["pin_id"] == pin_id:
             updatable = {"title", "description", "link", "board_id",
                          "board_section_id", "alt_text"}
+            _changes = {}
             for k, v in data.items():
                 if k in updatable:
-                    _pins_rows()[i][k] = v
-            _pins_rows()[i]["updated_at"] = _now()
-            return {"type": "pin", "pin": _pins_rows()[i]}
+                    _changes[k] = v
+            _changes["updated_at"] = _now()
+            pin.update(_changes)
+            _store_patch("pins", pin, _changes)
+            return {"type": "pin", "pin": pin}
     return {"error": f"Pin {pin_id} not found"}
 
 
 def delete_pin(pin_id: str):
-    for i, pin in enumerate(_pins_rows()):
+    for pin in _pins_rows():
         if pin["pin_id"] == pin_id:
-            _pins_rows().pop(i)
+            _store_delete("pins", pin)
             return {"type": "pin", "deleted": True, "pin_id": pin_id}
     return {"error": f"Pin {pin_id} not found"}
 

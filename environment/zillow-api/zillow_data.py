@@ -13,6 +13,33 @@ from _mutable_store import get_store  # noqa: E402
 
 _store = get_store("zillow-api")
 
+
+
+def _store_patch(_table, _row_or_pk, _updates):
+    """Persist field updates to a stored row (was: in-place mutation of a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
+
+def _store_delete(_table, _row_or_pk):
+    """Persist a row deletion (was: pop/remove on a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.delete(_pk)
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("properties", primary_key="zpid",
                 initial_loader=lambda: _coerce_properties(_load("properties.csv")))
 _store.register("price_history", primary_key="zpid",
@@ -245,13 +272,13 @@ def create_saved_search(user_id, name, city=None, state=None,
         "home_type": home_type,
         "created_at": _now(),
     }
-    _saved_searches_rows().append(search)
+    _store_insert("saved_searches", search)
     return search
 
 
 def delete_saved_search(search_id):
-    for i, s in enumerate(_saved_searches_rows()):
+    for s in _saved_searches_rows():
         if s["search_id"] == search_id:
-            _saved_searches_rows().pop(i)
+            _store_delete("saved_searches", s)
             return {"deleted": True, "search_id": search_id}
     return {"error": f"Saved search {search_id} not found"}

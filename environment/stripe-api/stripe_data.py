@@ -18,6 +18,19 @@ from _mutable_store import get_store  # noqa: E402
 
 _store = get_store("stripe-api")
 
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("customers", primary_key="id",
                 initial_loader=lambda: _coerce_customers(_load("customers.csv")))
 _store.register("products", primary_key="id",
@@ -213,7 +226,7 @@ def create_customer(name=None, email=None, description=None, currency="usd", pho
         "phone": phone or "",
         "created": _now(),
     }
-    _customers_rows().append(customer)
+    _store_insert("customers", customer)
     return customer
 
 
@@ -256,7 +269,7 @@ def create_payment_intent(amount, currency="usd", customer=None, description=Non
     if confirm:
         charge = _record_charge(amount, currency, customer, description, pi["id"], "succeeded")
         pi["latest_charge"] = charge["id"]
-    _payment_intents_rows().append(pi)
+    _store_insert("payment_intents", pi)
     return pi
 
 
@@ -280,7 +293,7 @@ def _record_charge(amount, currency, customer, description, payment_intent, stat
         "payment_intent": payment_intent,
         "created": _now(),
     }
-    _charges_rows().append(charge)
+    _store_insert("charges", charge)
     return charge
 
 
@@ -326,7 +339,7 @@ def create_refund(charge=None, amount=None, reason=None):
     }
     ch["amount_refunded"] += refund_amount
     ch["refunded"] = ch["amount_refunded"] >= ch["amount"]
-    _refunds_rows().append(refund)
+    _store_insert("refunds", refund)
     return refund
 
 
@@ -366,7 +379,7 @@ def create_invoice(customer=None, amount_due=None, currency="usd", subscription=
         "created": _now(),
         "due_date": None,
     }
-    _invoices_rows().append(invoice)
+    _store_insert("invoices", invoice)
     return invoice
 
 
@@ -406,7 +419,7 @@ def create_subscription(customer=None, price=None, quantity=1):
         "cancel_at_period_end": False,
         "created": now,
     }
-    _subscriptions_rows().append(sub)
+    _store_insert("subscriptions", sub)
     return sub
 
 

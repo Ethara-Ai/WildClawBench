@@ -12,6 +12,33 @@ from _mutable_store import get_store  # noqa: E402
 
 _store = get_store("jira-api")
 
+
+
+def _store_patch(_table, _row_or_pk, _updates):
+    """Persist field updates to a stored row (was: in-place mutation of a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
+
+def _store_delete(_table, _row_or_pk):
+    """Persist a row deletion (was: pop/remove on a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.delete(_pk)
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("projects", primary_key="id",
                 initial_loader=lambda: _coerce_projects(_load("projects.csv")))
 _store.register("users", primary_key="account_id",
@@ -234,22 +261,25 @@ def create_issue(project_key, summary, issue_type="Task", description="",
         "created": _now(),
         "updated": _now(),
     }
-    _issues_rows().append(issue)
+    _store_insert("issues", issue)
     return {"id": new_id, "key": key, "self": f"/rest/api/3/issue/{new_id}"}
 
 
 def update_issue(issue_key, summary=None, description=None, priority=None, assignee=None):
-    for i, issue in enumerate(_issues_rows()):
+    for issue in _issues_rows():
         if issue["key"] == issue_key:
+            _changes = {}
             if summary is not None:
-                _issues_rows()[i]["summary"] = summary
+                _changes["summary"] = summary
             if description is not None:
-                _issues_rows()[i]["description"] = description
+                _changes["description"] = description
             if priority is not None:
-                _issues_rows()[i]["priority"] = priority
+                _changes["priority"] = priority
             if assignee is not None:
-                _issues_rows()[i]["assignee"] = assignee or None
-            _issues_rows()[i]["updated"] = _now()
+                _changes["assignee"] = assignee or None
+            _changes["updated"] = _now()
+            issue.update(_changes)
+            _store_patch("issues", issue, _changes)
             return {"key": issue_key, "updated": True}
     return {"errorMessages": [f"Issue {issue_key} does not exist"], "errors": {}}
 
@@ -265,13 +295,14 @@ def get_transitions(issue_key):
 
 
 def transition_issue(issue_key, transition_id):
-    for i, issue in enumerate(_issues_rows()):
+    for issue in _issues_rows():
         if issue["key"] == issue_key:
             allowed = _WORKFLOW.get(issue["status"], {})
             if transition_id not in allowed:
                 return {"errorMessages": [f"Transition {transition_id} not valid from {issue['status']}"], "errors": {}}
-            _issues_rows()[i]["status"] = allowed[transition_id]
-            _issues_rows()[i]["updated"] = _now()
+            _changes = {"status": allowed[transition_id], "updated": _now()}
+            issue.update(_changes)
+            _store_patch("issues", issue, _changes)
             return {"key": issue_key, "status": allowed[transition_id], "transitioned": True}
     return {"errorMessages": [f"Issue {issue_key} does not exist"], "errors": {}}
 

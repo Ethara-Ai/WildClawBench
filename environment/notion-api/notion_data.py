@@ -14,6 +14,33 @@ from _mutable_store import get_store  # noqa: E402
 
 _store = get_store("notion-api")
 
+
+
+def _store_patch(_table, _row_or_pk, _updates):
+    """Persist field updates to a stored row (was: in-place mutation of a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
+
+def _store_delete(_table, _row_or_pk):
+    """Persist a row deletion (was: pop/remove on a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.delete(_pk)
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("users", primary_key="id",
                 initial_loader=lambda: _coerce_users(_load("users.csv")))
 _store.register("databases", primary_key="id",
@@ -304,7 +331,7 @@ def create_page(parent_type, parent_id, title, properties=None, created_by="user
         "icon": "",
         "cover_url": None,
     }
-    _pages_rows().append(page)
+    _store_insert("pages", page)
     if properties:
         _properties_doc()[page["id"]] = {
             k: ({"type": v.get("type", "rich_text"), "value": v.get("value")}
@@ -315,12 +342,13 @@ def create_page(parent_type, parent_id, title, properties=None, created_by="user
 
 
 def update_page(page_id, title=None, archived=None, properties=None):
-    for i, p in enumerate(_pages_rows()):
+    for p in _pages_rows():
         if p["id"] == page_id:
+            _changes = {}
             if title is not None:
-                _pages_rows()[i]["title"] = title
+                _changes["title"] = title
             if archived is not None:
-                _pages_rows()[i]["archived"] = bool(archived)
+                _changes["archived"] = bool(archived)
             if properties:
                 existing = _properties_doc().setdefault(page_id, {})
                 for k, v in properties.items():
@@ -328,8 +356,10 @@ def update_page(page_id, title=None, archived=None, properties=None):
                         existing[k] = {"type": v.get("type", "rich_text"), "value": v.get("value")}
                     else:
                         existing[k] = {"type": existing.get(k, {}).get("type", "rich_text"), "value": v}
-            _pages_rows()[i]["last_edited_time"] = _now()
-            return _attach_properties(_pages_rows()[i])
+            _changes["last_edited_time"] = _now()
+            p.update(_changes)
+            _store_patch("pages", p, _changes)
+            return _attach_properties(p)
     return {"error": f"Page {page_id} not found"}
 
 
@@ -380,28 +410,32 @@ def append_block_children(parent_id, blocks):
             "has_children": False,
             "checked": blk.get("checked") if blk.get("type") == "to_do" else None,
         }
-        _blocks_rows().append(new_block)
+        _store_insert("blocks", new_block)
         created.append(new_block)
         next_order += 1
     return {"object": "list", "results": created}
 
 
 def update_block(block_id, text=None, checked=None):
-    for i, b in enumerate(_blocks_rows()):
+    for b in _blocks_rows():
         if b["id"] == block_id:
+            _changes = {}
             if text is not None:
-                _blocks_rows()[i]["text"] = text
+                _changes["text"] = text
             if checked is not None and b["type"] == "to_do":
-                _blocks_rows()[i]["checked"] = bool(checked)
-            _blocks_rows()[i]["last_edited_time"] = _now()
-            return _blocks_rows()[i]
+                _changes["checked"] = bool(checked)
+            _changes["last_edited_time"] = _now()
+            b.update(_changes)
+            _store_patch("blocks", b, _changes)
+            return b
     return {"error": f"Block {block_id} not found"}
 
 
 def delete_block(block_id):
-    for i, b in enumerate(_blocks_rows()):
+    for b in _blocks_rows():
         if b["id"] == block_id:
-            removed = _blocks_rows().pop(i)
+            removed = b
+            _store_delete("blocks", b)
             return {"object": "block", "id": block_id, "deleted": True}
     return {"error": f"Block {block_id} not found"}
 
@@ -431,5 +465,5 @@ def create_comment(parent_page_id, parent_block_id, author_id, text):
         "created_time": _now(),
         "resolved": False,
     }
-    _comments_rows().append(comment)
+    _store_insert("comments", comment)
     return comment

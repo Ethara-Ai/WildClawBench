@@ -14,6 +14,33 @@ from _mutable_store import get_store  # noqa: E402
 
 _store = get_store("gitlab-api")
 
+
+
+def _store_patch(_table, _row_or_pk, _updates):
+    """Persist field updates to a stored row (was: in-place mutation of a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
+
+def _store_delete(_table, _row_or_pk):
+    """Persist a row deletion (was: pop/remove on a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.delete(_pk)
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("projects", primary_key="id",
                 initial_loader=lambda: _coerce_projects(_load("projects.csv")))
 _store.register("issues", primary_key="id",
@@ -232,8 +259,10 @@ def create_issue(project_id, title, description="", assignee=None, labels=None):
         "updated_at": _now(),
         "closed_at": None,
     }
-    _issues_rows().append(issue)
-    project["open_issues_count"] += 1
+    _store_insert("issues", issue)
+    _proj_changes = {"open_issues_count": project["open_issues_count"] + 1}
+    project.update(_proj_changes)
+    _store_patch("projects", project, _proj_changes)
     return issue
 
 
@@ -242,26 +271,33 @@ def update_issue(project_id, issue_iid, title=None, description=None,
     project = _find_project(project_id)
     if not project:
         return {"error": f"Project {project_id} not found"}
-    for idx, i in enumerate(_issues_rows()):
+    for i in _issues_rows():
         if i["project_id"] == project["id"] and i["iid"] == int(issue_iid):
+            _changes = {}
             if title is not None:
-                _issues_rows()[idx]["title"] = title
+                _changes["title"] = title
             if description is not None:
-                _issues_rows()[idx]["description"] = description
+                _changes["description"] = description
             if assignee is not None:
-                _issues_rows()[idx]["assignee"] = assignee
+                _changes["assignee"] = assignee
             if labels is not None:
-                _issues_rows()[idx]["labels"] = labels
+                _changes["labels"] = labels
             if state_event == "close" and i["state"] != "closed":
-                _issues_rows()[idx]["state"] = "closed"
-                _issues_rows()[idx]["closed_at"] = _now()
-                project["open_issues_count"] = max(0, project["open_issues_count"] - 1)
+                _changes["state"] = "closed"
+                _changes["closed_at"] = _now()
+                _proj_changes = {"open_issues_count": max(0, project["open_issues_count"] - 1)}
+                project.update(_proj_changes)
+                _store_patch("projects", project, _proj_changes)
             elif state_event == "reopen" and i["state"] != "opened":
-                _issues_rows()[idx]["state"] = "opened"
-                _issues_rows()[idx]["closed_at"] = None
-                project["open_issues_count"] += 1
-            _issues_rows()[idx]["updated_at"] = _now()
-            return _issues_rows()[idx]
+                _changes["state"] = "opened"
+                _changes["closed_at"] = None
+                _proj_changes = {"open_issues_count": project["open_issues_count"] + 1}
+                project.update(_proj_changes)
+                _store_patch("projects", project, _proj_changes)
+            _changes["updated_at"] = _now()
+            i.update(_changes)
+            _store_patch("issues", i, _changes)
+            return i
     return {"error": f"Issue {issue_iid} not found in project {project_id}"}
 
 
@@ -303,7 +339,7 @@ def create_merge_request(project_id, title, source_branch, target_branch="main",
         "updated_at": _now(),
         "merged_at": None,
     }
-    _merge_requests_rows().append(mr)
+    _store_insert("merge_requests", mr)
     return mr
 
 
@@ -311,7 +347,7 @@ def merge_merge_request(project_id, mr_iid):
     project = _find_project(project_id)
     if not project:
         return {"error": f"Project {project_id} not found"}
-    for idx, m in enumerate(_merge_requests_rows()):
+    for m in _merge_requests_rows():
         if m["project_id"] == project["id"] and m["iid"] == int(mr_iid):
             if m["draft"]:
                 return {"error": "Draft merge request cannot be merged"}
@@ -319,10 +355,10 @@ def merge_merge_request(project_id, mr_iid):
                 return {"error": "Merge request cannot be merged"}
             if m["state"] == "merged":
                 return {"error": "Merge request already merged"}
-            _merge_requests_rows()[idx]["state"] = "merged"
-            _merge_requests_rows()[idx]["merged_at"] = _now()
-            _merge_requests_rows()[idx]["updated_at"] = _now()
-            return _merge_requests_rows()[idx]
+            _changes = {"state": "merged", "merged_at": _now(), "updated_at": _now()}
+            m.update(_changes)
+            _store_patch("merge_requests", m, _changes)
+            return m
     return {"error": f"Merge request {mr_iid} not found in project {project_id}"}
 
 

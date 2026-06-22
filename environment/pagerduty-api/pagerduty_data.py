@@ -13,6 +13,33 @@ from _mutable_store import get_store  # noqa: E402
 
 _store = get_store("pagerduty-api")
 
+
+
+def _store_patch(_table, _row_or_pk, _updates):
+    """Persist field updates to a stored row (was: in-place mutation of a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
+
+def _store_delete(_table, _row_or_pk):
+    """Persist a row deletion (was: pop/remove on a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.delete(_pk)
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("users", primary_key="user_id",
                 initial_loader=lambda: _coerce_users(_load("users.csv")))
 _store.register("services", primary_key="service_id",
@@ -188,26 +215,29 @@ def create_incident(title, service_id, urgency="high", assigned_to=None):
         "created_at": _now_iso(),
         "resolved_at": None,
     }
-    _incidents_rows().append(incident)
+    _store_insert("incidents", incident)
     return incident
 
 
 def update_incident(incident_id, status=None, assigned_to=None):
-    for i, inc in enumerate(_incidents_rows()):
+    for inc in _incidents_rows():
         if inc["incident_id"] == incident_id:
+            _changes = {}
             if status is not None:
                 if status.lower() not in VALID_STATUSES:
                     return {"error": f"Invalid status '{status}'"}
-                _incidents_rows()[i]["status"] = status.lower()
+                _changes["status"] = status.lower()
                 if status.lower() == "resolved":
-                    _incidents_rows()[i]["resolved_at"] = _now_iso()
+                    _changes["resolved_at"] = _now_iso()
                 else:
-                    _incidents_rows()[i]["resolved_at"] = None
+                    _changes["resolved_at"] = None
             if assigned_to is not None:
                 if not _get_user(assigned_to):
                     return {"error": f"User {assigned_to} not found"}
-                _incidents_rows()[i]["assigned_to"] = assigned_to
-            return _incidents_rows()[i]
+                _changes["assigned_to"] = assigned_to
+            inc.update(_changes)
+            _store_patch("incidents", inc, _changes)
+            return inc
     return {"error": f"Incident {incident_id} not found"}
 
 

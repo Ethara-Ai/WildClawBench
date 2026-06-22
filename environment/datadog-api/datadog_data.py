@@ -15,6 +15,33 @@ from _mutable_store import get_store  # noqa: E402
 
 _store = get_store("datadog-api")
 
+
+
+def _store_patch(_table, _row_or_pk, _updates):
+    """Persist field updates to a stored row (was: in-place mutation of a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
+
+def _store_delete(_table, _row_or_pk):
+    """Persist a row deletion (was: pop/remove on a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.delete(_pk)
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("monitors", primary_key="id",
                 initial_loader=lambda: _coerce_monitors(_load("monitors.csv")))
 _store.register("dashboards", primary_key="id",
@@ -229,28 +256,31 @@ def create_monitor(name, mtype, query, message="", priority=3, tags=None):
         "created": _now_iso(),
         "modified": _now_iso(),
     }
-    _monitors_rows().append(monitor)
+    _store_insert("monitors", monitor)
     return monitor
 
 
 def update_monitor(monitor_id, name=None, query=None, message=None,
                    overall_state=None, priority=None, tags=None):
-    for idx, m in enumerate(_monitors_rows()):
+    for m in _monitors_rows():
         if str(m["id"]) == str(monitor_id):
+            _changes = {}
             if name is not None:
-                _monitors_rows()[idx]["name"] = name
+                _changes["name"] = name
             if query is not None:
-                _monitors_rows()[idx]["query"] = query
+                _changes["query"] = query
             if message is not None:
-                _monitors_rows()[idx]["message"] = message
+                _changes["message"] = message
             if overall_state is not None:
-                _monitors_rows()[idx]["overall_state"] = overall_state
+                _changes["overall_state"] = overall_state
             if priority is not None:
-                _monitors_rows()[idx]["priority"] = priority
+                _changes["priority"] = priority
             if tags is not None:
-                _monitors_rows()[idx]["tags"] = tags
-            _monitors_rows()[idx]["modified"] = _now_iso()
-            return _monitors_rows()[idx]
+                _changes["tags"] = tags
+            _changes["modified"] = _now_iso()
+            m.update(_changes)
+            _store_patch("monitors", m, _changes)
+            return m
     return {"error": f"Monitor {monitor_id} not found"}
 
 
@@ -294,7 +324,7 @@ def create_event(title, text, alert_type="info", priority="normal", host=None, t
         "tags": tags or [],
         "date_happened": int(time.time()),
     }
-    _events_rows().append(event)
+    _store_insert("events", event)
     return {"status": "ok", "event": event}
 
 

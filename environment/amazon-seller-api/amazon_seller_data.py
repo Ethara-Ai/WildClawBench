@@ -13,6 +13,33 @@ from _mutable_store import get_store  # noqa: E402
 
 _store = get_store("amazon-seller-api")
 
+
+
+def _store_patch(_table, _row_or_pk, _updates):
+    """Persist field updates to a stored row (was: in-place mutation of a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
+
+def _store_delete(_table, _row_or_pk):
+    """Persist a row deletion (was: pop/remove on a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.delete(_pk)
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("catalog_items", primary_key="sku",
                 initial_loader=lambda: _coerce_catalog_items(_load("catalog_items.csv")))
 _store.register("orders", primary_key="AmazonOrderId",
@@ -500,18 +527,24 @@ def get_order_items(order_id):
 
 
 def confirm_shipment(order_id, data):
-    for i, o in enumerate(_orders_rows()):
+    for o in _orders_rows():
         if o["AmazonOrderId"] == order_id:
             if o["OrderStatus"] not in ("Unshipped", "PartiallyShipped"):
                 return {"error": f"Order {order_id} cannot be shipped (status: {o['OrderStatus']})"}
-            _orders_rows()[i]["OrderStatus"] = "Shipped"
-            _orders_rows()[i]["LastUpdateDate"] = _now()
             shipped = o["NumberOfItemsShipped"] + o["NumberOfItemsUnshipped"]
-            _orders_rows()[i]["NumberOfItemsShipped"] = shipped
-            _orders_rows()[i]["NumberOfItemsUnshipped"] = 0
-            for j, oi in enumerate(_order_items_rows()):
+            _changes = {
+                "OrderStatus": "Shipped",
+                "LastUpdateDate": _now(),
+                "NumberOfItemsShipped": shipped,
+                "NumberOfItemsUnshipped": 0,
+            }
+            o.update(_changes)
+            _store_patch("orders", o, _changes)
+            for oi in _order_items_rows():
                 if oi["AmazonOrderId"] == order_id:
-                    _order_items_rows()[j]["QuantityShipped"] = oi["QuantityOrdered"]
+                    _oi_changes = {"QuantityShipped": oi["QuantityOrdered"]}
+                    oi.update(_oi_changes)
+                    _store_patch("order_items", oi, _oi_changes)
             return {"type": "shipment_confirmation", "status": "SUCCESS", "orderId": order_id}
     return {"error": f"Order {order_id} not found"}
 
@@ -562,11 +595,15 @@ def get_inventory_summaries(
 
 
 def update_inventory(seller_sku, quantity):
-    for i, inv in enumerate(_inventory_rows()):
+    for inv in _inventory_rows():
         if inv["sellerSku"] == seller_sku:
-            _inventory_rows()[i]["totalQuantity"] = int(quantity)
-            _inventory_rows()[i]["inStockSupplyQuantity"] = int(quantity)
-            _inventory_rows()[i]["lastUpdatedTime"] = _now()
+            _changes = {
+                "totalQuantity": int(quantity),
+                "inStockSupplyQuantity": int(quantity),
+                "lastUpdatedTime": _now(),
+            }
+            inv.update(_changes)
+            _store_patch("inventory", inv, _changes)
             return {"type": "inventory_update", "status": "SUCCESS", "sellerSku": seller_sku}
     return {"error": f"Inventory for SKU {seller_sku} not found"}
 
@@ -635,7 +672,7 @@ def create_report(report_type, data_start_time, data_end_time):
         "processingEndTime": None,
         "reportDocumentId": None,
     }
-    _reports_rows().append(report)
+    _store_insert("reports", report)
     _next_report_id += 1
     return {
         "type": "report_created",
@@ -764,20 +801,22 @@ def get_return(return_id):
 
 
 def authorize_return(return_id):
-    for i, r in enumerate(_returns_rows()):
+    for r in _returns_rows():
         if r["returnId"] == return_id:
             if r["returnStatus"] != "Authorized":
                 return {"error": f"Return {return_id} is not in Authorized status"}
-            _returns_rows()[i]["returnStatus"] = "Completed"
-            _returns_rows()[i]["resolution"] = "REFUND"
+            _changes = {"returnStatus": "Completed", "resolution": "REFUND"}
+            r.update(_changes)
+            _store_patch("returns", r, _changes)
             return {"type": "return_authorization", "status": "SUCCESS", "returnId": return_id}
     return {"error": f"Return {return_id} not found"}
 
 
 def close_return(return_id):
-    for i, r in enumerate(_returns_rows()):
+    for r in _returns_rows():
         if r["returnId"] == return_id:
-            _returns_rows()[i]["returnStatus"] = "Closed"
-            _returns_rows()[i]["resolution"] = "CLOSED"
+            _changes = {"returnStatus": "Closed", "resolution": "CLOSED"}
+            r.update(_changes)
+            _store_patch("returns", r, _changes)
             return {"type": "return_close", "status": "SUCCESS", "returnId": return_id}
     return {"error": f"Return {return_id} not found"}

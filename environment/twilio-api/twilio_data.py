@@ -14,6 +14,19 @@ from _mutable_store import get_store  # noqa: E402
 
 _store = get_store("twilio-api")
 
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("phone_numbers", primary_key="sid",
                 initial_loader=lambda: _coerce_phone_numbers(_load("phone_numbers.csv")))
 _store.register("messages", primary_key="sid",
@@ -224,7 +237,7 @@ def create_message(to, from_, body):
         "date_sent": None,
         "date_created": _now(),
     }
-    _messages_rows().append(msg)
+    _store_insert("messages", msg)
     return _serialize_message(msg)
 
 
@@ -274,7 +287,7 @@ def create_call(to, from_):
         "end_time": None,
         "date_created": _now(),
     }
-    _calls_rows().append(call)
+    _store_insert("calls", call)
     return _serialize_call(call)
 
 

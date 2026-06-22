@@ -13,6 +13,19 @@ from _mutable_store import get_store  # noqa: E402
 
 _store = get_store("shippo-api")
 
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("addresses", primary_key="object_id",
                 initial_loader=lambda: _coerce_addresses(_load("addresses.csv")))
 _store.register("parcels", primary_key="object_id",
@@ -197,7 +210,7 @@ def create_address(payload):
         "is_residential": bool(payload.get("is_residential", False)),
         "validated": True,
     }
-    _addresses_rows().append(addr)
+    _store_insert("addresses", addr)
     return _address_obj(addr)
 
 
@@ -247,10 +260,10 @@ def create_shipment(payload):
         "status": "SUCCESS",
         "created_time": _now(),
     }
-    _shipments_rows().append(shipment)
+    _store_insert("shipments", shipment)
     # Generate rates across carriers for the new shipment.
     for provider, token, name, amount, days in _DEFAULT_RATE_TEMPLATES:
-        _rates_rows().append({
+        _store_insert("rates", {
             "object_id": _new_id("rate"),
             "shipment": shipment["object_id"],
             "provider": provider,
@@ -274,7 +287,7 @@ def create_parcel(payload):
         "mass_unit": payload.get("mass_unit", "lb"),
         "template": payload.get("template") or None,
     }
-    _parcels_rows().append(parcel)
+    _store_insert("parcels", parcel)
     return _parcel_obj(parcel)
 
 
@@ -322,8 +335,8 @@ def create_transaction(payload):
         "label_url": f"https://shippo-delivery.s3.amazonaws.com/labels/{tracking_number}.pdf",
         "created_time": _now(),
     }
-    _transactions_rows().append(txn)
-    _tracking_rows().append({
+    _store_insert("transactions", txn)
+    _store_insert("tracking", {
         "carrier": rate["provider"],
         "tracking_number": tracking_number,
         "status": "PRE_TRANSIT",

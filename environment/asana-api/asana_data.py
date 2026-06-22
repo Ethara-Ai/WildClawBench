@@ -14,6 +14,33 @@ from _mutable_store import get_store  # noqa: E402
 
 _store = get_store("asana-api")
 
+
+
+def _store_patch(_table, _row_or_pk, _updates):
+    """Persist field updates to a stored row (was: in-place mutation of a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
+
+def _store_delete(_table, _row_or_pk):
+    """Persist a row deletion (was: pop/remove on a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.delete(_pk)
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("users", primary_key="gid",
                 initial_loader=lambda: _coerce_users(_load("users.csv")))
 _store.register("projects", primary_key="gid",
@@ -262,26 +289,29 @@ def create_task(name, project_gid=None, section_gid=None, assignee_gid=None,
         "created_at": now,
         "modified_at": now,
     }
-    _tasks_rows().append(task)
+    _store_insert("tasks", task)
     return {"data": _task_view(task)}
 
 
 def update_task(task_gid, name=None, completed=None, assignee_gid=None,
                 due_on=None, section_gid=None, notes=None):
-    for i, t in enumerate(_tasks_rows()):
+    for t in _tasks_rows():
         if t["gid"] == task_gid:
+            _changes = {}
             if name is not None:
-                _tasks_rows()[i]["name"] = name
+                _changes["name"] = name
             if completed is not None:
-                _tasks_rows()[i]["completed"] = bool(completed)
+                _changes["completed"] = bool(completed)
             if assignee_gid is not None:
-                _tasks_rows()[i]["assignee_gid"] = assignee_gid or None
+                _changes["assignee_gid"] = assignee_gid or None
             if due_on is not None:
-                _tasks_rows()[i]["due_on"] = due_on or None
+                _changes["due_on"] = due_on or None
             if section_gid is not None:
-                _tasks_rows()[i]["section_gid"] = section_gid or None
+                _changes["section_gid"] = section_gid or None
             if notes is not None:
-                _tasks_rows()[i]["notes"] = notes
-            _tasks_rows()[i]["modified_at"] = _now()
-            return {"data": _task_view(_tasks_rows()[i])}
+                _changes["notes"] = notes
+            _changes["modified_at"] = _now()
+            t.update(_changes)
+            _store_patch("tasks", t, _changes)
+            return {"data": _task_view(t)}
     return {"error": f"Task {task_gid} not found"}

@@ -17,6 +17,33 @@ from _mutable_store import get_store  # noqa: E402
 
 _store = get_store("slack-api")
 
+
+
+def _store_patch(_table, _row_or_pk, _updates):
+    """Persist field updates to a stored row (was: in-place mutation of a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
+
+def _store_delete(_table, _row_or_pk):
+    """Persist a row deletion (was: pop/remove on a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.delete(_pk)
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("users", primary_key="id",
                 initial_loader=lambda: _coerce_users(_load("users.csv")))
 _store.register("channels", primary_key="id",
@@ -163,10 +190,12 @@ def users_info(user_id):
 
 
 def users_set_presence(user_id, presence):
-    for i, u in enumerate(_users_rows()):
+    for u in _users_rows():
         if u["id"] == user_id:
-            _users_rows()[i]["presence"] = "away" if presence == "away" else "auto"
-            return _ok({"presence": _users_rows()[i]["presence"]})
+            _changes = {"presence": "away" if presence == "away" else "auto"}
+            u.update(_changes)
+            _store_patch("users", u, _changes)
+            return _ok({"presence": u["presence"]})
     return _err("user_not_found")
 
 
@@ -209,15 +238,17 @@ def conversations_create(name, is_private=False, user_id="U01AMELIA"):
         "created": int(time.time()),
         "num_members": 1,
     }
-    _channels_rows().append(channel)
-    _channel_members_rows().append({"channel_id": channel["id"], "user_id": user_id})
+    _store_insert("channels", channel)
+    _store_insert("channel_members", {"channel_id": channel["id"], "user_id": user_id})
     return _ok({"channel": channel})
 
 
 def conversations_archive(channel_id):
-    for i, c in enumerate(_channels_rows()):
+    for c in _channels_rows():
         if c["id"] == channel_id:
-            _channels_rows()[i]["is_archived"] = True
+            _changes = {"is_archived": True}
+            c.update(_changes)
+            _store_patch("channels", c, _changes)
             return _ok({})
     return _err("channel_not_found")
 
@@ -236,10 +267,12 @@ def conversations_invite(channel_id, user_id):
         return _err("user_not_found")
     if any(m["channel_id"] == channel_id and m["user_id"] == user_id for m in _channel_members_rows()):
         return _err("already_in_channel")
-    _channel_members_rows().append({"channel_id": channel_id, "user_id": user_id})
-    for i, c in enumerate(_channels_rows()):
+    _store_insert("channel_members", {"channel_id": channel_id, "user_id": user_id})
+    for c in _channels_rows():
         if c["id"] == channel_id:
-            _channels_rows()[i]["num_members"] += 1
+            _changes = {"num_members": c["num_members"] + 1}
+            c.update(_changes)
+            _store_patch("channels", c, _changes)
     return _ok({"channel": next(c for c in _channels_rows() if c["id"] == channel_id)})
 
 
@@ -283,26 +316,30 @@ def chat_post_message(channel_id, user_id, text, thread_ts=None):
         "reply_count": 0,
         "reactions": [],
     }
-    _messages_rows().append(msg)
+    _store_insert("messages", msg)
     if thread_ts:
-        for i, m in enumerate(_messages_rows()):
+        for m in _messages_rows():
             if m["channel_id"] == channel_id and m["ts"] == thread_ts:
-                _messages_rows()[i]["reply_count"] += 1
+                _changes = {"reply_count": m["reply_count"] + 1}
+                m.update(_changes)
+                _store_patch("messages", m, _changes)
     return _ok({"channel": channel_id, "ts": ts, "message": msg})
 
 
 def chat_update(channel_id, ts, text):
-    for i, m in enumerate(_messages_rows()):
+    for m in _messages_rows():
         if m["channel_id"] == channel_id and m["ts"] == ts:
-            _messages_rows()[i]["text"] = text
+            _changes = {"text": text}
+            m.update(_changes)
+            _store_patch("messages", m, _changes)
             return _ok({"channel": channel_id, "ts": ts, "text": text})
     return _err("message_not_found")
 
 
 def chat_delete(channel_id, ts):
-    for i, m in enumerate(_messages_rows()):
+    for m in _messages_rows():
         if m["channel_id"] == channel_id and m["ts"] == ts:
-            _messages_rows().pop(i)
+            _store_delete("messages", m)
             return _ok({"channel": channel_id, "ts": ts})
     return _err("message_not_found")
 
@@ -312,15 +349,17 @@ def chat_delete(channel_id, ts):
 # ---------------------------------------------------------------------------
 
 def reactions_add(channel_id, ts, name, user_id):
-    for i, m in enumerate(_messages_rows()):
+    for m in _messages_rows():
         if m["channel_id"] == channel_id and m["ts"] == ts:
             for r in m["reactions"]:
                 if r["name"] == name:
                     if user_id not in r["users"]:
                         r["users"].append(user_id)
                         r["count"] = len(r["users"])
+                    _store_patch("messages", m, {"reactions": m["reactions"]})
                     return _ok({})
             m["reactions"].append({"name": name, "users": [user_id], "count": 1})
+            _store_patch("messages", m, {"reactions": m["reactions"]})
             return _ok({})
     return _err("message_not_found")
 

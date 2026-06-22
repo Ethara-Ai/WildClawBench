@@ -17,6 +17,19 @@ from _mutable_store import get_store  # noqa: E402
 
 _store = get_store("ups-api")
 
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("rates", primary_key="service_code",
                 initial_loader=lambda: _coerce_rates(_load("rates.csv")))
 _store.register("shipments", primary_key="tracking_number",
@@ -191,8 +204,8 @@ def create_shipment(origin_zip, dest_zip, weight_lb, service_code="03"):
         "total_charge": total_charge,
         "label_url": label_url,
     }
-    _shipments_rows().append(shipment)
-    _tracking_rows().append({
+    _store_insert("shipments", shipment)
+    _store_insert("tracking", {
         "tracking_number": tracking_number,
         "status_type": "M",
         "status_code": "003",

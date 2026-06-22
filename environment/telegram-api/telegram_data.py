@@ -17,6 +17,33 @@ from _mutable_store import get_store  # noqa: E402
 
 _store = get_store("telegram-api")
 
+
+
+def _store_patch(_table, _row_or_pk, _updates):
+    """Persist field updates to a stored row (was: in-place mutation of a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
+
+def _store_delete(_table, _row_or_pk):
+    """Persist a row deletion (was: pop/remove on a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.delete(_pk)
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("users", primary_key="id",
                 initial_loader=lambda: _coerce_users(_load("users.csv")))
 _store.register("chats", primary_key="id",
@@ -200,7 +227,7 @@ def send_message(chat_id, text, reply_to_message_id=None):
         "reply_to_message_id": int(reply_to_message_id) if reply_to_message_id else None,
     }
     _next_message_id += 1
-    _messages_rows().append(msg)
+    _store_insert("messages", msg)
     return _ok(_format_message(msg))
 
 
@@ -217,7 +244,7 @@ def send_photo(chat_id, photo, caption=None):
         "reply_to_message_id": None,
     }
     _next_message_id += 1
-    _messages_rows().append(msg)
+    _store_insert("messages", msg)
     formatted = _format_message(msg)
     formatted.pop("text", None)
     if caption:
@@ -229,7 +256,9 @@ def send_photo(chat_id, photo, caption=None):
 def edit_message_text(chat_id, message_id, text):
     for m in _messages_rows():
         if m["chat_id"] == int(chat_id) and m["message_id"] == int(message_id):
-            m["text"] = text
+            _changes = {"text": text}
+            m.update(_changes)
+            _store_patch("messages", m, _changes)
             edited = _format_message(m)
             edited["edit_date"] = int(time.time())
             return _ok(edited)
@@ -237,9 +266,9 @@ def edit_message_text(chat_id, message_id, text):
 
 
 def delete_message(chat_id, message_id):
-    for i, m in enumerate(_messages_rows()):
+    for m in _messages_rows():
         if m["chat_id"] == int(chat_id) and m["message_id"] == int(message_id):
-            _messages_rows().pop(i)
+            _store_delete("messages", m)
             return _ok(True)
     return _err(400, "Bad Request: message to delete not found")
 

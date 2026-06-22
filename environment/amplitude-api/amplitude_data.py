@@ -17,6 +17,19 @@ from _mutable_store import get_store  # noqa: E402
 
 _store = get_store("amplitude-api")
 
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("events", primary_key="event_id",
                 initial_loader=lambda: _coerce_events(_load("events.csv")))
 _store.register("users", primary_key="user_id",
@@ -119,7 +132,7 @@ def ingest(payload):
     raw_events = payload.get("events") or []
     ingested = 0
     for ev in raw_events:
-        _events_rows().append({
+        _store_insert("events", {
             "event_id": ev.get("insert_id") or f"ev_{len(_events_rows()) + 1:06d}",
             "user_id": ev.get("user_id"),
             "device_id": ev.get("device_id"),

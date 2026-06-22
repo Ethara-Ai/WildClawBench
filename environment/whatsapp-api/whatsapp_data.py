@@ -14,6 +14,33 @@ from _mutable_store import get_store  # noqa: E402
 
 _store = get_store("whatsapp-api")
 
+
+
+def _store_patch(_table, _row_or_pk, _updates):
+    """Persist field updates to a stored row (was: in-place mutation of a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
+
+def _store_delete(_table, _row_or_pk):
+    """Persist a row deletion (was: pop/remove on a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.delete(_pk)
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("contacts", primary_key="wa_id",
                 initial_loader=lambda: _coerce_contacts(_load("contacts.csv")))
 _store.register("conversations", primary_key="conversation_id",
@@ -166,10 +193,12 @@ def send_text(to_wa_id, body):
         "status": "sent",
         "sent_at": now,
     }
-    _messages_rows().append(msg)
-    for i, c in enumerate(_conversations_rows()):
+    _store_insert("messages", msg)
+    for c in _conversations_rows():
         if c["conversation_id"] == conv["conversation_id"]:
-            _conversations_rows()[i]["last_message_at"] = now
+            _changes = {"last_message_at": now}
+            c.update(_changes)
+            _store_patch("conversations", c, _changes)
     return {"messages": [{"id": msg_id, "message_status": "accepted"}]}
 
 
@@ -193,7 +222,7 @@ def send_template(to_wa_id, template_name, components=None):
             "origin": "business_initiated",
             "within_24h_window": True,
         }
-        _conversations_rows().append(conv)
+        _store_insert("conversations", conv)
 
     msg_id = _new_message_id()
     now = _now()
@@ -209,16 +238,20 @@ def send_template(to_wa_id, template_name, components=None):
         "status": "sent",
         "sent_at": now,
     }
-    _messages_rows().append(msg)
-    for i, c in enumerate(_conversations_rows()):
+    _store_insert("messages", msg)
+    for c in _conversations_rows():
         if c["conversation_id"] == conv["conversation_id"]:
-            _conversations_rows()[i]["last_message_at"] = now
+            _changes = {"last_message_at": now}
+            c.update(_changes)
+            _store_patch("conversations", c, _changes)
     return {"messages": [{"id": msg_id, "message_status": "accepted"}]}
 
 
 def mark_read(message_id):
-    for i, m in enumerate(_messages_rows()):
+    for m in _messages_rows():
         if m["message_id"] == message_id:
-            _messages_rows()[i]["status"] = "read"
+            _changes = {"status": "read"}
+            m.update(_changes)
+            _store_patch("messages", m, _changes)
             return {"success": True, "message_id": message_id}
     return {"error": f"Message {message_id} not found"}

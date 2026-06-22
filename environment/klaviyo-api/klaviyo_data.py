@@ -20,6 +20,19 @@ from _mutable_store import get_store  # noqa: E402
 
 _store = get_store("klaviyo-api")
 
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("profiles", primary_key="id",
                 initial_loader=lambda: _coerce_profiles(_load("profiles.csv")))
 _store.register("lists", primary_key="id",
@@ -219,7 +232,7 @@ def create_profile(email, first_name="", last_name="", phone_number="",
         "created": now,
         "updated": now,
     }
-    _profiles_rows().append(profile)
+    _store_insert("profiles", profile)
     return {"data": _serialize_profile(profile)}
 
 

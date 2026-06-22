@@ -13,6 +13,20 @@ from _mutable_store import get_store  # noqa: E402
 
 _store = get_store("kubernetes-api")
 
+
+def _store_patch(_table, _row_or_pk, _updates):
+    """Persist field updates to a stored row (was: in-place mutation of a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
+
+def _store_delete(_table, _row_or_pk):
+    """Persist a row deletion (was: pop/remove on a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.delete(_pk)
+
 _store.register("namespaces", primary_key="name",
                 initial_loader=lambda: _coerce_namespaces(_load("namespaces.csv")))
 _store.register("nodes", primary_key="name",
@@ -279,10 +293,10 @@ def get_pod(namespace, name):
 
 
 def delete_pod(namespace, name):
-    for i, p in enumerate(_pods_rows()):
+    for p in _pods_rows():
         if p["namespace"] == namespace and p["name"] == name:
             obj = _pod_obj(p)
-            _pods_rows().pop(i)
+            _store_delete("pods", p)
             obj["status"]["phase"] = "Terminating"
             return obj
     return {"error": f"pod {name} not found in namespace {namespace}"}
@@ -307,14 +321,18 @@ def get_deployment(namespace, name):
 
 
 def scale_deployment(namespace, name, replicas):
-    for i, d in enumerate(_deployments_rows()):
+    for d in _deployments_rows():
         if d["namespace"] == namespace and d["name"] == name:
             replicas = max(0, int(replicas))
-            _deployments_rows()[i]["replicas"] = replicas
             # Mock: available/ready converge to requested replica count.
-            _deployments_rows()[i]["available_replicas"] = replicas
-            _deployments_rows()[i]["ready_replicas"] = replicas
-            _deployments_rows()[i]["updated_replicas"] = replicas
+            _changes = {
+                "replicas": replicas,
+                "available_replicas": replicas,
+                "ready_replicas": replicas,
+                "updated_replicas": replicas,
+            }
+            d.update(_changes)
+            _store_patch("deployments", d, _changes)
             return {
                 "kind": "Scale",
                 "apiVersion": "autoscaling/v1",

@@ -13,6 +13,33 @@ from _mutable_store import get_store  # noqa: E402
 
 _store = get_store("twitter-api")
 
+
+
+def _store_patch(_table, _row_or_pk, _updates):
+    """Persist field updates to a stored row (was: in-place mutation of a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
+
+def _store_delete(_table, _row_or_pk):
+    """Persist a row deletion (was: pop/remove on a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.delete(_pk)
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("users", primary_key="id",
                 initial_loader=lambda: _coerce_users(_load("users.csv")))
 _store.register("tweets", primary_key="id",
@@ -214,18 +241,19 @@ def create_tweet(text, author_id=None, reply_to_tweet_id=None):
             "quote_count": 0,
         },
     }
-    _tweets_rows().append(tweet)
+    _store_insert("tweets", tweet)
     if reply_to_tweet_id:
         for t in _tweets_rows():
             if t["id"] == reply_to_tweet_id:
                 t["public_metrics"]["reply_count"] += 1
+                _store_patch("tweets", t, {"public_metrics": t["public_metrics"]})
     return {"data": tweet}
 
 
 def delete_tweet(tweet_id):
-    for i, t in enumerate(_tweets_rows()):
+    for t in _tweets_rows():
         if t["id"] == tweet_id:
-            _tweets_rows().pop(i)
+            _store_delete("tweets", t)
             return {"data": {"deleted": True}}
     return {"error": f"Tweet {tweet_id} not found"}
 
@@ -249,8 +277,9 @@ def like_tweet(user_id, tweet_id):
     if not target:
         return {"error": f"Tweet {tweet_id} not found"}
     if not any(l["user_id"] == user_id and l["tweet_id"] == tweet_id for l in _likes_rows()):
-        _likes_rows().append({"user_id": user_id, "tweet_id": tweet_id})
+        _store_insert("likes", {"user_id": user_id, "tweet_id": tweet_id})
         target["public_metrics"]["like_count"] += 1
+        _store_patch("tweets", target, {"public_metrics": target["public_metrics"]})
     return {"data": {"liked": True}}
 
 
@@ -261,6 +290,7 @@ def retweet(user_id, tweet_id):
     if not target:
         return {"error": f"Tweet {tweet_id} not found"}
     if not any(r["user_id"] == user_id and r["tweet_id"] == tweet_id for r in _retweets_rows()):
-        _retweets_rows().append({"user_id": user_id, "tweet_id": tweet_id})
+        _store_insert("retweets", {"user_id": user_id, "tweet_id": tweet_id})
         target["public_metrics"]["retweet_count"] += 1
+        _store_patch("tweets", target, {"public_metrics": target["public_metrics"]})
     return {"data": {"retweeted": True}}

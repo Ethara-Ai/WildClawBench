@@ -13,6 +13,33 @@ from _mutable_store import get_store  # noqa: E402
 
 _store = get_store("eventbrite-api")
 
+
+
+def _store_patch(_table, _row_or_pk, _updates):
+    """Persist field updates to a stored row (was: in-place mutation of a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
+
+def _store_delete(_table, _row_or_pk):
+    """Persist a row deletion (was: pop/remove on a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.delete(_pk)
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("events", primary_key="id",
                 initial_loader=lambda: _coerce_events(_load("events.csv")))
 _store.register("venues", primary_key="id",
@@ -170,25 +197,29 @@ def create_event(organization_id, name, summary, start_utc, end_utc,
         "url": "",
         "created": _now(),
     }
-    _events_rows().append(event)
+    _store_insert("events", event)
     return _serialize_event(event)
 
 
 def publish_event(event_id):
-    for i, e in enumerate(_events_rows()):
+    for e in _events_rows():
         if e["id"] == event_id:
             if not any(t["event_id"] == event_id for t in _ticket_classes_rows()):
                 return {"error": "Event needs at least one ticket class before publish"}
-            _events_rows()[i]["status"] = "live"
-            return _serialize_event(_events_rows()[i])
+            _changes = {"status": "live"}
+            e.update(_changes)
+            _store_patch("events", e, _changes)
+            return _serialize_event(e)
     return {"error": f"Event {event_id} not found"}
 
 
 def cancel_event(event_id):
-    for i, e in enumerate(_events_rows()):
+    for e in _events_rows():
         if e["id"] == event_id:
-            _events_rows()[i]["status"] = "canceled"
-            return _serialize_event(_events_rows()[i])
+            _changes = {"status": "canceled"}
+            e.update(_changes)
+            _store_patch("events", e, _changes)
+            return _serialize_event(e)
     return {"error": f"Event {event_id} not found"}
 
 
@@ -233,7 +264,7 @@ def create_ticket_class(event_id, name, quantity_total, cost=0, free=True):
         "sales_start": _now(),
         "sales_end": _now(),
     }
-    _ticket_classes_rows().append(tc)
+    _store_insert("ticket_classes", tc)
     return tc
 
 
@@ -253,10 +284,12 @@ def list_attendees(event_id, status=None, checked_in=None):
 
 
 def check_in_attendee(attendee_id):
-    for i, a in enumerate(_attendees_rows()):
+    for a in _attendees_rows():
         if a["id"] == attendee_id:
-            _attendees_rows()[i]["checked_in"] = True
-            return _attendees_rows()[i]
+            _changes = {"checked_in": True}
+            a.update(_changes)
+            _store_patch("attendees", a, _changes)
+            return a
     return {"error": f"Attendee {attendee_id} not found"}
 
 
@@ -278,8 +311,10 @@ def register_attendee(event_id, ticket_class_id, name, email):
         "checked_in": False,
         "created": _now(),
     }
-    _attendees_rows().append(attendee)
-    for i, t in enumerate(_ticket_classes_rows()):
+    _store_insert("attendees", attendee)
+    for t in _ticket_classes_rows():
         if t["id"] == ticket_class_id:
-            _ticket_classes_rows()[i]["quantity_sold"] += 1
+            _changes = {"quantity_sold": t["quantity_sold"] + 1}
+            t.update(_changes)
+            _store_patch("ticket_classes", t, _changes)
     return attendee

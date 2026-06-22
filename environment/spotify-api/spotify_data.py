@@ -15,6 +15,19 @@ from _mutable_store import get_store  # noqa: E402
 
 _store = get_store("spotify-api")
 
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("artists", primary_key="artist_id",
                 initial_loader=lambda: _coerce_artists(_load("artists.csv")))
 _store.register("albums", primary_key="album_id",
@@ -249,7 +262,7 @@ def create_playlist(user_id, name, description="", public=True, collaborative=Fa
         "public": bool(public),
         "collaborative": bool(collaborative),
     }
-    _playlists_rows().append(playlist)
+    _store_insert("playlists", playlist)
     return _playlist_obj(playlist, with_tracks=True)
 
 
@@ -264,7 +277,7 @@ def add_tracks(playlist_id, uris):
         track_id = uri.split(":")[-1] if ":" in uri else uri
         if not any(t["track_id"] == track_id for t in _tracks_rows()):
             continue
-        _playlist_tracks_rows().append({
+        _store_insert("playlist_tracks", {
             "playlist_id": playlist_id,
             "track_id": track_id,
             "position": next_pos,

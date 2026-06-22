@@ -15,6 +15,33 @@ from _mutable_store import get_store  # noqa: E402
 
 _store = get_store("google-drive-api")
 
+
+
+def _store_patch(_table, _row_or_pk, _updates):
+    """Persist field updates to a stored row (was: in-place mutation of a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
+
+def _store_delete(_table, _row_or_pk):
+    """Persist a row deletion (was: pop/remove on a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.delete(_pk)
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("files", primary_key="id",
                 initial_loader=lambda: _coerce_files(_load("files.csv")))
 _store.register("permissions", primary_key="id",
@@ -194,8 +221,8 @@ def create_file(name, mime_type, parent_id=None, owner_email="amelia@orbit-labs.
         "trashed": False,
         "web_view_link": "",
     }
-    _files_rows().append(new_file)
-    _permissions_rows().append({
+    _store_insert("files", new_file)
+    _store_insert("permissions", {
         "id": f"perm-{uuid.uuid4().hex[:6]}",
         "file_id": new_file["id"],
         "type": "user",
@@ -207,18 +234,21 @@ def create_file(name, mime_type, parent_id=None, owner_email="amelia@orbit-labs.
 
 
 def update_file(file_id, name=None, parent_id=None, starred=None, trashed=None):
-    for i, f in enumerate(_files_rows()):
+    for f in _files_rows():
         if f["id"] == file_id:
+            _changes = {}
             if name is not None:
-                _files_rows()[i]["name"] = name
+                _changes["name"] = name
             if parent_id is not None:
-                _files_rows()[i]["parent_id"] = parent_id
+                _changes["parent_id"] = parent_id
             if starred is not None:
-                _files_rows()[i]["starred"] = bool(starred)
+                _changes["starred"] = bool(starred)
             if trashed is not None:
-                _files_rows()[i]["trashed"] = bool(trashed)
-            _files_rows()[i]["modified_time"] = _now()
-            return _serialize_file(_files_rows()[i])
+                _changes["trashed"] = bool(trashed)
+            _changes["modified_time"] = _now()
+            f.update(_changes)
+            _store_patch("files", f, _changes)
+            return _serialize_file(f)
     return {"error": f"File {file_id} not found"}
 
 
@@ -227,10 +257,11 @@ def trash_file(file_id):
 
 
 def delete_file(file_id):
-    for i, f in enumerate(_files_rows()):
+    for f in _files_rows():
         if f["id"] == file_id:
-            _files_rows().pop(i)
-            _permissions_rows()[:] = [p for p in _permissions_rows() if p["file_id"] != file_id]
+            _store_delete("files", f)
+            for p in [p for p in _permissions_rows() if p["file_id"] == file_id]:
+                _store_delete("permissions", p)
             return {"deleted": True, "id": file_id}
     return {"error": f"File {file_id} not found"}
 
@@ -257,13 +288,13 @@ def create_permission(file_id, type, role, email_address=None, display_name=None
         "email": email_address or "",
         "display_name": display_name or email_address or "",
     }
-    _permissions_rows().append(perm)
+    _store_insert("permissions", perm)
     return perm
 
 
 def delete_permission(file_id, permission_id):
-    for i, p in enumerate(_permissions_rows()):
+    for p in _permissions_rows():
         if p["id"] == permission_id and p["file_id"] == file_id:
-            _permissions_rows().pop(i)
+            _store_delete("permissions", p)
             return {"deleted": True, "id": permission_id}
     return {"error": f"Permission {permission_id} not found on {file_id}"}

@@ -19,6 +19,19 @@ from _mutable_store import get_store  # noqa: E402
 
 _store = get_store("microsoft-teams-api")
 
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("teams", primary_key="id",
                 initial_loader=lambda: _coerce_teams(_load("teams.csv")))
 _store.register("channels", primary_key="id",
@@ -224,5 +237,5 @@ def send_message(team_id, channel_id, content, content_type="html", importance="
         "importance": importance or "normal",
         "createdDateTime": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
-    _messages_rows().append(msg)
+    _store_insert("messages", msg)
     return _serialize_message(msg)

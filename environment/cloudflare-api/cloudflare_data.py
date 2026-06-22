@@ -13,6 +13,33 @@ from _mutable_store import get_store  # noqa: E402
 
 _store = get_store("cloudflare-api")
 
+
+
+def _store_patch(_table, _row_or_pk, _updates):
+    """Persist field updates to a stored row (was: in-place mutation of a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
+
+def _store_delete(_table, _row_or_pk):
+    """Persist a row deletion (was: pop/remove on a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.delete(_pk)
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("zones", primary_key="id",
                 initial_loader=lambda: _coerce_zones(_load("zones.csv")))
 _store.register("dns", primary_key="id",
@@ -229,7 +256,7 @@ def create_dns_record(zone_id, type, name, content, ttl=1, proxied=False, priori
         "created_on": _now(),
         "modified_on": _now(),
     }
-    _dns_rows().append(record)
+    _store_insert("dns", record)
     return _ok(_serialize_dns(record))
 
 
@@ -237,31 +264,34 @@ def update_dns_record(zone_id, record_id, type=None, name=None, content=None,
                       ttl=None, proxied=None, priority=None):
     if not _zone_exists(zone_id):
         return _err(f"Zone {zone_id} not found", code=1003, status=404)
-    for idx, r in enumerate(_dns_rows()):
+    for r in _dns_rows():
         if r["zone_id"] == zone_id and r["id"] == record_id:
+            _changes = {}
             if type is not None:
-                _dns_rows()[idx]["type"] = type
+                _changes["type"] = type
             if name is not None:
-                _dns_rows()[idx]["name"] = name
+                _changes["name"] = name
             if content is not None:
-                _dns_rows()[idx]["content"] = content
+                _changes["content"] = content
             if ttl is not None:
-                _dns_rows()[idx]["ttl"] = ttl
+                _changes["ttl"] = ttl
             if proxied is not None:
-                _dns_rows()[idx]["proxied"] = proxied
+                _changes["proxied"] = proxied
             if priority is not None:
-                _dns_rows()[idx]["priority"] = priority
-            _dns_rows()[idx]["modified_on"] = _now()
-            return _ok(_serialize_dns(_dns_rows()[idx]))
+                _changes["priority"] = priority
+            _changes["modified_on"] = _now()
+            r.update(_changes)
+            _store_patch("dns", r, _changes)
+            return _ok(_serialize_dns(r))
     return _err(f"DNS record {record_id} not found", code=81044, status=404)
 
 
 def delete_dns_record(zone_id, record_id):
     if not _zone_exists(zone_id):
         return _err(f"Zone {zone_id} not found", code=1003, status=404)
-    for idx, r in enumerate(_dns_rows()):
+    for r in _dns_rows():
         if r["zone_id"] == zone_id and r["id"] == record_id:
-            _dns_rows().pop(idx)
+            _store_delete("dns", r)
             return _ok({"id": record_id})
     return _err(f"DNS record {record_id} not found", code=81044, status=404)
 

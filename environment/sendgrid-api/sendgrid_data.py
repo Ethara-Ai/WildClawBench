@@ -13,6 +13,19 @@ from _mutable_store import get_store  # noqa: E402
 
 _store = get_store("sendgrid-api")
 
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("templates", primary_key="id",
                 initial_loader=lambda: _coerce_templates(_load("templates.csv")))
 _store.register("lists", primary_key="id",
@@ -205,7 +218,7 @@ def send_mail(personalizations, from_email, subject=None, content=None, template
                 "clicks": 0,
                 "sent_at": _now(),
             }
-            _sent_log_rows().append(entry)
+            _store_insert("sent_log", entry)
             created.append(entry["message_id"])
     return {"accepted": len(created), "message_ids": created, "status": "queued"}
 
@@ -238,7 +251,7 @@ def create_template(name, generation="dynamic", subject="", html_content=""):
         "active": True,
         "updated_at": _now(),
     }
-    _templates_rows().append(tmpl)
+    _store_insert("templates", tmpl)
     return _serialize_template(tmpl)
 
 
@@ -284,7 +297,7 @@ def upsert_contacts(contacts, list_ids=None):
                 "created_at": _now(),
                 "updated_at": _now(),
             }
-            _contacts_rows().append(new_c)
+            _store_insert("contacts", new_c)
             upserted.append(new_c["id"])
     return {"job_id": _new_id("job"), "upserted": len(upserted), "contact_ids": upserted}
 

@@ -15,6 +15,33 @@ from _mutable_store import get_store  # noqa: E402
 
 _store = get_store("gmail-api")
 
+
+
+def _store_patch(_table, _row_or_pk, _updates):
+    """Persist field updates to a stored row (was: in-place mutation of a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
+
+def _store_delete(_table, _row_or_pk):
+    """Persist a row deletion (was: pop/remove on a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.delete(_pk)
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("labels", primary_key="id",
                 initial_loader=lambda: _coerce_labels(_load("labels.csv")))
 _store.register("messages", primary_key="id",
@@ -153,7 +180,7 @@ def create_label(name):
         "threads_total": 0, "threadsTotal": 0,
         "threads_unread": 0, "threadsUnread": 0,
     }
-    _labels_rows().append(label)
+    _store_insert("labels", label)
     return label
 
 
@@ -236,26 +263,28 @@ def send_message(to_addr, subject, body, cc=None, thread_id=None,
         "is_unread": False,
         "is_starred": False,
     }
-    _messages_rows().append(msg)
+    _store_insert("messages", msg)
     return _serialize_message(msg)
 
 
 def modify_message(message_id, add_labels=None, remove_labels=None):
-    for i, m in enumerate(_messages_rows()):
+    for m in _messages_rows():
         if m["id"] == message_id:
             labels = set(m["labels"])
             if add_labels:
                 labels.update(add_labels)
             if remove_labels:
                 labels.difference_update(remove_labels)
-            _messages_rows()[i]["labels"] = sorted(labels)
+            _changes = {"labels": sorted(labels)}
             if "UNREAD" in (remove_labels or []):
-                _messages_rows()[i]["is_unread"] = False
+                _changes["is_unread"] = False
             if "STARRED" in (add_labels or []):
-                _messages_rows()[i]["is_starred"] = True
+                _changes["is_starred"] = True
             if "STARRED" in (remove_labels or []):
-                _messages_rows()[i]["is_starred"] = False
-            return _serialize_message(_messages_rows()[i])
+                _changes["is_starred"] = False
+            m.update(_changes)
+            _store_patch("messages", m, _changes)
+            return _serialize_message(m)
     return {"error": f"Message {message_id} not found"}
 
 
@@ -264,9 +293,9 @@ def trash_message(message_id):
 
 
 def delete_message(message_id):
-    for i, m in enumerate(_messages_rows()):
+    for m in _messages_rows():
         if m["id"] == message_id:
-            _messages_rows().pop(i)
+            _store_delete("messages", m)
             return {"deleted": True, "id": message_id}
     return {"error": f"Message {message_id} not found"}
 
@@ -318,7 +347,7 @@ def create_draft(to_addr, subject, body, cc=None, thread_id=None):
         "body": body,
         "updated_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
-    _drafts_rows().append(draft)
+    _store_insert("drafts", draft)
     return draft
 
 
@@ -333,5 +362,5 @@ def send_draft(draft_id):
         cc=draft["cc_addr"],
         thread_id=draft["thread_id"] or None,
     )
-    _drafts_rows().remove(draft)
+    _store_delete("drafts", draft)
     return sent

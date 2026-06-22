@@ -14,6 +14,33 @@ from _mutable_store import get_store  # noqa: E402
 
 _store = get_store("obsidian-api")
 
+
+
+def _store_patch(_table, _row_or_pk, _updates):
+    """Persist field updates to a stored row (was: in-place mutation of a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
+
+def _store_delete(_table, _row_or_pk):
+    """Persist a row deletion (was: pop/remove on a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.delete(_pk)
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("notes", primary_key="path",
                 initial_loader=lambda: _coerce_notes(_load("notes.csv")))
 _store.register_document("contents", initial_loader=lambda: _coerce_contents(_load("note_contents.csv")))
@@ -117,8 +144,8 @@ def create_note(path, content):
         "modified_at": _now(),
         "tags": _extract_tags(content),
     }
-    _notes_rows().append(note)
-    _contents_doc()[path] = content
+    _store_insert("notes", note)
+    _store.document("contents").merge({path: content})
     return {**note, "content": content}
 
 
@@ -127,24 +154,32 @@ def update_note(path, content=None, append=None):
     if idx < 0:
         return {"error": f"Note {path} not found"}
     if content is not None:
-        _contents_doc()[path] = content
+        new_body = content
     elif append is not None:
-        _contents_doc()[path] = _contents_doc().get(path, "") + append
+        new_body = _contents_doc().get(path, "") + append
     else:
         return {"error": "Either content or append must be provided"}
-    new_body = _contents_doc()[path]
-    _notes_rows()[idx]["size_bytes"] = len(new_body.encode("utf-8"))
-    _notes_rows()[idx]["modified_at"] = _now()
-    _notes_rows()[idx]["tags"] = _extract_tags(new_body)
-    return {**_notes_rows()[idx], "content": new_body}
+    _store.document("contents").merge({path: new_body})
+    note = _notes_rows()[idx]
+    _changes = {
+        "size_bytes": len(new_body.encode("utf-8")),
+        "modified_at": _now(),
+        "tags": _extract_tags(new_body),
+    }
+    note.update(_changes)
+    _store_patch("notes", note, _changes)
+    return {**note, "content": new_body}
 
 
 def delete_note(path):
     idx = _index_of(path)
     if idx < 0:
         return {"error": f"Note {path} not found"}
-    _notes_rows().pop(idx)
-    _contents_doc().pop(path, None)
+    _store_delete("notes", _notes_rows()[idx])
+    _contents = _store.document("contents")
+    _cv = _contents.get()
+    _cv.pop(path, None)
+    _contents.set(_cv)
     return {"deleted": True, "path": path}
 
 

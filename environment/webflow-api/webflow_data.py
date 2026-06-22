@@ -18,6 +18,19 @@ from _mutable_store import get_store  # noqa: E402
 
 _store = get_store("webflow-api")
 
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("sites", primary_key="id",
                 initial_loader=lambda: _coerce_sites(_load("sites.csv")))
 _store.register("collections", primary_key="id",
@@ -231,7 +244,7 @@ def create_item(collection_id, field_data, is_draft=False, is_archived=False):
         "created_on": now,
         "last_updated": now,
     }
-    _items_rows().append(item)
+    _store_insert("items", item)
     serialized = _serialize_item(item)
     # Surface any extra custom fields the caller supplied.
     for k, v in field_data.items():

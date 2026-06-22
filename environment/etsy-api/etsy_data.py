@@ -13,6 +13,33 @@ from _mutable_store import get_store  # noqa: E402
 
 _store = get_store("etsy-api")
 
+
+
+def _store_patch(_table, _row_or_pk, _updates):
+    """Persist field updates to a stored row (was: in-place mutation of a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
+
+def _store_delete(_table, _row_or_pk):
+    """Persist a row deletion (was: pop/remove on a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.delete(_pk)
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("listings", primary_key="listing_id",
                 initial_loader=lambda: _coerce_listings(_load("listings.csv")))
 _store.register("listing_images", primary_key="listing_image_id",
@@ -281,11 +308,13 @@ def update_shop(shop_id: int, data: dict):
     updatable = {"title", "announcement", "sale_message", "is_vacation",
                  "vacation_message", "accepts_custom_requests",
                  "policy_welcome", "policy_payment", "policy_shipping", "policy_refunds"}
+    _changes = {}
     for k, v in data.items():
         if k in updatable:
-            _shop_doc()[k] = v
-    _shop_doc()["update_date"] = _now()
-    return {"type": "shop", "shop": _shop_doc()}
+            _changes[k] = v
+    _changes["update_date"] = _now()
+    shop = _store.document("shop").merge(_changes)
+    return {"type": "shop", "shop": shop}
 
 
 # ---------------------------------------------------------------------------
@@ -401,13 +430,13 @@ def create_listing(shop_id: int, data: dict):
         "updated_timestamp": now,
         "ending_timestamp": None,
     }
-    _listings_rows().append(listing)
+    _store_insert("listings", listing)
     _next_listing_id += 1
     return {"type": "listing", "listing": listing}
 
 
 def update_listing(listing_id: int, data: dict):
-    for i, listing in enumerate(_listings_rows()):
+    for listing in _listings_rows():
         if listing["listing_id"] == listing_id:
             updatable = {
                 "title", "description", "price", "quantity", "tags", "materials",
@@ -417,25 +446,29 @@ def update_listing(listing_id: int, data: dict):
                 "shipping_profile_id", "return_policy_id", "is_supply",
                 "is_customizable", "is_personalizable",
             }
+            _changes = {}
             for k, v in data.items():
                 if k in updatable:
                     if k == "price" and v is not None:
-                        _listings_rows()[i][k] = float(v)
+                        _changes[k] = float(v)
                     elif k == "quantity" and v is not None:
-                        _listings_rows()[i][k] = int(v)
+                        _changes[k] = int(v)
                     elif k == "taxonomy_id" and v is not None:
-                        _listings_rows()[i][k] = int(v)
+                        _changes[k] = int(v)
                     else:
-                        _listings_rows()[i][k] = v
-            _listings_rows()[i]["updated_timestamp"] = _now()
-            return {"type": "listing", "listing": _listings_rows()[i]}
+                        _changes[k] = v
+            _changes["updated_timestamp"] = _now()
+            listing.update(_changes)
+            _store_patch("listings", listing, _changes)
+            return {"type": "listing", "listing": listing}
     return {"error": f"Listing {listing_id} not found"}
 
 
 def delete_listing(listing_id: int):
-    for i, listing in enumerate(_listings_rows()):
+    for listing in _listings_rows():
         if listing["listing_id"] == listing_id:
-            removed = _listings_rows().pop(i)
+            removed = listing
+            _store_delete("listings", listing)
             return {"type": "listing", "deleted": True, "listing_id": listing_id}
     return {"error": f"Listing {listing_id} not found"}
 
@@ -461,9 +494,9 @@ def get_listing_image(listing_id: int, image_id: int):
 
 
 def delete_listing_image(listing_id: int, image_id: int):
-    for i, img in enumerate(_listing_images_rows()):
+    for img in _listing_images_rows():
         if img["listing_id"] == listing_id and img["listing_image_id"] == image_id:
-            _listing_images_rows().pop(i)
+            _store_delete("listing_images", img)
             return {"type": "listing_image", "deleted": True, "listing_image_id": image_id}
     return {"error": f"Image {image_id} not found for listing {listing_id}"}
 
@@ -534,19 +567,25 @@ def get_receipt(receipt_id: int):
 
 
 def update_receipt(receipt_id: int, data: dict):
-    for i, r in enumerate(_receipts_rows()):
+    for r in _receipts_rows():
         if r["receipt_id"] == receipt_id:
             updatable = {"shipping_carrier", "tracking_code", "status"}
+            _changes = {}
             for k, v in data.items():
                 if k in updatable:
-                    _receipts_rows()[i][k] = v
+                    _changes[k] = v
+            r.update(_changes)
             if data.get("was_shipped") or data.get("tracking_code"):
-                if not _receipts_rows()[i]["shipped_timestamp"]:
-                    _receipts_rows()[i]["shipped_timestamp"] = _now()
-                if _receipts_rows()[i]["status"] == "paid":
-                    _receipts_rows()[i]["status"] = "shipped"
-            _receipts_rows()[i]["updated_timestamp"] = _now()
-            return {"type": "receipt", "receipt": _attach_transactions(_receipts_rows()[i])}
+                if not r["shipped_timestamp"]:
+                    _changes["shipped_timestamp"] = _now()
+                    r["shipped_timestamp"] = _changes["shipped_timestamp"]
+                if r["status"] == "paid":
+                    _changes["status"] = "shipped"
+                    r["status"] = "shipped"
+            _changes["updated_timestamp"] = _now()
+            r["updated_timestamp"] = _changes["updated_timestamp"]
+            _store_patch("receipts", r, _changes)
+            return {"type": "receipt", "receipt": _attach_transactions(r)}
     return {"error": f"Receipt {receipt_id} not found"}
 
 

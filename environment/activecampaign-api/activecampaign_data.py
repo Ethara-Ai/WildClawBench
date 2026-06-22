@@ -17,6 +17,19 @@ from _mutable_store import get_store  # noqa: E402
 
 _store = get_store("activecampaign-api")
 
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("contacts", primary_key="id",
                 initial_loader=lambda: _coerce_contacts(_load("contacts.csv")))
 _store.register("lists", primary_key="id",
@@ -244,7 +257,7 @@ def create_contact(email, first_name="", last_name="", phone="", status="1"):
         "created_timestamp": now,
         "updated_timestamp": now,
     }
-    _contacts_rows().append(contact)
+    _store_insert("contacts", contact)
     return {"contact": _serialize_contact(contact)}
 
 

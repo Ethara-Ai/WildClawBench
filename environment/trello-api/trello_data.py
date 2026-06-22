@@ -12,6 +12,33 @@ from _mutable_store import get_store  # noqa: E402
 
 _store = get_store("trello-api")
 
+
+
+def _store_patch(_table, _row_or_pk, _updates):
+    """Persist field updates to a stored row (was: in-place mutation of a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
+
+def _store_delete(_table, _row_or_pk):
+    """Persist a row deletion (was: pop/remove on a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.delete(_pk)
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("members", primary_key="id",
                 initial_loader=lambda: _coerce_members(_load("members.csv")))
 _store.register("boards", primary_key="id",
@@ -272,38 +299,42 @@ def create_card(id_list, name, desc="", due=None, member_ids=None):
         "member_ids": member_ids or [],
         "labels": [],
     }
-    _cards_rows().append(card)
+    _store_insert("cards", card)
     return _serialize_card(card)
 
 
 def update_card(card_id, name=None, desc=None, id_list=None, due=None, closed=None, pos=None):
-    for i, c in enumerate(_cards_rows()):
+    for c in _cards_rows():
         if c["id"] == card_id:
+            _changes = {}
             if name is not None:
-                _cards_rows()[i]["name"] = name
+                _changes["name"] = name
             if desc is not None:
-                _cards_rows()[i]["desc"] = desc
+                _changes["desc"] = desc
             if id_list is not None:
                 target = next((l for l in _lists_rows() if l["id"] == id_list), None)
                 if not target:
                     return {"error": "list not found", "message": f"List {id_list} not found"}
-                _cards_rows()[i]["id_list"] = id_list
-                _cards_rows()[i]["id_board"] = target["id_board"]
+                _changes["id_list"] = id_list
+                _changes["id_board"] = target["id_board"]
             if due is not None:
-                _cards_rows()[i]["due"] = due or None
+                _changes["due"] = due or None
             if closed is not None:
-                _cards_rows()[i]["closed"] = bool(closed)
+                _changes["closed"] = bool(closed)
             if pos is not None:
-                _cards_rows()[i]["pos"] = float(pos)
-            return _serialize_card(_cards_rows()[i])
+                _changes["pos"] = float(pos)
+            c.update(_changes)
+            _store_patch("cards", c, _changes)
+            return _serialize_card(c)
     return {"error": "card not found", "message": f"Card {card_id} not found"}
 
 
 def delete_card(card_id):
-    for i, c in enumerate(_cards_rows()):
+    for c in _cards_rows():
         if c["id"] == card_id:
-            _cards_rows().pop(i)
-            _checklists_rows()[:] = [cl for cl in _checklists_rows() if cl["id_card"] != card_id]
+            _store_delete("cards", c)
+            for cl in [cl for cl in _checklists_rows() if cl["id_card"] == card_id]:
+                _store_delete("checklists", cl)
             return {"_value": None, "deleted": True, "id": card_id}
     return {"error": "card not found", "message": f"Card {card_id} not found"}
 
@@ -329,5 +360,5 @@ def create_checklist(id_card, name):
         "id_board": card["id_board"],
         "check_items": [],
     }
-    _checklists_rows().append(checklist)
+    _store_insert("checklists", checklist)
     return _serialize_checklist(checklist)
