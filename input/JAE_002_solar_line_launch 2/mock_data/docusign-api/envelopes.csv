@@ -1,0 +1,2 @@
+envelope_id,status,email_subject,sender_name,sender_email,created_time,sent_time,completed_time,template_id
+DS-ENV-2026-1008-1342,sent,Solshine Solar — Deposit Agreement (v1),Jordan Reyes,jordan.reyes@solshinesolar.com,2026-10-08T13:42:00Z,2026-10-08T13:45:00Z,,tmpl_deposit

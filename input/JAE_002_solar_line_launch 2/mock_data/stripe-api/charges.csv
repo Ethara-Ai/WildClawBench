@@ -1,0 +1,3 @@
+id,customer,amount,currency,status,paid,refunded,amount_refunded,description,payment_intent,created
+ch_solar_deposit_stripe,cus_sarah,250000,usd,succeeded,true,false,0,Online payment — solar deposit (Kapadia),pi_solar_dep,1791547200
+ch_servicecall_01,,15000,usd,succeeded,true,false,0,Service call,pi_sc01,1790344800

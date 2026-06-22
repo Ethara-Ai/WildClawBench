@@ -1,0 +1,5 @@
+id,parent_type,parent_id,title,created_time,last_edited_time,created_by,archived,icon,cover_url
+page_study,workspace,ws_chandler,NABCEP Study Deck,2026-09-15T09:00:00.000Z,2026-10-10T09:00:00.000Z,u_jae,false,📘,
+page_shortlist,workspace,ws_chandler,Solar Supplier Shortlist,2026-10-02T09:00:00.000Z,2026-10-10T09:00:00.000Z,u_jae,false,📋,
+page_nasa_cache,workspace,ws_chandler,Bay View Irradiance Cache,2026-10-03T09:00:00.000Z,2026-10-03T09:00:00.000Z,u_jae,false,☀️,
+page_launch,workspace,ws_chandler,Solar Line Launch Plan,2026-10-01T09:00:00.000Z,2026-10-11T09:00:00.000Z,u_jae,false,🚀,

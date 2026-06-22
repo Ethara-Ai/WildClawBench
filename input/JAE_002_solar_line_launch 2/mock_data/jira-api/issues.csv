@@ -1,0 +1,3 @@
+id,key,project_key,issue_type,summary,description,status,priority,assignee,reporter,sprint_id,story_points,created,updated
+20247,HARBOR-247,HARBOR,Task,Ryan O'Malley crew — units 7-12 rough-in,Authoritative crew assignment: Ryan O'Malley leads units 7-12. Danny Flores and Jake Parsons cover units 13-18.,In Progress,High,Ryan O'Malley,Jae Chandler,s1,8,2026-09-20T09:00:00Z,2026-10-06T16:30:00Z
+20248,HARBOR-248,HARBOR,Task,Danny + Jake crew — units 13-18 rough-in,Danny Flores and Jake Parsons cover units 13-18.,In Progress,High,Danny Flores,Jae Chandler,s1,8,2026-09-20T09:00:00Z,2026-10-06T16:30:00Z
