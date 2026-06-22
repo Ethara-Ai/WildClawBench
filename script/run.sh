@@ -39,6 +39,7 @@ USE_TESTS=1              # 1 = --generate-tests --execute-tests, 0 = omit
 USE_LITELLM=1            # 1 = --litellm, 0 = omit
 USE_MOCK_STACK=1         # 1 = --mock-stack, 0 = omit
 SKIP_PREFLIGHT=0         # 1 = skip docker/agent-image/mock-image/.env checks
+PARALLEL_REPS=0          # 1 = run all K reps of a (task,model) concurrently, 0 = sequential
 AUTO_BUNDLE=1            # 1 = auto-repackage to output_bundle/ after each task, 0 = omit
 BUNDLE_ROOT="output_bundle"  # dest-root for the auto-bundler; overridable via KENSEI_BUNDLE_ROOT
 
@@ -73,6 +74,9 @@ EXAMPLES
   # Two models in parallel, 3 reps each:
   bash script/run.sh --model claude-opus-4.7,claude-sonnet-4.5 --reps 3
 
+  # 2 reps of one task, both reps running at the same time (run_1 ∥ run_2):
+  bash script/run.sh --task input/amanda_hayes_01 --reps 2 --parallel-reps
+
   # Bulk from a file (tasks sequential, models parallel):
   bash script/run.sh --bulk tasks.txt --model claude-opus-4.7 --reps 2
 
@@ -88,11 +92,14 @@ ADVANCED
       --no-mock-stack       Disable mock-stack docker fleet
       --no-bundle           Skip auto-repackage to output_bundle/ after each task
       --bundle-root DIR     Destination for auto-bundle (default: output_bundle; env: KENSEI_BUNDLE_ROOT)
+      --parallel-reps       Run all K reps of a (task,model) CONCURRENTLY (default: sequential)
       --skip-preflight      Skip docker/image/.env checks (DANGEROUS; for re-entry only)
 
 NOTES
   * Tasks always run SEQUENTIALLY. Models PARALLELIZE per task. K reps per
-    (task,model) run SEQUENTIALLY.
+    (task,model) run SEQUENTIALLY by default, or CONCURRENTLY with --parallel-reps.
+  * --parallel-reps spins up K docker/mock stacks per (task,model) at once; if you
+    also fan tasks out via `xargs -P N`, peak load is N×(models)×K stacks. Mind RAM.
   * Per-run logs land in logs/<task>_<model>_run<i>_<TIMESTAMP>.log.
   * One automatic retry per run on docker-recoverable errors
     (No such image | manifest unknown | Container startup failed).
@@ -421,6 +428,59 @@ run_regrade() {
     return "$rc"
 }
 
+# Run a single rep (with the one-shot docker-recovery retry) and write its
+# outcome (failed/recovered/failure) to $frag. Reads/writes only the RUN_RC and
+# RUN_LOG globals set by run_one — safe to background because each rep, when run
+# under `&`, gets its own process-local copy of those globals (no cross-rep
+# clobber). The actual run_N directory is claimed atomically Python-side, so
+# concurrent reps never share a slot.
+run_one_rep() {
+    local task_path="$1"
+    local model="$2"
+    local i="$3"
+    local current="$4"
+    local total="$5"
+    local frag="$6"
+
+    local task_name
+    task_name=$(basename "$task_path")
+    local rep_failed=0
+    local rep_recovered=0
+    local rep_failure=""
+
+    run_one "$task_path" "$model" "$current" "$total"
+
+    if (( RUN_RC != 0 )); then
+        if is_docker_recoverable_error "$RUN_LOG"; then
+            attempt_docker_recovery
+            log::warn "Retrying run $current/$total after recovery (${model})"
+            run_one "$task_path" "$model" "$current" "$total"
+            if (( RUN_RC == 0 )); then
+                rep_recovered=1
+                log::ok "Run $current (${model}) succeeded after recovery"
+            else
+                log::err "Run $current (${model}) failed after recovery (rc=$RUN_RC)"
+                rep_failed=1
+                rep_failure="${task_name}#${i}/${model} (rc=$RUN_RC after retry)"
+            fi
+        else
+            log::err "Run $current (${model}) failed (rc=$RUN_RC) — no retry"
+            log::hint "Tail of log ($RUN_LOG):"
+            tail -n 20 "$RUN_LOG" >&2 || true
+            rep_failed=1
+            rep_failure="${task_name}#${i}/${model} (rc=$RUN_RC)"
+        fi
+    else
+        log::ok "Run $current (${model}) completed"
+    fi
+
+    {
+        printf 'failed=%d\n' "$rep_failed"
+        printf 'recovered=%d\n' "$rep_recovered"
+        [[ -n "$rep_failure" ]] && printf 'failure=%s\n' "$rep_failure"
+    } > "$frag"
+}
+
 run_k_for_model_bg() {
     local task_path="$1"
     local model="$2"
@@ -429,40 +489,46 @@ run_k_for_model_bg() {
     local total="$5"
     local result_file="$6"
 
-    local task_name
-    task_name=$(basename "$task_path")
+    local frag_dir
+    frag_dir=$(mktemp -d -t wildclaw_reps.XXXXXX)
+    local frags=()
+    local rep_pids=()
+
+    # Dispatch K reps. PARALLEL_REPS=1 fans all K out at once (each rep lands in
+    # its own atomically-claimed run_N); =0 keeps the legacy sequential loop.
+    for (( i=1; i<=k; i++ )); do
+        local current=$(( current_base + i ))
+        local frag="${frag_dir}/rep_${i}.frag"
+        frags+=("$frag")
+        if (( PARALLEL_REPS == 1 )); then
+            run_one_rep "$task_path" "$model" "$i" "$current" "$total" "$frag" &
+            rep_pids+=($!)
+        else
+            run_one_rep "$task_path" "$model" "$i" "$current" "$total" "$frag"
+        fi
+    done
+
+    if (( PARALLEL_REPS == 1 )); then
+        for pid in "${rep_pids[@]}"; do
+            wait "$pid" || true
+        done
+    fi
+
+    # Fold per-rep fragments into the per-model result file consumed by main().
     local local_failed=0
     local local_recovered=0
     local local_failures=()
-
-    for (( i=1; i<=k; i++ )); do
-        local current=$(( current_base + i ))
-        run_one "$task_path" "$model" "$current" "$total"
-
-        if (( RUN_RC != 0 )); then
-            if is_docker_recoverable_error "$RUN_LOG"; then
-                attempt_docker_recovery
-                log::warn "Retrying run $current/$total after recovery (${model})"
-                run_one "$task_path" "$model" "$current" "$total"
-                if (( RUN_RC == 0 )); then
-                    local_recovered=$(( local_recovered + 1 ))
-                    log::ok "Run $current (${model}) succeeded after recovery"
-                else
-                    log::err "Run $current (${model}) failed after recovery (rc=$RUN_RC)"
-                    local_failed=$(( local_failed + 1 ))
-                    local_failures+=("${task_name}#${i}/${model} (rc=$RUN_RC after retry)")
-                fi
-            else
-                log::err "Run $current (${model}) failed (rc=$RUN_RC) — no retry"
-                log::hint "Tail of log ($RUN_LOG):"
-                tail -n 20 "$RUN_LOG" >&2 || true
-                local_failed=$(( local_failed + 1 ))
-                local_failures+=("${task_name}#${i}/${model} (rc=$RUN_RC)")
-            fi
-        else
-            log::ok "Run $current (${model}) completed"
-        fi
+    for frag in "${frags[@]}"; do
+        [[ -f "$frag" ]] || continue
+        while IFS='=' read -r key value; do
+            case "$key" in
+                failed)    local_failed=$(( local_failed + value )) ;;
+                recovered) local_recovered=$(( local_recovered + value )) ;;
+                failure)   local_failures+=("$value") ;;
+            esac
+        done < "$frag"
     done
+    rm -rf "$frag_dir"
 
     {
         printf 'failed=%d\n' "$local_failed"
@@ -557,6 +623,7 @@ parse_args() {
             --no-mock-stack)      USE_MOCK_STACK=0; shift ;;
             --no-bundle)          AUTO_BUNDLE=0; shift ;;
             --bundle-root)        BUNDLE_ROOT="$2"; shift 2 ;;
+            --parallel-reps)      PARALLEL_REPS=1; shift ;;
             --skip-preflight)     SKIP_PREFLIGHT=1; shift ;;
             --) shift; while (( $# > 0 )); do positional+=("$1"); shift; done ;;
             -*) log::err "Unknown flag: $1"; log::hint "Run 'bash script/run.sh --help' for usage"; exit 2 ;;
@@ -622,7 +689,7 @@ main() {
     log::kv "Mode"     "$MODE"
     log::kv "Tasks"    "${#TASKS[@]} (sequential)"
     log::kv "Models"   "${models[*]} ($( (( ${#models[@]} > 1 )) && echo 'parallel' || echo 'single' ))"
-    log::kv "Reps"     "$K per (task,model), sequential"
+    log::kv "Reps"     "$K per (task,model), $( (( PARALLEL_REPS == 1 )) && echo 'parallel' || echo 'sequential' )"
     log::kv "Backend"  "$BACKEND"
     log::kv "Thinking" "$THINKING"
     local feats=()
@@ -630,6 +697,7 @@ main() {
     (( USE_MOCK_STACK == 1 )) && feats+=("mock-stack")
     (( USE_TESTS == 1 ))      && feats+=("tests")
     (( JUDGE_COUNCIL == 1 ))  && feats+=("judge-council")
+    (( PARALLEL_REPS == 1 ))  && feats+=("parallel-reps")
     (( AUTO_BUNDLE == 1 ))    && feats+=("auto-bundle→${KENSEI_BUNDLE_ROOT:-$BUNDLE_ROOT}/")
     log::kv "Features" "${feats[*]:-none}"
     log::kv "Cwd"      "$(pwd)"

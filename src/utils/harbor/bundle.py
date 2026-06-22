@@ -392,7 +392,7 @@ def write_bundle(
         for run_index_offset, entry in enumerate(entries, start=1):
             # Honor a caller-supplied __run_index__ so the bundle writer lines
             # up with the harness's own run-number bookkeeping (eval/run_batch.py
-            # computes run_index via _next_run_index and creates run_N/ BEFORE
+            # computes run_index via _claim_run_dir and creates run_N/ BEFORE
             # write_bundle runs). Without this, enumerate(start=1) always wrote
             # to run_1/output.json and silently clobbered the prior run's copy,
             # leaving runs 1..N-1 with run_N's payload while every other per-run

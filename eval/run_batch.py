@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
 import logging
@@ -11,6 +12,7 @@ import subprocess
 import sys
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Mapping
@@ -527,15 +529,45 @@ def _model_type(model: str) -> str:
     return re.sub(r"[^a-z0-9.\-_]", "_", m)
 
 
-def _next_run_index(model_dir: Path) -> int:
+def _claim_run_dir(model_dir: Path) -> tuple[int, Path]:
+    """Atomically reserve the next run_N directory.
+
+    ``mkdir(exist_ok=False)`` is atomic on POSIX, so concurrent reps on the same
+    model_dir each claim a distinct index instead of racing on a scan-then-mkdir
+    (the old ``_next_run_index`` + ``mkdir(exist_ok=True)`` pattern let two reps
+    both pick run_1 and clobber one another).
+    """
+    model_dir.mkdir(parents=True, exist_ok=True)
     i = 1
-    while (model_dir / f"run_{i}").exists():
-        i += 1
-    return i
+    while True:
+        candidate = model_dir / f"run_{i}"
+        try:
+            candidate.mkdir(exist_ok=False)   # raises if another rep took it
+            return i, candidate
+        except FileExistsError:
+            i += 1
+
+
+@contextmanager
+def _locked(lock_path: Path):
+    """Hold an exclusive advisory lock for the duration of the block.
+
+    ``fcntl.flock`` is advisory and cross-process on the same host — enough to
+    serialize the read-modify-write of shared per-model files (pass_summary.json)
+    when reps for one (task, model) run in parallel.
+    """
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(lock_path, "w") as fh:
+        fcntl.flock(fh, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(fh, fcntl.LOCK_UN)
 
 
 def _write_pass_summary(model_dir: Path, model_type: str, run_index: int, reward,
                         scores: dict | None = None) -> None:
+  with _locked(model_dir / ".pass_summary.lock"):
     p = model_dir / "pass_summary.json"
     existing = {}
     if p.is_file():
@@ -1178,9 +1210,7 @@ def run_single_task(
     model_type = _model_type(model)
     task_bundle_dir = output_root / task_id_ori
     model_dir = task_bundle_dir / "trajectories" / model_type
-    run_index = _next_run_index(model_dir)
-    output_dir = model_dir / f"run_{run_index}"
-    output_dir.mkdir(parents=True, exist_ok=True)
+    run_index, output_dir = _claim_run_dir(model_dir)
 
     result = {"task_id": task_id, "scores": {}, "error": None}
 
