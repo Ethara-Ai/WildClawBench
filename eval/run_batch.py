@@ -661,7 +661,7 @@ def _next_run_index(model_dir: Path) -> int:
 
 
 def _write_pass_summary(model_dir: Path, model_type: str, run_index: int, reward,
-                        scores: dict | None = None) -> None:
+                        scores: dict | None = None, test_reward: float | None = None) -> None:
     p = model_dir / "pass_summary.json"
     existing = {}
     if p.is_file():
@@ -679,6 +679,8 @@ def _write_pass_summary(model_dir: Path, model_type: str, run_index: int, reward
     crit_failed = int(s.get("criteria_failed", s.get("tests_failed", 0)) or 0)
     reward_f = float(reward) if isinstance(reward, (int, float)) else 0.0
     pct = float(s.get("rubric_weights_percentage", reward_f * 100.0) or 0.0)
+    tw_f = round(float(test_reward) * 100.0, 2) if isinstance(test_reward, (int, float)) else 0.0
+    combined_f = round((tw_f + pct) / 2.0, 2)
     per_run.append({
         "run_index": run_index,
         "criteria_total": crit_total,
@@ -689,16 +691,24 @@ def _write_pass_summary(model_dir: Path, model_type: str, run_index: int, reward
         "tests_failed": crit_failed,
         "reward": reward_f,
         "rubric_weights_percentage": round(pct, 2),
+        "test_weights_percentage": tw_f,
+        "combined_score": combined_f,
     })
     per_run.sort(key=lambda r: r["run_index"])
     rewards = [r["reward"] for r in per_run]
     pcts = [r.get("rubric_weights_percentage", r["reward"] * 100.0) for r in per_run]
+    tw_pcts = [r.get("test_weights_percentage", 0.0) for r in per_run]
+    combined_scores = [r.get("combined_score", round((r.get("test_weights_percentage", 0.0) + r.get("rubric_weights_percentage", r["reward"] * 100.0)) / 2.0, 2)) for r in per_run]
     avg_reward = (sum(rewards) / len(rewards)) if rewards else 0.0
     avg_pct = (sum(pcts) / len(pcts)) if pcts else 0.0
+    avg_tw = (sum(tw_pcts) / len(tw_pcts)) if tw_pcts else 0.0
+    avg_combined = (sum(combined_scores) / len(combined_scores)) if combined_scores else 0.0
     p.write_text(json.dumps({
         "model": model_type, "runs": len(per_run),
         "average_reward": avg_reward,
         "average_rubric_weights_percentage": round(avg_pct, 2),
+        "average_test_weights_percentage": round(avg_tw, 2),
+        "average_combined_score": round(avg_combined, 2),
         "per_run": per_run,
     }, indent=2), encoding="utf-8")
 
@@ -1034,9 +1044,10 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
             except OSError:
                 pass
 
+    test_reward = (result.get("test_result") or {}).get("reward")
     reward = (result.get("scores") or {}).get("overall_score")
     _write_pass_summary(task_bundle_dir / "trajectories" / model_type, model_type,
-                        run_index, reward, scores=result.get("scores") or {})
+                        run_index, reward, scores=result.get("scores") or {}, test_reward=test_reward)
 
     # Copy the bundle inputs to the task root (kensei out/<task_id>/ layout).
     import shutil

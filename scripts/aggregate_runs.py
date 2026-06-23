@@ -55,6 +55,20 @@ def _criteria_counts(score: dict) -> tuple[int, int, int]:
     return int(total), int(passed), int(failed)
 
 
+def _test_weights_pct_from_pass_summary(score_path: Path, run_idx: int) -> float | None:
+    ps_path = score_path.parent.parent / "pass_summary.json"
+    try:
+        data = json.loads(ps_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    for r in data.get("per_run", []):
+        if r.get("run_index") == run_idx:
+            v = r.get("test_weights_percentage")
+            if isinstance(v, (int, float)):
+                return float(v)
+    return None
+
+
 def _walk_score_files(output_root: Path, backend_filter: str | None) -> Iterable[tuple[str, str, str, int, Path]]:
     # Yields (backend, task_id, model, run_index, score_path).  Path layout per
     # `_write_pass_summary` in eval/run_batch.py.
@@ -87,9 +101,10 @@ def _walk_score_files(output_root: Path, backend_filter: str | None) -> Iterable
 
 
 def aggregate(output_root: Path, backend_filter: str | None = None) -> dict:
-    # per_task_model[(backend, task, model)] = list of {run, pct, total, passed, failed}
     per_task_model: dict[tuple[str, str, str], list[dict]] = defaultdict(list)
     per_model: dict[tuple[str, str], list[float]] = defaultdict(list)
+    per_model_tw: dict[tuple[str, str], list[float]] = defaultdict(list)
+    per_model_combined: dict[tuple[str, str], list[float]] = defaultdict(list)
 
     for backend, task_id, model, run_idx, score_path in _walk_score_files(output_root, backend_filter):
         score = _read_score(score_path)
@@ -99,9 +114,14 @@ def aggregate(output_root: Path, backend_filter: str | None = None) -> dict:
         if pct is None:
             continue
         total, passed, failed = _criteria_counts(score)
+        tw_raw = _test_weights_pct_from_pass_summary(score_path, run_idx)
+        tw_val = tw_raw if tw_raw is not None else 0.0
+        combined_score = round((pct + tw_val) / 2.0, 2)
         entry = {
             "run": run_idx,
             "rubric_weights_percentage": round(pct, 2),
+            "test_weights_percentage": round(tw_val, 2),
+            "combined_score": combined_score,
             "criteria_total": total,
             "criteria_passed": passed,
             "criteria_failed": failed,
@@ -109,12 +129,9 @@ def aggregate(output_root: Path, backend_filter: str | None = None) -> dict:
         }
         per_task_model[(backend, task_id, model)].append(entry)
         per_model[(backend, model)].append(pct)
+        per_model_tw[(backend, model)].append(tw_val)
+        per_model_combined[(backend, model)].append(combined_score)
 
-    # Per (backend, model): collect per-task pass@K values for eval-aggregate
-    # rollup per walkthrough §4: 'eval-aggregate = mean of per-task pass@K values'.
-    # Distinct from per_model[(backend, model)] which is mean of ALL runs (user
-    # m1420 line 3). pass@K rewards the model for ever having succeeded; mean
-    # rewards consistency. Both are reported; neither replaces the other.
     per_model_pass_at_k: dict[tuple[str, str], list[float]] = defaultdict(list)
 
     summary = {
@@ -123,6 +140,8 @@ def aggregate(output_root: Path, backend_filter: str | None = None) -> dict:
     }
     for (backend, task, model), runs in sorted(per_task_model.items()):
         pcts = [r["rubric_weights_percentage"] for r in runs]
+        tw_pcts = [r["test_weights_percentage"] for r in runs]
+        combined_scores = [r["combined_score"] for r in runs]
         pass_at_k = max(pcts)
         per_model_pass_at_k[(backend, model)].append(pass_at_k)
         summary["by_task_model"].append({
@@ -133,24 +152,24 @@ def aggregate(output_root: Path, backend_filter: str | None = None) -> dict:
             "run_count": len(runs),
             "average_rubric_weights_percentage": round(statistics.fmean(pcts), 2),
             "stddev_rubric_weights_percentage": round(statistics.pstdev(pcts), 2) if len(pcts) > 1 else 0.0,
-            # Walkthrough §4 pass@K: best-of-K rollout per task. K = run_count.
+            "average_test_weights_percentage": round(statistics.fmean(tw_pcts), 2),
+            "average_combined_score": round(statistics.fmean(combined_scores), 2),
             "pass_at_k": round(pass_at_k, 2),
             "k": len(pcts),
         })
     for (backend, model), pcts in sorted(per_model.items()):
         task_pass_at_k_values = per_model_pass_at_k[(backend, model)]
+        tw_pcts = per_model_tw[(backend, model)]
+        combined_scores = per_model_combined[(backend, model)]
         summary["by_model"].append({
             "backend": backend,
             "model": model,
             "run_count": len(pcts),
             "task_count": len(task_pass_at_k_values),
-            # User formula m1420 line 3: mean over ALL runs of this model.
             "average_rubric_weights_percentage": round(statistics.fmean(pcts), 2),
             "stddev_rubric_weights_percentage": round(statistics.pstdev(pcts), 2) if len(pcts) > 1 else 0.0,
-            # Walkthrough §4 eval-aggregate: mean of per-task pass@K values.
-            # Each task contributes its best run; this is the headline 'how good
-            # is this model when it tries' number, complementary to the typical
-            # 'how good on average' average_rubric_weights_percentage.
+            "average_test_weights_percentage": round(statistics.fmean(tw_pcts), 2) if tw_pcts else 0.0,
+            "average_combined_score": round(statistics.fmean(combined_scores), 2) if combined_scores else 0.0,
             "average_pass_at_k": round(statistics.fmean(task_pass_at_k_values), 2) if task_pass_at_k_values else 0.0,
             "stddev_pass_at_k": round(statistics.pstdev(task_pass_at_k_values), 2) if len(task_pass_at_k_values) > 1 else 0.0,
         })
