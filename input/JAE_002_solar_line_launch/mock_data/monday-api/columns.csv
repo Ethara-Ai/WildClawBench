@@ -1,0 +1,3 @@
+column_id,board_id,title,type,position
+c_units,b_harbor,Units,text,1
+c_status,b_harbor,Status,status,2

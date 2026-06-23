@@ -1,0 +1,4 @@
+uuid,owner,event_type,name,status,start_time,end_time,location_type,location,created_at,canceled_reason
+ce_sarah,jae@chandlerelectric.com,et_solar_visit,Solar Site Visit — Sarah Kapadia,active,2026-10-14T10:00:00-05:00,2026-10-14T11:00:00-05:00,physical,Bay View,2026-10-11T09:00:00Z,
+ce_dale,jae@chandlerelectric.com,et_solar_visit,Solar Site Visit — Dale Brennan,active,2026-10-14T13:30:00-05:00,2026-10-14T14:30:00-05:00,physical,Greenfield,2026-10-11T09:00:00Z,
+ce_emma,jae@chandlerelectric.com,et_solar_visit,Solar Site Visit — Emma Kowalski,active,2026-10-14T16:30:00-05:00,2026-10-14T17:30:00-05:00,physical,Wauwatosa,2026-10-11T09:00:00Z,

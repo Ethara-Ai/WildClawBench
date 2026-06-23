@@ -1,0 +1,14 @@
+tableId,id,name,type
+tblContacts,fldName,Name,singleLineText
+tblContacts,fldEmail,Email,email
+tblContacts,fldCompany,Company,singleLineText
+tblContacts,fldRole,Role,singleLineText
+tblProjects,fldPName,Name,singleLineText
+tblProjects,fldPStatus,Status,singleSelect
+tblProjects,fldPOwner,Owner,singleLineText
+tblProjects,fldPBudget,Budget,number
+tblTasks,fldTName,Name,singleLineText
+tblTasks,fldTStatus,Status,singleSelect
+tblTasks,fldTProject,Project,singleLineText
+tblTasks,fldTEst,EstimateHours,number
+tblTasks,fldTDone,Done,checkbox

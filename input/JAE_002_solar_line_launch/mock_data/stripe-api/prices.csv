@@ -1,0 +1,2 @@
+id,product,unit_amount,currency,recurring_interval,active,nickname
+price_deposit,prod_solar_deposit,250000,usd,,true,Deposit

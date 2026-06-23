@@ -1,0 +1,2 @@
+sid,from_number,to_number,body,status,direction,num_segments,price,price_unit,error_code,date_sent,date_created
+SM_seed,+14145556289,+14145556289,(channel check),delivered,outbound-api,1,-0.0075,USD,,2026-10-11T08:00:00Z,2026-10-11T08:00:00Z

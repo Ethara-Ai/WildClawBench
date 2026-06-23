@@ -1,0 +1,4 @@
+Id,DisplayName,GivenName,FamilyName,CompanyName,PrimaryEmailAddr,PrimaryPhone,BillAddr_Line1,BillAddr_City,BillAddr_CountrySubDivisionCode,BillAddr_PostalCode,Balance,Active,Job,Notes
+1,Havlik General Contracting,Greg,Havlik,Havlik GC,greg.havlik@havlikgc.com,+14145556677,1400 W National Ave,Milwaukee,WI,53204,85000.0,true,Harborview,Largest contract
+2,Sarah Kapadia,Sarah,Kapadia,,sarah.kapadia@gmail.com,+14145558010,2100 S Kinnickinnic Ave,Milwaukee,WI,53207,0,true,Solar lead,
+3,Brennan Properties,Dale,Brennan,Brennan Properties,dale@brennanproperties.com,+14145558011,5000 W Loomis Rd,Greenfield,WI,53220,0,true,Solar lead,
