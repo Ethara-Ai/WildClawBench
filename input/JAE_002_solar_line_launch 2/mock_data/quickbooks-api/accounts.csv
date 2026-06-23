@@ -1,4 +1,0 @@
-Id,Name,AccountType,AccountSubType,CurrentBalance,Active,Classification,Description
-40,Services,Income,ServiceFeeIncome,0,true,Revenue,Service revenue
-60,Checking,Bank,Checking,42180.55,true,Asset,Business checking
-70,Estimated Taxes Payable,Other Current Liability,OtherCurrentLiabilities,18450.0,true,Liability,Q3 estimated tax balance owed

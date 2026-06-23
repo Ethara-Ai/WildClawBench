@@ -1,4 +1,0 @@
-baseId,id,name,primaryFieldId,records_csv
-appCHANDLER01,tblContacts,Contacts,fldName,records_contacts.csv
-appCHANDLER01,tblProjects,Projects,fldPName,records_projects.csv
-appCHANDLER01,tblTasks,Leads Board,fldTName,records_tasks.csv

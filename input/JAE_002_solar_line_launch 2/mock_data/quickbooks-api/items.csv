@@ -1,4 +1,0 @@
-Id,Name,Description,Type,UnitPrice,IncomeAccountRef_value,IncomeAccountRef_name,Active,Taxable
-10,Panel Upgrade,200A panel replacement labor+material,Service,3200,40,Services,true,true
-11,Solar Install,12-panel residential solar + inverter,Service,0,40,Services,true,true
-12,Service Call,Standard service call,Service,150,40,Services,true,true

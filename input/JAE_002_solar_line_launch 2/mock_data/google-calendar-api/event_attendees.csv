@@ -1,5 +1,0 @@
-event_id,email,display_name,response_status,optional,organizer
-evt_yuna,mina.chandler.home@gmail.com,Mina Chandler,accepted,false,false
-evt_visit_sarah,sarah.kapadia@gmail.com,Sarah Kapadia,accepted,false,false
-evt_visit_dale,dale@brennanproperties.com,Dale Brennan,accepted,false,false
-evt_visit_emma,emma.kowalski@gmail.com,Emma Kowalski,accepted,false,false
