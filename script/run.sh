@@ -284,8 +284,55 @@ preflight_env_file() {
 
 # Removes containers and networks that survived a prior crashed batch.
 # Names match conventions used by start_litellm/start_mock_stack/_start_task_mock_stack.
+# --- active-run registry (concurrency safety for cleanup_orphans) -------------
+# Each run.sh registers a PID marker so cleanup_orphans() can tell whether OTHER
+# run.sh processes are live. The global orphan sweep removes ALL k3net-*/ll-/
+# mocks-/t_ resources BY NAME, so under `xargs -P N` it would tear down a
+# concurrent run's LIVE stack (seen as 'No such container: mocks-task-...' and
+# 'network k3net-... not found'). We therefore sweep ONLY when this is the sole
+# active run; concurrent runs skip it and leave any leftovers for the last run
+# to finish (or stale-PID pruning) to reap.
+readonly RUN_REGISTRY="${TMPDIR:-/tmp}/wcb-active-runs"
+RUN_MARKER=""
+
+register_run() {
+    mkdir -p "$RUN_REGISTRY" 2>/dev/null || true
+    RUN_MARKER="$RUN_REGISTRY/$$"
+    : > "$RUN_MARKER" 2>/dev/null || true
+}
+
+cleanup_run_marker() {
+    [[ -n "$RUN_MARKER" ]] && rm -f "$RUN_MARKER" 2>/dev/null || true
+}
+
+# Returns 0 if ANOTHER live run.sh holds a marker; prunes markers of dead PIDs.
+other_runs_active() {
+    [[ -d "$RUN_REGISTRY" ]] || return 1
+    local m pid rc=1
+    for m in "$RUN_REGISTRY"/*; do
+        [[ -e "$m" ]] || continue
+        pid="${m##*/}"
+        [[ "$pid" == "$$" ]] && continue
+        if [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null; then
+            rc=0                                   # a live peer exists
+        else
+            rm -f "$m" 2>/dev/null || true         # stale marker from a dead run
+        fi
+    done
+    return $rc
+}
+
 cleanup_orphans() {
     log::step 5 5 "Orphan cleanup"
+
+    # Concurrency guard: never run the destructive global sweep while a peer
+    # run.sh is alive — it would force-remove the peer's live containers/network.
+    if other_runs_active; then
+        log::warn "Other run.sh process(es) active — SKIPPING global orphan sweep"
+        log::info "(concurrency-safe: avoids tearing down a peer's live stack)"
+        log::ok "Cleanup skipped"
+        return 0
+    fi
 
     local containers
     containers=$(docker ps -aq --filter 'name=ll-' --filter 'name=mocks-' --filter 'name=t_' 2>/dev/null || true)
@@ -702,6 +749,11 @@ main() {
     log::kv "Features" "${feats[*]:-none}"
     log::kv "Cwd"      "$(pwd)"
 
+    # Register this run so concurrent run.sh processes don't sweep each other's
+    # live docker resources (see cleanup_orphans / other_runs_active).
+    register_run
+    trap 'cleanup_run_marker' EXIT
+
     if (( SKIP_PREFLIGHT == 0 )); then
         log::rule "Preflight checks"
         preflight_docker || exit 1
@@ -722,7 +774,7 @@ main() {
 
     local tmpdir
     tmpdir=$(mktemp -d -t wildclaw_runsh.XXXXXX)
-    trap 'rm -rf "$tmpdir"' EXIT
+    trap 'rm -rf "$tmpdir"; cleanup_run_marker' EXIT
 
     log::rule "Executing ${total} run(s)"
 
