@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import contextlib
+import fcntl
 import hashlib
 import json
 import logging
@@ -221,8 +223,45 @@ CMD ["/start.sh"]
 """
 
 
+@contextlib.contextmanager
+def _mock_build_lock():
+    """Serialize concurrent mock-image builds ACROSS processes (flock).
+
+    Under `xargs -P N`, several run.sh / run_batch processes can find the image
+    stale at the same instant and all launch `docker build kensei3-mocks:v1`
+    simultaneously — wasting 5-10 min each and racing on the shared tag. An
+    exclusive cross-process file lock makes them build one-at-a-time; the
+    staleness re-check inside the locked body (docker image inspect + content
+    hash) then turns every waiter after the first into a no-op. Best-effort: if
+    flock is unavailable (non-POSIX), proceed without locking.
+    """
+    lock_path = Path(tempfile.gettempdir()) / "kensei3-mocks-build.lock"
+    try:
+        lf = open(lock_path, "w")  # noqa: SIM115
+    except OSError:
+        yield
+        return
+    try:
+        fcntl.flock(lf, fcntl.LOCK_EX)
+        yield
+    finally:
+        try:
+            fcntl.flock(lf, fcntl.LOCK_UN)
+        finally:
+            lf.close()
+
+
 def build_mock_image_if_needed(env_dir: Path, image: str = MOCK_IMAGE,
                                force: bool = False) -> bool:
+    # Cross-process build serialization: only one builder at a time. The locked
+    # body re-checks staleness first, so concurrent runs that arrive after the
+    # first builder finishes find the image current and skip the rebuild.
+    with _mock_build_lock():
+        return _build_mock_image_locked(env_dir, image, force)
+
+
+def _build_mock_image_locked(env_dir: Path, image: str = MOCK_IMAGE,
+                             force: bool = False) -> bool:
     # Opt-in rebuild: the cached image otherwise serves whatever mock server
     # code / baseline CSVs existed when it was first built, so edits under
     # environment/ are silently ignored until the tag is removed. force=True
