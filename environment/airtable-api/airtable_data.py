@@ -104,7 +104,7 @@ for _t in _tables:
     _store.register(
         _records_table_name(_t["id"]),
         primary_key="id",
-        initial_loader=(lambda tid=_t["id"], json_name=_t["records_json"], tname=_records_table_name(_t["id"]):
+        initial_loader=(lambda tid=_t["id"], json_name=_t["records_csv"], tname=_records_table_name(_t["id"]):
                         _coerce_records(tid, _load(json_name, tname))),
     )
 

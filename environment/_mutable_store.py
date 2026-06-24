@@ -234,7 +234,11 @@ def read_seed_with_ctx(path: Any, api: str, table: str) -> List[Row]:
       * If *path* has an explicit ``.json`` or ``.csv`` suffix, a sibling file
         with the OTHER suffix is checked first; a sibling ``.csv`` ALWAYS wins
         over a baked ``.json`` (so a bind-mounted CSV overlay shadows the
-        baked-in JSON without any callsite change).
+        baked-in JSON without any callsite change). Symmetrically, a requested
+        ``.csv`` that does not exist falls back to a sibling ``.json`` -- so a
+        config value carrying a ``.csv`` suffix still resolves against a
+        ``.json`` seed (the common case for generated task overlays, whose
+        configs name ``records_*.csv`` but ship ``records_*.json``).
       * If *path* has no suffix, ``.csv`` is probed before ``.json``.
       * :class:`CoerceError` is raised if no candidate file exists.
     """
@@ -247,6 +251,11 @@ def read_seed_with_ctx(path: Any, api: str, table: str) -> List[Row]:
             return read_csv_with_ctx(csv_sibling, api, table)
         return read_json_with_ctx(p, api, table)
     if ext == ".csv":
+        if p.exists():
+            return read_csv_with_ctx(p, api, table)
+        json_sibling = p.with_suffix(".json")
+        if json_sibling.exists():
+            return read_json_with_ctx(json_sibling, api, table)
         return read_csv_with_ctx(p, api, table)
     # No suffix: probe .csv first (overlay-wins), then .json
     csv_path = p.with_suffix(".csv")

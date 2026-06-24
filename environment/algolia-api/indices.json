@@ -1,7 +1,7 @@
 [
   {
     "name": "products",
-    "records_json": "records_products.json",
+    "records_csv": "records_products.json",
     "entries": "8",
     "data_size": "4096",
     "created_at": "2025-09-01T10:00:00.000Z",
@@ -9,7 +9,7 @@
   },
   {
     "name": "docs",
-    "records_json": "records_docs.json",
+    "records_csv": "records_docs.json",
     "entries": "6",
     "data_size": "3072",
     "created_at": "2025-09-01T10:00:00.000Z",
