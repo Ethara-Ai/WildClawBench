@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import mimetypes
 import re
 from pathlib import Path
@@ -10,6 +11,7 @@ from dotenv import load_dotenv
 import yaml
 
 load_dotenv()
+logger = logging.getLogger(__name__)
 # Resolve task-relative paths from repository root, not src/.
 ROOT_DIR = Path(__file__).resolve().parents[2]
 
@@ -247,10 +249,17 @@ def _attach_drift_script(task: dict, task_dir: Path) -> dict:
     inject_dir = task_dir / "inject"
     if inject_dir.is_dir():
         task["inject_path"] = str(inject_dir.resolve())
-    # multi_agent.* config opt-in (sub-agent spawning). task_config.yaml wins if
-    # present; otherwise synthesize from prompts.txt by scanning for "Multi-Agent"
-    # turn-header labels so tasks can ship without a config file. Convention:
-    # checker_id = "T<turn_index>_MA", aggregate "MA_C1", min_subagents=2.
+    # multi_agent.* config opt-in (sub-agent spawning). Resolution order, highest
+    # precedence first:
+    #   1. task_config.yaml `multi_agent:` block (explicit, full control).
+    #   2. task.yaml `multi_agent_complex_turns: [<1-indexed turn>, ...]` — the
+    #      config-driven path: fan-out fires (and is scored) on the turns the
+    #      author marked complex, with NO "Multi-Agent" token in the prompts.txt
+    #      header required.
+    #   3. Legacy fallback: scan prompts.txt for "Multi-Agent" turn-header labels
+    #      so older tasks keep working.
+    # All three emit the same shape: checker_id = "T<turn_index>_MA", aggregate
+    # "MA_C1", min_subagents=2.
     task["multi_agent_config"] = {}
     task["multi_agent_enabled"] = False
     cfg_path = task_dir / "task_config.yaml"
@@ -264,6 +273,16 @@ def _attach_drift_script(task: dict, task_dir: Path) -> dict:
                     task["multi_agent_enabled"] = bool(ma.get("enabled"))
         except (yaml.YAMLError, OSError):
             pass
+    if not task["multi_agent_enabled"]:
+        n_turns = len(task.get("turn_messages") or []) or None
+        synth = _multi_agent_config_from_complex_turns(
+            task.get("multi_agent_complex_turns"),
+            num_turns=n_turns,
+            task_id=task.get("task_id") or task.get("name"),
+        )
+        if synth.get("enabled"):
+            task["multi_agent_config"] = synth
+            task["multi_agent_enabled"] = True
     if not task["multi_agent_enabled"]:
         synth = _synthesize_multi_agent_config(task_dir)
         if synth.get("enabled"):
@@ -299,6 +318,59 @@ def _synthesize_multi_agent_config(task_dir: Path) -> dict:
         "expected_per_turn": {
             str(idx): {"min_subagents": 2, "checker_id": f"T{idx}_MA"}
             for idx in ma_turns
+        },
+        "aggregate_checker_id": "MA_C1",
+    }
+
+
+def _multi_agent_config_from_complex_turns(
+    complex_turns: Any,
+    num_turns: int | None = None,
+    *,
+    task_id: str | None = None,
+    min_subagents: int = 2,
+) -> dict:
+    """Derive a multi_agent config from task.yaml ``multi_agent_complex_turns``.
+
+    ``complex_turns`` are 1-indexed turn numbers matching the prompts.txt
+    ``--- TURN T<n> ---`` headers; the openclaw runner exposes 0-indexed
+    ``turn_index`` (and spawn_tree.jsonl rows carry that), so we subtract 1. The
+    returned shape is identical to :func:`_synthesize_multi_agent_config` so
+    downstream scoring (``spawn_tree_checks.build_checker_state``) is unchanged —
+    only the *source* of the config differs (config key vs. prompts.txt token).
+
+    When ``num_turns`` is known, a configured turn that exceeds the actual turn
+    count is kept (so the author's intent is honoured) but logged loudly: such a
+    turn can never spawn, so its ``T<idx>_MA`` checker and the ``MA_C1``
+    aggregate will fail until task.yaml / prompts.txt / the config agree.
+    """
+    if not isinstance(complex_turns, (list, tuple)):
+        return {}
+    idxs: set[int] = set()
+    for n in complex_turns:
+        try:
+            idx = int(n) - 1
+        except (TypeError, ValueError):
+            continue
+        if idx < 0:
+            continue
+        if num_turns is not None and idx >= num_turns:
+            logger.warning(
+                "[%s] multi_agent_complex_turns lists turn %s but prompts.txt "
+                "has only %d turn(s); turn_index %d can never spawn, so checker "
+                "T%d_MA and the MA_C1 aggregate will fail. Align task.yaml "
+                "`turns` / prompts.txt / `multi_agent_complex_turns`.",
+                task_id or "?", n, num_turns, idx, idx,
+            )
+        idxs.add(idx)
+    if not idxs:
+        return {}
+    return {
+        "enabled": True,
+        "default_allowed_tools": ["Read", "Write", "Edit", "Bash", "Grep", "Glob"],
+        "expected_per_turn": {
+            str(idx): {"min_subagents": min_subagents, "checker_id": f"T{idx}_MA"}
+            for idx in sorted(idxs)
         },
         "aggregate_checker_id": "MA_C1",
     }
@@ -610,6 +682,10 @@ def _load_yaml_task(path: Path) -> dict:
         # them in preference to inference so only the task's APIs spin up.
         "required_apis_declared": raw.get("required_apis"),
         "distractor_apis_declared": raw.get("distractor_apis"),
+        # 1-indexed turn numbers the author marked as needing sub-agent fan-out.
+        # _attach_drift_script turns this into the multi_agent_config / scoring
+        # checkers — no "Multi-Agent" token in the prompts.txt header required.
+        "multi_agent_complex_turns": raw.get("multi_agent_complex_turns"),
         # Per-turn wake-up script (Talos inject-format) loaded from prompts.txt;
         # empty for single-prompt tasks. run_batch feeds these to the multi-turn
         # runner / inject director.

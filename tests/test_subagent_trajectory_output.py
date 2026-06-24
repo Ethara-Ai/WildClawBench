@@ -22,6 +22,7 @@ from src.utils.trajectory.builder import build_published_trajectory  # noqa: E40
 from src.utils.spawn_tree_checks import build_checker_state  # noqa: E402
 from src.utils.task_parser import (  # noqa: E402
     _synthesize_multi_agent_config,
+    _multi_agent_config_from_complex_turns,
     _attach_drift_script,
 )
 
@@ -120,3 +121,40 @@ def test_task_parser_no_multi_agent_disabled(tmp_path):
     task = _attach_drift_script({}, tmp_path)
     assert task["multi_agent_enabled"] is False
     assert task["multi_agent_config"] == {}
+
+
+def test_complex_turns_helper_shape():
+    # 1-indexed task.yaml turns -> 0-indexed checkers, same shape as the token path.
+    cfg = _multi_agent_config_from_complex_turns([1, 4], num_turns=4)
+    assert cfg["enabled"] is True
+    assert set(cfg["expected_per_turn"]) == {"0", "3"}
+    assert cfg["expected_per_turn"]["0"]["checker_id"] == "T0_MA"
+    assert cfg["expected_per_turn"]["3"]["checker_id"] == "T3_MA"
+    assert cfg["expected_per_turn"]["0"]["min_subagents"] == 2
+    assert cfg["aggregate_checker_id"] == "MA_C1"
+
+
+def test_complex_turns_empty_or_bad_input_disabled():
+    assert _multi_agent_config_from_complex_turns(None) == {}
+    assert _multi_agent_config_from_complex_turns([]) == {}
+    assert _multi_agent_config_from_complex_turns("nope") == {}
+
+
+def test_complex_turns_out_of_range_kept(caplog):
+    # A configured turn beyond the actual turn count is honoured (kept) but warned;
+    # it can never spawn, so the author is told to align turns / prompts / config.
+    cfg = _multi_agent_config_from_complex_turns([1, 4], num_turns=1)
+    assert set(cfg["expected_per_turn"]) == {"0", "3"}
+
+
+def test_task_parser_enables_from_complex_turns_config(tmp_path):
+    # No "Multi-Agent" token anywhere -- enablement comes from the config key.
+    (tmp_path / "prompts.txt").write_text(
+        "--- TURN T1 (Day 1, 05:30) ---\nrun the whole thing\n"
+    )
+    task = {"multi_agent_complex_turns": [1], "turn_messages": ["run the whole thing"]}
+    out = _attach_drift_script(task, tmp_path)
+    assert out["multi_agent_enabled"] is True
+    cfg = out["multi_agent_config"]
+    assert cfg["expected_per_turn"]["0"]["checker_id"] == "T0_MA"
+    assert cfg["aggregate_checker_id"] == "MA_C1"
