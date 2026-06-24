@@ -77,14 +77,14 @@ N. <verbatim criterion>
 
 Polarity rule per walkthrough §2: `SATISFIED` always reflects the criterion text literally. If the criterion is "agent sent duplicate messages", `SATISFIED: Yes` means the agent ACTUALLY DID send duplicates. The aggregator translates `satisfied × weight_sign` into `passed`.
 
-**Aggregator (council):** **Partial-coverage majority vote per criterion** (b82+b83). Each criterion has its own voter pool: a judge votes on criterion `i` only if it emitted a verdict at index `i`. Smaller-context judges (Kimi 256k, GLM 200k) often truncate before the rubric ends. Threshold per criterion = `(voters+1)//2` (3-voter → 2 Yes, 2-voter → 1 Yes, 1-voter → 1 Yes). Tie → Yes. If 0 voters → criterion abstains (contributes 0 to numerator and 0 to passed). If fewer than 2 members parse-OK overall, council returns None and single-judge fallback runs.
+**Aggregator (council):** **Unanimous, else Sonnet source-of-truth tiebreak** per criterion (b82+b83). For each criterion index `i`: (1) **Unanimous** — if every configured member voted at `i` AND all agree on `SATISFIED`, use that verdict (`resolved_by="unanimous"`). (2) **Else Sonnet** — if the Sonnet member (located by stable family `sonnet`, never the rotating ARN) emitted a verdict at `i`, Sonnet's verdict IS the criterion verdict (`resolved_by="sonnet"`). This deliberately covers BOTH a genuine Yes/No split (all voted, disagree) AND partial coverage (a smaller-context judge — Kimi 256k, GLM 200k — truncated/failed and never reached `i`); Sonnet has full context and is the source of truth. NOT counted as abstained. (3) **Else Human Evaluation** — no unanimity AND Sonnet itself cast no verdict at `i` (Sonnet failed entirely, or rarely truncated): `i` is appended to `abstention_flags`, counted in `criteria_abstained`, contributes 0 to the numerator (`resolved_by="human_eval"`, `human_eval="required"`). If the roster has no sonnet member, `sonnet_idx` is None and all non-unanimous criteria abstain (a warning is logged). If fewer than 2 members parse-OK overall, council returns None and single-judge fallback runs.
 
-Rationale (user m1543 verbatim): _"not every model has the same input context and is not judging on all rubrics except Sonnet, then why enforce this? Just have it done."_ Strict equal-coverage was abandoned because it artificially invented No-votes the model did not cast.
+Rationale (user m1543 verbatim): _"not every model has the same input context and is not judging on all rubrics except Sonnet, then why enforce this? Just have it done."_ Strict equal-coverage was abandoned because it artificially invented No-votes the model did not cast; rather than break ties or fill gaps by majority, Sonnet — the only member guaranteed full context — is now the source of truth that resolves both genuine disagreements and partial coverage. Pure abstention (Human Evaluation) is reserved for when Sonnet itself produced no verdict.
 
 **Reward formula (walkthrough §4, equivalent to user m1420 line 1):**
 
 ```
-weighted = Σ weight for each criterion where satisfied_majority = True
+weighted = Σ weight for each criterion where the resolved satisfied = True
 total_positive = Σ weight for each criterion where weight > 0
 overall_score = max(0.0, min(1.0, weighted / total_positive))
 ```
@@ -99,9 +99,9 @@ This collapses to the user m1420 formula because `satisfied=True` on a negative-
 - `criteria_total`, `criteria_passed`, `criteria_failed`, `criteria_abstained` — counts of rubric criteria. **Invariant:** `criteria_total == criteria_passed + criteria_failed + criteria_abstained`.
 - `criteria[]` — per-criterion breakdown (see below)
 - `judge_model` — `'council'` if ≥2 council members survived parsing, else ARN/model string
-- `judge_council` — present only when council ran. Contains: `members`, `surviving`, `failed`, `aggregation: 'majority_vote_partial_coverage'` (b82), `per_member_user_chars`, `per_member_verdict_count` (b82) showing how many criteria each council member actually covered before truncation
+- `judge_council` — present only when council ran. Contains: `members`, `surviving`, `failed`, `aggregation: 'unanimous_or_sonnet_tiebreak'` (b82), `per_member_user_chars`, `per_member_verdict_count` (b82) showing how many criteria each council member actually covered before truncation (Sonnet's coverage is load-bearing — it resolves every non-unanimous criterion it reaches)
 - `truncation_flags` — criterion ids where any judge flagged `TRUNCATION_AFFECTED: Yes`. Diagnostic only; does not affect score.
-- `abstention_flags` (b82) — criterion ids where 0 judges emitted a verdict. Diagnostic only; abstained criteria contribute 0 to `weighted` AND are NOT counted in `criteria_passed` or `criteria_failed`.
+- `abstention_flags` (b82) — criterion ids that fell through to **Human Evaluation**: non-unanimous AND Sonnet emitted no verdict (`resolved_by="human_eval"`, `human_eval="required"`). A criterion where Kimi/GLM abstained but Sonnet voted is NOT abstained (it is resolved by Sonnet). These are counted in `criteria_abstained`; they contribute 0 to `weighted` AND are NOT counted in `criteria_passed` or `criteria_failed`.
 
 **Per-criterion shape (council, b78 + b82/b83):**
 
@@ -110,18 +110,22 @@ This collapses to the user m1420 formula because `satisfied=True` on a negative-
   "id": 12,
   "weight": 5,
   "criterion": "verbatim criterion text",
-  "satisfied": true,                            // majority vote (bool)
-  "passed": true,                               // post-polarity (bool)
+  "satisfied": true,                            // resolved verdict (bool): unanimous / Sonnet / human_eval
+  "passed": true,                               // post-polarity (bool); false on the human_eval branch
+  "resolved_by": "sonnet",                      // 'unanimous' | 'sonnet' | 'human_eval' — how the verdict was decided
+  "human_eval": "",                             // 'required' only on the human_eval branch, else ''
   "voters": 2,                                  // b82: judges who voted on this criterion
-  "voted_by_judge": [true, true, false],        // b82: per-member coverage at this index
-  "votes": "Yes/Yes/Abstain",                   // human-readable vote string ('Yes'|'No'|'Abstain')
-  "satisfied_by_judge": [true, true, false],    // per-member raw verdicts (False for abstainers)
+  "voted_by_judge": [true, true, false],        // b82: raw per-member coverage at this index
+  "votes": "Yes/Yes/Abstain",                   // human-readable raw vote string ('Yes'|'No'|'Abstain')
+  "satisfied_by_judge": [true, true, false],    // raw per-member verdicts (False for abstainers)
   "rationales_by_judge": ["...", "...", "(abstained — output truncated before this criterion)"],
   "truncation_affected_by_judge": [false, false, false],
   "judges": ["is9bst5tfadh", "p532c9fzmeed", "xx5msvho23iq"],
   "is_positive": true
 }
 ```
+
+The raw per-member fields (`voters`, `voted_by_judge`, `votes`, `satisfied_by_judge`, `rationales_by_judge`) are unchanged: they still show the underlying per-judge split that the `resolved_by` rule then resolves into the single `satisfied`/`passed` verdict.
 
 **Per-criterion shape (single-judge, b78 + b83):**
 

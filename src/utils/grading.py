@@ -210,8 +210,11 @@ def _member_max_output_tokens(arn: str, family: str | None = None) -> int:
     return _DEFAULT_MAX_OUTPUT_TOKENS
 
 # LLM council (opt-in). When enabled the rubric is scored by THREE judges in
-# parallel and aggregated by unanimous per-criterion verdict (m1609). Quorum
-# policy: any 2 surviving judges produce a valid council score. Each member's
+# parallel. Per-criterion aggregation is unanimous-or-Sonnet-tiebreak: a unanimous
+# council verdict stands, otherwise the Sonnet member's verdict is the source of
+# truth (covering both genuine Yes/No splits and partial coverage where a
+# smaller-context member truncated), and only when Sonnet casts no verdict does
+# the criterion route to Human Evaluation (see _grade_council). Each member's
 # family is fixed by the env-var NAME carrying its ARN (see the FAMILY block
 # above); the rotating ARN itself comes from .env, never hardcoded:
 #   JUDGE_COUNCIL=1
@@ -1020,23 +1023,29 @@ def _grade_council(
     user_for_member: "dict[str, str] | str",
     members: list[CouncilMember],
 ) -> dict:
-    """Council aggregation — UNANIMOUS-ONLY (m1609 2026-06-09).
+    """Council aggregation — UNANIMOUS, else SONNET source-of-truth tiebreak.
 
-    Single-judge mode was removed (m1609): the council is now the only grading
-    path. Per-criterion verdict is unanimous-or-abstain:
-      * all surviving judges say SATISFIED=Yes → criterion satisfied (Pass after
-        polarity); contribute weight to numerator.
-      * all surviving judges say SATISFIED=No  → criterion not satisfied (Fail
-        after polarity); contribute 0.
-      * any disagreement OR any missing verdict (truncation) → "Human Evaluation":
-        index added to abstention_flags, counted in criteria_abstained,
-        contributes 0 to numerator. The per-criterion `human_eval` field is ""
-        on unanimous outcomes (no review needed) and "required" on disagreement
-        or missing coverage (human review needed).
+    Single-judge mode was removed (m1609): the council is the only grading path.
+    Per-criterion the verdict is resolved in this order:
+      * Unanimous — every member voted AND all agree on SATISFIED → use that
+        verdict (Pass/Fail after polarity). `resolved_by="unanimous"`.
+      * Otherwise, if the Sonnet member emitted a verdict for this criterion →
+        Sonnet's verdict governs. This covers BOTH a genuine Yes/No split and
+        partial coverage where a smaller-context member (Kimi/GLM) truncated
+        before reaching this index. `resolved_by="sonnet"`.
+      * Otherwise — no unanimity AND Sonnet itself cast no verdict (Sonnet failed
+        or, rarely, truncated) → "Human Evaluation": index added to
+        abstention_flags, counted in criteria_abstained, contributes 0 to the
+        numerator. `resolved_by="human_eval"`, `human_eval="required"`.
 
-    Always returns a scores dict; on total council failure (zero surviving
-    members) every criterion is recorded as an abstention (Human Evaluation)
-    and overall_score is 0.0. No single-judge fallback exists."""
+    A satisfied positive criterion contributes its weight to the numerator; a
+    satisfied negative criterion (forbidden behavior occurred) subtracts |weight|.
+    The denominator is the sum of positive weights only.
+
+    Always returns a scores dict; on total council failure (zero surviving members
+    and therefore no Sonnet verdict) every criterion abstains and overall_score is
+    0.0. No single-judge fallback exists. If the roster has no sonnet-family member,
+    the tiebreak is unavailable and non-unanimous criteria abstain as before."""
     results = _run_council(members, system, user_for_member, len(rubrics))
     surviving = [r for r in results if r.get("ok") and isinstance(r.get("verdicts"), list)]
     if len(surviving) < len(members):
@@ -1055,6 +1064,22 @@ def _grade_council(
 
     verdicts_per_member: list[list[dict]] = [r["verdicts"] for r in surviving]
     n_members = len(members)
+    # survivor_lookup maps a member's (rotating) ARN → its parsed verdict list.
+    # Hoisted out of the per-criterion loop below (it was rebuilt once per rubric
+    # item; the surviving set is constant for the whole aggregation).
+    survivor_lookup = {r["model"]: vs for r, vs in zip(surviving, verdicts_per_member)}
+    # Sonnet is the tiebreaker / source of truth on any non-unanimous criterion:
+    # it is the largest-context (1M) and most capable council member. Located by
+    # stable FAMILY, never the rotating ARN (see the FAMILY decoupling block).
+    # When the roster has no sonnet member (a custom JUDGE_COUNCIL_MEMBERS roster),
+    # there is no tiebreaker and non-unanimous criteria fall back to Human
+    # Evaluation as before.
+    sonnet_idx = next((j for j, m in enumerate(members) if m.family == "sonnet"), None)
+    if sonnet_idx is None:
+        logger.warning(
+            "Judge council has no 'sonnet' member; non-unanimous criteria will "
+            "fall back to Human Evaluation (no source-of-truth tiebreaker)."
+        )
 
     crit_out: list[dict] = []
     truncation_flags: list[int] = []
@@ -1071,10 +1096,11 @@ def _grade_council(
 
     for i, r in enumerate(rubrics):
         wt = _extract_weight(r) if isinstance(r, dict) else 1.0
-        # Unanimous-or-abstain (m1609): every council member listed in `members`
-        # must (a) be a surviving member AND (b) have emitted a verdict at index
-        # i AND (c) agree with the others on SATISFIED. Any deviation routes the
-        # criterion to Human Evaluation (abstention).
+        # Per-criterion resolution (Sonnet source-of-truth tiebreak): a criterion
+        # is determined by unanimous council agreement when every member voted and
+        # agreed; otherwise Sonnet's verdict governs (genuine split OR a smaller
+        # member truncating before this index); only when Sonnet itself cast no
+        # verdict does the criterion route to Human Evaluation.
         per_satisfied: list[bool] = []
         per_rationale: list[str] = []
         per_truncation: list[bool] = []
@@ -1084,7 +1110,6 @@ def _grade_council(
         # Build per-member vote state aligned to the full `members` list so a
         # member that failed entirely (not in `surviving`) shows up as Abstain
         # in the votes string, matching the truncated-mid-rubric semantics.
-        survivor_lookup = {r["model"]: vs for r, vs in zip(surviving, verdicts_per_member)}
         for m in members:
             vs = survivor_lookup.get(m.model)
             if vs is None:
@@ -1115,30 +1140,50 @@ def _grade_council(
             unanimous_yes = False
             unanimous_no = False
 
-        if unanimous_yes or unanimous_no:
-            satisfied_majority = unanimous_yes
-            criterion_passed = _criterion_pass_from_satisfied(satisfied_majority, wt)
+        sonnet_voted = sonnet_idx is not None and per_voted[sonnet_idx]
+
+        # Resolution policy (Sonnet source-of-truth tiebreak):
+        #   1. Unanimous — all members voted AND agree → use that verdict.
+        #   2. Otherwise, if Sonnet emitted a verdict → Sonnet IS the verdict.
+        #      This covers BOTH a genuine Yes/No split AND partial coverage where
+        #      a smaller-context member (Kimi/GLM) truncated before this index.
+        #   3. Otherwise (no unanimity AND Sonnet itself cast no verdict) →
+        #      Human Evaluation (abstention): no source of truth exists.
+        if full_coverage and (unanimous_yes or unanimous_no):
+            verdict_satisfied = unanimous_yes
+            resolved_by = "unanimous"
+            human_eval = ""
+        elif sonnet_voted:
+            verdict_satisfied = bool(per_satisfied[sonnet_idx])
+            resolved_by = "sonnet"
+            human_eval = ""
+        else:
+            abstention_flags.append(i)
+            verdict_satisfied = False
+            resolved_by = "human_eval"
+            human_eval = "required"
+
+        if resolved_by == "human_eval":
+            criterion_passed = False
+        else:
+            criterion_passed = _criterion_pass_from_satisfied(verdict_satisfied, wt)
             if criterion_passed:
                 passed += 1
-            human_eval = ""
-            # Walkthrough §4 reward: contribute weight ONLY when council
-            # unanimously says Yes. No fractions. b51 leak impossible.
-            if satisfied_majority:
+            # Reward (walkthrough §4): a positive-weight criterion contributes its
+            # weight only when the resolved verdict is satisfied; a negative-weight
+            # criterion that is satisfied (forbidden behavior occurred) subtracts
+            # its |weight|. No fractions. b51 leak impossible.
+            if verdict_satisfied:
                 weighted += wt
-        else:
-            # Disagreement OR missing coverage → Human Evaluation required.
-            abstention_flags.append(i)
-            satisfied_majority = False
-            criterion_passed = False
-            human_eval = "required"
 
         if any(per_truncation):
             truncation_flags.append(i)
         crit_out.append({
             "id": i,
             "weight": wt,
-            "satisfied": satisfied_majority,
+            "satisfied": verdict_satisfied,
             "passed": criterion_passed,
+            "resolved_by": resolved_by,
             "human_eval": human_eval,
             "voters": voters,
             "criterion": (r.get("criterion") if isinstance(r, dict) else str(r)),
@@ -1241,7 +1286,7 @@ def _grade_council(
                 {"model": r["model"], "error": r.get("error", "")}
                 for r in results if not r.get("ok")
             ],
-            "aggregation": "majority_vote_partial_coverage",
+            "aggregation": "unanimous_or_sonnet_tiebreak",
             "per_member_user_chars": {
                 r["family"]: int(r.get("user_chars", 0) or 0) for r in results
             },
