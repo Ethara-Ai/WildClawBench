@@ -234,12 +234,17 @@ def _attach_drift_script(task: dict, task_dir: Path) -> dict:
     inject_dir = task_dir / "inject"
     if inject_dir.is_dir():
         task["inject_path"] = str(inject_dir.resolve())
-    # multi_agent.* config opt-in. task_config.yaml wins if present; otherwise
-    # synthesize from prompts.txt by scanning for "Multi-Agent" turn-header
-    # labels so tasks can ship without a config file. Convention:
-    # checker_id = "T<turn_index>_MA", aggregate "MA_C1", min_subagents=2.
-    task["multi_agent_config"] = {}
-    task["multi_agent_enabled"] = False
+    # multi_agent: spawn_subagent is available by default; the agent decides per
+    # turn whether to delegate based on the skill description. Tasks opt OUT
+    # with task_config.yaml ``multi_agent.enabled: false``. Tasks may still set
+    # ``expected_per_turn`` / ``aggregate_checker_id`` in task_config.yaml when
+    # they DO want per-turn delegation enforcement (the spawn_tree_checks layer
+    # respects whatever expected_per_turn it finds).
+    task["multi_agent_config"] = {
+        "enabled": True,
+        "default_allowed_tools": ["Read", "Write", "Edit", "Grep", "Glob", "Bash"],
+    }
+    task["multi_agent_enabled"] = True
     cfg_path = task_dir / "task_config.yaml"
     if cfg_path.is_file():
         try:
@@ -248,44 +253,10 @@ def _attach_drift_script(task: dict, task_dir: Path) -> dict:
                 ma = raw.get("multi_agent")
                 if isinstance(ma, dict):
                     task["multi_agent_config"] = ma
-                    task["multi_agent_enabled"] = bool(ma.get("enabled"))
+                    task["multi_agent_enabled"] = bool(ma.get("enabled", True))
         except (yaml.YAMLError, OSError):
             pass
-    if not task["multi_agent_enabled"]:
-        synth = _synthesize_multi_agent_config(task_dir)
-        if synth.get("enabled"):
-            task["multi_agent_config"] = synth
-            task["multi_agent_enabled"] = True
     return task
-
-
-def _synthesize_multi_agent_config(task_dir: Path) -> dict:
-    prompts_path = task_dir / "prompts.txt"
-    if not prompts_path.is_file():
-        return {}
-    try:
-        text = prompts_path.read_text(encoding="utf-8")
-    except OSError:
-        return {}
-    # Header form: "--- TURN [T]<n> (..., Multi-Agent) ---" per inject_director
-    # convention. 1-indexed in prompts.txt; openclaw runner exposes 0-indexed
-    # turn_index so we subtract 1 to match the expected_per_turn key contract.
-    pattern = re.compile(
-        r"^---\s*TURN\s+T?(\d+).*?Multi-Agent.*?---\s*$",
-        re.IGNORECASE | re.MULTILINE,
-    )
-    ma_turns = sorted({int(m) - 1 for m in pattern.findall(text)})
-    if not ma_turns:
-        return {}
-    return {
-        "enabled": True,
-        "default_allowed_tools": ["Read", "Write", "Edit", "Bash", "Grep", "Glob"],
-        "expected_per_turn": {
-            str(idx): {"min_subagents": 2, "checker_id": f"T{idx}_MA"}
-            for idx in ma_turns
-        },
-        "aggregate_checker_id": "MA_C1",
-    }
 
 
 def _derive_taxonomy_for_native_task(
