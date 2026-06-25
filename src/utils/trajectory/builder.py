@@ -561,6 +561,34 @@ def _load_sub_agent_trajectories(
     return out
 
 
+def _project_published_messages(raw_messages: List[Any]) -> List[Any]:
+    """Project raw trajectory messages into the published wrapper shape.
+
+    Canonical wrapper (Golden_Trajectory.json): ``type, id, parentId, timestamp,
+    message`` with ``parentId`` threaded to the previous message's id. Internal
+    bookkeeping (turn_index) is dropped and per-message scrubbing applied. Shared
+    by the parent trajectory and each native sub-agent (child) trajectory so both
+    have identical message schemas.
+    """
+    messages: List[Any] = []
+    prev_id = ""  # root message's parentId is "" (no parent); else previous id.
+    for m in raw_messages:
+        if not isinstance(m, dict):
+            messages.append(m)
+            continue
+        mid = m.get("id", "")
+        inner = m.get("message")
+        messages.append({
+            "type": m.get("type", "message"),
+            "id": mid,
+            "parentId": prev_id,
+            "timestamp": m.get("timestamp", ""),
+            "message": _scrub_published_message(inner) if isinstance(inner, dict) else inner,
+        })
+        prev_id = mid
+    return messages
+
+
 def build_published_trajectory(
     traj: Mapping[str, Any],
     task: Any,
@@ -588,27 +616,7 @@ def build_published_trajectory(
     marker. The rich in-memory ``traj`` is left untouched so grading still sees
     the agent's real tool output.
     """
-    messages: List[Any] = []
-    prev_id = ""  # root message's parentId is "" (no parent); else previous id.
-    for m in traj.get("messages") or []:
-        if not isinstance(m, dict):
-            messages.append(m)
-            continue
-        # Canonical wrapper shape (Golden_Trajectory.json): type, id, parentId,
-        # timestamp, message — with parentId threaded to the previous message's
-        # id. Internal bookkeeping (turn_index) and the upstream-dropped parentId
-        # are reconstructed here so threading is well-formed regardless of source.
-        mid = m.get("id", "")
-        inner = m.get("message")
-        pm: dict[str, Any] = {
-            "type": m.get("type", "message"),
-            "id": mid,
-            "parentId": prev_id,
-            "timestamp": m.get("timestamp", ""),
-            "message": _scrub_published_message(inner) if isinstance(inner, dict) else inner,
-        }
-        prev_id = mid
-        messages.append(pm)
+    messages = _project_published_messages(traj.get("messages") or [])
 
     inner_meta = (traj.get("trajectory") or {}).get("meta_info") or {}
     platform = inner_meta.get("platform") or "linux"
@@ -636,6 +644,368 @@ def build_published_trajectory(
     if sub_trajs:
         published["sub_agent_trajectories"] = sub_trajs
 
+    return published
+
+
+# ---------------------------------------------------------------------------
+# Golden layout (native sessions_spawn): parent.json + children/ + spawn_tree/
+#
+# Replaces the slim output.json form when a task runs with native multi-agent
+# spawning. The on-disk shape mirrors the reference goldens (Larry_Bates /
+# dawn_mitchell):
+#
+#   <run_dir>/parent.json                      (meta_info + messages)
+#   <run_dir>/children/01_<name>.json          (one per native subagent)
+#   <run_dir>/spawn_tree/parent_spawn_tree.txt (human-readable tree)
+#
+# The serializer below is pure/deterministic (testable with fixtures). The
+# correlation of an on-disk child session to its parent sessions_spawn call is
+# done by spawn order and is the one piece pending live-run validation.
+# ---------------------------------------------------------------------------
+
+
+def extract_spawn_calls(parent_messages: List[Any]) -> List[dict]:
+    """Pull native ``sessions_spawn`` calls from the parent's messages, in order.
+
+    Returns ``[{"name": ..., "prompt": ...}, ...]`` — one per spawn. ``name``
+    titles the child file; ``prompt`` becomes the child's task_description.
+    """
+    calls: List[dict] = []
+    for m in parent_messages or []:
+        inner = m.get("message") if isinstance(m, dict) else None
+        content = inner.get("content") if isinstance(inner, dict) else None
+        if not isinstance(content, list):
+            continue
+        for p in content:
+            if isinstance(p, dict) and p.get("type") == "toolCall" \
+                    and p.get("name") == "sessions_spawn":
+                args = p.get("arguments") or {}
+                calls.append({
+                    "name": str(args.get("name", "") or ""),
+                    "prompt": str(args.get("prompt", "") or ""),
+                })
+    return calls
+
+
+def _slug(text: str) -> str:
+    s = re.sub(r"[^a-z0-9]+", "-", (text or "").lower()).strip("-")
+    return s or "subagent"
+
+
+def build_child_trajectory(
+    *,
+    session_key: str,
+    raw_messages: List[Any],
+    name: str,
+    description: str,
+    parent_session: str,
+    platform: str = "linux",
+    completion_status: str = "success",
+) -> dict:
+    """Project one native sub-agent session into the golden child schema.
+
+    Matches the reference ``children/NN_*.json`` meta_info exactly:
+    ``task_name, task_description, task_completion_status, parent_session,
+    session_key, platform, message_count``.
+    """
+    messages = _project_published_messages(raw_messages)
+    return {
+        "meta_info": {
+            "task_name": name,
+            "task_description": description,
+            "task_completion_status": completion_status,
+            "parent_session": parent_session,
+            "session_key": session_key,
+            "platform": platform,
+            "message_count": len(messages),
+        },
+        "messages": messages,
+    }
+
+
+def render_spawn_tree_text(
+    *,
+    root_session: str,
+    task_type: str,
+    completion_status: str,
+    platform: str,
+    cluster: str,
+    n_messages: int,
+    children: List[Mapping[str, Any]],
+) -> str:
+    """Render the human-readable parent_spawn_tree.txt summary."""
+    bar = "=" * 72
+    lines = [
+        bar,
+        "  SPAWN TREE -- parent.json",
+        bar,
+        "",
+        "META",
+        f"  Root:      {root_session}",
+        f"  Type:      {task_type} -> {completion_status}",
+        f"  Platform:  {platform} | Cluster: {cluster}",
+        f"  Messages:  {n_messages} | Children: {len(children)}",
+        "",
+        "CHILDREN",
+    ]
+    if not children:
+        lines.append("  (none)")
+    for i, c in enumerate(children, 1):
+        meta = c.get("meta_info", {})
+        lines.append(
+            f"  {i:02d}. {meta.get('task_name', '?')} "
+            f"[{meta.get('task_completion_status', '?')}] "
+            f"-> {meta.get('session_key', '?')} "
+            f"({meta.get('message_count', 0)} msgs)"
+        )
+    return "\n".join(lines) + "\n"
+
+
+def write_golden_layout(
+    output_dir: Path,
+    *,
+    parent_published: Mapping[str, Any],
+    children_sessions: List[Mapping[str, Any]],
+    root_session: str,
+    cluster: str = "",
+    platform: str = "linux",
+) -> dict:
+    """Write parent.json + children/NN_<name>.json + spawn_tree/ to ``output_dir``.
+
+    ``parent_published`` is the slim {meta_info, messages} from
+    :func:`build_published_trajectory`. ``children_sessions`` is a list of
+    ``{"session_key", "raw_messages", "completion_status"}`` harvested from the
+    native session store (see jsonl_reader.read_sessions_grouped), in spawn
+    order. Child names/descriptions are taken from the parent's sessions_spawn
+    calls, correlated by order.
+
+    Returns the augmented parent dict (also written to parent.json).
+    """
+    output_dir = Path(output_dir)
+    parent_messages = list(parent_published.get("messages") or [])
+    spawn_calls = extract_spawn_calls(parent_messages)
+
+    # Build child trajectories, correlating each session to its spawn call by order.
+    children: List[dict] = []
+    spawned_keys: List[str] = []
+    for idx, sess in enumerate(children_sessions):
+        skey = str(sess.get("session_key", "") or f"child-{idx+1}")
+        call = spawn_calls[idx] if idx < len(spawn_calls) else {}
+        name = call.get("name") or f"subagent-{idx+1}"
+        child = build_child_trajectory(
+            session_key=skey,
+            raw_messages=list(sess.get("raw_messages") or []),
+            name=name,
+            description=call.get("prompt", ""),
+            parent_session=root_session,
+            platform=platform,
+            completion_status=str(sess.get("completion_status", "success")),
+        )
+        children.append(child)
+        spawned_keys.append(skey)
+
+    # Parent meta_info: golden superset (cluster + agents added).
+    base_meta = dict(parent_published.get("meta_info") or {})
+    parent_meta = {
+        "cluster": cluster,
+        "task_type": base_meta.get("task_type", ""),
+        "task_description": base_meta.get("task_description", ""),
+        "task_completion_status": base_meta.get("task_completion_status", ""),
+        "system_prompt": base_meta.get("system_prompt", ""),
+        "platform": base_meta.get("platform", platform),
+        "agents": {"root": root_session, "spawned": spawned_keys},
+    }
+    parent_doc = {"meta_info": parent_meta, "messages": parent_messages}
+
+    # Write files.
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "parent.json").write_text(
+        json.dumps(parent_doc, indent=2, ensure_ascii=False), encoding="utf-8",
+    )
+    if children:
+        children_dir = output_dir / "children"
+        children_dir.mkdir(exist_ok=True)
+        for i, child in enumerate(children, 1):
+            fname = f"{i:02d}_{_slug(child['meta_info']['task_name'])}.json"
+            (children_dir / fname).write_text(
+                json.dumps(child, indent=2, ensure_ascii=False), encoding="utf-8",
+            )
+    tree_dir = output_dir / "spawn_tree"
+    tree_dir.mkdir(exist_ok=True)
+    (tree_dir / "parent_spawn_tree.txt").write_text(
+        render_spawn_tree_text(
+            root_session=root_session,
+            task_type=parent_meta["task_type"],
+            completion_status=parent_meta["task_completion_status"],
+            platform=parent_meta["platform"],
+            cluster=cluster,
+            n_messages=len(parent_messages),
+            children=children,
+        ),
+        encoding="utf-8",
+    )
+    return parent_doc
+
+
+# ---------------------------------------------------------------------------
+# Native multi-agent harvest from the collected OpenClaw session store.
+#
+# Unlike write_golden_layout (which took hand-fed children_sessions), this reads
+# the REAL on-disk artifacts a native run leaves at
+# ``<run>/task_output/sessions/``:
+#   * sessions.json   — index: {canonical_subagent_key: {sessionId, label,
+#                       spawnedBy, ...}}  (verified against RUTH/JAE run_5)
+#   * <sessionId>.jsonl — one child session transcript per spawned sub-agent
+#   * chat.jsonl      — the parent session
+# and emits the Larry_Bates layout: agents block on output.json +
+# subagents/NN_<label>.json + spawn_tree/parent_spawn_tree.txt.
+# ---------------------------------------------------------------------------
+
+
+def _read_session_message_entries(path: Path) -> List[dict]:
+    """Return only the ``type=="message"`` rows from a session .jsonl file."""
+    if not path.is_file():
+        return []
+    out: List[dict] = []
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            e = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(e, dict) and e.get("type") == "message":
+            out.append(e)
+    return out
+
+
+def extract_spawn_label_tasks(parent_messages: List[Any]) -> dict:
+    """Map each native ``sessions_spawn`` call's ``label`` -> its ``task`` text.
+
+    Used to give child trajectories a clean one-line description. Handles this
+    build's arg names (``label``/``task``) and original-OpenClaw's
+    (``name``/``prompt``).
+    """
+    out: dict = {}
+    for m in parent_messages or []:
+        inner = m.get("message") if isinstance(m, dict) else None
+        content = inner.get("content") if isinstance(inner, dict) else None
+        if not isinstance(content, list):
+            continue
+        for p in content:
+            if not (isinstance(p, dict) and p.get("type") in ("toolCall", "tool_use")
+                    and p.get("name") == "sessions_spawn"):
+                continue
+            args = p.get("arguments") or p.get("input") or {}
+            label = args.get("label") or args.get("name")
+            task = args.get("task") or args.get("prompt")
+            if label and task:
+                out[str(label)] = str(task)
+    return out
+
+
+def attach_native_subagents(
+    published: dict,
+    sessions_dir: Path,
+    output_dir: Path,
+    *,
+    cluster: str = "",
+) -> dict:
+    """Harvest native sub-agent sessions into the Larry_Bates layout.
+
+    Reads ``<sessions_dir>/sessions.json`` + each child ``<sessionId>.jsonl`` and:
+      * adds ``meta_info.agents = {root, spawned:[canonical keys]}`` (+ optional
+        ``cluster``) to ``published`` (the parent ``output.json``),
+      * writes ``<output_dir>/subagents/NN_<label>.json`` — one per child, in the
+        reference child schema (task_name, task_description,
+        task_completion_status, parent_session, session_key, platform,
+        message_count, messages),
+      * writes ``<output_dir>/spawn_tree/parent_spawn_tree.txt``.
+
+    No-op (returns ``published`` unchanged, no files written) when there is no
+    ``sessions.json`` or no subagent entries — so single-agent runs are
+    unaffected.
+    """
+    sessions_dir = Path(sessions_dir)
+    idx_path = sessions_dir / "sessions.json"
+    if not idx_path.is_file():
+        return published
+    try:
+        idx = json.loads(idx_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return published
+    # Keep only true subagent sessions (the index may also list the parent).
+    subs = {
+        k: v for k, v in (idx.items() if isinstance(idx, dict) else [])
+        if isinstance(v, dict) and ":subagent:" in str(k)
+    }
+    if not subs:
+        return published
+
+    label_to_task = extract_spawn_label_tasks(published.get("messages") or [])
+    platform = (published.get("meta_info") or {}).get("platform") or "linux"
+
+    # Spawn order: updatedAt ascending (stable for ties).
+    ordered = sorted(subs.items(), key=lambda kv: kv[1].get("updatedAt", 0))
+
+    root = ""
+    children_docs: List[dict] = []
+    spawned_keys: List[str] = []
+    for canon_key, meta in ordered:
+        root = root or str(meta.get("spawnedBy", "") or "")
+        label = str(meta.get("label") or "subagent")
+        session_file = sessions_dir / f"{meta.get('sessionId', '')}.jsonl"
+        child_msgs = _project_published_messages(
+            _read_session_message_entries(session_file)
+        )
+        task_text = label_to_task.get(label, "")
+        desc = task_text.strip().splitlines()[0][:200] if task_text.strip() else ""
+        children_docs.append({
+            "meta_info": {
+                "task_name": label,
+                "task_description": desc,
+                "task_completion_status": "success",
+                "parent_session": root,
+                "session_key": canon_key,
+                "platform": platform,
+                "message_count": len(child_msgs),
+            },
+            "messages": child_msgs,
+        })
+        spawned_keys.append(canon_key)
+
+    # Augment parent meta_info: cluster (first, golden order) + agents block.
+    base_meta = published.get("meta_info") or {}
+    new_meta: dict = {}
+    if cluster:
+        new_meta["cluster"] = cluster
+    new_meta.update(base_meta)
+    new_meta["agents"] = {"root": root, "spawned": spawned_keys}
+    published["meta_info"] = new_meta
+
+    out = Path(output_dir)
+    subdir = out / "subagents"
+    subdir.mkdir(parents=True, exist_ok=True)
+    for i, child in enumerate(children_docs, 1):
+        fname = f"{i:02d}_{_slug(child['meta_info']['task_name'])}.json"
+        (subdir / fname).write_text(
+            json.dumps(child, indent=2, ensure_ascii=False), encoding="utf-8",
+        )
+    tree_dir = out / "spawn_tree"
+    tree_dir.mkdir(parents=True, exist_ok=True)
+    (tree_dir / "parent_spawn_tree.txt").write_text(
+        render_spawn_tree_text(
+            root_session=root,
+            task_type=new_meta.get("task_type", ""),
+            completion_status=new_meta.get("task_completion_status", ""),
+            platform=platform,
+            cluster=cluster,
+            n_messages=len(published.get("messages") or []),
+            children=children_docs,
+        ),
+        encoding="utf-8",
+    )
     return published
 
 

@@ -116,7 +116,21 @@ def test_task_parser_synthesizes_from_prompts(tmp_path):
     assert task["multi_agent_enabled"] is True
 
 
-def test_task_parser_no_multi_agent_disabled(tmp_path):
+def test_task_parser_default_on_capability_only(tmp_path, monkeypatch):
+    # With no multi_agent declaration, the capability is ON by default — but
+    # capability-only: no spawn requirement (empty expected_per_turn) and no
+    # aggregate checker, so build_checker_state emits nothing.
+    monkeypatch.setenv("WCB_MULTI_AGENT_DEFAULT", "1")
+    (tmp_path / "prompts.txt").write_text("--- TURN 1 (Day 1, Light) ---\nhi\n")
+    task = _attach_drift_script({}, tmp_path)
+    assert task["multi_agent_enabled"] is True
+    assert task["multi_agent_config"].get("expected_per_turn") == {}
+    assert "aggregate_checker_id" not in task["multi_agent_config"]
+
+
+def test_task_parser_default_off_via_env(tmp_path, monkeypatch):
+    # WCB_MULTI_AGENT_DEFAULT=0 restores strict opt-in (disabled when undeclared).
+    monkeypatch.setenv("WCB_MULTI_AGENT_DEFAULT", "0")
     (tmp_path / "prompts.txt").write_text("--- TURN 1 (Day 1, Light) ---\nhi\n")
     task = _attach_drift_script({}, tmp_path)
     assert task["multi_agent_enabled"] is False

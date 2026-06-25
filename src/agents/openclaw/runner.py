@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 
 from src.agents.base import AgentExecution, AgentTaskSpec, BaseAgent
 from src.utils.docker_utils import (
+    configure_native_subagents,
     inject_api_connectors,
     inject_lobster_workspace,
     inject_openclaw_models,
@@ -203,7 +204,18 @@ class OpenClawAgent(BaseAgent):
                 inject_openclaw_models(spec.task_id, spec.models_config)
 
             if spec.multi_agent_enabled:
-                inject_subagent_tool(spec.task_id, spec.multi_agent_config)
+                # Native mode (default): use OpenClaw's built-in sessions_spawn /
+                # sessions_yield tools (children land as separate sessions in the
+                # session store and are harvested into the golden parent/children
+                # layout). spawnEnabled defaults true for the non-discord headless
+                # `chat` channel, so no spawn-flag write is needed (and the config
+                # validator rejects a direct session.threadBindings.spawnSubagentSessions
+                # key anyway). Legacy mode injects the spawn_subagent.py skill.
+                _ma_cfg = spec.multi_agent_config or {}
+                if _ma_cfg.get("native", True):
+                    configure_native_subagents(spec.task_id, _ma_cfg)
+                else:
+                    inject_subagent_tool(spec.task_id, _ma_cfg)
 
             self._set_model(spec.task_id, spec.model, thinking=spec.thinking)
             self._inject_auth(spec.task_id)
@@ -277,6 +289,14 @@ class OpenClawAgent(BaseAgent):
             logger.info("[%s] Agent finished (%.2fs, %d turn(s))",
                         spec.task_id, elapsed_time, len(turn_messages))
 
+            # Native multi-agent: the parent turn returns as soon as it issues
+            # its async sessions_spawn calls (mode=run), but the spawned child
+            # sessions keep running in the still-alive gateway. Hold the
+            # container open until those children quiesce, otherwise teardown
+            # kills them mid-run and their trajectories are never written.
+            if spec.multi_agent_enabled:
+                self._wait_for_subagents(spec.task_id)
+
             logger.info("[%s] Agent exit code: %s", spec.task_id,
                         agent_proc.returncode if agent_proc else "n/a")
             return AgentExecution(
@@ -294,6 +314,65 @@ class OpenClawAgent(BaseAgent):
                 gateway_proc=gateway_proc,
                 agent_proc=agent_proc,
             )
+
+    def _wait_for_subagents(
+        self,
+        task_id: str,
+        *,
+        max_wait: float = 600.0,
+        quiesce: float = 12.0,
+        poll: float = 5.0,
+    ) -> None:
+        """Block until native sub-agent child sessions finish (or max_wait).
+
+        Native ``sessions_spawn`` children run asynchronously in the gateway and
+        write to ``/root/.openclaw/agents/main/sessions/<key>.jsonl``. The parent
+        ``chat`` session is in the same dir, so >1 ``.jsonl`` means at least one
+        child spawned. We poll the (size, mtime) signature of those files and
+        return once it stops changing for ``quiesce`` seconds (children done) or
+        ``max_wait`` elapses. No-op when only the parent session exists.
+        """
+        sessions_dir = "/root/.openclaw/agents/main/sessions"
+        count_cmd = f"ls {sessions_dir}/*.jsonl 2>/dev/null | wc -l"
+        try:
+            n = int(subprocess.run(
+                ["docker", "exec", task_id, "/bin/bash", "-c", count_cmd],
+                capture_output=True, text=True,
+            ).stdout.strip() or "0")
+        except (ValueError, subprocess.SubprocessError):
+            n = 0
+        if n <= 1:
+            return  # parent-only: nothing spawned
+        logger.info(
+            "[%s] %d session files present — waiting for sub-agents to finish "
+            "(max %.0fs)", task_id, n, max_wait,
+        )
+        sig_cmd = (
+            f"ls -la --time-style=+%s {sessions_dir}/*.jsonl 2>/dev/null "
+            "| awk '{print $5, $6, $NF}'"
+        )
+        deadline = time.time() + max_wait
+        last_sig: str | None = None
+        stable_since: float | None = None
+        while time.time() < deadline:
+            sig = subprocess.run(
+                ["docker", "exec", task_id, "/bin/bash", "-c", sig_cmd],
+                capture_output=True, text=True,
+            ).stdout.strip()
+            if sig and sig == last_sig:
+                if stable_since is None:
+                    stable_since = time.time()
+                elif time.time() - stable_since >= quiesce:
+                    logger.info("[%s] sub-agent sessions quiesced", task_id)
+                    return
+            else:
+                last_sig = sig
+                stable_since = None
+            time.sleep(poll)
+        logger.warning(
+            "[%s] sub-agent wait hit max_wait=%.0fs; collecting as-is",
+            task_id, max_wait,
+        )
 
     def collect_usage(self, task_id: str, output_dir: Path, elapsed_time: float) -> dict:
         transcript_host = output_dir / "chat.jsonl"

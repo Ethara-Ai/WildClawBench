@@ -880,6 +880,12 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
             # Full multi-turn wake-up script so the bundle's instruction.md
             # renders every turn, not just turn 0.
             "turn_messages": list(task.get("turn_messages") or []),
+            # Declared API sets (task.yaml required_apis/distractor_apis) so the
+            # published data/task.toml lists ONLY the task's own APIs instead of
+            # the runtime required∪mock_data union or the full ~104 catalog that
+            # compute_distractor_skills returns as a fallback.
+            "required_apis_declared": task.get("required_apis_declared"),
+            "distractor_apis_declared": task.get("distractor_apis_declared"),
         },
     )
     artifacts_dir = task_bundle_dir / "artifacts"
@@ -962,6 +968,21 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
         subagents_dir=_ws_full / "subagents",
         spawn_tree_path=_ws_full / "spawn_tree.jsonl",
     )
+    # Native multi-agent: harvest the collected OpenClaw session store into the
+    # Larry_Bates layout — adds meta_info.agents to output.json and writes
+    # subagents/NN_<label>.json + spawn_tree/parent_spawn_tree.txt. No-op for
+    # single-agent runs (no sessions.json), so their output.json is unchanged.
+    try:
+        from src.utils.trajectory.builder import attach_native_subagents
+        published = attach_native_subagents(
+            published,
+            output_dir / "task_output" / "sessions",
+            output_dir,
+            cluster=str(task.get("cluster") or task.get("category") or ""),
+        )
+    except Exception as exc:  # never let harvest break the run
+        logger.warning("[%s] native sub-agent harvest failed: %s",
+                       task["task_id"], exc)
     (output_dir / "output.json").write_text(
         json.dumps(published, indent=2, ensure_ascii=False), encoding="utf-8",
     )

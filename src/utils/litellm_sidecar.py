@@ -274,16 +274,56 @@ def build_litellm_config_yaml(
     )
 
 
+def _image_present_locally(image: str) -> bool:
+    return subprocess.run(
+        ["docker", "image", "inspect", image],
+        capture_output=True,
+    ).returncode == 0
+
+
 def pull_litellm_image(image: str = LITELLM_IMAGE) -> None:
     # `:main-stable` is a moving registry tag; we explicitly pull at batch
     # startup so registry/network failures surface here instead of inside the
     # first `docker run` and being misattributed to a task error.
-    logger.info("Pulling LiteLLM image %s", image)
-    r = subprocess.run(
-        ["docker", "pull", image],
-        capture_output=True, text=True,
-    )
+    #
+    # The pull is a registry round-trip even when the image is already cached
+    # locally (moving tag), so a slow/blocked/unauthenticated ghcr.io connection
+    # can hang the whole batch at startup. To stay robust:
+    #   * WILDCLAW_SKIP_LITELLM_PULL=1 skips the pull entirely when the image is
+    #     present locally (offline / pinned-image runs).
+    #   * the pull is time-bounded (WILDCLAW_LITELLM_PULL_TIMEOUT, default 180s).
+    #   * on timeout/failure we fall back to the local image if present, only
+    #     raising when there is genuinely no image to run.
+    if os.environ.get("WILDCLAW_SKIP_LITELLM_PULL") and _image_present_locally(image):
+        logger.info("Skipping LiteLLM pull (WILDCLAW_SKIP_LITELLM_PULL set); using local %s", image)
+        return
+
+    timeout = int(os.environ.get("WILDCLAW_LITELLM_PULL_TIMEOUT", "180"))
+    logger.info("Pulling LiteLLM image %s (timeout %ss)", image, timeout)
+    try:
+        r = subprocess.run(
+            ["docker", "pull", image],
+            capture_output=True, text=True, timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        if _image_present_locally(image):
+            logger.warning(
+                "LiteLLM pull timed out after %ss; falling back to the local "
+                "image %s. Set WILDCLAW_SKIP_LITELLM_PULL=1 to skip the pull.",
+                timeout, image,
+            )
+            return
+        raise RuntimeError(
+            f"LiteLLM pull of {image} timed out after {timeout}s and no local "
+            f"copy exists. Pre-pull it or set WILDCLAW_LITELLM_PULL_TIMEOUT higher."
+        )
     if r.returncode != 0:
+        if _image_present_locally(image):
+            logger.warning(
+                "LiteLLM pull failed (%s); falling back to the local image %s.",
+                (r.stderr or "").strip(), image,
+            )
+            return
         raise RuntimeError(
             f"Failed to pull LiteLLM image {image}: {(r.stderr or '').strip()}"
         )

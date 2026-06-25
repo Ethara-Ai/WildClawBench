@@ -100,6 +100,93 @@ _REPO_ENV_DIR = Path(__file__).resolve().parent.parent / "environment"
 _INFRA_FILES = ("_mutable_store.py", "tracking_middleware.py", "admin_plane.py",
                 "API_DOCUMENTATION.md")
 
+# A connector URL env line, e.g. `GMAIL_API_URL = "http://gmail-api:8017"`.
+_API_URL_RE = re.compile(r'^\s*([A-Z0-9_]+_API_URL)\s*=\s*"http://([a-z0-9-]+):(\d+)"\s*$')
+
+# Harness-injected wall-clock prefix on subagent context messages, e.g.
+# `[Thu 2026-06-25 14:38 UTC] `. Stripped for published-trajectory hygiene.
+_CLOCKSTAMP_RE = re.compile(
+    r"\[(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC\] ?")
+
+
+def _trim_task_toml_env(toml_path: Path, surviving_apis: set[str]) -> None:
+    """Trim task.toml's ``*.env`` blocks and the healthcheck curl chain to the
+    surviving (enabled) API set, so the manifest matches the shipped env dirs.
+
+    The catalog task.toml exports ~104 connector URLs across [verifier.env],
+    [environment.env] and [solution.env], and probes every one of them in
+    [environment.healthcheck]. Once the bundle env dir is trimmed to the task's
+    required+distractor APIs, those blocks must shrink to match or the manifest
+    advertises connectors the bundle no longer ships. Line-based and idempotent:
+    comments/formatting survive and re-runs are no-ops."""
+    if not toml_path.is_file() or not surviving_apis:
+        return
+    text = toml_path.read_text(encoding="utf-8")
+    lines = text.split("\n")
+
+    # api host (e.g. "gmail-api") -> port, harvested from every URL line present.
+    host_port: dict[str, str] = {}
+    for ln in lines:
+        m = _API_URL_RE.match(ln)
+        if m:
+            host_port[m.group(2)] = m.group(3)
+    survivor_ports = {host_port[a] for a in surviving_apis if a in host_port}
+
+    out: list[str] = []
+    section = ""
+    for ln in lines:
+        s = ln.strip()
+        if s.startswith("[") and s.endswith("]"):
+            section = s[1:-1]
+            out.append(ln)
+            continue
+        # 1) inside an *.env block, drop connector URL lines for dropped APIs.
+        m = _API_URL_RE.match(ln)
+        if m and section.endswith(".env"):
+            if m.group(2) in surviving_apis:
+                out.append(ln)
+            continue  # non-survivor: drop the line
+        # 2) shrink the healthcheck curl chain to the surviving ports only.
+        if section == "environment.healthcheck" and s.startswith("command") and "curl -f" in ln:
+            mm = re.match(r'^(\s*command\s*=\s*")(.*)("\s*)$', ln)
+            if mm:
+                segs = [seg.strip() for seg in mm.group(2).split("&&")]
+                kept = []
+                for seg in segs:
+                    pm = re.search(r"localhost:(\d+)/health", seg)
+                    if pm and pm.group(1) in survivor_ports:
+                        kept.append(seg)
+                out.append(f'{mm.group(1)}{" && ".join(kept)}{mm.group(3)}')
+                continue
+        out.append(ln)
+
+    new_text = "\n".join(out)
+    if new_text != text:
+        toml_path.write_text(new_text, encoding="utf-8")
+
+
+def _strip_clockstamps_in_dir(root: Path) -> int:
+    """Remove the harness-injected ``[Day YYYY-MM-DD HH:MM UTC]`` wall-clock
+    prefix from subagent trajectory JSON (published-trajectory hygiene).
+
+    Operates on raw file text so JSON formatting is preserved verbatim and only
+    the stamp token is removed; legitimate clock references inside deliverable
+    prose (e.g. a cron time "12:00 UTC") never match the bracketed pattern.
+    Returns the number of files modified."""
+    n = 0
+    if not root.is_dir():
+        return 0
+    for jf in root.rglob("*.json"):
+        try:
+            txt = jf.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        new = _CLOCKSTAMP_RE.sub("", txt)
+        if new != txt:
+            jf.write_text(new, encoding="utf-8")
+            n += 1
+    return n
+
 
 def _enabled_apis(input_task_dir: Path | None, task_dir: Path) -> set[str]:
     """The task's required + distractor API set, as `<name>-api` dir names.
@@ -126,6 +213,26 @@ def _enabled_apis(input_task_dir: Path | None, task_dir: Path) -> set[str]:
     return enabled
 
 
+def _required_apis_from_task_toml(toml_path: Path) -> set[str]:
+    """Parse ``required_skills`` from task.toml into ``<name>-api`` dir names.
+
+    Connector names ("gmail-api-connector") reduce to API dirs ("gmail-api").
+    Used so the published bundle ships every declared-required API dir even when
+    the run enabled a narrower set.
+    """
+    if not toml_path.is_file():
+        return set()
+    apis: set[str] = set()
+    m = re.search(r"required_skills\s*=\s*\[(.*?)\]",
+                  toml_path.read_text(encoding="utf-8", errors="replace"), re.S)
+    if m:
+        for part in m.group(1).split(","):
+            s = part.strip().strip('"').strip("'").replace("-connector", "").strip()
+            if s.endswith("-api"):
+                apis.add(s)
+    return apis
+
+
 def _finalize_bundle_environment(bundle: Path, input_task_dir: Path | None,
                                  task_dir: Path, current_date: str = "") -> None:
     """Trim data/environment to the task's enabled APIs, guarantee the shared
@@ -140,6 +247,17 @@ def _finalize_bundle_environment(bundle: Path, input_task_dir: Path | None,
         for item in list(env_out.iterdir()):
             if item.is_dir() and item.name.endswith("-api") and item.name not in enabled:
                 shutil.rmtree(item, ignore_errors=True)
+    # 1b) The bundle validator checks task.toml's required_skills against the env
+    # dirs. A run may enable a narrower set than the task declares (e.g. RUTH
+    # declares myfitnesspal/nasa as required but never injected them), so the
+    # trim above can drop a declared-required API. Re-source every declared
+    # required API from the repo catalog so all required dirs are present.
+    for api in _required_apis_from_task_toml(env_out.parent / "task.toml"):
+        dst = env_out / api
+        if not dst.is_dir():
+            src = _REPO_ENV_DIR / api
+            if src.is_dir():
+                shutil.copytree(src, dst, dirs_exist_ok=True)
     # 2) trim skills/ to the enabled connectors + the multimodal/self-improving
     # helpers (the catalog ships ~104 connectors). Mirrors bundle.py's filter.
     skills_dir = env_out / "skills"
@@ -166,6 +284,11 @@ def _finalize_bundle_environment(bundle: Path, input_task_dir: Path | None,
                 encoding="utf-8")
         except Exception as exc:  # pragma: no cover
             print(f"    (compose regen skipped: {exc})", file=sys.stderr)
+    # 5) trim task.toml's env blocks + healthcheck to the APIs we actually ship,
+    # so the manifest stays consistent with the (now trimmed) env dir.
+    surviving = {p.name for p in env_out.iterdir()
+                 if p.is_dir() and p.name.endswith("-api")}
+    _trim_task_toml_env(env_out.parent / "task.toml", surviving)
 
 
 # Extend as new harnesses/models are published. Default direct-Anthropic path
@@ -313,6 +436,32 @@ def _build_pytest_block(verifier_dir: Path) -> dict[str, Any]:
     }, summary, reward_txt
 
 
+def _weighted_test_percentage(tests: list[dict[str, Any]]) -> float | None:
+    """Canonical weighted test reward as a 0-100 percentage, recomputed from the
+    per-test (weight, passed) pairs in the report's pytest block.
+
+    Mirrors src.utils.harbor.ctrf.compute_test_reward / test_executor.
+    _compute_reward (SCORING_AND_TASK_LOGIC §2): reward = max(0, (pos_earned -
+    neg_penalty) / pos_total), where red-line (negative-weight) tests are
+    GUARDRAIL-style — they count as a penalty only when they RAN and FAILED (the
+    guardrail was violated), never when they passed (guardrail respected). Every
+    test in the report's pytest block ran, so "ran and failed" == "not passed".
+    Recomputing here keeps the published percentage correct-by-construction from
+    the shipped test_weights.json + ctrf statuses. Returns None when there are no
+    tests to score."""
+    if not tests:
+        return None
+    pos_total = sum(t["weight"] for t in tests if t["weight"] > 0)
+    if pos_total > 0:
+        pos_earned = sum(t["weight"] for t in tests if t["weight"] > 0 and t["passed"])
+        neg_penalty = sum(abs(t["weight"]) for t in tests if t["weight"] < 0 and not t["passed"])
+        return round(max(0.0, (pos_earned - neg_penalty) / pos_total) * 100.0, 2)
+    # No positive weights configured → simple pass ratio (mirrors the scorers).
+    total = len(tests)
+    passed = sum(1 for t in tests if t["passed"])
+    return round((passed / total) * 100.0, 2) if total else None
+
+
 def _infer_meta(criterion: str, is_positive: bool) -> tuple[str, str]:
     """Light heuristic for (type, evaluation_target) when --infer-rubric-meta set.
 
@@ -409,7 +558,15 @@ def build_report(
     pytest_block, ctrf_summary, reward_txt = _build_pytest_block(verifier)
     rubric_block = _build_rubric_block(score, infer_meta)
 
-    test_pct = ctrf_summary.get("weighted_percentage")
+    # Compute the weighted test percentage directly from the (weight, passed)
+    # pairs we just built, so the published number is correct-by-construction
+    # from the shipped test_weights.json + ctrf statuses — independent of a
+    # possibly-stale reward.txt written by an older/buggy grader. Fall back to
+    # the ctrf summary's weighted_percentage, then reward.txt, only when there
+    # are no weighted tests to score.
+    test_pct = _weighted_test_percentage(pytest_block["tests"])
+    if test_pct is None:
+        test_pct = ctrf_summary.get("weighted_percentage")
     if test_pct is None:
         test_pct = (reward_txt * 100.0) if reward_txt is not None else 0.0
     rubric_pct = score.get("rubric_weights_percentage", 0.0)
@@ -471,6 +628,16 @@ def _find_input_task_dir(input_root: Path, task_dir_name: str) -> Path | None:
     for p in candidates:
         if want and want in persona_core(p.name):
             return p
+    # First-name fallback: output dirs are often "<FIRST>_NNN_<slug>" while the
+    # input dir is "<First> <Last>" (e.g. RUTH_001_october_... <-> Ruth
+    # Armstrong). Match on the leading persona token, but only when it resolves
+    # to exactly one input dir (avoid cross-linking two same-first-name tasks).
+    want_first = want.split()[0] if want else ""
+    if want_first:
+        hits = [p for p in candidates
+                if persona_core(p.name).split()[:1] == [want_first]]
+        if len(hits) == 1:
+            return hits[0]
     return None
 
 
@@ -509,6 +676,7 @@ def convert_task(
     input_root: Path,
     infer_meta: bool,
     verbose: bool,
+    all_runs: bool = False,
 ) -> Path | None:
     trajectories = task_dir / "trajectories"
     if not trajectories.is_dir():
@@ -580,52 +748,103 @@ def convert_task(
     for harness_dir in sorted(p for p in trajectories.iterdir() if p.is_dir()):
         pretty = _pretty_model(harness_dir.name)
         dest_model = bundle / "trajectories" / pretty
+        # Start clean so stale/incomplete run dirs from a prior repackage (which
+        # would fail validation) never linger; only freshly-emitted runs remain.
+        shutil.rmtree(dest_model, ignore_errors=True)
         run_dirs = sorted(
             (p for p in harness_dir.iterdir() if p.is_dir() and re.match(r"run_\d+", p.name)),
             key=lambda p: _run_index_of(p.name),
         )
+        # Publish only the SINGLE LATEST valid run per model by default — a valid
+        # run is the highest-indexed one carrying output.json + the verifier
+        # artifacts (degraded early runs that never produced those are skipped).
+        # `--all-runs` restores emitting every valid run.
+        if not all_runs:
+            latest = next(
+                (p for p in reversed(run_dirs)
+                 if (p / "output.json").exists()
+                 and (p / "task_output" / "logs" / "verifier").is_dir()),
+                None,
+            )
+            run_dirs = [latest] if latest is not None else []
+            if verbose and latest is not None:
+                print(f"    {pretty}: publishing latest run only → {latest.name}")
         per_run_summ: list[dict[str, Any]] = []
         for run_dir in run_dirs:
             ridx = _run_index_of(run_dir.name)
+
+            # A run must carry the core deliverables (output.json + the verifier
+            # artifacts) to validate. Incomplete runs (e.g. a degraded early run
+            # that never produced output.json) are skipped rather than emitted as
+            # a structurally-invalid bundle dir.
+            src_out = run_dir / "output.json"
+            verifier_src = run_dir / "task_output" / "logs" / "verifier"
+            if not src_out.exists() or not verifier_src.is_dir():
+                if verbose:
+                    print(f"    skipping {run_dir.name}: missing output.json or verifier")
+                continue
+
             dest_run = dest_model / f"run_{ridx}"
             dest_run.mkdir(parents=True, exist_ok=True)
 
             # 1) output.json copied as-is
-            src_out = run_dir / "output.json"
-            if src_out.exists():
-                shutil.copy2(src_out, dest_run / "output.json")
+            shutil.copy2(src_out, dest_run / "output.json")
 
             # 2) report.json built
             report = build_report(run_dir, task_dir, pretty, ridx, infer_meta)
             _write_json(dest_run / "report.json", report)
 
-            # 3) output_media
+            # 3) output_media/ (always present; copy_output_media mkdirs it)
             n_media = copy_output_media(run_dir, dest_run)
 
             # The bundle run dir contains EXACTLY: output_media/, logs/verifier/,
-            # snapshots/, output.json, report.json — nothing else.
+            # snapshots/, subagents/, output.json, report.json — nothing else.
             #
             # 4) snapshots/ (workspace_before/ vs workspace_after/, each holding
             # persona/ + data/ + mock_data/). Copied as-is so the bundle preserves
-            # the initial-vs-final state.
+            # the initial-vs-final state. Always created (empty if no source).
+            dest_snap = dest_run / "snapshots"
+            dest_snap.mkdir(parents=True, exist_ok=True)
             src_snap = run_dir / "snapshot"
             if src_snap.is_dir():
                 shutil.copytree(
-                    src_snap, dest_run / "snapshots",
+                    src_snap, dest_snap,
                     dirs_exist_ok=True,
                     ignore=shutil.ignore_patterns(".DS_Store"),
                 )
 
-            # 5) logs/verifier/: the deterministic-test artifacts a re-grader needs
+            # 5) subagents/ — native multi-agent child trajectories (Larry_Bates
+            # layout, written by attach_native_subagents). Always created so the
+            # multi-agent validator passes; empty for single-agent runs.
+            dest_sub = dest_run / "subagents"
+            dest_sub.mkdir(parents=True, exist_ok=True)
+            src_sub = run_dir / "subagents"
+            if src_sub.is_dir():
+                shutil.copytree(
+                    src_sub, dest_sub,
+                    dirs_exist_ok=True,
+                    ignore=shutil.ignore_patterns(".DS_Store"),
+                )
+                # Strip harness-injected wall-clock prefixes from the published
+                # subagent trajectories (hygiene); leaves all else byte-identical.
+                _strip_clockstamps_in_dir(dest_sub)
+            # spawn_tree/ carried through alongside subagents when present.
+            src_tree = run_dir / "spawn_tree"
+            if src_tree.is_dir():
+                shutil.copytree(
+                    src_tree, dest_run / "spawn_tree",
+                    dirs_exist_ok=True,
+                    ignore=shutil.ignore_patterns(".DS_Store"),
+                )
+
+            # 6) logs/verifier/: the deterministic-test artifacts a re-grader needs
             # (the suite, its weights, the CTRF result, and the numeric reward).
-            verifier_src = run_dir / "task_output" / "logs" / "verifier"
-            if verifier_src.is_dir():
-                lv = dest_run / "logs" / "verifier"
-                lv.mkdir(parents=True, exist_ok=True)
-                for _vf in ("test_outputs.py", "ctrf.json", "test_weights.json", "reward.txt"):
-                    _s = verifier_src / _vf
-                    if _s.exists():
-                        shutil.copy2(_s, lv / _vf)
+            lv = dest_run / "logs" / "verifier"
+            lv.mkdir(parents=True, exist_ok=True)
+            for _vf in ("test_outputs.py", "ctrf.json", "test_weights.json", "reward.txt"):
+                _s = verifier_src / _vf
+                if _s.exists():
+                    shutil.copy2(_s, lv / _vf)
 
             # 6) Drop anything not in the allowed set (score/usage/timeline/old
             # singular 'snapshot'/'logs_verifier' from prior repackages) so the
@@ -735,6 +954,12 @@ def main(argv: list[str] | None = None) -> int:
         help="Heuristically fill rubric type/evaluation_target (else left empty).",
     )
     ap.add_argument("-v", "--verbose", action="store_true", help="Per-run detail.")
+    ap.add_argument(
+        "--all-runs",
+        action="store_true",
+        help="Publish every valid run per model. Default: only the single "
+        "latest valid run (highest run_N with output.json + verifier).",
+    )
     args = ap.parse_args(argv)
 
     source_root = Path(args.source_root).resolve()
@@ -761,7 +986,8 @@ def main(argv: list[str] | None = None) -> int:
     dest_root.mkdir(parents=True, exist_ok=True)
     produced = 0
     for task_dir in tasks:
-        if convert_task(task_dir, dest_root, input_root, args.infer_rubric_meta, args.verbose):
+        if convert_task(task_dir, dest_root, input_root, args.infer_rubric_meta,
+                        args.verbose, all_runs=args.all_runs):
             produced += 1
     print(f"done: {produced}/{len(tasks)} task bundle(s) written under {dest_root}")
     return 0 if produced else 1

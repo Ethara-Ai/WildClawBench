@@ -580,6 +580,10 @@ PY"""
 # ---- spawn-subagent skill injection (ported from june-7) ----
 _SUBAGENT_SKILL_NAME = "spawn-subagent-connector"
 _SUBAGENT_CONTAINER_ROOT = f"/usr/lib/node_modules/openclaw/skills/{_SUBAGENT_SKILL_NAME}"
+# Native-path fan-out steering is appended to AGENTS.md (the persona bootstrap),
+# NOT shipped as a skill: skills do not surface in the openclaw system prompt,
+# so a SKILL.md cannot steer the model. See _render_native_spawn_steering and
+# the AGENTS.md append in configure_native_subagents.
 _SUBAGENT_TURN_MARKER = f"{TMP_WORKSPACE}/.wildclaw_current_turn"
 _SUBAGENT_SPAWN_TREE = f"{TMP_WORKSPACE}/spawn_tree.jsonl"
 
@@ -696,6 +700,204 @@ def _render_subagent_skill_md(multi_agent_config: dict | None) -> str:
         "* The sub-agent's full transcript is at "
         f"`{TMP_WORKSPACE}/subagents/{{spawn_id}}.jsonl` if you need to audit it.\n"
     )
+
+
+def _render_native_spawn_steering(multi_agent_config: dict | None) -> str:
+    """Markdown steering block appended to AGENTS.md (the persona bootstrap).
+
+    Skills do NOT surface in the openclaw system prompt, but AGENTS.md content
+    does (verified 2026-06-25), so the fan-out directive lives here. References
+    only tools this build actually registers — ``sessions_spawn`` to launch and
+    ``sessions_list`` / ``sessions_history`` to collect (NO ``sessions_yield``,
+    which does not exist in this build). Trigger checklist mirrors the proven
+    legacy connector skill that reliably elicited fan-out.
+    """
+    return (
+        "## Working style: fan out independent workstreams (native sub-agents)\n"
+        "\n"
+        "When a single turn bundles several **independent** workstreams, do NOT "
+        "work through them yourself one by one. Decompose the turn and spawn one "
+        "sub-agent per independent workstream **in parallel** using the built-in "
+        "`sessions_spawn` tool, let each gather its own data and report back, then "
+        "synthesize their results into the final deliverables yourself.\n"
+        "\n"
+        "Fan out (spawn sub-agents) at the START of the turn if ANY of these hold:\n"
+        "\n"
+        "1. The turn bundles several independent workstreams — one message asking "
+        "you to *run the whole thing* / *sweep every surface and put it together*, "
+        "or to (e.g.) draft quotes AND stand up a tracker AND reconcile the books "
+        "AND stage a launch. One sub-agent per workstream.\n"
+        "2. The prompt names 2+ independent sources or angles (e.g. *the workbook, "
+        "the guide, AND the photo*). Each named angle = one sub-agent.\n"
+        "3. The turn asks for a synthesized multi-section deliverable spanning "
+        "several separate areas. Fan out to gather each area in parallel, then "
+        "synthesize.\n"
+        "\n"
+        "How to fan out:\n"
+        "\n"
+        "1. Identify the independent workstreams (aim for one per deliverable or "
+        "named source).\n"
+        "2. Call `sessions_spawn` once per workstream, up front, in parallel. Give "
+        "each a short `label` and a concrete, self-contained `task` naming the file "
+        "paths / API endpoints to hit and exactly what to return. The child fetches "
+        "its own data — point it at a path or query, do not paste raw data in.\n"
+        "3. Track the children with `sessions_list` and read their results with "
+        "`sessions_history`; wait until they finish.\n"
+        "4. Synthesize the children's results into the requested deliverables "
+        "yourself, holding the same red lines you normally would.\n"
+        "\n"
+        "Do NOT fan out for a single tight question or one purely sequential task. "
+        "Do NOT make one sub-agent do everything, and do NOT skip fan-out to do it "
+        "all inline when the turn clearly bundles independent workstreams.\n"
+    )
+
+
+def configure_native_subagents(
+    task_id: str,
+    multi_agent_config: dict | None = None,
+) -> None:
+    """Enable OpenClaw's NATIVE sessions_spawn multi-agent path for a task.
+
+    Unlike :func:`inject_subagent_tool` (which installs the custom
+    spawn_subagent.py skill), this uses the binary's built-in
+    ``sessions_spawn`` / ``sessions_yield`` tools.
+
+    Two config writes are required for native spawning to actually work:
+
+    1. ``agents.defaults.subagents.maxConcurrent`` (default 8) — fan-out width.
+
+    2. ``tools.alsoAllow`` listing the session tools. This is the critical one:
+       the agent image ships ``tools.profile = "coding"`` (from
+       ``@mariozechner/pi-coding-agent``), whose allowlist contains only
+       read/write/edit/exec-style coding tools and does NOT include
+       ``sessions_spawn`` / ``sessions_yield`` / ``subagents``. Without an
+       additive grant those tools are filtered out of the callable set, so the
+       model is never offered them and cannot spawn — verified empirically
+       across JAE_002 run_1/run_2 (spawn_tree empty, zero sessions_spawn calls)
+       on 2026-06-25. ``tools.alsoAllow`` is the schema-recognized additive path
+       (``ToolPolicySchema`` accepts ``allow|alsoAllow|deny``; ``profile`` +
+       ``alsoAllow`` is legal, ``allow`` + ``alsoAllow`` in one scope is not).
+
+    ``spawnEnabled`` itself is already ON for the headless ``chat`` channel
+    (``normalizeBoolean(undefined)`` is nullish, so the gate falls through to
+    ``channel !== "discord"`` = true), so no spawn-flag key is written:
+    ``session.threadBindings.spawnSubagentSessions`` is rejected by the config
+    validator (verified 2026-06-25).
+
+    The turn-marker file is still initialized so spawn/turn correlation works
+    for the harvester. No-op-safe: failures are logged, not raised, so a config
+    hiccup never aborts an otherwise-valid run.
+    """
+    cfg = multi_agent_config or {}
+    max_concurrent = int(cfg.get("max_concurrent", 8))
+    # Session tools the `coding` profile allowlist omits; granted additively so
+    # the native sessions_spawn path is actually callable by the agent. NOTE:
+    # this openclaw build registers sessions_spawn / sessions_list /
+    # sessions_history / subagents / agents_list but NOT sessions_yield (verified
+    # 2026-06-25: gateway warned `tools.allow allowlist contains unknown entries
+    # (sessions_yield)`). Children are collected via sessions_list /
+    # sessions_history, so sessions_yield is intentionally omitted.
+    session_tools = [
+        "sessions_spawn", "subagents", "agents_list",
+        "sessions_list", "sessions_history", "sessions_send",
+    ]
+    script = (
+        "import json, pathlib\n"
+        "p = pathlib.Path('/root/.openclaw/openclaw.json')\n"
+        "d = json.loads(p.read_text()) if p.exists() else {}\n"
+        "defaults = d.setdefault('agents', {}).setdefault('defaults', {})\n"
+        f"defaults.setdefault('subagents', {{}})['maxConcurrent'] = {max_concurrent}\n"
+        # Additively allow the native session tools on top of the `coding`
+        # profile (profile + alsoAllow is the supported combination).
+        "tools = d.setdefault('tools', {})\n"
+        "also = tools.setdefault('alsoAllow', [])\n"
+        f"for _t in {session_tools!r}:\n"
+        "    if _t not in also:\n"
+        "        also.append(_t)\n"
+        # Guard the schema rule: alsoAllow cannot coexist with an inline allow
+        # in the same scope. The image config uses `profile`, not `allow`, so we
+        # only drop a stray `allow` if one was somehow written earlier.
+        "if tools.get('allow'):\n"
+        "    tools['allow'] = [t for t in tools['allow'] if t not in also]\n"
+        "    if not tools['allow']:\n"
+        "        tools.pop('allow', None)\n"
+        "p.write_text(json.dumps(d, indent=2))\n"
+    )
+    r = subprocess.run(
+        ["docker", "exec", "-i", task_id, "python3", "-"],
+        input=script, capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        logger.warning(
+            "[%s] configure_native_subagents: config patch failed: %s",
+            task_id, r.stderr.strip(),
+        )
+
+    # Initialize the turn marker + spawn ledger dir (harvester correlates native
+    # child sessions to the turn that spawned them via this marker).
+    init_cmd = (
+        f"mkdir -p {TMP_WORKSPACE}/subagents && "
+        f"touch {_SUBAGENT_SPAWN_TREE} && "
+        f"printf 0 > {_SUBAGENT_TURN_MARKER}"
+    )
+    r = subprocess.run(
+        ["docker", "exec", task_id, "/bin/bash", "-c", init_cmd],
+        capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        logger.warning(
+            "[%s] configure_native_subagents: marker init failed: %s",
+            task_id, r.stderr.strip(),
+        )
+
+    # Steering: append the fan-out directive to the agent's bootstrap context.
+    # Allowing the tool (above) only makes spawning POSSIBLE; the model still
+    # needs to be TOLD to do it. Skills do NOT surface in the system prompt
+    # (verified JAE_002 run_3: zero skill names in meta_info.system_prompt), but
+    # the persona bootstrap MDs (AGENTS.md) DO — its content appears verbatim in
+    # the system prompt. So the steering goes into AGENTS.md, the channel the
+    # legacy connector skill effectively relied on. Appended to every AGENTS.md
+    # openclaw might load (persona home + workspace cwd) for robustness.
+    steering = _render_native_spawn_steering(cfg)
+    with tempfile.TemporaryDirectory() as staging:
+        steer_file = Path(staging) / "steer.md"
+        steer_file.write_text("\n\n" + steering + "\n", encoding="utf-8")
+        container_tmp = f"{TMP_WORKSPACE}/.wildclaw_spawn_steering.md"
+        cp = subprocess.run(
+            ["docker", "cp", str(steer_file), f"{task_id}:{container_tmp}"],
+            capture_output=True, text=True,
+        )
+    if cp.returncode != 0:
+        logger.warning(
+            "[%s] configure_native_subagents: steering stage failed: %s",
+            task_id, cp.stderr.strip(),
+        )
+    else:
+        # Append to each AGENTS.md that exists (idempotent: skip if already added).
+        append_cmd = (
+            "MARK='<!-- wildclaw-native-spawn -->'; "
+            f"for f in /root/AGENTS.md {TMP_WORKSPACE}/AGENTS.md; do "
+            "  [ -f \"$f\" ] || continue; "
+            "  grep -q \"$MARK\" \"$f\" && continue; "
+            f"  printf '\\n%s\\n' \"$MARK\" >> \"$f\"; "
+            f"  cat {container_tmp} >> \"$f\"; "
+            "done"
+        )
+        r = subprocess.run(
+            ["docker", "exec", task_id, "/bin/bash", "-c", append_cmd],
+            capture_output=True, text=True,
+        )
+        if r.returncode != 0:
+            logger.warning(
+                "[%s] configure_native_subagents: AGENTS.md steering append failed: %s",
+                task_id, r.stderr.strip(),
+            )
+        else:
+            logger.info(
+                "[%s] Native multi-agent armed: alsoAllow'd session tools + "
+                "fan-out steering appended to AGENTS.md",
+                task_id,
+            )
 
 
 def inject_subagent_tool(
@@ -939,6 +1141,18 @@ def collect_output_from_container(
     task_output_dir.mkdir(parents=True, exist_ok=True)
 
     _copy_dir_from_container(task_id, "/tmp/openclaw/.", str(task_output_dir))
+
+    # Native multi-agent: collect the OpenClaw session store so the parent
+    # session AND every native sessions_spawn child session survive teardown.
+    # Children live at /root/.openclaw/agents/main/sessions/<session-key>.jsonl;
+    # without this they are lost when the container is removed. jsonl_reader.
+    # read_sessions_grouped consumes this dir to split parent from children.
+    sessions_out = task_output_dir / "sessions"
+    sessions_out.mkdir(parents=True, exist_ok=True)
+    if not _copy_dir_from_container(
+        task_id, "/root/.openclaw/agents/main/sessions/.", str(sessions_out)
+    ):
+        logger.debug("[%s] no native session store to collect", task_id)
 
     _sweep_root_deliverables_to_workspace(task_id)
 

@@ -227,8 +227,24 @@ def write_bundle(
     # `infer_required_apis(prompt)` call returns [] for persona-format tasks
     # whose prompt has no literal API names, which silently wrote
     # `required_skills = []` to data/task.toml — the b31 bug class.
-    required = _early_required
-    distractor = _distractor_for_services
+    # task.toml's required_skills/distractor_skills must list ONLY the task's
+    # own APIs. Prefer the task's DECLARED sets (task.yaml required_apis/
+    # distractor_apis, threaded through task.extra) over the discovery-based
+    # `_early_required` (which unions in every mock_data overlay) and the
+    # catalog-wide `_distractor_for_services`. Fall back to the computed sets for
+    # legacy tasks that ship no declarations. NOTE: the live distractor SERVICES
+    # above still use `_distractor_for_services` (b46) — only the manifest lists
+    # are scoped here.
+    def _as_api(n: str) -> str:
+        return n if n.endswith("-api") else f"{n}-api"
+    _api_extra = task.extra if isinstance(task.extra, dict) else {}
+    _decl_req = _api_extra.get("required_apis_declared")
+    _decl_dist = _api_extra.get("distractor_apis_declared")
+    required = [_as_api(n) for n in _decl_req] if _decl_req else _early_required
+    distractor = (
+        [_as_api(n) for n in _decl_dist] if _decl_dist is not None
+        else _distractor_for_services
+    )
     required_skills = [f"{name}-connector" for name in required]
     distractor_skills = [f"{name}-connector" for name in distractor]
 

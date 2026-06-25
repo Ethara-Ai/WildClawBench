@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import mimetypes
+import os
 import re
 from pathlib import Path
 from typing import Any, Optional
@@ -262,6 +263,7 @@ def _attach_drift_script(task: dict, task_dir: Path) -> dict:
     # "MA_C1", min_subagents=2.
     task["multi_agent_config"] = {}
     task["multi_agent_enabled"] = False
+    explicit_off = False
     cfg_path = task_dir / "task_config.yaml"
     if cfg_path.is_file():
         try:
@@ -271,6 +273,9 @@ def _attach_drift_script(task: dict, task_dir: Path) -> dict:
                 if isinstance(ma, dict):
                     task["multi_agent_config"] = ma
                     task["multi_agent_enabled"] = bool(ma.get("enabled"))
+                    # An explicit `enabled: false` is authoritative: it opts the
+                    # task OUT of the default-on fallback below.
+                    explicit_off = ma.get("enabled") is False
         except (yaml.YAMLError, OSError):
             pass
     if not task["multi_agent_enabled"]:
@@ -288,7 +293,45 @@ def _attach_drift_script(task: dict, task_dir: Path) -> dict:
         if synth.get("enabled"):
             task["multi_agent_config"] = synth
             task["multi_agent_enabled"] = True
+    # Default-ON: with no explicit author decision, enable the sub-agent
+    # CAPABILITY by default (the sessions_spawn / subagents tools are exposed) so
+    # any task can fan out like the multi-agent reference tasks. This adds NO
+    # spawn requirement and NO scoring pressure — the synthesized config has an
+    # empty expected_per_turn and no aggregate checker, so build_checker_state
+    # emits nothing and _wait_for_subagents is a no-op when nothing spawns.
+    # Opt a task out with a task_config.yaml `multi_agent: {enabled: false}`
+    # block; disable globally with WCB_MULTI_AGENT_DEFAULT=0. Tasks that want
+    # multi-agent SCORED still declare multi_agent_complex_turns / the config.
+    if not task["multi_agent_enabled"] and not explicit_off and _multi_agent_default_on():
+        task["multi_agent_config"] = _default_multi_agent_config()
+        task["multi_agent_enabled"] = True
+        logger.info(
+            "[%s] multi-agent capability enabled by default (no spawn requirement; "
+            "set WCB_MULTI_AGENT_DEFAULT=0 to disable)",
+            task.get("task_id") or task.get("name") or "?",
+        )
     return task
+
+
+def _multi_agent_default_on() -> bool:
+    """Whether sub-agent capability is enabled by default for tasks that declare
+    no multi_agent config. Default ON; set WCB_MULTI_AGENT_DEFAULT to a falsy
+    token (0/false/no/off/empty) to revert to strict opt-in."""
+    return os.environ.get("WCB_MULTI_AGENT_DEFAULT", "1").strip().lower() not in (
+        "0", "false", "no", "off", "",
+    )
+
+
+def _default_multi_agent_config() -> dict:
+    """Capability-only multi_agent config: the sub-agent tools are exposed but
+    spawning is neither required nor scored (empty expected_per_turn, no
+    aggregate_checker_id). Same shape the runner consumes for native mode."""
+    return {
+        "enabled": True,
+        "native": True,
+        "default_allowed_tools": ["Read", "Write", "Edit", "Bash", "Grep", "Glob"],
+        "expected_per_turn": {},
+    }
 
 
 def _synthesize_multi_agent_config(task_dir: Path) -> dict:

@@ -212,7 +212,13 @@ class InjectScript:
 # prompts.txt parsing (50-turn wake-up script)
 # ---------------------------------------------------------------------------
 
-_TURN_RE = re.compile(r"^---\s*TURN\s+T(\d+)\b.*?---\s*$", re.IGNORECASE)
+# The ``T`` before the turn number is optional: both ``--- TURN T1 ... ---``
+# (canonical) and ``--- TURN 1 ... ---`` are accepted. This mirrors the
+# multi-agent header detector (_multi_agent_config_from_complex_turns uses
+# ``TURN\s+T?(\d+)``); keeping the two in sync prevents a task from passing
+# multi-agent detection while its prompt body silently fails to parse (which
+# yields an empty --message and an immediate agent crash).
+_TURN_RE = re.compile(r"^---\s*TURN\s+T?(\d+)\b.*?---\s*$", re.IGNORECASE)
 
 
 def parse_prompts_file(path: Path | str) -> List[str]:

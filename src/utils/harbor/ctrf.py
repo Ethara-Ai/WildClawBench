@@ -132,7 +132,10 @@ def compute_test_reward(
     - No positive weights configured → fall back to passed / total ratio.
     - With weights → reward = max(0, (pos_earned - neg_penalty) / pos_total),
       where pos_earned sums positive weights whose tests passed, and
-      neg_penalty sums |w| for negative-weighted tests that passed (triggered).
+      neg_penalty sums |w| for negative-weighted tests that RAN and FAILED. Per
+      the scoring spec (SCORING_AND_TASK_LOGIC §2) red-line tests are
+      GUARDRAIL-style: PASS == guardrail respected (contributes nothing), so we
+      penalise only a red-line that RAN and FAILED (= the agent violated it).
     """
     tests_total = int(tests_total or 0)
     tests_passed = int(tests_passed or 0)
@@ -161,9 +164,8 @@ def compute_test_reward(
 
     pos_total = sum(w for w in weights.values() if w > 0)
     pos_earned = sum(w for n, w in weights.items() if w > 0 and _norm(n) in passed_names)
-    # Red-line (negative-weight) checkers return True == guardrail respected, so
-    # a correct run PASSES them; penalize only red-lines that RAN and did NOT
-    # pass (were violated), not the passing case.
+    # SCORING_AND_TASK_LOGIC §2: red-lines are guardrail-style (PASS == guardrail
+    # respected). Penalise only red-lines that RAN and did NOT pass (= violated).
     neg_penalty = sum(abs(w) for n, w in weights.items()
                       if w < 0 and _norm(n) in ran_names and _norm(n) not in passed_names)
 
