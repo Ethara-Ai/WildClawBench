@@ -1,0 +1,6407 @@
+[
+  {
+    "Id": "9001",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9002",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9003",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9004",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9005",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9006",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9007",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9008",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9009",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9010",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9011",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9012",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9013",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9014",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9015",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9016",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9017",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9018",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9019",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9020",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9021",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9022",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9023",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9024",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9025",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9026",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9027",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9028",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9029",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9030",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9031",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9032",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9033",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9034",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9035",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9036",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9037",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9038",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9039",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9040",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9041",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9042",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9043",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9044",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9045",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9046",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9047",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9048",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9049",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9050",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9051",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9052",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9053",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9054",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9055",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9056",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9057",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9058",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9059",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9060",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9061",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9062",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9063",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9064",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9065",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9066",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9067",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9068",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9069",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9070",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9071",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9072",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9073",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9074",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9075",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9076",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9077",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9078",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9079",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9080",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9081",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9082",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9083",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9084",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9085",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9086",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9087",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9088",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9089",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9090",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9091",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9092",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9093",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9094",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9095",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9096",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9097",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9098",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9099",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9100",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9101",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9102",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9103",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9104",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9105",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9106",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9107",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9108",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9109",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9110",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9111",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9112",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9113",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9114",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9115",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9116",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9117",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9118",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9119",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9120",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9121",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9122",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9123",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9124",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9125",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9126",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9127",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9128",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9129",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9130",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9131",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9132",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9133",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9134",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9135",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9136",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9137",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9138",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9139",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9140",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9141",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9142",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9143",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9144",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9145",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9146",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9147",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9148",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9149",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9150",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9151",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9152",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9153",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9154",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9155",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9156",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9157",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9158",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9159",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9160",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9161",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9162",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9163",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9164",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9165",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9166",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9167",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9168",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9169",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9170",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9171",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9172",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9173",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9174",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9175",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9176",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9177",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9178",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9179",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9180",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9181",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9182",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9183",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9184",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9185",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9186",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9187",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9188",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9189",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9190",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9191",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9192",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9193",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9194",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9195",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9196",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9197",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9198",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9199",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9200",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9201",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9202",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9203",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9204",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9205",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9206",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9207",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9208",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9209",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9210",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9211",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9212",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9213",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9214",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9215",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9216",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9217",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9218",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9219",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9220",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9221",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9222",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9223",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9224",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9225",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9226",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9227",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9228",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9229",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9230",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9231",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9232",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9233",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9234",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9235",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9236",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9237",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9238",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9239",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9240",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9241",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9242",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9243",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9244",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9245",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9246",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9247",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9248",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9249",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9250",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9251",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9252",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9253",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9254",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9255",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9256",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9257",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9258",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9259",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9260",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9261",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9262",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9263",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9264",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9265",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9266",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9267",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9268",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9269",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9270",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9271",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9272",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9273",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9274",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9275",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9276",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9277",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9278",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9279",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9280",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9281",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9282",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9283",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9284",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9285",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9286",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9287",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9288",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9289",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9290",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9291",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9292",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9293",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9294",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9295",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9296",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9297",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9298",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9299",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9300",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9301",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9302",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9303",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9304",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  },
+  {
+    "Id": "9305",
+    "TxnDate": "2026-10-14",
+    "TotalAmt": 209.25,
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 209.25,
+        "LinkedTxn": [
+          {
+            "TxnId": "7001",
+            "TxnType": "Invoice"
+          }
+        ]
+      }
+    ],
+    "PrivateNote": "50% deposit on SL-2026-0118; balance $209.25 due 2026-12-05. Buyer requested earlier Nov 28 pickup window."
+  }
+]

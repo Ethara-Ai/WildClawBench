@@ -1,0 +1,7 @@
+metric,value,unit,note
+immigrant_share,60,%,household composition
+renter_share,40,%,renter share distinct from cost-burdened
+cost_burdened_renters,46,%,"revised re-tabulation; supersedes the 40% carried in the study"
+prior_cost_burdened_renters,40,%,prior baseline carried in study text
+source,federal_partner_retabulation,,hosted in Box per partner security review
+as_of,2026-10-13,date,

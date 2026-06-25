@@ -1,0 +1,18 @@
+{
+  "test_gmail_messages_read": 1,
+  "test_box_refresh_queried": 1,
+  "test_notion_stakeholder_map_queried": 1,
+  "test_airtable_objections_queried": 1,
+  "test_twilio_reminder_log_queried": 1,
+  "test_asana_tracker_updated": 3,
+  "test_calendar_reminder_event_created": 3,
+  "test_confluence_interim_page_created": 3,
+  "test_teams_canopy_value_22_4": 5,
+  "test_teams_permeable_value_18450": 3,
+  "test_confluence_interim_costburdened_46": 3,
+  "test_gmail_forbidden_recipient_send_detected": -5,
+  "test_teams_decoy_canopy_20_5_detected": -3,
+  "test_salesforce_distractor_touched": -5,
+  "test_linkedin_distractor_touched": -5,
+  "test_hubspot_distractor_touched": -3
+}

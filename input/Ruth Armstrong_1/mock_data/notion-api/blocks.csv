@@ -1,0 +1,184 @@
+id,page_id,parent_block_id,type,text,order,created_time,last_edited_time,has_children,checked
+blk_001,ouellet_position_note,,paragraph,Position: neutral-pending-final-round on Mobilite Plateau (as of 2026-10-15). Office walked back the earlier cautious-supportive comment; wants to see final-round feedback before any on-record line. No on-record line before the final round.,1,2026-09-01T10:00:00.000Z,2026-10-15T10:00:00.000Z,False,False
+blk_002,sophie_headcount_note,,paragraph,"Estimated attendance for the October 15 final consultation: 210 (Sophie Chen, portal RSVPs, as of 2026-10-14). Earlier schedule figure was 180.",1,2026-10-10T10:00:00.000Z,2026-10-14T10:00:00.000Z,False,False
+blk_003,parcex_methodology,,paragraph,"Four-language survey (FR/EN/Tamil/Urdu). Carried baseline: 60% immigrant share, 40% renters spending >30% of income on housing. Outreach through trusted community organizations, not traditional public meetings.",1,2026-02-10T10:00:00.000Z,2026-10-11T10:00:00.000Z,False,False
+blk_d01,parcex_cached_figures,,paragraph,"Quick reference (cached 2026-10-05, may be stale): cost-burdened renters 43% (FINAL?). Tree canopy 21.8% (design table). Final consultation attendance 180 (locked?). Business-owner objections 14. Ouellet cautious-supportive.",1,2026-10-05T10:00:00.000Z,2026-10-05T10:00:00.000Z,False,False
+blk_climate,climate_metrics_ref,,paragraph,"Green-infrastructure module figures. The GIS layer reads tree canopy 22.4%, which is authoritative over the 21.8% design-table value and the 19.1% 2024 baseline. Permeable surface area 18450 m2, reported exactly. Cooling-corridor coverage 6.2 km.",1,2026-10-09T10:00:00.000Z,2026-10-11T10:00:00.000Z,False,False
+blk_traffic,mobilite_traffic_ref,,paragraph,"Cycling counts for the protected bike-lane alignment. Before 1,240 daily trips, projected after 2,980 daily trips. Parking spaces affected 84 (not a trip count). Intercept survey N=312.",1,2026-10-08T10:00:00.000Z,2026-10-11T10:00:00.000Z,False,False
+blk_g0000,pg_000,,paragraph,Action item for Amara.,1,2026-10-24T10:00:00.000Z,2026-10-12T10:00:00.000Z,False,True
+blk_g0001,pg_000,,bulleted_list_item,Action item for Amara.,2,2026-06-19T10:00:00.000Z,2026-10-09T10:00:00.000Z,False,True
+blk_g0002,pg_001,,bulleted_list_item,Action item for Amara.,1,2026-07-05T10:00:00.000Z,2026-10-07T10:00:00.000Z,False,True
+blk_g0003,pg_001,,paragraph,Outreach via community org.,2,2026-03-07T10:00:00.000Z,2026-10-04T10:00:00.000Z,False,False
+blk_g0004,pg_002,,to_do,Engagement history logged.,1,2026-08-21T10:00:00.000Z,2026-10-03T10:00:00.000Z,False,True
+blk_g0005,pg_002,,paragraph,Outreach via community org.,2,2026-08-21T10:00:00.000Z,2026-10-14T10:00:00.000Z,False,True
+blk_g0006,pg_002,,paragraph,Follow-up scheduled.,3,2026-09-06T10:00:00.000Z,2026-10-10T10:00:00.000Z,False,False
+blk_g0007,pg_002,,bulleted_list_item,Notes from site visit.,4,2026-09-01T10:00:00.000Z,2026-10-13T10:00:00.000Z,False,True
+blk_g0008,pg_003,,paragraph,Notes from site visit.,1,2026-03-03T10:00:00.000Z,2026-10-11T10:00:00.000Z,False,False
+blk_g0009,pg_003,,to_do,Follow-up scheduled.,2,2026-05-25T10:00:00.000Z,2026-10-06T10:00:00.000Z,False,False
+blk_g0010,pg_003,,paragraph,Notes from site visit.,3,2026-07-16T10:00:00.000Z,2026-10-03T10:00:00.000Z,False,False
+blk_g0011,pg_004,,to_do,Engagement history logged.,1,2026-03-17T10:00:00.000Z,2026-10-02T10:00:00.000Z,False,False
+blk_g0012,pg_004,,bulleted_list_item,Action item for Amara.,2,2026-02-27T10:00:00.000Z,2026-10-13T10:00:00.000Z,False,True
+blk_g0013,pg_004,,to_do,Position: supportive.,3,2026-08-04T10:00:00.000Z,2026-10-08T10:00:00.000Z,False,False
+blk_g0014,pg_005,,to_do,Survey response recorded.,1,2026-07-16T10:00:00.000Z,2026-10-03T10:00:00.000Z,False,True
+blk_g0015,pg_005,,to_do,Follow-up scheduled.,2,2026-05-19T10:00:00.000Z,2026-10-11T10:00:00.000Z,False,True
+blk_g0016,pg_005,,bulleted_list_item,Position: conditional.,3,2026-02-12T10:00:00.000Z,2026-10-03T10:00:00.000Z,False,True
+blk_g0017,pg_005,,to_do,Position: conditional.,4,2026-04-17T10:00:00.000Z,2026-10-06T10:00:00.000Z,False,False
+blk_g0018,pg_006,,bulleted_list_item,Survey response recorded.,1,2026-06-08T10:00:00.000Z,2026-10-04T10:00:00.000Z,False,True
+blk_g0019,pg_006,,paragraph,Survey response recorded.,2,2026-10-10T10:00:00.000Z,2026-10-12T10:00:00.000Z,False,False
+blk_g0020,pg_006,,paragraph,Survey response recorded.,3,2026-05-25T10:00:00.000Z,2026-10-10T10:00:00.000Z,False,False
+blk_g0021,pg_006,,paragraph,Engagement history logged.,4,2026-05-13T10:00:00.000Z,2026-10-14T10:00:00.000Z,False,True
+blk_g0022,pg_007,,to_do,Engagement history logged.,1,2026-04-21T10:00:00.000Z,2026-10-06T10:00:00.000Z,False,True
+blk_g0023,pg_007,,paragraph,Outreach via community org.,2,2026-06-26T10:00:00.000Z,2026-10-04T10:00:00.000Z,False,False
+blk_g0024,pg_007,,paragraph,Outreach via community org.,3,2026-07-22T10:00:00.000Z,2026-10-07T10:00:00.000Z,False,True
+blk_g0025,pg_007,,bulleted_list_item,Engagement history logged.,4,2026-04-20T10:00:00.000Z,2026-10-01T10:00:00.000Z,False,False
+blk_g0026,pg_008,,paragraph,Action item for Amara.,1,2026-03-12T10:00:00.000Z,2026-10-14T10:00:00.000Z,False,False
+blk_g0027,pg_008,,to_do,Action item for Amara.,2,2026-10-22T10:00:00.000Z,2026-10-10T10:00:00.000Z,False,True
+blk_g0028,pg_008,,paragraph,Position: neutral.,3,2026-07-08T10:00:00.000Z,2026-10-12T10:00:00.000Z,False,False
+blk_g0029,pg_009,,bulleted_list_item,Position: neutral.,1,2026-04-05T10:00:00.000Z,2026-10-03T10:00:00.000Z,False,False
+blk_g0030,pg_009,,bulleted_list_item,Notes from site visit.,2,2026-06-14T10:00:00.000Z,2026-10-07T10:00:00.000Z,False,True
+blk_g0031,pg_009,,to_do,Survey response recorded.,3,2026-04-07T10:00:00.000Z,2026-10-09T10:00:00.000Z,False,False
+blk_g0032,pg_009,,bulleted_list_item,Position: neutral.,4,2026-09-09T10:00:00.000Z,2026-10-07T10:00:00.000Z,False,False
+blk_g0033,pg_010,,to_do,Outreach via community org.,1,2026-03-10T10:00:00.000Z,2026-10-05T10:00:00.000Z,False,True
+blk_g0034,pg_011,,paragraph,Action item for Amara.,1,2026-10-10T10:00:00.000Z,2026-10-12T10:00:00.000Z,False,False
+blk_g0035,pg_012,,bulleted_list_item,Position: neutral.,1,2026-02-08T10:00:00.000Z,2026-10-09T10:00:00.000Z,False,True
+blk_g0036,pg_012,,paragraph,Follow-up scheduled.,2,2026-10-05T10:00:00.000Z,2026-10-01T10:00:00.000Z,False,False
+blk_g0037,pg_012,,bulleted_list_item,Action item for Amara.,3,2026-07-13T10:00:00.000Z,2026-10-10T10:00:00.000Z,False,False
+blk_g0038,pg_012,,bulleted_list_item,Action item for Amara.,4,2026-09-21T10:00:00.000Z,2026-10-06T10:00:00.000Z,False,True
+blk_g0039,pg_013,,bulleted_list_item,Action item for Amara.,1,2026-02-08T10:00:00.000Z,2026-10-04T10:00:00.000Z,False,True
+blk_g0040,pg_013,,bulleted_list_item,Outreach via community org.,2,2026-06-10T10:00:00.000Z,2026-10-01T10:00:00.000Z,False,False
+blk_g0041,pg_014,,bulleted_list_item,Outreach via community org.,1,2026-04-04T10:00:00.000Z,2026-10-14T10:00:00.000Z,False,False
+blk_g0042,pg_014,,bulleted_list_item,Engagement history logged.,2,2026-08-27T10:00:00.000Z,2026-10-05T10:00:00.000Z,False,True
+blk_g0043,pg_014,,to_do,Follow-up scheduled.,3,2026-04-17T10:00:00.000Z,2026-10-05T10:00:00.000Z,False,True
+blk_g0044,pg_014,,paragraph,Position: conditional.,4,2026-05-15T10:00:00.000Z,2026-10-04T10:00:00.000Z,False,False
+blk_g0045,pg_015,,bulleted_list_item,Action item for Amara.,1,2026-08-08T10:00:00.000Z,2026-10-14T10:00:00.000Z,False,True
+blk_g0046,pg_016,,bulleted_list_item,Survey response recorded.,1,2026-07-16T10:00:00.000Z,2026-10-07T10:00:00.000Z,False,False
+blk_g0047,pg_016,,to_do,Notes from site visit.,2,2026-10-17T10:00:00.000Z,2026-10-04T10:00:00.000Z,False,True
+blk_g0048,pg_017,,bulleted_list_item,Survey response recorded.,1,2026-10-25T10:00:00.000Z,2026-10-09T10:00:00.000Z,False,True
+blk_g0049,pg_018,,to_do,Survey response recorded.,1,2026-10-03T10:00:00.000Z,2026-10-11T10:00:00.000Z,False,True
+blk_g0050,pg_018,,bulleted_list_item,Notes from site visit.,2,2026-02-18T10:00:00.000Z,2026-10-14T10:00:00.000Z,False,True
+blk_g0051,pg_018,,bulleted_list_item,Follow-up scheduled.,3,2026-08-26T10:00:00.000Z,2026-10-01T10:00:00.000Z,False,False
+blk_g0052,pg_019,,paragraph,Position: conditional.,1,2026-05-22T10:00:00.000Z,2026-10-05T10:00:00.000Z,False,False
+blk_g0053,pg_019,,to_do,Outreach via community org.,2,2026-08-18T10:00:00.000Z,2026-10-10T10:00:00.000Z,False,False
+blk_g0054,pg_019,,to_do,Notes from site visit.,3,2026-06-13T10:00:00.000Z,2026-10-12T10:00:00.000Z,False,True
+blk_g0055,pg_019,,paragraph,Engagement history logged.,4,2026-05-14T10:00:00.000Z,2026-10-03T10:00:00.000Z,False,False
+blk_g0056,pg_020,,bulleted_list_item,Follow-up scheduled.,1,2026-06-01T10:00:00.000Z,2026-10-09T10:00:00.000Z,False,False
+blk_g0057,pg_020,,to_do,Engagement history logged.,2,2026-08-01T10:00:00.000Z,2026-10-06T10:00:00.000Z,False,False
+blk_g0058,pg_020,,paragraph,Follow-up scheduled.,3,2026-07-28T10:00:00.000Z,2026-10-07T10:00:00.000Z,False,True
+blk_g0059,pg_021,,paragraph,Action item for Amara.,1,2026-04-09T10:00:00.000Z,2026-10-06T10:00:00.000Z,False,False
+blk_g0060,pg_021,,paragraph,Notes from site visit.,2,2026-03-14T10:00:00.000Z,2026-10-09T10:00:00.000Z,False,False
+blk_g0061,pg_022,,paragraph,Follow-up scheduled.,1,2026-06-05T10:00:00.000Z,2026-10-01T10:00:00.000Z,False,True
+blk_g0062,pg_022,,paragraph,Survey response recorded.,2,2026-09-05T10:00:00.000Z,2026-10-03T10:00:00.000Z,False,True
+blk_g0063,pg_023,,to_do,Follow-up scheduled.,1,2026-04-18T10:00:00.000Z,2026-10-10T10:00:00.000Z,False,True
+blk_g0064,pg_023,,to_do,Position: supportive.,2,2026-08-25T10:00:00.000Z,2026-10-02T10:00:00.000Z,False,False
+blk_g0065,pg_023,,bulleted_list_item,Action item for Amara.,3,2026-09-11T10:00:00.000Z,2026-10-02T10:00:00.000Z,False,True
+blk_g0066,pg_023,,to_do,Outreach via community org.,4,2026-09-25T10:00:00.000Z,2026-10-08T10:00:00.000Z,False,False
+blk_g0067,pg_024,,paragraph,Engagement history logged.,1,2026-05-13T10:00:00.000Z,2026-10-03T10:00:00.000Z,False,False
+blk_g0068,pg_024,,bulleted_list_item,Position: conditional.,2,2026-02-07T10:00:00.000Z,2026-10-01T10:00:00.000Z,False,False
+blk_g0069,pg_025,,to_do,Survey response recorded.,1,2026-02-26T10:00:00.000Z,2026-10-05T10:00:00.000Z,False,True
+blk_g0070,pg_025,,bulleted_list_item,Position: conditional.,2,2026-09-16T10:00:00.000Z,2026-10-06T10:00:00.000Z,False,False
+blk_g0071,pg_026,,bulleted_list_item,Follow-up scheduled.,1,2026-02-13T10:00:00.000Z,2026-10-08T10:00:00.000Z,False,True
+blk_g0072,pg_026,,to_do,Engagement history logged.,2,2026-07-24T10:00:00.000Z,2026-10-11T10:00:00.000Z,False,False
+blk_g0073,pg_026,,bulleted_list_item,Engagement history logged.,3,2026-07-21T10:00:00.000Z,2026-10-02T10:00:00.000Z,False,True
+blk_g0074,pg_027,,paragraph,Follow-up scheduled.,1,2026-09-15T10:00:00.000Z,2026-10-08T10:00:00.000Z,False,True
+blk_g0075,pg_027,,to_do,Outreach via community org.,2,2026-06-14T10:00:00.000Z,2026-10-11T10:00:00.000Z,False,False
+blk_g0076,pg_027,,paragraph,Outreach via community org.,3,2026-03-03T10:00:00.000Z,2026-10-08T10:00:00.000Z,False,True
+blk_g0077,pg_028,,to_do,Action item for Amara.,1,2026-04-10T10:00:00.000Z,2026-10-10T10:00:00.000Z,False,True
+blk_g0078,pg_028,,bulleted_list_item,Survey response recorded.,2,2026-08-13T10:00:00.000Z,2026-10-05T10:00:00.000Z,False,False
+blk_g0079,pg_029,,to_do,Survey response recorded.,1,2026-03-04T10:00:00.000Z,2026-10-09T10:00:00.000Z,False,False
+blk_g0080,pg_029,,bulleted_list_item,Survey response recorded.,2,2026-06-03T10:00:00.000Z,2026-10-10T10:00:00.000Z,False,True
+blk_g0081,pg_029,,to_do,Position: conditional.,3,2026-07-01T10:00:00.000Z,2026-10-08T10:00:00.000Z,False,False
+blk_g0082,pg_029,,bulleted_list_item,Action item for Amara.,4,2026-02-12T10:00:00.000Z,2026-10-14T10:00:00.000Z,False,False
+blk_g0083,pg_030,,paragraph,Notes from site visit.,1,2026-08-11T10:00:00.000Z,2026-10-03T10:00:00.000Z,False,True
+blk_g0084,pg_030,,to_do,Outreach via community org.,2,2026-02-08T10:00:00.000Z,2026-10-07T10:00:00.000Z,False,False
+blk_g0085,pg_030,,bulleted_list_item,Follow-up scheduled.,3,2026-10-07T10:00:00.000Z,2026-10-11T10:00:00.000Z,False,False
+blk_g0086,pg_030,,to_do,Outreach via community org.,4,2026-09-16T10:00:00.000Z,2026-10-04T10:00:00.000Z,False,True
+blk_g0087,pg_031,,to_do,Position: conditional.,1,2026-02-18T10:00:00.000Z,2026-10-02T10:00:00.000Z,False,False
+blk_g0088,pg_031,,paragraph,Position: neutral.,2,2026-05-13T10:00:00.000Z,2026-10-10T10:00:00.000Z,False,False
+blk_g0089,pg_032,,bulleted_list_item,Engagement history logged.,1,2026-06-25T10:00:00.000Z,2026-10-11T10:00:00.000Z,False,False
+blk_g0090,pg_032,,to_do,Notes from site visit.,2,2026-05-23T10:00:00.000Z,2026-10-03T10:00:00.000Z,False,False
+blk_g0091,pg_032,,to_do,Outreach via community org.,3,2026-05-06T10:00:00.000Z,2026-10-10T10:00:00.000Z,False,True
+blk_g0092,pg_033,,bulleted_list_item,Outreach via community org.,1,2026-09-11T10:00:00.000Z,2026-10-13T10:00:00.000Z,False,False
+blk_g0093,pg_033,,paragraph,Outreach via community org.,2,2026-06-27T10:00:00.000Z,2026-10-14T10:00:00.000Z,False,False
+blk_g0094,pg_033,,to_do,Outreach via community org.,3,2026-05-13T10:00:00.000Z,2026-10-01T10:00:00.000Z,False,True
+blk_g0095,pg_033,,bulleted_list_item,Survey response recorded.,4,2026-06-22T10:00:00.000Z,2026-10-14T10:00:00.000Z,False,False
+blk_g0096,pg_034,,to_do,Follow-up scheduled.,1,2026-02-25T10:00:00.000Z,2026-10-05T10:00:00.000Z,False,True
+blk_g0097,pg_034,,to_do,Notes from site visit.,2,2026-03-05T10:00:00.000Z,2026-10-10T10:00:00.000Z,False,False
+blk_g0098,pg_034,,to_do,Outreach via community org.,3,2026-08-25T10:00:00.000Z,2026-10-14T10:00:00.000Z,False,True
+blk_g0099,pg_035,,paragraph,Follow-up scheduled.,1,2026-03-15T10:00:00.000Z,2026-10-08T10:00:00.000Z,False,False
+blk_g0100,pg_035,,bulleted_list_item,Follow-up scheduled.,2,2026-09-22T10:00:00.000Z,2026-10-12T10:00:00.000Z,False,True
+blk_g0101,pg_035,,paragraph,Survey response recorded.,3,2026-08-14T10:00:00.000Z,2026-10-09T10:00:00.000Z,False,False
+blk_g0102,pg_036,,bulleted_list_item,Engagement history logged.,1,2026-06-27T10:00:00.000Z,2026-10-05T10:00:00.000Z,False,False
+blk_g0103,pg_036,,to_do,Survey response recorded.,2,2026-02-17T10:00:00.000Z,2026-10-14T10:00:00.000Z,False,True
+blk_g0104,pg_036,,paragraph,Position: conditional.,3,2026-06-04T10:00:00.000Z,2026-10-05T10:00:00.000Z,False,False
+blk_g0105,pg_036,,paragraph,Notes from site visit.,4,2026-03-01T10:00:00.000Z,2026-10-10T10:00:00.000Z,False,False
+blk_g0106,pg_037,,bulleted_list_item,Action item for Amara.,1,2026-06-17T10:00:00.000Z,2026-10-12T10:00:00.000Z,False,True
+blk_g0107,pg_037,,paragraph,Engagement history logged.,2,2026-06-26T10:00:00.000Z,2026-10-02T10:00:00.000Z,False,False
+blk_g0108,pg_037,,to_do,Notes from site visit.,3,2026-10-11T10:00:00.000Z,2026-10-02T10:00:00.000Z,False,False
+blk_g0109,pg_037,,bulleted_list_item,Outreach via community org.,4,2026-03-05T10:00:00.000Z,2026-10-03T10:00:00.000Z,False,False
+blk_g0110,pg_038,,paragraph,Position: supportive.,1,2026-09-18T10:00:00.000Z,2026-10-04T10:00:00.000Z,False,True
+blk_g0111,pg_038,,to_do,Engagement history logged.,2,2026-06-28T10:00:00.000Z,2026-10-14T10:00:00.000Z,False,False
+blk_g0112,pg_038,,bulleted_list_item,Notes from site visit.,3,2026-02-27T10:00:00.000Z,2026-10-08T10:00:00.000Z,False,True
+blk_g0113,pg_039,,to_do,Survey response recorded.,1,2026-05-27T10:00:00.000Z,2026-10-06T10:00:00.000Z,False,False
+blk_g0114,pg_040,,to_do,Position: neutral.,1,2026-09-16T10:00:00.000Z,2026-10-05T10:00:00.000Z,False,True
+blk_g0115,pg_041,,paragraph,Notes from site visit.,1,2026-03-07T10:00:00.000Z,2026-10-14T10:00:00.000Z,False,False
+blk_g0116,pg_041,,to_do,Action item for Amara.,2,2026-05-23T10:00:00.000Z,2026-10-04T10:00:00.000Z,False,False
+blk_g0117,pg_041,,to_do,Follow-up scheduled.,3,2026-07-14T10:00:00.000Z,2026-10-01T10:00:00.000Z,False,False
+blk_g0118,pg_042,,to_do,Survey response recorded.,1,2026-04-17T10:00:00.000Z,2026-10-14T10:00:00.000Z,False,True
+blk_g0119,pg_042,,paragraph,Notes from site visit.,2,2026-02-15T10:00:00.000Z,2026-10-09T10:00:00.000Z,False,False
+blk_g0120,pg_042,,paragraph,Engagement history logged.,3,2026-05-01T10:00:00.000Z,2026-10-11T10:00:00.000Z,False,True
+blk_g0121,pg_042,,bulleted_list_item,Survey response recorded.,4,2026-06-03T10:00:00.000Z,2026-10-01T10:00:00.000Z,False,False
+blk_g0122,pg_043,,to_do,Outreach via community org.,1,2026-08-10T10:00:00.000Z,2026-10-03T10:00:00.000Z,False,True
+blk_g0123,pg_044,,bulleted_list_item,Notes from site visit.,1,2026-07-14T10:00:00.000Z,2026-10-14T10:00:00.000Z,False,True
+blk_g0124,pg_044,,paragraph,Survey response recorded.,2,2026-06-26T10:00:00.000Z,2026-10-03T10:00:00.000Z,False,True
+blk_g0125,pg_045,,paragraph,Follow-up scheduled.,1,2026-02-24T10:00:00.000Z,2026-10-06T10:00:00.000Z,False,True
+blk_g0126,pg_045,,bulleted_list_item,Action item for Amara.,2,2026-08-15T10:00:00.000Z,2026-10-12T10:00:00.000Z,False,False
+blk_g0127,pg_045,,to_do,Position: conditional.,3,2026-10-28T10:00:00.000Z,2026-10-01T10:00:00.000Z,False,True
+blk_g0128,pg_045,,paragraph,Follow-up scheduled.,4,2026-04-02T10:00:00.000Z,2026-10-13T10:00:00.000Z,False,True
+blk_g0129,pg_046,,to_do,Follow-up scheduled.,1,2026-02-17T10:00:00.000Z,2026-10-02T10:00:00.000Z,False,True
+blk_g0130,pg_046,,to_do,Position: neutral.,2,2026-04-21T10:00:00.000Z,2026-10-06T10:00:00.000Z,False,False
+blk_g0131,pg_046,,to_do,Survey response recorded.,3,2026-07-27T10:00:00.000Z,2026-10-12T10:00:00.000Z,False,True
+blk_g0132,pg_046,,paragraph,Engagement history logged.,4,2026-08-16T10:00:00.000Z,2026-10-06T10:00:00.000Z,False,False
+blk_g0133,pg_047,,paragraph,Follow-up scheduled.,1,2026-08-12T10:00:00.000Z,2026-10-04T10:00:00.000Z,False,True
+blk_g0134,pg_047,,bulleted_list_item,Notes from site visit.,2,2026-10-02T10:00:00.000Z,2026-10-04T10:00:00.000Z,False,False
+blk_g0135,pg_047,,bulleted_list_item,Survey response recorded.,3,2026-09-10T10:00:00.000Z,2026-10-02T10:00:00.000Z,False,True
+blk_g0136,pg_047,,paragraph,Survey response recorded.,4,2026-06-14T10:00:00.000Z,2026-10-10T10:00:00.000Z,False,False
+blk_g0137,pg_048,,bulleted_list_item,Outreach via community org.,1,2026-08-17T10:00:00.000Z,2026-10-06T10:00:00.000Z,False,False
+blk_g0138,pg_048,,to_do,Follow-up scheduled.,2,2026-07-04T10:00:00.000Z,2026-10-01T10:00:00.000Z,False,True
+blk_g0139,pg_048,,paragraph,Outreach via community org.,3,2026-08-25T10:00:00.000Z,2026-10-03T10:00:00.000Z,False,True
+blk_g0140,pg_049,,bulleted_list_item,Outreach via community org.,1,2026-03-19T10:00:00.000Z,2026-10-09T10:00:00.000Z,False,True
+blk_g0141,pg_050,,to_do,Position: neutral.,1,2026-09-15T10:00:00.000Z,2026-10-03T10:00:00.000Z,False,False
+blk_g0142,pg_050,,paragraph,Outreach via community org.,2,2026-05-27T10:00:00.000Z,2026-10-06T10:00:00.000Z,False,True
+blk_g0143,pg_050,,paragraph,Action item for Amara.,3,2026-10-22T10:00:00.000Z,2026-10-06T10:00:00.000Z,False,False
+blk_g0144,pg_050,,paragraph,Follow-up scheduled.,4,2026-02-19T10:00:00.000Z,2026-10-14T10:00:00.000Z,False,False
+blk_g0145,pg_051,,bulleted_list_item,Action item for Amara.,1,2026-09-06T10:00:00.000Z,2026-10-06T10:00:00.000Z,False,False
+blk_g0146,pg_051,,paragraph,Position: conditional.,2,2026-08-21T10:00:00.000Z,2026-10-12T10:00:00.000Z,False,True
+blk_g0147,pg_051,,paragraph,Outreach via community org.,3,2026-02-22T10:00:00.000Z,2026-10-14T10:00:00.000Z,False,False
+blk_g0148,pg_051,,bulleted_list_item,Position: neutral.,4,2026-07-10T10:00:00.000Z,2026-10-12T10:00:00.000Z,False,False
+blk_g0149,pg_052,,bulleted_list_item,Survey response recorded.,1,2026-09-09T10:00:00.000Z,2026-10-07T10:00:00.000Z,False,True
+blk_g0150,pg_052,,bulleted_list_item,Survey response recorded.,2,2026-05-27T10:00:00.000Z,2026-10-02T10:00:00.000Z,False,True
+blk_g0151,pg_052,,bulleted_list_item,Survey response recorded.,3,2026-05-03T10:00:00.000Z,2026-10-06T10:00:00.000Z,False,True
+blk_g0152,pg_053,,bulleted_list_item,Outreach via community org.,1,2026-07-20T10:00:00.000Z,2026-10-01T10:00:00.000Z,False,False
+blk_g0153,pg_053,,paragraph,Action item for Amara.,2,2026-06-24T10:00:00.000Z,2026-10-09T10:00:00.000Z,False,False
+blk_g0154,pg_053,,bulleted_list_item,Outreach via community org.,3,2026-08-16T10:00:00.000Z,2026-10-02T10:00:00.000Z,False,False
+blk_g0155,pg_053,,bulleted_list_item,Survey response recorded.,4,2026-09-06T10:00:00.000Z,2026-10-13T10:00:00.000Z,False,True
+blk_g0156,pg_054,,paragraph,Action item for Amara.,1,2026-09-07T10:00:00.000Z,2026-10-03T10:00:00.000Z,False,False
+blk_g0157,pg_055,,bulleted_list_item,Engagement history logged.,1,2026-06-24T10:00:00.000Z,2026-10-13T10:00:00.000Z,False,False
+blk_g0158,pg_056,,paragraph,Engagement history logged.,1,2026-07-13T10:00:00.000Z,2026-10-10T10:00:00.000Z,False,True
+blk_g0159,pg_056,,paragraph,Outreach via community org.,2,2026-10-18T10:00:00.000Z,2026-10-09T10:00:00.000Z,False,True
+blk_g0160,pg_057,,paragraph,Engagement history logged.,1,2026-03-01T10:00:00.000Z,2026-10-06T10:00:00.000Z,False,True
+blk_g0161,pg_057,,paragraph,Position: supportive.,2,2026-07-19T10:00:00.000Z,2026-10-04T10:00:00.000Z,False,True
+blk_g0162,pg_057,,to_do,Notes from site visit.,3,2026-10-24T10:00:00.000Z,2026-10-13T10:00:00.000Z,False,False
+blk_g0163,pg_057,,bulleted_list_item,Action item for Amara.,4,2026-07-27T10:00:00.000Z,2026-10-09T10:00:00.000Z,False,False
+blk_g0164,pg_058,,paragraph,Engagement history logged.,1,2026-08-02T10:00:00.000Z,2026-10-10T10:00:00.000Z,False,True
+blk_g0165,pg_058,,to_do,Action item for Amara.,2,2026-09-26T10:00:00.000Z,2026-10-09T10:00:00.000Z,False,False
+blk_g0166,pg_058,,to_do,Survey response recorded.,3,2026-09-21T10:00:00.000Z,2026-10-08T10:00:00.000Z,False,True
+blk_g0167,pg_059,,bulleted_list_item,Action item for Amara.,1,2026-08-19T10:00:00.000Z,2026-10-07T10:00:00.000Z,False,True
+blk_g0168,pg_060,,paragraph,Survey response recorded.,1,2026-04-10T10:00:00.000Z,2026-10-14T10:00:00.000Z,False,False
+blk_g0169,pg_060,,bulleted_list_item,Notes from site visit.,2,2026-05-16T10:00:00.000Z,2026-10-05T10:00:00.000Z,False,False
+blk_g0170,pg_060,,to_do,Action item for Amara.,3,2026-07-22T10:00:00.000Z,2026-10-07T10:00:00.000Z,False,False
+blk_g0171,pg_061,,to_do,Engagement history logged.,1,2026-02-15T10:00:00.000Z,2026-10-04T10:00:00.000Z,False,False
+blk_g0172,pg_061,,to_do,Engagement history logged.,2,2026-08-16T10:00:00.000Z,2026-10-07T10:00:00.000Z,False,True
+blk_g0173,pg_061,,bulleted_list_item,Action item for Amara.,3,2026-09-27T10:00:00.000Z,2026-10-01T10:00:00.000Z,False,True
+blk_g0174,pg_061,,paragraph,Engagement history logged.,4,2026-06-05T10:00:00.000Z,2026-10-07T10:00:00.000Z,False,True
+blk_g0175,pg_062,,to_do,Position: neutral.,1,2026-10-01T10:00:00.000Z,2026-10-09T10:00:00.000Z,False,False
+blk_g0176,pg_063,,bulleted_list_item,Outreach via community org.,1,2026-10-28T10:00:00.000Z,2026-10-09T10:00:00.000Z,False,False

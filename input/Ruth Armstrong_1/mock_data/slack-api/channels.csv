@@ -1,0 +1,5 @@
+id,name,is_private,is_archived,topic,purpose,creator,created,num_members
+C_ICU,icu-equitable-transit,False,False,ICU Halifax session prep,Coordinate Ruth's equitable-transit presentation,U_ruth,1789900000,6
+C_ALLIANCE,alliance-cycliste-advisory,False,False,Advocacy committee,Cycling-infrastructure advisory,U_lucie,1789910000,8
+C_MOBILITE,mobilite-plateau-core,True,False,Consultation prep,Core team for Mobilite Plateau,U_ruth,1789920000,5
+C_GENERAL,general,False,False,,Team-wide,U_ruth,1789800000,30

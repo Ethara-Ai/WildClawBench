@@ -1,0 +1,349 @@
+id,createdTime,Name,Status,Project,EstimateHours,Done
+recTask0000000001,2026-10-07T16:22:00Z,Collect SMP-2026-1001 at Site 1,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000002,2026-10-21T16:05:00Z,Collect SMP-2026-1002 at Site 1,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000003,2026-10-07T16:48:00Z,Collect SMP-2026-1003 at Site 2,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000004,2026-10-21T16:32:00Z,Collect SMP-2026-1004 at Site 2,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000005,2026-10-07T17:14:00Z,Collect SMP-2026-1005 at Site 3,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000006,2026-10-21T17:01:00Z,Collect SMP-2026-1006 at Site 3,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000007,2026-10-08T16:10:00Z,Collect SMP-2026-1007 at Site 4,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000008,2026-10-22T16:28:00Z,Collect SMP-2026-1008 at Site 4,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000009,2026-10-08T16:55:00Z,Collect SMP-2026-1009 at Site 5,Done,Site 5 Water Quality Monitoring,2,true
+recTask0000000010,2026-10-22T16:48:00Z,Collect SMP-2026-1010 at Site 5,In progress,Site 5 Water Quality Monitoring,3,false
+recTask0000000011,2026-10-08T17:20:00Z,Collect SMP-2026-1011 at Site 6,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000012,2026-10-22T17:11:00Z,Collect SMP-2026-1012 at Site 6,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000013,2026-10-15T16:00:00.000Z,Re-pull Site 3 pH after lab analytical,To do,Site 3 Water Quality Monitoring,3,
+recTask0000000014,2026-10-15T16:05:00.000Z,Reconcile Y1 indirect line with portal FAQ cap,To do,Grant budget,2,
+recTask0000000015,2026-10-16T09:00:00.000Z,Confirm Brennan budget-review sign-off,In progress,Grant budget,1,
+recTask0000000001-988917,2026-10-07T16:22:00Z,Collect SMP-2026-1101 at Site 12,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000002-810334,2026-10-21T16:05:00Z,Collect SMP-2026-1102 at Site 10,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000003-590860,2026-10-07T16:48:00Z,Collect SMP-2026-1103 at Site 11,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000004-713513,2026-10-21T16:32:00Z,Collect SMP-2026-1104 at Site 8,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000005-489934,2026-10-07T17:14:00Z,Collect SMP-2026-1105 at Site 5,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000006-105377,2026-10-21T17:01:00Z,Collect SMP-2026-1106 at Site 3,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000007-913112,2026-10-08T16:10:00Z,Collect SMP-2026-1107 at Site 6,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000008-584612,2026-10-22T16:28:00Z,Collect SMP-2026-1108 at Site 12,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000009-147627,2026-10-08T16:55:00Z,Collect SMP-2026-1109 at Site 3,Done,Site 5 Water Quality Monitoring,2,true
+recTask0000000010-405932,2026-10-22T16:48:00Z,Collect SMP-2026-1110 at Site 4,In progress,Site 5 Water Quality Monitoring,3,false
+recTask0000000011-997772,2026-10-08T17:20:00Z,Collect SMP-2026-1111 at Site 6,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000012-584768,2026-10-22T17:11:00Z,Collect SMP-2026-1112 at Site 1,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000013-125210,2026-10-15T16:00:00.000Z,Collect SMP-2026-1113 at Site 1,To do,Site 3 Water Quality Monitoring,3,
+recTask0000000014-755525,2026-10-15T16:05:00.000Z,Collect SMP-2026-1114 at Site 3,To do,Grant budget,2,
+recTask0000000015-227860,2026-10-16T09:00:00.000Z,Collect SMP-2026-1115 at Site 11,In progress,Grant budget,1,
+recTask0000000016,2026-10-07T16:22:00Z,Collect SMP-2026-1116 at Site 2,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000017,2026-10-21T16:05:00Z,Collect SMP-2026-1117 at Site 4,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000018,2026-10-07T16:48:00Z,Collect SMP-2026-1118 at Site 10,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000019,2026-10-21T16:32:00Z,Collect SMP-2026-1119 at Site 1,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000020,2026-10-07T17:14:00Z,Collect SMP-2026-1120 at Site 9,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000021,2026-10-21T17:01:00Z,Collect SMP-2026-1121 at Site 8,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000022,2026-10-08T16:10:00Z,Collect SMP-2026-1122 at Site 11,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000023,2026-10-22T16:28:00Z,Collect SMP-2026-1123 at Site 4,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000024,2026-10-08T16:55:00Z,Collect SMP-2026-1124 at Site 7,Done,Site 5 Water Quality Monitoring,2,true
+recTask0000000025,2026-10-22T16:48:00Z,Collect SMP-2026-1125 at Site 4,In progress,Site 5 Water Quality Monitoring,3,false
+recTask0000000026,2026-10-08T17:20:00Z,Collect SMP-2026-1126 at Site 2,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000027,2026-10-22T17:11:00Z,Collect SMP-2026-1127 at Site 3,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000028,2026-10-15T16:00:00.000Z,Collect SMP-2026-1128 at Site 1,To do,Site 3 Water Quality Monitoring,3,
+recTask0000000029,2026-10-15T16:05:00.000Z,Collect SMP-2026-1129 at Site 8,To do,Grant budget,2,
+recTask0000000030,2026-10-16T09:00:00.000Z,Collect SMP-2026-1130 at Site 9,In progress,Grant budget,1,
+recTask0000000031,2026-10-07T16:22:00Z,Collect SMP-2026-1131 at Site 2,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000032,2026-10-21T16:05:00Z,Collect SMP-2026-1132 at Site 5,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000033,2026-10-07T16:48:00Z,Collect SMP-2026-1133 at Site 11,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000034,2026-10-21T16:32:00Z,Collect SMP-2026-1134 at Site 2,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000035,2026-10-07T17:14:00Z,Collect SMP-2026-1135 at Site 4,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000036,2026-10-21T17:01:00Z,Collect SMP-2026-1136 at Site 5,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000037,2026-10-08T16:10:00Z,Collect SMP-2026-1137 at Site 10,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000038,2026-10-22T16:28:00Z,Collect SMP-2026-1138 at Site 9,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000039,2026-10-08T16:55:00Z,Collect SMP-2026-1139 at Site 8,Done,Site 5 Water Quality Monitoring,2,true
+recTask0000000040,2026-10-22T16:48:00Z,Collect SMP-2026-1140 at Site 1,In progress,Site 5 Water Quality Monitoring,3,false
+recTask0000000041,2026-10-08T17:20:00Z,Collect SMP-2026-1141 at Site 11,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000042,2026-10-22T17:11:00Z,Collect SMP-2026-1142 at Site 6,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000043,2026-10-15T16:00:00.000Z,Collect SMP-2026-1143 at Site 5,To do,Site 3 Water Quality Monitoring,3,
+recTask0000000044,2026-10-15T16:05:00.000Z,Collect SMP-2026-1144 at Site 4,To do,Grant budget,2,
+recTask0000000045,2026-10-16T09:00:00.000Z,Collect SMP-2026-1145 at Site 12,In progress,Grant budget,1,
+recTask0000000046,2026-10-07T16:22:00Z,Collect SMP-2026-1146 at Site 2,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000047,2026-10-21T16:05:00Z,Collect SMP-2026-1147 at Site 3,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000048,2026-10-07T16:48:00Z,Collect SMP-2026-1148 at Site 3,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000049,2026-10-21T16:32:00Z,Collect SMP-2026-1149 at Site 2,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000050,2026-10-07T17:14:00Z,Collect SMP-2026-1150 at Site 2,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000051,2026-10-21T17:01:00Z,Collect SMP-2026-1151 at Site 11,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000052,2026-10-08T16:10:00Z,Collect SMP-2026-1152 at Site 2,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000053,2026-10-22T16:28:00Z,Collect SMP-2026-1153 at Site 9,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000054,2026-10-08T16:55:00Z,Collect SMP-2026-1154 at Site 9,Done,Site 5 Water Quality Monitoring,2,true
+recTask0000000055,2026-10-22T16:48:00Z,Collect SMP-2026-1155 at Site 5,In progress,Site 5 Water Quality Monitoring,3,false
+recTask0000000056,2026-10-08T17:20:00Z,Collect SMP-2026-1156 at Site 3,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000057,2026-10-22T17:11:00Z,Collect SMP-2026-1157 at Site 12,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000058,2026-10-15T16:00:00.000Z,Collect SMP-2026-1158 at Site 6,To do,Site 3 Water Quality Monitoring,3,
+recTask0000000059,2026-10-15T16:05:00.000Z,Collect SMP-2026-1159 at Site 1,To do,Grant budget,2,
+recTask0000000060,2026-10-16T09:00:00.000Z,Collect SMP-2026-1160 at Site 4,In progress,Grant budget,1,
+recTask0000000061,2026-10-07T16:22:00Z,Collect SMP-2026-1161 at Site 11,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000062,2026-10-21T16:05:00Z,Collect SMP-2026-1162 at Site 6,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000063,2026-10-07T16:48:00Z,Collect SMP-2026-1163 at Site 6,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000064,2026-10-21T16:32:00Z,Collect SMP-2026-1164 at Site 4,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000065,2026-10-07T17:14:00Z,Collect SMP-2026-1165 at Site 12,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000066,2026-10-21T17:01:00Z,Collect SMP-2026-1166 at Site 11,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000067,2026-10-08T16:10:00Z,Collect SMP-2026-1167 at Site 2,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000068,2026-10-22T16:28:00Z,Collect SMP-2026-1168 at Site 2,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000069,2026-10-08T16:55:00Z,Collect SMP-2026-1169 at Site 1,Done,Site 5 Water Quality Monitoring,2,true
+recTask0000000070,2026-10-22T16:48:00Z,Collect SMP-2026-1170 at Site 9,In progress,Site 5 Water Quality Monitoring,3,false
+recTask0000000071,2026-10-08T17:20:00Z,Collect SMP-2026-1171 at Site 6,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000072,2026-10-22T17:11:00Z,Collect SMP-2026-1172 at Site 4,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000073,2026-10-15T16:00:00.000Z,Collect SMP-2026-1173 at Site 12,To do,Site 3 Water Quality Monitoring,3,
+recTask0000000074,2026-10-15T16:05:00.000Z,Collect SMP-2026-1174 at Site 11,To do,Grant budget,2,
+recTask0000000075,2026-10-16T09:00:00.000Z,Collect SMP-2026-1175 at Site 6,In progress,Grant budget,1,
+recTask0000000076,2026-10-07T16:22:00Z,Collect SMP-2026-1176 at Site 10,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000077,2026-10-21T16:05:00Z,Collect SMP-2026-1177 at Site 2,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000078,2026-10-07T16:48:00Z,Collect SMP-2026-1178 at Site 10,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000079,2026-10-21T16:32:00Z,Collect SMP-2026-1179 at Site 11,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000080,2026-10-07T17:14:00Z,Collect SMP-2026-1180 at Site 10,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000081,2026-10-21T17:01:00Z,Collect SMP-2026-1181 at Site 8,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000082,2026-10-08T16:10:00Z,Collect SMP-2026-1182 at Site 5,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000083,2026-10-22T16:28:00Z,Collect SMP-2026-1183 at Site 3,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000084,2026-10-08T16:55:00Z,Collect SMP-2026-1184 at Site 10,Done,Site 5 Water Quality Monitoring,2,true
+recTask0000000085,2026-10-22T16:48:00Z,Collect SMP-2026-1185 at Site 1,In progress,Site 5 Water Quality Monitoring,3,false
+recTask0000000086,2026-10-08T17:20:00Z,Collect SMP-2026-1186 at Site 10,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000087,2026-10-22T17:11:00Z,Collect SMP-2026-1187 at Site 6,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000088,2026-10-15T16:00:00.000Z,Collect SMP-2026-1188 at Site 7,To do,Site 3 Water Quality Monitoring,3,
+recTask0000000089,2026-10-15T16:05:00.000Z,Collect SMP-2026-1189 at Site 6,To do,Grant budget,2,
+recTask0000000090,2026-10-16T09:00:00.000Z,Collect SMP-2026-1190 at Site 12,In progress,Grant budget,1,
+recTask0000000091,2026-10-07T16:22:00Z,Collect SMP-2026-1191 at Site 2,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000092,2026-10-21T16:05:00Z,Collect SMP-2026-1192 at Site 9,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000093,2026-10-07T16:48:00Z,Collect SMP-2026-1193 at Site 5,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000094,2026-10-21T16:32:00Z,Collect SMP-2026-1194 at Site 7,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000095,2026-10-07T17:14:00Z,Collect SMP-2026-1195 at Site 4,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000096,2026-10-21T17:01:00Z,Collect SMP-2026-1196 at Site 2,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000097,2026-10-08T16:10:00Z,Collect SMP-2026-1197 at Site 6,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000098,2026-10-22T16:28:00Z,Collect SMP-2026-1198 at Site 12,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000099,2026-10-08T16:55:00Z,Collect SMP-2026-1199 at Site 12,Done,Site 5 Water Quality Monitoring,2,true
+recTask0000000100,2026-10-22T16:48:00Z,Collect SMP-2026-1200 at Site 2,In progress,Site 5 Water Quality Monitoring,3,false
+recTask0000000101,2026-10-08T17:20:00Z,Collect SMP-2026-1201 at Site 11,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000102,2026-10-22T17:11:00Z,Collect SMP-2026-1202 at Site 12,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000103,2026-10-15T16:00:00.000Z,Collect SMP-2026-1203 at Site 5,To do,Site 3 Water Quality Monitoring,3,
+recTask0000000104,2026-10-15T16:05:00.000Z,Collect SMP-2026-1204 at Site 12,To do,Grant budget,2,
+recTask0000000105,2026-10-16T09:00:00.000Z,Collect SMP-2026-1205 at Site 6,In progress,Grant budget,1,
+recTask0000000106,2026-10-07T16:22:00Z,Collect SMP-2026-1206 at Site 7,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000107,2026-10-21T16:05:00Z,Collect SMP-2026-1207 at Site 2,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000108,2026-10-07T16:48:00Z,Collect SMP-2026-1208 at Site 1,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000109,2026-10-21T16:32:00Z,Collect SMP-2026-1209 at Site 11,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000110,2026-10-07T17:14:00Z,Collect SMP-2026-1210 at Site 8,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000111,2026-10-21T17:01:00Z,Collect SMP-2026-1211 at Site 11,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000112,2026-10-08T16:10:00Z,Collect SMP-2026-1212 at Site 6,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000113,2026-10-22T16:28:00Z,Collect SMP-2026-1213 at Site 7,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000114,2026-10-08T16:55:00Z,Collect SMP-2026-1214 at Site 7,Done,Site 5 Water Quality Monitoring,2,true
+recTask0000000115,2026-10-22T16:48:00Z,Collect SMP-2026-1215 at Site 9,In progress,Site 5 Water Quality Monitoring,3,false
+recTask0000000116,2026-10-08T17:20:00Z,Collect SMP-2026-1216 at Site 10,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000117,2026-10-22T17:11:00Z,Collect SMP-2026-1217 at Site 9,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000118,2026-10-15T16:00:00.000Z,Collect SMP-2026-1218 at Site 9,To do,Site 3 Water Quality Monitoring,3,
+recTask0000000119,2026-10-15T16:05:00.000Z,Collect SMP-2026-1219 at Site 7,To do,Grant budget,2,
+recTask0000000120,2026-10-16T09:00:00.000Z,Collect SMP-2026-1220 at Site 12,In progress,Grant budget,1,
+recTask0000000121,2026-10-07T16:22:00Z,Collect SMP-2026-1221 at Site 1,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000122,2026-10-21T16:05:00Z,Collect SMP-2026-1222 at Site 2,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000123,2026-10-07T16:48:00Z,Collect SMP-2026-1223 at Site 4,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000124,2026-10-21T16:32:00Z,Collect SMP-2026-1224 at Site 11,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000125,2026-10-07T17:14:00Z,Collect SMP-2026-1225 at Site 6,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000126,2026-10-21T17:01:00Z,Collect SMP-2026-1226 at Site 11,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000127,2026-10-08T16:10:00Z,Collect SMP-2026-1227 at Site 12,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000128,2026-10-22T16:28:00Z,Collect SMP-2026-1228 at Site 7,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000129,2026-10-08T16:55:00Z,Collect SMP-2026-1229 at Site 6,Done,Site 5 Water Quality Monitoring,2,true
+recTask0000000130,2026-10-22T16:48:00Z,Collect SMP-2026-1230 at Site 3,In progress,Site 5 Water Quality Monitoring,3,false
+recTask0000000131,2026-10-08T17:20:00Z,Collect SMP-2026-1231 at Site 5,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000132,2026-10-22T17:11:00Z,Collect SMP-2026-1232 at Site 5,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000133,2026-10-15T16:00:00.000Z,Collect SMP-2026-1233 at Site 2,To do,Site 3 Water Quality Monitoring,3,
+recTask0000000134,2026-10-15T16:05:00.000Z,Collect SMP-2026-1234 at Site 10,To do,Grant budget,2,
+recTask0000000135,2026-10-16T09:00:00.000Z,Collect SMP-2026-1235 at Site 8,In progress,Grant budget,1,
+recTask0000000136,2026-10-07T16:22:00Z,Collect SMP-2026-1236 at Site 11,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000137,2026-10-21T16:05:00Z,Collect SMP-2026-1237 at Site 7,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000138,2026-10-07T16:48:00Z,Collect SMP-2026-1238 at Site 5,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000139,2026-10-21T16:32:00Z,Collect SMP-2026-1239 at Site 6,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000140,2026-10-07T17:14:00Z,Collect SMP-2026-1240 at Site 7,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000141,2026-10-21T17:01:00Z,Collect SMP-2026-1241 at Site 12,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000142,2026-10-08T16:10:00Z,Collect SMP-2026-1242 at Site 7,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000143,2026-10-22T16:28:00Z,Collect SMP-2026-1243 at Site 7,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000144,2026-10-08T16:55:00Z,Collect SMP-2026-1244 at Site 10,Done,Site 5 Water Quality Monitoring,2,true
+recTask0000000145,2026-10-22T16:48:00Z,Collect SMP-2026-1245 at Site 10,In progress,Site 5 Water Quality Monitoring,3,false
+recTask0000000146,2026-10-08T17:20:00Z,Collect SMP-2026-1246 at Site 1,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000147,2026-10-22T17:11:00Z,Collect SMP-2026-1247 at Site 3,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000148,2026-10-15T16:00:00.000Z,Collect SMP-2026-1248 at Site 5,To do,Site 3 Water Quality Monitoring,3,
+recTask0000000149,2026-10-15T16:05:00.000Z,Collect SMP-2026-1249 at Site 10,To do,Grant budget,2,
+recTask0000000150,2026-10-16T09:00:00.000Z,Collect SMP-2026-1250 at Site 1,In progress,Grant budget,1,
+recTask0000000151,2026-10-07T16:22:00Z,Collect SMP-2026-1251 at Site 4,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000152,2026-10-21T16:05:00Z,Collect SMP-2026-1252 at Site 6,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000153,2026-10-07T16:48:00Z,Collect SMP-2026-1253 at Site 11,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000154,2026-10-21T16:32:00Z,Collect SMP-2026-1254 at Site 11,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000155,2026-10-07T17:14:00Z,Collect SMP-2026-1255 at Site 12,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000156,2026-10-21T17:01:00Z,Collect SMP-2026-1256 at Site 8,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000157,2026-10-08T16:10:00Z,Collect SMP-2026-1257 at Site 7,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000158,2026-10-22T16:28:00Z,Collect SMP-2026-1258 at Site 9,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000159,2026-10-08T16:55:00Z,Collect SMP-2026-1259 at Site 3,Done,Site 5 Water Quality Monitoring,2,true
+recTask0000000160,2026-10-22T16:48:00Z,Collect SMP-2026-1260 at Site 4,In progress,Site 5 Water Quality Monitoring,3,false
+recTask0000000161,2026-10-08T17:20:00Z,Collect SMP-2026-1261 at Site 7,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000162,2026-10-22T17:11:00Z,Collect SMP-2026-1262 at Site 2,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000163,2026-10-15T16:00:00.000Z,Collect SMP-2026-1263 at Site 9,To do,Site 3 Water Quality Monitoring,3,
+recTask0000000164,2026-10-15T16:05:00.000Z,Collect SMP-2026-1264 at Site 9,To do,Grant budget,2,
+recTask0000000165,2026-10-16T09:00:00.000Z,Collect SMP-2026-1265 at Site 11,In progress,Grant budget,1,
+recTask0000000166,2026-10-07T16:22:00Z,Collect SMP-2026-1266 at Site 9,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000167,2026-10-21T16:05:00Z,Collect SMP-2026-1267 at Site 10,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000168,2026-10-07T16:48:00Z,Collect SMP-2026-1268 at Site 10,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000169,2026-10-21T16:32:00Z,Collect SMP-2026-1269 at Site 4,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000170,2026-10-07T17:14:00Z,Collect SMP-2026-1270 at Site 3,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000171,2026-10-21T17:01:00Z,Collect SMP-2026-1271 at Site 6,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000172,2026-10-08T16:10:00Z,Collect SMP-2026-1272 at Site 12,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000173,2026-10-22T16:28:00Z,Collect SMP-2026-1273 at Site 11,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000174,2026-10-08T16:55:00Z,Collect SMP-2026-1274 at Site 8,Done,Site 5 Water Quality Monitoring,2,true
+recTask0000000175,2026-10-22T16:48:00Z,Collect SMP-2026-1275 at Site 11,In progress,Site 5 Water Quality Monitoring,3,false
+recTask0000000176,2026-10-08T17:20:00Z,Collect SMP-2026-1276 at Site 1,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000177,2026-10-22T17:11:00Z,Collect SMP-2026-1277 at Site 2,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000178,2026-10-15T16:00:00.000Z,Collect SMP-2026-1278 at Site 10,To do,Site 3 Water Quality Monitoring,3,
+recTask0000000179,2026-10-15T16:05:00.000Z,Collect SMP-2026-1279 at Site 9,To do,Grant budget,2,
+recTask0000000180,2026-10-16T09:00:00.000Z,Collect SMP-2026-1280 at Site 1,In progress,Grant budget,1,
+recTask0000000181,2026-10-07T16:22:00Z,Collect SMP-2026-1281 at Site 8,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000182,2026-10-21T16:05:00Z,Collect SMP-2026-1282 at Site 10,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000183,2026-10-07T16:48:00Z,Collect SMP-2026-1283 at Site 7,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000184,2026-10-21T16:32:00Z,Collect SMP-2026-1284 at Site 8,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000185,2026-10-07T17:14:00Z,Collect SMP-2026-1285 at Site 6,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000186,2026-10-21T17:01:00Z,Collect SMP-2026-1286 at Site 3,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000187,2026-10-08T16:10:00Z,Collect SMP-2026-1287 at Site 4,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000188,2026-10-22T16:28:00Z,Collect SMP-2026-1288 at Site 11,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000189,2026-10-08T16:55:00Z,Collect SMP-2026-1289 at Site 12,Done,Site 5 Water Quality Monitoring,2,true
+recTask0000000190,2026-10-22T16:48:00Z,Collect SMP-2026-1290 at Site 3,In progress,Site 5 Water Quality Monitoring,3,false
+recTask0000000191,2026-10-08T17:20:00Z,Collect SMP-2026-1291 at Site 3,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000192,2026-10-22T17:11:00Z,Collect SMP-2026-1292 at Site 1,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000193,2026-10-15T16:00:00.000Z,Collect SMP-2026-1293 at Site 7,To do,Site 3 Water Quality Monitoring,3,
+recTask0000000194,2026-10-15T16:05:00.000Z,Collect SMP-2026-1294 at Site 5,To do,Grant budget,2,
+recTask0000000195,2026-10-16T09:00:00.000Z,Collect SMP-2026-1295 at Site 10,In progress,Grant budget,1,
+recTask0000000196,2026-10-07T16:22:00Z,Collect SMP-2026-1296 at Site 9,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000197,2026-10-21T16:05:00Z,Collect SMP-2026-1297 at Site 1,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000198,2026-10-07T16:48:00Z,Collect SMP-2026-1298 at Site 3,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000199,2026-10-21T16:32:00Z,Collect SMP-2026-1299 at Site 1,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000200,2026-10-07T17:14:00Z,Collect SMP-2026-1300 at Site 5,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000201,2026-10-21T17:01:00Z,Collect SMP-2026-1301 at Site 12,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000202,2026-10-08T16:10:00Z,Collect SMP-2026-1302 at Site 4,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000203,2026-10-22T16:28:00Z,Collect SMP-2026-1303 at Site 3,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000204,2026-10-08T16:55:00Z,Collect SMP-2026-1304 at Site 7,Done,Site 5 Water Quality Monitoring,2,true
+recTask0000000205,2026-10-22T16:48:00Z,Collect SMP-2026-1305 at Site 8,In progress,Site 5 Water Quality Monitoring,3,false
+recTask0000000206,2026-10-08T17:20:00Z,Collect SMP-2026-1306 at Site 5,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000207,2026-10-22T17:11:00Z,Collect SMP-2026-1307 at Site 5,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000208,2026-10-15T16:00:00.000Z,Collect SMP-2026-1308 at Site 5,To do,Site 3 Water Quality Monitoring,3,
+recTask0000000209,2026-10-15T16:05:00.000Z,Collect SMP-2026-1309 at Site 2,To do,Grant budget,2,
+recTask0000000210,2026-10-16T09:00:00.000Z,Collect SMP-2026-1310 at Site 11,In progress,Grant budget,1,
+recTask0000000211,2026-10-07T16:22:00Z,Collect SMP-2026-1311 at Site 2,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000212,2026-10-21T16:05:00Z,Collect SMP-2026-1312 at Site 8,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000213,2026-10-07T16:48:00Z,Collect SMP-2026-1313 at Site 2,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000214,2026-10-21T16:32:00Z,Collect SMP-2026-1314 at Site 1,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000215,2026-10-07T17:14:00Z,Collect SMP-2026-1315 at Site 6,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000216,2026-10-21T17:01:00Z,Collect SMP-2026-1316 at Site 3,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000217,2026-10-08T16:10:00Z,Collect SMP-2026-1317 at Site 11,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000218,2026-10-22T16:28:00Z,Collect SMP-2026-1318 at Site 7,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000219,2026-10-08T16:55:00Z,Collect SMP-2026-1319 at Site 2,Done,Site 5 Water Quality Monitoring,2,true
+recTask0000000220,2026-10-22T16:48:00Z,Collect SMP-2026-1320 at Site 11,In progress,Site 5 Water Quality Monitoring,3,false
+recTask0000000221,2026-10-08T17:20:00Z,Collect SMP-2026-1321 at Site 3,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000222,2026-10-22T17:11:00Z,Collect SMP-2026-1322 at Site 10,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000223,2026-10-15T16:00:00.000Z,Collect SMP-2026-1323 at Site 12,To do,Site 3 Water Quality Monitoring,3,
+recTask0000000224,2026-10-15T16:05:00.000Z,Collect SMP-2026-1324 at Site 2,To do,Grant budget,2,
+recTask0000000225,2026-10-16T09:00:00.000Z,Collect SMP-2026-1325 at Site 6,In progress,Grant budget,1,
+recTask0000000226,2026-10-07T16:22:00Z,Collect SMP-2026-1326 at Site 5,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000227,2026-10-21T16:05:00Z,Collect SMP-2026-1327 at Site 11,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000228,2026-10-07T16:48:00Z,Collect SMP-2026-1328 at Site 7,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000229,2026-10-21T16:32:00Z,Collect SMP-2026-1329 at Site 6,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000230,2026-10-07T17:14:00Z,Collect SMP-2026-1330 at Site 7,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000231,2026-10-21T17:01:00Z,Collect SMP-2026-1331 at Site 8,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000232,2026-10-08T16:10:00Z,Collect SMP-2026-1332 at Site 3,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000233,2026-10-22T16:28:00Z,Collect SMP-2026-1333 at Site 6,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000234,2026-10-08T16:55:00Z,Collect SMP-2026-1334 at Site 6,Done,Site 5 Water Quality Monitoring,2,true
+recTask0000000235,2026-10-22T16:48:00Z,Collect SMP-2026-1335 at Site 7,In progress,Site 5 Water Quality Monitoring,3,false
+recTask0000000236,2026-10-08T17:20:00Z,Collect SMP-2026-1336 at Site 6,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000237,2026-10-22T17:11:00Z,Collect SMP-2026-1337 at Site 3,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000238,2026-10-15T16:00:00.000Z,Collect SMP-2026-1338 at Site 2,To do,Site 3 Water Quality Monitoring,3,
+recTask0000000239,2026-10-15T16:05:00.000Z,Collect SMP-2026-1339 at Site 1,To do,Grant budget,2,
+recTask0000000240,2026-10-16T09:00:00.000Z,Collect SMP-2026-1340 at Site 12,In progress,Grant budget,1,
+recTask0000000241,2026-10-07T16:22:00Z,Collect SMP-2026-1341 at Site 6,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000242,2026-10-21T16:05:00Z,Collect SMP-2026-1342 at Site 8,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000243,2026-10-07T16:48:00Z,Collect SMP-2026-1343 at Site 9,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000244,2026-10-21T16:32:00Z,Collect SMP-2026-1344 at Site 1,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000245,2026-10-07T17:14:00Z,Collect SMP-2026-1345 at Site 10,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000246,2026-10-21T17:01:00Z,Collect SMP-2026-1346 at Site 1,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000247,2026-10-08T16:10:00Z,Collect SMP-2026-1347 at Site 11,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000248,2026-10-22T16:28:00Z,Collect SMP-2026-1348 at Site 6,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000249,2026-10-08T16:55:00Z,Collect SMP-2026-1349 at Site 7,Done,Site 5 Water Quality Monitoring,2,true
+recTask0000000250,2026-10-22T16:48:00Z,Collect SMP-2026-1350 at Site 12,In progress,Site 5 Water Quality Monitoring,3,false
+recTask0000000251,2026-10-08T17:20:00Z,Collect SMP-2026-1351 at Site 3,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000252,2026-10-22T17:11:00Z,Collect SMP-2026-1352 at Site 6,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000253,2026-10-15T16:00:00.000Z,Collect SMP-2026-1353 at Site 11,To do,Site 3 Water Quality Monitoring,3,
+recTask0000000254,2026-10-15T16:05:00.000Z,Collect SMP-2026-1354 at Site 7,To do,Grant budget,2,
+recTask0000000255,2026-10-16T09:00:00.000Z,Collect SMP-2026-1355 at Site 11,In progress,Grant budget,1,
+recTask0000000256,2026-10-07T16:22:00Z,Collect SMP-2026-1356 at Site 11,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000257,2026-10-21T16:05:00Z,Collect SMP-2026-1357 at Site 9,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000258,2026-10-07T16:48:00Z,Collect SMP-2026-1358 at Site 1,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000259,2026-10-21T16:32:00Z,Collect SMP-2026-1359 at Site 8,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000260,2026-10-07T17:14:00Z,Collect SMP-2026-1360 at Site 11,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000261,2026-10-21T17:01:00Z,Collect SMP-2026-1361 at Site 11,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000262,2026-10-08T16:10:00Z,Collect SMP-2026-1362 at Site 10,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000263,2026-10-22T16:28:00Z,Collect SMP-2026-1363 at Site 9,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000264,2026-10-08T16:55:00Z,Collect SMP-2026-1364 at Site 4,Done,Site 5 Water Quality Monitoring,2,true
+recTask0000000265,2026-10-22T16:48:00Z,Collect SMP-2026-1365 at Site 1,In progress,Site 5 Water Quality Monitoring,3,false
+recTask0000000266,2026-10-08T17:20:00Z,Collect SMP-2026-1366 at Site 10,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000267,2026-10-22T17:11:00Z,Collect SMP-2026-1367 at Site 8,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000268,2026-10-15T16:00:00.000Z,Collect SMP-2026-1368 at Site 11,To do,Site 3 Water Quality Monitoring,3,
+recTask0000000269,2026-10-15T16:05:00.000Z,Collect SMP-2026-1369 at Site 1,To do,Grant budget,2,
+recTask0000000270,2026-10-16T09:00:00.000Z,Collect SMP-2026-1370 at Site 4,In progress,Grant budget,1,
+recTask0000000271,2026-10-07T16:22:00Z,Collect SMP-2026-1371 at Site 5,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000272,2026-10-21T16:05:00Z,Collect SMP-2026-1372 at Site 1,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000273,2026-10-07T16:48:00Z,Collect SMP-2026-1373 at Site 8,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000274,2026-10-21T16:32:00Z,Collect SMP-2026-1374 at Site 4,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000275,2026-10-07T17:14:00Z,Collect SMP-2026-1375 at Site 10,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000276,2026-10-21T17:01:00Z,Collect SMP-2026-1376 at Site 7,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000277,2026-10-08T16:10:00Z,Collect SMP-2026-1377 at Site 10,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000278,2026-10-22T16:28:00Z,Collect SMP-2026-1378 at Site 8,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000279,2026-10-08T16:55:00Z,Collect SMP-2026-1379 at Site 5,Done,Site 5 Water Quality Monitoring,2,true
+recTask0000000280,2026-10-22T16:48:00Z,Collect SMP-2026-1380 at Site 5,In progress,Site 5 Water Quality Monitoring,3,false
+recTask0000000281,2026-10-08T17:20:00Z,Collect SMP-2026-1381 at Site 7,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000282,2026-10-22T17:11:00Z,Collect SMP-2026-1382 at Site 8,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000283,2026-10-15T16:00:00.000Z,Collect SMP-2026-1383 at Site 10,To do,Site 3 Water Quality Monitoring,3,
+recTask0000000284,2026-10-15T16:05:00.000Z,Collect SMP-2026-1384 at Site 2,To do,Grant budget,2,
+recTask0000000285,2026-10-16T09:00:00.000Z,Collect SMP-2026-1385 at Site 1,In progress,Grant budget,1,
+recTask0000000286,2026-10-07T16:22:00Z,Collect SMP-2026-1386 at Site 12,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000287,2026-10-21T16:05:00Z,Collect SMP-2026-1387 at Site 11,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000288,2026-10-07T16:48:00Z,Collect SMP-2026-1388 at Site 1,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000289,2026-10-21T16:32:00Z,Collect SMP-2026-1389 at Site 5,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000290,2026-10-07T17:14:00Z,Collect SMP-2026-1390 at Site 3,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000291,2026-10-21T17:01:00Z,Collect SMP-2026-1391 at Site 5,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000292,2026-10-08T16:10:00Z,Collect SMP-2026-1392 at Site 12,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000293,2026-10-22T16:28:00Z,Collect SMP-2026-1393 at Site 11,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000294,2026-10-08T16:55:00Z,Collect SMP-2026-1394 at Site 5,Done,Site 5 Water Quality Monitoring,2,true
+recTask0000000295,2026-10-22T16:48:00Z,Collect SMP-2026-1395 at Site 12,In progress,Site 5 Water Quality Monitoring,3,false
+recTask0000000296,2026-10-08T17:20:00Z,Collect SMP-2026-1396 at Site 7,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000297,2026-10-22T17:11:00Z,Collect SMP-2026-1397 at Site 1,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000298,2026-10-15T16:00:00.000Z,Collect SMP-2026-1398 at Site 10,To do,Site 3 Water Quality Monitoring,3,
+recTask0000000299,2026-10-15T16:05:00.000Z,Collect SMP-2026-1399 at Site 5,To do,Grant budget,2,
+recTask0000000300,2026-10-16T09:00:00.000Z,Collect SMP-2026-1400 at Site 7,In progress,Grant budget,1,
+recTask0000000301,2026-10-07T16:22:00Z,Collect SMP-2026-1401 at Site 5,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000302,2026-10-21T16:05:00Z,Collect SMP-2026-1402 at Site 6,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000303,2026-10-07T16:48:00Z,Collect SMP-2026-1403 at Site 1,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000304,2026-10-21T16:32:00Z,Collect SMP-2026-1404 at Site 3,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000305,2026-10-07T17:14:00Z,Collect SMP-2026-1405 at Site 9,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000306,2026-10-21T17:01:00Z,Collect SMP-2026-1406 at Site 9,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000307,2026-10-08T16:10:00Z,Collect SMP-2026-1407 at Site 12,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000308,2026-10-22T16:28:00Z,Collect SMP-2026-1408 at Site 11,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000309,2026-10-08T16:55:00Z,Collect SMP-2026-1409 at Site 12,Done,Site 5 Water Quality Monitoring,2,true
+recTask0000000310,2026-10-22T16:48:00Z,Collect SMP-2026-1410 at Site 2,In progress,Site 5 Water Quality Monitoring,3,false
+recTask0000000311,2026-10-08T17:20:00Z,Collect SMP-2026-1411 at Site 7,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000312,2026-10-22T17:11:00Z,Collect SMP-2026-1412 at Site 4,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000313,2026-10-15T16:00:00.000Z,Collect SMP-2026-1413 at Site 7,To do,Site 3 Water Quality Monitoring,3,
+recTask0000000314,2026-10-15T16:05:00.000Z,Collect SMP-2026-1414 at Site 3,To do,Grant budget,2,
+recTask0000000315,2026-10-16T09:00:00.000Z,Collect SMP-2026-1415 at Site 11,In progress,Grant budget,1,
+recTask0000000316,2026-10-07T16:22:00Z,Collect SMP-2026-1416 at Site 5,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000317,2026-10-21T16:05:00Z,Collect SMP-2026-1417 at Site 2,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000318,2026-10-07T16:48:00Z,Collect SMP-2026-1418 at Site 3,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000319,2026-10-21T16:32:00Z,Collect SMP-2026-1419 at Site 7,Done,Site 2 Water Quality Monitoring,2,true
+recTask0000000320,2026-10-07T17:14:00Z,Collect SMP-2026-1420 at Site 12,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000321,2026-10-21T17:01:00Z,Collect SMP-2026-1421 at Site 10,Done,Site 3 Water Quality Monitoring,2,true
+recTask0000000322,2026-10-08T16:10:00Z,Collect SMP-2026-1422 at Site 2,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000323,2026-10-22T16:28:00Z,Collect SMP-2026-1423 at Site 4,Done,Site 4 Water Quality Monitoring,2,true
+recTask0000000324,2026-10-08T16:55:00Z,Collect SMP-2026-1424 at Site 12,Done,Site 5 Water Quality Monitoring,2,true
+recTask0000000325,2026-10-22T16:48:00Z,Collect SMP-2026-1425 at Site 9,In progress,Site 5 Water Quality Monitoring,3,false
+recTask0000000326,2026-10-08T17:20:00Z,Collect SMP-2026-1426 at Site 12,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000327,2026-10-22T17:11:00Z,Collect SMP-2026-1427 at Site 12,Done,Site 6 Water Quality Monitoring,2,true
+recTask0000000328,2026-10-15T16:00:00.000Z,Collect SMP-2026-1428 at Site 11,To do,Site 3 Water Quality Monitoring,3,
+recTask0000000329,2026-10-15T16:05:00.000Z,Collect SMP-2026-1429 at Site 2,To do,Grant budget,2,
+recTask0000000330,2026-10-16T09:00:00.000Z,Collect SMP-2026-1430 at Site 12,In progress,Grant budget,1,
+recTask0000000331,2026-10-07T16:22:00Z,Collect SMP-2026-1431 at Site 3,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000332,2026-10-21T16:05:00Z,Collect SMP-2026-1432 at Site 2,Done,Site 1 Water Quality Monitoring,2,true
+recTask0000000333,2026-10-07T16:48:00Z,Collect SMP-2026-1433 at Site 5,Done,Site 2 Water Quality Monitoring,2,true

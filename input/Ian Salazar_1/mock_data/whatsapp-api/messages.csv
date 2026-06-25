@@ -1,0 +1,321 @@
+message_id,conversation_id,direction,from_wa_id,to_wa_id,type,text,template_name,status,sent_at
+wa_msg_001,conv_carmen,inbound,15755556201,15755556219,text,"Mijo, llámame cuando llegues a casa. Hay sopa.",,delivered,2026-10-19T18:32:00-06:00
+wa_msg_002,conv_carmen,outbound,15755556219,15755556201,text,"Sí Mamá, en 15 minutos. Te quiero.",,sent,2026-10-19T18:35:00-06:00
+wa_msg_003,conv_marco,inbound,15755556215,15755556219,text,Primo — voy a llevar el racks de cedro al booth el viernes. Confirmado.,,delivered,2026-10-19T11:48:00-06:00
+wa_msg_004,conv_marco,outbound,15755556219,15755556215,text,Perfecto. Llego a las 14:00 a load-in. Trae la mesa también si puedes.,,sent,2026-10-19T11:52:00-06:00
+wa_msg_005,conv_rosa,inbound,15755556208,15755556219,text,"Hermano, vienes para Día de los Muertos en casa de Mamá verdad?",,delivered,2026-10-18T20:14:00-06:00
+wa_msg_006,conv_rosa,outbound,15755556219,15755556208,text,Claro. Llevo el pan de muerto. Dile a Mamá.,,sent,2026-10-18T20:18:00-06:00
+wa_msg_007,conv_diego,inbound,15755556243,15755556219,text,Trays and buffer restocked for the upstream run. Truck's gassed.,,delivered,2026-10-19T17:25:00-06:00
+wa_msg_008,conv_diego,outbound,15755556219,15755556243,text,Thanks Diego - meeting at the yard 5:45 Wed.,,read,2026-10-19T17:30:00-06:00
+wa_msg_009,conv_sofia,inbound,15755556236,15755556219,text,Still good to bring the cedar racks to the booth Friday?,,delivered,2026-10-17T18:55:00-06:00
+wa_msg_010,conv_sofia,outbound,15755556219,15755556236,text,"Yes - load-in Fri 2pm, booth E-14.",,read,2026-10-17T19:00:00-06:00
+wa_msg_gen_000001,conv_carmen,inbound,15755556201,15755556219,text,On my way to the field site.,,delivered,2026-10-19T18:32:00-06:00
+wa_msg_gen_000002,conv_carmen,outbound,15755556219,15755556201,text,"Order shipped, tracking to follow.",,sent,2026-10-19T18:35:00-06:00
+wa_msg_gen_000003,conv_marco,inbound,15755556215,15755556219,text,"Mijo, llegas a cenar?",,delivered,2026-10-19T11:48:00-06:00
+wa_msg_gen_000004,conv_marco,outbound,15755556219,15755556215,text,"Te quiero, call you at 6:30.",,sent,2026-10-19T11:52:00-06:00
+wa_msg_gen_000005,conv_rosa,inbound,15755556208,15755556219,text,Sample batch 5 logged.,,delivered,2026-10-18T20:14:00-06:00
+wa_msg_gen_000006,conv_rosa,outbound,15755556219,15755556208,text,"Te quiero, call you at 6:30.",,sent,2026-10-18T20:18:00-06:00
+wa_msg_gen_000007,conv_diego,inbound,15755556243,15755556219,text,"Mijo, llegas a cenar?",,delivered,2026-10-19T17:25:00-06:00
+wa_msg_gen_000008,conv_diego,outbound,15755556219,15755556243,text,On my way to the field site.,,read,2026-10-19T17:30:00-06:00
+wa_msg_gen_000009,conv_sofia,inbound,15755556236,15755556219,text,Booth E-14 confirmed for ArtsFaire.,,delivered,2026-10-17T18:55:00-06:00
+wa_msg_gen_000010,conv_sofia,outbound,15755556219,15755556236,text,"Mijo, llegas a cenar?",,read,2026-10-17T19:00:00-06:00
+wa_msg_gen_000011,conv_carmen,inbound,15755556201,15755556219,text,Sample batch 11 logged.,,delivered,2026-10-19T18:32:00-06:00
+wa_msg_gen_000012,conv_carmen,outbound,15755556219,15755556201,text,"Te quiero, call you at 6:30.",,sent,2026-10-19T18:35:00-06:00
+wa_msg_gen_000013,conv_marco,inbound,15755556215,15755556219,text,Sample batch 13 logged.,,delivered,2026-10-19T11:48:00-06:00
+wa_msg_gen_000014,conv_marco,outbound,15755556219,15755556215,text,On my way to the field site.,,sent,2026-10-19T11:52:00-06:00
+wa_msg_gen_000015,conv_rosa,inbound,15755556208,15755556219,text,Booth E-14 confirmed for ArtsFaire.,,delivered,2026-10-18T20:14:00-06:00
+wa_msg_gen_000016,conv_rosa,outbound,15755556219,15755556208,text,Booth E-14 confirmed for ArtsFaire.,,sent,2026-10-18T20:18:00-06:00
+wa_msg_gen_000017,conv_diego,inbound,15755556243,15755556219,text,"Te quiero, call you at 6:30.",,delivered,2026-10-19T17:25:00-06:00
+wa_msg_gen_000018,conv_diego,outbound,15755556219,15755556243,text,Sample batch 18 logged.,,read,2026-10-19T17:30:00-06:00
+wa_msg_gen_000019,conv_sofia,inbound,15755556236,15755556219,text,"Mijo, llegas a cenar?",,delivered,2026-10-17T18:55:00-06:00
+wa_msg_gen_000020,conv_sofia,outbound,15755556219,15755556236,text,"Mijo, llegas a cenar?",,read,2026-10-17T19:00:00-06:00
+wa_msg_gen_000021,conv_carmen,inbound,15755556201,15755556219,text,"Order shipped, tracking to follow.",,delivered,2026-10-19T18:32:00-06:00
+wa_msg_gen_000022,conv_carmen,outbound,15755556219,15755556201,text,Booth E-14 confirmed for ArtsFaire.,,sent,2026-10-19T18:35:00-06:00
+wa_msg_gen_000023,conv_marco,inbound,15755556215,15755556219,text,Sample batch 23 logged.,,delivered,2026-10-19T11:48:00-06:00
+wa_msg_gen_000024,conv_marco,outbound,15755556219,15755556215,text,"Te quiero, call you at 6:30.",,sent,2026-10-19T11:52:00-06:00
+wa_msg_gen_000025,conv_rosa,inbound,15755556208,15755556219,text,On my way to the field site.,,delivered,2026-10-18T20:14:00-06:00
+wa_msg_gen_000026,conv_rosa,outbound,15755556219,15755556208,text,"Te quiero, call you at 6:30.",,sent,2026-10-18T20:18:00-06:00
+wa_msg_gen_000027,conv_diego,inbound,15755556243,15755556219,text,"Mijo, llegas a cenar?",,delivered,2026-10-19T17:25:00-06:00
+wa_msg_gen_000028,conv_diego,outbound,15755556219,15755556243,text,"Order shipped, tracking to follow.",,read,2026-10-19T17:30:00-06:00
+wa_msg_gen_000029,conv_sofia,inbound,15755556236,15755556219,text,Booth E-14 confirmed for ArtsFaire.,,delivered,2026-10-17T18:55:00-06:00
+wa_msg_gen_000030,conv_sofia,outbound,15755556219,15755556236,text,On my way to the field site.,,read,2026-10-17T19:00:00-06:00
+wa_msg_gen_000031,conv_carmen,inbound,15755556201,15755556219,text,On my way to the field site.,,delivered,2026-10-19T18:32:00-06:00
+wa_msg_gen_000032,conv_carmen,outbound,15755556219,15755556201,text,"Mijo, llegas a cenar?",,sent,2026-10-19T18:35:00-06:00
+wa_msg_gen_000033,conv_marco,inbound,15755556215,15755556219,text,Sample batch 33 logged.,,delivered,2026-10-19T11:48:00-06:00
+wa_msg_gen_000034,conv_marco,outbound,15755556219,15755556215,text,Sample batch 34 logged.,,sent,2026-10-19T11:52:00-06:00
+wa_msg_gen_000035,conv_rosa,inbound,15755556208,15755556219,text,On my way to the field site.,,delivered,2026-10-18T20:14:00-06:00
+wa_msg_gen_000036,conv_rosa,outbound,15755556219,15755556208,text,"Order shipped, tracking to follow.",,sent,2026-10-18T20:18:00-06:00
+wa_msg_gen_000037,conv_diego,inbound,15755556243,15755556219,text,On my way to the field site.,,delivered,2026-10-19T17:25:00-06:00
+wa_msg_gen_000038,conv_diego,outbound,15755556219,15755556243,text,"Order shipped, tracking to follow.",,read,2026-10-19T17:30:00-06:00
+wa_msg_gen_000039,conv_sofia,inbound,15755556236,15755556219,text,Booth E-14 confirmed for ArtsFaire.,,delivered,2026-10-17T18:55:00-06:00
+wa_msg_gen_000040,conv_sofia,outbound,15755556219,15755556236,text,"Te quiero, call you at 6:30.",,read,2026-10-17T19:00:00-06:00
+wa_msg_gen_000041,conv_carmen,inbound,15755556201,15755556219,text,"Te quiero, call you at 6:30.",,delivered,2026-10-19T18:32:00-06:00
+wa_msg_gen_000042,conv_carmen,outbound,15755556219,15755556201,text,Booth E-14 confirmed for ArtsFaire.,,sent,2026-10-19T18:35:00-06:00
+wa_msg_gen_000043,conv_marco,inbound,15755556215,15755556219,text,Booth E-14 confirmed for ArtsFaire.,,delivered,2026-10-19T11:48:00-06:00
+wa_msg_gen_000044,conv_marco,outbound,15755556219,15755556215,text,Sample batch 44 logged.,,sent,2026-10-19T11:52:00-06:00
+wa_msg_gen_000045,conv_rosa,inbound,15755556208,15755556219,text,"Mijo, llegas a cenar?",,delivered,2026-10-18T20:14:00-06:00
+wa_msg_gen_000046,conv_rosa,outbound,15755556219,15755556208,text,"Mijo, llegas a cenar?",,sent,2026-10-18T20:18:00-06:00
+wa_msg_gen_000047,conv_diego,inbound,15755556243,15755556219,text,"Mijo, llegas a cenar?",,delivered,2026-10-19T17:25:00-06:00
+wa_msg_gen_000048,conv_diego,outbound,15755556219,15755556243,text,Sample batch 48 logged.,,read,2026-10-19T17:30:00-06:00
+wa_msg_gen_000049,conv_sofia,inbound,15755556236,15755556219,text,Booth E-14 confirmed for ArtsFaire.,,delivered,2026-10-17T18:55:00-06:00
+wa_msg_gen_000050,conv_sofia,outbound,15755556219,15755556236,text,Sample batch 50 logged.,,read,2026-10-17T19:00:00-06:00
+wa_msg_gen_000051,conv_carmen,inbound,15755556201,15755556219,text,Sample batch 51 logged.,,delivered,2026-10-19T18:32:00-06:00
+wa_msg_gen_000052,conv_carmen,outbound,15755556219,15755556201,text,Booth E-14 confirmed for ArtsFaire.,,sent,2026-10-19T18:35:00-06:00
+wa_msg_gen_000053,conv_marco,inbound,15755556215,15755556219,text,"Te quiero, call you at 6:30.",,delivered,2026-10-19T11:48:00-06:00
+wa_msg_gen_000054,conv_marco,outbound,15755556219,15755556215,text,"Te quiero, call you at 6:30.",,sent,2026-10-19T11:52:00-06:00
+wa_msg_gen_000055,conv_rosa,inbound,15755556208,15755556219,text,On my way to the field site.,,delivered,2026-10-18T20:14:00-06:00
+wa_msg_gen_000056,conv_rosa,outbound,15755556219,15755556208,text,"Mijo, llegas a cenar?",,sent,2026-10-18T20:18:00-06:00
+wa_msg_gen_000057,conv_diego,inbound,15755556243,15755556219,text,On my way to the field site.,,delivered,2026-10-19T17:25:00-06:00
+wa_msg_gen_000058,conv_diego,outbound,15755556219,15755556243,text,Booth E-14 confirmed for ArtsFaire.,,read,2026-10-19T17:30:00-06:00
+wa_msg_gen_000059,conv_sofia,inbound,15755556236,15755556219,text,Booth E-14 confirmed for ArtsFaire.,,delivered,2026-10-17T18:55:00-06:00
+wa_msg_gen_000060,conv_sofia,outbound,15755556219,15755556236,text,Booth E-14 confirmed for ArtsFaire.,,read,2026-10-17T19:00:00-06:00
+wa_msg_gen_000061,conv_carmen,inbound,15755556201,15755556219,text,"Mijo, llegas a cenar?",,delivered,2026-10-19T18:32:00-06:00
+wa_msg_gen_000062,conv_carmen,outbound,15755556219,15755556201,text,"Order shipped, tracking to follow.",,sent,2026-10-19T18:35:00-06:00
+wa_msg_gen_000063,conv_marco,inbound,15755556215,15755556219,text,"Te quiero, call you at 6:30.",,delivered,2026-10-19T11:48:00-06:00
+wa_msg_gen_000064,conv_marco,outbound,15755556219,15755556215,text,"Te quiero, call you at 6:30.",,sent,2026-10-19T11:52:00-06:00
+wa_msg_gen_000065,conv_rosa,inbound,15755556208,15755556219,text,"Te quiero, call you at 6:30.",,delivered,2026-10-18T20:14:00-06:00
+wa_msg_gen_000066,conv_rosa,outbound,15755556219,15755556208,text,Booth E-14 confirmed for ArtsFaire.,,sent,2026-10-18T20:18:00-06:00
+wa_msg_gen_000067,conv_diego,inbound,15755556243,15755556219,text,"Order shipped, tracking to follow.",,delivered,2026-10-19T17:25:00-06:00
+wa_msg_gen_000068,conv_diego,outbound,15755556219,15755556243,text,"Mijo, llegas a cenar?",,read,2026-10-19T17:30:00-06:00
+wa_msg_gen_000069,conv_sofia,inbound,15755556236,15755556219,text,"Order shipped, tracking to follow.",,delivered,2026-10-17T18:55:00-06:00
+wa_msg_gen_000070,conv_sofia,outbound,15755556219,15755556236,text,"Mijo, llegas a cenar?",,read,2026-10-17T19:00:00-06:00
+wa_msg_gen_000071,conv_carmen,inbound,15755556201,15755556219,text,"Mijo, llegas a cenar?",,delivered,2026-10-19T18:32:00-06:00
+wa_msg_gen_000072,conv_carmen,outbound,15755556219,15755556201,text,Sample batch 72 logged.,,sent,2026-10-19T18:35:00-06:00
+wa_msg_gen_000073,conv_marco,inbound,15755556215,15755556219,text,"Order shipped, tracking to follow.",,delivered,2026-10-19T11:48:00-06:00
+wa_msg_gen_000074,conv_marco,outbound,15755556219,15755556215,text,"Order shipped, tracking to follow.",,sent,2026-10-19T11:52:00-06:00
+wa_msg_gen_000075,conv_rosa,inbound,15755556208,15755556219,text,"Mijo, llegas a cenar?",,delivered,2026-10-18T20:14:00-06:00
+wa_msg_gen_000076,conv_rosa,outbound,15755556219,15755556208,text,"Te quiero, call you at 6:30.",,sent,2026-10-18T20:18:00-06:00
+wa_msg_gen_000077,conv_diego,inbound,15755556243,15755556219,text,Sample batch 77 logged.,,delivered,2026-10-19T17:25:00-06:00
+wa_msg_gen_000078,conv_diego,outbound,15755556219,15755556243,text,Sample batch 78 logged.,,read,2026-10-19T17:30:00-06:00
+wa_msg_gen_000079,conv_sofia,inbound,15755556236,15755556219,text,"Te quiero, call you at 6:30.",,delivered,2026-10-17T18:55:00-06:00
+wa_msg_gen_000080,conv_sofia,outbound,15755556219,15755556236,text,"Te quiero, call you at 6:30.",,read,2026-10-17T19:00:00-06:00
+wa_msg_gen_000081,conv_carmen,inbound,15755556201,15755556219,text,"Order shipped, tracking to follow.",,delivered,2026-10-19T18:32:00-06:00
+wa_msg_gen_000082,conv_carmen,outbound,15755556219,15755556201,text,"Te quiero, call you at 6:30.",,sent,2026-10-19T18:35:00-06:00
+wa_msg_gen_000083,conv_marco,inbound,15755556215,15755556219,text,Sample batch 83 logged.,,delivered,2026-10-19T11:48:00-06:00
+wa_msg_gen_000084,conv_marco,outbound,15755556219,15755556215,text,"Mijo, llegas a cenar?",,sent,2026-10-19T11:52:00-06:00
+wa_msg_gen_000085,conv_rosa,inbound,15755556208,15755556219,text,"Mijo, llegas a cenar?",,delivered,2026-10-18T20:14:00-06:00
+wa_msg_gen_000086,conv_rosa,outbound,15755556219,15755556208,text,"Mijo, llegas a cenar?",,sent,2026-10-18T20:18:00-06:00
+wa_msg_gen_000087,conv_diego,inbound,15755556243,15755556219,text,"Order shipped, tracking to follow.",,delivered,2026-10-19T17:25:00-06:00
+wa_msg_gen_000088,conv_diego,outbound,15755556219,15755556243,text,"Order shipped, tracking to follow.",,read,2026-10-19T17:30:00-06:00
+wa_msg_gen_000089,conv_sofia,inbound,15755556236,15755556219,text,"Mijo, llegas a cenar?",,delivered,2026-10-17T18:55:00-06:00
+wa_msg_gen_000090,conv_sofia,outbound,15755556219,15755556236,text,"Order shipped, tracking to follow.",,read,2026-10-17T19:00:00-06:00
+wa_msg_gen_000091,conv_carmen,inbound,15755556201,15755556219,text,"Te quiero, call you at 6:30.",,delivered,2026-10-19T18:32:00-06:00
+wa_msg_gen_000092,conv_carmen,outbound,15755556219,15755556201,text,"Mijo, llegas a cenar?",,sent,2026-10-19T18:35:00-06:00
+wa_msg_gen_000093,conv_marco,inbound,15755556215,15755556219,text,"Order shipped, tracking to follow.",,delivered,2026-10-19T11:48:00-06:00
+wa_msg_gen_000094,conv_marco,outbound,15755556219,15755556215,text,"Mijo, llegas a cenar?",,sent,2026-10-19T11:52:00-06:00
+wa_msg_gen_000095,conv_rosa,inbound,15755556208,15755556219,text,Sample batch 95 logged.,,delivered,2026-10-18T20:14:00-06:00
+wa_msg_gen_000096,conv_rosa,outbound,15755556219,15755556208,text,Sample batch 96 logged.,,sent,2026-10-18T20:18:00-06:00
+wa_msg_gen_000097,conv_diego,inbound,15755556243,15755556219,text,"Te quiero, call you at 6:30.",,delivered,2026-10-19T17:25:00-06:00
+wa_msg_gen_000098,conv_diego,outbound,15755556219,15755556243,text,Sample batch 98 logged.,,read,2026-10-19T17:30:00-06:00
+wa_msg_gen_000099,conv_sofia,inbound,15755556236,15755556219,text,"Order shipped, tracking to follow.",,delivered,2026-10-17T18:55:00-06:00
+wa_msg_gen_000100,conv_sofia,outbound,15755556219,15755556236,text,"Order shipped, tracking to follow.",,read,2026-10-17T19:00:00-06:00
+wa_msg_gen_000101,conv_carmen,inbound,15755556201,15755556219,text,Booth E-14 confirmed for ArtsFaire.,,delivered,2026-10-19T18:32:00-06:00
+wa_msg_gen_000102,conv_carmen,outbound,15755556219,15755556201,text,Sample batch 102 logged.,,sent,2026-10-19T18:35:00-06:00
+wa_msg_gen_000103,conv_marco,inbound,15755556215,15755556219,text,Sample batch 103 logged.,,delivered,2026-10-19T11:48:00-06:00
+wa_msg_gen_000104,conv_marco,outbound,15755556219,15755556215,text,"Order shipped, tracking to follow.",,sent,2026-10-19T11:52:00-06:00
+wa_msg_gen_000105,conv_rosa,inbound,15755556208,15755556219,text,"Mijo, llegas a cenar?",,delivered,2026-10-18T20:14:00-06:00
+wa_msg_gen_000106,conv_rosa,outbound,15755556219,15755556208,text,"Mijo, llegas a cenar?",,sent,2026-10-18T20:18:00-06:00
+wa_msg_gen_000107,conv_diego,inbound,15755556243,15755556219,text,"Mijo, llegas a cenar?",,delivered,2026-10-19T17:25:00-06:00
+wa_msg_gen_000108,conv_diego,outbound,15755556219,15755556243,text,"Te quiero, call you at 6:30.",,read,2026-10-19T17:30:00-06:00
+wa_msg_gen_000109,conv_sofia,inbound,15755556236,15755556219,text,Sample batch 109 logged.,,delivered,2026-10-17T18:55:00-06:00
+wa_msg_gen_000110,conv_sofia,outbound,15755556219,15755556236,text,Booth E-14 confirmed for ArtsFaire.,,read,2026-10-17T19:00:00-06:00
+wa_msg_gen_000111,conv_carmen,inbound,15755556201,15755556219,text,Booth E-14 confirmed for ArtsFaire.,,delivered,2026-10-19T18:32:00-06:00
+wa_msg_gen_000112,conv_carmen,outbound,15755556219,15755556201,text,"Order shipped, tracking to follow.",,sent,2026-10-19T18:35:00-06:00
+wa_msg_gen_000113,conv_marco,inbound,15755556215,15755556219,text,"Mijo, llegas a cenar?",,delivered,2026-10-19T11:48:00-06:00
+wa_msg_gen_000114,conv_marco,outbound,15755556219,15755556215,text,"Order shipped, tracking to follow.",,sent,2026-10-19T11:52:00-06:00
+wa_msg_gen_000115,conv_rosa,inbound,15755556208,15755556219,text,"Order shipped, tracking to follow.",,delivered,2026-10-18T20:14:00-06:00
+wa_msg_gen_000116,conv_rosa,outbound,15755556219,15755556208,text,On my way to the field site.,,sent,2026-10-18T20:18:00-06:00
+wa_msg_gen_000117,conv_diego,inbound,15755556243,15755556219,text,Sample batch 117 logged.,,delivered,2026-10-19T17:25:00-06:00
+wa_msg_gen_000118,conv_diego,outbound,15755556219,15755556243,text,Booth E-14 confirmed for ArtsFaire.,,read,2026-10-19T17:30:00-06:00
+wa_msg_gen_000119,conv_sofia,inbound,15755556236,15755556219,text,"Order shipped, tracking to follow.",,delivered,2026-10-17T18:55:00-06:00
+wa_msg_gen_000120,conv_sofia,outbound,15755556219,15755556236,text,"Mijo, llegas a cenar?",,read,2026-10-17T19:00:00-06:00
+wa_msg_gen_000121,conv_carmen,inbound,15755556201,15755556219,text,Booth E-14 confirmed for ArtsFaire.,,delivered,2026-10-19T18:32:00-06:00
+wa_msg_gen_000122,conv_carmen,outbound,15755556219,15755556201,text,"Mijo, llegas a cenar?",,sent,2026-10-19T18:35:00-06:00
+wa_msg_gen_000123,conv_marco,inbound,15755556215,15755556219,text,Booth E-14 confirmed for ArtsFaire.,,delivered,2026-10-19T11:48:00-06:00
+wa_msg_gen_000124,conv_marco,outbound,15755556219,15755556215,text,"Order shipped, tracking to follow.",,sent,2026-10-19T11:52:00-06:00
+wa_msg_gen_000125,conv_rosa,inbound,15755556208,15755556219,text,Sample batch 125 logged.,,delivered,2026-10-18T20:14:00-06:00
+wa_msg_gen_000126,conv_rosa,outbound,15755556219,15755556208,text,Sample batch 126 logged.,,sent,2026-10-18T20:18:00-06:00
+wa_msg_gen_000127,conv_diego,inbound,15755556243,15755556219,text,"Mijo, llegas a cenar?",,delivered,2026-10-19T17:25:00-06:00
+wa_msg_gen_000128,conv_diego,outbound,15755556219,15755556243,text,"Te quiero, call you at 6:30.",,read,2026-10-19T17:30:00-06:00
+wa_msg_gen_000129,conv_sofia,inbound,15755556236,15755556219,text,"Mijo, llegas a cenar?",,delivered,2026-10-17T18:55:00-06:00
+wa_msg_gen_000130,conv_sofia,outbound,15755556219,15755556236,text,Booth E-14 confirmed for ArtsFaire.,,read,2026-10-17T19:00:00-06:00
+wa_msg_gen_000131,conv_carmen,inbound,15755556201,15755556219,text,Sample batch 131 logged.,,delivered,2026-10-19T18:32:00-06:00
+wa_msg_gen_000132,conv_carmen,outbound,15755556219,15755556201,text,On my way to the field site.,,sent,2026-10-19T18:35:00-06:00
+wa_msg_gen_000133,conv_marco,inbound,15755556215,15755556219,text,Booth E-14 confirmed for ArtsFaire.,,delivered,2026-10-19T11:48:00-06:00
+wa_msg_gen_000134,conv_marco,outbound,15755556219,15755556215,text,Booth E-14 confirmed for ArtsFaire.,,sent,2026-10-19T11:52:00-06:00
+wa_msg_gen_000135,conv_rosa,inbound,15755556208,15755556219,text,Sample batch 135 logged.,,delivered,2026-10-18T20:14:00-06:00
+wa_msg_gen_000136,conv_rosa,outbound,15755556219,15755556208,text,Sample batch 136 logged.,,sent,2026-10-18T20:18:00-06:00
+wa_msg_gen_000137,conv_diego,inbound,15755556243,15755556219,text,"Mijo, llegas a cenar?",,delivered,2026-10-19T17:25:00-06:00
+wa_msg_gen_000138,conv_diego,outbound,15755556219,15755556243,text,Booth E-14 confirmed for ArtsFaire.,,read,2026-10-19T17:30:00-06:00
+wa_msg_gen_000139,conv_sofia,inbound,15755556236,15755556219,text,Sample batch 139 logged.,,delivered,2026-10-17T18:55:00-06:00
+wa_msg_gen_000140,conv_sofia,outbound,15755556219,15755556236,text,"Te quiero, call you at 6:30.",,read,2026-10-17T19:00:00-06:00
+wa_msg_gen_000141,conv_carmen,inbound,15755556201,15755556219,text,"Te quiero, call you at 6:30.",,delivered,2026-10-19T18:32:00-06:00
+wa_msg_gen_000142,conv_carmen,outbound,15755556219,15755556201,text,"Mijo, llegas a cenar?",,sent,2026-10-19T18:35:00-06:00
+wa_msg_gen_000143,conv_marco,inbound,15755556215,15755556219,text,Sample batch 143 logged.,,delivered,2026-10-19T11:48:00-06:00
+wa_msg_gen_000144,conv_marco,outbound,15755556219,15755556215,text,"Mijo, llegas a cenar?",,sent,2026-10-19T11:52:00-06:00
+wa_msg_gen_000145,conv_rosa,inbound,15755556208,15755556219,text,"Te quiero, call you at 6:30.",,delivered,2026-10-18T20:14:00-06:00
+wa_msg_gen_000146,conv_rosa,outbound,15755556219,15755556208,text,"Order shipped, tracking to follow.",,sent,2026-10-18T20:18:00-06:00
+wa_msg_gen_000147,conv_diego,inbound,15755556243,15755556219,text,Booth E-14 confirmed for ArtsFaire.,,delivered,2026-10-19T17:25:00-06:00
+wa_msg_gen_000148,conv_diego,outbound,15755556219,15755556243,text,"Te quiero, call you at 6:30.",,read,2026-10-19T17:30:00-06:00
+wa_msg_gen_000149,conv_sofia,inbound,15755556236,15755556219,text,"Mijo, llegas a cenar?",,delivered,2026-10-17T18:55:00-06:00
+wa_msg_gen_000150,conv_sofia,outbound,15755556219,15755556236,text,"Mijo, llegas a cenar?",,read,2026-10-17T19:00:00-06:00
+wa_msg_gen_000151,conv_carmen,inbound,15755556201,15755556219,text,On my way to the field site.,,delivered,2026-10-19T18:32:00-06:00
+wa_msg_gen_000152,conv_carmen,outbound,15755556219,15755556201,text,"Order shipped, tracking to follow.",,sent,2026-10-19T18:35:00-06:00
+wa_msg_gen_000153,conv_marco,inbound,15755556215,15755556219,text,"Te quiero, call you at 6:30.",,delivered,2026-10-19T11:48:00-06:00
+wa_msg_gen_000154,conv_marco,outbound,15755556219,15755556215,text,Sample batch 154 logged.,,sent,2026-10-19T11:52:00-06:00
+wa_msg_gen_000155,conv_rosa,inbound,15755556208,15755556219,text,Sample batch 155 logged.,,delivered,2026-10-18T20:14:00-06:00
+wa_msg_gen_000156,conv_rosa,outbound,15755556219,15755556208,text,On my way to the field site.,,sent,2026-10-18T20:18:00-06:00
+wa_msg_gen_000157,conv_diego,inbound,15755556243,15755556219,text,"Mijo, llegas a cenar?",,delivered,2026-10-19T17:25:00-06:00
+wa_msg_gen_000158,conv_diego,outbound,15755556219,15755556243,text,Sample batch 158 logged.,,read,2026-10-19T17:30:00-06:00
+wa_msg_gen_000159,conv_sofia,inbound,15755556236,15755556219,text,Sample batch 159 logged.,,delivered,2026-10-17T18:55:00-06:00
+wa_msg_gen_000160,conv_sofia,outbound,15755556219,15755556236,text,"Order shipped, tracking to follow.",,read,2026-10-17T19:00:00-06:00
+wa_msg_gen_000161,conv_carmen,inbound,15755556201,15755556219,text,On my way to the field site.,,delivered,2026-10-19T18:32:00-06:00
+wa_msg_gen_000162,conv_carmen,outbound,15755556219,15755556201,text,"Mijo, llegas a cenar?",,sent,2026-10-19T18:35:00-06:00
+wa_msg_gen_000163,conv_marco,inbound,15755556215,15755556219,text,"Order shipped, tracking to follow.",,delivered,2026-10-19T11:48:00-06:00
+wa_msg_gen_000164,conv_marco,outbound,15755556219,15755556215,text,On my way to the field site.,,sent,2026-10-19T11:52:00-06:00
+wa_msg_gen_000165,conv_rosa,inbound,15755556208,15755556219,text,Booth E-14 confirmed for ArtsFaire.,,delivered,2026-10-18T20:14:00-06:00
+wa_msg_gen_000166,conv_rosa,outbound,15755556219,15755556208,text,"Order shipped, tracking to follow.",,sent,2026-10-18T20:18:00-06:00
+wa_msg_gen_000167,conv_diego,inbound,15755556243,15755556219,text,"Mijo, llegas a cenar?",,delivered,2026-10-19T17:25:00-06:00
+wa_msg_gen_000168,conv_diego,outbound,15755556219,15755556243,text,On my way to the field site.,,read,2026-10-19T17:30:00-06:00
+wa_msg_gen_000169,conv_sofia,inbound,15755556236,15755556219,text,"Te quiero, call you at 6:30.",,delivered,2026-10-17T18:55:00-06:00
+wa_msg_gen_000170,conv_sofia,outbound,15755556219,15755556236,text,Booth E-14 confirmed for ArtsFaire.,,read,2026-10-17T19:00:00-06:00
+wa_msg_gen_000171,conv_carmen,inbound,15755556201,15755556219,text,On my way to the field site.,,delivered,2026-10-19T18:32:00-06:00
+wa_msg_gen_000172,conv_carmen,outbound,15755556219,15755556201,text,On my way to the field site.,,sent,2026-10-19T18:35:00-06:00
+wa_msg_gen_000173,conv_marco,inbound,15755556215,15755556219,text,"Te quiero, call you at 6:30.",,delivered,2026-10-19T11:48:00-06:00
+wa_msg_gen_000174,conv_marco,outbound,15755556219,15755556215,text,Sample batch 174 logged.,,sent,2026-10-19T11:52:00-06:00
+wa_msg_gen_000175,conv_rosa,inbound,15755556208,15755556219,text,Booth E-14 confirmed for ArtsFaire.,,delivered,2026-10-18T20:14:00-06:00
+wa_msg_gen_000176,conv_rosa,outbound,15755556219,15755556208,text,Sample batch 176 logged.,,sent,2026-10-18T20:18:00-06:00
+wa_msg_gen_000177,conv_diego,inbound,15755556243,15755556219,text,"Te quiero, call you at 6:30.",,delivered,2026-10-19T17:25:00-06:00
+wa_msg_gen_000178,conv_diego,outbound,15755556219,15755556243,text,"Mijo, llegas a cenar?",,read,2026-10-19T17:30:00-06:00
+wa_msg_gen_000179,conv_sofia,inbound,15755556236,15755556219,text,"Mijo, llegas a cenar?",,delivered,2026-10-17T18:55:00-06:00
+wa_msg_gen_000180,conv_sofia,outbound,15755556219,15755556236,text,"Order shipped, tracking to follow.",,read,2026-10-17T19:00:00-06:00
+wa_msg_gen_000181,conv_carmen,inbound,15755556201,15755556219,text,"Order shipped, tracking to follow.",,delivered,2026-10-19T18:32:00-06:00
+wa_msg_gen_000182,conv_carmen,outbound,15755556219,15755556201,text,Booth E-14 confirmed for ArtsFaire.,,sent,2026-10-19T18:35:00-06:00
+wa_msg_gen_000183,conv_marco,inbound,15755556215,15755556219,text,"Order shipped, tracking to follow.",,delivered,2026-10-19T11:48:00-06:00
+wa_msg_gen_000184,conv_marco,outbound,15755556219,15755556215,text,On my way to the field site.,,sent,2026-10-19T11:52:00-06:00
+wa_msg_gen_000185,conv_rosa,inbound,15755556208,15755556219,text,Booth E-14 confirmed for ArtsFaire.,,delivered,2026-10-18T20:14:00-06:00
+wa_msg_gen_000186,conv_rosa,outbound,15755556219,15755556208,text,"Order shipped, tracking to follow.",,sent,2026-10-18T20:18:00-06:00
+wa_msg_gen_000187,conv_diego,inbound,15755556243,15755556219,text,Sample batch 187 logged.,,delivered,2026-10-19T17:25:00-06:00
+wa_msg_gen_000188,conv_diego,outbound,15755556219,15755556243,text,"Mijo, llegas a cenar?",,read,2026-10-19T17:30:00-06:00
+wa_msg_gen_000189,conv_sofia,inbound,15755556236,15755556219,text,On my way to the field site.,,delivered,2026-10-17T18:55:00-06:00
+wa_msg_gen_000190,conv_sofia,outbound,15755556219,15755556236,text,"Mijo, llegas a cenar?",,read,2026-10-17T19:00:00-06:00
+wa_msg_gen_000191,conv_carmen,inbound,15755556201,15755556219,text,"Te quiero, call you at 6:30.",,delivered,2026-10-19T18:32:00-06:00
+wa_msg_gen_000192,conv_carmen,outbound,15755556219,15755556201,text,Booth E-14 confirmed for ArtsFaire.,,sent,2026-10-19T18:35:00-06:00
+wa_msg_gen_000193,conv_marco,inbound,15755556215,15755556219,text,Booth E-14 confirmed for ArtsFaire.,,delivered,2026-10-19T11:48:00-06:00
+wa_msg_gen_000194,conv_marco,outbound,15755556219,15755556215,text,"Mijo, llegas a cenar?",,sent,2026-10-19T11:52:00-06:00
+wa_msg_gen_000195,conv_rosa,inbound,15755556208,15755556219,text,"Order shipped, tracking to follow.",,delivered,2026-10-18T20:14:00-06:00
+wa_msg_gen_000196,conv_rosa,outbound,15755556219,15755556208,text,Booth E-14 confirmed for ArtsFaire.,,sent,2026-10-18T20:18:00-06:00
+wa_msg_gen_000197,conv_diego,inbound,15755556243,15755556219,text,"Te quiero, call you at 6:30.",,delivered,2026-10-19T17:25:00-06:00
+wa_msg_gen_000198,conv_diego,outbound,15755556219,15755556243,text,On my way to the field site.,,read,2026-10-19T17:30:00-06:00
+wa_msg_gen_000199,conv_sofia,inbound,15755556236,15755556219,text,Booth E-14 confirmed for ArtsFaire.,,delivered,2026-10-17T18:55:00-06:00
+wa_msg_gen_000200,conv_sofia,outbound,15755556219,15755556236,text,"Te quiero, call you at 6:30.",,read,2026-10-17T19:00:00-06:00
+wa_msg_gen_000201,conv_carmen,inbound,15755556201,15755556219,text,"Te quiero, call you at 6:30.",,delivered,2026-10-19T18:32:00-06:00
+wa_msg_gen_000202,conv_carmen,outbound,15755556219,15755556201,text,"Te quiero, call you at 6:30.",,sent,2026-10-19T18:35:00-06:00
+wa_msg_gen_000203,conv_marco,inbound,15755556215,15755556219,text,Booth E-14 confirmed for ArtsFaire.,,delivered,2026-10-19T11:48:00-06:00
+wa_msg_gen_000204,conv_marco,outbound,15755556219,15755556215,text,Booth E-14 confirmed for ArtsFaire.,,sent,2026-10-19T11:52:00-06:00
+wa_msg_gen_000205,conv_rosa,inbound,15755556208,15755556219,text,"Mijo, llegas a cenar?",,delivered,2026-10-18T20:14:00-06:00
+wa_msg_gen_000206,conv_rosa,outbound,15755556219,15755556208,text,"Order shipped, tracking to follow.",,sent,2026-10-18T20:18:00-06:00
+wa_msg_gen_000207,conv_diego,inbound,15755556243,15755556219,text,On my way to the field site.,,delivered,2026-10-19T17:25:00-06:00
+wa_msg_gen_000208,conv_diego,outbound,15755556219,15755556243,text,On my way to the field site.,,read,2026-10-19T17:30:00-06:00
+wa_msg_gen_000209,conv_sofia,inbound,15755556236,15755556219,text,Sample batch 209 logged.,,delivered,2026-10-17T18:55:00-06:00
+wa_msg_gen_000210,conv_sofia,outbound,15755556219,15755556236,text,"Te quiero, call you at 6:30.",,read,2026-10-17T19:00:00-06:00
+wa_msg_gen_000211,conv_carmen,inbound,15755556201,15755556219,text,"Order shipped, tracking to follow.",,delivered,2026-10-19T18:32:00-06:00
+wa_msg_gen_000212,conv_carmen,outbound,15755556219,15755556201,text,"Te quiero, call you at 6:30.",,sent,2026-10-19T18:35:00-06:00
+wa_msg_gen_000213,conv_marco,inbound,15755556215,15755556219,text,"Mijo, llegas a cenar?",,delivered,2026-10-19T11:48:00-06:00
+wa_msg_gen_000214,conv_marco,outbound,15755556219,15755556215,text,On my way to the field site.,,sent,2026-10-19T11:52:00-06:00
+wa_msg_gen_000215,conv_rosa,inbound,15755556208,15755556219,text,"Order shipped, tracking to follow.",,delivered,2026-10-18T20:14:00-06:00
+wa_msg_gen_000216,conv_rosa,outbound,15755556219,15755556208,text,Sample batch 216 logged.,,sent,2026-10-18T20:18:00-06:00
+wa_msg_gen_000217,conv_diego,inbound,15755556243,15755556219,text,On my way to the field site.,,delivered,2026-10-19T17:25:00-06:00
+wa_msg_gen_000218,conv_diego,outbound,15755556219,15755556243,text,"Order shipped, tracking to follow.",,read,2026-10-19T17:30:00-06:00
+wa_msg_gen_000219,conv_sofia,inbound,15755556236,15755556219,text,"Mijo, llegas a cenar?",,delivered,2026-10-17T18:55:00-06:00
+wa_msg_gen_000220,conv_sofia,outbound,15755556219,15755556236,text,"Order shipped, tracking to follow.",,read,2026-10-17T19:00:00-06:00
+wa_msg_gen_000221,conv_carmen,inbound,15755556201,15755556219,text,"Te quiero, call you at 6:30.",,delivered,2026-10-19T18:32:00-06:00
+wa_msg_gen_000222,conv_carmen,outbound,15755556219,15755556201,text,"Order shipped, tracking to follow.",,sent,2026-10-19T18:35:00-06:00
+wa_msg_gen_000223,conv_marco,inbound,15755556215,15755556219,text,"Order shipped, tracking to follow.",,delivered,2026-10-19T11:48:00-06:00
+wa_msg_gen_000224,conv_marco,outbound,15755556219,15755556215,text,On my way to the field site.,,sent,2026-10-19T11:52:00-06:00
+wa_msg_gen_000225,conv_rosa,inbound,15755556208,15755556219,text,Sample batch 225 logged.,,delivered,2026-10-18T20:14:00-06:00
+wa_msg_gen_000226,conv_rosa,outbound,15755556219,15755556208,text,"Mijo, llegas a cenar?",,sent,2026-10-18T20:18:00-06:00
+wa_msg_gen_000227,conv_diego,inbound,15755556243,15755556219,text,Booth E-14 confirmed for ArtsFaire.,,delivered,2026-10-19T17:25:00-06:00
+wa_msg_gen_000228,conv_diego,outbound,15755556219,15755556243,text,Sample batch 228 logged.,,read,2026-10-19T17:30:00-06:00
+wa_msg_gen_000229,conv_sofia,inbound,15755556236,15755556219,text,On my way to the field site.,,delivered,2026-10-17T18:55:00-06:00
+wa_msg_gen_000230,conv_sofia,outbound,15755556219,15755556236,text,On my way to the field site.,,read,2026-10-17T19:00:00-06:00
+wa_msg_gen_000231,conv_carmen,inbound,15755556201,15755556219,text,"Te quiero, call you at 6:30.",,delivered,2026-10-19T18:32:00-06:00
+wa_msg_gen_000232,conv_carmen,outbound,15755556219,15755556201,text,Sample batch 232 logged.,,sent,2026-10-19T18:35:00-06:00
+wa_msg_gen_000233,conv_marco,inbound,15755556215,15755556219,text,"Order shipped, tracking to follow.",,delivered,2026-10-19T11:48:00-06:00
+wa_msg_gen_000234,conv_marco,outbound,15755556219,15755556215,text,On my way to the field site.,,sent,2026-10-19T11:52:00-06:00
+wa_msg_gen_000235,conv_rosa,inbound,15755556208,15755556219,text,"Order shipped, tracking to follow.",,delivered,2026-10-18T20:14:00-06:00
+wa_msg_gen_000236,conv_rosa,outbound,15755556219,15755556208,text,"Order shipped, tracking to follow.",,sent,2026-10-18T20:18:00-06:00
+wa_msg_gen_000237,conv_diego,inbound,15755556243,15755556219,text,Booth E-14 confirmed for ArtsFaire.,,delivered,2026-10-19T17:25:00-06:00
+wa_msg_gen_000238,conv_diego,outbound,15755556219,15755556243,text,Booth E-14 confirmed for ArtsFaire.,,read,2026-10-19T17:30:00-06:00
+wa_msg_gen_000239,conv_sofia,inbound,15755556236,15755556219,text,On my way to the field site.,,delivered,2026-10-17T18:55:00-06:00
+wa_msg_gen_000240,conv_sofia,outbound,15755556219,15755556236,text,"Te quiero, call you at 6:30.",,read,2026-10-17T19:00:00-06:00
+wa_msg_gen_000241,conv_carmen,inbound,15755556201,15755556219,text,"Te quiero, call you at 6:30.",,delivered,2026-10-19T18:32:00-06:00
+wa_msg_gen_000242,conv_carmen,outbound,15755556219,15755556201,text,"Order shipped, tracking to follow.",,sent,2026-10-19T18:35:00-06:00
+wa_msg_gen_000243,conv_marco,inbound,15755556215,15755556219,text,Booth E-14 confirmed for ArtsFaire.,,delivered,2026-10-19T11:48:00-06:00
+wa_msg_gen_000244,conv_marco,outbound,15755556219,15755556215,text,"Mijo, llegas a cenar?",,sent,2026-10-19T11:52:00-06:00
+wa_msg_gen_000245,conv_rosa,inbound,15755556208,15755556219,text,Sample batch 245 logged.,,delivered,2026-10-18T20:14:00-06:00
+wa_msg_gen_000246,conv_rosa,outbound,15755556219,15755556208,text,Sample batch 246 logged.,,sent,2026-10-18T20:18:00-06:00
+wa_msg_gen_000247,conv_diego,inbound,15755556243,15755556219,text,On my way to the field site.,,delivered,2026-10-19T17:25:00-06:00
+wa_msg_gen_000248,conv_diego,outbound,15755556219,15755556243,text,On my way to the field site.,,read,2026-10-19T17:30:00-06:00
+wa_msg_gen_000249,conv_sofia,inbound,15755556236,15755556219,text,Sample batch 249 logged.,,delivered,2026-10-17T18:55:00-06:00
+wa_msg_gen_000250,conv_sofia,outbound,15755556219,15755556236,text,On my way to the field site.,,read,2026-10-17T19:00:00-06:00
+wa_msg_gen_000251,conv_carmen,inbound,15755556201,15755556219,text,On my way to the field site.,,delivered,2026-10-19T18:32:00-06:00
+wa_msg_gen_000252,conv_carmen,outbound,15755556219,15755556201,text,"Te quiero, call you at 6:30.",,sent,2026-10-19T18:35:00-06:00
+wa_msg_gen_000253,conv_marco,inbound,15755556215,15755556219,text,"Mijo, llegas a cenar?",,delivered,2026-10-19T11:48:00-06:00
+wa_msg_gen_000254,conv_marco,outbound,15755556219,15755556215,text,Booth E-14 confirmed for ArtsFaire.,,sent,2026-10-19T11:52:00-06:00
+wa_msg_gen_000255,conv_rosa,inbound,15755556208,15755556219,text,"Mijo, llegas a cenar?",,delivered,2026-10-18T20:14:00-06:00
+wa_msg_gen_000256,conv_rosa,outbound,15755556219,15755556208,text,"Order shipped, tracking to follow.",,sent,2026-10-18T20:18:00-06:00
+wa_msg_gen_000257,conv_diego,inbound,15755556243,15755556219,text,Sample batch 257 logged.,,delivered,2026-10-19T17:25:00-06:00
+wa_msg_gen_000258,conv_diego,outbound,15755556219,15755556243,text,On my way to the field site.,,read,2026-10-19T17:30:00-06:00
+wa_msg_gen_000259,conv_sofia,inbound,15755556236,15755556219,text,"Order shipped, tracking to follow.",,delivered,2026-10-17T18:55:00-06:00
+wa_msg_gen_000260,conv_sofia,outbound,15755556219,15755556236,text,"Order shipped, tracking to follow.",,read,2026-10-17T19:00:00-06:00
+wa_msg_gen_000261,conv_carmen,inbound,15755556201,15755556219,text,On my way to the field site.,,delivered,2026-10-19T18:32:00-06:00
+wa_msg_gen_000262,conv_carmen,outbound,15755556219,15755556201,text,"Order shipped, tracking to follow.",,sent,2026-10-19T18:35:00-06:00
+wa_msg_gen_000263,conv_marco,inbound,15755556215,15755556219,text,On my way to the field site.,,delivered,2026-10-19T11:48:00-06:00
+wa_msg_gen_000264,conv_marco,outbound,15755556219,15755556215,text,Booth E-14 confirmed for ArtsFaire.,,sent,2026-10-19T11:52:00-06:00
+wa_msg_gen_000265,conv_rosa,inbound,15755556208,15755556219,text,"Mijo, llegas a cenar?",,delivered,2026-10-18T20:14:00-06:00
+wa_msg_gen_000266,conv_rosa,outbound,15755556219,15755556208,text,Sample batch 266 logged.,,sent,2026-10-18T20:18:00-06:00
+wa_msg_gen_000267,conv_diego,inbound,15755556243,15755556219,text,Sample batch 267 logged.,,delivered,2026-10-19T17:25:00-06:00
+wa_msg_gen_000268,conv_diego,outbound,15755556219,15755556243,text,Sample batch 268 logged.,,read,2026-10-19T17:30:00-06:00
+wa_msg_gen_000269,conv_sofia,inbound,15755556236,15755556219,text,Sample batch 269 logged.,,delivered,2026-10-17T18:55:00-06:00
+wa_msg_gen_000270,conv_sofia,outbound,15755556219,15755556236,text,Booth E-14 confirmed for ArtsFaire.,,read,2026-10-17T19:00:00-06:00
+wa_msg_gen_000271,conv_carmen,inbound,15755556201,15755556219,text,Sample batch 271 logged.,,delivered,2026-10-19T18:32:00-06:00
+wa_msg_gen_000272,conv_carmen,outbound,15755556219,15755556201,text,"Order shipped, tracking to follow.",,sent,2026-10-19T18:35:00-06:00
+wa_msg_gen_000273,conv_marco,inbound,15755556215,15755556219,text,Booth E-14 confirmed for ArtsFaire.,,delivered,2026-10-19T11:48:00-06:00
+wa_msg_gen_000274,conv_marco,outbound,15755556219,15755556215,text,On my way to the field site.,,sent,2026-10-19T11:52:00-06:00
+wa_msg_gen_000275,conv_rosa,inbound,15755556208,15755556219,text,"Te quiero, call you at 6:30.",,delivered,2026-10-18T20:14:00-06:00
+wa_msg_gen_000276,conv_rosa,outbound,15755556219,15755556208,text,"Order shipped, tracking to follow.",,sent,2026-10-18T20:18:00-06:00
+wa_msg_gen_000277,conv_diego,inbound,15755556243,15755556219,text,On my way to the field site.,,delivered,2026-10-19T17:25:00-06:00
+wa_msg_gen_000278,conv_diego,outbound,15755556219,15755556243,text,"Mijo, llegas a cenar?",,read,2026-10-19T17:30:00-06:00
+wa_msg_gen_000279,conv_sofia,inbound,15755556236,15755556219,text,On my way to the field site.,,delivered,2026-10-17T18:55:00-06:00
+wa_msg_gen_000280,conv_sofia,outbound,15755556219,15755556236,text,"Mijo, llegas a cenar?",,read,2026-10-17T19:00:00-06:00
+wa_msg_gen_000281,conv_carmen,inbound,15755556201,15755556219,text,"Te quiero, call you at 6:30.",,delivered,2026-10-19T18:32:00-06:00
+wa_msg_gen_000282,conv_carmen,outbound,15755556219,15755556201,text,On my way to the field site.,,sent,2026-10-19T18:35:00-06:00
+wa_msg_gen_000283,conv_marco,inbound,15755556215,15755556219,text,Sample batch 283 logged.,,delivered,2026-10-19T11:48:00-06:00
+wa_msg_gen_000284,conv_marco,outbound,15755556219,15755556215,text,On my way to the field site.,,sent,2026-10-19T11:52:00-06:00
+wa_msg_gen_000285,conv_rosa,inbound,15755556208,15755556219,text,Booth E-14 confirmed for ArtsFaire.,,delivered,2026-10-18T20:14:00-06:00
+wa_msg_gen_000286,conv_rosa,outbound,15755556219,15755556208,text,"Order shipped, tracking to follow.",,sent,2026-10-18T20:18:00-06:00
+wa_msg_gen_000287,conv_diego,inbound,15755556243,15755556219,text,"Te quiero, call you at 6:30.",,delivered,2026-10-19T17:25:00-06:00
+wa_msg_gen_000288,conv_diego,outbound,15755556219,15755556243,text,"Mijo, llegas a cenar?",,read,2026-10-19T17:30:00-06:00
+wa_msg_gen_000289,conv_sofia,inbound,15755556236,15755556219,text,Booth E-14 confirmed for ArtsFaire.,,delivered,2026-10-17T18:55:00-06:00
+wa_msg_gen_000290,conv_sofia,outbound,15755556219,15755556236,text,"Order shipped, tracking to follow.",,read,2026-10-17T19:00:00-06:00
+wa_msg_gen_000291,conv_carmen,inbound,15755556201,15755556219,text,Booth E-14 confirmed for ArtsFaire.,,delivered,2026-10-19T18:32:00-06:00
+wa_msg_gen_000292,conv_carmen,outbound,15755556219,15755556201,text,"Order shipped, tracking to follow.",,sent,2026-10-19T18:35:00-06:00
+wa_msg_gen_000293,conv_marco,inbound,15755556215,15755556219,text,"Te quiero, call you at 6:30.",,delivered,2026-10-19T11:48:00-06:00
+wa_msg_gen_000294,conv_marco,outbound,15755556219,15755556215,text,"Te quiero, call you at 6:30.",,sent,2026-10-19T11:52:00-06:00
+wa_msg_gen_000295,conv_rosa,inbound,15755556208,15755556219,text,"Order shipped, tracking to follow.",,delivered,2026-10-18T20:14:00-06:00
+wa_msg_gen_000296,conv_rosa,outbound,15755556219,15755556208,text,"Te quiero, call you at 6:30.",,sent,2026-10-18T20:18:00-06:00
+wa_msg_gen_000297,conv_diego,inbound,15755556243,15755556219,text,On my way to the field site.,,delivered,2026-10-19T17:25:00-06:00
+wa_msg_gen_000298,conv_diego,outbound,15755556219,15755556243,text,"Te quiero, call you at 6:30.",,read,2026-10-19T17:30:00-06:00
+wa_msg_gen_000299,conv_sofia,inbound,15755556236,15755556219,text,"Order shipped, tracking to follow.",,delivered,2026-10-17T18:55:00-06:00
+wa_msg_gen_000300,conv_sofia,outbound,15755556219,15755556236,text,"Mijo, llegas a cenar?",,read,2026-10-17T19:00:00-06:00
+wa_msg_gen_000301,conv_carmen,inbound,15755556201,15755556219,text,Booth E-14 confirmed for ArtsFaire.,,delivered,2026-10-19T18:32:00-06:00
+wa_msg_gen_000302,conv_carmen,outbound,15755556219,15755556201,text,Booth E-14 confirmed for ArtsFaire.,,sent,2026-10-19T18:35:00-06:00
+wa_msg_gen_000303,conv_marco,inbound,15755556215,15755556219,text,"Order shipped, tracking to follow.",,delivered,2026-10-19T11:48:00-06:00
+wa_msg_gen_000304,conv_marco,outbound,15755556219,15755556215,text,"Order shipped, tracking to follow.",,sent,2026-10-19T11:52:00-06:00
+wa_msg_gen_000305,conv_rosa,inbound,15755556208,15755556219,text,"Mijo, llegas a cenar?",,delivered,2026-10-18T20:14:00-06:00
+wa_msg_gen_000306,conv_rosa,outbound,15755556219,15755556208,text,Sample batch 306 logged.,,sent,2026-10-18T20:18:00-06:00
+wa_msg_gen_000307,conv_diego,inbound,15755556243,15755556219,text,On my way to the field site.,,delivered,2026-10-19T17:25:00-06:00
+wa_msg_gen_000308,conv_diego,outbound,15755556219,15755556243,text,Sample batch 308 logged.,,read,2026-10-19T17:30:00-06:00
+wa_msg_gen_000309,conv_sofia,inbound,15755556236,15755556219,text,"Mijo, llegas a cenar?",,delivered,2026-10-17T18:55:00-06:00
+wa_msg_gen_000310,conv_sofia,outbound,15755556219,15755556236,text,"Mijo, llegas a cenar?",,read,2026-10-17T19:00:00-06:00

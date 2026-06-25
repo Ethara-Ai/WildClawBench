@@ -1,0 +1,3 @@
+conversation_id,wa_id,started_at,last_message_at,origin,within_24h_window
+conv_family,15552201,2026-10-01T08:00:00-04:00,2026-10-13T07:00:00-04:00,user,True
+conv_nathalie,15553312,2026-10-02T08:00:00-04:00,2026-10-11T18:00:00-04:00,user,False

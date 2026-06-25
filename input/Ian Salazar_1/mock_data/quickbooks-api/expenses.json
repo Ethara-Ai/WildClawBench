@@ -1,0 +1,4888 @@
+[
+  {
+    "Id": "5001",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5002",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5003",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5004",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5005",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5006",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5007",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5008",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5009",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5010",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5011",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5012",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5013",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5014",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5015",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5016",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5017",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5018",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5019",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5020",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5021",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5022",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5023",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5024",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5025",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5026",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5027",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5028",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5029",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5030",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5031",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5032",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5033",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5034",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5035",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5036",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5037",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5038",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5039",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5040",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5041",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5042",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5043",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5044",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5045",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5046",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5047",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5048",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5049",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5050",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5051",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5052",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5053",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5054",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5055",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5056",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5057",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5058",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5059",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5060",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5061",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5062",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5063",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5064",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5065",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5066",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5067",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5068",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5069",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5070",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5071",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5072",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5073",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5074",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5075",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5076",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5077",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5078",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5079",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5080",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5081",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5082",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5083",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5084",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5085",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5086",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5087",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5088",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5089",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5090",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5091",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5092",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5093",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5094",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5095",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5096",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5097",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5098",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5099",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5100",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5101",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5102",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5103",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5104",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5105",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5106",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5107",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5108",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5109",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5110",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5111",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5112",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5113",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5114",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5115",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5116",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5117",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5118",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5119",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5120",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5121",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5122",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5123",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5124",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5125",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5126",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5127",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5128",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5129",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5130",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5131",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5132",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5133",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5134",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5135",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5136",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5137",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5138",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5139",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5140",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5141",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5142",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5143",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5144",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5145",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5146",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5147",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5148",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5149",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5150",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5151",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5152",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5153",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5154",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5155",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5156",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5157",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5158",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5159",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5160",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5161",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5162",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5163",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5164",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5165",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5166",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5167",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5168",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5169",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5170",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5171",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5172",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5173",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5174",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5175",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5176",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5177",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5178",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5179",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5180",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5181",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5182",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5183",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5184",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5185",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5186",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5187",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5188",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5189",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5190",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5191",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5192",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5193",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5194",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5195",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5196",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5197",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5198",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5199",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5200",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5201",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5202",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5203",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5204",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5205",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5206",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5207",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5208",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5209",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5210",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5211",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5212",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5213",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5214",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5215",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5216",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5217",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5218",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5219",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5220",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5221",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5222",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5223",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5224",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5225",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5226",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5227",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5228",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5229",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5230",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5231",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5232",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5233",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5234",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5235",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5236",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5237",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5238",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5239",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5240",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5241",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5242",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5243",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5244",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5245",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5246",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5247",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5248",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5249",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5250",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5251",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5252",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5253",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5254",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5255",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5256",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5257",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5258",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5259",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5260",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5261",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5262",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5263",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5264",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5265",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5266",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5267",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5268",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5269",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5270",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5271",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5272",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5273",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5274",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5275",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5276",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5277",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5278",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5279",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5280",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5281",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5282",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5283",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5284",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5285",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5286",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5287",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5288",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5289",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5290",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5291",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5292",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5293",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5294",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5295",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5296",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5297",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5298",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5299",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5300",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5301",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5302",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5303",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5304",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5305",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5306",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5307",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5308",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5309",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5310",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5311",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5312",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5313",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5314",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5315",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5316",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5317",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5318",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5319",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5320",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5321",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5322",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5323",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5324",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5325",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5326",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5327",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5328",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5329",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5330",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5331",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5332",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5333",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5334",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5335",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5336",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5337",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5338",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5339",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5340",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5341",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5342",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5343",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5344",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5345",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5346",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5347",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5348",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  },
+  {
+    "Id": "5349",
+    "TxnDate": "2026-09-28",
+    "TotalAmt": 320.0,
+    "Line": [
+      {
+        "Description": "Field meter recalibration kit + replacement DO probes.",
+        "Amount": 320.0
+      }
+    ],
+    "MetaData": {
+      "CreateTime": "2026-09-28T09:00:00-06:00"
+    }
+  }
+]

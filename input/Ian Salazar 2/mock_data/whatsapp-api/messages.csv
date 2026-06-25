@@ -1,7 +1,0 @@
-message_id,conversation_id,direction,from_wa_id,to_wa_id,type,text,template_name,status,sent_at
-wa_msg_001,conv_carmen,inbound,15755556201,15755556219,text,"Mijo, llámame cuando llegues a casa. Hay sopa.",,delivered,2026-10-19T18:32:00-06:00
-wa_msg_002,conv_carmen,outbound,15755556219,15755556201,text,"Sí Mamá, en 15 minutos. Te quiero.",,sent,2026-10-19T18:35:00-06:00
-wa_msg_003,conv_marco,inbound,15755556215,15755556219,text,Primo — voy a llevar el racks de cedro al booth el viernes. Confirmado.,,delivered,2026-10-19T11:48:00-06:00
-wa_msg_004,conv_marco,outbound,15755556219,15755556215,text,Perfecto. Llego a las 14:00 a load-in. Trae la mesa también si puedes.,,sent,2026-10-19T11:52:00-06:00
-wa_msg_005,conv_rosa,inbound,15755556208,15755556219,text,"Hermano, vienes para Día de los Muertos en casa de Mamá verdad?",,delivered,2026-10-18T20:14:00-06:00
-wa_msg_006,conv_rosa,outbound,15755556219,15755556208,text,Claro. Llevo el pan de muerto. Dile a Mamá.,,sent,2026-10-18T20:18:00-06:00

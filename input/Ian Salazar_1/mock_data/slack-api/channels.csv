@@ -1,0 +1,243 @@
+id,name,is_private,is_archived,topic,purpose,creator,created,num_members
+C_general,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_upstream,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_fieldwork,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000001,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000002,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000003,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000004,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000005,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000006,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000007,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000008,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000009,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000010,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000011,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000012,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000013,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000014,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000015,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000016,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000017,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000018,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000019,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000020,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000021,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000022,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000023,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000024,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000025,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000026,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000027,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000028,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000029,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000030,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000031,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000032,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000033,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000034,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000035,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000036,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000037,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000038,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000039,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000040,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000041,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000042,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000043,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000044,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000045,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000046,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000047,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000048,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000049,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000050,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000051,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000052,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000053,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000054,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000055,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000056,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000057,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000058,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000059,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000060,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000061,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000062,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000063,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000064,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000065,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000066,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000067,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000068,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000069,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000070,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000071,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000072,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000073,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000074,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000075,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000076,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000077,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000078,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000079,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000080,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000081,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000082,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000083,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000084,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000085,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000086,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000087,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000088,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000089,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000090,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000091,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000092,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000093,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000094,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000095,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000096,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000097,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000098,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000099,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000100,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000101,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000102,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000103,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000104,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000105,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000106,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000107,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000108,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000109,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000110,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000111,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000112,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000113,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000114,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000115,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000116,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000117,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000118,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000119,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000120,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000121,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000122,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000123,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000124,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000125,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000126,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000127,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000128,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000129,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000130,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000131,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000132,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000133,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000134,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000135,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000136,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000137,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000138,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000139,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000140,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000141,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000142,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000143,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000144,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000145,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000146,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000147,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000148,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000149,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000150,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000151,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000152,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000153,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000154,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000155,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000156,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000157,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000158,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000159,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000160,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000161,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000162,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000163,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000164,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000165,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000166,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000167,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000168,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000169,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000170,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000171,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000172,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000173,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000174,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000175,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000176,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000177,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000178,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000179,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000180,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000181,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000182,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000183,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000184,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000185,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000186,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000187,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000188,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000189,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000190,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000191,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000192,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000193,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000194,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000195,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000196,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000197,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000198,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000199,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000200,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000201,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000202,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000203,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000204,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000205,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000206,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000207,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000208,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000209,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000210,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000211,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000212,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000213,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000214,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000215,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000216,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000217,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000218,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000219,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000220,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000221,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000222,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000223,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000224,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000225,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000226,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000227,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000228,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000229,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000230,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000231,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000232,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000233,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000234,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000235,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000236,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2
+C_gen_000237,fieldwork,False,False,"Field-day logistics — gear, vehicles, weather windows",All-team field coordination,U_ian,1714867200,4
+C_gen_000238,general,False,False,Doña Ana County Env Services — general,Workspace-wide announcements + chatter,U_olivera,1709308800,4
+C_gen_000239,upstream-monitoring,False,False,Upstream cluster (Sites 1–6) — Tularosa confluence batch,Sample-batch coordination + lab updates,U_ian,1717459200,2

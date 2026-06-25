@@ -1,0 +1,229 @@
+Id,Name,AccountType,AccountSubType,CurrentBalance,Active,Classification,Description
+1,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+3,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+4,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+5,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2001,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2002,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2003,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2004,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2005,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2006,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2007,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2008,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2009,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2010,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2011,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2012,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2013,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2014,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2015,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2016,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2017,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2018,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2019,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2020,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2021,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2022,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2023,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2024,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2025,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2026,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2027,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2028,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2029,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2030,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2031,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2032,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2033,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2034,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2035,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2036,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2037,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2038,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2039,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2040,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2041,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2042,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2043,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2044,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2045,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2046,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2047,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2048,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2049,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2050,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2051,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2052,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2053,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2054,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2055,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2056,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2057,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2058,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2059,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2060,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2061,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2062,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2063,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2064,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2065,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2066,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2067,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2068,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2069,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2070,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2071,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2072,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2073,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2074,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2075,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2076,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2077,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2078,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2079,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2080,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2081,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2082,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2083,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2084,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2085,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2086,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2087,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2088,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2089,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2090,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2091,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2092,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2093,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2094,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2095,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2096,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2097,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2098,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2099,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2100,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2101,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2102,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2103,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2104,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2105,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2106,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2107,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2108,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2109,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2110,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2111,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2112,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2113,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2114,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2115,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2116,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2117,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2118,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2119,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2120,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2121,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2122,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2123,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2124,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2125,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2126,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2127,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2128,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2129,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2130,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2131,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2132,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2133,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2134,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2135,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2136,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2137,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2138,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2139,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2140,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2141,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2142,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2143,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2144,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2145,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2146,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2147,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2148,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2149,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2150,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2151,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2152,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2153,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2154,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2155,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2156,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2157,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2158,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2159,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2160,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2161,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2162,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2163,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2164,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2165,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2166,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2167,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2168,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2169,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2170,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2171,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2172,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2173,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2174,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2175,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2176,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2177,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2178,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2179,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2180,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2181,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2182,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2183,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2184,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2185,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2186,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2187,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2188,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2189,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2190,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2191,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2192,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2193,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2194,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2195,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2196,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2197,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2198,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2199,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2200,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2201,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2202,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2203,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2204,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2205,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2206,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2207,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2208,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2209,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2210,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2211,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2212,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2213,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2214,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2215,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2216,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2217,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2218,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash
+2219,Etsy clearing,Bank,CashOnHand,618.40,True,Asset,Etsy deposits clearing
+2220,Accounts Receivable,Accounts Receivable,AccountsReceivable,0.00,True,Asset,
+2221,Etsy Sales — Income,Income,SalesOfProductIncome,0.00,True,Revenue,Sales via Etsy
+2222,Materials — Leather + dye,Expense,SuppliesMaterials,0.00,True,Expense,Leather + finishing supplies
+2223,Cash on hand,Bank,CashOnHand,2418.20,True,Asset,Operating cash

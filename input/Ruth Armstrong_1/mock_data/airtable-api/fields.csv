@@ -1,0 +1,5 @@
+tableId,id,name,type
+tblContacts,fldName,Name,singleLineText
+tblContacts,fldEmail,Email,email
+tblContacts,fldCompany,Company,singleLineText
+tblContacts,fldRole,Role,singleLineText

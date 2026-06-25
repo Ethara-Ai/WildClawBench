@@ -1,0 +1,2 @@
+baseId,id,name,primaryFieldId,records_csv
+appMobilitePlateau,tblContacts,Contacts,fldName,records_contacts.csv

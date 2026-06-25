@@ -1,0 +1,6851 @@
+[
+  {
+    "Id": "7001",
+    "DocNumber": "SL-2026-0118",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7002",
+    "DocNumber": "SL-2026-0112",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7003",
+    "DocNumber": "SL-2026-0115",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7004",
+    "DocNumber": "SL-2026-0118-G0001",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7005",
+    "DocNumber": "SL-2026-0112-G0002",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7006",
+    "DocNumber": "SL-2026-0115-G0003",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7007",
+    "DocNumber": "SL-2026-0118-G0004",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7008",
+    "DocNumber": "SL-2026-0112-G0005",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7009",
+    "DocNumber": "SL-2026-0115-G0006",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7010",
+    "DocNumber": "SL-2026-0118-G0007",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7011",
+    "DocNumber": "SL-2026-0112-G0008",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7012",
+    "DocNumber": "SL-2026-0115-G0009",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7013",
+    "DocNumber": "SL-2026-0118-G0010",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7014",
+    "DocNumber": "SL-2026-0112-G0011",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7015",
+    "DocNumber": "SL-2026-0115-G0012",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7016",
+    "DocNumber": "SL-2026-0118-G0013",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7017",
+    "DocNumber": "SL-2026-0112-G0014",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7018",
+    "DocNumber": "SL-2026-0115-G0015",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7019",
+    "DocNumber": "SL-2026-0118-G0016",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7020",
+    "DocNumber": "SL-2026-0112-G0017",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7021",
+    "DocNumber": "SL-2026-0115-G0018",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7022",
+    "DocNumber": "SL-2026-0118-G0019",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7023",
+    "DocNumber": "SL-2026-0112-G0020",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7024",
+    "DocNumber": "SL-2026-0115-G0021",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7025",
+    "DocNumber": "SL-2026-0118-G0022",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7026",
+    "DocNumber": "SL-2026-0112-G0023",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7027",
+    "DocNumber": "SL-2026-0115-G0024",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7028",
+    "DocNumber": "SL-2026-0118-G0025",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7029",
+    "DocNumber": "SL-2026-0112-G0026",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7030",
+    "DocNumber": "SL-2026-0115-G0027",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7031",
+    "DocNumber": "SL-2026-0118-G0028",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7032",
+    "DocNumber": "SL-2026-0112-G0029",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7033",
+    "DocNumber": "SL-2026-0115-G0030",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7034",
+    "DocNumber": "SL-2026-0118-G0031",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7035",
+    "DocNumber": "SL-2026-0112-G0032",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7036",
+    "DocNumber": "SL-2026-0115-G0033",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7037",
+    "DocNumber": "SL-2026-0118-G0034",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7038",
+    "DocNumber": "SL-2026-0112-G0035",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7039",
+    "DocNumber": "SL-2026-0115-G0036",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7040",
+    "DocNumber": "SL-2026-0118-G0037",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7041",
+    "DocNumber": "SL-2026-0112-G0038",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7042",
+    "DocNumber": "SL-2026-0115-G0039",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7043",
+    "DocNumber": "SL-2026-0118-G0040",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7044",
+    "DocNumber": "SL-2026-0112-G0041",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7045",
+    "DocNumber": "SL-2026-0115-G0042",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7046",
+    "DocNumber": "SL-2026-0118-G0043",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7047",
+    "DocNumber": "SL-2026-0112-G0044",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7048",
+    "DocNumber": "SL-2026-0115-G0045",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7049",
+    "DocNumber": "SL-2026-0118-G0046",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7050",
+    "DocNumber": "SL-2026-0112-G0047",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7051",
+    "DocNumber": "SL-2026-0115-G0048",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7052",
+    "DocNumber": "SL-2026-0118-G0049",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7053",
+    "DocNumber": "SL-2026-0112-G0050",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7054",
+    "DocNumber": "SL-2026-0115-G0051",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7055",
+    "DocNumber": "SL-2026-0118-G0052",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7056",
+    "DocNumber": "SL-2026-0112-G0053",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7057",
+    "DocNumber": "SL-2026-0115-G0054",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7058",
+    "DocNumber": "SL-2026-0118-G0055",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7059",
+    "DocNumber": "SL-2026-0112-G0056",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7060",
+    "DocNumber": "SL-2026-0115-G0057",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7061",
+    "DocNumber": "SL-2026-0118-G0058",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7062",
+    "DocNumber": "SL-2026-0112-G0059",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7063",
+    "DocNumber": "SL-2026-0115-G0060",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7064",
+    "DocNumber": "SL-2026-0118-G0061",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7065",
+    "DocNumber": "SL-2026-0112-G0062",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7066",
+    "DocNumber": "SL-2026-0115-G0063",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7067",
+    "DocNumber": "SL-2026-0118-G0064",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7068",
+    "DocNumber": "SL-2026-0112-G0065",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7069",
+    "DocNumber": "SL-2026-0115-G0066",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7070",
+    "DocNumber": "SL-2026-0118-G0067",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7071",
+    "DocNumber": "SL-2026-0112-G0068",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7072",
+    "DocNumber": "SL-2026-0115-G0069",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7073",
+    "DocNumber": "SL-2026-0118-G0070",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7074",
+    "DocNumber": "SL-2026-0112-G0071",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7075",
+    "DocNumber": "SL-2026-0115-G0072",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7076",
+    "DocNumber": "SL-2026-0118-G0073",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7077",
+    "DocNumber": "SL-2026-0112-G0074",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7078",
+    "DocNumber": "SL-2026-0115-G0075",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7079",
+    "DocNumber": "SL-2026-0118-G0076",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7080",
+    "DocNumber": "SL-2026-0112-G0077",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7081",
+    "DocNumber": "SL-2026-0115-G0078",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7082",
+    "DocNumber": "SL-2026-0118-G0079",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7083",
+    "DocNumber": "SL-2026-0112-G0080",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7084",
+    "DocNumber": "SL-2026-0115-G0081",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7085",
+    "DocNumber": "SL-2026-0118-G0082",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7086",
+    "DocNumber": "SL-2026-0112-G0083",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7087",
+    "DocNumber": "SL-2026-0115-G0084",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7088",
+    "DocNumber": "SL-2026-0118-G0085",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7089",
+    "DocNumber": "SL-2026-0112-G0086",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7090",
+    "DocNumber": "SL-2026-0115-G0087",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7091",
+    "DocNumber": "SL-2026-0118-G0088",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7092",
+    "DocNumber": "SL-2026-0112-G0089",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7093",
+    "DocNumber": "SL-2026-0115-G0090",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7094",
+    "DocNumber": "SL-2026-0118-G0091",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7095",
+    "DocNumber": "SL-2026-0112-G0092",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7096",
+    "DocNumber": "SL-2026-0115-G0093",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7097",
+    "DocNumber": "SL-2026-0118-G0094",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7098",
+    "DocNumber": "SL-2026-0112-G0095",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7099",
+    "DocNumber": "SL-2026-0115-G0096",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7100",
+    "DocNumber": "SL-2026-0118-G0097",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7101",
+    "DocNumber": "SL-2026-0112-G0098",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7102",
+    "DocNumber": "SL-2026-0115-G0099",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7103",
+    "DocNumber": "SL-2026-0118-G0100",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7104",
+    "DocNumber": "SL-2026-0112-G0101",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7105",
+    "DocNumber": "SL-2026-0115-G0102",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7106",
+    "DocNumber": "SL-2026-0118-G0103",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7107",
+    "DocNumber": "SL-2026-0112-G0104",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7108",
+    "DocNumber": "SL-2026-0115-G0105",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7109",
+    "DocNumber": "SL-2026-0118-G0106",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7110",
+    "DocNumber": "SL-2026-0112-G0107",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7111",
+    "DocNumber": "SL-2026-0115-G0108",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7112",
+    "DocNumber": "SL-2026-0118-G0109",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7113",
+    "DocNumber": "SL-2026-0112-G0110",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7114",
+    "DocNumber": "SL-2026-0115-G0111",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7115",
+    "DocNumber": "SL-2026-0118-G0112",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7116",
+    "DocNumber": "SL-2026-0112-G0113",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7117",
+    "DocNumber": "SL-2026-0115-G0114",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7118",
+    "DocNumber": "SL-2026-0118-G0115",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7119",
+    "DocNumber": "SL-2026-0112-G0116",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7120",
+    "DocNumber": "SL-2026-0115-G0117",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7121",
+    "DocNumber": "SL-2026-0118-G0118",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7122",
+    "DocNumber": "SL-2026-0112-G0119",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7123",
+    "DocNumber": "SL-2026-0115-G0120",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7124",
+    "DocNumber": "SL-2026-0118-G0121",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7125",
+    "DocNumber": "SL-2026-0112-G0122",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7126",
+    "DocNumber": "SL-2026-0115-G0123",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7127",
+    "DocNumber": "SL-2026-0118-G0124",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7128",
+    "DocNumber": "SL-2026-0112-G0125",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7129",
+    "DocNumber": "SL-2026-0115-G0126",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7130",
+    "DocNumber": "SL-2026-0118-G0127",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7131",
+    "DocNumber": "SL-2026-0112-G0128",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7132",
+    "DocNumber": "SL-2026-0115-G0129",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7133",
+    "DocNumber": "SL-2026-0118-G0130",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7134",
+    "DocNumber": "SL-2026-0112-G0131",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7135",
+    "DocNumber": "SL-2026-0115-G0132",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7136",
+    "DocNumber": "SL-2026-0118-G0133",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7137",
+    "DocNumber": "SL-2026-0112-G0134",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7138",
+    "DocNumber": "SL-2026-0115-G0135",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7139",
+    "DocNumber": "SL-2026-0118-G0136",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7140",
+    "DocNumber": "SL-2026-0112-G0137",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7141",
+    "DocNumber": "SL-2026-0115-G0138",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7142",
+    "DocNumber": "SL-2026-0118-G0139",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7143",
+    "DocNumber": "SL-2026-0112-G0140",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7144",
+    "DocNumber": "SL-2026-0115-G0141",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7145",
+    "DocNumber": "SL-2026-0118-G0142",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7146",
+    "DocNumber": "SL-2026-0112-G0143",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7147",
+    "DocNumber": "SL-2026-0115-G0144",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7148",
+    "DocNumber": "SL-2026-0118-G0145",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7149",
+    "DocNumber": "SL-2026-0112-G0146",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7150",
+    "DocNumber": "SL-2026-0115-G0147",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7151",
+    "DocNumber": "SL-2026-0118-G0148",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7152",
+    "DocNumber": "SL-2026-0112-G0149",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7153",
+    "DocNumber": "SL-2026-0115-G0150",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7154",
+    "DocNumber": "SL-2026-0118-G0151",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7155",
+    "DocNumber": "SL-2026-0112-G0152",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7156",
+    "DocNumber": "SL-2026-0115-G0153",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7157",
+    "DocNumber": "SL-2026-0118-G0154",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7158",
+    "DocNumber": "SL-2026-0112-G0155",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7159",
+    "DocNumber": "SL-2026-0115-G0156",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7160",
+    "DocNumber": "SL-2026-0118-G0157",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7161",
+    "DocNumber": "SL-2026-0112-G0158",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7162",
+    "DocNumber": "SL-2026-0115-G0159",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7163",
+    "DocNumber": "SL-2026-0118-G0160",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7164",
+    "DocNumber": "SL-2026-0112-G0161",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7165",
+    "DocNumber": "SL-2026-0115-G0162",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7166",
+    "DocNumber": "SL-2026-0118-G0163",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7167",
+    "DocNumber": "SL-2026-0112-G0164",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7168",
+    "DocNumber": "SL-2026-0115-G0165",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7169",
+    "DocNumber": "SL-2026-0118-G0166",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7170",
+    "DocNumber": "SL-2026-0112-G0167",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7171",
+    "DocNumber": "SL-2026-0115-G0168",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7172",
+    "DocNumber": "SL-2026-0118-G0169",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7173",
+    "DocNumber": "SL-2026-0112-G0170",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7174",
+    "DocNumber": "SL-2026-0115-G0171",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7175",
+    "DocNumber": "SL-2026-0118-G0172",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7176",
+    "DocNumber": "SL-2026-0112-G0173",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7177",
+    "DocNumber": "SL-2026-0115-G0174",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7178",
+    "DocNumber": "SL-2026-0118-G0175",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7179",
+    "DocNumber": "SL-2026-0112-G0176",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7180",
+    "DocNumber": "SL-2026-0115-G0177",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7181",
+    "DocNumber": "SL-2026-0118-G0178",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7182",
+    "DocNumber": "SL-2026-0112-G0179",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7183",
+    "DocNumber": "SL-2026-0115-G0180",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7184",
+    "DocNumber": "SL-2026-0118-G0181",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7185",
+    "DocNumber": "SL-2026-0112-G0182",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7186",
+    "DocNumber": "SL-2026-0115-G0183",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7187",
+    "DocNumber": "SL-2026-0118-G0184",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7188",
+    "DocNumber": "SL-2026-0112-G0185",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7189",
+    "DocNumber": "SL-2026-0115-G0186",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7190",
+    "DocNumber": "SL-2026-0118-G0187",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7191",
+    "DocNumber": "SL-2026-0112-G0188",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7192",
+    "DocNumber": "SL-2026-0115-G0189",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7193",
+    "DocNumber": "SL-2026-0118-G0190",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7194",
+    "DocNumber": "SL-2026-0112-G0191",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7195",
+    "DocNumber": "SL-2026-0115-G0192",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7196",
+    "DocNumber": "SL-2026-0118-G0193",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7197",
+    "DocNumber": "SL-2026-0112-G0194",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7198",
+    "DocNumber": "SL-2026-0115-G0195",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7199",
+    "DocNumber": "SL-2026-0118-G0196",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7200",
+    "DocNumber": "SL-2026-0112-G0197",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7201",
+    "DocNumber": "SL-2026-0115-G0198",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7202",
+    "DocNumber": "SL-2026-0118-G0199",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7203",
+    "DocNumber": "SL-2026-0112-G0200",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7204",
+    "DocNumber": "SL-2026-0115-G0201",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7205",
+    "DocNumber": "SL-2026-0118-G0202",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7206",
+    "DocNumber": "SL-2026-0112-G0203",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7207",
+    "DocNumber": "SL-2026-0115-G0204",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7208",
+    "DocNumber": "SL-2026-0118-G0205",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7209",
+    "DocNumber": "SL-2026-0112-G0206",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7210",
+    "DocNumber": "SL-2026-0115-G0207",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7211",
+    "DocNumber": "SL-2026-0118-G0208",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7212",
+    "DocNumber": "SL-2026-0112-G0209",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7213",
+    "DocNumber": "SL-2026-0115-G0210",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7214",
+    "DocNumber": "SL-2026-0118-G0211",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7215",
+    "DocNumber": "SL-2026-0112-G0212",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7216",
+    "DocNumber": "SL-2026-0115-G0213",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7217",
+    "DocNumber": "SL-2026-0118-G0214",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7218",
+    "DocNumber": "SL-2026-0112-G0215",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7219",
+    "DocNumber": "SL-2026-0115-G0216",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7220",
+    "DocNumber": "SL-2026-0118-G0217",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7221",
+    "DocNumber": "SL-2026-0112-G0218",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7222",
+    "DocNumber": "SL-2026-0115-G0219",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7223",
+    "DocNumber": "SL-2026-0118-G0220",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7224",
+    "DocNumber": "SL-2026-0112-G0221",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7225",
+    "DocNumber": "SL-2026-0115-G0222",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7226",
+    "DocNumber": "SL-2026-0118-G0223",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7227",
+    "DocNumber": "SL-2026-0112-G0224",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7228",
+    "DocNumber": "SL-2026-0115-G0225",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7229",
+    "DocNumber": "SL-2026-0118-G0226",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7230",
+    "DocNumber": "SL-2026-0112-G0227",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7231",
+    "DocNumber": "SL-2026-0115-G0228",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7232",
+    "DocNumber": "SL-2026-0118-G0229",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7233",
+    "DocNumber": "SL-2026-0112-G0230",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7234",
+    "DocNumber": "SL-2026-0115-G0231",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7235",
+    "DocNumber": "SL-2026-0118-G0232",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7236",
+    "DocNumber": "SL-2026-0112-G0233",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7237",
+    "DocNumber": "SL-2026-0115-G0234",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7238",
+    "DocNumber": "SL-2026-0118-G0235",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7239",
+    "DocNumber": "SL-2026-0112-G0236",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7240",
+    "DocNumber": "SL-2026-0115-G0237",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7241",
+    "DocNumber": "SL-2026-0118-G0238",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7242",
+    "DocNumber": "SL-2026-0112-G0239",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7243",
+    "DocNumber": "SL-2026-0115-G0240",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7244",
+    "DocNumber": "SL-2026-0118-G0241",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7245",
+    "DocNumber": "SL-2026-0112-G0242",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7246",
+    "DocNumber": "SL-2026-0115-G0243",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7247",
+    "DocNumber": "SL-2026-0118-G0244",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7248",
+    "DocNumber": "SL-2026-0112-G0245",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7249",
+    "DocNumber": "SL-2026-0115-G0246",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7250",
+    "DocNumber": "SL-2026-0118-G0247",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7251",
+    "DocNumber": "SL-2026-0112-G0248",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7252",
+    "DocNumber": "SL-2026-0115-G0249",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7253",
+    "DocNumber": "SL-2026-0118-G0250",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7254",
+    "DocNumber": "SL-2026-0112-G0251",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7255",
+    "DocNumber": "SL-2026-0115-G0252",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7256",
+    "DocNumber": "SL-2026-0118-G0253",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7257",
+    "DocNumber": "SL-2026-0112-G0254",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7258",
+    "DocNumber": "SL-2026-0115-G0255",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7259",
+    "DocNumber": "SL-2026-0118-G0256",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7260",
+    "DocNumber": "SL-2026-0112-G0257",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7261",
+    "DocNumber": "SL-2026-0115-G0258",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7262",
+    "DocNumber": "SL-2026-0118-G0259",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7263",
+    "DocNumber": "SL-2026-0112-G0260",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7264",
+    "DocNumber": "SL-2026-0115-G0261",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7265",
+    "DocNumber": "SL-2026-0118-G0262",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7266",
+    "DocNumber": "SL-2026-0112-G0263",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7267",
+    "DocNumber": "SL-2026-0115-G0264",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7268",
+    "DocNumber": "SL-2026-0118-G0265",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7269",
+    "DocNumber": "SL-2026-0112-G0266",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7270",
+    "DocNumber": "SL-2026-0115-G0267",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7271",
+    "DocNumber": "SL-2026-0118-G0268",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7272",
+    "DocNumber": "SL-2026-0112-G0269",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7273",
+    "DocNumber": "SL-2026-0115-G0270",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7274",
+    "DocNumber": "SL-2026-0118-G0271",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7275",
+    "DocNumber": "SL-2026-0112-G0272",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7276",
+    "DocNumber": "SL-2026-0115-G0273",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7277",
+    "DocNumber": "SL-2026-0118-G0274",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7278",
+    "DocNumber": "SL-2026-0112-G0275",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7279",
+    "DocNumber": "SL-2026-0115-G0276",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7280",
+    "DocNumber": "SL-2026-0118-G0277",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7281",
+    "DocNumber": "SL-2026-0112-G0278",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7282",
+    "DocNumber": "SL-2026-0115-G0279",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7283",
+    "DocNumber": "SL-2026-0118-G0280",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7284",
+    "DocNumber": "SL-2026-0112-G0281",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7285",
+    "DocNumber": "SL-2026-0115-G0282",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7286",
+    "DocNumber": "SL-2026-0118-G0283",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  },
+  {
+    "Id": "7287",
+    "DocNumber": "SL-2026-0112-G0284",
+    "TxnDate": "2026-09-18",
+    "DueDate": "2026-09-25",
+    "CustomerRef": {
+      "value": "12",
+      "name": "Etsy buyer - R. Solano"
+    },
+    "Line": [
+      {
+        "Amount": 86.0,
+        "Description": "Card wallet pair - veg-tan"
+      }
+    ],
+    "TotalAmt": 86.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7288",
+    "DocNumber": "SL-2026-0115-G0285",
+    "TxnDate": "2026-10-02",
+    "DueDate": "2026-10-09",
+    "CustomerRef": {
+      "value": "10",
+      "name": "Etsy buyer - N. Henderson"
+    },
+    "Line": [
+      {
+        "Amount": 142.0,
+        "Description": "Field notebook cover - custom monogram"
+      }
+    ],
+    "TotalAmt": 142.0,
+    "Balance": 0.0,
+    "Status": "Paid"
+  },
+  {
+    "Id": "7289",
+    "DocNumber": "SL-2026-0118-G0286",
+    "TxnDate": "2026-10-14",
+    "DueDate": "2026-12-05",
+    "CustomerRef": {
+      "value": "ABQ-COMM-01",
+      "name": "M. Vasquez (Albuquerque commission, Etsy buyer @rgv_archivist)"
+    },
+    "Line": [
+      {
+        "Amount": 378.5,
+        "Description": "Custom journal cover - hand-tooled, full-grain veg-tan, monogram",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      },
+      {
+        "Amount": 40.0,
+        "Description": "Rush surcharge - requested original delivery Dec 5",
+        "SalesItemLineDetail": {
+          "ItemRef": {
+            "name": "Custom Leatherwork"
+          }
+        }
+      }
+    ],
+    "TotalAmt": 418.5,
+    "Balance": 209.25,
+    "Status": "Partial"
+  }
+]

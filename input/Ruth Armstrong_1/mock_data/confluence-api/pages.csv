@@ -1,0 +1,25 @@
+id,type,status,title,space_key,parent_id,version,body,created_by,created_at
+100201,page,current,Parc-Extension survey methodology,PARCEX,,7,Four-language instrument (FR/EN/Tamil/Urdu). Cost-burdened renter = >30% of income on housing. Carried baseline 40%; federal partner refresh pending re-tabulation.,usr_ruth,2026-02-12T10:00:00.000Z
+100202,page,current,Interim equity report - skeleton (DRAFT),PARCEX,100201,3,"Sections: demographics, survey results, outreach funnel, policy recommendations. Due October 26. Immigrant-community data stays internal.",usr_ruth,2026-09-20T10:00:00.000Z
+100203,page,current,Green-infra module FINAL (cross-dept),CLIMATE,,5,FINAL cross-department reconciled. Tree canopy 20.5%. Permeable surface 18000 m2 (rounded). Use these figures for the November 12 submission.,usr_ruth,2026-10-11T10:00:00.000Z
+100210,page,current,Stakeholder briefing v2,CLIMATE,100201,5,Working documentation for the team space.,usr_ruth,2026-07-20T10:00:00.000Z
+100211,page,current,Working notes v2,PARCEX,,1,Working documentation for the team space.,usr_ruth,2026-09-27T10:00:00.000Z
+100212,page,current,Stakeholder briefing v4,CLIMATE,100203,1,Working documentation for the team space.,usr_ruth,2026-10-18T10:00:00.000Z
+100213,page,current,Site-visit notes v1,CLIMATE,,3,Working documentation for the team space.,usr_ruth,2026-09-14T10:00:00.000Z
+100214,page,current,Outreach plan v2,CLIMATE,,2,Working documentation for the team space.,usr_amara,2026-07-05T10:00:00.000Z
+100215,page,current,Stakeholder briefing v2,CLIMATE,100203,2,Working documentation for the team space.,usr_ruth,2026-07-11T10:00:00.000Z
+100216,page,current,Site-visit notes v2,PARCEX,100203,5,Working documentation for the team space.,usr_ruth,2026-09-15T10:00:00.000Z
+100217,page,current,Working notes v3,CLIMATE,,2,Working documentation for the team space.,usr_amara,2026-10-18T10:00:00.000Z
+100218,page,current,Stakeholder briefing v4,CLIMATE,100201,1,Working documentation for the team space.,usr_amara,2026-06-13T10:00:00.000Z
+100219,page,current,Stakeholder briefing v3,CLIMATE,100201,3,Working documentation for the team space.,usr_amara,2026-09-05T10:00:00.000Z
+100220,page,current,Working notes v2,CLIMATE,100203,1,Working documentation for the team space.,usr_ruth,2026-10-07T10:00:00.000Z
+100221,page,current,Stakeholder briefing v3,PARCEX,100203,2,Working documentation for the team space.,usr_amara,2026-06-16T10:00:00.000Z
+100222,page,current,Site-visit notes v4,CLIMATE,100201,5,Working documentation for the team space.,usr_ruth,2026-07-23T10:00:00.000Z
+100223,page,current,Stakeholder briefing v4,CLIMATE,100203,1,Working documentation for the team space.,usr_amara,2026-07-25T10:00:00.000Z
+100224,page,current,Data methodology addendum v3,CLIMATE,100201,2,Working documentation for the team space.,usr_ruth,2026-07-14T10:00:00.000Z
+100225,page,current,Working notes v2,CLIMATE,100201,1,Working documentation for the team space.,usr_ruth,2026-07-20T10:00:00.000Z
+100226,page,current,Working notes v4,CLIMATE,100203,3,Working documentation for the team space.,usr_ruth,2026-06-03T10:00:00.000Z
+100227,page,current,Data methodology addendum v4,PARCEX,,6,Working documentation for the team space.,usr_amara,2026-07-22T10:00:00.000Z
+100228,page,current,Site-visit notes v4,PARCEX,,2,Working documentation for the team space.,usr_ruth,2026-09-10T10:00:00.000Z
+100229,page,current,Working notes v4,CLIMATE,,5,Working documentation for the team space.,usr_ruth,2026-07-21T10:00:00.000Z
+100230,page,current,Stakeholder briefing v4,CLIMATE,,1,Working documentation for the team space.,usr_ruth,2026-07-05T10:00:00.000Z

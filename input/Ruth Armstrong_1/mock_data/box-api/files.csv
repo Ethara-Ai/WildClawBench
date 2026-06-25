@@ -1,0 +1,37 @@
+id,name,parent_id,owner_id,description,size,extension,sha1,created_at,modified_at
+boxf_census,parc_extension_census_refresh.csv,fold_parcex,box_ruth,"Refreshed census: cost-burdened renters 46% (revised, supersedes 40%). Immigrant share 60%. Renter share 40%.",412,csv,a1b2c3,2026-10-12T09:00:00Z,2026-10-12T09:00:00Z
+boxf_survey,parc_extension_survey_results.xlsx,fold_parcex,box_ruth,"Four-language survey: French 38.4%, English 35.1%, Tamil 51.2%, Urdu 48.6%.",5204,xlsx,d4e5f6,2026-10-12T09:05:00Z,2026-10-12T09:05:00Z
+boxf_000,fieldwork_log_0.xlsx,fold_parcex,box_ruth,Federal partner raw artifact.,739589,xlsx,1a410,2026-08-02T09:00:00Z,2026-10-12T09:00:00Z
+boxf_001,outreach_funnel_export_1.csv,fold_archive,box_ruth,Federal partner raw artifact.,126522,csv,7a48a,2026-02-18T09:00:00Z,2026-10-09T09:00:00Z
+boxf_002,interpreter_invoices_2.pdf,fold_shared,box_ruth,Internal working file.,196489,pdf,554ed,2026-09-18T09:00:00Z,2026-10-09T09:00:00Z
+boxf_003,consent_forms_batch_3.zip,fold_archive,box_ruth,Archived.,195549,zip,bfa16,2026-08-11T09:00:00Z,2026-10-05T09:00:00Z
+boxf_004,outreach_funnel_export_4.csv,fold_shared,box_ruth,Archived.,342513,csv,d1364,2026-07-01T09:00:00Z,2026-10-04T09:00:00Z
+boxf_005,outreach_funnel_export_5.csv,fold_parcex,box_ruth,Federal partner raw artifact.,644622,csv,bad04,2026-06-16T09:00:00Z,2026-10-12T09:00:00Z
+boxf_006,interpreter_invoices_6.pdf,fold_shared,box_ruth,Federal partner raw artifact.,736861,pdf,58a61,2026-09-08T09:00:00Z,2026-10-05T09:00:00Z
+boxf_007,interpreter_invoices_7.pdf,fold_shared,box_ruth,Federal partner raw artifact.,516158,pdf,8db97,2026-06-10T09:00:00Z,2026-10-01T09:00:00Z
+boxf_008,consent_forms_batch_8.zip,fold_parcex,box_ruth,Federal partner raw artifact.,542800,zip,ca85f,2026-03-05T09:00:00Z,2026-10-10T09:00:00Z
+boxf_009,fieldwork_log_9.xlsx,fold_parcex,box_ruth,Internal working file.,238343,xlsx,d3918,2026-03-15T09:00:00Z,2026-10-02T09:00:00Z
+boxf_010,methodology_appendix_10.pdf,fold_archive,box_ruth,Federal partner raw artifact.,814585,pdf,7e83d,2026-04-15T09:00:00Z,2026-10-10T09:00:00Z
+boxf_011,methodology_appendix_11.pdf,fold_shared,box_ruth,Internal working file.,231287,pdf,19299,2026-05-13T09:00:00Z,2026-10-12T09:00:00Z
+boxf_012,raw_survey_responses_anonymized_12.csv,fold_shared,box_ruth,Shared with team.,354361,csv,94cef,2026-08-10T09:00:00Z,2026-10-05T09:00:00Z
+boxf_013,consent_forms_batch_13.zip,fold_parcex,box_ruth,Shared with team.,39086,zip,60d59,2026-07-01T09:00:00Z,2026-10-07T09:00:00Z
+boxf_014,demographic_crosstabs_14.xlsx,fold_archive,box_ruth,Federal partner raw artifact.,683164,xlsx,eaad4,2026-02-16T09:00:00Z,2026-10-06T09:00:00Z
+boxf_015,interpreter_invoices_15.pdf,fold_archive,box_ruth,Archived.,456339,pdf,83947,2026-04-10T09:00:00Z,2026-10-03T09:00:00Z
+boxf_016,consent_forms_batch_16.zip,fold_archive,box_ruth,Internal working file.,207306,zip,44f85,2026-05-12T09:00:00Z,2026-10-12T09:00:00Z
+boxf_017,fieldwork_log_17.xlsx,fold_parcex,box_ruth,Internal working file.,216738,xlsx,d7acd,2026-02-15T09:00:00Z,2026-10-09T09:00:00Z
+boxf_018,interpreter_invoices_18.pdf,fold_archive,box_ruth,Archived.,111432,pdf,20ebb,2026-06-13T09:00:00Z,2026-10-10T09:00:00Z
+boxf_019,outreach_funnel_export_19.csv,fold_shared,box_ruth,Federal partner raw artifact.,815393,csv,b58df,2026-10-20T09:00:00Z,2026-10-08T09:00:00Z
+boxf_020,raw_survey_responses_anonymized_20.csv,fold_parcex,box_ruth,Federal partner raw artifact.,276766,csv,af72f,2026-04-16T09:00:00Z,2026-10-11T09:00:00Z
+boxf_021,outreach_funnel_export_21.csv,fold_shared,box_ruth,Internal working file.,867999,csv,41bd5,2026-04-24T09:00:00Z,2026-10-01T09:00:00Z
+boxf_022,demographic_crosstabs_22.xlsx,fold_parcex,box_ruth,Federal partner raw artifact.,442041,xlsx,e3023,2026-04-20T09:00:00Z,2026-10-11T09:00:00Z
+boxf_023,demographic_crosstabs_23.xlsx,fold_shared,box_ruth,Internal working file.,532110,xlsx,6cbfd,2026-04-26T09:00:00Z,2026-10-12T09:00:00Z
+boxf_024,methodology_appendix_24.pdf,fold_parcex,box_ruth,Federal partner raw artifact.,37119,pdf,19ae0,2026-10-15T09:00:00Z,2026-10-11T09:00:00Z
+boxf_025,fieldwork_log_25.xlsx,fold_archive,box_ruth,Federal partner raw artifact.,470030,xlsx,e59bb,2026-03-18T09:00:00Z,2026-10-06T09:00:00Z
+boxf_026,interpreter_invoices_26.pdf,fold_archive,box_ruth,Federal partner raw artifact.,249660,pdf,e7a42,2026-08-19T09:00:00Z,2026-10-02T09:00:00Z
+boxf_027,consent_forms_batch_27.zip,fold_archive,box_ruth,Internal working file.,306059,zip,7e430,2026-02-14T09:00:00Z,2026-10-03T09:00:00Z
+boxf_028,demographic_crosstabs_28.xlsx,fold_archive,box_ruth,Federal partner raw artifact.,227041,xlsx,499bb,2026-06-28T09:00:00Z,2026-10-10T09:00:00Z
+boxf_029,methodology_appendix_29.pdf,fold_parcex,box_ruth,Federal partner raw artifact.,876541,pdf,c4032,2026-04-24T09:00:00Z,2026-10-11T09:00:00Z
+boxf_030,methodology_appendix_30.pdf,fold_parcex,box_ruth,Archived.,60454,pdf,b32f5,2026-03-02T09:00:00Z,2026-10-10T09:00:00Z
+boxf_031,fieldwork_log_31.xlsx,fold_parcex,box_ruth,Federal partner raw artifact.,749787,xlsx,f412f,2026-02-13T09:00:00Z,2026-10-09T09:00:00Z
+boxf_032,methodology_appendix_32.pdf,fold_shared,box_ruth,Internal working file.,504523,pdf,32378,2026-05-13T09:00:00Z,2026-10-05T09:00:00Z
+boxf_033,outreach_funnel_export_33.csv,fold_shared,box_ruth,Federal partner raw artifact.,441307,csv,ead7e,2026-05-04T09:00:00Z,2026-10-07T09:00:00Z

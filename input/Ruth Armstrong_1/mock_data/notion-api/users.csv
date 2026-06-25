@@ -1,0 +1,9 @@
+id,name,email,avatar_url,type,bot,owner_workspace,created_time
+usr_ruth,Ruth Armstrong,ruth.armstrong@Finthesiss.ai,,person,False,True,2026-05-01T10:00:00.000Z
+usr_amara,Amara Diallo,amara.diallo.urbaniste@Finthesiss.ai,,person,False,False,2026-06-01T10:00:00.000Z
+usr_jean-francois,Jean-Francois Lavigne,jf.lavigne.ville@Finthesiss.ai,,person,False,False,2026-06-01T10:00:00.000Z
+usr_amara_x2,Amara Diallo,amara.diallo.urbaniste@Finthesiss.ai,,person,False,False,2026-06-01T10:00:00.000Z
+usr_sophie,Sophie Chen,sophie.chen.plateau@Finthesiss.ai,,person,False,False,2026-06-01T10:00:00.000Z
+usr_david,David Ouellet,d.ouellet.conseil@Finthesiss.ai,,person,False,False,2026-06-01T10:00:00.000Z
+usr_lucie,Lucie Bergeron,lucie.bergeron.velo@Finthesiss.ai,,person,False,False,2026-06-01T10:00:00.000Z
+usr_marie-claire,Marie-Claire Dubois,mcdubois.clinique@Finthesiss.ai,,person,False,False,2026-06-01T10:00:00.000Z

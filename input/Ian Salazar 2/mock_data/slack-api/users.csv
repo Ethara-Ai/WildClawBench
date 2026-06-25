@@ -1,5 +1,0 @@
-id,name,real_name,email,is_admin,is_bot,tz,status_text,presence
-U_ian,ian.salazar,Ian Salazar,ian.salazar@dac-env.gov,False,False,America/Denver,field — back at 17:00,active
-U_olivera,samuel.olivera,Dr. Sam Olivera,samuel.olivera@example.org,True,False,America/Denver,,away
-U_natalia,natalia.cordero,Natalia Cordero,natalia.cordero@dac-env.gov,False,False,America/Denver,,active
-U_diego,diego.trujillo,Diego Trujillo,diego.trujillo@dac-env.gov,False,False,America/Denver,,active

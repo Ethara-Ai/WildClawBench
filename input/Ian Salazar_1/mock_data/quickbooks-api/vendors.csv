@@ -1,0 +1,315 @@
+Id,DisplayName,CompanyName,PrimaryEmailAddr,PrimaryPhone,BillAddr_Line1,BillAddr_City,BillAddr_CountrySubDivisionCode,BillAddr_PostalCode,Balance,Active,AcctNum,Vendor1099
+20,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+21,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5001,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5002,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5003,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5004,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5005,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5006,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5007,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5008,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5009,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5010,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5011,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5012,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5013,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5014,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5015,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5016,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5017,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5018,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5019,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5020,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5021,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5022,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5023,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5024,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5025,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5026,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5027,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5028,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5029,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5030,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5031,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5032,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5033,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5034,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5035,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5036,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5037,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5038,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5039,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5040,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5041,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5042,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5043,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5044,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5045,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5046,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5047,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5048,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5049,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5050,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5051,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5052,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5053,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5054,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5055,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5056,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5057,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5058,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5059,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5060,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5061,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5062,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5063,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5064,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5065,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5066,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5067,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5068,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5069,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5070,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5071,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5072,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5073,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5074,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5075,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5076,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5077,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5078,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5079,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5080,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5081,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5082,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5083,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5084,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5085,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5086,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5087,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5088,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5089,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5090,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5091,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5092,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5093,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5094,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5095,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5096,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5097,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5098,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5099,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5100,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5101,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5102,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5103,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5104,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5105,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5106,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5107,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5108,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5109,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5110,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5111,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5112,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5113,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5114,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5115,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5116,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5117,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5118,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5119,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5120,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5121,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5122,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5123,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5124,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5125,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5126,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5127,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5128,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5129,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5130,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5131,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5132,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5133,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5134,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5135,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5136,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5137,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5138,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5139,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5140,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5141,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5142,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5143,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5144,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5145,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5146,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5147,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5148,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5149,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5150,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5151,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5152,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5153,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5154,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5155,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5156,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5157,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5158,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5159,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5160,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5161,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5162,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5163,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5164,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5165,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5166,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5167,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5168,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5169,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5170,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5171,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5172,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5173,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5174,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5175,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5176,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5177,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5178,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5179,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5180,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5181,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5182,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5183,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5184,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5185,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5186,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5187,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5188,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5189,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5190,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5191,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5192,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5193,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5194,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5195,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5196,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5197,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5198,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5199,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5200,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5201,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5202,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5203,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5204,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5205,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5206,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5207,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5208,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5209,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5210,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5211,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5212,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5213,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5214,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5215,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5216,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5217,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5218,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5219,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5220,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5221,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5222,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5223,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5224,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5225,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5226,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5227,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5228,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5229,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5230,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5231,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5232,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5233,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5234,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5235,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5236,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5237,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5238,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5239,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5240,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5241,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5242,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5243,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5244,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5245,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5246,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5247,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5248,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5249,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5250,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5251,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5252,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5253,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5254,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5255,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5256,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5257,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5258,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5259,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5260,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5261,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5262,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5263,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5264,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5265,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5266,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5267,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5268,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5269,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5270,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5271,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5272,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5273,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5274,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5275,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5276,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5277,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5278,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5279,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5280,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5281,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5282,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5283,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5284,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5285,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5286,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5287,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5288,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5289,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5290,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5291,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5292,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5293,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5294,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5295,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5296,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5297,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5298,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5299,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5300,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5301,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5302,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5303,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5304,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5305,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5306,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5307,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5308,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5309,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5310,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False
+5311,Maverick Leather Co.,Maverick Leather Co.,orders@maverickleatherco.com,(801) 555-2188,1200 W Pioneer Pkwy,South Salt Lake,UT,84119,0.00,True,MLC-118-IS,False
+5312,Fiebing Co. (dye + finish),Fiebing Company,support@fiebing.com,(414) 555-0142,516 S Cleveland Ave,Milwaukee,WI,53204,0.00,True,FIEB-4422,False

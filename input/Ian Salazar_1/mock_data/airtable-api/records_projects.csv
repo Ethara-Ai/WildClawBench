@@ -1,0 +1,313 @@
+id,createdTime,Name,Status,Owner,Budget
+recProj0000000001,2026-09-15T09:00:00Z,Site 1 Water Quality Monitoring,Done,Ian Salazar,5000
+recProj0000000002,2026-09-15T09:05:00Z,Site 2 Water Quality Monitoring,Done,Ian Salazar,5000
+recProj0000000003,2026-09-15T09:10:00Z,Site 3 Water Quality Monitoring,Done,Ian Salazar,5000
+recProj0000000004,2026-09-15T09:15:00Z,Site 4 Water Quality Monitoring,Done,Ian Salazar,5000
+recProj0000000005,2026-09-15T09:20:00Z,Site 5 Water Quality Monitoring,In progress,Ian Salazar,6500
+recProj0000000006,2026-09-15T09:25:00Z,Site 6 Water Quality Monitoring,Done,Ian Salazar,5500
+recProj0000000001-994795,2026-09-15T09:00:00Z,Monitoring round 1 - Site 1,Done,Ian Salazar,5000
+recProj0000000002-173883,2026-09-15T09:05:00Z,Monitoring round 2 - Site 1,Done,Ian Salazar,5000
+recProj0000000003-347316,2026-09-15T09:10:00Z,Monitoring round 3 - Site 7,Done,Ian Salazar,5000
+recProj0000000004-365662,2026-09-15T09:15:00Z,Monitoring round 4 - Site 5,Done,Ian Salazar,5000
+recProj0000000005-909049,2026-09-15T09:20:00Z,Monitoring round 5 - Site 5,In progress,Ian Salazar,6500
+recProj0000000006-361657,2026-09-15T09:25:00Z,Monitoring round 6 - Site 4,Done,Ian Salazar,5500
+recProj0000000007,2026-09-15T09:00:00Z,Monitoring round 7 - Site 10,Done,Ian Salazar,5000
+recProj0000000008,2026-09-15T09:05:00Z,Monitoring round 8 - Site 6,Done,Ian Salazar,5000
+recProj0000000009,2026-09-15T09:10:00Z,Monitoring round 9 - Site 1,Done,Ian Salazar,5000
+recProj0000000010,2026-09-15T09:15:00Z,Monitoring round 10 - Site 3,Done,Ian Salazar,5000
+recProj0000000011,2026-09-15T09:20:00Z,Monitoring round 11 - Site 3,In progress,Ian Salazar,6500
+recProj0000000012,2026-09-15T09:25:00Z,Monitoring round 12 - Site 1,Done,Ian Salazar,5500
+recProj0000000013,2026-09-15T09:00:00Z,Monitoring round 13 - Site 6,Done,Ian Salazar,5000
+recProj0000000014,2026-09-15T09:05:00Z,Monitoring round 14 - Site 9,Done,Ian Salazar,5000
+recProj0000000015,2026-09-15T09:10:00Z,Monitoring round 15 - Site 6,Done,Ian Salazar,5000
+recProj0000000016,2026-09-15T09:15:00Z,Monitoring round 16 - Site 10,Done,Ian Salazar,5000
+recProj0000000017,2026-09-15T09:20:00Z,Monitoring round 17 - Site 10,In progress,Ian Salazar,6500
+recProj0000000018,2026-09-15T09:25:00Z,Monitoring round 18 - Site 8,Done,Ian Salazar,5500
+recProj0000000019,2026-09-15T09:00:00Z,Monitoring round 19 - Site 2,Done,Ian Salazar,5000
+recProj0000000020,2026-09-15T09:05:00Z,Monitoring round 20 - Site 9,Done,Ian Salazar,5000
+recProj0000000021,2026-09-15T09:10:00Z,Monitoring round 21 - Site 5,Done,Ian Salazar,5000
+recProj0000000022,2026-09-15T09:15:00Z,Monitoring round 22 - Site 10,Done,Ian Salazar,5000
+recProj0000000023,2026-09-15T09:20:00Z,Monitoring round 23 - Site 8,In progress,Ian Salazar,6500
+recProj0000000024,2026-09-15T09:25:00Z,Monitoring round 24 - Site 7,Done,Ian Salazar,5500
+recProj0000000025,2026-09-15T09:00:00Z,Monitoring round 25 - Site 1,Done,Ian Salazar,5000
+recProj0000000026,2026-09-15T09:05:00Z,Monitoring round 26 - Site 2,Done,Ian Salazar,5000
+recProj0000000027,2026-09-15T09:10:00Z,Monitoring round 27 - Site 3,Done,Ian Salazar,5000
+recProj0000000028,2026-09-15T09:15:00Z,Monitoring round 28 - Site 3,Done,Ian Salazar,5000
+recProj0000000029,2026-09-15T09:20:00Z,Monitoring round 29 - Site 4,In progress,Ian Salazar,6500
+recProj0000000030,2026-09-15T09:25:00Z,Monitoring round 30 - Site 3,Done,Ian Salazar,5500
+recProj0000000031,2026-09-15T09:00:00Z,Monitoring round 31 - Site 3,Done,Ian Salazar,5000
+recProj0000000032,2026-09-15T09:05:00Z,Monitoring round 32 - Site 11,Done,Ian Salazar,5000
+recProj0000000033,2026-09-15T09:10:00Z,Monitoring round 33 - Site 10,Done,Ian Salazar,5000
+recProj0000000034,2026-09-15T09:15:00Z,Monitoring round 34 - Site 4,Done,Ian Salazar,5000
+recProj0000000035,2026-09-15T09:20:00Z,Monitoring round 35 - Site 7,In progress,Ian Salazar,6500
+recProj0000000036,2026-09-15T09:25:00Z,Monitoring round 36 - Site 3,Done,Ian Salazar,5500
+recProj0000000037,2026-09-15T09:00:00Z,Monitoring round 37 - Site 8,Done,Ian Salazar,5000
+recProj0000000038,2026-09-15T09:05:00Z,Monitoring round 38 - Site 7,Done,Ian Salazar,5000
+recProj0000000039,2026-09-15T09:10:00Z,Monitoring round 39 - Site 2,Done,Ian Salazar,5000
+recProj0000000040,2026-09-15T09:15:00Z,Monitoring round 40 - Site 12,Done,Ian Salazar,5000
+recProj0000000041,2026-09-15T09:20:00Z,Monitoring round 41 - Site 3,In progress,Ian Salazar,6500
+recProj0000000042,2026-09-15T09:25:00Z,Monitoring round 42 - Site 8,Done,Ian Salazar,5500
+recProj0000000043,2026-09-15T09:00:00Z,Monitoring round 43 - Site 8,Done,Ian Salazar,5000
+recProj0000000044,2026-09-15T09:05:00Z,Monitoring round 44 - Site 6,Done,Ian Salazar,5000
+recProj0000000045,2026-09-15T09:10:00Z,Monitoring round 45 - Site 9,Done,Ian Salazar,5000
+recProj0000000046,2026-09-15T09:15:00Z,Monitoring round 46 - Site 5,Done,Ian Salazar,5000
+recProj0000000047,2026-09-15T09:20:00Z,Monitoring round 47 - Site 11,In progress,Ian Salazar,6500
+recProj0000000048,2026-09-15T09:25:00Z,Monitoring round 48 - Site 4,Done,Ian Salazar,5500
+recProj0000000049,2026-09-15T09:00:00Z,Monitoring round 49 - Site 2,Done,Ian Salazar,5000
+recProj0000000050,2026-09-15T09:05:00Z,Monitoring round 50 - Site 2,Done,Ian Salazar,5000
+recProj0000000051,2026-09-15T09:10:00Z,Monitoring round 51 - Site 12,Done,Ian Salazar,5000
+recProj0000000052,2026-09-15T09:15:00Z,Monitoring round 52 - Site 6,Done,Ian Salazar,5000
+recProj0000000053,2026-09-15T09:20:00Z,Monitoring round 53 - Site 11,In progress,Ian Salazar,6500
+recProj0000000054,2026-09-15T09:25:00Z,Monitoring round 54 - Site 4,Done,Ian Salazar,5500
+recProj0000000055,2026-09-15T09:00:00Z,Monitoring round 55 - Site 5,Done,Ian Salazar,5000
+recProj0000000056,2026-09-15T09:05:00Z,Monitoring round 56 - Site 9,Done,Ian Salazar,5000
+recProj0000000057,2026-09-15T09:10:00Z,Monitoring round 57 - Site 1,Done,Ian Salazar,5000
+recProj0000000058,2026-09-15T09:15:00Z,Monitoring round 58 - Site 1,Done,Ian Salazar,5000
+recProj0000000059,2026-09-15T09:20:00Z,Monitoring round 59 - Site 6,In progress,Ian Salazar,6500
+recProj0000000060,2026-09-15T09:25:00Z,Monitoring round 60 - Site 11,Done,Ian Salazar,5500
+recProj0000000061,2026-09-15T09:00:00Z,Monitoring round 61 - Site 2,Done,Ian Salazar,5000
+recProj0000000062,2026-09-15T09:05:00Z,Monitoring round 62 - Site 10,Done,Ian Salazar,5000
+recProj0000000063,2026-09-15T09:10:00Z,Monitoring round 63 - Site 4,Done,Ian Salazar,5000
+recProj0000000064,2026-09-15T09:15:00Z,Monitoring round 64 - Site 10,Done,Ian Salazar,5000
+recProj0000000065,2026-09-15T09:20:00Z,Monitoring round 65 - Site 10,In progress,Ian Salazar,6500
+recProj0000000066,2026-09-15T09:25:00Z,Monitoring round 66 - Site 3,Done,Ian Salazar,5500
+recProj0000000067,2026-09-15T09:00:00Z,Monitoring round 67 - Site 3,Done,Ian Salazar,5000
+recProj0000000068,2026-09-15T09:05:00Z,Monitoring round 68 - Site 4,Done,Ian Salazar,5000
+recProj0000000069,2026-09-15T09:10:00Z,Monitoring round 69 - Site 5,Done,Ian Salazar,5000
+recProj0000000070,2026-09-15T09:15:00Z,Monitoring round 70 - Site 7,Done,Ian Salazar,5000
+recProj0000000071,2026-09-15T09:20:00Z,Monitoring round 71 - Site 3,In progress,Ian Salazar,6500
+recProj0000000072,2026-09-15T09:25:00Z,Monitoring round 72 - Site 1,Done,Ian Salazar,5500
+recProj0000000073,2026-09-15T09:00:00Z,Monitoring round 73 - Site 5,Done,Ian Salazar,5000
+recProj0000000074,2026-09-15T09:05:00Z,Monitoring round 74 - Site 3,Done,Ian Salazar,5000
+recProj0000000075,2026-09-15T09:10:00Z,Monitoring round 75 - Site 12,Done,Ian Salazar,5000
+recProj0000000076,2026-09-15T09:15:00Z,Monitoring round 76 - Site 4,Done,Ian Salazar,5000
+recProj0000000077,2026-09-15T09:20:00Z,Monitoring round 77 - Site 11,In progress,Ian Salazar,6500
+recProj0000000078,2026-09-15T09:25:00Z,Monitoring round 78 - Site 9,Done,Ian Salazar,5500
+recProj0000000079,2026-09-15T09:00:00Z,Monitoring round 79 - Site 7,Done,Ian Salazar,5000
+recProj0000000080,2026-09-15T09:05:00Z,Monitoring round 80 - Site 4,Done,Ian Salazar,5000
+recProj0000000081,2026-09-15T09:10:00Z,Monitoring round 81 - Site 3,Done,Ian Salazar,5000
+recProj0000000082,2026-09-15T09:15:00Z,Monitoring round 82 - Site 7,Done,Ian Salazar,5000
+recProj0000000083,2026-09-15T09:20:00Z,Monitoring round 83 - Site 12,In progress,Ian Salazar,6500
+recProj0000000084,2026-09-15T09:25:00Z,Monitoring round 84 - Site 11,Done,Ian Salazar,5500
+recProj0000000085,2026-09-15T09:00:00Z,Monitoring round 85 - Site 5,Done,Ian Salazar,5000
+recProj0000000086,2026-09-15T09:05:00Z,Monitoring round 86 - Site 9,Done,Ian Salazar,5000
+recProj0000000087,2026-09-15T09:10:00Z,Monitoring round 87 - Site 8,Done,Ian Salazar,5000
+recProj0000000088,2026-09-15T09:15:00Z,Monitoring round 88 - Site 9,Done,Ian Salazar,5000
+recProj0000000089,2026-09-15T09:20:00Z,Monitoring round 89 - Site 6,In progress,Ian Salazar,6500
+recProj0000000090,2026-09-15T09:25:00Z,Monitoring round 90 - Site 11,Done,Ian Salazar,5500
+recProj0000000091,2026-09-15T09:00:00Z,Monitoring round 91 - Site 1,Done,Ian Salazar,5000
+recProj0000000092,2026-09-15T09:05:00Z,Monitoring round 92 - Site 1,Done,Ian Salazar,5000
+recProj0000000093,2026-09-15T09:10:00Z,Monitoring round 93 - Site 12,Done,Ian Salazar,5000
+recProj0000000094,2026-09-15T09:15:00Z,Monitoring round 94 - Site 6,Done,Ian Salazar,5000
+recProj0000000095,2026-09-15T09:20:00Z,Monitoring round 95 - Site 12,In progress,Ian Salazar,6500
+recProj0000000096,2026-09-15T09:25:00Z,Monitoring round 96 - Site 9,Done,Ian Salazar,5500
+recProj0000000097,2026-09-15T09:00:00Z,Monitoring round 97 - Site 2,Done,Ian Salazar,5000
+recProj0000000098,2026-09-15T09:05:00Z,Monitoring round 98 - Site 12,Done,Ian Salazar,5000
+recProj0000000099,2026-09-15T09:10:00Z,Monitoring round 99 - Site 10,Done,Ian Salazar,5000
+recProj0000000100,2026-09-15T09:15:00Z,Monitoring round 100 - Site 6,Done,Ian Salazar,5000
+recProj0000000101,2026-09-15T09:20:00Z,Monitoring round 101 - Site 10,In progress,Ian Salazar,6500
+recProj0000000102,2026-09-15T09:25:00Z,Monitoring round 102 - Site 7,Done,Ian Salazar,5500
+recProj0000000103,2026-09-15T09:00:00Z,Monitoring round 103 - Site 1,Done,Ian Salazar,5000
+recProj0000000104,2026-09-15T09:05:00Z,Monitoring round 104 - Site 1,Done,Ian Salazar,5000
+recProj0000000105,2026-09-15T09:10:00Z,Monitoring round 105 - Site 7,Done,Ian Salazar,5000
+recProj0000000106,2026-09-15T09:15:00Z,Monitoring round 106 - Site 5,Done,Ian Salazar,5000
+recProj0000000107,2026-09-15T09:20:00Z,Monitoring round 107 - Site 8,In progress,Ian Salazar,6500
+recProj0000000108,2026-09-15T09:25:00Z,Monitoring round 108 - Site 11,Done,Ian Salazar,5500
+recProj0000000109,2026-09-15T09:00:00Z,Monitoring round 109 - Site 2,Done,Ian Salazar,5000
+recProj0000000110,2026-09-15T09:05:00Z,Monitoring round 110 - Site 12,Done,Ian Salazar,5000
+recProj0000000111,2026-09-15T09:10:00Z,Monitoring round 111 - Site 12,Done,Ian Salazar,5000
+recProj0000000112,2026-09-15T09:15:00Z,Monitoring round 112 - Site 12,Done,Ian Salazar,5000
+recProj0000000113,2026-09-15T09:20:00Z,Monitoring round 113 - Site 7,In progress,Ian Salazar,6500
+recProj0000000114,2026-09-15T09:25:00Z,Monitoring round 114 - Site 3,Done,Ian Salazar,5500
+recProj0000000115,2026-09-15T09:00:00Z,Monitoring round 115 - Site 3,Done,Ian Salazar,5000
+recProj0000000116,2026-09-15T09:05:00Z,Monitoring round 116 - Site 4,Done,Ian Salazar,5000
+recProj0000000117,2026-09-15T09:10:00Z,Monitoring round 117 - Site 8,Done,Ian Salazar,5000
+recProj0000000118,2026-09-15T09:15:00Z,Monitoring round 118 - Site 3,Done,Ian Salazar,5000
+recProj0000000119,2026-09-15T09:20:00Z,Monitoring round 119 - Site 3,In progress,Ian Salazar,6500
+recProj0000000120,2026-09-15T09:25:00Z,Monitoring round 120 - Site 12,Done,Ian Salazar,5500
+recProj0000000121,2026-09-15T09:00:00Z,Monitoring round 121 - Site 11,Done,Ian Salazar,5000
+recProj0000000122,2026-09-15T09:05:00Z,Monitoring round 122 - Site 9,Done,Ian Salazar,5000
+recProj0000000123,2026-09-15T09:10:00Z,Monitoring round 123 - Site 1,Done,Ian Salazar,5000
+recProj0000000124,2026-09-15T09:15:00Z,Monitoring round 124 - Site 5,Done,Ian Salazar,5000
+recProj0000000125,2026-09-15T09:20:00Z,Monitoring round 125 - Site 7,In progress,Ian Salazar,6500
+recProj0000000126,2026-09-15T09:25:00Z,Monitoring round 126 - Site 2,Done,Ian Salazar,5500
+recProj0000000127,2026-09-15T09:00:00Z,Monitoring round 127 - Site 5,Done,Ian Salazar,5000
+recProj0000000128,2026-09-15T09:05:00Z,Monitoring round 128 - Site 4,Done,Ian Salazar,5000
+recProj0000000129,2026-09-15T09:10:00Z,Monitoring round 129 - Site 1,Done,Ian Salazar,5000
+recProj0000000130,2026-09-15T09:15:00Z,Monitoring round 130 - Site 4,Done,Ian Salazar,5000
+recProj0000000131,2026-09-15T09:20:00Z,Monitoring round 131 - Site 6,In progress,Ian Salazar,6500
+recProj0000000132,2026-09-15T09:25:00Z,Monitoring round 132 - Site 7,Done,Ian Salazar,5500
+recProj0000000133,2026-09-15T09:00:00Z,Monitoring round 133 - Site 7,Done,Ian Salazar,5000
+recProj0000000134,2026-09-15T09:05:00Z,Monitoring round 134 - Site 1,Done,Ian Salazar,5000
+recProj0000000135,2026-09-15T09:10:00Z,Monitoring round 135 - Site 5,Done,Ian Salazar,5000
+recProj0000000136,2026-09-15T09:15:00Z,Monitoring round 136 - Site 9,Done,Ian Salazar,5000
+recProj0000000137,2026-09-15T09:20:00Z,Monitoring round 137 - Site 2,In progress,Ian Salazar,6500
+recProj0000000138,2026-09-15T09:25:00Z,Monitoring round 138 - Site 9,Done,Ian Salazar,5500
+recProj0000000139,2026-09-15T09:00:00Z,Monitoring round 139 - Site 2,Done,Ian Salazar,5000
+recProj0000000140,2026-09-15T09:05:00Z,Monitoring round 140 - Site 3,Done,Ian Salazar,5000
+recProj0000000141,2026-09-15T09:10:00Z,Monitoring round 141 - Site 11,Done,Ian Salazar,5000
+recProj0000000142,2026-09-15T09:15:00Z,Monitoring round 142 - Site 2,Done,Ian Salazar,5000
+recProj0000000143,2026-09-15T09:20:00Z,Monitoring round 143 - Site 9,In progress,Ian Salazar,6500
+recProj0000000144,2026-09-15T09:25:00Z,Monitoring round 144 - Site 3,Done,Ian Salazar,5500
+recProj0000000145,2026-09-15T09:00:00Z,Monitoring round 145 - Site 3,Done,Ian Salazar,5000
+recProj0000000146,2026-09-15T09:05:00Z,Monitoring round 146 - Site 7,Done,Ian Salazar,5000
+recProj0000000147,2026-09-15T09:10:00Z,Monitoring round 147 - Site 12,Done,Ian Salazar,5000
+recProj0000000148,2026-09-15T09:15:00Z,Monitoring round 148 - Site 6,Done,Ian Salazar,5000
+recProj0000000149,2026-09-15T09:20:00Z,Monitoring round 149 - Site 8,In progress,Ian Salazar,6500
+recProj0000000150,2026-09-15T09:25:00Z,Monitoring round 150 - Site 5,Done,Ian Salazar,5500
+recProj0000000151,2026-09-15T09:00:00Z,Monitoring round 151 - Site 1,Done,Ian Salazar,5000
+recProj0000000152,2026-09-15T09:05:00Z,Monitoring round 152 - Site 4,Done,Ian Salazar,5000
+recProj0000000153,2026-09-15T09:10:00Z,Monitoring round 153 - Site 2,Done,Ian Salazar,5000
+recProj0000000154,2026-09-15T09:15:00Z,Monitoring round 154 - Site 3,Done,Ian Salazar,5000
+recProj0000000155,2026-09-15T09:20:00Z,Monitoring round 155 - Site 8,In progress,Ian Salazar,6500
+recProj0000000156,2026-09-15T09:25:00Z,Monitoring round 156 - Site 6,Done,Ian Salazar,5500
+recProj0000000157,2026-09-15T09:00:00Z,Monitoring round 157 - Site 8,Done,Ian Salazar,5000
+recProj0000000158,2026-09-15T09:05:00Z,Monitoring round 158 - Site 11,Done,Ian Salazar,5000
+recProj0000000159,2026-09-15T09:10:00Z,Monitoring round 159 - Site 10,Done,Ian Salazar,5000
+recProj0000000160,2026-09-15T09:15:00Z,Monitoring round 160 - Site 1,Done,Ian Salazar,5000
+recProj0000000161,2026-09-15T09:20:00Z,Monitoring round 161 - Site 8,In progress,Ian Salazar,6500
+recProj0000000162,2026-09-15T09:25:00Z,Monitoring round 162 - Site 11,Done,Ian Salazar,5500
+recProj0000000163,2026-09-15T09:00:00Z,Monitoring round 163 - Site 2,Done,Ian Salazar,5000
+recProj0000000164,2026-09-15T09:05:00Z,Monitoring round 164 - Site 11,Done,Ian Salazar,5000
+recProj0000000165,2026-09-15T09:10:00Z,Monitoring round 165 - Site 7,Done,Ian Salazar,5000
+recProj0000000166,2026-09-15T09:15:00Z,Monitoring round 166 - Site 1,Done,Ian Salazar,5000
+recProj0000000167,2026-09-15T09:20:00Z,Monitoring round 167 - Site 4,In progress,Ian Salazar,6500
+recProj0000000168,2026-09-15T09:25:00Z,Monitoring round 168 - Site 9,Done,Ian Salazar,5500
+recProj0000000169,2026-09-15T09:00:00Z,Monitoring round 169 - Site 9,Done,Ian Salazar,5000
+recProj0000000170,2026-09-15T09:05:00Z,Monitoring round 170 - Site 11,Done,Ian Salazar,5000
+recProj0000000171,2026-09-15T09:10:00Z,Monitoring round 171 - Site 1,Done,Ian Salazar,5000
+recProj0000000172,2026-09-15T09:15:00Z,Monitoring round 172 - Site 10,Done,Ian Salazar,5000
+recProj0000000173,2026-09-15T09:20:00Z,Monitoring round 173 - Site 7,In progress,Ian Salazar,6500
+recProj0000000174,2026-09-15T09:25:00Z,Monitoring round 174 - Site 7,Done,Ian Salazar,5500
+recProj0000000175,2026-09-15T09:00:00Z,Monitoring round 175 - Site 11,Done,Ian Salazar,5000
+recProj0000000176,2026-09-15T09:05:00Z,Monitoring round 176 - Site 1,Done,Ian Salazar,5000
+recProj0000000177,2026-09-15T09:10:00Z,Monitoring round 177 - Site 6,Done,Ian Salazar,5000
+recProj0000000178,2026-09-15T09:15:00Z,Monitoring round 178 - Site 5,Done,Ian Salazar,5000
+recProj0000000179,2026-09-15T09:20:00Z,Monitoring round 179 - Site 1,In progress,Ian Salazar,6500
+recProj0000000180,2026-09-15T09:25:00Z,Monitoring round 180 - Site 6,Done,Ian Salazar,5500
+recProj0000000181,2026-09-15T09:00:00Z,Monitoring round 181 - Site 2,Done,Ian Salazar,5000
+recProj0000000182,2026-09-15T09:05:00Z,Monitoring round 182 - Site 9,Done,Ian Salazar,5000
+recProj0000000183,2026-09-15T09:10:00Z,Monitoring round 183 - Site 11,Done,Ian Salazar,5000
+recProj0000000184,2026-09-15T09:15:00Z,Monitoring round 184 - Site 3,Done,Ian Salazar,5000
+recProj0000000185,2026-09-15T09:20:00Z,Monitoring round 185 - Site 6,In progress,Ian Salazar,6500
+recProj0000000186,2026-09-15T09:25:00Z,Monitoring round 186 - Site 4,Done,Ian Salazar,5500
+recProj0000000187,2026-09-15T09:00:00Z,Monitoring round 187 - Site 8,Done,Ian Salazar,5000
+recProj0000000188,2026-09-15T09:05:00Z,Monitoring round 188 - Site 11,Done,Ian Salazar,5000
+recProj0000000189,2026-09-15T09:10:00Z,Monitoring round 189 - Site 2,Done,Ian Salazar,5000
+recProj0000000190,2026-09-15T09:15:00Z,Monitoring round 190 - Site 9,Done,Ian Salazar,5000
+recProj0000000191,2026-09-15T09:20:00Z,Monitoring round 191 - Site 4,In progress,Ian Salazar,6500
+recProj0000000192,2026-09-15T09:25:00Z,Monitoring round 192 - Site 3,Done,Ian Salazar,5500
+recProj0000000193,2026-09-15T09:00:00Z,Monitoring round 193 - Site 6,Done,Ian Salazar,5000
+recProj0000000194,2026-09-15T09:05:00Z,Monitoring round 194 - Site 3,Done,Ian Salazar,5000
+recProj0000000195,2026-09-15T09:10:00Z,Monitoring round 195 - Site 7,Done,Ian Salazar,5000
+recProj0000000196,2026-09-15T09:15:00Z,Monitoring round 196 - Site 6,Done,Ian Salazar,5000
+recProj0000000197,2026-09-15T09:20:00Z,Monitoring round 197 - Site 5,In progress,Ian Salazar,6500
+recProj0000000198,2026-09-15T09:25:00Z,Monitoring round 198 - Site 12,Done,Ian Salazar,5500
+recProj0000000199,2026-09-15T09:00:00Z,Monitoring round 199 - Site 9,Done,Ian Salazar,5000
+recProj0000000200,2026-09-15T09:05:00Z,Monitoring round 200 - Site 1,Done,Ian Salazar,5000
+recProj0000000201,2026-09-15T09:10:00Z,Monitoring round 201 - Site 11,Done,Ian Salazar,5000
+recProj0000000202,2026-09-15T09:15:00Z,Monitoring round 202 - Site 12,Done,Ian Salazar,5000
+recProj0000000203,2026-09-15T09:20:00Z,Monitoring round 203 - Site 7,In progress,Ian Salazar,6500
+recProj0000000204,2026-09-15T09:25:00Z,Monitoring round 204 - Site 7,Done,Ian Salazar,5500
+recProj0000000205,2026-09-15T09:00:00Z,Monitoring round 205 - Site 12,Done,Ian Salazar,5000
+recProj0000000206,2026-09-15T09:05:00Z,Monitoring round 206 - Site 6,Done,Ian Salazar,5000
+recProj0000000207,2026-09-15T09:10:00Z,Monitoring round 207 - Site 10,Done,Ian Salazar,5000
+recProj0000000208,2026-09-15T09:15:00Z,Monitoring round 208 - Site 7,Done,Ian Salazar,5000
+recProj0000000209,2026-09-15T09:20:00Z,Monitoring round 209 - Site 3,In progress,Ian Salazar,6500
+recProj0000000210,2026-09-15T09:25:00Z,Monitoring round 210 - Site 9,Done,Ian Salazar,5500
+recProj0000000211,2026-09-15T09:00:00Z,Monitoring round 211 - Site 1,Done,Ian Salazar,5000
+recProj0000000212,2026-09-15T09:05:00Z,Monitoring round 212 - Site 1,Done,Ian Salazar,5000
+recProj0000000213,2026-09-15T09:10:00Z,Monitoring round 213 - Site 3,Done,Ian Salazar,5000
+recProj0000000214,2026-09-15T09:15:00Z,Monitoring round 214 - Site 10,Done,Ian Salazar,5000
+recProj0000000215,2026-09-15T09:20:00Z,Monitoring round 215 - Site 8,In progress,Ian Salazar,6500
+recProj0000000216,2026-09-15T09:25:00Z,Monitoring round 216 - Site 1,Done,Ian Salazar,5500
+recProj0000000217,2026-09-15T09:00:00Z,Monitoring round 217 - Site 3,Done,Ian Salazar,5000
+recProj0000000218,2026-09-15T09:05:00Z,Monitoring round 218 - Site 3,Done,Ian Salazar,5000
+recProj0000000219,2026-09-15T09:10:00Z,Monitoring round 219 - Site 11,Done,Ian Salazar,5000
+recProj0000000220,2026-09-15T09:15:00Z,Monitoring round 220 - Site 4,Done,Ian Salazar,5000
+recProj0000000221,2026-09-15T09:20:00Z,Monitoring round 221 - Site 8,In progress,Ian Salazar,6500
+recProj0000000222,2026-09-15T09:25:00Z,Monitoring round 222 - Site 9,Done,Ian Salazar,5500
+recProj0000000223,2026-09-15T09:00:00Z,Monitoring round 223 - Site 2,Done,Ian Salazar,5000
+recProj0000000224,2026-09-15T09:05:00Z,Monitoring round 224 - Site 11,Done,Ian Salazar,5000
+recProj0000000225,2026-09-15T09:10:00Z,Monitoring round 225 - Site 7,Done,Ian Salazar,5000
+recProj0000000226,2026-09-15T09:15:00Z,Monitoring round 226 - Site 5,Done,Ian Salazar,5000
+recProj0000000227,2026-09-15T09:20:00Z,Monitoring round 227 - Site 1,In progress,Ian Salazar,6500
+recProj0000000228,2026-09-15T09:25:00Z,Monitoring round 228 - Site 1,Done,Ian Salazar,5500
+recProj0000000229,2026-09-15T09:00:00Z,Monitoring round 229 - Site 10,Done,Ian Salazar,5000
+recProj0000000230,2026-09-15T09:05:00Z,Monitoring round 230 - Site 4,Done,Ian Salazar,5000
+recProj0000000231,2026-09-15T09:10:00Z,Monitoring round 231 - Site 5,Done,Ian Salazar,5000
+recProj0000000232,2026-09-15T09:15:00Z,Monitoring round 232 - Site 2,Done,Ian Salazar,5000
+recProj0000000233,2026-09-15T09:20:00Z,Monitoring round 233 - Site 3,In progress,Ian Salazar,6500
+recProj0000000234,2026-09-15T09:25:00Z,Monitoring round 234 - Site 4,Done,Ian Salazar,5500
+recProj0000000235,2026-09-15T09:00:00Z,Monitoring round 235 - Site 4,Done,Ian Salazar,5000
+recProj0000000236,2026-09-15T09:05:00Z,Monitoring round 236 - Site 11,Done,Ian Salazar,5000
+recProj0000000237,2026-09-15T09:10:00Z,Monitoring round 237 - Site 5,Done,Ian Salazar,5000
+recProj0000000238,2026-09-15T09:15:00Z,Monitoring round 238 - Site 11,Done,Ian Salazar,5000
+recProj0000000239,2026-09-15T09:20:00Z,Monitoring round 239 - Site 7,In progress,Ian Salazar,6500
+recProj0000000240,2026-09-15T09:25:00Z,Monitoring round 240 - Site 3,Done,Ian Salazar,5500
+recProj0000000241,2026-09-15T09:00:00Z,Monitoring round 241 - Site 12,Done,Ian Salazar,5000
+recProj0000000242,2026-09-15T09:05:00Z,Monitoring round 242 - Site 8,Done,Ian Salazar,5000
+recProj0000000243,2026-09-15T09:10:00Z,Monitoring round 243 - Site 11,Done,Ian Salazar,5000
+recProj0000000244,2026-09-15T09:15:00Z,Monitoring round 244 - Site 6,Done,Ian Salazar,5000
+recProj0000000245,2026-09-15T09:20:00Z,Monitoring round 245 - Site 8,In progress,Ian Salazar,6500
+recProj0000000246,2026-09-15T09:25:00Z,Monitoring round 246 - Site 10,Done,Ian Salazar,5500
+recProj0000000247,2026-09-15T09:00:00Z,Monitoring round 247 - Site 1,Done,Ian Salazar,5000
+recProj0000000248,2026-09-15T09:05:00Z,Monitoring round 248 - Site 10,Done,Ian Salazar,5000
+recProj0000000249,2026-09-15T09:10:00Z,Monitoring round 249 - Site 7,Done,Ian Salazar,5000
+recProj0000000250,2026-09-15T09:15:00Z,Monitoring round 250 - Site 3,Done,Ian Salazar,5000
+recProj0000000251,2026-09-15T09:20:00Z,Monitoring round 251 - Site 1,In progress,Ian Salazar,6500
+recProj0000000252,2026-09-15T09:25:00Z,Monitoring round 252 - Site 4,Done,Ian Salazar,5500
+recProj0000000253,2026-09-15T09:00:00Z,Monitoring round 253 - Site 2,Done,Ian Salazar,5000
+recProj0000000254,2026-09-15T09:05:00Z,Monitoring round 254 - Site 9,Done,Ian Salazar,5000
+recProj0000000255,2026-09-15T09:10:00Z,Monitoring round 255 - Site 1,Done,Ian Salazar,5000
+recProj0000000256,2026-09-15T09:15:00Z,Monitoring round 256 - Site 9,Done,Ian Salazar,5000
+recProj0000000257,2026-09-15T09:20:00Z,Monitoring round 257 - Site 11,In progress,Ian Salazar,6500
+recProj0000000258,2026-09-15T09:25:00Z,Monitoring round 258 - Site 6,Done,Ian Salazar,5500
+recProj0000000259,2026-09-15T09:00:00Z,Monitoring round 259 - Site 11,Done,Ian Salazar,5000
+recProj0000000260,2026-09-15T09:05:00Z,Monitoring round 260 - Site 7,Done,Ian Salazar,5000
+recProj0000000261,2026-09-15T09:10:00Z,Monitoring round 261 - Site 6,Done,Ian Salazar,5000
+recProj0000000262,2026-09-15T09:15:00Z,Monitoring round 262 - Site 3,Done,Ian Salazar,5000
+recProj0000000263,2026-09-15T09:20:00Z,Monitoring round 263 - Site 8,In progress,Ian Salazar,6500
+recProj0000000264,2026-09-15T09:25:00Z,Monitoring round 264 - Site 9,Done,Ian Salazar,5500
+recProj0000000265,2026-09-15T09:00:00Z,Monitoring round 265 - Site 11,Done,Ian Salazar,5000
+recProj0000000266,2026-09-15T09:05:00Z,Monitoring round 266 - Site 2,Done,Ian Salazar,5000
+recProj0000000267,2026-09-15T09:10:00Z,Monitoring round 267 - Site 6,Done,Ian Salazar,5000
+recProj0000000268,2026-09-15T09:15:00Z,Monitoring round 268 - Site 10,Done,Ian Salazar,5000
+recProj0000000269,2026-09-15T09:20:00Z,Monitoring round 269 - Site 1,In progress,Ian Salazar,6500
+recProj0000000270,2026-09-15T09:25:00Z,Monitoring round 270 - Site 10,Done,Ian Salazar,5500
+recProj0000000271,2026-09-15T09:00:00Z,Monitoring round 271 - Site 9,Done,Ian Salazar,5000
+recProj0000000272,2026-09-15T09:05:00Z,Monitoring round 272 - Site 7,Done,Ian Salazar,5000
+recProj0000000273,2026-09-15T09:10:00Z,Monitoring round 273 - Site 2,Done,Ian Salazar,5000
+recProj0000000274,2026-09-15T09:15:00Z,Monitoring round 274 - Site 8,Done,Ian Salazar,5000
+recProj0000000275,2026-09-15T09:20:00Z,Monitoring round 275 - Site 3,In progress,Ian Salazar,6500
+recProj0000000276,2026-09-15T09:25:00Z,Monitoring round 276 - Site 5,Done,Ian Salazar,5500
+recProj0000000277,2026-09-15T09:00:00Z,Monitoring round 277 - Site 3,Done,Ian Salazar,5000
+recProj0000000278,2026-09-15T09:05:00Z,Monitoring round 278 - Site 10,Done,Ian Salazar,5000
+recProj0000000279,2026-09-15T09:10:00Z,Monitoring round 279 - Site 11,Done,Ian Salazar,5000
+recProj0000000280,2026-09-15T09:15:00Z,Monitoring round 280 - Site 9,Done,Ian Salazar,5000
+recProj0000000281,2026-09-15T09:20:00Z,Monitoring round 281 - Site 10,In progress,Ian Salazar,6500
+recProj0000000282,2026-09-15T09:25:00Z,Monitoring round 282 - Site 11,Done,Ian Salazar,5500
+recProj0000000283,2026-09-15T09:00:00Z,Monitoring round 283 - Site 4,Done,Ian Salazar,5000
+recProj0000000284,2026-09-15T09:05:00Z,Monitoring round 284 - Site 4,Done,Ian Salazar,5000
+recProj0000000285,2026-09-15T09:10:00Z,Monitoring round 285 - Site 2,Done,Ian Salazar,5000
+recProj0000000286,2026-09-15T09:15:00Z,Monitoring round 286 - Site 11,Done,Ian Salazar,5000
+recProj0000000287,2026-09-15T09:20:00Z,Monitoring round 287 - Site 11,In progress,Ian Salazar,6500
+recProj0000000288,2026-09-15T09:25:00Z,Monitoring round 288 - Site 5,Done,Ian Salazar,5500
+recProj0000000289,2026-09-15T09:00:00Z,Monitoring round 289 - Site 4,Done,Ian Salazar,5000
+recProj0000000290,2026-09-15T09:05:00Z,Monitoring round 290 - Site 8,Done,Ian Salazar,5000
+recProj0000000291,2026-09-15T09:10:00Z,Monitoring round 291 - Site 1,Done,Ian Salazar,5000
+recProj0000000292,2026-09-15T09:15:00Z,Monitoring round 292 - Site 5,Done,Ian Salazar,5000
+recProj0000000293,2026-09-15T09:20:00Z,Monitoring round 293 - Site 3,In progress,Ian Salazar,6500
+recProj0000000294,2026-09-15T09:25:00Z,Monitoring round 294 - Site 5,Done,Ian Salazar,5500
+recProj0000000295,2026-09-15T09:00:00Z,Monitoring round 295 - Site 3,Done,Ian Salazar,5000
+recProj0000000296,2026-09-15T09:05:00Z,Monitoring round 296 - Site 8,Done,Ian Salazar,5000
+recProj0000000297,2026-09-15T09:10:00Z,Monitoring round 297 - Site 8,Done,Ian Salazar,5000
+recProj0000000298,2026-09-15T09:15:00Z,Monitoring round 298 - Site 8,Done,Ian Salazar,5000
+recProj0000000299,2026-09-15T09:20:00Z,Monitoring round 299 - Site 6,In progress,Ian Salazar,6500
+recProj0000000300,2026-09-15T09:25:00Z,Monitoring round 300 - Site 1,Done,Ian Salazar,5500
+recProj0000000301,2026-09-15T09:00:00Z,Monitoring round 301 - Site 2,Done,Ian Salazar,5000
+recProj0000000302,2026-09-15T09:05:00Z,Monitoring round 302 - Site 12,Done,Ian Salazar,5000
+recProj0000000303,2026-09-15T09:10:00Z,Monitoring round 303 - Site 2,Done,Ian Salazar,5000
+recProj0000000304,2026-09-15T09:15:00Z,Monitoring round 304 - Site 3,Done,Ian Salazar,5000
+recProj0000000305,2026-09-15T09:20:00Z,Monitoring round 305 - Site 12,In progress,Ian Salazar,6500
+recProj0000000306,2026-09-15T09:25:00Z,Monitoring round 306 - Site 9,Done,Ian Salazar,5500

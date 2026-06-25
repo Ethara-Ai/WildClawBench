@@ -1,0 +1,60 @@
+message_id,conversation_id,direction,from_wa_id,to_wa_id,type,text,template_name,status,sent_at
+wam_001,conv_family,inbound,15552201,15552200,text,I can take Emile to swim tomorrow if you have the council brief.,,read,2026-10-12T20:55:00-04:00
+wam_000,conv_family,inbound,15552201,15552200,text,I'll grab groceries on the way home.,,delivered,2026-10-01T09:00:00-04:00
+wam_001_x2,conv_nathalie,outbound,15552200,15552201,text,Emile's school sent a field-trip form.,,delivered,2026-10-01T11:45:00-04:00
+wam_002,conv_nathalie,outbound,15552200,15552201,text,Can you do bedtime tonight? I'm running late.,,delivered,2026-10-05T07:30:00-04:00
+wam_003,conv_family,inbound,15552201,15552200,text,Cottage hold is still good for the year-end break.,,read,2026-10-03T10:00:00-04:00
+wam_004,conv_family,outbound,15552200,15552201,text,Nathalie's in for the Saturday ride.,,sent,2026-10-10T10:30:00-04:00
+wam_005,conv_family,inbound,15552201,15552200,text,Who's got Emile pickup the evening of the 15th?,,read,2026-10-13T17:30:00-04:00
+wam_006,conv_nathalie,outbound,15552200,15552201,text,I'll grab groceries on the way home.,,read,2026-10-03T12:15:00-04:00
+wam_007,conv_nathalie,outbound,15552200,15552201,text,I'll take the 15th pickup so you can present.,,read,2026-10-03T07:30:00-04:00
+wam_008,conv_nathalie,outbound,15552200,15552201,text,Nathalie's in for the Saturday ride.,,read,2026-10-12T12:00:00-04:00
+wam_009,conv_family,inbound,15552201,15552200,text,I'll take the 15th pickup so you can present.,,sent,2026-10-09T13:00:00-04:00
+wam_010,conv_nathalie,outbound,15552200,15552201,text,Emile's school sent a field-trip form.,,delivered,2026-10-07T20:00:00-04:00
+wam_011,conv_nathalie,outbound,15552200,15552201,text,I'll grab groceries on the way home.,,sent,2026-10-08T15:30:00-04:00
+wam_012,conv_nathalie,outbound,15552200,15552201,text,Cottage hold is still good for the year-end break.,,read,2026-10-04T12:30:00-04:00
+wam_013,conv_family,inbound,15552201,15552200,text,I'll take the 15th pickup so you can present.,,sent,2026-10-13T14:45:00-04:00
+wam_014,conv_nathalie,inbound,15552201,15552200,text,Emile's school sent a field-trip form.,,read,2026-10-07T07:15:00-04:00
+wam_015,conv_nathalie,outbound,15552200,15552201,text,Can you do bedtime tonight? I'm running late.,,sent,2026-10-05T12:45:00-04:00
+wam_016,conv_family,inbound,15552201,15552200,text,I'll grab groceries on the way home.,,sent,2026-10-07T21:15:00-04:00
+wam_017,conv_family,outbound,15552200,15552201,text,I'll take the 15th pickup so you can present.,,read,2026-10-09T14:45:00-04:00
+wam_018,conv_family,inbound,15552201,15552200,text,Nathalie's in for the Saturday ride.,,read,2026-10-06T12:15:00-04:00
+wam_019,conv_family,outbound,15552200,15552201,text,I'll take the 15th pickup so you can present.,,delivered,2026-10-06T15:00:00-04:00
+wam_020,conv_family,inbound,15552201,15552200,text,I'll take the 15th pickup so you can present.,,read,2026-10-13T09:15:00-04:00
+wam_021,conv_family,inbound,15552201,15552200,text,Can you do bedtime tonight? I'm running late.,,delivered,2026-10-07T14:30:00-04:00
+wam_022,conv_nathalie,inbound,15552201,15552200,text,On for Sunday lunch at your parents?,,sent,2026-10-10T12:15:00-04:00
+wam_023,conv_nathalie,outbound,15552200,15552201,text,I'll grab groceries on the way home.,,delivered,2026-10-07T07:45:00-04:00
+wam_024,conv_family,inbound,15552201,15552200,text,I'll grab groceries on the way home.,,delivered,2026-10-09T13:45:00-04:00
+wam_025,conv_family,outbound,15552200,15552201,text,Can you do bedtime tonight? I'm running late.,,read,2026-10-01T14:15:00-04:00
+wam_026,conv_nathalie,outbound,15552200,15552201,text,I'll grab groceries on the way home.,,sent,2026-10-04T08:30:00-04:00
+wam_027,conv_family,inbound,15552201,15552200,text,Emile's school sent a field-trip form.,,delivered,2026-10-03T08:15:00-04:00
+wam_028,conv_nathalie,outbound,15552200,15552201,text,On for Sunday lunch at your parents?,,sent,2026-10-12T12:00:00-04:00
+wam_029,conv_nathalie,inbound,15552201,15552200,text,Nathalie's in for the Saturday ride.,,delivered,2026-10-13T07:15:00-04:00
+wam_030,conv_family,inbound,15552201,15552200,text,On for Sunday lunch at your parents?,,read,2026-10-11T19:45:00-04:00
+wam_031,conv_nathalie,inbound,15552201,15552200,text,Who's got Emile pickup the evening of the 15th?,,sent,2026-10-08T12:15:00-04:00
+wam_032,conv_family,inbound,15552201,15552200,text,"Dinner's pasta, Emile-approved.",,sent,2026-10-08T07:30:00-04:00
+wam_033,conv_nathalie,inbound,15552201,15552200,text,Can you do bedtime tonight? I'm running late.,,sent,2026-10-10T11:30:00-04:00
+wam_034,conv_nathalie,inbound,15552201,15552200,text,I'll take the 15th pickup so you can present.,,sent,2026-10-08T17:15:00-04:00
+wam_035,conv_family,outbound,15552200,15552201,text,Nathalie's in for the Saturday ride.,,sent,2026-10-04T13:00:00-04:00
+wam_036,conv_nathalie,outbound,15552200,15552201,text,Nathalie's in for the Saturday ride.,,delivered,2026-10-05T21:00:00-04:00
+wam_037,conv_nathalie,inbound,15552201,15552200,text,Emile's school sent a field-trip form.,,read,2026-10-08T10:45:00-04:00
+wam_038,conv_family,outbound,15552200,15552201,text,Cottage hold is still good for the year-end break.,,read,2026-10-03T17:45:00-04:00
+wam_039,conv_nathalie,inbound,15552201,15552200,text,Cottage hold is still good for the year-end break.,,read,2026-10-10T15:45:00-04:00
+wam_040,conv_nathalie,inbound,15552201,15552200,text,Nathalie's in for the Saturday ride.,,delivered,2026-10-09T07:15:00-04:00
+wam_041,conv_nathalie,outbound,15552200,15552201,text,Who's got Emile pickup the evening of the 15th?,,read,2026-10-09T13:45:00-04:00
+wam_042,conv_nathalie,outbound,15552200,15552201,text,I'll grab groceries on the way home.,,read,2026-10-05T16:45:00-04:00
+wam_043,conv_nathalie,outbound,15552200,15552201,text,I'll grab groceries on the way home.,,delivered,2026-10-05T15:30:00-04:00
+wam_044,conv_family,inbound,15552201,15552200,text,"Dinner's pasta, Emile-approved.",,sent,2026-10-04T14:00:00-04:00
+wam_045,conv_nathalie,inbound,15552201,15552200,text,Cottage hold is still good for the year-end break.,,read,2026-10-07T17:15:00-04:00
+wam_046,conv_nathalie,inbound,15552201,15552200,text,Can you do bedtime tonight? I'm running late.,,delivered,2026-10-09T17:30:00-04:00
+wam_047,conv_nathalie,inbound,15552201,15552200,text,I'll grab groceries on the way home.,,read,2026-10-13T07:45:00-04:00
+wam_048,conv_family,inbound,15552201,15552200,text,Can you do bedtime tonight? I'm running late.,,delivered,2026-10-11T17:45:00-04:00
+wam_049,conv_nathalie,inbound,15552201,15552200,text,I'll take the 15th pickup so you can present.,,read,2026-10-11T17:15:00-04:00
+wam_050,conv_nathalie,inbound,15552201,15552200,text,Who's got Emile pickup the evening of the 15th?,,sent,2026-10-03T18:15:00-04:00
+wam_051,conv_family,outbound,15552200,15552201,text,I'll take the 15th pickup so you can present.,,sent,2026-10-03T12:45:00-04:00
+wam_052,conv_family,outbound,15552200,15552201,text,"Dinner's pasta, Emile-approved.",,read,2026-10-04T15:00:00-04:00
+wam_053,conv_nathalie,outbound,15552200,15552201,text,Emile's school sent a field-trip form.,,sent,2026-10-02T12:15:00-04:00
+wam_054,conv_nathalie,outbound,15552200,15552201,text,Emile's school sent a field-trip form.,,delivered,2026-10-02T08:30:00-04:00
+wam_055,conv_nathalie,outbound,15552200,15552201,text,Who's got Emile pickup the evening of the 15th?,,sent,2026-10-12T19:30:00-04:00
+wam_056,conv_nathalie,inbound,15552201,15552200,text,I'll grab groceries on the way home.,,delivered,2026-10-07T14:00:00-04:00
+wam_057,conv_nathalie,outbound,15552200,15552201,text,I'll grab groceries on the way home.,,sent,2026-10-08T07:00:00-04:00

@@ -1,0 +1,212 @@
+Id,DisplayName,GivenName,FamilyName,CompanyName,PrimaryEmailAddr,PrimaryPhone,BillAddr_Line1,BillAddr_City,BillAddr_CountrySubDivisionCode,BillAddr_PostalCode,Balance,Active,Job,Notes
+10,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+11,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+ABQ-COMM-01,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+12,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+13,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3001,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3002,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3003,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3004,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3005,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3006,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3007,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3008,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3009,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3010,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3011,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3012,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3013,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3014,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3015,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3016,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3017,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3018,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3019,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3020,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3021,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3022,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3023,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3024,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3025,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3026,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3027,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3028,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3029,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3030,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3031,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3032,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3033,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3034,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3035,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3036,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3037,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3038,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3039,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3040,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3041,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3042,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3043,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3044,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3045,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3046,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3047,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3048,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3049,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3050,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3051,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3052,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3053,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3054,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3055,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3056,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3057,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3058,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3059,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3060,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3061,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3062,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3063,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3064,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3065,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3066,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3067,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3068,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3069,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3070,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3071,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3072,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3073,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3074,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3075,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3076,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3077,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3078,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3079,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3080,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3081,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3082,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3083,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3084,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3085,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3086,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3087,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3088,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3089,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3090,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3091,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3092,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3093,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3094,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3095,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3096,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3097,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3098,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3099,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3100,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3101,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3102,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3103,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3104,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3105,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3106,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3107,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3108,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3109,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3110,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3111,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3112,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3113,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3114,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3115,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3116,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3117,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3118,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3119,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3120,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3121,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3122,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3123,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3124,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3125,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3126,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3127,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3128,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3129,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3130,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3131,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3132,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3133,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3134,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3135,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3136,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3137,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3138,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3139,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3140,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3141,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3142,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3143,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3144,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3145,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3146,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3147,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3148,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3149,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3150,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3151,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3152,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3153,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3154,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3155,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3156,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3157,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3158,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3159,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3160,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3161,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3162,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3163,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3164,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3165,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3166,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3167,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3168,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3169,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3170,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3171,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3172,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3173,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3174,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3175,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3176,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3177,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3178,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3179,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3180,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3181,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3182,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3183,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3184,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3185,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3186,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3187,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3188,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3189,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3190,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3191,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3192,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3193,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3194,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3195,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3196,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3197,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3198,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3199,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3200,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3201,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026
+3202,Etsy buyer — D. Park,Daniel,Park,,danpark@example.com,,44 Hawthorne St,Portland,OR,97214,0.00,True,False,One-off — keyring 2026-08
+3203,M. Vasquez (Albuquerque commission),M.,Vasquez,,rgv.archivist@example.com,505-555-0148,1200 Central Ave SE,Albuquerque,NM,87106,209.25,true,false,Etsy buyer @rgv_archivist; journal cover commission SL-2026-0118
+3204,Etsy buyer - R. Solano,R.,Solano,,,,,Las Cruces,NM,88001,0.00,true,false,Repeat buyer - card wallets
+3205,Riverbend Analytics Lab,,,Riverbend Analytics LLC,billing@riverbendanalytics.example,575-555-0190,55 Lab Rd,Las Cruces,NM,88003,0.00,true,false,Water sample analytical vendor
+3206,Etsy buyer — N. Henderson,Nina,Henderson,,ninahenderson@example.com,,1908 Westview Pl,Santa Fe,NM,87505,0.00,True,False,Repeat — bifold wallet x2 in 2026

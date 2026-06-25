@@ -1,4 +1,0 @@
-conversation_id,wa_id,started_at,last_message_at,origin,within_24h_window
-conv_carmen,15755556201,2025-06-01T18:30:00-06:00,2026-10-19T18:32:00-06:00,user_initiated,True
-conv_marco,15755556215,2025-01-12T19:00:00-07:00,2026-10-19T11:48:00-06:00,user_initiated,True
-conv_rosa,15755556208,2024-12-24T20:00:00-07:00,2026-10-18T20:14:00-06:00,user_initiated,False

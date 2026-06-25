@@ -1,0 +1,2 @@
+sid,phone_number,friendly_name,iso_country,sms_enabled,voice_enabled,mms_enabled,capabilities_fax,date_created
+PN_001,+15145550199,Consultation reminders,CA,True,False,False,False,2026-08-01T10:00:00-04:00
