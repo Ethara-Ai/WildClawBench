@@ -25,7 +25,9 @@ it emits the published bundle layout (like the amanda_webb_01 reference):
     <dest-root>/<bundle_name>/
         prompt.txt, rubric.json, data/ ...           (skeleton copied as-is)
         ground-truth.md                              (input golden_steer_flow.md,
-                                                       renamed, byte-identical)
+                                                       sliced to Focal Event +
+                                                       Canonical Solve Path +
+                                                       Value Lock sections)
         trajectories/<Pretty Model>/                 (e.g. "Claude Opus 4.7")
             pass_summary.json                         (REBUILT schema)
             run_N/
@@ -117,10 +119,90 @@ ARTIFACTS_INPUTS_SUBPATH = ("artifacts", "inputs", "files")
 
 # Grader "golden steer flow" re-sourced from the original input task dir and
 # published into the bundle root under a stable, consumer-facing name. Renamed
-# (not relocated) so downstream tooling can rely on "ground-truth.md"; contents
-# are copied byte-for-byte.
+# (not relocated) so downstream tooling can rely on "ground-truth.md". Contents
+# are NOT byte-copied: only three target sections are extracted (Focal Event,
+# Canonical Solve Path, Value Lock) so the published bundle does not leak the
+# full author-side flow doc. See extract_ground_truth_sections() below.
 GOLDEN_STEER_FILENAME = "golden_steer_flow.md"
 GROUND_TRUTH_FILENAME = "ground-truth.md"
+
+# Source-file lookup order for the slice. Upstream authoring tools have
+# emitted the same content under three different filenames over time, so we
+# accept any of them; first match wins. Order is the resolution priority:
+# GTFA.md (newest convention) -> golden_steer_flow.md (legacy) ->
+# ground-truth.md (already-sliced fallback). Note that ground-truth.md as
+# input is idempotent under extract_ground_truth_sections(): re-extracting
+# the three target sections from a file that already only contains them is a
+# no-op other than re-emitting them in canonical order.
+GROUND_TRUTH_SOURCE_CANDIDATES: tuple[str, ...] = (
+    "GTFA.md",
+    "golden_steer_flow.md",
+    "ground-truth.md",
+)
+
+# Heading aliases for the published ground-truth slice. Each tuple is a set of
+# case-insensitive substrings; a heading matches the section if its normalized
+# text contains ANY alias. Matching is on the heading TEXT only (decorations,
+# section-number prefixes, trailing words like "and Scope" are stripped first
+# in _normalize_heading_text). Order here is the order sections are emitted.
+GROUND_TRUTH_SECTION_ALIASES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("Focal Event", ("focal event",)),
+    ("Canonical Solve Path", ("canonical solve path",)),
+    # "Value Lock" covers titlecase, ALLCAPS, and underscore/hyphen variants
+    # because _normalize_heading_text() collapses [_\-\s]+ to single spaces and
+    # lowercases. So "VALUE_LOCK", "Value-Lock", "Value Lock" all hit.
+    ("Value Lock", ("value lock",)),
+)
+
+# Section-prefix patterns we strip from heading text before alias matching so
+# "Section 1: Focal Event and Scope" -> "focal event and scope" -> matches.
+# Each pattern is anchored to the start of the (already lowercased) heading.
+#
+# NOTE on strategy: prefix-stripping is DEFENSIVE, not load-bearing. Alias
+# matching is substring-based (`alias in normalized`), so even if a prefix
+# slips through ("Chapter II — Focal Event" -> "chapter ii focal event"),
+# the substring "focal event" still matches. The prefix regex exists to keep
+# normalized output tidy and to absorb common author conventions; widening
+# it never breaks correctness, only improves matched headings' cleanliness.
+#
+# Keywords covered (case-insensitive after lower()):
+#   section, sec, s, part, pt, chapter, ch, chap, step, phase, appendix
+# Numbering covered: ASCII digits 0-9 (with optional multi-level like 2.1),
+#   single ASCII letter (Appendix A), roman numerals i..mmmm (lowercased).
+# Separators between number and title: `:` `.` `-` `)` `]` em-dash `—`
+#   en-dash `–`, or whitespace alone.
+# Also covers identifier-style prefixes used by upstream authoring tools, e.g.
+# "GS-4 Title", "GS-4: Title", "WCB-12 - Title" (1-6 ASCII letters, optional
+# dash/space, digits, optional separator). These appear in real golden_steer
+# files as cross-reference IDs and must NOT survive into the slice key.
+_HEADING_PREFIX_RE = re.compile(
+    r"""^(?:
+        # keyword + (number|letter|roman) + optional separator
+        (?:section|sec\.?|s\.|part|pt\.?|chapter|chap\.?|ch\.?|step|phase|appendix)
+        \s*
+        (?:\d+(?:\.\d+)*|[ivxlcdm]+|[a-z])?      # number / multi-level / roman / letter
+        \s*
+        [:.\-)\]\u2013\u2014]?                   # separator (or none)
+        \s*
+        |
+        # identifier-style: 1-6 letters + optional dash/space + digits, e.g.
+        # "gs-4", "gs 4", "wcb-12". Trailing separator (":", "-", em/en dash,
+        # ".", ")", "]") optional.
+        [a-z]{1,6}[\s\-\u2013\u2014]?\d+(?:\.\d+)*\s*[:.\-)\]\u2013\u2014]?\s*
+        |
+        # bare numeric prefix: "1." "1)" "(1)" "[1]" "1-" "1:"
+        [(\[]?\s*\d+(?:\.\d+)*\s*[)\]]?\s*[:.\-)\u2013\u2014]?\s*
+    )""",
+    re.VERBOSE,
+)
+
+# ATX heading: 1-6 leading '#', optional space, capture text, optional trailing
+# '#'s. Allows up to 3 spaces of indentation per CommonMark.
+_ATX_HEADING_RE = re.compile(r"^[ ]{0,3}(#{1,6})\s*(.+?)\s*#*\s*$")
+
+# Setext underlines: '=' (h1) or '-' (h2), at least 1 char, possibly indented.
+_SETEXT_H1_RE = re.compile(r"^[ ]{0,3}=+\s*$")
+_SETEXT_H2_RE = re.compile(r"^[ ]{0,3}-+\s*$")
 
 # Harness-runtime files re-sourced from the harness's own `environment/` dir
 # into every published bundle's `data/environment/`. These power the runtime
@@ -200,6 +282,151 @@ def _write_json(path: Path, obj: Any) -> None:
 def _pretty_model(harness_dirname: str) -> str:
     key = harness_dirname.strip().lower()
     return MODEL_LABELS.get(key, harness_dirname)
+
+
+def _strip_inline_decoration(text: str) -> str:
+    """Strip leading/trailing **bold**, *italic*, __bold__, _italic_, backticks."""
+    prev = None
+    cur = text.strip()
+    while cur != prev:
+        prev = cur
+        for n in (3, 2, 1):
+            for ch in ("*", "_", "`"):
+                wrap = ch * n
+                if len(cur) >= 2 * n and cur.startswith(wrap) and cur.endswith(wrap):
+                    cur = cur[n:-n].strip()
+                    break
+    return cur
+
+
+def _normalize_heading_text(raw: str) -> str:
+    """Lower-case, strip decorations + section prefixes, collapse to alphanum+space.
+
+    The final collapse step replaces any run of NON-alphanumeric characters
+    with a single space. This is intentionally broad so the same alias hits
+    every plausible authoring style:
+      - separator variants: ``Value-Lock`` ``Value_Lock`` ``Value/Lock``
+        ``Value.Lock`` ``Value Lock`` ``Value\u2014Lock`` (em dash)
+        ``Value\u2013Lock`` (en dash) ``Value\u00a0Lock`` (NBSP)
+      - leftover decoration noise: ``**focal** event`` -> ``focal event``
+      - HTML/anchor trailers: ``focal event {#anchor}`` -> ``focal event anchor``
+      - emoji / pictographs: ``\U0001F7E2 focal event`` -> ``focal event``
+    Alias matching is substring-based on this normalized form, so canonical
+    aliases stay short and authors get tolerance "for free".
+    """
+    text = _strip_inline_decoration(raw).lower()
+    text = _HEADING_PREFIX_RE.sub("", text).strip()
+    # Collapse every non-alphanumeric run (Unicode dashes, slashes, periods,
+    # NBSP, emoji, residual punctuation, leftover decoration markers, etc.)
+    # to a single ASCII space. Keep digits in case future aliases use them.
+    text = re.sub(r"[^a-z0-9]+", " ", text)
+    return text.strip()
+
+
+def _iter_headings(lines: list[str]):
+    """Yield (line_index, level, normalized_text) for every heading in `lines`.
+
+    Handles ATX (`#`..`######`) and setext (text underlined with `===`/`---`).
+    Skips fenced code blocks so a `# comment` inside a ``` block is not parsed.
+    """
+    in_fence = False
+    fence_char = ""
+    i = 0
+    n = len(lines)
+    while i < n:
+        line = lines[i]
+        stripped = line.lstrip()
+        if stripped.startswith("```") or stripped.startswith("~~~"):
+            ch = stripped[0]
+            if not in_fence:
+                in_fence = True
+                fence_char = ch
+            elif ch == fence_char:
+                in_fence = False
+                fence_char = ""
+            i += 1
+            continue
+        if in_fence:
+            i += 1
+            continue
+        m = _ATX_HEADING_RE.match(line)
+        if m:
+            level = len(m.group(1))
+            yield i, level, _normalize_heading_text(m.group(2))
+            i += 1
+            continue
+        if i + 1 < n and line.strip():
+            nxt = lines[i + 1]
+            if _SETEXT_H1_RE.match(nxt):
+                yield i, 1, _normalize_heading_text(line)
+                i += 2
+                continue
+            if _SETEXT_H2_RE.match(nxt):
+                yield i, 2, _normalize_heading_text(line)
+                i += 2
+                continue
+        i += 1
+
+
+def _heading_matches(normalized: str, aliases: tuple[str, ...]) -> bool:
+    return any(alias in normalized for alias in aliases)
+
+
+def _heading_span_end(line_idx: int, level: int, lines: list[str]) -> int:
+    """Find the line AFTER the body of a heading whose underline/hash sits at line_idx.
+
+    Body ends at the next heading of equal-or-shallower level, or EOF. Thematic
+    breaks (`---`) inside the body are KEPT (they are decorative separators in
+    the source flow doc); the consumer can strip them if undesired.
+    """
+    headings = list(_iter_headings(lines))
+    for hi, hlevel, _ in headings:
+        if hi > line_idx and hlevel <= level:
+            return hi
+    return len(lines)
+
+
+def extract_ground_truth_sections(text: str) -> str:
+    """Return only the target sections (Focal Event / Canonical Solve Path /
+    Value Lock) from a `golden_steer_flow.md` body, in the order declared by
+    GROUND_TRUTH_SECTION_ALIASES. Each emitted section keeps its original
+    heading line and body verbatim. If a target section is missing the
+    function silently skips it. The output ends with a single trailing
+    newline; sections are separated by one blank line.
+    """
+    if not text:
+        return ""
+    lines = text.splitlines()
+    headings = list(_iter_headings(lines))
+
+    chunks: list[str] = []
+    seen_targets: set[str] = set()
+    for hi, level, norm in headings:
+        for canonical, aliases in GROUND_TRUTH_SECTION_ALIASES:
+            if canonical in seen_targets:
+                continue
+            if not _heading_matches(norm, aliases):
+                continue
+            end = _heading_span_end(hi, level, lines)
+            body_lines = lines[hi:end]
+            while body_lines and not body_lines[-1].strip():
+                body_lines.pop()
+            if body_lines:
+                chunks.append("\n".join(body_lines))
+            seen_targets.add(canonical)
+            break
+
+    ordered: list[str] = []
+    for canonical, _ in GROUND_TRUTH_SECTION_ALIASES:
+        for chunk in chunks:
+            first = chunk.splitlines()[0] if chunk else ""
+            if _heading_matches(_normalize_heading_text(first), (canonical.lower(),)):
+                ordered.append(chunk)
+                break
+
+    if not ordered:
+        return ""
+    return "\n\n".join(ordered) + "\n"
 
 
 def _method_of(test_name: str) -> str:
@@ -442,6 +669,21 @@ def _find_input_task_dir(input_root: Path, task_dir_name: str) -> Path | None:
     return None
 
 
+def _find_ground_truth_source(input_task_dir: Path) -> Path | None:
+    """First-match-wins resolution over GROUND_TRUTH_SOURCE_CANDIDATES.
+
+    Returns the path of the first candidate that exists as a regular file,
+    or None if none of them exist. Order in the tuple is the priority order:
+    GTFA.md (newest) -> golden_steer_flow.md (legacy) -> ground-truth.md
+    (already-sliced fallback). Symlinks resolve via is_file()'s follow.
+    """
+    for name in GROUND_TRUTH_SOURCE_CANDIDATES:
+        candidate = input_task_dir / name
+        if candidate.is_file():
+            return candidate
+    return None
+
+
 def stage_persona_and_artifacts(
     input_task_dir: Path, bundle: Path, verbose: bool
 ) -> tuple[int, int]:
@@ -534,13 +776,46 @@ def convert_task(
         if prompt_src.exists():
             bundle.mkdir(parents=True, exist_ok=True)
             shutil.copy2(prompt_src, bundle / "prompt.txt")
-        # Ground truth: publish golden_steer_flow.md as ground-truth.md, byte-exact.
-        steer_src = input_task_dir / GOLDEN_STEER_FILENAME
-        if steer_src.exists():
-            bundle.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(steer_src, bundle / GROUND_TRUTH_FILENAME)
-            if verbose:
-                print(f"    staged ground truth: {GOLDEN_STEER_FILENAME} -> {GROUND_TRUTH_FILENAME}")
+        # Ground truth: publish a SLICE of the source flow doc as ground-truth.md.
+        # Source is whichever of GROUND_TRUTH_SOURCE_CANDIDATES exists first.
+        # Only the Focal Event / Canonical Solve Path / Value Lock sections are
+        # extracted; the rest of the author-side flow doc is intentionally not
+        # leaked into the bundle. See extract_ground_truth_sections().
+        steer_src = _find_ground_truth_source(input_task_dir)
+        if steer_src is None:
+            print(
+                f"  ! {task_dir.name}: no ground-truth source file found in "
+                f"{input_task_dir} (looked for: "
+                f"{', '.join(GROUND_TRUTH_SOURCE_CANDIDATES)}); "
+                f"skipping {GROUND_TRUTH_FILENAME}",
+                file=sys.stderr,
+            )
+        else:
+            try:
+                steer_text = steer_src.read_text(encoding="utf-8")
+            except OSError as exc:
+                steer_text = ""
+                print(
+                    f"  ! {task_dir.name}: failed to read {steer_src.name} "
+                    f"({exc}); skipping {GROUND_TRUTH_FILENAME}",
+                    file=sys.stderr,
+                )
+            extracted = extract_ground_truth_sections(steer_text)
+            if extracted:
+                bundle.mkdir(parents=True, exist_ok=True)
+                (bundle / GROUND_TRUTH_FILENAME).write_text(extracted, encoding="utf-8")
+                if verbose:
+                    print(
+                        f"    staged ground truth: {steer_src.name} -> "
+                        f"{GROUND_TRUTH_FILENAME} (sliced)"
+                    )
+            elif steer_text:
+                print(
+                    f"  ! {task_dir.name}: {steer_src.name} present but "
+                    f"no target sections (Focal Event / Canonical Solve Path / "
+                    f"Value Lock) matched; skipping {GROUND_TRUTH_FILENAME}",
+                    file=sys.stderr,
+                )
         stage_persona_and_artifacts(input_task_dir, bundle, verbose)
     elif verbose:
         print(f"    (no input dir matched under {input_root}; prompt/persona/artifacts skipped)")
