@@ -693,20 +693,46 @@ def stage_persona_and_artifacts(
     if src_persona.is_dir():
         dest_persona = env_dir / "persona"
         dest_persona.mkdir(parents=True, exist_ok=True)
+        # Top-level persona files (SOUL.md, MEMORY.md, USER.md, AGENTS.md, ...)
+        # The persona/home/ subdir is intentionally skipped here -- it is
+        # the runtime input-artifact source and is handled below alongside
+        # <task>/data/ so the bundle mirrors what the agent actually saw.
         for item in src_persona.iterdir():
             if item.is_file() and item.name != ".DS_Store":
                 shutil.copy2(item, dest_persona / item.name)
                 n_persona += 1
 
+    # Artifact input files: mirror the runtime precedence in
+    # src/utils/task_parser.py:340-347 -- <task>/persona/home/ wins if it
+    # exists and contains at least one file (recursively); otherwise
+    # <task>/data/. Without this, tasks shipping inputs under persona/home/
+    # produce bundles whose artifacts/inputs/files/ is empty even though
+    # the agent received those files via docker_utils.inject_data_into_workspace.
     n_files = 0
-    src_files = input_task_dir / "data"
-    if src_files.is_dir():
+    persona_home = input_task_dir / "persona" / "home"
+    data_dir = input_task_dir / "data"
+    if persona_home.is_dir() and any(
+        p.is_file() for p in persona_home.rglob("*")
+    ):
+        src_files = persona_home
+    elif data_dir.is_dir():
+        src_files = data_dir
+    else:
+        src_files = None
+
+    if src_files is not None:
         dest_files = env_dir.joinpath(*ARTIFACTS_INPUTS_SUBPATH)
         dest_files.mkdir(parents=True, exist_ok=True)
-        for item in src_files.iterdir():
-            if item.is_file() and item.name != ".DS_Store":
-                shutil.copy2(item, dest_files / item.name)
-                n_files += 1
+        # rglob preserves nested layout (e.g. persona/home/sub/doc.txt ->
+        # artifacts/inputs/files/sub/doc.txt) so multi-level inputs round-trip.
+        for item in src_files.rglob("*"):
+            if not item.is_file() or item.name == ".DS_Store":
+                continue
+            rel = item.relative_to(src_files)
+            target = dest_files / rel
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(item, target)
+            n_files += 1
 
     n_harness_env = _stage_harness_env_files(env_dir, verbose)
 

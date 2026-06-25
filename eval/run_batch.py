@@ -65,8 +65,7 @@ from src.utils.litellm_sidecar import (
 )
 from src.utils.trajectory.builder import build_trajectory_from_jsonl
 from src.utils.trajectory.local_media import replace_inline_media_with_files
-from src.utils.store import Task as StoreTask, Store
-from src.utils.harbor.bundle import write_bundle
+from src.utils.store import Task as StoreTask
 
 load_dotenv()
 logging.basicConfig(
@@ -1005,25 +1004,50 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
             entry = dict(traj)
             entry["__test_result__"] = tr_meta
             entry["__run_index__"] = run_index
-            store_path = getattr(config, "state_db", None)
-            store = Store(Path(store_path)) if store_path else Store(Path(":memory:"))
-            manifest = write_bundle(
-                task=st,
-                out_dir=task_bundle_dir,
-                store=store,
-                config=config,
-                trajectories_by_model={model_type: [entry]},
-                attachments=task.get("attachments") or [],
-                task_dir=Path(td) if td else None,
+            # Route through script/repackage_to_bundle.py (stdlib-only, used by
+            # run.sh and deliver.sh). Harbor's in-process write_bundle dropped
+            # admin_plane.py/_mutable_store.py and sourced persona/artifacts
+            # from config.environment_dir instead of input/<task>/.
+            import subprocess
+            source_root = task_bundle_dir.parent
+            bundle_root = os.environ.get(
+                "KENSEI_BUNDLE_ROOT",
+                str(Path("output_bundle")),
             )
-            logger.info(
-                "[%s] Harbor bundle written: %s (required=%d, distractor=%d)",
-                task["task_id"], task_bundle_dir,
-                len(manifest.get("required_skills") or []),
-                len(manifest.get("distractor_skills") or []),
-            )
+            input_root = os.environ.get("KENSEI_INPUT_ROOT", "input")
+            repo_root = Path(__file__).resolve().parent.parent
+            script_path = repo_root / "script" / "repackage_to_bundle.py"
+            cmd = [
+                sys.executable,
+                str(script_path),
+                "--source-root", str(source_root),
+                "--dest-root", str(bundle_root),
+                "--input-root", str(input_root),
+                "--persona", task["task_id"],
+            ]
+            try:
+                completed = subprocess.run(
+                    cmd, cwd=str(repo_root),
+                    capture_output=True, text=True, check=False,
+                )
+                if completed.returncode == 0:
+                    logger.info(
+                        "[%s] Bundle written via repackage_to_bundle: %s/%s",
+                        task["task_id"], bundle_root, task["task_id"],
+                    )
+                else:
+                    logger.warning(
+                        "[%s] repackage_to_bundle.py exited %d\nstdout:\n%s\nstderr:\n%s",
+                        task["task_id"], completed.returncode,
+                        completed.stdout, completed.stderr,
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "[%s] repackage_to_bundle invocation failed: %s",
+                    task["task_id"], exc,
+                )
         except Exception as exc:
-            logger.warning("[%s] Harbor bundle write failed: %s", task["task_id"], exc)
+            logger.warning("[%s] Auto-bundle preparation failed: %s", task["task_id"], exc)
 
 
 def run_single_task(
