@@ -29,6 +29,11 @@ readonly DEFAULT_MODEL="claude-opus-4.7"
 readonly DEFAULT_K=1
 readonly LOG_DIR="logs"
 
+# Absolute path to THIS script so the parallel-task launcher can re-invoke it
+# per task — run.sh is the single entry point for everything.
+SELF="${WCB_SELF:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")}"  # WCB_SELF: test hook
+readonly SELF
+
 # Configurable knobs (overridable via long flags below; defaults preserve the
 # legacy invocation contract documented in (b10) — backend=openclaw, judge=on,
 # tests=on, thinking=xhigh).
@@ -40,6 +45,8 @@ USE_LITELLM=1            # 1 = --litellm, 0 = omit
 USE_MOCK_STACK=1         # 1 = --mock-stack, 0 = omit
 SKIP_PREFLIGHT=0         # 1 = skip docker/agent-image/mock-image/.env checks
 PARALLEL_REPS=0          # 1 = run all K reps of a (task,model) concurrently, 0 = sequential
+PARALLEL_TASKS=1         # >1 = run that many TASKS concurrently via the failure-isolated launcher
+INPUT_DIR=""             # --input-dir DIR: queue every task subdir under DIR
 AUTO_BUNDLE=1            # 1 = auto-repackage to output_bundle/ after each task, 0 = omit
 BUNDLE_ROOT="output_bundle"  # dest-root for the auto-bundler; overridable via KENSEI_BUNDLE_ROOT
 
@@ -53,6 +60,7 @@ USAGE
   bash script/run.sh [TASK] [MODEL[,MODEL2,...]] [K]          # positional
   bash script/run.sh --task TASK --model MODEL --reps K       # flag form
   bash script/run.sh --bulk TASKS_FILE [--model M] [--reps K] # bulk: tasks sequential, models parallel per task
+  bash script/run.sh --input-dir DIR -P N [--reps K]          # run every task under DIR, N in parallel (failure-isolated)
   bash script/run.sh --regrade RUN_DIR [--rubric PATH]        # re-judge existing run; overwrites score.json
 
 COMMON FLAGS
@@ -60,6 +68,8 @@ COMMON FLAGS
   -m, --model NAME          Model id; comma-separate for parallel models (e.g. claude-opus-4.7,claude-sonnet-4.5)
   -k, --reps N              Repetitions per (task,model); sequential. Alias: --k
   -B, --bulk FILE           Read task paths from FILE (one per line, # comments ok)
+      --input-dir DIR       Queue every task subdir under DIR
+  -P, --parallel-tasks N    Run N tasks CONCURRENTLY, each failure-isolated (one failing never stops the rest)
   -R, --regrade DIR         Re-run judge phase only against an existing run dir
       --rubric PATH         Override rubric for --regrade
   -h, --help                Show this help and exit
@@ -80,6 +90,9 @@ EXAMPLES
   # Bulk from a file (tasks sequential, models parallel):
   bash script/run.sh --bulk tasks.txt --model claude-opus-4.7 --reps 2
 
+  # Run EVERY task in a folder, 3 in parallel, 4 reps each (a failing task never stops the others):
+  bash script/run.sh --input-dir input_prafful --parallel-tasks 3 --reps 4
+
   # Regrade an existing run:
   bash script/run.sh --regrade output/openclaw/amanda_hayes_01/trajectories/claude-opus-4.7/run_1
 
@@ -96,10 +109,11 @@ ADVANCED
       --skip-preflight      Skip docker/image/.env checks (DANGEROUS; for re-entry only)
 
 NOTES
-  * Tasks always run SEQUENTIALLY. Models PARALLELIZE per task. K reps per
-    (task,model) run SEQUENTIALLY by default, or CONCURRENTLY with --parallel-reps.
-  * --parallel-reps spins up K docker/mock stacks per (task,model) at once; if you
-    also fan tasks out via `xargs -P N`, peak load is N×(models)×K stacks. Mind RAM.
+  * Tasks run SEQUENTIALLY by default; pass -P/--parallel-tasks N to run N tasks at
+    once — FAILURE-ISOLATED, so a single task failing (even a crash) never stops the
+    others. Models PARALLELIZE per task. K reps run SEQUENTIALLY unless --parallel-reps.
+  * Peak docker load ≈ (parallel-tasks) × (models) × (parallel-reps ? K : 1) stacks.
+    Mind RAM/CPU and Bedrock rate limits; lower -P if you hit ThrottlingException.
   * Per-run logs land in logs/<task>_<model>_run<i>_<TIMESTAMP>.log.
   * One automatic retry per run on docker-recoverable errors
     (No such image | manifest unknown | Container startup failed).
@@ -671,12 +685,32 @@ parse_args() {
             --no-bundle)          AUTO_BUNDLE=0; shift ;;
             --bundle-root)        BUNDLE_ROOT="$2"; shift 2 ;;
             --parallel-reps)      PARALLEL_REPS=1; shift ;;
+            -P|--parallel-tasks)
+                [[ -n "${2:-}" ]] || { log::err "$1 requires a value"; exit 2; }
+                PARALLEL_TASKS="$2"; shift 2 ;;
+            --input-dir)
+                [[ -n "${2:-}" ]] || { log::err "$1 requires a value"; exit 2; }
+                INPUT_DIR="$2"; shift 2 ;;
             --skip-preflight)     SKIP_PREFLIGHT=1; shift ;;
             --) shift; while (( $# > 0 )); do positional+=("$1"); shift; done ;;
             -*) log::err "Unknown flag: $1"; log::hint "Run 'bash script/run.sh --help' for usage"; exit 2 ;;
             *)  positional+=("$1"); shift ;;
         esac
     done
+
+    # --input-dir DIR: queue every immediate task subdir under DIR. Combined with
+    # -P/--parallel-tasks it fans them out concurrently; otherwise they run
+    # sequentially through the normal loop.
+    if [[ -n "$INPUT_DIR" ]]; then
+        if [[ ! -d "$INPUT_DIR" ]]; then
+            log::err "--input-dir not found: $INPUT_DIR"; exit 2
+        fi
+        local _d
+        while IFS= read -r _d; do
+            [[ -n "$_d" ]] && TASKS+=("$_d")
+        done < <(find "$INPUT_DIR" -mindepth 1 -maxdepth 1 -type d | sort)
+        (( ${#TASKS[@]} > 0 )) || { log::err "no task dirs under --input-dir $INPUT_DIR"; exit 2; }
+    fi
 
     # If --regrade, bypass bulk/single handling.
     if [[ "$MODE" == "regrade" ]]; then
@@ -712,6 +746,85 @@ parse_args() {
     (( ${#positional[@]} >= 3 )) && K="${positional[2]}"
 }
 
+# Launcher mode: run ${#TASKS[@]} tasks, PARALLEL_TASKS at a time, each FULLY
+# ISOLATED — a task failing/crashing (even exit 255 or a signal-kill) never stops
+# the others. Re-invokes THIS script per task with --skip-preflight (the launcher
+# already validated docker/images/.env once); concurrency-safe cleanup +
+# flock-serialized mock build make the concurrent worker runs race-free.
+run_parallel_tasks() {
+    local par="$PARALLEL_TASKS"
+    local status_dir
+    status_dir="$(mktemp -d "${TMPDIR:-/tmp}/wcb_partasks.XXXXXX")"
+
+    # Per-task worker flags reconstructed from the parsed globals so each run
+    # matches what the user asked for.
+    local -a wargs=(--model "$MODELS_ARG" --reps "$K" --backend "$BACKEND"
+                    --thinking "$THINKING" --skip-preflight)
+    (( USE_LITELLM == 0 ))    && wargs+=(--no-litellm)
+    (( USE_MOCK_STACK == 0 )) && wargs+=(--no-mock-stack)
+    (( USE_TESTS == 0 ))      && wargs+=(--no-tests)
+    (( JUDGE_COUNCIL == 0 ))  && wargs+=(--no-judge-council)
+    (( AUTO_BUNDLE == 0 ))    && wargs+=(--no-bundle)
+    (( PARALLEL_REPS == 1 ))  && wargs+=(--parallel-reps)
+
+    log::rule "Parallel launch: ${#TASKS[@]} task(s), ${par} at a time (failure-isolated)"
+
+    local -a pids=()
+    local t name
+    for t in "${TASKS[@]}"; do
+        name="$(basename "$t")"
+        # Subshell: run one task, record PASS/FAIL, and ALWAYS exit 0 so a single
+        # task's failure can never abort the launcher (no xargs-style 255/signal
+        # propagation). Per-task output goes to its own logs/ file via run.sh.
+        (
+            if bash "$SELF" --task "$t" "${wargs[@]}"; then
+                echo "PASS" > "$status_dir/$name"
+            else
+                echo "FAIL(rc=$?)" > "$status_dir/$name"
+            fi
+        ) &
+        pids+=("$!")
+        log::info "launched [${#pids[@]}/${#TASKS[@]}]: $name"
+        # Bound concurrency portably (no `wait -n`, which is bash 4.3+): when at
+        # capacity, block on the OLDEST job, then free its slot.
+        if (( ${#pids[@]} >= par )); then
+            wait "${pids[0]}" 2>/dev/null || true
+            pids=("${pids[@]:1}")
+        fi
+    done
+    wait  # drain the remaining workers
+
+    local pass=0 fail=0 s
+    for t in "${TASKS[@]}"; do
+        name="$(basename "$t")"; s="$status_dir/$name"
+        if [[ -f "$s" && "$(cat "$s")" == "PASS" ]]; then
+            pass=$(( pass + 1 ))
+        else
+            fail=$(( fail + 1 ))
+        fi
+    done
+    log::summary_box "Parallel run summary" \
+        "Tasks=${#TASKS[@]}" "Passed=$pass" "Failed=$fail" "Parallelism=$par"
+    if (( fail > 0 )); then
+        log::err "Failed/incomplete task(s) — see logs/ for each:"
+        for t in "${TASKS[@]}"; do
+            name="$(basename "$t")"; s="$status_dir/$name"
+            if [[ ! -f "$s" || "$(cat "$s")" != "PASS" ]]; then
+                log::err "  - ${name} $([[ -f "$s" ]] && cat "$s" || echo '(no status — worker killed)')"
+            fi
+        done
+    fi
+    rm -rf "$status_dir"
+
+    log::substep "Aggregating pass@K across all tasks"
+    if python3 script/aggregate_runs.py --backend "$BACKEND" >/dev/null 2>&1; then
+        log::ok "Aggregated → output/${BACKEND}_aggregate_summary.json"
+    else
+        log::warn "aggregate_runs.py failed; pass@K rollup unavailable"
+    fi
+    (( fail == 0 ))
+}
+
 main() {
     parse_args "$@"
 
@@ -730,6 +843,9 @@ main() {
     fi
     if ! [[ "$K" =~ ^[0-9]+$ ]] || (( K < 1 )); then
         log::err "--reps must be a positive integer, got: $K"; exit 2
+    fi
+    if ! [[ "$PARALLEL_TASKS" =~ ^[0-9]+$ ]] || (( PARALLEL_TASKS < 1 )); then
+        log::err "--parallel-tasks must be a positive integer, got: $PARALLEL_TASKS"; exit 2
     fi
 
     log::section "WildClawBench runner"
@@ -763,6 +879,14 @@ main() {
         cleanup_orphans
     else
         log::warn "Skipping preflight (--skip-preflight)"
+    fi
+
+    # Parallel-task launcher: fan THIS script out per task, failure-isolated.
+    # Each worker is a normal single-task run.sh (made concurrency-safe by the
+    # cleanup registry + flock-serialized mock-image build).
+    if (( PARALLEL_TASKS > 1 )) && (( ${#TASKS[@]} > 1 )); then
+        run_parallel_tasks
+        exit $?
     fi
 
     local total=$(( ${#TASKS[@]} * ${#models[@]} * K ))
