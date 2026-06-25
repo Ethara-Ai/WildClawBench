@@ -24,6 +24,8 @@ it emits the published bundle layout (like the amanda_webb_01 reference):
 
     <dest-root>/<bundle_name>/
         prompt.txt, rubric.json, data/ ...           (skeleton copied as-is)
+        ground-truth.md                              (input golden_steer_flow.md,
+                                                       renamed, byte-identical)
         trajectories/<Pretty Model>/                 (e.g. "Claude Opus 4.7")
             pass_summary.json                         (REBUILT schema)
             run_N/
@@ -112,6 +114,13 @@ ARTIFACTS_SCRATCH_DIRNAME = "_tmp"
 # we re-source them from the ORIGINAL task input dir (default root: "input").
 # Where staged inputs live inside the bundle's environment dir.
 ARTIFACTS_INPUTS_SUBPATH = ("artifacts", "inputs", "files")
+
+# Grader "golden steer flow" re-sourced from the original input task dir and
+# published into the bundle root under a stable, consumer-facing name. Renamed
+# (not relocated) so downstream tooling can rely on "ground-truth.md"; contents
+# are copied byte-for-byte.
+GOLDEN_STEER_FILENAME = "golden_steer_flow.md"
+GROUND_TRUTH_FILENAME = "ground-truth.md"
 
 # Harness-runtime files re-sourced from the harness's own `environment/` dir
 # into every published bundle's `data/environment/`. These power the runtime
@@ -525,6 +534,13 @@ def convert_task(
         if prompt_src.exists():
             bundle.mkdir(parents=True, exist_ok=True)
             shutil.copy2(prompt_src, bundle / "prompt.txt")
+        # Ground truth: publish golden_steer_flow.md as ground-truth.md, byte-exact.
+        steer_src = input_task_dir / GOLDEN_STEER_FILENAME
+        if steer_src.exists():
+            bundle.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(steer_src, bundle / GROUND_TRUTH_FILENAME)
+            if verbose:
+                print(f"    staged ground truth: {GOLDEN_STEER_FILENAME} -> {GROUND_TRUTH_FILENAME}")
         stage_persona_and_artifacts(input_task_dir, bundle, verbose)
     elif verbose:
         print(f"    (no input dir matched under {input_root}; prompt/persona/artifacts skipped)")
