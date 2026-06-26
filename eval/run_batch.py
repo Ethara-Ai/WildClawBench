@@ -66,6 +66,7 @@ from src.utils.litellm_sidecar import (
 from src.utils.trajectory.builder import build_trajectory_from_jsonl
 from src.utils.trajectory.local_media import replace_inline_media_with_files
 from src.utils.store import Task as StoreTask
+from src.utils.env_overlay_snapshot import stage_environment_with_overlays
 
 load_dotenv()
 logging.basicConfig(
@@ -1084,6 +1085,40 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
             # input collection the task was loaded from. KENSEI_INPUT_ROOT
             # remains as an override escape hatch; falls back to "input"
             # only when task_dir is unset (legacy/unparented tasks).
+
+            # Stage the post-overlay mock environment into
+            # output/<backend>/<task>/data/environment/<api>/** BEFORE the
+            # bundler runs. The bundler's copytree at
+            # script/repackage_to_bundle.py:783 then copies this whole
+            # data/ tree into output_bundle/<task>/data/, so both output/
+            # and output_bundle/ end up with identical api dirs.
+            # _overlay_manifest.json is intentionally written here and
+            # stripped by the bundler's ignore_patterns so it stays in
+            # output/ only (user contract m0150). See
+            # src/utils/env_overlay_snapshot.py for the merge semantics
+            # and why this matches the running container's view of
+            # /opt/mocks/<api>/ exactly.
+            env_baseline = config.environment_dir if config is not None else None
+            if env_baseline:
+                try:
+                    env_dest = task_bundle_dir / "data" / "environment"
+                    stage_environment_with_overlays(
+                        Path(env_baseline),
+                        task.get("mock_overlays") or {},
+                        env_dest,
+                        write_manifest=True,
+                    )
+                    logger.info(
+                        "[%s] Staged data/environment/ with %d overlay api(s)",
+                        task["task_id"],
+                        len(task.get("mock_overlays") or {}),
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "[%s] Env overlay staging failed: %s",
+                        task["task_id"], exc,
+                    )
+
             import subprocess
             source_root = task_bundle_dir.parent
             bundle_root = os.environ.get(

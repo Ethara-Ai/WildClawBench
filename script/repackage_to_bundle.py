@@ -791,6 +791,7 @@ def convert_task(
                 "sqlite_mcp_server.db",
                 "tracking_middleware.py",
                 "_meta.json",
+                "_overlay_manifest.json",
             ),
         )
 
