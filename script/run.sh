@@ -606,6 +606,17 @@ run_k_for_model_bg() {
 # Fail-soft: never propagates a non-zero exit (the eval already succeeded;
 # bundling is a downstream convenience). Skipped when AUTO_BUNDLE=0 or for
 # tasks that produced zero trajectories under output/<backend>/.
+#
+# Input-root resolution: a hardcoded `--input-root input` silently produces
+# trajectories-only bundles when run.sh's CWD does not contain an `input/`
+# subtree with the task — `repackage_to_bundle.py::_find_input_task_dir`
+# returns None on no match, which silently skips prompt/persona/ground-truth
+# staging (warning is gated on --verbose). Derive --input-root from the
+# actual on-disk task_path so this auto path converges with the
+# eval/run_batch.py b3 fix (`input_root = Path(task["task_dir"]).parent`),
+# honoring the script/AGENTS.md convergence invariant. KENSEI_INPUT_ROOT
+# remains as an override; falls back to "input" only when task_path is a
+# bare relative name (legacy positional CLI form).
 bundle_task() {
     local task_path="$1"
     (( AUTO_BUNDLE == 1 )) || return 0
@@ -615,19 +626,34 @@ bundle_task() {
     local source_root="output/${BACKEND}"
     local bundle_root="${KENSEI_BUNDLE_ROOT:-$BUNDLE_ROOT}"
 
+    # Resolve input-root from the on-disk task path. Fall back to
+    # KENSEI_INPUT_ROOT → "input" only when task_path is not a real
+    # directory (e.g. legacy positional form `bash script/run.sh alden-croft_MB`
+    # where the caller passed just the basename).
+    local input_root
+    if [[ -d "$task_path" ]]; then
+        input_root="$(cd "$(dirname "$task_path")" && pwd)"
+    else
+        input_root="${KENSEI_INPUT_ROOT:-input}"
+    fi
+
     if [[ ! -d "${source_root}/${task_name}/trajectories" ]]; then
         log::warn "bundle: no trajectories for ${task_name} under ${source_root}/ — skipping"
         return 0
     fi
 
-    log::substep "Bundling → ${bundle_root}/${task_name}"
+    log::substep "Bundling → ${bundle_root}/${task_name} (input_root=${input_root})"
     mkdir -p "$bundle_root"
     local bundle_log="${LOG_DIR}/bundle_${task_name}_$(date +%Y%m%d_%H%M%S).log"
+    # --verbose so silent skips (no input match, missing ground-truth source,
+    # missing harness env files) surface in $bundle_log instead of vanishing
+    # into a clean exit 0 with empty stderr.
     if python3 script/repackage_to_bundle.py \
             --source-root "$source_root" \
             --dest-root   "$bundle_root" \
-            --input-root  "input" \
+            --input-root  "$input_root" \
             --persona     "$task_name" \
+            --verbose \
             > "$bundle_log" 2>&1; then
         log::ok "Bundled ${task_name} → ${bundle_root}/${task_name} (log: ${bundle_log})"
     else

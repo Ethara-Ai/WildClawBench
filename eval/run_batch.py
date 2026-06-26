@@ -1008,22 +1008,44 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
             # run.sh and deliver.sh). Harbor's in-process write_bundle dropped
             # admin_plane.py/_mutable_store.py and sourced persona/artifacts
             # from config.environment_dir instead of input/<task>/.
+            #
+            # Input-root resolution: tasks may live under different input
+            # collections (input/, input_v2/, input_internal/, ...). The
+            # loaded task spec carries the absolute path it was loaded from
+            # as task["task_dir"] (src/utils/task_parser.py:390). Use its
+            # parent as --input-root and its basename as --persona so we
+            # always match the on-disk dirname exactly, regardless of which
+            # input collection the task was loaded from. KENSEI_INPUT_ROOT
+            # remains as an override escape hatch; falls back to "input"
+            # only when task_dir is unset (legacy/unparented tasks).
             import subprocess
             source_root = task_bundle_dir.parent
             bundle_root = os.environ.get(
                 "KENSEI_BUNDLE_ROOT",
                 str(Path("output_bundle")),
             )
-            input_root = os.environ.get("KENSEI_INPUT_ROOT", "input")
             repo_root = Path(__file__).resolve().parent.parent
             script_path = repo_root / "script" / "repackage_to_bundle.py"
+
+            td = task.get("task_dir") or ""
+            if td and Path(td).is_dir():
+                input_root = str(Path(td).parent)
+                persona_arg = Path(td).name
+            else:
+                input_root = os.environ.get("KENSEI_INPUT_ROOT", "input")
+                persona_arg = task["task_id"]
+
             cmd = [
                 sys.executable,
                 str(script_path),
                 "--source-root", str(source_root),
                 "--dest-root", str(bundle_root),
                 "--input-root", str(input_root),
-                "--persona", task["task_id"],
+                "--persona", persona_arg,
+                # Verbose so silent skips (no input match, missing
+                # ground-truth source, missing harness env files) surface
+                # in run logs instead of disappearing into capture_output.
+                "--verbose",
             ]
             try:
                 completed = subprocess.run(
@@ -1032,9 +1054,21 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
                 )
                 if completed.returncode == 0:
                     logger.info(
-                        "[%s] Bundle written via repackage_to_bundle: %s/%s",
+                        "[%s] Bundle written via repackage_to_bundle: %s/%s "
+                        "(input_root=%s persona=%s)",
                         task["task_id"], bundle_root, task["task_id"],
+                        input_root, persona_arg,
                     )
+                    # Surface stderr even on success: the bundler emits
+                    # warnings for "no input dir matched", missing
+                    # ground-truth source, and missing harness env files
+                    # without bumping the exit code. Without this, those
+                    # warnings would be swallowed by capture_output.
+                    if completed.stderr.strip():
+                        logger.warning(
+                            "[%s] repackage_to_bundle stderr:\n%s",
+                            task["task_id"], completed.stderr,
+                        )
                 else:
                     logger.warning(
                         "[%s] repackage_to_bundle.py exited %d\nstdout:\n%s\nstderr:\n%s",
