@@ -1766,6 +1766,9 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list):
         aws_region=config.bedrock_region,
         openai_api_key=config.openai_api_key,
         openai_whisper_api_key=config.openai_whisper_api_key,
+        meta_api_key=config.meta_api_key,
+        meta_base_url=config.meta_base_url,
+        meta_model=config.meta_model,
         enable_usage_callback=True,
         enable_headroom_callback=_agent_headroom,
     )
@@ -1822,6 +1825,7 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list):
         aws_region=config.bedrock_region,
         openai_api_key=config.openai_api_key,
         openai_whisper_api_key=config.openai_whisper_api_key,
+        meta_api_key=config.meta_api_key,
         usage_callback_host_path=str(callback_src),
         usage_log_host_dir=str(usage_dir),
         headroom_callback_host_path=headroom_callback_src,
@@ -1838,6 +1842,7 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list):
     probe_model = (
         "claude-opus-4.7" if config.aws_bearer_token and config.bedrock_inference_arn
         else "gpt-5.5" if config.openai_api_key
+        else config.meta_model if (config.meta_api_key and config.meta_model)
         else ""
     )
     if probe_model:
@@ -2183,10 +2188,26 @@ def main() -> None:
                 image_model=args.openclaw_image_model,
             )
 
-    # In LiteLLM mode the model must be a sidecar model id (claude-opus-4.7 / gpt-5.5).
+    # In LiteLLM mode the model must be a sidecar model id (claude-opus-4.7 /
+    # gpt-5.5 / the configured Meta vendor model). The Meta id is dynamic
+    # (config.meta_model), so it's checked alongside the static set.
+    sidecar_model_ids = set(LITELLM_MODEL_IDS)
+    if config.meta_api_key and config.meta_model:
+        sidecar_model_ids.add(config.meta_model)
     effective_model = args.model
-    if use_litellm and args.model not in LITELLM_MODEL_IDS and not args.model.startswith("litellm/"):
-        effective_model = os.environ.get("LITELLM_DEFAULT_MODEL", "claude-opus-4.7")
+    if use_litellm and args.model not in sidecar_model_ids and not args.model.startswith("litellm/"):
+        # Pick a default that is actually REGISTERED in the sidecar. The historic
+        # default is claude-opus-4.7, but on a Meta-only (no Bedrock/OpenAI) run
+        # that id isn't in the model_list, so fall back to the configured Meta id.
+        if config.aws_bearer_token and config.bedrock_inference_arn:
+            _fallback = "claude-opus-4.7"
+        elif config.openai_api_key:
+            _fallback = "gpt-5.5"
+        elif config.meta_api_key and config.meta_model:
+            _fallback = config.meta_model
+        else:
+            _fallback = "claude-opus-4.7"
+        effective_model = os.environ.get("LITELLM_DEFAULT_MODEL", _fallback)
         logger.info("LiteLLM mode: '%s' is not a sidecar model id; using '%s'", args.model, effective_model)
 
     # Per-task mock isolation is available only when the shared litellm/mock

@@ -389,9 +389,11 @@ def execute_tests(
 ) -> Dict[str, Any]:
     """Run `test_code` against the live mock stack. Returns a test_result dict.
 
-    `workspace_dir` is mounted read-only at /workspace inside the runner so
-    `file_exists("path/file")` and `read_file("path/file")` resolve relative to
-    the agent's produced artifacts. `mock_env_dict` carries <SVC>_URL env vars
+    `workspace_dir` is mounted read-only at BOTH /tmp_workspace (the cwd) and
+    /workspace, with WORKSPACE=/tmp_workspace exported, so the generated
+    `test_outputs.py` (which reads `WORKSPACE`, default "/workspace") and any
+    relative-path / hardcoded-/workspace readers all resolve against the agent's
+    produced artifacts. `mock_env_dict` carries <SVC>_URL env vars
     pointing at the running mock-stack container hostnames; `network` is the
     docker network those containers live on.
 
@@ -434,7 +436,18 @@ def execute_tests(
             "docker", "run", "--rm",
             "-v", f"{tmp}:/tests:ro",
             "-v", f"{ws_mount}:/tmp_workspace:ro",
+            # Generated test_outputs.py resolves deliverables via
+            # WORKSPACE = os.environ.get("WORKSPACE", "/workspace") + _file_content().
+            # The agent's workspace is mounted at /tmp_workspace, so without these
+            # two lines every absolute-path read landed on the empty default
+            # /workspace and ALL content assertions failed "<file> not found"
+            # even when the file existed (ROSE_002 glassy_lagoon: 0/42, files
+            # present in workspace_full/). Expose the SAME workspace at /workspace
+            # too (honors the default + the docstring) and pin WORKSPACE to the
+            # real mount so both relative- and absolute-path readers resolve.
+            "-v", f"{ws_mount}:/workspace:ro",
             "-w", "/tmp_workspace",
+            "-e", "WORKSPACE=/tmp_workspace",
         ]
         if network:
             cmd += ["--network", network]

@@ -520,13 +520,19 @@ class OpenClawAgent(BaseAgent):
                     ],
                 }
             else:
+                # The provider's `models[].id` MUST equal openclaw_model_id (the
+                # primary is litellm/<openclaw_model_id>); a hardcoded id only
+                # worked while gpt-5.5 was the sole non-anthropic route. For any
+                # other OpenAI-compatible sidecar model (e.g. the Meta vendor
+                # model) a mismatched id would leave openclaw unable to resolve
+                # the selected model.
                 litellm_provider = {
                     "baseUrl": base_url_v1,
                     "apiKey": self.litellm_master_key or "sk-litellm",
                     "auth": "api-key",
                     "api": "openai-completions",
                     "models": [
-                        {"id": "gpt-5.5", "name": "gpt-5.5",
+                        {"id": openclaw_model_id, "name": openclaw_model_id,
                          "input": ["text", "image"], "reasoning": True,
                          "contextWindow": 1050000, "maxTokens": 128000},
                     ],

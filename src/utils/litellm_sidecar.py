@@ -21,6 +21,9 @@ def build_litellm_config_yaml(
     enable_usage_callback: bool = False,
     enable_headroom_callback: bool = False,
     openai_whisper_api_key: str = "",
+    meta_api_key: str = "",
+    meta_base_url: str = "https://api.ai.meta.com/v1",
+    meta_model: str = "",
 ) -> str:
     model_blocks: list[str] = []
     # `cache_control_injection_points` MUST live inside each model's
@@ -173,6 +176,33 @@ def build_litellm_config_yaml(
                 "      model: openai/whisper-1\n"
                 "      api_key: os.environ/OPENAI_WHISPER_API_KEY"
             )
+    if meta_api_key and meta_model:
+        # Meta vendor model (internal Llama API) exposed through the sidecar as
+        # an OpenAI-compatible upstream. LiteLLM reaches it via the `openai/`
+        # provider prefix + an explicit api_base, the same OpenAI-compatible
+        # bridge used for any non-OpenAI /v1/chat/completions relay.
+        #
+        # PARAMETER POLICY (vendor onboarding guide, non-negotiable): keep ALL
+        # inference params at their DEFAULTS for this relay — do NOT set
+        # reasoning_effort, temperature, top_p, top_k, max_tokens, or
+        # response_format here. The relay also documents hard gaps: no
+        # structured output, no parallel tool calling, no function tool-call
+        # streaming. The global `litellm_settings.drop_params: true` (set below)
+        # is what makes this safe end-to-end: any of those params an upstream
+        # caller (openclaw, judge, testgen) emits are silently dropped before
+        # the request reaches api.ai.meta.com instead of 400-ing the relay.
+        # Intentionally NO `stream_options.include_usage` and NO input/output
+        # cost overrides — both are non-default request shaping the guide tells
+        # us not to add; usage is still recorded post-call by the LiteLLM usage
+        # callback from the response body. The harness-facing model id IS
+        # `meta_model`, so `--model <meta_model>` routes straight here.
+        model_blocks.append(
+            f"  - model_name: {meta_model}\n"
+            "    litellm_params:\n"
+            f"      model: openai/{meta_model}\n"
+            f"      api_base: {meta_base_url}\n"
+            "      api_key: os.environ/META_API_KEY"
+        )
     # OpenClaw's image tool falls back to built-in default model ids when its
     # own imageModel override isn't applied inside the container. The openclaw
     # 2026.3.11 dist (verified via grep of /usr/lib/node_modules/openclaw/dist)
@@ -196,6 +226,15 @@ def build_litellm_config_yaml(
             f"      model: bedrock/converse/{bedrock_arn}\n"
             f"      aws_region_name: {aws_region or 'ap-south-1'}\n"
             + cache_marker.rstrip("\n")
+        )
+    elif meta_api_key and meta_model:
+        # Meta-only run: route openclaw's built-in image fallback ids to the
+        # vendor model (Llama is multimodal). Same default-params policy — only
+        # routing fields, no inference param overrides.
+        image_alias = (
+            f"      model: openai/{meta_model}\n"
+            f"      api_base: {meta_base_url}\n"
+            "      api_key: os.environ/META_API_KEY"
         )
     else:
         image_alias = ""
@@ -387,6 +426,7 @@ def start_litellm(
     headroom_log_host_dir: str = "",
     enable_headroom: bool = False,
     openai_whisper_api_key: str = "",
+    meta_api_key: str = "",
 ) -> None:
     env_args: list[str] = ["-e", f"LITELLM_MASTER_KEY={master_key}"]
     _litellm_log = os.environ.get("LITELLM_LOG", "").strip()
@@ -404,6 +444,10 @@ def start_litellm(
     _whisper_key = openai_whisper_api_key or openai_api_key
     if _whisper_key:
         env_args += ["-e", f"OPENAI_WHISPER_API_KEY={_whisper_key}"]
+    # Meta vendor key: read by the `meta-vendor` model block via
+    # `api_key: os.environ/META_API_KEY`.
+    if meta_api_key:
+        env_args += ["-e", f"META_API_KEY={meta_api_key}"]
 
     # Mount the callback module + writable log dir so UsageWriter can write
     # real provider-side usage rows from inside the sidecar. The env var name
