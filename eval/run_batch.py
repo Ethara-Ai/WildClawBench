@@ -564,8 +564,102 @@ def _locked(lock_path: Path):
             fcntl.flock(fh, fcntl.LOCK_UN)
 
 
-def _write_pass_summary(model_dir: Path, model_type: str, run_index: int, reward,
-                        scores: dict | None = None) -> None:
+def _finite_float(v):
+    """Return v as a float iff it is a finite real number, else None."""
+    if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(float(v)):
+        return float(v)
+    return None
+
+
+def _mean_or_none(vals):
+    nums = [v for v in vals if v is not None]
+    return (sum(nums) / len(nums)) if nums else None
+
+
+def _pass_summary_entry(run_index: int, scores: dict | None, test_result: dict | None) -> dict:
+    """Build one per_run record carrying BOTH scoring channels.
+
+    Channel B (rubric): criteria_* + rubric_reward, from score.json.
+    Channel A (pytest): tests_* + test_reward, from the real test_result/ctrf —
+        NOT aliased to criteria_* anymore.
+    combined_reward mirrors _augment_score_with_combined_rewards; `reward` is the
+    authoritative run reward (combined when tests ran, else rubric).
+    """
+    s = scores or {}
+    tr = test_result or {}
+    # --- Channel B: rubric (canonical criteria_*, legacy tests_* fallback) ---
+    crit_total = int(s.get("criteria_total", s.get("tests_total", 0)) or 0)
+    crit_passed = int(s.get("criteria_passed", s.get("tests_passed", 0)) or 0)
+    crit_failed = int(s.get("criteria_failed", s.get("tests_failed", 0)) or 0)
+    rubric_reward = _finite_float(s.get("rubric_based_reward"))
+    if rubric_reward is None:
+        rubric_reward = _finite_float(s.get("overall_score"))
+    rubric_pct = _finite_float(s.get("rubric_weights_percentage"))
+    if rubric_pct is None and rubric_reward is not None:
+        rubric_pct = rubric_reward * 100.0
+    # --- Channel A: real pytest counts ---
+    t_total = int(tr.get("tests_total", 0) or 0)
+    t_passed = int(tr.get("tests_passed", 0) or 0)
+    t_failed = int(tr.get("tests_failed", 0) or 0)
+    t_err = int(tr.get("tests_errored", 0) or 0)
+    t_skip = int(tr.get("tests_skipped", 0) or 0)
+    test_reward = _finite_float(s.get("test_based_reward"))
+    if test_reward is None and t_total > 0:
+        test_reward = _finite_float(tr.get("reward"))
+    # --- combined ---
+    combined = _finite_float(s.get("combined_reward"))
+    if combined is None:
+        if test_reward is not None and rubric_reward is not None:
+            combined = (test_reward + rubric_reward) / 2.0
+        elif test_reward is not None:
+            combined = test_reward
+        else:
+            combined = rubric_reward
+    authoritative = combined if combined is not None else (rubric_reward or 0.0)
+    return {
+        "run_index": run_index,
+        # Channel B — rubric judge
+        "criteria_total": crit_total,
+        "criteria_passed": crit_passed,
+        "criteria_failed": crit_failed,
+        "rubric_reward": rubric_reward,
+        "rubric_weights_percentage": round(rubric_pct, 2) if rubric_pct is not None else None,
+        # Channel A — real pytest
+        "tests_total": t_total,
+        "tests_passed": t_passed,
+        "tests_failed": t_failed,
+        "tests_errored": t_err,
+        "tests_skipped": t_skip,
+        "test_reward": test_reward,
+        # authoritative run reward = combined (falls back to rubric when no tests)
+        "combined_reward": combined,
+        "reward": authoritative,
+    }
+
+
+def _pass_summary_doc(model_type: str, per_run: list) -> dict:
+    per_run = sorted(per_run, key=lambda r: r["run_index"])
+    avg_reward = _mean_or_none([r.get("reward") for r in per_run]) or 0.0
+    avg_combined = _mean_or_none([r.get("combined_reward") for r in per_run])
+    avg_rubric = _mean_or_none([r.get("rubric_reward") for r in per_run])
+    avg_test = _mean_or_none([r.get("test_reward") for r in per_run])
+    avg_pct = _mean_or_none([r.get("rubric_weights_percentage") for r in per_run])
+    return {
+        "model": model_type,
+        "runs": len(per_run),
+        # average_reward is now the authoritative (combined) mean, not rubric-only
+        "average_reward": avg_reward,
+        "average_combined_reward": avg_combined,
+        "average_rubric_reward": avg_rubric,
+        "average_test_reward": avg_test,
+        "average_rubric_weights_percentage": round(avg_pct, 2) if avg_pct is not None else None,
+        "per_run": per_run,
+    }
+
+
+def _write_pass_summary(model_dir: Path, model_type: str, run_index: int,
+                        scores: dict | None = None,
+                        test_result: dict | None = None) -> None:
   with _locked(model_dir / ".pass_summary.lock"):
     p = model_dir / "pass_summary.json"
     existing = {}
@@ -575,37 +669,9 @@ def _write_pass_summary(model_dir: Path, model_type: str, run_index: int, reward
         except json.JSONDecodeError:
             existing = {}
     per_run = [r for r in existing.get("per_run", []) if r.get("run_index") != run_index]
-    s = scores or {}
-    # Source of truth is the rubric grader: criteria_* (canonical) with tests_*
-    # fallback for legacy score.json files. reward is overall_score (0..1);
-    # rubric_weights_percentage = reward * 100 (user formula m1420 line 2).
-    crit_total = int(s.get("criteria_total", s.get("tests_total", 0)) or 0)
-    crit_passed = int(s.get("criteria_passed", s.get("tests_passed", 0)) or 0)
-    crit_failed = int(s.get("criteria_failed", s.get("tests_failed", 0)) or 0)
-    reward_f = float(reward) if isinstance(reward, (int, float)) else 0.0
-    pct = float(s.get("rubric_weights_percentage", reward_f * 100.0) or 0.0)
-    per_run.append({
-        "run_index": run_index,
-        "criteria_total": crit_total,
-        "criteria_passed": crit_passed,
-        "criteria_failed": crit_failed,
-        "tests_total": crit_total,
-        "tests_passed": crit_passed,
-        "tests_failed": crit_failed,
-        "reward": reward_f,
-        "rubric_weights_percentage": round(pct, 2),
-    })
-    per_run.sort(key=lambda r: r["run_index"])
-    rewards = [r["reward"] for r in per_run]
-    pcts = [r.get("rubric_weights_percentage", r["reward"] * 100.0) for r in per_run]
-    avg_reward = (sum(rewards) / len(rewards)) if rewards else 0.0
-    avg_pct = (sum(pcts) / len(pcts)) if pcts else 0.0
-    p.write_text(json.dumps({
-        "model": model_type, "runs": len(per_run),
-        "average_reward": avg_reward,
-        "average_rubric_weights_percentage": round(avg_pct, 2),
-        "per_run": per_run,
-    }, indent=2), encoding="utf-8")
+    per_run.append(_pass_summary_entry(run_index, scores, test_result))
+    p.write_text(json.dumps(_pass_summary_doc(model_type, per_run), indent=2),
+                 encoding="utf-8")
 
 
 def _condense_transcript_for_judge(traj: dict, limit: int | None = None) -> str:
@@ -956,9 +1022,9 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
             except OSError:
                 pass
 
-    reward = (result.get("scores") or {}).get("overall_score")
     _write_pass_summary(task_bundle_dir / "trajectories" / model_type, model_type,
-                        run_index, reward, scores=result.get("scores") or {})
+                        run_index, scores=result.get("scores") or {},
+                        test_result=result.get("test_result") or {})
 
     # Copy the bundle inputs to the task root (kensei out/<task_id>/ layout).
     import shutil
