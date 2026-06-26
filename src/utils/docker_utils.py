@@ -768,9 +768,16 @@ def configure_native_subagents(
     spawn_subagent.py skill), this uses the binary's built-in
     ``sessions_spawn`` / ``sessions_yield`` tools.
 
-    Two config writes are required for native spawning to actually work:
+    Config writes required for native spawning to actually work:
 
     1. ``agents.defaults.subagents.maxConcurrent`` (default 8) — fan-out width.
+
+    1b. ``agents.defaults.subagents.maxChildrenPerAgent`` (set to 20) — the
+       per-session active-children gate. OpenClaw's dist default is 5; left
+       unset, wide fan-out is rejected mid-turn with ``forbidden: ... reached
+       max active children for this session (N/5)``. 20 is the schema MAXIMUM
+       (the validator rejects > 20 and aborts startup), so this raises the cap
+       as far as openclaw allows.
 
     2. ``tools.alsoAllow`` listing the session tools. This is the critical one:
        the agent image ships ``tools.profile = "coding"`` (from
@@ -796,6 +803,17 @@ def configure_native_subagents(
     """
     cfg = multi_agent_config or {}
     max_concurrent = int(cfg.get("max_concurrent", 8))
+    # Per-session active-children gate. OpenClaw enforces a SEPARATE limit from
+    # maxConcurrent: `agents.defaults.subagents.maxChildrenPerAgent` (dist
+    # default 5). When a session already has that many live children, further
+    # sessions_spawn calls are rejected with `status: "forbidden" ... reached
+    # max active children for this session (N/5)` — observed throttling fan-out
+    # to 5 and forcing serial retries (Gabriela_Scott_01 run_1, 6/14 spawns
+    # forbidden, 2026-06-26). We raise it to the SCHEMA MAXIMUM of 20 (the
+    # openclaw config validator rejects anything > 20: "Too big: expected
+    # number to be <=20", which aborts gateway/agent startup — Kevin_Harper_01
+    # run_2, 2026-06-26). maxConcurrent still governs how many run at once.
+    max_children = min(20, int(cfg.get("max_children", 20)))
     # Session tools the `coding` profile allowlist omits; granted additively so
     # the native sessions_spawn path is actually callable by the agent. NOTE:
     # this openclaw build registers sessions_spawn / sessions_list /
@@ -813,6 +831,9 @@ def configure_native_subagents(
         "d = json.loads(p.read_text()) if p.exists() else {}\n"
         "defaults = d.setdefault('agents', {}).setdefault('defaults', {})\n"
         f"defaults.setdefault('subagents', {{}})['maxConcurrent'] = {max_concurrent}\n"
+        # Lift the per-session active-children gate (dist default 5) so wide
+        # fan-out is not rejected with `forbidden: max active children`.
+        f"defaults.setdefault('subagents', {{}})['maxChildrenPerAgent'] = {max_children}\n"
         # Additively allow the native session tools on top of the `coding`
         # profile (profile + alsoAllow is the supported combination).
         "tools = d.setdefault('tools', {})\n"
