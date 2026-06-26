@@ -2117,23 +2117,55 @@ def _run_dispatch(args, backend, config: Config, mock_env_dict: dict, effective_
         task["__use_judge_council__"] = use_judge_council
         task["__force_testgen__"] = bool(getattr(args, "force_testgen", False))
         logger.info("Single task mode: %s (format=%s)", task["task_id"], task.get("format", "md"))
-        result = run_single_task(
-            task,
-            effective_model,
-            backend=backend,
-            output_root=output_root,
-            lobster=lobster,
-            models_config=models_config,
-            thinking=args.thinking,
-            config=config,
-            mock_env_dict=mock_env_dict,
-            network=network,
-            enable_mock_stack=enable_mock_stack,
-            generate_tests=gen_tests,
-            testgen_max_attempts=testgen_max_attempts,
-            execute_tests=exec_tests,
-            testexec_timeout=testexec_timeout,
-        )
+        # ISOLATION INVARIANT (b6/m0192): one task or rep failure must NEVER
+        # cascade to other reps or other -P parallel tasks. The legacy code
+        # called run_single_task() unguarded, so a RuntimeError from
+        # _start_task_mock_stack (overlay CSV malformed, mock container
+        # unhealthy, etc.) propagated as an unhandled exception, killing the
+        # whole python process for this rep BEFORE `result` was even
+        # constructed. From script/run.sh's POV the rep just exits with a
+        # traceback; with PARALLEL_REPS=1 + -P 5 the failure window can
+        # straddle other reps' setup phases. The category-mode threadpool
+        # path at lines ~2197-2226 already wraps future.result() in
+        # try/except and produces a soft {"task_id": tid, "scores": {},
+        # "error": str(exc)} record — mirror that contract here so the
+        # --task entry point converges on the same fail-soft semantics.
+        # script/AGENTS.md invariant: run.sh and `python3 eval/run_batch.py`
+        # must converge on identical artifacts for the same args; that
+        # includes failure-mode artifacts (non-zero exit + structured error
+        # log) not raw tracebacks.
+        try:
+            result = run_single_task(
+                task,
+                effective_model,
+                backend=backend,
+                output_root=output_root,
+                lobster=lobster,
+                models_config=models_config,
+                thinking=args.thinking,
+                config=config,
+                mock_env_dict=mock_env_dict,
+                network=network,
+                enable_mock_stack=enable_mock_stack,
+                generate_tests=gen_tests,
+                testgen_max_attempts=testgen_max_attempts,
+                execute_tests=exec_tests,
+                testexec_timeout=testexec_timeout,
+            )
+        except Exception as exc:
+            # Mirror the category-mode soft-failure shape so callers
+            # (script/run.sh::run_one_rep, deliver.sh) see a clean rc=1
+            # instead of a raw traceback. This is the only place the
+            # --task entry path can leak unhandled exceptions.
+            logger.error(
+                "[%s] run_single_task raised (isolating rep): %s",
+                task.get("task_id", "<unknown>"), exc, exc_info=True,
+            )
+            result = {
+                "task_id": task.get("task_id", "<unknown>"),
+                "scores": {},
+                "error": str(exc),
+            }
         if result.get("error") or (result.get("scores") or {}).get("error"):
             sys.exit(1)
         return
@@ -2175,25 +2207,33 @@ def _run_dispatch(args, backend, config: Config, mock_env_dict: dict, effective_
         results: list[dict] = []
         if args.parallel <= 1:
             for task in tasks:
-                results.append(
-                    run_single_task(
-                        task,
-                        effective_model,
-                        backend=backend,
-                        output_root=output_root,
-                        lobster=lobster,
-                        models_config=models_config,
-                        thinking=args.thinking,
-                        config=config,
-                        mock_env_dict=mock_env_dict,
-                        network=network,
-                        enable_mock_stack=enable_mock_stack,
-                        generate_tests=gen_tests,
-                        testgen_max_attempts=testgen_max_attempts,
-                        execute_tests=exec_tests,
-                        testexec_timeout=testexec_timeout,
+                tid = task.get("task_id", "<unknown>")
+                try:
+                    results.append(
+                        run_single_task(
+                            task,
+                            effective_model,
+                            backend=backend,
+                            output_root=output_root,
+                            lobster=lobster,
+                            models_config=models_config,
+                            thinking=args.thinking,
+                            config=config,
+                            mock_env_dict=mock_env_dict,
+                            network=network,
+                            enable_mock_stack=enable_mock_stack,
+                            generate_tests=gen_tests,
+                            testgen_max_attempts=testgen_max_attempts,
+                            execute_tests=exec_tests,
+                            testexec_timeout=testexec_timeout,
+                        )
                     )
-                )
+                except Exception as exc:
+                    logger.error(
+                        "[%s] run_single_task raised (isolating task, continuing loop): %s",
+                        tid, exc, exc_info=True,
+                    )
+                    results.append({"task_id": tid, "scores": {}, "error": str(exc)})
         else:
             with ThreadPoolExecutor(max_workers=args.parallel) as pool:
                 futures = {
