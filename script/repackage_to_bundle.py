@@ -219,6 +219,187 @@ HARNESS_ROOT = Path(__file__).resolve().parent.parent
 HARNESS_ENV_DIR = HARNESS_ROOT / "environment"
 
 
+# ----------------------------------------------------------------------------
+# Test runners + solver scaffolding (data/tests/, data/solution/)
+# ----------------------------------------------------------------------------
+# These four files are part of the published bundle contract and were emitted
+# by the legacy Harbor path (src/utils/harbor/bundle.py + solve_sh.py + test_sh.py).
+# After the b1 refactor routed auto-bundle through this standalone script the
+# emissions were silently lost (see docs/reps-failure-diagnosis.md ancestry).
+#
+# We INLINE-PORT the Harbor generators rather than `from src.utils.harbor import`
+# because this module is intentionally standalone + stdlib-only (script/AGENTS.md
+# convergence invariant + zero-dep posture so deliver.sh and run.sh can call it
+# without dragging the eval venv along).
+#
+# Sources (all confirmed at TASK ROOT, NOT under data/tests/):
+#   input/<task>/test_outputs.py    -> bundle/data/tests/test_outputs.py
+#   input/<task>/test_weights.json  -> bundle/data/tests/test_weights.json
+#   <generated>                     -> bundle/data/tests/test.sh
+#   <generated from env_vars>       -> bundle/data/solution/solve.sh
+#
+# `test.sh` is 100% static (port of src/utils/harbor/test_sh.py::_TEST_SH).
+# `solve.sh` is parameterized by env_vars discovered from bundle/data/environment/
+# (each <api>/service.toml -> env_var_name -> http://<name>:<port>). This mirrors
+# what src/utils/mock_stack.py::start_mock_stack exports to the agent container,
+# so the published solve.sh references the same env var names the agent saw.
+TEST_OUTPUTS_FILENAME = "test_outputs.py"
+TEST_WEIGHTS_FILENAME = "test_weights.json"
+TEST_SH_FILENAME = "test.sh"
+SOLVE_SH_FILENAME = "solve.sh"
+TESTS_SUBDIR = "tests"
+SOLUTION_SUBDIR = "solution"
+SERVICE_TOML_FILENAME = "service.toml"
+
+# Verbatim port of src/utils/harbor/test_sh.py::_TEST_SH (157-line static bash
+# script). Touch in lock-step with that file; if it ever needs to diverge,
+# document why in script/AGENTS.md.
+_TEST_SH: str = r"""#!/usr/bin/env bash
+set -euo pipefail
+
+mkdir -p /logs/verifier
+
+# Honor the TEST_DIR contract (verifier env sets /tests); fall back to the
+# bundle-relative tests/ layout when the absolute mount is absent so existing
+# bundles keep working unchanged.
+TEST_DIR="${TEST_DIR:-/tests}"
+if [ ! -f "$TEST_DIR/test_outputs.py" ]; then
+    TEST_DIR="tests"
+fi
+export TEST_DIR
+
+if ! command -v uv >/dev/null 2>&1; then
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    export PATH="$HOME/.local/bin:$PATH"
+fi
+
+uvx --with pytest==8.4.1 --with pytest-json-ctrf==0.3.5 --with requests \
+    pytest --ctrf /logs/verifier/ctrf.json "$TEST_DIR/test_outputs.py" -rA || true
+
+python3 - <<'PY'
+import json
+import os
+
+ctrf_path = "/logs/verifier/ctrf.json"
+weights_path = os.path.join(os.environ.get("TEST_DIR", "tests"), "test_weights.json")
+reward_path = "/logs/verifier/reward.txt"
+
+ctrf = {}
+if os.path.exists(ctrf_path):
+    try:
+        with open(ctrf_path) as f:
+            ctrf = json.load(f)
+    except Exception:
+        ctrf = {}
+
+results = ctrf.get("results", {}) if isinstance(ctrf, dict) else {}
+summary = results.get("summary", {}) if isinstance(results, dict) else {}
+tests = results.get("tests", []) if isinstance(results, dict) else []
+
+# Build passed-set in three normalized shapes so weight-key lookup matches
+# regardless of which form the per-task test_weights.json uses:
+#   - full CTRF name      (e.g. "tests/test_outputs.py::TestFoo::test_bar")
+#   - class-qualified     (e.g. "TestFoo::test_bar")
+#   - bare test name      (e.g. "test_bar")
+# This single normalisation fixes BOTH:
+#   A.1 (CTRF-FQN-vs-bare-key) — CTRF emits "tests/test_outputs.py::Class::test_x"
+#       but test_weights.json frequently holds bare "test_x"; the prior code's
+#       `n in passed_names` never matched, so pos_earned stayed 0 even when
+#       every test passed (root cause behind 27/50 vendor GRADER_BROKEN tasks).
+#   A.2 (bare-name collisions across multi-service classes) — when one bare
+#       name (e.g. "test_no_post_requests_made") appears in 4 service classes,
+#       test_weights.json can only hold one entry per bare key. A bare weight
+#       key now resolves to a class-aware multiset: it counts as PASSED iff
+#       at least one class's variant passed (treats the bare key as "any
+#       service passed this check"). Class-qualified weight keys remain
+#       precise. Tasks like chen-amazon-sales, sandeep-marathon-nutrition,
+#       megan-bbq-recap, alden-boat-closeout, angela-nanite-deck depend on
+#       this multiset semantics.
+passed_full = set()
+passed_class_qual = set()  # "TestFoo::test_bar"
+passed_bare = set()        # "test_bar" (collapses across classes)
+for t in tests:
+    if not isinstance(t, dict):
+        continue
+    status = (t.get("status") or "").lower()
+    name = t.get("name") or ""
+    if status != "passed" or not name:
+        continue
+    passed_full.add(name)
+    parts = name.split("::")
+    if len(parts) >= 2:
+        passed_bare.add(parts[-1])
+    if len(parts) >= 3:
+        passed_class_qual.add("::".join(parts[-2:]))
+    elif len(parts) == 2:
+        # No class wrapper (module-level test) — still record bare; the
+        # class-qualified slot stays empty so only bare/full-name lookups
+        # can resolve it.
+        passed_class_qual.add(name.split("::")[-1])
+
+tests_total = int(summary.get("tests", 0) or 0)
+tests_passed = int(summary.get("passed", 0) or 0)
+
+weights = {}
+if os.path.exists(weights_path):
+    try:
+        with open(weights_path) as f:
+            weights = json.load(f)
+    except Exception:
+        weights = {}
+
+weights_map = {}
+if isinstance(weights, dict):
+    weights_map = {str(k): float(v) for k, v in weights.items()
+                   if isinstance(v, (int, float))}
+elif isinstance(weights, list):
+    for item in weights:
+        if not isinstance(item, dict):
+            continue
+        name = item.get("name") or item.get("test")
+        w = item.get("weight")
+        if name and isinstance(w, (int, float)):
+            weights_map[str(name)] = float(w)
+
+def _key_passed(key):
+    # Resolve a test_weights.json key against the passed-name shapes.
+    # A class-qualified key MUST match precisely — falling back to the
+    # bare-multiset would let any other class's pass spuriously satisfy a
+    # different class's weight (verified by the class-qualified-precision
+    # smoke case). Only a bare key (no "::") gets the A.2 multiset semantics.
+    if key in passed_full:
+        return True
+    if "::" in key:
+        return key in passed_class_qual
+    return key in passed_bare
+
+pos_total = sum(w for w in weights_map.values() if w > 0)
+pos_earned = sum(w for n, w in weights_map.items() if w > 0 and _key_passed(n))
+neg_penalty = sum(abs(w) for n, w in weights_map.items() if w < 0 and _key_passed(n))
+
+if pos_total > 0:
+    reward = (pos_earned - neg_penalty) / pos_total
+elif tests_total > 0:
+    reward = tests_passed / tests_total
+else:
+    reward = 0.0
+
+with open(reward_path, "w") as f:
+    f.write(f"{reward:.6f}\n")
+
+if isinstance(ctrf, dict) and isinstance(results, dict) and isinstance(summary, dict):
+    summary["overall_score"] = round(reward, 4)
+    summary["weighted_percentage"] = round(reward * 100.0, 2)
+    results["summary"] = summary
+    ctrf["results"] = results
+    with open(ctrf_path, "w") as f:
+        json.dump(ctrf, f, indent=2, ensure_ascii=False)
+
+print(f"reward={reward:.6f} (pos_total={pos_total} pos_earned={pos_earned} neg_penalty={neg_penalty} passed={tests_passed}/{tests_total})")
+PY
+"""
+
+
 # Tokens that look like a uuid / hex hash / pure-number suffix get dropped so the
 # persona "core" survives. e.g. ben_cox_8fc24d4b-dd01-... -> "ben cox".
 _UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
@@ -599,6 +780,60 @@ def build_report(
     }
 
 
+def _stage_verifier_test_sources(
+    input_task_dir: Path | None,
+    dest_verifier: Path,
+    verbose: bool,
+) -> tuple[bool, bool, bool]:
+    """Mirror `test.sh` + `test_outputs.py` + `test_weights.json` into
+    each per-rep `logs/verifier/` next to the run outputs (ctrf, reward,
+    test_output.log, test_function_outputs).
+
+    Symmetrical with the host-side mirror in
+    `eval/run_batch.py` (post-execution write next to `test_output.log`).
+    The bundle's `copy_verifier_logs()` will already inherit these three
+    files when present in the source `output/<backend>/<task>/.../logs/verifier/`;
+    this helper is the BACKFILL path for two cases:
+      (1) older output trees that pre-date the run_batch.py mirror, and
+      (2) standalone `repackage_to_bundle.py` runs that import-by-bash.
+    On a fresh run the writes here are no-ops (target already populated
+    by `copy_verifier_logs`); idempotent.
+
+    Source resolution:
+      - `test.sh`           -> re-emit via `_generate_test_sh()` (stdlib-only)
+      - `test_outputs.py`   -> `input_task_dir/test_outputs.py` (task ROOT, NOT data/tests/)
+      - `test_weights.json` -> `input_task_dir/test_weights.json`
+
+    When `input_task_dir` is None we still emit `test.sh` because it has
+    zero input-side dependency.
+    """
+    dest_verifier.mkdir(parents=True, exist_ok=True)
+    wrote_test_sh = False
+    wrote_outputs = False
+    wrote_weights = False
+    test_sh_path = dest_verifier / TEST_SH_FILENAME
+    if not test_sh_path.exists():
+        test_sh_path.write_text(_generate_test_sh(), encoding="utf-8")
+        wrote_test_sh = True
+    if input_task_dir is not None:
+        src_outputs = input_task_dir / TEST_OUTPUTS_FILENAME
+        dst_outputs = dest_verifier / TEST_OUTPUTS_FILENAME
+        if src_outputs.is_file() and not dst_outputs.exists():
+            shutil.copy2(src_outputs, dst_outputs)
+            wrote_outputs = True
+        src_weights = input_task_dir / TEST_WEIGHTS_FILENAME
+        dst_weights = dest_verifier / TEST_WEIGHTS_FILENAME
+        if src_weights.is_file() and not dst_weights.exists():
+            shutil.copy2(src_weights, dst_weights)
+            wrote_weights = True
+    if verbose:
+        print(
+            f"      logs/verifier mirror: test.sh={wrote_test_sh} "
+            f"test_outputs.py={wrote_outputs} test_weights.json={wrote_weights}"
+        )
+    return wrote_test_sh, wrote_outputs, wrote_weights
+
+
 def copy_verifier_logs(run_dir: Path, dest_run: Path) -> int:
     """Copy task_output/logs/verifier/* into the bundle at run_N/logs/verifier/*.
 
@@ -762,6 +997,161 @@ def _stage_harness_env_files(env_dir: Path, verbose: bool) -> int:
     return n
 
 
+def _parse_service_toml(toml_path: Path) -> dict[str, Any] | None:
+    try:
+        import tomllib
+    except ImportError:
+        return _parse_service_toml_regex(toml_path)
+    try:
+        with toml_path.open("rb") as fh:
+            doc = tomllib.load(fh)
+    except (OSError, Exception):
+        return None
+    svc = doc.get("service") if isinstance(doc, dict) else None
+    if not isinstance(svc, dict):
+        return None
+    return svc
+
+
+def _parse_service_toml_regex(toml_path: Path) -> dict[str, Any] | None:
+    try:
+        text = toml_path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    in_service = False
+    out: dict[str, Any] = {}
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("[") and line.endswith("]"):
+            in_service = line == "[service]"
+            continue
+        if not in_service or "=" not in line:
+            continue
+        k, _, v = line.partition("=")
+        k = k.strip()
+        v = v.strip().strip(",")
+        if (v.startswith('"') and v.endswith('"')) or (
+            v.startswith("'") and v.endswith("'")
+        ):
+            out[k] = v[1:-1]
+        else:
+            try:
+                out[k] = int(v)
+            except ValueError:
+                out[k] = v
+    return out or None
+
+
+def _discover_service_env_vars(
+    env_dir: Path, enabled_apis: set[str] | None = None
+) -> dict[str, str]:
+    out: dict[str, str] = {}
+    if not env_dir.is_dir():
+        return out
+    for sub in sorted(env_dir.iterdir()):
+        if not sub.is_dir():
+            continue
+        if enabled_apis is not None and sub.name not in enabled_apis:
+            continue
+        toml_path = sub / SERVICE_TOML_FILENAME
+        if not toml_path.is_file():
+            continue
+        svc = _parse_service_toml(toml_path)
+        if not svc:
+            continue
+        env_var_name = svc.get("env_var_name")
+        name = svc.get("name") or sub.name
+        port = svc.get("port", 8000)
+        if not isinstance(env_var_name, str) or not env_var_name:
+            continue
+        try:
+            port_int = int(port)
+        except (TypeError, ValueError):
+            port_int = 8000
+        out[env_var_name] = f"http://{name}:{port_int}"
+    return out
+
+
+def _generate_solve_sh(env_vars: dict[str, str] | None = None) -> str:
+    env_vars = dict(env_vars or {})
+    lines = [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "",
+        "python3 - <<'PY'",
+        "import os",
+        "",
+    ]
+    if env_vars:
+        for key in sorted(env_vars.keys()):
+            default = env_vars[key]
+            lvar = key.lower()
+            lines.append(
+                f"{lvar} = os.environ.get({key!r}, {default!r}).rstrip('/')"
+            )
+        lines.append("")
+    lines.append(
+        "print('Solution not yet implemented -- populate with API calls from "
+        "golden trajectory.')"
+    )
+    lines.append("PY")
+    return "\n".join(lines) + "\n"
+
+
+def _generate_test_sh() -> str:
+    return _TEST_SH
+
+
+def _stage_test_runners_and_solver(
+    input_task_dir: Path | None,
+    bundle: Path,
+    verbose: bool,
+) -> tuple[bool, bool, bool, bool]:
+    """Stage data/tests/{test_outputs.py,test_weights.json,test.sh} + data/solution/solve.sh.
+
+    Returns (had_outputs, had_weights, wrote_test_sh, wrote_solve_sh) for verbose reporting.
+    test.sh and solve.sh are always emitted (zero-dep on input/). test_outputs.py
+    and test_weights.json are emitted only when present at the input task root.
+    """
+    tests_dir = bundle / "data" / TESTS_SUBDIR
+    solution_dir = bundle / "data" / SOLUTION_SUBDIR
+
+    had_outputs = False
+    had_weights = False
+    if input_task_dir is not None:
+        src_outputs = input_task_dir / TEST_OUTPUTS_FILENAME
+        if src_outputs.is_file():
+            tests_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src_outputs, tests_dir / TEST_OUTPUTS_FILENAME)
+            had_outputs = True
+        src_weights = input_task_dir / TEST_WEIGHTS_FILENAME
+        if src_weights.is_file():
+            tests_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src_weights, tests_dir / TEST_WEIGHTS_FILENAME)
+            had_weights = True
+
+    tests_dir.mkdir(parents=True, exist_ok=True)
+    (tests_dir / TEST_SH_FILENAME).write_text(_generate_test_sh(), encoding="utf-8")
+    wrote_test_sh = True
+
+    bundle_env_dir = bundle / "data" / "environment"
+    env_vars = _discover_service_env_vars(bundle_env_dir, enabled_apis=None)
+    solution_dir.mkdir(parents=True, exist_ok=True)
+    (solution_dir / SOLVE_SH_FILENAME).write_text(
+        _generate_solve_sh(env_vars), encoding="utf-8"
+    )
+    wrote_solve_sh = True
+
+    if verbose:
+        print(
+            f"    staged test runners: outputs={had_outputs} weights={had_weights} "
+            f"test.sh={wrote_test_sh} solve.sh={wrote_solve_sh} (env_vars={len(env_vars)})"
+        )
+    return had_outputs, had_weights, wrote_test_sh, wrote_solve_sh
+
+
 def convert_task(
     task_dir: Path,
     dest_root: Path,
@@ -847,6 +1237,8 @@ def convert_task(
     elif verbose:
         print(f"    (no input dir matched under {input_root}; prompt/persona/artifacts skipped)")
 
+    _stage_test_runners_and_solver(input_task_dir, bundle, verbose)
+
     produced_any = False
     for harness_dir in sorted(p for p in trajectories.iterdir() if p.is_dir()):
         pretty = _pretty_model(harness_dir.name)
@@ -869,6 +1261,9 @@ def convert_task(
             # 2) logs/verifier/ copied as-is (raw ctrf.json, test_weights.json,
             #    reward.txt and siblings — see copy_verifier_logs docstring)
             n_verifier = copy_verifier_logs(run_dir, dest_run)
+            _stage_verifier_test_sources(
+                input_task_dir, dest_run / "logs" / "verifier", verbose
+            )
 
             # 3) report.json built
             report = build_report(run_dir, task_dir, pretty, ridx, infer_meta)
