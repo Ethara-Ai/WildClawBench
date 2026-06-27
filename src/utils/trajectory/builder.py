@@ -905,6 +905,34 @@ def extract_spawn_label_tasks(parent_messages: List[Any]) -> dict:
     return out
 
 
+def _extract_spawn_results(messages: List[Any]) -> dict:
+    """session_key -> {run_id, tool_call_id} from sessions_spawn tool RESULTS.
+
+    The native ``sessions_spawn`` tool result carries the accepted child's
+    ``childSessionKey`` and ``runId`` in its text payload; we key by session_key
+    so the parent meta_info roster can link each child to its run_id and the
+    spawning tool call.
+    """
+    out: dict = {}
+    for m in messages or []:
+        inner = m.get("message") if isinstance(m, dict) else None
+        if not isinstance(inner, dict):
+            continue
+        if inner.get("role") == "toolResult" and inner.get("toolName") == "sessions_spawn":
+            txt = "".join(
+                c.get("text", "") for c in (inner.get("content") or [])
+                if isinstance(c, dict) and c.get("type") == "text"
+            )
+            csk = re.search(r'"childSessionKey":\s*"([^"]+)"', txt)
+            rid = re.search(r'"runId":\s*"([^"]+)"', txt)
+            if csk:
+                out[csk.group(1)] = {
+                    "run_id": rid.group(1) if rid else None,
+                    "tool_call_id": inner.get("toolCallId"),
+                }
+    return out
+
+
 def attach_native_subagents(
     published: dict,
     sessions_dir: Path,
@@ -982,6 +1010,26 @@ def attach_native_subagents(
         new_meta["cluster"] = cluster
     new_meta.update(base_meta)
     new_meta["agents"] = {"root": root, "spawned": spawned_keys}
+    # Per-subagent roster on the parent meta_info so spawned children are
+    # discoverable directly from output.json (label -> session_key -> run_id ->
+    # trajectory_file), not only via spawn_tree/ + subagents/. run_id and
+    # spawn_tool_call_id are recovered from the parent's sessions_spawn tool
+    # results (childSessionKey -> runId), keyed by session_key.
+    _spawn_res = _extract_spawn_results(published.get("messages") or [])
+    new_meta["subagent_count"] = len(children_docs)
+    new_meta["subagent_session_keys"] = list(spawned_keys)
+    new_meta["subagents"] = [
+        {
+            "label": c["meta_info"].get("task_name"),
+            "session_key": c["meta_info"].get("session_key"),
+            "run_id": _spawn_res.get(c["meta_info"].get("session_key"), {}).get("run_id"),
+            "spawn_tool_call_id": _spawn_res.get(c["meta_info"].get("session_key"), {}).get("tool_call_id"),
+            "trajectory_file": f"{i:02d}_{_slug(c['meta_info']['task_name'])}.json",
+            "task_completion_status": c["meta_info"].get("task_completion_status"),
+            "message_count": c["meta_info"].get("message_count"),
+        }
+        for i, c in enumerate(children_docs, 1)
+    ]
     published["meta_info"] = new_meta
 
     out = Path(output_dir)

@@ -112,7 +112,7 @@ def load_task(path: str | Path) -> dict:
                 return _attach_drift_script(load_task(f), p)
         # Native layout accepts either prompt.txt (single prompt) or prompts.txt
         # (Talos inject-format per-turn wake-up script; see inject_director.py).
-        if ((p / "prompt.txt").is_file() or (p / "prompts.txt").is_file()) and (p / "rubric.json").is_file():
+        if ((p / "prompt.txt").is_file() or (p / "prompts.txt").is_file() or (p / "PROMPT.md").is_file()) and (p / "rubric.json").is_file():
             return _attach_drift_script(_load_native_task(p), p)
         raise FileNotFoundError(f"No task file found in {p}")
     suffix = p.suffix.lower()
@@ -548,6 +548,14 @@ def _load_native_task(task_dir: Path) -> dict:
         from src.utils.inject_director import parse_prompts_file
         turn_messages = parse_prompts_file(task_dir / "prompts.txt")
         prompt = (turn_messages[0] if turn_messages else "").strip()
+    elif (task_dir / "PROMPT.md").is_file():
+        # Newer authoring format: prompt ships as PROMPT.md (TURN-delimited or plain).
+        from src.utils.inject_director import parse_prompts_file
+        turn_messages = parse_prompts_file(task_dir / "PROMPT.md")
+        prompt = (
+            turn_messages[0].strip() if turn_messages
+            else (task_dir / "PROMPT.md").read_text(encoding="utf-8").strip()
+        )
     else:
         prompt = ""
     try:
@@ -674,6 +682,16 @@ def _load_yaml_task(path: Path) -> dict:
             from src.utils.inject_director import parse_prompts_file
             turn_messages = parse_prompts_file(task_dir / "prompts.txt")
             prompt = (turn_messages[0] if turn_messages else "").strip()
+        elif (task_dir / "PROMPT.md").is_file():
+            # Newer authoring format: the prompt ships as PROMPT.md. Support both a
+            # `--- TURN T<n> ---`-delimited multi-turn script and a single free-form
+            # prompt (no TURN headers => the whole file is turn 0).
+            from src.utils.inject_director import parse_prompts_file
+            turn_messages = parse_prompts_file(task_dir / "PROMPT.md")
+            prompt = (
+                turn_messages[0].strip() if turn_messages
+                else (task_dir / "PROMPT.md").read_text(encoding="utf-8").strip()
+            )
 
     rubrics = raw.get("rubrics") or []
     if not rubrics and (task_dir / "rubric.json").is_file():

@@ -91,11 +91,14 @@ elif isinstance(weights, list):
 
 pos_total = sum(w for w in weights_map.values() if w > 0)
 pos_earned = sum(w for n, w in weights_map.items() if w > 0 and _norm(n) in passed_names)
-# Red-line (negative-weight) checkers return True == guardrail respected, so a
-# correct run PASSES them. Penalize only red-lines that RAN and did NOT pass
-# (were violated) — penalizing the passing case docks correct behaviour.
+# Negative-weight checkers are violation-detectors: PASS == the forbidden
+# behaviour fired. Penalize the ones that PASSED (triggered); a failed negative
+# means the agent avoided the bad thing and is not penalized. Mirrors june-7
+# canonical and the rubric grader (penalize a negative criterion only when
+# satisfied). Penalizing FAILED negatives inverts polarity and docks correct
+# behaviour (every avoided distractor scored as a failure).
 neg_penalty = sum(abs(w) for n, w in weights_map.items()
-                  if w < 0 and _norm(n) in ran_names and _norm(n) not in passed_names)
+                  if w < 0 and _norm(n) in passed_names)
 
 if pos_total > 0:
     reward = max(0.0, (pos_earned - neg_penalty) / pos_total)

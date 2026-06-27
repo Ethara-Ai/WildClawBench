@@ -132,10 +132,11 @@ def compute_test_reward(
     - No positive weights configured → fall back to passed / total ratio.
     - With weights → reward = max(0, (pos_earned - neg_penalty) / pos_total),
       where pos_earned sums positive weights whose tests passed, and
-      neg_penalty sums |w| for negative-weighted tests that RAN and FAILED. Per
-      the scoring spec (SCORING_AND_TASK_LOGIC §2) red-line tests are
-      GUARDRAIL-style: PASS == guardrail respected (contributes nothing), so we
-      penalise only a red-line that RAN and FAILED (= the agent violated it).
+      neg_penalty sums |w| for negative-weighted tests that PASSED (triggered).
+      Negative tests are violation-detectors: PASS == the forbidden behaviour
+      fired, so a passing negative is penalised; a failed negative means the
+      agent avoided it (no penalty). Mirrors june-7 canonical and the rubric
+      grader (penalise a negative criterion only when satisfied).
     """
     tests_total = int(tests_total or 0)
     tests_passed = int(tests_passed or 0)
@@ -164,10 +165,12 @@ def compute_test_reward(
 
     pos_total = sum(w for w in weights.values() if w > 0)
     pos_earned = sum(w for n, w in weights.items() if w > 0 and _norm(n) in passed_names)
-    # SCORING_AND_TASK_LOGIC §2: red-lines are guardrail-style (PASS == guardrail
-    # respected). Penalise only red-lines that RAN and did NOT pass (= violated).
+    # Negative tests are violation-detectors (PASS == forbidden behaviour fired):
+    # penalise the ones that PASSED. A failed negative = avoided = no penalty.
+    # Mirrors june-7 canonical and the rubric grader (penalise only a satisfied
+    # negative criterion).
     neg_penalty = sum(abs(w) for n, w in weights.items()
-                      if w < 0 and _norm(n) in ran_names and _norm(n) not in passed_names)
+                      if w < 0 and _norm(n) in passed_names)
 
     if pos_total > 0:
         return max(0.0, (pos_earned - neg_penalty) / pos_total)

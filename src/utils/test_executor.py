@@ -333,14 +333,18 @@ def _compute_reward(results: Mapping[str, dict], weights: Mapping[str, float]) -
 
     - pos_total: sum of positive weights (desired behaviours)
     - pos_earned: sum of positive weights whose test passed
-    - neg_penalty: sum of |w| for negative-weight (red-line) tests that RAN and
-      FAILED. Per the scoring spec (SCORING_AND_TASK_LOGIC §2), red-line tests
-      are GUARDRAIL-style: written so PASS == guardrail respected (e.g.
-      `assert _api_send_count(GMAIL) == 0`). A red-line that passes contributes
-      nothing (it was already excluded from pos_total — its weight is negative);
-      we penalise only when a red-line RAN and FAILED (= the agent violated the
-      guardrail). The `max(0, …)` floor means a red-line spree zeroes the run
-      rather than driving the reward negative.
+    - neg_penalty: sum of |w| for negative-weight tests that PASSED (triggered).
+      The negative tests in this corpus are VIOLATION-DETECTORS: written so
+      PASS == the forbidden behaviour occurred (e.g. `assert distractor_touched
+      > 0`, `assert stale_value_present`). So a negative test that PASSES means
+      the agent did the bad thing → penalise |w|; a negative test that FAILS
+      means the agent avoided it → no penalty. This matches the june-7 canonical
+      (Kensei2) reward and the rubric grader, which likewise penalises a
+      negative criterion only when it is *satisfied* (fired). Penalising failed
+      negatives instead — as a prior cut did — inverts the polarity and punishes
+      good behaviour (every avoided distractor scored as a failure). The
+      `max(0, …)` floor means a violation spree zeroes the run rather than going
+      negative.
     - falls back to tests_passed/tests_total when pos_total <= 0
     Returns 0..1.
     """
@@ -354,18 +358,18 @@ def _compute_reward(results: Mapping[str, dict], weights: Mapping[str, float]) -
         return str(name).rsplit("::", 1)[-1].strip()
 
     passed_names: set[str] = set()
-    ran_names: set[str] = set()
     for full_name, res in results.items():
-        ran_names.add(_norm(full_name))
         if res.get("status") == "passed":
             passed_names.add(_norm(full_name))
 
     pos_total = sum(float(w) for w in weights.values() if w > 0)
     pos_earned = sum(float(w) for n, w in weights.items() if w > 0 and _norm(n) in passed_names)
-    # SCORING_AND_TASK_LOGIC §2: red-lines are guardrail-style (PASS == guardrail
-    # respected). Penalise only red-lines that RAN and did NOT pass (= violated).
+    # Negative tests are violation-detectors (PASS == forbidden behaviour fired).
+    # Penalise the ones that PASSED (triggered); a failed negative = the agent
+    # avoided the bad thing and is not penalised. Mirrors june-7 canonical and
+    # the rubric grader (penalise a negative criterion only when satisfied).
     neg_penalty = sum(abs(float(w)) for n, w in weights.items()
-                      if w < 0 and _norm(n) in ran_names and _norm(n) not in passed_names)
+                      if w < 0 and _norm(n) in passed_names)
 
     if pos_total <= 0:
         scored = [r for r in results.values() if r.get("status") != "skipped"]

@@ -100,6 +100,11 @@ def build_litellm_config_yaml(
             + "      input_cost_per_token: 0.000005\n"
             "      output_cost_per_token: 0.000025"
         )
+        # Opus model name(s). All alias the one Bedrock opus inference-profile ARN
+        # (KENSEI_BEDROCK_MODEL_ARN, currently Opus 4.8). claude-opus-4.8 is the
+        # current name; claude-opus-4.7 is kept as a backward-compat alias so older
+        # scripts/run args keep working (they now route to the same 4.8 ARN).
+        model_blocks.append("  - model_name: claude-opus-4.8\n" + opus_params)
         model_blocks.append("  - model_name: claude-opus-4.7\n" + opus_params)
         # openclaw's _set_model presents the recognized id "claude-opus-4-6" to
         # activate extended thinking (see runner.py); that id arrives here on the
