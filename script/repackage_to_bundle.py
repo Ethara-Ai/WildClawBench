@@ -1329,6 +1329,74 @@ def select_tasks(source_root: Path, persona: str | None, do_all: bool) -> list[P
     return matches
 
 
+# =============================================================================
+# Output-side data staging (parity with bundle/data/)
+# =============================================================================
+#
+# Why this exists:
+#   `output/<backend>/<task>/data/` was a runtime scratch tree (only contained
+#   raw env baseline + per-task overlay snapshot + the _overlay_manifest.json
+#   sidecar). The bundle's `data/` (built by `convert_task` -> bundle.root)
+#   was a superset: it ALSO contained
+#     - data/environment/{tracking_middleware,admin_plane,_mutable_store}.py
+#       (from <repo>/environment/)
+#     - data/environment/persona/* (from input/<task>/persona/)
+#     - data/environment/artifacts/inputs/files/** (from input/<task>/persona/home
+#       or input/<task>/data/)
+#     - data/tests/{test.sh,test_outputs.py,test_weights.json}
+#     - data/solution/solve.sh
+#
+# `stage_output_data` writes the SAME 5 staging artifacts into the source
+# `output/<backend>/<task>/data/` tree so that `output/<task>/data` and
+# `output_bundle/<task>/data` become byte-equal modulo the three by-design
+# strips (`_overlay_manifest.json`, `_meta.json`, `skills/*/_meta.json`).
+#
+# Implementation strategy: reuse `stage_persona_and_artifacts` and
+# `_stage_test_runners_and_solver` verbatim by passing `task_dir` as the
+# `bundle` arg. Both helpers write to `<bundle>/data/...`, so the writes
+# land in `<task_dir>/data/...` -- exactly the parity we want.
+#
+# Caller contract: invoked by `eval/run_batch.py::_build_trajectory` via
+# subprocess AFTER the agent run completes BUT BEFORE the bundler subprocess
+# call. The bundler's `shutil.copytree(task_dir/'data', bundle/'data', ...)`
+# at L1173-1186 then propagates the staged tree into the bundle naturally,
+# so the bundler's own subsequent calls to `stage_persona_and_artifacts` and
+# `_stage_test_runners_and_solver` become idempotent backfills (no harm).
+# =============================================================================
+def stage_output_data(
+    task_dir: Path,
+    input_root: Path,
+    verbose: bool = False,
+) -> bool:
+    """Stage the 5 mirror-into-output artifacts into ``task_dir/data/``.
+
+    Returns True on success (best-effort: missing input dir doesn't fail).
+    Always emits ``data/tests/test.sh`` and ``data/solution/solve.sh`` (they
+    have zero dependency on ``input/<task>/``); the rest are conditional on
+    an input task dir match.
+    """
+    if not task_dir.is_dir():
+        print(f"error: task_dir not a directory: {task_dir}", file=sys.stderr)
+        return False
+
+    input_task_dir = _find_input_task_dir(input_root, task_dir.name)
+    if input_task_dir is None and verbose:
+        print(
+            f"    (no input dir matched under {input_root}; "
+            f"persona/artifacts/test_outputs/test_weights skipped; "
+            f"test.sh + solve.sh still emitted)"
+        )
+
+    # When input_task_dir is None we still want test.sh + solve.sh emitted
+    # into task_dir/data/{tests,solution}/. stage_persona_and_artifacts
+    # requires a non-None input_task_dir, so we only call it when present.
+    if input_task_dir is not None:
+        stage_persona_and_artifacts(input_task_dir, task_dir, verbose)
+
+    _stage_test_runners_and_solver(input_task_dir, task_dir, verbose)
+    return True
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         description="Repackage raw run output into the published bundle structure.",
@@ -1341,8 +1409,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     ap.add_argument(
         "--dest-root",
-        required=True,
-        help="Destination root for the published bundle tree (created if absent).",
+        help="Destination root for the published bundle tree (created if absent). "
+        "Required for bundle mode; ignored for --stage-output-data.",
     )
     ap.add_argument(
         "--input-root",
@@ -1363,11 +1431,21 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Heuristically fill rubric type/evaluation_target (else left empty).",
     )
+    # --stage-output-data: alternate mode. Instead of writing a bundle under
+    # --dest-root, stage the 5 mirror artifacts (harness env .py files,
+    # persona/, artifacts/inputs/files/, tests/, solution/) directly into
+    # the SOURCE output/<task>/data/ tree so it matches the bundle's data/
+    # modulo the 3 by-design strips. See `stage_output_data` docstring.
+    ap.add_argument(
+        "--stage-output-data",
+        action="store_true",
+        help="Mirror persona/artifacts/harness-env/tests/solution into the SOURCE "
+        "output/<task>/data/ tree (no bundle written; --dest-root ignored).",
+    )
     ap.add_argument("-v", "--verbose", action="store_true", help="Per-run detail.")
     args = ap.parse_args(argv)
 
     source_root = Path(args.source_root).resolve()
-    dest_root = Path(args.dest_root).resolve()
     input_root = Path(args.input_root).resolve()
     if not source_root.is_dir():
         print(f"error: --source-root not a directory: {source_root}", file=sys.stderr)
@@ -1382,6 +1460,22 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 1
+
+    if args.stage_output_data:
+        print(f"source : {source_root}")
+        print(f"input  : {input_root}")
+        print(f"mode   : stage-output-data ({len(tasks)} task(s))")
+        produced = 0
+        for task_dir in tasks:
+            if stage_output_data(task_dir, input_root, args.verbose):
+                produced += 1
+        print(f"done: staged output data for {produced}/{len(tasks)} task(s)")
+        return 0 if produced else 1
+
+    if not args.dest_root:
+        print("error: --dest-root is required in bundle mode", file=sys.stderr)
+        return 2
+    dest_root = Path(args.dest_root).resolve()
 
     print(f"source : {source_root}")
     print(f"dest   : {dest_root}")

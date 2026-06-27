@@ -1136,6 +1136,52 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
                 input_root = os.environ.get("KENSEI_INPUT_ROOT", "input")
                 persona_arg = task["task_id"]
 
+            # Stage the 5 mirror artifacts (harness env .py files, persona/,
+            # artifacts/inputs/files/, tests/, solution/) into the SOURCE
+            # output/<task>/data/ tree FIRST so it matches bundle/data/
+            # modulo the 3 by-design strips (_overlay_manifest.json,
+            # _meta.json, skills/*/_meta.json). The bundler's subsequent
+            # shutil.copytree(task_dir/'data', bundle/'data', ...) will then
+            # propagate the staged tree into the bundle naturally. See
+            # `stage_output_data` in script/repackage_to_bundle.py for the
+            # parity contract. Fail-soft: a staging error must never block
+            # the bundle write -- the bundler also has its own staging path.
+            stage_cmd = [
+                sys.executable,
+                str(script_path),
+                "--source-root", str(source_root),
+                "--input-root", str(input_root),
+                "--persona", persona_arg,
+                "--stage-output-data",
+                "--verbose",
+            ]
+            try:
+                stage_completed = subprocess.run(
+                    stage_cmd, cwd=str(repo_root),
+                    capture_output=True, text=True, check=False,
+                )
+                if stage_completed.returncode == 0:
+                    logger.info(
+                        "[%s] Output-side data staged (parity with bundle/data/)",
+                        task["task_id"],
+                    )
+                    if stage_completed.stderr.strip():
+                        logger.warning(
+                            "[%s] stage-output-data stderr:\n%s",
+                            task["task_id"], stage_completed.stderr,
+                        )
+                else:
+                    logger.warning(
+                        "[%s] stage-output-data exited %d\nstdout:\n%s\nstderr:\n%s",
+                        task["task_id"], stage_completed.returncode,
+                        stage_completed.stdout, stage_completed.stderr,
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "[%s] stage-output-data invocation failed: %s",
+                    task["task_id"], exc,
+                )
+
             cmd = [
                 sys.executable,
                 str(script_path),
