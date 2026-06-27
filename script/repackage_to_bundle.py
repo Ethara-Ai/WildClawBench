@@ -1104,6 +1104,692 @@ def _generate_test_sh() -> str:
     return _TEST_SH
 
 
+# ============================================================================
+# Harbor-parity emitters: instruction.md + Dockerfile + docker-compose.yaml + task.toml
+#
+# Background (b1 historical context): src/utils/harbor/bundle.py::write_bundle
+# (now dead code, see commit 6e03e6b) emitted four additional files into every
+# bundle that this standalone bundler silently dropped after the b1 refactor:
+#
+#   bundle/data/instruction.md                    (prompt + workspace-hint)
+#   bundle/data/environment/Dockerfile            (agent image build recipe)
+#   bundle/data/environment/docker-compose.yaml   (mock-stack compose graph)
+#   bundle/data/task.toml                         (Harbor task spec metadata)
+#
+# These are re-emitted here as STDLIB-ONLY inline ports. NEVER replace with
+# `from src.utils.harbor.dockerfile import ...` etc. — the standalone-stdlib
+# invariant for this script must hold (deliver.sh and run.sh invoke it
+# without the eval venv).
+#
+# Source of truth for the templates:
+#   src/utils/harbor/dockerfile.py  (generate_harbor_dockerfile)
+#   src/utils/harbor/compose.py     (generate_harbor_compose + runtime_env_defaults)
+#   src/utils/harbor/task_toml.py   (build_task_toml + _DEFAULTS)
+#   src/utils/task_parser.py:288    (_append_workspace_hint)
+#
+# Any change in Harbor must be mirrored here in lock-step; the byte-equal
+# Harbor parity tests in tests/test_repackage_bundle_test_runners.py will
+# fail otherwise. See script/AGENTS.md "4-file emission contract" invariant
+# (which already covers test.sh+solve.sh+test_outputs.py+test_weights.json
+# and is being extended here to cover the four new emissions).
+# ============================================================================
+
+# task_parser.py:288-307 workspace-hint suffix. Appended ONLY when the input
+# task ships attachments (persona/home/ files or data/ files); pinned to the
+# docker_utils.collect_output_from_container + openclaw assertLocalMediaAllowed
+# contract that artifacts MUST be written under /root/workspace/. instruction.md
+# must equal what the agent received, so we mirror task_parser semantics.
+_WORKSPACE_HINT = (
+    "\n\n---\n"
+    "Workspace inputs (already staged on disk at `/root/workspace/home` "
+    "or `/root/workspace/Home`):\n"
+    "Save EVERY output artifact you produce under `/root/workspace/`. "
+    "Files written anywhere else (including `/tmp/` and elsewhere under "
+    "`/root/`) will NOT be collected as deliverables."
+)
+
+
+def _append_workspace_hint(prompt: str, attachments_present: bool) -> str:
+    """Inline port of src/utils/task_parser.py::_append_workspace_hint."""
+    if not attachments_present:
+        return prompt
+    return prompt + _WORKSPACE_HINT
+
+
+def _detect_attachments_present(input_task_dir: Path) -> bool:
+    """Mirror src/utils/task_parser.py:340-347 attachment-detection priority.
+
+    persona/home wins when non-empty (recursively), else data/.
+    Returns True iff at least one file would have been mounted into the agent.
+    """
+    persona_home = input_task_dir / "persona" / "home"
+    if persona_home.is_dir():
+        for entry in persona_home.rglob("*"):
+            if entry.is_file():
+                return True
+    data_dir = input_task_dir / "data"
+    if data_dir.is_dir():
+        for entry in data_dir.rglob("*"):
+            if entry.is_file():
+                return True
+    return False
+
+
+def _resolve_used_apis(input_task_dir: Path | None) -> list[str]:
+    """Authoritative list of APIs the task overlays at runtime.
+
+    Sourced from `input/<task>/mock_data/<api>/*` directory names — the same
+    ground truth that `src/utils/mock_stack.py::start_mock_stack` uses to mount
+    per-task overlays. Returns sorted list. Empty when no mock_data/.
+    """
+    if input_task_dir is None:
+        return []
+    mock_data = input_task_dir / "mock_data"
+    if not mock_data.is_dir():
+        return []
+    return sorted(p.name for p in mock_data.iterdir() if p.is_dir())
+
+
+def _compute_distractor_apis(env_dir: Path, used_apis: list[str]) -> list[str]:
+    """Distractor pool = all available APIs in env_dir minus used.
+
+    Mirrors `compute_distractor_skills(required, task_id, count=None)` policy
+    (src/utils/skills_inference.py:169): when count is None we publish the
+    FULL distractor pool (sorted), matching Harbor's bundle behavior.
+    """
+    if not env_dir.is_dir():
+        return []
+    used_set = set(used_apis)
+    out = []
+    for entry in sorted(env_dir.iterdir()):
+        if not entry.is_dir():
+            continue
+        name = entry.name
+        if name in used_set:
+            continue
+        # An API dir is identified by having a service.toml. Skip persona/
+        # artifacts/ skills/ and the 3 harness env .py files (which aren't
+        # dirs anyway, but defensive).
+        if (entry / SERVICE_TOML_FILENAME).is_file():
+            out.append(name)
+    return out
+
+
+# Agent skill mount paths. dockerfile.py:8.
+_AGENT_SKILL_DIRS: tuple[str, ...] = (
+    "/root/.claude/skills",
+    "/root/.codex/skills",
+    "/root/.opencode/skills",
+    "/root/.goose/skills",
+    "/root/.factory/skills",
+    "/root/.agents/skills",
+    "/root/.gemini/skills",
+    "/root/.cursor/skills",
+)
+
+
+def _generate_environment_dockerfile(
+    has_skills: bool = False,
+    has_persona: bool = False,
+    has_artifacts: bool = False,
+) -> str:
+    """Inline port of src/utils/harbor/dockerfile.py::generate_harbor_dockerfile."""
+    lines: list[str] = [
+        "FROM ubuntu:24.04",
+        "",
+        "RUN apt-get update && apt-get install -y --no-install-recommends \\",
+        "    curl \\",
+        "    jq \\",
+        "    python3 \\",
+        "    python3-pip \\",
+        "    ffmpeg \\",
+        "    poppler-utils \\",
+        "    ca-certificates \\",
+        "    && rm -rf /var/lib/apt/lists/*",
+        "",
+        "RUN pip install --no-cache-dir --break-system-packages pymupdf pillow",
+        "",
+    ]
+    if has_skills:
+        first = _AGENT_SKILL_DIRS[0]
+        rest = list(_AGENT_SKILL_DIRS[1:])
+        lines += ["# Copy skills to all agent framework paths", "COPY skills %s" % first]
+        if rest:
+            mkdirs = " ".join(rest)
+            copies = " && ".join("cp -a %s/. %s/" % (first, d) for d in rest)
+            lines.append("RUN mkdir -p %s && %s" % (mkdirs, copies))
+        lines.append("")
+    if has_persona:
+        lines += ["# Copy persona", "COPY persona /root/.openclaw/persona", ""]
+    if has_artifacts:
+        lines += [
+            "# Copy multimodal artifacts",
+            "COPY artifacts/inputs/files /app/artifacts/inputs/files",
+            "",
+        ]
+    lines += ["WORKDIR /app", ""]
+    return "\n".join(lines)
+
+
+# compose.py:25-31 runtime_env_defaults.
+_LLM_PROXY_URL = "http://litellm-proxy:4000"
+_DEFAULT_CURRENT_DATE = "2026-05-28"
+
+
+def _compose_runtime_env_defaults() -> dict[str, str]:
+    return {
+        "LITELLM_BASE_URL": _LLM_PROXY_URL,
+        "OPENAI_API_BASE": f"{_LLM_PROXY_URL}/v1",
+        "OPENAI_API_KEY": "placeholder",
+        "CURRENT_DATE": _DEFAULT_CURRENT_DATE,
+    }
+
+
+def _compose_mem(value: str) -> str:
+    """compose.py:_compose_mem. Strip docker-compose's trailing 'i' from Ki/Mi/Gi."""
+    if not value:
+        return value
+    lower = value.lower()
+    if lower.endswith(("ki", "mi", "gi")):
+        return value[:-1]
+    return value
+
+
+def _compose_healthcheck_cmd(port: int, path: str) -> str:
+    """compose.py:_healthcheck_cmd. urllib.request curl-less probe."""
+    return (
+        f"python3 -c \"import urllib.request,sys; "
+        f"sys.exit(0 if urllib.request.urlopen('http://localhost:{port}{path}',"
+        f'timeout=3).status<400 else 1)"'
+    )
+
+
+def _parse_service_toml_full(toml_path: Path) -> dict[str, Any] | None:
+    """Parse both [service] and [k8s] sections. Returns merged dict for compose.
+
+    Mirrors src/utils/harbor/compose.py::_parse_service_toml (which returns
+    name/port/env_var_name/healthcheck_path/k8s_image/cpu_request/memory_request/memory_limit).
+    Defaults match Harbor exactly: memory_limit="256Mi" when [k8s].memory_limit absent.
+    """
+    try:
+        import tomllib
+    except ImportError:
+        tomllib = None
+    doc: dict[str, Any] = {}
+    if tomllib is not None:
+        try:
+            with toml_path.open("rb") as fh:
+                doc = tomllib.load(fh) or {}
+        except Exception:
+            doc = {}
+    if not doc:
+        try:
+            text = toml_path.read_text(encoding="utf-8")
+        except OSError:
+            return None
+        section: str | None = None
+        for raw in text.splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+            if line.startswith("[") and line.endswith("]"):
+                section = line[1:-1].strip()
+                doc.setdefault(section, {})
+                continue
+            if section is None or "=" not in line:
+                continue
+            k, _, v = line.partition("=")
+            k = k.strip()
+            v = v.strip().strip(",")
+            if (v.startswith('"') and v.endswith('"')) or (
+                v.startswith("'") and v.endswith("'")
+            ):
+                doc[section][k] = v[1:-1]
+            else:
+                try:
+                    doc[section][k] = int(v)
+                except ValueError:
+                    doc[section][k] = v
+    svc = doc.get("service", {}) if isinstance(doc, dict) else {}
+    k8s = doc.get("k8s", {}) if isinstance(doc, dict) else {}
+    if not isinstance(svc, dict):
+        svc = {}
+    if not isinstance(k8s, dict):
+        k8s = {}
+    return {
+        "name": svc.get("name") or toml_path.parent.name,
+        "port": int(svc.get("port") or 8000),
+        "env_var_name": svc.get("env_var_name") or "",
+        "healthcheck_path": svc.get("healthcheck_path") or "/health",
+        "k8s_image": k8s.get("image") or "",
+        "cpu_request": k8s.get("cpu_request") or "25m",
+        "memory_request": k8s.get("memory_request") or "128Mi",
+        "memory_limit": k8s.get("memory_limit") or "256Mi",
+    }
+
+
+def _discover_services_full(env_dir: Path) -> list[dict[str, Any]]:
+    """Like _discover_service_env_vars but returns full service records.
+
+    Each record matches Harbor's _parse_service_toml shape: name/port/env_var_name/
+    healthcheck_path/k8s_image/cpu_request/memory_request/memory_limit.
+    Used by _generate_environment_compose. Memory_limit defaults to "256Mi"
+    matching Harbor; this is what triggers the per-service deploy block.
+    """
+    if not env_dir.is_dir():
+        return []
+    out: list[dict[str, Any]] = []
+    for entry in sorted(env_dir.iterdir()):
+        if not entry.is_dir():
+            continue
+        toml_path = entry / SERVICE_TOML_FILENAME
+        if not toml_path.is_file():
+            continue
+        parsed = _parse_service_toml_full(toml_path)
+        if not parsed:
+            continue
+        out.append(parsed)
+    return out
+
+
+def _generate_environment_compose(
+    env_dir: Path,
+    services: list[dict[str, Any]] | None = None,
+    env_vars: dict[str, str] | None = None,
+) -> str:
+    """Inline port of src/utils/harbor/compose.py::generate_harbor_compose."""
+    if services is None:
+        services = _discover_services_full(env_dir)
+    if env_vars is None:
+        env_vars = {
+            svc["env_var_name"]: f"http://{svc['name']}:{svc['port']}"
+            for svc in services
+            if svc.get("env_var_name")
+        }
+    svc_list = list(services)
+
+    lines: list[str] = ["services:"]
+    lines.append("  main:")
+    lines.append("    build:")
+    lines.append("      context: .")
+    lines.append("    image: harbor-main:local")
+    lines.append('    command: ["sleep", "infinity"]')
+    lines.append("    environment:")
+    for key, value in env_vars.items():
+        lines.append(f"      - {key}={value}")
+    runtime_env = _compose_runtime_env_defaults()
+    lines.append(f"      - LITELLM_BASE_URL={runtime_env['LITELLM_BASE_URL']}")
+    lines.append(f"      - OPENAI_API_BASE={runtime_env['OPENAI_API_BASE']}")
+    lines.append(f"      - OPENAI_API_KEY={runtime_env['OPENAI_API_KEY']}")
+    lines.append("      - LLAMA_API_KEY=${LLAMA_API_KEY}")
+    lines.append(f"      - CURRENT_DATE={runtime_env['CURRENT_DATE']}")
+    lines.append("      - TEST_DIR=${TEST_DIR:-/tests}")
+    lines.append("    volumes:")
+    lines.append("      - ${HOST_VERIFIER_LOGS_PATH:-./logs/verifier}:${ENV_VERIFIER_LOGS_PATH:-/logs/verifier}")
+    lines.append("      - ${HOST_AGENT_LOGS_PATH:-./logs/agent}:${ENV_AGENT_LOGS_PATH:-/logs/agent}")
+    lines.append("    deploy:")
+    lines.append("      resources:")
+    lines.append("        limits:")
+    lines.append("          cpus: \"${CPUS:-1}\"")
+    lines.append("          memory: \"${MEMORY:-4096M}\"")
+    if svc_list:
+        lines.append("    depends_on:")
+        for svc in svc_list:
+            lines.append(f"      {svc['name']}:")
+            lines.append("        condition: service_healthy")
+
+    for svc in svc_list:
+        name = svc["name"]
+        port = int(svc["port"])
+        hpath = svc.get("healthcheck_path") or "/health"
+        mem = svc.get("memory_limit") or ""
+        lines.append(f"  {name}:")
+        lines.append("    build:")
+        lines.append(f"      context: ./{name}")
+        lines.append(f"    image: harbor-{name}:local")
+        lines.append("    expose:")
+        lines.append(f"      - \"{port}\"")
+        lines.append("    healthcheck:")
+        lines.append("      test:")
+        lines.append("        - CMD")
+        lines.append("        - sh")
+        lines.append("        - -c")
+        lines.append(f"        - {_compose_healthcheck_cmd(port, hpath)}")
+        lines.append("      interval: 5s")
+        lines.append("      timeout: 5s")
+        lines.append("      retries: 12")
+        if mem:
+            lines.append("    deploy:")
+            lines.append("      resources:")
+            lines.append("        limits:")
+            lines.append(f"          memory: {_compose_mem(mem)}")
+
+    return "\n".join(lines) + "\n"
+
+
+# task_toml.py:9-32 _DEFAULTS + _DEFAULT_DIMENSIONS.
+_TOML_DEFAULTS: dict[str, Any] = {
+    "verifier_timeout_sec": 600,
+    "agent_timeout_sec": 900,
+    "env_build_timeout_sec": 600,
+    "env_cpus": 1,
+    "env_memory_mb": 4096,
+    "env_storage_mb": 10240,
+    "env_allow_internet": True,
+    "env_skills_dir": "skills",
+    "healthcheck_command": "curl -f http://localhost:8000/health",
+    "healthcheck_interval_sec": 5,
+    "healthcheck_timeout_sec": 30,
+    "healthcheck_retries": 3,
+    "pass_at_k": 8,
+}
+_TOML_DEFAULT_DIMENSIONS: dict[str, Any] = {
+    "complex": "medium",
+    "long_horizon": False,
+    "objective": True,
+    "multimodal": True,
+    "cross_modal_cross_api": False,
+    "asset_complexity": "low",
+}
+
+
+def _q_toml(value: Any) -> str:
+    """task_toml.py::_q. Escape and quote a TOML string."""
+    s = "" if value is None else str(value)
+    s = s.replace("\\", "\\\\").replace('"', '\\"').replace("\n", " ")
+    return f'"{s}"'
+
+
+def _arr_toml_strs(values: list[Any]) -> str:
+    if not values:
+        return "[]"
+    parts = ", ".join(_q_toml(v) for v in values)
+    return f"[{parts}]"
+
+
+def _truncate_desc(text: str, limit: int | None = None) -> str:
+    """task_toml.py::_truncate_for_description."""
+    s = (text or "").replace("\r", "").replace("\n", " ").strip()
+    if limit is None or len(s) <= limit:
+        return s
+    return s[: max(0, limit - 1)].rstrip() + "\u2026"
+
+
+def _toml_bool(value: bool) -> str:
+    return "true" if value else "false"
+
+
+def _build_task_toml(
+    *,
+    task_id: str,
+    initial_prompt: str,
+    required_skills: list[str],
+    distractor_skills: list[str],
+    env_vars: dict[str, str] | None = None,
+    dependency_tags: list[str] | None = None,
+    dimensions: dict[str, Any] | None = None,
+    verifier_env: dict[str, str] | None = None,
+    solution_env: dict[str, str] | None = None,
+    pass_at_k: int | None = None,
+    healthcheck_command: str | None = None,
+    task_type: str = "",
+    difficulty: str = "",
+) -> str:
+    """Inline port of src/utils/harbor/task_toml.py::build_task_toml.
+
+    Sticks to the canonical section order (schema_version, [task], [metadata],
+    [verifier], [verifier.env], [agent], [environment], [environment.env],
+    [environment.healthcheck], [solution.env], [multimodal], [evaluation],
+    [dimensions]). Drift from Harbor's order will break byte-equal tests.
+    """
+    env_vars = env_vars or {}
+    dependency_tags = dependency_tags or []
+    dimensions = dict(_TOML_DEFAULT_DIMENSIONS, **(dimensions or {}))
+    verifier_env = verifier_env or {}
+    solution_env = solution_env or {}
+    pass_at_k = pass_at_k if pass_at_k is not None else _TOML_DEFAULTS["pass_at_k"]
+    healthcheck_command = healthcheck_command or _TOML_DEFAULTS["healthcheck_command"]
+    name = task_id or "kensei2-task"
+    description = _truncate_desc(initial_prompt or "")
+    keywords = [k for k in (task_type, difficulty) if k]
+
+    lines: list[str] = []
+    lines.append('schema_version = "1.1"')
+    lines.append("")
+    lines.append("[task]")
+    lines.append(f"name = {_q_toml(name)}")
+    lines.append(f"description = {_q_toml(description)}")
+    lines.append(f"keywords = {_arr_toml_strs(keywords)}")
+    lines.append("")
+    lines.append("[metadata]")
+    lines.append(f"category = {_q_toml(task_type)}")
+    lines.append(f"difficulty = {_q_toml(difficulty)}")
+    lines.append(f"required_skills = {_arr_toml_strs(required_skills)}")
+    lines.append(f"distractor_skills = {_arr_toml_strs(distractor_skills)}")
+    lines.append("")
+    lines.append("[verifier]")
+    lines.append(f"timeout_sec = {_TOML_DEFAULTS['verifier_timeout_sec']}")
+    lines.append("")
+    lines.append("[verifier.env]")
+    for k, v in verifier_env.items():
+        lines.append(f"{k} = {_q_toml(v)}")
+    lines.append("")
+    lines.append("[agent]")
+    lines.append(f"timeout_sec = {_TOML_DEFAULTS['agent_timeout_sec']}")
+    lines.append("")
+    lines.append("[environment]")
+    lines.append(f"build_timeout_sec = {_TOML_DEFAULTS['env_build_timeout_sec']}")
+    lines.append(f"cpus = {_TOML_DEFAULTS['env_cpus']}")
+    lines.append(f"memory_mb = {_TOML_DEFAULTS['env_memory_mb']}")
+    lines.append(f"storage_mb = {_TOML_DEFAULTS['env_storage_mb']}")
+    lines.append(f"allow_internet = {_toml_bool(_TOML_DEFAULTS['env_allow_internet'])}")
+    lines.append(f"skills_dir = {_q_toml(_TOML_DEFAULTS['env_skills_dir'])}")
+    lines.append("")
+    lines.append("[environment.env]")
+    for k, v in env_vars.items():
+        lines.append(f"{k} = {_q_toml(v)}")
+    lines.append("")
+    lines.append("[environment.healthcheck]")
+    lines.append(f"command = {_q_toml(healthcheck_command)}")
+    lines.append(f"interval_sec = {_TOML_DEFAULTS['healthcheck_interval_sec']}")
+    lines.append(f"timeout_sec = {_TOML_DEFAULTS['healthcheck_timeout_sec']}")
+    lines.append(f"retries = {_TOML_DEFAULTS['healthcheck_retries']}")
+    lines.append("")
+    lines.append("[solution.env]")
+    for k, v in solution_env.items():
+        lines.append(f"{k} = {_q_toml(v)}")
+    lines.append("")
+    lines.append("[multimodal]")
+    lines.append(f"dependency_tags = {_arr_toml_strs(dependency_tags)}")
+    lines.append("")
+    lines.append("[evaluation]")
+    lines.append(f"pass_at_k = {pass_at_k}")
+    lines.append("")
+    lines.append("[dimensions]")
+    for key in (
+        "complex",
+        "long_horizon",
+        "objective",
+        "multimodal",
+        "cross_modal_cross_api",
+        "asset_complexity",
+    ):
+        val = dimensions.get(key, _TOML_DEFAULT_DIMENSIONS[key])
+        if isinstance(val, bool):
+            lines.append(f"{key} = {_toml_bool(val)}")
+        elif isinstance(val, (int, float)):
+            lines.append(f"{key} = {val}")
+        else:
+            lines.append(f"{key} = {_q_toml(val)}")
+    lines.append("")
+    return "\n".join(lines)
+
+
+# ============================================================================
+# Three new stage helpers: instruction.md, Dockerfile+docker-compose.yaml, task.toml
+# Each is fail-soft. Skipped only when their authoritative input is absent.
+# ============================================================================
+
+
+def _stage_data_instruction(
+    input_task_dir: Path | None,
+    bundle: Path,
+    verbose: bool,
+) -> bool:
+    """Emit bundle/data/instruction.md = prompt.txt + (workspace_hint if attachments).
+
+    Mirrors what the agent received at runtime via task_parser._append_workspace_hint.
+    No-op when input_task_dir missing or input_task_dir/prompt.txt missing.
+    """
+    if input_task_dir is None:
+        return False
+    prompt_src = input_task_dir / "prompt.txt"
+    if not prompt_src.is_file():
+        return False
+    try:
+        prompt_text = prompt_src.read_text(encoding="utf-8")
+    except OSError as exc:
+        if verbose:
+            print(f"    instruction.md skipped: {exc}", file=sys.stderr)
+        return False
+    attachments = _detect_attachments_present(input_task_dir)
+    final_text = _append_workspace_hint(prompt_text, attachments)
+    data_dir = bundle / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    (data_dir / "instruction.md").write_text(final_text, encoding="utf-8")
+    if verbose:
+        print(f"    staged instruction.md (attachments={attachments})")
+    return True
+
+
+def _stage_environment_dockerfile_and_compose(
+    bundle: Path,
+    verbose: bool,
+) -> tuple[bool, bool]:
+    """Emit bundle/data/environment/Dockerfile and docker-compose.yaml.
+
+    Derives has_skills / has_persona / has_artifacts from the staged
+    bundle/data/environment/ tree. Compose service list is also derived from
+    that tree (each <api>/service.toml entry). Both files are written
+    unconditionally — they're zero-dep on input/<task>/ and reflect what
+    the bundle env actually contains. Returns (wrote_dockerfile, wrote_compose).
+    """
+    env_dir = bundle / "data" / "environment"
+    if not env_dir.is_dir():
+        return False, False
+    has_skills = (env_dir / "skills").is_dir()
+    has_persona = (env_dir / "persona").is_dir()
+    has_artifacts = (env_dir / "artifacts" / "inputs" / "files").is_dir()
+    dockerfile_text = _generate_environment_dockerfile(
+        has_skills=has_skills,
+        has_persona=has_persona,
+        has_artifacts=has_artifacts,
+    )
+    (env_dir / "Dockerfile").write_text(dockerfile_text, encoding="utf-8")
+    services = _discover_services_full(env_dir)
+    env_vars = {
+        svc["env_var_name"]: f"http://{svc['name']}:{svc['port']}"
+        for svc in services
+        if svc.get("env_var_name")
+    }
+    compose_text = _generate_environment_compose(env_dir, services=services, env_vars=env_vars)
+    (env_dir / "docker-compose.yaml").write_text(compose_text, encoding="utf-8")
+    if verbose:
+        print(
+            f"    staged environment/Dockerfile + docker-compose.yaml "
+            f"(skills={has_skills} persona={has_persona} artifacts={has_artifacts} "
+            f"services={len(services)})"
+        )
+    return True, True
+
+
+def _stage_task_toml(
+    input_task_dir: Path | None,
+    bundle: Path,
+    verbose: bool,
+    pass_at_k: int | None = None,
+) -> bool:
+    """Emit bundle/data/task.toml using Harbor-parity build_task_toml port.
+
+    Resolution policy (matches Harbor bundle.py:171-253):
+      - required = input/<task>/mock_data/<api>/ dir names (sorted)
+      - distractor = bundle/data/environment/ APIs minus required
+      - env_vars = filtered_services (required ∪ distractor)
+      - healthcheck_command = ' && '.join('curl -f http://localhost:{port}/health' per filtered svc)
+      - environment_env = env_vars + runtime_env_defaults()
+      - verifier_env = environment_env + {TEST_DIR:/tests}
+      - solution_env = environment_env
+      - required_skills = [f'{n}-connector' for n in required]
+      - distractor_skills = [f'{n}-connector' for n in distractor]
+      - multimodal = bool(attachments_present)
+    No-op when input_task_dir missing OR input_task_dir/prompt.txt missing.
+    """
+    if input_task_dir is None:
+        return False
+    prompt_src = input_task_dir / "prompt.txt"
+    if not prompt_src.is_file():
+        return False
+    try:
+        prompt_text = prompt_src.read_text(encoding="utf-8")
+    except OSError:
+        prompt_text = ""
+
+    used_apis = _resolve_used_apis(input_task_dir)
+    bundle_env_dir = bundle / "data" / "environment"
+    distractor_apis = _compute_distractor_apis(bundle_env_dir, used_apis)
+    used_with_distractor = set(used_apis) | set(distractor_apis)
+
+    all_services = _discover_services_full(bundle_env_dir)
+    filtered = [s for s in all_services if s["name"] in used_with_distractor]
+    env_vars = {
+        svc["env_var_name"]: f"http://{svc['name']}:{svc['port']}"
+        for svc in filtered
+        if svc.get("env_var_name")
+    }
+    healthcheck_cmd = (
+        " && ".join(
+            f"curl -f http://localhost:{svc['port']}{svc.get('healthcheck_path') or '/health'}"
+            for svc in filtered
+        )
+        or _TOML_DEFAULTS["healthcheck_command"]
+    )
+    runtime_env = _compose_runtime_env_defaults()
+    environment_env = {**env_vars, **runtime_env}
+    verifier_env = {**environment_env, "TEST_DIR": "/tests"}
+    solution_env = dict(environment_env)
+
+    required_skills = [f"{name}-connector" for name in used_apis]
+    distractor_skills = [f"{name}-connector" for name in distractor_apis]
+
+    attachments_present = _detect_attachments_present(input_task_dir)
+    dimensions = {
+        "multimodal": attachments_present,
+    }
+
+    toml_text = _build_task_toml(
+        task_id=input_task_dir.name,
+        initial_prompt=prompt_text,
+        required_skills=required_skills,
+        distractor_skills=distractor_skills,
+        env_vars=environment_env,
+        dependency_tags=[],
+        dimensions=dimensions,
+        verifier_env=verifier_env,
+        solution_env=solution_env,
+        pass_at_k=pass_at_k,
+        healthcheck_command=healthcheck_cmd,
+    )
+    data_dir = bundle / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    (data_dir / "task.toml").write_text(toml_text, encoding="utf-8")
+    if verbose:
+        print(
+            f"    staged task.toml (required={len(required_skills)} "
+            f"distractor={len(distractor_skills)} env_vars={len(env_vars)})"
+        )
+    return True
+
+
 def _stage_test_runners_and_solver(
     input_task_dir: Path | None,
     bundle: Path,
@@ -1182,6 +1868,8 @@ def convert_task(
                 "tracking_middleware.py",
                 "_meta.json",
                 "_overlay_manifest.json",
+                "__pycache__",
+                "*.pyc",
             ),
         )
 
@@ -1238,6 +1926,9 @@ def convert_task(
         print(f"    (no input dir matched under {input_root}; prompt/persona/artifacts skipped)")
 
     _stage_test_runners_and_solver(input_task_dir, bundle, verbose)
+    _stage_data_instruction(input_task_dir, bundle, verbose)
+    _stage_environment_dockerfile_and_compose(bundle, verbose)
+    _stage_task_toml(input_task_dir, bundle, verbose)
 
     produced_any = False
     for harness_dir in sorted(p for p in trajectories.iterdir() if p.is_dir()):
@@ -1394,6 +2085,9 @@ def stage_output_data(
         stage_persona_and_artifacts(input_task_dir, task_dir, verbose)
 
     _stage_test_runners_and_solver(input_task_dir, task_dir, verbose)
+    _stage_data_instruction(input_task_dir, task_dir, verbose)
+    _stage_environment_dockerfile_and_compose(task_dir, verbose)
+    _stage_task_toml(input_task_dir, task_dir, verbose)
     return True
 
 
