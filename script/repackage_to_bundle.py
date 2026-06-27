@@ -1870,6 +1870,15 @@ def convert_task(
                 "_overlay_manifest.json",
                 "__pycache__",
                 "*.pyc",
+                # Repo dev-tooling directory under environment/scripts/ (audit_data_formats.py,
+                # migrate_csv_to_json.py, wiring_report.py, format_audit.json, endpoint_run.log,
+                # wiring_report.json). Reference delivery (alex-santos-...) has no such dir.
+                # Leaks repo internals into delivery bundle. Added 2026-06-27 per user m1008.
+                "scripts",
+                # Internal R&D meta-skill under environment/skills/. Reference delivery shows
+                # 104 skills; ours had 105 with this extra. Leaks an in-progress / experimental
+                # skill into delivery. Added 2026-06-27 per user m1008.
+                "self-improving-agent-*",
             ),
         )
 
