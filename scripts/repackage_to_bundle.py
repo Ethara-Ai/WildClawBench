@@ -500,17 +500,56 @@ def _pick_rationale(c: dict[str, Any]) -> str:
     return ""
 
 
-def _build_rubric_block(score: dict[str, Any], infer_meta: bool) -> list[dict[str, Any]]:
+def _index_source_rubric(source_rubric: list[dict[str, Any]] | None) -> dict[str, dict[str, Any]]:
+    """Index the authoring rubric.json by number AND normalized criterion text.
+
+    rubric.json is the source of truth for `type` / `evaluation_target` /
+    `importance` — score.json never carries them. We key on both the R-number
+    and the normalized criterion text so a match still lands if numbering ever
+    drifts between the grader and the authoring file.
+    """
+    idx: dict[str, dict[str, Any]] = {}
+    for r in source_rubric or []:
+        if not isinstance(r, dict):
+            continue
+        num = str(r.get("number") or "").strip()
+        if num:
+            idx[f"#num:{num}"] = r
+        crit = re.sub(r"\s+", " ", str(r.get("criterion") or "")).strip().lower()
+        if crit:
+            idx[f"#crit:{crit}"] = r
+    return idx
+
+
+def _build_rubric_block(
+    score: dict[str, Any],
+    infer_meta: bool,
+    source_rubric: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
     rubric: list[dict[str, Any]] = []
+    src_idx = _index_source_rubric(source_rubric)
     for c in score.get("criteria", []):
         weight = c.get("weight", 0)
         is_positive = bool(c.get("is_positive", weight >= 0))
         criterion = c.get("criterion", "")
+        number = f"R{int(c.get('id', 0)) + 1}"
         importance = "critically_important" if abs(float(weight)) >= 5 else "important"
-        typ, target = _infer_meta(criterion, is_positive) if infer_meta else ("", "")
+        # Authoring rubric.json is authoritative for type/evaluation_target (and
+        # importance when present). Fall back to the keyword heuristic only when
+        # there is no source match AND --infer-rubric-meta was passed.
+        crit_key = re.sub(r"\s+", " ", str(criterion)).strip().lower()
+        src = src_idx.get(f"#num:{number}") or src_idx.get(f"#crit:{crit_key}")
+        if src:
+            typ = str(src.get("type") or "")
+            target = str(src.get("evaluation_target") or "")
+            importance = str(src.get("importance") or importance)
+        elif infer_meta:
+            typ, target = _infer_meta(criterion, is_positive)
+        else:
+            typ, target = "", ""
         passed = bool(c.get("passed", False))
         item: dict[str, Any] = {
-            "number": f"R{int(c.get('id', 0)) + 1}",
+            "number": number,
             "criterion": criterion,
             "type": typ,
             "evaluation_target": target,
@@ -556,7 +595,12 @@ def build_report(
     output_json = _load_json(run_dir / "output.json")
 
     pytest_block, ctrf_summary, reward_txt = _build_pytest_block(verifier)
-    rubric_block = _build_rubric_block(score, infer_meta)
+    # rubric.json (authoring source) carries the real type / evaluation_target /
+    # importance that score.json drops; merge them into the report rubric block.
+    source_rubric = _load_json(task_dir / "rubric.json")
+    if not isinstance(source_rubric, list):
+        source_rubric = None
+    rubric_block = _build_rubric_block(score, infer_meta, source_rubric)
 
     # Compute the weighted test percentage directly from the (weight, passed)
     # pairs we just built, so the published number is correct-by-construction

@@ -1029,6 +1029,19 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
                 use_council=task.get("__use_judge_council__"),
             )
             result["scores"] = scores
+            # tests_* in score.json are the DETERMINISTIC pytest counts, not a
+            # copy of the rubric criteria_*. grade_with_rubric() can only emit
+            # the criteria counts as a placeholder alias (it never sees the
+            # tests); now that the deterministic suite has already run, overwrite
+            # them with the real ctrf/test_executor counts so tests_* and
+            # criteria_* are no longer accidentally identical. Falls back to the
+            # criteria alias only when no deterministic suite ran.
+            if isinstance(scores, dict):
+                te = result.get("test_result") or {}
+                if isinstance(te, dict) and te.get("tests_total") is not None:
+                    scores["tests_total"] = int(te.get("tests_total", 0) or 0)
+                    scores["tests_passed"] = int(te.get("tests_passed", 0) or 0)
+                    scores["tests_failed"] = int(te.get("tests_failed", 0) or 0)
             if isinstance(scores, dict) and scores.get("usage"):
                 result["__judge_usage__"] = dict(scores["usage"])
             (output_dir / "score.json").write_text(
