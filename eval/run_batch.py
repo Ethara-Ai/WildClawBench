@@ -1489,6 +1489,25 @@ def run_single_task(
                     encoding="utf-8")
                 (verifier_dir / "test_output.log").write_text(
                     te.get("test_output", "") or "", encoding="utf-8")
+                # Mirror the test sources alongside the verifier outputs so a
+                # consumer reading `logs/verifier/` has BOTH the inputs (what
+                # we ran) and the outputs (what we got). Symmetrical with the
+                # bundle-side mirror in `script/repackage_to_bundle.py`
+                # `_stage_verifier_test_sources()`. The bundle copies these
+                # verbatim via `copy_verifier_logs` so the bundle inherits
+                # them automatically; we still emit them on the bundle side
+                # too so manual `repackage_to_bundle.py` runs against an
+                # older output tree backfill cleanly.
+                try:
+                    (verifier_dir / "test_outputs.py").write_text(
+                        task.get("test_code") or "", encoding="utf-8")
+                    (verifier_dir / "test_weights.json").write_text(
+                        task.get("test_weights") or "{}", encoding="utf-8")
+                    from src.utils.harbor.test_sh import generate_harbor_test_sh
+                    (verifier_dir / "test.sh").write_text(
+                        generate_harbor_test_sh(), encoding="utf-8")
+                except Exception as exc:
+                    logger.warning("[%s] verifier test sources mirror failed: %s", task_id, exc)
                 err_suffix = ""
                 if te["tests_total"] == 0 and te.get("error"):
                     err_suffix = f" ERROR={te['error']}"
@@ -1578,15 +1597,41 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
     sidecar + docker network (+ mock-API stack). Returns
     (use_litellm, litellm_yaml, network, sidecar, mock_env_dict, usage_log_path).
     Registers teardown callables onto `cleanups`. Falls back gracefully to
-    OpenRouter."""
+    OpenRouter.
+
+    SHARED-INFRA SHORT-CIRCUIT
+    --------------------------
+    When WCB_SHARED_NETWORK + WCB_SHARED_SIDECAR are set (by
+    `script/run.sh::bootstrap_shared_sidecar` calling
+    `eval/bootstrap_sidecar.py` once per batch), this function REUSES the
+    bash-owned network + sidecar instead of creating per-rep ones. Skipped:
+    `pull_litellm_image` / `ensure_litellm_headroom_image` /
+    `create_network` / writing the litellm yaml / `start_litellm` /
+    `wait_for_litellm_healthy` / `verify_litellm_upstream_reachable`.
+    `cleanups[]` does NOT register teardown for these — bash owns the
+    lifecycle via EXIT/INT/TERM trap. Per-task mock stack lifecycle is
+    UNCHANGED (still per-rep at `_start_task_mock_stack`); only the
+    batch-level sidecar+network become shared. See
+    `docs/reps-failure-diagnosis.md` §B1-B9 for the failure modes this
+    short-circuit eliminates."""
     use_litellm = args.litellm if args.litellm is not None else config.litellm_enabled()
     if not use_litellm:
         return False, "", "", "", {}, ""
 
+    shared_network = os.environ.get("WCB_SHARED_NETWORK", "").strip()
+    shared_sidecar = os.environ.get("WCB_SHARED_SIDECAR", "").strip()
+    shared_usage_log = os.environ.get("WCB_SHARED_SIDECAR_USAGE_LOG", "").strip()
+    shared_yaml_path = os.environ.get("WCB_SHARED_SIDECAR_YAML", "").strip()
+    shared_mode = bool(shared_network and shared_sidecar)
+
     import uuid as _uuid
     batch_id = _uuid.uuid4().hex[:12]
-    network = f"k3net-{batch_id}"
-    sidecar = f"ll-{batch_id}"
+    if shared_mode:
+        network = shared_network
+        sidecar = shared_sidecar
+    else:
+        network = f"k3net-{batch_id}"
+        sidecar = f"ll-{batch_id}"
 
     _agent_headroom = (os.environ.get("KENSEI_AGENT_HEADROOM_ENABLED", "").strip().lower()
                        in ("1", "true", "yes", "on"))
@@ -1606,20 +1651,28 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
             "Strict mode: refusing to silently downgrade to OpenRouter."
         )
 
-    pull_litellm_image()
-    if _agent_headroom:
-        ensure_litellm_headroom_image()
-    create_network(network)
-    cleanups.append(lambda: remove_network(network))
+    if not shared_mode:
+        pull_litellm_image()
+        if _agent_headroom:
+            ensure_litellm_headroom_image()
+        create_network(network)
+        cleanups.append(lambda: remove_network(network))
     config.work_dir.mkdir(parents=True, exist_ok=True)
-    cfg_path = config.work_dir / f"litellm-config-{batch_id}.yaml"
-    cfg_path.write_text(litellm_yaml, encoding="utf-8")
+    if shared_mode and shared_yaml_path and Path(shared_yaml_path).is_file():
+        cfg_path = Path(shared_yaml_path)
+    else:
+        cfg_path = config.work_dir / f"litellm-config-{batch_id}.yaml"
+        cfg_path.write_text(litellm_yaml, encoding="utf-8")
 
     callback_src = Path(__file__).resolve().parent.parent / "src" / "utils" / "litellm_usage_callback.py"
-    usage_dir = config.work_dir / f"litellm-usage-{batch_id}"
-    usage_dir.mkdir(parents=True, exist_ok=True)
-    usage_log_path = usage_dir / "usage.jsonl"
-    usage_log_path.touch(exist_ok=True)
+    if shared_mode and shared_usage_log:
+        usage_log_path = Path(shared_usage_log)
+        usage_dir = usage_log_path.parent
+    else:
+        usage_dir = config.work_dir / f"litellm-usage-{batch_id}"
+        usage_dir.mkdir(parents=True, exist_ok=True)
+        usage_log_path = usage_dir / "usage.jsonl"
+        usage_log_path.touch(exist_ok=True)
     # S-003 hardening: the LiteLLM sidecar writes back to these paths via
     # the `/var/litellm_usage` bind mount. Previously these were 0o666/0o777
     # (world-writable) to sidestep container-UID mismatch. The owner-only
@@ -1628,19 +1681,20 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
     # up in practice the failure surfaces in the warning log below and the
     # follow-up is to add `--user "$(uid):$(gid)"` to start_litellm rather
     # than re-opening the modes.
-    try:
-        os.chmod(usage_log_path, 0o600)
-        os.chmod(usage_dir, 0o700)
-    except OSError as _chmod_err:
-        logger.warning(
-            "[%s] chmod failed on litellm usage paths (%s) — "
-            "sidecar may be unable to write usage rows",
-            batch_id, _chmod_err,
-        )
+    if not shared_mode:
+        try:
+            os.chmod(usage_log_path, 0o600)
+            os.chmod(usage_dir, 0o700)
+        except OSError as _chmod_err:
+            logger.warning(
+                "[%s] chmod failed on litellm usage paths (%s) — "
+                "sidecar may be unable to write usage rows",
+                batch_id, _chmod_err,
+            )
 
     headroom_callback_src = ""
     headroom_log_dir_str = ""
-    if _agent_headroom:
+    if _agent_headroom and not shared_mode:
         headroom_callback_src = str(
             Path(__file__).resolve().parent.parent / "src" / "utils" / "litellm_headroom_callback.py"
         )
@@ -1656,47 +1710,54 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
             )
         headroom_log_dir_str = str(headroom_log_dir)
 
-    start_litellm(
-        container_name=sidecar,
-        network=network,
-        host_config_path=str(cfg_path),
-        master_key=config.litellm_master_key,
-        aws_bearer_token=config.aws_bearer_token,
-        aws_region=config.bedrock_region,
-        openai_api_key=config.openai_api_key,
-        openai_whisper_api_key=config.openai_whisper_api_key,
-        usage_callback_host_path=str(callback_src),
-        usage_log_host_dir=str(usage_dir),
-        headroom_callback_host_path=headroom_callback_src,
-        headroom_log_host_dir=headroom_log_dir_str,
-        enable_headroom=_agent_headroom,
-        anthropic_api_key=config.anthropic_api_key,
-    )
-    cleanups.append(lambda: stop_litellm(sidecar))
-    if not wait_for_litellm_healthy(sidecar):
-        raise RuntimeError(
-            f"LiteLLM sidecar {sidecar} did not become healthy in time. "
-            f"Strict mode: refusing to continue with a dead sidecar. "
-            f"Override budget via KENSEI_LITELLM_HEALTH_TIMEOUT env (seconds)."
+    if shared_mode:
+        logger.info(
+            "LiteLLM sidecar %s reused (shared-infra mode, network=%s); "
+            "skipping start/wait/verify — bash owns lifecycle",
+            sidecar, network,
         )
-    probe_model = (
-        "claude-opus-4.7" if (config.aws_bearer_token and config.bedrock_inference_arn) or config.anthropic_api_key
-        else "gpt-5.5" if config.openai_api_key
-        else ""
-    )
-    if probe_model:
-        ok, detail = verify_litellm_upstream_reachable(
-            sidecar, master_key=config.litellm_master_key, model_name=probe_model,
+    else:
+        start_litellm(
+            container_name=sidecar,
+            network=network,
+            host_config_path=str(cfg_path),
+            master_key=config.litellm_master_key,
+            aws_bearer_token=config.aws_bearer_token,
+            aws_region=config.bedrock_region,
+            openai_api_key=config.openai_api_key,
+            openai_whisper_api_key=config.openai_whisper_api_key,
+            usage_callback_host_path=str(callback_src),
+            usage_log_host_dir=str(usage_dir),
+            headroom_callback_host_path=headroom_callback_src,
+            headroom_log_host_dir=headroom_log_dir_str,
+            enable_headroom=_agent_headroom,
+            anthropic_api_key=config.anthropic_api_key,
         )
-        if not ok:
+        cleanups.append(lambda: stop_litellm(sidecar))
+        if not wait_for_litellm_healthy(sidecar):
             raise RuntimeError(
-                f"LiteLLM sidecar {sidecar} is up but upstream provider is unreachable "
-                f"via model={probe_model!r}: {detail}. This is the failure mode that "
-                f"produces 'LLM request timed out / Connection error.' in the agent's "
-                f"gateway.log (see openclaw.log 2026-06-02). Fix upstream egress "
-                f"(Bedrock IAM / region / network) before retrying."
+                f"LiteLLM sidecar {sidecar} did not become healthy in time. "
+                f"Strict mode: refusing to continue with a dead sidecar. "
+                f"Override budget via KENSEI_LITELLM_HEALTH_TIMEOUT env (seconds)."
             )
-    logger.info("LiteLLM sidecar %s ready on network %s", sidecar, network)
+        probe_model = (
+            "claude-opus-4.7" if (config.aws_bearer_token and config.bedrock_inference_arn) or config.anthropic_api_key
+            else "gpt-5.5" if config.openai_api_key
+            else ""
+        )
+        if probe_model:
+            ok, detail = verify_litellm_upstream_reachable(
+                sidecar, master_key=config.litellm_master_key, model_name=probe_model,
+            )
+            if not ok:
+                raise RuntimeError(
+                    f"LiteLLM sidecar {sidecar} is up but upstream provider is unreachable "
+                    f"via model={probe_model!r}: {detail}. This is the failure mode that "
+                    f"produces 'LLM request timed out / Connection error.' in the agent's "
+                    f"gateway.log (see openclaw.log 2026-06-02). Fix upstream egress "
+                    f"(Bedrock IAM / region / network) before retrying."
+                )
+        logger.info("LiteLLM sidecar %s ready on network %s", sidecar, network)
 
     mock_env_dict: dict[str, str] = {}
     if args.mock_stack:
