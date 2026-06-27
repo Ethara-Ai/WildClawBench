@@ -373,6 +373,115 @@ cleanup_orphans() {
     log::ok "Cleanup complete"
 }
 
+# --- shared infra: one sidecar + one network per batch -----------------------
+# Replaces per-rep sidecar/network setup. See docs/reps-failure-diagnosis.md
+# §B1-B9 and src/utils/AGENTS.md for the python-side short-circuit contract.
+# Globals written: WCB_SHARED_NETWORK, WCB_SHARED_SIDECAR (exported); also
+# the supporting WCB_SHARED_SIDECAR_USAGE_LOG / WCB_SHARED_SIDECAR_YAML /
+# WCB_SHARED_LITELLM_MASTER_KEY for the python side to reuse the same paths.
+# Initialize ONLY if unset/empty. Under -P >1, run_parallel_tasks fans out
+# `bash $SELF --task ... --skip-preflight` workers that inherit the parent's
+# exported WCB_SHARED_* env vars. Bare `VAR=""` at script-load would clobber
+# the inherited value with empty string before the bootstrap-gate at line
+# ~1011 could read it, defeating the entire shared-sidecar fix. Use
+# parameter-default expansion so the assignment is a no-op when the var is
+# already non-empty.
+: "${WCB_SHARED_NETWORK:=}"
+: "${WCB_SHARED_SIDECAR:=}"
+: "${WCB_SHARED_SIDECAR_USAGE_LOG:=}"
+: "${WCB_SHARED_SIDECAR_YAML:=}"
+: "${WCB_SHARED_LITELLM_MASTER_KEY:=}"
+# WCB_SHARED_OWNER_PID is the PID of the process that ran bootstrap_shared_sidecar
+# (always the parent run.sh). Workers under -P >1 inherit this via export. The
+# teardown_shared_sidecar guard at the top of that function uses this to refuse
+# to tear down infra that the worker does NOT own — without this guard, the
+# tmpdir-trap installed in every process (parent AND worker) at run.sh:~1029
+# fires teardown_shared_sidecar on worker exit, and the first finishing worker
+# yanks the shared sidecar out from under slower siblings. The reps still
+# "succeeded" in real testing only because Docker's `docker rm -f` race with
+# in-flight TCP completed in time on a fast laptop — load-dependent latent
+# race that would bite on slower hardware. Reproduced + fixed 2026-06-27.
+: "${WCB_SHARED_OWNER_PID:=}"
+
+bootstrap_shared_sidecar() {
+    log::rule "Bootstrap shared LiteLLM sidecar (one per batch, not per rep)"
+    local suffix tmpfile rc=0
+    suffix="$$-$(date +%Y%m%d_%H%M%S)"
+    tmpfile="$(mktemp -t wcb_bootstrap.XXXXXX)"
+
+    # python writes key=value to stdout; progress to stderr (tee'd to the
+    # user terminal). On non-zero exit, we fail loud and abort the batch —
+    # without the sidecar no reps can talk to Bedrock anyway.
+    if python3 eval/bootstrap_sidecar.py --name-suffix "$suffix" > "$tmpfile" 2> >(while read -r ln; do log::info "$ln"; done); then
+        rc=0
+    else
+        rc=$?
+    fi
+    if (( rc != 0 )); then
+        log::err "bootstrap_sidecar.py exited rc=$rc — aborting batch"
+        rm -f "$tmpfile"
+        return $rc
+    fi
+
+    # Parse the key=value lines. Empty values mean the bootstrap declined
+    # (e.g. no creds → OpenRouter fallback); we just don't export anything.
+    local k v
+    while IFS='=' read -r k v; do
+        case "$k" in
+            name)        WCB_SHARED_SIDECAR="$v" ;;
+            network)     WCB_SHARED_NETWORK="$v" ;;
+            usage_log)   WCB_SHARED_SIDECAR_USAGE_LOG="$v" ;;
+            yaml_path)   WCB_SHARED_SIDECAR_YAML="$v" ;;
+            master_key)  WCB_SHARED_LITELLM_MASTER_KEY="$v" ;;
+        esac
+    done < "$tmpfile"
+    rm -f "$tmpfile"
+
+    if [[ -z "$WCB_SHARED_SIDECAR" || -z "$WCB_SHARED_NETWORK" ]]; then
+        log::warn "Shared sidecar declined by bootstrap (no creds?); reps will fall back per-process"
+        return 0
+    fi
+
+    WCB_SHARED_OWNER_PID=$$
+    export WCB_SHARED_NETWORK WCB_SHARED_SIDECAR \
+           WCB_SHARED_SIDECAR_USAGE_LOG WCB_SHARED_SIDECAR_YAML \
+           WCB_SHARED_LITELLM_MASTER_KEY WCB_SHARED_OWNER_PID
+    log::ok "Shared sidecar=$WCB_SHARED_SIDECAR network=$WCB_SHARED_NETWORK owner_pid=$WCB_SHARED_OWNER_PID"
+
+    # Install teardown trap that fires on normal exit + Ctrl-C + SIGTERM,
+    # so an interrupted batch does not leak the sidecar/network. We REPLACE
+    # the existing EXIT trap (which only wiped the run marker) and chain
+    # cleanup_run_marker at the end so its prior contract is preserved.
+    trap 'teardown_shared_sidecar; cleanup_run_marker' EXIT
+    trap 'teardown_shared_sidecar; cleanup_run_marker; exit 130' INT
+    trap 'teardown_shared_sidecar; cleanup_run_marker; exit 143' TERM
+}
+
+teardown_shared_sidecar() {
+    # Owner-PID guard: under -P >1, workers fork via `bash $SELF --task ...`
+    # and inherit WCB_SHARED_* exports. Each worker's tmpdir-trap at
+    # run.sh:~1029 fires teardown_shared_sidecar on worker exit. Without this
+    # guard, the first finishing worker would `docker rm -f` the SHARED sidecar
+    # while slower siblings are still mid-flight, causing load-dependent
+    # failures. Only the process that bootstrapped (PID == owner) may tear down.
+    if [[ -n "${WCB_SHARED_OWNER_PID:-}" && "$$" != "$WCB_SHARED_OWNER_PID" ]]; then
+        return 0
+    fi
+    # Idempotent: blank-out the env vars so a re-entrant trap (e.g. EXIT
+    # firing after INT already ran) does not docker-rm twice.
+    [[ -z "${WCB_SHARED_SIDECAR:-}${WCB_SHARED_NETWORK:-}" ]] && return 0
+    local sc="${WCB_SHARED_SIDECAR:-}"
+    local nw="${WCB_SHARED_NETWORK:-}"
+    local yp="${WCB_SHARED_SIDECAR_YAML:-}"
+    WCB_SHARED_SIDECAR=""; WCB_SHARED_NETWORK=""
+    WCB_SHARED_SIDECAR_USAGE_LOG=""; WCB_SHARED_SIDECAR_YAML=""
+    WCB_SHARED_LITELLM_MASTER_KEY=""
+    log::info "Tearing down shared sidecar=${sc} network=${nw}"
+    [[ -n "$sc" ]] && docker rm -f "$sc" >/dev/null 2>&1 || true
+    [[ -n "$nw" ]] && docker network rm "$nw" >/dev/null 2>&1 || true
+    [[ -n "$yp" && -f "$yp" ]] && rm -f "$yp" 2>/dev/null || true
+}
+
 # Stamps "$RUN_RC" and "$RUN_LOG" globals so the retry loop can inspect.
 RUN_RC=0
 RUN_LOG=""
@@ -535,10 +644,21 @@ run_one_rep() {
         log::ok "Run $current (${model}) completed"
     fi
 
+    # Use `if` rather than `[[ -n ... ]] && printf` because the latter returns
+    # exit-code 1 on the success path (when $rep_failure is empty) — and that
+    # exit code becomes the brace group's exit code, which propagates as the
+    # function's exit code. Under `set -e` (run_one sets it at line 497 and
+    # never disables it) running inside a backgrounded subshell (run_one_rep
+    # is invoked from run_k_for_model_bg which is itself `&`-backgrounded by
+    # main()), bash errexit can terminate the for-loop at line 641 after rep 1
+    # succeeds, so reps 2..K never fire. Use `if` so the brace group's last
+    # command is always a successful printf.
     {
         printf 'failed=%d\n' "$rep_failed"
         printf 'recovered=%d\n' "$rep_recovered"
-        [[ -n "$rep_failure" ]] && printf 'failure=%s\n' "$rep_failure"
+        if [[ -n "$rep_failure" ]]; then
+            printf 'failure=%s\n' "$rep_failure"
+        fi
     } > "$frag"
 }
 
@@ -907,6 +1027,23 @@ main() {
         log::warn "Skipping preflight (--skip-preflight)"
     fi
 
+    # Shared infra: bring up ONE litellm sidecar + ONE docker network for the
+    # whole batch (all tasks × models × reps), instead of one per rep python
+    # process. See docs/reps-failure-diagnosis.md §B1-B9 (THIRTEEN unwrapped
+    # raise sites in the per-rep python setup) — making the sidecar a batch-
+    # singleton eliminates those raise sites from the rep loop entirely.
+    # Skipped under --skip-preflight (worker children inherit our exported
+    # WCB_SHARED_* env vars) AND when SKIP_SHARED_SIDECAR=1 is set (manual
+    # bypass for the rare direct `python3 eval/run_batch.py` invocation that
+    # needs its own sidecar lifecycle).
+    if (( SKIP_PREFLIGHT == 0 )) && (( USE_LITELLM == 1 )) \
+       && [[ "${SKIP_SHARED_SIDECAR:-0}" != "1" ]] \
+       && [[ -z "${WCB_SHARED_SIDECAR:-}" ]]; then
+        bootstrap_shared_sidecar || exit 1
+    elif [[ -n "${WCB_SHARED_SIDECAR:-}" ]]; then
+        log::info "Inheriting shared sidecar from parent: ${WCB_SHARED_SIDECAR}"
+    fi
+
     # Parallel-task launcher: fan THIS script out per task, failure-isolated.
     # Each worker is a normal single-task run.sh (made concurrency-safe by the
     # cleanup registry + flock-serialized mock-image build).
@@ -924,7 +1061,13 @@ main() {
 
     local tmpdir
     tmpdir=$(mktemp -d -t wildclaw_runsh.XXXXXX)
-    trap 'rm -rf "$tmpdir"; cleanup_run_marker' EXIT
+    # Invariant: every exit path (normal / Ctrl-C / SIGTERM) MUST call
+    # teardown_shared_sidecar OR the batch-singleton sidecar+network leak.
+    # teardown_shared_sidecar is idempotent and a no-op when no shared
+    # sidecar was set up.
+    trap 'rm -rf "$tmpdir"; teardown_shared_sidecar; cleanup_run_marker' EXIT
+    trap 'rm -rf "$tmpdir"; teardown_shared_sidecar; cleanup_run_marker; exit 130' INT
+    trap 'rm -rf "$tmpdir"; teardown_shared_sidecar; cleanup_run_marker; exit 143' TERM
 
     log::rule "Executing ${total} run(s)"
 
