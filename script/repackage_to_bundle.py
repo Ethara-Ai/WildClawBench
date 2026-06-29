@@ -244,11 +244,20 @@ HARNESS_ENV_DIR = HARNESS_ROOT / "environment"
 # what src/utils/mock_stack.py::start_mock_stack exports to the agent container,
 # so the published solve.sh references the same env var names the agent saw.
 TEST_OUTPUTS_FILENAME = "test_outputs.py"
+TEST_OUTPUTS_FILENAME_LEGACY = "test_output.py"
 TEST_WEIGHTS_FILENAME = "test_weights.json"
 TEST_SH_FILENAME = "test.sh"
 SOLVE_SH_FILENAME = "solve.sh"
 TESTS_SUBDIR = "tests"
 SOLUTION_SUBDIR = "solution"
+
+
+def _resolve_test_outputs_source(input_task_dir: Path) -> Path | None:
+    for name in (TEST_OUTPUTS_FILENAME, TEST_OUTPUTS_FILENAME_LEGACY):
+        cand = input_task_dir / name
+        if cand.is_file():
+            return cand
+    return None
 SERVICE_TOML_FILENAME = "service.toml"
 
 # Verbatim port of src/utils/harbor/test_sh.py::_TEST_SH (157-line static bash
@@ -816,9 +825,9 @@ def _stage_verifier_test_sources(
         test_sh_path.write_text(_generate_test_sh(), encoding="utf-8")
         wrote_test_sh = True
     if input_task_dir is not None:
-        src_outputs = input_task_dir / TEST_OUTPUTS_FILENAME
+        src_outputs = _resolve_test_outputs_source(input_task_dir)
         dst_outputs = dest_verifier / TEST_OUTPUTS_FILENAME
-        if src_outputs.is_file() and not dst_outputs.exists():
+        if src_outputs is not None and not dst_outputs.exists():
             shutil.copy2(src_outputs, dst_outputs)
             wrote_outputs = True
         src_weights = input_task_dir / TEST_WEIGHTS_FILENAME
@@ -1807,8 +1816,8 @@ def _stage_test_runners_and_solver(
     had_outputs = False
     had_weights = False
     if input_task_dir is not None:
-        src_outputs = input_task_dir / TEST_OUTPUTS_FILENAME
-        if src_outputs.is_file():
+        src_outputs = _resolve_test_outputs_source(input_task_dir)
+        if src_outputs is not None:
             tests_dir.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src_outputs, tests_dir / TEST_OUTPUTS_FILENAME)
             had_outputs = True
