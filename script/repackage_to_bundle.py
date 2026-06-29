@@ -1911,6 +1911,56 @@ def _bundle_data_ignore(dir: str, names: list[str]) -> set[str]:
     return ignored
 
 
+def _backfill_skill_scripts_from_baseline(bundle_env_dir: Path, verbose: bool) -> int:
+    """Backfill missing `skills/<connector>/scripts/` from <repo>/environment/.
+
+    The bundler sources skills from `output/<task>/data/environment/skills/`,
+    which is populated at run time by `src/utils/env_overlay_snapshot.py`.
+    If that stage didn't run (legacy outputs predating b63, manual re-bundle
+    of stale `output/` trees, etc.), per-connector `scripts/` dirs may be
+    missing from the output AND therefore from the bundle.
+
+    To guarantee deliverable bundles always carry per-connector helper
+    scripts (e.g. `fetch_<api>_data.py`), we backfill ONLY missing
+    `scripts/` subdirs from the canonical baseline at
+    `<repo>/environment/skills/<connector>/scripts/`. Existing bundle
+    scripts/ dirs are NEVER overwritten -- preserves any per-task
+    overlay/mutation. The top-level `environment/scripts/` dev-tooling dir
+    is NOT backfilled.
+
+    Returns the number of connector scripts/ dirs backfilled.
+    """
+    bundle_skills = bundle_env_dir / "skills"
+    baseline_skills = HARNESS_ENV_DIR / "skills"
+    if not bundle_skills.is_dir() or not baseline_skills.is_dir():
+        return 0
+    backfilled = 0
+    for bundle_skill in sorted(bundle_skills.iterdir()):
+        if not bundle_skill.is_dir():
+            continue
+        if not bundle_skill.name.endswith("-connector"):
+            continue
+        scripts_dst = bundle_skill / "scripts"
+        if scripts_dst.exists():
+            continue
+        scripts_src = baseline_skills / bundle_skill.name / "scripts"
+        if not scripts_src.is_dir():
+            continue
+        try:
+            shutil.copytree(
+                scripts_src,
+                scripts_dst,
+                ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+            )
+            backfilled += 1
+        except OSError as exc:
+            if verbose:
+                print(f"    backfill failed for {bundle_skill.name}/scripts: {exc}")
+    if verbose and backfilled:
+        print(f"    backfilled {backfilled} connector scripts/ dir(s) from <repo>/environment/skills/")
+    return backfilled
+
+
 def convert_task(
     task_dir: Path,
     dest_root: Path,
@@ -1936,6 +1986,7 @@ def convert_task(
             dirs_exist_ok=True,
             ignore=_bundle_data_ignore,
         )
+        _backfill_skill_scripts_from_baseline(bundle / "data" / "environment", verbose)
 
     # Re-source prompt.txt, persona/ and staged input files (stripped/altered in
     # run output) from the original input task dir, fuzzy-matched by persona core.
