@@ -1712,6 +1712,32 @@ def _stage_environment_dockerfile_and_compose(
     return True, True
 
 
+_L_TAG_RE = re.compile(r"^\s*(l1|l2)\s*:\s*(.+?)\s*$", re.MULTILINE)
+
+
+def _resolve_dependency_tags(input_task_dir: Path | None) -> list[str]:
+    """Multimodal dependency_tags = [l1, l2] sourced from input/<task>/task.yaml.
+
+    Mirrors Harbor bundle.py:_dependency_tags — the l1 then l2 *values* in order,
+    dropping any that are blank. Fail-soft: returns [] when task.yaml is absent or
+    unreadable, or when neither tag is present.
+    """
+    if input_task_dir is None:
+        return []
+    task_yaml = input_task_dir / "task.yaml"
+    if not task_yaml.is_file():
+        return []
+    try:
+        text = task_yaml.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return []
+    found: dict[str, str] = {}
+    for key, raw in _L_TAG_RE.findall(text):
+        if key not in found:
+            found[key] = raw.strip().strip("'\"").strip()
+    return [v for v in (found.get("l1"), found.get("l2")) if v]
+
+
 def _stage_task_toml(
     input_task_dir: Path | None,
     bundle: Path,
@@ -1774,6 +1800,7 @@ def _stage_task_toml(
     dimensions = {
         "multimodal": attachments_present,
     }
+    dependency_tags = _resolve_dependency_tags(input_task_dir)
 
     toml_text = _build_task_toml(
         task_id=input_task_dir.name,
@@ -1781,7 +1808,7 @@ def _stage_task_toml(
         required_skills=required_skills,
         distractor_skills=distractor_skills,
         env_vars=environment_env,
-        dependency_tags=[],
+        dependency_tags=dependency_tags,
         dimensions=dimensions,
         verifier_env=verifier_env,
         solution_env=solution_env,
@@ -1794,7 +1821,8 @@ def _stage_task_toml(
     if verbose:
         print(
             f"    staged task.toml (required={len(required_skills)} "
-            f"distractor={len(distractor_skills)} env_vars={len(env_vars)})"
+            f"distractor={len(distractor_skills)} env_vars={len(env_vars)} "
+            f"dependency_tags={dependency_tags})"
         )
     return True
 
@@ -1847,6 +1875,40 @@ def _stage_test_runners_and_solver(
     return had_outputs, had_weights, wrote_test_sh, wrote_solve_sh
 
 
+# Basename-anywhere patterns stripped from the copied data/ tree. NOTE: "scripts"
+# is deliberately NOT here — see _bundle_data_ignore. ignore_patterns matches a
+# basename at every depth, so a blanket "scripts" would also delete every
+# skills/<connector>/scripts/ dir (the connector helper scripts), not just the
+# repo dev-tooling environment/scripts/ dir we actually want gone.
+_BUNDLE_DATA_IGNORE_NAMES = shutil.ignore_patterns(
+    "litellm-proxy",
+    "API_DOCUMENTATION.md",
+    "sqlite_mcp_server.db",
+    "tracking_middleware.py",
+    "_meta.json",
+    "_overlay_manifest.json",
+    "__pycache__",
+    "*.pyc",
+    # Internal R&D meta-skill under environment/skills/. Reference delivery shows
+    # 104 skills; ours had 105 with this extra. Added 2026-06-27 per user m1008.
+    "self-improving-agent-*",
+)
+
+
+def _bundle_data_ignore(dir: str, names: list[str]) -> set[str]:
+    """copytree ignore: the name patterns above, plus environment/scripts ONLY.
+
+    The repo dev-tooling dir environment/scripts/ (audit_data_formats.py,
+    migrate_csv_to_json.py, wiring_report.*, ...) must be stripped, but the
+    per-connector skills/<name>/scripts/ dirs must survive. A path-aware check
+    drops `scripts` only when it sits directly under environment/.
+    """
+    ignored = set(_BUNDLE_DATA_IGNORE_NAMES(dir, names))
+    if Path(dir).name == "environment" and "scripts" in names:
+        ignored.add("scripts")
+    return ignored
+
+
 def convert_task(
     task_dir: Path,
     dest_root: Path,
@@ -1870,25 +1932,7 @@ def convert_task(
             task_dir / "data",
             bundle / "data",
             dirs_exist_ok=True,
-            ignore=shutil.ignore_patterns(
-                "litellm-proxy",
-                "API_DOCUMENTATION.md",
-                "sqlite_mcp_server.db",
-                "tracking_middleware.py",
-                "_meta.json",
-                "_overlay_manifest.json",
-                "__pycache__",
-                "*.pyc",
-                # Repo dev-tooling directory under environment/scripts/ (audit_data_formats.py,
-                # migrate_csv_to_json.py, wiring_report.py, format_audit.json, endpoint_run.log,
-                # wiring_report.json). Reference delivery (alex-santos-...) has no such dir.
-                # Leaks repo internals into delivery bundle. Added 2026-06-27 per user m1008.
-                "scripts",
-                # Internal R&D meta-skill under environment/skills/. Reference delivery shows
-                # 104 skills; ours had 105 with this extra. Leaks an in-progress / experimental
-                # skill into delivery. Added 2026-06-27 per user m1008.
-                "self-improving-agent-*",
-            ),
+            ignore=_bundle_data_ignore,
         )
 
     # Re-source prompt.txt, persona/ and staged input files (stripped/altered in
