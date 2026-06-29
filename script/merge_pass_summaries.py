@@ -18,9 +18,16 @@ script merges them into a single pass_summary.json that:
   * is BACKWARD-COMPATIBLE with the legacy schema fields
     (average_test_weights_percentage / average_rubric_weights_percentage)
 
-The output is what `_pass_summary_doc()` in eval/run_batch.py would have
-written if all reps had been done in one place, with the addition of
-pass@K stats (max-per-run) for both rubric and test channels.
+The output is STRICTLY indistinguishable from what `_pass_summary_doc()`
+in eval/run_batch.py would have written if all reps had been done in one
+place (legacy harness shape: model, runs, average_test_weights_percentage,
+average_rubric_weights_percentage, per_run with run_index +
+include_multimodal + test_weights_percentage + rubric_weights_percentage).
+This makes merged files first-class pass_summary.json artifacts -- they
+can be delivered as if produced by a single batch run.
+
+Pass --extended to additionally emit pass@K stats (max-per-run) and
+extra reward averages plus a merged_from audit trail.
 
 USAGE
 -----
@@ -117,13 +124,41 @@ def _load(path: Path) -> dict:
     return data
 
 
-def merge_pass_summaries(inputs: list[Path], dedup: bool = False) -> dict:
+LEGACY_TOP_KEYS = (
+    "model",
+    "runs",
+    "average_test_weights_percentage",
+    "average_rubric_weights_percentage",
+    "per_run",
+)
+LEGACY_PER_RUN_KEYS = (
+    "run_index",
+    "include_multimodal",
+    "test_weights_percentage",
+    "rubric_weights_percentage",
+)
+
+
+def merge_pass_summaries(
+    inputs: list[Path],
+    dedup: bool = False,
+    extended: bool = False,
+) -> dict:
     """Merge two or more pass_summary.json dicts into one canonical doc.
 
     Returns the merged document. Does not write to disk.
     When dedup=False (default), every input rep is kept as a distinct rep
     (1+7 -> 8). When dedup=True, reps whose non-index fields are identical
     are kept ONCE (useful when the same file was passed twice by accident).
+
+    Default output conforms STRICTLY to the legacy harness emission shape
+    written by eval/run_batch.py::_pass_summary_doc() under the legacy
+    schema -- the same 5 top-level keys and 4 per-run keys produced when
+    the run was a single batch. Indistinguishable from a first-class
+    pass_summary.json from the harness. Pass extended=True to additionally
+    emit the rich schema (average_reward, average_combined_reward,
+    average_rubric_reward, average_test_reward, pass_at_k_* fields,
+    merged_from audit trail).
     """
     if len(inputs) < 2:
         sys.stderr.write("error: need at least 2 input files to merge\n")
@@ -162,19 +197,37 @@ def merge_pass_summaries(inputs: list[Path], dedup: bool = False) -> dict:
     def col(field: str) -> list[float | None]:
         return [_f(rec.get(field)) for rec in merged_runs]
 
+    avg_rubric_pct = _mean(col("rubric_weights_percentage"))
+    avg_test_pct = _mean(col("test_weights_percentage"))
+
+    if not extended:
+        legacy_per_run: list[dict] = []
+        for rec in merged_runs:
+            out: dict = {
+                "run_index": rec.get("run_index"),
+                "include_multimodal": bool(rec.get("include_multimodal", True)),
+                "test_weights_percentage": rec.get("test_weights_percentage"),
+                "rubric_weights_percentage": rec.get("rubric_weights_percentage"),
+            }
+            legacy_per_run.append(out)
+        return {
+            "model": model,
+            "runs": len(legacy_per_run),
+            "average_test_weights_percentage": _round_or_none(avg_test_pct),
+            "average_rubric_weights_percentage": _round_or_none(avg_rubric_pct),
+            "per_run": legacy_per_run,
+        }
+
     avg_reward = _mean(col("reward")) or 0.0
     avg_combined = _mean(col("combined_reward"))
     avg_rubric = _mean(col("rubric_reward"))
     avg_test = _mean(col("test_reward"))
-    avg_rubric_pct = _mean(col("rubric_weights_percentage"))
-    avg_test_pct = _mean(col("test_weights_percentage"))
-
     pass_at_k_rubric_pct = _pmax(col("rubric_weights_percentage"))
     pass_at_k_test_pct = _pmax(col("test_weights_percentage"))
     pass_at_k_reward = _pmax(col("reward"))
     pass_at_k_combined = _pmax(col("combined_reward"))
 
-    merged = {
+    return {
         "model": model,
         "runs": len(merged_runs),
         "average_reward": avg_reward,
@@ -190,7 +243,6 @@ def merge_pass_summaries(inputs: list[Path], dedup: bool = False) -> dict:
         "merged_from": [str(p) for p in inputs],
         "per_run": merged_runs,
     }
-    return merged
 
 
 def main() -> int:
@@ -229,12 +281,22 @@ def main() -> int:
             "preserves every rep as a distinct rep (1 + 7 = 8)."
         ),
     )
+    parser.add_argument(
+        "--extended",
+        action="store_true",
+        help=(
+            "Emit the rich (extended) schema with pass@K stats, additional reward "
+            "averages, and a merged_from audit trail. Default output is the legacy "
+            "harness shape -- indistinguishable from a first-class pass_summary.json "
+            "emitted by eval/run_batch.py."
+        ),
+    )
     args = parser.parse_args()
 
     if len(args.inputs) < 2:
         parser.error("at least 2 input files are required")
 
-    merged = merge_pass_summaries(args.inputs, dedup=args.dedup)
+    merged = merge_pass_summaries(args.inputs, dedup=args.dedup, extended=args.extended)
     text = json.dumps(merged, indent=args.indent) + "\n"
 
     if args.in_place:
