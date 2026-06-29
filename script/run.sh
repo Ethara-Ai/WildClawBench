@@ -996,9 +996,9 @@ main() {
 
     log::section "WildClawBench runner"
     log::kv "Mode"     "$MODE"
-    log::kv "Tasks"    "${#TASKS[@]} (sequential)"
-    log::kv "Models"   "${models[*]} ($( (( ${#models[@]} > 1 )) && echo 'parallel' || echo 'single' ))"
-    log::kv "Reps"     "$K per (task,model), $( (( PARALLEL_REPS == 1 )) && echo 'parallel' || echo 'sequential' )"
+    log::kv "Tasks"    "${#TASKS[@]}"
+    log::kv "Models"   "${models[*]}"
+    log::kv "Reps"     "$K per (task,model)"
     log::kv "Backend"  "$BACKEND"
     log::kv "Thinking" "$THINKING"
     local feats=()

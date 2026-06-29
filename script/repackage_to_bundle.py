@@ -1720,7 +1720,9 @@ def _resolve_dependency_tags(input_task_dir: Path | None) -> list[str]:
 
     Mirrors Harbor bundle.py:_dependency_tags — the l1 then l2 *values* in order,
     dropping any that are blank. Fail-soft: returns [] when task.yaml is absent or
-    unreadable, or when neither tag is present.
+    unreadable, or when neither tag is present. Stdlib-only (no PyYAML) per the
+    standalone-stdlib invariant; the flat `key: value` schema in task.yaml is
+    simple enough that a regex match is safer than a third-party YAML parser.
     """
     if input_task_dir is None:
         return []

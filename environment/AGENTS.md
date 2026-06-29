@@ -44,3 +44,26 @@ app = FastAPI(...); install_tracker(app); install_admin_plane(app, store=<name>_
   plain mocks; only DriftDirector (host) flips `MOCK_ADMIN_ENABLED=1`.
 - Don't let `/admin/*` or `/audit/*` show up in agent-visible audit logs (skip-lists already set).
 - `skills/` comments still say "Kensei2" — that's vendored heritage, not a new dependency.
+  Same for "Kensei3" references; don't "fix" them.
+
+## STORE INVARIANTS (`_mutable_store.py`)
+- `:235` — sibling `.csv` overlay ALWAYS wins over baked `.json` for the same key.
+- `:891` — file blobs read from `<api_dir>/file_blobs/<basename>`; these MUST NEVER touch the
+  agent's `/root/workspace/` — read-only bind mount only.
+- The per-task `:ro` file mounts under `/opt/mocks/<api>/` (set up by
+  `src/utils/mock_stack.py::start_mock_stack(overlays=...)`) are the runtime view this directory
+  serves. The host-side equivalent — `environment/<api>/` baseline merged with
+  `input/<task>/mock_data/<api>/` overlays — is snapshotted into
+  `output/<backend>/<task>/data/environment/<api>/` by `src/utils/env_overlay_snapshot.py` so
+  bundles + downstream tooling can inspect EXACTLY what each mock served. If you change baseline
+  layout or filename conventions here, audit `env_overlay_snapshot.py` and the bundler in lockstep.
+
+## IMAGE BUILD
+- Mock image is `kensei3-mocks:v1`; content-hash labeled over `environment/*`.
+- After editing any `<name>_data.py` or shared-plane file: `KENSEI_MOCK_REBUILD=1 <cmd>`.
+- All per-API Dockerfiles are `python:3.12-slim` SHA-pinned, use hash-verified
+  `pip install --require-hashes -r requirements-locked.txt`, run as non-root `app` user.
+
+## DOCKERFILE PINNING POLICY
+- Each `<name>-api/requirements-locked.txt` is hash-pinned. NEVER regenerate without re-running
+  `pip-compile --generate-hashes` and committing both `.in` and `.txt` together.

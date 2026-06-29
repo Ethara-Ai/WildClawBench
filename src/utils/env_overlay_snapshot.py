@@ -78,6 +78,32 @@ def _iter_api_dirs(env_baseline: Path) -> Iterable[Path]:
     )
 
 
+def _per_api_copytree_ignore(api_name: str, api_root: Path):
+    """Path-aware ignore for a single api / top-level env subdir copy.
+
+    Build artifacts (__pycache__, *.pyc) are stripped at any depth -- they
+    are never legitimate content for the bundle. The "self-improving-agent-*"
+    filter only applies when the iteration is at <skills>/ root (it's an
+    internal R&D meta-skill, never under api dirs anyway). The "scripts"
+    name is NEVER stripped here -- shipping `<skill>/scripts/` is the
+    common case for connector skills. The top-level `environment/scripts/`
+    dir is already prevented from being iterated via _SKIP_TOPLEVEL_NAMES.
+    """
+    root = api_root.resolve()
+
+    def _ignore(src_dir: str, names):
+        src = Path(src_dir).resolve()
+        out: set[str] = set()
+        for n in names:
+            if n == "__pycache__" or n.endswith(".pyc"):
+                out.add(n)
+            elif api_name == "skills" and src == root and n.startswith("self-improving-agent-"):
+                out.add(n)
+        return out
+
+    return _ignore
+
+
 def stage_environment_with_overlays(
     env_baseline: Path,
     overlays: dict | None,
@@ -154,31 +180,10 @@ def stage_environment_with_overlays(
 
         baseline_api_dir = baseline_apis.get(api)
         if baseline_api_dir is not None:
-            # Lock-step with script/repackage_to_bundle.py:1864-1881
-            # ignore_patterns (b62). Without these filters the output-side
-            # data/environment/<api>/ would leak:
-            #   - scripts/   (repo dev-tooling subdir, e.g. environment/scripts/
-            #     with audit_data_formats.py + migrate_csv_to_json.py +
-            #     wiring_report.py + endpoint_run.log + format_audit.json +
-            #     wiring_report.json -- engineering scaffolding, NEVER for
-            #     graded recipients).
-            #   - self-improving-agent-*  (internal R&D meta-skill subtree,
-            #     NEVER for delivery).
-            #   - __pycache__/ + *.pyc  (build artifacts; bundler strips them
-            #     for cleanliness, this side must match to preserve the
-            #     --stage-output-data parity contract in b53).
-            # The bundler strips the same set when reading from output/<task>/
-            # so the canonical deliverable already excluded them; this fix
-            # closes the parity gap on the source-of-truth side.
             shutil.copytree(
                 baseline_api_dir,
                 api_dest,
-                ignore=shutil.ignore_patterns(
-                    "scripts",
-                    "self-improving-agent-*",
-                    "__pycache__",
-                    "*.pyc",
-                ),
+                ignore=_per_api_copytree_ignore(api, baseline_api_dir),
             )
         else:
             api_dest.mkdir(parents=True, exist_ok=True)
