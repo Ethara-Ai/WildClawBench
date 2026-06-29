@@ -39,6 +39,27 @@ from typing import Iterable
 
 MANIFEST_FILENAME = "_overlay_manifest.json"
 
+# Top-level subdirs under environment/ that this module must NEVER snapshot
+# into output/<backend>/<task>/data/environment/. Lock-step with the bundler
+# ignore_patterns at script/repackage_to_bundle.py:1864-1881 (b62) so the
+# --stage-output-data parity contract (b53) holds end-to-end:
+#   - "scripts": repo dev-tooling (audit_data_formats.py, migrate_csv_to_json.py,
+#     wiring_report.py, endpoint_run.log, format_audit.json, wiring_report.json)
+#     -- engineering scaffolding, never for graded recipients.
+# Filename-glob patterns inside per-api copies (e.g. *.pyc, __pycache__) are
+# handled separately via shutil.ignore_patterns(...) on the copytree call below.
+_SKIP_TOPLEVEL_NAMES: frozenset[str] = frozenset({"scripts", "__pycache__"})
+
+# Top-level subdir name PREFIXES under environment/ that must NEVER snapshot
+# (fnmatch-style globs against the leaf name).
+_SKIP_TOPLEVEL_PREFIXES: tuple[str, ...] = ("self-improving-agent-",)
+
+
+def _is_skipped_toplevel(name: str) -> bool:
+    if name in _SKIP_TOPLEVEL_NAMES:
+        return True
+    return any(name.startswith(p) for p in _SKIP_TOPLEVEL_PREFIXES)
+
 
 def _sha256_file(path: Path) -> str:
     h = hashlib.sha256()
@@ -51,7 +72,10 @@ def _sha256_file(path: Path) -> str:
 def _iter_api_dirs(env_baseline: Path) -> Iterable[Path]:
     if not env_baseline.is_dir():
         return []
-    return sorted(p for p in env_baseline.iterdir() if p.is_dir())
+    return sorted(
+        p for p in env_baseline.iterdir()
+        if p.is_dir() and not _is_skipped_toplevel(p.name)
+    )
 
 
 def stage_environment_with_overlays(
@@ -115,7 +139,10 @@ def stage_environment_with_overlays(
     # api dir that's not in baseline -- unusual but matches container's
     # ability to mount into a fresh path).
     baseline_apis = {p.name: p for p in _iter_api_dirs(env_baseline)}
-    overlay_apis = {api for api in overlays.keys() if isinstance(api, str)}
+    overlay_apis = {
+        api for api in overlays.keys()
+        if isinstance(api, str) and not _is_skipped_toplevel(api)
+    }
     all_apis = sorted(set(baseline_apis.keys()) | overlay_apis)
 
     for api in all_apis:
@@ -127,7 +154,32 @@ def stage_environment_with_overlays(
 
         baseline_api_dir = baseline_apis.get(api)
         if baseline_api_dir is not None:
-            shutil.copytree(baseline_api_dir, api_dest)
+            # Lock-step with script/repackage_to_bundle.py:1864-1881
+            # ignore_patterns (b62). Without these filters the output-side
+            # data/environment/<api>/ would leak:
+            #   - scripts/   (repo dev-tooling subdir, e.g. environment/scripts/
+            #     with audit_data_formats.py + migrate_csv_to_json.py +
+            #     wiring_report.py + endpoint_run.log + format_audit.json +
+            #     wiring_report.json -- engineering scaffolding, NEVER for
+            #     graded recipients).
+            #   - self-improving-agent-*  (internal R&D meta-skill subtree,
+            #     NEVER for delivery).
+            #   - __pycache__/ + *.pyc  (build artifacts; bundler strips them
+            #     for cleanliness, this side must match to preserve the
+            #     --stage-output-data parity contract in b53).
+            # The bundler strips the same set when reading from output/<task>/
+            # so the canonical deliverable already excluded them; this fix
+            # closes the parity gap on the source-of-truth side.
+            shutil.copytree(
+                baseline_api_dir,
+                api_dest,
+                ignore=shutil.ignore_patterns(
+                    "scripts",
+                    "self-improving-agent-*",
+                    "__pycache__",
+                    "*.pyc",
+                ),
+            )
         else:
             api_dest.mkdir(parents=True, exist_ok=True)
 
