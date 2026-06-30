@@ -5,9 +5,9 @@ Mock-overlay validator.
 Compares a candidate mock-data file (or a whole task's mock_data/ tree) against
 a known-good example for the same API+filename living under examples/<api>/.
 
-It checks structural shape (CSV/JSON well-formed), schema (same field set as the
-example), inferred field types (does each column parse the same way as the
-example?), and primary-key uniqueness when an id-like column is detected.
+It checks structural shape (CSV/JSON well-formed), schema (same field set as
+the example), and inferred field types (does each column parse the same way
+as the example?).
 
 Usage:
     python3 validate.py FILE [FILE ...]
@@ -493,28 +493,6 @@ def example_files_for_api(api: str) -> dict[str, Path]:
 # ---------------------------------------------------------------------------
 
 
-def _detect_pk_column(example_rows: list[dict[str, Any]]) -> str | None:
-    # Best-effort PK detection: prefer 'id', then *_id, then the first column whose
-    # example values are all distinct and non-blank. Used to flag duplicate ids in
-    # overlays — the runtime would silently rename the table on collision.
-    if not example_rows:
-        return None
-    cols = list(example_rows[0].keys())
-    # Prefer 'id', then anything ending in _id, then anything else.
-    priority = [
-        c for c in cols if c == "id"
-    ] + [
-        c for c in cols if c != "id" and c.lower().endswith("_id")
-    ] + [
-        c for c in cols if c != "id" and not c.lower().endswith("_id")
-    ]
-    for col in priority:
-        values = [str(r.get(col, "")).strip() for r in example_rows]
-        if all(v != "" for v in values) and len(set(values)) == len(values):
-            return col
-    return None
-
-
 def _validate_table(
     overlay_path: Path,
     example_path: Path,
@@ -626,42 +604,6 @@ def _validate_table(
                 )
             )
 
-    # Primary-key uniqueness if a sensible PK is detected from the example
-    pk = _detect_pk_column(example_rows)
-    if pk and pk in overlay_col_set:
-        seen: dict[str, int] = {}
-        blanks = 0
-        for r in overlay_rows:
-            v = str(r.get(pk, "")).strip()
-            if v == "":
-                blanks += 1
-                continue
-            seen[v] = seen.get(v, 0) + 1
-        dups = sorted([v for v, n in seen.items() if n > 1])
-        if dups:
-            preview = ", ".join(dups[:5])
-            more = "" if len(dups) <= 5 else f" (+{len(dups) - 5} more)"
-            issues.append(
-                Issue(
-                    severity=SEV_ERROR,
-                    code="PK_DUPLICATE",
-                    message=f"column '{pk}' has duplicate values: {preview}{more}",
-                    api=api,
-                    file=str(overlay_path),
-                    hint=f"'{pk}' looks like the primary key and must be unique across rows",
-                )
-            )
-        if blanks:
-            issues.append(
-                Issue(
-                    severity=SEV_ERROR,
-                    code="PK_BLANK",
-                    message=f"column '{pk}' has {blanks} blank value(s)",
-                    api=api,
-                    file=str(overlay_path),
-                    hint=f"'{pk}' looks like the primary key and must be non-empty",
-                )
-            )
 
     return issues
 

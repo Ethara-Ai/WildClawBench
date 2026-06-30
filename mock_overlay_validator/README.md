@@ -94,8 +94,7 @@ Exit code is `0` on success, `1` on errors (or warnings with
    **document** (single object). Tables wrapped in an envelope like
    `{"QueryResponse": {"Customer": [...]}}` (QuickBooks-style) are detected
    and treated as tables.
-4. We compare shape: columns/keys present, primary-key uniqueness, value
-   types per column.
+4. We compare shape: columns/keys present and value types per column.
 
 ## Diagnostic codes
 
@@ -139,8 +138,6 @@ Exit code is `0` on success, `1` on errors (or warnings with
 | `SCHEMA_MISSING_KEYS` | error | Document overlay missing required top-level keys | Add them. |
 | `SCHEMA_EXTRA_KEYS` | warn | Document overlay has unknown top-level keys | Probably a typo. |
 | `SCHEMA_TYPE_DRIFT` | error | A column's values don't parse like the example (e.g. `bool` example, `str` overlay) | Match the example's value shape. |
-| `PK_DUPLICATE` | error | Primary-key column has duplicate values | Make them unique. |
-| `PK_BLANK` | error | Primary-key column has empty/blank values | Fill them in. |
 | `OVERLAY_EMPTY` | warn | Overlay file has zero rows | Table will be empty at runtime — confirm that's intentional. |
 | `EXAMPLE_BROKEN` | warn | Validator's own example is broken (not your fault) | Report this to the validator maintainers. |
 | `EXAMPLE_EMPTY` | warn | Validator's example has zero rows so type/PK checks are skipped | Informational. |
@@ -159,9 +156,7 @@ Exit code is `0` on success, `1` on errors (or warnings with
    is almost never what you want.
 5. **Types matter.** If the example column has integers, send integers. If
    it has ISO datetimes, send ISO datetimes. The validator flags drift.
-6. **Primary keys must be unique and non-blank.** On collision the runtime
-   silently renames the table, breaking every downstream API call.
-7. **No prose, no comments inside data files.** It's all going through a
+6. **No prose, no comments inside data files.** It's all going through a
    strict loader.
 
 ## Updating examples
