@@ -32,7 +32,7 @@ Output:
 
 ```
 usage: merge_pass_summaries.py [-h] [-o OUTPUT | --in-place] [--indent INDENT]
-                               [--dedup]
+                               [--dedup] [--extended]
                                inputs [inputs ...]
 
 Merge multiple pass_summary.json files into one consolidated summary.
@@ -46,7 +46,11 @@ options:
   --in-place           Overwrite the FIRST input file with the merged result.
   --indent INDENT      JSON indent (default: 2)
   --dedup              Drop bit-identical reps (default = concat, 1+7=8).
+  --extended           Emit rich schema with pass@K + reward averages + merged_from
+                       audit trail. Default emits the legacy harness shape only.
 ```
+
+**Default output** conforms strictly to the legacy `_pass_summary_doc()` shape from `eval/run_batch.py` — indistinguishable from a first-class harness emission. Use `--extended` when you want pass@K stats, the rich reward averages, and a `merged_from` audit trail.
 
 ---
 
@@ -153,6 +157,29 @@ Auto-discovers all `pass_summary*.json` files per task, merges them, writes the 
 
 ## What the output looks like
 
+### Default mode (legacy harness shape — indistinguishable from real `pass_summary.json`)
+
+```json
+{
+  "model": "Claude Opus 4.7",
+  "runs": 8,
+  "average_test_weights_percentage": 6.82,
+  "average_rubric_weights_percentage": 9.56,
+  "per_run": [
+    {"run_index": 1, "include_multimodal": true, "test_weights_percentage": 6.82, "rubric_weights_percentage": 14.71},
+    {"run_index": 2, "include_multimodal": true, "test_weights_percentage": 6.82, "rubric_weights_percentage": 8.82},
+    "...",
+    {"run_index": 8, "include_multimodal": true, "test_weights_percentage": 6.82, "rubric_weights_percentage": 8.82}
+  ]
+}
+```
+
+This is byte-equivalent to what `eval/run_batch.py::_pass_summary_doc()` emits when all reps run in a single batch under the legacy schema. Drop-in replacement for a first-class `pass_summary.json`.
+
+### Extended mode (`--extended`)
+
+Adds pass@K stats, the rich reward averages, and a `merged_from` audit trail:
+
 ```json
 {
   "model": "Claude Opus 4.7",
@@ -173,25 +200,23 @@ Auto-discovers all `pass_summary*.json` files per task, merges them, writes the 
   ],
   "per_run": [
     {"run_index": 1, "include_multimodal": true, "test_weights_percentage": 6.82, "rubric_weights_percentage": 14.71},
-    {"run_index": 2, "include_multimodal": true, "test_weights_percentage": 6.82, "rubric_weights_percentage": 8.82},
-    "...",
-    {"run_index": 8, "include_multimodal": true, "test_weights_percentage": 6.82, "rubric_weights_percentage": 8.82}
+    "..."
   ]
 }
 ```
 
 ### Field reference
 
-| Field | Description |
-|-------|-------------|
-| `model` | Carried through from inputs (all inputs must agree, else error). |
-| `runs` | Count of per-rep records in the merged result. |
-| `average_test_weights_percentage` | Mean test % across all merged reps (legacy schema). |
-| `average_rubric_weights_percentage` | Mean rubric % across all merged reps (legacy schema). |
-| `average_reward`, `average_combined_reward`, `average_rubric_reward`, `average_test_reward` | Means from the current schema (`null` when source files only have the legacy schema). |
-| `pass_at_k_*` | Max of per-rep values (best-case = pass@K with K = total reps). |
-| `merged_from` | Audit trail of source paths. |
-| `per_run` | Concatenated per-rep records, renumbered `run_index` 1..N contiguous. Original fields preserved verbatim per record. |
+| Field | Mode | Description |
+|-------|------|-------------|
+| `model` | both | Carried through from inputs (all inputs must agree, else error). |
+| `runs` | both | Count of per-rep records in the merged result. |
+| `average_test_weights_percentage` | both | Mean test % across all merged reps. |
+| `average_rubric_weights_percentage` | both | Mean rubric % across all merged reps. |
+| `average_reward`, `average_combined_reward`, `average_rubric_reward`, `average_test_reward` | extended only | Means from the current rich schema (`null` when source files only have legacy fields). |
+| `pass_at_k_*` | extended only | Max of per-rep values (best-case = pass@K with K = total reps). |
+| `merged_from` | extended only | Audit trail of source paths. |
+| `per_run` | both | Concatenated per-rep records, renumbered `run_index` 1..N contiguous. In default mode, each rep carries the 4 legacy keys; in extended mode, the original rich fields are preserved verbatim. |
 
 ---
 
@@ -209,7 +234,7 @@ The script prints a descriptive error to stderr before exiting non-zero.
 ## Quick reference cheat sheet
 
 ```bash
-# Merge to file
+# Merge to file (default: legacy harness shape)
 python3 script/merge_pass_summaries.py A.json B.json -o merged.json
 
 # Merge to stdout
@@ -220,6 +245,9 @@ python3 script/merge_pass_summaries.py A.json B.json --in-place
 
 # Merge 3+ files
 python3 script/merge_pass_summaries.py A.json B.json C.json -o merged.json
+
+# Extended mode (pass@K, merged_from, full reward averages)
+python3 script/merge_pass_summaries.py A.json B.json --extended -o merged.json
 
 # Dedup mode (rarely needed)
 python3 script/merge_pass_summaries.py A.json B.json --dedup -o merged.json
