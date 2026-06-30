@@ -896,6 +896,29 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
     # is derived from the pytest reward (already in result["test_result"]).
     traj = _inject_output_meta_info(traj, task, result)
 
+    if task.get("multi_agent_enabled") and (task.get("multi_agent_config") or {}).get("native", True):
+        try:
+            from src.utils.trajectory.builder import attach_native_subagents
+            _agent_cost = 0.0
+            try:
+                _agent_cost = float(
+                    (agent_usage.get("sources", {}).get("agent", {}) or {}).get("cost_usd")
+                    or agent_usage.get("cost_usd") or 0.0
+                )
+            except (AttributeError, TypeError, ValueError):
+                _agent_cost = 0.0
+            attach_native_subagents(
+                traj,
+                output_dir / "task_output" / "sessions",
+                output_dir,
+                total_agent_cost=_agent_cost,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "[%s] attach_native_subagents failed: %s",
+                task.get("task_id"), exc,
+            )
+
     (output_dir / "output.json").write_text(
         json.dumps(traj, indent=2, ensure_ascii=False), encoding="utf-8",
     )

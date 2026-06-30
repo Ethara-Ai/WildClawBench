@@ -24,21 +24,34 @@ backend="$1"
 shift || true
 
 case "$backend" in
-  openclaw)
-    exec python3 eval/run_batch.py --agent-backend openclaw "$@"
-    ;;
-  claudecode)
-    exec python3 eval/run_batch.py --agent-backend claudecode "$@"
-    ;;
-  codex)
-    exec python3 eval/run_batch.py --agent-backend codex "$@"
-    ;;
-  hermesagent)
-    exec python3 eval/run_batch.py --agent-backend hermesagent "$@"
-    ;;
+  openclaw|claudecode|codex|hermesagent) ;;
   *)
     echo "Unknown backend: $backend"
     echo "Expected one of: openclaw, claudecode, codex, hermesagent"
     exit 1
     ;;
 esac
+
+task_slug="batch"
+model_slug="default"
+prev=""
+for arg in "$@"; do
+  case "$prev" in
+    --task)
+      task_slug=$(basename "${arg%/}" | tr -c '[:alnum:]' '_' | sed 's/_\+/_/g; s/^_//; s/_$//')
+      ;;
+    --model)
+      model_slug=$(echo "$arg" | tr -c '[:alnum:]' '_' | sed 's/_\+/_/g; s/^_//; s/_$//')
+      ;;
+    --category)
+      task_slug="cat_${arg}"
+      ;;
+  esac
+  prev="$arg"
+done
+
+mkdir -p logs
+log_path="logs/${backend}_${task_slug}_${model_slug}_$(date +%Y%m%d_%H%M%S).log"
+echo "[run.sh] logging to $log_path" >&2
+
+exec python3 eval/run_batch.py --agent-backend "$backend" "$@" 2>&1 | tee "$log_path"

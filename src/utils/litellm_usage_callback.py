@@ -222,10 +222,26 @@ def _write_row(kwargs: dict, response_obj: Any, start_time: Any, end_time: Any) 
         if cost <= 0.0:
             cost = _float(kwargs.get("response_cost"))
 
+        meta = kwargs.get("metadata") or {}
+        if not meta:
+            lp = kwargs.get("litellm_params") or {}
+            meta = lp.get("metadata") or lp.get("user_api_key_metadata") or {}
+        session_id = ""
+        for k in ("session_id", "openclaw_session_id", "sessionId", "session"):
+            v = meta.get(k) if isinstance(meta, dict) else None
+            if isinstance(v, str) and v:
+                session_id = v
+                break
+        if not session_id:
+            u = kwargs.get("user")
+            if isinstance(u, str) and u:
+                session_id = u
+
         row = {
             "ts": datetime.now(timezone.utc).isoformat(),
             "model": kwargs.get("model") or "",
             "kind": "preflight" if _is_preflight_ping(kwargs) else "agent",
+            "session_id":         session_id,
             "input_tokens":       input_tokens,
             "output_tokens":      output_tokens,
             "total_tokens":       total_tokens,

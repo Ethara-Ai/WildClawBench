@@ -437,6 +437,286 @@ def build_trajectory_from_jsonl(
     }
 
 
+_NATIVE_SUBAGENT_SLUG_RE = re.compile(r"[^A-Za-z0-9]+")
+
+
+def _native_slugify(value: str) -> str:
+    cleaned = _NATIVE_SUBAGENT_SLUG_RE.sub("_", str(value or "").strip()).strip("_")
+    return cleaned.lower() or "subagent"
+
+
+def _parse_native_child_session(path: Path) -> Optional[dict]:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    session_id = path.stem
+    label = ""
+    spawn_ts = ""
+    tokens_in = 0
+    tokens_out = 0
+    cost_usd = 0.0
+    messages: list[dict] = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            ev = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(ev, dict):
+            continue
+        ts = ev.get("timestamp")
+        if ts and not spawn_ts:
+            spawn_ts = str(ts)
+        if not label:
+            for k in ("label", "task_label", "agent_label", "session_label"):
+                v = ev.get(k)
+                if isinstance(v, str) and v:
+                    label = v
+                    break
+            meta = ev.get("metadata")
+            if not label and isinstance(meta, dict):
+                for k in ("label", "task_label", "agent_label", "session_label"):
+                    v = meta.get(k)
+                    if isinstance(v, str) and v:
+                        label = v
+                        break
+        usage = (ev.get("message") or {}).get("usage") or ev.get("usage")
+        if isinstance(usage, dict):
+            for k_in in ("input", "input_tokens", "prompt_tokens", "tokens_in"):
+                val = usage.get(k_in)
+                if isinstance(val, int):
+                    tokens_in = max(tokens_in, val)
+                    break
+            for k_out in ("output", "output_tokens", "completion_tokens", "tokens_out"):
+                val = usage.get(k_out)
+                if isinstance(val, int):
+                    tokens_out = max(tokens_out, val)
+                    break
+            cost_raw = usage.get("cost_usd")
+            if cost_raw is None:
+                cost_alt = usage.get("cost")
+                if isinstance(cost_alt, (int, float)):
+                    cost_raw = cost_alt
+            if isinstance(cost_raw, (int, float)):
+                cost_usd = max(cost_usd, float(cost_raw))
+        if ev.get("type") == "message":
+            messages.append(ev)
+    if not messages and tokens_in == 0 and tokens_out == 0:
+        return None
+    return {
+        "session_id": session_id,
+        "label": label or session_id,
+        "spawn_ts": spawn_ts,
+        "tokens_in": tokens_in,
+        "tokens_out": tokens_out,
+        "cost_usd": cost_usd,
+        "messages": messages,
+    }
+
+
+def _shape_native_subagent_delivery(child: dict) -> dict:
+    tokens_in = int(child.get("tokens_in") or 0)
+    tokens_out = int(child.get("tokens_out") or 0)
+    return {
+        "session_id": child.get("session_id"),
+        "label": child.get("label"),
+        "spawn_ts": child.get("spawn_ts"),
+        "meta_info": {
+            "task_type": "subagent",
+            "task_label": child.get("label"),
+            "status": "ok",
+            "platform": "linux",
+            "usage": {
+                "input_tokens": tokens_in,
+                "output_tokens": tokens_out,
+                "total_tokens": tokens_in + tokens_out,
+                "cost_usd": round(float(child.get("cost_usd") or 0.0), 6),
+            },
+        },
+        "messages": child.get("messages") or [],
+    }
+
+
+def _render_native_spawn_tree_text(chat_name: str, children: list[dict]) -> str:
+    lines = [f"root: chat ({chat_name})"]
+    for idx, c in enumerate(children, start=1):
+        lines.append(
+            f"  \u2514\u2500 {idx:02d} {c.get('label')} [{c.get('session_id')}] "
+            f"tokens={c.get('tokens_in', 0)}/{c.get('tokens_out', 0)} "
+            f"cost=${c.get('cost_usd', 0.0):.4f}"
+        )
+    return "\n".join(lines) + "\n"
+
+
+def _extract_native_spawn_labels(chat_path: Path) -> list[str]:
+    if not chat_path.is_file():
+        return []
+    try:
+        text = chat_path.read_text(encoding="utf-8")
+    except OSError:
+        return []
+    seen: set[str] = set()
+    labels: list[str] = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            ev = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(ev, dict) or ev.get("type") != "message":
+            continue
+        msg = ev.get("message") or {}
+        if msg.get("role") != "assistant":
+            continue
+        for c in msg.get("content") or []:
+            if not isinstance(c, dict):
+                continue
+            if c.get("type") != "toolCall" or c.get("name") != "sessions_spawn":
+                continue
+            args = c.get("arguments") or c.get("input") or {}
+            lab = args.get("label") if isinstance(args, dict) else None
+            if isinstance(lab, str) and lab and lab not in seen:
+                seen.add(lab)
+                labels.append(lab)
+    return labels
+
+
+def _distribute_and_flatten_message_costs(child: dict) -> None:
+    cost_total = float(child.get("cost_usd") or 0)
+    msgs = child.get("messages") or []
+    rounds: list[dict] = []
+    for m in msgs:
+        u = (m.get("message") or {}).get("usage") if isinstance(m, dict) else None
+        if isinstance(u, dict) and isinstance(u.get("output"), int):
+            rounds.append(u)
+    if not rounds:
+        return
+    final_out = rounds[-1].get("output", 0)
+    prev = 0
+    assigned = 0.0
+    for i, u in enumerate(rounds):
+        curr = u.get("output", 0)
+        delta = max(curr - prev, 0)
+        share = (delta / final_out) if final_out else 0
+        per = round(cost_total * share, 6) if i < len(rounds) - 1 else round(cost_total - assigned, 6)
+        assigned += per
+        u["cost"] = per
+        prev = curr
+
+
+def attach_native_subagents(
+    published: dict,
+    sessions_dir: Path,
+    output_dir: Path,
+    total_agent_cost: float = 0.0,
+) -> None:
+    if not isinstance(published, dict) or not sessions_dir.is_dir():
+        return
+    chat_path = sessions_dir / "chat.jsonl"
+    child_paths = sorted(
+        p for p in sessions_dir.glob("*.jsonl") if p.name != "chat.jsonl"
+    )
+    if not child_paths:
+        return
+    children: list[dict] = []
+    for cp in child_paths:
+        rec = _parse_native_child_session(cp)
+        if rec is not None:
+            children.append(rec)
+    if not children:
+        return
+    children.sort(key=lambda c: c.get("spawn_ts") or "")
+
+    spawn_labels = _extract_native_spawn_labels(chat_path)
+    for idx, child in enumerate(children):
+        if idx < len(spawn_labels):
+            child["label"] = spawn_labels[idx]
+
+    sum_tokens_out = sum(int(c.get("tokens_out") or 0) for c in children)
+    if total_agent_cost > 0 and sum_tokens_out > 0:
+        for c in children:
+            c["cost_usd"] = round(
+                total_agent_cost * int(c.get("tokens_out") or 0) / sum_tokens_out, 6
+            )
+            _distribute_and_flatten_message_costs(c)
+
+    subagents_out = output_dir / "subagents"
+    subagents_out.mkdir(parents=True, exist_ok=True)
+    delivery_paths: list[str] = []
+    for idx, child in enumerate(children, start=1):
+        slug = _native_slugify(child.get("label") or f"subagent_{idx}")
+        rel = f"subagents/{idx:02d}_{slug}.json"
+        delivery_paths.append(rel)
+        (output_dir / rel).write_text(
+            json.dumps(_shape_native_subagent_delivery(child), indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+    tree_dir = output_dir / "spawn_tree"
+    tree_dir.mkdir(parents=True, exist_ok=True)
+    (tree_dir / "parent_spawn_tree.txt").write_text(
+        _render_native_spawn_tree_text(chat_path.name, children),
+        encoding="utf-8",
+    )
+
+    meta_info = published.get("meta_info")
+    if not isinstance(meta_info, dict):
+        meta_info = {}
+        published["meta_info"] = meta_info
+    meta_info["agents"] = {
+        "root": {
+            "session_id": "chat",
+            "transcript": "task_output/sessions/chat.jsonl",
+        },
+        "spawned": [
+            {
+                "ordinal": idx,
+                "label": c.get("label") or f"subagent_{idx}",
+                "session_id": c.get("session_id"),
+                "spawn_ts": c.get("spawn_ts"),
+                "tokens_in": int(c.get("tokens_in") or 0),
+                "tokens_out": int(c.get("tokens_out") or 0),
+                "cost_usd": round(float(c.get("cost_usd") or 0.0), 6),
+                "transcript": f"task_output/sessions/{c.get('session_id')}.jsonl",
+                "delivery": delivery_paths[idx - 1],
+            }
+            for idx, c in enumerate(children, start=1)
+        ],
+    }
+
+    spawn_tree_path = output_dir / "task_output" / "workspace_full" / "spawn_tree.jsonl"
+    spawn_tree_path.parent.mkdir(parents=True, exist_ok=True)
+    with spawn_tree_path.open("a", encoding="utf-8") as fh:
+        for idx, c in enumerate(children, start=1):
+            tokens_in = int(c.get("tokens_in") or 0)
+            tokens_out = int(c.get("tokens_out") or 0)
+            row = {
+                "kind": "spawn",
+                "spawn_id": c.get("session_id"),
+                "label": c.get("label") or f"subagent_{idx}",
+                "role": c.get("label") or f"subagent_{idx}",
+                "turn_index": -1,
+                "tokens_in": tokens_in,
+                "tokens_out": tokens_out,
+                "input_tokens": tokens_in,
+                "output_tokens": tokens_out,
+                "cost_usd": round(float(c.get("cost_usd") or 0.0), 6),
+                "status": "ok",
+                "source": "native_sessions_spawn",
+            }
+            fh.write(json.dumps(row) + "\n")
+
+    logger.info(
+        "Attached %d native sub-agent(s) under %s",
+        len(children), output_dir,
+    )
+
+
 def _count_thinking_blocks(messages) -> tuple[int, list[dict]]:
     total = 0
     samples: list[dict] = []

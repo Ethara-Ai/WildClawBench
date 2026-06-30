@@ -773,6 +773,29 @@ def inject_api_connectors(
     # startup. Verification probe afterward catches future drift loudly.
     _install_skill_runtime_deps(task_id, env_root)
     _verify_skill_runtime_deps(task_id)
+
+    if injected:
+        verify_cmd = (
+            f"for a in {' '.join(injected)}; do "
+            f"  [ -f {openclaw_skills_root}/$a-connector/SKILL.md ] && echo OK:$a || echo MISSING:$a; "
+            "done"
+        )
+        r = subprocess.run(
+            ["docker", "exec", task_id, "/bin/bash", "-c", verify_cmd],
+            capture_output=True, text=True,
+        )
+        present = [ln[3:] for ln in r.stdout.splitlines() if ln.startswith("OK:")]
+        absent = [ln[8:] for ln in r.stdout.splitlines() if ln.startswith("MISSING:")]
+        if absent:
+            logger.warning(
+                "[%s] Connector skills copied but SKILL.md missing for: %s",
+                task_id, absent,
+            )
+        logger.info(
+            "[%s] Connector skills registered: %d/%d (%s)",
+            task_id, len(present), len(injected), ",".join(sorted(present)) or "none",
+        )
+
     api_doc = env_root / "API_DOCUMENTATION.md"
     if api_doc.is_file():
         r = subprocess.run(
@@ -1175,6 +1198,262 @@ def write_turn_marker(task_id: str, turn_index: int) -> None:
         )
 
 
+# ---------------------------------------------------------------------------
+# Native sub-agent path (sessions_spawn) — alternative to inject_subagent_tool.
+# Switches the parent agent from the custom spawn_subagent skill to OpenClaw's
+# built-in sessions_spawn tool. Children run as real OpenClaw sub-sessions in
+# the still-alive gateway and are harvested post-run via collect_output (which
+# now snapshots /root/.openclaw/agents/main/sessions/ for builder.attach_native_subagents).
+# ---------------------------------------------------------------------------
+
+_NATIVE_OPENCLAW_CONFIG_PATH = "/root/.openclaw/openclaw.json"
+_NATIVE_AGENTS_MD_PATHS = ("/root/AGENTS.md", f"{TMP_WORKSPACE}/AGENTS.md")
+_NATIVE_STEERING_MARKER = "<!-- wildclaw-native-spawn -->"
+# sessions_yield is intentionally omitted — OpenClaw's allowlist validator
+# rejects it as unknown; children are collected via sessions_list/sessions_history.
+_NATIVE_SESSION_TOOLS = (
+    "sessions_spawn",
+    "subagents",
+    "agents_list",
+    "sessions_list",
+    "sessions_history",
+    "sessions_send",
+)
+
+
+def _render_native_spawn_steering(max_concurrent: int) -> str:
+    return (
+        "\n\n"
+        f"{_NATIVE_STEERING_MARKER}\n"
+        "## Working style: fan out independent workstreams (native sub-agents)\n"
+        "\n"
+        "When a single turn bundles several **independent** workstreams, do NOT "
+        "work through them yourself one by one. Decompose the turn and spawn one "
+        "sub-agent per independent workstream **in parallel** using the built-in "
+        "`sessions_spawn` tool, let each gather its own data and report back, "
+        "then synthesize their results into the final deliverables yourself.\n"
+        "\n"
+        "Fan out (spawn sub-agents) at the START of the turn if ANY of these hold:\n"
+        "\n"
+        "1. The turn bundles several independent workstreams — one message asking "
+        "you to *run the whole thing* / *sweep every surface and put it together*, "
+        "or to (e.g.) draft quotes AND stand up a tracker AND reconcile the books "
+        "AND stage a launch. One sub-agent per workstream.\n"
+        "2. The prompt names 2+ independent sources or angles (e.g. *the workbook, "
+        "the guide, AND the photo*). Each named angle = one sub-agent.\n"
+        "3. The turn asks for a synthesized multi-section deliverable spanning "
+        "several separate areas. Fan out to gather each area in parallel, then "
+        "synthesize.\n"
+        "\n"
+        "How to fan out:\n"
+        "\n"
+        "1. Identify the independent workstreams (aim for one per deliverable or "
+        "named source).\n"
+        "2. Call `sessions_spawn` once per workstream, up front, in parallel. "
+        "Give each a short `label` and a concrete, self-contained `task` naming "
+        "the file paths / API endpoints to hit and exactly what to return. The "
+        "child fetches its own data — point it at a path or query, do not paste "
+        "raw data in.\n"
+        "3. Track the children with `sessions_list` and read their results with "
+        "`sessions_history`; wait until they finish.\n"
+        "4. Synthesize the children's results into the requested deliverables "
+        "yourself, holding the same red lines you normally would.\n"
+        "\n"
+        "Do NOT fan out for a single tight question or one purely sequential "
+        "task. Do NOT make one sub-agent do everything, and do NOT skip fan-out "
+        "to do it all inline when the turn clearly bundles independent "
+        "workstreams.\n"
+        "\n"
+        "### Call syntax (CRITICAL)\n"
+        "\n"
+        "```\n"
+        "sessions_spawn({\n"
+        "  \"label\":   \"<short_role_name>\",\n"
+        "  \"task\":    \"<self-contained instructions; name files/endpoints to hit>\",\n"
+        "  \"mode\":    \"run\",\n"
+        "  \"runtime\": \"subagent\"\n"
+        "})\n"
+        "```\n"
+        "\n"
+        "**Allowed parameters: `label`, `task`, `mode`, `runtime` ONLY.** "
+        "**Do NOT pass `agentId`.** OpenClaw will reject it with "
+        "`{status:'forbidden', error:'agentId is not allowed for sessions_spawn (allowed: none)'}` "
+        "and the child will silently fail to materialize.\n"
+        "\n"
+        f"You may run up to {max_concurrent} sub-agents in parallel.\n"
+    )
+
+
+def configure_native_subagents(
+    task_id: str,
+    multi_agent_config: dict | None = None,
+    required_apis: list[str] | None = None,
+) -> None:
+    """Wire OpenClaw's built-in sessions_spawn pathway for fan-out turns.
+
+    Performs four idempotent writes inside the running agent container:
+      1. JSON-patch ``/root/.openclaw/openclaw.json``:
+         - ``agents.defaults.subagents.maxConcurrent = max_concurrent`` (default 8)
+         - ``tools.alsoAllow`` additively gains the six native session tools.
+           ``alsoAllow`` is additive on top of the image's ``tools.profile`` and
+           is rejected by the validator if a sibling inline ``tools.allow`` lists
+           the same tools — that collision is stripped here.
+         - When ``required_apis`` is non-empty each ``<api>`` and ``<api>-connector``
+           name is added to alsoAllow as well. The gateway tolerates unknown
+           alsoAllow entries (it only emits a `tools.profile ... unknown entries`
+           warning for unmatched names), so this is a defensive no-op when the
+           skill loader exposes a different tool name and an unlock when it
+           matches — the per-API connector layer is the most likely reason a
+           productivity task model never engages the environment.
+      2. Ledger files match the legacy layout so existing grader-side checks
+         (spawn_tree_checks.py) and runner.collect_usage's fold continue to work:
+         ``mkdir -p $TMP_WORKSPACE/subagents`` + touch spawn_tree.jsonl
+         + initialize the turn marker to 0.
+      3. Append a steering block to both ``/root/AGENTS.md`` and
+         ``$TMP_WORKSPACE/AGENTS.md`` (idempotent via marker comment); OpenClaw
+         surfaces AGENTS.md content in its system prompt while skills are not
+         surfaced there, so this is where the call contract must live.
+
+    Mirrors inject_subagent_tool's call signature; OpenClawAgent.run_task
+    branches on ``multi_agent_config.native`` (default ``True``) to pick this
+    path vs the legacy custom-skill path.
+    """
+    cfg = multi_agent_config or {}
+    try:
+        max_concurrent = int(cfg.get("max_concurrent") or 8)
+    except (TypeError, ValueError):
+        max_concurrent = 8
+
+    api_extras: list[str] = []
+    for api in required_apis or []:
+        if not isinstance(api, str) or not api.strip():
+            continue
+        a = api.strip()
+        for candidate in (a, f"{a}-connector"):
+            if candidate not in api_extras:
+                api_extras.append(candidate)
+
+    # 1. openclaw.json patch — single python3 round-trip via docker exec -i.
+    script = f"""\
+import json, pathlib
+p = pathlib.Path({json.dumps(_NATIVE_OPENCLAW_CONFIG_PATH)})
+d = json.loads(p.read_text()) if p.exists() else {{}}
+
+agents = d.setdefault("agents", {{}})
+defaults = agents.setdefault("defaults", {{}})
+subagents = defaults.setdefault("subagents", {{}})
+subagents["maxConcurrent"] = {int(max_concurrent)}
+
+native_tools = {json.dumps(list(_NATIVE_SESSION_TOOLS))}
+api_extras = {json.dumps(api_extras)}
+grant_set = list(native_tools) + [t for t in api_extras if t not in native_tools]
+
+tools = d.setdefault("tools", {{}})
+also = list(tools.get("alsoAllow") or [])
+for t in grant_set:
+    if t not in also:
+        also.append(t)
+tools["alsoAllow"] = also
+
+inline = tools.get("allow")
+if isinstance(inline, list):
+    filtered = [x for x in inline if x not in grant_set]
+    if filtered:
+        tools["allow"] = filtered
+    else:
+        tools.pop("allow", None)
+
+p.write_text(json.dumps(d, indent=2))
+print("native-subagents-configured")
+"""
+    r = subprocess.run(
+        ["docker", "exec", "-i", task_id, "python3", "-"],
+        input=script,
+        capture_output=True,
+        text=True,
+    )
+    if r.returncode != 0:
+        raise RuntimeError(
+            f"configure_native_subagents: openclaw.json patch failed:\n{r.stderr}"
+        )
+
+    # 1b. Read-back assertion: confirm the 6 session tools actually landed in
+    # alsoAllow. Without this we have no evidence the patch is sticking —
+    # gateway.log warns about `unknown entries` but stays silent when a write
+    # is silently dropped or overwritten by a subsequent bootstrap step.
+    verify_script = (
+        "import json, pathlib\n"
+        f"p = pathlib.Path({json.dumps(_NATIVE_OPENCLAW_CONFIG_PATH)})\n"
+        "d = json.loads(p.read_text()) if p.exists() else {}\n"
+        "print(','.join((d.get('tools') or {}).get('alsoAllow') or []))\n"
+    )
+    v = subprocess.run(
+        ["docker", "exec", "-i", task_id, "python3", "-"],
+        input=verify_script,
+        capture_output=True,
+        text=True,
+    )
+    if v.returncode != 0:
+        raise RuntimeError(
+            f"configure_native_subagents: alsoAllow read-back failed:\n{v.stderr}"
+        )
+    on_disk = {t.strip() for t in v.stdout.strip().split(",") if t.strip()}
+    missing_tools = [t for t in _NATIVE_SESSION_TOOLS if t not in on_disk]
+    if missing_tools:
+        raise RuntimeError(
+            f"configure_native_subagents: alsoAllow missing native tools after patch: "
+            f"{missing_tools} (on_disk={sorted(on_disk)})"
+        )
+    logger.info(
+        "[%s] alsoAllow confirmed (%d native session tools registered)",
+        task_id, len(_NATIVE_SESSION_TOOLS),
+    )
+
+    # 2. Ledger + turn marker init (mirrors inject_subagent_tool).
+    init_cmd = (
+        f"mkdir -p {TMP_WORKSPACE}/subagents && "
+        f"touch {_SUBAGENT_SPAWN_TREE} && "
+        f"printf 0 > {_SUBAGENT_TURN_MARKER}"
+    )
+    r = subprocess.run(
+        ["docker", "exec", task_id, "/bin/bash", "-c", init_cmd],
+        capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        logger.warning(
+            "[%s] native subagent ledger init failed: %s",
+            task_id, r.stderr.strip(),
+        )
+
+    # 3. AGENTS.md steering append (idempotent — marker comment is the guard).
+    steering = _render_native_spawn_steering(max_concurrent)
+    for path in _NATIVE_AGENTS_MD_PATHS:
+        append_script = (
+            f"set -e; "
+            f"target={shlex.quote(path)}; "
+            f"marker={shlex.quote(_NATIVE_STEERING_MARKER)}; "
+            f"if [ -f \"$target\" ] && grep -q \"$marker\" \"$target\"; then exit 0; fi; "
+            f"mkdir -p $(dirname \"$target\"); "
+            f"cat >> \"$target\""
+        )
+        r = subprocess.run(
+            ["docker", "exec", "-i", task_id, "/bin/bash", "-c", append_script],
+            input=steering,
+            capture_output=True,
+            text=True,
+        )
+        if r.returncode != 0:
+            logger.warning(
+                "[%s] native steering append to %s failed: %s",
+                task_id, path, r.stderr.strip(),
+            )
+
+    logger.info(
+        "[%s] Configured native subagents (maxConcurrent=%d, tools+=%d session + %d per-API, AGENTS.md steering)",
+        task_id, max_concurrent, len(_NATIVE_SESSION_TOOLS), len(api_extras),
+    )
+
+
 def run_warmup(
     task_id: str,
     warmup: str,
@@ -1277,7 +1556,38 @@ def _sweep_root_deliverables_to_workspace(task_id: str) -> None:
         "        moved.append(name)",
         "    except OSError:",
         "        pass",
+        "tree_dirs = ('Documents', 'out', 'output')",
+        "tree_moved = []",
+        "for d in tree_dirs:",
+        "    src_dir = os.path.join('/root', d)",
+        "    if not os.path.isdir(src_dir):",
+        "        continue",
+        "    dst_dir = os.path.join(workspace, d)",
+        "    try:",
+        "        if os.path.isdir(dst_dir):",
+        "            for root, _, files in os.walk(src_dir):",
+        "                rel = os.path.relpath(root, src_dir)",
+        "                tgt = dst_dir if rel == '.' else os.path.join(dst_dir, rel)",
+        "                os.makedirs(tgt, exist_ok=True)",
+        "                for fn in files:",
+        "                    s = os.path.join(root, fn)",
+        "                    t = os.path.join(tgt, fn)",
+        "                    if os.path.exists(t):",
+        "                        continue",
+        "                    try:",
+        "                        shutil.copy2(s, t)",
+        "                        tree_moved.append(os.path.relpath(t, workspace))",
+        "                    except OSError:",
+        "                        pass",
+        "        else:",
+        "            shutil.copytree(src_dir, dst_dir)",
+        "            for root, _, files in os.walk(dst_dir):",
+        "                for fn in files:",
+        "                    tree_moved.append(os.path.relpath(os.path.join(root, fn), workspace))",
+        "    except OSError:",
+        "        pass",
         "if moved: print('swept:', ','.join(moved))",
+        "if tree_moved: print('swept-trees:', ','.join(tree_moved))",
         "PY",
     ])
     r = subprocess.run(
@@ -1285,8 +1595,10 @@ def _sweep_root_deliverables_to_workspace(task_id: str) -> None:
         capture_output=True,
         text=True,
     )
-    if r.returncode == 0 and r.stdout.strip().startswith("swept:"):
-        logger.info("[%s] Recovered /root deliverables: %s", task_id, r.stdout.strip())
+    if r.returncode == 0:
+        for line in r.stdout.splitlines():
+            if line.startswith("swept:") or line.startswith("swept-trees:"):
+                logger.info("[%s] Recovered /root deliverables: %s", task_id, line.strip())
 
 
 def collect_output_from_container(
@@ -1315,6 +1627,18 @@ def collect_output_from_container(
     _copy_dir_from_container(task_id, "/tmp/openclaw/.", str(task_output_dir))
 
     _sweep_root_deliverables_to_workspace(task_id)
+
+    # Snapshot the OpenClaw session store so attach_native_subagents (and any
+    # offline forensics) can read every spawned child's transcript. Runs
+    # unconditionally — for non-native runs the dir just contains chat.jsonl,
+    # which is harmless duplication of the legacy chat.jsonl snapshot.
+    sessions_out = task_output_dir / "sessions"
+    sessions_out.mkdir(parents=True, exist_ok=True)
+    _copy_dir_from_container(
+        task_id,
+        "/root/.openclaw/agents/main/sessions/.",
+        str(sessions_out),
+    )
 
     if include_workspace_changes:
         workspace_out = task_output_dir / "workspace"

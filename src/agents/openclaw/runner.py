@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 
 from src.agents.base import AgentExecution, AgentTaskSpec, BaseAgent
 from src.utils.docker_utils import (
+    configure_native_subagents,
     inject_api_connectors,
     inject_lobster_workspace,
     inject_openclaw_models,
@@ -237,7 +238,15 @@ class OpenClawAgent(BaseAgent):
                 inject_openclaw_models(spec.task_id, spec.models_config)
 
             if spec.multi_agent_enabled:
-                inject_subagent_tool(spec.task_id, spec.multi_agent_config)
+                _ma_cfg = spec.multi_agent_config or {}
+                if _ma_cfg.get("native", True):
+                    configure_native_subagents(
+                        spec.task_id,
+                        _ma_cfg,
+                        required_apis=_required,
+                    )
+                else:
+                    inject_subagent_tool(spec.task_id, _ma_cfg)
 
             self._set_model(spec.task_id, spec.model, thinking=spec.thinking)
             self._inject_auth(spec.task_id)
@@ -309,6 +318,9 @@ class OpenClawAgent(BaseAgent):
             self._task_windows[spec.task_id] = (wall_start, time.time())
             logger.info("[%s] Agent finished (%.2fs, %d turn(s))",
                         spec.task_id, elapsed_time, len(turn_messages))
+
+            if spec.multi_agent_enabled and (spec.multi_agent_config or {}).get("native", True):
+                self._wait_for_subagents(spec.task_id)
 
             logger.info("[%s] Agent exit code: %s", spec.task_id,
                         agent_proc.returncode if agent_proc else "n/a")
@@ -416,6 +428,81 @@ class OpenClawAgent(BaseAgent):
         if preflight_usage is not None:
             usage["__preflight__"] = preflight_usage
         return usage
+
+    def _wait_for_subagents(
+        self,
+        task_id: str,
+        *,
+        quiesce: float = 12.0,
+        max_wait: float = 600.0,
+    ) -> None:
+        sessions_dir = "/root/.openclaw/agents/main/sessions"
+        count_cmd = f"ls {sessions_dir}/*.jsonl 2>/dev/null | wc -l"
+        try:
+            n = int(subprocess.run(
+                ["docker", "exec", task_id, "/bin/bash", "-c", count_cmd],
+                capture_output=True, text=True, timeout=10,
+            ).stdout.strip() or "0")
+        except (ValueError, subprocess.SubprocessError):
+            n = 0
+        if n <= 1:
+            return
+        probe_script = (
+            "import json, os, sys\n"
+            f"d = {json.dumps(sessions_dir)}\n"
+            "out = []\n"
+            "try:\n"
+            "    for n in sorted(os.listdir(d)):\n"
+            "        if not n.endswith('.jsonl'):\n"
+            "            continue\n"
+            "        st = os.stat(os.path.join(d, n))\n"
+            "        out.append([n, st.st_size, st.st_mtime_ns])\n"
+            "except FileNotFoundError:\n"
+            "    pass\n"
+            "sys.stdout.write(json.dumps(out))\n"
+        )
+        start = time.time()
+        last_sig: list | None = None
+        stable_since: float | None = None
+        poll_interval = 2.0
+        while time.time() - start < max_wait:
+            try:
+                r = subprocess.run(
+                    ["docker", "exec", "-i", task_id, "python3", "-"],
+                    input=probe_script,
+                    capture_output=True,
+                    text=True,
+                    timeout=15,
+                )
+            except subprocess.TimeoutExpired:
+                time.sleep(poll_interval)
+                continue
+            if r.returncode != 0:
+                return
+            try:
+                sig = json.loads(r.stdout.strip() or "[]")
+            except json.JSONDecodeError:
+                return
+            non_chat = [s for s in sig if s and s[0] != "chat.jsonl"]
+            if not non_chat:
+                return
+            if sig == last_sig:
+                if stable_since is None:
+                    stable_since = time.time()
+                elif time.time() - stable_since >= quiesce:
+                    logger.info(
+                        "[%s] Sub-agents quiesced (%.1fs stable, %d session(s))",
+                        task_id, quiesce, len(non_chat),
+                    )
+                    return
+            else:
+                last_sig = sig
+                stable_since = None
+            time.sleep(poll_interval)
+        logger.warning(
+            "[%s] Sub-agent wait hit max_wait=%.0fs (proceeding)",
+            task_id, max_wait,
+        )
 
     def _set_model(self, task_id: str, model: str, thinking: str | None = None) -> None:
         if self.litellm_config_yaml:

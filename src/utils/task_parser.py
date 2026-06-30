@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import os
 import re
 from pathlib import Path
 from typing import Any, Optional
@@ -234,12 +235,15 @@ def _attach_drift_script(task: dict, task_dir: Path) -> dict:
     inject_dir = task_dir / "inject"
     if inject_dir.is_dir():
         task["inject_path"] = str(inject_dir.resolve())
-    # multi_agent.* config opt-in. task_config.yaml wins if present; otherwise
-    # synthesize from prompts.txt by scanning for "Multi-Agent" turn-header
-    # labels so tasks can ship without a config file. Convention:
-    # checker_id = "T<turn_index>_MA", aggregate "MA_C1", min_subagents=2.
+    # Resolution order (each step is authoritative over the next):
+    #   1. task_config.yaml multi_agent dict (even enabled:false blocks default-on).
+    #   2. prompts.txt scan for "Multi-Agent" turn-header labels.
+    #   3. default-ON capability fallback (gated by WCB_MULTI_AGENT_DEFAULT).
+    # native:true is the default for any synthesized/default-on config; legacy
+    # spawn_subagent skill path is opt-in via multi_agent.native:false.
     task["multi_agent_config"] = {}
     task["multi_agent_enabled"] = False
+    explicit_disable = False
     cfg_path = task_dir / "task_config.yaml"
     if cfg_path.is_file():
         try:
@@ -249,14 +253,34 @@ def _attach_drift_script(task: dict, task_dir: Path) -> dict:
                 if isinstance(ma, dict):
                     task["multi_agent_config"] = ma
                     task["multi_agent_enabled"] = bool(ma.get("enabled"))
+                    explicit_disable = not task["multi_agent_enabled"]
         except (yaml.YAMLError, OSError):
             pass
-    if not task["multi_agent_enabled"]:
+    if not task["multi_agent_enabled"] and not explicit_disable:
         synth = _synthesize_multi_agent_config(task_dir)
         if synth.get("enabled"):
             task["multi_agent_config"] = synth
             task["multi_agent_enabled"] = True
+    if not task["multi_agent_enabled"] and not explicit_disable and _multi_agent_default_on():
+        task["multi_agent_config"] = _default_multi_agent_config()
+        task["multi_agent_enabled"] = True
+    if task["multi_agent_enabled"] and isinstance(task["multi_agent_config"], dict):
+        task["multi_agent_config"].setdefault("native", True)
     return task
+
+
+def _multi_agent_default_on() -> bool:
+    val = os.environ.get("WCB_MULTI_AGENT_DEFAULT", "1").strip().lower()
+    return val not in ("0", "false", "no", "off")
+
+
+def _default_multi_agent_config() -> dict:
+    return {
+        "enabled": True,
+        "native": True,
+        "default_allowed_tools": ["Read", "Write", "Edit", "Bash", "Grep", "Glob"],
+        "expected_per_turn": {},
+    }
 
 
 def _synthesize_multi_agent_config(task_dir: Path) -> dict:
