@@ -1538,6 +1538,30 @@ def run_single_task(
                     _audit = inject_applier.audit_summary()
                 except Exception as exc:
                     logger.debug("[%s] audit summary fetch failed: %s", task_id, exc)
+                # Also capture the FULL request diary (bodies included) and fold
+                # it into each service's audit entry under "requests", so the
+                # saved agent_state.json can re-run body-inspecting tests OFFLINE
+                # (no live mock stack). audit_summary keeps only counts; this
+                # adds the request/response bodies the body-checking tests read.
+                try:
+                    _full = inject_applier.audit_full()
+                    for _api, _blob in (_full or {}).items():
+                        if not isinstance(_blob, dict):
+                            continue
+                        _reqs = _blob.get("requests")
+                        if _reqs is None:
+                            continue
+                        _entry = _audit.get(_api)
+                        if isinstance(_entry, dict):
+                            _entry["requests"] = _reqs
+                        else:
+                            _audit[_api] = {
+                                "total_requests": _blob.get("total", len(_reqs)),
+                                "endpoints": {},
+                                "requests": _reqs,
+                            }
+                except Exception as exc:
+                    logger.debug("[%s] audit full fetch failed: %s", task_id, exc)
                 _tpaths = []
                 for _cand in (grading_transcript_path,
                               output_dir / "chat.jsonl",

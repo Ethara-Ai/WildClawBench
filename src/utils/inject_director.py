@@ -550,6 +550,33 @@ class InjectApplier:
                 continue
         return audit
 
+    def audit_full(self) -> Dict[str, Any]:
+        """Return the FULL per-service request diary (bodies included), keyed by
+        service name: ``{"<api>": {"total": int, "requests": [{method, path,
+        query_params, request_body, status_code, response_body, ...}, ...]}}``.
+
+        Read from each live service's ``/audit/requests`` (the tracking
+        middleware's complete log). ``audit_summary`` keeps only per-endpoint
+        counts; tests that inspect ``request_body`` (e.g. "did the agent write
+        Room 112?") need this full diary. Persisting it into agent_state.json
+        is what lets those tests re-run OFFLINE — no live mock stack required.
+        """
+        full: Dict[str, Any] = {}
+        for api in sorted(self._urls):
+            base = self._urls.get(api)
+            if not base:
+                continue
+            try:
+                r = self._session.get(base.rstrip("/") + "/audit/requests",
+                                      headers=self._headers(), timeout=10.0)
+                if r.status_code == 200:
+                    data = r.json()
+                    if isinstance(data, dict):
+                        full[api] = data
+            except (requests.RequestException, ValueError):
+                continue
+        return full
+
     def _admin_patch(self, api: str, table: str, pk: str, fields: Dict[str, Any]) -> Dict[str, Any]:
         base = self._urls.get(api)
         if not base:

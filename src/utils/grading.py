@@ -988,7 +988,10 @@ def _grade_council(
             "is_positive": wt >= 0,
         })
 
-    overall = max(0.0, min(1.0, weighted / total_w))
+    # User formula (verbatim, no clamp): negative-weight criteria that fired
+    # subtract |weight|; the result may go below 0 to reflect guardrail breaches.
+    #   final_reward = (Σ passed_positive_w − Σ |triggered_negative_w|) / Σ positive_w
+    overall = weighted / total_w
     council_usage = _ZERO_USAGE.copy()
     for r in results:
         u = r.get("usage") or {}
@@ -1172,7 +1175,9 @@ def grade_with_rubric(
             "truncation_affected": truncation_affected,
             "is_positive": wt >= 0,
         })
-    overall = max(0.0, min(1.0, weighted / total_w))
+    # User formula (verbatim, no clamp) — single-judge mirror of the council path.
+    #   final_reward = (Σ passed_positive_w − Σ |triggered_negative_w|) / Σ positive_w
+    overall = weighted / total_w
     n = len(rubrics)
     n_abstained = len(abstention_flags)
     failed = n - passed - n_abstained

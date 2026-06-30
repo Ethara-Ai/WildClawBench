@@ -10,7 +10,7 @@ Returns a dict shaped for `bundle.write_bundle`'s `__test_result__` consumer:
   test_scores (JSON str: {qualified_name: "passed"|"failed"|"errored"}),
   test_output (raw stdout/stderr text),
   test_code (verbatim copy of the executed code, for the harbor bundle),
-  reward (float, 0..1; sum(weight × pass) / sum(|weight|)).
+  reward (float, unclamped; (Σ passed_positive_w − Σ |triggered_negative_w|) / Σ positive_w).
 """
 from __future__ import annotations
 
@@ -346,7 +346,7 @@ def _compute_reward(results: Mapping[str, dict], weights: Mapping[str, float]) -
       `max(0, …)` floor means a violation spree zeroes the run rather than going
       negative.
     - falls back to tests_passed/tests_total when pos_total <= 0
-    Returns 0..1.
+    Returns the unclamped weighted reward (≤ 1; may be < 0 on a violation spree).
     """
     if not weights:
         return 0.0
@@ -376,7 +376,10 @@ def _compute_reward(results: Mapping[str, dict], weights: Mapping[str, float]) -
         total = len(scored)
         passed = sum(1 for r in scored if r.get("status") == "passed")
         return round(passed / total, 4) if total else 0.0
-    return round(max(0.0, (pos_earned - neg_penalty) / pos_total), 4)
+    # User formula (verbatim, no clamp): a violation spree may drive the reward
+    # below 0 to reflect the true magnitude of guardrail breaches.
+    #   final_reward = (Σ passed_positive_w − Σ |triggered_negative_w|) / Σ positive_w
+    return round((pos_earned - neg_penalty) / pos_total, 4)
 
 
 def execute_tests(
