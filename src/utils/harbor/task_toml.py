@@ -98,6 +98,7 @@ def build_task_toml(
     lines.append("")
     lines.append("[task]")
     lines.append("name = %s" % _q(name))
+    lines.append("task_id = %s" % _q(name))
     lines.append("description = %s" % _q(description))
     lines.append("authors = %s" % _arr_authors(authors or []))
     lines.append("keywords = %s" % _arr_strs(keywords))
