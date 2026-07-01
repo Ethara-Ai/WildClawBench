@@ -1567,6 +1567,7 @@ def _build_task_toml(
     lines.append("")
     lines.append("[task]")
     lines.append(f"name = {_q_toml(name)}")
+    lines.append(f"task_id = {_q_toml(name)}")
     lines.append(f"description = {_q_toml(description)}")
     lines.append(f"keywords = {_arr_toml_strs(keywords)}")
     lines.append("")
