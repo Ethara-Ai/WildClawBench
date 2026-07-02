@@ -815,23 +815,53 @@ def _validate_table(
         )
         return issues
 
+    # Required columns = intersection of example row key-sets (present in EVERY
+    # example row = genuinely required by the runtime loader). Known columns =
+    # union (may appear on some rows; safe to include, not an error when absent).
+    # We check required columns per-row so a column dropped from any overlay row
+    # surfaces even if another row still carries it (the runtime loader reads
+    # row-by-row; a missing key crashes with KeyError on that row).
+    example_shape = _compute_list_shape(example_rows)
+    required_cols = set(example_shape.required_keys) if example_shape.dict_element_count else example_col_set
+    known_cols = set(example_shape.known_keys) if example_shape.dict_element_count else example_col_set
+
     overlay_col_set: set[str] = set()
     for row in overlay_rows:
         if isinstance(row, dict):
             overlay_col_set.update(row.keys())
 
-    missing = sorted(example_col_set - overlay_col_set)
-    extra = sorted(overlay_col_set - example_col_set)
+    missing_per_col: dict[str, list[int]] = {}
+    for col in sorted(required_cols):
+        offenders = [
+            i for i, row in enumerate(overlay_rows)
+            if isinstance(row, dict) and col not in row
+        ]
+        if offenders:
+            missing_per_col[col] = offenders
 
-    if missing:
+    extra = sorted(overlay_col_set - known_cols)
+
+    if missing_per_col:
+        total_rows = sum(1 for r in overlay_rows if isinstance(r, dict))
+        parts: list[str] = []
+        for col in sorted(missing_per_col.keys()):
+            offenders = missing_per_col[col]
+            preview = offenders if len(offenders) <= 10 else offenders[:10] + ["..."]
+            parts.append(
+                f"'{col}' missing in {len(offenders)}/{total_rows} row(s) {preview}"
+            )
         issues.append(
             Issue(
                 severity=SEV_ERROR,
                 code="SCHEMA_MISSING_COLUMNS",
-                message=f"overlay is missing required column(s): {', '.join(missing)}",
+                message="overlay rows missing required column(s): " + "; ".join(parts),
                 api=api,
                 file=str(overlay_path),
-                hint=f"example columns: {', '.join(example_cols)}",
+                hint=(
+                    "the runtime loader reads each row individually; a required key "
+                    "absent from any row crashes that row's coercion. "
+                    f"required columns: {', '.join(sorted(required_cols))}"
+                ),
             )
         )
     if extra:

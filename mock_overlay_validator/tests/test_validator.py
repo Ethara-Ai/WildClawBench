@@ -316,5 +316,113 @@ class RaggednessToleranceTests(unittest.TestCase):
             ))
 
 
+class PerRowRequiredColumnTests(unittest.TestCase):
+    def test_wa_id_dropped_from_50_of_51_rows_fires_missing_columns(self):
+        ex = json.loads((V.EXAMPLES_DIR / "whatsapp-api" / "conversations.json").read_text())
+        overlay = [dict(ex[0])]
+        for _ in range(50):
+            r = dict(ex[0])
+            r.pop("wa_id", None)
+            overlay.append(r)
+        with tempfile.TemporaryDirectory() as td:
+            overlay_dir = Path(td) / "whatsapp-api"
+            overlay_dir.mkdir()
+            (overlay_dir / "conversations.json").write_text(json.dumps(overlay))
+            report = V.Report()
+            V.validate_overlay_dir(overlay_dir, "whatsapp-api", report)
+            missing = [
+                i for i in report.issues
+                if i.code == "SCHEMA_MISSING_COLUMNS" and "wa_id" in i.message
+            ]
+            self.assertEqual(len(missing), 1, msg=str([i.message for i in report.issues]))
+            self.assertIn("50/51", missing[0].message)
+            self.assertGreaterEqual(len(report.errors), 1)
+
+    def test_all_rows_have_required_column_is_clean(self):
+        ex = json.loads((V.EXAMPLES_DIR / "whatsapp-api" / "conversations.json").read_text())
+        with tempfile.TemporaryDirectory() as td:
+            overlay_dir = Path(td) / "whatsapp-api"
+            overlay_dir.mkdir()
+            (overlay_dir / "conversations.json").write_text(json.dumps(ex))
+            report = V.Report()
+            V.validate_overlay_dir(overlay_dir, "whatsapp-api", report)
+            missing = [i for i in report.issues if i.code == "SCHEMA_MISSING_COLUMNS"]
+            self.assertEqual(missing, [], msg=str([i.message for i in missing]))
+
+    def test_optional_column_absent_is_not_missing_error(self):
+        example_rows = [
+            {"id": "a", "required1": 1, "optional_col": "x"},
+            {"id": "b", "required1": 2},
+        ]
+        overlay_rows = [
+            {"id": "c", "required1": 3},
+            {"id": "d", "required1": 4},
+        ]
+        with tempfile.TemporaryDirectory() as td:
+            api_dir = Path(td) / "examples" / "synth-api"
+            api_dir.mkdir(parents=True)
+            (api_dir / "widgets.json").write_text(json.dumps(example_rows))
+            orig = V.EXAMPLES_DIR
+            V.EXAMPLES_DIR = Path(td) / "examples"
+            try:
+                overlay_dir = Path(td) / "overlay" / "synth-api"
+                overlay_dir.mkdir(parents=True)
+                (overlay_dir / "widgets.json").write_text(json.dumps(overlay_rows))
+                report = V.Report()
+                V.validate_overlay_dir(overlay_dir, "synth-api", report)
+                missing = [i for i in report.issues if i.code == "SCHEMA_MISSING_COLUMNS"]
+                self.assertEqual(missing, [], msg=str([i.message for i in missing]))
+            finally:
+                V.EXAMPLES_DIR = orig
+
+    def test_extra_column_still_warns_when_not_in_known(self):
+        example_rows = [{"id": "a", "name": "n"}]
+        overlay_rows = [{"id": "b", "name": "m", "mystery_col": 1}]
+        with tempfile.TemporaryDirectory() as td:
+            api_dir = Path(td) / "examples" / "synth-api"
+            api_dir.mkdir(parents=True)
+            (api_dir / "widgets.json").write_text(json.dumps(example_rows))
+            orig = V.EXAMPLES_DIR
+            V.EXAMPLES_DIR = Path(td) / "examples"
+            try:
+                overlay_dir = Path(td) / "overlay" / "synth-api"
+                overlay_dir.mkdir(parents=True)
+                (overlay_dir / "widgets.json").write_text(json.dumps(overlay_rows))
+                report = V.Report()
+                V.validate_overlay_dir(overlay_dir, "synth-api", report)
+                self.assertTrue(any(
+                    i.code == "SCHEMA_EXTRA_COLUMNS" and "mystery_col" in i.message
+                    for i in report.issues
+                ))
+            finally:
+                V.EXAMPLES_DIR = orig
+
+    def test_optional_column_present_in_overlay_no_extra_warning(self):
+        example_rows = [
+            {"id": "a", "required1": 1, "optional_col": "x"},
+            {"id": "b", "required1": 2},
+        ]
+        overlay_rows = [
+            {"id": "c", "required1": 3, "optional_col": "y"},
+            {"id": "d", "required1": 4},
+        ]
+        with tempfile.TemporaryDirectory() as td:
+            api_dir = Path(td) / "examples" / "synth-api"
+            api_dir.mkdir(parents=True)
+            (api_dir / "widgets.json").write_text(json.dumps(example_rows))
+            orig = V.EXAMPLES_DIR
+            V.EXAMPLES_DIR = Path(td) / "examples"
+            try:
+                overlay_dir = Path(td) / "overlay" / "synth-api"
+                overlay_dir.mkdir(parents=True)
+                (overlay_dir / "widgets.json").write_text(json.dumps(overlay_rows))
+                report = V.Report()
+                V.validate_overlay_dir(overlay_dir, "synth-api", report)
+                extra = [i for i in report.issues if i.code == "SCHEMA_EXTRA_COLUMNS"]
+                self.assertEqual(extra, [], msg=str([i.message for i in extra]))
+            finally:
+                V.EXAMPLES_DIR = orig
+
+
 if __name__ == "__main__":
     unittest.main()
