@@ -32,7 +32,10 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Set
 from src.utils.config import Config
 from src.utils.skills_inference import compute_distractor_skills, infer_required_apis
 from src.utils.store import Store, Task
-from src.utils.trajectory.builder import build_published_trajectory
+from src.utils.trajectory.builder import (
+    attach_native_subagents,
+    build_published_trajectory,
+)
 from .compose import discover_services, generate_harbor_compose
 from .ctrf import build_ctrf, compute_test_reward
 from .dockerfile import generate_harbor_dockerfile
@@ -432,6 +435,20 @@ def write_bundle(
                 published = build_published_trajectory(
                     entry, task, entry.get("__completion_status__", "") or "",
                 )
+                # Native multi-agent: re-attach the sub-agent roster
+                # (meta_info.agents / subagents / subagent_count). This is the
+                # SECOND output.json writer for the run dir (the first is
+                # eval/run_batch.py:_build_trajectory). Without re-attaching here
+                # we silently clobber the subagent meta that the first write
+                # added. No-op for single-agent runs (no sessions.json).
+                try:
+                    published = attach_native_subagents(
+                        published,
+                        run_dir / "task_output" / "sessions",
+                        run_dir,
+                    )
+                except Exception:
+                    pass
             else:
                 published = entry
             (run_dir / "output.json").write_text(

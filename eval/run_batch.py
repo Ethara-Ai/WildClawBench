@@ -1563,10 +1563,24 @@ def run_single_task(
                 except Exception as exc:
                     logger.debug("[%s] audit full fetch failed: %s", task_id, exc)
                 _tpaths = []
-                for _cand in (grading_transcript_path,
-                              output_dir / "chat.jsonl",
-                              output_dir / "task_output" / "chat.jsonl"):
-                    if _cand and Path(_cand).is_file():
+                # Prefer the HOST-copied transcripts over grading_transcript_path:
+                # prepare_grading_transcript() falls back to the raw in-container
+                # path (/root/.openclaw/.../chat.jsonl) when its docker-cp snapshot
+                # fails. The non-root harness user cannot stat that path, and
+                # Path.is_file() does NOT swallow EACCES (only ENOENT/ENOTDIR), so
+                # probing it directly raised PermissionError and aborted the whole
+                # agent_state build (-> no agent_state.json). Order the readable
+                # host copies first and guard every probe so one unreadable
+                # candidate can never sink the build.
+                def _readable_file(_p) -> bool:
+                    try:
+                        return _p is not None and Path(_p).is_file()
+                    except OSError:
+                        return False
+                for _cand in (output_dir / "chat.jsonl",
+                              output_dir / "task_output" / "chat.jsonl",
+                              grading_transcript_path):
+                    if _readable_file(_cand):
                         _tpaths.append(Path(_cand))
                 _last = extract_assistant_text(_tpaths) if _tpaths else ""
                 _state = build_agent_state(

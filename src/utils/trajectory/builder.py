@@ -996,6 +996,7 @@ def attach_native_subagents(
                 "task_completion_status": "success",
                 "parent_session": root,
                 "session_key": canon_key,
+                "subagent_id": str(meta.get("sessionId", "") or ""),
                 "platform": platform,
                 "message_count": len(child_msgs),
             },
@@ -1022,6 +1023,7 @@ def attach_native_subagents(
         {
             "label": c["meta_info"].get("task_name"),
             "session_key": c["meta_info"].get("session_key"),
+            "subagent_id": c["meta_info"].get("subagent_id"),
             "run_id": _spawn_res.get(c["meta_info"].get("session_key"), {}).get("run_id"),
             "spawn_tool_call_id": _spawn_res.get(c["meta_info"].get("session_key"), {}).get("tool_call_id"),
             "trajectory_file": f"{i:02d}_{_slug(c['meta_info']['task_name'])}.json",
