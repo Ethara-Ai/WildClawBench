@@ -375,17 +375,88 @@ def _container_kind(value: Any) -> str:
 DeepFinding = tuple[str, str, str]
 
 
+@dataclass(frozen=True)
+class _ListShape:
+    # Per-list shape derived from the raw example siblings. required_keys is
+    # the intersection (must appear in every sibling); known_keys is the union
+    # (may appear in some siblings). kinds_per_key carries container-kind
+    # polymorphism per key (dict/list/scalar/null). dict_elements holds the
+    # raw sibling dicts so a deeper recursion can gather per-key sibling
+    # values and preserve ragged-tolerance at every nesting level.
+    required_keys: frozenset
+    known_keys: frozenset
+    kinds_per_key: dict
+    dict_element_count: int
+    dict_elements: tuple
+
+
+def _element_kind(value: Any) -> str:
+    if value is None:
+        return "null"
+    return _container_kind(value)
+
+
+def _compute_list_shape(example_list: list) -> _ListShape:
+    dict_elems = [e for e in example_list if isinstance(e, dict)]
+    if not dict_elems:
+        return _ListShape(frozenset(), frozenset(), {}, 0, tuple())
+    key_sets = [set(e.keys()) for e in dict_elems]
+    required = frozenset(set.intersection(*key_sets)) if key_sets else frozenset()
+    known = frozenset(set.union(*key_sets))
+    kinds: dict[str, set[str]] = {}
+    for e in dict_elems:
+        for k, v in e.items():
+            kinds.setdefault(k, set()).add(_element_kind(v))
+    frozen_kinds = {k: frozenset(v) for k, v in kinds.items()}
+    return _ListShape(required, known, frozen_kinds, len(dict_elems), tuple(dict_elems))
+
+
+def _merge_dicts_for_values(dicts: list[dict]) -> dict:
+    if not dicts:
+        return {}
+    return _merge_canonical(dicts) if all(isinstance(d, dict) for d in dicts) else {}
+
+
+def _deep_compare_field(
+    example_values: list,
+    actual_value: Any,
+    path: str,
+) -> list[DeepFinding]:
+    # Per-field entrypoint: example_values is the raw collection of that
+    # field's value across all example rows. For dict siblings the intersection
+    # defines required keys and the union defines known keys (ragged parents
+    # never over-constrain). For list siblings the flattened concatenation
+    # feeds the same intersection semantics one level deeper.
+    non_null = [v for v in example_values if v is not None]
+    if not non_null:
+        return []
+    all_dicts = all(isinstance(v, dict) for v in non_null)
+    all_lists = all(isinstance(v, list) for v in non_null)
+    if all_dicts and len(non_null) >= 1:
+        shape = _compute_list_shape(non_null)
+        canonical = _merge_dicts_for_values(non_null)
+        if not isinstance(actual_value, dict):
+            return _deep_compare(canonical, actual_value, path)
+        return _deep_compare(canonical, actual_value, path, parent_shape=shape)
+    if all_lists:
+        flat = [item for lst in non_null for item in lst]
+        return _deep_compare(flat if flat else non_null[0], actual_value, path)
+    return _deep_compare(non_null[0], actual_value, path)
+
+
 def _deep_compare(
     example: Any,
     actual: Any,
     path: str,
+    *,
+    parent_shape: _ListShape | None = None,
 ) -> list[DeepFinding]:
     # Recursive structural comparison between an example (canonical) and an
-    # actual JSON value. Emits key drift + container-vs-scalar type drift at
-    # every nested path. For arrays it compares each actual element against the
-    # first example element (canonical shape); if the array's actual elements
-    # have inconsistent key sets among themselves that is emitted once as
-    # RAGGED_OBJECT_KEYS (INFO) so the team knows harness tolerates but flags it.
+    # actual JSON value. When called from a list branch, parent_shape carries
+    # the intersection/union/kinds computed from raw sibling example dicts, so
+    # the dict branch can (a) only flag KEY_MISSING for keys present in EVERY
+    # example sibling and (b) accept container-kind polymorphism the seed
+    # itself displays. RAGGED_OBJECT_KEYS is reported once per list level.
     findings: list[DeepFinding] = []
     ex_kind = _container_kind(example)
     ac_kind = _container_kind(actual)
@@ -404,27 +475,71 @@ def _deep_compare(
     if ex_kind == "dict":
         ex_keys = set(example.keys())
         ac_keys = set(actual.keys())
+        if parent_shape is not None and parent_shape.dict_element_count > 0:
+            required_keys = set(parent_shape.required_keys)
+            known_keys = set(parent_shape.known_keys)
+        else:
+            required_keys = ex_keys
+            known_keys = ex_keys
         for k in sorted(ex_keys - ac_keys):
-            findings.append((
-                "KEY_MISSING",
-                SEV_ERROR,
-                f"missing canonical key '{path}.{k}'",
-            ))
+            if k in required_keys:
+                findings.append((
+                    "KEY_MISSING",
+                    SEV_ERROR,
+                    f"missing canonical key '{path}.{k}'",
+                ))
         for k in sorted(ac_keys - ex_keys):
-            findings.append((
-                "KEY_EXTRA",
-                SEV_WARN,
-                f"extra key '{path}.{k}' not in canonical",
-            ))
+            if k not in known_keys:
+                findings.append((
+                    "KEY_EXTRA",
+                    SEV_WARN,
+                    f"extra key '{path}.{k}' not in canonical",
+                ))
         for k in sorted(ex_keys & ac_keys):
-            findings.extend(_deep_compare(example[k], actual[k], f"{path}.{k}"))
+            if parent_shape is not None and k in parent_shape.kinds_per_key:
+                seen_kinds = parent_shape.kinds_per_key[k]
+                actual_kind = _element_kind(actual[k])
+                if actual_kind in seen_kinds:
+                    if actual_kind in {"scalar", "null"}:
+                        # Polymorphism includes this kind; skip container-vs-container
+                        # nested recursion when both sides land on the same accepted
+                        # scalar/null kind (nothing meaningful to compare deeper).
+                        continue
+                else:
+                    canonical_kind = _element_kind(example[k])
+                    findings.append((
+                        "TYPE_MISMATCH",
+                        SEV_ERROR,
+                        f"type mismatch at '{path}.{k}': canonical={canonical_kind}, actual={actual_kind}",
+                    ))
+                    continue
+            if parent_shape is not None and parent_shape.dict_elements:
+                sibling_values = [e[k] for e in parent_shape.dict_elements if k in e]
+                findings.extend(_deep_compare_field(sibling_values, actual[k], f"{path}.{k}"))
+            else:
+                findings.extend(_deep_compare(example[k], actual[k], f"{path}.{k}"))
         return findings
 
     if ex_kind == "list":
         if not example or not actual:
             return findings
-        canonical_item = example[0]
+        shape = _compute_list_shape(example)
+        dict_elems = [e for e in example if isinstance(e, dict)]
+        if dict_elems:
+            canonical_item: Any = _merge_dicts_for_values(dict_elems)
+        else:
+            canonical_item = example[0]
         canonical_is_dict = isinstance(canonical_item, dict)
+        if shape.dict_element_count > 1 and shape.known_keys != shape.required_keys:
+            optional = sorted(shape.known_keys - shape.required_keys)
+            findings.append((
+                "RAGGED_OBJECT_KEYS",
+                SEV_INFO,
+                f"ragged object keys at '{path}': "
+                f"required={sorted(shape.required_keys)}, "
+                f"optional={optional} "
+                "-- harness tolerates this; only required-key absences are FAIL",
+            ))
         ragged_reported = False
         first_actual_keys: set[str] | None = None
         for idx, item in enumerate(actual):
@@ -443,7 +558,9 @@ def _deep_compare(
                         "-- harness tolerates this; required-key absences are reported separately as FAIL",
                     ))
                     ragged_reported = True
-            findings.extend(_deep_compare(canonical_item, item, f"{path}[]"))
+            findings.extend(
+                _deep_compare(canonical_item, item, f"{path}[]", parent_shape=shape)
+            )
         return findings
 
     ex_type = _infer_field_type(example)
@@ -460,6 +577,10 @@ def _deep_compare(
 
 
 def _merge_canonical(values: list[Any]) -> Any:
+    # Top-level dict-key union is the "advertised surface" used for
+    # SCHEMA_MISSING_COLUMNS diffing. Nested list[dict] values are preserved
+    # RAW (not collapsed to a single merged exemplar) so _deep_compare's list
+    # branch can compute the real intersection/union across raw siblings.
     dict_values = [v for v in values if isinstance(v, dict)]
     if dict_values and len(dict_values) == len([v for v in values if v is not None]):
         merged: dict[str, Any] = {}
@@ -475,22 +596,15 @@ def _merge_canonical(values: list[Any]) -> Any:
                 if isinstance(existing, dict) and isinstance(v, dict):
                     merged[k] = _merge_canonical([existing, v])
                 elif isinstance(existing, list) and isinstance(v, list):
-                    if not existing:
+                    if not existing and v:
                         merged[k] = v
-                    elif v:
-                        merged[k] = [_merge_canonical(existing + v)] if all(
-                            isinstance(x, dict) for x in existing + v
-                        ) else existing
-        for k, v in list(merged.items()):
-            if isinstance(v, list) and v and all(isinstance(x, dict) for x in v):
-                merged[k] = [_merge_canonical(v)]
         return merged
     list_values = [v for v in values if isinstance(v, list)]
     if list_values and len(list_values) == len([v for v in values if v is not None]):
-        flat = [item for lst in list_values for item in lst]
-        if flat and all(isinstance(x, dict) for x in flat):
-            return [_merge_canonical(flat)]
-        return list_values[0] if list_values[0] else []
+        for lst in list_values:
+            if lst:
+                return lst
+        return []
     for v in values:
         if v is not None and (not isinstance(v, str) or v.strip()):
             return v
@@ -762,6 +876,7 @@ def _validate_table(
     if overlay_path.suffix.lower() == ".json" and example_path.suffix.lower() == ".json":
         root = f"{overlay_path.name}[]"
         findings: list[DeepFinding] = []
+        top_shape = _compute_list_shape(example_rows)
         first_actual_keys: set[str] | None = None
         ragged_reported = False
         for idx, row in enumerate(overlay_rows):
@@ -782,7 +897,13 @@ def _validate_table(
                 ))
                 ragged_reported = True
             for k in sorted(set(canonical_row.keys()) & set(row.keys())):
-                findings.extend(_deep_compare(canonical_row[k], row[k], f"{root}.{k}"))
+                if k in top_shape.kinds_per_key:
+                    seen_kinds = top_shape.kinds_per_key[k]
+                    actual_kind = _element_kind(row[k])
+                    if actual_kind in seen_kinds and actual_kind in {"scalar", "null"}:
+                        continue
+                example_values_for_k = [r.get(k) for r in example_rows if isinstance(r, dict) and k in r]
+                findings.extend(_deep_compare_field(example_values_for_k, row[k], f"{root}.{k}"))
         for code, sev, msg in _dedupe_findings(findings):
             issues.append(
                 Issue(

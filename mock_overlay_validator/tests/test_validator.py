@@ -172,7 +172,7 @@ class DeepCompareTests(unittest.TestCase):
             msgs = [i.message for i in report.issues]
             self.assertTrue(any(
                 "type mismatch at" in m and "doorbots[].motion_snooze" in m
-                and "canonical=scalar" in m and "actual=dict" in m
+                and "canonical=null" in m and "actual=dict" in m
                 for m in msgs
             ))
 
@@ -200,6 +200,120 @@ class ReportShapeTests(unittest.TestCase):
         data = json.loads(json.dumps(report.to_dict()))
         self.assertEqual(data["summary"]["errors"], 1)
         self.assertEqual(data["issues"][0]["code"], "X")
+
+
+class RaggednessToleranceTests(unittest.TestCase):
+    def test_ragged_nested_array_bills_line_no_key_missing(self):
+        ex = V.EXAMPLES_DIR / "quickbooks-api" / "bills.json"
+        with tempfile.TemporaryDirectory() as td:
+            overlay_dir = Path(td) / "quickbooks-api"
+            overlay_dir.mkdir()
+            (overlay_dir / "bills.json").write_text(ex.read_text())
+            report = V.Report()
+            V.validate_overlay_dir(overlay_dir, "quickbooks-api", report)
+            offenders = [i for i in report.issues
+                         if i.code == "KEY_MISSING" and "Line[]" in i.message]
+            self.assertEqual(offenders, [], msg=str([i.message for i in offenders]))
+
+    def test_customers_primary_email_addr_polymorphism_no_type_mismatch(self):
+        ex = V.EXAMPLES_DIR / "quickbooks-api" / "customers.json"
+        with tempfile.TemporaryDirectory() as td:
+            overlay_dir = Path(td) / "quickbooks-api"
+            overlay_dir.mkdir()
+            (overlay_dir / "customers.json").write_text(ex.read_text())
+            report = V.Report()
+            V.validate_overlay_dir(overlay_dir, "quickbooks-api", report)
+            offenders = [i for i in report.issues
+                         if i.code == "TYPE_MISMATCH" and "PrimaryEmailAddr" in i.message]
+            self.assertEqual(offenders, [], msg=str([i.message for i in offenders]))
+
+    def test_single_element_example_list_no_crash_no_spurious_error(self):
+        with tempfile.TemporaryDirectory() as td:
+            overlay_dir = Path(td) / "gmail-api"
+            overlay_dir.mkdir()
+            ex_rows = json.loads((V.EXAMPLES_DIR / "gmail-api" / "messages.json").read_text())
+            (overlay_dir / "messages.json").write_text(json.dumps([ex_rows[0]]))
+            report = V.Report()
+            V.validate_overlay_dir(overlay_dir, "gmail-api", report)
+            self.assertEqual(len(report.errors), 0, msg=str([i.message for i in report.errors]))
+
+    def test_empty_actual_list_no_crash(self):
+        with tempfile.TemporaryDirectory() as td:
+            overlay_dir = Path(td) / "gmail-api"
+            overlay_dir.mkdir()
+            (overlay_dir / "messages.json").write_text("[]")
+            report = V.Report()
+            V.validate_overlay_dir(overlay_dir, "gmail-api", report)
+            self.assertFalse(_has_error(report, "KEY_MISSING"))
+            self.assertFalse(_has_error(report, "TYPE_MISMATCH"))
+
+    def test_two_level_nested_list_of_dicts(self):
+        example = [
+            {"root_id": "r1", "children": [
+                {"id": "c1", "kind": "T", "characters": "hi",
+                 "children": [{"id": "gc1", "kind": "T", "characters": "yo"}]},
+                {"id": "c2", "kind": "T", "characters": "hi",
+                 "children": [{"id": "gc2", "kind": "T", "characters": "yo"}]},
+            ]}
+        ]
+        actual_ok = [
+            {"root_id": "r1", "children": [
+                {"id": "c1", "kind": "T", "characters": "hi",
+                 "children": [{"id": "gc1", "kind": "T", "characters": "yo"}]},
+            ]}
+        ]
+        findings_ok = V._deep_compare(example, actual_ok, "root")
+        codes = {c for c, _, _ in findings_ok}
+        self.assertNotIn("KEY_MISSING", codes)
+        actual_bad = [
+            {"root_id": "r1", "children": [
+                {"id": "c1", "kind": "T", "characters": "hi",
+                 "children": [{"id": "gc1", "kind": "T"}]},
+            ]}
+        ]
+        findings_bad = V._deep_compare(example, actual_bad, "root")
+        codes_bad = {c for c, _, _ in findings_bad}
+        self.assertIn("KEY_MISSING", codes_bad)
+        self.assertTrue(any("characters" in m for c, _, m in findings_bad if c == "KEY_MISSING"))
+
+    def test_optional_key_present_in_overlay_no_extra_no_missing(self):
+        ex = V.EXAMPLES_DIR / "quickbooks-api" / "bills.json"
+        overlay = json.loads(ex.read_text())
+        for r in overlay:
+            for line in r.get("Line", []):
+                for k in ("DetailType", "Id", "LineNum", "Quantity", "UnitPrice"):
+                    line.setdefault(k, "x")
+        with tempfile.TemporaryDirectory() as td:
+            overlay_dir = Path(td) / "quickbooks-api"
+            overlay_dir.mkdir()
+            (overlay_dir / "bills.json").write_text(json.dumps(overlay))
+            report = V.Report()
+            V.validate_overlay_dir(overlay_dir, "quickbooks-api", report)
+            offenders = [
+                i for i in report.issues
+                if i.code in ("KEY_MISSING", "KEY_EXTRA") and "Line[]" in i.message
+            ]
+            filtered = [i for i in offenders if any(
+                k in i.message for k in ("DetailType", "Id", "LineNum", "Quantity", "UnitPrice"))]
+            self.assertEqual(filtered, [],
+                             msg=str([i.message for i in filtered]))
+
+    def test_genuinely_unknown_key_still_emits_key_extra(self):
+        ex = V.EXAMPLES_DIR / "quickbooks-api" / "bills.json"
+        overlay = json.loads(ex.read_text())
+        for r in overlay:
+            for line in r.get("Line", []):
+                line["totally_made_up_deep_key"] = 1
+        with tempfile.TemporaryDirectory() as td:
+            overlay_dir = Path(td) / "quickbooks-api"
+            overlay_dir.mkdir()
+            (overlay_dir / "bills.json").write_text(json.dumps(overlay))
+            report = V.Report()
+            V.validate_overlay_dir(overlay_dir, "quickbooks-api", report)
+            self.assertTrue(any(
+                i.code == "KEY_EXTRA" and "totally_made_up_deep_key" in i.message
+                for i in report.issues
+            ))
 
 
 if __name__ == "__main__":
