@@ -135,12 +135,14 @@ Exit code is `0` on success, `1` on errors (or warnings with
 |---|---|---|---|
 | `SCHEMA_MISSING_COLUMNS` | error | Overlay lacks columns present in example | Add them, even if blank. |
 | `SCHEMA_EXTRA_COLUMNS` | warn | Overlay has columns not in example | The runtime ignores them — usually a typo. |
-| `SCHEMA_MISSING_KEYS` | error | Document overlay missing required top-level keys | Add them. |
-| `SCHEMA_EXTRA_KEYS` | warn | Document overlay has unknown top-level keys | Probably a typo. |
 | `SCHEMA_TYPE_DRIFT` | error | A column's values don't parse like the example (e.g. `bool` example, `str` overlay) | Match the example's value shape. |
+| `KEY_MISSING` | error | A nested JSON key that exists in the canonical example is absent in the overlay (path is dotted, e.g. `identity.json.owners.acc_chk_001`) | Add the missing key. |
+| `KEY_EXTRA` | warn | Overlay has a nested key the canonical example doesn't have | The runtime ignores it — usually a typo or a stale field. |
+| `TYPE_MISMATCH` | error | At a nested path, canonical is `scalar` but overlay is `dict`/`list` (or vice versa). Path uses `[]` inside arrays. | Match the canonical shape (e.g. don't wrap a scalar in an object). |
+| `RAGGED_OBJECT_KEYS` | info | Objects inside a JSON array have inconsistent key-sets among themselves. The harness tolerates this; missing required keys are reported separately as errors. | Make row objects uniform for cleaner data. |
 | `OVERLAY_EMPTY` | warn | Overlay file has zero rows | Table will be empty at runtime — confirm that's intentional. |
 | `EXAMPLE_BROKEN` | warn | Validator's own example is broken (not your fault) | Report this to the validator maintainers. |
-| `EXAMPLE_EMPTY` | warn | Validator's example has zero rows so type/PK checks are skipped | Informational. |
+| `EXAMPLE_EMPTY` | warn | Validator's example has zero rows so type checks are skipped | Informational. |
 
 ## Ground rules for mock-data authors
 

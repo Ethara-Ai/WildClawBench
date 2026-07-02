@@ -144,6 +144,55 @@ class WrappedTableTests(unittest.TestCase):
         self.assertGreater(len(rows), 0)
 
 
+class DeepCompareTests(unittest.TestCase):
+    def test_nested_key_missing_and_extra_in_document(self):
+        with tempfile.TemporaryDirectory() as td:
+            overlay_dir = Path(td) / "plaid-api"
+            overlay_dir.mkdir()
+            (overlay_dir / "identity.json").write_text(json.dumps({
+                "owners": {"acc_pcu_chk_01": {}, "acc_pcu_sav_02": {}}
+            }))
+            report = V.Report()
+            V.validate_overlay_dir(overlay_dir, "plaid-api", report)
+            msgs = [i.message for i in report.issues]
+            self.assertTrue(any("acc_chk_001" in m and "missing canonical key" in m for m in msgs))
+            self.assertTrue(any("acc_pcu_chk_01" in m and "extra key" in m for m in msgs))
+
+    def test_type_mismatch_scalar_vs_dict_in_array(self):
+        with tempfile.TemporaryDirectory() as td:
+            overlay_dir = Path(td) / "ring-api"
+            overlay_dir.mkdir()
+            ex = json.loads((V.EXAMPLES_DIR / "ring-api" / "devices.json").read_text())
+            for row in ex.get("doorbots", []):
+                if "motion_snooze" in row:
+                    row["motion_snooze"] = {"nested": "was scalar"}
+            (overlay_dir / "devices.json").write_text(json.dumps(ex))
+            report = V.Report()
+            V.validate_overlay_dir(overlay_dir, "ring-api", report)
+            msgs = [i.message for i in report.issues]
+            self.assertTrue(any(
+                "type mismatch at" in m and "doorbots[].motion_snooze" in m
+                and "canonical=scalar" in m and "actual=dict" in m
+                for m in msgs
+            ))
+
+    def test_ragged_object_keys_in_json_array(self):
+        with tempfile.TemporaryDirectory() as td:
+            overlay_dir = Path(td) / "gmail-api"
+            overlay_dir.mkdir()
+            (overlay_dir / "messages.json").write_text(json.dumps([
+                {"id": "a", "threadId": "t1", "labelIds": [], "snippet": "s", "payload": {},
+                 "sizeEstimate": 1, "historyId": "1", "internalDate": "1"},
+                {"id": "b", "threadId": "t1", "labelIds": [], "snippet": "s", "payload": {},
+                 "sizeEstimate": 1, "historyId": "1", "internalDate": "1"},
+                {"id": "c", "snippet": "s"},
+            ]))
+            report = V.Report()
+            V.validate_overlay_dir(overlay_dir, "gmail-api", report)
+            codes = {i.code for i in report.issues}
+            self.assertIn("RAGGED_OBJECT_KEYS", codes)
+
+
 class ReportShapeTests(unittest.TestCase):
     def test_json_serialisation(self):
         report = V.Report()

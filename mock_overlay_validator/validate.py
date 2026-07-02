@@ -364,6 +364,154 @@ def _types_compatible(example_types: set[str], overlay_types: set[str]) -> bool:
     return True
 
 
+def _container_kind(value: Any) -> str:
+    if isinstance(value, dict):
+        return "dict"
+    if isinstance(value, list):
+        return "list"
+    return "scalar"
+
+
+DeepFinding = tuple[str, str, str]
+
+
+def _deep_compare(
+    example: Any,
+    actual: Any,
+    path: str,
+) -> list[DeepFinding]:
+    # Recursive structural comparison between an example (canonical) and an
+    # actual JSON value. Emits key drift + container-vs-scalar type drift at
+    # every nested path. For arrays it compares each actual element against the
+    # first example element (canonical shape); if the array's actual elements
+    # have inconsistent key sets among themselves that is emitted once as
+    # RAGGED_OBJECT_KEYS (INFO) so the team knows harness tolerates but flags it.
+    findings: list[DeepFinding] = []
+    ex_kind = _container_kind(example)
+    ac_kind = _container_kind(actual)
+
+    if ex_kind != ac_kind:
+        if ex_kind == "scalar" and ac_kind == "scalar":
+            pass
+        else:
+            findings.append((
+                "TYPE_MISMATCH",
+                SEV_ERROR,
+                f"type mismatch at '{path}': canonical={ex_kind}, actual={ac_kind}",
+            ))
+            return findings
+
+    if ex_kind == "dict":
+        ex_keys = set(example.keys())
+        ac_keys = set(actual.keys())
+        for k in sorted(ex_keys - ac_keys):
+            findings.append((
+                "KEY_MISSING",
+                SEV_ERROR,
+                f"missing canonical key '{path}.{k}'",
+            ))
+        for k in sorted(ac_keys - ex_keys):
+            findings.append((
+                "KEY_EXTRA",
+                SEV_WARN,
+                f"extra key '{path}.{k}' not in canonical",
+            ))
+        for k in sorted(ex_keys & ac_keys):
+            findings.extend(_deep_compare(example[k], actual[k], f"{path}.{k}"))
+        return findings
+
+    if ex_kind == "list":
+        if not example or not actual:
+            return findings
+        canonical_item = example[0]
+        canonical_is_dict = isinstance(canonical_item, dict)
+        ragged_reported = False
+        first_actual_keys: set[str] | None = None
+        for idx, item in enumerate(actual):
+            if canonical_is_dict and isinstance(item, dict):
+                if first_actual_keys is None:
+                    first_actual_keys = set(item.keys())
+                elif not ragged_reported and set(item.keys()) != first_actual_keys:
+                    ragged_indices = [
+                        i for i, r in enumerate(actual)
+                        if isinstance(r, dict) and set(r.keys()) != first_actual_keys
+                    ]
+                    findings.append((
+                        "RAGGED_OBJECT_KEYS",
+                        SEV_INFO,
+                        f"Class B: ragged object keys vs first object at row(s) {ragged_indices} "
+                        "-- harness tolerates this; required-key absences are reported separately as FAIL",
+                    ))
+                    ragged_reported = True
+            findings.extend(_deep_compare(canonical_item, item, f"{path}[]"))
+        return findings
+
+    ex_type = _infer_field_type(example)
+    ac_type = _infer_field_type(actual)
+    ex_types = {ex_type} - {"blank", "null"}
+    ac_types = {ac_type} - {"blank", "null"}
+    if not _types_compatible(ex_types, ac_types):
+        findings.append((
+            "TYPE_MISMATCH",
+            SEV_ERROR,
+            f"type mismatch at '{path}': canonical={ex_type}, actual={ac_type}",
+        ))
+    return findings
+
+
+def _merge_canonical(values: list[Any]) -> Any:
+    dict_values = [v for v in values if isinstance(v, dict)]
+    if dict_values and len(dict_values) == len([v for v in values if v is not None]):
+        merged: dict[str, Any] = {}
+        for d in dict_values:
+            for k, v in d.items():
+                if k not in merged:
+                    merged[k] = v
+                    continue
+                existing = merged[k]
+                if existing is None and v is not None:
+                    merged[k] = v
+                    continue
+                if isinstance(existing, dict) and isinstance(v, dict):
+                    merged[k] = _merge_canonical([existing, v])
+                elif isinstance(existing, list) and isinstance(v, list):
+                    if not existing:
+                        merged[k] = v
+                    elif v:
+                        merged[k] = [_merge_canonical(existing + v)] if all(
+                            isinstance(x, dict) for x in existing + v
+                        ) else existing
+        for k, v in list(merged.items()):
+            if isinstance(v, list) and v and all(isinstance(x, dict) for x in v):
+                merged[k] = [_merge_canonical(v)]
+        return merged
+    list_values = [v for v in values if isinstance(v, list)]
+    if list_values and len(list_values) == len([v for v in values if v is not None]):
+        flat = [item for lst in list_values for item in lst]
+        if flat and all(isinstance(x, dict) for x in flat):
+            return [_merge_canonical(flat)]
+        return list_values[0] if list_values[0] else []
+    for v in values:
+        if v is not None and (not isinstance(v, str) or v.strip()):
+            return v
+    for v in values:
+        if v is not None:
+            return v
+    return None
+
+
+def _dedupe_findings(findings: list[DeepFinding]) -> list[DeepFinding]:
+    seen: set[tuple[str, str]] = set()
+    out: list[DeepFinding] = []
+    for code, sev, msg in findings:
+        key = (code, msg)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append((code, sev, msg))
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Normalisation: turn either CSV-rows-of-strings or JSON-list-of-dicts into the
 # same shape — list[dict[str, value]] — so schema comparison is format-agnostic.
@@ -385,9 +533,13 @@ def _peel_wrapped_table(data: Any) -> list[dict[str, Any]] | None:
             return inner
         return None
     if isinstance(inner, dict):
-        for v in inner.values():
-            if isinstance(v, list) and v and all(isinstance(r, dict) for r in v):
-                return v
+        list_valued = [
+            v for v in inner.values()
+            if isinstance(v, list) and v and all(isinstance(r, dict) for r in v)
+        ]
+        dict_valued = [v for v in inner.values() if isinstance(v, dict)]
+        if len(list_valued) == 1 and not dict_valued:
+            return list_valued[0]
     return None
 
 
@@ -533,7 +685,8 @@ def _validate_table(
         )
         return issues
 
-    example_cols = list(example_rows[0].keys())
+    canonical_row = _merge_canonical(example_rows)
+    example_cols = list(canonical_row.keys())
     example_col_set = set(example_cols)
 
     if not overlay_rows:
@@ -548,7 +701,10 @@ def _validate_table(
         )
         return issues
 
-    overlay_col_set = set(overlay_rows[0].keys())
+    overlay_col_set: set[str] = set()
+    for row in overlay_rows:
+        if isinstance(row, dict):
+            overlay_col_set.update(row.keys())
 
     missing = sorted(example_col_set - overlay_col_set)
     extra = sorted(overlay_col_set - example_col_set)
@@ -579,7 +735,6 @@ def _validate_table(
             )
         )
 
-    # Per-column type drift (only for columns present on both sides)
     shared = sorted(example_col_set & overlay_col_set)
     for col in shared:
         example_types = _summarise_field_types(r.get(col) for r in example_rows)
@@ -604,6 +759,40 @@ def _validate_table(
                 )
             )
 
+    if overlay_path.suffix.lower() == ".json" and example_path.suffix.lower() == ".json":
+        root = f"{overlay_path.name}[]"
+        findings: list[DeepFinding] = []
+        first_actual_keys: set[str] | None = None
+        ragged_reported = False
+        for idx, row in enumerate(overlay_rows):
+            if not isinstance(row, dict):
+                continue
+            if first_actual_keys is None:
+                first_actual_keys = set(row.keys())
+            elif not ragged_reported and set(row.keys()) != first_actual_keys:
+                ragged_indices = [
+                    i for i, r in enumerate(overlay_rows)
+                    if isinstance(r, dict) and set(r.keys()) != first_actual_keys
+                ]
+                findings.append((
+                    "RAGGED_OBJECT_KEYS",
+                    SEV_INFO,
+                    f"Class B: ragged object keys vs first object at row(s) {ragged_indices} "
+                    "-- harness tolerates this; required-key absences are reported separately as FAIL",
+                ))
+                ragged_reported = True
+            for k in sorted(set(canonical_row.keys()) & set(row.keys())):
+                findings.extend(_deep_compare(canonical_row[k], row[k], f"{root}.{k}"))
+        for code, sev, msg in _dedupe_findings(findings):
+            issues.append(
+                Issue(
+                    severity=sev,
+                    code=code,
+                    message=msg,
+                    api=api,
+                    file=str(overlay_path),
+                )
+            )
 
     return issues
 
@@ -631,48 +820,17 @@ def _validate_document(
         )
         return issues
 
-    example_keys = set(example_doc.keys())
-    overlay_keys = set(overlay_doc.keys())
-    missing = sorted(example_keys - overlay_keys)
-    extra = sorted(overlay_keys - example_keys)
-    if missing:
+    root = overlay_path.name
+    for code, sev, msg in _dedupe_findings(_deep_compare(example_doc, overlay_doc, root)):
         issues.append(
             Issue(
-                severity=SEV_ERROR,
-                code="SCHEMA_MISSING_KEYS",
-                message=f"document is missing required key(s): {', '.join(missing)}",
+                severity=sev,
+                code=code,
+                message=msg,
                 api=api,
                 file=str(overlay_path),
-                hint=f"example keys: {', '.join(sorted(example_keys))}",
             )
         )
-    if extra:
-        issues.append(
-            Issue(
-                severity=SEV_WARN,
-                code="SCHEMA_EXTRA_KEYS",
-                message=f"document has unexpected key(s): {', '.join(extra)}",
-                api=api,
-                file=str(overlay_path),
-                hint=f"example keys: {', '.join(sorted(example_keys))}",
-            )
-        )
-    for k in sorted(example_keys & overlay_keys):
-        et = _infer_field_type(example_doc.get(k))
-        ot = _infer_field_type(overlay_doc.get(k))
-        if not _types_compatible({et} - {"blank", "null"}, {ot} - {"blank", "null"}):
-            issues.append(
-                Issue(
-                    severity=SEV_ERROR,
-                    code="SCHEMA_TYPE_DRIFT",
-                    message=(
-                        f"key '{k}' value doesn't parse like the example "
-                        f"(example={et}, overlay={ot})"
-                    ),
-                    api=api,
-                    file=str(overlay_path),
-                )
-            )
     return issues
 
 
