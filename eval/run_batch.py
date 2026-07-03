@@ -53,12 +53,16 @@ from src.utils.skills_inference import (
 )
 from src.utils.testgen import generate_task_tests
 from src.utils.litellm_sidecar import (
+    CC_BRIDGE_INTERNAL_PORT,
     build_litellm_config_yaml,
     create_network,
     ensure_litellm_headroom_image,
     pull_litellm_image,
     remove_network,
+    start_bridge,
     start_litellm,
+    stop_bridge,
+    wait_for_bridge_healthy,
     stop_litellm,
     verify_litellm_upstream_reachable,
     wait_for_litellm_healthy,
@@ -1668,7 +1672,13 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
     shared_sidecar = os.environ.get("WCB_SHARED_SIDECAR", "").strip()
     shared_usage_log = os.environ.get("WCB_SHARED_SIDECAR_USAGE_LOG", "").strip()
     shared_yaml_path = os.environ.get("WCB_SHARED_SIDECAR_YAML", "").strip()
+    shared_cc_bridge = os.environ.get("WCB_SHARED_CC_BRIDGE", "").strip()
+    shared_cc_bridge_url = os.environ.get("WCB_SHARED_CC_BRIDGE_URL", "").strip()
     shared_mode = bool(shared_network and shared_sidecar)
+
+    use_oauth = bool(getattr(args, "use_claude_oauth", None)) or (
+        config.use_claude_oauth and bool(config.cc_account_pool)
+    )
 
     import uuid as _uuid
     batch_id = _uuid.uuid4().hex[:12]
@@ -1678,6 +1688,16 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
     else:
         network = f"k3net-{batch_id}"
         sidecar = f"ll-{batch_id}"
+
+    cc_bridge_name = ""
+    cc_bridge_url = ""
+    if use_oauth:
+        if shared_mode and shared_cc_bridge and shared_cc_bridge_url:
+            cc_bridge_name = shared_cc_bridge
+            cc_bridge_url = shared_cc_bridge_url
+        else:
+            cc_bridge_name = f"wcbsh-cc-bridge-{batch_id}"
+            cc_bridge_url = f"http://{cc_bridge_name}:{CC_BRIDGE_INTERNAL_PORT}"
 
     _agent_headroom = (os.environ.get("KENSEI_AGENT_HEADROOM_ENABLED", "").strip().lower()
                        in ("1", "true", "yes", "on"))
@@ -1690,6 +1710,9 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
         enable_usage_callback=True,
         enable_headroom_callback=_agent_headroom,
         anthropic_api_key=config.anthropic_api_key,
+        use_claude_oauth=use_oauth,
+        bridge_url=cc_bridge_url,
+        enable_oauth_usage_callback=use_oauth,
     )
     if not litellm_yaml:
         raise RuntimeError(
@@ -1703,6 +1726,38 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
             ensure_litellm_headroom_image()
         create_network(network)
         cleanups.append(lambda: remove_network(network))
+
+    if use_oauth and not (shared_mode and shared_cc_bridge):
+        pool_paths = [p.strip() for p in config.cc_account_pool.split(":") if p.strip()]
+        pool_dirs = {os.path.dirname(os.path.abspath(p)) for p in pool_paths if os.path.isfile(p)}
+        if not pool_dirs:
+            raise RuntimeError(
+                f"OAuth pool spec {config.cc_account_pool!r} resolved to zero readable files. "
+                f"Point WCB_CC_ACCOUNT_POOL at existing OAuth credential JSON file(s)."
+            )
+        if len(pool_dirs) > 1:
+            raise RuntimeError(
+                f"OAuth pool files span multiple host directories {pool_dirs}. "
+                f"Consolidate under one directory so a single mount can expose them."
+            )
+        pool_host_dir = next(iter(pool_dirs))
+        bridge_secret = config.cc_bridge_secret or os.environ.get("WCB_CC_BRIDGE_SECRET", "").strip()
+        if not bridge_secret:
+            import secrets as _secrets
+            bridge_secret = _secrets.token_hex(32)
+            os.environ["WCB_CC_BRIDGE_SECRET"] = bridge_secret
+        start_bridge(
+            container_name=cc_bridge_name,
+            network=network,
+            pool_host_dir=pool_host_dir,
+            bridge_secret=bridge_secret,
+        )
+        cleanups.append(lambda: stop_bridge(cc_bridge_name))
+        if not wait_for_bridge_healthy(cc_bridge_name):
+            raise RuntimeError(
+                f"cc-bridge {cc_bridge_name} did not become healthy in time. "
+                f"Override budget via WCB_CC_BRIDGE_HEALTH_TIMEOUT env (seconds)."
+            )
     config.work_dir.mkdir(parents=True, exist_ok=True)
     if shared_mode and shared_yaml_path and Path(shared_yaml_path).is_file():
         cfg_path = Path(shared_yaml_path)
@@ -1763,6 +1818,11 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
             sidecar, network,
         )
     else:
+        oauth_cb_src = ""
+        if use_oauth:
+            oauth_cb_src = str(
+                Path(__file__).resolve().parent.parent / "src" / "utils" / "litellm_usage_oauth_callback.py"
+            )
         start_litellm(
             container_name=sidecar,
             network=network,
@@ -1778,6 +1838,7 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
             headroom_log_host_dir=headroom_log_dir_str,
             enable_headroom=_agent_headroom,
             anthropic_api_key=config.anthropic_api_key,
+            oauth_usage_callback_host_path=oauth_cb_src,
         )
         cleanups.append(lambda: stop_litellm(sidecar))
         if not wait_for_litellm_healthy(sidecar):

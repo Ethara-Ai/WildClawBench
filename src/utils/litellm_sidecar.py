@@ -32,6 +32,9 @@ def build_litellm_config_yaml(
     openai_whisper_api_key: str = "",
     enable_headroom_callback: bool = False,
     anthropic_api_key: str = "",
+    use_claude_oauth: bool = False,
+    bridge_url: str = "",
+    enable_oauth_usage_callback: bool = False,
 ) -> str:
     whisper_env_ref = (
         "os.environ/OPENAI_API_KEY_WHISPER"
@@ -55,7 +58,53 @@ def build_litellm_config_yaml(
         "        - location: message\n"
         "          role: system\n"
     )
-    if bedrock_arn:
+    if use_claude_oauth and bridge_url:
+        # ---------------------------------------------------------------
+        # Claude Code OAuth trajectory path (opt-in via --use-claude-oauth).
+        #
+        # Approved deviation from src/utils/AGENTS.md invariant at line 276
+        # ("Opus traffic NEVER reaches public Anthropic transport"). Opus
+        # here is fronted by the wcbsh-cc-bridge-<suffix> sidecar which
+        # attaches an OAuth Bearer token (from WCB_CC_ACCOUNT_POOL creds)
+        # and forwards to https://api.anthropic.com under a Claude Code
+        # Max subscription. LiteLLM sees a plain `anthropic/` model on a
+        # custom api_base; the bridge is a transparent Anthropic-Messages
+        # proxy (per Oracle review — pure pass-through, no key rewriting).
+        #
+        # Thinking directive shape here MUST be {type:enabled,budget_tokens}
+        # not adaptive+effort:high — Anthropic-direct 400s the adaptive
+        # shape (that's a Bedrock-Converse-specific extension). budget_tokens
+        # 32000 mirrors kaiju-harness's Opus fixed-budget shape and yields
+        # visibly populated thinking blocks on api.anthropic.com's opus route.
+        #
+        # cost_per_token = 0 so LiteLLM's completion_cost() reports $0 for
+        # subscription usage (the real subscription is prepaid, per-request
+        # cost is zero). Bedrock-equivalent pricing is emitted separately by
+        # litellm_usage_oauth_callback.py into usage_oauth.jsonl for audit.
+        #
+        # extra_headers.x-wcb-bridge-secret enforces that only sidecar co-
+        # tenants with the shared batch secret can drain the subscription.
+        # Bridge validates via hmac.compare_digest; missing/mismatched → 401.
+        # ---------------------------------------------------------------
+        opus_oauth_params = (
+            "    litellm_params:\n"
+            "      model: anthropic/claude-opus-4-8\n"
+            f"      api_base: {bridge_url}\n"
+            "      api_key: os.environ/WCB_CC_STUB_KEY\n"
+            "      thinking: {\"type\": \"enabled\", \"budget_tokens\": 32000}\n"
+            "      stream_options:\n"
+            "        include_usage: true\n"
+            "      extra_headers:\n"
+            "        x-wcb-bridge-secret: os.environ/WCB_CC_BRIDGE_SECRET\n"
+            + cache_marker
+            + "      input_cost_per_token: 0\n"
+            "      output_cost_per_token: 0\n"
+            "      cache_read_input_token_cost: 0\n"
+            "      cache_creation_input_token_cost: 0"
+        )
+        model_blocks.append("  - model_name: claude-opus-4.7\n" + opus_oauth_params)
+        model_blocks.append("  - model_name: claude-opus-4-6\n" + opus_oauth_params)
+    elif bedrock_arn:
         # Extended-thinking visibility on opus-4-6/4-7 via Bedrock Converse needs the
         # EXACT pair thinking:{type:adaptive} + output_config:{effort}. Three shapes
         # were tried empirically against this LiteLLM (main-stable sha 75543fa1d739):
@@ -143,6 +192,13 @@ def build_litellm_config_yaml(
         # /v1/messages route on the direct API would 400 it. Agent behavior
         # is unaffected because the opus model still responds correctly; only
         # the streamed reasoning trace is absent on this fallback path.
+        #
+        # NOTE on AGENTS.md invariant "Opus traffic NEVER reaches public
+        # Anthropic transport": this fallback IS a deviation, retained for
+        # dev-machine usability when Bedrock creds are rotated. Production
+        # OAuth path (use_claude_oauth branch above) is a SEPARATE approved
+        # deviation using OAuth subscription + wcbsh-cc-bridge sidecar for
+        # authorized/audited access; do not conflate the two.
         opus_anthropic_params = (
             "    litellm_params:\n"
             "      model: anthropic/claude-opus-4-20250514\n"
@@ -322,6 +378,8 @@ def build_litellm_config_yaml(
         _cbs.append("litellm_usage_callback.proxy_handler_instance")
     if enable_headroom_callback:
         _cbs.append("litellm_headroom_callback.headroom_callback_instance")
+    if enable_oauth_usage_callback:
+        _cbs.append("litellm_usage_oauth_callback.oauth_usage_callback_instance")
     if _cbs:
         callback_line = "  callbacks: [" + ", ".join(f'"{c}"' for c in _cbs) + "]\n"
     else:
@@ -493,6 +551,7 @@ def start_litellm(
     headroom_log_host_dir: str = "",
     enable_headroom: bool = False,
     anthropic_api_key: str = "",
+    oauth_usage_callback_host_path: str = "",
 ) -> None:
     from src.utils.docker_utils import (
         build_env_args,
@@ -516,6 +575,11 @@ def start_litellm(
         env_pairs.append(("OPENAI_API_KEY_WHISPER", openai_whisper_api_key))
     if anthropic_api_key:
         env_pairs.append(("ANTHROPIC_API_KEY", anthropic_api_key))
+    _cc_secret = os.environ.get("WCB_CC_BRIDGE_SECRET", "").strip()
+    if _cc_secret:
+        env_pairs.append(("WCB_CC_BRIDGE_SECRET", _cc_secret))
+    _cc_stub = os.environ.get("WCB_CC_STUB_KEY", "").strip() or "sk-wcb-oauth-stub"
+    env_pairs.append(("WCB_CC_STUB_KEY", _cc_stub))
     env_args = build_env_args(env_pairs)
 
     callback_args: list[str] = []
@@ -524,6 +588,11 @@ def start_litellm(
             "-v", f"{usage_callback_host_path}:/app/litellm_usage_callback.py:ro",
             "-v", f"{usage_log_host_dir}:/var/litellm_usage",
             *build_env_args([("LITELLM_USAGE_LOG_PATH", "/var/litellm_usage/usage.jsonl")]),
+        ]
+    if oauth_usage_callback_host_path and usage_log_host_dir:
+        callback_args += [
+            "-v", f"{oauth_usage_callback_host_path}:/app/litellm_usage_oauth_callback.py:ro",
+            *build_env_args([("WCB_OAUTH_USAGE_LOG_PATH", "/var/litellm_usage/usage_oauth.jsonl")]),
         ]
 
     headroom_args: list[str] = []
@@ -670,4 +739,153 @@ def verify_litellm_upstream_reachable(
 
 
 def stop_litellm(container_name: str) -> None:
+    subprocess.run(["docker", "rm", "-f", container_name], capture_output=True)
+
+
+CC_BRIDGE_IMAGE = "wildclawbench-cc-bridge:v1"
+CC_BRIDGE_INTERNAL_PORT = 8765
+
+
+def ensure_cc_bridge_image(image: str = CC_BRIDGE_IMAGE) -> None:
+    r = subprocess.run(
+        ["docker", "image", "inspect", image],
+        capture_output=True,
+    )
+    if r.returncode == 0:
+        return
+    repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    dockerfile = os.path.join(repo_root, "docker", "cc-bridge", "Dockerfile")
+    if not os.path.isfile(dockerfile):
+        raise RuntimeError(
+            f"cc-bridge image {image} not present locally and Dockerfile missing at {dockerfile}. "
+            f"Build manually: docker build -t {image} -f {dockerfile} {repo_root}"
+        )
+    logger.info("Building cc-bridge image %s", image)
+    r = subprocess.run(
+        ["docker", "build", "-t", image, "-f", dockerfile, repo_root],
+        capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        raise RuntimeError(
+            f"cc-bridge image build failed:\n{r.stderr}\n"
+            f"Manual: docker build -t {image} -f {dockerfile} {repo_root}"
+        )
+    logger.info("cc-bridge image %s built", image)
+
+
+def start_bridge(
+    container_name: str,
+    network: str,
+    pool_host_dir: str,
+    bridge_secret: str,
+    port: int = CC_BRIDGE_INTERNAL_PORT,
+    image: str = CC_BRIDGE_IMAGE,
+    upstream: str = "https://api.anthropic.com",
+    account_pool_spec: str = "",
+    skip_system_prefix: bool = False,
+) -> None:
+    from src.utils.docker_utils import (
+        build_env_args,
+        _validate_docker_token,
+    )
+    _validate_docker_token("container_name", container_name)
+    _validate_docker_token("network", network)
+    if not pool_host_dir or not os.path.isdir(pool_host_dir):
+        raise RuntimeError(
+            f"start_bridge: pool_host_dir must exist ({pool_host_dir!r})"
+        )
+    if not bridge_secret:
+        raise RuntimeError("start_bridge: bridge_secret required (co-tenant threat)")
+
+    if not account_pool_spec:
+        account_pool_spec = ":".join(
+            f"/oauth_pool/{f}"
+            for f in sorted(os.listdir(pool_host_dir))
+            if f.endswith(".json")
+        )
+    if not account_pool_spec:
+        raise RuntimeError(
+            f"start_bridge: no *.json OAuth credential files found under {pool_host_dir}"
+        )
+
+    env_pairs: list[tuple[str, str]] = [
+        ("WCB_CC_ACCOUNT_POOL", account_pool_spec),
+        ("WCB_CC_BRIDGE_SECRET", bridge_secret),
+        ("WCB_CC_UPSTREAM", upstream),
+    ]
+    if skip_system_prefix:
+        env_pairs.append(("WCB_CC_SKIP_SYSTEM_PREFIX", "1"))
+    for _k in (
+        "WCB_CC_MAX_INLINE_RETRIES",
+        "WCB_CC_MAX_INLINE_WAIT",
+        "WCB_CC_UPSTREAM",
+        "WCB_CC_DEBUG_LOG_BODY",
+        "WCB_CC_USER_AGENT",
+        "WCB_CC_X_APP",
+    ):
+        _v = os.environ.get(_k)
+        if _v:
+            env_pairs.append((_k, _v))
+    env_args = build_env_args(env_pairs)
+    image = _validate_docker_token("cc-bridge image", image)
+
+    ensure_cc_bridge_image(image)
+
+    cmd = [
+        "docker", "run", "-d",
+        "--name", container_name,
+        "--network", network,
+        *env_args,
+        "-v", f"{pool_host_dir}:/oauth_pool:rw",
+        image,
+        "--host", "0.0.0.0",
+        "--port", str(port),
+    ]
+    logger.info(
+        "[%s] Starting cc-bridge on network %s (image=%s pool_dir=%s)",
+        container_name, network, image, pool_host_dir,
+    )
+    subprocess.run(["docker", "rm", "-f", container_name], capture_output=True)
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError(f"cc-bridge container start failed:\n{r.stderr}")
+    connect_default_bridge(container_name)
+    logger.info(
+        "[%s] cc-bridge dual-homed (internal + default bridge for api.anthropic.com egress)",
+        container_name,
+    )
+
+
+def wait_for_bridge_healthy(
+    container_name: str,
+    port: int = CC_BRIDGE_INTERNAL_PORT,
+    timeout: float | None = None,
+) -> bool:
+    if timeout is None:
+        try:
+            timeout = float(os.environ.get("WCB_CC_BRIDGE_HEALTH_TIMEOUT", "60"))
+        except ValueError:
+            timeout = 60.0
+    probe = (
+        "import urllib.request; "
+        f"urllib.request.urlopen('http://localhost:{port}/healthz', timeout=2)"
+    )
+    deadline = time.time() + timeout
+    interval = 1.5
+    while time.time() < deadline:
+        r = subprocess.run(
+            ["docker", "exec", container_name, "python3", "-c", probe],
+            capture_output=True,
+        )
+        if r.returncode == 0:
+            logger.info("[%s] cc-bridge healthy", container_name)
+            return True
+        time.sleep(interval)
+    logger.warning(
+        "[%s] cc-bridge did not become healthy within %.0fs", container_name, timeout
+    )
+    return False
+
+
+def stop_bridge(container_name: str) -> None:
     subprocess.run(["docker", "rm", "-f", container_name], capture_output=True)

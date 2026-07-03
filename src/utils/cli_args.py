@@ -96,6 +96,16 @@ def build_run_batch_parser(default_model: str, default_parallel: int) -> argpars
         help="Override the AWS region for Bedrock (else AWS_REGION env, default ap-south-1).",
     )
     parser.add_argument(
+        "--use-claude-oauth",
+        dest="use_claude_oauth",
+        action="store_true",
+        default=None,
+        help="Route opus traffic through the wcbsh-cc-bridge sidecar under a "
+             "Claude Code OAuth subscription instead of Bedrock. Requires "
+             "WCB_CC_ACCOUNT_POOL to point at one or more OAuth credential "
+             "JSON files. Equivalent to WCB_USE_CLAUDE_OAUTH=1.",
+    )
+    parser.add_argument(
         "--mock-stack",
         dest="mock_stack",
         action="store_true",

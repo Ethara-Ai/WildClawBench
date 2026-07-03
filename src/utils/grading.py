@@ -1720,6 +1720,57 @@ def extract_preflight_usage_from_litellm_log(log_path: Path) -> dict:
     return totals
 
 
+def extract_oauth_usage_from_litellm_log(
+    log_path: Path,
+    window_start_ts: str = "",
+    window_end_ts: str = "",
+) -> dict:
+    totals = {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+        "total_tokens": 0,
+        "cost_actual": 0.0,
+        "cost_bedrock_equivalent": 0.0,
+        "request_count": 0,
+        "usage_source": "litellm_oauth",
+        "route": "claude_oauth_bridge",
+    }
+    try:
+        if not log_path or not Path(log_path).exists():
+            return totals
+        lines = Path(log_path).read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return totals
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if window_start_ts and row.get("ts", "") < window_start_ts:
+            continue
+        if window_end_ts and row.get("ts", "") > window_end_ts:
+            continue
+        totals["request_count"] += 1
+        totals["input_tokens"]       += int(row.get("input_tokens", 0) or 0)
+        totals["output_tokens"]      += int(row.get("output_tokens", 0) or 0)
+        totals["cache_read_tokens"]  += int(row.get("cache_read_tokens", 0) or 0)
+        totals["cache_write_tokens"] += int(row.get("cache_write_tokens", 0) or 0)
+        totals["cost_actual"]        += float(row.get("cost_actual", 0.0) or 0.0)
+        totals["cost_bedrock_equivalent"] += float(row.get("cost_bedrock_equivalent", 0.0) or 0.0)
+    totals["total_tokens"] = (
+        totals["input_tokens"] + totals["output_tokens"]
+        + totals["cache_read_tokens"] + totals["cache_write_tokens"]
+    )
+    totals["cost_actual"] = round(totals["cost_actual"], 6)
+    totals["cost_bedrock_equivalent"] = round(totals["cost_bedrock_equivalent"], 6)
+    return totals
+
+
 def extract_usage_from_jsonl(jsonl_path: Path) -> dict:
     totals = {
         "input_tokens": 0,

@@ -43,6 +43,7 @@ JUDGE_COUNCIL=1          # 1 = --judge-council, 0 = omit
 USE_TESTS=1              # 1 = --generate-tests --execute-tests, 0 = omit
 USE_LITELLM=1            # 1 = --litellm, 0 = omit
 USE_MOCK_STACK=1         # 1 = --mock-stack, 0 = omit
+USE_CLAUDE_OAUTH=0       # 1 = --use-claude-oauth (route opus through OAuth bridge), 0 = Bedrock
 SKIP_PREFLIGHT=0         # 1 = skip docker/agent-image/mock-image/.env checks
 PARALLEL_REPS=0          # 1 = run all K reps of a (task,model) concurrently, 0 = sequential
 PARALLEL_TASKS=1         # >1 = run that many TASKS concurrently via the failure-isolated launcher
@@ -103,6 +104,8 @@ ADVANCED
       --no-tests            Disable --generate-tests/--execute-tests
       --no-litellm          Disable LiteLLM sidecar (direct Bedrock)
       --no-mock-stack       Disable mock-stack docker fleet
+      --use-claude-oauth    Route opus through Claude Code OAuth bridge (Max plan) instead of Bedrock;
+                            requires WCB_CC_ACCOUNT_POOL pointing at OAuth credential JSON file(s)
       --no-bundle           Skip auto-repackage to output_bundle/ after each task
       --bundle-root DIR     Destination for auto-bundle (default: output_bundle; env: KENSEI_BUNDLE_ROOT)
       --parallel-reps       Run all K reps of a (task,model) CONCURRENTLY (default: sequential)
@@ -391,6 +394,8 @@ cleanup_orphans() {
 : "${WCB_SHARED_SIDECAR_USAGE_LOG:=}"
 : "${WCB_SHARED_SIDECAR_YAML:=}"
 : "${WCB_SHARED_LITELLM_MASTER_KEY:=}"
+: "${WCB_SHARED_CC_BRIDGE:=}"
+: "${WCB_SHARED_CC_BRIDGE_URL:=}"
 # WCB_SHARED_OWNER_PID is the PID of the process that ran bootstrap_shared_sidecar
 # (always the parent run.sh). Workers under -P >1 inherit this via export. The
 # teardown_shared_sidecar guard at the top of that function uses this to refuse
@@ -433,6 +438,8 @@ bootstrap_shared_sidecar() {
             usage_log)   WCB_SHARED_SIDECAR_USAGE_LOG="$v" ;;
             yaml_path)   WCB_SHARED_SIDECAR_YAML="$v" ;;
             master_key)  WCB_SHARED_LITELLM_MASTER_KEY="$v" ;;
+            cc_bridge)     WCB_SHARED_CC_BRIDGE="$v" ;;
+            cc_bridge_url) WCB_SHARED_CC_BRIDGE_URL="$v" ;;
         esac
     done < "$tmpfile"
     rm -f "$tmpfile"
@@ -445,7 +452,8 @@ bootstrap_shared_sidecar() {
     WCB_SHARED_OWNER_PID=$$
     export WCB_SHARED_NETWORK WCB_SHARED_SIDECAR \
            WCB_SHARED_SIDECAR_USAGE_LOG WCB_SHARED_SIDECAR_YAML \
-           WCB_SHARED_LITELLM_MASTER_KEY WCB_SHARED_OWNER_PID
+           WCB_SHARED_LITELLM_MASTER_KEY WCB_SHARED_OWNER_PID \
+           WCB_SHARED_CC_BRIDGE WCB_SHARED_CC_BRIDGE_URL
     log::ok "Shared sidecar=$WCB_SHARED_SIDECAR network=$WCB_SHARED_NETWORK owner_pid=$WCB_SHARED_OWNER_PID"
 
     # Install teardown trap that fires on normal exit + Ctrl-C + SIGTERM,
@@ -473,11 +481,14 @@ teardown_shared_sidecar() {
     local sc="${WCB_SHARED_SIDECAR:-}"
     local nw="${WCB_SHARED_NETWORK:-}"
     local yp="${WCB_SHARED_SIDECAR_YAML:-}"
+    local cb="${WCB_SHARED_CC_BRIDGE:-}"
     WCB_SHARED_SIDECAR=""; WCB_SHARED_NETWORK=""
     WCB_SHARED_SIDECAR_USAGE_LOG=""; WCB_SHARED_SIDECAR_YAML=""
     WCB_SHARED_LITELLM_MASTER_KEY=""
-    log::info "Tearing down shared sidecar=${sc} network=${nw}"
+    WCB_SHARED_CC_BRIDGE=""; WCB_SHARED_CC_BRIDGE_URL=""
+    log::info "Tearing down shared sidecar=${sc} network=${nw}${cb:+ cc_bridge=$cb}"
     [[ -n "$sc" ]] && docker rm -f "$sc" >/dev/null 2>&1 || true
+    [[ -n "$cb" ]] && docker rm -f "$cb" >/dev/null 2>&1 || true
     [[ -n "$nw" ]] && docker network rm "$nw" >/dev/null 2>&1 || true
     [[ -n "$yp" && -f "$yp" ]] && rm -f "$yp" 2>/dev/null || true
 }
@@ -514,6 +525,7 @@ run_one() {
     )
     (( USE_LITELLM == 1 )) && cmd+=(--litellm)
     (( USE_MOCK_STACK == 1 )) && cmd+=(--mock-stack)
+    (( USE_CLAUDE_OAUTH == 1 )) && cmd+=(--use-claude-oauth)
     if (( USE_TESTS == 1 )); then
         cmd+=(--generate-tests --testgen-max-attempts 3 --execute-tests --testexec-timeout 600)
     fi
@@ -828,6 +840,7 @@ parse_args() {
             --no-tests)           USE_TESTS=0; shift ;;
             --no-litellm)         USE_LITELLM=0; shift ;;
             --no-mock-stack)      USE_MOCK_STACK=0; shift ;;
+            --use-claude-oauth)   USE_CLAUDE_OAUTH=1; shift ;;
             --no-bundle)          AUTO_BUNDLE=0; shift ;;
             --bundle-root)        BUNDLE_ROOT="$2"; shift 2 ;;
             --parallel-reps)      PARALLEL_REPS=1; shift ;;
@@ -908,6 +921,7 @@ run_parallel_tasks() {
                     --thinking "$THINKING" --skip-preflight)
     (( USE_LITELLM == 0 ))    && wargs+=(--no-litellm)
     (( USE_MOCK_STACK == 0 )) && wargs+=(--no-mock-stack)
+    (( USE_CLAUDE_OAUTH == 1 )) && wargs+=(--use-claude-oauth)
     (( USE_TESTS == 0 ))      && wargs+=(--no-tests)
     (( JUDGE_COUNCIL == 0 ))  && wargs+=(--no-judge-council)
     (( AUTO_BUNDLE == 0 ))    && wargs+=(--no-bundle)

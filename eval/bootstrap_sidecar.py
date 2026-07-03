@@ -76,13 +76,17 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 
 from src.utils.config import Config  # noqa: E402
 from src.utils.litellm_sidecar import (  # noqa: E402
+    CC_BRIDGE_INTERNAL_PORT,
     build_litellm_config_yaml,
     create_network,
     ensure_litellm_headroom_image,
     pull_litellm_image,
+    start_bridge,
     start_litellm,
+    stop_bridge,
     stop_litellm,
     verify_litellm_upstream_reachable,
+    wait_for_bridge_healthy,
     wait_for_litellm_healthy,
 )
 
@@ -123,6 +127,8 @@ def main() -> int:
     suffix = args.name_suffix
     network = f"wcbsh-net-{suffix}"
     sidecar = f"wcbsh-sidecar-{suffix}"
+    cc_bridge = f"wcbsh-cc-bridge-{suffix}"
+    cc_bridge_url = ""
 
     config = Config.from_env()
     use_litellm = config.litellm_enabled()
@@ -133,12 +139,24 @@ def main() -> int:
         _emit("usage_log", "")
         _emit("yaml_path", "")
         _emit("master_key", "")
+        _emit("cc_bridge", "")
+        _emit("cc_bridge_url", "")
         return 0
 
     _agent_headroom = (
         os.environ.get("KENSEI_AGENT_HEADROOM_ENABLED", "").strip().lower()
         in ("1", "true", "yes", "on")
     )
+
+    use_oauth = config.use_claude_oauth and bool(config.cc_account_pool)
+    bridge_secret = config.cc_bridge_secret
+    if use_oauth and not bridge_secret:
+        import secrets
+        bridge_secret = secrets.token_hex(32)
+        _log("generated ephemeral WCB_CC_BRIDGE_SECRET for this batch")
+    if use_oauth:
+        cc_bridge_url = f"http://{cc_bridge}:{CC_BRIDGE_INTERNAL_PORT}"
+        os.environ["WCB_CC_BRIDGE_SECRET"] = bridge_secret
 
     litellm_yaml = build_litellm_config_yaml(
         bedrock_sonnet_arn=config.bedrock_sonnet_arn if config.aws_bearer_token else "",
@@ -149,6 +167,9 @@ def main() -> int:
         enable_usage_callback=True,
         enable_headroom_callback=_agent_headroom,
         anthropic_api_key=config.anthropic_api_key,
+        use_claude_oauth=use_oauth,
+        bridge_url=cc_bridge_url,
+        enable_oauth_usage_callback=use_oauth,
     )
     if not litellm_yaml:
         _log(
@@ -165,6 +186,49 @@ def main() -> int:
 
     _log(f"creating network {network}…")
     create_network(network)
+
+    if use_oauth:
+        pool_paths = [p.strip() for p in config.cc_account_pool.split(":") if p.strip()]
+        pool_dirs = {os.path.dirname(os.path.abspath(p)) for p in pool_paths if os.path.isfile(p)}
+        if not pool_dirs:
+            _log(
+                f"OAuth pool spec {config.cc_account_pool!r} resolved to zero readable files. "
+                f"Point WCB_CC_ACCOUNT_POOL at host-side OAuth credential JSON file(s)."
+            )
+            return 6
+        if len(pool_dirs) > 1:
+            _log(
+                f"OAuth pool files span multiple host directories {pool_dirs}. "
+                f"Consolidate under one directory (e.g. ~/.wcb/oauth_pool/) so a single "
+                f"docker -v mount can expose them all."
+            )
+            return 6
+        pool_host_dir = next(iter(pool_dirs))
+        _log(f"starting cc-bridge {cc_bridge} on network {network} (pool={pool_host_dir})…")
+        try:
+            start_bridge(
+                container_name=cc_bridge,
+                network=network,
+                pool_host_dir=pool_host_dir,
+                bridge_secret=bridge_secret,
+            )
+        except Exception as exc:
+            _log(f"start_bridge failed: {exc}")
+            try:
+                stop_bridge(cc_bridge)
+            except Exception:  # noqa: BLE001
+                pass
+            return 6
+        if not wait_for_bridge_healthy(cc_bridge):
+            _log(
+                f"cc-bridge {cc_bridge} did not become healthy in time. "
+                f"Override WCB_CC_BRIDGE_HEALTH_TIMEOUT (seconds) for slow hosts."
+            )
+            try:
+                stop_bridge(cc_bridge)
+            except Exception:  # noqa: BLE001
+                pass
+            return 7
 
     config.work_dir.mkdir(parents=True, exist_ok=True)
     cfg_path = config.work_dir / f"litellm-config-shared-{suffix}.yaml"
@@ -201,6 +265,11 @@ def main() -> int:
         headroom_log_dir_str = str(headroom_log_dir)
 
     _log(f"starting sidecar {sidecar} on network {network}…")
+    oauth_cb_src = ""
+    if use_oauth:
+        oauth_cb_src = str(
+            Path(__file__).resolve().parent.parent / "src" / "utils" / "litellm_usage_oauth_callback.py"
+        )
     try:
         start_litellm(
             container_name=sidecar,
@@ -217,6 +286,7 @@ def main() -> int:
             headroom_log_host_dir=headroom_log_dir_str,
             enable_headroom=_agent_headroom,
             anthropic_api_key=config.anthropic_api_key,
+            oauth_usage_callback_host_path=oauth_cb_src,
         )
     except Exception as exc:
         _log(f"start_litellm failed: {exc}")
@@ -259,6 +329,8 @@ def main() -> int:
     _emit("usage_log", str(usage_log_path))
     _emit("yaml_path", str(cfg_path))
     _emit("master_key", config.litellm_master_key)
+    _emit("cc_bridge", cc_bridge if use_oauth else "")
+    _emit("cc_bridge_url", cc_bridge_url)
     return 0
 
 

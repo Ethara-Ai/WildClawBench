@@ -56,6 +56,9 @@ logs/
 # Audit deliverables (findings.json, REPORT.md, BUGS.md, REMEDIATION.md, logs/) — local-only, machine-specific.
 audit/
 
+# macOS Finder duplicate-on-copy of audit/ (created when the folder is duplicated in Finder).
+/audit 2/
+
 # Operator/maintainer knowledge bases — NOT loaded by the harness at runtime.
 # Persona-side AGENTS.md files under input/<task>/persona/ ARE loaded into the
 # agent container via docker cp and must remain tracked; only the source-tree
@@ -69,3 +72,8 @@ audit/
 # Local-only triage / verification notes that aren't required to run the harness.
 CRUCIBLE.md
 SIX_CHECK_VERIFICATION_REPORT.md
+
+# Never commit .env or any timestamped backup of it — secrets live here.
+.env
+.env.*
+.env.backup*
