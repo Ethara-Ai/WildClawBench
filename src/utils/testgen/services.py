@@ -10,17 +10,111 @@ Gracefully degrades to empty results when the environment tree is missing
 
 from __future__ import annotations
 
+import ast
 import csv as _csv
 import json
 import logging
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 _logger = logging.getLogger(__name__)
 
 ServiceInfo = Dict[str, object]  # {"name": str, "env_var": str, "port": int}
+
+_HTTP_DECORATOR_METHODS = {"get", "post", "put", "patch", "delete"}
+
+
+def _extract_routes_from_source(source: str) -> List[str]:
+    """Route path templates from one FastAPI server module.
+
+    Handles the two decorator shapes used across environment/:
+      @app.get("/3.0/lists")
+      @app.get(_BASE + "/employees/{employee_id}")   # _BASE = "/api/gateway.php/{company}/v1"
+    """
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return []
+
+    str_consts: Dict[str, str] = {}
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+            and isinstance(node.value, ast.Constant)
+            and isinstance(node.value.value, str)
+            and node.value.value.startswith("/")
+        ):
+            str_consts[node.targets[0].id] = node.value.value
+
+    def _resolve(arg: ast.expr) -> Optional[str]:
+        if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+            return arg.value
+        if isinstance(arg, ast.BinOp) and isinstance(arg.op, ast.Add):
+            left = _resolve(arg.left)
+            right = _resolve(arg.right)
+            if left is not None and right is not None:
+                return left + right
+        if isinstance(arg, ast.Name):
+            return str_consts.get(arg.id)
+        return None
+
+    routes: List[str] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        for deco in node.decorator_list:
+            if not (
+                isinstance(deco, ast.Call)
+                and isinstance(deco.func, ast.Attribute)
+                and deco.func.attr in _HTTP_DECORATOR_METHODS
+                and deco.args
+            ):
+                continue
+            path = _resolve(deco.args[0])
+            if path and path.startswith("/"):
+                routes.append(path)
+    return routes
+
+
+@lru_cache(maxsize=4)
+def _cached_service_routes(env_dir_str: str) -> Dict[str, tuple]:
+    result: Dict[str, tuple] = {}
+    for entry in sorted(os.listdir(env_dir_str)):
+        svc_dir = os.path.join(env_dir_str, entry)
+        if not os.path.isdir(svc_dir) or not os.path.isfile(os.path.join(svc_dir, "service.toml")):
+            continue
+        routes: List[str] = []
+        for fname in sorted(os.listdir(svc_dir)):
+            if not fname.endswith(".py"):
+                continue
+            try:
+                with open(os.path.join(svc_dir, fname), "r", encoding="utf-8") as f:
+                    routes.extend(_extract_routes_from_source(f.read()))
+            except OSError:
+                _logger.debug("routes: failed to read %s/%s", entry, fname, exc_info=True)
+        if routes:
+            result[entry] = tuple(sorted(set(routes)))
+    return result
+
+
+def read_service_routes(env_dir: Path | str | None) -> Dict[str, List[str]]:
+    """Served route path templates per API, e.g. {"mailchimp-api": ["/3.0/lists", ...]}.
+
+    Grounds lint L27: endpoint paths referenced in generated tests must match a
+    real served route *including its full prefix* (Mailchimp's `/3.0`,
+    Salesforce's `/services/data/v59.0`, ...), because the audit summary keys
+    requests by the full path. Empty dict when env_dir is missing.
+    """
+    if not env_dir:
+        return {}
+    env_path = Path(env_dir)
+    if not env_path.is_dir():
+        return {}
+    return {name: list(routes) for name, routes in _cached_service_routes(str(env_path)).items()}
 
 
 def _parse_service_toml(path: str) -> Optional[dict]:
