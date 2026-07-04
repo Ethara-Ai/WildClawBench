@@ -44,7 +44,12 @@ from .constants import (
 from .lints import self_validate_tests
 from .repair import auto_repair_truncated_python
 from .sanitize import sanitize_llm_test_code
-from .services import collect_mock_data_snapshot, read_api_docs, read_services
+from .services import (
+    collect_mock_data_snapshot,
+    read_api_docs,
+    read_service_routes,
+    read_services,
+)
 from .wrapper import build_wrapper_prefix
 
 _logger = logging.getLogger(__name__)
@@ -341,6 +346,14 @@ def generate_task_tests(
     scoped = sorted(set(required_apis) | set(distractor_apis))
     wrapper_prefix = build_wrapper_prefix(services, scoped_apis=scoped)
 
+    # Served routes for scoped APIs, keyed by the <SVC>_URL wrapper constant —
+    # feeds lint L27 (endpoint prefixes in tests must match real served paths).
+    all_routes = read_service_routes(env_dir)
+    service_routes = {
+        name.upper().replace("-", "_") + "_URL": all_routes[name]
+        for name in scoped if name in all_routes
+    }
+
     try:
         system_prompt = _load_prompt("testgen_system")
     except (FileNotFoundError, OSError) as exc:
@@ -443,6 +456,7 @@ def generate_task_tests(
             weights,
             has_api_services=has_api_services,
             distractor_apis=distractor_apis,
+            service_routes=service_routes,
         )
 
         if not best_code or len(failures) < len(best_failures):

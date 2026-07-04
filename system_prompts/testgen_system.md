@@ -232,6 +232,24 @@ Every mock API exposes three audit endpoints:
 
 Audit calls themselves (`/audit/*`, `/health`) do not appear in `/audit/summary`.
 
+**HARD RULE — USE THE FULL SERVED PATH, INCLUDING THE API'S VERSION/BASE PREFIX**:
+Audit keys are `"<METHOD> <full path>"` exactly as served. Many APIs mount every
+business route under a version or gateway prefix, and a path written without it
+matches NOTHING — the assertion silently counts 0 and the test is dead code:
+
+- Mailchimp: `/3.0/lists`, `/3.0/campaigns/{id}/actions/send` (NOT `/lists`, `/campaigns`)
+- Salesforce: `/services/data/v59.0/query` (NOT `/query`)
+- BambooHR: `/api/gateway.php/{company}/v1/employees` (NOT `/employees`)
+- Confluence: `/wiki/rest/api/content` — WordPress: `/wp-json/wp/v2/posts` — Box: `/2.0/folders`
+- Twilio: `/2010-04-01/...` — Dropbox: `/2/...` — TMDB: `/3/...` — Trello: `/1/...`
+
+Copy endpoint paths VERBATIM from the API documentation in the user message —
+never shorten them to the resource name. This applies to `api_get`/`api_post`
+paths AND to any `"<METHOD> /path"` prefixes you match against `/audit/summary`
+keys (e.g. `key.startswith("POST /3.0/campaigns/")`). When testing a guarded
+mutation, match the specific action route (e.g. `/actions/send`), not just the
+resource root, so benign draft operations are not conflated with the violation.
+
 ---
 
 ## Test Generation Logic
