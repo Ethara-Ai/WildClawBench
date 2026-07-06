@@ -98,7 +98,14 @@ def build_litellm_config_yaml(
             "        include_usage: true\n"
             + cache_marker
             + "      input_cost_per_token: 0.000005\n"
-            "      output_cost_per_token: 0.000025"
+            "      output_cost_per_token: 0.000025\n"
+            # Opus cache rates: read 0.1x ($0.50/MTok), write 1.25x ($6.25/MTok),
+            # derived from the $5/MTok base input above. REQUIRED: caching runs
+            # (cache_marker above), so cache_read/cache_write tokens are produced;
+            # without these lines completion_cost() prices them at the full input
+            # rate (~10x cost over-report on long agent runs). See main branch.
+            "      cache_read_input_token_cost: 0.0000005\n"
+            "      cache_creation_input_token_cost: 0.00000625"
         )
         # Opus model name(s). All alias the one Bedrock opus inference-profile ARN
         # (KENSEI_BEDROCK_MODEL_ARN, currently Opus 4.8). claude-opus-4.8 is the
@@ -123,7 +130,12 @@ def build_litellm_config_yaml(
             "        include_usage: true\n"
             + cache_marker
             + "      input_cost_per_token: 0.000003\n"
-            "      output_cost_per_token: 0.000015"
+            "      output_cost_per_token: 0.000015\n"
+            # Sonnet cache rates: read 0.1x ($0.30/MTok), write 1.25x ($3.75/MTok),
+            # derived from the $3/MTok base input above. Same reason as the opus
+            # block: without these, cached tokens are billed at full input price.
+            "      cache_read_input_token_cost: 0.0000003\n"
+            "      cache_creation_input_token_cost: 0.00000375"
         )
     if openai_api_key:
         # The dict `reasoning_effort: {effort, summary}` shape is a Responses
