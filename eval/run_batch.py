@@ -1135,6 +1135,24 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
             logger.warning("[%s] Harbor bundle write failed: %s", task["task_id"], exc)
 
 
+def _apply_no_subagents(task: dict, args) -> None:
+    """Force sub-agent spawning OFF for this run when --no-subagents was passed.
+
+    Overrides every enablement source in task_parser (explicit task_config.yaml
+    multi_agent blocks, multi_agent_complex_turns, the WCB_MULTI_AGENT_DEFAULT
+    capability default). With multi_agent_enabled False the runner never grants
+    the session tools via tools.alsoAllow AND explicitly denies them (see
+    deny_native_subagents), so the model is never offered sessions_spawn.
+    """
+    if not getattr(args, "no_subagents", False):
+        return
+    if task.get("multi_agent_enabled"):
+        logger.info("[%s] --no-subagents: forcing multi-agent OFF "
+                    "(was enabled via task/default config)", task.get("task_id", "?"))
+    task["multi_agent_enabled"] = False
+    task["multi_agent_config"] = {"enabled": False, "forced_off_by": "--no-subagents"}
+
+
 def run_single_task(
     task: dict,
     model: str,
@@ -2335,6 +2353,7 @@ def _run_dispatch(args, backend, config: Config, mock_env_dict: dict, effective_
         task = load_task(task_file)
         task["__use_judge_council__"] = use_judge_council
         task["__force_testgen__"] = bool(getattr(args, "force_testgen", False))
+        _apply_no_subagents(task, args)
         logger.info("Single task mode: %s (format=%s)", task["task_id"], task.get("format", "md"))
         result = run_single_task(
             task,
@@ -2384,6 +2403,7 @@ def _run_dispatch(args, backend, config: Config, mock_env_dict: dict, effective_
                 t = load_task(tf)
                 t["__use_judge_council__"] = use_judge_council
                 t["__force_testgen__"] = bool(getattr(args, "force_testgen", False))
+                _apply_no_subagents(t, args)
                 tasks.append(t)
             except Exception as exc:
                 logger.error("Parse failed %s: %s", tf, exc)

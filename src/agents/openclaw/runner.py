@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from src.agents.base import AgentExecution, AgentTaskSpec, BaseAgent
 from src.utils.docker_utils import (
     configure_native_subagents,
+    deny_native_subagents,
     inject_api_connectors,
     inject_lobster_workspace,
     inject_openclaw_models,
@@ -218,6 +219,13 @@ class OpenClawAgent(BaseAgent):
                     inject_subagent_tool(spec.task_id, _ma_cfg)
 
             self._set_model(spec.task_id, spec.model, thinking=spec.thinking)
+            if not spec.multi_agent_enabled:
+                # Explicit deny on top of the withheld alsoAllow grant, so a
+                # --no-subagents run (or any single-agent task) can never spawn
+                # even if image config drift ever grants the session tools.
+                # MUST run after _set_model: its config script ASSIGNS
+                # tools["deny"] and would clobber an earlier deny append.
+                deny_native_subagents(spec.task_id)
             self._inject_auth(spec.task_id)
             image_model = self.image_model or spec.model
             self._set_image_model(spec.task_id, image_model)
@@ -356,7 +364,7 @@ class OpenClawAgent(BaseAgent):
         task_id: str,
         *,
         max_wait: float = 600.0,
-        quiesce: float = 12.0,
+        quiesce: float = 60.0,
         poll: float = 5.0,
     ) -> None:
         """Block until native sub-agent child sessions finish (or max_wait).
@@ -367,7 +375,20 @@ class OpenClawAgent(BaseAgent):
         child spawned. We poll the (size, mtime) signature of those files and
         return once it stops changing for ``quiesce`` seconds (children done) or
         ``max_wait`` elapses. No-op when only the parent session exists.
+
+        quiesce=12s truncated live children: sessions append only at message
+        boundaries, so a single long LLM turn or slow exec looks identical to
+        "done". Measured over 25,226 inter-message gaps in bundled child
+        trajectories (2026-07-06): p95=15.9s, p99=56s — 12s misread ~5% of
+        gaps and killed lanes mid-turn (Midori run_3 H5, Gabriela_Scott run_5).
+        60s covers ~99%; override via OPENCLAW_SUBAGENT_QUIESCE_SECONDS. The
+        tail is fat (legit gaps up to 18min), so any timer is a heuristic —
+        the authoritative check is the gateway's run registry, which this
+        host cannot exercise (image is amd64-only) and is left as the known
+        follow-up.
         """
+        quiesce = float(os.environ.get("OPENCLAW_SUBAGENT_QUIESCE_SECONDS", quiesce))
+        max_wait = float(os.environ.get("OPENCLAW_SUBAGENT_MAX_WAIT_SECONDS", max_wait))
         sessions_dir = "/root/.openclaw/agents/main/sessions"
         count_cmd = f"ls {sessions_dir}/*.jsonl 2>/dev/null | wc -l"
         try:

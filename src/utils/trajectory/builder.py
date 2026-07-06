@@ -692,6 +692,62 @@ def _slug(text: str) -> str:
     return s or "subagent"
 
 
+# Sub-agent lanes killed mid-run (gateway teardown quiesce race, upstream
+# stream aborts, approval-gate deadlock) still land on disk with whatever
+# messages made it — previously all stamped "success" unconditionally.
+# Audited 2026-07-06 across 194 bundled child trajectories: 6 damaged lanes,
+# every one labeled success. Each failure mode leaves a distinct fingerprint
+# in the FINAL message, so completion is derived from the ending instead.
+_APPROVE_PLEA_RE = re.compile(r"^\s*/approve\b")
+
+
+def classify_child_completion(messages: List[Any]) -> tuple[str, str]:
+    """Derive (completion_status, ended_reason) from a child's projected messages.
+
+    Statuses:
+      * ``success`` — ends with a text-bearing assistant turn (the report).
+      * ``aborted`` — ends mid-flight: empty assistant content (stream cut),
+        thinking-only final turn, a toolCall with no toolResult after it, or
+        a non-assistant final message.
+      * ``blocked_on_approval`` — final text is an ``/approve <id>`` plea:
+        the exec approval gate fired and headless runs have no channel to
+        answer it (obfuscation detector is NOT covered by exec.security=full).
+    """
+    if not messages:
+        return "aborted", "no messages recorded"
+    last = messages[-1] if isinstance(messages[-1], dict) else {}
+    inner = last.get("message") if isinstance(last.get("message"), dict) else {}
+    role = inner.get("role")
+    if role != "assistant":
+        return "aborted", f"ends on role={role!r}, not an assistant report"
+    content = inner.get("content")
+    if isinstance(content, str):
+        text = content
+        has_tool_call = False
+    elif isinstance(content, list):
+        if not content:
+            return "aborted", "final assistant turn has empty content (stream cut)"
+        text = "".join(
+            b.get("text", "") for b in content
+            if isinstance(b, dict) and b.get("type") == "text"
+        )
+        has_tool_call = any(
+            isinstance(b, dict) and b.get("type") in ("toolCall", "tool_use")
+            for b in content
+        )
+    else:
+        return "aborted", "final assistant turn has no content"
+    if _APPROVE_PLEA_RE.match(text or ""):
+        return "blocked_on_approval", "ended pleading for exec approval (no channel in headless runs)"
+    if has_tool_call:
+        # A toolResult always lands as the NEXT message; a trailing toolCall
+        # means the lane died waiting for it.
+        return "aborted", "final turn issues a toolCall with no toolResult"
+    if not (text or "").strip():
+        return "aborted", "final assistant turn is thinking-only (no report text)"
+    return "success", "ends with assistant report text"
+
+
 def build_child_trajectory(
     *,
     session_key: str,
@@ -707,8 +763,16 @@ def build_child_trajectory(
     Matches the reference ``children/NN_*.json`` meta_info exactly:
     ``task_name, task_description, task_completion_status, parent_session,
     session_key, platform, message_count``.
+
+    ``completion_status="success"`` (the default) is treated as a rubber
+    stamp and re-derived from the ending via classify_child_completion; an
+    explicit non-success status from the caller is preserved as-is. No
+    ``ended_reason`` key here — this meta_info is an exact reference-schema
+    contract (see test_golden_layout key-set assertion).
     """
     messages = _project_published_messages(raw_messages)
+    if completion_status == "success":
+        completion_status, _ = classify_child_completion(messages)
     return {
         "meta_info": {
             "task_name": name,
@@ -989,11 +1053,13 @@ def attach_native_subagents(
         )
         task_text = label_to_task.get(label, "")
         desc = task_text.strip().splitlines()[0][:200] if task_text.strip() else ""
+        completion_status, ended_reason = classify_child_completion(child_msgs)
         children_docs.append({
             "meta_info": {
                 "task_name": label,
                 "task_description": desc,
-                "task_completion_status": "success",
+                "task_completion_status": completion_status,
+                "ended_reason": ended_reason,
                 "parent_session": root,
                 "session_key": canon_key,
                 "subagent_id": str(meta.get("sessionId", "") or ""),

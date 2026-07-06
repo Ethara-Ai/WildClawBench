@@ -927,6 +927,53 @@ def configure_native_subagents(
             )
 
 
+def deny_native_subagents(task_id: str) -> None:
+    """Explicitly deny the native session tools for a single-agent run.
+
+    Belt-and-suspenders for --no-subagents: skipping
+    :func:`configure_native_subagents` already withholds the tools (the
+    ``coding`` profile allowlist omits them, verified zero spawns without the
+    alsoAllow grant), but a deny entry also wins over any grant that might
+    arrive from image config drift. Only tools this build registers are
+    listed — same set configure_native_subagents grants. deny beats
+    profile/allow/alsoAllow in OpenClaw's ToolPolicySchema resolution.
+    No-op-safe: failure is logged, never raised.
+    """
+    session_tools = [
+        "sessions_spawn", "subagents", "agents_list",
+        "sessions_list", "sessions_history", "sessions_send",
+    ]
+    script = (
+        "import json, pathlib\n"
+        "p = pathlib.Path('/root/.openclaw/openclaw.json')\n"
+        "d = json.loads(p.read_text()) if p.exists() else {}\n"
+        "tools = d.setdefault('tools', {})\n"
+        "deny = tools.setdefault('deny', [])\n"
+        f"for _t in {session_tools!r}:\n"
+        "    if _t not in deny:\n"
+        "        deny.append(_t)\n"
+        # Drop any stale grant from an earlier config write so allow/deny
+        # never disagree about the same tools.
+        "also = tools.get('alsoAllow')\n"
+        "if also:\n"
+        f"    tools['alsoAllow'] = [t for t in also if t not in {session_tools!r}]\n"
+        "    if not tools['alsoAllow']:\n"
+        "        tools.pop('alsoAllow', None)\n"
+        "p.write_text(json.dumps(d, indent=2))\n"
+    )
+    r = subprocess.run(
+        ["docker", "exec", "-i", task_id, "python3", "-"],
+        input=script, capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        logger.warning(
+            "[%s] deny_native_subagents: config patch failed: %s",
+            task_id, r.stderr.strip(),
+        )
+    else:
+        logger.info("[%s] Session tools denied (sub-agent spawning disabled)", task_id)
+
+
 def inject_subagent_tool(
     task_id: str,
     multi_agent_config: dict | None = None,

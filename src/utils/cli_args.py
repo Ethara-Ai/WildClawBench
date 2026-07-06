@@ -68,6 +68,17 @@ def build_run_batch_parser(default_model: str, default_parallel: int) -> argpars
         default=None,
         help="Optional OpenClaw image tool model. If unset, falls back to the chat --model.",
     )
+    parser.add_argument(
+        "--no-subagents",
+        dest="no_subagents",
+        action="store_true",
+        default=False,
+        help="Disable sub-agent spawning for every task in this run, overriding "
+             "task_config.yaml multi_agent blocks and the WCB_MULTI_AGENT_DEFAULT "
+             "capability default. The session tools (sessions_spawn etc.) are "
+             "both withheld (no tools.alsoAllow grant) and explicitly denied "
+             "(tools.deny), so the model never sees them.",
+    )
 
     # ---- LiteLLM / Bedrock routing (openclaw backend) ----
     routing = parser.add_mutually_exclusive_group()

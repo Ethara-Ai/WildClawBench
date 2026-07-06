@@ -15,7 +15,7 @@ This installs:
 import time
 import json
 from io import BytesIO
-from typing import List
+from typing import List, Optional
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -96,9 +96,37 @@ def install_tracker(app):
     app.add_middleware(RequestTracker)
 
     @app.get("/audit/requests")
-    def get_audit_requests():
-        """Return all captured request/response logs."""
-        return {"total": len(_request_log), "requests": _request_log}
+    def get_audit_requests(
+        limit: Optional[int] = None,
+        offset: int = 0,
+        include_body: bool = True,
+    ):
+        """Return captured request/response logs.
+
+        WARNING: the unpaginated default response embeds a full copy of every
+        response body seen this session and grows without bound — late in a
+        session it can exceed what client tooling returns intact (long output
+        is often silently capped). Prefer `/audit/summary` for an overview, or
+        page through with `limit`/`offset` and `include_body=false` (drops the
+        bulky `response_body` field; `request_body` is always kept).
+
+        Defaults (no params = full dump, bodies included) are kept for
+        compatibility with the grading harness, which reads this endpoint
+        parameter-less and asserts on response_body content.
+        """
+        items = _request_log[offset:offset + limit] if limit is not None \
+            else _request_log[offset:]
+        if not include_body:
+            items = [
+                {k: v for k, v in e.items() if k != "response_body"}
+                for e in items
+            ]
+        return {
+            "total": len(_request_log),
+            "offset": offset,
+            "returned": len(items),
+            "requests": items,
+        }
 
     @app.get("/audit/requests/clear")
     def clear_audit_requests():
