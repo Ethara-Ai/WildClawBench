@@ -480,3 +480,63 @@ def test_cache_control_survival_smoke():
         "cache_control did not survive Headroom compression — second call "
         "should have produced cache_read_tokens > 0"
     )
+
+
+# ---------- Test 7: Sonnet judge routed through the OAuth subscription bridge ----------
+
+
+def _bridge_env(monkeypatch, url="http://127.0.0.1:18765", model=None):
+    monkeypatch.setenv("KENSEI_JUDGE_USE_LITELLM", "true")
+    monkeypatch.setenv("KENSEI_JUDGE_HEADROOM_ENABLED", "false")
+    if url is not None:
+        monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", url)
+    else:
+        monkeypatch.delenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", raising=False)
+    if model is not None:
+        monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_MODEL", model)
+    else:
+        monkeypatch.delenv("KENSEI_JUDGE_OAUTH_BRIDGE_MODEL", raising=False)
+    monkeypatch.setenv("WCB_CC_STUB_KEY", "sk-wcb-oauth-stub")
+    monkeypatch.setenv("WCB_CC_BRIDGE_SECRET", "testsecret")
+
+
+def _capture_completion_kwargs(monkeypatch, arn, family):
+    completion_mock = mock.MagicMock(return_value=_make_litellm_response())
+    fake_litellm = SimpleNamespace(completion=completion_mock, register_model=mock.MagicMock())
+    monkeypatch.setitem(sys.modules, "litellm", fake_litellm)
+    judge_litellm.call_judge_via_litellm(
+        model=arn, system="s", user="u",
+        max_output_tokens=8192, cost_fn=grading._judge_cost_usd, family=family,
+    )
+    _, kwargs = completion_mock.call_args
+    return kwargs
+
+
+def test_oauth_bridge_route_injected_for_sonnet(monkeypatch):
+    _bridge_env(monkeypatch)
+    kwargs = _capture_completion_kwargs(monkeypatch, SONNET_ARN, "sonnet")
+    assert kwargs["api_base"] == "http://127.0.0.1:18765"
+    assert kwargs["api_key"] == "sk-wcb-oauth-stub"
+    assert kwargs["extra_headers"] == {"x-wcb-bridge-secret": "testsecret"}
+    assert kwargs["model"] == "anthropic/claude-sonnet-4-5-20250929"
+    assert "aws_region_name" not in kwargs
+
+
+def test_oauth_bridge_route_custom_model(monkeypatch):
+    _bridge_env(monkeypatch, model="anthropic/claude-sonnet-4-6")
+    kwargs = _capture_completion_kwargs(monkeypatch, SONNET_ARN, "sonnet")
+    assert kwargs["model"] == "anthropic/claude-sonnet-4-6"
+    assert kwargs["api_base"] == "http://127.0.0.1:18765"
+
+
+def test_oauth_bridge_not_injected_when_url_unset(monkeypatch):
+    _bridge_env(monkeypatch, url=None)
+    kwargs = _capture_completion_kwargs(monkeypatch, SONNET_ARN, "sonnet")
+    assert "api_base" not in kwargs
+    assert kwargs.get("aws_region_name") == "ap-south-1"
+
+
+def test_oauth_bridge_not_injected_for_non_sonnet(monkeypatch):
+    _bridge_env(monkeypatch)
+    kwargs = _capture_completion_kwargs(monkeypatch, GLM_ARN, "glm")
+    assert "api_base" not in kwargs

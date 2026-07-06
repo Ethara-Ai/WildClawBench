@@ -68,6 +68,38 @@ TMP_WORKSPACE = os.environ.get("TMP_WORKSPACE", "/tmp_workspace")
 # member on real WildClawBench runs.
 _DEFAULT_JUDGE_MAX_EVIDENCE = 450_000
 
+# Claude via the OAuth subscription bridge has a HARD 200,000-token context
+# window (api.anthropic.com), NOT the 1,000,000-token Bedrock Sonnet profile the
+# rotating ARN points at. The per-family Sonnet budget (1,350,000 chars in
+# _FAMILY_EVIDENCE) is sized for that 1M Bedrock window and blows past 200K
+# tokens on large trajectories, which then falls back to the tokenless
+# urllib/Bedrock path and fails with "no Bedrock bearer token".
+#
+# We budget by CHARS but the ceiling is in TOKENS, and the chars/token ratio is
+# NOT constant — it depends on how token-dense the trajectory is:
+#   * kayla run_4 (prose-ish):   545K chars → 139K tokens  (~3.9 chars/token)
+#   * kayla run_1 (JSON-dense):  405K chars → 217K tokens  (~1.87 chars/token) → 400
+# So a char cap must survive the WORST-case (~1.8 chars/token) density. An earlier
+# 600K cap failed: 405K evidence chars alone already hit 216,921 tokens > 200,000.
+# Target a safe ~160K-token input ceiling (leaving margin under 200K for
+# system(~7K)+rubric+criteria+output(8K) and any density spikes):
+#   160,000 tokens × 1.8 chars/token ≈ 288,000 chars  → round to 300,000.
+# At worst-case density that is ~167K tokens; at run_4 density only ~77K tokens
+# (still ample evidence + Headroom compression runs on top). Tunable via
+# KENSEI_JUDGE_OAUTH_MAX_EVIDENCE for trajectories that are even denser.
+_DEFAULT_JUDGE_OAUTH_MAX_EVIDENCE = 300_000
+
+
+def _judge_oauth_max_evidence() -> int:
+    raw = os.environ.get("KENSEI_JUDGE_OAUTH_MAX_EVIDENCE")
+    if raw is None or raw.strip() == "":
+        return _DEFAULT_JUDGE_OAUTH_MAX_EVIDENCE
+    try:
+        n = int(raw)
+    except ValueError:
+        return _DEFAULT_JUDGE_OAUTH_MAX_EVIDENCE
+    return n if n > 0 else _DEFAULT_JUDGE_OAUTH_MAX_EVIDENCE
+
 
 def _resolve_judge_max_evidence() -> int | None:
     raw = os.environ.get("JUDGE_MAX_EVIDENCE")
@@ -199,7 +231,16 @@ def _member_evidence_budget(model: str, family: str | None = None) -> int | None
         return _resolve_judge_max_evidence()
     fam = _family_for(model, family)
     if fam is not None and fam in _FAMILY_EVIDENCE:
-        return min(_FAMILY_EVIDENCE[fam][0], _AWS_EDGE_BODY_CAP)
+        base = min(_FAMILY_EVIDENCE[fam][0], _AWS_EDGE_BODY_CAP)
+        if fam == "sonnet":
+            try:
+                from . import judge_litellm
+
+                if judge_litellm._judge_oauth_bridge_url():
+                    return min(base, _judge_oauth_max_evidence())
+            except Exception:
+                pass
+        return base
     return _DEFAULT_JUDGE_MAX_EVIDENCE
 
 
@@ -922,6 +963,7 @@ def _run_council(
         import time as _time
         model = member.model
         family = member.family
+        effective_model = _effective_judge_model(model, family)
         user = _resolve_user(model)
         label = _short_judge_label(model)
         # Per-member API call telemetry: pre-call line lets operators see WHICH
@@ -944,7 +986,8 @@ def _run_council(
                 label, family, elapsed, str(exc)[:200],
             )
             return {
-                "model": model, "family": family, "ok": False,
+                "model": model, "effective_model": effective_model,
+                "family": family, "ok": False,
                 "error": f"call: {exc}",
                 "usage": {**_ZERO_USAGE, "error": f"call: {exc}"},
                 "user_chars": len(user),
@@ -963,7 +1006,8 @@ def _run_council(
                 label, family, elapsed, in_tok, out_tok, c_read, c_write, str(exc)[:200],
             )
             return {
-                "model": model, "family": family, "ok": False,
+                "model": model, "effective_model": effective_model,
+                "family": family, "ok": False,
                 "error": f"parse: {exc}", "usage": usage,
                 "user_chars": len(user),
                 "raw_response": raw[:2000] if isinstance(raw, str) else "",
@@ -975,7 +1019,8 @@ def _run_council(
             len(verdicts), n_criteria,
         )
         return {
-            "model": model, "family": family, "ok": True,
+            "model": model, "effective_model": effective_model,
+            "family": family, "ok": True,
             "verdicts": verdicts, "usage": usage,
             "user_chars": len(user),
         }
@@ -1014,6 +1059,25 @@ def _short_judge_label(model: str) -> str:
     'openai/<model>' shape verbatim."""
     if model.startswith("bedrock/"):
         return model.rsplit("/", 1)[-1]
+    return model
+
+
+def _effective_judge_model(model: str, family: str) -> str:
+    """Model actually hit on the wire, for score.json display.
+
+    A member's configured Bedrock ARN is only a stable label: when the sonnet
+    member routes through the Claude Max OAuth bridge, judge_litellm overrides
+    the request model to the anthropic model and pops the Bedrock region, so
+    the endpoint is anthropic — not Bedrock. Returns that effective anthropic
+    id (bare, no 'anthropic/' prefix); otherwise the raw member id."""
+    if family == "sonnet":
+        try:
+            from . import judge_litellm  # local import: avoid import-time cost
+            if judge_litellm._judge_oauth_bridge_url():
+                eff = judge_litellm._judge_oauth_bridge_model()
+                return eff.split("/", 1)[-1] if eff.startswith("anthropic/") else eff
+        except Exception:
+            pass
     return model
 
 
@@ -1280,10 +1344,10 @@ def _grade_council(
         "criteria": crit_out,
         "judge_model": "council",
         "judge_council": {
-            "members": [r["model"] for r in results],
-            "surviving": [r["model"] for r in surviving],
+            "members": [r.get("effective_model", r["model"]) for r in results],
+            "surviving": [r.get("effective_model", r["model"]) for r in surviving],
             "failed": [
-                {"model": r["model"], "error": r.get("error", "")}
+                {"model": r.get("effective_model", r["model"]), "error": r.get("error", "")}
                 for r in results if not r.get("ok")
             ],
             "aggregation": "unanimous_or_sonnet_tiebreak",

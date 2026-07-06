@@ -87,6 +87,7 @@ from src.utils.litellm_sidecar import (  # noqa: E402
     stop_litellm,
     verify_litellm_upstream_reachable,
     wait_for_bridge_healthy,
+    wait_for_bridge_host_port,
     wait_for_litellm_healthy,
 )
 
@@ -141,6 +142,8 @@ def main() -> int:
         _emit("master_key", "")
         _emit("cc_bridge", "")
         _emit("cc_bridge_url", "")
+        _emit("cc_bridge_host_port", "")
+        _emit("cc_bridge_host_url", "")
         return 0
 
     _agent_headroom = (
@@ -154,9 +157,23 @@ def main() -> int:
         import secrets
         bridge_secret = secrets.token_hex(32)
         _log("generated ephemeral WCB_CC_BRIDGE_SECRET for this batch")
+    cc_bridge_host_port = ""
     if use_oauth:
         cc_bridge_url = f"http://{cc_bridge}:{CC_BRIDGE_INTERNAL_PORT}"
         os.environ["WCB_CC_BRIDGE_SECRET"] = bridge_secret
+        # Publish the bridge on a loopback host port so the HOST-side judge
+        # (grading.py -> judge_litellm) can reach it for the Sonnet-via-OAuth
+        # route. If WCB_CC_BRIDGE_HOST_PORT is preset we honor it; otherwise pick
+        # a free ephemeral port. start_bridge reads WCB_CC_BRIDGE_HOST_PORT and
+        # binds 127.0.0.1:<port>:8765 (secret still gates every request).
+        import socket
+        cc_bridge_host_port = os.environ.get("WCB_CC_BRIDGE_HOST_PORT", "").strip()
+        if not cc_bridge_host_port:
+            _s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            _s.bind(("127.0.0.1", 0))
+            cc_bridge_host_port = str(_s.getsockname()[1])
+            _s.close()
+            os.environ["WCB_CC_BRIDGE_HOST_PORT"] = cc_bridge_host_port
 
     litellm_yaml = build_litellm_config_yaml(
         bedrock_sonnet_arn=config.bedrock_sonnet_arn if config.aws_bearer_token else "",
@@ -204,25 +221,59 @@ def main() -> int:
             )
             return 6
         pool_host_dir = next(iter(pool_dirs))
-        _log(f"starting cc-bridge {cc_bridge} on network {network} (pool={pool_host_dir})…")
-        try:
-            start_bridge(
-                container_name=cc_bridge,
-                network=network,
-                pool_host_dir=pool_host_dir,
-                bridge_secret=bridge_secret,
+        bridge_ok = False
+        for _attempt in range(1, 4):
+            _log(
+                f"starting cc-bridge {cc_bridge} on network {network} "
+                f"(pool={pool_host_dir}) attempt {_attempt}/3, host_port={cc_bridge_host_port}…"
             )
-        except Exception as exc:
-            _log(f"start_bridge failed: {exc}")
+            try:
+                start_bridge(
+                    container_name=cc_bridge,
+                    network=network,
+                    pool_host_dir=pool_host_dir,
+                    bridge_secret=bridge_secret,
+                )
+            except Exception as exc:
+                _log(f"start_bridge failed: {exc}")
+                try:
+                    stop_bridge(cc_bridge)
+                except Exception:  # noqa: BLE001
+                    pass
+                return 6
+            if not wait_for_bridge_healthy(cc_bridge):
+                _log(
+                    f"cc-bridge {cc_bridge} did not become healthy in time. "
+                    f"Override WCB_CC_BRIDGE_HEALTH_TIMEOUT (seconds) for slow hosts."
+                )
+                try:
+                    stop_bridge(cc_bridge)
+                except Exception:  # noqa: BLE001
+                    pass
+                return 7
+
+            if wait_for_bridge_host_port(cc_bridge_host_port):
+                bridge_ok = True
+                break
+
+            _log(
+                f"cc-bridge host port 127.0.0.1:{cc_bridge_host_port} unreachable "
+                f"(Docker Desktop dropped the loopback publish); recreating on a fresh port"
+            )
             try:
                 stop_bridge(cc_bridge)
             except Exception:  # noqa: BLE001
                 pass
-            return 6
-        if not wait_for_bridge_healthy(cc_bridge):
+            _s2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            _s2.bind(("127.0.0.1", 0))
+            cc_bridge_host_port = str(_s2.getsockname()[1])
+            _s2.close()
+            os.environ["WCB_CC_BRIDGE_HOST_PORT"] = cc_bridge_host_port
+
+        if not bridge_ok:
             _log(
-                f"cc-bridge {cc_bridge} did not become healthy in time. "
-                f"Override WCB_CC_BRIDGE_HEALTH_TIMEOUT (seconds) for slow hosts."
+                "cc-bridge host port never became reachable after 3 attempts; the "
+                "host-side Sonnet judge would fail with Connection refused. Aborting."
             )
             try:
                 stop_bridge(cc_bridge)
@@ -306,7 +357,9 @@ def main() -> int:
     if not args.skip_upstream_verify:
         probe_model = (
             "claude-opus-4.7"
-            if (config.aws_bearer_token and config.bedrock_inference_arn) or config.anthropic_api_key
+            if use_oauth
+            or (config.aws_bearer_token and config.bedrock_inference_arn)
+            or config.anthropic_api_key
             else "gpt-5.5" if config.openai_api_key
             else ""
         )
@@ -331,6 +384,11 @@ def main() -> int:
     _emit("master_key", config.litellm_master_key)
     _emit("cc_bridge", cc_bridge if use_oauth else "")
     _emit("cc_bridge_url", cc_bridge_url)
+    _emit("cc_bridge_host_port", cc_bridge_host_port)
+    _emit(
+        "cc_bridge_host_url",
+        f"http://127.0.0.1:{cc_bridge_host_port}" if cc_bridge_host_port else "",
+    )
     return 0
 
 

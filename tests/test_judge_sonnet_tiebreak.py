@@ -351,3 +351,64 @@ def test_no_sonnet_member_non_unanimous_abstains(monkeypatch):
     assert crit["resolved_by"] == "human_eval"
     assert out["criteria_abstained"] == 1
     assert out["abstention_flags"] == [0]
+
+
+# ---------- effective-model relabel (OAuth bridge display) ----------
+
+def test_effective_model_sonnet_on_bridge_shows_anthropic(monkeypatch):
+    """When the sonnet judge runs via the OAuth subscription bridge, the
+    display label resolves to the bare anthropic model actually hit, not the
+    Bedrock ARN the operator passed as the member id."""
+    monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "http://127.0.0.1:51554")
+    monkeypatch.delenv("KENSEI_JUDGE_OAUTH_BRIDGE_MODEL", raising=False)
+    assert grading._effective_judge_model(SONNET_ARN, "sonnet") == "claude-sonnet-4-5-20250929"
+
+
+def test_effective_model_custom_bridge_model(monkeypatch):
+    monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "http://127.0.0.1:51554")
+    monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_MODEL", "anthropic/claude-sonnet-4-6")
+    assert grading._effective_judge_model(SONNET_ARN, "sonnet") == "claude-sonnet-4-6"
+
+
+def test_effective_model_no_bridge_keeps_arn(monkeypatch):
+    monkeypatch.delenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", raising=False)
+    assert grading._effective_judge_model(SONNET_ARN, "sonnet") == SONNET_ARN
+
+
+def test_effective_model_non_sonnet_keeps_arn(monkeypatch):
+    monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "http://127.0.0.1:51554")
+    assert grading._effective_judge_model(GLM_ARN, "glm") == GLM_ARN
+
+
+# ---------- evidence budget cap for the sonnet judge on the OAuth bridge ----------
+
+def test_evidence_budget_sonnet_on_bridge_capped(monkeypatch):
+    """Claude via the OAuth subscription bridge has a hard 200K-token context
+    window. Because chars/token varies with trajectory density (~1.8 worst case),
+    the sonnet evidence budget is capped to the bridge default (300K chars, which
+    stays under 200K tokens even for token-dense JSON trajectories) rather than
+    the 1M-token Bedrock profile the ARN advertises."""
+    monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "http://127.0.0.1:51554")
+    monkeypatch.delenv("JUDGE_MAX_EVIDENCE", raising=False)
+    monkeypatch.delenv("KENSEI_JUDGE_OAUTH_MAX_EVIDENCE", raising=False)
+    assert grading._member_evidence_budget(SONNET_ARN, "sonnet") == 300_000
+
+
+def test_evidence_budget_sonnet_no_bridge_full_bedrock(monkeypatch):
+    monkeypatch.delenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", raising=False)
+    monkeypatch.delenv("JUDGE_MAX_EVIDENCE", raising=False)
+    assert grading._member_evidence_budget(SONNET_ARN, "sonnet") == 1_350_000
+
+
+def test_evidence_budget_sonnet_bridge_env_override(monkeypatch):
+    monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "http://127.0.0.1:51554")
+    monkeypatch.delenv("JUDGE_MAX_EVIDENCE", raising=False)
+    monkeypatch.setenv("KENSEI_JUDGE_OAUTH_MAX_EVIDENCE", "450000")
+    assert grading._member_evidence_budget(SONNET_ARN, "sonnet") == 450_000
+
+
+def test_evidence_budget_non_sonnet_unaffected_by_bridge(monkeypatch):
+    monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "http://127.0.0.1:51554")
+    monkeypatch.delenv("JUDGE_MAX_EVIDENCE", raising=False)
+    assert grading._member_evidence_budget(GLM_ARN, "glm") == 175_000
+    assert grading._member_evidence_budget(KIMI_ARN, "kimi") == 225_000

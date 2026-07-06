@@ -60,6 +60,23 @@ def judge_use_litellm() -> bool:
     return _truthy(os.environ.get("KENSEI_JUDGE_USE_LITELLM"))
 
 
+def _judge_oauth_bridge_url() -> str:
+    """Master gate for routing the Sonnet judge through the Claude Max OAuth
+    bridge. Empty/unset = judge uses Bedrock/OpenAI as before. When set (e.g.
+    http://127.0.0.1:<port>), the sonnet judge's litellm.completion is pointed
+    at the host-published cc-bridge instead of Bedrock."""
+    return (os.environ.get("KENSEI_JUDGE_OAUTH_BRIDGE_URL") or "").strip()
+
+
+def _judge_oauth_bridge_model() -> str:
+    """Model id sent on the bridge route. The bridge normalizes the exact tail
+    upstream, so this only needs to be a valid anthropic/ sonnet id."""
+    return (
+        os.environ.get("KENSEI_JUDGE_OAUTH_BRIDGE_MODEL")
+        or "anthropic/claude-sonnet-4-5-20250929"
+    ).strip()
+
+
 def judge_headroom_enabled() -> bool:
     """Compression switch. Default on when set empty/unset; allows A/B
     testing LiteLLM-without-compression by setting this to false explicitly."""
@@ -365,6 +382,23 @@ def call_judge_via_litellm(
     }
     if region:
         completion_kwargs["aws_region_name"] = region
+
+    # OAuth-bridge route: send the sonnet judge to the cc-bridge (Claude Max
+    # subscription) instead of Bedrock. Transparent Anthropic-Messages proxy,
+    # host-published at KENSEI_JUDGE_OAUTH_BRIDGE_URL; auth = stub key +
+    # x-wcb-bridge-secret co-tenant guard. Overrides any Bedrock region.
+    bridge_url = _judge_oauth_bridge_url()
+    if bridge_url and family == "sonnet":
+        completion_kwargs["model"] = _judge_oauth_bridge_model()
+        completion_kwargs["api_base"] = bridge_url
+        completion_kwargs["api_key"] = os.environ.get(
+            "WCB_CC_STUB_KEY", "sk-wcb-oauth-stub"
+        )
+        completion_kwargs["extra_headers"] = {
+            "x-wcb-bridge-secret": os.environ.get("WCB_CC_BRIDGE_SECRET", ""),
+        }
+        completion_kwargs.pop("aws_region_name", None)
+
     response = litellm.completion(**completion_kwargs)
 
     # Extract text. LiteLLM normalizes to OpenAI shape across providers.

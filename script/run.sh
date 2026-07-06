@@ -396,6 +396,7 @@ cleanup_orphans() {
 : "${WCB_SHARED_LITELLM_MASTER_KEY:=}"
 : "${WCB_SHARED_CC_BRIDGE:=}"
 : "${WCB_SHARED_CC_BRIDGE_URL:=}"
+: "${WCB_SHARED_CC_BRIDGE_HOST_URL:=}"
 # WCB_SHARED_OWNER_PID is the PID of the process that ran bootstrap_shared_sidecar
 # (always the parent run.sh). Workers under -P >1 inherit this via export. The
 # teardown_shared_sidecar guard at the top of that function uses this to refuse
@@ -440,6 +441,7 @@ bootstrap_shared_sidecar() {
             master_key)  WCB_SHARED_LITELLM_MASTER_KEY="$v" ;;
             cc_bridge)     WCB_SHARED_CC_BRIDGE="$v" ;;
             cc_bridge_url) WCB_SHARED_CC_BRIDGE_URL="$v" ;;
+            cc_bridge_host_url) WCB_SHARED_CC_BRIDGE_HOST_URL="$v" ;;
         esac
     done < "$tmpfile"
     rm -f "$tmpfile"
@@ -453,8 +455,21 @@ bootstrap_shared_sidecar() {
     export WCB_SHARED_NETWORK WCB_SHARED_SIDECAR \
            WCB_SHARED_SIDECAR_USAGE_LOG WCB_SHARED_SIDECAR_YAML \
            WCB_SHARED_LITELLM_MASTER_KEY WCB_SHARED_OWNER_PID \
-           WCB_SHARED_CC_BRIDGE WCB_SHARED_CC_BRIDGE_URL
+           WCB_SHARED_CC_BRIDGE WCB_SHARED_CC_BRIDGE_URL \
+           WCB_SHARED_CC_BRIDGE_HOST_URL
     log::ok "Shared sidecar=$WCB_SHARED_SIDECAR network=$WCB_SHARED_NETWORK owner_pid=$WCB_SHARED_OWNER_PID"
+
+    # Route the HOST-side Sonnet judge through the OAuth subscription bridge.
+    # bootstrap published the in-network cc-bridge on a loopback host port
+    # (cc_bridge_host_url); the host-side grading step (run_batch.py) can only
+    # reach it via 127.0.0.1. Auto-export the judge env only when the OAuth
+    # path is active so Bedrock judging is left untouched otherwise. The judge's
+    # own family=='sonnet' gate + x-wcb-bridge-secret still apply downstream.
+    if [[ -n "$WCB_SHARED_CC_BRIDGE_HOST_URL" && "${USE_CLAUDE_OAUTH:-0}" == "1" ]]; then
+        export KENSEI_JUDGE_OAUTH_BRIDGE_URL="$WCB_SHARED_CC_BRIDGE_HOST_URL"
+        export KENSEI_JUDGE_USE_LITELLM=1
+        log::ok "Sonnet judge -> OAuth bridge $WCB_SHARED_CC_BRIDGE_HOST_URL"
+    fi
 
     # Install teardown trap that fires on normal exit + Ctrl-C + SIGTERM,
     # so an interrupted batch does not leak the sidecar/network. We REPLACE
@@ -486,6 +501,8 @@ teardown_shared_sidecar() {
     WCB_SHARED_SIDECAR_USAGE_LOG=""; WCB_SHARED_SIDECAR_YAML=""
     WCB_SHARED_LITELLM_MASTER_KEY=""
     WCB_SHARED_CC_BRIDGE=""; WCB_SHARED_CC_BRIDGE_URL=""
+    WCB_SHARED_CC_BRIDGE_HOST_URL=""
+    unset KENSEI_JUDGE_OAUTH_BRIDGE_URL 2>/dev/null || true
     log::info "Tearing down shared sidecar=${sc} network=${nw}${cb:+ cc_bridge=$cb}"
     [[ -n "$sc" ]] && docker rm -f "$sc" >/dev/null 2>&1 || true
     [[ -n "$cb" ]] && docker rm -f "$cb" >/dev/null 2>&1 || true

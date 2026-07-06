@@ -1,0 +1,154 @@
+#!/usr/bin/env bash
+# ---------------------------------------------------------------------------
+# wcb — simple login/logout wrapper for the WildClawBench Claude-Max OAuth path
+#
+# WHY THIS EXISTS: running a trajectory on the Claude Max subscription requires a
+# few OAuth env vars to be present. Typing/pasting them every time is error prone,
+# so this wrapper turns them into a `login` / `logout` pair (like tasker):
+#   * `login`  -> loads the OAuth vars from .env into your shell (subscription ON)
+#   * `logout` -> unsets them (subscription OFF; a fresh login is required again)
+#   * `run`    -> runs a trajectory via script/run.sh with the OAuth path + reps
+#
+# NO SECRETS ARE HARDCODED HERE. Every value is read from the repo .env file
+# (the single source of truth). Edit .env to change the pool path / secret / ARN.
+#
+# IMPORTANT: `login` / `logout` must MUTATE YOUR CURRENT SHELL, so you have to
+# SOURCE this script for those two subcommands:
+#       source script/wcb login
+#       source script/wcb logout
+# `run` and `status` work either sourced or executed:
+#       source script/wcb run input/kayla_morgan_9b8f1d3c-... --reps 3
+# For convenience, add this to your ~/.zshrc so `wcb` is a shell function:
+#       wcb() { source /Users/apple/Desktop/Kensei_harness_core_new/WildClawBench/script/wcb "$@"; }
+# then just:  wcb login   /   wcb run <task> --reps N   /   wcb logout
+# ---------------------------------------------------------------------------
+
+# Resolve the repo root from this script's own location (works sourced or run).
+if [ -n "${BASH_SOURCE[0]:-}" ]; then _wcb_self="${BASH_SOURCE[0]}"; else _wcb_self="${(%):-%N}"; fi
+_wcb_root="$(cd "$(dirname "$_wcb_self")/.." 2>/dev/null && pwd)"
+_wcb_env="$_wcb_root/.env"
+
+_wcb_ok()   { printf '\033[32m[wcb]\033[0m %s\n' "$*"; }
+_wcb_warn() { printf '\033[33m[wcb]\033[0m %s\n' "$*"; }
+_wcb_err()  { printf '\033[31m[wcb]\033[0m %s\n' "$*" >&2; }
+
+# Read a single KEY=VALUE from .env (last match wins), stripped of surrounding
+# quotes. Returns empty if the key is absent or commented out.
+_wcb_env_get() {
+    [ -f "$_wcb_env" ] || return 0
+    local _line
+    _line="$(grep -E "^[[:space:]]*$1=" "$_wcb_env" 2>/dev/null | tail -n1)"
+    [ -n "$_line" ] || return 0
+    _line="${_line#*=}"
+    _line="${_line%\"}"; _line="${_line#\"}"
+    _line="${_line%\'}"; _line="${_line#\'}"
+    printf '%s' "$_line"
+}
+
+_wcb_login() {
+    if [ ! -f "$_wcb_env" ]; then
+        _wcb_err "no .env found at $_wcb_env — cannot login"
+        return 1
+    fi
+    local _use _pool _secret _stub _arn
+    _use="$(_wcb_env_get WCB_USE_CLAUDE_OAUTH)"
+    _pool="$(_wcb_env_get WCB_CC_ACCOUNT_POOL)"
+    _secret="$(_wcb_env_get WCB_CC_BRIDGE_SECRET)"
+    _stub="$(_wcb_env_get WCB_CC_STUB_KEY)"
+    _arn="$(_wcb_env_get JUDGE_COUNCIL_SONNET_ARN)"
+
+    if [ -z "$_pool" ] || [ -z "$_secret" ]; then
+        _wcb_err "WCB_CC_ACCOUNT_POOL / WCB_CC_BRIDGE_SECRET missing in .env — cannot login"
+        return 1
+    fi
+    if [ ! -f "$_pool" ]; then
+        _wcb_err "pool file missing: $_pool — cannot login"
+        return 1
+    fi
+
+    export WCB_USE_CLAUDE_OAUTH="${_use:-1}"
+    export WCB_CC_ACCOUNT_POOL="$_pool"
+    export WCB_CC_BRIDGE_SECRET="$_secret"
+    [ -n "$_stub" ] && export WCB_CC_STUB_KEY="$_stub"
+    if [ -n "$_arn" ]; then
+        export JUDGE_COUNCIL_SONNET_ARN="$_arn"
+    fi
+
+    _wcb_ok "logged in — Claude Max subscription ACTIVE"
+    _wcb_ok "  WCB_USE_CLAUDE_OAUTH=$WCB_USE_CLAUDE_OAUTH"
+    _wcb_ok "  WCB_CC_ACCOUNT_POOL=$WCB_CC_ACCOUNT_POOL"
+    _wcb_ok "  WCB_CC_STUB_KEY=$WCB_CC_STUB_KEY (bridge secret set, hidden)"
+    [ -n "$_arn" ] && _wcb_ok "  JUDGE_COUNCIL_SONNET_ARN set (sonnet judge enabled)"
+}
+
+_wcb_logout() {
+    unset WCB_USE_CLAUDE_OAUTH WCB_CC_ACCOUNT_POOL WCB_CC_BRIDGE_SECRET WCB_CC_STUB_KEY
+    unset JUDGE_COUNCIL_SONNET_ARN
+    unset KENSEI_JUDGE_OAUTH_BRIDGE_URL KENSEI_JUDGE_USE_LITELLM
+    _wcb_ok "logged out — subscription vars cleared (login again to re-enable)"
+}
+
+_wcb_status() {
+    if [ "${WCB_USE_CLAUDE_OAUTH:-0}" = "1" ] && [ -n "${WCB_CC_ACCOUNT_POOL:-}" ]; then
+        _wcb_ok "status: LOGGED IN (pool=$WCB_CC_ACCOUNT_POOL)"
+    else
+        _wcb_warn "status: LOGGED OUT — run 'source script/wcb login'"
+    fi
+}
+
+_wcb_run() {
+    if [ "${WCB_USE_CLAUDE_OAUTH:-0}" != "1" ]; then
+        _wcb_err "not logged in — run 'source script/wcb login' first"
+        return 1
+    fi
+    local task="" model="claude-opus-4.7" reps="1"
+    local -a extra=()
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -r|--reps|--rep|--iter|--iterations|-k) reps="$2"; shift 2 ;;
+            -m|--model) model="$2"; shift 2 ;;
+            -t|--task) task="$2"; shift 2 ;;
+            *)
+                if [ -z "$task" ] && [ "${1#-}" = "$1" ]; then
+                    task="$1"; shift
+                else
+                    extra+=("$1"); shift
+                fi
+                ;;
+        esac
+    done
+    if [ -z "$task" ]; then
+        _wcb_err "usage: wcb run <task> [--reps N] [--model M] [extra run.sh flags...]"
+        return 1
+    fi
+    export PATH="$_wcb_root/.venv/bin:$PATH"
+    ( cd "$_wcb_root" && ./script/run.sh --task "$task" --model "$model" --reps "$reps" \
+        --backend openclaw --use-claude-oauth "${extra[@]}" )
+}
+
+case "${1:-help}" in
+    login)  _wcb_login ;;
+    logout) _wcb_logout ;;
+    status) _wcb_status ;;
+    run)    shift; _wcb_run "$@" ;;
+    help|-h|--help)
+        cat <<EOF
+wcb — Claude Max subscription login wrapper (reads all values from .env)
+
+Subcommands:
+  source script/wcb login                 load OAuth vars from .env (subscription ON)
+  source script/wcb logout                unset OAuth vars (subscription OFF)
+  wcb status                              show login state
+  wcb run <task> [--reps N] [--model M]   run a trajectory on the subscription
+
+Tip: add to ~/.zshrc so \`wcb\` is a command:
+  wcb() { source /Users/apple/Desktop/Kensei_harness_core_new/WildClawBench/script/wcb "\$@"; }
+
+Examples:
+  wcb login
+  wcb run input/kayla_morgan_9b8f1d3c-f1f0-40b7-bdbe-f55045abc016 --reps 3
+  wcb logout
+EOF
+        ;;
+    *) _wcb_err "unknown subcommand: $1 (try: login | logout | status | run | help)" ;;
+esac

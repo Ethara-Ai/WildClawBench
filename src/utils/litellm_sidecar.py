@@ -831,25 +831,74 @@ def start_bridge(
 
     ensure_cc_bridge_image(image)
 
+    dump_mount: list[str] = []
+    _dump_host = os.environ.get("WCB_CC_BODY_DUMP_HOST_DIR")
+    if _dump_host:
+        os.makedirs(_dump_host, exist_ok=True)
+        dump_mount = ["-v", f"{_dump_host}:/wcb_dumps:rw"]
+        env_args += build_env_args([("WCB_CC_BODY_DUMP_DIR", "/wcb_dumps")])
+
+    # Publish the bridge on a host loopback port when WCB_CC_BRIDGE_HOST_PORT is
+    # set, so the host-side Sonnet judge (grading.py runs on the host, not in the
+    # sidecar network) can reach the bridge at http://127.0.0.1:<port>. Bound to
+    # 127.0.0.1 only; the x-wcb-bridge-secret still gates every request.
+    publish_args: list[str] = []
+    _host_port = os.environ.get("WCB_CC_BRIDGE_HOST_PORT", "").strip()
+    if _host_port:
+        publish_args = ["-p", f"127.0.0.1:{_host_port}:{port}"]
+
+    # Network-attach ordering is load-bearing on Docker Desktop for Mac. When a
+    # container is CREATED on a user-defined network and a `-p` publish is
+    # requested, the loopback port-forward (docker-proxy/vpnkit) silently fails
+    # to bind 127.0.0.1 — `docker inspect` shows the PortBindings but `docker ps`
+    # shows no `->` forward and host curl is REFUSED. The fix: when publishing,
+    # CREATE the container on the DEFAULT `bridge` network (with `-p`), then
+    # attach the sidecar `network` second. That keeps the loopback forward alive
+    # AND still resolves the bridge by name on the sidecar net (verified: agent
+    # peers reach http://<name>:8765 fine). Without a publish we keep the old
+    # order (create on sidecar net, dual-home to default bridge for egress).
+    if publish_args:
+        create_network_arg = "bridge"
+        secondary_network = network
+    else:
+        create_network_arg = network
+        secondary_network = "bridge"
+
     cmd = [
         "docker", "run", "-d",
         "--name", container_name,
-        "--network", network,
+        "--network", create_network_arg,
         *env_args,
+        *dump_mount,
+        *publish_args,
         "-v", f"{pool_host_dir}:/oauth_pool:rw",
         image,
         "--host", "0.0.0.0",
         "--port", str(port),
     ]
     logger.info(
-        "[%s] Starting cc-bridge on network %s (image=%s pool_dir=%s)",
-        container_name, network, image, pool_host_dir,
+        "[%s] Starting cc-bridge on network %s (image=%s pool_dir=%s publish=%s)",
+        container_name, create_network_arg, image, pool_host_dir, _host_port or "none",
     )
     subprocess.run(["docker", "rm", "-f", container_name], capture_output=True)
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:
         raise RuntimeError(f"cc-bridge container start failed:\n{r.stderr}")
-    connect_default_bridge(container_name)
+    # Attach the second NIC. When we published, this is the sidecar network so
+    # the agent/sidecar can resolve the bridge by name; otherwise it's the
+    # default bridge for api.anthropic.com egress. connect_default_bridge is
+    # idempotent for the 'bridge' case; use a direct connect for the sidecar net.
+    if secondary_network == "bridge":
+        connect_default_bridge(container_name)
+    else:
+        cr = subprocess.run(
+            ["docker", "network", "connect", secondary_network, container_name],
+            capture_output=True, text=True,
+        )
+        if cr.returncode != 0 and "already exists" not in (cr.stderr or ""):
+            raise RuntimeError(
+                f"Failed to attach {container_name} to {secondary_network}: {cr.stderr}"
+            )
     logger.info(
         "[%s] cc-bridge dual-homed (internal + default bridge for api.anthropic.com egress)",
         container_name,
@@ -884,6 +933,31 @@ def wait_for_bridge_healthy(
     logger.warning(
         "[%s] cc-bridge did not become healthy within %.0fs", container_name, timeout
     )
+    return False
+
+
+def wait_for_bridge_host_port(host_port: str, timeout: float = 15.0) -> bool:
+    """Probe the HOST-published loopback port (127.0.0.1:<host_port>/healthz).
+
+    wait_for_bridge_healthy only checks health from INSIDE the container, which
+    passes even when Docker Desktop for Mac silently drops the `-p` loopback
+    forward. But the Sonnet judge dials the bridge from the host, so a dropped
+    publish surfaces much later as `[Errno 61] Connection refused` at grade time
+    (intermittent, load-dependent). This probe catches the dropped publish up
+    front so the caller can recreate the bridge instead of failing at grading.
+    """
+    if not host_port:
+        return True
+    import urllib.request
+
+    deadline = time.time() + timeout
+    url = f"http://127.0.0.1:{host_port}/healthz"
+    while time.time() < deadline:
+        try:
+            with urllib.request.urlopen(url, timeout=2):
+                return True
+        except Exception:  # noqa: BLE001
+            time.sleep(1.0)
     return False
 
 

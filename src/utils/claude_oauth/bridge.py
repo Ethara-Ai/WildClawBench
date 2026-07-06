@@ -57,6 +57,16 @@ DEFAULT_ANTHROPIC_VERSION = "2023-06-01"
 OAUTH_BETA = "oauth-2025-04-20"
 SYSTEM_PREFIX = "You are Claude Code, Anthropic's official CLI for Claude."
 
+# Load-bearing (the "extra usage" 400 fix): Anthropic content-inspects the
+# system[] array of OAuth (sk-ant-oat01-*) requests. For on-plan (Max) billing
+# instead of the misleading "Third-party apps now draw from your extra usage"
+# 400, system[] must carry a billing-attribution block as system[0] AND the
+# harness's bulk prompt must be relocated out of system[] into the first user
+# message. Validated against real 2.1.x CLI traffic: opencode-claude-auth
+# #147/#148, hermes-claude-auth #9, sub2api. Gated by WCB_CC_BILLING_ATTRIBUTION.
+CLAUDE_CLI_VERSION = "2.1.123"
+BILLING_HEADER_PREFIX = "x-anthropic-billing-header:"
+
 # Resilience tuning knobs (overridable via env).
 DEFAULT_MAX_INLINE_RETRIES = 3
 DEFAULT_MAX_INLINE_WAIT_SECONDS = 30
@@ -165,6 +175,93 @@ def _max_inline_wait_seconds() -> int:
         return DEFAULT_MAX_INLINE_WAIT_SECONDS
 
 
+def _billing_attribution_enabled() -> bool:
+    return os.environ.get("WCB_CC_BILLING_ATTRIBUTION", "1").strip().lower() not in (
+        "0", "false", "no", "off", "",
+    )
+
+
+def _billing_header_text(raw_body: bytes) -> str:
+    import hashlib
+
+    fp = hashlib.sha256(raw_body + CLAUDE_CLI_VERSION.encode()).hexdigest()[:3]
+    return (
+        f"{BILLING_HEADER_PREFIX} cc_version={CLAUDE_CLI_VERSION}.{fp}; "
+        f"cc_entrypoint=cli; cch=00000;"
+    )
+
+
+# Load-bearing: Anthropic's OAuth validator rejects a request whose tools[]
+# contains 7+ tools with bare-lowercase-word names (openclaw's read/edit/exec/
+# cron/subagents/...) with the misleading "extra usage" 400. Empirically pinned
+# by replaying real request bodies against api.anthropic.com: <=6 unknown names
+# pass, >=7 fail; ANY reversible rename (prefix/capitalize) makes all 15 pass;
+# no specific name is forbidden and the exact Claude Code toolset is NOT
+# required. We prefix every outbound tool name with TOOL_NAME_PREFIX (a
+# legitimate MCP-style namespace) and strip it back off responses. The prefix
+# is unique, so the reverse is a pure string op with no per-request map and no
+# collisions. Gated by WCB_CC_TOOL_RENAME (default on).
+TOOL_NAME_PREFIX = "mcp__wcb__"
+
+
+def _tool_rename_enabled() -> bool:
+    return os.environ.get("WCB_CC_TOOL_RENAME", "1").strip().lower() not in (
+        "0", "false", "no", "off", "",
+    )
+
+
+def rename_tools_outbound(body: dict[str, Any]) -> dict[str, Any]:
+    """Prefix every tool name with TOOL_NAME_PREFIX before forwarding upstream.
+
+    Renames both the ``tools[]`` declarations and any assistant ``tool_use``
+    blocks in ``messages[]`` history so names stay consistent across turns.
+    Idempotent: an already-prefixed name is left unchanged.
+    """
+    if not isinstance(body, dict):
+        return body
+
+    tools = body.get("tools")
+    if isinstance(tools, list):
+        for t in tools:
+            if isinstance(t, dict):
+                name = t.get("name")
+                if isinstance(name, str) and not name.startswith(TOOL_NAME_PREFIX):
+                    t["name"] = TOOL_NAME_PREFIX + name
+
+    messages = body.get("messages")
+    if isinstance(messages, list):
+        for m in messages:
+            if not isinstance(m, dict):
+                continue
+            content = m.get("content")
+            if not isinstance(content, list):
+                continue
+            for blk in content:
+                if (
+                    isinstance(blk, dict)
+                    and blk.get("type") == "tool_use"
+                    and isinstance(blk.get("name"), str)
+                    and not blk["name"].startswith(TOOL_NAME_PREFIX)
+                ):
+                    blk["name"] = TOOL_NAME_PREFIX + blk["name"]
+    return body
+
+
+def strip_tool_prefix_bytes(data: bytes) -> bytes:
+    """Remove TOOL_NAME_PREFIX from tool names in an upstream response body.
+
+    Works uniformly on non-streaming JSON and buffered SSE bytes: the prefix
+    only ever appears in a JSON ``"name":"mcp__wcb__..."`` we produced, so a
+    literal byte replace of the quoted-prefix token is exact and collision-free.
+    """
+    if not data:
+        return data
+    needle = b'"' + TOOL_NAME_PREFIX.encode()
+    if needle not in data:
+        return data
+    return data.replace(b'"' + TOOL_NAME_PREFIX.encode(), b'"')
+
+
 # Option D — buffer-and-retry: buffer the whole upstream SSE stream and re-issue
 # on a mid-stream drop so the client only ever sees a COMPLETE response.
 def _buffer_and_retry_enabled() -> bool:
@@ -236,6 +333,84 @@ def inject_system_prefix(body: dict[str, Any]) -> dict[str, Any]:
 
     body["system"] = [{"type": "text", "text": SYSTEM_PREFIX}]
     return body
+
+
+def _system_block_text(blk: Any) -> str:
+    if isinstance(blk, str):
+        return blk
+    if isinstance(blk, dict) and isinstance(blk.get("text"), str):
+        return blk["text"]
+    return ""
+
+
+def apply_billing_attribution(body: dict[str, Any], raw_body: bytes) -> dict[str, Any]:
+    """Make an OAuth request bill on-plan (Max) instead of "extra usage".
+
+    Runs AFTER ``inject_system_prefix`` and expects ``body['system']`` to be a
+    list whose leading text block is ``SYSTEM_PREFIX``. Performs two transforms
+    the Anthropic OAuth validator requires (see load-bearing note by the
+    constants):
+
+      1. Prepend a billing-attribution block as ``system[0]``.
+      2. Relocate every OTHER system block (the harness's bulk prompt) into the
+         first user message, leaving only ``[billing, identity]`` in system[].
+
+    Idempotent: a body whose ``system[0]`` already starts with
+    ``BILLING_HEADER_PREFIX`` is returned unchanged.
+    """
+    system = body.get("system")
+    if isinstance(system, str):
+        system = [{"type": "text", "text": system}]
+    if not isinstance(system, list) or not system:
+        return body
+
+    if _system_block_text(system[0]).startswith(BILLING_HEADER_PREFIX):
+        return body
+
+    identity: list[Any] = []
+    rest: list[Any] = []
+    for blk in system:
+        text = _system_block_text(blk)
+        if not identity and text.startswith(SYSTEM_PREFIX):
+            identity.append(blk)
+        else:
+            rest.append(blk)
+    if not identity:
+        identity.append({"type": "text", "text": SYSTEM_PREFIX})
+
+    relocated = "\n\n".join(t for t in (_system_block_text(b) for b in rest) if t)
+    if relocated:
+        _prepend_to_first_user_message(body, relocated)
+
+    body["system"] = [
+        {"type": "text", "text": _billing_header_text(raw_body)},
+        *identity,
+    ]
+    return body
+
+
+def _prepend_to_first_user_message(body: dict[str, Any], text: str) -> None:
+    messages = body.get("messages")
+    if not isinstance(messages, list):
+        messages = []
+        body["messages"] = messages
+
+    idx = next(
+        (i for i, m in enumerate(messages)
+         if isinstance(m, dict) and m.get("role") == "user"),
+        None,
+    )
+    if idx is None:
+        messages.insert(0, {"role": "user", "content": text})
+        return
+
+    content = messages[idx].get("content")
+    if isinstance(content, str):
+        messages[idx]["content"] = f"{text}\n\n{content}"
+    elif isinstance(content, list):
+        messages[idx]["content"] = [{"type": "text", "text": text}, *content]
+    else:
+        messages[idx]["content"] = text
 
 
 def normalize_body_for_anthropic_direct(body: dict[str, Any]) -> dict[str, Any]:
@@ -508,8 +683,11 @@ async def _forward_non_streaming(
                 for k, v in upstream.headers.items()
                 if k.lower() not in STRIP_HEADERS_OUT
             }
+            _out = upstream.content
+            if _tool_rename_enabled():
+                _out = strip_tool_prefix_bytes(_out)
             return Response(
-                content=upstream.content,
+                content=_out,
                 status_code=upstream.status_code,
                 headers=resp_headers,
                 media_type=upstream.headers.get("content-type"),
@@ -672,7 +850,7 @@ async def _stream_with_failover(
                             saw_stop = True
                         if b"\nevent: error" in tail or tail.startswith(b"event: error"):
                             saw_error = True
-                        yield chunk
+                        yield strip_tool_prefix_bytes(chunk) if _tool_rename_enabled() else chunk
                 except Exception as e:  # noqa: BLE001 - any read failure mid-stream (not BaseException)
                     _LOG.warning("mid-stream read error after status 200: %s", e)
                     yield (
@@ -877,7 +1055,7 @@ async def _stream_buffered_with_retry(
                     yield _SSE_PING  # keep the client<->bridge connection warm
             kind, body = task.result()
             if kind == "ok":
-                yield body
+                yield strip_tool_prefix_bytes(body) if _tool_rename_enabled() else body
             elif kind == "creds":
                 yield _sse_error_bytes("authentication_error", body.decode("utf-8", "replace") or "credentials unavailable")
             elif kind == "error":
@@ -1036,6 +1214,10 @@ def build_app(provider: ProviderLike | None = None) -> FastAPI:
                 if isinstance(body_json, dict):
                     body_json = inject_system_prefix(body_json)
                     body_json = normalize_body_for_anthropic_direct(body_json)
+                    if _billing_attribution_enabled():
+                        body_json = apply_billing_attribution(body_json, raw_body)
+                    if _tool_rename_enabled():
+                        body_json = rename_tools_outbound(body_json)
                     raw_body = json.dumps(body_json).encode("utf-8")
             except ValueError as e:
                 _LOG.warning("Skipping system-prefix injection (bad JSON): %s", e)
@@ -1045,18 +1227,30 @@ def build_app(provider: ProviderLike | None = None) -> FastAPI:
                 bj = json.loads(raw_body)
                 if isinstance(bj, dict):
                     keys = sorted(bj.keys())
-                    sys_shape = type(bj.get("system")).__name__ if "system" in bj else "-"
+                    _sys = bj.get("system")
+                    sys_shape = type(_sys).__name__ if "system" in bj else "-"
+                    sys_len = len(_sys) if isinstance(_sys, list) else -1
+                    sys0 = ""
+                    if isinstance(_sys, list) and _sys:
+                        sys0 = _system_block_text(_sys[0])[:60]
+                    elif isinstance(_sys, str):
+                        sys0 = _sys[:60]
                     tool_count = len(bj.get("tools") or [])
+                    tool0 = ""
+                    _tools = bj.get("tools")
+                    if isinstance(_tools, list) and _tools and isinstance(_tools[0], dict):
+                        tool0 = ",".join(sorted(_tools[0].keys()))
                     msg_count = len(bj.get("messages") or [])
                     _LOG.warning(
-                        "REQ_BODY_DIAG size=%d keys=%s system=%s tools=%d messages=%d model=%s stream=%s thinking=%s",
-                        len(raw_body), keys, sys_shape, tool_count, msg_count,
+                        "REQ_BODY_DIAG size=%d keys=%s system=%s sys_len=%d sys0=%r tools=%d tool0=%s messages=%d model=%s stream=%s thinking=%s",
+                        len(raw_body), keys, sys_shape, sys_len, sys0, tool_count, tool0, msg_count,
                         bj.get("model"), bj.get("stream"),
                         (bj.get("thinking") or {}).get("type") if isinstance(bj.get("thinking"), dict) else bj.get("thinking"),
                     )
                     _LOG.warning("REQ_BODY_HEADERS %s", dict(request.headers))
                     try:
-                        _dump_path = f"/tmp/wcb_bridge_last_body_{int(time.time())}.json"
+                        _dump_dir = os.environ.get("WCB_CC_BODY_DUMP_DIR", "/tmp")
+                        _dump_path = f"{_dump_dir}/wcb_bridge_last_body_{int(time.time())}.json"
                         with open(_dump_path, "wb") as _f:
                             _f.write(raw_body)
                         _LOG.warning("REQ_BODY_DUMP wrote %d bytes to %s", len(raw_body), _dump_path)

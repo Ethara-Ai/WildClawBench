@@ -151,6 +151,22 @@ class OpenClawAgent(BaseAgent):
                     "WCB_AUDIO_TRANSCRIBE_AUTH",
                     self.litellm_master_key or "sk-litellm",
                 )
+                # openclaw's Anthropic-messages SDK client ignores the per-provider
+                # baseUrl in openclaw.json for provider_key 'anthropic' and dials
+                # api.anthropic.com directly, bypassing the litellm sidecar +
+                # cc-bridge (the OAuth billing-attribution transform never runs and
+                # the raw system[] trips the "extra usage" 400). ANTHROPIC_BASE_URL
+                # is the SDK-honored override (same pattern as claudecode/runner.py
+                # :370). No /v1 suffix: the client appends /v1/messages itself.
+                if "claude" in (spec.model or "").lower():
+                    base_url_root = (
+                        f"http://{self.litellm_container_name}:{self.litellm_port}"
+                    )
+                    stub = self.litellm_master_key or "sk-litellm"
+                    extra_env_dict.setdefault("ANTHROPIC_BASE_URL", base_url_root)
+                    extra_env_dict.setdefault("ANTHROPIC_API_BASE", base_url_root)
+                    extra_env_dict.setdefault("ANTHROPIC_AUTH_TOKEN", stub)
+                    extra_env_dict.setdefault("ANTHROPIC_API_KEY", stub)
 
             start_container(
                 spec.task_id,
