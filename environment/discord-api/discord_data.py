@@ -14,9 +14,11 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_seed_with_ctx, get_store, opt_csv_list, opt_str, strict_bool, strict_int)
 
 _store = get_store("discord-api")
+_API = "discord-api"
 
 
 def _store_insert(_table, _row):
@@ -32,15 +34,18 @@ def _store_insert(_table, _row):
     return _t.upsert(_row)
 
 _store.register("guilds", primary_key="id",
-                initial_loader=lambda: _coerce_guilds(_load("guilds.csv")))
+                initial_loader=lambda: _coerce_guilds(_load("guilds.json", "guilds")))
 _store.register("channels", primary_key="id",
-                initial_loader=lambda: _coerce_channels(_load("channels.csv")))
+                initial_loader=lambda: _coerce_channels(_load("channels.json", "channels")))
 _store.register("messages", primary_key="id",
-                initial_loader=lambda: _coerce_messages(_load("messages.csv")))
-_store.register("members", primary_key="guild_id",
-                initial_loader=lambda: _coerce_members(_load("members.csv")))
+                initial_loader=lambda: _coerce_messages(_load("messages.json", "messages")))
+# members natural key (guild_id, user_id) -> synth composite pk
+_store.register("members", primary_key="_pk",
+                initial_loader=lambda: [
+                    {**r, "_pk": f"{r['guild_id']}@{r['user']['id']}"}
+                    for r in _coerce_members(_load("members.json", "members"))])
 _store.register("roles", primary_key="id",
-                initial_loader=lambda: _coerce_roles(_load("roles.csv")))
+                initial_loader=lambda: _coerce_roles(_load("roles.json", "roles")))
 _store.register_document("me", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "me.json", encoding="utf-8")))
 
 
@@ -73,9 +78,12 @@ _DISCORD_EPOCH = 1420070400000
 _seq = 0
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():

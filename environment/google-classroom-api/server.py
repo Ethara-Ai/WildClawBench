@@ -1,15 +1,17 @@
-"""FastAPI server wrapping classroom_data module as REST endpoints."""
+"""FastAPI server wrapping google_classroom_data module as REST endpoints."""
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Optional, List
 
-import classroom_data
+import google_classroom_data
 try:
     from tracking_middleware import install_tracker
     from admin_plane import install_admin_plane
-except ModuleNotFoundError:  # standalone run without the shared module on sys.path
+except ModuleNotFoundError as _shared_plane_err:  # standalone run without the shared module on sys.path
+    import logging as _logging
+    _logging.error("SHARED PLANE MISSING - audit + admin disabled: %s", _shared_plane_err)
     def install_tracker(app):  # no-op fallback: audit endpoints disabled
         return None
 
@@ -18,7 +20,7 @@ except ModuleNotFoundError:  # standalone run without the shared module on sys.p
 
 app = FastAPI(title="Google Classroom API (Mock)", version="1.0")
 install_tracker(app)
-install_admin_plane(app, store=classroom_data._store)
+install_admin_plane(app, store=google_classroom_data._store)
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -32,7 +34,7 @@ def list_courses(
     pageSize: int = Query(default=20, ge=1, le=100),
     pageToken: Optional[str] = Query(default=None),
 ):
-    return classroom_data.list_courses(
+    return google_classroom_data.list_courses(
         course_states=courseStates, page_size=pageSize,
         page_token=int(pageToken) if pageToken else 0,
     )
@@ -40,7 +42,7 @@ def list_courses(
 
 @app.get("/v1/courses/{course_id}")
 def get_course(course_id: str):
-    result = classroom_data.get_course(course_id)
+    result = google_classroom_data.get_course(course_id)
     if "error" in result:
         return JSONResponse(status_code=404, content=result)
     return result
@@ -57,7 +59,7 @@ class CourseCreateBody(BaseModel):
 
 @app.post("/v1/courses", status_code=201)
 def create_course(body: CourseCreateBody):
-    result = classroom_data.create_course(body.model_dump())
+    result = google_classroom_data.create_course(body.model_dump())
     if "error" in result:
         return JSONResponse(status_code=400, content=result)
     return result
@@ -75,7 +77,7 @@ class CourseUpdateBody(BaseModel):
 @app.patch("/v1/courses/{course_id}")
 def update_course(course_id: str, body: CourseUpdateBody):
     data = {k: v for k, v in body.model_dump().items() if v is not None}
-    result = classroom_data.update_course(course_id, data)
+    result = google_classroom_data.update_course(course_id, data)
     if "error" in result:
         return JSONResponse(status_code=404, content=result)
     return result
@@ -83,7 +85,7 @@ def update_course(course_id: str, body: CourseUpdateBody):
 
 @app.post("/v1/courses/{course_id}:archive")
 def archive_course(course_id: str):
-    result = classroom_data.archive_course(course_id)
+    result = google_classroom_data.archive_course(course_id)
     if "error" in result:
         return JSONResponse(status_code=404, content=result)
     return result
@@ -100,7 +102,7 @@ def list_coursework(
     pageSize: int = Query(default=20, ge=1, le=100),
     pageToken: Optional[str] = Query(default=None),
 ):
-    result = classroom_data.list_coursework(
+    result = google_classroom_data.list_coursework(
         course_id=course_id, topic_id=topicId,
         course_work_states=courseWorkStates, order_by=orderBy,
         page_size=pageSize, page_token=int(pageToken) if pageToken else 0,
@@ -112,7 +114,7 @@ def list_coursework(
 
 @app.get("/v1/courses/{course_id}/courseWork/{coursework_id}")
 def get_coursework(course_id: str, coursework_id: str):
-    result = classroom_data.get_coursework(course_id, coursework_id)
+    result = google_classroom_data.get_coursework(course_id, coursework_id)
     if "error" in result:
         return JSONResponse(status_code=404, content=result)
     return result
@@ -147,7 +149,7 @@ def create_coursework(course_id: str, body: CourseWorkCreateBody):
         data["dueDate"] = dict(data["dueDate"])
     if data.get("dueTime"):
         data["dueTime"] = dict(data["dueTime"])
-    result = classroom_data.create_coursework(course_id, data)
+    result = google_classroom_data.create_coursework(course_id, data)
     if "error" in result:
         return JSONResponse(status_code=400, content=result)
     return result
@@ -172,7 +174,7 @@ def update_coursework(course_id: str, coursework_id: str, body: CourseWorkUpdate
                 data[k] = dict(v)
             else:
                 data[k] = v
-    result = classroom_data.update_coursework(course_id, coursework_id, data)
+    result = google_classroom_data.update_coursework(course_id, coursework_id, data)
     if "error" in result:
         return JSONResponse(status_code=404, content=result)
     return result
@@ -180,7 +182,7 @@ def update_coursework(course_id: str, coursework_id: str, body: CourseWorkUpdate
 
 @app.delete("/v1/courses/{course_id}/courseWork/{coursework_id}")
 def delete_coursework(course_id: str, coursework_id: str):
-    result = classroom_data.delete_coursework(course_id, coursework_id)
+    result = google_classroom_data.delete_coursework(course_id, coursework_id)
     if "error" in result:
         return JSONResponse(status_code=404, content=result)
     return result
@@ -194,7 +196,7 @@ def list_topics(
     pageSize: int = Query(default=20, ge=1, le=100),
     pageToken: Optional[str] = Query(default=None),
 ):
-    result = classroom_data.list_topics(
+    result = google_classroom_data.list_topics(
         course_id=course_id, page_size=pageSize,
         page_token=int(pageToken) if pageToken else 0,
     )
@@ -205,7 +207,7 @@ def list_topics(
 
 @app.get("/v1/courses/{course_id}/topics/{topic_id}")
 def get_topic(course_id: str, topic_id: str):
-    result = classroom_data.get_topic(course_id, topic_id)
+    result = google_classroom_data.get_topic(course_id, topic_id)
     if "error" in result:
         return JSONResponse(status_code=404, content=result)
     return result
@@ -217,7 +219,7 @@ class TopicCreateBody(BaseModel):
 
 @app.post("/v1/courses/{course_id}/topics", status_code=201)
 def create_topic(course_id: str, body: TopicCreateBody):
-    result = classroom_data.create_topic(course_id, body.model_dump())
+    result = google_classroom_data.create_topic(course_id, body.model_dump())
     if "error" in result:
         return JSONResponse(status_code=400, content=result)
     return result
@@ -230,7 +232,7 @@ class TopicUpdateBody(BaseModel):
 @app.patch("/v1/courses/{course_id}/topics/{topic_id}")
 def update_topic(course_id: str, topic_id: str, body: TopicUpdateBody):
     data = {k: v for k, v in body.model_dump().items() if v is not None}
-    result = classroom_data.update_topic(course_id, topic_id, data)
+    result = google_classroom_data.update_topic(course_id, topic_id, data)
     if "error" in result:
         return JSONResponse(status_code=404, content=result)
     return result
@@ -238,7 +240,7 @@ def update_topic(course_id: str, topic_id: str, body: TopicUpdateBody):
 
 @app.delete("/v1/courses/{course_id}/topics/{topic_id}")
 def delete_topic(course_id: str, topic_id: str):
-    result = classroom_data.delete_topic(course_id, topic_id)
+    result = google_classroom_data.delete_topic(course_id, topic_id)
     if "error" in result:
         return JSONResponse(status_code=404, content=result)
     return result
@@ -255,7 +257,7 @@ def list_submissions(
     pageSize: int = Query(default=20, ge=1, le=100),
     pageToken: Optional[str] = Query(default=None),
 ):
-    result = classroom_data.list_submissions(
+    result = google_classroom_data.list_submissions(
         course_id=course_id, coursework_id=coursework_id,
         states=states, late=late,
         page_size=pageSize, page_token=int(pageToken) if pageToken else 0,
@@ -267,7 +269,7 @@ def list_submissions(
 
 @app.get("/v1/courses/{course_id}/courseWork/{coursework_id}/studentSubmissions/{submission_id}")
 def get_submission(course_id: str, coursework_id: str, submission_id: str):
-    result = classroom_data.get_submission(course_id, coursework_id, submission_id)
+    result = google_classroom_data.get_submission(course_id, coursework_id, submission_id)
     if "error" in result:
         return JSONResponse(status_code=404, content=result)
     return result
@@ -281,7 +283,7 @@ class GradeSubmissionBody(BaseModel):
 @app.patch("/v1/courses/{course_id}/courseWork/{coursework_id}/studentSubmissions/{submission_id}")
 def grade_submission(course_id: str, coursework_id: str, submission_id: str, body: GradeSubmissionBody):
     data = {k: v for k, v in body.model_dump().items() if v is not None}
-    result = classroom_data.grade_submission(course_id, coursework_id, submission_id, data)
+    result = google_classroom_data.grade_submission(course_id, coursework_id, submission_id, data)
     if "error" in result:
         return JSONResponse(status_code=404, content=result)
     return result
@@ -289,7 +291,7 @@ def grade_submission(course_id: str, coursework_id: str, submission_id: str, bod
 
 @app.post("/v1/courses/{course_id}/courseWork/{coursework_id}/studentSubmissions/{submission_id}:return")
 def return_submission(course_id: str, coursework_id: str, submission_id: str):
-    result = classroom_data.return_submission(course_id, coursework_id, submission_id)
+    result = google_classroom_data.return_submission(course_id, coursework_id, submission_id)
     if "error" in result:
         return JSONResponse(status_code=404, content=result)
     return result
@@ -297,7 +299,31 @@ def return_submission(course_id: str, coursework_id: str, submission_id: str):
 
 @app.post("/v1/courses/{course_id}/courseWork/{coursework_id}/studentSubmissions/{submission_id}:reclaim")
 def reclaim_submission(course_id: str, coursework_id: str, submission_id: str):
-    result = classroom_data.reclaim_submission(course_id, coursework_id, submission_id)
+    result = google_classroom_data.reclaim_submission(course_id, coursework_id, submission_id)
+    if "error" in result:
+        return JSONResponse(status_code=404, content=result)
+    return result
+
+
+@app.post("/v1/courses/{course_id}/courseWork/{coursework_id}/studentSubmissions/{submission_id}:turnIn")
+def turn_in_submission(course_id: str, coursework_id: str, submission_id: str):
+    result = google_classroom_data.turn_in_submission(course_id, coursework_id, submission_id)
+    if "error" in result:
+        return JSONResponse(status_code=404, content=result)
+    return result
+
+
+class ModifyAttachmentsBody(BaseModel):
+    # Real Classroom sends {"addAttachments": [ {...} ]}; accept it permissively
+    # so any attachment shape the agent supplies is recorded.
+    addAttachments: Optional[List[dict]] = None
+
+
+@app.post("/v1/courses/{course_id}/courseWork/{coursework_id}/studentSubmissions/{submission_id}:modifyAttachments")
+def modify_submission_attachments(course_id: str, coursework_id: str, submission_id: str,
+                                  body: ModifyAttachmentsBody = ModifyAttachmentsBody()):
+    result = google_classroom_data.modify_submission_attachments(
+        course_id, coursework_id, submission_id, body.addAttachments or [])
     if "error" in result:
         return JSONResponse(status_code=404, content=result)
     return result
@@ -311,7 +337,7 @@ def list_students(
     pageSize: int = Query(default=30, ge=1, le=100),
     pageToken: Optional[str] = Query(default=None),
 ):
-    result = classroom_data.list_students(
+    result = google_classroom_data.list_students(
         course_id=course_id, page_size=pageSize,
         page_token=int(pageToken) if pageToken else 0,
     )
@@ -322,7 +348,7 @@ def list_students(
 
 @app.get("/v1/courses/{course_id}/students/{user_id}")
 def get_student(course_id: str, user_id: str):
-    result = classroom_data.get_student(course_id, user_id)
+    result = google_classroom_data.get_student(course_id, user_id)
     if "error" in result:
         return JSONResponse(status_code=404, content=result)
     return result
@@ -335,7 +361,7 @@ class InviteStudentBody(BaseModel):
 
 @app.post("/v1/courses/{course_id}/students", status_code=201)
 def invite_student(course_id: str, body: InviteStudentBody):
-    result = classroom_data.invite_student(course_id, body.model_dump())
+    result = google_classroom_data.invite_student(course_id, body.model_dump())
     if "error" in result:
         return JSONResponse(status_code=400, content=result)
     return result
@@ -343,7 +369,7 @@ def invite_student(course_id: str, body: InviteStudentBody):
 
 @app.delete("/v1/courses/{course_id}/students/{user_id}")
 def remove_student(course_id: str, user_id: str):
-    result = classroom_data.remove_student(course_id, user_id)
+    result = google_classroom_data.remove_student(course_id, user_id)
     if "error" in result:
         return JSONResponse(status_code=404, content=result)
     return result
@@ -353,7 +379,7 @@ def remove_student(course_id: str, user_id: str):
 
 @app.get("/v1/courses/{course_id}/teachers")
 def list_teachers(course_id: str):
-    result = classroom_data.list_teachers(course_id)
+    result = google_classroom_data.list_teachers(course_id)
     if "error" in result:
         return JSONResponse(status_code=404, content=result)
     return result
@@ -361,7 +387,7 @@ def list_teachers(course_id: str):
 
 @app.get("/v1/courses/{course_id}/teachers/{user_id}")
 def get_teacher(course_id: str, user_id: str):
-    result = classroom_data.get_teacher(course_id, user_id)
+    result = google_classroom_data.get_teacher(course_id, user_id)
     if "error" in result:
         return JSONResponse(status_code=404, content=result)
     return result
@@ -376,7 +402,7 @@ def list_announcements(
     pageSize: int = Query(default=20, ge=1, le=100),
     pageToken: Optional[str] = Query(default=None),
 ):
-    result = classroom_data.list_announcements(
+    result = google_classroom_data.list_announcements(
         course_id=course_id, announcement_states=announcementStates,
         page_size=pageSize, page_token=int(pageToken) if pageToken else 0,
     )
@@ -387,7 +413,7 @@ def list_announcements(
 
 @app.get("/v1/courses/{course_id}/announcements/{announcement_id}")
 def get_announcement(course_id: str, announcement_id: str):
-    result = classroom_data.get_announcement(course_id, announcement_id)
+    result = google_classroom_data.get_announcement(course_id, announcement_id)
     if "error" in result:
         return JSONResponse(status_code=404, content=result)
     return result
@@ -400,7 +426,7 @@ class AnnouncementCreateBody(BaseModel):
 
 @app.post("/v1/courses/{course_id}/announcements", status_code=201)
 def create_announcement(course_id: str, body: AnnouncementCreateBody):
-    result = classroom_data.create_announcement(course_id, body.model_dump())
+    result = google_classroom_data.create_announcement(course_id, body.model_dump())
     if "error" in result:
         return JSONResponse(status_code=400, content=result)
     return result
@@ -414,7 +440,7 @@ class AnnouncementUpdateBody(BaseModel):
 @app.patch("/v1/courses/{course_id}/announcements/{announcement_id}")
 def update_announcement(course_id: str, announcement_id: str, body: AnnouncementUpdateBody):
     data = {k: v for k, v in body.model_dump().items() if v is not None}
-    result = classroom_data.update_announcement(course_id, announcement_id, data)
+    result = google_classroom_data.update_announcement(course_id, announcement_id, data)
     if "error" in result:
         return JSONResponse(status_code=404, content=result)
     return result
@@ -422,7 +448,7 @@ def update_announcement(course_id: str, announcement_id: str, body: Announcement
 
 @app.delete("/v1/courses/{course_id}/announcements/{announcement_id}")
 def delete_announcement(course_id: str, announcement_id: str):
-    result = classroom_data.delete_announcement(course_id, announcement_id)
+    result = google_classroom_data.delete_announcement(course_id, announcement_id)
     if "error" in result:
         return JSONResponse(status_code=404, content=result)
     return result
@@ -436,7 +462,7 @@ def list_materials(
     pageSize: int = Query(default=20, ge=1, le=100),
     pageToken: Optional[str] = Query(default=None),
 ):
-    result = classroom_data.list_materials(
+    result = google_classroom_data.list_materials(
         course_id=course_id, page_size=pageSize,
         page_token=int(pageToken) if pageToken else 0,
     )
@@ -447,7 +473,7 @@ def list_materials(
 
 @app.get("/v1/courses/{course_id}/courseWorkMaterials/{material_id}")
 def get_material(course_id: str, material_id: str):
-    result = classroom_data.get_material(course_id, material_id)
+    result = google_classroom_data.get_material(course_id, material_id)
     if "error" in result:
         return JSONResponse(status_code=404, content=result)
     return result
@@ -474,7 +500,7 @@ def create_material(course_id: str, body: MaterialCreateBody):
     data = body.model_dump()
     if data.get("materials"):
         data["materials"] = [m for m in data["materials"] if m]
-    result = classroom_data.create_material(course_id, data)
+    result = google_classroom_data.create_material(course_id, data)
     if "error" in result:
         return JSONResponse(status_code=400, content=result)
     return result

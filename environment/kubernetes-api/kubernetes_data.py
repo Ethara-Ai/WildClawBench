@@ -9,9 +9,11 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_seed_with_ctx, get_store, opt_str, strict_bool, strict_int)
 
 _store = get_store("kubernetes-api")
+_API = "kubernetes-api"
 
 
 def _store_patch(_table, _row_or_pk, _updates):
@@ -28,15 +30,15 @@ def _store_delete(_table, _row_or_pk):
     return _t.delete(_pk)
 
 _store.register("namespaces", primary_key="name",
-                initial_loader=lambda: _coerce_namespaces(_load("namespaces.csv")))
+                initial_loader=lambda: _coerce_namespaces(_load("namespaces.json", "namespaces")))
 _store.register("nodes", primary_key="name",
-                initial_loader=lambda: _coerce_nodes(_load("nodes.csv")))
+                initial_loader=lambda: _coerce_nodes(_load("nodes.json", "nodes")))
 _store.register("pods", primary_key="name",
-                initial_loader=lambda: _coerce_pods(_load("pods.csv")))
-_store.register("deployments", primary_key="name",
-                initial_loader=lambda: _coerce_deployments(_load("deployments.csv")))
-_store.register("services", primary_key="name",
-                initial_loader=lambda: _coerce_services(_load("services.csv")))
+                initial_loader=lambda: _coerce_pods(_load("pods.json", "pods")))
+_store.register("deployments", primary_key="_pk",
+                initial_loader=lambda: _coerce_deployments(_load("deployments.json", "deployments")))
+_store.register("services", primary_key="_pk",
+                initial_loader=lambda: _coerce_services(_load("services.json", "services")))
 
 
 def _namespaces_rows():
@@ -60,9 +62,12 @@ def _services_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -112,12 +117,14 @@ def _coerce_pods(rows):
 def _coerce_deployments(rows):
     out = []
     for r in rows:
+        clean = _strip_ctx(r)
         out.append({
-            **r,
-            "replicas": int(r["replicas"]),
-            "available_replicas": int(r["available_replicas"]),
-            "ready_replicas": int(r["ready_replicas"]),
-            "updated_replicas": int(r["updated_replicas"]),
+            **clean,
+            "_pk": f"{clean['namespace']}/{clean['name']}",
+            "replicas": strict_int(r, "replicas"),
+            "available_replicas": strict_int(r, "available_replicas"),
+            "ready_replicas": strict_int(r, "ready_replicas"),
+            "updated_replicas": strict_int(r, "updated_replicas"),
         })
     return out
 
@@ -125,11 +132,13 @@ def _coerce_deployments(rows):
 def _coerce_services(rows):
     out = []
     for r in rows:
+        clean = _strip_ctx(r)
         out.append({
-            **r,
-            "port": int(r["port"]),
-            "target_port": int(r["target_port"]),
-            "external_ip": r["external_ip"] or None,
+            **clean,
+            "_pk": f"{clean['namespace']}/{clean['name']}",
+            "port": strict_int(r, "port"),
+            "target_port": strict_int(r, "target_port"),
+            "external_ip": opt_str(r, "external_ip", default="") or None,
         })
     return out
 

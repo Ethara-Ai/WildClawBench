@@ -9,7 +9,14 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_seed_with_ctx, get_store,
+    strict_int,
+    strict_float,
+    strict_bool,
+)
+
+_API = "eventbrite-api"
 
 _store = get_store("eventbrite-api")
 
@@ -41,15 +48,15 @@ def _store_insert(_table, _row):
     return _t.upsert(_row)
 
 _store.register("events", primary_key="id",
-                initial_loader=lambda: _coerce_events(_load("events.csv")))
+                initial_loader=lambda: _coerce_events(_load("events.json", "events")))
 _store.register("venues", primary_key="id",
-                initial_loader=lambda: _coerce_venues(_load("venues.csv")))
+                initial_loader=lambda: _coerce_venues(_load("venues.json", "venues")))
 _store.register("ticket_classes", primary_key="id",
-                initial_loader=lambda: _coerce_ticket_classes(_load("ticket_classes.csv")))
+                initial_loader=lambda: _coerce_ticket_classes(_load("ticket_classes.json", "ticket_classes")))
 _store.register("attendees", primary_key="id",
-                initial_loader=lambda: _coerce_attendees(_load("attendees.csv")))
+                initial_loader=lambda: _coerce_attendees(_load("attendees.json", "attendees")))
 _store.register("organizations", primary_key="id",
-                initial_loader=lambda: _load("organizations.csv"))
+                initial_loader=lambda: [_strip_ctx(r) for r in _load("organizations.json", "organizations")])
 
 
 def _events_rows():
@@ -73,9 +80,12 @@ def _organizations_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -87,29 +97,29 @@ def _to_bool(v):
 
 
 def _coerce_events(rows):
-    return [{**r,
-             "capacity": int(r["capacity"]),
-             "is_free": _to_bool(r["is_free"]),
-             "online_event": _to_bool(r["online_event"])} for r in rows]
+    return [{**_strip_ctx(r),
+             "capacity": strict_int(r, "capacity"),
+             "is_free": strict_bool(r, "is_free"),
+             "online_event": strict_bool(r, "online_event")} for r in rows]
 
 
 def _coerce_venues(rows):
-    return [{**r,
-             "latitude": float(r["latitude"]),
-             "longitude": float(r["longitude"])} for r in rows]
+    return [{**_strip_ctx(r),
+             "latitude": strict_float(r, "latitude"),
+             "longitude": strict_float(r, "longitude")} for r in rows]
 
 
 def _coerce_ticket_classes(rows):
-    return [{**r,
-             "quantity_total": int(r["quantity_total"]),
-             "quantity_sold": int(r["quantity_sold"]),
-             "cost": int(r["cost"]),
-             "fee": int(r["fee"]),
-             "free": _to_bool(r["free"])} for r in rows]
+    return [{**_strip_ctx(r),
+             "quantity_total": strict_int(r, "quantity_total"),
+             "quantity_sold": strict_int(r, "quantity_sold"),
+             "cost": strict_int(r, "cost"),
+             "fee": strict_int(r, "fee"),
+             "free": strict_bool(r, "free")} for r in rows]
 
 
 def _coerce_attendees(rows):
-    return [{**r, "checked_in": _to_bool(r["checked_in"])} for r in rows]
+    return [{**_strip_ctx(r), "checked_in": strict_bool(r, "checked_in")} for r in rows]
 
 
 

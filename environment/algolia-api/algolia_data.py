@@ -13,14 +13,19 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store
+from _mutable_store import (
+    read_seed_with_ctx, get_store, opt_csv_list, opt_int)
 
 _store = get_store("algolia-api")
+_API = "algolia-api"
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _to_bool(v):
@@ -57,8 +62,11 @@ _BOOL_FIELDS = {"in_stock"}
 
 def _coerce_record(row):
     out = {}
-    for k, v in row.items():
+    for k, v in _strip_ctx(row).items():
         if k in _BOOL_FIELDS:
+            # Deliberately tolerant: Algolia records carry free-form user-defined
+            # schemas, so this path intentionally diverges from the fleet-wide
+            # strict_*/opt_* guarantee. Do not "harden" to strict_bool.
             out[k] = _to_bool(v)
         elif k in _NUMERIC_FIELDS:
             out[k] = _maybe_number(v)
@@ -67,7 +75,7 @@ def _coerce_record(row):
     return out
 
 
-_indices_meta = [dict(r) for r in _load("indices.csv")]
+_indices_meta = [_strip_ctx(r) for r in _load("indices.json", "indices")]
 
 
 def _records_table_name(index: str) -> str:
@@ -80,8 +88,8 @@ _store.register(
     initial_loader=lambda: [
         {
             "name": m["name"],
-            "entries": _to_int(m["entries"]),
-            "dataSize": _to_int(m["data_size"]),
+            "entries": opt_int(m, "entries", default=0),
+            "dataSize": opt_int(m, "data_size", default=0),
             "createdAt": m["created_at"],
             "updatedAt": m["updated_at"],
         }
@@ -94,17 +102,17 @@ for _meta in _indices_meta:
     _store.register(
         _records_table_name(_meta["name"]),
         primary_key="objectID",
-        initial_loader=(lambda csv_name=_meta["records_csv"]:
-                        [_coerce_record(r) for r in _load(csv_name)]),
+        initial_loader=(lambda json_name=_meta["records_csv"], tname=_records_table_name(_meta["name"]):
+                        [_coerce_record(r) for r in _load(json_name, tname)]),
     )
 
 
 def _coerce_settings(row):
     return {
-        "searchableAttributes": [a.strip() for a in row["searchableAttributes"].split(",") if a.strip()],
-        "attributesForFaceting": [a.strip() for a in row["attributesForFaceting"].split(",") if a.strip()],
-        "hitsPerPage": _to_int(row["hitsPerPage"], 20),
-        "ranking": [a.strip() for a in row["ranking"].split(",") if a.strip()],
+        "searchableAttributes": [a.strip() for a in opt_csv_list(row, "searchableAttributes") if a.strip()],
+        "attributesForFaceting": [a.strip() for a in opt_csv_list(row, "attributesForFaceting") if a.strip()],
+        "hitsPerPage": opt_int(row, "hitsPerPage", default=20),
+        "ranking": [a.strip() for a in opt_csv_list(row, "ranking") if a.strip()],
     }
 
 
@@ -113,7 +121,7 @@ _store.register(
     "settings",
     primary_key="index",
     initial_loader=lambda: [
-        {"index": r["index"], **_coerce_settings(r)} for r in _load("settings.csv")
+        {"index": r["index"], **_coerce_settings(r)} for r in _load("settings.json", "settings")
     ],
 )
 
@@ -261,3 +269,5 @@ def delete_object(index, object_id):
         return {"objectID": object_id, "deletedAt": "",
                 "taskID": _to_int(uuid.uuid4().int % 1000000)}
     return {"error": f"Object {object_id} not found in index {index}"}
+
+_store.eager_load()

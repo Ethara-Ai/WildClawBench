@@ -10,9 +10,11 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (  # noqa: E402
+    read_seed_with_ctx, get_store, opt_csv_list, opt_float, opt_str, strict_bool, strict_float, strict_int)
 
 _store = get_store("instacart-api")
+_API = "instacart-api"
 
 
 
@@ -42,13 +44,13 @@ def _store_insert(_table, _row):
     return _t.upsert(_row)
 
 _store.register("retailers", primary_key="retailer_id",
-                initial_loader=lambda: _coerce_retailers(_load("retailers.csv")))
+                initial_loader=lambda: _coerce_retailers(_load("retailers.json", "retailers")))
 _store.register("products", primary_key="product_id",
-                initial_loader=lambda: _coerce_products(_load("products.csv")))
+                initial_loader=lambda: _coerce_products(_load("products.json", "products")))
 _store.register("orders", primary_key="order_id",
-                initial_loader=lambda: _coerce_orders(_load("orders.csv")))
-_store.register("order_items", primary_key="order_id",
-                initial_loader=lambda: _coerce_order_items(_load("order_items.csv")))
+                initial_loader=lambda: _coerce_orders(_load("orders.json", "orders")))
+_store.register("order_items", primary_key="_pk",
+                initial_loader=lambda: [{**r, "_pk": f"{r['order_id']}@{r['product_id']}@{i}"} for i, r in enumerate(_coerce_order_items(_load("order_items.json", "order_items")))])
 _store.register_document("user", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "user.json", encoding="utf-8")))
 
 
@@ -65,7 +67,7 @@ def _orders_rows():
 
 
 def _order_items_rows():
-    return _store.table("order_items").rows()
+    return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("order_items").rows()]
 
 
 def _user_doc():
@@ -73,9 +75,12 @@ def _user_doc():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now_iso():
@@ -90,12 +95,12 @@ def _coerce_retailers(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "min_basket": float(r["min_basket"]),
-            "delivery_fee": float(r["delivery_fee"]),
-            "service_fee_pct": float(r["service_fee_pct"]),
-            "eta_minutes": int(r["eta_minutes"]),
-            "delivers_to_zips": [z.strip() for z in r["delivers_to_zips"].split(",")],
+            **_strip_ctx(r),
+            "min_basket": strict_float(r, "min_basket"),
+            "delivery_fee": strict_float(r, "delivery_fee"),
+            "service_fee_pct": strict_float(r, "service_fee_pct"),
+            "eta_minutes": strict_int(r, "eta_minutes"),
+            "delivers_to_zips": [z.strip() for z in opt_csv_list(r, "delivers_to_zips", sep=",")],
         })
     return out
 
@@ -104,10 +109,10 @@ def _coerce_products(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "price": float(r["price"]),
-            "sale_price": float(r["sale_price"]) if r["sale_price"] else None,
-            "in_stock": _to_bool(r["in_stock"]),
+            **_strip_ctx(r),
+            "price": strict_float(r, "price"),
+            "sale_price": opt_float(r, "sale_price", default=None),
+            "in_stock": strict_bool(r, "in_stock"),
         })
     return out
 
@@ -116,12 +121,12 @@ def _coerce_orders(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "subtotal": float(r["subtotal"]),
-            "delivery_fee": float(r["delivery_fee"]),
-            "service_fee": float(r["service_fee"]),
-            "tip": float(r["tip"]),
-            "total": float(r["total"]),
+            **_strip_ctx(r),
+            "subtotal": strict_float(r, "subtotal"),
+            "delivery_fee": strict_float(r, "delivery_fee"),
+            "service_fee": strict_float(r, "service_fee"),
+            "tip": strict_float(r, "tip"),
+            "total": strict_float(r, "total"),
         })
     return out
 
@@ -130,11 +135,11 @@ def _coerce_order_items(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "quantity": int(r["quantity"]),
-            "unit_price": float(r["unit_price"]),
-            "line_total": float(r["line_total"]),
-            "replacement_for": r["replacement_for"] or None,
+            **_strip_ctx(r),
+            "quantity": strict_int(r, "quantity"),
+            "unit_price": strict_float(r, "unit_price"),
+            "line_total": strict_float(r, "line_total"),
+            "replacement_for": opt_str(r, "replacement_for", default="") or None,
         })
     return out
 
@@ -324,8 +329,9 @@ def checkout(cart_id, tip=0.0, delivery_window_start=None, delivery_window_end=N
         "shopper_id": "",
     }
     _store_insert("orders", order)
-    for it in cart_full["items"]:
+    for i, it in enumerate(cart_full["items"]):
         _store_insert("order_items", {
+            "_pk": f"{order_id}@{it['product_id']}@{i}",
             "order_id": order_id,
             "product_id": it["product_id"],
             "quantity": it["quantity"],

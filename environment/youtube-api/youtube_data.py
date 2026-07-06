@@ -9,9 +9,10 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store
-
+from _mutable_store import (
+    read_seed_with_ctx, get_store, opt_csv_list, opt_str, strict_int)
 _store = get_store("youtube-api")
+_API = "youtube-api"
 
 # channel.json loaded before _load helper because _coerce_videos references _CHANNEL_TITLE.
 with open(DATA_DIR / "channel.json", encoding="utf-8") as _f:
@@ -20,9 +21,12 @@ _CHANNEL_ID = _channel_raw["id"]
 _CHANNEL_TITLE = _channel_raw["snippet"]["title"]
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _load_json(filename):
@@ -52,7 +56,7 @@ def _coerce_videos(rows):
                     "maxres": {"url": thumb, "width": 1280, "height": 720},
                 },
                 "channelTitle": _CHANNEL_TITLE,
-                "tags": [t.strip() for t in r["tags"].split(",")] if r.get("tags") else [],
+                "tags": [t.strip() for t in opt_csv_list(r, "tags", sep=",")] if r.get("tags") else [],
                 "categoryId": r.get("categoryId") or "",
                 "liveBroadcastContent": r.get("liveBroadcastContent") or "none",
                 "defaultLanguage": r.get("defaultLanguage") or None,
@@ -106,7 +110,7 @@ def _coerce_playlists(rows):
                 "privacyStatus": r["privacyStatus"],
             },
             "contentDetails": {
-                "itemCount": int(r["itemCount"]),
+                "itemCount": strict_int(r, "itemCount"),
             },
         })
     return out
@@ -122,7 +126,7 @@ def _coerce_playlist_items(rows):
                 "channelId": r["channelId"],
                 "title": r["title"],
                 "playlistId": r["playlistId"],
-                "position": int(r["position"]),
+                "position": strict_int(r, "position"),
                 "resourceId": {
                     "kind": "youtube#video",
                     "videoId": r["videoId"],
@@ -148,18 +152,18 @@ def _coerce_comments(rows):
         out.append({
             "id": r["comment_id"],
             "videoId": r["videoId"],
-            "channelId": r["channelId"] if r["channelId"] else None,
-            "parentId": r["parentId"] if r["parentId"] else None,
+            "channelId": opt_str(r, "channelId", default="") or None,
+            "parentId": opt_str(r, "parentId", default="") or None,
             "snippet": {
                 "authorDisplayName": r["authorDisplayName"],
                 "authorChannelId": {"value": r["authorChannelId"]},
                 "textDisplay": r["textDisplay"],
                 "textOriginal": r["textDisplay"],
-                "likeCount": int(r["likeCount"]),
+                "likeCount": strict_int(r, "likeCount"),
                 "publishedAt": r["publishedAt"],
                 "updatedAt": r["updatedAt"],
                 "videoId": r["videoId"],
-                "parentId": r["parentId"] if r["parentId"] else None,
+                "parentId": opt_str(r, "parentId", default="") or None,
             },
             "moderationStatus": r["moderationStatus"],
         })
@@ -184,15 +188,15 @@ def _coerce_captions(rows):
 
 
 _store.register("videos", primary_key="id",
-                initial_loader=lambda: _coerce_videos(_load("videos.csv")))
+                initial_loader=lambda: _coerce_videos(_load("videos.json", "videos")))
 _store.register("playlists", primary_key="id",
-                initial_loader=lambda: _coerce_playlists(_load("playlists.csv")))
+                initial_loader=lambda: _coerce_playlists(_load("playlists.json", "playlists")))
 _store.register("playlist_items", primary_key="id",
-                initial_loader=lambda: _coerce_playlist_items(_load("playlist_items.csv")))
+                initial_loader=lambda: _coerce_playlist_items(_load("playlist_items.json", "playlist_items")))
 _store.register("comments", primary_key="id",
-                initial_loader=lambda: _coerce_comments(_load("comments.csv")))
+                initial_loader=lambda: _coerce_comments(_load("comments.json", "comments")))
 _store.register("captions", primary_key="id",
-                initial_loader=lambda: _coerce_captions(_load("captions.csv")))
+                initial_loader=lambda: _coerce_captions(_load("captions.json", "captions")))
 _store.register_document("channel", initial_loader=lambda: _channel_raw)
 _store.register_document("video_categories",
                          initial_loader=lambda: _load_json("video_categories.json"))
@@ -828,3 +832,5 @@ def get_video_analytics(video_id: str):
                 "metrics": entry,
             }
     return {"error": f"Analytics for video {video_id} not found"}
+
+_store.eager_load()

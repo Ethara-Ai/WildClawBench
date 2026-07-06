@@ -13,14 +13,18 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_seed_with_ctx, get_store,
+    strict_float,
+)
 
 _store = get_store("amadeus-api")
+_API = "amadeus-api"
 
 _store.register("airports", primary_key="iata_code",
-                initial_loader=lambda: _coerce_airports(_load("airports.csv")))
+                initial_loader=lambda: _coerce_airports(_load("airports.json", "airports")))
 _store.register("airlines", primary_key="iata_code",
-                initial_loader=lambda: _coerce_airlines(_load("airlines.csv")))
+                initial_loader=lambda: _coerce_airlines(_load("airlines.json", "airlines")))
 _store.register_document("offers", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "flight_offers.json", encoding="utf-8")))
 
 
@@ -37,9 +41,12 @@ def _offers_doc():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 # ---------------------------------------------------------------------------
@@ -50,15 +57,15 @@ def _coerce_airports(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "latitude": float(r["latitude"]),
-            "longitude": float(r["longitude"]),
+            **_strip_ctx(r),
+            "latitude": strict_float(r, "latitude"),
+            "longitude": strict_float(r, "longitude"),
         })
     return out
 
 
 def _coerce_airlines(rows):
-    return [dict(r) for r in rows]
+    return [_strip_ctx(r) for r in rows]
 
 
 
@@ -237,3 +244,5 @@ def get_airlines(airline_codes=None):
         for a in pool
     ]
     return {"meta": {"count": len(data)}, "data": data}
+
+_store.eager_load()

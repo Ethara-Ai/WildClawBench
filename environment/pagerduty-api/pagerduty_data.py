@@ -1,6 +1,7 @@
 """Data access module for the PagerDuty API mock service."""
 
 import csv
+from copy import deepcopy
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -9,9 +10,11 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_seed_with_ctx, get_store, opt_str, strict_int)
 
 _store = get_store("pagerduty-api")
+_API = "pagerduty-api"
 
 
 
@@ -41,15 +44,15 @@ def _store_insert(_table, _row):
     return _t.upsert(_row)
 
 _store.register("users", primary_key="user_id",
-                initial_loader=lambda: _coerce_users(_load("users.csv")))
+                initial_loader=lambda: _coerce_users(_load("users.json", "users")))
 _store.register("services", primary_key="service_id",
-                initial_loader=lambda: _coerce_services(_load("services.csv")))
+                initial_loader=lambda: _coerce_services(_load("services.json", "services")))
 _store.register("incidents", primary_key="incident_id",
-                initial_loader=lambda: _coerce_incidents(_load("incidents.csv")))
+                initial_loader=lambda: _coerce_incidents(_load("incidents.json", "incidents")))
 _store.register("policies", primary_key="escalation_policy_id",
-                initial_loader=lambda: _coerce_policies(_load("escalation_policies.csv")))
+                initial_loader=lambda: _coerce_policies(_load("escalation_policies.json", "policies")))
 _store.register("schedules", primary_key="schedule_id",
-                initial_loader=lambda: _coerce_schedules(_load("schedules.csv")))
+                initial_loader=lambda: _coerce_schedules(_load("schedules.json", "schedules")))
 
 
 def _users_rows():
@@ -75,9 +78,12 @@ def _schedules_rows():
 VALID_STATUSES = {"triggered", "acknowledged", "resolved"}
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now_iso():

@@ -15,9 +15,13 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (  # noqa: E402
+    read_seed_with_ctx, get_store,
+    strict_bool,
+)
 
 _store = get_store("servicenow-api")
+_API = "servicenow-api"
 
 
 def _store_insert(_table, _row):
@@ -33,13 +37,13 @@ def _store_insert(_table, _row):
     return _t.upsert(_row)
 
 _store.register("incidents", primary_key="sys_id",
-                initial_loader=lambda: _coerce_incidents(_load("incident.csv")))
+                initial_loader=lambda: _coerce_incidents(_load("incident.json", "incidents")))
 _store.register("changes", primary_key="sys_id",
-                initial_loader=lambda: _coerce_changes(_load("change_request.csv")))
+                initial_loader=lambda: _coerce_changes(_load("change_request.json", "changes")))
 _store.register("problems", primary_key="sys_id",
-                initial_loader=lambda: _coerce_problems(_load("problem.csv")))
+                initial_loader=lambda: _coerce_problems(_load("problem.json", "problems")))
 _store.register("users", primary_key="sys_id",
-                initial_loader=lambda: _coerce_users(_load("sys_user.csv")))
+                initial_loader=lambda: _coerce_users(_load("sys_user.json", "users")))
 
 
 def _incidents_rows():
@@ -62,9 +66,12 @@ def _users_rows():
 INCIDENT_STATES = {"1": "New", "2": "In Progress", "3": "On Hold", "6": "Resolved", "7": "Closed"}
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():

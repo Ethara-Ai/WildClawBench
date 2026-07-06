@@ -13,9 +13,12 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (  # noqa: E402
+    read_seed_with_ctx, get_store, opt_csv_list, opt_int, strict_bool)
 
 _store = get_store("zendesk-api")
+
+_API = "zendesk-api"
 
 
 def _store_insert(_table, _row):
@@ -31,13 +34,13 @@ def _store_insert(_table, _row):
     return _t.upsert(_row)
 
 _store.register("users", primary_key="id",
-                initial_loader=lambda: _coerce_users(_load("users.csv")))
+                initial_loader=lambda: _coerce_users(_load("users.json", "users")))
 _store.register("organizations", primary_key="id",
-                initial_loader=lambda: _coerce_orgs(_load("organizations.csv")))
+                initial_loader=lambda: _coerce_orgs(_load("organizations.json", "organizations")))
 _store.register("tickets", primary_key="id",
-                initial_loader=lambda: _coerce_tickets(_load("tickets.csv")))
+                initial_loader=lambda: _coerce_tickets(_load("tickets.json", "tickets")))
 _store.register("comments", primary_key="id",
-                initial_loader=lambda: _coerce_comments(_load("comments.csv")))
+                initial_loader=lambda: _coerce_comments(_load("comments.json", "comments")))
 
 
 def _users_rows():
@@ -60,9 +63,12 @@ VALID_STATUS = {"new", "open", "pending", "hold", "solved", "closed"}
 VALID_PRIORITY = {"low", "normal", "high", "urgent"}
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():

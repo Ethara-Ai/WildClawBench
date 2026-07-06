@@ -9,9 +9,11 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (  # noqa: E402
+    read_json_with_ctx, get_store, opt_float, opt_str, strict_int)
 
 _store = get_store("google-classroom-api")
+_API = "google-classroom-api"
 
 
 
@@ -36,26 +38,39 @@ def _store_insert(_table, _row):
     the table was registered with primary_key="id" or a domain-specific key.
     """
     _t = _store.table(_table)
-    if _t.primary_key not in _row and "id" in _row:
-        _row = {**_row, _t.primary_key: _row["id"]}
+    if _t.primary_key not in _row:
+        if "id" in _row:
+            _row = {**_row, _t.primary_key: _row["id"]}
+        elif _t.primary_key == "_pk" and "courseId" in _row:
+            # Mirror the composite key scheme used by the JSON initial loaders
+            # (topics/students/teachers: "<courseId>@<topicId|userId>").
+            _suffix = _row.get("topicId") or _row.get("userId")
+            if _suffix:
+                _row = {**_row, "_pk": f"{_row['courseId']}@{_suffix}"}
     return _t.upsert(_row)
 
 _store.register("courses", primary_key="id",
-                initial_loader=lambda: _coerce_courses(_load("courses.csv")))
+                initial_loader=lambda: _coerce_courses(_load("courses.json", "courses")))
 _store.register("coursework", primary_key="id",
-                initial_loader=lambda: _coerce_coursework(_load("coursework.csv")))
-_store.register("topics", primary_key="courseId",
-                initial_loader=lambda: _coerce_topics(_load("topics.csv")))
-_store.register("students", primary_key="courseId",
-                initial_loader=lambda: _coerce_students(_load("students.csv")))
-_store.register("teachers", primary_key="courseId",
-                initial_loader=lambda: _coerce_teachers(_load("teachers.csv")))
+                initial_loader=lambda: _coerce_coursework(_load("coursework.json", "coursework")))
+_store.register("topics", primary_key="_pk",
+                initial_loader=lambda: [
+                    {**r, "_pk": f"{r['courseId']}@{r['topicId']}"}
+                    for r in _coerce_topics(_load("topics.json", "topics"))])
+_store.register("students", primary_key="_pk",
+                initial_loader=lambda: [
+                    {**r, "_pk": f"{r['courseId']}@{r['userId']}"}
+                    for r in _coerce_students(_load("students.json", "students"))])
+_store.register("teachers", primary_key="_pk",
+                initial_loader=lambda: [
+                    {**r, "_pk": f"{r['courseId']}@{r['userId']}"}
+                    for r in _coerce_teachers(_load("teachers.json", "teachers"))])
 _store.register("submissions", primary_key="id",
-                initial_loader=lambda: _coerce_submissions(_load("submissions.csv")))
+                initial_loader=lambda: _coerce_submissions(_load("submissions.json", "submissions")))
 _store.register("announcements", primary_key="id",
-                initial_loader=lambda: _coerce_announcements(_load("announcements.csv")))
+                initial_loader=lambda: _coerce_announcements(_load("announcements.json", "announcements")))
 _store.register("materials", primary_key="id",
-                initial_loader=lambda: _coerce_materials(_load("materials.csv")))
+                initial_loader=lambda: _coerce_materials(_load("materials.json", "materials")))
 
 
 def _courses_rows():
@@ -91,9 +106,12 @@ def _materials_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_json_with_ctx((DATA_DIR / filename).with_suffix(".json"), _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():

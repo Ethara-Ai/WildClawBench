@@ -11,18 +11,20 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_seed_with_ctx, get_store, opt_str, strict_int)
 
 _store = get_store("openlibrary-api")
+_API = "openlibrary-api"
 
 _store.register("authors", primary_key="author_id",
-                initial_loader=lambda: _coerce_authors(_load("authors.csv")))
+                initial_loader=lambda: _coerce_authors(_load("authors.json", "authors")))
 _store.register("works", primary_key="work_id",
-                initial_loader=lambda: _coerce_works(_load("works.csv")))
+                initial_loader=lambda: _coerce_works(_load("works.json", "works")))
 _store.register("editions", primary_key="edition_id",
-                initial_loader=lambda: _coerce_editions(_load("editions.csv")))
+                initial_loader=lambda: _coerce_editions(_load("editions.json", "editions")))
 _store.register("subjects", primary_key="subject",
-                initial_loader=lambda: _coerce_subjects(_load("subjects.csv")))
+                initial_loader=lambda: _coerce_subjects(_load("subjects.json", "subjects")))
 
 
 def _authors_rows():
@@ -42,9 +44,12 @@ def _subjects_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _split(s):
@@ -61,11 +66,11 @@ def _coerce_authors(rows):
         out.append({
             "author_id": r["author_id"],
             "name": r["name"],
-            "birth_date": r["birth_date"] or None,
-            "death_date": r["death_date"] or None,
+            "birth_date": opt_str(r, "birth_date", default="") or None,
+            "death_date": opt_str(r, "death_date", default="") or None,
             "bio": r["bio"],
             "top_work": r["top_work"],
-            "work_count": int(r["work_count"]),
+            "work_count": strict_int(r, "work_count"),
         })
     return out
 
@@ -77,10 +82,10 @@ def _coerce_works(rows):
             "work_id": r["work_id"],
             "title": r["title"],
             "author_id": r["author_id"],
-            "first_publish_year": int(r["first_publish_year"]),
+            "first_publish_year": strict_int(r, "first_publish_year"),
             "subjects": _split(r["subjects"]),
             "description": r["description"],
-            "edition_count": int(r["edition_count"]),
+            "edition_count": strict_int(r, "edition_count"),
         })
     return out
 
@@ -96,14 +101,14 @@ def _coerce_editions(rows):
             "isbn_10": r["isbn_10"],
             "publisher": r["publisher"],
             "publish_date": r["publish_date"],
-            "number_of_pages": int(r["number_of_pages"]),
+            "number_of_pages": strict_int(r, "number_of_pages"),
             "language": r["language"],
         })
     return out
 
 
 def _coerce_subjects(rows):
-    return [dict(r) for r in rows]
+    return [_strip_ctx(r) for r in rows]
 
 
 
@@ -300,3 +305,5 @@ def get_subject(subject):
             for w in works
         ],
     }
+
+_store.eager_load()

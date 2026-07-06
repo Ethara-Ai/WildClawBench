@@ -15,14 +15,18 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store
-
+from _mutable_store import (
+    read_seed_with_ctx, get_store, opt_float, opt_int, opt_str, strict_bool)
 _store = get_store("intercom-api")
+_API = "intercom-api"
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -58,11 +62,11 @@ def _coerce_contacts(rows):
             "id": r["id"],
             "role": r["role"],
             "name": r["name"],
-            "email": r["email"] or None,
-            "phone": r["phone"] or None,
-            "company_id": r["company_id"] or None,
+            "email": opt_str(r, "email", default="") or None,
+            "phone": opt_str(r, "phone", default="") or None,
+            "company_id": opt_str(r, "company_id", default="") or None,
             "created_at": r["created_at"],
-            "last_seen_at": r["last_seen_at"] or None,
+            "last_seen_at": opt_str(r, "last_seen_at", default="") or None,
         })
     return out
 
@@ -75,8 +79,8 @@ def _coerce_companies(rows):
             "company_id": r["company_id"],
             "name": r["name"],
             "plan": r["plan"],
-            "monthly_spend": _to_float(r["monthly_spend"]),
-            "user_count": _to_int(r["user_count"]),
+            "monthly_spend": opt_float(r, "monthly_spend", default=0.0),
+            "user_count": opt_int(r, "user_count", default=0),
             "industry": r["industry"],
             "created_at": r["created_at"],
         })
@@ -93,8 +97,8 @@ def _coerce_conversations(rows):
             "title": r["title"],
             "created_at": r["created_at"],
             "updated_at": r["updated_at"],
-            "assignee_id": r["assignee_id"] or None,
-            "open": _to_bool(r["open"]),
+            "assignee_id": opt_str(r, "assignee_id", default="") or None,
+            "open": strict_bool(r, "open"),
         })
     return out
 
@@ -108,20 +112,20 @@ def _coerce_parts(rows):
             "part_type": r["part_type"],
             "author_type": r["author_type"],
             "author_id": r["author_id"],
-            "body": r["body"] or None,
+            "body": opt_str(r, "body", default="") or None,
             "created_at": r["created_at"],
         })
     return out
 
 
 _store.register("contacts", primary_key="id",
-                initial_loader=lambda: _coerce_contacts(_load("contacts.csv")))
+                initial_loader=lambda: _coerce_contacts(_load("contacts.json", "contacts")))
 _store.register("companies", primary_key="id",
-                initial_loader=lambda: _coerce_companies(_load("companies.csv")))
+                initial_loader=lambda: _coerce_companies(_load("companies.json", "companies")))
 _store.register("conversations", primary_key="id",
-                initial_loader=lambda: _coerce_conversations(_load("conversations.csv")))
+                initial_loader=lambda: _coerce_conversations(_load("conversations.json", "conversations")))
 _store.register("parts", primary_key="id",
-                initial_loader=lambda: _coerce_parts(_load("conversation_parts.csv")))
+                initial_loader=lambda: _coerce_parts(_load("conversation_parts.json", "parts")))
 
 
 def _contacts_rows(): return _store.table("contacts").rows()
@@ -308,3 +312,5 @@ def add_part(conversation_id, message_type, body=None, author_id="admin-jonas", 
     _store.table("conversations").patch(conversation_id, patch)
     conv = _find_conversation(conversation_id) or conv
     return _conversation_obj(conv, with_parts=True)
+
+_store.eager_load()

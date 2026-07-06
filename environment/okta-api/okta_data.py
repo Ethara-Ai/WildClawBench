@@ -9,9 +9,10 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import read_seed_with_ctx, get_store, opt_str  # noqa: E402
 
 _store = get_store("okta-api")
+_API = "okta-api"
 
 
 def _store_insert(_table, _row):
@@ -27,15 +28,15 @@ def _store_insert(_table, _row):
     return _t.upsert(_row)
 
 _store.register("users", primary_key="id",
-                initial_loader=lambda: _coerce_users(_load("users.csv")))
+                initial_loader=lambda: _coerce_users(_load("users.json", "users")))
 _store.register("groups", primary_key="id",
-                initial_loader=lambda: _load("groups.csv"))
-_store.register("memberships", primary_key="group_id",
-                initial_loader=lambda: _load("group_memberships.csv"))
+                initial_loader=lambda: [_strip_ctx(r) for r in _load("groups.json", "groups")])
+_store.register("memberships", primary_key="_pk",
+                initial_loader=lambda: [{**_strip_ctx(r), "_pk": f"{r['group_id']}@{r['user_id']}"} for r in _load("group_memberships.json", "memberships")])
 _store.register("apps", primary_key="id",
-                initial_loader=lambda: _load("apps.csv"))
-_store.register("app_assignments", primary_key="app_id",
-                initial_loader=lambda: _load("app_assignments.csv"))
+                initial_loader=lambda: [_strip_ctx(r) for r in _load("apps.json", "apps")])
+_store.register("app_assignments", primary_key="_pk",
+                initial_loader=lambda: [{**_strip_ctx(r), "_pk": f"{r['app_id']}@{r['user_id']}"} for r in _load("app_assignments.json", "app_assignments")])
 
 
 def _users_rows():
@@ -59,9 +60,12 @@ def _app_assignments_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():

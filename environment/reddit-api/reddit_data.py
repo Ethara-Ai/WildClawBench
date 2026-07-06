@@ -13,9 +13,11 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_seed_with_ctx, get_store, opt_str, strict_bool, strict_float, strict_int)
 
 _store = get_store("reddit-api")
+_API = "reddit-api"
 
 
 def _store_insert(_table, _row):
@@ -31,13 +33,13 @@ def _store_insert(_table, _row):
     return _t.upsert(_row)
 
 _store.register("subreddits", primary_key="id",
-                initial_loader=lambda: _coerce_subreddits(_load("subreddits.csv")))
+                initial_loader=lambda: _coerce_subreddits(_load("subreddits.json", "subreddits")))
 _store.register("posts", primary_key="id",
-                initial_loader=lambda: _coerce_posts(_load("posts.csv")))
+                initial_loader=lambda: _coerce_posts(_load("posts.json", "posts")))
 _store.register("comments", primary_key="id",
-                initial_loader=lambda: _coerce_comments(_load("comments.csv")))
+                initial_loader=lambda: _coerce_comments(_load("comments.json", "comments")))
 _store.register("users", primary_key="id",
-                initial_loader=lambda: _coerce_users(_load("users.csv")))
+                initial_loader=lambda: _coerce_users(_load("users.json", "users")))
 
 
 def _subreddits_rows():
@@ -57,9 +59,12 @@ def _users_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _to_bool(v):

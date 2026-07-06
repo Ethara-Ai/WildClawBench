@@ -6,7 +6,6 @@ plane's baseline capture. A synthetic primary key is generated when the source
 row lacks one.
 """
 
-import csv
 import uuid
 from pathlib import Path
 
@@ -14,17 +13,21 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import get_store, read_seed_with_ctx  # noqa: E402
 
 _store = get_store("google-docs-api")
+_API = "google-docs-api"
 
 
-def _load(filename):
+def _load(filename, table):
+    # Optional seed: keep returning [] when neither the .csv nor a sibling
+    # .json exists (read_seed_with_ctx raises CoerceError for a missing file,
+    # which would break these born-optional tables).
     p = DATA_DIR / filename
-    if not p.is_file():
+    if not p.is_file() and not p.with_suffix(".json").is_file():
         return []
-    with open(p, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+    rows = read_seed_with_ctx(p, _API, table)
+    return [{k: v for k, v in r.items() if not k.startswith("__")} for r in rows]
 
 
 def _ensure_pk(rows, pk, synth=None):
@@ -38,7 +41,7 @@ def _ensure_pk(rows, pk, synth=None):
 
 
 _store.register("documents", primary_key="id",
-                initial_loader=lambda: _ensure_pk(_load("documents.csv"), "id"))
+                initial_loader=lambda: _ensure_pk(_load("documents.csv", "documents"), "id"))
 
 _PK = {"documents": "id"}
 
@@ -57,18 +60,17 @@ def get_row(name, pk_value):
 
 
 def create_row(name, body):
-    rows = _store.table(name).rows()
     r = dict(body)
     if not r.get(_PK[name]):
         r[_PK[name]] = uuid.uuid4().hex[:12]
-    rows.append(r)
-    return r
+    return _store.table(name).upsert(r)
 
 
 def update_row(name, pk_value, patch):
-    rows = _store.table(name).rows()
-    for i, r in enumerate(rows):
+    t = _store.table(name)
+    for r in t.rows():
         if str(r.get(_PK[name])) == str(pk_value):
-            rows[i].update({k: v for k, v in patch.items() if v is not None})
-            return rows[i]
+            fields = {k: v for k, v in patch.items()
+                      if v is not None and k != _PK[name]}
+            return t.patch(r[_PK[name]], fields) if fields else r
     return None

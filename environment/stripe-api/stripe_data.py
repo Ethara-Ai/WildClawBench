@@ -14,9 +14,11 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_seed_with_ctx, get_store, opt_int, opt_str, strict_bool)
 
 _store = get_store("stripe-api")
+_API = "stripe-api"
 
 
 def _store_insert(_table, _row):
@@ -32,17 +34,17 @@ def _store_insert(_table, _row):
     return _t.upsert(_row)
 
 _store.register("customers", primary_key="id",
-                initial_loader=lambda: _coerce_customers(_load("customers.csv")))
+                initial_loader=lambda: _coerce_customers(_load("customers.json", "customers")))
 _store.register("products", primary_key="id",
-                initial_loader=lambda: _coerce_products(_load("products.csv")))
+                initial_loader=lambda: _coerce_products(_load("products.json", "products")))
 _store.register("prices", primary_key="id",
-                initial_loader=lambda: _coerce_prices(_load("prices.csv")))
+                initial_loader=lambda: _coerce_prices(_load("prices.json", "prices")))
 _store.register("charges", primary_key="id",
-                initial_loader=lambda: _coerce_charges(_load("charges.csv")))
+                initial_loader=lambda: _coerce_charges(_load("charges.json", "charges")))
 _store.register("invoices", primary_key="id",
-                initial_loader=lambda: _coerce_invoices(_load("invoices.csv")))
+                initial_loader=lambda: _coerce_invoices(_load("invoices.json", "invoices")))
 _store.register("subscriptions", primary_key="id",
-                initial_loader=lambda: _coerce_subscriptions(_load("subscriptions.csv")))
+                initial_loader=lambda: _coerce_subscriptions(_load("subscriptions.json", "subscriptions")))
 _store.register_document("balance", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "balance.json", encoding="utf-8")))
 _store.register("payment_intents", primary_key="payment_intent_id",
                 initial_loader=lambda: [])
@@ -87,9 +89,12 @@ def _refunds_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():

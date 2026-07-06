@@ -10,9 +10,19 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_seed_with_ctx, # noqa: E402
+    get_store,
+    strict_int,
+    strict_bool,
+    strict_str,
+    opt_bool,
+    opt_float,
+    opt_str,
+)
 
 _store = get_store("notion-api")
+_API = "notion-api"
 
 
 
@@ -42,16 +52,16 @@ def _store_insert(_table, _row):
     return _t.upsert(_row)
 
 _store.register("users", primary_key="id",
-                initial_loader=lambda: _coerce_users(_load("users.csv")))
+                initial_loader=lambda: _coerce_users(_load("users.json", "users")))
 _store.register("databases", primary_key="id",
-                initial_loader=lambda: _coerce_databases(_load("databases.csv")))
+                initial_loader=lambda: _coerce_databases(_load("databases.json", "databases")))
 _store.register("pages", primary_key="id",
-                initial_loader=lambda: _coerce_pages(_load("pages.csv")))
+                initial_loader=lambda: _coerce_pages(_load("pages.json", "pages")))
 _store.register("blocks", primary_key="id",
-                initial_loader=lambda: _coerce_blocks(_load("blocks.csv")))
+                initial_loader=lambda: _coerce_blocks(_load("blocks.json", "blocks")))
 _store.register("comments", primary_key="id",
-                initial_loader=lambda: _coerce_comments(_load("comments.csv")))
-_store.register_document("properties", initial_loader=lambda: _coerce_properties(_load("page_properties.csv")))
+                initial_loader=lambda: _coerce_comments(_load("comments.json", "comments")))
+_store.register_document("properties", initial_loader=lambda: _coerce_properties(_load("page_properties.json", "page_properties")))
 _store.register_document("workspace", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "workspace.json", encoding="utf-8")))
 
 
@@ -84,9 +94,12 @@ def _workspace_doc():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():

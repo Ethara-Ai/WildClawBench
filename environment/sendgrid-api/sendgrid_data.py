@@ -9,9 +9,12 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (  # noqa: E402
+    read_seed_with_ctx, get_store, opt_csv_list, opt_int, strict_bool)
 
 _store = get_store("sendgrid-api")
+
+_API = "sendgrid-api"
 
 
 def _store_insert(_table, _row):
@@ -27,15 +30,15 @@ def _store_insert(_table, _row):
     return _t.upsert(_row)
 
 _store.register("templates", primary_key="id",
-                initial_loader=lambda: _coerce_templates(_load("templates.csv")))
+                initial_loader=lambda: _coerce_templates(_load("templates.json", "templates")))
 _store.register("lists", primary_key="id",
-                initial_loader=lambda: _coerce_lists(_load("lists.csv")))
+                initial_loader=lambda: _coerce_lists(_load("lists.json", "lists")))
 _store.register("contacts", primary_key="id",
-                initial_loader=lambda: _coerce_contacts(_load("contacts.csv")))
+                initial_loader=lambda: _coerce_contacts(_load("contacts.json", "contacts")))
 _store.register("sent_log", primary_key="message_id",
-                initial_loader=lambda: _coerce_sent_log(_load("sent_log.csv")))
+                initial_loader=lambda: _coerce_sent_log(_load("sent_log.json", "sent_log")))
 _store.register("stats", primary_key="date",
-                initial_loader=lambda: _coerce_stats(_load("stats.csv")))
+                initial_loader=lambda: _coerce_stats(_load("stats.json", "stats")))
 
 
 def _templates_rows():
@@ -59,9 +62,12 @@ def _stats_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():

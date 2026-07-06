@@ -14,9 +14,14 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_seed_with_ctx, get_store,
+    strict_int,
+    opt_float,
+)
 
 _store = get_store("fedex-api")
+_API = "fedex-api"
 
 
 def _store_insert(_table, _row):
@@ -31,12 +36,15 @@ def _store_insert(_table, _row):
         _row = {**_row, _t.primary_key: _row["id"]}
     return _t.upsert(_row)
 
-_store.register("rates", primary_key="service_type",
-                initial_loader=lambda: _coerce_rates(_load("rates.csv")))
+# rates natural key (service_type, origin_zip, dest_zip, weight_lb) -> synth composite pk
+_store.register("rates", primary_key="_pk",
+                initial_loader=lambda: [
+                    {**r, "_pk": f"{r['service_type']}@{r['origin_zip']}@{r['dest_zip']}@{r['weight_lb']}"}
+                    for r in _coerce_rates(_load("rates.json", "rates"))])
 _store.register("shipments", primary_key="tracking_number",
-                initial_loader=lambda: _coerce_shipments(_load("shipments.csv")))
+                initial_loader=lambda: _coerce_shipments(_load("shipments.json", "shipments")))
 _store.register("tracking", primary_key="tracking_number",
-                initial_loader=lambda: _coerce_tracking(_load("tracking.csv")))
+                initial_loader=lambda: _coerce_tracking(_load("tracking.json", "tracking")))
 
 
 def _rates_rows():
@@ -52,9 +60,12 @@ def _tracking_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _to_float(v):

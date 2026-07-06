@@ -1,4 +1,4 @@
-"""FastAPI server wrapping calendar_data module as REST endpoints.
+"""FastAPI server wrapping google_calendar_data module as REST endpoints.
 
 Mirrors the Google Calendar API v3 surface (subset).
 """
@@ -8,11 +8,13 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 
-import calendar_data
+import google_calendar_data
 try:
     from tracking_middleware import install_tracker
     from admin_plane import install_admin_plane
-except ModuleNotFoundError:  # standalone run without the shared module on sys.path
+except ModuleNotFoundError as _shared_plane_err:  # standalone run without the shared module on sys.path
+    import logging as _logging
+    _logging.error("SHARED PLANE MISSING - audit + admin disabled: %s", _shared_plane_err)
     def install_tracker(app):  # no-op fallback: audit endpoints disabled
         return None
 
@@ -21,7 +23,7 @@ except ModuleNotFoundError:  # standalone run without the shared module on sys.p
 
 app = FastAPI(title="Google Calendar API (Mock)", version="v3")
 install_tracker(app)
-install_admin_plane(app, store=calendar_data._store)
+install_admin_plane(app, store=google_calendar_data._store)
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -31,12 +33,12 @@ def health():
 
 @app.get("/calendar/v3/users/me/calendarList")
 def list_calendars():
-    return calendar_data.list_calendars()
+    return google_calendar_data.list_calendars()
 
 
 @app.get("/calendar/v3/calendars/{calendar_id}")
 def get_calendar(calendar_id: str):
-    result = calendar_data.get_calendar(calendar_id)
+    result = google_calendar_data.get_calendar(calendar_id)
     if "error" in result:
         return JSONResponse(status_code=404, content=result)
     return result
@@ -55,7 +57,7 @@ def list_events(
     maxResults: int = Query(25, ge=1, le=250),
     pageToken: Optional[str] = None,
 ):
-    result = calendar_data.list_events(
+    result = google_calendar_data.list_events(
         calendar_id, time_min=timeMin, time_max=timeMax, q=q,
         single_events=singleEvents, order_by=orderBy,
         max_results=maxResults, page_token=pageToken,
@@ -67,7 +69,7 @@ def list_events(
 
 @app.get("/calendar/v3/calendars/{calendar_id}/events/{event_id}")
 def get_event(calendar_id: str, event_id: str):
-    result = calendar_data.get_event(calendar_id, event_id)
+    result = google_calendar_data.get_event(calendar_id, event_id)
     if "error" in result:
         return JSONResponse(status_code=404, content=result)
     return result
@@ -101,7 +103,7 @@ class EventCreateBody(BaseModel):
 @app.post("/calendar/v3/calendars/{calendar_id}/events", status_code=201)
 def create_event(calendar_id: str, body: EventCreateBody):
     payload = body.model_dump(exclude_none=True)
-    result = calendar_data.create_event(calendar_id, payload)
+    result = google_calendar_data.create_event(calendar_id, payload)
     if "error" in result:
         return JSONResponse(status_code=404, content=result)
     return result
@@ -121,7 +123,7 @@ class EventUpdateBody(BaseModel):
 @app.patch("/calendar/v3/calendars/{calendar_id}/events/{event_id}")
 def update_event(calendar_id: str, event_id: str, body: EventUpdateBody):
     payload = body.model_dump(exclude_none=True)
-    result = calendar_data.update_event(calendar_id, event_id, payload)
+    result = google_calendar_data.update_event(calendar_id, event_id, payload)
     if "error" in result:
         return JSONResponse(status_code=404, content=result)
     return result
@@ -129,7 +131,7 @@ def update_event(calendar_id: str, event_id: str, body: EventUpdateBody):
 
 @app.delete("/calendar/v3/calendars/{calendar_id}/events/{event_id}")
 def delete_event(calendar_id: str, event_id: str):
-    result = calendar_data.delete_event(calendar_id, event_id)
+    result = google_calendar_data.delete_event(calendar_id, event_id)
     if "error" in result:
         return JSONResponse(status_code=404, content=result)
     return result
@@ -149,4 +151,4 @@ class FreeBusyBody(BaseModel):
 
 @app.post("/calendar/v3/freeBusy")
 def freebusy(body: FreeBusyBody):
-    return calendar_data.freebusy(body.timeMin, body.timeMax, [i.id for i in body.items])
+    return google_calendar_data.freebusy(body.timeMin, body.timeMax, [i.id for i in body.items])

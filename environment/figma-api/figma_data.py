@@ -14,9 +14,10 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import read_seed_with_ctx, get_store, strict_bool  # noqa: E402
 
 _store = get_store("figma-api")
+_API = "figma-api"
 
 
 def _store_insert(_table, _row):
@@ -32,13 +33,13 @@ def _store_insert(_table, _row):
     return _t.upsert(_row)
 
 _store.register("projects", primary_key="project_id",
-                initial_loader=lambda: _coerce_projects(_load("projects.csv")))
+                initial_loader=lambda: _coerce_projects(_load("projects.json", "projects")))
 _store.register("files", primary_key="file_key",
-                initial_loader=lambda: _coerce_files(_load("files.csv")))
+                initial_loader=lambda: _coerce_files(_load("files.json", "files")))
 _store.register("components", primary_key="component_key",
-                initial_loader=lambda: _coerce_components(_load("components.csv")))
+                initial_loader=lambda: _coerce_components(_load("components.json", "components")))
 _store.register("comments", primary_key="comment_id",
-                initial_loader=lambda: _coerce_comments(_load("comments.csv")))
+                initial_loader=lambda: _coerce_comments(_load("comments.json", "comments")))
 _store.register_document("team", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "team.json", encoding="utf-8")))
 _store.register_document("file_nodes", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "file_nodes.json", encoding="utf-8")))
 
@@ -68,9 +69,12 @@ def _file_nodes_doc():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():

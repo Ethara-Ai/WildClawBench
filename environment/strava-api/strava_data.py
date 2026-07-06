@@ -13,9 +13,11 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (  # noqa: E402
+    read_seed_with_ctx, get_store, opt_int, strict_float, strict_int)
 
 _store = get_store("strava-api")
+_API = "strava-api"
 
 
 def _store_patch(_table, _row_or_pk, _updates):
@@ -32,11 +34,12 @@ def _store_delete(_table, _row_or_pk):
     return _t.delete(_pk)
 
 _store.register("activities", primary_key="id",
-                initial_loader=lambda: _coerce_activities(_load("activities.csv")))
+                initial_loader=lambda: _coerce_activities(_load("activities.json", "activities")))
 _store.register("segments", primary_key="id",
-                initial_loader=lambda: _coerce_segments(_load("segments.csv")))
-_store.register("kudoers", primary_key="activity_id",
-                initial_loader=lambda: _coerce_kudoers(_load("kudoers.csv")))
+                initial_loader=lambda: _coerce_segments(_load("segments.json", "segments")))
+_store.register("kudoers", primary_key="_pk",
+                initial_loader=lambda: [{**r, "_pk": f"{r['activity_id']}@{r['athlete_id']}"}
+                                        for r in _coerce_kudoers(_load("kudoers.json", "kudoers"))])
 _store.register_document("athlete", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "athlete.json", encoding="utf-8")))
 
 
@@ -57,9 +60,12 @@ def _athlete_doc():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _epoch(iso):

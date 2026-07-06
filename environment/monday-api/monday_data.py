@@ -14,14 +14,18 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store
-
+from _mutable_store import (
+    read_seed_with_ctx, get_store, opt_str, strict_bool, strict_int)
 _store = get_store("monday-api")
+_API = "monday-api"
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -33,29 +37,29 @@ def _to_bool(v):
 
 
 def _coerce_workspaces(rows):
-    return [dict(r) for r in rows]
+    return [_strip_ctx(r) for r in rows]
 
 
 def _coerce_boards(rows):
-    return [dict(r) for r in rows]
+    return [_strip_ctx(r) for r in rows]
 
 
 def _coerce_groups(rows):
     out = []
     for r in rows:
-        out.append({**r, "position": int(r["position"])})
+        out.append({**_strip_ctx(r), "position": strict_int(r, "position")})
     return out
 
 
 def _coerce_columns(rows):
     out = []
     for r in rows:
-        out.append({**r, "position": int(r["position"])})
+        out.append({**_strip_ctx(r), "position": strict_int(r, "position")})
     return out
 
 
 def _coerce_items(rows):
-    return [dict(r) for r in rows]
+    return [_strip_ctx(r) for r in rows]
 
 
 def _coerce_column_values(rows):
@@ -65,7 +69,7 @@ def _coerce_column_values(rows):
             "item_id": r["item_id"],
             "column_id": r["column_id"],
             "text": r["text"],
-            "value": r["value"] or None,
+            "value": opt_str(r, "value", default="") or None,
             # synthesized composite PK
             "_pk": f"{r['item_id']}@{r['column_id']}",
         })
@@ -75,31 +79,31 @@ def _coerce_column_values(rows):
 def _coerce_users(rows):
     out = []
     for r in rows:
-        out.append({**r, "is_admin": _to_bool(r["is_admin"])})
+        out.append({**_strip_ctx(r), "is_admin": strict_bool(r, "is_admin")})
     return out
 
 
 _store.register("workspaces", primary_key="workspace_id",
-                initial_loader=lambda: _coerce_workspaces(_load("workspaces.csv")))
+                initial_loader=lambda: _coerce_workspaces(_load("workspaces.json", "workspaces")))
 _store.register("boards", primary_key="board_id",
-                initial_loader=lambda: _coerce_boards(_load("boards.csv")))
+                initial_loader=lambda: _coerce_boards(_load("boards.json", "boards")))
 # groups have group_id but it is not unique across boards -> synth pk
 _store.register("groups", primary_key="_pk",
                 initial_loader=lambda: [
                     {**g, "_pk": f"{g['board_id']}@{g['group_id']}"}
-                    for g in _coerce_groups(_load("groups.csv"))
+                    for g in _coerce_groups(_load("groups.json", "groups"))
                 ])
 _store.register("columns", primary_key="_pk",
                 initial_loader=lambda: [
                     {**c, "_pk": f"{c['board_id']}@{c['column_id']}"}
-                    for c in _coerce_columns(_load("columns.csv"))
+                    for c in _coerce_columns(_load("columns.json", "columns"))
                 ])
 _store.register("items", primary_key="item_id",
-                initial_loader=lambda: _coerce_items(_load("items.csv")))
+                initial_loader=lambda: _coerce_items(_load("items.json", "items")))
 _store.register("column_values", primary_key="_pk",
-                initial_loader=lambda: _coerce_column_values(_load("column_values.csv")))
+                initial_loader=lambda: _coerce_column_values(_load("column_values.json", "column_values")))
 _store.register("users", primary_key="user_id",
-                initial_loader=lambda: _coerce_users(_load("users.csv")))
+                initial_loader=lambda: _coerce_users(_load("users.json", "users")))
 
 
 def _workspaces_rows(): return _store.table("workspaces").rows()
@@ -325,3 +329,5 @@ def list_users():
             for u in _users_rows()
         ]
     }
+
+_store.eager_load()

@@ -15,9 +15,11 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_seed_with_ctx, get_store, opt_float, opt_str, strict_bool)
 
 _store = get_store("alpaca-api")
+_API = "alpaca-api"
 
 
 def _store_insert(_table, _row):
@@ -33,12 +35,12 @@ def _store_insert(_table, _row):
     return _t.upsert(_row)
 
 _store.register("positions", primary_key="asset_id",
-                initial_loader=lambda: _coerce_positions(_load("positions.csv")))
+                initial_loader=lambda: _coerce_positions(_load("positions.json", "positions")))
 _store.register("orders", primary_key="id",
-                initial_loader=lambda: _coerce_orders(_load("orders.csv")))
+                initial_loader=lambda: _coerce_orders(_load("orders.json", "orders")))
 _store.register("assets", primary_key="id",
-                initial_loader=lambda: _coerce_assets(_load("assets.csv")))
-_store.register_document("quotes", initial_loader=lambda: _coerce_quotes(_load("quotes.csv")))
+                initial_loader=lambda: _coerce_assets(_load("assets.json", "assets")))
+_store.register_document("quotes", initial_loader=lambda: _coerce_quotes(_load("quotes.json", "quotes")))
 _store.register_document("account", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "account.json", encoding="utf-8")))
 
 
@@ -63,9 +65,12 @@ def _account_doc():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():

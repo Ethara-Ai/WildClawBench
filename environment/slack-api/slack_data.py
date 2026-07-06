@@ -13,9 +13,16 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_seed_with_ctx, # noqa: E402
+    get_store,
+    strict_int,
+    strict_bool,
+    opt_str,
+)
 
 _store = get_store("slack-api")
+_API = "slack-api"
 
 
 
@@ -45,14 +52,14 @@ def _store_insert(_table, _row):
     return _t.upsert(_row)
 
 _store.register("users", primary_key="id",
-                initial_loader=lambda: _coerce_users(_load("users.csv")))
+                initial_loader=lambda: _coerce_users(_load("users.json", "users")))
 _store.register("channels", primary_key="id",
-                initial_loader=lambda: _coerce_channels(_load("channels.csv")))
+                initial_loader=lambda: _coerce_channels(_load("channels.json", "channels")))
 _store.register("messages", primary_key="ts",
-                initial_loader=lambda: _coerce_messages(_load("messages.csv")))
-_store.register("channel_members", primary_key="channel_id",
-                initial_loader=lambda: _load("channel_members.csv"))
-_store.register_document("team", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "team.json", encoding="utf-8")))
+                initial_loader=lambda: _coerce_messages(_load("messages.json", "messages")))
+_store.register("channel_members", primary_key="_pk",
+                initial_loader=lambda: [{**r, "_pk": f"{r['channel_id']}@{r['user_id']}"} for r in (_strip_ctx(x) for x in _load("channel_members.json", "channel_members"))])
+_store.register_document("team", initial_loader=lambda: json.load(open(DATA_DIR / "team.json", encoding="utf-8")))
 
 
 def _users_rows():
@@ -76,9 +83,12 @@ def _team_doc():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _to_bool(v):

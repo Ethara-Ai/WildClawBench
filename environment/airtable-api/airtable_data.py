@@ -1,8 +1,8 @@
 """Data access module for the Airtable API mock service.
 
 Records are modeled generically as {id, createdTime, fields:{...}} where each
-non-id / non-createdTime CSV column becomes a field. Field value casting is
-driven by the field type declared in fields.csv (number -> float, checkbox ->
+non-id / non-createdTime column becomes a field. Field value casting is
+driven by the field type declared in fields.json (number -> float, checkbox ->
 bool); everything else stays a string.
 """
 
@@ -16,14 +16,19 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store
+from _mutable_store import (
+    read_seed_with_ctx, get_store)
 
 _store = get_store("airtable-api")
+_API = "airtable-api"
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -34,9 +39,9 @@ def _to_bool(v):
     return str(v).strip().lower() == "true"
 
 
-_bases = [dict(r) for r in _load("bases.csv")]
-_tables = [dict(r) for r in _load("tables.csv")]
-_fields_rows = [dict(r) for r in _load("fields.csv")]
+_bases = [_strip_ctx(r) for r in _load("bases.json", "bases")]
+_tables = [_strip_ctx(r) for r in _load("tables.json", "tables")]
+_fields_rows = [_strip_ctx(r) for r in _load("fields.json", "fields")]
 
 _field_types: dict[str, dict[str, str]] = {}
 _field_meta: dict[str, list[dict]] = {}
@@ -58,6 +63,9 @@ def _cast_field(table_id, name, value):
         except (TypeError, ValueError):
             return value
     if ftype == "checkbox":
+        # Deliberately tolerant: Airtable schemas are user-defined at runtime,
+        # so this path intentionally diverges from the fleet-wide strict_*/opt_*
+        # guarantee (mirrors the number branch's try/except). Do not "harden".
         return _to_bool(value)
     return value
 
@@ -66,7 +74,7 @@ def _coerce_records(table_id, rows):
     out = []
     for r in rows:
         fields = {}
-        for k, v in r.items():
+        for k, v in _strip_ctx(r).items():
             if k in ("id", "createdTime"):
                 continue
             cast = _cast_field(table_id, k, v)
@@ -96,8 +104,8 @@ for _t in _tables:
     _store.register(
         _records_table_name(_t["id"]),
         primary_key="id",
-        initial_loader=(lambda tid=_t["id"], csv_name=_t["records_csv"]:
-                        _coerce_records(tid, _load(csv_name))),
+        initial_loader=(lambda tid=_t["id"], json_name=_t["records_csv"], tname=_records_table_name(_t["id"]):
+                        _coerce_records(tid, _load(json_name, tname))),
     )
 
 
@@ -235,3 +243,5 @@ def delete_record(base_id, table_id_or_name, record_id):
     if tbl.delete(record_id):
         return {"id": record_id, "deleted": True}
     return {"error": f"Record {record_id} not found"}
+
+_store.eager_load()

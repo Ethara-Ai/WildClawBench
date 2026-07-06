@@ -15,9 +15,15 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (  # noqa: E402
+    read_seed_with_ctx, get_store,
+    strict_bool,
+    opt_float,
+)
 
 _store = get_store("coinbase-api")
+
+_API = "coinbase-api"
 
 
 def _store_insert(_table, _row):
@@ -33,11 +39,11 @@ def _store_insert(_table, _row):
     return _t.upsert(_row)
 
 _store.register("accounts", primary_key="id",
-                initial_loader=lambda: _coerce_accounts(_load("accounts.csv")))
+                initial_loader=lambda: _coerce_accounts(_load("accounts.json", "accounts")))
 _store.register("prices", primary_key="pair",
-                initial_loader=lambda: _coerce_prices(_load("prices.csv")))
+                initial_loader=lambda: _coerce_prices(_load("prices.json", "prices")))
 _store.register("transactions", primary_key="id",
-                initial_loader=lambda: _coerce_transactions(_load("transactions.csv")))
+                initial_loader=lambda: _coerce_transactions(_load("transactions.json", "transactions")))
 _store.register_document("user", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "user.json", encoding="utf-8")))
 
 
@@ -58,9 +64,12 @@ def _user_doc():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
