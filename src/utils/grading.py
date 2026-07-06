@@ -111,6 +111,20 @@ _MEMBER_EVIDENCE_BUDGETS: tuple[tuple[str, int, int], ...] = (
     # Sonnet 4.6 — 1,000,000 ctx, 8192 max_output. cpt 1.375 measured against dispatched user_chars (evidence + ~5000-char scaffold).
     # (1_000_000 − 8192 − 3000) × 1.375 = 1,357,361 dispatched chars − 5,000 scaffold = 1,352,361 → 1_350_000 evidence budget.
     ("urg0zifsjiga", 1_350_000, 8192),
+    # 2026-07-02 profile rotation — the .env council ARNs were replaced with new
+    # application-inference-profile ids that had NO entry here, so every judge
+    # fell through to _DEFAULT_MAX_OUTPUT_TOKENS=4000 and truncated mid-verdict
+    # on 49-criterion rubrics (Jae_Chandler_01: all failed criteria were
+    # zero-voter abstention auto-fails). Same models as above, new profile ids.
+    # Sonnet 4.6 (new profile) — max_output raised to 16384: at ~160 tok/verdict a
+    # 49-criterion rubric needs ~7.8k, so 8192 leaves no margin. Sonnet 4.x
+    # supports 64k output on Bedrock; 16384 is safe. Budget re-derived:
+    # (1_000_000 − 16_384 − 3000) × 1.375 = 1,348,347 − 5,000 scaffold → 1_325_000.
+    ("ehj0ago7sthx", 1_325_000, 16384),
+    # GLM 5 (new profile) — same limits as u4czm4f2p3ws below.
+    ("hdhquanln3cf",   175_000, 16384),
+    # Kimi K2.5 (new profile) — same limits as q6g7fi6wumk3 below.
+    ("mtsgys4yvyz1",   225_000, 16384),
     # Kimi K2.5 — 262,144 ctx, 16384 max_output. The earlier 300_000 budget was
     # probe-tuned against alden-croft PROSE (cpt 1.29). Dense financial/CSV
     # evidence tokenizes harder: amanda_hayes_01 claude/run_3 dispatched 306,639
@@ -383,6 +397,12 @@ _JUDGE_RATES = {
     "urg0zifsjiga": (3e-6, 1.5e-5, 3e-7, 3.75e-6),
     "u4czm4f2p3ws": (0.6e-6, 2.4e-6, 0.0, 0.0),
     "q6g7fi6wumk3": (0.6e-6, 2.5e-6, 0.0, 0.0),
+    # 2026-07-02 profile rotation — same models, new inference-profile ids
+    # (Sonnet 4.6 / GLM 5 / Kimi K2.5). Without these, _judge_cost_usd
+    # silently reported $0 for every council call.
+    "ehj0ago7sthx": (3e-6, 1.5e-5, 3e-7, 3.75e-6),
+    "hdhquanln3cf": (0.6e-6, 2.4e-6, 0.0, 0.0),
+    "mtsgys4yvyz1": (0.6e-6, 2.5e-6, 0.0, 0.0),
     "gpt-5.4": (1.25e-6, 1e-5, 1.25e-7, 0.0),
     "gpt-5.5": (5e-6, 3e-5, 5e-7, 0.0),
 }

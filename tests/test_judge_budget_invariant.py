@@ -34,6 +34,10 @@ _MEMBER_LIMITS = {
     "urg0zifsjiga": {"ctx_window": 1_000_000, "chars_per_token_floor": 1.375},
     "q6g7fi6wumk3": {"ctx_window":   262_144, "chars_per_token_floor": 1.15},
     "u4czm4f2p3ws": {"ctx_window":   202_752, "chars_per_token_floor": 1.15},
+    # 2026-07-02 profile rotation — same models, new inference-profile ids.
+    "ehj0ago7sthx": {"ctx_window": 1_000_000, "chars_per_token_floor": 1.375},
+    "mtsgys4yvyz1": {"ctx_window":   262_144, "chars_per_token_floor": 1.15},
+    "hdhquanln3cf": {"ctx_window":   202_752, "chars_per_token_floor": 1.15},
 }
 
 

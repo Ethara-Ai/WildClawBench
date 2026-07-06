@@ -237,8 +237,44 @@ class OpenClawAgent(BaseAgent):
                 bash_cmd=gateway_cmd,
                 log_path=spec.output_dir / "gateway.log",
             )
-            logger.info("[%s] Waiting for gateway (2s)...", spec.task_id)
-            time.sleep(2)
+            # Poll gateway.log until the gateway reports it is listening, rather
+            # than sleeping a fixed 2s. The gateway can take up to ~30s to become
+            # ready (memory index, bootstrap-limit tuning, config-triggered
+            # restarts). A fixed 2s wait raced the agent's websocket connect: on
+            # a slow start the agent connected before the gateway was up, the
+            # socket dropped with a "1006 abnormal closure", and the agent fell
+            # back to EMBEDDED mode — where it makes no real tool/API calls, so
+            # the audit is empty and every rubric/test scores 0. Waiting for the
+            # readiness marker removes the race regardless of gateway start time.
+            gateway_log = spec.output_dir / "gateway.log"
+            ready_timeout = float(os.environ.get("OPENCLAW_GATEWAY_READY_TIMEOUT", "60"))
+            logger.info("[%s] Waiting for gateway to listen (up to %ds)...",
+                        spec.task_id, int(ready_timeout))
+            deadline = time.time() + ready_timeout
+            gateway_ready = False
+            while time.time() < deadline:
+                if gateway_proc.poll() is not None:
+                    logger.error("[%s] Gateway process exited before listening "
+                                 "(rc=%s) — see gateway.log", spec.task_id,
+                                 gateway_proc.returncode)
+                    break
+                try:
+                    if gateway_log.exists() and "listening on ws" in \
+                            gateway_log.read_text(errors="ignore"):
+                        gateway_ready = True
+                        break
+                except OSError:
+                    pass
+                time.sleep(0.5)
+            if gateway_ready:
+                # Small settle margin so the ws server is fully accepting conns.
+                time.sleep(1)
+                logger.info("[%s] Gateway is listening; launching agent",
+                            spec.task_id)
+            else:
+                logger.warning("[%s] Gateway readiness marker not seen within "
+                               "%ds; proceeding anyway (agent may fall back to "
+                               "embedded mode)", spec.task_id, int(ready_timeout))
 
             # Multi-turn / staged injection: invoke the agent once per turn on
             # the SAME session ("chat") so context carries across turns. Turn 0

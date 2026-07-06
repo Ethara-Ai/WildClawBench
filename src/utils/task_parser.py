@@ -507,13 +507,26 @@ def _append_workspace_hint(prompt: str, attachments: list[dict]) -> str:
     # rejects `/tmp/*` plus `/root/<other>/*`. Deliverables written
     # anywhere else are invisible to the grader at collection time and
     # may also fail the image tool at read time.
+    #
+    # 2026-07-02: wording matters here. The earlier phrasing ("Save EVERY
+    # output artifact... will NOT be collected as deliverables") redefined
+    # the task's deliverable channel as local files: on Jae_Chandler_01 two
+    # different models each read it literally, skipped the Notion/Confluence/
+    # Airtable page creation the task's authored tests grade on, and scored
+    # 1/22. This footer is a file-collection contract only — it must never
+    # steer the agent away from system-of-record actions the task calls for.
     hint = (
         "\n\n---\n"
         "Workspace inputs (already staged on disk at `/root/workspace/`):\n"
         f"{listing}\n"
-        "Save EVERY output artifact you produce under `/root/workspace/`. "
-        "Files written anywhere else (including `/tmp/` and elsewhere "
-        "under `/root/`) will NOT be collected as deliverables."
+        "Any FILE you produce must be saved under `/root/workspace/` — "
+        "files written anywhere else (including `/tmp/` and elsewhere "
+        "under `/root/`) will NOT be collected. This is a file-collection "
+        "rule only; it does not change where the task's deliverables "
+        "belong. If the task calls for work in an external system or "
+        "service (for example creating or updating pages, records, or "
+        "cards through the available APIs), do that work there as asked — "
+        "a local file copy does not replace it."
     )
     return prompt + hint
 

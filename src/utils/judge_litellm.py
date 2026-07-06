@@ -115,6 +115,12 @@ _JUDGE_REGISTRY = (
     ("urg0zifsjiga", 3e-6,    1.5e-5, 3e-7,     3.75e-6, 1_000_000, 8192),   # Sonnet 4.6
     ("u4czm4f2p3ws", 0.6e-6,  2.4e-6, 0.0,      0.0,       202_752, 16384),  # GLM 5
     ("q6g7fi6wumk3", 0.6e-6,  2.5e-6, 0.0,      0.0,       262_144, 16384),  # Kimi K2.5
+    # 2026-07-02 profile rotation — same models, new inference-profile ids.
+    # Unregistered ids made litellm.completion raise "Unknown provider=None"
+    # and fall back to the urllib path on every council call.
+    ("ehj0ago7sthx", 3e-6,    1.5e-5, 3e-7,     3.75e-6, 1_000_000, 16384),  # Sonnet 4.6 (new)
+    ("hdhquanln3cf", 0.6e-6,  2.4e-6, 0.0,      0.0,       202_752, 16384),  # GLM 5 (new)
+    ("mtsgys4yvyz1", 0.6e-6,  2.5e-6, 0.0,      0.0,       262_144, 16384),  # Kimi K2.5 (new)
 )
 
 _registered_once = False
