@@ -15,14 +15,19 @@ from pathlib import Path
 DATA_DIR = Path(__file__).parent
 
 sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_seed_with_ctx, get_store, opt_csv_list, opt_float, opt_str, strict_bool)
 
 _store = get_store("plaid-api")
+_API = "plaid-api"
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _to_bool(v):
@@ -48,14 +53,14 @@ def _coerce_accounts(rows):
         out.append({
             "account_id": r["account_id"],
             "name": r["name"],
-            "official_name": r["official_name"] or None,
+            "official_name": opt_str(r, "official_name", default="") or None,
             "mask": r["mask"],
             "type": r["type"],
             "subtype": r["subtype"],
             "balances": {
-                "available": _to_float(r["available"]),
-                "current": _to_float(r["current"]),
-                "limit": _to_float(r["limit"]),
+                "available": opt_float(r, "available", default=None),
+                "current": opt_float(r, "current", default=None),
+                "limit": opt_float(r, "limit", default=None),
                 "iso_currency_code": r["iso_currency_code"],
                 "unofficial_currency_code": None,
             },
@@ -69,13 +74,13 @@ def _coerce_transactions(rows):
         out.append({
             "transaction_id": r["transaction_id"],
             "account_id": r["account_id"],
-            "amount": _to_float(r["amount"]),
+            "amount": opt_float(r, "amount", default=None),
             "iso_currency_code": r["iso_currency_code"],
             "date": r["date"],
             "name": r["name"],
-            "merchant_name": r["merchant_name"] or None,
-            "category": [c for c in r["category"].split(";") if c],
-            "pending": _to_bool(r["pending"]),
+            "merchant_name": opt_str(r, "merchant_name", default="") or None,
+            "category": [c for c in opt_csv_list(r, "category", sep=";") if c],
+            "pending": strict_bool(r, "pending"),
             "payment_channel": r["payment_channel"],
         })
     return out
@@ -92,9 +97,9 @@ def _load_identity():
 
 
 _store.register("accounts", primary_key="account_id",
-                initial_loader=lambda: _coerce_accounts(_load("accounts.csv")))
+                initial_loader=lambda: _coerce_accounts(_load("accounts.json", "accounts")))
 _store.register("transactions", primary_key="transaction_id",
-                initial_loader=lambda: _coerce_transactions(_load("transactions.csv")))
+                initial_loader=lambda: _coerce_transactions(_load("transactions.json", "transactions")))
 _store.register_document("item", initial_loader=_load_item)
 _store.register_document("identity", initial_loader=_load_identity)
 
@@ -202,3 +207,5 @@ def get_identity(account_ids=None):
         "item": _item_doc()["item"],
         "request_id": _request_id(),
     }
+
+_store.eager_load()

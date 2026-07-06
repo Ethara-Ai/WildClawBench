@@ -10,21 +10,43 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store
-
+from _mutable_store import (
+    read_seed_with_ctx, get_store, opt_str, strict_float)
 _store = get_store("quickbooks-api")
+_API = "quickbooks-api"
 
 REALM_ID = "4620816365272861350"
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _load_json(filename):
     with open(DATA_DIR / filename, encoding="utf-8") as f:
         return json.load(f)
+
+
+def _load_qbo_envelope(filename, envelope_key):
+    raw = _load_json(filename)
+    if isinstance(raw, dict):
+        qr = raw.get("QueryResponse")
+        if isinstance(qr, dict) and envelope_key in qr:
+            inner = qr[envelope_key]
+            if isinstance(inner, list):
+                return inner
+    return raw
+
+
+def _load_qbo_or_csv(filename, envelope_key, csv_coercer, table):
+    csv_sibling = (DATA_DIR / filename).with_suffix(".csv")
+    if csv_sibling.exists():
+        return csv_coercer(_load(csv_sibling.name, table))
+    return _load_qbo_envelope(filename, envelope_key)
 
 
 def _now():
@@ -37,9 +59,9 @@ def _coerce_customers(rows):
         out.append({
             "Id": r["Id"],
             "DisplayName": r["DisplayName"],
-            "GivenName": r["GivenName"] if r["GivenName"] else None,
-            "FamilyName": r["FamilyName"] if r["FamilyName"] else None,
-            "CompanyName": r["CompanyName"] if r["CompanyName"] else None,
+            "GivenName": opt_str(r, "GivenName", default="") or None,
+            "FamilyName": opt_str(r, "FamilyName", default="") or None,
+            "CompanyName": opt_str(r, "CompanyName", default="") or None,
             "PrimaryEmailAddr": {"Address": r["PrimaryEmailAddr"]} if r["PrimaryEmailAddr"] else None,
             "PrimaryPhone": {"FreeFormNumber": r["PrimaryPhone"]} if r["PrimaryPhone"] else None,
             "BillAddr": {
@@ -48,10 +70,10 @@ def _coerce_customers(rows):
                 "CountrySubDivisionCode": r["BillAddr_CountrySubDivisionCode"],
                 "PostalCode": r["BillAddr_PostalCode"],
             },
-            "Balance": float(r["Balance"]),
+            "Balance": strict_float(r, "Balance"),
             "Active": r["Active"].lower() == "true",
             "Job": r["Job"].lower() == "true",
-            "Notes": r["Notes"] if r["Notes"] else None,
+            "Notes": opt_str(r, "Notes", default="") or None,
             "MetaData": {"CreateTime": _now(), "LastUpdatedTime": _now()},
             "SyncToken": "0",
         })
@@ -64,7 +86,7 @@ def _coerce_vendors(rows):
         out.append({
             "Id": r["Id"],
             "DisplayName": r["DisplayName"],
-            "CompanyName": r["CompanyName"] if r["CompanyName"] else None,
+            "CompanyName": opt_str(r, "CompanyName", default="") or None,
             "PrimaryEmailAddr": {"Address": r["PrimaryEmailAddr"]} if r["PrimaryEmailAddr"] else None,
             "PrimaryPhone": {"FreeFormNumber": r["PrimaryPhone"]} if r["PrimaryPhone"] else None,
             "BillAddr": {
@@ -73,9 +95,9 @@ def _coerce_vendors(rows):
                 "CountrySubDivisionCode": r["BillAddr_CountrySubDivisionCode"],
                 "PostalCode": r["BillAddr_PostalCode"],
             },
-            "Balance": float(r["Balance"]),
+            "Balance": strict_float(r, "Balance"),
             "Active": r["Active"].lower() == "true",
-            "AcctNum": r["AcctNum"] if r["AcctNum"] else None,
+            "AcctNum": opt_str(r, "AcctNum", default="") or None,
             "Vendor1099": r["Vendor1099"].lower() == "true",
             "MetaData": {"CreateTime": _now(), "LastUpdatedTime": _now()},
             "SyncToken": "0",
@@ -89,9 +111,9 @@ def _coerce_items(rows):
         out.append({
             "Id": r["Id"],
             "Name": r["Name"],
-            "Description": r["Description"] if r["Description"] else None,
+            "Description": opt_str(r, "Description", default="") or None,
             "Type": r["Type"],
-            "UnitPrice": float(r["UnitPrice"]),
+            "UnitPrice": strict_float(r, "UnitPrice"),
             "IncomeAccountRef": {
                 "value": r["IncomeAccountRef_value"],
                 "name": r["IncomeAccountRef_name"],
@@ -112,10 +134,10 @@ def _coerce_accounts(rows):
             "Name": r["Name"],
             "AccountType": r["AccountType"],
             "AccountSubType": r["AccountSubType"],
-            "CurrentBalance": float(r["CurrentBalance"]),
+            "CurrentBalance": strict_float(r, "CurrentBalance"),
             "Active": r["Active"].lower() == "true",
             "Classification": r["Classification"],
-            "Description": r["Description"] if r["Description"] else None,
+            "Description": opt_str(r, "Description", default="") or None,
             "MetaData": {"CreateTime": _now(), "LastUpdatedTime": _now()},
             "SyncToken": "0",
         })
@@ -123,26 +145,36 @@ def _coerce_accounts(rows):
 
 
 _store.register("customers", primary_key="Id",
-                initial_loader=lambda: _coerce_customers(_load("customers.csv")))
+                initial_loader=lambda: _load_qbo_or_csv("customers.json", "Customer", _coerce_customers, "customers"))
 _store.register("vendors", primary_key="Id",
-                initial_loader=lambda: _coerce_vendors(_load("vendors.csv")))
+                initial_loader=lambda: _load_qbo_or_csv("vendors.json", "Vendor", _coerce_vendors, "vendors"))
 _store.register("items", primary_key="Id",
-                initial_loader=lambda: _coerce_items(_load("items.csv")))
+                initial_loader=lambda: _coerce_items(_load("items.json", "items")))
 _store.register("accounts", primary_key="Id",
-                initial_loader=lambda: _coerce_accounts(_load("accounts.csv")))
+                initial_loader=lambda: _load_qbo_or_csv("accounts.json", "Account", _coerce_accounts, "accounts"))
 _store.register("invoices", primary_key="Id",
-                initial_loader=lambda: _load_json("invoices.json"))
+                initial_loader=lambda: _load("invoices.json", "invoices"))
 _store.register("bills", primary_key="Id",
-                initial_loader=lambda: _load_json("bills.json"))
+                initial_loader=lambda: _load("bills.json", "bills"))
 _store.register("payments", primary_key="Id",
-                initial_loader=lambda: _load_json("payments.json"))
+                initial_loader=lambda: _load("payments.json", "payments"))
 _store.register("estimates", primary_key="Id",
-                initial_loader=lambda: _load_json("estimates.json"))
+                initial_loader=lambda: _load("estimates.json", "estimates"))
 _store.register("expenses", primary_key="Id",
-                initial_loader=lambda: _load_json("expenses.json"))
+                initial_loader=lambda: _load("expenses.json", "expenses"))
 
 _store.register_document("company_info",
                          initial_loader=lambda: _load_json("company_info.json"))
+_store.register_document("company_raw",
+                         initial_loader=lambda: _load_json("company.json"))
+_store.register_document("bill_payments",
+                         initial_loader=lambda: _load_json("bill-payments.json"))
+_store.register_document("corporate_expense_ledger",
+                         initial_loader=lambda: _load_json("Corporate_Expense_Ledger.json"))
+_store.register_document("reimbursement_policy",
+                         initial_loader=lambda: _load_json("Reimbursement_Policy.json"))
+_store.register_document("break_even_analysis",
+                         initial_loader=lambda: _load_json("break-even-analysis.json"))
 
 
 def _next_int_id(table_name: str) -> int:
@@ -163,6 +195,27 @@ def _next_int_id(table_name: str) -> int:
 
 def get_company_info():
     return {"CompanyInfo": _store.document("company_info").get()}
+
+
+def get_company_raw():
+    # company.json is already API-shaped ({"CompanyInfo": {...}}); served verbatim.
+    return _store.document("company_raw").get()
+
+
+def get_bill_payments():
+    return _store.document("bill_payments").get()
+
+
+def get_corporate_expense_ledger():
+    return _store.document("corporate_expense_ledger").get()
+
+
+def get_reimbursement_policy():
+    return _store.document("reimbursement_policy").get()
+
+
+def get_break_even_analysis():
+    return _store.document("break_even_analysis").get()
 
 
 def list_customers():
@@ -206,9 +259,16 @@ def update_customer(customer_id: str, data: dict):
     updatable = {"DisplayName", "GivenName", "FamilyName", "CompanyName",
                  "PrimaryEmailAddr", "PrimaryPhone", "BillAddr", "Active", "Notes"}
     patch = {k: v for k, v in data.items() if k in updatable}
-    meta = dict(c["MetaData"]); meta["LastUpdatedTime"] = _now()
+    existing_meta = c.get("MetaData") or {}
+    meta = dict(existing_meta) if isinstance(existing_meta, dict) else {}
+    meta.setdefault("CreateTime", _now())
+    meta["LastUpdatedTime"] = _now()
     patch["MetaData"] = meta
-    patch["SyncToken"] = str(int(c["SyncToken"]) + 1)
+    try:
+        current_sync = int(c.get("SyncToken") or 0)
+    except (TypeError, ValueError):
+        current_sync = 0
+    patch["SyncToken"] = str(current_sync + 1)
     _store.table("customers").patch(customer_id, patch)
     return {"Customer": _store.table("customers").get(customer_id)}
 
@@ -252,9 +312,16 @@ def update_vendor(vendor_id: str, data: dict):
     updatable = {"DisplayName", "CompanyName", "PrimaryEmailAddr",
                  "PrimaryPhone", "BillAddr", "Active", "AcctNum", "Vendor1099"}
     patch = {k: val for k, val in data.items() if k in updatable}
-    meta = dict(v["MetaData"]); meta["LastUpdatedTime"] = _now()
+    existing_meta = v.get("MetaData") or {}
+    meta = dict(existing_meta) if isinstance(existing_meta, dict) else {}
+    meta.setdefault("CreateTime", _now())
+    meta["LastUpdatedTime"] = _now()
     patch["MetaData"] = meta
-    patch["SyncToken"] = str(int(v["SyncToken"]) + 1)
+    try:
+        current_sync = int(v.get("SyncToken") or 0)
+    except (TypeError, ValueError):
+        current_sync = 0
+    patch["SyncToken"] = str(current_sync + 1)
     _store.table("vendors").patch(vendor_id, patch)
     return {"Vendor": _store.table("vendors").get(vendor_id)}
 
@@ -365,9 +432,16 @@ def update_invoice(invoice_id: str, data: dict):
         total = sum(l.get("Amount", 0) for l in lines if l.get("DetailType") != "SubTotalLineDetail")
         patch["TotalAmt"] = total
         patch["Balance"] = total
-    meta = dict(inv["MetaData"]); meta["LastUpdatedTime"] = _now()
+    existing_meta = inv.get("MetaData") or {}
+    meta = dict(existing_meta) if isinstance(existing_meta, dict) else {}
+    meta.setdefault("CreateTime", _now())
+    meta["LastUpdatedTime"] = _now()
     patch["MetaData"] = meta
-    patch["SyncToken"] = str(int(inv["SyncToken"]) + 1)
+    try:
+        current_sync = int(inv.get("SyncToken") or 0)
+    except (TypeError, ValueError):
+        current_sync = 0
+    patch["SyncToken"] = str(current_sync + 1)
     _store.table("invoices").patch(invoice_id, patch)
     return {"Invoice": _store.table("invoices").get(invoice_id)}
 
@@ -376,12 +450,19 @@ def void_invoice(invoice_id: str):
     inv = _store.table("invoices").get(invoice_id)
     if not inv:
         return {"error": f"Invoice {invoice_id} not found"}
-    meta = dict(inv["MetaData"]); meta["LastUpdatedTime"] = _now()
+    existing_meta = inv.get("MetaData") or {}
+    meta = dict(existing_meta) if isinstance(existing_meta, dict) else {}
+    meta.setdefault("CreateTime", _now())
+    meta["LastUpdatedTime"] = _now()
+    try:
+        current_sync = int(inv.get("SyncToken") or 0)
+    except (TypeError, ValueError):
+        current_sync = 0
     _store.table("invoices").patch(invoice_id, {
         "Status": "Voided",
         "Balance": 0.00,
         "MetaData": meta,
-        "SyncToken": str(int(inv["SyncToken"]) + 1),
+        "SyncToken": str(current_sync + 1),
     })
     return {"Invoice": _store.table("invoices").get(invoice_id)}
 
@@ -390,7 +471,10 @@ def send_invoice(invoice_id: str):
     inv = _store.table("invoices").get(invoice_id)
     if not inv:
         return {"error": f"Invoice {invoice_id} not found"}
-    meta = dict(inv["MetaData"]); meta["LastUpdatedTime"] = _now()
+    existing_meta = inv.get("MetaData") or {}
+    meta = dict(existing_meta) if isinstance(existing_meta, dict) else {}
+    meta.setdefault("CreateTime", _now())
+    meta["LastUpdatedTime"] = _now()
     _store.table("invoices").patch(invoice_id, {
         "EmailStatus": "Sent",
         "MetaData": meta,
@@ -443,12 +527,19 @@ def pay_bill(bill_id: str):
     b = _store.table("bills").get(bill_id)
     if not b:
         return {"error": f"Bill {bill_id} not found"}
-    meta = dict(b["MetaData"]); meta["LastUpdatedTime"] = _now()
+    existing_meta = b.get("MetaData") or {}
+    meta = dict(existing_meta) if isinstance(existing_meta, dict) else {}
+    meta.setdefault("CreateTime", _now())
+    meta["LastUpdatedTime"] = _now()
+    try:
+        current_sync = int(b.get("SyncToken") or 0)
+    except (TypeError, ValueError):
+        current_sync = 0
     _store.table("bills").patch(bill_id, {
         "Balance": 0.00,
         "Status": "Paid",
         "MetaData": meta,
-        "SyncToken": str(int(b["SyncToken"]) + 1),
+        "SyncToken": str(current_sync + 1),
     })
     return {"Bill": _store.table("bills").get(bill_id)}
 
@@ -900,3 +991,5 @@ def accounts_payable_aging():
         },
         "Rows": {"Row": rows},
     }
+
+_store.eager_load()

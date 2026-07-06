@@ -9,14 +9,18 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store
-
+from _mutable_store import (
+    read_seed_with_ctx, get_store, opt_int, opt_str, strict_int)
 _store = get_store("ring-api")
+_API = "ring-api"
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _load_json(filename):
@@ -32,8 +36,8 @@ def _coerce_events(rows):
     out = []
     for r in rows:
         out.append({
-            "id": int(r["id"]),
-            "doorbot_id": int(r["doorbot_id"]),
+            "id": strict_int(r, "id"),
+            "doorbot_id": strict_int(r, "doorbot_id"),
             "device_id": r["device_id"],
             "kind": r["kind"],
             "created_at": r["created_at"],
@@ -41,8 +45,8 @@ def _coerce_events(rows):
             "favorite": r["favorite"].lower() == "true",
             "recording": {"status": r["recording_status"]},
             "snapshot_url": r["snapshot_url"],
-            "duration_seconds": int(r["duration_seconds"]) if r["duration_seconds"] else None,
-            "cv_properties": r["cv_properties"] if r["cv_properties"] else None,
+            "duration_seconds": opt_int(r, "duration_seconds", default=None),
+            "cv_properties": opt_str(r, "cv_properties", default="") or None,
         })
     return out
 
@@ -51,7 +55,7 @@ def _coerce_shared_users(rows):
     out = []
     for r in rows:
         out.append({
-            "user_id": int(r["user_id"]),
+            "user_id": strict_int(r, "user_id"),
             "first_name": r["first_name"],
             "last_name": r["last_name"],
             "email": r["email"],
@@ -66,10 +70,10 @@ def _coerce_motion_zones(rows):
     out = []
     for r in rows:
         out.append({
-            "device_id": int(r["device_id"]),
+            "device_id": strict_int(r, "device_id"),
             "zone_id": r["zone_id"],
             "zone_name": r["zone_name"],
-            "sensitivity": int(r["sensitivity"]),
+            "sensitivity": strict_int(r, "sensitivity"),
             "enabled": r["enabled"].lower() == "true",
             "coordinates": r["coordinates"],
         })
@@ -79,8 +83,12 @@ def _coerce_motion_zones(rows):
 def _coerce_notification_prefs(rows):
     out = []
     for r in rows:
+        device_id = strict_int(r, "device_id")
+        channel = r.get("channel") or "push"
         out.append({
-            "device_id": int(r["device_id"]),
+            "_pk": f"{device_id}/{channel}",
+            "device_id": device_id,
+            "channel": channel,
             "motion_alerts": r["motion_alerts"].lower() == "true" if r["motion_alerts"] else None,
             "ding_alerts": r["ding_alerts"].lower() == "true" if r["ding_alerts"] else None,
             "person_alerts": r["person_alerts"].lower() == "true" if r["person_alerts"] else None,
@@ -96,17 +104,17 @@ _store.register_document("location", initial_loader=lambda: _load_json("location
 _store.register_document("active_dings", initial_loader=lambda: _load_json("active_dings.json"))
 
 _store.register("events", primary_key="id",
-                initial_loader=lambda: _coerce_events(_load("events.csv")))
+                initial_loader=lambda: _coerce_events(_load("events.json", "events")))
 _store.register("shared_users", primary_key="user_id",
-                initial_loader=lambda: _coerce_shared_users(_load("shared_users.csv")))
+                initial_loader=lambda: _coerce_shared_users(_load("shared_users.json", "shared_users")))
 # motion_zones natural key (device_id, zone_id) -> synth composite pk
 _store.register("motion_zones", primary_key="_pk",
                 initial_loader=lambda: [
                     {**z, "_pk": f"{z['device_id']}@{z['zone_id']}"}
-                    for z in _coerce_motion_zones(_load("motion_zones.csv"))])
-_store.register("notification_prefs", primary_key="device_id",
+                    for z in _coerce_motion_zones(_load("motion_zones.json", "motion_zones"))])
+_store.register("notification_prefs", primary_key="_pk",
                 initial_loader=lambda: _coerce_notification_prefs(
-                    _load("notification_prefs.csv")))
+                    _load("notification_prefs.json", "notification_prefs")))
 
 
 def _devices(): return _store.document("devices").get()
@@ -115,7 +123,7 @@ def _active_dings(): return _store.document("active_dings").get()
 def _events_rows(): return _store.table("events").rows()
 def _shared_users_rows(): return _store.table("shared_users").rows()
 def _motion_zones_rows(): return _store.table("motion_zones").rows()
-def _notification_prefs_rows(): return _store.table("notification_prefs").rows()
+def _notification_prefs_rows(): return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("notification_prefs").rows()]
 
 
 def _next_event_id():
@@ -398,23 +406,27 @@ def list_notification_prefs():
     return {"type": "notification_prefs", "count": len(rows), "results": rows}
 
 
-def get_notification_pref(device_id: int):
-    p = _store.table("notification_prefs").get(device_id)
+def get_notification_pref(device_id: int, channel: str = "push"):
+    pk = f"{device_id}/{channel}"
+    p = _store.table("notification_prefs").get(pk)
     if p:
-        return {"type": "notification_pref", "notification_pref": p}
+        return {"type": "notification_pref",
+                "notification_pref": {k: v for k, v in p.items() if k != "_pk"}}
     return {"error": f"Notification preferences for device {device_id} not found"}
 
 
-def update_notification_pref(device_id: int, data: dict):
-    p = _store.table("notification_prefs").get(device_id)
+def update_notification_pref(device_id: int, data: dict, channel: str = "push"):
+    pk = f"{device_id}/{channel}"
+    p = _store.table("notification_prefs").get(pk)
     if not p:
         return {"error": f"Notification preferences for device {device_id} not found"}
     updatable = {"motion_alerts", "ding_alerts", "person_alerts", "package_alerts"}
     patch = {k: v for k, v in data.items() if k in updatable}
     if patch:
-        _store.table("notification_prefs").patch(device_id, patch)
+        _store.table("notification_prefs").patch(pk, patch)
+    after = _store.table("notification_prefs").get(pk)
     return {"type": "notification_pref",
-            "notification_pref": _store.table("notification_prefs").get(device_id)}
+            "notification_pref": {k: v for k, v in after.items() if k != "_pk"}}
 
 
 def activate_siren(device_id: int, duration_seconds: int = 30):
@@ -459,3 +471,5 @@ def toggle_floodlight(device_id: int, on: bool):
     device, _ = _mutate_device(device_id, _apply)
     return {"type": "floodlight", "device_id": device_id,
             "floodlight_status": (device or {}).get("floodlight_status", {})}
+
+_store.eager_load()

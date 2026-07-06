@@ -9,9 +9,11 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (  # noqa: E402
+    read_seed_with_ctx, get_store, opt_str, strict_bool, strict_float, strict_int)
 
 _store = get_store("shippo-api")
+_API = "shippo-api"
 
 
 def _store_insert(_table, _row):
@@ -27,17 +29,18 @@ def _store_insert(_table, _row):
     return _t.upsert(_row)
 
 _store.register("addresses", primary_key="object_id",
-                initial_loader=lambda: _coerce_addresses(_load("addresses.csv")))
+                initial_loader=lambda: _coerce_addresses(_load("addresses.json", "addresses")))
 _store.register("parcels", primary_key="object_id",
-                initial_loader=lambda: _coerce_parcels(_load("parcels.csv")))
+                initial_loader=lambda: _coerce_parcels(_load("parcels.json", "parcels")))
 _store.register("shipments", primary_key="object_id",
-                initial_loader=lambda: _coerce_shipments(_load("shipments.csv")))
+                initial_loader=lambda: _coerce_shipments(_load("shipments.json", "shipments")))
 _store.register("rates", primary_key="object_id",
-                initial_loader=lambda: _coerce_rates(_load("rates.csv")))
+                initial_loader=lambda: _coerce_rates(_load("rates.json", "rates")))
 _store.register("transactions", primary_key="object_id",
-                initial_loader=lambda: _coerce_transactions(_load("transactions.csv")))
-_store.register("tracking", primary_key="carrier",
-                initial_loader=lambda: _coerce_tracking(_load("tracking.csv")))
+                initial_loader=lambda: _coerce_transactions(_load("transactions.json", "transactions")))
+_store.register("tracking", primary_key="_pk",
+                initial_loader=lambda: [{**r, "_pk": f"{r['carrier']}@{r['tracking_number']}@{r['status_time']}"}
+                                        for r in _coerce_tracking(_load("tracking.json", "tracking"))])
 
 
 def _addresses_rows():
@@ -65,9 +68,12 @@ def _tracking_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():

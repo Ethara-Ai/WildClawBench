@@ -15,9 +15,11 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_seed_with_ctx, get_store, opt_csv_list, strict_bool)
 
 _store = get_store("microsoft-teams-api")
+_API = "microsoft-teams-api"
 
 
 def _store_insert(_table, _row):
@@ -33,11 +35,11 @@ def _store_insert(_table, _row):
     return _t.upsert(_row)
 
 _store.register("teams", primary_key="id",
-                initial_loader=lambda: _coerce_teams(_load("teams.csv")))
+                initial_loader=lambda: _coerce_teams(_load("teams.json", "teams")))
 _store.register("channels", primary_key="id",
-                initial_loader=lambda: _coerce_channels(_load("channels.csv")))
+                initial_loader=lambda: _coerce_channels(_load("channels.json", "channels")))
 _store.register("messages", primary_key="id",
-                initial_loader=lambda: _coerce_messages(_load("messages.csv")))
+                initial_loader=lambda: _coerce_messages(_load("messages.json", "messages")))
 
 
 def _teams_rows():
@@ -53,9 +55,12 @@ def _messages_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _to_bool(v):

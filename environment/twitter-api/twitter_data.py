@@ -9,9 +9,11 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_seed_with_ctx, get_store, opt_str, strict_bool, strict_int)
 
 _store = get_store("twitter-api")
+_API = "twitter-api"
 
 
 
@@ -41,15 +43,15 @@ def _store_insert(_table, _row):
     return _t.upsert(_row)
 
 _store.register("users", primary_key="id",
-                initial_loader=lambda: _coerce_users(_load("users.csv")))
+                initial_loader=lambda: _coerce_users(_load("users.json", "users")))
 _store.register("tweets", primary_key="id",
-                initial_loader=lambda: _coerce_tweets(_load("tweets.csv")))
-_store.register("follows", primary_key="follower_id",
-                initial_loader=lambda: _load("follows.csv"))
-_store.register("likes", primary_key="user_id",
-                initial_loader=lambda: _load("likes.csv"))
-_store.register("retweets", primary_key="user_id",
-                initial_loader=lambda: _load("retweets.csv"))
+                initial_loader=lambda: _coerce_tweets(_load("tweets.json", "tweets")))
+_store.register("follows", primary_key="_pk",
+                initial_loader=lambda: [{**r, "_pk": f"{r['follower_id']}@{r['following_id']}"} for r in (_strip_ctx(x) for x in _load("follows.json", "follows"))])
+_store.register("likes", primary_key="_pk",
+                initial_loader=lambda: [{**r, "_pk": f"{r['user_id']}@{r['tweet_id']}"} for r in (_strip_ctx(x) for x in _load("likes.json", "likes"))])
+_store.register("retweets", primary_key="_pk",
+                initial_loader=lambda: [{**r, "_pk": f"{r['user_id']}@{r['tweet_id']}"} for r in (_strip_ctx(x) for x in _load("retweets.json", "retweets"))])
 
 
 def _users_rows():
@@ -69,13 +71,16 @@ def _likes_rows():
 
 
 def _retweets_rows():
-    return _store.table("retweets").rows()
+    return [{k: v for k, v in r.items() if k != "_pk"} for r in _store.table("retweets").rows()]
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -91,12 +96,17 @@ def _to_bool(v):
 # ---------------------------------------------------------------------------
 
 def _coerce_users(rows):
+    # The metric columns live in the seed as strings; they belong only under
+    # public_metrics (ints) per the Twitter v2 contract. Drop the raw top-level
+    # copies so a user is not emitted with the same metric in two types.
+    _metric_cols = ("followers_count", "following_count", "tweet_count")
     out = []
     for r in rows:
+        base = {k: v for k, v in _strip_ctx(r).items() if k not in _metric_cols}
         out.append({
-            **r,
-            "verified": _to_bool(r["verified"]),
-            "protected": _to_bool(r["protected"]),
+            **base,
+            "verified": strict_bool(r, "verified"),
+            "protected": strict_bool(r, "protected"),
             "public_metrics": {
                 "followers_count": int(r["followers_count"]),
                 "following_count": int(r["following_count"]),
@@ -277,7 +287,8 @@ def like_tweet(user_id, tweet_id):
     if not target:
         return {"error": f"Tweet {tweet_id} not found"}
     if not any(l["user_id"] == user_id and l["tweet_id"] == tweet_id for l in _likes_rows()):
-        _store_insert("likes", {"user_id": user_id, "tweet_id": tweet_id})
+        _store_insert("likes", {"_pk": f"{user_id}@{tweet_id}",
+                                "user_id": user_id, "tweet_id": tweet_id})
         target["public_metrics"]["like_count"] += 1
         _store_patch("tweets", target, {"public_metrics": target["public_metrics"]})
     return {"data": {"liked": True}}
@@ -290,7 +301,11 @@ def retweet(user_id, tweet_id):
     if not target:
         return {"error": f"Tweet {tweet_id} not found"}
     if not any(r["user_id"] == user_id and r["tweet_id"] == tweet_id for r in _retweets_rows()):
-        _store_insert("retweets", {"user_id": user_id, "tweet_id": tweet_id})
+        _store.table("retweets").upsert({
+            "_pk": f"{user_id}@{tweet_id}",
+            "user_id": user_id,
+            "tweet_id": tweet_id,
+        })
         target["public_metrics"]["retweet_count"] += 1
         _store_patch("tweets", target, {"public_metrics": target["public_metrics"]})
     return {"data": {"retweeted": True}}

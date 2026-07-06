@@ -9,9 +9,11 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_seed_with_ctx, get_store, opt_csv_list, opt_float, opt_int, opt_str, strict_float, strict_int)
 
 _store = get_store("etsy-api")
+_API = "etsy-api"
 
 
 
@@ -41,21 +43,21 @@ def _store_insert(_table, _row):
     return _t.upsert(_row)
 
 _store.register("listings", primary_key="listing_id",
-                initial_loader=lambda: _coerce_listings(_load("listings.csv")))
+                initial_loader=lambda: _coerce_listings(_load("listings.json", "listings")))
 _store.register("listing_images", primary_key="listing_image_id",
-                initial_loader=lambda: _coerce_listing_images(_load("listing_images.csv")))
+                initial_loader=lambda: _coerce_listing_images(_load("listing_images.json", "listing_images")))
 _store.register("receipts", primary_key="receipt_id",
-                initial_loader=lambda: _coerce_receipts(_load("receipts.csv")))
+                initial_loader=lambda: _coerce_receipts(_load("receipts.json", "receipts")))
 _store.register("transactions", primary_key="transaction_id",
-                initial_loader=lambda: _coerce_transactions(_load("transactions.csv")))
+                initial_loader=lambda: _coerce_transactions(_load("transactions.json", "transactions")))
 _store.register("reviews", primary_key="review_id",
-                initial_loader=lambda: _coerce_reviews(_load("reviews.csv")))
+                initial_loader=lambda: _coerce_reviews(_load("reviews.json", "reviews")))
 _store.register("shop_sections", primary_key="shop_section_id",
-                initial_loader=lambda: _coerce_shop_sections(_load("shop_sections.csv")))
+                initial_loader=lambda: _coerce_shop_sections(_load("shop_sections.json", "shop_sections")))
 _store.register("shipping_profiles", primary_key="shipping_profile_id",
-                initial_loader=lambda: _coerce_shipping_profiles(_load("shipping_profiles.csv")))
+                initial_loader=lambda: _coerce_shipping_profiles(_load("shipping_profiles.json", "shipping_profiles")))
 _store.register("return_policies", primary_key="return_policy_id",
-                initial_loader=lambda: _coerce_return_policies(_load("return_policies.csv")))
+                initial_loader=lambda: _coerce_return_policies(_load("return_policies.json", "return_policies")))
 _store.register_document("shop", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "shop.json", encoding="utf-8")))
 
 
@@ -96,9 +98,12 @@ def _shop_doc():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():

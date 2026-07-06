@@ -10,9 +10,11 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_seed_with_ctx, get_store, opt_csv_list, opt_str, strict_bool, strict_int)
 
 _store = get_store("gitlab-api")
+_API = "gitlab-api"
 
 
 
@@ -42,15 +44,15 @@ def _store_insert(_table, _row):
     return _t.upsert(_row)
 
 _store.register("projects", primary_key="id",
-                initial_loader=lambda: _coerce_projects(_load("projects.csv")))
+                initial_loader=lambda: _coerce_projects(_load("projects.json", "projects")))
 _store.register("issues", primary_key="id",
-                initial_loader=lambda: _coerce_issues(_load("issues.csv")))
+                initial_loader=lambda: _coerce_issues(_load("issues.json", "issues")))
 _store.register("merge_requests", primary_key="id",
-                initial_loader=lambda: _coerce_merge_requests(_load("merge_requests.csv")))
+                initial_loader=lambda: _coerce_merge_requests(_load("merge_requests.json", "merge_requests")))
 _store.register("pipelines", primary_key="id",
-                initial_loader=lambda: _coerce_pipelines(_load("pipelines.csv")))
+                initial_loader=lambda: _coerce_pipelines(_load("pipelines.json", "pipelines")))
 _store.register("users", primary_key="id",
-                initial_loader=lambda: _coerce_users(_load("users.csv")))
+                initial_loader=lambda: _coerce_users(_load("users.json", "users")))
 _store.register_document("current_user", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "current_user.json", encoding="utf-8")))
 
 
@@ -79,9 +81,12 @@ def _current_user_doc():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():

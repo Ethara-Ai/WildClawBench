@@ -10,20 +10,22 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_seed_with_ctx, get_store, opt_str, strict_bool, strict_float, strict_int)
 
 _store = get_store("twitch-api")
+_API = "twitch-api"
 
 _store.register("users", primary_key="id",
-                initial_loader=lambda: _coerce_users(_load("users.csv")))
+                initial_loader=lambda: _coerce_users(_load("users.json", "users")))
 _store.register("games", primary_key="id",
-                initial_loader=lambda: _coerce_games(_load("games.csv")))
+                initial_loader=lambda: _coerce_games(_load("games.json", "games")))
 _store.register("channels", primary_key="broadcaster_id",
-                initial_loader=lambda: _coerce_channels(_load("channels.csv")))
+                initial_loader=lambda: _coerce_channels(_load("channels.json", "channels")))
 _store.register("streams", primary_key="id",
-                initial_loader=lambda: _coerce_streams(_load("streams.csv")))
+                initial_loader=lambda: _coerce_streams(_load("streams.json", "streams")))
 _store.register("clips", primary_key="id",
-                initial_loader=lambda: _coerce_clips(_load("clips.csv")))
+                initial_loader=lambda: _coerce_clips(_load("clips.json", "clips")))
 
 
 def _users_rows():
@@ -47,9 +49,12 @@ def _clips_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _to_bool(v):
@@ -68,8 +73,8 @@ def _coerce_users(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "view_count": int(r["view_count"]),
+            **_strip_ctx(r),
+            "view_count": strict_int(r, "view_count"),
         })
     return out
 
@@ -81,8 +86,8 @@ def _coerce_games(rows):
             "id": r["id"],
             "name": r["name"],
             "box_art_url": r["box_art_url"],
-            "rank": int(r["rank"]),
-            "viewer_count": int(r["viewer_count"]),
+            "rank": strict_int(r, "rank"),
+            "viewer_count": strict_int(r, "viewer_count"),
         })
     return out
 
@@ -91,9 +96,9 @@ def _coerce_channels(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
+            **_strip_ctx(r),
             "tags": _split_tags(r["tags"]),
-            "follower_count": int(r["follower_count"]),
+            "follower_count": strict_int(r, "follower_count"),
         })
     return out
 
@@ -102,10 +107,10 @@ def _coerce_streams(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "viewer_count": int(r["viewer_count"]),
-            "is_live": _to_bool(r["is_live"]),
-            "started_at": r["started_at"] or None,
+            **_strip_ctx(r),
+            "viewer_count": strict_int(r, "viewer_count"),
+            "is_live": strict_bool(r, "is_live"),
+            "started_at": opt_str(r, "started_at", default="") or None,
         })
     return out
 
@@ -114,9 +119,9 @@ def _coerce_clips(rows):
     out = []
     for r in rows:
         out.append({
-            **r,
-            "view_count": int(r["view_count"]),
-            "duration": float(r["duration"]),
+            **_strip_ctx(r),
+            "view_count": strict_int(r, "view_count"),
+            "duration": strict_float(r, "duration"),
         })
     return out
 
@@ -221,3 +226,5 @@ def get_channel_followers(broadcaster_id):
     if not channel:
         return {"data": [], "total": 0}
     return {"data": [], "total": channel["follower_count"]}
+
+_store.eager_load()

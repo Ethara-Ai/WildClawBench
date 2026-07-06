@@ -11,9 +11,15 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (  # noqa: E402
+    read_seed_with_ctx, get_store,
+    strict_int,
+    strict_float,
+    strict_bool,
+)
 
 _store = get_store("datadog-api")
+_API = "datadog-api"
 
 
 
@@ -43,15 +49,15 @@ def _store_insert(_table, _row):
     return _t.upsert(_row)
 
 _store.register("monitors", primary_key="id",
-                initial_loader=lambda: _coerce_monitors(_load("monitors.csv")))
+                initial_loader=lambda: _coerce_monitors(_load("monitors.json", "monitors")))
 _store.register("dashboards", primary_key="id",
-                initial_loader=lambda: _coerce_dashboards(_load("dashboards.csv")))
+                initial_loader=lambda: _coerce_dashboards(_load("dashboards.json", "dashboards")))
 _store.register("events", primary_key="id",
-                initial_loader=lambda: _coerce_events(_load("events.csv")))
+                initial_loader=lambda: _coerce_events(_load("events.json", "events")))
 _store.register("hosts", primary_key="name",
-                initial_loader=lambda: _coerce_hosts(_load("hosts.csv")))
-_store.register("metrics", primary_key="metric",
-                initial_loader=lambda: _coerce_metrics(_load("metrics.csv")))
+                initial_loader=lambda: _coerce_hosts(_load("hosts.json", "hosts")))
+_store.register("metrics", primary_key="_pk",
+                initial_loader=lambda: _coerce_metrics(_load("metrics.json", "metrics")))
 
 
 def _monitors_rows():
@@ -75,9 +81,12 @@ def _metrics_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now_iso():
@@ -148,10 +157,17 @@ def _coerce_hosts(rows):
 def _coerce_metrics(rows):
     out = []
     for r in rows:
+        clean = _strip_ctx(r)
+        tags = clean.get("tags") or []
+        if isinstance(tags, str):
+            tags = _split_tags(tags)
+        tag_string = ",".join(sorted(tags))
         out.append({
-            **r,
-            "base_value": float(r["base_value"]),
-            "amplitude": float(r["amplitude"]),
+            **clean,
+            "tags": tags,
+            "_pk": f"{clean['metric']}|{tag_string}",
+            "base_value": strict_float(r, "base_value"),
+            "amplitude": strict_float(r, "amplitude"),
         })
     return out
 

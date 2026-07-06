@@ -17,7 +17,7 @@
       "header": [{"key": "Content-Type", "value": "application/json"}],
       "body": {"mode": "raw", "raw": "{\"product_id\": \"uberx\", \"start_latitude\": 37.7752, \"start_longitude\": -122.4180, \"end_latitude\": 37.7956, \"end_longitude\": -122.3934}"}}},
     {"name": "get request", "request": {"method": "GET", "url": "{{baseUrl}}/v1.2/requests/req-7f0011aa"}},
-    {"name": "cancel request", "request": {"method": "DELETE", "url": "{{baseUrl}}/v1.2/requests/req-7f0011aa"}},
+    {"name": "cancel request (400 expected - already-completed ride)", "request": {"method": "DELETE", "url": "{{baseUrl}}/v1.2/requests/req-7f0011aa"}},
     {"name": "ride history", "request": {"method": "GET", "url": "{{baseUrl}}/v1.2/history?limit=10"}},
     {"name": "rider profile", "request": {"method": "GET", "url": "{{baseUrl}}/v1.2/me"}}
   ]

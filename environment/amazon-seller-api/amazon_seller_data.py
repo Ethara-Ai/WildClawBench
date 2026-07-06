@@ -9,9 +9,11 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (
+    read_seed_with_ctx, get_store, opt_csv_list, opt_float, opt_str, strict_float, strict_int)
 
 _store = get_store("amazon-seller-api")
+_API = "amazon-seller-api"
 
 
 
@@ -41,20 +43,21 @@ def _store_insert(_table, _row):
     return _t.upsert(_row)
 
 _store.register("catalog_items", primary_key="sku",
-                initial_loader=lambda: _coerce_catalog_items(_load("catalog_items.csv")))
+                initial_loader=lambda: _coerce_catalog_items(_load("catalog_items.json", "catalog_items")))
 _store.register("orders", primary_key="AmazonOrderId",
-                initial_loader=lambda: _coerce_orders(_load("orders.csv")))
+                initial_loader=lambda: _coerce_orders(_load("orders.json", "orders")))
 _store.register("order_items", primary_key="OrderItemId",
-                initial_loader=lambda: _coerce_order_items(_load("order_items.csv")))
+                initial_loader=lambda: _coerce_order_items(_load("order_items.json", "order_items")))
 _store.register("inventory", primary_key="fnSku",
-                initial_loader=lambda: _coerce_inventory(_load("inventory.csv")))
+                initial_loader=lambda: _coerce_inventory(_load("inventory.json", "inventory")))
 _store.register("returns", primary_key="returnId",
-                initial_loader=lambda: _coerce_returns(_load("returns.csv")))
+                initial_loader=lambda: _coerce_returns(_load("returns.json", "returns")))
 _store.register("reports", primary_key="reportId",
-                initial_loader=lambda: _coerce_reports(_load("reports.csv")))
+                initial_loader=lambda: _coerce_reports(_load("reports.json", "reports")))
 _store.register("pricing", primary_key="asin",
-                initial_loader=lambda: _coerce_pricing(_load("pricing.csv")))
+                initial_loader=lambda: _coerce_pricing(_load("pricing.json", "pricing")))
 _store.register_document("seller_account", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "seller_account.json", encoding="utf-8")))
+_store.register_document("buying_notes", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "buying_notes_fw26.json", encoding="utf-8")))
 
 
 def _catalog_items_rows():
@@ -90,9 +93,12 @@ def _seller_account_doc():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():
@@ -231,6 +237,10 @@ _next_return_id = 6
 
 def get_seller_account():
     return {"type": "seller_account", "seller": _seller_store}
+
+
+def get_buying_notes():
+    return {"type": "buying_notes", "buyingNotes": _store.document("buying_notes").get()}
 
 
 def get_account_health():
@@ -820,3 +830,11 @@ def close_return(return_id):
             _store_patch("returns", r, _changes)
             return {"type": "return_close", "status": "SUCCESS", "returnId": return_id}
     return {"error": f"Return {return_id} not found"}
+
+_store.eager_load()
+
+# Module-level handles the accessor functions operate on. The catalog is a
+# mutable list (create/update/delete go through it), seeded once from the store
+# table; the seller account is the registered document's value.
+_catalog_store = _catalog_items_rows()
+_seller_store = _seller_account_doc()

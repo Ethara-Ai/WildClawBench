@@ -11,9 +11,13 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (  # noqa: E402
+    read_seed_with_ctx, get_store,
+    strict_int, opt_int,
+)
 
 _store = get_store("wordpress-api")
+_API = "wordpress-api"
 
 
 
@@ -43,19 +47,19 @@ def _store_insert(_table, _row):
     return _t.upsert(_row)
 
 _store.register("posts", primary_key="id",
-                initial_loader=lambda: _coerce_posts(_load("posts.csv")))
+                initial_loader=lambda: _coerce_posts(_load("posts.json", "posts")))
 _store.register("pages", primary_key="id",
-                initial_loader=lambda: _coerce_pages(_load("pages.csv")))
+                initial_loader=lambda: _coerce_pages(_load("pages.json", "pages")))
 _store.register("categories", primary_key="id",
-                initial_loader=lambda: _coerce_categories(_load("categories.csv")))
+                initial_loader=lambda: _coerce_categories(_load("categories.json", "categories")))
 _store.register("tags", primary_key="id",
-                initial_loader=lambda: _coerce_tags(_load("tags.csv")))
+                initial_loader=lambda: _coerce_tags(_load("tags.json", "tags")))
 _store.register("comments", primary_key="id",
-                initial_loader=lambda: _coerce_comments(_load("comments.csv")))
+                initial_loader=lambda: _coerce_comments(_load("comments.json", "comments")))
 _store.register("media", primary_key="id",
-                initial_loader=lambda: _coerce_media(_load("media.csv")))
+                initial_loader=lambda: _coerce_media(_load("media.json", "media")))
 _store.register("users", primary_key="id",
-                initial_loader=lambda: _coerce_users(_load("users.csv")))
+                initial_loader=lambda: _coerce_users(_load("users.json", "users")))
 
 
 def _posts_rows():
@@ -87,9 +91,12 @@ def _users_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():

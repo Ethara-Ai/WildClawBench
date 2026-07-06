@@ -14,9 +14,13 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import get_store  # noqa: E402
+from _mutable_store import (  # noqa: E402
+    read_seed_with_ctx, get_store,
+    strict_int,
+)
 
 _store = get_store("mixpanel-api")
+_API = "mixpanel-api"
 
 
 def _store_insert(_table, _row):
@@ -32,10 +36,10 @@ def _store_insert(_table, _row):
     return _t.upsert(_row)
 
 _store.register("events", primary_key="event_id",
-                initial_loader=lambda: _coerce_events(_load("events.csv")))
-_store.register_document("funnels", initial_loader=lambda: _coerce_funnels(_load("funnels.csv")))
+                initial_loader=lambda: _coerce_events(_load("events.json", "events")))
+_store.register_document("funnels", initial_loader=lambda: _coerce_funnels(_load("funnels.json", "funnels")))
 _store.register("profiles", primary_key="distinct_id",
-                initial_loader=lambda: _coerce_profiles(_load("profiles.csv")))
+                initial_loader=lambda: _coerce_profiles(_load("profiles.json", "profiles")))
 
 
 def _events_rows():
@@ -51,9 +55,12 @@ def _profiles_rows():
 
 
 
-def _load(filename):
-    with open(DATA_DIR / filename, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+def _load(filename, table):
+    return read_seed_with_ctx(DATA_DIR / filename, _API, table)
+
+
+def _strip_ctx(r):
+    return {k: v for k, v in r.items() if not k.startswith("__")}
 
 
 def _now():

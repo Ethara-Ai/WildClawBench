@@ -24,6 +24,12 @@ Security model
    the same Docker network but at a different IP, so it cannot reach the
    admin plane even if it discovers the routes.
 
+   The allowlist matches the raw TCP source IP. For proxied deployments,
+   set ``MOCK_ADMIN_ALLOWLIST`` to the proxy's IP, OR enable
+   ``MOCK_ADMIN_TRUST_FORWARDED_FOR=1`` to parse the first IP from the
+   ``X-Forwarded-For`` request header (off by default --- only enable behind
+   a trusted proxy that strips client-supplied values).
+
 3. The audit/tracking middleware that records all requests for the agent's
    visibility is configured to skip ``/admin/*`` paths (already done in
    ``tracking_middleware.py`` for ``/audit/*``; we add ``/admin/*`` to the
@@ -94,6 +100,7 @@ from _mutable_store import Store, StoreError
 ENV_ENABLED = "MOCK_ADMIN_ENABLED"
 ENV_ALLOWLIST = "MOCK_ADMIN_ALLOWLIST"
 ENV_TOKEN = "MOCK_ADMIN_TOKEN"
+ENV_TRUST_FORWARDED_FOR = "MOCK_ADMIN_TRUST_FORWARDED_FOR"
 
 ADMIN_PREFIX = "/admin"
 
@@ -112,6 +119,18 @@ def _allowlist_ips() -> List[str]:
 def _expected_token() -> Optional[str]:
     tok = os.environ.get(ENV_TOKEN, "").strip()
     return tok or None
+
+
+def _trust_forwarded_for() -> bool:
+    return os.environ.get(ENV_TRUST_FORWARDED_FOR, "").strip() == "1"
+
+
+def _client_ip(request: Request) -> str:
+    if _trust_forwarded_for():
+        xff = request.headers.get("X-Forwarded-For", "").strip()
+        if xff:
+            return xff.split(",")[0].strip()
+    return request.client.host if request.client else ""
 
 
 class _AdminGate(BaseHTTPMiddleware):
@@ -133,7 +152,7 @@ class _AdminGate(BaseHTTPMiddleware):
         if not path.startswith(ADMIN_PREFIX):
             return await call_next(request)
 
-        client_host = request.client.host if request.client else ""
+        client_host = _client_ip(request)
         if self._allowlist and client_host not in self._allowlist:
             return JSONResponse(status_code=404, content={"detail": "Not Found"})
 
