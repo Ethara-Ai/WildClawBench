@@ -412,3 +412,27 @@ def test_evidence_budget_non_sonnet_unaffected_by_bridge(monkeypatch):
     monkeypatch.delenv("JUDGE_MAX_EVIDENCE", raising=False)
     assert grading._member_evidence_budget(GLM_ARN, "glm") == 175_000
     assert grading._member_evidence_budget(KIMI_ARN, "kimi") == 225_000
+
+
+# ---------- judge cost is $0 on the OAuth subscription (billed via the flat plan) ----------
+
+def test_judge_cost_zero_for_sonnet_on_bridge(monkeypatch):
+    """The sonnet judge runs on the Claude Max subscription, so its real dollar
+    cost is the flat plan (not per-token). When the OAuth bridge is active the
+    reported cost_usd is forced to 0 while token counts are preserved."""
+    monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "http://127.0.0.1:51554")
+    assert grading._judge_cost_usd(SONNET_ARN, 95_727, 2_417, 0, 0, "sonnet") == (0.0, True)
+
+
+def test_judge_cost_nonzero_for_sonnet_without_bridge(monkeypatch):
+    monkeypatch.delenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", raising=False)
+    cost, priced = grading._judge_cost_usd(SONNET_ARN, 95_727, 2_417, 0, 0, "sonnet")
+    assert priced is True
+    assert cost == pytest.approx(0.323436, rel=1e-9)
+
+
+def test_judge_cost_non_sonnet_unaffected_by_bridge(monkeypatch):
+    monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "http://127.0.0.1:51554")
+    cost, priced = grading._judge_cost_usd(GLM_ARN, 10_000, 2_000, 0, 0, "glm")
+    assert priced is True
+    assert cost > 0.0

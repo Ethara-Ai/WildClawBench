@@ -559,6 +559,17 @@ def _judge_cost_usd(
     # mid-flight on a mis-configured judge. The fail-fast guarantee lives in
     # validate_judge_pricing(), called at grade_with_rubric() startup; callers
     # that bypass grade_with_rubric must run that validator themselves first.
+    # Subscription judging (sonnet via the Claude Max OAuth bridge) is not
+    # metered per-token — it draws on the flat Max plan — so the per-token list
+    # price would be a misleading "charge". Force cost_usd=0 (priced_ok=True) for
+    # that path; real cost is reconciled separately later. Token counts are kept.
+    if family == "sonnet":
+        try:
+            from . import judge_litellm  # local import: avoid import-time cost
+            if judge_litellm._judge_oauth_bridge_url():
+                return 0.0, True
+        except Exception:
+            pass
     rate = _judge_rate_for(model, family)
     if rate is None:
         logger.error(
@@ -1284,8 +1295,11 @@ def _grade_council(
         out_tok = int(u.get("output_tokens", 0) or 0)
         cr_tok = int(u.get("cache_read_tokens", 0) or 0)
         cw_tok = int(u.get("cache_write_tokens", 0) or 0)
+        # per_member.model must match judge_council.members/surviving (the
+        # OAuth-bridge effective label, not the rotating Bedrock ARN).
+        _member_model = r.get("effective_model") or r.get("model", "")
         member_entry: dict = {
-            "model": r.get("model", ""),
+            "model": _member_model,
             "input_tokens": in_tok,
             "output_tokens": out_tok,
             "cache_read_tokens": cr_tok,
@@ -1299,9 +1313,8 @@ def _grade_council(
             member_entry["cost_priced_ok"] = bool(u.get("cost_priced_ok"))
         if r.get("error"):
             member_entry["error"] = str(r.get("error"))[:200]
-        # Key by family. Families are unique per council (one sonnet/glm/kimi
-        # each); the full ARN is retained inside member_entry["model"] for audit.
-        # Fall back to the full model string only if family is somehow absent.
+        # Key by family (unique per council: one sonnet/glm/kimi each); fall
+        # back to the full model string only if family is somehow absent.
         key = r.get("family") or str(r.get("model", "") or "")
         if key in per_member:
             key = str(r.get("model", "") or key)

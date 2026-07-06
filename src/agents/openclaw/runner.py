@@ -121,6 +121,68 @@ class OpenClawAgent(BaseAgent):
             logger.warning("[%s] chat.jsonl host snapshot failed: %s", task_id, exc)
         return self.transcript_container_path
 
+    def _wait_for_llm_route_ready(
+        self,
+        task_id: str,
+        *,
+        attempts: int = 20,
+        interval: float = 1.5,
+        connect_timeout: float = 4.0,
+    ) -> bool:
+        # ROOT-CAUSE FIX for the intermittent "LLM request timed out." fast-fail
+        # that killed trajectories on the FIRST request (and therefore dropped
+        # all thinking/thinkingSignature blocks). openclaw's first LLM call goes
+        # agent-container -> litellm sidecar -> cc-bridge -> api.anthropic.com. A
+        # blind 2s gateway wait did NOT guarantee that in-network route was warm:
+        # under concurrent reps the cold first connect got refused and openclaw
+        # buckets ANY connect failure (ECONNREFUSED/ECONNRESET/ETIMEDOUT) as
+        # reason=timeout, surfacing "LLM request timed out." with no retry that
+        # helps. We must probe the route FROM THE AGENT'S OWN NETNS (not the
+        # host, not the sidecar) so we exercise the exact path the first real
+        # request uses, and only launch the agent once it answers.
+        if not (self.litellm_config_yaml and self.litellm_container_name):
+            return True
+        base = f"http://{self.litellm_container_name}:{self.litellm_port}"
+        # Any HTTP response (even 401/404) proves the TCP route to the sidecar is
+        # up and forwarding; we only care that the connection is no longer cold.
+        probe = (
+            "import sys,urllib.request,urllib.error\n"
+            f"u='{base}/health/liveliness'\n"
+            f"try:\n"
+            f"    urllib.request.urlopen(u, timeout={connect_timeout}); sys.exit(0)\n"
+            "except urllib.error.HTTPError:\n"
+            "    sys.exit(0)\n"
+            "except Exception as e:\n"
+            "    sys.stderr.write(str(e)); sys.exit(1)\n"
+        )
+        for i in range(1, attempts + 1):
+            try:
+                result = subprocess.run(
+                    ["docker", "exec", task_id, "python3", "-c", probe],
+                    capture_output=True,
+                    text=True,
+                    timeout=connect_timeout + 6.0,
+                )
+            except subprocess.TimeoutExpired:
+                result = None
+            except OSError as exc:
+                logger.warning("[%s] LLM route probe exec failed (%s); "
+                               "continuing", task_id, exc)
+                return False
+            if result is not None and result.returncode == 0:
+                logger.info(
+                    "[%s] LLM route warm after %d probe(s) (%s)",
+                    task_id, i, base,
+                )
+                return True
+            time.sleep(interval)
+        logger.warning(
+            "[%s] LLM route NOT confirmed warm after %d probes (%s); launching "
+            "agent anyway (first request may fast-fail as 'timeout')",
+            task_id, attempts, base,
+        )
+        return False
+
     def run_task(self, spec: AgentTaskSpec) -> AgentExecution:
         gateway_proc = None
         agent_proc = None
@@ -264,6 +326,7 @@ class OpenClawAgent(BaseAgent):
             )
             logger.info("[%s] Waiting for gateway (2s)...", spec.task_id)
             time.sleep(2)
+            self._wait_for_llm_route_ready(spec.task_id)
 
             safe_prompt = spec.prompt.replace("'", "'\\''")
             start_time = time.perf_counter()

@@ -451,13 +451,34 @@ def normalize_body_for_anthropic_direct(body: dict[str, Any]) -> dict[str, Any]:
     thinking = body.get("thinking")
     if isinstance(thinking, dict):
         ttype = thinking.get("type")
+        # Preserve the caller's display mode; default to "summarized".
+        #
+        # Load-bearing (priority-3 comment): the `display` field is what makes
+        # Anthropic-direct return READABLE thinking text. Verified live
+        # 2026-07-06 against api.anthropic.com with the Claude Max OAuth token:
+        #   thinking={type:enabled,budget_tokens:1024}                 -> thinking text "" (signature only)
+        #   thinking={type:enabled,budget_tokens:1024,display:summarized} -> thinking text len 142 (readable)
+        # Without display:summarized the OAuth/CLI path redacts the reasoning to
+        # an empty string + encrypted signature, so openclaw records empty
+        # thinking blocks. output_config:{effort:high} does NOT restore text on
+        # this endpoint. Do NOT drop `display`; if absent, inject "summarized".
+        display = thinking.get("display")
+        if display not in ("summarized", "omitted"):
+            display = "summarized"
         if ttype == "adaptive":
             budget = thinking.get("budget_tokens")
             if not isinstance(budget, int) or budget <= 0:
                 budget = 32000
-            body["thinking"] = {"type": "enabled", "budget_tokens": budget}
-        elif ttype == "enabled" and not isinstance(thinking.get("budget_tokens"), int):
-            body["thinking"] = {"type": "enabled", "budget_tokens": 32000}
+            body["thinking"] = {
+                "type": "enabled", "budget_tokens": budget, "display": display,
+            }
+        elif ttype == "enabled":
+            budget = thinking.get("budget_tokens")
+            if not isinstance(budget, int) or budget <= 0:
+                budget = 32000
+            body["thinking"] = {
+                "type": "enabled", "budget_tokens": budget, "display": display,
+            }
     return body
 
 
