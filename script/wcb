@@ -61,10 +61,18 @@ _wcb_login() {
         _wcb_err "WCB_CC_ACCOUNT_POOL / WCB_CC_BRIDGE_SECRET missing in .env — cannot login"
         return 1
     fi
-    if [ ! -f "$_pool" ]; then
-        _wcb_err "pool file missing: $_pool — cannot login"
-        return 1
-    fi
+    # Pool spec may be a file path, "default", or "keychain:<service>".
+    # Only enforce the file-exists check for actual file-path specs; the
+    # non-file specs are resolved live by src/utils/claude_oauth (Keychain).
+    case "$_pool" in
+        default|keychain:*) ;;
+        *)
+            if [ ! -f "$_pool" ]; then
+                _wcb_err "pool file missing: $_pool — cannot login"
+                return 1
+            fi
+            ;;
+    esac
 
     export WCB_USE_CLAUDE_OAUTH="${_use:-1}"
     export WCB_CC_ACCOUNT_POOL="$_pool"
