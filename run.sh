@@ -18,6 +18,9 @@
 # --jobs N runs up to N tasks concurrently (default 1 = sequential). Each task
 #   gets its own mock stack + k3net network, so they coexist; the orphan cleanup
 #   only touches stopped containers / empty networks, never a live run.
+# --no-subagents forces sub-agent spawning OFF for the run(s): the model is never
+#   offered sessions_spawn, so it does the whole task inline (no fan-out). Works
+#   with single, --bulk, and combined with --jobs.
 # --regrade skips docker/mock preflight (no agent runs); only needs .env credentials.
 
 set -u
@@ -325,6 +328,9 @@ cleanup_orphans() {
 # Returns: stamps "$RUN_RC" and "$RUN_LOG" globals so the retry loop can inspect.
 RUN_RC=0
 RUN_LOG=""
+# Set to "1" by the --no-subagents CLI flag; forwarded to run_batch.py so the
+# model is never granted sessions_spawn (no fan-out for the whole run).
+NO_SUBAGENTS=""
 
 run_one() {
     local task_path="$1"
@@ -355,6 +361,7 @@ run_one() {
         --thinking xhigh \
         --parallel 1 \
         --judge-council \
+        ${NO_SUBAGENTS:+--no-subagents} \
         2>&1 | tee "$RUN_LOG"
     RUN_RC=${PIPESTATUS[0]}
     set -e
@@ -549,14 +556,16 @@ main() {
     local k="$DEFAULT_K"
     local jobs=1
 
-    # Pre-scan for --jobs/-j anywhere in the args, then strip it so the existing
-    # positional/mode parsing below is unchanged. Default 1 = sequential (old behavior).
+    # Pre-scan for --jobs/-j and --no-subagents anywhere in the args, then strip
+    # them so the existing positional/mode parsing below is unchanged.
+    # Default 1 = sequential (old behavior); default subagents = task-configured.
     local _args=()
     while (( $# )); do
         case "$1" in
-            --jobs|-j)  jobs="${2:-}"; shift 2 ;;
-            --jobs=*)   jobs="${1#*=}"; shift ;;
-            *)          _args+=("$1"); shift ;;
+            --jobs|-j)       jobs="${2:-}"; shift 2 ;;
+            --jobs=*)        jobs="${1#*=}"; shift ;;
+            --no-subagents)  NO_SUBAGENTS=1; shift ;;
+            *)               _args+=("$1"); shift ;;
         esac
     done
     set -- ${_args[@]+"${_args[@]}"}
