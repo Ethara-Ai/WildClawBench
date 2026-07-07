@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import subprocess
 import tempfile
 import time
@@ -340,6 +341,25 @@ class OpenClawAgent(BaseAgent):
             # kills them mid-run and their trajectories are never written.
             if spec.multi_agent_enabled:
                 self._wait_for_subagents(spec.task_id)
+                # Repair the fan-out-then-stop failure: the parent occasionally
+                # ends its turn right after spawning, believing it will be
+                # "resumed on completion" (belief seen verbatim in GERALD
+                # run_8's thinking). This single-turn harness has no such
+                # resume, so the deliverables never get written and every
+                # rubric/test collapses. Detect that exact stop and drive one
+                # synthesis turn on the SAME session so the parent collects its
+                # children and assembles the outputs. Already-synthesized runs
+                # are left untouched. Disable via
+                # OPENCLAW_SUBAGENT_SYNTH_RECOVERY=0.
+                recovered = self._recover_synthesis_if_stalled(
+                    spec, len(turn_messages))
+                if recovered is not None:
+                    agent_proc = recovered
+                    # Extend the usage window + elapsed so the recovery turn's
+                    # tokens and time are counted (window end was stamped
+                    # above, before the recovery turn ran).
+                    self._task_windows[spec.task_id] = (wall_start, time.time())
+                    elapsed_time = time.perf_counter() - start_time
 
             logger.info("[%s] Agent exit code: %s", spec.task_id,
                         agent_proc.returncode if agent_proc else "n/a")
@@ -430,6 +450,159 @@ class OpenClawAgent(BaseAgent):
             "[%s] sub-agent wait hit max_wait=%.0fs; collecting as-is",
             task_id, max_wait,
         )
+
+    # Tool calls whose presence AFTER the last sessions_spawn prove the parent
+    # went on to build deliverables (vs. ending its turn to "wait" for
+    # children). These tools always write files.
+    _WRITE_TOOL_NAMES = frozenset(
+        {"write", "edit", "str_replace", "apply_patch"}
+    )
+
+    # ``exec`` is ambiguous — it is used both to INSPECT (cat/grep/pdftotext/
+    # python-read) and to WRITE deliverables. Counting every post-spawn exec as
+    # synthesis false-cleared a real stall (GERALD run_9: two inspection execs
+    # after fan-out, zero deliverables, rubric 5.8%). So an exec only proves
+    # synthesis when its command shows file-writing intent: a pandas/CSV/JSON
+    # dump, a Python ``open(..., "w")``, a ``tee``, or a redirect into a
+    # real deliverable file (``> report.md``) — excluding /dev, /tmp and fd
+    # redirects, which are scratch, not output.
+    _EXEC_WRITE_INTENT = re.compile(
+        r"""(?xi)
+        \.to_csv\( | \.to_json\( | \.to_excel\( | \.write_text\(
+        | \.writelines\( | \.savefig\( | json\.dump\( | csv\.writer
+        | open\([^)]*,\s*['"][wax] | writeFileSync | fs\.writeFile | \btee\b
+        | >>?\s*['"]?(?!/dev/|/tmp/|/proc/|&)[\w./~ -]*\.(?:csv|tsv|json|jsonl
+          |md|markdown|txt|eml|html|xml|ya?ml|pdf|png|jpe?g|svg|docx?|xlsx?)
+        """
+    )
+
+    def _recover_synthesis_if_stalled(
+        self, spec: AgentTaskSpec, turns_done: int,
+    ) -> subprocess.Popen | None:
+        """Drive one synthesis turn iff the parent fanned out but never
+        synthesized.
+
+        Returns the recovery agent process (so the caller can report its exit
+        code / fold its usage), or ``None`` when no recovery was needed, the
+        feature is disabled, or stall-detection failed. Enabled by default;
+        disable with ``OPENCLAW_SUBAGENT_SYNTH_RECOVERY=0``.
+        """
+        flag = os.environ.get(
+            "OPENCLAW_SUBAGENT_SYNTH_RECOVERY", "1"
+        ).strip().lower()
+        if flag in ("0", "false", "no", "off", ""):
+            return None
+        try:
+            stalled = self._parent_stopped_after_spawn(spec.task_id)
+        except (subprocess.SubprocessError, OSError, ValueError) as exc:
+            logger.warning(
+                "[%s] synthesis-stall detection failed (%s); skipping recovery "
+                "turn", spec.task_id, exc,
+            )
+            return None
+        if not stalled:
+            return None
+        logger.warning(
+            "[%s] parent ended its turn after fan-out WITHOUT synthesizing "
+            "(no deliverable write after the last sessions_spawn) — driving a recovery "
+            "synthesis turn on the same session", spec.task_id,
+        )
+        message = (
+            "Your sub-agents have finished and their results are now available. "
+            "There is no automatic resume — you must finish the task in THIS "
+            "turn. Enumerate the children with `sessions_list` and read each "
+            "one's output with `sessions_history`, then produce ALL of the "
+            "final deliverables the task asked for and write every deliverable "
+            "file to the workspace. Do NOT spawn any more sub-agents and do NOT "
+            "reply with only a status update. Hold the same red lines and "
+            "two-source verification rules you were given."
+        )
+        # Tag any (unexpected) spawns from this turn to the next index so spawn
+        # correlation stays consistent with the primary turns.
+        write_turn_marker(spec.task_id, turns_done)
+        safe_msg = message.replace("'", "'\\''")
+        proc = run_background(
+            spec.task_id,
+            bash_cmd=(
+                f"openclaw agent --session-id chat "
+                f"--timeout {spec.timeout_seconds} "
+                f"--message '{safe_msg}'"
+            ),
+            log_path=spec.output_dir / "agent_recovery.log",
+        )
+        logger.info("[%s] Waiting for recovery synthesis turn...", spec.task_id)
+        try:
+            proc.wait(timeout=spec.timeout_seconds)
+            logger.info("[%s] Recovery synthesis turn finished", spec.task_id)
+        except subprocess.TimeoutExpired:
+            logger.warning("[%s] Recovery synthesis turn timed out", spec.task_id)
+            proc.kill()
+            proc.wait()
+        # The recovery turn shouldn't fan out, but settle any stragglers.
+        self._wait_for_subagents(spec.task_id)
+        return proc
+
+    def _parent_stopped_after_spawn(self, task_id: str) -> bool:
+        """True iff a parent session fanned out (>=1 ``sessions_spawn``) yet
+        issued no deliverable-producing tool call after its LAST spawn — the
+        exact fingerprint of the "ended turn expecting a resume" failure.
+
+        Reads the live session transcripts from the gateway container. The
+        parent is the only session that calls ``sessions_spawn`` (children do
+        not fan out further in these tasks), so the first session containing a
+        spawn is the parent. Returns False when no fan-out is found or the
+        parent clearly synthesized.
+        """
+        sessions_dir = "/root/.openclaw/agents/main/sessions"
+        listing = subprocess.run(
+            ["docker", "exec", task_id, "/bin/bash", "-c",
+             f"ls {sessions_dir}/*.jsonl 2>/dev/null"],
+            capture_output=True, text=True,
+        ).stdout.split()
+        for path in listing:
+            raw = subprocess.run(
+                ["docker", "exec", task_id, "/bin/bash", "-c", f"cat '{path}'"],
+                capture_output=True, text=True,
+            ).stdout
+            # (message_index, tool_name, exec_command_or_empty)
+            tool_calls: list[tuple[int, str, str]] = []
+            msg_index = 0
+            for line in raw.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not (isinstance(entry, dict) and entry.get("type") == "message"):
+                    continue
+                inner = entry.get("message")
+                content = inner.get("content") if isinstance(inner, dict) else None
+                if isinstance(content, list):
+                    for part in content:
+                        if not (isinstance(part, dict)
+                                and part.get("type") in ("toolCall", "tool_use")):
+                            continue
+                        name = str(part.get("name") or "")
+                        cmd = ""
+                        if name == "exec":
+                            args = part.get("arguments") or part.get("input") or {}
+                            if isinstance(args, dict):
+                                cmd = str(args.get("command") or "")
+                        tool_calls.append((msg_index, name, cmd))
+                msg_index += 1
+            spawn_positions = [i for i, n, _ in tool_calls if n == "sessions_spawn"]
+            if not spawn_positions:
+                continue  # not the parent (this session never fanned out)
+            last_spawn = max(spawn_positions)
+            synthesized = any(
+                n in self._WRITE_TOOL_NAMES
+                or (n == "exec" and self._EXEC_WRITE_INTENT.search(cmd))
+                for i, n, cmd in tool_calls if i > last_spawn
+            )
+            return not synthesized
+        return False
 
     def collect_usage(self, task_id: str, output_dir: Path, elapsed_time: float) -> dict:
         transcript_host = output_dir / "chat.jsonl"

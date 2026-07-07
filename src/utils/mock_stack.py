@@ -232,7 +232,9 @@ def build_mock_image_if_needed(env_dir: Path, image: str = MOCK_IMAGE,
         return False
 
     api_dirs = sorted(api_ports.keys())
-    logger.info("Building mock image %s with %d APIs (~5-10 min)", image, len(api_dirs))
+    logger.info("Building shared mock image %s with all %d APIs baked in "
+                "(one-time, ~5-10 min; each run starts only its task's subset "
+                "via MOCK_ENABLED_APIS)", image, len(api_dirs))
 
     with tempfile.TemporaryDirectory(prefix="kensei3-mocks-build-") as tmpdir:
         tmp = Path(tmpdir)
