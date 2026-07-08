@@ -195,6 +195,25 @@ def build_run_batch_parser(default_model: str, default_parallel: int) -> argpars
         action="store_false",
         help="Force-disable the judge council even if JUDGE_COUNCIL=1 in env.",
     )
+    parser.add_argument(
+        "--use-claude-oauth",
+        dest="use_claude_oauth",
+        action="store_true",
+        default=False,
+        help="Route the agent's opus calls through the Claude Code OAuth bridge "
+             "sidecar (subscription-billed via api.anthropic.com) instead of "
+             "metered Bedrock. Requires --cc-account-pool. Equivalent to "
+             "WCB_USE_CLAUDE_OAUTH=1. The Sonnet judge stays on Bedrock.",
+    )
+    parser.add_argument(
+        "--cc-account-pool",
+        dest="cc_account_pool",
+        default="",
+        help="Directory (or colon-joined paths) of Claude OAuth creds JSON "
+             "files for the bridge's account pool. A single creds file is "
+             "fine — its parent dir is mounted. Also settable via "
+             "WCB_CC_ACCOUNT_POOL.",
+    )
     return parser
 
 

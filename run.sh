@@ -332,6 +332,15 @@ RUN_LOG=""
 # model is never granted sessions_spawn (no fan-out for the whole run).
 NO_SUBAGENTS=""
 
+# Claude OAuth bridge opt-in (see bootstrap_shared_sidecar). Off by default.
+# NOTE: kept EMPTY (not "0") when off so `${USE_CLAUDE_OAUTH:+--flag}` in run_one
+# only expands when actually enabled. `${USE_CLAUDE_OAUTH:-0} == "1"` guards work
+# with empty too.
+USE_CLAUDE_OAUTH="${USE_CLAUDE_OAUTH:-}"
+CC_ACCOUNT_POOL="${CC_ACCOUNT_POOL:-}"
+# Shared-sidecar bookkeeping (populated by bootstrap_shared_sidecar).
+WCB_SHARED_OWNER_PID=""
+
 run_one() {
     local task_path="$1"
     local model="$2"
@@ -362,6 +371,8 @@ run_one() {
         --parallel 1 \
         --judge-council \
         ${NO_SUBAGENTS:+--no-subagents} \
+        ${USE_CLAUDE_OAUTH:+--use-claude-oauth} \
+        ${CC_ACCOUNT_POOL:+--cc-account-pool "$CC_ACCOUNT_POOL"} \
         2>&1 | tee "$RUN_LOG"
     RUN_RC=${PIPESTATUS[0]}
     set -e
@@ -548,6 +559,107 @@ process_task() {
     printf 'recovered=%d\n' "$t_recovered" >> "$summary_file"
 }
 
+# --------------------------------------------------------------------------
+# Shared-infra bootstrap (Claude OAuth). Starts ONE network + LiteLLM sidecar
+# (+ host-published cc-bridge) per batch via eval/bootstrap_sidecar.py, exports
+# WCB_SHARED_* so every rep reuses them, auto-wires the host-side Sonnet judge
+# to the OAuth bridge, and installs a ref-counted teardown trap. Ported from
+# origin/claude_oauth_pathway::script/run.sh (log helpers + tmpdir chaining
+# adapted to talos; `cleanup_run_marker` replaced by talos's `rm -rf $tmpdir`).
+# --------------------------------------------------------------------------
+bootstrap_shared_sidecar() {
+    log_step "Bootstrap shared LiteLLM sidecar (one per batch, not per rep)"
+    local suffix tmpfile rc=0
+    suffix="$$-$(date +%Y%m%d_%H%M%S)"
+    tmpfile="$(mktemp -t wcb_bootstrap.XXXXXX)"
+
+    # python writes key=value to stdout; progress to stderr (surfaced via log_info).
+    # On non-zero exit we fail loud and abort — without the sidecar no rep can
+    # reach Bedrock/the bridge anyway.
+    if python3 eval/bootstrap_sidecar.py --name-suffix "$suffix" > "$tmpfile" 2> >(while read -r ln; do log_info "$ln"; done); then
+        rc=0
+    else
+        rc=$?
+    fi
+    if (( rc != 0 )); then
+        log_err "bootstrap_sidecar.py exited rc=$rc — aborting batch"
+        rm -f "$tmpfile"
+        return $rc
+    fi
+
+    local k v
+    while IFS='=' read -r k v; do
+        case "$k" in
+            name)               WCB_SHARED_SIDECAR="$v" ;;
+            network)            WCB_SHARED_NETWORK="$v" ;;
+            usage_log)          WCB_SHARED_SIDECAR_USAGE_LOG="$v" ;;
+            yaml_path)          WCB_SHARED_SIDECAR_YAML="$v" ;;
+            master_key)         WCB_SHARED_LITELLM_MASTER_KEY="$v" ;;
+            cc_bridge)          WCB_SHARED_CC_BRIDGE="$v" ;;
+            cc_bridge_url)      WCB_SHARED_CC_BRIDGE_URL="$v" ;;
+            cc_bridge_host_url) WCB_SHARED_CC_BRIDGE_HOST_URL="$v" ;;
+        esac
+    done < "$tmpfile"
+    rm -f "$tmpfile"
+
+    if [[ -z "${WCB_SHARED_SIDECAR:-}" || -z "${WCB_SHARED_NETWORK:-}" ]]; then
+        log_warn "Shared sidecar declined by bootstrap (no creds?); reps fall back per-process"
+        return 0
+    fi
+
+    WCB_SHARED_OWNER_PID=$$
+    export WCB_SHARED_NETWORK WCB_SHARED_SIDECAR \
+           WCB_SHARED_SIDECAR_USAGE_LOG WCB_SHARED_SIDECAR_YAML \
+           WCB_SHARED_LITELLM_MASTER_KEY WCB_SHARED_OWNER_PID \
+           WCB_SHARED_CC_BRIDGE WCB_SHARED_CC_BRIDGE_URL \
+           WCB_SHARED_CC_BRIDGE_HOST_URL
+    log_ok "Shared sidecar=$WCB_SHARED_SIDECAR network=$WCB_SHARED_NETWORK owner_pid=$WCB_SHARED_OWNER_PID"
+
+    # Route the HOST-side Sonnet judge through the OAuth bridge. bootstrap
+    # published the in-network cc-bridge on a loopback host port; the host-side
+    # grading step reaches it via 127.0.0.1. Only when OAuth is active — Bedrock
+    # judging is untouched otherwise. The judge's own sonnet-only gate +
+    # x-wcb-bridge-secret still apply downstream.
+    if [[ -n "${WCB_SHARED_CC_BRIDGE_HOST_URL:-}" && "${USE_CLAUDE_OAUTH:-0}" == "1" ]]; then
+        export KENSEI_JUDGE_OAUTH_BRIDGE_URL="$WCB_SHARED_CC_BRIDGE_HOST_URL"
+        export KENSEI_JUDGE_USE_LITELLM=1
+        log_ok "Sonnet judge -> OAuth bridge $WCB_SHARED_CC_BRIDGE_HOST_URL"
+    fi
+
+    # Replace the EXIT/INT/TERM traps so an interrupted batch does not leak the
+    # sidecar/network/bridge. Chain talos's tmpdir cleanup (was `rm -rf $tmpdir`).
+    trap 'teardown_shared_sidecar; rm -rf "${tmpdir:-}"' EXIT
+    trap 'teardown_shared_sidecar; rm -rf "${tmpdir:-}"; exit 130' INT
+    trap 'teardown_shared_sidecar; rm -rf "${tmpdir:-}"; exit 143' TERM
+}
+
+teardown_shared_sidecar() {
+    # Owner-PID guard: under --jobs>1, workers inherit WCB_SHARED_* and each
+    # worker's EXIT trap fires teardown. Without this guard the first finishing
+    # worker would `docker rm -f` the SHARED sidecar out from under slower
+    # siblings. Only the bootstrapping PID (owner) may tear down.
+    if [[ -n "${WCB_SHARED_OWNER_PID:-}" && "$$" != "$WCB_SHARED_OWNER_PID" ]]; then
+        return 0
+    fi
+    # Idempotent: blank the vars so a re-entrant trap (EXIT after INT) won't rm twice.
+    [[ -z "${WCB_SHARED_SIDECAR:-}${WCB_SHARED_NETWORK:-}" ]] && return 0
+    local sc="${WCB_SHARED_SIDECAR:-}"
+    local nw="${WCB_SHARED_NETWORK:-}"
+    local yp="${WCB_SHARED_SIDECAR_YAML:-}"
+    local cb="${WCB_SHARED_CC_BRIDGE:-}"
+    WCB_SHARED_SIDECAR=""; WCB_SHARED_NETWORK=""
+    WCB_SHARED_SIDECAR_USAGE_LOG=""; WCB_SHARED_SIDECAR_YAML=""
+    WCB_SHARED_LITELLM_MASTER_KEY=""
+    WCB_SHARED_CC_BRIDGE=""; WCB_SHARED_CC_BRIDGE_URL=""
+    WCB_SHARED_CC_BRIDGE_HOST_URL=""
+    unset KENSEI_JUDGE_OAUTH_BRIDGE_URL 2>/dev/null || true
+    log_info "Tearing down shared sidecar=${sc} network=${nw}${cb:+ cc_bridge=$cb}"
+    [[ -n "$sc" ]] && docker rm -f "$sc" >/dev/null 2>&1 || true
+    [[ -n "$cb" ]] && docker rm -f "$cb" >/dev/null 2>&1 || true
+    [[ -n "$nw" ]] && docker network rm "$nw" >/dev/null 2>&1 || true
+    [[ -n "$yp" && -f "$yp" ]] && rm -f "$yp" 2>/dev/null || true
+}
+
 main() {
     local mode="single"
     local tasks=()
@@ -562,13 +674,23 @@ main() {
     local _args=()
     while (( $# )); do
         case "$1" in
-            --jobs|-j)       jobs="${2:-}"; shift 2 ;;
-            --jobs=*)        jobs="${1#*=}"; shift ;;
-            --no-subagents)  NO_SUBAGENTS=1; shift ;;
-            *)               _args+=("$1"); shift ;;
+            --jobs|-j)           jobs="${2:-}"; shift 2 ;;
+            --jobs=*)            jobs="${1#*=}"; shift ;;
+            --no-subagents)      NO_SUBAGENTS=1; shift ;;
+            --use-claude-oauth)  USE_CLAUDE_OAUTH=1; shift ;;
+            --cc-account-pool)   CC_ACCOUNT_POOL="${2:-}"; shift 2 ;;
+            --cc-account-pool=*) CC_ACCOUNT_POOL="${1#*=}"; shift ;;
+            *)                   _args+=("$1"); shift ;;
         esac
     done
     set -- ${_args[@]+"${_args[@]}"}
+    # Surface the OAuth opt-in to the Python side. Config.from_env reads
+    # WCB_USE_CLAUDE_OAUTH / WCB_CC_ACCOUNT_POOL; bootstrap_sidecar.py + run_batch
+    # pick them up. Both are inert unless --use-claude-oauth was passed.
+    if [[ "${USE_CLAUDE_OAUTH:-0}" == "1" ]]; then
+        export WCB_USE_CLAUDE_OAUTH=1
+        [[ -n "${CC_ACCOUNT_POOL:-}" ]] && export WCB_CC_ACCOUNT_POOL="$CC_ACCOUNT_POOL"
+    fi
     if ! [[ "$jobs" =~ ^[0-9]+$ ]] || (( jobs < 1 )); then
         log_err "--jobs must be a positive integer, got: $jobs"
         exit 2
@@ -647,6 +769,15 @@ main() {
     local tmpdir
     tmpdir=$(mktemp -d -t wildclaw_runsh.XXXXXX)
     trap 'rm -rf "$tmpdir"' EXIT
+
+    # Claude OAuth: bring up ONE shared network+sidecar+cc-bridge before fan-out
+    # so every task/model/rep reuses it (and the host-side judge auto-wires to
+    # the bridge). Must precede the concurrent task loop below. bootstrap
+    # REPLACES the EXIT trap above with one that also tears the shared infra down.
+    # Inert unless --use-claude-oauth was passed.
+    if [[ "${USE_CLAUDE_OAUTH:-0}" == "1" ]]; then
+        bootstrap_shared_sidecar || { log_err "shared sidecar bootstrap failed"; exit 1; }
+    fi
 
     # Per-task base offset is deterministic (task_idx × models × k), so tasks need
     # no sequential accumulation and can run concurrently. Each task writes one

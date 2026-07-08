@@ -59,6 +59,16 @@ class Config:
     meta_base_url: str = "https://api.ai.meta.com/v1"
     meta_model: str = ""
 
+    # ---- Claude Code OAuth bridge (opt-in agent trajectory) ----
+    # When enabled, the agent's opus calls route through a local Anthropic-proxy
+    # sidecar authenticated with a Claude subscription OAuth token instead of
+    # metered Bedrock. `cc_account_pool` is a dir (or colon-joined paths) of
+    # creds JSON files; `cc_bridge_secret` gates the sidecar (auto-generated when
+    # empty). All three are inert unless `use_claude_oauth` is set.
+    use_claude_oauth: bool = False
+    cc_account_pool: str = ""
+    cc_bridge_secret: str = ""
+
     # ---- OpenRouter (fallback LLM routing) ----
     openrouter_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
@@ -170,6 +180,9 @@ class Config:
             litellm_master_key=s("KENSEI_LITELLM_MASTER_KEY", "KENSEI3_LITELLM_MASTER_KEY", "LITELLM_MASTER_KEY", default="sk-talos-litellm"),
             litellm_port=i("KENSEI3_LITELLM_PORT", i("LITELLM_PORT", 4000)),
             min_harbor_score=f("MIN_HARBOR_SCORE"),
+            use_claude_oauth=b("WCB_USE_CLAUDE_OAUTH", False),
+            cc_account_pool=s("WCB_CC_ACCOUNT_POOL", default=""),
+            cc_bridge_secret=s("WCB_CC_BRIDGE_SECRET", default=""),
         )
 
     def litellm_enabled(self) -> bool:

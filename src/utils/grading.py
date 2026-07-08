@@ -50,6 +50,32 @@ JUDGE_MODEL = os.environ.get("JUDGE_MODEL", "openai/gpt-5.4")  # may be bedrock/
 # member on real WildClawBench runs.
 _DEFAULT_JUDGE_MAX_EVIDENCE = 450_000
 
+# Evidence cap when the Sonnet judge routes through the Claude OAuth bridge.
+# The bridge forwards to claude-sonnet-4-5, which has a HARD 200,000-token
+# context — far smaller than Bedrock Sonnet's 1M. Without this cap, grading
+# sends Bedrock-sized evidence and every OAuth judge call 400s with
+# `prompt is too long: >200000` (observed on Ruth_Armstrong_01). ~300k chars
+# ≈ 120k tokens + scaffold, comfortably under 200k. Override via
+# KENSEI_JUDGE_OAUTH_MAX_EVIDENCE.
+_DEFAULT_JUDGE_OAUTH_MAX_EVIDENCE = 300_000
+
+
+def _judge_oauth_max_evidence() -> int:
+    raw = os.environ.get("KENSEI_JUDGE_OAUTH_MAX_EVIDENCE")
+    if raw is None or raw.strip() == "":
+        return _DEFAULT_JUDGE_OAUTH_MAX_EVIDENCE
+    try:
+        n = int(raw)
+    except ValueError:
+        return _DEFAULT_JUDGE_OAUTH_MAX_EVIDENCE
+    return n if n > 0 else _DEFAULT_JUDGE_OAUTH_MAX_EVIDENCE
+
+
+def _judge_oauth_active() -> bool:
+    """True when the Sonnet judge is routed through the Claude OAuth bridge."""
+    from src.utils import judge_litellm
+    return bool(judge_litellm._judge_oauth_bridge_url())
+
 
 def _resolve_judge_max_evidence() -> int | None:
     raw = os.environ.get("JUDGE_MAX_EVIDENCE")
@@ -148,6 +174,18 @@ _DEFAULT_MAX_OUTPUT_TOKENS = 4000
 
 
 def _member_evidence_budget(model: str) -> int | None:
+    base = _member_evidence_budget_base(model)
+    # When the Sonnet judge routes through the Claude OAuth bridge (200K-token
+    # context), clamp EVERY member's evidence so judge prompts don't exceed it.
+    # `base is None` means "no cap" from the base resolver — the OAuth ceiling
+    # still applies, so return it outright.
+    if _judge_oauth_active():
+        cap = _judge_oauth_max_evidence()
+        return cap if base is None else min(base, cap)
+    return base
+
+
+def _member_evidence_budget_base(model: str) -> int | None:
     env_raw = os.environ.get("JUDGE_MAX_EVIDENCE")
     if env_raw is not None and env_raw.strip() != "":
         return _resolve_judge_max_evidence()
@@ -205,8 +243,21 @@ def council_enabled() -> bool:
 def council_members() -> list[str]:
     raw = os.environ.get("JUDGE_COUNCIL_MEMBERS", "").strip()
     if raw:
-        return [m.strip() for m in raw.split(",") if m.strip()]
-    return [m for m in _DEFAULT_COUNCIL_MEMBERS if m]
+        members = [m.strip() for m in raw.split(",") if m.strip()]
+    else:
+        members = [m for m in _DEFAULT_COUNCIL_MEMBERS if m]
+    # Claude-OAuth runs (wcb / --use-claude-oauth) have NO Bedrock credentials:
+    # only the Sonnet member is reachable, via the host-published OAuth bridge.
+    # GLM/Kimi are Bedrock-only, so keeping them would fail every OAuth-run
+    # council on quorum. When the judge OAuth bridge is active, drop the
+    # non-Sonnet members so ONLY Sonnet runs; ARN/Bedrock runs (no bridge URL)
+    # keep the full roster and run all three.
+    from . import judge_litellm
+    if judge_litellm._judge_oauth_bridge_url():
+        sonnet_only = [m for m in members if judge_litellm._is_sonnet_judge(m)]
+        if sonnet_only:
+            return sonnet_only
+    return members
 
 
 def _judge_system_prompt() -> str:
@@ -762,6 +813,16 @@ def _call_one_judge(model: str, system: str, user: str) -> tuple[str, dict]:
     provider, _, rest = m.partition("/")
     if provider == "bedrock":
         return _call_judge_bedrock(rest, system, user)
+    if provider == "auth":
+        # OAuth-bridge sentinel (e.g. auth/claude-oauth-bridge). It is ONLY
+        # reachable via the LiteLLM bridge path above; reaching here means that
+        # path failed or wasn't configured. Do NOT fall through to OpenAI — that
+        # masks the real cause as the misleading "no OpenAI key for judge".
+        raise RuntimeError(
+            f"judge model {m!r} requires the Claude OAuth bridge — set "
+            "KENSEI_JUDGE_OAUTH_BRIDGE_URL and KENSEI_JUDGE_USE_LITELLM=1 "
+            "(bridge path unavailable or errored)"
+        )
     return _call_judge_openai(rest or m, system, user)
 
 
@@ -917,7 +978,13 @@ def _grade_council(
     single-judge'."""
     results = _run_council(members, system, user_for_member, len(rubrics))
     surviving = [r for r in results if r.get("ok") and isinstance(r.get("verdicts"), list)]
-    if len(surviving) < 2:
+    # In Claude OAuth mode only the Sonnet member can reach a model (it routes
+    # through the bridge); Kimi/GLM are Bedrock-only and cannot use the OAuth
+    # subscription, so they legitimately drop out. Match the branch: let the
+    # council grade on the Sonnet survivor alone rather than falling to the
+    # (Bedrock/OpenAI) single-judge path, which has no working creds here.
+    min_surviving = 1 if _judge_oauth_active() else 2
+    if len(surviving) < min_surviving:
         failed_summary = "; ".join(
             f"{_short_judge_label(r.get('model', '?'))}={(r.get('error') or 'unknown').strip()[:160]}"
             for r in results if not r.get("ok")

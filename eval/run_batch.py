@@ -60,6 +60,11 @@ from src.utils.litellm_sidecar import (
     stop_litellm,
     verify_litellm_upstream_reachable,
     wait_for_litellm_healthy,
+    CC_BRIDGE_INTERNAL_PORT,
+    ensure_cc_bridge_image,
+    start_bridge,
+    stop_bridge,
+    wait_for_bridge_healthy,
 )
 from src.utils.trajectory.builder import build_published_trajectory, build_trajectory_from_jsonl
 from src.utils.trajectory.local_media import replace_inline_media_with_files
@@ -1815,10 +1820,62 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list):
     if not use_litellm:
         return False, "", "", "", {}, ""
 
+    # --- Shared-infra short-circuit (WCB_SHARED_* set by run.sh bootstrap) ----
+    # run.sh::bootstrap_shared_sidecar starts ONE network+sidecar(+cc-bridge) per
+    # batch via eval/bootstrap_sidecar.py and exports these. When present we
+    # REUSE them instead of creating per-rep infra, and register NO teardown
+    # (run.sh owns lifecycle via its EXIT/INT/TERM trap). Unset => per-batch path.
+    shared_network = os.environ.get("WCB_SHARED_NETWORK", "").strip()
+    shared_sidecar = os.environ.get("WCB_SHARED_SIDECAR", "").strip()
+    shared_usage_log = os.environ.get("WCB_SHARED_SIDECAR_USAGE_LOG", "").strip()
+    shared_yaml_path = os.environ.get("WCB_SHARED_SIDECAR_YAML", "").strip()
+    shared_cc_bridge = os.environ.get("WCB_SHARED_CC_BRIDGE", "").strip()
+    shared_cc_bridge_url = os.environ.get("WCB_SHARED_CC_BRIDGE_URL", "").strip()
+    shared_mode = bool(shared_network and shared_sidecar)
+
     import uuid as _uuid
     batch_id = _uuid.uuid4().hex[:12]
-    network = f"k3net-{batch_id}"
-    sidecar = f"ll-{batch_id}"
+    if shared_mode:
+        network = shared_network
+        sidecar = shared_sidecar
+    else:
+        network = f"k3net-{batch_id}"
+        sidecar = f"ll-{batch_id}"
+
+    # --- Claude Code OAuth bridge (opt-in --use-claude-oauth) ----------------
+    # When on, the sidecar's opus blocks are repointed at a wcbsh-cc-bridge
+    # sidecar that swaps the stub key for a subscription OAuth token. Inert when
+    # off (bridge_url stays "", so build_litellm_config_yaml uses Bedrock).
+    use_oauth = bool(getattr(args, "use_claude_oauth", False) or config.use_claude_oauth)
+    cc_pool_dir = (getattr(args, "cc_account_pool", "") or config.cc_account_pool or "").strip()
+    bridge_url = ""
+    cc_bridge_name = ""
+    if use_oauth:
+        import secrets as _secrets
+        if shared_mode and shared_cc_bridge and shared_cc_bridge_url:
+            # Reuse the bootstrap-owned bridge (agent reaches it in-network).
+            cc_bridge_name = shared_cc_bridge
+            bridge_url = shared_cc_bridge_url
+        else:
+            cc_bridge_name = f"wcbsh-cc-bridge-{batch_id}"
+            bridge_url = f"http://{cc_bridge_name}:{CC_BRIDGE_INTERNAL_PORT}"
+        # In shared mode the bootstrap already exported the secret — reuse it so
+        # worker + bridge agree. Fall back to config, then a fresh secret.
+        cc_bridge_secret = (
+            (config.cc_bridge_secret or "").strip()
+            or os.environ.get("WCB_CC_BRIDGE_SECRET", "").strip()
+            or _secrets.token_hex(32)
+        )
+        # start_litellm reads this from the env to wire the sidecar's opus
+        # blocks to the bridge — export BEFORE building/starting either.
+        os.environ["WCB_CC_BRIDGE_SECRET"] = cc_bridge_secret
+        if not cc_pool_dir:
+            raise RuntimeError(
+                "--use-claude-oauth requires --cc-account-pool (a directory, or "
+                "colon-joined paths, of Claude OAuth creds JSON), or set "
+                "WCB_CC_ACCOUNT_POOL. Export creds first with "
+                "`python -m src.utils.claude_oauth --check`."
+            )
 
     # Agent-side Headroom prompt compression defaults ON in this harness (parity
     # with the judge Headroom switch in judge_litellm.judge_headroom_enabled).
@@ -1840,6 +1897,9 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list):
         meta_model=config.meta_model,
         enable_usage_callback=True,
         enable_headroom_callback=_agent_headroom,
+        use_claude_oauth=use_oauth,
+        bridge_url=bridge_url,
+        enable_oauth_usage_callback=use_oauth,
     )
     if not litellm_yaml:
         raise RuntimeError(
@@ -1847,30 +1907,113 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list):
             "Strict mode: refusing to silently downgrade to OpenRouter."
         )
 
-    pull_litellm_image()
-    create_network(network)
-    cleanups.append(lambda: remove_network(network))
+    if not shared_mode:
+        pull_litellm_image()
+        create_network(network)
+        cleanups.append(lambda: remove_network(network))
+
+    # Bring the OAuth bridge up on the same internal network BEFORE the sidecar,
+    # so the sidecar's opus blocks have a live upstream to point at. The bridge
+    # is dual-homed (internal + default bridge) for egress to api.anthropic.com.
+    if use_oauth and not (shared_mode and shared_cc_bridge):
+        _pool_dir = os.path.abspath(os.path.expanduser(cc_pool_dir))
+        if os.path.isfile(_pool_dir):          # single creds file → mount its parent dir
+            _pool_dir = os.path.dirname(_pool_dir)
+        ensure_cc_bridge_image()
+        # Publish the bridge on a host loopback port so the HOST-side judge can
+        # reach it. Prefer a fixed WCB_CC_BRIDGE_HOST_PORT if set AND currently
+        # free; otherwise allocate a free ephemeral port. This avoids the
+        # "Bind for 127.0.0.1:<port> failed: port is already allocated" error
+        # when a prior run's cc-bridge container is still holding the port.
+        import socket as _socket
+
+        def _port_free(p: int) -> bool:
+            with _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM) as _s:
+                try:
+                    _s.bind(("127.0.0.1", p))
+                    return True
+                except OSError:
+                    return False
+
+        _fixed = os.environ.get("WCB_CC_BRIDGE_HOST_PORT", "").strip()
+        if not (_fixed and _fixed.isdigit() and _port_free(int(_fixed))):
+            with _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM) as _s:
+                _s.bind(("127.0.0.1", 0))
+                _free_port = _s.getsockname()[1]
+            os.environ["WCB_CC_BRIDGE_HOST_PORT"] = str(_free_port)
+            if _fixed:
+                logger.warning(
+                    "[%s] WCB_CC_BRIDGE_HOST_PORT=%s is busy; using free port %s instead",
+                    batch_id, _fixed, _free_port,
+                )
+        start_bridge(
+            container_name=cc_bridge_name,
+            network=network,
+            pool_host_dir=_pool_dir,
+            bridge_secret=os.environ["WCB_CC_BRIDGE_SECRET"],
+        )
+        cleanups.append(lambda: stop_bridge(cc_bridge_name))
+        if not wait_for_bridge_healthy(cc_bridge_name):
+            raise RuntimeError(
+                f"Claude OAuth bridge {cc_bridge_name} did not become healthy. "
+                f"Inspect `docker logs {cc_bridge_name}` (expired/invalid creds?)."
+            )
+        logger.info("[%s] Claude OAuth bridge up at %s", batch_id, bridge_url)
+        # Route the HOST-side Sonnet judge through the just-published OAuth bridge
+        # so grading needs no Bedrock/OpenAI creds. Requires the bridge to be
+        # published on a host loopback port (WCB_CC_BRIDGE_HOST_PORT → start_bridge
+        # publishes -p 127.0.0.1:<port>:8765). Only set under OAuth; ARN/Bedrock
+        # runs leave KENSEI_JUDGE_OAUTH_BRIDGE_URL unset so the judge council runs
+        # the full Bedrock roster (Sonnet+GLM+Kimi).
+        _judge_host_port = os.environ.get("WCB_CC_BRIDGE_HOST_PORT", "").strip()
+        if _judge_host_port:
+            os.environ["KENSEI_JUDGE_OAUTH_BRIDGE_URL"] = f"http://127.0.0.1:{_judge_host_port}"
+            os.environ.setdefault("KENSEI_JUDGE_USE_LITELLM", "1")
+            logger.info(
+                "[%s] Sonnet judge -> OAuth bridge http://127.0.0.1:%s (GLM/Kimi dropped: no Bedrock creds)",
+                batch_id, _judge_host_port,
+            )
+        else:
+            logger.warning(
+                "[%s] OAuth run but WCB_CC_BRIDGE_HOST_PORT unset — cc-bridge not host-published, "
+                "so the host-side judge cannot reach it and will fail. Set WCB_CC_BRIDGE_HOST_PORT.",
+                batch_id,
+            )
+
     config.work_dir.mkdir(parents=True, exist_ok=True)
-    cfg_path = config.work_dir / f"litellm-config-{batch_id}.yaml"
-    cfg_path.write_text(litellm_yaml, encoding="utf-8")
+    if shared_mode and shared_yaml_path and Path(shared_yaml_path).is_file():
+        cfg_path = Path(shared_yaml_path)
+    else:
+        cfg_path = config.work_dir / f"litellm-config-{batch_id}.yaml"
+        cfg_path.write_text(litellm_yaml, encoding="utf-8")
 
     callback_src = Path(__file__).resolve().parent.parent / "src" / "utils" / "litellm_usage_callback.py"
-    usage_dir = config.work_dir / f"litellm-usage-{batch_id}"
-    usage_dir.mkdir(parents=True, exist_ok=True)
-    usage_log_path = usage_dir / "usage.jsonl"
-    usage_log_path.touch(exist_ok=True)
+    oauth_callback_src = ""
+    if use_oauth:
+        oauth_callback_src = str(
+            Path(__file__).resolve().parent.parent / "src" / "utils" / "litellm_usage_oauth_callback.py"
+        )
+    if shared_mode and shared_usage_log:
+        usage_log_path = Path(shared_usage_log)
+        usage_dir = usage_log_path.parent
+    else:
+        usage_dir = config.work_dir / f"litellm-usage-{batch_id}"
+        usage_dir.mkdir(parents=True, exist_ok=True)
+        usage_log_path = usage_dir / "usage.jsonl"
+        usage_log_path.touch(exist_ok=True)
     # Surface to _build_trajectory so it can back-fill per-message cost blocks
     # (chat.jsonl writes them as zero on this image build; IAN Pointer 5).
     globals()["_USAGE_LOG_PATH"] = str(usage_log_path)
-    try:
-        os.chmod(usage_log_path, 0o666)
-        os.chmod(usage_dir, 0o777)
-    except OSError:
-        pass
+    if not shared_mode:
+        try:
+            os.chmod(usage_log_path, 0o666)
+            os.chmod(usage_dir, 0o777)
+        except OSError:
+            pass
 
     headroom_callback_src = ""
     headroom_log_dir_str = ""
-    if _agent_headroom:
+    if _agent_headroom and not shared_mode:
         headroom_callback_src = str(
             Path(__file__).resolve().parent.parent / "src" / "utils" / "litellm_headroom_callback.py"
         )
@@ -1885,36 +2028,45 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list):
         # usage.json (IAN report Pointer 3).
         globals()["_HEADROOM_LOG_DIR"] = headroom_log_dir_str
 
-    start_litellm(
-        container_name=sidecar,
-        network=network,
-        host_config_path=str(cfg_path),
-        master_key=config.litellm_master_key,
-        aws_bearer_token=config.aws_bearer_token,
-        aws_region=config.bedrock_region,
-        openai_api_key=config.openai_api_key,
-        openai_whisper_api_key=config.openai_whisper_api_key,
-        meta_api_key=config.meta_api_key,
-        usage_callback_host_path=str(callback_src),
-        usage_log_host_dir=str(usage_dir),
-        headroom_callback_host_path=headroom_callback_src,
-        headroom_log_host_dir=headroom_log_dir_str,
-        enable_headroom=_agent_headroom,
-    )
-    cleanups.append(lambda: stop_litellm(sidecar))
-    if not wait_for_litellm_healthy(sidecar):
-        raise RuntimeError(
-            f"LiteLLM sidecar {sidecar} did not become healthy in time. "
-            f"Strict mode: refusing to continue with a dead sidecar. "
-            f"Override budget via KENSEI_LITELLM_HEALTH_TIMEOUT env (seconds)."
+    if shared_mode:
+        logger.info(
+            "LiteLLM sidecar %s reused (shared-infra mode, network=%s); "
+            "skipping start/wait/verify — run.sh owns lifecycle", sidecar, network,
         )
+    else:
+        start_litellm(
+            container_name=sidecar,
+            network=network,
+            host_config_path=str(cfg_path),
+            master_key=config.litellm_master_key,
+            aws_bearer_token=config.aws_bearer_token,
+            aws_region=config.bedrock_region,
+            openai_api_key=config.openai_api_key,
+            openai_whisper_api_key=config.openai_whisper_api_key,
+            meta_api_key=config.meta_api_key,
+            usage_callback_host_path=str(callback_src),
+            usage_log_host_dir=str(usage_dir),
+            oauth_usage_callback_host_path=oauth_callback_src,
+            headroom_callback_host_path=headroom_callback_src,
+            headroom_log_host_dir=headroom_log_dir_str,
+            enable_headroom=_agent_headroom,
+        )
+        cleanups.append(lambda: stop_litellm(sidecar))
+        if not wait_for_litellm_healthy(sidecar):
+            raise RuntimeError(
+                f"LiteLLM sidecar {sidecar} did not become healthy in time. "
+                f"Strict mode: refusing to continue with a dead sidecar. "
+                f"Override budget via KENSEI_LITELLM_HEALTH_TIMEOUT env (seconds)."
+            )
     probe_model = (
         "claude-opus-4.7" if config.aws_bearer_token and config.bedrock_inference_arn
         else "gpt-5.5" if config.openai_api_key
         else config.meta_model if (config.meta_api_key and config.meta_model)
         else ""
     )
-    if probe_model:
+    if probe_model and not shared_mode:
+        # In shared mode the bootstrap already verified upstream reachability
+        # once; re-verifying per-rep is wasteful and races on the shared sidecar.
         ok, detail = verify_litellm_upstream_reachable(
             sidecar, master_key=config.litellm_master_key, model_name=probe_model,
         )

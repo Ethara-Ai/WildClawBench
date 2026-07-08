@@ -150,23 +150,36 @@ class InjectScript:
         d = Path(inject_dir)
         if not d.is_dir():
             raise InjectConfigError(f"inject dir not found: {d}")
+        # Case-insensitive: tasks ship either `stage0/` or `Stage0/`. The regex
+        # was case-sensitive, so `Stage0` (capital S) matched nothing → "no
+        # stageN/ dirs" → inject setup failed → single-turn fallback with no
+        # before/after workspace snapshots. IGNORECASE accepts both spellings.
         stage_dirs = sorted(
-            (p for p in d.iterdir() if p.is_dir() and re.match(r"stage\d+$", p.name)),
-            key=lambda p: int(re.match(r"stage(\d+)$", p.name).group(1)),
+            (p for p in d.iterdir()
+             if p.is_dir() and re.match(r"stage\d+$", p.name, re.IGNORECASE)),
+            key=lambda p: int(re.match(r"stage(\d+)$", p.name, re.IGNORECASE).group(1)),
         )
         if not stage_dirs:
             raise InjectConfigError(f"no stageN/ dirs under {d}")
         stages: List[InjectStage] = []
         for sd in stage_dirs:
+            # Accept both `mutations.json` (plural, documented) and the
+            # `mutation.json` (singular) spelling some tasks ship. Without this,
+            # a singular-named file is silently skipped → no stages → inject
+            # setup fails → no before/after snapshots.
             mf = sd / "mutations.json"
             if not mf.is_file():
-                LOG.warning("inject: %s has no mutations.json; skipping", sd.name)
-                continue
+                _alt = sd / "mutation.json"
+                if _alt.is_file():
+                    mf = _alt
+                else:
+                    LOG.warning("inject: %s has no mutations.json/mutation.json; skipping", sd.name)
+                    continue
             try:
                 raw = json.loads(mf.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError) as exc:
                 raise InjectConfigError(f"{mf}: {exc}") from exc
-            idx = int(re.match(r"stage(\d+)$", sd.name).group(1))
+            idx = int(re.match(r"stage(\d+)$", sd.name, re.IGNORECASE).group(1))
             between = (
                 raw.get("applies_between_turns")
                 or raw.get("applied_between")

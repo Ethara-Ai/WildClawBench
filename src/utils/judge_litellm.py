@@ -68,6 +68,49 @@ def judge_headroom_enabled() -> bool:
     return _truthy(raw)
 
 
+# ---------- Claude OAuth judge route (opt-in, dormant by default) ----------
+# When KENSEI_JUDGE_OAUTH_BRIDGE_URL points at a host-reachable cc-bridge, the
+# Sonnet council member routes through it (subscription OAuth) instead of
+# Bedrock. Kimi/GLM ALWAYS stay on Bedrock — they 403 on the Anthropic route.
+# The bridge that fronts the agent lives on the internal docker network and is
+# NOT host-reachable; run/publish a host-side bridge (e.g. WCB_CC_BRIDGE_HOST_PORT
+# or `python -m src.utils.claude_oauth --port 8788`) and point this env at it.
+_SONNET_JUDGE_TAILS = ("urg0zifsjiga", "ehj0ago7sthx")
+
+
+def _judge_oauth_bridge_url() -> str:
+    """Host-reachable cc-bridge base URL for the Sonnet judge, or "" (off)."""
+    return os.environ.get("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "").strip()
+
+
+def _judge_oauth_bridge_model() -> str:
+    """Anthropic model id the bridge forwards the Sonnet judge to."""
+    return os.environ.get(
+        "KENSEI_JUDGE_OAUTH_BRIDGE_MODEL", "anthropic/claude-sonnet-4-5-20250929"
+    ).strip()
+
+
+def _is_oauth_bridge_model(model: str) -> bool:
+    """True iff `model` is the explicit Claude-OAuth-bridge sentinel, i.e. an
+    `auth/...` id such as `auth/claude-oauth-bridge`. Unlike a Bedrock ARN this
+    carries no provider LiteLLM understands, so it MUST be routed straight to
+    the OAuth bridge; otherwise the `auth` provider falls through to OpenAI and
+    fails with "no OpenAI key for judge"."""
+    return (model or "").strip().lower().startswith("auth/")
+
+
+def _is_sonnet_judge(model: str) -> bool:
+    """True iff `model` is the Sonnet council member (by name or ARN tail) or the
+    explicit OAuth-bridge sentinel — both are forwarded through the bridge to the
+    Sonnet judge model."""
+    m = (model or "").lower()
+    return (
+        "sonnet" in m
+        or any(t in (model or "") for t in _SONNET_JUDGE_TAILS)
+        or _is_oauth_bridge_model(model)
+    )
+
+
 def _headroom_target_ratio() -> float:
     raw = os.environ.get("KENSEI_JUDGE_HEADROOM_TARGET_RATIO")
     if not raw:
@@ -286,7 +329,7 @@ def call_judge_via_litellm(
     # Sanity: judges MUST NOT receive `thinking`, `reasoning_effort`,
     # `output_config`, or `response_format` — those silently change the
     # output character and break `_VERDICT_RE` parsing. Pass nothing extra.
-    response = litellm.completion(
+    completion_kwargs = dict(
         model=model,
         messages=messages,
         max_tokens=max_output_tokens,
@@ -301,6 +344,23 @@ def call_judge_via_litellm(
         # Bedrock judges drop it and still run through the LiteLLM path.
         drop_params=True,
     )
+
+    # Claude OAuth judge route (opt-in via KENSEI_JUDGE_OAUTH_BRIDGE_URL). Route
+    # ONLY the Sonnet member through the bridge; Kimi/GLM stay on Bedrock (they
+    # 403 on the Anthropic /v1/messages route). Default: env unset => no-op.
+    _judge_bridge = _judge_oauth_bridge_url()
+    if _judge_bridge and _is_sonnet_judge(model):
+        completion_kwargs["model"] = _judge_oauth_bridge_model()
+        completion_kwargs["api_base"] = _judge_bridge
+        completion_kwargs["api_key"] = (
+            os.environ.get("WCB_CC_STUB_KEY", "").strip() or "sk-wcb-oauth-stub"
+        )
+        _judge_secret = os.environ.get("WCB_CC_BRIDGE_SECRET", "").strip()
+        if _judge_secret:
+            completion_kwargs["extra_headers"] = {"x-wcb-bridge-secret": _judge_secret}
+        logger.info("[judge] Sonnet member routed through Claude OAuth bridge %s", _judge_bridge)
+
+    response = litellm.completion(**completion_kwargs)
 
     # Extract text. LiteLLM normalizes to OpenAI shape across providers.
     try:

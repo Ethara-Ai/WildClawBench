@@ -24,6 +24,9 @@ def build_litellm_config_yaml(
     meta_api_key: str = "",
     meta_base_url: str = "https://api.ai.meta.com/v1",
     meta_model: str = "",
+    use_claude_oauth: bool = False,
+    bridge_url: str = "",
+    enable_oauth_usage_callback: bool = False,
 ) -> str:
     model_blocks: list[str] = []
     # `cache_control_injection_points` MUST live inside each model's
@@ -42,7 +45,33 @@ def build_litellm_config_yaml(
         "        - location: message\n"
         "          role: system\n"
     )
-    if bedrock_arn:
+    if use_claude_oauth and bridge_url:
+        # Claude Code OAuth trajectory (opt-in --use-claude-oauth). The opus
+        # model blocks point at the wcbsh-cc-bridge sidecar, which swaps the
+        # stub api_key for an OAuth Bearer token and forwards to
+        # api.anthropic.com on the native /v1/messages route. x-wcb-bridge-secret
+        # gates co-tenant access; usage lands in usage_oauth.jsonl. thinking uses
+        # the Anthropic-native enabled+budget shape (the Bedrock branch below
+        # documents why that shape 400s on Converse — it's correct here), and
+        # cache costs are zeroed (OAuth is subscription-billed, not per-token).
+        opus_oauth_params = (
+            "    litellm_params:\n"
+            "      model: anthropic/claude-opus-4-8\n"
+            f"      api_base: {bridge_url}\n"
+            "      api_key: os.environ/WCB_CC_STUB_KEY\n"
+            "      thinking: {\"type\": \"enabled\", \"budget_tokens\": 32000}\n"
+            "      stream_options:\n"
+            "        include_usage: true\n"
+            + cache_marker
+            + "      extra_headers:\n"
+            "        x-wcb-bridge-secret: os.environ/WCB_CC_BRIDGE_SECRET\n"
+            "      cache_read_input_token_cost: 0\n"
+            "      cache_creation_input_token_cost: 0"
+        )
+        model_blocks.append("  - model_name: claude-opus-4.8\n" + opus_oauth_params)
+        model_blocks.append("  - model_name: claude-opus-4.7\n" + opus_oauth_params)
+        model_blocks.append("  - model_name: claude-opus-4-6\n" + opus_oauth_params)
+    elif bedrock_arn:
         # Extended-thinking visibility on opus-4-6/4-7 via Bedrock Converse needs the
         # EXACT pair thinking:{type:adaptive} + output_config:{effort}. Three shapes
         # were tried empirically against this LiteLLM (main-stable sha 75543fa1d739):
@@ -288,6 +317,8 @@ def build_litellm_config_yaml(
         _cbs.append("litellm_usage_callback.proxy_handler_instance")
     if enable_headroom_callback:
         _cbs.append("litellm_headroom_callback.headroom_callback_instance")
+    if enable_oauth_usage_callback:
+        _cbs.append("litellm_usage_oauth_callback.oauth_usage_callback_instance")
     if _cbs:
         callback_line = "  callbacks: [" + ", ".join(f'"{c}"' for c in _cbs) + "]\n"
     else:
@@ -444,6 +475,7 @@ def start_litellm(
     enable_headroom: bool = False,
     openai_whisper_api_key: str = "",
     meta_api_key: str = "",
+    oauth_usage_callback_host_path: str = "",
 ) -> None:
     env_args: list[str] = ["-e", f"LITELLM_MASTER_KEY={master_key}"]
     _litellm_log = os.environ.get("LITELLM_LOG", "").strip()
@@ -466,6 +498,17 @@ def start_litellm(
     if meta_api_key:
         env_args += ["-e", f"META_API_KEY={meta_api_key}"]
 
+    # Claude OAuth bridge: forward the shared HMAC secret + stub key so the
+    # sidecar's opus model blocks can authenticate to the wcbsh-cc-bridge
+    # sidecar (they reference os.environ/WCB_CC_BRIDGE_SECRET and
+    # os.environ/WCB_CC_STUB_KEY). Opt-in — empty secret means OAuth is off,
+    # so nothing changes on the Bedrock path.
+    _cc_secret = os.environ.get("WCB_CC_BRIDGE_SECRET", "").strip()
+    if _cc_secret:
+        env_args += ["-e", f"WCB_CC_BRIDGE_SECRET={_cc_secret}"]
+    _cc_stub = os.environ.get("WCB_CC_STUB_KEY", "").strip() or "sk-wcb-oauth-stub"
+    env_args += ["-e", f"WCB_CC_STUB_KEY={_cc_stub}"]
+
     # Mount the callback module + writable log dir so UsageWriter can write
     # real provider-side usage rows from inside the sidecar. The env var name
     # is also read by litellm_usage_callback.py:_write_row.
@@ -476,6 +519,19 @@ def start_litellm(
             "-v", f"{usage_log_host_dir}:/var/litellm_usage",
             "-e", "LITELLM_USAGE_LOG_PATH=/var/litellm_usage/usage.jsonl",
         ]
+
+    # Claude OAuth usage attribution: mount the oauth callback module so
+    # oauth_usage_callback_instance writes subscription-billed rows to a SEPARATE
+    # usage_oauth.jsonl sink (never merged with usage.jsonl — schema invariant).
+    # It reads WCB_OAUTH_USAGE_LOG_PATH (default /var/litellm_usage/usage_oauth.jsonl).
+    if oauth_usage_callback_host_path and usage_log_host_dir:
+        callback_args += [
+            "-v", f"{oauth_usage_callback_host_path}:/app/litellm_usage_oauth_callback.py:ro",
+        ]
+        # Ensure the shared usage dir is mounted even if the base usage callback
+        # above didn't run (avoids a double-mount when it did).
+        if not (usage_callback_host_path and usage_log_host_dir):
+            callback_args += ["-v", f"{usage_log_host_dir}:/var/litellm_usage"]
 
     # Headroom pre-call compressor: writes to a SEPARATE JSONL sink
     # (/var/litellm_headroom/headroom.jsonl). Must never collide with
@@ -618,4 +674,227 @@ def verify_litellm_upstream_reachable(
 
 
 def stop_litellm(container_name: str) -> None:
+    subprocess.run(["docker", "rm", "-f", container_name], capture_output=True)
+
+
+CC_BRIDGE_IMAGE = "wildclawbench-cc-bridge:v1"
+CC_BRIDGE_INTERNAL_PORT = 8765
+
+
+def ensure_cc_bridge_image(image: str = CC_BRIDGE_IMAGE) -> None:
+    r = subprocess.run(
+        ["docker", "image", "inspect", image],
+        capture_output=True,
+    )
+    if r.returncode == 0:
+        return
+    repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    dockerfile = os.path.join(repo_root, "docker", "cc-bridge", "Dockerfile")
+    if not os.path.isfile(dockerfile):
+        raise RuntimeError(
+            f"cc-bridge image {image} not present locally and Dockerfile missing at {dockerfile}. "
+            f"Build manually: docker build -t {image} -f {dockerfile} {repo_root}"
+        )
+    logger.info("Building cc-bridge image %s", image)
+    r = subprocess.run(
+        ["docker", "build", "-t", image, "-f", dockerfile, repo_root],
+        capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        raise RuntimeError(
+            f"cc-bridge image build failed:\n{r.stderr}\n"
+            f"Manual: docker build -t {image} -f {dockerfile} {repo_root}"
+        )
+    logger.info("cc-bridge image %s built", image)
+
+
+def start_bridge(
+    container_name: str,
+    network: str,
+    pool_host_dir: str,
+    bridge_secret: str,
+    port: int = CC_BRIDGE_INTERNAL_PORT,
+    image: str = CC_BRIDGE_IMAGE,
+    upstream: str = "https://api.anthropic.com",
+    account_pool_spec: str = "",
+    skip_system_prefix: bool = False,
+) -> None:
+    from src.utils.docker_utils import (
+        build_env_args,
+        _validate_docker_token,
+    )
+    _validate_docker_token("container_name", container_name)
+    _validate_docker_token("network", network)
+    if not pool_host_dir or not os.path.isdir(pool_host_dir):
+        raise RuntimeError(
+            f"start_bridge: pool_host_dir must exist ({pool_host_dir!r})"
+        )
+    if not bridge_secret:
+        raise RuntimeError("start_bridge: bridge_secret required (co-tenant threat)")
+
+    if not account_pool_spec:
+        account_pool_spec = ":".join(
+            f"/oauth_pool/{f}"
+            for f in sorted(os.listdir(pool_host_dir))
+            if f.endswith(".json")
+        )
+    if not account_pool_spec:
+        raise RuntimeError(
+            f"start_bridge: no *.json OAuth credential files found under {pool_host_dir}"
+        )
+
+    env_pairs: list[tuple[str, str]] = [
+        ("WCB_CC_ACCOUNT_POOL", account_pool_spec),
+        ("WCB_CC_BRIDGE_SECRET", bridge_secret),
+        ("WCB_CC_UPSTREAM", upstream),
+    ]
+    if skip_system_prefix:
+        env_pairs.append(("WCB_CC_SKIP_SYSTEM_PREFIX", "1"))
+    for _k in (
+        "WCB_CC_MAX_INLINE_RETRIES",
+        "WCB_CC_MAX_INLINE_WAIT",
+        "WCB_CC_UPSTREAM",
+        "WCB_CC_DEBUG_LOG_BODY",
+        "WCB_CC_USER_AGENT",
+        "WCB_CC_X_APP",
+    ):
+        _v = os.environ.get(_k)
+        if _v:
+            env_pairs.append((_k, _v))
+    env_args = build_env_args(env_pairs)
+    image = _validate_docker_token("cc-bridge image", image)
+
+    ensure_cc_bridge_image(image)
+
+    dump_mount: list[str] = []
+    _dump_host = os.environ.get("WCB_CC_BODY_DUMP_HOST_DIR")
+    if _dump_host:
+        os.makedirs(_dump_host, exist_ok=True)
+        dump_mount = ["-v", f"{_dump_host}:/wcb_dumps:rw"]
+        env_args += build_env_args([("WCB_CC_BODY_DUMP_DIR", "/wcb_dumps")])
+
+    # Publish the bridge on a host loopback port when WCB_CC_BRIDGE_HOST_PORT is
+    # set, so the host-side Sonnet judge (grading.py runs on the host, not in the
+    # sidecar network) can reach the bridge at http://127.0.0.1:<port>. Bound to
+    # 127.0.0.1 only; the x-wcb-bridge-secret still gates every request.
+    publish_args: list[str] = []
+    _host_port = os.environ.get("WCB_CC_BRIDGE_HOST_PORT", "").strip()
+    if _host_port:
+        publish_args = ["-p", f"127.0.0.1:{_host_port}:{port}"]
+
+    # Network-attach ordering is load-bearing on Docker Desktop for Mac. When a
+    # container is CREATED on a user-defined network and a `-p` publish is
+    # requested, the loopback port-forward (docker-proxy/vpnkit) silently fails
+    # to bind 127.0.0.1 — `docker inspect` shows the PortBindings but `docker ps`
+    # shows no `->` forward and host curl is REFUSED. The fix: when publishing,
+    # CREATE the container on the DEFAULT `bridge` network (with `-p`), then
+    # attach the sidecar `network` second. That keeps the loopback forward alive
+    # AND still resolves the bridge by name on the sidecar net (verified: agent
+    # peers reach http://<name>:8765 fine). Without a publish we keep the old
+    # order (create on sidecar net, dual-home to default bridge for egress).
+    if publish_args:
+        create_network_arg = "bridge"
+        secondary_network = network
+    else:
+        create_network_arg = network
+        secondary_network = "bridge"
+
+    cmd = [
+        "docker", "run", "-d",
+        "--name", container_name,
+        "--network", create_network_arg,
+        *env_args,
+        *dump_mount,
+        *publish_args,
+        "-v", f"{pool_host_dir}:/oauth_pool:rw",
+        image,
+        "--host", "0.0.0.0",
+        "--port", str(port),
+    ]
+    logger.info(
+        "[%s] Starting cc-bridge on network %s (image=%s pool_dir=%s publish=%s)",
+        container_name, create_network_arg, image, pool_host_dir, _host_port or "none",
+    )
+    subprocess.run(["docker", "rm", "-f", container_name], capture_output=True)
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError(f"cc-bridge container start failed:\n{r.stderr}")
+    # Attach the second NIC. When we published, this is the sidecar network so
+    # the agent/sidecar can resolve the bridge by name; otherwise it's the
+    # default bridge for api.anthropic.com egress. connect_default_bridge is
+    # idempotent for the 'bridge' case; use a direct connect for the sidecar net.
+    if secondary_network == "bridge":
+        connect_default_bridge(container_name)
+    else:
+        cr = subprocess.run(
+            ["docker", "network", "connect", secondary_network, container_name],
+            capture_output=True, text=True,
+        )
+        if cr.returncode != 0 and "already exists" not in (cr.stderr or ""):
+            raise RuntimeError(
+                f"Failed to attach {container_name} to {secondary_network}: {cr.stderr}"
+            )
+    logger.info(
+        "[%s] cc-bridge dual-homed (internal + default bridge for api.anthropic.com egress)",
+        container_name,
+    )
+
+
+def wait_for_bridge_healthy(
+    container_name: str,
+    port: int = CC_BRIDGE_INTERNAL_PORT,
+    timeout: float | None = None,
+) -> bool:
+    if timeout is None:
+        try:
+            timeout = float(os.environ.get("WCB_CC_BRIDGE_HEALTH_TIMEOUT", "60"))
+        except ValueError:
+            timeout = 60.0
+    probe = (
+        "import urllib.request; "
+        f"urllib.request.urlopen('http://localhost:{port}/healthz', timeout=2)"
+    )
+    deadline = time.time() + timeout
+    interval = 1.5
+    while time.time() < deadline:
+        r = subprocess.run(
+            ["docker", "exec", container_name, "python3", "-c", probe],
+            capture_output=True,
+        )
+        if r.returncode == 0:
+            logger.info("[%s] cc-bridge healthy", container_name)
+            return True
+        time.sleep(interval)
+    logger.warning(
+        "[%s] cc-bridge did not become healthy within %.0fs", container_name, timeout
+    )
+    return False
+
+
+def wait_for_bridge_host_port(host_port: str, timeout: float = 15.0) -> bool:
+    """Probe the HOST-published loopback port (127.0.0.1:<host_port>/healthz).
+
+    wait_for_bridge_healthy only checks health from INSIDE the container, which
+    passes even when Docker Desktop for Mac silently drops the `-p` loopback
+    forward. But the Sonnet judge dials the bridge from the host, so a dropped
+    publish surfaces much later as `[Errno 61] Connection refused` at grade time
+    (intermittent, load-dependent). This probe catches the dropped publish up
+    front so the caller can recreate the bridge instead of failing at grading.
+    """
+    if not host_port:
+        return True
+    import urllib.request
+
+    deadline = time.time() + timeout
+    url = f"http://127.0.0.1:{host_port}/healthz"
+    while time.time() < deadline:
+        try:
+            with urllib.request.urlopen(url, timeout=2):
+                return True
+        except Exception:  # noqa: BLE001
+            time.sleep(1.0)
+    return False
+
+
+def stop_bridge(container_name: str) -> None:
     subprocess.run(["docker", "rm", "-f", container_name], capture_output=True)

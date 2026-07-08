@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import shlex
 import subprocess
 import tempfile
@@ -17,6 +18,77 @@ TMP_WORKSPACE = os.environ.get("TMP_WORKSPACE",  "/tmp_workspace")
 WORKSPACE_BASELINE_PATH = "/tmp/wildclaw_workspace_baseline.json"
 
 BRAVE_API_KEY = os.environ.get("BRAVE_API_KEY", "")
+
+# ---------------------------------------------------------------------------
+# argv hardening helpers (ported from the claude_oauth_pathway bridge work).
+# Used when constructing `docker run` argv from caller-supplied names/env so a
+# leading '-' or embedded whitespace/NUL can't inject a flag or split a token.
+# ---------------------------------------------------------------------------
+_ENV_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_FORBIDDEN_VALUE_CHARS = ("\n", "\r", "\x00")
+_FORBIDDEN_TOKEN_CHARS = ("\n", "\r", "\x00", " ", "\t")
+
+
+def _validate_env_arg(key: str, value: str) -> tuple[str, str]:
+    if not isinstance(key, str) or not _ENV_KEY_RE.match(key):
+        raise ValueError(f"invalid env var name: {key!r}")
+    if not isinstance(value, str):
+        raise ValueError(
+            f"env value for {key!r} must be str, got {type(value).__name__}"
+        )
+    if value.startswith("-"):
+        raise ValueError(
+            f"env value for {key!r} starts with '-' (argv-flag injection)"
+        )
+    if any(c in value for c in _FORBIDDEN_VALUE_CHARS):
+        raise ValueError(
+            f"env value for {key!r} contains a forbidden control char"
+        )
+    return key, value
+
+
+def _validate_docker_token(name: str, token: str) -> str:
+    """Validate a bare argv token (image, network, container_name, ...).
+
+    These positions never have a '-e' prefix, so a leading '-' would be
+    consumed directly as a docker flag. Whitespace would split the token
+    into multiple argv elements. NUL would terminate it.
+    """
+    if not isinstance(token, str):
+        raise ValueError(
+            f"{name} must be str, got {type(token).__name__}"
+        )
+    if not token:
+        raise ValueError(f"{name} must be a non-empty string")
+    if token.startswith("-"):
+        raise ValueError(
+            f"{name} {token!r} starts with '-' (argv-flag injection)"
+        )
+    if any(c in token for c in _FORBIDDEN_TOKEN_CHARS):
+        raise ValueError(
+            f"{name} {token!r} contains a forbidden whitespace / control char"
+        )
+    return token
+
+
+def build_env_args(pairs: "list[tuple[str, str]] | dict[str, str]") -> list[str]:
+    """Build a validated ['-e', 'K=V', '-e', 'K=V', ...] list.
+
+    Accepts an ordered list of (key, value) pairs OR a dict (insertion-
+    ordered). Empty values are honored — they emit '-e KEY=' which docker
+    treats as 'set KEY to the empty string'.
+    """
+    if isinstance(pairs, dict):
+        items = list(pairs.items())
+    else:
+        items = list(pairs)
+    out: list[str] = []
+    for key, value in items:
+        _validate_env_arg(key, value)
+        out.append("-e")
+        out.append(f"{key}={value}")
+    return out
+
 
 def remove_container(name: str) -> None:
     subprocess.run(["docker", "rm", "-f", name], capture_output=True)
