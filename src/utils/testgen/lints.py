@@ -57,12 +57,145 @@ def function_passes_empty_files(func: ast.FunctionDef) -> bool:
     return True
 
 
+_HTTP_METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE"}
+_METHOD_KEY_RE = re.compile(r"^(GET|POST|PUT|PATCH|DELETE)\s+(/\S*)$", re.IGNORECASE)
+# Paths served by the shared middleware/admin plane, not by per-service routers.
+_SHARED_PLANE_PREFIXES = ("/audit", "/admin", "/health")
+
+
+def _route_prefix_match(path: str, route: str) -> bool:
+    """True if `path` segment-wise prefix-matches `route` ({params} wildcard)."""
+    p_segs = [s for s in path.split("/") if s]
+    r_segs = [s for s in route.split("/") if s]
+    if len(p_segs) > len(r_segs):
+        return False
+    for p, r in zip(p_segs, r_segs):
+        if r.startswith("{") and r.endswith("}"):
+            continue
+        if p.startswith("{") and p.endswith("}"):
+            continue
+        if p.lower() != r.lower():
+            return False
+    return True
+
+
+def _leading_literal_path(node: ast.expr) -> Optional[str]:
+    """Literal path (or its leading literal part for f-strings) from an AST arg.
+
+    For f-strings like f"/3.0/lists/{lid}/members" only the text before the
+    first interpolation is comparable; a trailing partial segment is dropped.
+    """
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    if isinstance(node, ast.JoinedStr) and node.values:
+        first = node.values[0]
+        if isinstance(first, ast.Constant) and isinstance(first.value, str):
+            lit = first.value
+            if len(node.values) > 1 and not lit.endswith("/"):
+                lit = lit.rsplit("/", 1)[0] + "/"
+            return lit
+    return None
+
+
+def _helper_match_semantics(tree: ast.AST) -> dict:
+    """{helper_name: "prefix" | "substring"} for module-level test helpers.
+
+    A helper that compares via .startswith() has prefix semantics (a dropped
+    version segment makes it dead code); one that compares via `in` has
+    substring semantics (a bare tail like "/send" still matches the full
+    served path). startswith wins when both appear.
+    """
+    semantics: dict = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef) or node.name.startswith("test_"):
+            continue
+        has_startswith = any(
+            isinstance(n, ast.Call)
+            and isinstance(n.func, ast.Attribute)
+            and n.func.attr == "startswith"
+            for n in ast.walk(node)
+        )
+        has_in = any(
+            isinstance(n, ast.Compare) and any(isinstance(op, ast.In) for op in n.ops)
+            for n in ast.walk(node)
+        )
+        if has_startswith:
+            semantics[node.name] = "prefix"
+        elif has_in:
+            semantics[node.name] = "substring"
+    return semantics
+
+
+def _extract_endpoint_refs(tree: ast.AST) -> List[tuple]:
+    """(service_url_const_or_None, path, mode) triples referenced by the code.
+
+    Sources: api_get/api_post(BASE_URL, "/path"), _get/_post(f"{BASE_URL}/path"),
+    "METHOD /path" audit-key literals, and helper calls pairing an HTTP-method
+    literal with a path literal (e.g. _endpoint_count(summary, "POST", "/x")).
+    mode is "prefix" (strict segment match) or "substring" (tail like "/send"
+    is fine), inferred from how the literal is actually consumed.
+    """
+    helper_modes = _helper_match_semantics(tree)
+    # Constants used as `"POST /x" in key` have substring semantics.
+    substring_consts = {
+        id(operand)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Compare) and any(isinstance(op, ast.In) for op in node.ops)
+        for operand in [node.left] + list(node.comparators)
+        if isinstance(operand, ast.Constant)
+    }
+
+    refs: List[tuple] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            fname = node.func.id
+            if fname in ("api_get", "api_post") and len(node.args) >= 2:
+                const = node.args[0].id if isinstance(node.args[0], ast.Name) else None
+                path = _leading_literal_path(node.args[1])
+                if path and path.startswith("/"):
+                    refs.append((const, path, "prefix"))
+                continue
+            if fname in ("_get", "_post") and node.args:
+                arg = node.args[0]
+                if (
+                    isinstance(arg, ast.JoinedStr)
+                    and len(arg.values) >= 2
+                    and isinstance(arg.values[0], ast.FormattedValue)
+                    and isinstance(arg.values[0].value, ast.Name)
+                    and isinstance(arg.values[1], ast.Constant)
+                    and isinstance(arg.values[1].value, str)
+                ):
+                    lit = arg.values[1].value
+                    if len(arg.values) > 2 and not lit.endswith("/"):
+                        lit = lit.rsplit("/", 1)[0] + "/"
+                    if lit.startswith("/"):
+                        refs.append((arg.values[0].value.id, lit, "prefix"))
+                continue
+            # helper style: any call mixing an HTTP-method literal + path literal
+            literals = [
+                a.value for a in node.args
+                if isinstance(a, ast.Constant) and isinstance(a.value, str)
+            ]
+            if any(l.upper() in _HTTP_METHODS for l in literals):
+                mode = helper_modes.get(fname, "prefix")
+                for l in literals:
+                    if l.startswith("/"):
+                        refs.append((None, l, mode))
+        elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+            m = _METHOD_KEY_RE.match(node.value.strip())
+            if m:
+                mode = "substring" if id(node) in substring_consts else "prefix"
+                refs.append((None, m.group(2), mode))
+    return refs
+
+
 def self_validate_tests(
     code: str,
     weights: dict,
     *,
     has_api_services: bool = False,
     distractor_apis: Optional[Iterable[str]] = None,
+    service_routes: Optional[dict] = None,
 ) -> List[str]:
     """Run deterministic lints on generated test code.
 
@@ -279,6 +412,43 @@ def self_validate_tests(
                 "L26: missing TestNegativeWeight* coverage for %d distractor API(s): %s "
                 "— add at least one negative test per distractor that checks /audit/summary."
                 % (len(uncovered), ", ".join(uncovered))
+            )
+
+    # L27: endpoint paths must match a served route INCLUDING its full prefix.
+    # The audit summary keys requests by the full path (e.g. Mailchimp serves
+    # /3.0/lists, so "GET /lists" matches nothing and the test silently no-ops).
+    if service_routes:
+        all_routes = sorted({r for routes in service_routes.values() for r in routes})
+        bad_paths: List[str] = []
+        seen_bad: set = set()
+        for const, path, mode in _extract_endpoint_refs(tree):
+            norm = "/" + "/".join(s for s in path.split("/") if s)
+            if norm == "/" or norm.startswith(_SHARED_PLANE_PREFIXES):
+                continue
+            candidates = service_routes.get(const) if const else None
+            if candidates is None:
+                if const is not None:
+                    continue  # URL constant outside the scoped services — not ours to judge
+                candidates = all_routes
+            if any(_route_prefix_match(norm, r) for r in candidates):
+                continue
+            if mode == "substring" and any(norm.lower() in r.lower() for r in candidates):
+                continue
+            key = (const, norm)
+            if key in seen_bad:
+                continue
+            seen_bad.add(key)
+            first_seg = norm.split("/")[1].lower()
+            hints = [r for r in candidates if "/%s" % first_seg in r.lower()][:2]
+            hint = " (did you mean: %s)" % ", ".join(hints) if hints else ""
+            where = " via %s" % const if const else ""
+            bad_paths.append("'%s'%s%s" % (norm, where, hint))
+        if bad_paths:
+            failures.append(
+                "L27: endpoint path(s) matching NO served route: %s. Audit summary keys "
+                "use the FULL served path — include the API's version/base prefix "
+                "(e.g. Mailchimp '/3.0/lists' not '/lists', Salesforce "
+                "'/services/data/v59.0/query' not '/query')." % "; ".join(bad_paths[:5])
             )
 
     return failures
