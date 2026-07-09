@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import math
 import mimetypes
 import os
 import re
@@ -665,6 +666,47 @@ def _next_run_index(model_dir: Path) -> int:
     return i
 
 
+def _augment_score_with_combined_rewards(scores: dict, result: dict) -> None:
+    """Add the two-channel rewards to `scores` in place (ports the scoring model
+    from origin/claude_oauth_pathway):
+
+      - rubric_based_reward : Channel B, the LLM-judge rubric (= overall_score)
+      - test_based_reward   : Channel A, the deterministic pytest/ctrf suite
+      - combined_reward     : mean of the two when BOTH ran; else whichever exists
+
+    The combined reward is the authoritative run reward. This is what makes API
+    usage count for 50% without forcing it (behavioral half) while still
+    rewarding deliverables (rubric half). Non-finite/None values are dropped so a
+    missing channel degrades to the other rather than poisoning the mean.
+    """
+    tr = (result or {}).get("test_result") or {}
+
+    def _finite(v):
+        if v is None:
+            return None
+        try:
+            f = float(v)
+        except (TypeError, ValueError):
+            return None
+        return f if math.isfinite(f) else None
+
+    # Channel A — real pytest reward (only when tests actually ran)
+    test_reward = _finite(tr.get("reward")) if tr.get("tests_total") else None
+    # Channel B — rubric judge reward
+    rubric_reward = _finite(scores.get("overall_score"))
+
+    if test_reward is not None and rubric_reward is not None:
+        combined_reward = (test_reward + rubric_reward) / 2.0
+    elif test_reward is not None:
+        combined_reward = test_reward
+    else:
+        combined_reward = rubric_reward
+
+    scores["test_based_reward"] = test_reward
+    scores["rubric_based_reward"] = rubric_reward
+    scores["combined_reward"] = combined_reward
+
+
 def _write_pass_summary(model_dir: Path, model_type: str, run_index: int, reward,
                         scores: dict | None = None) -> None:
     p = model_dir / "pass_summary.json"
@@ -1047,6 +1089,11 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
                     scores["tests_total"] = int(te.get("tests_total", 0) or 0)
                     scores["tests_passed"] = int(te.get("tests_passed", 0) or 0)
                     scores["tests_failed"] = int(te.get("tests_failed", 0) or 0)
+                # Two-channel combined reward (rubric + behavioral)/2, matching
+                # origin/claude_oauth_pathway. Writes test_based_reward /
+                # rubric_based_reward / combined_reward into score.json so API
+                # usage counts for 50% without forcing it.
+                _augment_score_with_combined_rewards(scores, result)
             if isinstance(scores, dict) and scores.get("usage"):
                 result["__judge_usage__"] = dict(scores["usage"])
             (output_dir / "score.json").write_text(
@@ -1082,9 +1129,14 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
             except OSError:
                 pass
 
-    reward = (result.get("scores") or {}).get("overall_score")
+    # Authoritative run reward = combined (rubric + behavioral)/2 when tests ran,
+    # else falls back to the rubric overall_score. Mirrors origin/claude_oauth_pathway.
+    _scores = result.get("scores") or {}
+    reward = _scores.get("combined_reward")
+    if reward is None:
+        reward = _scores.get("overall_score")
     _write_pass_summary(task_bundle_dir / "trajectories" / model_type, model_type,
-                        run_index, reward, scores=result.get("scores") or {})
+                        run_index, reward, scores=_scores)
 
     # Copy the bundle inputs to the task root (kensei out/<task_id>/ layout).
     import shutil
