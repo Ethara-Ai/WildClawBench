@@ -617,7 +617,7 @@ def _pass_summary_entry(run_index: int, scores: dict | None, test_result: dict |
         else:
             combined = rubric_reward
     authoritative = combined if combined is not None else (rubric_reward or 0.0)
-    return {
+    entry = {
         "run_index": run_index,
         # Channel B — rubric judge
         "criteria_total": crit_total,
@@ -636,6 +636,11 @@ def _pass_summary_entry(run_index: int, scores: dict | None, test_result: dict |
         "combined_reward": combined,
         "reward": authoritative,
     }
+    # Preserve the last-resort-stub marker so operators + downstream tools can
+    # distinguish "grader wrote 0" from "no grader ran; stub emitted by finally".
+    if s.get("__last_resort_stub__"):
+        entry["__last_resort_stub__"] = True
+    return entry
 
 
 def _pass_summary_doc(model_type: str, per_run: list) -> dict:
@@ -1002,7 +1007,7 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
             # Without this, a swallowed exception leaves no trace except a
             # WARNING in stdout, and the operator can't tell whether judging
             # was skipped, crashed, or quietly returned empty.
-            logger.warning("[%s] rubric grading failed: %s", task.get("task_id"), exc)
+            logger.warning("[%s] rubric grading failed: %s", task.get("task_id"), exc, exc_info=True)
             try:
                 stub = {
                     "overall_score": None,
@@ -1014,14 +1019,25 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
                     "judge_model": None,
                     "error": f"{type(exc).__name__}: {exc}",
                     "results_dir": str(results_dir),
+                    "__last_resort_stub__": True,
                 }
-                _augment_score_with_combined_rewards(stub, result)
+                # _augment_score_with_combined_rewards can raise on malformed
+                # result dicts; its failure must not sink the stub write below.
+                try:
+                    _augment_score_with_combined_rewards(stub, result)
+                except Exception as aug_exc:
+                    logger.warning("[%s] _augment_score_with_combined_rewards failed on stub: %s",
+                                   task.get("task_id"), aug_exc, exc_info=True)
                 (output_dir / "score.json").write_text(
-                    json.dumps(stub, indent=2, ensure_ascii=False),
+                    json.dumps(stub, indent=2, ensure_ascii=False, default=str),
                     encoding="utf-8",
                 )
-            except OSError:
-                pass
+            except Exception as stub_exc:
+                # Broadened from `except OSError`: json.dumps ValueError on NaN/Inf
+                # and TypeError on non-serializable score fields must not silently
+                # escape (they were the primary silent-swallow path).
+                logger.error("[%s] stub score.json write failed: %s",
+                             task.get("task_id"), stub_exc, exc_info=True)
 
     _write_pass_summary(task_bundle_dir / "trajectories" / model_type, model_type,
                         run_index, scores=result.get("scores") or {},
@@ -1570,7 +1586,9 @@ def run_single_task(
         try:
             _build_trajectory(task, output_dir, task_bundle_dir, model_type, run_index, result, config=config, agent_usage=usage)
         except Exception as exc:
-            logger.warning("[%s] trajectory build failed: %s", task_id, exc)
+            # exc_info=True is load-bearing: this branch hides missing-score.json
+            # root causes (rubric-block failures, output.json write races). Do not remove.
+            logger.warning("[%s] trajectory build failed: %s", task_id, exc, exc_info=True)
 
         result = save_usage(
             output_dir, result, usage, task_id,
@@ -1620,6 +1638,39 @@ def run_single_task(
                             task_id, task_mock_container)
             except Exception as exc:
                 logger.warning("[%s] Per-task mock stack cleanup failed: %s", task_id, exc)
+
+        # Last-resort score.json invariant guard. Every claimed run_N/ dir MUST have
+        # a score.json so downstream aggregators (script/*, regrade.py) never see a
+        # phantom run. If grade_the_task and the rubric block both missed, drop a
+        # sentinel stub carrying `__last_resort_stub__: True` so aggregators can
+        # distinguish "graded 0" from "never scored". overall_score is null (not 0.0)
+        # for the same reason. Fires only when nothing else wrote — no clobber.
+        try:
+            score_path = output_dir / "score.json"
+            if not score_path.exists():
+                last_resort = {
+                    "overall_score": None,
+                    "rubric_weights_percentage": None,
+                    "criteria_total": 0,
+                    "criteria_passed": 0,
+                    "criteria_failed": 0,
+                    "criteria_abstained": 0,
+                    "judge_model": None,
+                    "error": result.get("error") or "score.json missing after finally; no grader wrote it",
+                    "source": "run_single_task last-resort stub",
+                    "task_id": task_id,
+                    "__last_resort_stub__": True,
+                }
+                score_path.write_text(
+                    json.dumps(last_resort, indent=2, ensure_ascii=False, default=str),
+                    encoding="utf-8",
+                )
+                logger.warning(
+                    "[%s] score.json was missing after finally; wrote last-resort stub at %s",
+                    task_id, score_path,
+                )
+        except Exception as exc:
+            logger.error("[%s] last-resort score.json write failed: %s", task_id, exc, exc_info=True)
 
     return result
 
