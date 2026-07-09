@@ -904,6 +904,15 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
         workspace_root=output_dir / "task_output" / "workspace_full",
     )
 
+    # F2 provenance: the graded transcript came from the /tmp snapshot, not a
+    # live container copy (see OpenClawAgent.collect_usage). output.json is the
+    # source of truth for regrade.py, which preserves the marker; the judge
+    # blocks below stamp it onto score.json so aggregate_runs.py can report a
+    # fleet-wide recovery rate. Absent on every normal run.
+    snapshot_recovered = bool(agent_usage and agent_usage.get("__snapshot_recovered__"))
+    if snapshot_recovered:
+        traj["__snapshot_recovered__"] = True
+
     # Project rich S3-upload records to the reference's trimmed schema
     # {ref_id,path,filename,mime_type,size_bytes,source:'agent_workspace'}
     # and append verifier artifacts (NOT uploaded). S3 URLs are implied by
@@ -993,6 +1002,8 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
             if isinstance(scores, dict) and scores.get("usage"):
                 result["__judge_usage__"] = dict(scores["usage"])
             _augment_score_with_combined_rewards(scores, result)
+            if snapshot_recovered and isinstance(scores, dict):
+                scores["__snapshot_recovered__"] = True
             (output_dir / "score.json").write_text(
                 json.dumps(scores, indent=2, ensure_ascii=False), encoding="utf-8")
             logger.info("[%s] Rubric judged: overall=%.3f (%.2f%%) — %d/%d criteria passed, model=%s",
@@ -1021,6 +1032,8 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
                     "results_dir": str(results_dir),
                     "__last_resort_stub__": True,
                 }
+                if snapshot_recovered:
+                    stub["__snapshot_recovered__"] = True
                 # _augment_score_with_combined_rewards can raise on malformed
                 # result dicts; its failure must not sink the stub write below.
                 try:
@@ -1459,6 +1472,9 @@ def run_single_task(
         gateway_proc = execution.gateway_proc
         agent_proc = execution.agent_proc
         elapsed_time = execution.elapsed_time
+        # F4 diagnostics only (never gates grading): woven into the last-resort
+        # score.json stub's error text when scoring failed to produce a score.
+        result["__agent_exit_code__"] = getattr(execution, "agent_exit_code", None)
         if execution.error:
             result["error"] = execution.error
     except Exception as exc:
@@ -1648,6 +1664,13 @@ def run_single_task(
         try:
             score_path = output_dir / "score.json"
             if not score_path.exists():
+                stub_error = result.get("error") or "score.json missing after finally; no grader wrote it"
+                # F4 diagnostics: name the agent's exit code so the operator can
+                # tell "agent crashed (137 = OOM-kill, etc.)" from "agent ran
+                # fine but scoring lost its inputs" without replaying the run.
+                exit_code = result.get("__agent_exit_code__")
+                if exit_code not in (None, 0):
+                    stub_error = f"{stub_error} [agent exit code: {exit_code}]"
                 last_resort = {
                     "overall_score": None,
                     "rubric_weights_percentage": None,
@@ -1656,7 +1679,7 @@ def run_single_task(
                     "criteria_failed": 0,
                     "criteria_abstained": 0,
                     "judge_model": None,
-                    "error": result.get("error") or "score.json missing after finally; no grader wrote it",
+                    "error": stub_error,
                     "source": "run_single_task last-resort stub",
                     "task_id": task_id,
                     "__last_resort_stub__": True,

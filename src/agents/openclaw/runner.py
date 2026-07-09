@@ -109,16 +109,28 @@ class OpenClawAgent(BaseAgent):
         # access to /root/.openclaw/agents/main/sessions/chat.jsonl) could
         # append fabricated assistant messages claiming the task is done
         # between agent_proc.wait() and grade_the_task. See b54 Issue 6.
+        # Atomic write: docker cp streams into the destination IN PLACE, so an
+        # interrupted copy would leave a truncated file at the well-known
+        # chat-snap name — and the collect_usage fallback would restore (and
+        # the judge would grade) a cut-off transcript. Copy to a .tmp name and
+        # rename only after the copy fully succeeded; Path.replace is atomic
+        # on the same filesystem, so the final name never holds partial bytes.
+        host_snap = Path(tempfile.gettempdir()) / f"chat-snap-{task_id}.jsonl"
+        snap_tmp = Path(str(host_snap) + ".tmp")
         try:
-            host_snap = Path(tempfile.gettempdir()) / f"chat-snap-{task_id}.jsonl"
             r = subprocess.run(
-                ["docker", "cp", f"{task_id}:{self.transcript_container_path}", str(host_snap)],
+                ["docker", "cp", f"{task_id}:{self.transcript_container_path}", str(snap_tmp)],
                 capture_output=True, text=True, timeout=30,
             )
-            if r.returncode == 0 and host_snap.exists() and host_snap.stat().st_size > 0:
+            if r.returncode == 0 and snap_tmp.exists() and snap_tmp.stat().st_size > 0:
+                snap_tmp.replace(host_snap)
                 return str(host_snap)
         except (subprocess.SubprocessError, OSError) as exc:
             logger.warning("[%s] chat.jsonl host snapshot failed: %s", task_id, exc)
+        try:
+            snap_tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
         return self.transcript_container_path
 
     def run_task(self, spec: AgentTaskSpec) -> AgentExecution:
@@ -263,23 +275,46 @@ class OpenClawAgent(BaseAgent):
             )
 
             logger.info("[%s] Waiting for agent to finish...", spec.task_id)
+            timed_out = False
             try:
                 agent_proc.wait(timeout=spec.timeout_seconds)
                 elapsed_time = time.perf_counter() - start_time
                 logger.info("[%s] Agent finished (%.2fs)", spec.task_id, elapsed_time)
             except subprocess.TimeoutExpired:
                 logger.warning("[%s] Agent timed out", spec.task_id)
+                timed_out = True
                 elapsed_time = float(spec.timeout_seconds)
                 agent_proc.kill()
                 agent_proc.wait()
             self._task_windows[spec.task_id] = (wall_start, time.time())
 
             logger.info("[%s] Agent exit code: %s", spec.task_id, agent_proc.returncode)
+            # F4 diagnostics: record (never act on) the exit code. Timeout kills
+            # are excluded — a timed-out agent is graded for partial credit and
+            # its -9 from our own kill() is not a crash signal.
+            agent_exit_code = None if timed_out else agent_proc.returncode
+            if not timed_out and agent_proc.returncode not in (0, None):
+                logger.warning(
+                    "[%s] Agent process exited nonzero (%s); grading proceeds, "
+                    "exit code recorded for diagnostics",
+                    spec.task_id, agent_proc.returncode,
+                )
+            # Freeze the transcript to /tmp at the earliest possible moment
+            # (chat-snap-<task_id>.jsonl). collect_usage's later docker cp is
+            # the ONLY source of the host chat.jsonl — the sole input to
+            # trajectory building and rubric judging — and falls back to this
+            # snapshot if the container dies or is removed before teardown.
+            # See docs/RCA_missing_score_json.md RC-2. Best-effort by design.
+            try:
+                self.prepare_grading_transcript(spec.task_id)
+            except Exception:
+                pass
             return AgentExecution(
                 elapsed_time=elapsed_time,
                 error=None,
                 gateway_proc=gateway_proc,
                 agent_proc=agent_proc,
+                agent_exit_code=agent_exit_code,
             )
 
         except Exception as exc:
@@ -294,11 +329,49 @@ class OpenClawAgent(BaseAgent):
     def collect_usage(self, task_id: str, output_dir: Path, elapsed_time: float) -> dict:
         transcript_host = output_dir / "chat.jsonl"
         output_dir.mkdir(parents=True, exist_ok=True)
-        r_cp = subprocess.run(
-            ["docker", "cp", f"{task_id}:{self.transcript_container_path}", str(transcript_host)],
-            capture_output=True,
-            text=True,
-        )
+        cp_cmd = ["docker", "cp", f"{task_id}:{self.transcript_container_path}", str(transcript_host)]
+        snapshot_recovered = False
+        r_cp = subprocess.run(cp_cmd, capture_output=True, text=True)
+        if r_cp.returncode != 0:
+            # Loud + resilient (docs/RCA_missing_score_json.md RC-2): this copy
+            # is the ONLY source of the host chat.jsonl that trajectory building
+            # and rubric judging read. Log unconditionally (the old warning was
+            # gated on zero usage rows, hiding real failures), retry once for
+            # transient docker hiccups, then fall back to the /tmp snapshot
+            # frozen right after the agent finished (see run_task).
+            logger.warning(
+                "[%s] chat.jsonl docker cp failed (attempt 1): %s — retrying",
+                task_id, (r_cp.stderr or "").strip(),
+            )
+            time.sleep(1.0)
+            r_cp = subprocess.run(cp_cmd, capture_output=True, text=True)
+        if r_cp.returncode != 0 or not transcript_host.exists():
+            snap = Path(tempfile.gettempdir()) / f"chat-snap-{task_id}.jsonl"
+            try:
+                if snap.exists() and snap.stat().st_size > 0:
+                    transcript_host.write_bytes(snap.read_bytes())
+                    snapshot_recovered = True
+                    logger.warning(
+                        "[%s] chat.jsonl restored from host snapshot %s", task_id, snap,
+                    )
+                else:
+                    # No trustworthy source. If the failed cp left a PARTIAL
+                    # chat.jsonl behind (docker cp writes in place), remove it:
+                    # a truncated transcript would be silently graded as if
+                    # complete, scoring the run lower than it deserves. Missing
+                    # → honest skip + diagnostic stub; partial → wrong grade.
+                    if r_cp.returncode != 0 and transcript_host.exists():
+                        transcript_host.unlink(missing_ok=True)
+                        logger.warning(
+                            "[%s] removed partial chat.jsonl left by the failed docker cp",
+                            task_id,
+                        )
+                    logger.warning(
+                        "[%s] chat.jsonl copy failed and no host snapshot available: %s",
+                        task_id, (r_cp.stderr or "").strip(),
+                    )
+            except OSError as exc:
+                logger.warning("[%s] chat.jsonl snapshot restore failed: %s", task_id, exc)
 
         usage: dict
         preflight_usage: dict | None = None
@@ -314,10 +387,11 @@ class OpenClawAgent(BaseAgent):
             usage = {"request_count": 0}
 
         if usage.get("request_count", 0) == 0:
-            if r_cp.returncode == 0 and transcript_host.exists():
+            # transcript_host may exist via direct cp OR the snapshot restore
+            # above — either is a valid usage source.
+            if transcript_host.exists():
                 usage = extract_usage_from_jsonl(transcript_host)
             else:
-                logger.warning("[%s] Transcript copy failed: %s", task_id, r_cp.stderr.strip())
                 usage = {
                     "input_tokens": 0,
                     "output_tokens": 0,
@@ -333,6 +407,12 @@ class OpenClawAgent(BaseAgent):
         usage["elapsed_time"] = round(elapsed_time, 2)
         if preflight_usage is not None:
             usage["__preflight__"] = preflight_usage
+        if snapshot_recovered:
+            # F2 provenance: the transcript graded downstream came from the
+            # /tmp snapshot, not a live container copy. Stamped onto
+            # output.json + score.json by _build_trajectory, preserved by
+            # regrade.py, and counted as a fleet-wide rate by aggregate_runs.
+            usage["__snapshot_recovered__"] = True
         return usage
 
     def _set_model(self, task_id: str, model: str, thinking: str | None = None) -> None:

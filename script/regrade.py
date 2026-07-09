@@ -161,6 +161,13 @@ def regrade(run_dir: Path, rubric_override: Path | None = None) -> dict:
         use_council=True,
     )
 
+    # F2 provenance: output.json (the regrade source of truth) records whether
+    # the graded transcript was recovered from the /tmp snapshot rather than a
+    # live container copy. Carry the marker forward so a regrade never launders
+    # a snapshot-recovered run into an unmarked one.
+    if isinstance(traj, dict) and traj.get("__snapshot_recovered__"):
+        scores["__snapshot_recovered__"] = True
+
     score_path = run_dir / "score.json"
     score_path.write_text(json.dumps(scores, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"[regrade] wrote {score_path}", file=sys.stderr)

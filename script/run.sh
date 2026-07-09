@@ -337,19 +337,46 @@ other_runs_active() {
 }
 
 cleanup_orphans() {
+    # --exited-only: restricted sweep that reaps only DEAD (exited/dead)
+    # containers and never touches networks. Safe to run while sibling reps /
+    # model workers of THIS run.sh are in flight — the full sweep is not
+    # (other_runs_active only sees other run.sh processes; backgrounded
+    # subshells share our PID marker, so `$$` hides them from the registry).
+    # Used by attempt_docker_recovery. See docs/RCA_missing_score_json.md RC-1.
+    local exited_only=0
+    [[ "${1:-}" == "--exited-only" ]] && exited_only=1
+
     log::step 5 5 "Orphan cleanup"
 
     # Concurrency guard: never run the destructive global sweep while a peer
     # run.sh is alive — it would force-remove the peer's live containers/network.
-    if other_runs_active; then
+    if (( exited_only == 0 )) && other_runs_active; then
         log::warn "Other run.sh process(es) active — SKIPPING global orphan sweep"
         log::info "(concurrency-safe: avoids tearing down a peer's live stack)"
         log::ok "Cleanup skipped"
         return 0
     fi
 
+    # Name filters are ANCHORED regexes (^/? tolerates docker's internal
+    # leading slash). The old unanchored substrings matched LIVE agent
+    # containers whose task-derived names merely CONTAIN "t_" — e.g.
+    # "Ruth_Armstrong_task_input_claude-..." via "input_claude" — and
+    # force-removed them mid-run (docs/RCA_missing_score_json.md RC-1).
+    local name_filters=(
+        --filter 'name=^/?ll-'
+        --filter 'name=^/?mocks-'
+        --filter 'name=^/?t_'
+    )
+
+    # NOTE: no empty-array expansion here — bash 3.2 (macOS default) treats
+    # "${empty[@]}" as an unbound variable under `set -u`.
     local containers
-    containers=$(docker ps -aq --filter 'name=ll-' --filter 'name=mocks-' --filter 'name=t_' 2>/dev/null || true)
+    if (( exited_only == 1 )); then
+        containers=$(docker ps -aq "${name_filters[@]}" \
+            --filter 'status=exited' --filter 'status=dead' 2>/dev/null || true)
+    else
+        containers=$(docker ps -aq "${name_filters[@]}" 2>/dev/null || true)
+    fi
     if [[ -n "$containers" ]]; then
         local count
         count=$(echo "$containers" | wc -l | tr -d ' ')
@@ -359,8 +386,13 @@ cleanup_orphans() {
         log::info "No orphan containers"
     fi
 
+    if (( exited_only == 1 )); then
+        log::ok "Cleanup complete (exited-only sweep; networks untouched)"
+        return 0
+    fi
+
     local networks
-    networks=$(docker network ls --filter 'name=k3net-' -q 2>/dev/null || true)
+    networks=$(docker network ls --filter 'name=^k3net-' -q 2>/dev/null || true)
     if [[ -n "$networks" ]]; then
         local count
         count=$(echo "$networks" | wc -l | tr -d ' ')
@@ -542,7 +574,10 @@ attempt_docker_recovery() {
         docker tag "sha256:${AGENT_IMAGE_SHA}" "$AGENT_IMAGE" || return 1
     fi
 
-    cleanup_orphans
+    # Restricted sweep: sibling reps / model workers of this run.sh may be
+    # live and share our PID marker, so other_runs_active cannot see them.
+    # Reap only dead containers; never touch running stacks or networks.
+    cleanup_orphans --exited-only
     log::ok "Recovery complete"
 }
 

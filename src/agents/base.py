@@ -27,6 +27,11 @@ class AgentExecution:
     error: str | None = None
     gateway_proc: subprocess.Popen[str] | None = None
     agent_proc: subprocess.Popen[str] | None = None
+    # Diagnostic only (TL review follow-up F4). A nonzero exit does NOT set
+    # `error` (grading must still run on whatever the agent produced); it is
+    # surfaced in the last-resort score.json stub iff scoring later failed.
+    # None when timed out (partial-credit design) or unknown.
+    agent_exit_code: int | None = None
 
 
 class BaseAgent(ABC):

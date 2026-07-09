@@ -107,6 +107,11 @@ def aggregate(output_root: Path, backend_filter: str | None = None) -> dict:
             "criteria_failed": failed,
             "score_path": str(score_path),
         }
+        # F2 provenance: this run was graded from the /tmp transcript snapshot
+        # (container copy failed). Carried per-run and rolled up as a rate so
+        # a rising recovery frequency is visible fleet-wide.
+        if score.get("__snapshot_recovered__"):
+            entry["snapshot_recovered"] = True
         per_task_model[(backend, task_id, model)].append(entry)
         per_model[(backend, model)].append(pct)
 
@@ -121,10 +126,16 @@ def aggregate(output_root: Path, backend_filter: str | None = None) -> dict:
         "by_task_model": [],
         "by_model": [],
     }
+    # F2 provenance rollup: count snapshot-recovered runs per model so a rising
+    # recovery frequency (containers dying before transcript copy) is visible.
+    per_model_snapshot_recovered: dict[tuple[str, str], int] = defaultdict(int)
+
     for (backend, task, model), runs in sorted(per_task_model.items()):
         pcts = [r["rubric_weights_percentage"] for r in runs]
         pass_at_k = max(pcts)
         per_model_pass_at_k[(backend, model)].append(pass_at_k)
+        snap_runs = sum(1 for r in runs if r.get("snapshot_recovered"))
+        per_model_snapshot_recovered[(backend, model)] += snap_runs
         summary["by_task_model"].append({
             "backend": backend,
             "task_id": task,
@@ -136,9 +147,11 @@ def aggregate(output_root: Path, backend_filter: str | None = None) -> dict:
             # Walkthrough §4 pass@K: best-of-K rollout per task. K = run_count.
             "pass_at_k": round(pass_at_k, 2),
             "k": len(pcts),
+            "snapshot_recovered_runs": snap_runs,
         })
     for (backend, model), pcts in sorted(per_model.items()):
         task_pass_at_k_values = per_model_pass_at_k[(backend, model)]
+        snap_count = per_model_snapshot_recovered[(backend, model)]
         summary["by_model"].append({
             "backend": backend,
             "model": model,
@@ -153,6 +166,8 @@ def aggregate(output_root: Path, backend_filter: str | None = None) -> dict:
             # 'how good on average' average_rubric_weights_percentage.
             "average_pass_at_k": round(statistics.fmean(task_pass_at_k_values), 2) if task_pass_at_k_values else 0.0,
             "stddev_pass_at_k": round(statistics.pstdev(task_pass_at_k_values), 2) if len(task_pass_at_k_values) > 1 else 0.0,
+            "snapshot_recovered_runs": snap_count,
+            "snapshot_recovered_rate": round(snap_count / len(pcts), 4) if pcts else 0.0,
         })
     return summary
 
