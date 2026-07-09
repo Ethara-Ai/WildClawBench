@@ -583,21 +583,7 @@ def _load_native_task(task_dir: Path) -> dict:
 
     attachments: list[dict] = []
     data_dir = task_dir / "data"
-    # "API-only" mode: when WCB_API_ONLY is set, do NOT stage the task's data/
-    # files into the agent workspace. Those files are the same information the
-    # mock APIs serve, so staging them lets the agent read the answers off disk
-    # and skip the APIs entirely — which makes the behavioral test suite
-    # (audit-log checks for API queries/write-backs) score 0/N despite a good
-    # rubric. Dropping them forces the agent through the mock APIs. Leaving the
-    # flag unset preserves the default (files staged), so this is opt-in.
-    _api_only = os.environ.get("WCB_API_ONLY", "").strip().lower() in ("1", "true", "yes", "on")
-    if data_dir.is_dir() and _api_only:
-        _n_data = sum(1 for f in data_dir.rglob("*") if f.is_file() and not f.name.startswith("."))
-        logger.info(
-            "WCB_API_ONLY set: NOT staging %d data/ file(s) into the workspace for %s "
-            "(agent must use the mock APIs)", _n_data, task_dir.name,
-        )
-    if data_dir.is_dir() and not _api_only:
+    if data_dir.is_dir():
         for f in sorted(data_dir.rglob("*")):
             if not f.is_file() or f.name.startswith("."):
                 continue
@@ -668,19 +654,6 @@ def _collect_data_attachments(task_dir: Path) -> list[dict]:
     attachments: list[dict] = []
     data_dir = task_dir / "data"
     if not data_dir.is_dir():
-        return attachments
-    # API-only mode: when WCB_API_ONLY is set, do NOT stage the task's data/
-    # files into the agent workspace. Those files are the same information the
-    # mock APIs serve, so staging them lets the agent read the answers off disk
-    # and skip the APIs entirely — which makes the behavioral test suite
-    # (audit-log checks) score 0/N despite a good rubric. Dropping them forces
-    # the agent through the mock APIs. Unset preserves the default (files staged).
-    if os.environ.get("WCB_API_ONLY", "").strip().lower() in ("1", "true", "yes", "on"):
-        _n = sum(1 for f in data_dir.rglob("*") if f.is_file() and not f.name.startswith("."))
-        logger.info(
-            "WCB_API_ONLY set: NOT staging %d data/ file(s) into the workspace for %s "
-            "(agent must use the mock APIs)", _n, task_dir.name,
-        )
         return attachments
     for f in sorted(data_dir.rglob("*")):
         if not f.is_file() or f.name.startswith("."):
