@@ -4,7 +4,7 @@
 # docker-error retry. Designed to fail loudly with one signal at a time.
 #
 # Usage:
-#   ./run.sh                                                # default: input/alden-croft_MB, claude-opus-4.7, K=1
+#   ./run.sh                                                # default: input/alden-croft_MB, claude-opus-4.8, K=1
 #   ./run.sh <task-path>                                    # one task, K=1
 #   ./run.sh <task-path> <model[,model2,...]>               # one task, one or more models (parallel)
 #   ./run.sh <task-path> <model[,model2,...]> <K>           # K sequential runs per model; models run in parallel
@@ -30,7 +30,13 @@ readonly AGENT_IMAGE="wildclawbench-ubuntu:v1.3"
 readonly AGENT_IMAGE_SHA="60eec8752cb597e180780ff08d7569c1892c169521f1f2b069c2efeb006a4078"
 readonly AGENT_TAR_PATH="Images/wildclawbench-ubuntu_v1.3.tar"
 readonly DEFAULT_TASK="input/alden-croft_MB"
-readonly DEFAULT_MODEL="claude-opus-4.8"
+# Default model is read from .env's DEFAULT_MODEL (same convention as the other
+# .env reads below), falling back to claude-opus-4.8 if unset. Avoids hardcoding
+# a model that silently diverges from .env. An explicit positional model arg
+# ($2) still overrides this.
+DEFAULT_MODEL="$(grep -E '^DEFAULT_MODEL=' .env 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '"'\''' | tr -d '[:space:]')"
+[[ -z "$DEFAULT_MODEL" ]] && DEFAULT_MODEL="claude-opus-4.8"
+readonly DEFAULT_MODEL
 readonly DEFAULT_K=1
 readonly LOG_DIR="logs"
 readonly HEADROOM_IMAGE="wildclawbench-litellm-headroom:v2"

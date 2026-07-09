@@ -137,7 +137,14 @@ _wcb_run() {
         _wcb_err "not logged in — run 'source script/wcb login' first"
         return 1
     fi
-    local task="" model="claude-opus-4.7" reps="1"
+    # Default model comes from .env's DEFAULT_MODEL (was hardcoded to
+    # claude-opus-4.7, which silently overrode .env). Falls back to
+    # claude-opus-4.8 if .env has no DEFAULT_MODEL. An explicit -m/--model
+    # still wins over this.
+    local task="" reps="1"
+    local model
+    model="$(grep -E '^DEFAULT_MODEL=' "$_wcb_root/.env" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '"'\''' | tr -d '[:space:]')"
+    [ -z "$model" ] && model="claude-opus-4.8"
     local -a extra=()
     while [ $# -gt 0 ]; do
         case "$1" in
