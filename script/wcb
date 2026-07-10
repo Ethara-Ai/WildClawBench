@@ -18,11 +18,13 @@
 #       source script/wcb logout
 # `run` and `status` work either sourced or executed:
 #       source script/wcb run input/kayla_morgan_9b8f1d3c-... --reps 3
-# FIRST TIME ON A NEW LAPTOP: run one command that extracts your Claude Max
-# token from the Keychain, writes .env + the pool file, and installs the wcb()
-# shell function into ~/.zshrc automatically:
+# FIRST TIME ON A NEW MACHINE: run one command that extracts your Claude Max
+# token from this OS's credential store (macOS Keychain, or on Linux the
+# ~/.claude/.credentials.json file the `claude` CLI writes), writes .env + the
+# pool file, and installs the wcb() shell function into your shell rc
+# (~/.zshrc for zsh / ~/.bashrc for bash) automatically:
 #       source script/wcb setup
-#       source ~/.zshrc
+#       source ~/.zshrc     # (or ~/.bashrc on Linux/bash — setup prints the exact file)
 # then just:  wcb login   /   wcb run <task> --reps N   /   wcb logout
 # ---------------------------------------------------------------------------
 
@@ -174,15 +176,44 @@ _wcb_setup() {
     local _pool_dir="$HOME/.wcb/oauth_pool"
     local _pool_file="$_pool_dir/account_a.json"
     local _svc="Claude Code-credentials"
+    local _os; _os="$(uname -s)"
 
-    # --- 1) token from this machine's Keychain -----------------------------
-    local _raw
-    _raw="$(security find-generic-password -s "$_svc" -w 2>/dev/null)"
-    if [ -z "$_raw" ]; then
-        _wcb_err "no Claude Code credentials in Keychain (service '$_svc')."
-        _wcb_err "Sign into the Claude Code app with your Max subscription first, then re-run 'wcb setup'."
-        return 1
-    fi
+    # --- 1) token from this machine's OS credential store ------------------
+    # macOS: the `claude` CLI stores the blob in the Keychain -> read via
+    #        `security`. Linux: the CLI writes ~/.claude/.credentials.json as a
+    #        plaintext file (no keychain needed); fall back to `secret-tool`
+    #        (Secret Service) if a desktop keyring holds it instead.
+    local _raw=""
+    case "$_os" in
+        Darwin)
+            _raw="$(security find-generic-password -s "$_svc" -w 2>/dev/null)"
+            if [ -z "$_raw" ]; then
+                _wcb_err "no Claude Code credentials in Keychain (service '$_svc')."
+                _wcb_err "Sign into the Claude Code app with your Max subscription first, then re-run 'wcb setup'."
+                return 1
+            fi
+            ;;
+        Linux)
+            local _cred_file="$HOME/.claude/.credentials.json"
+            if [ -f "$_cred_file" ]; then
+                _raw="$(cat "$_cred_file" 2>/dev/null)"
+            fi
+            if [ -z "$_raw" ] && command -v secret-tool >/dev/null 2>&1; then
+                _raw="$(secret-tool lookup service "$_svc" 2>/dev/null)"
+            fi
+            if [ -z "$_raw" ]; then
+                _wcb_err "no Claude Code credentials found on this Linux machine."
+                _wcb_err "Expected $_cred_file (written by the 'claude' CLI on login)."
+                _wcb_err "Sign in with your Max subscription first:  claude   (then log in), then re-run 'wcb setup'."
+                return 1
+            fi
+            ;;
+        *)
+            _wcb_err "unsupported OS for 'wcb setup': $_os (only Darwin/Linux)."
+            _wcb_err "Provide credentials manually via WCB_CC_CREDS_PATH or CLAUDE_CODE_CREDENTIALS."
+            return 1
+            ;;
+    esac
     mkdir -p "$_pool_dir"
     if ! printf '%s' "$_raw" | python3 -c 'import sys,json;d=json.load(sys.stdin);inner=d.get("claudeAiOauth",d);assert inner.get("accessToken"),"no accessToken";json.dump({"claudeAiOauth":inner},open(sys.argv[1],"w"),indent=2)' "$_pool_file" 2>/dev/null; then
         _wcb_err "Keychain payload was not valid Claude OAuth JSON — aborting."
@@ -267,19 +298,31 @@ _wcb_setup() {
             fi
         fi
     else
-        _wcb_warn "docker not found on PATH — install Docker Desktop before running a task"
+        if [ "$_os" = "Darwin" ]; then
+            _wcb_warn "docker not found on PATH — install Docker Desktop before running a task"
+        else
+            _wcb_warn "docker not found on PATH — install Docker Engine before running a task (e.g. 'apt-get install docker.io')"
+        fi
     fi
 
-    # --- 3) ~/.zshrc wcb() function pointing at THIS repo ------------------
-    local _rc="$HOME/.zshrc"
+    # --- 3) shell-rc wcb() function pointing at THIS repo -----------------
+    # Pick the rc file for THIS machine's login shell: zsh -> ~/.zshrc (macOS
+    # default), bash -> ~/.bashrc (Linux default). Falls back by OS if $SHELL
+    # is unset. This is what makes `wcb ...` work without the `source` prefix.
+    local _rc
+    case "${SHELL:-}" in
+        */zsh)  _rc="$HOME/.zshrc" ;;
+        */bash) _rc="$HOME/.bashrc" ;;
+        *)      if [ "$_os" = "Darwin" ]; then _rc="$HOME/.zshrc"; else _rc="$HOME/.bashrc"; fi ;;
+    esac
     local _fn="wcb() { source \"$_wcb_root/script/wcb\" \"\$@\"; }"
     touch "$_rc"
     grep -vE '^[[:space:]]*wcb\(\)' "$_rc" > "$_rc.tmp" 2>/dev/null || : > "$_rc.tmp"
     printf '%s\n' "$_fn" >> "$_rc.tmp"
     mv "$_rc.tmp" "$_rc"
-    _wcb_ok "installed wcb() in ~/.zshrc -> $_wcb_root/script/wcb"
+    _wcb_ok "installed wcb() in $_rc -> $_wcb_root/script/wcb"
 
-    _wcb_ok "setup complete. Now run:  source ~/.zshrc  &&  wcb login"
+    _wcb_ok "setup complete. Now run:  source $_rc  &&  wcb login"
 }
 
 # Read-only health check: verifies every prerequisite on THIS machine and
@@ -287,6 +330,13 @@ _wcb_setup() {
 _wcb_doctor() {
     local _ok=0
     local _pool="$HOME/.wcb/oauth_pool/account_a.json"
+    local _os; _os="$(uname -s)"
+    local _dockerd_hint="start Docker Desktop"
+    local _dockeri_hint="install Docker Desktop"
+    if [ "$_os" != "Darwin" ]; then
+        _dockerd_hint="start the docker daemon ('systemctl start docker')"
+        _dockeri_hint="install Docker Engine"
+    fi
     _wcb_ok "repo: $_wcb_root"
     if [ -f "$_wcb_env" ]; then _wcb_ok ".env present"; else _wcb_err ".env MISSING — run 'wcb setup'"; _ok=1; fi
     if [ -f "$_pool" ]; then
@@ -301,10 +351,10 @@ _wcb_doctor() {
     [ -n "$(_wcb_env_get WCB_CC_BRIDGE_SECRET)" ] && _wcb_ok "WCB_CC_BRIDGE_SECRET set" || { _wcb_err "WCB_CC_BRIDGE_SECRET missing — run 'wcb setup'"; _ok=1; }
     if [ -x "$_wcb_root/.venv/bin/python3" ]; then _wcb_ok ".venv present"; else _wcb_err ".venv MISSING — run 'wcb setup'"; _ok=1; fi
     if command -v docker >/dev/null 2>&1; then
-        docker info >/dev/null 2>&1 && _wcb_ok "docker daemon up" || { _wcb_err "docker installed but daemon not running — start Docker Desktop"; _ok=1; }
+        docker info >/dev/null 2>&1 && _wcb_ok "docker daemon up" || { _wcb_err "docker installed but daemon not running — $_dockerd_hint"; _ok=1; }
         docker image inspect wildclawbench-cc-bridge:v1 >/dev/null 2>&1 && _wcb_ok "cc-bridge image present" || { _wcb_err "cc-bridge image missing — run 'wcb setup'"; _ok=1; }
     else
-        _wcb_err "docker not found — install Docker Desktop"; _ok=1
+        _wcb_err "docker not found — $_dockeri_hint"; _ok=1
     fi
     if [ "$_ok" -eq 0 ]; then _wcb_ok "doctor: all checks passed — ready to 'wcb login' and 'wcb run'"; else _wcb_err "doctor: some checks FAILED (see above)"; fi
     return "$_ok"
@@ -328,10 +378,11 @@ Subcommands:
   wcb status                              show login state
   wcb run <task> [--reps N] [--model M]   run a trajectory on the subscription
 
-New laptop (one time):
-  source script/wcb setup    # extracts Keychain token, writes .env + pool file,
-                             # installs wcb() into ~/.zshrc
-  source ~/.zshrc
+New machine (one time):
+  source script/wcb setup    # extracts token from this OS's store (macOS Keychain
+                             # or Linux ~/.claude/.credentials.json), writes .env +
+                             # pool file, installs wcb() into your shell rc
+  source ~/.zshrc            # (or ~/.bashrc on Linux/bash — setup prints the file)
 
 Examples:
   wcb login

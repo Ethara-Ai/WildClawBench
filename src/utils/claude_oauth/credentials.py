@@ -16,9 +16,16 @@ Sources are tried in this priority order:
 
   1. ``CLAUDE_CODE_CREDENTIALS`` env var (inline JSON, for tests/CI).
   2. ``WCB_CC_CREDS_PATH`` env var (path to JSON file, for overrides).
-  3. macOS Keychain (``security find-generic-password -s ...``).
-  4. ``~/.claude/.credentials.json`` (Linux fallback).
-  5. ``~/.cache/wildclawbench/claude_creds.json`` (bridge refresh cache, last).
+  3. ``~/.claude/.credentials.json`` (the primary source on Linux, where the
+     ``claude`` CLI writes the token as a plaintext file).
+  4. macOS Keychain (``security find-generic-password -s ...``; no-op off Darwin).
+  5. Linux Secret Service (``secret-tool lookup ...``; optional, desktop only,
+     no-op off Linux or when no keyring is unlocked).
+  6. ``~/.cache/wildclawbench/claude_creds.json`` (bridge refresh cache, last).
+
+On Linux no OS keychain is required: the ``claude`` CLI writes the file at (3),
+which is read directly. The Secret Service source at (5) only matters for
+desktop-Linux setups whose CLI stored the token in GNOME Keyring / KWallet.
 
 When a refresh happens, we write to (5) only -- never back to Keychain --
 because the ``claude`` CLI also manages Keychain and we don't want write
@@ -135,6 +142,33 @@ def _read_keychain_macos() -> Optional[str]:
     return out or None
 
 
+def _read_secretservice_linux() -> Optional[str]:
+    """Read the token from the Linux Secret Service (GNOME Keyring / KWallet).
+
+    Optional desktop-Linux source: newer `claude` CLI builds may store the
+    credential blob in the freedesktop Secret Service instead of the plaintext
+    ``~/.claude/.credentials.json`` file. Requires ``secret-tool`` (libsecret)
+    on PATH and an *unlocked* keyring — so it silently no-ops on headless
+    servers / EC2 (no D-Bus session), where the file source is used instead.
+    """
+    if platform.system() != "Linux":
+        return None
+    try:
+        r = subprocess.run(
+            ["secret-tool", "lookup", "service", _KEYCHAIN_SERVICE],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (subprocess.SubprocessError, FileNotFoundError) as e:
+        _LOG.debug("secret-service read failed: %s", e)
+        return None
+    if r.returncode != 0:
+        return None
+    out = r.stdout.strip()
+    return out or None
+
+
 def _read_cache_file() -> Optional[str]:
     if _CACHE_PATH.is_file():
         try:
@@ -144,19 +178,39 @@ def _read_cache_file() -> Optional[str]:
     return None
 
 
+def _no_credentials_hint() -> str:
+    """OS-appropriate remediation hint for a missing-credentials error."""
+    system = platform.system()
+    if system == "Darwin":
+        return (
+            "No Claude Code credentials found. Sign in via the `claude` CLI "
+            "first, then verify with:\n"
+            "  security find-generic-password -s 'Claude Code-credentials' -w"
+        )
+    if system == "Linux":
+        return (
+            "No Claude Code credentials found. Sign in via the `claude` CLI "
+            "first (it writes ~/.claude/.credentials.json on Linux), then verify with:\n"
+            "  test -f ~/.claude/.credentials.json && echo OK\n"
+            "Alternatively set WCB_CC_CREDS_PATH to a credentials JSON file, or "
+            "CLAUDE_CODE_CREDENTIALS to inline JSON."
+        )
+    return (
+        "No Claude Code credentials found. Set WCB_CC_CREDS_PATH to a "
+        "credentials JSON file, or CLAUDE_CODE_CREDENTIALS to inline JSON."
+    )
+
+
 def load_credentials() -> OAuthCredentials:
     raw = (
         _read_inline_env()
         or _read_credentials_file()
         or _read_keychain_macos()
+        or _read_secretservice_linux()
         or _read_cache_file()
     )
     if not raw:
-        raise CredentialsError(
-            "No Claude Code credentials found. Sign in via the `claude` CLI "
-            "first, then verify with:\n"
-            "  security find-generic-password -s 'Claude Code-credentials' -w"
-        )
+        raise CredentialsError(_no_credentials_hint())
     try:
         payload = json.loads(raw)
     except json.JSONDecodeError as e:
