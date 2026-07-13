@@ -35,6 +35,7 @@ def build_litellm_config_yaml(
     use_claude_oauth: bool = False,
     bridge_url: str = "",
     enable_oauth_usage_callback: bool = False,
+    enable_stream_callback: bool = False,
 ) -> str:
     whisper_env_ref = (
         "os.environ/OPENAI_API_KEY_WHISPER"
@@ -380,6 +381,16 @@ def build_litellm_config_yaml(
         _cbs.append("litellm_headroom_callback.headroom_callback_instance")
     if enable_oauth_usage_callback:
         _cbs.append("litellm_usage_oauth_callback.oauth_usage_callback_instance")
+    if enable_stream_callback:
+        # Live-token observability tap (docs/STREAMING_PLAN.md): pure
+        # pass-through iterator hook writing to its OWN sink
+        # (/var/litellm_stream/stream.jsonl) — never usage.jsonl NOR
+        # usage_oauth.jsonl (m0130 sink separation). Batch-scoped: registered
+        # only when WCB_STREAM was on at setup (R6). NOTE: on the OAuth agent
+        # path callers pass enable_stream_callback=False — the cc-bridge tee
+        # is the real-time tap there; the sidecar would only see the bridge's
+        # end-of-turn burst (docs/STREAMING_PLAN.md §1.5).
+        _cbs.append("litellm_stream_callback.stream_handler_instance")
     if _cbs:
         callback_line = "  callbacks: [" + ", ".join(f'"{c}"' for c in _cbs) + "]\n"
     else:
@@ -552,6 +563,8 @@ def start_litellm(
     enable_headroom: bool = False,
     anthropic_api_key: str = "",
     oauth_usage_callback_host_path: str = "",
+    stream_callback_host_path: str = "",
+    stream_log_host_dir: str = "",
 ) -> None:
     from src.utils.docker_utils import (
         build_env_args,
@@ -616,6 +629,17 @@ def start_litellm(
             *build_env_args(headroom_pairs),
         ]
 
+    # Live-token stream tap (docs/STREAMING_PLAN.md): its OWN sink dir,
+    # mounted separately from /var/litellm_usage so the feeds can never
+    # collide (m0130 sink-separation invariant).
+    stream_args: list[str] = []
+    if stream_callback_host_path and stream_log_host_dir:
+        stream_args = [
+            "-v", f"{stream_callback_host_path}:/app/litellm_stream_callback.py:ro",
+            "-v", f"{stream_log_host_dir}:/var/litellm_stream",
+            *build_env_args([("WCB_STREAM_LOG_PATH", "/var/litellm_stream/stream.jsonl")]),
+        ]
+
     image_to_run = _validate_docker_token("litellm image", image_to_run)
     cmd = [
         "docker", "run", "-d",
@@ -624,6 +648,7 @@ def start_litellm(
         *env_args,
         *callback_args,
         *headroom_args,
+        *stream_args,
         "-v", f"{host_config_path}:/app/config.yaml:ro",
         image_to_run,
         "--config", "/app/config.yaml",
@@ -783,6 +808,7 @@ def start_bridge(
     upstream: str = "https://api.anthropic.com",
     account_pool_spec: str = "",
     skip_system_prefix: bool = False,
+    stream_log_host_dir: str = "",
 ) -> None:
     from src.utils.docker_utils import (
         build_env_args,
@@ -838,6 +864,18 @@ def start_bridge(
         dump_mount = ["-v", f"{_dump_host}:/wcb_dumps:rw"]
         env_args += build_env_args([("WCB_CC_BODY_DUMP_DIR", "/wcb_dumps")])
 
+    # Live-stream tee sink (docs/STREAMING_PLAN.md §3.2): the bridge is the
+    # ONLY real-time token tap on the OAuth path (the sidecar behind it sees
+    # just the buffered end-of-turn burst). Same host dir as the batch stream
+    # feed so the terminal renderer tails ONE file; mounted rw, separate from
+    # every usage sink (m0130). Absent dir ⇒ tee stays inert (R6 default-off).
+    stream_mount: list[str] = []
+    if stream_log_host_dir:
+        stream_mount = ["-v", f"{stream_log_host_dir}:/var/wcb_stream:rw"]
+        env_args += build_env_args(
+            [("WCB_CC_STREAM_LOG_PATH", "/var/wcb_stream/stream.jsonl")]
+        )
+
     # Publish the bridge on a host loopback port when WCB_CC_BRIDGE_HOST_PORT is
     # set, so the host-side Sonnet judge (grading.py runs on the host, not in the
     # sidecar network) can reach the bridge at http://127.0.0.1:<port>. Bound to
@@ -870,6 +908,7 @@ def start_bridge(
         "--network", create_network_arg,
         *env_args,
         *dump_mount,
+        *stream_mount,
         *publish_args,
         "-v", f"{pool_host_dir}:/oauth_pool:rw",
         image,

@@ -378,8 +378,18 @@ def generate_task_tests(
     }
     attempts_done = 0
 
+    # Live-stream heartbeat (docs/STREAMING_PLAN.md §3.4): status events only
+    # — testgen output is cached generated code, not worth token streaming.
+    # stream_events.emit() is a guaranteed no-raise no-op when WCB_STREAM is
+    # off (the default).
+    from src.utils import stream_events as _stream
+    import uuid as _uuid
+    _stream_id = _uuid.uuid4().hex[:12]
+
     for attempt in range(1, max_attempts + 1):
         attempts_done = attempt
+        _stream.emit("testgen", "status", _stream_id, kind="status",
+                     delta=f"attempt {attempt}/{max_attempts} started")
         user_message = _build_user_message(
             prompt=prompt,
             task_toml=task_toml,
@@ -471,6 +481,8 @@ def generate_task_tests(
                 "[TESTGEN] Passed all lints on attempt %d (task=%s)",
                 attempt, task_identifier,
             )
+            _stream.emit("testgen", "status", _stream_id, kind="status",
+                         delta=f"attempt {attempt}: all lints passed")
             break
 
         _logger.info(
@@ -478,6 +490,8 @@ def generate_task_tests(
             attempt, max_attempts, len(failures), task_identifier,
             "; ".join(failures[:3]),
         )
+        _stream.emit("testgen", "status", _stream_id, kind="status",
+                     delta=f"attempt {attempt}: {len(failures)} lint failure(s)")
         lint_failures = failures
 
     # Final auto-repair + fallback
@@ -512,6 +526,11 @@ def generate_task_tests(
     result.lint_failures = best_failures
     result.usage = total_usage
     result.duration_ms = (time.time() - gen_start) * 1000
+    _stream.emit(
+        "testgen", "status", _stream_id, kind="status",
+        delta=("done (fallback stub)" if result.used_fallback
+               else f"done ({attempts_done} attempt(s))"),
+    )
 
     _logger.info(
         "[TESTGEN] Done task=%s code=%dch weights=%d tokens_in=%d tokens_out=%d "
