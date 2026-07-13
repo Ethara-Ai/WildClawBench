@@ -26,6 +26,10 @@ EV_STAGE = "stage"        # container / task lifecycle stage transition
 EV_PROGRESS = "progress"  # completed / total counter update
 EV_LOG = "log"            # a free-form log line (level, message)
 EV_SUMMARY = "summary"    # final execution summary payload
+EV_TOKEN = "token"        # live LLM stream chunk for the dashboard's stream pane
+                          # payload: {style: thinking|text|judge|status, text: str}
+                          # producer: src/utils/stream_renderer.py in bus mode
+                          # (docs/STREAMING_PLAN.md — display-only, fail-open)
 
 
 @dataclass

@@ -44,11 +44,28 @@ _SUMMARY_EVERY_SECS = 5.0
 _TOKEN_FEED_STALE_SECS = 30.0
 _DIM = "\033[2m"
 _RESET = "\033[0m"
+# Bus-mode flush policy: agent deltas are batched into readable chunks for the
+# dashboard's RichLog (which appends entries, not characters). A chunk flushes
+# on newline, on reaching _BUS_CHUNK_CHARS (split at the last space when one
+# exists past a minimum), or when the buffer sat unflushed for _BUS_STALE_SECS.
+_BUS_CHUNK_CHARS = 80
+_BUS_STALE_SECS = 0.4
 
 
 def _thinking_enabled() -> bool:
     raw = os.environ.get("WCB_STREAM_THINKING", "1").strip().lower()
     return raw in _TRUTHY
+
+
+def _publish_token(style: str, text: str) -> None:
+    """Publish one display-ready chunk onto the TUI event bus (EV_TOKEN).
+
+    Lazy import; raises to the caller, which latches the renderer's _bus_dead
+    (R2 fail-open). Emitting with no subscriber is a documented bus no-op, so
+    stray calls outside a dashboard display nothing and cost ~nothing.
+    """
+    from src.utils.ui.events import EV_TOKEN, get_bus
+    get_bus().emit(EV_TOKEN, style=style, text=text)
 
 
 class StreamRenderer(threading.Thread):
@@ -59,11 +76,18 @@ class StreamRenderer(threading.Thread):
         stream_path: Optional[Path],
         agent_log_path: Optional[Path],
         run_label: str = "",
+        mode: str = "tty",
     ) -> None:
         super().__init__(name="wcb-stream-renderer", daemon=True)
         self._stream_path = Path(stream_path) if stream_path else None
         self._agent_log_path = Path(agent_log_path) if agent_log_path else None
         self._run_label = run_label
+        # "tty": write to the terminal (default). "bus": publish EV_TOKEN
+        # events for the Textual dashboard's Live Stream pane instead — used
+        # when lifecycle.is_dashboard_active() (see start_renderer). Same
+        # thread, same tail loops, same classification state; only the final
+        # output primitive differs.
+        self._mode = mode if mode in ("tty", "bus") else "tty"
         self._stop_event = threading.Event()
         self._out: Optional[TextIO] = None
         self._owns_out = False
@@ -76,6 +100,11 @@ class StreamRenderer(threading.Thread):
         self._line_buf: dict[str, str] = {}  # per-source partial lines (judges)
         self._delta_count = 0
         self._last_summary = 0.0
+        # bus-mode state
+        self._bus_buf = ""
+        self._bus_kind: Optional[str] = None  # kind of the buffered agent chunk
+        self._bus_last_append = 0.0
+        self._bus_dead = False  # latched on first publish failure (fail-open)
 
     # ------------------------------------------------------------------ setup
 
@@ -91,6 +120,8 @@ class StreamRenderer(threading.Thread):
         self._color = self._interactive and not os.environ.get("NO_COLOR")
 
     def _w(self, text: str) -> None:
+        if self._mode == "bus":
+            return  # bus mode never touches a terminal (belt over braces)
         try:
             assert self._out is not None
             self._out.write(text)
@@ -99,11 +130,56 @@ class StreamRenderer(threading.Thread):
             # A dead terminal must never take the run down with it.
             self._stop_event.set()
 
-    def _line(self, text: str, dim: bool = False) -> None:
+    def _line(self, text: str, dim: bool = False, style: Optional[str] = None) -> None:
+        if self._mode == "bus":
+            # Whole-line entries map straight to bus events. Callers that
+            # don't pass an explicit style get the historical semantics:
+            # dim lines are status chatter, bright lines are judge content.
+            self._bus_send(style or ("status" if dim else "judge"), text)
+            return
         if dim and self._color:
             self._w(f"{_DIM}{text}{_RESET}\n")
         else:
             self._w(text + "\n")
+
+    # ------------------------------------------------------------- bus output
+
+    def _bus_send(self, style: str, text: str) -> None:
+        """Publish one chunk; fail-open (first failure disables publishing)."""
+        if self._bus_dead or not text:
+            return
+        try:
+            _publish_token(style, text)
+        except Exception:
+            self._bus_dead = True
+
+    def _bus_append(self, kind: str, delta: str) -> None:
+        """Buffer an agent delta; flush in readable chunks (see policy above)."""
+        if self._bus_kind != kind:
+            self._bus_flush()
+            self._bus_kind = kind
+        self._bus_buf += delta
+        self._bus_last_append = time.time()
+        while "\n" in self._bus_buf:
+            line, self._bus_buf = self._bus_buf.split("\n", 1)
+            self._bus_send(self._bus_kind or "text", line)
+        while len(self._bus_buf) >= _BUS_CHUNK_CHARS:
+            cut = self._bus_buf.rfind(" ", 20, _BUS_CHUNK_CHARS)
+            if cut == -1:
+                cut = _BUS_CHUNK_CHARS
+            chunk = self._bus_buf[:cut]
+            self._bus_buf = self._bus_buf[cut:].lstrip(" ")
+            self._bus_send(self._bus_kind or "text", chunk)
+
+    def _bus_flush(self) -> None:
+        if self._bus_buf.strip():
+            self._bus_send(self._bus_kind or "text", self._bus_buf)
+        self._bus_buf = ""
+
+    def _bus_flush_if_stale(self) -> None:
+        if (self._bus_buf
+                and time.time() - self._bus_last_append >= _BUS_STALE_SECS):
+            self._bus_flush()
 
     # ---------------------------------------------------------------- control
 
@@ -123,7 +199,13 @@ class StreamRenderer(threading.Thread):
 
     def run(self) -> None:  # noqa: D102
         try:
-            self._resolve_out()
+            if self._mode == "bus":
+                # No terminal: output goes to the event bus. Treat as
+                # interactive so the full render path runs (not summary mode).
+                self._interactive = True
+                self._color = False
+            else:
+                self._resolve_out()
             if self._stream_path is not None:
                 self._run_token_mode()
             elif self._agent_log_path is not None:
@@ -143,6 +225,10 @@ class StreamRenderer(threading.Thread):
         saw_any = False
         carry = ""
         while not self._stop_event.is_set():
+            if self._mode == "bus":
+                # Time-based flush so a paused model (thinking gap) doesn't
+                # hold the last chunk hostage in the buffer.
+                self._bus_flush_if_stale()
             if not self._stream_path.exists():
                 if (not saw_any and time.time() - started > _TOKEN_FEED_STALE_SECS
                         and self._agent_log_path is not None):
@@ -213,6 +299,8 @@ class StreamRenderer(threading.Thread):
         if event in ("message_stop", "error"):
             self._open_requests.discard(req)
             if req == self._main_request:
+                if self._mode == "bus":
+                    self._bus_flush()  # a turn ended: release the tail chunk
                 if self._cur_kind is not None:
                     self._w("\n")
                     self._cur_kind = None
@@ -227,9 +315,14 @@ class StreamRenderer(threading.Thread):
             return
         if req != self._main_request:
             return  # sub-agent deltas: status lines only (D5)
+        if kind == "thinking" and not _thinking_enabled():
+            return
+        if self._mode == "bus":
+            # Same classification brain, different sink: batch into readable
+            # chunks for the dashboard pane (style == kind: thinking|text).
+            self._bus_append("thinking" if kind == "thinking" else "text", delta)
+            return
         if kind == "thinking":
-            if not _thinking_enabled():
-                return
             if self._cur_kind != "thinking":
                 if self._cur_kind is not None:
                     self._w("\n")
@@ -266,7 +359,9 @@ class StreamRenderer(threading.Thread):
 
     def _flush_partial_lines(self) -> None:
         try:
-            if self._cur_kind is not None and self._interactive:
+            if self._mode == "bus":
+                self._bus_flush()  # release any tail agent chunk
+            if self._cur_kind is not None and self._interactive and self._mode == "tty":
                 self._w(f"{_RESET}\n" if self._color else "\n")
                 self._cur_kind = None
             for source, buf in list(self._line_buf.items()):
@@ -315,7 +410,9 @@ class StreamRenderer(threading.Thread):
                 if not ln.strip():
                     continue
                 if self._interactive:
-                    self._line(f"[agent] {ln}")
+                    # agent.log narration is agent output, not judge content —
+                    # style it as plain text in the dashboard pane (bus mode).
+                    self._line(f"[agent] {ln}", style="text")
                 else:
                     self._summary_tick("delta")
 
@@ -329,19 +426,18 @@ def start_renderer(
 
     Gate matches stream_events: WCB_STREAM truthy. token mode needs
     WCB_STREAM_LOG_PATH (stream_path); otherwise turn mode over agent.log.
-    Never raises."""
+
+    Output routing: when the Textual dashboard owns the terminal
+    (lifecycle.is_dashboard_active()), raw tty writes would corrupt its
+    canvas — so the renderer runs in BUS mode instead, publishing EV_TOKEN
+    events that the dashboard's Live Stream pane renders (single-terminal
+    TUI + streaming). Otherwise it renders to the tty as before. Either way
+    the feed/taps/grading are untouched (R1). Never raises."""
     try:
         if os.environ.get("WCB_STREAM", "").strip().lower() not in _TRUTHY:
             return None
-        if _dashboard_active():
-            # The Textual dashboard (--tui / WCB_TUI=1) owns the whole screen;
-            # raw token writes to /dev/tty would corrupt its canvas. Suppress
-            # the terminal renderer — the stream feed itself keeps being
-            # written by the taps (it never depended on this renderer), so a
-            # `tail -f` of stream.jsonl or a future EV_TOKEN dashboard pane
-            # still gets everything. Display-only decision (R1 untouched).
-            return None
-        r = StreamRenderer(stream_path, agent_log_path, run_label=run_label)
+        mode = "bus" if _dashboard_active() else "tty"
+        r = StreamRenderer(stream_path, agent_log_path, run_label=run_label, mode=mode)
         r.start()
         return r
     except Exception:

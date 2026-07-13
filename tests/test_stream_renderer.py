@@ -123,23 +123,95 @@ def test_token_mode_skips_torn_lines(monkeypatch, tmp_path):
         assert not r.is_alive()
 
 
-def test_renderer_suppressed_under_textual_dashboard(monkeypatch, tmp_path):
-    """--tui + --stream: the dashboard owns the screen (src/utils/ui), so the
-    terminal renderer must decline to start. The stream FEED is unaffected —
-    taps write it regardless of any renderer. Fail-open the other way too:
-    a broken/absent UI package means no dashboard, so rendering proceeds."""
+def test_renderer_bus_mode_under_textual_dashboard(monkeypatch, tmp_path):
+    """--tui + --stream single-terminal contract: under the dashboard the
+    renderer runs in BUS mode (publishes EV_TOKEN for the Live Stream pane,
+    never opens a tty handle); without the dashboard it renders to the tty.
+    The stream FEED is unaffected either way — taps write it regardless."""
     monkeypatch.setenv("WCB_STREAM", "1")
     from src.utils.ui import lifecycle
 
     lifecycle.set_dashboard_active(True)
     try:
-        assert start_renderer(tmp_path / "s.jsonl", tmp_path / "a.log") is None
+        r = start_renderer(tmp_path / "s.jsonl", tmp_path / "a.log")
+        assert r is not None and r._mode == "bus"  # single-terminal contract
+        assert r._out is None  # bus mode never opens a terminal handle
+        r.stop(timeout=2.0)
+        assert not r.is_alive()
     finally:
         lifecycle.set_dashboard_active(False)
 
     r = start_renderer(tmp_path / "s.jsonl", tmp_path / "a.log")
     try:
-        assert r is not None  # dashboard off -> renders normally
+        assert r is not None and r._mode == "tty"  # dashboard off -> tty render
     finally:
         if r is not None:
             r.stop(timeout=1.0)
+
+
+def _bus_renderer(monkeypatch):
+    """Renderer in bus mode with a collector replacing the real bus publish."""
+    import src.utils.stream_renderer as sr
+    events = []
+    monkeypatch.setattr(sr, "_publish_token",
+                        lambda style, text: events.append((style, text)))
+    r = StreamRenderer(None, None, mode="bus")
+    r._interactive = True  # what run() sets in bus mode
+    return r, events
+
+
+def test_bus_mode_agent_chunks_flush_on_newline_and_size(monkeypatch):
+    r, events = _bus_renderer(monkeypatch)
+    r._render_event({"source": "agent", "event": "message_start", "kind": "status",
+                     "delta": "", "request_id": "m"})
+    r._render_event({"source": "agent", "event": "delta", "kind": "text",
+                     "delta": "first line\nsecond", "request_id": "m"})
+    assert ("text", "first line") in events           # newline flush
+    assert all(t != "second" for _, t in events)      # partial held back
+    r._render_event({"source": "agent", "event": "delta", "kind": "text",
+                     "delta": " word" * 30, "request_id": "m"})
+    assert any(s == "text" and len(t) >= 20 for s, t in events)  # size flush
+    assert all(len(t) <= 80 for _, t in events)       # never exceeds chunk cap
+    r._render_event({"source": "agent", "event": "message_stop", "kind": "status",
+                     "delta": "", "request_id": "m"})
+    joined = "first line second" + " word" * 30
+    reassembled = " ".join(t for s, t in events if s == "text")
+    assert reassembled.split() == joined.split()      # nothing lost, order kept
+
+
+def test_bus_mode_thinking_style_and_gate(monkeypatch):
+    r, events = _bus_renderer(monkeypatch)
+    r._render_event({"source": "agent", "event": "message_start", "kind": "status",
+                     "delta": "", "request_id": "m"})
+    r._render_event({"source": "agent", "event": "delta", "kind": "thinking",
+                     "delta": "pondering...\n", "request_id": "m"})
+    assert ("thinking", "pondering...") in events
+    monkeypatch.setenv("WCB_STREAM_THINKING", "0")
+    r._render_event({"source": "agent", "event": "delta", "kind": "thinking",
+                     "delta": "hidden\n", "request_id": "m"})
+    assert all("hidden" not in t for _, t in events)  # gate respected in bus mode
+
+
+def test_bus_mode_judge_lines_and_subagent_status(monkeypatch):
+    r, events = _bus_renderer(monkeypatch)
+    r._render_event({"source": "judge:kimi", "event": "delta", "kind": "text",
+                     "delta": "1. Yes\n", "request_id": "j"})
+    assert ("judge", "[judge:kimi] 1. Yes") in events
+    r._render_event({"source": "agent", "event": "message_start", "kind": "status",
+                     "delta": "", "request_id": "main"})
+    r._render_event({"source": "agent", "event": "message_start", "kind": "status",
+                     "delta": "", "request_id": "sub42"})
+    assert any(s == "status" and "sub-agent" in t for s, t in events)
+
+
+def test_bus_mode_fail_open_on_publish_error(monkeypatch):
+    import src.utils.stream_renderer as sr
+
+    def _boom(style, text):
+        raise RuntimeError("bus gone")
+    monkeypatch.setattr(sr, "_publish_token", _boom)
+    r = StreamRenderer(None, None, mode="bus")
+    r._interactive = True
+    r._render_event({"source": "judge:glm", "event": "delta", "kind": "text",
+                     "delta": "verdict\n", "request_id": "j"})  # must not raise
+    assert r._bus_dead  # latched; subsequent sends are no-ops
