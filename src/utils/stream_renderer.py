@@ -333,8 +333,28 @@ def start_renderer(
     try:
         if os.environ.get("WCB_STREAM", "").strip().lower() not in _TRUTHY:
             return None
+        if _dashboard_active():
+            # The Textual dashboard (--tui / WCB_TUI=1) owns the whole screen;
+            # raw token writes to /dev/tty would corrupt its canvas. Suppress
+            # the terminal renderer — the stream feed itself keeps being
+            # written by the taps (it never depended on this renderer), so a
+            # `tail -f` of stream.jsonl or a future EV_TOKEN dashboard pane
+            # still gets everything. Display-only decision (R1 untouched).
+            return None
         r = StreamRenderer(stream_path, agent_log_path, run_label=run_label)
         r.start()
         return r
     except Exception:
         return None
+
+
+def _dashboard_active() -> bool:
+    """True while the Textual dashboard owns the terminal (src/utils/ui).
+
+    Fail-open in BOTH directions: if the UI package is absent or broken there
+    is no dashboard, so False (render normally) is always the safe answer."""
+    try:
+        from src.utils.ui import lifecycle as _lifecycle
+        return bool(_lifecycle.is_dashboard_active())
+    except Exception:
+        return False

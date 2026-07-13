@@ -121,3 +121,25 @@ def test_token_mode_skips_torn_lines(monkeypatch, tmp_path):
     finally:
         r.stop(timeout=2.0)
         assert not r.is_alive()
+
+
+def test_renderer_suppressed_under_textual_dashboard(monkeypatch, tmp_path):
+    """--tui + --stream: the dashboard owns the screen (src/utils/ui), so the
+    terminal renderer must decline to start. The stream FEED is unaffected —
+    taps write it regardless of any renderer. Fail-open the other way too:
+    a broken/absent UI package means no dashboard, so rendering proceeds."""
+    monkeypatch.setenv("WCB_STREAM", "1")
+    from src.utils.ui import lifecycle
+
+    lifecycle.set_dashboard_active(True)
+    try:
+        assert start_renderer(tmp_path / "s.jsonl", tmp_path / "a.log") is None
+    finally:
+        lifecycle.set_dashboard_active(False)
+
+    r = start_renderer(tmp_path / "s.jsonl", tmp_path / "a.log")
+    try:
+        assert r is not None  # dashboard off -> renders normally
+    finally:
+        if r is not None:
+            r.stop(timeout=1.0)
