@@ -1,6 +1,6 @@
 [
   {
-    "id": "11",
+    "id": 11,
     "slug": "auth-service",
     "name": "Auth Service",
     "org_slug": "orbit-labs",
@@ -9,7 +9,7 @@
     "date_created": "2024-04-12T10:00:00.000Z"
   },
   {
-    "id": "12",
+    "id": 12,
     "slug": "web-frontend",
     "name": "Web Frontend",
     "org_slug": "orbit-labs",
@@ -18,7 +18,7 @@
     "date_created": "2024-03-20T10:00:00.000Z"
   },
   {
-    "id": "13",
+    "id": 13,
     "slug": "billing-service",
     "name": "Billing Service",
     "org_slug": "orbit-labs",

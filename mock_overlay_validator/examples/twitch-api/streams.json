@@ -8,10 +8,10 @@
     "game_name": "Elden Ring",
     "type": "live",
     "title": "Blind Elden Ring run - no spoilers please",
-    "viewer_count": "18400",
+    "viewer_count": 18400,
     "started_at": "2026-05-27T14:00:00Z",
     "language": "en",
-    "is_live": "true"
+    "is_live": true
   },
   {
     "id": "80002",
@@ -22,10 +22,10 @@
     "game_name": "Speedrunning",
     "type": "live",
     "title": "WR attempts all morning",
-    "viewer_count": "9200",
+    "viewer_count": 9200,
     "started_at": "2026-05-27T13:30:00Z",
     "language": "en",
-    "is_live": "true"
+    "is_live": true
   },
   {
     "id": "80003",
@@ -36,10 +36,10 @@
     "game_name": "Software and Game Development",
     "type": "live",
     "title": "Orbit CLI 2.0 launch stream and live Q&A",
-    "viewer_count": "2600",
+    "viewer_count": 2600,
     "started_at": "2026-05-27T15:00:00Z",
     "language": "en",
-    "is_live": "true"
+    "is_live": true
   },
   {
     "id": "80004",
@@ -50,10 +50,10 @@
     "game_name": "Software and Game Development",
     "type": "",
     "title": "Building a roguelike in Rust - day 14",
-    "viewer_count": "0",
+    "viewer_count": 0,
     "started_at": "",
     "language": "en",
-    "is_live": "false"
+    "is_live": false
   },
   {
     "id": "80005",
@@ -64,10 +64,10 @@
     "game_name": "Cities: Skylines II",
     "type": "",
     "title": "Building the perfect transit network",
-    "viewer_count": "0",
+    "viewer_count": 0,
     "started_at": "",
     "language": "en",
-    "is_live": "false"
+    "is_live": false
   },
   {
     "id": "80006",
@@ -78,9 +78,9 @@
     "game_name": "Strategy",
     "type": "",
     "title": "Map making sunday",
-    "viewer_count": "0",
+    "viewer_count": 0,
     "started_at": "",
     "language": "en",
-    "is_live": "false"
+    "is_live": false
   }
 ]

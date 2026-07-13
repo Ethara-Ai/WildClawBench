@@ -2,46 +2,46 @@
   {
     "id": "price_Starter_M",
     "product": "prod_Starter",
-    "unit_amount": "1900",
+    "unit_amount": 1900,
     "currency": "usd",
     "recurring_interval": "month",
-    "active": "true",
+    "active": true,
     "nickname": "Starter Monthly"
   },
   {
     "id": "price_Pro_M",
     "product": "prod_Pro",
-    "unit_amount": "4900",
+    "unit_amount": 4900,
     "currency": "usd",
     "recurring_interval": "month",
-    "active": "true",
+    "active": true,
     "nickname": "Pro Monthly"
   },
   {
     "id": "price_Pro_Y",
     "product": "prod_Pro",
-    "unit_amount": "49000",
+    "unit_amount": 49000,
     "currency": "usd",
     "recurring_interval": "year",
-    "active": "true",
+    "active": true,
     "nickname": "Pro Annual"
   },
   {
     "id": "price_Ent_M",
     "product": "prod_Enterprise",
-    "unit_amount": "29900",
+    "unit_amount": 29900,
     "currency": "usd",
     "recurring_interval": "month",
-    "active": "true",
+    "active": true,
     "nickname": "Enterprise Monthly"
   },
   {
     "id": "price_POS",
     "product": "prod_POS",
-    "unit_amount": "9900",
+    "unit_amount": 9900,
     "currency": "usd",
     "recurring_interval": "",
-    "active": "true",
+    "active": true,
     "nickname": "POS Bundle One-time"
   }
 ]

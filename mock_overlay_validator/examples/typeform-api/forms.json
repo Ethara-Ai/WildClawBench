@@ -4,8 +4,8 @@
     "title": "Customer Satisfaction Survey",
     "workspace": "ws-orbit-labs",
     "language": "en",
-    "is_public": "true",
-    "response_count": "3",
+    "is_public": true,
+    "response_count": 3,
     "created_time": "2026-04-10T09:00:00Z",
     "last_updated_time": "2026-05-20T14:00:00Z"
   },
@@ -14,8 +14,8 @@
     "title": "Product Onboarding Feedback",
     "workspace": "ws-orbit-labs",
     "language": "en",
-    "is_public": "true",
-    "response_count": "2",
+    "is_public": true,
+    "response_count": 2,
     "created_time": "2026-04-18T11:30:00Z",
     "last_updated_time": "2026-05-18T10:15:00Z"
   },
@@ -24,8 +24,8 @@
     "title": "Event Registration",
     "workspace": "ws-orbit-labs",
     "language": "en",
-    "is_public": "false",
-    "response_count": "2",
+    "is_public": false,
+    "response_count": 2,
     "created_time": "2026-05-01T08:00:00Z",
     "last_updated_time": "2026-05-22T16:40:00Z"
   }

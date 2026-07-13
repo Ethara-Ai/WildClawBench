@@ -7,7 +7,7 @@
     "isbn_10": "0618640150",
     "publisher": "Houghton Mifflin",
     "publish_date": "2005-10-17",
-    "number_of_pages": "1216",
+    "number_of_pages": 1216,
     "language": "eng"
   },
   {
@@ -18,7 +18,7 @@
     "isbn_10": "0261103571",
     "publisher": "HarperCollins",
     "publish_date": "2007-04-16",
-    "number_of_pages": "576",
+    "number_of_pages": 576,
     "language": "eng"
   },
   {
@@ -29,7 +29,7 @@
     "isbn_10": "0553262505",
     "publisher": "Bantam Spectra",
     "publish_date": "1984-09-01",
-    "number_of_pages": "183",
+    "number_of_pages": 183,
     "language": "eng"
   },
   {
@@ -40,7 +40,7 @@
     "isbn_10": "0553293354",
     "publisher": "Bantam Books",
     "publish_date": "1991-10-01",
-    "number_of_pages": "244",
+    "number_of_pages": 244,
     "language": "eng"
   },
   {
@@ -51,7 +51,7 @@
     "isbn_10": "0316229296",
     "publisher": "Orbit",
     "publish_date": "2015-08-04",
-    "number_of_pages": "512",
+    "number_of_pages": 512,
     "language": "eng"
   },
   {
@@ -62,7 +62,7 @@
     "isbn_10": "0441013597",
     "publisher": "Ace Books",
     "publish_date": "2005-08-02",
-    "number_of_pages": "688",
+    "number_of_pages": 688,
     "language": "eng"
   },
   {
@@ -73,7 +73,7 @@
     "isbn_10": "0807083690",
     "publisher": "Beacon Press",
     "publish_date": "2004-02-01",
-    "number_of_pages": "287",
+    "number_of_pages": 287,
     "language": "eng"
   },
   {
@@ -84,7 +84,7 @@
     "isbn_10": "0441478123",
     "publisher": "Ace Books",
     "publish_date": "2000-04-04",
-    "number_of_pages": "304",
+    "number_of_pages": 304,
     "language": "eng"
   },
   {
@@ -95,7 +95,7 @@
     "isbn_10": "0553294385",
     "publisher": "Spectra",
     "publish_date": "2008-08-26",
-    "number_of_pages": "224",
+    "number_of_pages": 224,
     "language": "eng"
   }
 ]

@@ -6,7 +6,7 @@
     "title": "Engineering Home",
     "space_key": "ENG",
     "parent_id": "",
-    "version": "3",
+    "version": 3,
     "body": "Welcome to the Engineering space. Start here for runbooks and design docs.",
     "created_by": "amelia",
     "created_at": "2025-09-02T10:00:00Z"
@@ -18,7 +18,7 @@
     "title": "Service Runbooks",
     "space_key": "ENG",
     "parent_id": "100101",
-    "version": "5",
+    "version": 5,
     "body": "Index of operational runbooks for production services.",
     "created_by": "jonas",
     "created_at": "2025-09-10T11:00:00Z"
@@ -30,7 +30,7 @@
     "title": "Auth Service Runbook",
     "space_key": "ENG",
     "parent_id": "100102",
-    "version": "8",
+    "version": 8,
     "body": "On-call steps for the authentication service including failover.",
     "created_by": "helena",
     "created_at": "2025-09-12T09:30:00Z"
@@ -42,7 +42,7 @@
     "title": "Billing Service Runbook",
     "space_key": "ENG",
     "parent_id": "100102",
-    "version": "4",
+    "version": 4,
     "body": "On-call steps for the billing service and reconciliation jobs.",
     "created_by": "rohit",
     "created_at": "2025-10-01T14:20:00Z"
@@ -54,7 +54,7 @@
     "title": "Architecture Decisions",
     "space_key": "ENG",
     "parent_id": "100101",
-    "version": "2",
+    "version": 2,
     "body": "Log of accepted architecture decision records (ADRs).",
     "created_by": "amelia",
     "created_at": "2025-10-05T16:00:00Z"
@@ -66,7 +66,7 @@
     "title": "Product Home",
     "space_key": "PROD",
     "parent_id": "",
-    "version": "2",
+    "version": 2,
     "body": "Welcome to the Product space. Roadmaps and specs live here.",
     "created_by": "noor",
     "created_at": "2025-09-03T10:00:00Z"
@@ -78,7 +78,7 @@
     "title": "Q3 Roadmap",
     "space_key": "PROD",
     "parent_id": "100201",
-    "version": "6",
+    "version": 6,
     "body": "Prioritized initiatives for the third quarter.",
     "created_by": "noor",
     "created_at": "2025-09-15T13:00:00Z"
@@ -90,7 +90,7 @@
     "title": "Multi-region Failover Spec",
     "space_key": "PROD",
     "parent_id": "100202",
-    "version": "3",
+    "version": 3,
     "body": "Specification for active-active multi-region failover.",
     "created_by": "jonas",
     "created_at": "2025-10-12T10:45:00Z"

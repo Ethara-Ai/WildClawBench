@@ -6,8 +6,8 @@
     "city_code": "NYC",
     "country_name": "United States",
     "country_code": "US",
-    "latitude": "40.6413",
-    "longitude": "-73.7781",
+    "latitude": 40.6413,
+    "longitude": -73.7781,
     "timezone": "America/New_York"
   },
   {
@@ -17,8 +17,8 @@
     "city_code": "LAX",
     "country_name": "United States",
     "country_code": "US",
-    "latitude": "33.9416",
-    "longitude": "-118.4085",
+    "latitude": 33.9416,
+    "longitude": -118.4085,
     "timezone": "America/Los_Angeles"
   },
   {
@@ -28,8 +28,8 @@
     "city_code": "LON",
     "country_name": "United Kingdom",
     "country_code": "GB",
-    "latitude": "51.4700",
-    "longitude": "-0.4543",
+    "latitude": 51.47,
+    "longitude": -0.4543,
     "timezone": "Europe/London"
   },
   {
@@ -39,8 +39,8 @@
     "city_code": "PAR",
     "country_name": "France",
     "country_code": "FR",
-    "latitude": "49.0097",
-    "longitude": "2.5479",
+    "latitude": 49.0097,
+    "longitude": 2.5479,
     "timezone": "Europe/Paris"
   },
   {
@@ -50,8 +50,8 @@
     "city_code": "FRA",
     "country_name": "Germany",
     "country_code": "DE",
-    "latitude": "50.0379",
-    "longitude": "8.5622",
+    "latitude": 50.0379,
+    "longitude": 8.5622,
     "timezone": "Europe/Berlin"
   },
   {
@@ -61,8 +61,8 @@
     "city_code": "DXB",
     "country_name": "United Arab Emirates",
     "country_code": "AE",
-    "latitude": "25.2532",
-    "longitude": "55.3657",
+    "latitude": 25.2532,
+    "longitude": 55.3657,
     "timezone": "Asia/Dubai"
   },
   {
@@ -72,8 +72,8 @@
     "city_code": "SIN",
     "country_name": "Singapore",
     "country_code": "SG",
-    "latitude": "1.3644",
-    "longitude": "103.9915",
+    "latitude": 1.3644,
+    "longitude": 103.9915,
     "timezone": "Asia/Singapore"
   },
   {
@@ -83,8 +83,8 @@
     "city_code": "TYO",
     "country_name": "Japan",
     "country_code": "JP",
-    "latitude": "35.7720",
-    "longitude": "140.3929",
+    "latitude": 35.772,
+    "longitude": 140.3929,
     "timezone": "Asia/Tokyo"
   },
   {
@@ -94,8 +94,8 @@
     "city_code": "SFO",
     "country_name": "United States",
     "country_code": "US",
-    "latitude": "37.6213",
-    "longitude": "-122.3790",
+    "latitude": 37.6213,
+    "longitude": -122.379,
     "timezone": "America/Los_Angeles"
   },
   {
@@ -105,8 +105,8 @@
     "city_code": "BOS",
     "country_name": "United States",
     "country_code": "US",
-    "latitude": "42.3656",
-    "longitude": "-71.0096",
+    "latitude": 42.3656,
+    "longitude": -71.0096,
     "timezone": "America/New_York"
   },
   {
@@ -116,8 +116,8 @@
     "city_code": "CHI",
     "country_name": "United States",
     "country_code": "US",
-    "latitude": "41.9742",
-    "longitude": "-87.9073",
+    "latitude": 41.9742,
+    "longitude": -87.9073,
     "timezone": "America/Chicago"
   },
   {
@@ -127,8 +127,8 @@
     "city_code": "AMS",
     "country_name": "Netherlands",
     "country_code": "NL",
-    "latitude": "52.3105",
-    "longitude": "4.7683",
+    "latitude": 52.3105,
+    "longitude": 4.7683,
     "timezone": "Europe/Amsterdam"
   }
 ]

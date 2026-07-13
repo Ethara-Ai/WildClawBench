@@ -5,9 +5,9 @@
     "title": "What is your name?",
     "field_type": "short_text",
     "ref": "name",
-    "required": "true",
+    "required": true,
     "choices": "",
-    "order": "1"
+    "order": 1
   },
   {
     "field_id": "fld-csat-rating",
@@ -15,9 +15,9 @@
     "title": "How would you rate our service?",
     "field_type": "rating",
     "ref": "service_rating",
-    "required": "true",
+    "required": true,
     "choices": "",
-    "order": "2"
+    "order": 2
   },
   {
     "field_id": "fld-csat-recommend",
@@ -25,9 +25,9 @@
     "title": "Would you recommend us?",
     "field_type": "multiple_choice",
     "ref": "recommend",
-    "required": "true",
+    "required": true,
     "choices": "Definitely|Probably|Not sure|No",
-    "order": "3"
+    "order": 3
   },
   {
     "field_id": "fld-csat-email",
@@ -35,9 +35,9 @@
     "title": "Your email",
     "field_type": "email",
     "ref": "contact_email",
-    "required": "false",
+    "required": false,
     "choices": "",
-    "order": "4"
+    "order": 4
   },
   {
     "field_id": "fld-onb-role",
@@ -45,9 +45,9 @@
     "title": "What is your role?",
     "field_type": "multiple_choice",
     "ref": "role",
-    "required": "true",
+    "required": true,
     "choices": "Engineer|Product Manager|Designer|Executive|Other",
-    "order": "1"
+    "order": 1
   },
   {
     "field_id": "fld-onb-ease",
@@ -55,9 +55,9 @@
     "title": "How easy was setup?",
     "field_type": "rating",
     "ref": "setup_ease",
-    "required": "true",
+    "required": true,
     "choices": "",
-    "order": "2"
+    "order": 2
   },
   {
     "field_id": "fld-onb-comments",
@@ -65,9 +65,9 @@
     "title": "Any additional comments?",
     "field_type": "short_text",
     "ref": "comments",
-    "required": "false",
+    "required": false,
     "choices": "",
-    "order": "3"
+    "order": 3
   },
   {
     "field_id": "fld-evt-name",
@@ -75,9 +75,9 @@
     "title": "Full name",
     "field_type": "short_text",
     "ref": "attendee_name",
-    "required": "true",
+    "required": true,
     "choices": "",
-    "order": "1"
+    "order": 1
   },
   {
     "field_id": "fld-evt-email",
@@ -85,9 +85,9 @@
     "title": "Email address",
     "field_type": "email",
     "ref": "attendee_email",
-    "required": "true",
+    "required": true,
     "choices": "",
-    "order": "2"
+    "order": 2
   },
   {
     "field_id": "fld-evt-track",
@@ -95,8 +95,8 @@
     "title": "Which track will you attend?",
     "field_type": "multiple_choice",
     "ref": "track",
-    "required": "true",
+    "required": true,
     "choices": "Platform|Frontend|Data|Security",
-    "order": "3"
+    "order": 3
   }
 ]

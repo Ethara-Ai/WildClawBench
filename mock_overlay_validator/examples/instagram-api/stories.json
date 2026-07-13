@@ -33,7 +33,12 @@
     "caption": "Fitness Day is TOMORROW! 💪 All students welcome — games, challenges, and prizes!",
     "link": "",
     "poll_question": "Favorite event?",
-    "poll_options": "Relay Race|Tug of War|Obstacle Course|Dance Battle"
+    "poll_options": [
+      "Relay Race",
+      "Tug of War",
+      "Obstacle Course",
+      "Dance Battle"
+    ]
   },
   {
     "id": "17950001010",

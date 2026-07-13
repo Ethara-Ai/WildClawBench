@@ -6,7 +6,7 @@
     "email": "maria.chen@acme-corp.com",
     "recipient_type": "signer",
     "status": "sent",
-    "routing_order": "1",
+    "routing_order": 1,
     "signed_time": ""
   },
   {
@@ -16,7 +16,7 @@
     "email": "amelia.ortega@orbit-labs.com",
     "recipient_type": "signer",
     "status": "sent",
-    "routing_order": "2",
+    "routing_order": 2,
     "signed_time": ""
   },
   {
@@ -26,7 +26,7 @@
     "email": "tomas.reyes@partner.io",
     "recipient_type": "signer",
     "status": "delivered",
-    "routing_order": "1",
+    "routing_order": 1,
     "signed_time": ""
   },
   {
@@ -36,7 +36,7 @@
     "email": "jonas.pereira@orbit-labs.com",
     "recipient_type": "signer",
     "status": "sent",
-    "routing_order": "2",
+    "routing_order": 2,
     "signed_time": ""
   },
   {
@@ -46,7 +46,7 @@
     "email": "lena.voss@vendorco.com",
     "recipient_type": "signer",
     "status": "completed",
-    "routing_order": "1",
+    "routing_order": 1,
     "signed_time": "2026-05-18T16:40:00Z"
   },
   {
@@ -56,7 +56,7 @@
     "email": "helena.park@orbit-labs.com",
     "recipient_type": "signer",
     "status": "completed",
-    "routing_order": "2",
+    "routing_order": 2,
     "signed_time": "2026-05-18T16:45:00Z"
   },
   {
@@ -66,7 +66,7 @@
     "email": "devon.clark@contractor.dev",
     "recipient_type": "signer",
     "status": "sent",
-    "routing_order": "1",
+    "routing_order": 1,
     "signed_time": ""
   },
   {
@@ -76,7 +76,7 @@
     "email": "priya.nair@lessor.com",
     "recipient_type": "signer",
     "status": "completed",
-    "routing_order": "1",
+    "routing_order": 1,
     "signed_time": "2026-05-02T12:05:00Z"
   },
   {
@@ -86,7 +86,7 @@
     "email": "rohit.bansal@orbit-labs.com",
     "recipient_type": "signer",
     "status": "completed",
-    "routing_order": "2",
+    "routing_order": 2,
     "signed_time": "2026-05-02T12:10:00Z"
   }
 ]

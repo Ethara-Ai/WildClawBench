@@ -5,8 +5,8 @@
     "name": "Apple Inc. Common Stock",
     "exchange": "NASDAQ",
     "asset_class": "us_equity",
-    "tradable": "true",
-    "fractionable": "true"
+    "tradable": true,
+    "fractionable": true
   },
   {
     "id": "f30d734c-2806-4d0d-b145-f9fee271c5cd",
@@ -14,8 +14,8 @@
     "name": "Microsoft Corporation Common Stock",
     "exchange": "NASDAQ",
     "asset_class": "us_equity",
-    "tradable": "true",
-    "fractionable": "true"
+    "tradable": true,
+    "fractionable": true
   },
   {
     "id": "b6d1aa75-5c14-4920-aef3-7eb33a01c123",
@@ -23,8 +23,8 @@
     "name": "Tesla Inc. Common Stock",
     "exchange": "NASDAQ",
     "asset_class": "us_equity",
-    "tradable": "true",
-    "fractionable": "true"
+    "tradable": true,
+    "fractionable": true
   },
   {
     "id": "69b6d1aa-5c14-4920-aef3-7eb33a01c456",
@@ -32,8 +32,8 @@
     "name": "NVIDIA Corporation Common Stock",
     "exchange": "NASDAQ",
     "asset_class": "us_equity",
-    "tradable": "true",
-    "fractionable": "true"
+    "tradable": true,
+    "fractionable": true
   },
   {
     "id": "0d1aa75b-5c14-4920-aef3-7eb33a01c789",
@@ -41,8 +41,8 @@
     "name": "Amazon.com Inc. Common Stock",
     "exchange": "NASDAQ",
     "asset_class": "us_equity",
-    "tradable": "true",
-    "fractionable": "true"
+    "tradable": true,
+    "fractionable": true
   },
   {
     "id": "1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d",
@@ -50,8 +50,8 @@
     "name": "Alphabet Inc. Class A",
     "exchange": "NASDAQ",
     "asset_class": "us_equity",
-    "tradable": "true",
-    "fractionable": "true"
+    "tradable": true,
+    "fractionable": true
   },
   {
     "id": "2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e",
@@ -59,7 +59,7 @@
     "name": "SPDR S&P 500 ETF Trust",
     "exchange": "ARCA",
     "asset_class": "us_equity",
-    "tradable": "true",
-    "fractionable": "false"
+    "tradable": true,
+    "fractionable": false
   }
 ]

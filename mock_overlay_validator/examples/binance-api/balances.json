@@ -1,42 +1,42 @@
 [
   {
     "asset": "BTC",
-    "free": "0.45821000",
-    "locked": "0.01000000"
+    "free": 0.45821,
+    "locked": 0.01
   },
   {
     "asset": "ETH",
-    "free": "3.20140000",
-    "locked": "0.50000000"
+    "free": 3.2014,
+    "locked": 0.5
   },
   {
     "asset": "BNB",
-    "free": "12.40000000",
-    "locked": "0.00000000"
+    "free": 12.4,
+    "locked": 0.0
   },
   {
     "asset": "SOL",
-    "free": "85.00000000",
-    "locked": "5.00000000"
+    "free": 85.0,
+    "locked": 5.0
   },
   {
     "asset": "USDT",
-    "free": "15420.55000000",
-    "locked": "250.00000000"
+    "free": 15420.55,
+    "locked": 250.0
   },
   {
     "asset": "XRP",
-    "free": "2500.00000000",
-    "locked": "0.00000000"
+    "free": 2500.0,
+    "locked": 0.0
   },
   {
     "asset": "ADA",
-    "free": "1800.00000000",
-    "locked": "0.00000000"
+    "free": 1800.0,
+    "locked": 0.0
   },
   {
     "asset": "DOGE",
-    "free": "12000.00000000",
-    "locked": "0.00000000"
+    "free": 12000.0,
+    "locked": 0.0
   }
 ]

@@ -26,7 +26,11 @@ errors were found.
 ```
 mock_overlay_validator/
 ├── validate.py                # the only entry point
+├── _baked_contracts.py        # per-API coercer contracts (generated)
 ├── README.md                  # this file
+├── tools/
+│   ├── rebake_contracts.py    # regenerate _baked_contracts.py from environment/
+│   └── regenerate_examples.py # rewrite examples/*.json to match contracts
 └── examples/
     ├── gmail-api/
     │   ├── drafts.json
@@ -37,9 +41,22 @@ mock_overlay_validator/
     └── ... 101 APIs total
 ```
 
+The package is fully self-contained: `validate.py` reads `_baked_contracts.py`
+and the `examples/` tree, nothing else. Nothing outside this directory is
+imported or read at runtime.
+
 Each `examples/<api>-api/<name>.{csv,json}` is the canonical reference for that
-table or document. Your overlay file with the matching **stem** (filename minus
-extension) is compared against it.
+table or document, with values stored in the *coerced* form the runtime holds
+in memory (ints as ints, floats as floats, bools as bools). Overlays with
+either coerced or string-form values validate identically, because the runtime
+coercers accept both.
+
+If the coercers in `environment/<api>-api/<api>_data.py` change, re-bake:
+
+```bash
+python3 tools/rebake_contracts.py > _baked_contracts.py
+python3 tools/regenerate_examples.py    # optional: update example values too
+```
 
 ## Quick start
 
@@ -135,7 +152,9 @@ Exit code is `0` on success, `1` on errors (or warnings with
 |---|---|---|---|
 | `SCHEMA_MISSING_COLUMNS` | error | Overlay lacks columns present in example | Add them, even if blank. |
 | `SCHEMA_EXTRA_COLUMNS` | warn | Overlay has columns not in example | The runtime ignores them — usually a typo. |
-| `SCHEMA_TYPE_DRIFT` | error | A column's values don't parse like the example (e.g. `bool` example, `str` overlay) | Match the example's value shape. |
+| `SCHEMA_TYPE_DRIFT` | error | A column's values don't parse like the example (e.g. `bool` example, `str` overlay). Only fires for columns without a coercer contract. | Match the example's value shape. |
+| `SCHEMA_COERCE_MISMATCH` | error | A column has value(s) the runtime coercer in `<api>_data.py` would reject (e.g. `strict_int` given `"abc"`, `strict_bool` given `"maybe"`). This is the strong check and it supersedes `SCHEMA_TYPE_DRIFT` when a contract is available. | Supply values the named coercer accepts. |
+| `SCHEMA_PK_DUPLICATE` | error | The declared primary-key column has duplicate values across rows. Runtime auto-suffixes duplicates with `#idx` and prints a warning; lookups by the PK will only find the first. | Make PK values unique. |
 | `KEY_MISSING` | error | A nested JSON key that exists in the canonical example is absent in the overlay (path is dotted, e.g. `identity.json.owners.acc_chk_001`) | Add the missing key. |
 | `KEY_EXTRA` | warn | Overlay has a nested key the canonical example doesn't have | The runtime ignores it — usually a typo or a stale field. |
 | `TYPE_MISMATCH` | error | At a nested path, canonical is `scalar` but overlay is `dict`/`list` (or vice versa). Path uses `[]` inside arrays. | Match the canonical shape (e.g. don't wrap a scalar in an object). |

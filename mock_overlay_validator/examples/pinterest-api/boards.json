@@ -6,9 +6,9 @@
     "privacy": "PUBLIC",
     "created_at": "2025-11-03T09:10:00",
     "updated_at": "2026-05-12T14:30:00",
-    "pin_count": "18",
-    "follower_count": "324",
-    "collaborator_count": "0"
+    "pin_count": 18,
+    "follower_count": 324,
+    "collaborator_count": 0
   },
   {
     "board_id": "board_1002",
@@ -17,9 +17,9 @@
     "privacy": "PUBLIC",
     "created_at": "2023-01-10T08:00:00",
     "updated_at": "2026-05-15T11:00:00",
-    "pin_count": "20",
-    "follower_count": "512",
-    "collaborator_count": "1"
+    "pin_count": 20,
+    "follower_count": 512,
+    "collaborator_count": 1
   },
   {
     "board_id": "board_1003",
@@ -28,9 +28,9 @@
     "privacy": "PUBLIC",
     "created_at": "2026-02-10T14:22:00",
     "updated_at": "2026-04-18T09:45:00",
-    "pin_count": "15",
-    "follower_count": "189",
-    "collaborator_count": "0"
+    "pin_count": 15,
+    "follower_count": 189,
+    "collaborator_count": 0
   },
   {
     "board_id": "board_1004",
@@ -39,9 +39,9 @@
     "privacy": "PUBLIC",
     "created_at": "2023-06-20T11:30:00",
     "updated_at": "2026-04-22T16:00:00",
-    "pin_count": "8",
-    "follower_count": "145",
-    "collaborator_count": "0"
+    "pin_count": 8,
+    "follower_count": 145,
+    "collaborator_count": 0
   },
   {
     "board_id": "board_1005",
@@ -50,9 +50,9 @@
     "privacy": "PUBLIC",
     "created_at": "2023-03-15T10:00:00",
     "updated_at": "2026-04-10T12:15:00",
-    "pin_count": "12",
-    "follower_count": "203",
-    "collaborator_count": "0"
+    "pin_count": 12,
+    "follower_count": 203,
+    "collaborator_count": 0
   },
   {
     "board_id": "board_1006",
@@ -61,9 +61,9 @@
     "privacy": "PUBLIC",
     "created_at": "2023-08-01T15:45:00",
     "updated_at": "2026-04-19T10:30:00",
-    "pin_count": "10",
-    "follower_count": "167",
-    "collaborator_count": "0"
+    "pin_count": 10,
+    "follower_count": 167,
+    "collaborator_count": 0
   },
   {
     "board_id": "board_1007",
@@ -72,9 +72,9 @@
     "privacy": "PUBLIC",
     "created_at": "2023-09-12T10:15:00",
     "updated_at": "2026-04-21T08:00:00",
-    "pin_count": "6",
-    "follower_count": "88",
-    "collaborator_count": "0"
+    "pin_count": 6,
+    "follower_count": 88,
+    "collaborator_count": 0
   },
   {
     "board_id": "board_1008",
@@ -83,9 +83,9 @@
     "privacy": "PUBLIC",
     "created_at": "2024-02-05T09:00:00",
     "updated_at": "2026-04-17T15:20:00",
-    "pin_count": "5",
-    "follower_count": "72",
-    "collaborator_count": "0"
+    "pin_count": 5,
+    "follower_count": 72,
+    "collaborator_count": 0
   },
   {
     "board_id": "board_1009",
@@ -94,8 +94,8 @@
     "privacy": "SECRET",
     "created_at": "2026-01-15T08:00:00",
     "updated_at": "2026-05-18T11:45:00",
-    "pin_count": "4",
-    "follower_count": "0",
-    "collaborator_count": "0"
+    "pin_count": 4,
+    "follower_count": 0,
+    "collaborator_count": 0
   }
 ]

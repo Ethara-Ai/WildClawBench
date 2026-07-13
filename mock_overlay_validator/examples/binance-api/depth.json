@@ -2,97 +2,97 @@
   {
     "symbol": "BTCUSDT",
     "side": "bid",
-    "price": "67250.00",
-    "qty": "0.512"
+    "price": 67250.0,
+    "qty": 0.512
   },
   {
     "symbol": "BTCUSDT",
     "side": "bid",
-    "price": "67249.50",
-    "qty": "1.230"
+    "price": 67249.5,
+    "qty": 1.23
   },
   {
     "symbol": "BTCUSDT",
     "side": "bid",
-    "price": "67248.10",
-    "qty": "0.875"
+    "price": 67248.1,
+    "qty": 0.875
   },
   {
     "symbol": "BTCUSDT",
     "side": "bid",
-    "price": "67247.00",
-    "qty": "2.140"
+    "price": 67247.0,
+    "qty": 2.14
   },
   {
     "symbol": "BTCUSDT",
     "side": "bid",
-    "price": "67245.20",
-    "qty": "0.330"
+    "price": 67245.2,
+    "qty": 0.33
   },
   {
     "symbol": "BTCUSDT",
     "side": "ask",
-    "price": "67251.00",
-    "qty": "0.640"
+    "price": 67251.0,
+    "qty": 0.64
   },
   {
     "symbol": "BTCUSDT",
     "side": "ask",
-    "price": "67252.40",
-    "qty": "1.080"
+    "price": 67252.4,
+    "qty": 1.08
   },
   {
     "symbol": "BTCUSDT",
     "side": "ask",
-    "price": "67253.90",
-    "qty": "0.420"
+    "price": 67253.9,
+    "qty": 0.42
   },
   {
     "symbol": "BTCUSDT",
     "side": "ask",
-    "price": "67255.00",
-    "qty": "1.770"
+    "price": 67255.0,
+    "qty": 1.77
   },
   {
     "symbol": "BTCUSDT",
     "side": "ask",
-    "price": "67256.80",
-    "qty": "0.295"
+    "price": 67256.8,
+    "qty": 0.295
   },
   {
     "symbol": "ETHUSDT",
     "side": "bid",
-    "price": "3520.10",
-    "qty": "4.120"
+    "price": 3520.1,
+    "qty": 4.12
   },
   {
     "symbol": "ETHUSDT",
     "side": "bid",
-    "price": "3519.85",
-    "qty": "8.330"
+    "price": 3519.85,
+    "qty": 8.33
   },
   {
     "symbol": "ETHUSDT",
     "side": "bid",
-    "price": "3519.40",
-    "qty": "2.600"
+    "price": 3519.4,
+    "qty": 2.6
   },
   {
     "symbol": "ETHUSDT",
     "side": "ask",
-    "price": "3520.50",
-    "qty": "3.940"
+    "price": 3520.5,
+    "qty": 3.94
   },
   {
     "symbol": "ETHUSDT",
     "side": "ask",
-    "price": "3521.00",
-    "qty": "6.210"
+    "price": 3521.0,
+    "qty": 6.21
   },
   {
     "symbol": "ETHUSDT",
     "side": "ask",
-    "price": "3521.75",
-    "qty": "1.880"
+    "price": 3521.75,
+    "qty": 1.88
   }
 ]

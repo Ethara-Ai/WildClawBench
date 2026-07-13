@@ -4,10 +4,10 @@
     "phone_number": "+14155550123",
     "friendly_name": "Orbit Support Line",
     "iso_country": "US",
-    "sms_enabled": "true",
-    "voice_enabled": "true",
-    "mms_enabled": "true",
-    "capabilities_fax": "false",
+    "sms_enabled": true,
+    "voice_enabled": true,
+    "mms_enabled": true,
+    "capabilities_fax": false,
     "date_created": "2025-09-02T09:00:00Z"
   },
   {
@@ -15,10 +15,10 @@
     "phone_number": "+14155550199",
     "friendly_name": "Orbit Marketing",
     "iso_country": "US",
-    "sms_enabled": "true",
-    "voice_enabled": "false",
-    "mms_enabled": "true",
-    "capabilities_fax": "false",
+    "sms_enabled": true,
+    "voice_enabled": false,
+    "mms_enabled": true,
+    "capabilities_fax": false,
     "date_created": "2025-09-05T10:30:00Z"
   },
   {
@@ -26,10 +26,10 @@
     "phone_number": "+442071838750",
     "friendly_name": "Orbit UK Support",
     "iso_country": "GB",
-    "sms_enabled": "true",
-    "voice_enabled": "true",
-    "mms_enabled": "false",
-    "capabilities_fax": "false",
+    "sms_enabled": true,
+    "voice_enabled": true,
+    "mms_enabled": false,
+    "capabilities_fax": false,
     "date_created": "2025-10-01T11:00:00Z"
   },
   {
@@ -37,10 +37,10 @@
     "phone_number": "+61291234567",
     "friendly_name": "Orbit AU Line",
     "iso_country": "AU",
-    "sms_enabled": "true",
-    "voice_enabled": "true",
-    "mms_enabled": "false",
-    "capabilities_fax": "false",
+    "sms_enabled": true,
+    "voice_enabled": true,
+    "mms_enabled": false,
+    "capabilities_fax": false,
     "date_created": "2025-10-12T12:15:00Z"
   }
 ]

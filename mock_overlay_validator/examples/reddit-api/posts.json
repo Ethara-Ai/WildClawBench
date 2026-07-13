@@ -6,10 +6,10 @@
     "author": "devkat",
     "url": "https://example.com/grpc-post",
     "selftext": "",
-    "score": "1820",
-    "num_comments": "3",
-    "created_utc": "1716800000",
-    "is_self": "false"
+    "score": 1820,
+    "num_comments": 3,
+    "created_utc": 1716800000.0,
+    "is_self": false
   },
   {
     "id": "t3_p002",
@@ -18,10 +18,10 @@
     "author": "buildbot",
     "url": "",
     "selftext": "Looking for real-world layouts and tooling that scaled past 30 services.",
-    "score": "640",
-    "num_comments": "2",
-    "created_utc": "1716810000",
-    "is_self": "true"
+    "score": 640,
+    "num_comments": 2,
+    "created_utc": 1716810000.0,
+    "is_self": true
   },
   {
     "id": "t3_p003",
@@ -30,10 +30,10 @@
     "author": "rackmonkey",
     "url": "https://example.com/nas-build",
     "selftext": "",
-    "score": "2310",
-    "num_comments": "2",
-    "created_utc": "1716700000",
-    "is_self": "false"
+    "score": 2310,
+    "num_comments": 2,
+    "created_utc": 1716700000.0,
+    "is_self": false
   },
   {
     "id": "t3_p004",
@@ -42,10 +42,10 @@
     "author": "cablechaos",
     "url": "",
     "selftext": "A cautionary tale about an unlabeled patch panel and a long debugging night.",
-    "score": "990",
-    "num_comments": "1",
-    "created_utc": "1716720000",
-    "is_self": "true"
+    "score": 990,
+    "num_comments": 1,
+    "created_utc": 1716720000.0,
+    "is_self": true
   },
   {
     "id": "t3_p005",
@@ -54,10 +54,10 @@
     "author": "leafyleo",
     "url": "https://example.com/tomatoes",
     "selftext": "",
-    "score": "1450",
-    "num_comments": "2",
-    "created_utc": "1716650000",
-    "is_self": "false"
+    "score": 1450,
+    "num_comments": 2,
+    "created_utc": 1716650000.0,
+    "is_self": false
   },
   {
     "id": "t3_p006",
@@ -66,9 +66,9 @@
     "author": "sprouthunter",
     "url": "",
     "selftext": "It came up on its own and I have no idea what it is. Photos in comments.",
-    "score": "210",
-    "num_comments": "1",
-    "created_utc": "1716660000",
-    "is_self": "true"
+    "score": 210,
+    "num_comments": 1,
+    "created_utc": 1716660000.0,
+    "is_self": true
   }
 ]

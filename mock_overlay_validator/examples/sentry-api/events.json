@@ -1,7 +1,7 @@
 [
   {
-    "id": "70001",
-    "issue_id": "40001",
+    "id": 70001,
+    "issue_id": 40001,
     "event_id": "a1b2c3d4e5f64718a1b2c3d4e5f64718",
     "message": "DeadlineExceeded refreshing session token",
     "platform": "go",
@@ -11,8 +11,8 @@
     "date_created": "2026-05-26T09:00:00.000Z"
   },
   {
-    "id": "70002",
-    "issue_id": "40001",
+    "id": 70002,
+    "issue_id": 40001,
     "event_id": "b2c3d4e5f6471801b2c3d4e5f6471801",
     "message": "DeadlineExceeded refreshing session token",
     "platform": "go",
@@ -22,8 +22,8 @@
     "date_created": "2026-05-26T08:55:00.000Z"
   },
   {
-    "id": "70003",
-    "issue_id": "40010",
+    "id": 70003,
+    "issue_id": 40010,
     "event_id": "c3d4e5f64718012ac3d4e5f64718012a",
     "message": "TypeError reading property avatar of null",
     "platform": "javascript",
@@ -33,8 +33,8 @@
     "date_created": "2026-05-26T07:30:00.000Z"
   },
   {
-    "id": "70004",
-    "issue_id": "40020",
+    "id": 70004,
+    "issue_id": 40020,
     "event_id": "d4e5f64718012a3bd4e5f64718012a3b",
     "message": "gRPC UNAVAILABLE during deploy",
     "platform": "java",
@@ -44,8 +44,8 @@
     "date_created": "2026-05-25T11:00:00.000Z"
   },
   {
-    "id": "70005",
-    "issue_id": "40002",
+    "id": 70005,
+    "issue_id": 40002,
     "event_id": "e5f64718012a3b4ce5f64718012a3b4c",
     "message": "NilPointer in token validator",
     "platform": "go",

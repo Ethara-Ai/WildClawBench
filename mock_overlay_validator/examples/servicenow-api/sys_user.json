@@ -6,7 +6,7 @@
     "email": "amelia.ortega@orbit-labs.com",
     "title": "IT Service Manager",
     "department": "IT Service Management",
-    "active": "true"
+    "active": true
   },
   {
     "sys_id": "usr-jonas",
@@ -15,7 +15,7 @@
     "email": "jonas.pereira@orbit-labs.com",
     "title": "Senior Support Engineer",
     "department": "IT Support",
-    "active": "true"
+    "active": true
   },
   {
     "sys_id": "usr-helena",
@@ -24,7 +24,7 @@
     "email": "helena.park@orbit-labs.com",
     "title": "Network Engineer",
     "department": "Infrastructure",
-    "active": "true"
+    "active": true
   },
   {
     "sys_id": "usr-rohit",
@@ -33,7 +33,7 @@
     "email": "rohit.bansal@orbit-labs.com",
     "title": "Database Administrator",
     "department": "Infrastructure",
-    "active": "true"
+    "active": true
   },
   {
     "sys_id": "usr-noor",
@@ -42,7 +42,7 @@
     "email": "noor.aziz@orbit-labs.com",
     "title": "Service Desk Analyst",
     "department": "IT Support",
-    "active": "true"
+    "active": true
   },
   {
     "sys_id": "usr-diego",
@@ -51,7 +51,7 @@
     "email": "diego.santos@orbit-labs.com",
     "title": "Change Manager",
     "department": "IT Service Management",
-    "active": "true"
+    "active": true
   },
   {
     "sys_id": "usr-yuki",
@@ -60,7 +60,7 @@
     "email": "yuki.tanaka@orbit-labs.com",
     "title": "Security Analyst",
     "department": "Information Security",
-    "active": "true"
+    "active": true
   },
   {
     "sys_id": "usr-priya",
@@ -69,6 +69,6 @@
     "email": "priya.nair@orbit-labs.com",
     "title": "Problem Coordinator",
     "department": "IT Service Management",
-    "active": "false"
+    "active": false
   }
 ]

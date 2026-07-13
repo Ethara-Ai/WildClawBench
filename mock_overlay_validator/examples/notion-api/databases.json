@@ -7,7 +7,7 @@
     "last_edited_time": "2026-05-20T14:00:00.000Z",
     "created_by": "user-amelia",
     "icon": "checkbox",
-    "archived": "false"
+    "archived": false
   },
   {
     "id": "db-okrs",
@@ -17,7 +17,7 @@
     "last_edited_time": "2026-05-12T09:30:00.000Z",
     "created_by": "user-jonas",
     "icon": "bullseye",
-    "archived": "false"
+    "archived": false
   },
   {
     "id": "db-meetings",
@@ -27,7 +27,7 @@
     "last_edited_time": "2026-05-26T08:45:00.000Z",
     "created_by": "user-helena",
     "icon": "calendar",
-    "archived": "false"
+    "archived": false
   },
   {
     "id": "db-research",
@@ -37,6 +37,6 @@
     "last_edited_time": "2026-05-19T11:20:00.000Z",
     "created_by": "user-noor",
     "icon": "microscope",
-    "archived": "false"
+    "archived": false
   }
 ]

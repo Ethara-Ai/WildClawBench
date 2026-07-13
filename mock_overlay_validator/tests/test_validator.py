@@ -424,5 +424,121 @@ class PerRowRequiredColumnTests(unittest.TestCase):
                 V.EXAMPLES_DIR = orig
 
 
+class CoercerContractTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+        self.addCleanup(self.tmp.cleanup)
+        V._CONTRACT_CACHE.clear()
+
+    def _airbnb_listings(self, rows):
+        p = self.dir / "listings.json"
+        p.write_text(json.dumps(rows), encoding="utf-8")
+        return p
+
+    def _base_row(self, **over):
+        row = {
+            "listing_id": "L1", "host_id": "H1", "title": "x",
+            "city": "x", "country": "x", "room_type": "Entire",
+            "beds": "1", "baths": "1.0", "max_guests": "2",
+            "price_per_night": "100.00", "cleaning_fee": "10.00",
+            "rating": "4.5", "review_count": "3", "instant_book": "true",
+        }
+        row.update(over)
+        return row
+
+    def test_contract_loaded_for_airbnb(self):
+        c = V._load_api_contract("airbnb-api")
+        self.assertIsNotNone(c)
+        self.assertIn("listings", c.tables)
+        self.assertEqual(c.tables["listings"].primary_key, "listing_id")
+        self.assertEqual(c.tables["listings"].columns["beds"].coercer, "strict_int")
+        self.assertTrue(c.tables["listings"].columns["beds"].required)
+
+    def test_strict_int_rejects_non_parseable(self):
+        p = self._airbnb_listings([self._base_row(beds="not-a-number")])
+        ex = V.EXAMPLES_DIR / "airbnb-api" / "listings.json"
+        issues = V._validate_table(p, ex, "airbnb-api")
+        codes = {i.code for i in issues if i.severity == V.SEV_ERROR}
+        self.assertIn("SCHEMA_COERCE_MISMATCH", codes)
+
+    def test_strict_int_accepts_native_int_and_string_int(self):
+        p = self._airbnb_listings([
+            self._base_row(beds=2),
+            self._base_row(listing_id="L2", beds="3"),
+        ])
+        ex = V.EXAMPLES_DIR / "airbnb-api" / "listings.json"
+        issues = V._validate_table(p, ex, "airbnb-api")
+        self.assertFalse(
+            any(i.code == "SCHEMA_COERCE_MISMATCH" for i in issues),
+            msg=str([i.message for i in issues]),
+        )
+
+    def test_strict_bool_rejects_maybe(self):
+        p = self._airbnb_listings([self._base_row(instant_book="maybe")])
+        ex = V.EXAMPLES_DIR / "airbnb-api" / "listings.json"
+        issues = V._validate_table(p, ex, "airbnb-api")
+        msgs = [i.message for i in issues if i.code == "SCHEMA_COERCE_MISMATCH"]
+        self.assertTrue(any("instant_book" in m for m in msgs), msg=str(msgs))
+
+    def test_strict_bool_accepts_native_and_string_forms(self):
+        p = self._airbnb_listings([
+            self._base_row(instant_book=True),
+            self._base_row(listing_id="L2", instant_book="yes"),
+            self._base_row(listing_id="L3", instant_book="0"),
+        ])
+        ex = V.EXAMPLES_DIR / "airbnb-api" / "listings.json"
+        issues = V._validate_table(p, ex, "airbnb-api")
+        self.assertFalse(any(i.code == "SCHEMA_COERCE_MISMATCH" for i in issues))
+
+    def test_pk_duplicate_flagged(self):
+        p = self._airbnb_listings([
+            self._base_row(),
+            self._base_row(),
+        ])
+        ex = V.EXAMPLES_DIR / "airbnb-api" / "listings.json"
+        issues = V._validate_table(p, ex, "airbnb-api")
+        codes = {i.code for i in issues if i.severity == V.SEV_ERROR}
+        self.assertIn("SCHEMA_PK_DUPLICATE", codes)
+
+    def test_pk_missing_flagged_as_required(self):
+        row = self._base_row()
+        row.pop("listing_id")
+        p = self._airbnb_listings([row])
+        ex = V.EXAMPLES_DIR / "airbnb-api" / "listings.json"
+        issues = V._validate_table(p, ex, "airbnb-api")
+        codes = {i.code for i in issues if i.severity == V.SEV_ERROR}
+        self.assertIn("SCHEMA_MISSING_COLUMNS", codes)
+
+    def test_contract_absent_falls_back_gracefully(self):
+        c = V._load_api_contract("nonexistent-api")
+        self.assertIsNone(c)
+
+    def test_synthetic_pk_not_treated_as_required(self):
+        c = V._load_api_contract("ring-api")
+        self.assertIsNotNone(c)
+        mz = c.tables.get("motion_zones")
+        self.assertIsNotNone(mz)
+        self.assertTrue(mz.pk_synthetic, "motion_zones _pk is synthesized in list-comp")
+
+    def test_quickbooks_envelope_coercer_recognized(self):
+        c = V._load_api_contract("quickbooks-api")
+        self.assertIsNotNone(c)
+        cust = c.tables.get("customers")
+        self.assertIsNotNone(cust)
+        self.assertEqual(cust.coercer_func, "_coerce_customers")
+        self.assertIn("Balance", cust.columns)
+        self.assertEqual(cust.columns["Balance"].coercer, "strict_float")
+
+    def test_every_baked_api_loads_and_reports_its_own_stem(self):
+        for stem in V.BAKED_CONTRACTS:
+            c = V._load_api_contract(stem)
+            self.assertIsNotNone(c, f"{stem} missing from baked contracts")
+            self.assertEqual(c.api, stem)
+
+    def test_unknown_api_returns_none(self):
+        self.assertIsNone(V._load_api_contract("this-api-does-not-exist"))
+
+
 if __name__ == "__main__":
     unittest.main()

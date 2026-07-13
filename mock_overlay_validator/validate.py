@@ -28,11 +28,14 @@ import argparse
 import csv
 import io
 import json
+import math
 import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable
+
+from _baked_contracts import BAKED_CONTRACTS
 
 # ---------------------------------------------------------------------------
 # Layout
@@ -361,6 +364,156 @@ def _types_compatible(example_types: set[str], overlay_types: set[str]) -> bool:
                 break
         if not matched:
             return False
+    return True
+
+
+COERCER_NAMES = {
+    "strict_int", "opt_int",
+    "strict_float", "opt_float",
+    "strict_bool", "opt_bool",
+    "strict_str", "opt_str",
+    "strict_csv_list", "opt_csv_list",
+}
+
+
+@dataclass
+class ColumnContract:
+    coercer: str
+    required: bool
+    sep: str | None = None
+
+
+@dataclass
+class TableContract:
+    api: str
+    table: str
+    file: str
+    coercer_func: str | None
+    primary_key: str | None
+    pk_synthetic: bool
+    columns: dict[str, ColumnContract] = field(default_factory=dict)
+
+
+@dataclass
+class ApiContract:
+    api: str
+    tables: dict[str, TableContract] = field(default_factory=dict)
+    documents: dict[str, str] = field(default_factory=dict)
+
+
+_CONTRACT_CACHE: dict[str, ApiContract | None] = {}
+
+
+def _build_api_contract(stem: str, raw: dict) -> ApiContract:
+    contract = ApiContract(api=stem)
+    for table, tspec in raw.get("tables", {}).items():
+        cols = {
+            col: ColumnContract(
+                coercer=cspec["coercer"],
+                required=cspec["required"],
+                sep=cspec.get("sep"),
+            )
+            for col, cspec in tspec.get("columns", {}).items()
+        }
+        contract.tables[table] = TableContract(
+            api=stem,
+            table=table,
+            file=tspec["file"],
+            coercer_func=tspec.get("coercer_func"),
+            primary_key=tspec.get("primary_key"),
+            pk_synthetic=tspec.get("pk_synthetic", False),
+            columns=cols,
+        )
+    contract.documents = dict(raw.get("documents", {}))
+    return contract
+
+
+def _load_api_contract(api: str) -> ApiContract | None:
+    stem = api[:-4] if api.endswith("-api") else api
+    if stem in _CONTRACT_CACHE:
+        return _CONTRACT_CACHE[stem]
+    raw = BAKED_CONTRACTS.get(stem)
+    if raw is None:
+        _CONTRACT_CACHE[stem] = None
+        return None
+    contract = _build_api_contract(stem, raw)
+    _CONTRACT_CACHE[stem] = contract
+    return contract
+
+
+def _table_contract_for(api: str, filename: str) -> TableContract | None:
+    contract = _load_api_contract(api)
+    if contract is None:
+        return None
+    target_stems = {filename, Path(filename).stem + ".json", Path(filename).stem + ".csv"}
+    for tc in contract.tables.values():
+        if tc.file in target_stems or Path(tc.file).stem == Path(filename).stem:
+            return tc
+    return None
+
+
+def _int_parseable(v: Any) -> bool:
+    if isinstance(v, bool):
+        return True
+    if isinstance(v, int):
+        return True
+    if isinstance(v, float):
+        return v.is_integer()
+    if isinstance(v, str):
+        s = v.strip()
+        if not s:
+            return False
+        try:
+            int(s)
+            return True
+        except ValueError:
+            return False
+    return False
+
+
+def _float_parseable(v: Any) -> bool:
+    if isinstance(v, bool) or isinstance(v, (int, float)):
+        if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+            return False
+        return True
+    if isinstance(v, str):
+        s = v.strip()
+        if not s:
+            return False
+        try:
+            f = float(s)
+        except ValueError:
+            return False
+        return not (math.isnan(f) or math.isinf(f))
+    return False
+
+
+_BOOL_TOKENS = {"true", "1", "yes", "t", "y", "false", "0", "no", "f", "n"}
+
+
+def _bool_parseable(v: Any) -> bool:
+    if isinstance(v, bool):
+        return True
+    if isinstance(v, str):
+        return v.strip().lower() in _BOOL_TOKENS
+    return False
+
+
+def _csv_list_parseable(v: Any) -> bool:
+    return isinstance(v, (str, list))
+
+
+def _coercer_check(coercer: str, v: Any) -> bool:
+    if v is None:
+        return True
+    if coercer in ("strict_int", "opt_int"):
+        return _int_parseable(v)
+    if coercer in ("strict_float", "opt_float"):
+        return _float_parseable(v)
+    if coercer in ("strict_bool", "opt_bool"):
+        return _bool_parseable(v)
+    if coercer in ("strict_csv_list", "opt_csv_list"):
+        return _csv_list_parseable(v)
     return True
 
 
@@ -803,6 +956,8 @@ def _validate_table(
     example_cols = list(canonical_row.keys())
     example_col_set = set(example_cols)
 
+    contract = _table_contract_for(api, overlay_path.name)
+
     if not overlay_rows:
         issues.append(
             Issue(
@@ -824,6 +979,15 @@ def _validate_table(
     example_shape = _compute_list_shape(example_rows)
     required_cols = set(example_shape.required_keys) if example_shape.dict_element_count else example_col_set
     known_cols = set(example_shape.known_keys) if example_shape.dict_element_count else example_col_set
+
+    if contract is not None:
+        contract_required = {c for c, cc in contract.columns.items() if cc.required}
+        if contract.primary_key and not contract.pk_synthetic:
+            contract_required.add(contract.primary_key)
+        required_cols = required_cols | contract_required
+        known_cols = known_cols | set(contract.columns.keys())
+        if contract.primary_key and not contract.pk_synthetic:
+            known_cols.add(contract.primary_key)
 
     overlay_col_set: set[str] = set()
     for row in overlay_rows:
@@ -879,8 +1043,41 @@ def _validate_table(
             )
         )
 
-    shared = sorted(example_col_set & overlay_col_set)
+    contract_cols = set(contract.columns.keys()) if contract else set()
+    shared = sorted((example_col_set | contract_cols) & overlay_col_set)
     for col in shared:
+        cc = contract.columns.get(col) if contract else None
+        if cc is not None and cc.coercer in COERCER_NAMES:
+            bad: list[tuple[int, Any]] = []
+            for i, row in enumerate(overlay_rows):
+                if not isinstance(row, dict) or col not in row:
+                    continue
+                v = row[col]
+                if cc.coercer.startswith("strict_") and v is None:
+                    bad.append((i, v))
+                    continue
+                if not _coercer_check(cc.coercer, v):
+                    bad.append((i, v))
+            if bad:
+                sample = ", ".join(f"row {i}={v!r}" for i, v in bad[:5])
+                issues.append(
+                    Issue(
+                        severity=SEV_ERROR,
+                        code="SCHEMA_COERCE_MISMATCH",
+                        message=(
+                            f"column '{col}' has {len(bad)} value(s) that would fail "
+                            f"the runtime coercer {cc.coercer}: {sample}"
+                        ),
+                        api=api,
+                        file=str(overlay_path),
+                        hint=(
+                            f"the runtime calls {cc.coercer}(row, '{col}') in "
+                            f"{api}_data.py; supply values it accepts (see "
+                            "environment/_mutable_store.py)"
+                        ),
+                    )
+                )
+            continue
         example_types = _summarise_field_types(r.get(col) for r in example_rows)
         overlay_types = _summarise_field_types(r.get(col) for r in overlay_rows)
         if not _types_compatible(example_types, overlay_types):
@@ -899,6 +1096,29 @@ def _validate_table(
                         "make sure each value uses the same shape as the example "
                         "(e.g. integers stay integers, ISO datetimes stay ISO, "
                         "comma-lists keep using commas)"
+                    ),
+                )
+            )
+
+    if contract and contract.primary_key and not contract.pk_synthetic:
+        pk = contract.primary_key
+        seen: dict[Any, list[int]] = {}
+        for i, row in enumerate(overlay_rows):
+            if isinstance(row, dict) and pk in row:
+                seen.setdefault(row[pk], []).append(i)
+        dupes = {k: v for k, v in seen.items() if len(v) > 1}
+        if dupes:
+            preview = "; ".join(f"{k!r} at rows {v[:5]}" for k, v in list(dupes.items())[:5])
+            issues.append(
+                Issue(
+                    severity=SEV_ERROR,
+                    code="SCHEMA_PK_DUPLICATE",
+                    message=f"primary key '{pk}' has duplicate value(s): {preview}",
+                    api=api,
+                    file=str(overlay_path),
+                    hint=(
+                        f"runtime auto-suffixes duplicates with '#idx' and prints a warning; "
+                        f"downstream lookups by '{pk}' will only find the first occurrence"
                     ),
                 )
             )

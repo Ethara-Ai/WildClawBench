@@ -5,7 +5,7 @@
     "status": "COMPLETED",
     "amount_value": "49.99",
     "currency_code": "USD",
-    "final_capture": "true",
+    "final_capture": true,
     "create_time": "2026-05-10T09:01:00Z"
   },
   {
@@ -14,7 +14,7 @@
     "status": "COMPLETED",
     "amount_value": "7.50",
     "currency_code": "USD",
-    "final_capture": "true",
+    "final_capture": true,
     "create_time": "2026-05-23T08:46:00Z"
   }
 ]

@@ -5,8 +5,8 @@
     "first_name": "Omar",
     "last_name": "Haddad",
     "email": "ap@vandelay.com",
-    "is_customer": "true",
-    "is_supplier": "false",
+    "is_customer": true,
+    "is_supplier": false,
     "status": "ACTIVE",
     "account_number": "VAND-001"
   },
@@ -16,8 +16,8 @@
     "first_name": "Bill",
     "last_name": "Lumbergh",
     "email": "accounts@initech.com",
-    "is_customer": "true",
-    "is_supplier": "false",
+    "is_customer": true,
+    "is_supplier": false,
     "status": "ACTIVE",
     "account_number": "INIT-002"
   },
@@ -27,8 +27,8 @@
     "first_name": "Hank",
     "last_name": "Scorpio",
     "email": "billing@globex.com",
-    "is_customer": "true",
-    "is_supplier": "false",
+    "is_customer": true,
+    "is_supplier": false,
     "status": "ACTIVE",
     "account_number": "GLOB-003"
   },
@@ -38,8 +38,8 @@
     "first_name": "Wile",
     "last_name": "Coyote",
     "email": "sales@acmesupplies.com",
-    "is_customer": "false",
-    "is_supplier": "true",
+    "is_customer": false,
+    "is_supplier": true,
     "status": "ACTIVE",
     "account_number": "ACME-004"
   },
@@ -49,8 +49,8 @@
     "first_name": "Pepper",
     "last_name": "Potts",
     "email": "finance@stark.com",
-    "is_customer": "true",
-    "is_supplier": "false",
+    "is_customer": true,
+    "is_supplier": false,
     "status": "ACTIVE",
     "account_number": "STARK-005"
   },
@@ -60,8 +60,8 @@
     "first_name": "Charlie",
     "last_name": "Bucket",
     "email": "orders@wonka.com",
-    "is_customer": "false",
-    "is_supplier": "true",
+    "is_customer": false,
+    "is_supplier": true,
     "status": "ACTIVE",
     "account_number": "WONK-006"
   },
@@ -71,8 +71,8 @@
     "first_name": "Gavin",
     "last_name": "Belson",
     "email": "ar@hooli.com",
-    "is_customer": "true",
-    "is_supplier": "false",
+    "is_customer": true,
+    "is_supplier": false,
     "status": "ARCHIVED",
     "account_number": "HOOL-007"
   }

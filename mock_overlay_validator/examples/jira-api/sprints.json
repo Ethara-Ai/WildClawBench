@@ -1,7 +1,7 @@
 [
   {
-    "id": "101",
-    "board_id": "1",
+    "id": 101,
+    "board_id": 1,
     "name": "ENG Sprint 21",
     "state": "closed",
     "start_date": "2026-05-05T09:00:00Z",
@@ -9,8 +9,8 @@
     "goal": "Stabilize auth service"
   },
   {
-    "id": "102",
-    "board_id": "1",
+    "id": 102,
+    "board_id": 1,
     "name": "ENG Sprint 22",
     "state": "active",
     "start_date": "2026-05-19T09:00:00Z",
@@ -18,8 +18,8 @@
     "goal": "Ship dual-write shim"
   },
   {
-    "id": "103",
-    "board_id": "1",
+    "id": 103,
+    "board_id": 1,
     "name": "ENG Sprint 23",
     "state": "future",
     "start_date": "2026-06-02T09:00:00Z",
@@ -27,8 +27,8 @@
     "goal": "gRPC migration"
   },
   {
-    "id": "201",
-    "board_id": "2",
+    "id": 201,
+    "board_id": 2,
     "name": "OPS Continuous",
     "state": "active",
     "start_date": "2026-05-01T09:00:00Z",

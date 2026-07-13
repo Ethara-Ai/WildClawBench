@@ -4,7 +4,7 @@
     "name": "Backlog",
     "type": "backlog",
     "color": "#bec2c8",
-    "position": "0",
+    "position": 0,
     "teamId": "team-ux",
     "description": "Issues that are not yet prioritized"
   },
@@ -13,7 +13,7 @@
     "name": "Todo",
     "type": "unstarted",
     "color": "#e2e2e2",
-    "position": "1",
+    "position": 1,
     "teamId": "team-ux",
     "description": "Issues ready to be picked up"
   },
@@ -22,7 +22,7 @@
     "name": "In Progress",
     "type": "started",
     "color": "#f2c94c",
-    "position": "2",
+    "position": 2,
     "teamId": "team-ux",
     "description": "Issues actively being worked on"
   },
@@ -31,7 +31,7 @@
     "name": "In Review",
     "type": "started",
     "color": "#f2994a",
-    "position": "3",
+    "position": 3,
     "teamId": "team-ux",
     "description": "Issues in code review"
   },
@@ -40,7 +40,7 @@
     "name": "Done",
     "type": "completed",
     "color": "#5e6ad2",
-    "position": "4",
+    "position": 4,
     "teamId": "team-ux",
     "description": "Completed issues"
   },
@@ -49,7 +49,7 @@
     "name": "Canceled",
     "type": "canceled",
     "color": "#95a2b3",
-    "position": "5",
+    "position": 5,
     "teamId": "team-ux",
     "description": "Won't fix or otherwise canceled"
   },
@@ -58,7 +58,7 @@
     "name": "Backlog",
     "type": "backlog",
     "color": "#bec2c8",
-    "position": "0",
+    "position": 0,
     "teamId": "team-backend",
     "description": "Issues that are not yet prioritized"
   },
@@ -67,7 +67,7 @@
     "name": "Todo",
     "type": "unstarted",
     "color": "#e2e2e2",
-    "position": "1",
+    "position": 1,
     "teamId": "team-backend",
     "description": "Issues ready to be picked up"
   },
@@ -76,7 +76,7 @@
     "name": "In Progress",
     "type": "started",
     "color": "#f2c94c",
-    "position": "2",
+    "position": 2,
     "teamId": "team-backend",
     "description": "Issues actively being worked on"
   },
@@ -85,7 +85,7 @@
     "name": "In Review",
     "type": "started",
     "color": "#f2994a",
-    "position": "3",
+    "position": 3,
     "teamId": "team-backend",
     "description": "Issues in code review"
   },
@@ -94,7 +94,7 @@
     "name": "Done",
     "type": "completed",
     "color": "#5e6ad2",
-    "position": "4",
+    "position": 4,
     "teamId": "team-backend",
     "description": "Completed issues"
   },
@@ -103,7 +103,7 @@
     "name": "Canceled",
     "type": "canceled",
     "color": "#95a2b3",
-    "position": "5",
+    "position": 5,
     "teamId": "team-backend",
     "description": "Won't fix or otherwise canceled"
   }

@@ -11,8 +11,8 @@
     "country": "US",
     "phone": "4155550111",
     "email": "ship@orbit-labs.com",
-    "is_residential": "false",
-    "validated": "true"
+    "is_residential": false,
+    "validated": true
   },
   {
     "object_id": "addr-recv-01",
@@ -26,8 +26,8 @@
     "country": "US",
     "phone": "5125550182",
     "email": "amelia.ortega@orbit-labs.com",
-    "is_residential": "true",
-    "validated": "true"
+    "is_residential": true,
+    "validated": true
   },
   {
     "object_id": "addr-recv-02",
@@ -41,8 +41,8 @@
     "country": "US",
     "phone": "6175550199",
     "email": "jonas@example.com",
-    "is_residential": "false",
-    "validated": "true"
+    "is_residential": false,
+    "validated": true
   },
   {
     "object_id": "addr-recv-03",
@@ -56,7 +56,7 @@
     "country": "US",
     "phone": "5035550144",
     "email": "helena.park@orbit-labs.com",
-    "is_residential": "true",
-    "validated": "false"
+    "is_residential": true,
+    "validated": false
   }
 ]

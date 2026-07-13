@@ -8,7 +8,9 @@
     "time_zone": "America/New_York",
     "created_on": "2026-01-15T10:00:00.000Z",
     "last_published": "2026-05-20T14:30:00.000Z",
-    "custom_domains": "www.northwind.example.com"
+    "custom_domains": [
+      "www.northwind.example.com"
+    ]
   },
   {
     "id": "650a1f0000000000000001a2",
@@ -19,7 +21,9 @@
     "time_zone": "America/Los_Angeles",
     "created_on": "2026-02-02T09:20:00.000Z",
     "last_published": "2026-05-22T11:05:00.000Z",
-    "custom_domains": "docs.acme.example.com"
+    "custom_domains": [
+      "docs.acme.example.com"
+    ]
   },
   {
     "id": "650a1f0000000000000001a3",
@@ -41,6 +45,8 @@
     "time_zone": "America/Denver",
     "created_on": "2026-04-01T16:00:00.000Z",
     "last_published": "2026-05-25T19:40:00.000Z",
-    "custom_domains": "shop.trailhead.example.com"
+    "custom_domains": [
+      "shop.trailhead.example.com"
+    ]
   }
 ]

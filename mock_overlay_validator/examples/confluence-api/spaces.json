@@ -1,6 +1,6 @@
 [
   {
-    "id": "98001",
+    "id": 98001,
     "key": "ENG",
     "name": "Engineering",
     "type": "global",
@@ -8,7 +8,7 @@
     "description": "Engineering team space for design docs and runbooks"
   },
   {
-    "id": "98002",
+    "id": 98002,
     "key": "PROD",
     "name": "Product",
     "type": "global",

@@ -6,8 +6,8 @@
     "brand": "Safeway Organics",
     "category": "Produce",
     "unit_size": "2 lb",
-    "price": "2.49",
-    "in_stock": "true",
+    "price": 2.49,
+    "in_stock": true,
     "sale_price": "",
     "image_url": ""
   },
@@ -18,8 +18,8 @@
     "brand": "Lucerne",
     "category": "Dairy",
     "unit_size": "1 gal",
-    "price": "4.79",
-    "in_stock": "true",
+    "price": 4.79,
+    "in_stock": true,
     "sale_price": "",
     "image_url": ""
   },
@@ -30,9 +30,9 @@
     "brand": "Signature SELECT",
     "category": "Bakery",
     "unit_size": "24 oz",
-    "price": "4.29",
-    "in_stock": "true",
-    "sale_price": "3.49",
+    "price": 4.29,
+    "in_stock": true,
+    "sale_price": 3.49,
     "image_url": ""
   },
   {
@@ -42,8 +42,8 @@
     "brand": "Open Nature",
     "category": "Meat",
     "unit_size": "1.5 lb",
-    "price": "9.99",
-    "in_stock": "true",
+    "price": 9.99,
+    "in_stock": true,
     "sale_price": "",
     "image_url": ""
   },
@@ -54,8 +54,8 @@
     "brand": "Safeway Organics",
     "category": "Produce",
     "unit_size": "3 lb",
-    "price": "5.99",
-    "in_stock": "true",
+    "price": 5.99,
+    "in_stock": true,
     "sale_price": "",
     "image_url": ""
   },
@@ -66,8 +66,8 @@
     "brand": "Chobani",
     "category": "Dairy",
     "unit_size": "32 oz",
-    "price": "6.49",
-    "in_stock": "false",
+    "price": 6.49,
+    "in_stock": false,
     "sale_price": "",
     "image_url": ""
   },
@@ -78,8 +78,8 @@
     "brand": "Whole Foods",
     "category": "Seafood",
     "unit_size": "1 lb",
-    "price": "14.99",
-    "in_stock": "true",
+    "price": 14.99,
+    "in_stock": true,
     "sale_price": "",
     "image_url": ""
   },
@@ -90,8 +90,8 @@
     "brand": "365 by Whole Foods",
     "category": "Produce",
     "unit_size": "5 oz",
-    "price": "3.49",
-    "in_stock": "true",
+    "price": 3.49,
+    "in_stock": true,
     "sale_price": "",
     "image_url": ""
   },
@@ -102,8 +102,8 @@
     "brand": "Oatly",
     "category": "Dairy Alt",
     "unit_size": "64 oz",
-    "price": "5.99",
-    "in_stock": "true",
+    "price": 5.99,
+    "in_stock": true,
     "sale_price": "",
     "image_url": ""
   },
@@ -114,9 +114,9 @@
     "brand": "365 by Whole Foods",
     "category": "Produce",
     "unit_size": "each",
-    "price": "1.99",
-    "in_stock": "true",
-    "sale_price": "1.49",
+    "price": 1.99,
+    "in_stock": true,
+    "sale_price": 1.49,
     "image_url": ""
   },
   {
@@ -126,8 +126,8 @@
     "brand": "Trader Joe's",
     "category": "Frozen",
     "unit_size": "22 oz",
-    "price": "5.49",
-    "in_stock": "true",
+    "price": 5.49,
+    "in_stock": true,
     "sale_price": "",
     "image_url": ""
   },
@@ -138,8 +138,8 @@
     "brand": "Trader Joe's",
     "category": "Frozen",
     "unit_size": "12 oz",
-    "price": "2.99",
-    "in_stock": "true",
+    "price": 2.99,
+    "in_stock": true,
     "sale_price": "",
     "image_url": ""
   },
@@ -150,8 +150,8 @@
     "brand": "Charles Shaw",
     "category": "Wine",
     "unit_size": "750 ml",
-    "price": "3.99",
-    "in_stock": "true",
+    "price": 3.99,
+    "in_stock": true,
     "sale_price": "",
     "image_url": ""
   },
@@ -162,8 +162,8 @@
     "brand": "Kirkland Signature",
     "category": "Household",
     "unit_size": "30 rolls",
-    "price": "24.99",
-    "in_stock": "true",
+    "price": 24.99,
+    "in_stock": true,
     "sale_price": "",
     "image_url": ""
   },
@@ -174,8 +174,8 @@
     "brand": "Kirkland Signature",
     "category": "Deli",
     "unit_size": "each",
-    "price": "4.99",
-    "in_stock": "true",
+    "price": 4.99,
+    "in_stock": true,
     "sale_price": "",
     "image_url": ""
   },
@@ -186,8 +186,8 @@
     "brand": "CVS Health",
     "category": "Pharmacy",
     "unit_size": "100 caps",
-    "price": "8.49",
-    "in_stock": "true",
+    "price": 8.49,
+    "in_stock": true,
     "sale_price": "",
     "image_url": ""
   },
@@ -198,9 +198,9 @@
     "brand": "Colgate",
     "category": "Personal Care",
     "unit_size": "6 oz",
-    "price": "4.99",
-    "in_stock": "true",
-    "sale_price": "3.49",
+    "price": 4.99,
+    "in_stock": true,
+    "sale_price": 3.49,
     "image_url": ""
   }
 ]

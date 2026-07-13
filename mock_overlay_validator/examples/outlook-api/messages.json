@@ -8,7 +8,7 @@
     "to_address": "alex.carter@contoso.com",
     "body_preview": "Please find attached the Q2 budget for your review before Friday.",
     "content_type": "html",
-    "is_read": "false",
+    "is_read": false,
     "importance": "high",
     "received_date": "2026-05-04T08:30:00Z"
   },
@@ -21,7 +21,7 @@
     "to_address": "alex.carter@contoso.com",
     "body_preview": "Sounds good I will prepare the backlog ahead of the meeting.",
     "content_type": "html",
-    "is_read": "true",
+    "is_read": true,
     "importance": "normal",
     "received_date": "2026-05-05T13:10:00Z"
   },
@@ -34,7 +34,7 @@
     "to_address": "alex.carter@contoso.com",
     "body_preview": "Excited to have you onboard. Here is your first-week guide.",
     "content_type": "html",
-    "is_read": "true",
+    "is_read": true,
     "importance": "normal",
     "received_date": "2026-05-06T09:00:00Z"
   },
@@ -47,7 +47,7 @@
     "to_address": "alex.carter@contoso.com",
     "body_preview": "Our records show invoice INV-2041 is now 15 days past due.",
     "content_type": "html",
-    "is_read": "false",
+    "is_read": false,
     "importance": "high",
     "received_date": "2026-05-09T11:45:00Z"
   },
@@ -60,7 +60,7 @@
     "to_address": "alex.carter@contoso.com",
     "body_preview": "Are you free for lunch on Tuesday or Wednesday next week?",
     "content_type": "text",
-    "is_read": "true",
+    "is_read": true,
     "importance": "low",
     "received_date": "2026-05-12T16:20:00Z"
   },
@@ -73,7 +73,7 @@
     "to_address": "alex.carter@contoso.com",
     "body_preview": "Please rotate your API keys before the end of the month.",
     "content_type": "html",
-    "is_read": "false",
+    "is_read": false,
     "importance": "high",
     "received_date": "2026-05-15T07:55:00Z"
   },
@@ -86,7 +86,7 @@
     "to_address": "alex.carter@contoso.com",
     "body_preview": "Your travel request for the May conference has been approved.",
     "content_type": "html",
-    "is_read": "true",
+    "is_read": true,
     "importance": "normal",
     "received_date": "2026-05-18T10:30:00Z"
   },
@@ -99,7 +99,7 @@
     "to_address": "alex.carter@contoso.com",
     "body_preview": "Signups are up 12 percent week over week. Full report inside.",
     "content_type": "html",
-    "is_read": "true",
+    "is_read": true,
     "importance": "normal",
     "received_date": "2026-05-25T06:00:00Z"
   }

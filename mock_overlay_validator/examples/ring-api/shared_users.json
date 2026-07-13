@@ -1,6 +1,6 @@
 [
   {
-    "user_id": "100001",
+    "user_id": 100001,
     "first_name": "Carlos",
     "last_name": "Martinez",
     "email": "carlos.martinez@email.com",
@@ -9,7 +9,7 @@
     "shared_at": "2022-06-20T14:30:00.000Z"
   },
   {
-    "user_id": "100003",
+    "user_id": 100003,
     "first_name": "Tom",
     "last_name": "Reyes",
     "email": "tom.reyes@email.com",
@@ -18,7 +18,7 @@
     "shared_at": "2024-01-12T09:30:00.000Z"
   },
   {
-    "user_id": "100004",
+    "user_id": 100004,
     "first_name": "Daniel",
     "last_name": "Bennett",
     "email": "daniel.bennett@email.com",
@@ -27,7 +27,7 @@
     "shared_at": "2024-03-15T10:00:00.000Z"
   },
   {
-    "user_id": "100005",
+    "user_id": 100005,
     "first_name": "Sarah",
     "last_name": "Bennett",
     "email": "sarah.bennett@email.com",

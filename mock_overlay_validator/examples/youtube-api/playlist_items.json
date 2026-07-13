@@ -5,7 +5,7 @@
     "videoId": "vid_001",
     "channelId": "UC_EquineHealthChannel",
     "title": "Equine Skin Lesions - What Every Owner Should Know",
-    "position": "0",
+    "position": 0,
     "publishedAt": "2025-04-10T13:00:00Z"
   },
   {
@@ -14,7 +14,7 @@
     "videoId": "vid_002",
     "channelId": "UC_EquineHealthChannel",
     "title": "Early Signs of Skin Disease in Horses - Do Not Ignore These",
-    "position": "1",
+    "position": 1,
     "publishedAt": "2025-04-03T13:00:00Z"
   },
   {
@@ -23,7 +23,7 @@
     "videoId": "vid_003",
     "channelId": "UC_EquineHealthChannel",
     "title": "Ringworm in Horses - Identification Treatment and Biosecurity",
-    "position": "2",
+    "position": 2,
     "publishedAt": "2025-03-27T13:00:00Z"
   },
   {
@@ -32,7 +32,7 @@
     "videoId": "vid_004",
     "channelId": "UC_EquineHealthChannel",
     "title": "Rain Rot vs Ringworm - How to Tell the Difference",
-    "position": "3",
+    "position": 3,
     "publishedAt": "2025-03-20T13:00:00Z"
   },
   {
@@ -41,7 +41,7 @@
     "videoId": "vid_006",
     "channelId": "UC_EquineHealthChannel",
     "title": "Understanding Your Horse's Skin Scraping Results",
-    "position": "4",
+    "position": 4,
     "publishedAt": "2025-03-06T13:00:00Z"
   },
   {
@@ -50,7 +50,7 @@
     "videoId": "vid_022",
     "channelId": "UC_EquineHealthChannel",
     "title": "Normal Horse Skin vs Concerning - Quick Reference #shorts",
-    "position": "5",
+    "position": 5,
     "publishedAt": "2025-03-18T16:00:00Z"
   },
   {
@@ -59,7 +59,7 @@
     "videoId": "vid_027",
     "channelId": "UC_EquineHealthChannel",
     "title": "Cellulitis in Horses - That Suddenly Swollen Leg",
-    "position": "6",
+    "position": 6,
     "publishedAt": "2024-11-07T13:00:00Z"
   },
   {
@@ -68,7 +68,7 @@
     "videoId": "vid_030",
     "channelId": "UC_EquineHealthChannel",
     "title": "Scratches and Pastern Dermatitis - Full Management Guide",
-    "position": "7",
+    "position": 7,
     "publishedAt": "2024-10-17T13:00:00Z"
   },
   {
@@ -77,7 +77,7 @@
     "videoId": "vid_005",
     "channelId": "UC_EquineHealthChannel",
     "title": "Horse First Aid Kit - What Your Barn Actually Needs",
-    "position": "0",
+    "position": 0,
     "publishedAt": "2025-03-13T13:00:00Z"
   },
   {
@@ -86,7 +86,7 @@
     "videoId": "vid_008",
     "channelId": "UC_EquineHealthChannel",
     "title": "Equine Nutrition Fundamentals - Getting the Basics Right",
-    "position": "1",
+    "position": 1,
     "publishedAt": "2025-02-27T13:00:00Z"
   },
   {
@@ -95,7 +95,7 @@
     "videoId": "vid_012",
     "channelId": "UC_EquineHealthChannel",
     "title": "Seasonal Horse Health Calendar - Month by Month Guide",
-    "position": "2",
+    "position": 2,
     "publishedAt": "2025-02-06T13:00:00Z"
   },
   {
@@ -104,7 +104,7 @@
     "videoId": "vid_014",
     "channelId": "UC_EquineHealthChannel",
     "title": "Equine Dental Care - What Owners Need to Know",
-    "position": "3",
+    "position": 3,
     "publishedAt": "2025-01-23T13:00:00Z"
   },
   {
@@ -113,7 +113,7 @@
     "videoId": "vid_015",
     "channelId": "UC_EquineHealthChannel",
     "title": "Reading Your Horse's Vital Signs at Home",
-    "position": "4",
+    "position": 4,
     "publishedAt": "2025-01-16T13:00:00Z"
   },
   {
@@ -122,7 +122,7 @@
     "videoId": "vid_028",
     "channelId": "UC_EquineHealthChannel",
     "title": "When to Blanket Your Horse - The Real Answer",
-    "position": "5",
+    "position": 5,
     "publishedAt": "2024-10-31T13:00:00Z"
   },
   {
@@ -131,7 +131,7 @@
     "videoId": "vid_016",
     "channelId": "UC_EquineHealthChannel",
     "title": "Colic in Horses - What to Do While Waiting for the Vet",
-    "position": "0",
+    "position": 0,
     "publishedAt": "2025-01-09T13:00:00Z"
   },
   {
@@ -140,7 +140,7 @@
     "videoId": "vid_020",
     "channelId": "UC_EquineHealthChannel",
     "title": "Equine Eye Emergencies - Do Not Wait on These",
-    "position": "1",
+    "position": 1,
     "publishedAt": "2024-12-19T13:00:00Z"
   },
   {
@@ -149,7 +149,7 @@
     "videoId": "vid_025",
     "channelId": "UC_EquineHealthChannel",
     "title": "Heat Stroke in Horses - Prevention and Emergency Response",
-    "position": "2",
+    "position": 2,
     "publishedAt": "2024-11-21T13:00:00Z"
   },
   {
@@ -158,7 +158,7 @@
     "videoId": "vid_013",
     "channelId": "UC_EquineHealthChannel",
     "title": "Wound Care for Horses - Clean Bandage or Leave It Open",
-    "position": "3",
+    "position": 3,
     "publishedAt": "2025-01-30T13:00:00Z"
   },
   {
@@ -167,7 +167,7 @@
     "videoId": "vid_009",
     "channelId": "UC_EquineHealthChannel",
     "title": "Hoof Abscess - Signs Treatment and Recovery Timeline",
-    "position": "0",
+    "position": 0,
     "publishedAt": "2025-02-20T13:00:00Z"
   },
   {
@@ -176,7 +176,7 @@
     "videoId": "vid_024",
     "channelId": "UC_EquineHealthChannel",
     "title": "Thrush in Horses - Treatment That Actually Resolves It",
-    "position": "1",
+    "position": 1,
     "publishedAt": "2024-11-28T13:00:00Z"
   },
   {
@@ -185,7 +185,7 @@
     "videoId": "vid_018",
     "channelId": "UC_EquineHealthChannel",
     "title": "Spring Pasture Transition - Avoiding Laminitis",
-    "position": "2",
+    "position": 2,
     "publishedAt": "2025-01-02T13:00:00Z"
   },
   {
@@ -194,7 +194,7 @@
     "videoId": "vid_010",
     "channelId": "UC_EquineHealthChannel",
     "title": "Biosecurity for Small Barns - Preventing Disease Spread",
-    "position": "0",
+    "position": 0,
     "publishedAt": "2025-02-13T13:00:00Z"
   },
   {
@@ -203,7 +203,7 @@
     "videoId": "vid_021",
     "channelId": "UC_EquineHealthChannel",
     "title": "Deworming in 2025 - Fecal Egg Counts Explained",
-    "position": "1",
+    "position": 1,
     "publishedAt": "2024-12-12T13:00:00Z"
   },
   {
@@ -212,7 +212,7 @@
     "videoId": "vid_029",
     "channelId": "UC_EquineHealthChannel",
     "title": "Strangles - What Every Barn Needs to Know",
-    "position": "2",
+    "position": 2,
     "publishedAt": "2024-10-24T13:00:00Z"
   },
   {
@@ -221,7 +221,7 @@
     "videoId": "vid_006",
     "channelId": "UC_EquineHealthChannel",
     "title": "Understanding Your Horse's Skin Scraping Results",
-    "position": "0",
+    "position": 0,
     "publishedAt": "2025-03-06T13:00:00Z"
   },
   {
@@ -230,7 +230,7 @@
     "videoId": "vid_026",
     "channelId": "UC_EquineHealthChannel",
     "title": "Understanding Equine Blood Work - A Plain Language Guide",
-    "position": "1",
+    "position": 1,
     "publishedAt": "2024-11-14T13:00:00Z"
   },
   {
@@ -239,7 +239,7 @@
     "videoId": "vid_021",
     "channelId": "UC_EquineHealthChannel",
     "title": "Deworming in 2025 - Fecal Egg Counts Explained",
-    "position": "2",
+    "position": 2,
     "publishedAt": "2024-12-12T13:00:00Z"
   },
   {
@@ -248,7 +248,7 @@
     "videoId": "vid_018",
     "channelId": "UC_EquineHealthChannel",
     "title": "Spring Pasture Transition - Avoiding Laminitis",
-    "position": "0",
+    "position": 0,
     "publishedAt": "2025-01-02T13:00:00Z"
   },
   {
@@ -257,7 +257,7 @@
     "videoId": "vid_019",
     "channelId": "UC_EquineHealthChannel",
     "title": "Fly Management That Actually Works - 2025 Update",
-    "position": "1",
+    "position": 1,
     "publishedAt": "2024-12-26T13:00:00Z"
   },
   {
@@ -266,7 +266,7 @@
     "videoId": "vid_028",
     "channelId": "UC_EquineHealthChannel",
     "title": "When to Blanket Your Horse - The Real Answer",
-    "position": "2",
+    "position": 2,
     "publishedAt": "2024-10-31T13:00:00Z"
   },
   {
@@ -275,7 +275,7 @@
     "videoId": "vid_012",
     "channelId": "UC_EquineHealthChannel",
     "title": "Seasonal Horse Health Calendar - Month by Month Guide",
-    "position": "3",
+    "position": 3,
     "publishedAt": "2025-02-06T13:00:00Z"
   },
   {
@@ -284,7 +284,7 @@
     "videoId": "vid_007",
     "channelId": "UC_EquineHealthChannel",
     "title": "5 Things to Check on Your Horse Every Day #shorts",
-    "position": "0",
+    "position": 0,
     "publishedAt": "2025-04-08T16:00:00Z"
   },
   {
@@ -293,7 +293,7 @@
     "videoId": "vid_011",
     "channelId": "UC_EquineHealthChannel",
     "title": "How to Take Good Photos of Your Horse's Injury #shorts",
-    "position": "1",
+    "position": 1,
     "publishedAt": "2025-04-05T16:00:00Z"
   },
   {
@@ -302,7 +302,7 @@
     "videoId": "vid_017",
     "channelId": "UC_EquineHealthChannel",
     "title": "Is This Lump on My Horse Normal? #shorts",
-    "position": "2",
+    "position": 2,
     "publishedAt": "2025-03-25T16:00:00Z"
   },
   {
@@ -311,7 +311,7 @@
     "videoId": "vid_022",
     "channelId": "UC_EquineHealthChannel",
     "title": "Normal Horse Skin vs Concerning - Quick Reference #shorts",
-    "position": "3",
+    "position": 3,
     "publishedAt": "2025-03-18T16:00:00Z"
   },
   {
@@ -320,7 +320,7 @@
     "videoId": "vid_003",
     "channelId": "UC_EquineHealthChannel",
     "title": "Ringworm in Horses - Identification Treatment and Biosecurity",
-    "position": "0",
+    "position": 0,
     "publishedAt": "2025-03-27T13:00:00Z"
   },
   {
@@ -329,7 +329,7 @@
     "videoId": "vid_029",
     "channelId": "UC_EquineHealthChannel",
     "title": "Strangles - What Every Barn Needs to Know",
-    "position": "1",
+    "position": 1,
     "publishedAt": "2024-10-24T13:00:00Z"
   },
   {
@@ -338,7 +338,7 @@
     "videoId": "vid_004",
     "channelId": "UC_EquineHealthChannel",
     "title": "Rain Rot vs Ringworm - How to Tell the Difference",
-    "position": "2",
+    "position": 2,
     "publishedAt": "2025-03-20T13:00:00Z"
   },
   {
@@ -347,7 +347,7 @@
     "videoId": "vid_010",
     "channelId": "UC_EquineHealthChannel",
     "title": "Biosecurity for Small Barns - Preventing Disease Spread",
-    "position": "3",
+    "position": 3,
     "publishedAt": "2025-02-13T13:00:00Z"
   },
   {
@@ -356,7 +356,7 @@
     "videoId": "vid_023",
     "channelId": "UC_EquineHealthChannel",
     "title": "Preparing for Your Vet Visit - Get More From the Appointment",
-    "position": "0",
+    "position": 0,
     "publishedAt": "2024-12-05T13:00:00Z"
   },
   {
@@ -365,7 +365,7 @@
     "videoId": "vid_006",
     "channelId": "UC_EquineHealthChannel",
     "title": "Understanding Your Horse's Skin Scraping Results",
-    "position": "1",
+    "position": 1,
     "publishedAt": "2025-03-06T13:00:00Z"
   },
   {
@@ -374,7 +374,7 @@
     "videoId": "vid_026",
     "channelId": "UC_EquineHealthChannel",
     "title": "Understanding Equine Blood Work - A Plain Language Guide",
-    "position": "2",
+    "position": 2,
     "publishedAt": "2024-11-14T13:00:00Z"
   }
 ]

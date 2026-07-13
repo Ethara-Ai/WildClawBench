@@ -5,8 +5,8 @@
     "wsname": "XBT/USD",
     "base": "XXBT",
     "quote": "ZUSD",
-    "pair_decimals": "1",
-    "lot_decimals": "8",
+    "pair_decimals": 1,
+    "lot_decimals": 8,
     "ordermin": "0.0001",
     "status": "online"
   },
@@ -16,8 +16,8 @@
     "wsname": "ETH/USD",
     "base": "XETH",
     "quote": "ZUSD",
-    "pair_decimals": "2",
-    "lot_decimals": "8",
+    "pair_decimals": 2,
+    "lot_decimals": 8,
     "ordermin": "0.01",
     "status": "online"
   },
@@ -27,8 +27,8 @@
     "wsname": "XRP/USD",
     "base": "XXRP",
     "quote": "ZUSD",
-    "pair_decimals": "5",
-    "lot_decimals": "8",
+    "pair_decimals": 5,
+    "lot_decimals": 8,
     "ordermin": "10",
     "status": "online"
   },
@@ -38,8 +38,8 @@
     "wsname": "SOL/USD",
     "base": "SOL",
     "quote": "ZUSD",
-    "pair_decimals": "2",
-    "lot_decimals": "8",
+    "pair_decimals": 2,
+    "lot_decimals": 8,
     "ordermin": "0.1",
     "status": "online"
   },
@@ -49,8 +49,8 @@
     "wsname": "ADA/USD",
     "base": "ADA",
     "quote": "ZUSD",
-    "pair_decimals": "6",
-    "lot_decimals": "8",
+    "pair_decimals": 6,
+    "lot_decimals": 8,
     "ordermin": "15",
     "status": "online"
   },
@@ -60,8 +60,8 @@
     "wsname": "DOT/USD",
     "base": "DOT",
     "quote": "ZUSD",
-    "pair_decimals": "4",
-    "lot_decimals": "8",
+    "pair_decimals": 4,
+    "lot_decimals": 8,
     "ordermin": "1",
     "status": "online"
   },
@@ -71,8 +71,8 @@
     "wsname": "XBT/EUR",
     "base": "XXBT",
     "quote": "ZEUR",
-    "pair_decimals": "1",
-    "lot_decimals": "8",
+    "pair_decimals": 1,
+    "lot_decimals": 8,
     "ordermin": "0.0001",
     "status": "online"
   },
@@ -82,8 +82,8 @@
     "wsname": "LINK/USD",
     "base": "LINK",
     "quote": "ZUSD",
-    "pair_decimals": "5",
-    "lot_decimals": "8",
+    "pair_decimals": 5,
+    "lot_decimals": 8,
     "ordermin": "0.5",
     "status": "online"
   },
@@ -93,8 +93,8 @@
     "wsname": "MATIC/USD",
     "base": "MATIC",
     "quote": "ZUSD",
-    "pair_decimals": "5",
-    "lot_decimals": "8",
+    "pair_decimals": 5,
+    "lot_decimals": 8,
     "ordermin": "10",
     "status": "online"
   }

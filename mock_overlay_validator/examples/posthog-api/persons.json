@@ -1,7 +1,7 @@
 [
   {
     "id": "per_5001",
-    "project_id": "1",
+    "project_id": 1,
     "distinct_id": "user_3001",
     "name": "Jordan Reyes",
     "email": "jordan@example.com",
@@ -9,7 +9,7 @@
   },
   {
     "id": "per_5002",
-    "project_id": "1",
+    "project_id": 1,
     "distinct_id": "user_3002",
     "name": "Mira Patel",
     "email": "mira@example.com",
@@ -17,7 +17,7 @@
   },
   {
     "id": "per_5003",
-    "project_id": "1",
+    "project_id": 1,
     "distinct_id": "user_3003",
     "name": "Sam Okafor",
     "email": "sam@example.com",
@@ -25,7 +25,7 @@
   },
   {
     "id": "per_5004",
-    "project_id": "1",
+    "project_id": 1,
     "distinct_id": "user_3004",
     "name": "Lena Brandt",
     "email": "lena@example.com",
@@ -33,7 +33,7 @@
   },
   {
     "id": "per_5005",
-    "project_id": "2",
+    "project_id": 2,
     "distinct_id": "user_3005",
     "name": "Theo Marsh",
     "email": "theo@example.com",

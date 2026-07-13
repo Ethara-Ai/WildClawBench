@@ -5,7 +5,7 @@
     "description": "Authentication and session service",
     "status": "critical",
     "escalation_policy_id": "EP001",
-    "auto_resolve_timeout": "14400"
+    "auto_resolve_timeout": 14400
   },
   {
     "service_id": "PS002",
@@ -13,7 +13,7 @@
     "description": "Subscription billing and invoicing",
     "status": "active",
     "escalation_policy_id": "EP002",
-    "auto_resolve_timeout": "14400"
+    "auto_resolve_timeout": 14400
   },
   {
     "service_id": "PS003",
@@ -21,6 +21,6 @@
     "description": "Email and push notification dispatch",
     "status": "active",
     "escalation_policy_id": "EP001",
-    "auto_resolve_timeout": "14400"
+    "auto_resolve_timeout": 14400
   }
 ]

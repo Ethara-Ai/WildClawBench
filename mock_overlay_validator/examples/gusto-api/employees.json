@@ -7,11 +7,11 @@
     "email": "amelia.ortega@orbit-labs.com",
     "department": "Engineering",
     "job_title": "VP of Engineering",
-    "rate": "210000.00",
+    "rate": 210000.0,
     "payment_unit": "Year",
     "flsa_status": "Exempt",
     "start_date": "2019-03-04",
-    "terminated": "false"
+    "terminated": false
   },
   {
     "id": "gemp-202",
@@ -21,11 +21,11 @@
     "email": "jonas.pereira@orbit-labs.com",
     "department": "Engineering",
     "job_title": "Staff Software Engineer",
-    "rate": "185000.00",
+    "rate": 185000.0,
     "payment_unit": "Year",
     "flsa_status": "Exempt",
     "start_date": "2020-06-15",
-    "terminated": "false"
+    "terminated": false
   },
   {
     "id": "gemp-203",
@@ -35,11 +35,11 @@
     "email": "helena.park@orbit-labs.com",
     "department": "Engineering",
     "job_title": "Senior Software Engineer",
-    "rate": "165000.00",
+    "rate": 165000.0,
     "payment_unit": "Year",
     "flsa_status": "Exempt",
     "start_date": "2021-01-11",
-    "terminated": "false"
+    "terminated": false
   },
   {
     "id": "gemp-204",
@@ -49,11 +49,11 @@
     "email": "rohit.bansal@orbit-labs.com",
     "department": "Engineering",
     "job_title": "Software Engineer",
-    "rate": "140000.00",
+    "rate": 140000.0,
     "payment_unit": "Year",
     "flsa_status": "Exempt",
     "start_date": "2022-09-19",
-    "terminated": "false"
+    "terminated": false
   },
   {
     "id": "gemp-205",
@@ -63,11 +63,11 @@
     "email": "noor.aziz@orbit-labs.com",
     "department": "People",
     "job_title": "People Operations Manager",
-    "rate": "120000.00",
+    "rate": 120000.0,
     "payment_unit": "Year",
     "flsa_status": "Exempt",
     "start_date": "2020-02-03",
-    "terminated": "false"
+    "terminated": false
   },
   {
     "id": "gemp-206",
@@ -77,11 +77,11 @@
     "email": "diego.santos@orbit-labs.com",
     "department": "Sales",
     "job_title": "Account Executive",
-    "rate": "95000.00",
+    "rate": 95000.0,
     "payment_unit": "Year",
     "flsa_status": "Exempt",
     "start_date": "2021-11-08",
-    "terminated": "false"
+    "terminated": false
   },
   {
     "id": "gemp-207",
@@ -91,11 +91,11 @@
     "email": "tariq.hassan@orbit-labs.com",
     "department": "Support",
     "job_title": "Support Specialist",
-    "rate": "32.50",
+    "rate": 32.5,
     "payment_unit": "Hour",
     "flsa_status": "Nonexempt",
     "start_date": "2022-03-14",
-    "terminated": "false"
+    "terminated": false
   },
   {
     "id": "gemp-208",
@@ -105,10 +105,10 @@
     "email": "lena.fischer@orbit-labs.com",
     "department": "People",
     "job_title": "Recruiter",
-    "rate": "90000.00",
+    "rate": 90000.0,
     "payment_unit": "Year",
     "flsa_status": "Exempt",
     "start_date": "2023-10-02",
-    "terminated": "false"
+    "terminated": false
   }
 ]

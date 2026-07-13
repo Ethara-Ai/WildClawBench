@@ -5,10 +5,10 @@
     "name": "Tonkotsu Ramen",
     "description": "Rich pork-bone broth with chashu and soft egg",
     "category": "Ramen",
-    "price": "15.50",
-    "calories": "720",
-    "popular": "true",
-    "available": "true"
+    "price": 15.5,
+    "calories": 720,
+    "popular": true,
+    "available": true
   },
   {
     "item_id": "item-sak-002",
@@ -16,10 +16,10 @@
     "name": "Spicy Miso Ramen",
     "description": "Miso broth with chili oil and ground pork",
     "category": "Ramen",
-    "price": "16.00",
-    "calories": "810",
-    "popular": "true",
-    "available": "true"
+    "price": 16.0,
+    "calories": 810,
+    "popular": true,
+    "available": true
   },
   {
     "item_id": "item-sak-003",
@@ -27,10 +27,10 @@
     "name": "Pork Gyoza (6 pc)",
     "description": "Pan-fried pork and cabbage dumplings",
     "category": "Appetizers",
-    "price": "7.50",
-    "calories": "420",
-    "popular": "false",
-    "available": "true"
+    "price": 7.5,
+    "calories": 420,
+    "popular": false,
+    "available": true
   },
   {
     "item_id": "item-sak-004",
@@ -38,10 +38,10 @@
     "name": "Edamame",
     "description": "Steamed soybeans with sea salt",
     "category": "Appetizers",
-    "price": "5.00",
-    "calories": "180",
-    "popular": "false",
-    "available": "true"
+    "price": 5.0,
+    "calories": 180,
+    "popular": false,
+    "available": true
   },
   {
     "item_id": "item-bel-001",
@@ -49,10 +49,10 @@
     "name": "Margherita Pizza",
     "description": "San Marzano tomato basil and fresh mozzarella",
     "category": "Pizza",
-    "price": "18.00",
-    "calories": "980",
-    "popular": "true",
-    "available": "true"
+    "price": 18.0,
+    "calories": 980,
+    "popular": true,
+    "available": true
   },
   {
     "item_id": "item-bel-002",
@@ -60,10 +60,10 @@
     "name": "Spaghetti Carbonara",
     "description": "Guanciale egg and pecorino romano",
     "category": "Pasta",
-    "price": "21.50",
-    "calories": "1120",
-    "popular": "true",
-    "available": "true"
+    "price": 21.5,
+    "calories": 1120,
+    "popular": true,
+    "available": true
   },
   {
     "item_id": "item-bel-003",
@@ -71,10 +71,10 @@
     "name": "Tiramisu",
     "description": "Espresso-soaked ladyfingers and mascarpone",
     "category": "Dessert",
-    "price": "9.00",
-    "calories": "560",
-    "popular": "false",
-    "available": "true"
+    "price": 9.0,
+    "calories": 560,
+    "popular": false,
+    "available": true
   },
   {
     "item_id": "item-tac-001",
@@ -82,10 +82,10 @@
     "name": "Carne Asada Taco",
     "description": "Grilled steak with onion and cilantro",
     "category": "Tacos",
-    "price": "3.75",
-    "calories": "260",
-    "popular": "true",
-    "available": "true"
+    "price": 3.75,
+    "calories": 260,
+    "popular": true,
+    "available": true
   },
   {
     "item_id": "item-tac-002",
@@ -93,10 +93,10 @@
     "name": "Al Pastor Burrito",
     "description": "Marinated pork pineapple rice and beans",
     "category": "Burritos",
-    "price": "11.50",
-    "calories": "840",
-    "popular": "true",
-    "available": "true"
+    "price": 11.5,
+    "calories": 840,
+    "popular": true,
+    "available": true
   },
   {
     "item_id": "item-tac-003",
@@ -104,10 +104,10 @@
     "name": "Chips and Guacamole",
     "description": "House-made guac with fresh tortilla chips",
     "category": "Sides",
-    "price": "6.50",
-    "calories": "520",
-    "popular": "false",
-    "available": "true"
+    "price": 6.5,
+    "calories": 520,
+    "popular": false,
+    "available": true
   },
   {
     "item_id": "item-grn-001",
@@ -115,10 +115,10 @@
     "name": "Kale Caesar Salad",
     "description": "Lacinato kale parmesan and house croutons",
     "category": "Salads",
-    "price": "12.00",
-    "calories": "430",
-    "popular": "true",
-    "available": "true"
+    "price": 12.0,
+    "calories": 430,
+    "popular": true,
+    "available": true
   },
   {
     "item_id": "item-grn-002",
@@ -126,10 +126,10 @@
     "name": "Quinoa Power Bowl",
     "description": "Quinoa chickpeas avocado and tahini",
     "category": "Bowls",
-    "price": "13.50",
-    "calories": "610",
-    "popular": "true",
-    "available": "true"
+    "price": 13.5,
+    "calories": 610,
+    "popular": true,
+    "available": true
   },
   {
     "item_id": "item-drg-001",
@@ -137,10 +137,10 @@
     "name": "Har Gow (4 pc)",
     "description": "Steamed shrimp dumplings",
     "category": "Dim Sum",
-    "price": "6.50",
-    "calories": "240",
-    "popular": "true",
-    "available": "true"
+    "price": 6.5,
+    "calories": 240,
+    "popular": true,
+    "available": true
   },
   {
     "item_id": "item-drg-002",
@@ -148,9 +148,9 @@
     "name": "BBQ Pork Buns (3 pc)",
     "description": "Fluffy steamed buns with char siu",
     "category": "Dim Sum",
-    "price": "6.00",
-    "calories": "510",
-    "popular": "true",
-    "available": "false"
+    "price": 6.0,
+    "calories": 510,
+    "popular": true,
+    "available": false
   }
 ]

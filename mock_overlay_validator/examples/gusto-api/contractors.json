@@ -7,7 +7,7 @@
     "business_name": "",
     "type": "Individual",
     "email": "sam.whitaker@example.com",
-    "hourly_rate": "85.00",
+    "hourly_rate": 85.0,
     "wage_type": "Hourly",
     "start_date": "2025-02-01"
   },
@@ -19,7 +19,7 @@
     "business_name": "Brightline Design LLC",
     "type": "Business",
     "email": "billing@brightlinedesign.com",
-    "hourly_rate": "0.00",
+    "hourly_rate": 0.0,
     "wage_type": "Fixed",
     "start_date": "2025-06-15"
   },
@@ -31,7 +31,7 @@
     "business_name": "",
     "type": "Individual",
     "email": "ingrid.solberg@example.com",
-    "hourly_rate": "95.00",
+    "hourly_rate": 95.0,
     "wage_type": "Hourly",
     "start_date": "2025-09-10"
   },
@@ -43,7 +43,7 @@
     "business_name": "Northgate Consulting Group",
     "type": "Business",
     "email": "accounts@northgate.example.com",
-    "hourly_rate": "0.00",
+    "hourly_rate": 0.0,
     "wage_type": "Fixed",
     "start_date": "2026-01-20"
   }
