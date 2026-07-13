@@ -23,7 +23,7 @@ import threading
 from typing import Any, Callable, Dict, Optional
 
 from . import lifecycle
-from .events import EV_LOG, EV_PROGRESS, EV_STAGE, EV_SUMMARY, Event, get_bus
+from .events import EV_LOG, EV_PROGRESS, EV_STAGE, EV_SUMMARY, EV_TOKEN, Event, get_bus
 
 try:
     from textual.app import App, ComposeResult
@@ -38,6 +38,26 @@ except Exception:  # pragma: no cover - exercised only when textual is missing
 
 def textual_available() -> bool:
     return _TEXTUAL_AVAILABLE
+
+
+def token_markup(payload: Dict[str, Any]) -> str:
+    """Rich markup for one EV_TOKEN payload in the Live Stream pane.
+
+    Pure function (no textual dependency) so it is unit-testable everywhere.
+    The producer (stream_renderer bus mode) sends display-ready text — judge
+    lines already carry their `[judge:<family>]` prefix — so this only maps
+    style → markup and escapes user text so model output can never inject
+    Rich markup into the pane.
+    """
+    text = str(payload.get("text", "")).replace("[", "\\[")
+    style = payload.get("style", "status")
+    if style == "thinking":
+        return f"[dim]\\[thinking] {text}[/]"
+    if style == "text":
+        return text
+    if style == "judge":
+        return f"[cyan]{text}[/]"
+    return f"[dim italic]{text}[/]"
 
 
 class _BusLogHandler(logging.Handler):
@@ -65,7 +85,9 @@ if _TEXTUAL_AVAILABLE:
         CSS = """
         Screen { layout: vertical; }
         #body { height: 1fr; }
-        #log { width: 2fr; border: round $accent; padding: 0 1; }
+        #left { width: 2fr; }
+        #stream { height: 2fr; border: round $success; padding: 0 1; }
+        #log { height: 1fr; border: round $accent; padding: 0 1; }
         #status { width: 1fr; border: round $primary; padding: 0 1; }
         #progress { height: auto; padding: 0 1; }
         """
@@ -94,7 +116,12 @@ if _TEXTUAL_AVAILABLE:
         def compose(self) -> "ComposeResult":
             yield Header(show_clock=True)
             with Horizontal(id="body"):
-                yield RichLog(id="log", highlight=False, markup=True, wrap=True)
+                with Vertical(id="left"):
+                    # Live LLM stream (EV_TOKEN, populated by the stream
+                    # renderer's bus mode) above the harness log. Empty until
+                    # a --stream run emits; harmless otherwise.
+                    yield RichLog(id="stream", highlight=False, markup=True, wrap=True)
+                    yield RichLog(id="log", highlight=False, markup=True, wrap=True)
                 yield Static(self._render_status(), id="status")
             yield ProgressBar(id="progress", total=max(1, self._total_hint))
             yield Footer()
@@ -174,6 +201,18 @@ if _TEXTUAL_AVAILABLE:
                 self._handle_progress(evt.payload)
             elif evt.kind == EV_SUMMARY:
                 self._handle_summary(evt.payload)
+            elif evt.kind == EV_TOKEN:
+                self._handle_token(evt.payload)
+
+        def _handle_token(self, p: Dict[str, Any]) -> None:
+            # Live Stream pane: display-ready text from the stream renderer's
+            # bus mode (docs/STREAMING_PLAN.md). Escaping happens inside
+            # token_markup; failures are swallowed like every other handler —
+            # a display problem must never reach the harness worker.
+            try:
+                self.query_one("#stream", RichLog).write(token_markup(p))
+            except Exception:
+                pass
 
         def _handle_log(self, p: Dict[str, Any]) -> None:
             level = p.get("level", "INFO")

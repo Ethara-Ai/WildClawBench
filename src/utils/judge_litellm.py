@@ -399,7 +399,27 @@ def call_judge_via_litellm(
         }
         completion_kwargs.pop("aws_region_name", None)
 
-    response = litellm.completion(**completion_kwargs)
+    # Live-stream liveness (docs/STREAMING_PLAN.md D4): this judge call stays
+    # NON-streaming by decision (`"stream": False` above is untouched), so the
+    # display feed gets exactly two status events — started/finished — instead
+    # of token deltas. stream_events.emit() is a guaranteed no-raise no-op
+    # unless WCB_STREAM is on.
+    from src.utils import stream_events as _stream
+    import uuid as _uuid
+    _sid = _uuid.uuid4().hex[:12]
+    _stream.emit(f"judge:{family}", "status", _sid, kind="status",
+                 delta="verdict request started (non-streaming)",
+                 model=str(completion_kwargs.get("model") or ""))
+    try:
+        response = litellm.completion(**completion_kwargs)
+    except Exception:
+        _stream.emit(f"judge:{family}", "error", _sid, kind="status",
+                     delta="verdict request failed",
+                     model=str(completion_kwargs.get("model") or ""))
+        raise
+    _stream.emit(f"judge:{family}", "status", _sid, kind="status",
+                 delta="verdict received",
+                 model=str(completion_kwargs.get("model") or ""))
 
     # Extract text. LiteLLM normalizes to OpenAI shape across providers.
     try:

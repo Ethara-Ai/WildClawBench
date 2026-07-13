@@ -53,6 +53,10 @@ PARALLEL_TASKS=1         # >1 = run that many TASKS concurrently via the failure
 INPUT_DIR=""             # --input-dir DIR: queue every task subdir under DIR
 AUTO_BUNDLE=1            # 1 = auto-repackage to output_bundle/ after each task, 0 = omit
 BUNDLE_ROOT="output_bundle"  # dest-root for the auto-bundler; overridable via KENSEI_BUNDLE_ROOT
+STREAM=0                 # 1 = live-stream LLM output to the terminal (--stream). Single-run
+                         # foreground only (1 task × 1 model × K=1 × -P 1); display-only
+                         # observability — never touches grading/deliverables. See
+                         # docs/STREAMING_PLAN.md.
 
 print_help() {
     cat <<'EOF'
@@ -114,6 +118,11 @@ ADVANCED
       --no-bundle           Skip auto-repackage to output_bundle/ after each task
       --bundle-root DIR     Destination for auto-bundle (default: output_bundle; env: KENSEI_BUNDLE_ROOT)
       --parallel-reps       Run all K reps of a (task,model) CONCURRENTLY (default: sequential)
+      --stream              Live-stream LLM output (agent thinking+text, judge verdicts) to the
+                            terminal while the run executes. Single-run only (1 task × 1 model ×
+                            K=1 × -P 1) — silently downgraded otherwise. Display-only: never
+                            affects grading, scores, or bundles. Default: off.
+      --no-stream           Force streaming off (default)
       --skip-preflight      Skip docker/image/.env checks (DANGEROUS; for re-entry only)
 
 NOTES
@@ -430,6 +439,7 @@ cleanup_orphans() {
 : "${WCB_SHARED_CC_BRIDGE:=}"
 : "${WCB_SHARED_CC_BRIDGE_URL:=}"
 : "${WCB_SHARED_CC_BRIDGE_HOST_URL:=}"
+: "${WCB_SHARED_SIDECAR_STREAM_LOG:=}"
 # WCB_SHARED_OWNER_PID is the PID of the process that ran bootstrap_shared_sidecar
 # (always the parent run.sh). Workers under -P >1 inherit this via export. The
 # teardown_shared_sidecar guard at the top of that function uses this to refuse
@@ -475,6 +485,7 @@ bootstrap_shared_sidecar() {
             cc_bridge)     WCB_SHARED_CC_BRIDGE="$v" ;;
             cc_bridge_url) WCB_SHARED_CC_BRIDGE_URL="$v" ;;
             cc_bridge_host_url) WCB_SHARED_CC_BRIDGE_HOST_URL="$v" ;;
+            stream_log)  WCB_SHARED_SIDECAR_STREAM_LOG="$v" ;;
         esac
     done < "$tmpfile"
     rm -f "$tmpfile"
@@ -489,7 +500,7 @@ bootstrap_shared_sidecar() {
            WCB_SHARED_SIDECAR_USAGE_LOG WCB_SHARED_SIDECAR_YAML \
            WCB_SHARED_LITELLM_MASTER_KEY WCB_SHARED_OWNER_PID \
            WCB_SHARED_CC_BRIDGE WCB_SHARED_CC_BRIDGE_URL \
-           WCB_SHARED_CC_BRIDGE_HOST_URL
+           WCB_SHARED_CC_BRIDGE_HOST_URL WCB_SHARED_SIDECAR_STREAM_LOG
     log::ok "Shared sidecar=$WCB_SHARED_SIDECAR network=$WCB_SHARED_NETWORK owner_pid=$WCB_SHARED_OWNER_PID"
 
     # Route the HOST-side Sonnet judge through the OAuth subscription bridge.
@@ -829,6 +840,29 @@ bundle_task() {
         return 0
     fi
 
+    # Backfill pass before repackaging (both idempotent, both fail-soft like
+    # the bundler itself — the eval already succeeded):
+    #   (a) run-data: writes data/environment/ (mock APIs) into run dirs that
+    #       lack it — the post-6e03e6b pipeline never writes it, so without
+    #       this the bundle ships persona + plane files only, no mock-API
+    #       services (see script/backfill_run_data.py header).
+    #   (b) pass_summary: rebuilds pass_summary.json from score.json +
+    #       ctrf.json so real tests_* counts and combined_reward survive into
+    #       the bundle and the later aggregate step.
+    # Under -P >1 concurrent workers may both scan the whole ${source_root};
+    # benign — skip-existing plus identical generated content make the race
+    # harmless.
+    local backfill_log="${LOG_DIR}/backfill_${task_name}_$(date +%Y%m%d_%H%M%S).log"
+    if ! python3 script/backfill_run_data.py \
+            --output-root "$source_root" --input-root "$input_root" \
+            >> "$backfill_log" 2>&1; then
+        log::warn "bundle: run-data backfill failed for ${task_name} (see ${backfill_log}); bundle may lack mock APIs"
+    fi
+    if ! python3 script/backfill_pass_summary.py "${source_root}/${task_name}" \
+            >> "$backfill_log" 2>&1; then
+        log::warn "bundle: pass_summary backfill failed for ${task_name} (see ${backfill_log}); continuing"
+    fi
+
     log::substep "Bundling → ${bundle_root}/${task_name} (input_root=${input_root})"
     mkdir -p "$bundle_root"
     local bundle_log="${LOG_DIR}/bundle_${task_name}_$(date +%Y%m%d_%H%M%S).log"
@@ -843,6 +877,17 @@ bundle_task() {
             --verbose \
             > "$bundle_log" 2>&1; then
         log::ok "Bundled ${task_name} → ${bundle_root}/${task_name} (log: ${bundle_log})"
+        # Enrich mode: copy live references/+scripts/ into the bundle's
+        # connector dirs (bundles snapshot skills/ from run output, which may
+        # predate the docs generator). Whole ${bundle_root} rather than just
+        # this task because the repackager's fuzzy persona match may name the
+        # dest dir differently; already-rich bundles are skipped, so the wider
+        # scan stays idempotent.
+        if ! python3 script/backfill_connector_docs.py \
+                --bundle-root "$bundle_root" \
+                >> "$bundle_log" 2>&1; then
+            log::warn "bundle: connector-docs enrich failed (see ${bundle_log}); thin connectors may remain"
+        fi
     else
         log::warn "bundle: repackage failed for ${task_name} (see ${bundle_log}); continuing"
     fi
@@ -899,6 +944,8 @@ parse_args() {
             --use-claude-oauth)   USE_CLAUDE_OAUTH=1; shift ;;
             --no-bundle)          AUTO_BUNDLE=0; shift ;;
             --bundle-root)        BUNDLE_ROOT="$2"; shift 2 ;;
+            --stream)             STREAM=1; shift ;;
+            --no-stream)          STREAM=0; shift ;;
             --parallel-reps)      PARALLEL_REPS=1; shift ;;
             -j|--jobs|-P|--parallel-tasks)
                 [[ -n "${2:-}" ]] || { log::err "$1 requires a value"; exit 2; }
@@ -1034,6 +1081,10 @@ run_parallel_tasks() {
     rm -rf "$status_dir"
 
     log::substep "Aggregating pass@K across all tasks"
+    # Rebuild every pass_summary.json first so the rollup reads real tests_*
+    # counts + combined_reward, including tasks graded before the schema fix.
+    python3 script/backfill_pass_summary.py "output/${BACKEND}" >/dev/null 2>&1 || \
+        log::warn "pass_summary backfill failed; aggregate may read stale summaries"
     if python3 script/aggregate_runs.py --backend "$BACKEND" >/dev/null 2>&1; then
         log::ok "Aggregated → output/${BACKEND}_aggregate_summary.json"
     else
@@ -1065,6 +1116,25 @@ main() {
         log::err "--parallel-tasks must be a positive integer, got: $PARALLEL_TASKS"; exit 2
     fi
 
+    # Live-stream gate (docs/STREAMING_PLAN.md D6/R6). Token streaming is
+    # single-run foreground only: with fan-out (multi task/model/rep) the
+    # shared feed interleaves runs unreadably, so the flag downgrades with a
+    # warning instead of half-working. Must be decided (and exported) BEFORE
+    # bootstrap_shared_sidecar below — the gate is batch-scoped: it controls
+    # whether the shared sidecar mounts the stream callback at all.
+    if (( STREAM == 1 )) && (( K == 1 && ${#models[@]} == 1 && ${#TASKS[@]} == 1 && PARALLEL_TASKS == 1 )); then
+        export WCB_STREAM=1
+    else
+        if (( STREAM == 1 )); then
+            log::warn "--stream: live token streaming is single-run only (1 task × 1 model × K=1 × -P 1); disabled for this batch"
+        fi
+        STREAM=0
+        # run.sh is AUTHORITATIVE over the gate: a stale WCB_STREAM inherited
+        # from the caller's environment must not leak token-mode into fan-out
+        # batches (D6) or into flag-off runs (R6 byte-identical contract).
+        unset WCB_STREAM 2>/dev/null || true
+    fi
+
     log::section "WildClawBench runner"
     log::kv "Mode"     "$MODE"
     log::kv "Tasks"    "${#TASKS[@]}"
@@ -1079,6 +1149,7 @@ main() {
     (( JUDGE_COUNCIL == 1 ))  && feats+=("judge-council")
     (( PARALLEL_REPS == 1 ))  && feats+=("parallel-reps")
     (( AUTO_BUNDLE == 1 ))    && feats+=("auto-bundle→${KENSEI_BUNDLE_ROOT:-$BUNDLE_ROOT}/")
+    (( STREAM == 1 ))         && feats+=("stream")
     log::kv "Features" "${feats[*]:-none}"
     log::kv "Cwd"      "$(pwd)"
 
@@ -1091,6 +1162,10 @@ main() {
         log::rule "Preflight checks"
         preflight_docker || exit 1
         preflight_agent_image || exit 1
+        # Before the mock-image check: a first-time docs backfill changes the
+        # environment/ content hash, and this order lets a preflight build
+        # (image absent) pick the enriched tree up immediately.
+        preflight_connector_docs
         preflight_mock_image || exit 1
         preflight_headroom_image || exit 1
         preflight_env_file || exit 1
@@ -1212,6 +1287,10 @@ main() {
 
     if (( K > 1 || ${#TASKS[@]} > 1 || ${#models[@]} > 1 )); then
         log::substep "Aggregating pass@K"
+        # Same repair as the parallel-launcher path: the rollup must read the
+        # rebuilt (real tests_* + combined_reward) summaries, not stale ones.
+        python3 script/backfill_pass_summary.py "output/${BACKEND}" >/dev/null 2>&1 || \
+            log::warn "pass_summary backfill failed; aggregate may read stale summaries"
         if python3 script/aggregate_runs.py --backend "$BACKEND" 2>&1; then
             log::ok "Aggregated → output/${BACKEND}_aggregate_summary.json"
         else

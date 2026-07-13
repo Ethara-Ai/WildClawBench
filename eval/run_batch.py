@@ -1876,6 +1876,22 @@ def run_single_task(
     elif drift_info:
         drift_director = _start_drift_director(task, drift_info, output_dir)
     mock_health_logger = _start_mock_health_logger(task, task_id, output_dir)
+    # Live-stream renderer (docs/STREAMING_PLAN.md §4). Display-only daemon
+    # thread: token mode over the batch feed when the sidecar tap is mounted,
+    # else turn-level tailing of this run's agent.log. None when WCB_STREAM
+    # is off (the default) — start_renderer() gates internally and never
+    # raises. Nothing graded reads it or waits on it (R1).
+    stream_renderer = None
+    try:
+        from src.utils.stream_renderer import start_renderer as _start_stream_renderer
+        _stream_feed = os.environ.get("WCB_STREAM_LOG_PATH", "").strip()
+        stream_renderer = _start_stream_renderer(
+            Path(_stream_feed) if _stream_feed else None,
+            output_dir / "agent.log",
+            run_label=f"{task_id_ori}/run_{run_index}",
+        )
+    except Exception as exc:
+        logger.warning("[%s] stream renderer start failed (display-only): %s", task_id, exc)
 
     try:
         execution = backend.run_task(
@@ -2209,6 +2225,16 @@ def run_single_task(
             except Exception as exc:
                 logger.warning("[%s] Per-task mock stack cleanup failed: %s", task_id, exc)
 
+        # Stop the display renderer AFTER grading/trajectory (so judge deltas
+        # rendered) and only now, at the very end of teardown: stop() is a
+        # bounded join (≤5s, R3) — it can delay this teardown tail slightly
+        # but can never gate grading, which already completed above.
+        if stream_renderer is not None:
+            try:
+                stream_renderer.stop(timeout=5.0)
+            except Exception:
+                pass
+
         # Last-resort score.json invariant guard. Every claimed run_N/ dir MUST have
         # a score.json so downstream aggregators (script/*, regrade.py) never see a
         # phantom run. If grade_the_task and the rubric block both missed, drop a
@@ -2318,6 +2344,13 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
 
     _agent_headroom = (os.environ.get("KENSEI_AGENT_HEADROOM_ENABLED", "").strip().lower()
                        in ("1", "true", "yes", "on"))
+    # Live-stream observability gate (docs/STREAMING_PLAN.md). Batch-scoped
+    # (R6): evaluated once here, decides callback registration + mounts for
+    # the whole batch. Default OFF — an unset WCB_STREAM yields containers
+    # and a config yaml byte-identical to pre-streaming builds.
+    _stream_enabled = (os.environ.get("WCB_STREAM", "").strip().lower()
+                       in ("1", "true", "yes", "on"))
+    shared_stream_log = os.environ.get("WCB_SHARED_SIDECAR_STREAM_LOG", "").strip()
     litellm_yaml = build_litellm_config_yaml(
         bedrock_sonnet_arn=config.bedrock_sonnet_arn if config.aws_bearer_token else "",
         bedrock_arn=config.bedrock_inference_arn if config.aws_bearer_token else "",
@@ -2347,6 +2380,46 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
         create_network(network)
         cleanups.append(lambda: remove_network(network))
 
+    # Live-stream feed wiring (docs/STREAMING_PLAN.md §2.2). Own dir + own
+    # mount, strictly separate from /var/litellm_usage AND usage_oauth.jsonl
+    # (m0130). MUST be resolved BEFORE the cc-bridge start below: on this
+    # branch the bridge tee is the real-time token tap and needs the feed dir
+    # mounted at container start. In shared mode the feed was created by
+    # eval/bootstrap_sidecar.py and arrives via WCB_SHARED_SIDECAR_STREAM_LOG;
+    # if the shared sidecar was booted without streaming, the feed stays unset
+    # and the renderer falls back to turn-level agent.log tailing on its own.
+    stream_callback_src = ""
+    stream_log_dir_str = ""
+    stream_log_path = None
+    if _stream_enabled:
+        if shared_mode:
+            if shared_stream_log:
+                stream_log_path = Path(shared_stream_log)
+        else:
+            stream_dir = config.work_dir / f"litellm-stream-{batch_id}"
+            stream_dir.mkdir(parents=True, exist_ok=True)
+            stream_log_path = stream_dir / "stream.jsonl"
+            stream_log_path.touch(exist_ok=True)
+            try:
+                os.chmod(stream_log_path, 0o600)
+                os.chmod(stream_dir, 0o700)
+            except OSError as _chmod_err:
+                logger.warning(
+                    "[%s] chmod failed on stream feed paths (%s) — "
+                    "bridge/sidecar may be unable to write stream rows",
+                    batch_id, _chmod_err,
+                )
+            stream_callback_src = str(
+                Path(__file__).resolve().parent.parent / "src" / "utils" / "litellm_stream_callback.py"
+            )
+            stream_log_dir_str = str(stream_dir)
+        if stream_log_path is not None:
+            # Host-side emitters (judge deltas, testgen heartbeats — via
+            # src/utils/stream_events.py) and the terminal renderer all key
+            # off this env var. Display-only consumers; grading never reads
+            # the feed (R1).
+            os.environ["WCB_STREAM_LOG_PATH"] = str(stream_log_path)
+
     if use_oauth and not (shared_mode and shared_cc_bridge):
         pool_paths = [p.strip() for p in config.cc_account_pool.split(":") if p.strip()]
         pool_dirs = {os.path.dirname(os.path.abspath(p)) for p in pool_paths if os.path.isfile(p)}
@@ -2371,6 +2444,12 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
             network=network,
             pool_host_dir=pool_host_dir,
             bridge_secret=bridge_secret,
+            # Real-time tee sink (docs/STREAMING_PLAN.md §3.2). Empty when
+            # streaming is off → tee inert, bridge byte-identical to today.
+            stream_log_host_dir=(
+                stream_log_dir_str
+                or (str(stream_log_path.parent) if stream_log_path is not None else "")
+            ),
         )
         cleanups.append(lambda: stop_bridge(cc_bridge_name))
         if not wait_for_bridge_healthy(cc_bridge_name):
@@ -2466,6 +2545,8 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
             enable_headroom=_agent_headroom,
             anthropic_api_key=config.anthropic_api_key,
             oauth_usage_callback_host_path=oauth_cb_src,
+            stream_callback_host_path=stream_callback_src,
+            stream_log_host_dir=stream_log_dir_str,
         )
         cleanups.append(lambda: stop_litellm(sidecar))
         if not wait_for_litellm_healthy(sidecar):

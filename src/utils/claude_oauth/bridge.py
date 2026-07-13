@@ -38,6 +38,7 @@ import httpx
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 
+from .stream_tee import StreamTee
 from .credentials import (
     CredentialProvider,
     CredentialsError,
@@ -864,6 +865,11 @@ async def _stream_with_failover(
                 # a small rolling buffer so a marker split across two chunks is still
                 # matched on a line boundary.
                 tail = b""
+                # Live-stream tee (docs/STREAMING_PLAN.md §3.2), passthrough
+                # variant: observe-only beside the existing tail bookkeeping;
+                # inert without WCB_CC_STREAM_LOG_PATH, fail-open.
+                tee = StreamTee(source="agent")
+                tee.attempt_started()
                 try:
                     async for chunk in upstream.aiter_bytes():
                         tail = (tail + chunk)[-256:]
@@ -871,9 +877,11 @@ async def _stream_with_failover(
                             saw_stop = True
                         if b"\nevent: error" in tail or tail.startswith(b"event: error"):
                             saw_error = True
+                        tee.feed(chunk)
                         yield strip_tool_prefix_bytes(chunk) if _tool_rename_enabled() else chunk
                 except Exception as e:  # noqa: BLE001 - any read failure mid-stream (not BaseException)
                     _LOG.warning("mid-stream read error after status 200: %s", e)
+                    tee.error("upstream stream aborted mid-response")
                     yield (
                         b"\nevent: error\n"
                         b'data: {"type":"error","error":{"type":"api_error",'
@@ -888,11 +896,14 @@ async def _stream_with_failover(
                     # message_stop -> truncation. Force the client to treat it as
                     # an error rather than a complete (short) turn.
                     _LOG.warning("stream ended without message_stop -> signalling truncation")
+                    tee.error("upstream stream ended without message_stop (truncated)")
                     yield (
                         b"\nevent: error\n"
                         b'data: {"type":"error","error":{"type":"api_error",'
                         b'"message":"wcb-bridge: upstream stream ended without message_stop (truncated)"}}\n\n'
                     )
+                else:
+                    tee.finish()
 
             # Forward the upstream status and headers (request-id,
             # anthropic-ratelimit-*) instead of hardcoding 200 / dropping them,
@@ -976,6 +987,11 @@ async def _stream_buffered_with_retry(
     """
     max_retries = _max_stream_buffer_retries()
     max_wait = _max_inline_wait_seconds()
+    # Live-stream tee (docs/STREAMING_PLAN.md §3.2): observe-only, inert
+    # without WCB_CC_STREAM_LOG_PATH, fail-open. This is the ONLY real-time
+    # token tap on the OAuth path — the client-facing replay below stays an
+    # end-of-turn burst by design (buffer-and-retry semantics unchanged).
+    tee = StreamTee(source="agent")
 
     async def _capture() -> Tuple[str, bytes]:
         """Return (kind, body) where kind ∈ {'ok','error','creds','incomplete'}.
@@ -987,8 +1003,10 @@ async def _stream_buffered_with_retry(
             try:
                 access_token = await asyncio.to_thread(provider.get_access_token)
             except CredentialsError as e:
+                tee.error("credentials unavailable")
                 return ("creds", str(e).encode("utf-8"))
             if access_token in tried_tokens:
+                tee.error("failover exhausted (burned slot)")
                 return ("error", b"")  # failover looped to a burned slot
 
             fwd = _build_forward_headers(headers_in, access_token)
@@ -1032,6 +1050,7 @@ async def _stream_buffered_with_retry(
                             "buffered stream: upstream non-2xx status=%d kind=%s body=%s",
                             upstream.status_code, classified.kind.name, body_preview,
                         )
+                        tee.error(f"upstream HTTP {upstream.status_code}")
                         return ("error", body)
                     # 2xx — a success means we're not capped anymore (clear phantom).
                     try:
@@ -1039,6 +1058,7 @@ async def _stream_buffered_with_retry(
                             provider.last_cap_reset_at = None  # type: ignore[attr-defined]
                     except Exception:  # noqa: BLE001
                         pass
+                    tee.attempt_started()
                     async for chunk in upstream.aiter_bytes():
                         buf += chunk
                         tail = (tail + chunk)[-256:]
@@ -1046,6 +1066,9 @@ async def _stream_buffered_with_retry(
                             saw_stop = True
                         if b"\nevent: error" in tail or tail.startswith(b"event: error"):
                             saw_error = True
+                        # Observe-only live tap; `buf`/`tail`/client bytes are
+                        # untouched (R5) and tee failures self-disable (R2).
+                        tee.feed(chunk)
                 finally:
                     await cm.__aexit__(None, None, None)
             except Exception as e:  # noqa: BLE001 — mid-stream read/connect drop
@@ -1055,14 +1078,20 @@ async def _stream_buffered_with_retry(
                 await client.aclose()
 
             if saw_stop:
+                tee.finish()
                 return ("ok", bytes(buf))  # complete stream captured
             # Incomplete: mid-stream drop OR ended without message_stop.
             attempt += 1
             if attempt > max_retries:
                 if saw_error:
+                    tee.finish()
                     return ("ok", bytes(buf))  # a terminal error frame is complete enough to relay
                 _LOG.error("buffered stream: still incomplete after %d retries", max_retries)
+                tee.error("upstream stream incomplete after retries")
                 return ("incomplete", b"")
+            # The partial turn the live feed saw is void — mark the retry so
+            # the renderer replaces it; the next attempt re-opens the request.
+            tee.retrying(attempt)
             await asyncio.sleep(min(2 ** attempt, max_wait))
             _LOG.info("buffered stream: re-issuing upstream (attempt %d/%d)", attempt, max_retries)
 

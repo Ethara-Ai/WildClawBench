@@ -636,6 +636,13 @@ def _call_judge_openai(model: str, system: str, user: str) -> tuple[str, dict]:
     )
     text_parts: list[str] = []
     u: dict = {}
+    # Live-stream tap (docs/STREAMING_PLAN.md §3.3), same pattern as the
+    # Bedrock judge path: emit each delta as it accumulates; no-op when
+    # WCB_STREAM is off; never raises.
+    from src.utils import stream_events as _stream
+    import uuid as _uuid
+    _sid = _uuid.uuid4().hex[:12]
+    _stream.emit("judge:openai", "message_start", _sid, kind="status", model=model)
     with urllib.request.urlopen(req, timeout=120) as r:
         for raw_line in r:
             line = raw_line.decode("utf-8", errors="replace").rstrip("\r\n")
@@ -654,9 +661,12 @@ def _call_judge_openai(model: str, system: str, user: str) -> tuple[str, dict]:
                 content = delta.get("content")
                 if isinstance(content, str):
                     text_parts.append(content)
+                    _stream.emit("judge:openai", "delta", _sid, kind="text",
+                                 delta=content, model=model)
             usage_obj = obj.get("usage")
             if isinstance(usage_obj, dict):
                 u = usage_obj
+    _stream.emit("judge:openai", "message_stop", _sid, kind="status", model=model)
     text = "".join(text_parts)
     details = u.get("prompt_tokens_details", {}) or {}
     prompt_tok = int(u.get("prompt_tokens", 0) or 0)
@@ -756,6 +766,14 @@ def _call_judge_bedrock(
     def _consume(req) -> tuple[str, dict]:
         text_parts: list[str] = []
         u: dict = {}
+        # Live-stream tap (docs/STREAMING_PLAN.md §3.3): each delta is emitted
+        # to the display feed AS it is accumulated — accumulate-then-parse is
+        # untouched (R4), and stream_events.emit() is a guaranteed no-raise
+        # no-op unless WCB_STREAM is on.
+        from src.utils import stream_events as _stream
+        import uuid as _uuid
+        _sid = _uuid.uuid4().hex[:12]
+        _src = f"judge:{family or 'bedrock'}"
         try:
             resp = urllib.request.urlopen(req, timeout=120)
         except urllib.error.HTTPError as e:
@@ -764,7 +782,10 @@ def _call_judge_bedrock(
                 err_body = e.read().decode("utf-8", "replace")[:2000]
             except Exception:
                 pass
+            _stream.emit(_src, "error", _sid, kind="status",
+                         delta=f"HTTP {e.code}", model=arn)
             raise RuntimeError(f"Bedrock HTTP {e.code} at {url}: {err_body}") from None
+        _stream.emit(_src, "message_start", _sid, kind="status", model=arn)
         with resp as r:
             def _chunks():
                 while True:
@@ -777,16 +798,21 @@ def _call_judge_bedrock(
                     continue
                 if evt_type and evt_type.endswith("Exception"):
                     err = evt_payload.get("Message") or evt_payload.get("message") or ""
+                    _stream.emit(_src, "error", _sid, kind="status",
+                                 delta=str(err)[:200], model=arn)
                     raise RuntimeError(f"Bedrock judge error ({evt_type}): {err}")
                 if evt_type == "contentBlockDelta":
                     delta = evt_payload.get("delta") or {}
                     txt = delta.get("text")
                     if isinstance(txt, str):
                         text_parts.append(txt)
+                        _stream.emit(_src, "delta", _sid, kind="text",
+                                     delta=txt, model=arn)
                 elif evt_type == "metadata":
                     usage_obj = evt_payload.get("usage")
                     if isinstance(usage_obj, dict):
                         u = usage_obj
+        _stream.emit(_src, "message_stop", _sid, kind="status", model=arn)
         text = "".join(text_parts)
         in_tok = int(u.get("inputTokens", 0) or 0)
         out_tok = int(u.get("outputTokens", 0) or 0)
