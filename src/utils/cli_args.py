@@ -194,6 +194,15 @@ def build_run_batch_parser(default_model: str, default_parallel: int) -> argpars
         action="store_false",
         help="Force-disable the judge council even if JUDGE_COUNCIL=1 in env.",
     )
+    parser.add_argument(
+        "--tui",
+        dest="tui",
+        action="store_true",
+        default=False,
+        help="Launch the full-screen Textual live dashboard (container lifecycle, "
+             "live log, progress, and final summary). Interactive terminals only; "
+             "auto-falls back to Rich logging when piped/tee'd. Equivalent to WCB_TUI=1.",
+    )
     return parser
 
 

@@ -2191,7 +2191,39 @@ def main() -> None:
         default_model=DEFAULT_MODEL,
         default_parallel=DEFAULT_PARALLEL,
     )
+    _select_ui_and_run(args)
 
+
+def _select_ui_and_run(args) -> None:
+    """Choose the UI mode, then run the harness body.
+
+    Two modes (see src/utils/ui/):
+      * TUI (opt-in): ``--tui`` / ``WCB_TUI=1`` AND stdout is a real terminal AND
+        textual is importable -> run the whole harness inside the full-screen
+        Textual dashboard. Falls through to Rich if the dashboard can't start.
+      * Rich (default): attach a RichHandler to the root logger so every existing
+        ``logger.*`` call is colorized. Rich auto-degrades to ANSI-free text on a
+        non-tty sink, so ``run.sh``'s ``tee``'d logs stay clean.
+
+    UI wiring is intentionally additive: the harness body (``_run_main_body``) is
+    unchanged in behavior, and exit-code semantics are preserved on the default
+    (main-thread) path used by ``run.sh``.
+    """
+    from src.utils.ui import console as ui_console, tui as ui_tui
+
+    want_tui = bool(
+        getattr(args, "tui", False)
+        or os.environ.get("WCB_TUI", "").strip().lower() in ("1", "true", "yes")
+    )
+    if want_tui and ui_console.is_interactive() and ui_tui.textual_available():
+        if ui_tui.run_with_dashboard(lambda: _run_main_body(args)):
+            return
+        # Dashboard declined to start (e.g. textual import failed at runtime).
+    ui_console.install_rich_logging()
+    _run_main_body(args)
+
+
+def _run_main_body(args) -> None:
     config = Config.from_env()
     if getattr(args, "bedrock_arn", None):
         config.bedrock_inference_arn = args.bedrock_arn
@@ -2274,6 +2306,21 @@ def main() -> None:
 
 def _run_dispatch(args, backend, config: Config, mock_env_dict: dict, effective_model: str,
                   network: str = "", enable_mock_stack: bool = False) -> None:
+    # UI layer (Rich summary + lifecycle). Imported lazily so importing this
+    # module for unit tests never pulls in the UI stack. All calls are additive
+    # and never change scoring/outputs.
+    import time as _time
+    from src.utils.ui import lifecycle as _ui_lifecycle, summary as _ui_summary
+    from src.utils.ui.events import EV_PROGRESS as _EV_PROGRESS, get_bus as _get_bus
+    _dispatch_start = _time.time()
+
+    def _emit_progress(done: int, total: int) -> None:
+        # Drives the Textual dashboard's progress bar. No-op without a subscriber.
+        try:
+            _get_bus().emit(_EV_PROGRESS, completed=done, total=max(1, total))
+        except Exception:
+            pass
+
     gen_tests = args.generate_tests
     if gen_tests is None:
         gen_tests = bool(config.bedrock_inference_arn and config.aws_bearer_token)
@@ -2385,7 +2432,18 @@ def _run_dispatch(args, backend, config: Config, mock_env_dict: dict, effective_
                 "scores": {},
                 "error": str(exc),
             }
-        if result.get("error") or (result.get("scores") or {}).get("error"):
+        # Terminal lifecycle stage + execution summary for the single-task path
+        # (the flow script/run.sh always takes). Display-only; no behavior change.
+        _tid = result.get("task_id", "<unknown>")
+        _errored = bool(result.get("error") or (result.get("scores") or {}).get("error"))
+        _ui_lifecycle.emit_stage(_tid, _ui_lifecycle.STAGE_FAIL if _errored else _ui_lifecycle.STAGE_DONE,
+                                 result.get("error") or "")
+        _emit_progress(1, 1)
+        try:
+            _ui_summary.render_execution_summary([result], _time.time() - _dispatch_start)
+        except Exception as _sx:
+            logger.debug("execution summary render failed: %s", _sx)
+        if _errored:
             sys.exit(1)
         return
     if args.category.lower() == "all":
@@ -2453,6 +2511,7 @@ def _run_dispatch(args, backend, config: Config, mock_env_dict: dict, effective_
                         tid, exc, exc_info=True,
                     )
                     results.append({"task_id": tid, "scores": {}, "error": str(exc)})
+                _emit_progress(len(results), len(tasks))
         else:
             with ThreadPoolExecutor(max_workers=args.parallel) as pool:
                 futures = {
@@ -2483,14 +2542,23 @@ def _run_dispatch(args, backend, config: Config, mock_env_dict: dict, effective_
                     except Exception as exc:
                         logger.error("[%s] Thread exception: %s", tid, exc)
                         results.append({"task_id": tid, "scores": {}, "error": str(exc)})
+                    _emit_progress(len(results), len(tasks))
 
         summary_label = f"{lobster['name']}_{safe_model_name}" if lobster else safe_model_name
-        print_summary(results, category, output_root, summary_label)
+        # quiet=True: keep the summary_<model>.json write, but let the Rich
+        # execution summary below own the console output (no duplicate report).
+        print_summary(results, category, output_root, summary_label, quiet=True)
         all_results.extend(results)
 
     if len(categories) > 1 and all_results:
         summary_label = f"{lobster['name']}_{safe_model_name}" if lobster else safe_model_name
-        print_global_summary(all_results, output_root, summary_label)
+        print_global_summary(all_results, output_root, summary_label, quiet=True)
+
+    if all_results:
+        try:
+            _ui_summary.render_execution_summary(all_results, _time.time() - _dispatch_start)
+        except Exception as _sx:
+            logger.debug("execution summary render failed: %s", _sx)
 
 if __name__ == "__main__":
     main()

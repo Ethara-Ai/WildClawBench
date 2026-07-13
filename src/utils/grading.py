@@ -1595,7 +1595,13 @@ def format_scores(task_id: str, scores: dict) -> str:
     lines.append("=" * 60)
     return "\n".join(lines)
 
-def print_summary(results: list[dict], category: str, output_dir: Path, model_name: str) -> None:
+def print_summary(results: list[dict], category: str, output_dir: Path, model_name: str,
+                  quiet: bool = False) -> None:
+    # quiet=True suppresses the ASCII console report (the Rich execution summary
+    # in eval/run_batch.py renders it instead) while preserving the JSON write
+    # below. Shadowing `print` for the whole function keeps every line unchanged.
+    import builtins as _b
+    print = _b.print if not quiet else (lambda *a, **k: None)  # noqa: A001
     print(f"\n{'#'*60}")
     print(f"  Summary Report — {category}")
     print(f"{'#'*60}")
@@ -1659,6 +1665,16 @@ def print_summary(results: list[dict], category: str, output_dir: Path, model_na
     )
     print(f"\n  Summary written to → {summary_path}")
     print("#" * 60)
+
+    if quiet:
+        # The verbose ASCII report above is suppressed under quiet mode (the Rich
+        # execution summary renders it instead). Keep a compact, greppable marker
+        # in the log so downstream tooling that keys on the old "Summary Report —
+        # <category>" header still finds the report. Routed through the logger,
+        # never raw print, so it reaches logs/*.log on the default path without
+        # corrupting the Textual dashboard's full-screen canvas.
+        logger.info("Summary Report — %s | %d task(s) | written to %s",
+                    category, len(results), summary_path)
 
 _MODEL_COST_PER_TOKEN: dict[str, tuple[float, float]] = {
     "gpt-5.5":            (0.000005,  0.00003),
@@ -1932,7 +1948,12 @@ def extract_usage_from_jsonl(jsonl_path: Path) -> dict:
     totals["cost_usd"] = round(totals["cost_usd"], 6)
     return totals
 
-def print_global_summary(results: list[dict], output_dir: Path, model_name: str) -> None:
+def print_global_summary(results: list[dict], output_dir: Path, model_name: str,
+                         quiet: bool = False) -> None:
+    # quiet=True suppresses the ASCII console report (Rich renders it) while
+    # preserving any JSON side effects below. See print_summary for rationale.
+    import builtins as _b
+    print = _b.print if not quiet else (lambda *a, **k: None)  # noqa: A001
     print(f"\n{'#'*60}")
     print(f"  Global Summary Report — ALL CATEGORIES")
     print(f"{'#'*60}")
@@ -1985,3 +2006,10 @@ def print_global_summary(results: list[dict], output_dir: Path, model_name: str)
     )
     print(f"\n  Global summary written to → {summary_path}")
     print("#" * 60)
+
+    if quiet:
+        # See print_summary: keep a compact, greppable marker in the log for
+        # scrapers keying on the old "Global Summary Report — ALL CATEGORIES"
+        # header when the ASCII report is suppressed. Logger, not raw print.
+        logger.info("Global Summary Report — ALL CATEGORIES | %d task(s) | written to %s",
+                    total_tasks, summary_path)

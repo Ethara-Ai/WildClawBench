@@ -30,6 +30,21 @@ from src.utils.grading import (
     extract_usage_from_litellm_log,
 )
 
+try:
+    # UI lifecycle rendering. Optional and side-effect free: emit_stage is a
+    # no-op when no renderer is attached, so this never affects non-UI runs.
+    from src.utils.ui import lifecycle as _ui_lifecycle
+except Exception:  # pragma: no cover - defensive; keeps the backend importable
+    class _NoLifecycle:
+        STAGE_CREATE = STAGE_START = STAGE_EXEC = "STAGE"
+        STAGE_STATUS = STAGE_DONE = STAGE_FAIL = "STAGE"
+
+        @staticmethod
+        def emit_stage(*a, **k):
+            return None
+
+    _ui_lifecycle = _NoLifecycle()  # type: ignore
+
 load_dotenv()
 
 logger = logging.getLogger(__name__)
@@ -230,6 +245,8 @@ class OpenClawAgent(BaseAgent):
                     extra_env_dict.setdefault("ANTHROPIC_AUTH_TOKEN", stub)
                     extra_env_dict.setdefault("ANTHROPIC_API_KEY", stub)
 
+            _ui_lifecycle.emit_stage(spec.task_id, _ui_lifecycle.STAGE_CREATE,
+                                     "openclaw agent container")
             start_container(
                 spec.task_id,
                 exec_path,
@@ -239,6 +256,8 @@ class OpenClawAgent(BaseAgent):
                 extra_env_dict=extra_env_dict or None,
                 network=self.litellm_network,
             )
+            _ui_lifecycle.emit_stage(spec.task_id, _ui_lifecycle.STAGE_START,
+                                     "container up, staging workspace")
 
             # Raise openclaw binary's bootstrap-file caps before the gateway
             # starts. Default is 20k chars/file + 150k total, which truncates
@@ -341,16 +360,23 @@ class OpenClawAgent(BaseAgent):
                 log_path=spec.output_dir / "agent.log",
             )
 
+            _ui_lifecycle.emit_stage(spec.task_id, _ui_lifecycle.STAGE_EXEC,
+                                     f"agent running (timeout {spec.timeout_seconds}s)")
             logger.info("[%s] Waiting for agent to finish...", spec.task_id)
             try:
                 agent_proc.wait(timeout=spec.timeout_seconds)
                 elapsed_time = time.perf_counter() - start_time
                 logger.info("[%s] Agent finished (%.2fs)", spec.task_id, elapsed_time)
+                _ui_lifecycle.emit_stage(spec.task_id, _ui_lifecycle.STAGE_STATUS,
+                                         f"agent finished in {elapsed_time:.1f}s")
             except subprocess.TimeoutExpired:
                 logger.warning("[%s] Agent timed out", spec.task_id)
                 elapsed_time = float(spec.timeout_seconds)
                 agent_proc.kill()
                 agent_proc.wait()
+                _ui_lifecycle.emit_stage(spec.task_id, _ui_lifecycle.STAGE_STATUS,
+                                         f"agent timed out after {spec.timeout_seconds}s",
+                                         status="timed out")
             self._task_windows[spec.task_id] = (wall_start, time.time())
 
             logger.info("[%s] Agent exit code: %s", spec.task_id, agent_proc.returncode)
@@ -363,6 +389,7 @@ class OpenClawAgent(BaseAgent):
 
         except Exception as exc:
             logger.error("[%s] Execution error: %s", spec.task_id, exc)
+            _ui_lifecycle.emit_stage(spec.task_id, _ui_lifecycle.STAGE_FAIL, str(exc))
             return AgentExecution(
                 elapsed_time=float(spec.timeout_seconds),
                 error=str(exc),
