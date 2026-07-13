@@ -288,6 +288,26 @@ sys.exit(0 if ok else 1)
     log::ok "Mock image built"
 }
 
+# Backfill richer references/ + scripts/ into the 91 thin mock-API connectors
+# so every bundle produced by this batch ships the rich connector shape.
+# Idempotent (skip-exists) and fully offline. A first-time write bumps the
+# environment/ content hash (it covers skills/ too), so
+# build_mock_image_if_needed auto-rebuilds the mock image once at the next
+# stack start — expected, one-off cost. Fail-soft: thin connectors degrade
+# bundle quality, not run correctness.
+preflight_connector_docs() {
+    local out
+    if out=$(python3 script/backfill_connector_docs.py 2>&1); then
+        if grep -qE '^written     : [1-9]' <<<"$out"; then
+            log::ok "Connector docs backfilled (mock image auto-rebuilds once on next stack start)"
+        else
+            log::info "Connector docs already rich (nothing to backfill)"
+        fi
+    else
+        log::warn "backfill_connector_docs.py failed — bundles may ship thin connectors"
+    fi
+}
+
 preflight_env_file() {
     log::step 4 5 ".env credentials"
     if [[ ! -f .env ]]; then
@@ -802,6 +822,29 @@ bundle_task() {
         return 0
     fi
 
+    # Backfill pass before repackaging (both idempotent, both fail-soft like
+    # the bundler itself — the eval already succeeded):
+    #   (a) run-data: writes data/environment/ (mock APIs) into run dirs that
+    #       lack it — the post-6e03e6b pipeline never writes it, so without
+    #       this the bundle ships persona + plane files only, no mock-API
+    #       services (see script/backfill_run_data.py header).
+    #   (b) pass_summary: rebuilds pass_summary.json from score.json +
+    #       ctrf.json so real tests_* counts and combined_reward survive into
+    #       the bundle and the later aggregate step.
+    # Under -P >1 concurrent workers may both scan the whole ${source_root};
+    # benign — skip-existing plus identical generated content make the race
+    # harmless.
+    local backfill_log="${LOG_DIR}/backfill_${task_name}_$(date +%Y%m%d_%H%M%S).log"
+    if ! python3 script/backfill_run_data.py \
+            --output-root "$source_root" --input-root "$input_root" \
+            >> "$backfill_log" 2>&1; then
+        log::warn "bundle: run-data backfill failed for ${task_name} (see ${backfill_log}); bundle may lack mock APIs"
+    fi
+    if ! python3 script/backfill_pass_summary.py "${source_root}/${task_name}" \
+            >> "$backfill_log" 2>&1; then
+        log::warn "bundle: pass_summary backfill failed for ${task_name} (see ${backfill_log}); continuing"
+    fi
+
     log::substep "Bundling → ${bundle_root}/${task_name} (input_root=${input_root})"
     mkdir -p "$bundle_root"
     local bundle_log="${LOG_DIR}/bundle_${task_name}_$(date +%Y%m%d_%H%M%S).log"
@@ -816,6 +859,17 @@ bundle_task() {
             --verbose \
             > "$bundle_log" 2>&1; then
         log::ok "Bundled ${task_name} → ${bundle_root}/${task_name} (log: ${bundle_log})"
+        # Enrich mode: copy live references/+scripts/ into the bundle's
+        # connector dirs (bundles snapshot skills/ from run output, which may
+        # predate the docs generator). Whole ${bundle_root} rather than just
+        # this task because the repackager's fuzzy persona match may name the
+        # dest dir differently; already-rich bundles are skipped, so the wider
+        # scan stays idempotent.
+        if ! python3 script/backfill_connector_docs.py \
+                --bundle-root "$bundle_root" \
+                >> "$bundle_log" 2>&1; then
+            log::warn "bundle: connector-docs enrich failed (see ${bundle_log}); thin connectors may remain"
+        fi
     else
         log::warn "bundle: repackage failed for ${task_name} (see ${bundle_log}); continuing"
     fi
@@ -1007,6 +1061,10 @@ run_parallel_tasks() {
     rm -rf "$status_dir"
 
     log::substep "Aggregating pass@K across all tasks"
+    # Rebuild every pass_summary.json first so the rollup reads real tests_*
+    # counts + combined_reward, including tasks graded before the schema fix.
+    python3 script/backfill_pass_summary.py "output/${BACKEND}" >/dev/null 2>&1 || \
+        log::warn "pass_summary backfill failed; aggregate may read stale summaries"
     if python3 script/aggregate_runs.py --backend "$BACKEND" >/dev/null 2>&1; then
         log::ok "Aggregated → output/${BACKEND}_aggregate_summary.json"
     else
@@ -1084,6 +1142,10 @@ main() {
         log::rule "Preflight checks"
         preflight_docker || exit 1
         preflight_agent_image || exit 1
+        # Before the mock-image check: a first-time docs backfill changes the
+        # environment/ content hash, and this order lets a preflight build
+        # (image absent) pick the enriched tree up immediately.
+        preflight_connector_docs
         preflight_mock_image || exit 1
         preflight_env_file || exit 1
         cleanup_orphans
@@ -1204,6 +1266,10 @@ main() {
 
     if (( K > 1 || ${#TASKS[@]} > 1 || ${#models[@]} > 1 )); then
         log::substep "Aggregating pass@K"
+        # Same repair as the parallel-launcher path: the rollup must read the
+        # rebuilt (real tests_* + combined_reward) summaries, not stale ones.
+        python3 script/backfill_pass_summary.py "output/${BACKEND}" >/dev/null 2>&1 || \
+            log::warn "pass_summary backfill failed; aggregate may read stale summaries"
         if python3 script/aggregate_runs.py --backend "$BACKEND" 2>&1; then
             log::ok "Aggregated → output/${BACKEND}_aggregate_summary.json"
         else

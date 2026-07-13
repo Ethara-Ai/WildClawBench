@@ -133,11 +133,11 @@ cd "$REPO_ROOT"
 # ---- intro banner ----------------------------------------------------------
 log::section "WildClawBench Delivery Pipeline"
 if [[ "$DO_RUN" -eq 1 ]]; then
-    MODE_LABEL="eval -> convert -> stage -> push"
-    TOTAL_STEPS=4
+    MODE_LABEL="eval -> backfill -> convert -> stage -> push"
+    TOTAL_STEPS=5
 else
-    MODE_LABEL="convert -> stage -> push"
-    TOTAL_STEPS=3
+    MODE_LABEL="backfill -> convert -> stage -> push"
+    TOTAL_STEPS=4
 fi
 log::kv "Mode"        "$MODE_LABEL"
 log::kv "Repo"        "$REPO_ROOT"
@@ -219,6 +219,23 @@ fi
 
 [[ -d "$REPO_ROOT/$SOURCE_ROOT" ]] || log::die "source root not found: $SOURCE_ROOT (nothing to convert)"
 
+# ---- BACKFILL: repair graded output before converting ------------------------
+# Delivery publishes; unlike run.sh's fail-soft auto-bundle, missing run data
+# here means shipping bundles without mock APIs — so the first two are fatal.
+# All three scripts are offline + idempotent (see their headers).
+next_step "Backfill graded output (run data + pass summaries + connector docs)"
+log::substep "Run-data backfill: data/environment/ into run dirs missing it"
+python3 "$REPO_ROOT/script/backfill_run_data.py" \
+    --output-root "$SOURCE_ROOT" --input-root "$INPUT_ROOT" \
+    || log::die "backfill_run_data.py failed — bundles would ship without mock APIs"
+log::substep "pass_summary.json rebuild (real tests_* counts + combined_reward)"
+python3 "$REPO_ROOT/script/backfill_pass_summary.py" "$SOURCE_ROOT" >/dev/null \
+    || log::die "backfill_pass_summary.py failed"
+log::substep "Connector docs: generate references/+scripts/ for thin connectors"
+python3 "$REPO_ROOT/script/backfill_connector_docs.py" >/dev/null \
+    || log::warn "connector-docs generation failed; bundles may ship thin connectors"
+log::ok "Backfill complete"
+
 # ---- CONVERT raw output -> harbour/bundle format ---------------------------
 next_step "Convert raw output -> harbour CLI bundles"
 log::kv "Source root" "$SOURCE_ROOT"
@@ -255,6 +272,13 @@ converted=("$STAGING"/*)
 converted=("${converted[@]/$STAGING\/.tasks.txt}")
 [[ ${#converted[@]} -gt 0 ]] || log::die "conversion produced no bundles under staging dir"
 log::ok "Converted ${#converted[@]} bundle(s)"
+
+# Bundles snapshot data/environment/skills/ from run output frozen at run time;
+# enrich any thin connector dirs from the (now rich) live tree before staging.
+log::substep "Enriching bundle connector docs from live skills tree"
+python3 "$REPO_ROOT/script/backfill_connector_docs.py" \
+    --bundle-root "$STAGING" --skills-root "$REPO_ROOT/environment/skills" >/dev/null \
+    || log::warn "bundle connector enrich failed; thin connectors may remain"
 
 # ---- STAGE: clone delivery repo & copy bundles in --------------------------
 next_step "Clone delivery repo + stage bundles"

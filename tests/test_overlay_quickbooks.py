@@ -235,8 +235,18 @@ def test_ragged_invoices_csv_overlay_surfaces_coerce_error(
         "OVR-1,INV-X,2026-12-01,100.00, extra, Open\n",
         encoding="utf-8",
     )
-    with pytest.raises(CoerceError) as excinfo:
+    # NOTE: match CoerceError by class NAME, not by the top-level-imported
+    # class object. quickbooks_data resolves _mutable_store (and thus its
+    # CoerceError) freshly at re-import time; if an earlier test in the session
+    # evicted _mutable_store from sys.modules (test_drift_plane_smoke.py does),
+    # the re-imported CoerceError is a DISTINCT class and pytest.raises keyed
+    # on the stale top-level import would not catch it. Name+message matching
+    # pins the same contract robustly regardless of import order.
+    with pytest.raises(Exception) as excinfo:
         isolated_qb_import(sandbox)
+    assert type(excinfo.value).__name__ == "CoerceError", (
+        f"expected CoerceError, got {type(excinfo.value).__name__}: {excinfo.value}"
+    )
     msg = str(excinfo.value)
     assert "ragged row" in msg
     assert _API in msg
@@ -449,8 +459,15 @@ def test_ragged_customers_csv_overlay_surfaces_coerce_error(
         "CUST-X,Bad Row,0, extra, true\n",
         encoding="utf-8",
     )
-    with pytest.raises(CoerceError) as excinfo:
+    # NOTE: match CoerceError by class NAME, not the stale top-level-imported
+    # class object -- see the invoices ragged test above for the full
+    # rationale (import-order-dependent _mutable_store identity via
+    # test_drift_plane_smoke.py evicting it from sys.modules).
+    with pytest.raises(Exception) as excinfo:
         isolated_qb_import(sandbox)
+    assert type(excinfo.value).__name__ == "CoerceError", (
+        f"expected CoerceError, got {type(excinfo.value).__name__}: {excinfo.value}"
+    )
     msg = str(excinfo.value)
     assert "ragged row" in msg
     assert _API in msg
