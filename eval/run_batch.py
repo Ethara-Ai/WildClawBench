@@ -63,6 +63,7 @@ from src.utils.litellm_sidecar import (
     start_litellm,
     stop_bridge,
     wait_for_bridge_healthy,
+    wait_for_bridge_host_port,
     stop_litellm,
     verify_litellm_upstream_reachable,
     wait_for_litellm_healthy,
@@ -1718,6 +1719,23 @@ def _run_cleanups(cleanups: list) -> None:
     cleanups.clear()
 
 
+def _warn_if_judge_litellm_disabled(batch_id: str) -> None:
+    """OAuth judge routing requires the LiteLLM judge transport. The wiring
+    above uses setdefault so an operator's explicit env always wins — but an
+    explicit KENSEI_JUDGE_USE_LITELLM=false (e.g. left in .env from a
+    streaming test) silently kills the bridge route: the Sonnet judge falls
+    back to urllib/Bedrock, and on subscription-only hosts the whole council
+    abstains (rubric-zero). Make that misconfiguration impossible to miss."""
+    val = os.environ.get("KENSEI_JUDGE_USE_LITELLM", "").strip().lower()
+    if val not in ("1", "true", "yes", "on"):
+        logger.warning(
+            "[%s] KENSEI_JUDGE_USE_LITELLM=%r explicitly disables the LiteLLM "
+            "judge transport — the Sonnet judge CANNOT reach the OAuth bridge "
+            "and will fall back to Bedrock. Unset it (or set it to 1) for "
+            "subscription judging.", batch_id, val,
+        )
+
+
 def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
                              mock_enabled_apis: "set[str] | None" = None):
     """For the openclaw backend, optionally bring up a per-batch shared LiteLLM
@@ -1874,6 +1892,19 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
             import secrets as _secrets
             bridge_secret = _secrets.token_hex(32)
             os.environ["WCB_CC_BRIDGE_SECRET"] = bridge_secret
+        # Publish the bridge on a loopback host port so the HOST-side Sonnet
+        # judge (grading runs in THIS process) can reach the OAuth bridge.
+        # Without a publish the judge env below can never be satisfied, the
+        # dispatcher falls back to urllib/Bedrock, and on subscription-only
+        # hosts the whole council dies → every criterion abstains (the
+        # rubric-zero incident). start_bridge() reads WCB_CC_BRIDGE_HOST_PORT.
+        bridge_host_port = os.environ.get("WCB_CC_BRIDGE_HOST_PORT", "").strip()
+        if not bridge_host_port:
+            import socket as _socket
+            with _socket.socket() as _s:
+                _s.bind(("127.0.0.1", 0))
+                bridge_host_port = str(_s.getsockname()[1])
+            os.environ["WCB_CC_BRIDGE_HOST_PORT"] = bridge_host_port
         start_bridge(
             container_name=cc_bridge_name,
             network=network,
@@ -1892,6 +1923,48 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
                 f"cc-bridge {cc_bridge_name} did not become healthy in time. "
                 f"Override budget via WCB_CC_BRIDGE_HEALTH_TIMEOUT env (seconds)."
             )
+        # Route the HOST-side Sonnet judge through the OAuth bridge for THIS
+        # process, regardless of launch path (root run.sh, deliver.sh, direct
+        # run_batch.py — previously only script/run.sh's shared-sidecar
+        # bootstrap exported these, so every other path silently judged via
+        # Bedrock). setdefault: an operator's explicit env still wins.
+        bridge_host_url = f"http://127.0.0.1:{bridge_host_port}"
+        if wait_for_bridge_host_port(bridge_host_port):
+            os.environ.setdefault("KENSEI_JUDGE_OAUTH_BRIDGE_URL", bridge_host_url)
+            os.environ.setdefault("KENSEI_JUDGE_USE_LITELLM", "1")
+            logger.info(
+                "[%s] Sonnet judge -> OAuth bridge %s (use_litellm=%s)",
+                batch_id, os.environ["KENSEI_JUDGE_OAUTH_BRIDGE_URL"],
+                os.environ["KENSEI_JUDGE_USE_LITELLM"],
+            )
+            _warn_if_judge_litellm_disabled(batch_id)
+        elif not config.aws_bearer_token:
+            # No bridge for the judge AND no Bedrock creds to fall back to:
+            # grading would be a guaranteed all-abstain. Fail loudly now.
+            raise RuntimeError(
+                f"cc-bridge host port {bridge_host_url} is unreachable and no "
+                f"Bedrock bearer token is configured — the judge council would "
+                f"fully abstain (rubric-zero). Check the bridge publish/port."
+            )
+        else:
+            logger.warning(
+                "[%s] cc-bridge host port %s unreachable; Sonnet judge will "
+                "fall back to Bedrock", batch_id, bridge_host_url,
+            )
+    elif use_oauth and shared_mode:
+        # Shared bridge from bootstrap_sidecar.py: script/run.sh normally
+        # exports the judge env, but a bespoke caller may only pass the
+        # WCB_SHARED_* vars — wire the judge here too so behaviour does not
+        # depend on which wrapper launched us.
+        _shared_host_url = os.environ.get("WCB_SHARED_CC_BRIDGE_HOST_URL", "").strip()
+        if _shared_host_url:
+            os.environ.setdefault("KENSEI_JUDGE_OAUTH_BRIDGE_URL", _shared_host_url)
+            os.environ.setdefault("KENSEI_JUDGE_USE_LITELLM", "1")
+            logger.info(
+                "[%s] Sonnet judge -> shared OAuth bridge %s",
+                batch_id, os.environ["KENSEI_JUDGE_OAUTH_BRIDGE_URL"],
+            )
+            _warn_if_judge_litellm_disabled(batch_id)
     config.work_dir.mkdir(parents=True, exist_ok=True)
     if shared_mode and shared_yaml_path and Path(shared_yaml_path).is_file():
         cfg_path = Path(shared_yaml_path)

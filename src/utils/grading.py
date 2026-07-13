@@ -608,6 +608,36 @@ def validate_judge_pricing(members: Sequence[CouncilMember | str]) -> None:
         )
 
 
+_JUDGE_SSL_CTX = None
+
+
+def _judge_ssl_context():
+    """TLS context for the direct-urllib judge transports.
+
+    python.org macOS builds ship NO default CA bundle until "Install
+    Certificates.command" is run, so `urllib.request.urlopen` fails every
+    HTTPS judge call with CERTIFICATE_VERIFY_FAILED — all 3 council members
+    die and every criterion abstains (the 2026-06-17 rubric-zero incident).
+    Honor the system store / an explicit SSL_CERT_FILE when they yield CAs;
+    otherwise fall back to certifi's bundle — the same CA source the
+    LiteLLM/httpx judge path already uses, so both transports trust
+    identically. Cached: the loaded context is reused across all members.
+    """
+    global _JUDGE_SSL_CTX
+    if _JUDGE_SSL_CTX is not None:
+        return _JUDGE_SSL_CTX
+    import ssl
+    ctx = ssl.create_default_context()
+    if not ctx.get_ca_certs():
+        try:
+            import certifi
+            ctx = ssl.create_default_context(cafile=certifi.where())
+        except Exception:
+            pass  # no certifi either — keep the default ctx; error surfaces as before
+    _JUDGE_SSL_CTX = ctx
+    return ctx
+
+
 def _call_judge_openai(model: str, system: str, user: str) -> tuple[str, dict]:
     import urllib.request
     key = os.environ.get("KENSEI_OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY", "")
@@ -643,7 +673,7 @@ def _call_judge_openai(model: str, system: str, user: str) -> tuple[str, dict]:
     import uuid as _uuid
     _sid = _uuid.uuid4().hex[:12]
     _stream.emit("judge:openai", "message_start", _sid, kind="status", model=model)
-    with urllib.request.urlopen(req, timeout=120) as r:
+    with urllib.request.urlopen(req, timeout=120, context=_judge_ssl_context()) as r:
         for raw_line in r:
             line = raw_line.decode("utf-8", errors="replace").rstrip("\r\n")
             if not line.startswith("data:"):
@@ -775,7 +805,7 @@ def _call_judge_bedrock(
         _sid = _uuid.uuid4().hex[:12]
         _src = f"judge:{family or 'bedrock'}"
         try:
-            resp = urllib.request.urlopen(req, timeout=120)
+            resp = urllib.request.urlopen(req, timeout=120, context=_judge_ssl_context())
         except urllib.error.HTTPError as e:
             err_body = ""
             try:
@@ -955,6 +985,26 @@ def _call_one_judge(
                 family=family,
             )
         except Exception as exc:  # pragma: no cover - fallback path
+            # When the Sonnet member is configured to judge via the Claude Max
+            # OAuth bridge, do NOT silently fall back to the urllib/Bedrock
+            # path: on subscription-only hosts there are no Bedrock creds, so
+            # the fallback dies with a misleading "no Bedrock bearer token"
+            # (or cert error), the member is recorded as failed, and — since
+            # Sonnet is the tiebreaker — EVERY criterion abstains (the
+            # 2026-06-17 rubric-zero incident). Surface the real bridge error
+            # instead; _run_council records it verbatim in judge_council.failed.
+            _oauth_sonnet = False
+            if family == "sonnet":
+                try:
+                    from . import judge_litellm as _jl
+                    _oauth_sonnet = bool(_jl._judge_oauth_bridge_url())
+                except Exception:
+                    _oauth_sonnet = False
+            if _oauth_sonnet:
+                raise RuntimeError(
+                    f"OAuth-bridge sonnet judge failed (Bedrock fallback suppressed "
+                    f"— fix the bridge, not the fallback): {exc}"
+                ) from exc
             logger.warning(
                 "Judge LiteLLM path failed for %s: %s — falling back to direct urllib path",
                 _short_judge_label(m), str(exc)[:200],
@@ -1149,11 +1199,24 @@ def _grade_council(
     the tiebreak is unavailable and non-unanimous criteria abstain as before."""
     results = _run_council(members, system, user_for_member, len(rubrics))
     surviving = [r for r in results if r.get("ok") and isinstance(r.get("verdicts"), list)]
-    if len(surviving) < len(members):
-        failed_summary = "; ".join(
-            f"{_short_judge_label(r.get('model', '?'))}={(r.get('error') or 'unknown').strip()[:160]}"
-            for r in results if not r.get("ok")
-        ) or "(none — all members responded)"
+    failed_summary = "; ".join(
+        f"{_short_judge_label(r.get('model', '?'))}={(r.get('error') or 'unknown').strip()[:160]}"
+        for r in results if not r.get("ok")
+    ) or "(none — all members responded)"
+    council_error = ""
+    if not surviving:
+        # Total failure is NOT a graded outcome: every criterion will abstain and
+        # overall_score will be 0.0 with zero Pass/Fail verdicts (the 2026-06-17
+        # rubric-zero incident). Escalate to ERROR and stamp `error` into the
+        # returned scores so score.json cannot masquerade as a real grade.
+        council_error = f"judge council total failure (0/{len(members)} members): {failed_summary}"
+        logger.error(
+            "Judge council TOTAL failure: 0/%d members returned verdicts — every "
+            "criterion will abstain (Human Evaluation) and overall_score will be "
+            "0.0. Member errors: %s",
+            len(members), failed_summary,
+        )
+    elif len(surviving) < len(members):
         # Not fatal under unanimous rule: any non-surviving member just means the
         # remaining survivors must all agree for a determinate verdict. With zero
         # survivors every criterion abstains and overall_score is 0.0.
@@ -1373,7 +1436,7 @@ def _grade_council(
     # SQLite store / ctrf.json) derives its tests_* counts from criteria_* via the
     # tr_meta adapter at eval/run_batch.py:962-968, which already falls back to
     # criteria_* when no real pytest ran. See NOMENCLATURE.md for the channel boundary.
-    return {
+    scores_out = {
         "overall_score": round(overall, 4),
         "rubric_weights_percentage": round(overall * 100.0, 2),
         "criteria_total": n,
@@ -1404,6 +1467,9 @@ def _grade_council(
         "abstention_flags": abstention_flags,
         "usage": council_usage,
     }
+    if council_error:
+        scores_out["error"] = council_error
+    return scores_out
 
 
 def grade_with_rubric(
