@@ -46,6 +46,7 @@ USE_TESTS=1              # 1 = --generate-tests --execute-tests, 0 = omit
 USE_LITELLM=1            # 1 = --litellm, 0 = omit
 USE_MOCK_STACK=1         # 1 = --mock-stack, 0 = omit
 USE_CLAUDE_OAUTH=0       # 1 = --use-claude-oauth (route opus through OAuth bridge), 0 = Bedrock
+USE_TUI=0                # 1 = --tui (full-screen Textual live dashboard)
 SKIP_PREFLIGHT=0         # 1 = skip docker/agent-image/mock-image/.env checks
 PARALLEL_REPS=0          # 1 = run all K reps of a (task,model) concurrently, 0 = sequential
 PARALLEL_TASKS=1         # >1 = run that many TASKS concurrently via the failure-isolated launcher
@@ -582,6 +583,7 @@ run_one() {
         cmd+=(--generate-tests --testgen-max-attempts 3 --execute-tests --testexec-timeout 600)
     fi
     (( JUDGE_COUNCIL == 1 )) && cmd+=(--judge-council)
+    (( USE_TUI == 1 )) && cmd+=(--tui)
     [[ -n "$NO_SUBAGENTS" ]] && cmd+=(--no-subagents)
 
     set +e
@@ -890,6 +892,7 @@ parse_args() {
                 [[ -n "${2:-}" ]] || { log::err "$1 requires a value"; exit 2; }
                 THINKING="$2"; shift 2 ;;
             --no-judge-council)   JUDGE_COUNCIL=0; shift ;;
+            --tui)                USE_TUI=1; shift ;;
             --no-tests)           USE_TESTS=0; shift ;;
             --no-litellm)         USE_LITELLM=0; shift ;;
             --no-mock-stack)      USE_MOCK_STACK=0; shift ;;
