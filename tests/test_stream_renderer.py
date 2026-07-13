@@ -215,3 +215,57 @@ def test_bus_mode_fail_open_on_publish_error(monkeypatch):
     r._render_event({"source": "judge:glm", "event": "delta", "kind": "text",
                      "delta": "verdict\n", "request_id": "j"})  # must not raise
     assert r._bus_dead  # latched; subsequent sends are no-ops
+
+
+def test_waiting_state_narration_until_first_agent_token(monkeypatch, tmp_path):
+    """The 2026-07-13 matt_garcia bug, encoded: agent.log narration renders
+    while the token feed is silent; the FIRST agent feed row switches the
+    pane to token rendering permanently and later narration is dropped.
+    Non-agent feed rows must not end the narration phase."""
+    import json
+    import time as _time
+    import src.utils.stream_renderer as sr
+
+    events = []
+    monkeypatch.setattr(sr, "_publish_token",
+                        lambda style, text: events.append((style, text)))
+    feed = tmp_path / "stream.jsonl"
+    feed.touch()
+    agent_log = tmp_path / "agent.log"
+    r = StreamRenderer(feed, agent_log, mode="bus")
+    r.start()
+    try:
+        # Phase 1: feed silent -> narration renders
+        agent_log.write_text("setting up workspace\n")
+        _time.sleep(0.6)
+        assert ("text", "[agent] setting up workspace") in events
+
+        # Phase 2: a NON-agent feed row does not end narration
+        with open(feed, "a") as fh:
+            fh.write(json.dumps({"source": "testgen", "event": "status",
+                                 "kind": "status", "delta": "attempt 1/3",
+                                 "request_id": "tg"}) + "\n")
+        _time.sleep(0.6)
+        with open(agent_log, "a") as fh:
+            fh.write("still narrating\n")
+        _time.sleep(0.6)
+        assert ("text", "[agent] still narrating") in events
+
+        # Phase 3: first AGENT feed row -> tokens live, narration stops
+        with open(feed, "a") as fh:
+            fh.write(json.dumps({"source": "agent", "event": "message_start",
+                                 "kind": "status", "delta": "",
+                                 "request_id": "m1"}) + "\n")
+            fh.write(json.dumps({"source": "agent", "event": "delta",
+                                 "kind": "text", "delta": "streamed tokens\n",
+                                 "request_id": "m1"}) + "\n")
+        _time.sleep(0.6)
+        assert any(s == "text" and t == "streamed tokens" for s, t in events)
+        before = len(events)
+        with open(agent_log, "a") as fh:
+            fh.write("late narration must be dropped\n")
+        _time.sleep(0.6)
+        assert all("late narration" not in t for _, t in events[before:])
+    finally:
+        r.stop(timeout=2.0)
+        assert not r.is_alive()

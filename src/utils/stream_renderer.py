@@ -23,10 +23,15 @@ Modes:
       - agent thinking deltas: dim, prefixed [thinking] per block; hidden
         entirely when WCB_STREAM_THINKING is falsy.
       - judge:*/testgen: line-buffered with a [source] prefix.
+      - while NO agent token has arrived yet (container setup, the wait
+        before the first LLM call, or a dead sidecar hook), the pane shows
+        agent.log turn narration instead; the FIRST agent feed row promotes
+        to token rendering permanently. No staleness clock, no one-way
+        fallback (the old 30s design missed a healthy feed — see
+        _run_token_mode docstring).
   * turn mode   — tail agent.log (openclaw's real-time turn narration),
-      printing whole lines. Used as the fallback when the token feed is
-      absent/stale for >30s (e.g. sidecar hook unavailable), and as the
-      primary mode when run_batch starts the renderer without a stream path.
+      printing whole lines. The primary mode when run_batch starts the
+      renderer without a stream path (WCB_STREAM_LOG_PATH unset).
 """
 from __future__ import annotations
 
@@ -41,7 +46,6 @@ from typing import Optional, TextIO
 _TRUTHY = ("1", "true", "yes", "on")
 _POLL_SECS = 0.2
 _SUMMARY_EVERY_SECS = 5.0
-_TOKEN_FEED_STALE_SECS = 30.0
 _DIM = "\033[2m"
 _RESET = "\033[0m"
 # Bus-mode flush policy: agent deltas are batched into readable chunks for the
@@ -217,57 +221,91 @@ class StreamRenderer(threading.Thread):
     # ------------------------------------------------------------ token mode
 
     def _run_token_mode(self) -> None:
+        """Watch the token feed AND, until agent tokens arrive, agent.log.
+
+        History: the first design switched ONE-WAY to agent.log tailing after
+        a 30s staleness window. That clock started at renderer start — which
+        is during container setup, minutes before the agent's first LLM call —
+        so a perfectly healthy token feed was never rendered (matt_garcia
+        run_1, 2026-07-13: 1,748 feed rows captured, pane stuck in narration
+        mode). Now there is no clock and no one-way door: agent.log turn
+        narration renders only WHILE no agent-source token has arrived; the
+        first agent feed row promotes the pane to token rendering and stops
+        the narration tail (narration duplicates each turn's final text, so
+        showing both would double content). Non-agent feed rows (testgen
+        status, judges) render in either state and do not end the narration.
+        """
         assert self._stream_path is not None
-        started = time.time()
         # Start at current EOF: prior reps' events in a shared batch feed are
         # behind this offset by construction (single-run foreground gate D6).
-        offset = self._stream_path.stat().st_size if self._stream_path.exists() else 0
-        saw_any = False
-        carry = ""
+        feed_offset = self._stream_path.stat().st_size if self._stream_path.exists() else 0
+        feed_carry = ""
+        log_offset = 0
+        log_carry = ""
+        tokens_live = False
+        showed_narration = False
         while not self._stop_event.is_set():
             if self._mode == "bus":
                 # Time-based flush so a paused model (thinking gap) doesn't
                 # hold the last chunk hostage in the buffer.
                 self._bus_flush_if_stale()
-            if not self._stream_path.exists():
-                if (not saw_any and time.time() - started > _TOKEN_FEED_STALE_SECS
-                        and self._agent_log_path is not None):
-                    self._line("[stream] token feed unavailable — falling back "
-                               "to turn-level agent.log", dim=True)
-                    self._run_turn_mode()
-                    return
-                self._stop_event.wait(_POLL_SECS)
-                continue
-            try:
-                with open(self._stream_path, "r", encoding="utf-8", errors="replace") as fh:
-                    fh.seek(offset)
-                    data = fh.read()
-                    offset = fh.tell()
-            except OSError:
-                self._stop_event.wait(_POLL_SECS)
-                continue
-            if not data:
-                if (not saw_any and time.time() - started > _TOKEN_FEED_STALE_SECS
-                        and self._agent_log_path is not None):
-                    self._line("[stream] token feed stale — falling back to "
-                               "turn-level agent.log", dim=True)
-                    self._run_turn_mode()
-                    return
-                self._stop_event.wait(_POLL_SECS)
-                continue
-            saw_any = True
-            carry += data
-            lines = carry.split("\n")
-            carry = lines.pop()  # possibly-torn trailing fragment
-            for raw in lines:
-                raw = raw.strip()
-                if not raw:
-                    continue
+            progressed = False
+
+            # --- token feed: always read, always preferred -----------------
+            if self._stream_path.exists():
                 try:
-                    evt = json.loads(raw)
-                except json.JSONDecodeError:
-                    continue  # torn line — skip, never error
-                self._render_event(evt)
+                    with open(self._stream_path, "r", encoding="utf-8", errors="replace") as fh:
+                        fh.seek(feed_offset)
+                        data = fh.read()
+                        feed_offset = fh.tell()
+                except OSError:
+                    data = ""
+                if data:
+                    progressed = True
+                    feed_carry += data
+                    lines = feed_carry.split("\n")
+                    feed_carry = lines.pop()  # possibly-torn trailing fragment
+                    for raw in lines:
+                        raw = raw.strip()
+                        if not raw:
+                            continue
+                        try:
+                            evt = json.loads(raw)
+                        except json.JSONDecodeError:
+                            continue  # torn line — skip, never error
+                        if not tokens_live and str(evt.get("source") or "") == "agent":
+                            tokens_live = True
+                            if showed_narration:
+                                self._line("[stream] token feed live — switching "
+                                           "from turn narration", dim=True)
+                        self._render_event(evt)
+
+            # --- agent.log narration: only while no agent tokens yet -------
+            if (not tokens_live and self._agent_log_path is not None
+                    and self._agent_log_path.exists()):
+                try:
+                    with open(self._agent_log_path, "r", encoding="utf-8", errors="replace") as fh:
+                        fh.seek(log_offset)
+                        data = fh.read()
+                        log_offset = fh.tell()
+                except OSError:
+                    data = ""
+                if data:
+                    progressed = True
+                    log_carry += data
+                    lines = log_carry.split("\n")
+                    log_carry = lines.pop()
+                    for ln in lines:
+                        if not ln.strip():
+                            continue
+                        showed_narration = True
+                        if self._interactive:
+                            self._line(f"[agent] {ln}", style="text")
+                        else:
+                            self._summary_tick("delta")
+
+            if not progressed:
+                self._stop_event.wait(_POLL_SECS)
         # drain nothing further; stop() flushes partial lines
 
     def _render_event(self, evt: dict) -> None:
