@@ -16,6 +16,33 @@ from _mutable_store import (
 _store = get_store("zoom-api")
 _API = "zoom-api"
 
+
+
+def _store_patch(_table, _row_or_pk, _updates):
+    """Persist field updates to a stored row (was: in-place mutation of a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
+
+def _store_delete(_table, _row_or_pk):
+    """Persist a row deletion (was: pop/remove on a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.delete(_pk)
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("meetings", primary_key="id",
                 initial_loader=lambda: _coerce_meetings(_load("meetings.json", "meetings")))
 _store.register("recordings", primary_key="id",
@@ -188,32 +215,35 @@ def create_meeting(user_id, topic, start_time=None, duration=60, timezone="UTC",
         "join_url": f"https://zoom.us/j/{mid}",
         "created_at": _now(),
     }
-    _meetings_rows().append(meeting)
+    _store_insert("meetings", meeting)
     return _serialize_meeting(meeting)
 
 
 def update_meeting(meeting_id, topic=None, start_time=None, duration=None,
                    agenda=None, timezone=None):
-    for i, m in enumerate(_meetings_rows()):
+    for m in _meetings_rows():
         if m["id"] == meeting_id:
+            _changes = {}
             if topic is not None:
-                _meetings_rows()[i]["topic"] = topic
+                _changes["topic"] = topic
             if start_time is not None:
-                _meetings_rows()[i]["start_time"] = start_time
+                _changes["start_time"] = start_time
             if duration is not None:
-                _meetings_rows()[i]["duration"] = duration
+                _changes["duration"] = duration
             if agenda is not None:
-                _meetings_rows()[i]["agenda"] = agenda
+                _changes["agenda"] = agenda
             if timezone is not None:
-                _meetings_rows()[i]["timezone"] = timezone
-            return _serialize_meeting(_meetings_rows()[i])
+                _changes["timezone"] = timezone
+            m.update(_changes)
+            _store_patch("meetings", m, _changes)
+            return _serialize_meeting(m)
     return {"error": f"Meeting {meeting_id} not found", "code": 3001}
 
 
 def delete_meeting(meeting_id):
-    for i, m in enumerate(_meetings_rows()):
+    for m in _meetings_rows():
         if m["id"] == meeting_id:
-            _meetings_rows().pop(i)
+            _store_delete("meetings", m)
             return {"deleted": True, "id": meeting_id}
     return {"error": f"Meeting {meeting_id} not found", "code": 3001}
 

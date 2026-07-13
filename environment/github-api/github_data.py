@@ -15,6 +15,33 @@ from _mutable_store import (
 _store = get_store("github-api")
 _API = "github-api"
 
+
+
+def _store_patch(_table, _row_or_pk, _updates):
+    """Persist field updates to a stored row (was: in-place mutation of a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
+
+def _store_delete(_table, _row_or_pk):
+    """Persist a row deletion (was: pop/remove on a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.delete(_pk)
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("repos", primary_key="id",
                 initial_loader=lambda: _coerce_repos(_load("repos.json", "repos")))
 _store.register("issues", primary_key="id",
@@ -226,36 +253,43 @@ def create_issue(owner, repo_name, title, body, assignee=None, labels=None):
         "closed_at": None,
         "is_pull_request": False,
     }
-    _issues_rows().append(issue)
-    for j, r in enumerate(_repos_rows()):
+    _store_insert("issues", issue)
+    for r in _repos_rows():
         if r["owner"] == owner and r["name"] == repo_name:
-            _repos_rows()[j]["open_issues"] += 1
+            _changes = {"open_issues": r["open_issues"] + 1}
+            r.update(_changes)
+            _store_patch("repos", r, _changes)
     return _serialize_issue(issue)
 
 
 def update_issue(owner, repo_name, number, title=None, body=None, state=None,
                  assignee=None, labels=None):
-    for i, issue in enumerate(_issues_rows()):
+    for issue in _issues_rows():
         if issue["repo"] == repo_name and issue["number"] == number:
+            _changes = {}
             if title is not None:
-                _issues_rows()[i]["title"] = title
+                _changes["title"] = title
             if body is not None:
-                _issues_rows()[i]["body"] = body
+                _changes["body"] = body
             if assignee is not None:
-                _issues_rows()[i]["assignee"] = assignee
+                _changes["assignee"] = assignee
             if labels is not None:
-                _issues_rows()[i]["labels"] = labels
-            if state and state != _issues_rows()[i]["state"]:
-                _issues_rows()[i]["state"] = state
+                _changes["labels"] = labels
+            if state and state != issue["state"]:
+                _changes["state"] = state
                 if state == "closed":
-                    _issues_rows()[i]["closed_at"] = _now()
-                    for j, r in enumerate(_repos_rows()):
+                    _changes["closed_at"] = _now()
+                    for r in _repos_rows():
                         if r["name"] == repo_name:
-                            _repos_rows()[j]["open_issues"] = max(0, _repos_rows()[j]["open_issues"] - 1)
+                            _repo_changes = {"open_issues": max(0, r["open_issues"] - 1)}
+                            r.update(_repo_changes)
+                            _store_patch("repos", r, _repo_changes)
                 else:
-                    _issues_rows()[i]["closed_at"] = None
-            _issues_rows()[i]["updated_at"] = _now()
-            return _serialize_issue(_issues_rows()[i])
+                    _changes["closed_at"] = None
+            _changes["updated_at"] = _now()
+            issue.update(_changes)
+            _store_patch("issues", issue, _changes)
+            return _serialize_issue(issue)
     return {"error": f"Issue {repo_name}#{number} not found"}
 
 
@@ -288,13 +322,15 @@ def get_pull(owner, repo_name, number):
 
 
 def merge_pull(owner, repo_name, number):
-    for i, p in enumerate(_pulls_rows()):
+    for p in _pulls_rows():
         if p["repo"] == repo_name and p["number"] == number:
             if not p["mergeable"]:
                 return {"error": "PR is not mergeable"}
             if p["draft"]:
                 return {"error": "PR is a draft"}
-            _pulls_rows()[i]["merged"] = True
+            _changes = {"merged": True}
+            p.update(_changes)
+            _store_patch("pulls", p, _changes)
             update_issue(owner, repo_name, number, state="closed")
             return {"merged": True, "sha": "deadbeefcafe123"}
     return {"error": f"Pull {repo_name}#{number} not found"}
@@ -321,7 +357,7 @@ def create_comment(owner, repo_name, number, body):
         "body": body,
         "created_at": _now(),
     }
-    _comments_rows().append(comment)
+    _store_insert("comments", comment)
     return comment
 
 _store.eager_load()

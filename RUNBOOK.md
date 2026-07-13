@@ -45,9 +45,9 @@ pip install -r requirements.txt
 Copy `.env.example` to `.env` and fill in. Minimal working set:
 
 ```ini
-# Agent model (Opus via Bedrock through LiteLLM)
-KENSEI_BEDROCK_MODEL_ARN=arn:aws:bedrock:ap-south-1:<acct>:application-inference-profile/96j5zamnqlci
-KENSEI_BEDROCK_SONNET_ARN=arn:aws:bedrock:ap-south-1:<acct>:application-inference-profile/is9bst5tfadh
+# Agent model (Opus 4.7 via Bedrock through LiteLLM)
+KENSEI_BEDROCK_MODEL_ARN=arn:aws:bedrock:ap-south-1:<acct>:application-inference-profile/j6mdizxjngus
+KENSEI_BEDROCK_SONNET_ARN=arn:aws:bedrock:ap-south-1:<acct>:application-inference-profile/urg0zifsjiga
 KENSEI_AWS_BEARER_TOKEN=ABSK...
 KENSEI_AWS_REGION=ap-south-1
 
@@ -55,7 +55,7 @@ KENSEI_AWS_REGION=ap-south-1
 KENSEI_OPENAI_API_KEY=sk-proj-...
 
 # Judge primary (Sonnet via Bedrock direct)
-JUDGE_MODEL=bedrock/arn:aws:bedrock:ap-south-1:<acct>:application-inference-profile/is9bst5tfadh
+JUDGE_MODEL=bedrock/arn:aws:bedrock:ap-south-1:<acct>:application-inference-profile/urg0zifsjiga
 JUDGE_MODEL_FALLBACK=openai/gpt-5.4
 
 # Defaults

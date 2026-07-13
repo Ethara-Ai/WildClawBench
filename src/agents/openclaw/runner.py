@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import subprocess
 import tempfile
 import time
@@ -12,17 +13,21 @@ from dotenv import load_dotenv
 
 from src.agents.base import AgentExecution, AgentTaskSpec, BaseAgent
 from src.utils.docker_utils import (
+    configure_native_subagents,
+    deny_native_subagents,
     inject_api_connectors,
     inject_data_into_workspace,
     inject_lobster_workspace,
     inject_openclaw_models,
     inject_persona_into_workspace,
+    inject_subagent_tool,
     run_background,
     run_warmup,
     setup_skills,
     setup_workspace,
     snapshot_workspace_state,
     start_container,
+    write_turn_marker,
 )
 from src.utils.grading import (
     extract_preflight_usage_from_litellm_log,
@@ -245,6 +250,18 @@ class OpenClawAgent(BaseAgent):
                     extra_env_dict.setdefault("ANTHROPIC_AUTH_TOKEN", stub)
                     extra_env_dict.setdefault("ANTHROPIC_API_KEY", stub)
 
+            # Sub-agent spawn runtime (src/utils/subagent_director.py) discovers
+            # the LiteLLM sidecar from these container env vars. Only set on the
+            # litellm path; OpenRouter runs don't expose a /v1/messages sidecar
+            # to the child. Single-agent tasks leave the env untouched.
+            if (spec.multi_agent_enabled and self.litellm_config_yaml
+                    and self.litellm_container_name):
+                base_url = f"http://{self.litellm_container_name}:{self.litellm_port}"
+                extra_env_dict.setdefault("LITELLM_BASE_URL", base_url)
+                extra_env_dict.setdefault(
+                    "LITELLM_API_KEY", self.litellm_master_key or "sk-litellm")
+                extra_env_dict.setdefault("WILDCLAW_MODEL", spec.model)
+
             _ui_lifecycle.emit_stage(spec.task_id, _ui_lifecycle.STAGE_CREATE,
                                      "openclaw agent container")
             start_container(
@@ -323,7 +340,28 @@ class OpenClawAgent(BaseAgent):
             if spec.models_config:
                 inject_openclaw_models(spec.task_id, spec.models_config)
 
+            if spec.multi_agent_enabled:
+                # Native mode (default): use OpenClaw's built-in sessions_spawn /
+                # sessions_yield tools (children land as separate sessions in the
+                # session store and are harvested into the golden parent/children
+                # layout). spawnEnabled defaults true for the non-discord headless
+                # `chat` channel, so no spawn-flag write is needed (and the config
+                # validator rejects a direct session.threadBindings.spawnSubagentSessions
+                # key anyway). Legacy mode injects the spawn_subagent.py skill.
+                _ma_cfg = spec.multi_agent_config or {}
+                if _ma_cfg.get("native", True):
+                    configure_native_subagents(spec.task_id, _ma_cfg)
+                else:
+                    inject_subagent_tool(spec.task_id, _ma_cfg)
+
             self._set_model(spec.task_id, spec.model, thinking=spec.thinking)
+            if not spec.multi_agent_enabled:
+                # Explicit deny on top of the withheld alsoAllow grant, so a
+                # --no-subagents run (or any single-agent task) can never spawn
+                # even if image config drift ever grants the session tools.
+                # MUST run after _set_model: its config script ASSIGNS
+                # tools["deny"] and would clobber an earlier deny append.
+                deny_native_subagents(spec.task_id)
             self._inject_auth(spec.task_id)
             image_model = self.image_model or spec.model
             self._set_image_model(spec.task_id, image_model)
@@ -343,43 +381,147 @@ class OpenClawAgent(BaseAgent):
                 bash_cmd=gateway_cmd,
                 log_path=spec.output_dir / "gateway.log",
             )
-            logger.info("[%s] Waiting for gateway (2s)...", spec.task_id)
-            time.sleep(2)
+            # Poll gateway.log until the gateway reports it is listening, rather
+            # than sleeping a fixed 2s. The gateway can take up to ~30s to become
+            # ready (memory index, bootstrap-limit tuning, config-triggered
+            # restarts). A fixed 2s wait raced the agent's websocket connect: on
+            # a slow start the agent connected before the gateway was up, the
+            # socket dropped with a "1006 abnormal closure", and the agent fell
+            # back to EMBEDDED mode — where it makes no real tool/API calls, so
+            # the audit is empty and every rubric/test scores 0. Waiting for the
+            # readiness marker removes the race regardless of gateway start time.
+            gateway_log = spec.output_dir / "gateway.log"
+            ready_timeout = float(os.environ.get("OPENCLAW_GATEWAY_READY_TIMEOUT", "60"))
+            logger.info("[%s] Waiting for gateway to listen (up to %ds)...",
+                        spec.task_id, int(ready_timeout))
+            deadline = time.time() + ready_timeout
+            gateway_ready = False
+            # Iteration bound alongside the wall-clock deadline: terminates
+            # even under a frozen/stubbed clock (unit tests no-op time.sleep).
+            for _ in range(max(1, int(ready_timeout / 0.5))):
+                if time.time() >= deadline:
+                    break
+                if gateway_proc.poll() is not None:
+                    logger.error("[%s] Gateway process exited before listening "
+                                 "(rc=%s) — see gateway.log", spec.task_id,
+                                 gateway_proc.returncode)
+                    break
+                try:
+                    if gateway_log.exists() and "listening on ws" in \
+                            gateway_log.read_text(errors="ignore"):
+                        gateway_ready = True
+                        break
+                except OSError:
+                    pass
+                time.sleep(0.5)
+            if gateway_ready:
+                # Small settle margin so the ws server is fully accepting conns.
+                time.sleep(1)
+                logger.info("[%s] Gateway is listening; launching agent",
+                            spec.task_id)
+            else:
+                logger.warning("[%s] Gateway readiness marker not seen within "
+                               "%ds; proceeding anyway (agent may fall back to "
+                               "embedded mode)", spec.task_id, int(ready_timeout))
+            # LLM route probe (OAuth/sidecar path): confirm the gateway can
+            # actually complete a model round-trip before the first turn.
             self._wait_for_llm_route_ready(spec.task_id)
 
-            safe_prompt = spec.prompt.replace("'", "'\\''")
+            # Multi-turn / staged injection: invoke the agent once per turn on
+            # the SAME session ("chat") so context carries across turns. Turn 0
+            # is the task prompt; each later turn is a follow-up message, and
+            # before each later turn the agent is idle while before_turn(i)
+            # applies that stage's silent mock-data injection. Single-turn runs
+            # (spec.turns is None) execute exactly one iteration with spec.prompt,
+            # behaviour-identical to the prior single-shot path.
+            turn_messages: tuple[str, ...] = spec.turns or (spec.prompt,)
             start_time = time.perf_counter()
             wall_start = time.time()
-            agent_proc = run_background(
-                spec.task_id,
-                bash_cmd=(
-                    f"openclaw agent --session-id chat "
-                    f"--timeout {spec.timeout_seconds} "
-                    f"--message '{safe_prompt}'"
-                ),
-                log_path=spec.output_dir / "agent.log",
-            )
-
             _ui_lifecycle.emit_stage(spec.task_id, _ui_lifecycle.STAGE_EXEC,
                                      f"agent running (timeout {spec.timeout_seconds}s)")
-            logger.info("[%s] Waiting for agent to finish...", spec.task_id)
-            try:
-                agent_proc.wait(timeout=spec.timeout_seconds)
-                elapsed_time = time.perf_counter() - start_time
-                logger.info("[%s] Agent finished (%.2fs)", spec.task_id, elapsed_time)
-                _ui_lifecycle.emit_stage(spec.task_id, _ui_lifecycle.STAGE_STATUS,
-                                         f"agent finished in {elapsed_time:.1f}s")
-            except subprocess.TimeoutExpired:
-                logger.warning("[%s] Agent timed out", spec.task_id)
+            agent_proc = None
+            timed_out = False
+            for turn_index, message in enumerate(turn_messages):
+                if turn_index > 0 and spec.before_turn is not None:
+                    # Agent is idle here -> apply this stage's injection.
+                    try:
+                        spec.before_turn(turn_index)
+                    except Exception as exc:
+                        logger.error("[%s] before_turn(%d) hook failed: %s",
+                                     spec.task_id, turn_index, exc)
+                if spec.multi_agent_enabled:
+                    # Correlate sub-agent spawns landing in this turn to its index.
+                    write_turn_marker(spec.task_id, turn_index)
+                safe_msg = message.replace("'", "'\\''")
+                if len(turn_messages) > 1:
+                    logger.info("[%s] Agent turn %d/%d starting",
+                                spec.task_id, turn_index + 1, len(turn_messages))
+                    _ui_lifecycle.emit_stage(
+                        spec.task_id, _ui_lifecycle.STAGE_STATUS,
+                        f"agent turn {turn_index + 1}/{len(turn_messages)}")
+                agent_proc = run_background(
+                    spec.task_id,
+                    bash_cmd=(
+                        f"openclaw agent --session-id chat "
+                        f"--timeout {spec.timeout_seconds} "
+                        f"--message '{safe_msg}'"
+                    ),
+                    log_path=spec.output_dir / "agent.log",
+                )
+                logger.info("[%s] Waiting for agent to finish...", spec.task_id)
+                try:
+                    agent_proc.wait(timeout=spec.timeout_seconds)
+                    logger.info("[%s] Agent turn %d finished", spec.task_id, turn_index + 1)
+                except subprocess.TimeoutExpired:
+                    logger.warning("[%s] Agent turn %d timed out", spec.task_id, turn_index + 1)
+                    agent_proc.kill()
+                    agent_proc.wait()
+                    timed_out = True
+                    break
+            elapsed_time = time.perf_counter() - start_time
+            if timed_out:
+                # Timeout contract: elapsed reports the budget that was spent,
+                # not the (possibly frozen/short) wall-clock measurement.
                 elapsed_time = float(spec.timeout_seconds)
-                agent_proc.kill()
-                agent_proc.wait()
                 _ui_lifecycle.emit_stage(spec.task_id, _ui_lifecycle.STAGE_STATUS,
                                          f"agent timed out after {spec.timeout_seconds}s",
                                          status="timed out")
+            else:
+                _ui_lifecycle.emit_stage(spec.task_id, _ui_lifecycle.STAGE_STATUS,
+                                         f"agent finished in {elapsed_time:.1f}s")
             self._task_windows[spec.task_id] = (wall_start, time.time())
+            logger.info("[%s] Agent finished (%.2fs, %d turn(s))",
+                        spec.task_id, elapsed_time, len(turn_messages))
 
-            logger.info("[%s] Agent exit code: %s", spec.task_id, agent_proc.returncode)
+            # Native multi-agent: the parent turn returns as soon as it issues
+            # its async sessions_spawn calls (mode=run), but the spawned child
+            # sessions keep running in the still-alive gateway. Hold the
+            # container open until those children quiesce, otherwise teardown
+            # kills them mid-run and their trajectories are never written.
+            if spec.multi_agent_enabled:
+                self._wait_for_subagents(spec.task_id)
+                # Repair the fan-out-then-stop failure: the parent occasionally
+                # ends its turn right after spawning, believing it will be
+                # "resumed on completion" (belief seen verbatim in GERALD
+                # run_8's thinking). This single-turn harness has no such
+                # resume, so the deliverables never get written and every
+                # rubric/test collapses. Detect that exact stop and drive one
+                # synthesis turn on the SAME session so the parent collects its
+                # children and assembles the outputs. Already-synthesized runs
+                # are left untouched. Disable via
+                # OPENCLAW_SUBAGENT_SYNTH_RECOVERY=0.
+                recovered = self._recover_synthesis_if_stalled(
+                    spec, len(turn_messages))
+                if recovered is not None:
+                    agent_proc = recovered
+                    # Extend the usage window + elapsed so the recovery turn's
+                    # tokens and time are counted (window end was stamped
+                    # above, before the recovery turn ran).
+                    self._task_windows[spec.task_id] = (wall_start, time.time())
+                    elapsed_time = time.perf_counter() - start_time
+
+            logger.info("[%s] Agent exit code: %s", spec.task_id,
+                        agent_proc.returncode if agent_proc else "n/a")
             return AgentExecution(
                 elapsed_time=elapsed_time,
                 error=None,
@@ -396,6 +538,231 @@ class OpenClawAgent(BaseAgent):
                 gateway_proc=gateway_proc,
                 agent_proc=agent_proc,
             )
+
+    def _wait_for_subagents(
+        self,
+        task_id: str,
+        *,
+        max_wait: float = 600.0,
+        quiesce: float = 60.0,
+        poll: float = 5.0,
+    ) -> None:
+        """Block until native sub-agent child sessions finish (or max_wait).
+
+        Native ``sessions_spawn`` children run asynchronously in the gateway and
+        write to ``/root/.openclaw/agents/main/sessions/<key>.jsonl``. The parent
+        ``chat`` session is in the same dir, so >1 ``.jsonl`` means at least one
+        child spawned. We poll the (size, mtime) signature of those files and
+        return once it stops changing for ``quiesce`` seconds (children done) or
+        ``max_wait`` elapses. No-op when only the parent session exists.
+
+        quiesce=12s truncated live children: sessions append only at message
+        boundaries, so a single long LLM turn or slow exec looks identical to
+        "done". Measured over 25,226 inter-message gaps in bundled child
+        trajectories (2026-07-06): p95=15.9s, p99=56s — 12s misread ~5% of
+        gaps and killed lanes mid-turn (Midori run_3 H5, Gabriela_Scott run_5).
+        60s covers ~99%; override via OPENCLAW_SUBAGENT_QUIESCE_SECONDS. The
+        tail is fat (legit gaps up to 18min), so any timer is a heuristic —
+        the authoritative check is the gateway's run registry, which this
+        host cannot exercise (image is amd64-only) and is left as the known
+        follow-up.
+        """
+        quiesce = float(os.environ.get("OPENCLAW_SUBAGENT_QUIESCE_SECONDS", quiesce))
+        max_wait = float(os.environ.get("OPENCLAW_SUBAGENT_MAX_WAIT_SECONDS", max_wait))
+        sessions_dir = "/root/.openclaw/agents/main/sessions"
+        count_cmd = f"ls {sessions_dir}/*.jsonl 2>/dev/null | wc -l"
+        try:
+            n = int(subprocess.run(
+                ["docker", "exec", task_id, "/bin/bash", "-c", count_cmd],
+                capture_output=True, text=True,
+            ).stdout.strip() or "0")
+        except (ValueError, subprocess.SubprocessError):
+            n = 0
+        if n <= 1:
+            return  # parent-only: nothing spawned
+        logger.info(
+            "[%s] %d session files present — waiting for sub-agents to finish "
+            "(max %.0fs)", task_id, n, max_wait,
+        )
+        sig_cmd = (
+            f"ls -la --time-style=+%s {sessions_dir}/*.jsonl 2>/dev/null "
+            "| awk '{print $5, $6, $NF}'"
+        )
+        deadline = time.time() + max_wait
+        last_sig: str | None = None
+        stable_since: float | None = None
+        while time.time() < deadline:
+            sig = subprocess.run(
+                ["docker", "exec", task_id, "/bin/bash", "-c", sig_cmd],
+                capture_output=True, text=True,
+            ).stdout.strip()
+            if sig and sig == last_sig:
+                if stable_since is None:
+                    stable_since = time.time()
+                elif time.time() - stable_since >= quiesce:
+                    logger.info("[%s] sub-agent sessions quiesced", task_id)
+                    return
+            else:
+                last_sig = sig
+                stable_since = None
+            time.sleep(poll)
+        logger.warning(
+            "[%s] sub-agent wait hit max_wait=%.0fs; collecting as-is",
+            task_id, max_wait,
+        )
+
+    # Tool calls whose presence AFTER the last sessions_spawn prove the parent
+    # went on to build deliverables (vs. ending its turn to "wait" for
+    # children). These tools always write files.
+    _WRITE_TOOL_NAMES = frozenset(
+        {"write", "edit", "str_replace", "apply_patch"}
+    )
+
+    # ``exec`` is ambiguous — it is used both to INSPECT (cat/grep/pdftotext/
+    # python-read) and to WRITE deliverables. Counting every post-spawn exec as
+    # synthesis false-cleared a real stall (GERALD run_9: two inspection execs
+    # after fan-out, zero deliverables, rubric 5.8%). So an exec only proves
+    # synthesis when its command shows file-writing intent: a pandas/CSV/JSON
+    # dump, a Python ``open(..., "w")``, a ``tee``, or a redirect into a
+    # real deliverable file (``> report.md``) — excluding /dev, /tmp and fd
+    # redirects, which are scratch, not output.
+    _EXEC_WRITE_INTENT = re.compile(
+        r"""(?xi)
+        \.to_csv\( | \.to_json\( | \.to_excel\( | \.write_text\(
+        | \.writelines\( | \.savefig\( | json\.dump\( | csv\.writer
+        | open\([^)]*,\s*['"][wax] | writeFileSync | fs\.writeFile | \btee\b
+        | >>?\s*['"]?(?!/dev/|/tmp/|/proc/|&)[\w./~ -]*\.(?:csv|tsv|json|jsonl
+          |md|markdown|txt|eml|html|xml|ya?ml|pdf|png|jpe?g|svg|docx?|xlsx?)
+        """
+    )
+
+    def _recover_synthesis_if_stalled(
+        self, spec: AgentTaskSpec, turns_done: int,
+    ) -> subprocess.Popen | None:
+        """Drive one synthesis turn iff the parent fanned out but never
+        synthesized.
+
+        Returns the recovery agent process (so the caller can report its exit
+        code / fold its usage), or ``None`` when no recovery was needed, the
+        feature is disabled, or stall-detection failed. Enabled by default;
+        disable with ``OPENCLAW_SUBAGENT_SYNTH_RECOVERY=0``.
+        """
+        flag = os.environ.get(
+            "OPENCLAW_SUBAGENT_SYNTH_RECOVERY", "1"
+        ).strip().lower()
+        if flag in ("0", "false", "no", "off", ""):
+            return None
+        try:
+            stalled = self._parent_stopped_after_spawn(spec.task_id)
+        except (subprocess.SubprocessError, OSError, ValueError) as exc:
+            logger.warning(
+                "[%s] synthesis-stall detection failed (%s); skipping recovery "
+                "turn", spec.task_id, exc,
+            )
+            return None
+        if not stalled:
+            return None
+        logger.warning(
+            "[%s] parent ended its turn after fan-out WITHOUT synthesizing "
+            "(no deliverable write after the last sessions_spawn) — driving a recovery "
+            "synthesis turn on the same session", spec.task_id,
+        )
+        message = (
+            "Your sub-agents have finished and their results are now available. "
+            "There is no automatic resume — you must finish the task in THIS "
+            "turn. Enumerate the children with `sessions_list` and read each "
+            "one's output with `sessions_history`, then produce ALL of the "
+            "final deliverables the task asked for and write every deliverable "
+            "file to the workspace. Do NOT spawn any more sub-agents and do NOT "
+            "reply with only a status update. Hold the same red lines and "
+            "two-source verification rules you were given."
+        )
+        # Tag any (unexpected) spawns from this turn to the next index so spawn
+        # correlation stays consistent with the primary turns.
+        write_turn_marker(spec.task_id, turns_done)
+        safe_msg = message.replace("'", "'\\''")
+        proc = run_background(
+            spec.task_id,
+            bash_cmd=(
+                f"openclaw agent --session-id chat "
+                f"--timeout {spec.timeout_seconds} "
+                f"--message '{safe_msg}'"
+            ),
+            log_path=spec.output_dir / "agent_recovery.log",
+        )
+        logger.info("[%s] Waiting for recovery synthesis turn...", spec.task_id)
+        try:
+            proc.wait(timeout=spec.timeout_seconds)
+            logger.info("[%s] Recovery synthesis turn finished", spec.task_id)
+        except subprocess.TimeoutExpired:
+            logger.warning("[%s] Recovery synthesis turn timed out", spec.task_id)
+            proc.kill()
+            proc.wait()
+        # The recovery turn shouldn't fan out, but settle any stragglers.
+        self._wait_for_subagents(spec.task_id)
+        return proc
+
+    def _parent_stopped_after_spawn(self, task_id: str) -> bool:
+        """True iff a parent session fanned out (>=1 ``sessions_spawn``) yet
+        issued no deliverable-producing tool call after its LAST spawn — the
+        exact fingerprint of the "ended turn expecting a resume" failure.
+
+        Reads the live session transcripts from the gateway container. The
+        parent is the only session that calls ``sessions_spawn`` (children do
+        not fan out further in these tasks), so the first session containing a
+        spawn is the parent. Returns False when no fan-out is found or the
+        parent clearly synthesized.
+        """
+        sessions_dir = "/root/.openclaw/agents/main/sessions"
+        listing = subprocess.run(
+            ["docker", "exec", task_id, "/bin/bash", "-c",
+             f"ls {sessions_dir}/*.jsonl 2>/dev/null"],
+            capture_output=True, text=True,
+        ).stdout.split()
+        for path in listing:
+            raw = subprocess.run(
+                ["docker", "exec", task_id, "/bin/bash", "-c", f"cat '{path}'"],
+                capture_output=True, text=True,
+            ).stdout
+            # (message_index, tool_name, exec_command_or_empty)
+            tool_calls: list[tuple[int, str, str]] = []
+            msg_index = 0
+            for line in raw.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not (isinstance(entry, dict) and entry.get("type") == "message"):
+                    continue
+                inner = entry.get("message")
+                content = inner.get("content") if isinstance(inner, dict) else None
+                if isinstance(content, list):
+                    for part in content:
+                        if not (isinstance(part, dict)
+                                and part.get("type") in ("toolCall", "tool_use")):
+                            continue
+                        name = str(part.get("name") or "")
+                        cmd = ""
+                        if name == "exec":
+                            args = part.get("arguments") or part.get("input") or {}
+                            if isinstance(args, dict):
+                                cmd = str(args.get("command") or "")
+                        tool_calls.append((msg_index, name, cmd))
+                msg_index += 1
+            spawn_positions = [i for i, n, _ in tool_calls if n == "sessions_spawn"]
+            if not spawn_positions:
+                continue  # not the parent (this session never fanned out)
+            last_spawn = max(spawn_positions)
+            synthesized = any(
+                n in self._WRITE_TOOL_NAMES
+                or (n == "exec" and self._EXEC_WRITE_INTENT.search(cmd))
+                for i, n, cmd in tool_calls if i > last_spawn
+            )
+            return not synthesized
+        return False
 
     def collect_usage(self, task_id: str, output_dir: Path, elapsed_time: float) -> dict:
         transcript_host = output_dir / "chat.jsonl"
@@ -434,6 +801,50 @@ class OpenClawAgent(BaseAgent):
                     "request_count": 0,
                     "usage_source": "none",
                 }
+
+        # Fold sub-agent token totals from spawn_tree.jsonl into parent usage so
+        # leaderboard cost math reflects the full call graph (not just the
+        # parent's LiteLLM hits). Missing/malformed file is silently treated as
+        # zero spawns — single-agent tasks remain byte-identical.
+        spawn_tree = output_dir / "task_output" / "workspace_full" / "spawn_tree.jsonl"
+        sub_in = sub_out = sub_count = 0
+        sub_cost = 0.0
+        if spawn_tree.is_file():
+            for line in spawn_tree.read_text(encoding="utf-8", errors="replace").splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(row, dict):
+                    continue
+                sub_count += 1
+                try:
+                    sub_in += int(row.get("tokens_in") or 0)
+                except (TypeError, ValueError):
+                    pass
+                try:
+                    sub_out += int(row.get("tokens_out") or 0)
+                except (TypeError, ValueError):
+                    pass
+                # Cost lives on BOTH per-spawn and "summary" rows; only sum the
+                # per-spawn rows to avoid double-counting.
+                if row.get("kind") != "summary":
+                    try:
+                        sub_cost += float(row.get("cost_usd") or 0.0)
+                    except (TypeError, ValueError):
+                        pass
+        if sub_count:
+            usage["subagent_count"] = sub_count
+            usage["subagent_tokens_in"] = sub_in
+            usage["subagent_tokens_out"] = sub_out
+            usage["subagent_cost_usd"] = round(sub_cost, 6)
+            usage["input_tokens"] = int(usage.get("input_tokens") or 0) + sub_in
+            usage["output_tokens"] = int(usage.get("output_tokens") or 0) + sub_out
+            usage["total_tokens"] = int(usage.get("total_tokens") or 0) + sub_in + sub_out
+            usage["cost_usd"] = round(float(usage.get("cost_usd") or 0.0) + sub_cost, 6)
 
         self._task_windows.pop(task_id, None)
         usage["elapsed_time"] = round(elapsed_time, 2)
@@ -505,13 +916,19 @@ class OpenClawAgent(BaseAgent):
                     ],
                 }
             else:
+                # The provider's `models[].id` MUST equal openclaw_model_id (the
+                # primary is litellm/<openclaw_model_id>); a hardcoded id only
+                # worked while gpt-5.5 was the sole non-anthropic route. For any
+                # other OpenAI-compatible sidecar model (e.g. the Meta vendor
+                # model) a mismatched id would leave openclaw unable to resolve
+                # the selected model.
                 litellm_provider = {
                     "baseUrl": base_url_v1,
                     "apiKey": self.litellm_master_key or "sk-litellm",
                     "auth": "api-key",
                     "api": "openai-completions",
                     "models": [
-                        {"id": "gpt-5.5", "name": "gpt-5.5",
+                        {"id": openclaw_model_id, "name": openclaw_model_id,
                          "input": ["text", "image"], "reasoning": True,
                          "contextWindow": 1050000, "maxTokens": 128000},
                     ],

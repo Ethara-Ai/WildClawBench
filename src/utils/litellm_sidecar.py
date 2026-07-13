@@ -35,6 +35,9 @@ def build_litellm_config_yaml(
     use_claude_oauth: bool = False,
     bridge_url: str = "",
     enable_oauth_usage_callback: bool = False,
+    meta_api_key: str = "",
+    meta_base_url: str = "https://api.ai.meta.com/v1",
+    meta_model: str = "",
 ) -> str:
     whisper_env_ref = (
         "os.environ/OPENAI_API_KEY_WHISPER"
@@ -131,8 +134,8 @@ def build_litellm_config_yaml(
         # CRITICAL routing/detection decoupling (still required): adaptive-thinking
         # detection keys off the `model` STRING via get_base_model()->_is_opus_4_6_model()
         # substring match. Our opus access is an opaque application-inference-profile ARN
-        # (.../96j5zamnqlci); putting that ARN in `model:` makes get_base_model return
-        # "96j5zamnqlci" (split('/')[-1]) -> fails the opus-4-6 substring -> Bedrock
+        # (.../j6mdizxjngus); putting that ARN in `model:` makes get_base_model return
+        # "j6mdizxjngus" (split('/')[-1]) -> fails the opus-4-6 substring -> Bedrock
         # 400s the legacy shape. Fix: `model:` carries the RECOGNIZABLE name
         # "anthropic.claude-opus-4-6-v1"; `model_id:` (common_utils.py:get_bedrock_model_id
         # pops it, URL-encodes into the endpoint URL) carries the real ARN for routing.
@@ -173,6 +176,11 @@ def build_litellm_config_yaml(
             "      cache_read_input_token_cost: 0.0000005\n"
             "      cache_creation_input_token_cost: 0.00000625"
         )
+        # Opus model name(s). All alias the one Bedrock opus inference-profile ARN
+        # (KENSEI_BEDROCK_MODEL_ARN, currently Opus 4.8). claude-opus-4.8 is the
+        # current name; claude-opus-4.7 is kept as a backward-compat alias so older
+        # scripts/run args keep working (they now route to the same 4.8 ARN).
+        model_blocks.append("  - model_name: claude-opus-4.8\n" + opus_params)
         model_blocks.append("  - model_name: claude-opus-4.7\n" + opus_params)
         # openclaw's _set_model presents the recognized id "claude-opus-4-6" to
         # activate extended thinking (see runner.py); that id arrives here on the
@@ -292,6 +300,33 @@ def build_litellm_config_yaml(
                 "      model: openai/whisper-1\n"
                 f"      api_key: {whisper_env_ref}"
             )
+    if meta_api_key and meta_model:
+        # Meta vendor model (internal Llama API) exposed through the sidecar as
+        # an OpenAI-compatible upstream. LiteLLM reaches it via the `openai/`
+        # provider prefix + an explicit api_base, the same OpenAI-compatible
+        # bridge used for any non-OpenAI /v1/chat/completions relay.
+        #
+        # PARAMETER POLICY (vendor onboarding guide, non-negotiable): keep ALL
+        # inference params at their DEFAULTS for this relay — do NOT set
+        # reasoning_effort, temperature, top_p, top_k, max_tokens, or
+        # response_format here. The relay also documents hard gaps: no
+        # structured output, no parallel tool calling, no function tool-call
+        # streaming. The global `litellm_settings.drop_params: true` (set below)
+        # is what makes this safe end-to-end: any of those params an upstream
+        # caller (openclaw, judge, testgen) emits are silently dropped before
+        # the request reaches api.ai.meta.com instead of 400-ing the relay.
+        # Intentionally NO `stream_options.include_usage` and NO input/output
+        # cost overrides — both are non-default request shaping the guide tells
+        # us not to add; usage is still recorded post-call by the LiteLLM usage
+        # callback from the response body. The harness-facing model id IS
+        # `meta_model`, so `--model <meta_model>` routes straight here.
+        model_blocks.append(
+            f"  - model_name: {meta_model}\n"
+            "    litellm_params:\n"
+            f"      model: openai/{meta_model}\n"
+            f"      api_base: {meta_base_url}\n"
+            "      api_key: os.environ/META_API_KEY"
+        )
     # OpenClaw's memory tool POSTs model=text-embedding-3-small to the sidecar
     # /v1/embeddings on session-start, on memory search, and from our explicit
     # `openclaw memory index` step. With no embeddings route registered the
@@ -342,6 +377,15 @@ def build_litellm_config_yaml(
             f"      model: bedrock/converse/{bedrock_arn}\n"
             f"      aws_region_name: {aws_region or 'ap-south-1'}\n"
             + cache_marker.rstrip("\n")
+        )
+    elif meta_api_key and meta_model:
+        # Meta-only run: route openclaw's built-in image fallback ids to the
+        # vendor model (Llama is multimodal). Same default-params policy — only
+        # routing fields, no inference param overrides.
+        image_alias = (
+            f"      model: openai/{meta_model}\n"
+            f"      api_base: {meta_base_url}\n"
+            "      api_key: os.environ/META_API_KEY"
         )
     else:
         image_alias = ""
@@ -422,16 +466,56 @@ def build_litellm_config_yaml(
     )
 
 
+def _image_present_locally(image: str) -> bool:
+    return subprocess.run(
+        ["docker", "image", "inspect", image],
+        capture_output=True,
+    ).returncode == 0
+
+
 def pull_litellm_image(image: str = LITELLM_IMAGE) -> None:
     # `:main-stable` is a moving registry tag; we explicitly pull at batch
     # startup so registry/network failures surface here instead of inside the
     # first `docker run` and being misattributed to a task error.
-    logger.info("Pulling LiteLLM image %s", image)
-    r = subprocess.run(
-        ["docker", "pull", image],
-        capture_output=True, text=True,
-    )
+    #
+    # The pull is a registry round-trip even when the image is already cached
+    # locally (moving tag), so a slow/blocked/unauthenticated ghcr.io connection
+    # can hang the whole batch at startup. To stay robust:
+    #   * WILDCLAW_SKIP_LITELLM_PULL=1 skips the pull entirely when the image is
+    #     present locally (offline / pinned-image runs).
+    #   * the pull is time-bounded (WILDCLAW_LITELLM_PULL_TIMEOUT, default 180s).
+    #   * on timeout/failure we fall back to the local image if present, only
+    #     raising when there is genuinely no image to run.
+    if os.environ.get("WILDCLAW_SKIP_LITELLM_PULL") and _image_present_locally(image):
+        logger.info("Skipping LiteLLM pull (WILDCLAW_SKIP_LITELLM_PULL set); using local %s", image)
+        return
+
+    timeout = int(os.environ.get("WILDCLAW_LITELLM_PULL_TIMEOUT", "180"))
+    logger.info("Pulling LiteLLM image %s (timeout %ss)", image, timeout)
+    try:
+        r = subprocess.run(
+            ["docker", "pull", image],
+            capture_output=True, text=True, timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        if _image_present_locally(image):
+            logger.warning(
+                "LiteLLM pull timed out after %ss; falling back to the local "
+                "image %s. Set WILDCLAW_SKIP_LITELLM_PULL=1 to skip the pull.",
+                timeout, image,
+            )
+            return
+        raise RuntimeError(
+            f"LiteLLM pull of {image} timed out after {timeout}s and no local "
+            f"copy exists. Pre-pull it or set WILDCLAW_LITELLM_PULL_TIMEOUT higher."
+        )
     if r.returncode != 0:
+        if _image_present_locally(image):
+            logger.warning(
+                "LiteLLM pull failed (%s); falling back to the local image %s.",
+                (r.stderr or "").strip(), image,
+            )
+            return
         raise RuntimeError(
             f"Failed to pull LiteLLM image {image}: {(r.stderr or '').strip()}"
         )
@@ -552,6 +636,7 @@ def start_litellm(
     enable_headroom: bool = False,
     anthropic_api_key: str = "",
     oauth_usage_callback_host_path: str = "",
+    meta_api_key: str = "",
 ) -> None:
     from src.utils.docker_utils import (
         build_env_args,
@@ -580,6 +665,10 @@ def start_litellm(
         env_pairs.append(("WCB_CC_BRIDGE_SECRET", _cc_secret))
     _cc_stub = os.environ.get("WCB_CC_STUB_KEY", "").strip() or "sk-wcb-oauth-stub"
     env_pairs.append(("WCB_CC_STUB_KEY", _cc_stub))
+    # Meta vendor key: read by the meta model block via
+    # `api_key: os.environ/META_API_KEY`.
+    if meta_api_key:
+        env_pairs.append(("META_API_KEY", meta_api_key))
     env_args = build_env_args(env_pairs)
 
     callback_args: list[str] = []
@@ -595,6 +684,11 @@ def start_litellm(
             *build_env_args([("WCB_OAUTH_USAGE_LOG_PATH", "/var/litellm_usage/usage_oauth.jsonl")]),
         ]
 
+    # Headroom pre-call compressor: writes to a SEPARATE JSONL sink
+    # (/var/litellm_headroom/headroom.jsonl). Must never collide with
+    # LITELLM_USAGE_LOG_PATH — token-tracking invariant (user m0130).
+    # LITELLM_HEADROOM_IMAGE has `headroom-ai` baked in; the stock image
+    # cannot `import headroom` at proxy startup (no egress at that point).
     headroom_args: list[str] = []
     image_to_run = LITELLM_IMAGE
     if enable_headroom and headroom_callback_host_path and headroom_log_host_dir:

@@ -163,6 +163,11 @@ class MockHealthLogger(threading.Thread):
         healthy = 0
         failures: list[str] = []
         for name, url in self.api_url_map.items():
+            # Skip non-URL config entries (admin tokens, etc.) so the
+            # "<healthy>/<total>" count reflects only real API probe targets —
+            # i.e. the APIs actually in use by this task.
+            if _parse_url(url) is None:
+                continue
             rec = self._probe(name, url, agent_up=agent_up, ts=ts)
             records.append(rec)
             if rec["status"] == "ok":
@@ -170,7 +175,7 @@ class MockHealthLogger(threading.Thread):
             else:
                 failures.append(name)
         self._append_jsonl(records)
-        total = len(self.api_url_map)
+        total = healthy + len(failures)
         via = "agent" if agent_up else "mock"
         if failures:
             self._log.warning(

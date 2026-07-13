@@ -14,11 +14,24 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
+from _mutable_store import (  # noqa: E402
     read_seed_with_ctx, get_store, opt_str, strict_bool)
 
 _store = get_store("segment-api")
 _API = "segment-api"
+
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
 
 _store.register("events", primary_key="messageId",
                 initial_loader=lambda: _coerce_events(_load("events.json", "events")))
@@ -138,7 +151,7 @@ def _ingest(event_type, payload):
     }
     if event_type == "page" and payload.get("name"):
         entry["properties"].setdefault("name", payload["name"])
-    _events_rows().append(entry)
+    _store_insert("events", entry)
     return entry
 
 

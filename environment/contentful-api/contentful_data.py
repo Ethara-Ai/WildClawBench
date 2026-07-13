@@ -23,6 +23,33 @@ from _mutable_store import (
 _store = get_store("contentful-api")
 _API = "contentful-api"
 
+
+
+def _store_patch(_table, _row_or_pk, _updates):
+    """Persist field updates to a stored row (was: in-place mutation of a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
+
+def _store_delete(_table, _row_or_pk):
+    """Persist a row deletion (was: pop/remove on a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.delete(_pk)
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("content_types", primary_key="id",
                 initial_loader=lambda: _coerce_content_types(_load("content_types.json", "content_types")))
 _store.register("entries", primary_key="id",
@@ -260,7 +287,7 @@ def create_entry(content_type, fields):
         "published_version": 0,
         "fields": dict(fields or {}),
     }
-    _entries_rows().append(entry)
+    _store_insert("entries", entry)
     return _entry_obj(entry)
 
 
@@ -270,14 +297,15 @@ def update_entry(entry_id, fields):
             if fields:
                 e["fields"].update(fields)
             e["updated_at"] = _now()
+            _store_patch("entries", e, {"fields": e["fields"], "updated_at": e["updated_at"]})
             return _entry_obj(e)
     return {"error": f"Entry {entry_id} not found"}
 
 
 def delete_entry(entry_id):
-    for i, e in enumerate(_entries_rows()):
+    for e in _entries_rows():
         if e["id"] == entry_id:
-            _entries_rows().pop(i)
+            _store_delete("entries", e)
             return {"id": entry_id, "deleted": True}
     return {"error": f"Entry {entry_id} not found"}
 

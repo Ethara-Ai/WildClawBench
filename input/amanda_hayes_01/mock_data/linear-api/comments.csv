@@ -1,9 +1,0 @@
-id,body,issueId,userId,createdAt,updatedAt
-cmt-301-1,Reproduced with a JSONB column that has DEFAULT '{}'. The schema diff AST walker doesn't handle CockroachDB's internal representation of empty object defaults.,BKD-301,user-amanda,2026-09-22T10:30:00,2026-09-22T10:30:00
-cmt-301-2,Good catch. Similar issue in the ARRAY column path too - want to bundle both fixes?,BKD-301,user-raj,2026-09-23T09:15:00,2026-09-23T09:15:00
-cmt-302-1,Hitting max_connections=100 after 8 min of sustained 5K inserts/sec. pgbouncer transaction mode might help but need to test with prepared statements.,BKD-302,user-amanda,2026-09-28T11:00:00,2026-09-28T11:00:00
-cmt-303-1,Runbook reviewed and merged. Includes rollback to Postgres read replica if p99 exceeds 200ms threshold.,BKD-303,user-elena,2026-09-19T16:00:00,2026-09-19T16:00:00
-cmt-304-1,Circuit breaker trips after 5 consecutive CockroachDB write failures. Half-open state retries after 30s.,BKD-304,user-raj,2026-09-28T14:00:00,2026-09-28T14:00:00
-cmt-305-1,Amanda - do you still have the Copper Onion receipt from the team dinner? Accounting needs it by Oct 5.,BKD-305,user-raj,2026-09-26T09:00:00,2026-09-26T09:00:00
-cmt-305-2,Yeah I have it. Will submit through the expense portal this week.,BKD-305,user-amanda,2026-09-26T10:15:00,2026-09-26T10:15:00
-cmt-307-1,PR #892 adds configurable clock_skew_tolerance_seconds defaulting to 60s. Tests passing on staging.,BKD-307,user-raj,2026-09-29T15:00:00,2026-09-29T15:00:00

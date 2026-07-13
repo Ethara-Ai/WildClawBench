@@ -44,6 +44,8 @@ class Config:
 
     # ---- OpenAI (direct / via-LiteLLM) ----
     openai_api_key: str = ""
+    # Optional dedicated key for Whisper / audio transcription; falls back to
+    # openai_api_key at the call site when empty.
     openai_whisper_api_key: str = ""
 
     # ---- Anthropic direct (alternative upstream for opus when Bedrock unavailable) ----
@@ -52,6 +54,17 @@ class Config:
     # no Bedrock bearer token is available. This keeps the harness usable on
     # machines where the Bedrock IAM access has been rotated/revoked.
     anthropic_api_key: str = ""
+
+    # ---- Meta vendor (Llama API, OpenAI-compatible, routed via LiteLLM) ----
+    # An internal OpenAI-compatible relay (https://api.ai.meta.com/v1). The
+    # vendor onboarding guide is explicit: keep ALL inference params at their
+    # defaults (never override reasoning_effort/temperature/top_p/top_k), so the
+    # sidecar model block for this provider carries only routing fields. The
+    # harness-facing model id equals `meta_model`, so `--model <meta_model>`
+    # routes here. Registered only when both key and model id are present.
+    meta_api_key: str = ""
+    meta_base_url: str = "https://api.ai.meta.com/v1"
+    meta_model: str = ""
 
     # ---- OpenRouter (fallback LLM routing) ----
     openrouter_api_key: str = ""
@@ -170,6 +183,9 @@ class Config:
             openai_api_key=s("KENSEI_OPENAI_API_KEY", "OPENAI_API_KEY"),
             openai_whisper_api_key=s("KENSEI_OPENAI_WHISPER_API_KEY", "OPENAI_WHISPER_API_KEY"),
             anthropic_api_key=s("KENSEI_ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY"),
+            meta_api_key=s("KENSEI_META_API_KEY", "META_API_KEY"),
+            meta_base_url=s("KENSEI_META_BASE_URL", "META_API_BASE_URL", default="https://api.ai.meta.com/v1"),
+            meta_model=s("KENSEI_META_MODEL", "META_MODEL"),
             openrouter_api_key=s("OPENROUTER_API_KEY"),
             openrouter_base_url=s("OPENROUTER_BASE_URL", default="https://openrouter.ai/api/v1"),
             brave_api_key=s("BRAVE_API_KEY", default="placeholder"),
@@ -203,6 +219,8 @@ class Config:
         if self.openai_api_key:
             return True
         if self.anthropic_api_key:
+            return True
+        if self.meta_api_key and self.meta_model:
             return True
         if self.use_claude_oauth and self.cc_account_pool:
             return True

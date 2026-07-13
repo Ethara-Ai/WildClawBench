@@ -20,6 +20,33 @@ from _mutable_store import (
 _store = get_store("freshdesk-api")
 _API = "freshdesk-api"
 
+
+
+def _store_patch(_table, _row_or_pk, _updates):
+    """Persist field updates to a stored row (was: in-place mutation of a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
+
+def _store_delete(_table, _row_or_pk):
+    """Persist a row deletion (was: pop/remove on a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.delete(_pk)
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("tickets", primary_key="id",
                 initial_loader=lambda: _coerce_tickets(_load("tickets.json", "tickets")))
 _store.register("contacts", primary_key="id",
@@ -170,23 +197,26 @@ def create_ticket(payload):
         "created_at": now,
         "updated_at": now,
     }
-    _tickets_rows().append(ticket)
+    _store_insert("tickets", ticket)
     return ticket
 
 
 def update_ticket(ticket_id, payload):
-    for i, t in enumerate(_tickets_rows()):
+    for t in _tickets_rows():
         if t["id"] == int(ticket_id):
+            _changes = {}
             for field in ("subject", "description", "type"):
                 if field in payload and payload[field] is not None:
-                    _tickets_rows()[i][field] = payload[field]
+                    _changes[field] = payload[field]
             for field in ("status", "priority", "responder_id", "requester_id"):
                 if field in payload and payload[field] is not None:
-                    _tickets_rows()[i][field] = int(payload[field])
+                    _changes[field] = int(payload[field])
             if "tags" in payload and payload["tags"] is not None:
-                _tickets_rows()[i]["tags"] = payload["tags"]
-            _tickets_rows()[i]["updated_at"] = _now_iso()
-            return _tickets_rows()[i]
+                _changes["tags"] = payload["tags"]
+            _changes["updated_at"] = _now_iso()
+            t.update(_changes)
+            _store_patch("tickets", t, _changes)
+            return t
     return {"error": "ticket not found", "message": f"Ticket {ticket_id} not found"}
 
 

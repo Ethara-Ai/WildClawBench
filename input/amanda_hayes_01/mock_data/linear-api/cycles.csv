@@ -1,5 +1,0 @@
-id,name,number,teamId,startsAt,endsAt,completedAt,createdAt,updatedAt
-cycle-bkd-7,Sprint 7,7,team-backend,2026-08-25,2026-09-07,2026-09-07T17:00:00,2026-08-18T09:00:00,2026-09-07T17:00:00
-cycle-bkd-8,Sprint 8,8,team-backend,2026-09-08,2026-09-21,2026-09-21T17:00:00,2026-09-01T09:00:00,2026-09-21T17:00:00
-cycle-bkd-9,Sprint 9,9,team-backend,2026-09-22,2026-10-05,,2026-09-15T09:00:00,2026-09-30T10:00:00
-cycle-bkd-10,Sprint 10,10,team-backend,2026-10-06,2026-10-19,,2026-09-29T09:00:00,2026-09-30T10:00:00

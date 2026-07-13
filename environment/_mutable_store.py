@@ -84,14 +84,18 @@ cleanly inside the slim Docker image used by every mock service.
 from __future__ import annotations
 
 import copy
+import logging
 import csv
 import json
 import math
+import os
 from pathlib import Path
 import threading
 import time
 import uuid
 from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional
+
+logger = logging.getLogger(__name__)
 
 
 Row = Dict[str, Any]
@@ -715,26 +719,51 @@ class Store:
 
     def _populate_table(self, table_name: str) -> None:
         t = self._tables[table_name]
-        rows = list(self._initial_loaders[table_name]())
+        # Two loader-failure policies, selected by MOCK_RESILIENT_LOAD:
+        #   strict (default, host side): a coercion/loader failure (e.g. an
+        #     overlaid mock_data CSV whose schema doesn't match this server)
+        #     RAISES so validators/tests surface the CoerceError at load time
+        #     with the api+table+file context, not as a downstream KeyError.
+        #   resilient (inside the live mock container; start_mock_stack sets
+        #     MOCK_RESILIENT_LOAD=1): the failure must NOT kill the uvicorn
+        #     process — that would take the whole per-task mock stack down and
+        #     disable injection. Degrade to an EMPTY table with a loud log.
+        try:
+            rows = list(self._initial_loaders[table_name]())
+        except Exception as exc:  # noqa: BLE001
+            if os.environ.get("MOCK_RESILIENT_LOAD", "").strip().lower() not in (
+                    "1", "true", "yes", "on"):
+                raise
+            logger.error(
+                "store '%s' table '%s': initial loader failed (%s: %s); serving an "
+                "EMPTY table. Usually an overlaid mock_data CSV whose columns don't "
+                "match this mock server. Fix the CSV schema (or the server coercion).",
+                self._name, table_name, type(exc).__name__, exc,
+            )
+            rows = []
         seen_pks: Dict[Any, int] = {}
         collapse_count = 0
         first_collision: Optional[Any] = None
-        for idx, r in enumerate(rows):
-            if t._pk not in r:
-                raise StoreError(
-                    f"initial row for table '{table_name}' missing primary key "
-                    f"'{t._pk}': {list(r.keys())[:8]}"
+        for i, r in enumerate(rows):
+            if t._pk not in r or r.get(t._pk) in (None, ""):
+                # Synthesize a per-load pk so a row missing/blank in the primary-key
+                # column is still served rather than aborting the whole load.
+                logger.warning(
+                    "store '%s' table '%s': row %d missing primary key '%s'; "
+                    "synthesizing one.", self._name, table_name, i, t._pk,
                 )
+                r = dict(r)
+                r[t._pk] = f"_auto_{i}"
             pk_value = r[t._pk]
             if pk_value in seen_pks:
                 if first_collision is None:
                     first_collision = pk_value
                 collapse_count += 1
                 stored_row = copy.deepcopy(r)
-                stored_row["_pk"] = f"{pk_value}#{idx}"
+                stored_row["_pk"] = f"{pk_value}#{i}"
                 stored_key = stored_row["_pk"]
             else:
-                seen_pks[pk_value] = idx
+                seen_pks[pk_value] = i
                 stored_row = copy.deepcopy(r)
                 stored_key = pk_value
             t._rows[stored_key] = stored_row
@@ -833,7 +862,14 @@ class Store:
                 if not self._initialized[tn]:
                     self._populate_table(tn)
             for dn in list(self._documents):
-                self.document(dn)
+                try:
+                    self.document(dn)
+                except Exception as exc:  # noqa: BLE001
+                    logger.error(
+                        "store '%s' document '%s': loader failed (%s: %s); skipping.",
+                        self._name, dn, type(exc).__name__, exc,
+                    )
+                    self._initialized[f"doc::{dn}"] = True
             self._initial_baseline = {
                 "tables": {tn: t._dump() for tn, t in self._tables.items()},
                 "documents": {dn: d._dump() for dn, d in self._documents.items()},

@@ -1274,7 +1274,11 @@ def _grade_council(
             "is_positive": wt >= 0,
         })
 
-    overall = max(0.0, min(1.0, weighted / total_w))
+    # User formula (verbatim, no clamp):
+    #   final_reward = (Σ passed_positive_w − Σ |triggered_negative_w|) / Σ positive_w
+    # Negative-weight violation checkers must be able to pull the reward below
+    # zero; clamping here silently erases their signal.
+    overall = weighted / total_w
     council_usage = _ZERO_USAGE.copy()
     # Per-member usage breakdown: the flat sum below collapses all members into
     # one cost line, hiding which model spent what. Preserve each member's own

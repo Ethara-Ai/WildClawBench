@@ -19,6 +19,21 @@ from _mutable_store import (
 _store = get_store("doordash-api")
 _API = "doordash-api"
 
+_API = "doordash-api"
+
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("stores", primary_key="store_id",
                 initial_loader=lambda: _coerce_stores(_load("stores.json", "stores")))
 _store.register("menu_items", primary_key="item_id",
@@ -276,9 +291,9 @@ def checkout(cart_id, customer_name="Guest", tip=0.0):
         "placed_at": _now_iso(),
         "dasher_name": "",
     }
-    _orders_rows().append(order)
+    _store_insert("orders", order)
     for it in cart_full["items"]:
-        _order_items_rows().append({
+        _store_insert("order_items", {
             "order_id": order_id,
             "item_id": it["item_id"],
             "quantity": it["quantity"],

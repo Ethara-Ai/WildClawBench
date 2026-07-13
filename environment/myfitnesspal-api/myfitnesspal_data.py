@@ -18,6 +18,33 @@ from _mutable_store import (
 _store = get_store("myfitnesspal-api")
 _API = "myfitnesspal-api"
 
+
+
+def _store_patch(_table, _row_or_pk, _updates):
+    """Persist field updates to a stored row (was: in-place mutation of a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
+
+def _store_delete(_table, _row_or_pk):
+    """Persist a row deletion (was: pop/remove on a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.delete(_pk)
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("foods", primary_key="food_id",
                 initial_loader=lambda: _coerce_foods(_load("foods.json", "foods")))
 _store.register("diary_entries", primary_key="entry_id",
@@ -210,10 +237,12 @@ def update_user_profile(data: dict):
         "display_name", "daily_calorie_goal", "activity_level",
         "current_weight_lbs", "goal_weight_lbs", "weekly_weight_goal_lbs",
     }
+    _changes = {}
     for k, v in data.items():
         if k in updatable:
-            _user_profile_doc()[k] = v
-    return {"type": "user_profile", "user_profile": _user_profile_doc()}
+            _changes[k] = v
+    profile = _store.document("user_profile").merge(_changes) if _changes else _user_profile_doc()
+    return {"type": "user_profile", "user_profile": profile}
 
 
 # ---------------------------------------------------------------------------
@@ -234,17 +263,20 @@ def get_goals():
 
 
 def update_goals(data: dict):
+    _doc = _store.document("user_profile")
+    _v = _doc.get()
     if "daily_calorie_goal" in data:
-        _user_profile_doc()["daily_calorie_goal"] = int(data["daily_calorie_goal"])
-        _user_profile_doc()["nutrient_goals"]["calories"] = int(data["daily_calorie_goal"])
+        _v["daily_calorie_goal"] = int(data["daily_calorie_goal"])
+        _v["nutrient_goals"]["calories"] = int(data["daily_calorie_goal"])
     if "macro_goals" in data:
-        _user_profile_doc()["macro_goals"].update(data["macro_goals"])
+        _v["macro_goals"].update(data["macro_goals"])
     if "nutrient_goals" in data:
-        _user_profile_doc()["nutrient_goals"].update(data["nutrient_goals"])
+        _v["nutrient_goals"].update(data["nutrient_goals"])
     if "weekly_weight_goal_lbs" in data:
-        _user_profile_doc()["weekly_weight_goal_lbs"] = float(data["weekly_weight_goal_lbs"])
+        _v["weekly_weight_goal_lbs"] = float(data["weekly_weight_goal_lbs"])
     if "goal_weight_lbs" in data:
-        _user_profile_doc()["goal_weight_lbs"] = float(data["goal_weight_lbs"])
+        _v["goal_weight_lbs"] = float(data["goal_weight_lbs"])
+    _doc.set(_v)
     return get_goals()
 
 
@@ -375,14 +407,15 @@ def create_diary_entry(data: dict):
         "sugars_g": round(food["sugars_g"] * servings, 1),
         "protein_g": round(food["protein_g"] * servings, 1),
     }
-    _diary_entries_rows().append(entry)
+    _store_insert("diary_entries", entry)
     _next_entry_id += 1
     return {"type": "diary_entry", "diary_entry": entry}
 
 
 def update_diary_entry(entry_id: int, data: dict):
-    for i, entry in enumerate(_diary_entries_rows()):
+    for entry in _diary_entries_rows():
         if entry["entry_id"] == entry_id:
+            _changes = {}
             if "servings" in data:
                 new_servings = float(data["servings"])
                 food_id = entry["food_id"]
@@ -392,26 +425,28 @@ def update_diary_entry(entry_id: int, data: dict):
                         food = f
                         break
                 if food:
-                    _diary_entries_rows()[i]["servings"] = new_servings
-                    _diary_entries_rows()[i]["calories"] = round(food["calories"] * new_servings, 1)
-                    _diary_entries_rows()[i]["total_fat_g"] = round(food["total_fat_g"] * new_servings, 1)
-                    _diary_entries_rows()[i]["saturated_fat_g"] = round(food["saturated_fat_g"] * new_servings, 1)
-                    _diary_entries_rows()[i]["cholesterol_mg"] = round(food["cholesterol_mg"] * new_servings, 1)
-                    _diary_entries_rows()[i]["sodium_mg"] = round(food["sodium_mg"] * new_servings, 1)
-                    _diary_entries_rows()[i]["total_carbs_g"] = round(food["total_carbs_g"] * new_servings, 1)
-                    _diary_entries_rows()[i]["dietary_fiber_g"] = round(food["dietary_fiber_g"] * new_servings, 1)
-                    _diary_entries_rows()[i]["sugars_g"] = round(food["sugars_g"] * new_servings, 1)
-                    _diary_entries_rows()[i]["protein_g"] = round(food["protein_g"] * new_servings, 1)
+                    _changes["servings"] = new_servings
+                    _changes["calories"] = round(food["calories"] * new_servings, 1)
+                    _changes["total_fat_g"] = round(food["total_fat_g"] * new_servings, 1)
+                    _changes["saturated_fat_g"] = round(food["saturated_fat_g"] * new_servings, 1)
+                    _changes["cholesterol_mg"] = round(food["cholesterol_mg"] * new_servings, 1)
+                    _changes["sodium_mg"] = round(food["sodium_mg"] * new_servings, 1)
+                    _changes["total_carbs_g"] = round(food["total_carbs_g"] * new_servings, 1)
+                    _changes["dietary_fiber_g"] = round(food["dietary_fiber_g"] * new_servings, 1)
+                    _changes["sugars_g"] = round(food["sugars_g"] * new_servings, 1)
+                    _changes["protein_g"] = round(food["protein_g"] * new_servings, 1)
             if "meal" in data:
-                _diary_entries_rows()[i]["meal"] = data["meal"]
-            return {"type": "diary_entry", "diary_entry": _diary_entries_rows()[i]}
+                _changes["meal"] = data["meal"]
+            entry.update(_changes)
+            _store_patch("diary_entries", entry, _changes)
+            return {"type": "diary_entry", "diary_entry": entry}
     return {"error": f"Diary entry {entry_id} not found"}
 
 
 def delete_diary_entry(entry_id: int):
-    for i, entry in enumerate(_diary_entries_rows()):
+    for entry in _diary_entries_rows():
         if entry["entry_id"] == entry_id:
-            _diary_entries_rows().pop(i)
+            _store_delete("diary_entries", entry)
             return {"type": "diary_entry", "deleted": True, "entry_id": entry_id}
     return {"error": f"Diary entry {entry_id} not found"}
 
@@ -621,7 +656,7 @@ def create_exercise(data: dict):
         "calories_burned": int(data["calories_burned"]),
         "notes": data.get("notes", ""),
     }
-    _exercise_log_rows().append(exercise)
+    _store_insert("exercise_log", exercise)
     _next_exercise_id += 1
     return {"type": "exercise", "exercise": exercise}
 
@@ -664,7 +699,7 @@ def create_weight_entry(data: dict):
         "weight_lbs": float(data["weight_lbs"]),
         "notes": data.get("notes", ""),
     }
-    _weight_log_rows().append(entry)
+    _store_insert("weight_log", entry)
     _next_weight_id += 1
     return {"type": "weight_entry", "weight_entry": entry}
 
@@ -697,17 +732,20 @@ def create_water(data: dict):
         "cups": int(data["cups"]),
         "notes": data.get("notes", ""),
     }
-    _water_log_rows().append(entry)
+    _store_insert("water_log", entry)
     _next_water_id += 1
     return {"type": "water", "water": entry}
 
 
 def update_water(date: str, data: dict):
-    for i, w in enumerate(_water_log_rows()):
+    for w in _water_log_rows():
         if w["date"] == date:
+            _changes = {}
             if "cups" in data:
-                _water_log_rows()[i]["cups"] = int(data["cups"])
+                _changes["cups"] = int(data["cups"])
             if "notes" in data:
-                _water_log_rows()[i]["notes"] = data["notes"]
-            return {"type": "water", "water": _water_log_rows()[i]}
+                _changes["notes"] = data["notes"]
+            w.update(_changes)
+            _store_patch("water_log", w, _changes)
+            return {"type": "water", "water": w}
     return {"error": f"Water entry for {date} not found"}

@@ -1,6 +1,5 @@
 """Data access module for the Typeform API mock service."""
 
-import csv
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -17,6 +16,33 @@ from _mutable_store import (
 
 _store = get_store("typeform-api")
 _API = "typeform-api"
+
+
+
+def _store_patch(_table, _row_or_pk, _updates):
+    """Persist field updates to a stored row (was: in-place mutation of a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
+
+def _store_delete(_table, _row_or_pk):
+    """Persist a row deletion (was: pop/remove on a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.delete(_pk)
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
 
 _store.register("forms", primary_key="form_id",
                 initial_loader=lambda: _coerce_forms(_load("forms.json", "forms")))
@@ -225,9 +251,9 @@ def create_form(payload):
         "created_time": now,
         "last_updated_time": now,
     }
-    _forms_rows().append(form)
+    _store_insert("forms", form)
     for i, f in enumerate(payload.get("fields", []), start=1):
-        _fields_rows().append({
+        _store_insert("fields", {
             "field_id": _new_id("fld"),
             "form_id": form_id,
             "title": f.get("title", ""),
@@ -245,13 +271,16 @@ def update_form(form_id, payload):
     form = _find_form(form_id)
     if form is None:
         return {"error": f"form {form_id} not found"}
+    _changes = {}
     if "title" in payload:
-        form["title"] = payload["title"]
+        _changes["title"] = payload["title"]
     if "language" in payload:
-        form["language"] = payload["language"]
+        _changes["language"] = payload["language"]
     if "is_public" in payload:
-        form["is_public"] = bool(payload["is_public"])
-    form["last_updated_time"] = _now()
+        _changes["is_public"] = bool(payload["is_public"])
+    _changes["last_updated_time"] = _now()
+    form.update(_changes)
+    _store_patch("forms", form, _changes)
     return _form_obj(form)
 
 
@@ -259,11 +288,14 @@ def delete_form(form_id):
     form = _find_form(form_id)
     if form is None:
         return {"error": f"form {form_id} not found"}
-    _forms_rows().remove(form)
+    _store_delete("forms", form)
     response_ids = [r["response_id"] for r in _responses_rows() if r["form_id"] == form_id]
-    _fields_rows()[:] = [f for f in _fields_rows() if f["form_id"] != form_id]
-    _responses_rows()[:] = [r for r in _responses_rows() if r["form_id"] != form_id]
-    _answers_rows()[:] = [a for a in _answers_rows() if a["response_id"] not in response_ids]
+    for f in [f for f in _fields_rows() if f["form_id"] == form_id]:
+        _store_delete("fields", f)
+    for r in [r for r in _responses_rows() if r["form_id"] == form_id]:
+        _store_delete("responses", r)
+    for a in [a for a in _answers_rows() if a["response_id"] in response_ids]:
+        _store_delete("answers", a)
     return {"deleted": True, "id": form_id}
 
 

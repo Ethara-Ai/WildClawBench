@@ -21,6 +21,19 @@ from _mutable_store import (
 _store = get_store("square-api")
 _API = "square-api"
 
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("customers", primary_key="id",
                 initial_loader=lambda: _coerce_customers(_load("customers.json", "customers")))
 _store.register("catalog", primary_key="id",
@@ -240,7 +253,7 @@ def create_payment(amount, currency="USD", source_id="cnon:card-nonce-ok",
         "receipt_number": f"RCP{seq:03d}",
         "created_at": _now(),
     }
-    _payments_rows().append(payment)
+    _store_insert("payments", payment)
     return {"payment": payment}
 
 
@@ -264,7 +277,7 @@ def create_refund(payment_id, amount=None, currency="USD", reason=None):
         "reason": reason or "Requested by customer",
         "created_at": _now(),
     }
-    _refunds_rows().append(refund)
+    _store_insert("refunds", refund)
     return {"refund": refund}
 
 
@@ -294,7 +307,7 @@ def create_customer(given_name=None, family_name=None, email_address=None,
         "company_name": company_name,
         "created_at": _now(),
     }
-    _customers_rows().append(customer)
+    _store_insert("customers", customer)
     return {"customer": customer}
 
 
@@ -344,7 +357,7 @@ def create_order(customer_id=None, location_id="LOC_MAIN", line_items=None):
         "state": "OPEN",
         "created_at": _now(),
     }
-    _orders_rows().append(order)
+    _store_insert("orders", order)
     return {"order": order}
 
 

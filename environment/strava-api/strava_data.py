@@ -13,11 +13,25 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
+from _mutable_store import (  # noqa: E402
     read_seed_with_ctx, get_store, opt_int, strict_float, strict_int)
 
 _store = get_store("strava-api")
 _API = "strava-api"
+
+
+def _store_patch(_table, _row_or_pk, _updates):
+    """Persist field updates to a stored row (was: in-place mutation of a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
+
+def _store_delete(_table, _row_or_pk):
+    """Persist a row deletion (was: pop/remove on a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.delete(_pk)
 
 _store.register("activities", primary_key="id",
                 initial_loader=lambda: _coerce_activities(_load("activities.json", "activities")))
@@ -156,13 +170,16 @@ def get_activity(activity_id):
 
 
 def update_activity(activity_id, name=None, type=None):
-    for i, a in enumerate(_activities_rows()):
+    for a in _activities_rows():
         if a["id"] == activity_id:
+            _changes = {}
             if name is not None:
-                _activities_rows()[i]["name"] = name
+                _changes["name"] = name
             if type is not None:
-                _activities_rows()[i]["type"] = type
-                _activities_rows()[i]["sport_type"] = type
+                _changes["type"] = type
+                _changes["sport_type"] = type
+            a.update(_changes)
+            _store_patch("activities", a, _changes)
             return get_activity(activity_id)
     return {"error": f"Activity {activity_id} not found", "errors": [{"resource": "Activity", "code": "not_found"}]}
 

@@ -55,6 +55,84 @@ def read_session_jsonl(workdir: str | os.PathLike, persona_name: str) -> List[di
     return entries
 
 
+def _read_jsonl_file(path: Path) -> List[dict]:
+    """Parse one ``.jsonl`` file into a list of entry dicts (skipping bad lines)."""
+    out: List[dict] = []
+    with path.open("r") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                out.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+    return out
+
+
+def _session_id_of(entries: List[dict]) -> str | None:
+    """Return the session id from a session file's header entry, if present.
+
+    OpenClaw writes each session file with a leading
+    ``{"type": "session", "id": "<session-id>", ...}`` header (verified against
+    captured ``chat.jsonl``). The main headless run uses ``--session-id chat``;
+    native ``sessions_spawn`` children get their own files whose header id is the
+    subagent session id (e.g. ``agent:main:subagent:<uuid>``), which is how we
+    tell parent from child without concatenating them.
+    """
+    for e in entries:
+        if isinstance(e, dict) and e.get("type") == "session":
+            sid = e.get("id")
+            return str(sid) if sid is not None else None
+    return None
+
+
+def read_sessions_grouped(
+    workdir: str | os.PathLike,
+    persona_name: str,
+    *,
+    main_session_id: str = "chat",
+) -> dict:
+    """Group the OpenClaw sessions dir into the main session and its children.
+
+    Returns ``{"main": [entries], "children": {session_id: [entries], ...}}``.
+
+    Unlike :func:`read_session_jsonl` (which concatenates every ``.jsonl`` in
+    mtime order — fine when there is only one session, but it would silently
+    merge native ``sessions_spawn`` child sessions into the parent), this keys
+    off each file's ``session`` header id. The file whose header id equals
+    ``main_session_id`` is the parent; all others are children, ordered by file
+    mtime (spawn order). A file without a recognizable header is treated as part
+    of ``main`` for backward compatibility.
+
+    NOTE (validate-later): the exact on-disk filename / header-id string OpenClaw
+    uses for a *headless* subagent session is confirmed in shape but not yet from
+    a live native run; ``main_session_id`` is parameterized so the runner can
+    pass whatever ``--session-id`` it launched with.
+    """
+    workdir = Path(workdir)
+    sessions_dir = workdir / "data" / persona_name / "agents" / "main" / "sessions"
+    result: dict = {"main": [], "children": {}}
+    if not sessions_dir.is_dir():
+        _logger.warning("Sessions dir not found: %s", sessions_dir)
+        return result
+
+    files = sorted(
+        (p for p in sessions_dir.iterdir() if p.suffix == ".jsonl"),
+        key=lambda p: p.stat().st_mtime,
+    )
+    for path in files:
+        entries = _read_jsonl_file(path)
+        if not entries:
+            continue
+        sid = _session_id_of(entries)
+        if sid is None or sid == main_session_id:
+            result["main"].extend(entries)
+        else:
+            result["children"][sid] = entries
+    return result
+
+
 def _count_thinking(content) -> tuple[int, int, bool]:
     """Return (n_thinking_blocks, first_thinking_len, has_signature)."""
     if not isinstance(content, list):

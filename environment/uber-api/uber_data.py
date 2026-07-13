@@ -18,6 +18,33 @@ from _mutable_store import (
 _store = get_store("uber-api")
 _API = "uber-api"
 
+
+
+def _store_patch(_table, _row_or_pk, _updates):
+    """Persist field updates to a stored row (was: in-place mutation of a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
+
+def _store_delete(_table, _row_or_pk):
+    """Persist a row deletion (was: pop/remove on a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.delete(_pk)
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("products", primary_key="product_id",
                 initial_loader=lambda: _coerce_products(_load("products.json", "products")))
 _store.register("trips", primary_key="request_id",
@@ -233,7 +260,7 @@ def create_request(product_id, start_latitude, start_longitude,
         "requested_at": _now_iso(),
         "completed_at": None,
     }
-    _trips_rows().append(trip)
+    _store_insert("trips", trip)
     return trip
 
 
@@ -245,12 +272,14 @@ def get_request(request_id):
 
 
 def cancel_request(request_id):
-    for i, t in enumerate(_trips_rows()):
+    for t in _trips_rows():
         if t["request_id"] == request_id:
             if t["status"] in {"completed", "canceled_rider", "canceled_driver"}:
                 return {"error": f"Request {request_id} cannot be canceled (status: {t['status']})"}
-            _trips_rows()[i]["status"] = "canceled_rider"
-            return _trips_rows()[i]
+            _changes = {"status": "canceled_rider"}
+            t.update(_changes)
+            _store_patch("trips", t, _changes)
+            return t
     return {"error": f"Request {request_id} not found"}
 
 

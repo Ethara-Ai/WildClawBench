@@ -1,7 +1,0 @@
-id,name,displayName,email,avatarUrl,active,admin,teamId,createdAt,updatedAt
-user-anita,anita.patel,Anita Patel,anita.patel@meridianux.com,https://avatars.example.com/anita.png,true,true,team-portal-ux,2025-06-15T09:00:00,2026-10-10T10:00:00
-user-raj,raj.mehta,Raj Mehta,raj.mehta@meridianux.com,https://avatars.example.com/raj.png,true,false,team-portal-ux,2025-07-01T09:00:00,2026-10-08T10:00:00
-user-cass,cass.leung,Cass Leung,cass.leung@meridianux.com,https://avatars.example.com/cass.png,true,false,team-portal-ux,2025-07-01T09:00:00,2026-09-20T10:00:00
-user-tanya,tanya.brooks,Tanya Brooks,tanya.brooks@meridianux.com,https://avatars.example.com/tanya.png,true,false,team-portal-ux,2025-08-01T09:00:00,2026-10-09T10:00:00
-user-lila,lila.fontaine,Lila Fontaine,lila.fontaine@meridianux.com,https://avatars.example.com/lila.png,true,false,team-portal-ux,2025-06-15T09:00:00,2026-10-14T10:00:00
-user-morgan,morgan.okafor,Morgan Okafor,morgan.okafor@meridianux.com,https://avatars.example.com/morgan.png,true,false,team-design-sys,2025-08-15T09:00:00,2026-09-10T10:00:00

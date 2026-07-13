@@ -19,6 +19,19 @@ from _mutable_store import read_seed_with_ctx, get_store, strict_bool  # noqa: E
 _store = get_store("figma-api")
 _API = "figma-api"
 
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("projects", primary_key="project_id",
                 initial_loader=lambda: _coerce_projects(_load("projects.json", "projects")))
 _store.register("files", primary_key="file_key",
@@ -241,7 +254,7 @@ def create_comment(file_key, message, node_id=None, user_id="user-1001"):
         "resolved": False,
         "created_at": _now(),
     }
-    _comments_rows().append(comment)
+    _store_insert("comments", comment)
     return _comment_view(comment)
 
 

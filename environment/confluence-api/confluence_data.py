@@ -21,6 +21,19 @@ from _mutable_store import (
 _store = get_store("confluence-api")
 _API = "confluence-api"
 
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("spaces", primary_key="id",
                 initial_loader=lambda: _coerce_spaces(_load("spaces.json", "spaces")))
 _store.register("pages", primary_key="id",
@@ -228,7 +241,7 @@ def create_content(title, space_key, body="", parent_id=None, created_by="apiuse
         "created_by": created_by,
         "created_at": _now(),
     }
-    _pages_rows().append(page)
+    _store_insert("pages", page)
     return _content_view(page)
 
 

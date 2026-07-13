@@ -17,6 +17,19 @@ from _mutable_store import (
 _store = get_store("woocommerce-api")
 _API = "woocommerce-api"
 
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("products", primary_key="id",
                 initial_loader=lambda: _coerce_products(_load("products.json", "products")))
 _store.register("customers", primary_key="id",
@@ -277,7 +290,7 @@ def create_order(customer_id=0, status="pending", currency="USD",
         "billing_email": billing.get("email", ""),
         "date_created": "2026-05-28T00:00:00",
     }
-    _orders_rows().append(order)
+    _store_insert("orders", order)
     return _serialize_order(order)
 
 

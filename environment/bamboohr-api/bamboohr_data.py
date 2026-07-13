@@ -21,6 +21,19 @@ from _mutable_store import (
 _store = get_store("bamboohr-api")
 _API = "bamboohr-api"
 
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("employees", primary_key="id",
                 initial_loader=lambda: _coerce_employees(_load("employees.json", "employees")))
 _store.register("time_off", primary_key="id",
@@ -146,7 +159,7 @@ def create_employee(firstName, lastName, workEmail=None, department=None,
         "status": "Active",
         "supervisorId": supervisorId or None,
     }
-    _employees_rows().append(emp)
+    _store_insert("employees", emp)
     return emp
 
 
@@ -179,7 +192,7 @@ def create_time_off_request(employeeId, type, start, end, amount=1,
         "notes": notes or "",
         "created": _now_date(),
     }
-    _time_off_rows().append(req)
+    _store_insert("time_off", req)
     return req
 
 

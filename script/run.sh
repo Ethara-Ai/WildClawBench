@@ -23,6 +23,8 @@ source "$(dirname "$0")/lib/log.sh"
 
 readonly AGENT_IMAGE="wildclawbench-ubuntu:v1.3"
 readonly AGENT_IMAGE_SHA="60eec8752cb597e180780ff08d7569c1892c169521f1f2b069c2efeb006a4078"
+# Custom LiteLLM sidecar image with headroom-ai baked in (agent prompt compression).
+readonly HEADROOM_IMAGE="wildclawbench-litellm-headroom:v2"
 readonly AGENT_TAR_PATH="Images/wildclawbench-ubuntu_v1.3.tar"
 readonly DEFAULT_TASK="input/alden-croft_MB"
 readonly DEFAULT_MODEL="claude-opus-4.7"
@@ -71,6 +73,8 @@ COMMON FLAGS
   -B, --bulk FILE           Read task paths from FILE (one per line, # comments ok)
       --input-dir DIR       Queue every task subdir under DIR
   -P, --parallel-tasks N    Run N tasks CONCURRENTLY, each failure-isolated (one failing never stops the rest)
+                            (-j/--jobs are accepted as aliases)
+  --no-subagents            Force sub-agent spawning OFF (model never granted sessions_spawn)
   -R, --regrade DIR         Re-run judge phase only against an existing run dir
       --rubric PATH         Override rubric for --regrade
   -h, --help                Show this help and exit
@@ -125,7 +129,7 @@ EOF
 }
 
 preflight_docker() {
-    log::step 1 5 "Docker daemon"
+    log::step 1 6 "Docker daemon"
     if ! command -v docker >/dev/null 2>&1; then
         log::err "docker CLI not found in PATH"
         log::hint "Install Docker Desktop: https://www.docker.com/products/docker-desktop"
@@ -214,7 +218,7 @@ ensure_pv_installed() {
 #   2. Tag missing but content image (by SHA) present: re-tag from SHA.
 #   3. Neither tag nor SHA present: try to load from AGENT_TAR_PATH; fail with HF hint.
 preflight_agent_image() {
-    log::step 2 5 "Agent image ${AGENT_IMAGE}"
+    log::step 2 6 "Agent image ${AGENT_IMAGE}"
 
     if docker image inspect "$AGENT_IMAGE" >/dev/null 2>&1; then
         log::ok "Image present"
@@ -260,7 +264,7 @@ preflight_agent_image() {
 }
 
 preflight_mock_image() {
-    log::step 3 5 "Mock-stack image kensei3-mocks:v1"
+    log::step 3 6 "Mock-stack image kensei3-mocks:v1"
     if docker image inspect kensei3-mocks:v1 >/dev/null 2>&1; then
         log::ok "Mock image present (no rebuild needed)"
         return 0
@@ -279,8 +283,36 @@ sys.exit(0 if ok else 1)
     log::ok "Mock image built"
 }
 
+# Agent-side Headroom prompt compression is opt-in (KENSEI_AGENT_HEADROOM_ENABLED
+# truthy in .env; see eval/run_batch.py). When enabled, start_litellm() runs the
+# custom sidecar image HEADROOM_IMAGE (headroom-ai baked in) instead of the stock
+# LiteLLM image. Nothing else builds it, so build it here if missing. Skipped
+# entirely when Headroom is not enabled.
+preflight_headroom_image() {
+    log::step 4 6 "Headroom LiteLLM image ${HEADROOM_IMAGE}"
+    local hr_val
+    hr_val=$(grep -E '^KENSEI_AGENT_HEADROOM_ENABLED=' .env 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '[:space:]' | tr 'A-Z' 'a-z')
+    if [[ ! "$hr_val" =~ ^(1|true|yes|on)$ ]]; then
+        log::ok "Agent Headroom not enabled; stock LiteLLM image will be used (no build needed)"
+        return 0
+    fi
+    if docker image inspect "$HEADROOM_IMAGE" >/dev/null 2>&1; then
+        log::ok "Headroom image present (no rebuild needed)"
+        return 0
+    fi
+    log::warn "Headroom image absent — building from docker/litellm-headroom.Dockerfile (~1-2 min)"
+    if docker build -f docker/litellm-headroom.Dockerfile -t "$HEADROOM_IMAGE" . >/dev/null 2>&1; then
+        log::ok "Headroom image built"
+    else
+        log::err "Headroom image build failed. Build it manually:"
+        log::err "  docker build -f docker/litellm-headroom.Dockerfile -t ${HEADROOM_IMAGE} ."
+        log::err "Or disable Headroom by setting KENSEI_AGENT_HEADROOM_ENABLED=false in .env"
+        return 1
+    fi
+}
+
 preflight_env_file() {
-    log::step 4 5 ".env credentials"
+    log::step 5 6 ".env credentials"
     if [[ ! -f .env ]]; then
         log::err ".env not found in $(pwd)"
         log::hint "Copy .env.example → .env and fill in credentials"
@@ -340,7 +372,7 @@ other_runs_active() {
 }
 
 cleanup_orphans() {
-    log::step 5 5 "Orphan cleanup"
+    log::step 6 6 "Orphan cleanup"
 
     # Concurrency guard: never run the destructive global sweep while a peer
     # run.sh is alive — it would force-remove the peer's live containers/network.
@@ -513,6 +545,9 @@ teardown_shared_sidecar() {
 # Stamps "$RUN_RC" and "$RUN_LOG" globals so the retry loop can inspect.
 RUN_RC=0
 RUN_LOG=""
+# Set to "1" by the --no-subagents CLI flag; forwarded to run_batch.py so the
+# model is never granted sessions_spawn (no sub-agent fan-out for the whole run).
+NO_SUBAGENTS=""
 
 run_one() {
     local task_path="$1"
@@ -547,6 +582,7 @@ run_one() {
         cmd+=(--generate-tests --testgen-max-attempts 3 --execute-tests --testexec-timeout 600)
     fi
     (( JUDGE_COUNCIL == 1 )) && cmd+=(--judge-council)
+    [[ -n "$NO_SUBAGENTS" ]] && cmd+=(--no-subagents)
 
     set +e
     "${cmd[@]}" 2>&1 | tee "$RUN_LOG"
@@ -861,12 +897,13 @@ parse_args() {
             --no-bundle)          AUTO_BUNDLE=0; shift ;;
             --bundle-root)        BUNDLE_ROOT="$2"; shift 2 ;;
             --parallel-reps)      PARALLEL_REPS=1; shift ;;
-            -P|--parallel-tasks)
+            -j|--jobs|-P|--parallel-tasks)
                 [[ -n "${2:-}" ]] || { log::err "$1 requires a value"; exit 2; }
                 PARALLEL_TASKS="$2"; shift 2 ;;
             --input-dir)
                 [[ -n "${2:-}" ]] || { log::err "$1 requires a value"; exit 2; }
                 INPUT_DIR="$2"; shift 2 ;;
+            --no-subagents)       NO_SUBAGENTS=1; shift ;;
             --skip-preflight)     SKIP_PREFLIGHT=1; shift ;;
             --) shift; while (( $# > 0 )); do positional+=("$1"); shift; done ;;
             -*) log::err "Unknown flag: $1"; log::hint "Run 'bash script/run.sh --help' for usage"; exit 2 ;;
@@ -1052,6 +1089,7 @@ main() {
         preflight_docker || exit 1
         preflight_agent_image || exit 1
         preflight_mock_image || exit 1
+        preflight_headroom_image || exit 1
         preflight_env_file || exit 1
         cleanup_orphans
     else

@@ -10,11 +10,24 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
+from _mutable_store import (  # noqa: E402
     read_seed_with_ctx, get_store, opt_csv_list, strict_int)
 
 _store = get_store("linkedin-api")
 _API = "linkedin-api"
+
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
 
 _store.register("posts", primary_key="id",
                 initial_loader=lambda: _coerce_posts(_load("posts.json", "posts")))
@@ -157,7 +170,7 @@ def create_post(commentary, author_id=None, visibility="PUBLIC"):
         "created_at": _now(),
         "socialDetail": {"likeCount": 0, "commentCount": 0, "shareCount": 0},
     }
-    _posts_rows().append(post)
+    _store_insert("posts", post)
     return post
 
 

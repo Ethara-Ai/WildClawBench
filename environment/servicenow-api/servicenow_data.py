@@ -15,13 +15,26 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
+from _mutable_store import (  # noqa: E402
     read_seed_with_ctx, get_store,
     strict_bool,
 )
 
 _store = get_store("servicenow-api")
 _API = "servicenow-api"
+
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
 
 _store.register("incidents", primary_key="sys_id",
                 initial_loader=lambda: _coerce_incidents(_load("incident.json", "incidents")))
@@ -182,7 +195,7 @@ def create_incident(short_description, description=None, priority="3", impact="3
         "opened_at": now,
         "updated_at": now,
     }
-    _incidents_rows().append(rec)
+    _store_insert("incidents", rec)
     return rec
 
 

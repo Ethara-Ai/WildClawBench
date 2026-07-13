@@ -13,11 +13,26 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
+from _mutable_store import (  # noqa: E402
     read_seed_with_ctx, get_store, opt_csv_list, opt_int, strict_bool)
 
 _store = get_store("zendesk-api")
 _API = "zendesk-api"
+
+_API = "zendesk-api"
+
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
 
 _store.register("users", primary_key="id",
                 initial_loader=lambda: _coerce_users(_load("users.json", "users")))
@@ -194,10 +209,10 @@ def create_ticket(subject, description=None, priority="normal", ticket_type="que
         "created_at": now,
         "updated_at": now,
     }
-    _tickets_rows().append(ticket)
+    _store_insert("tickets", ticket)
     body = comment_body or description
     if body:
-        _comments_rows().append({
+        _store_insert("comments", {
             "id": _next_id(_comments_rows()),
             "ticket_id": ticket_id,
             "author_id": _to_int(requester_id),
@@ -229,7 +244,7 @@ def update_ticket(ticket_id, status=None, priority=None, assignee_id=None,
     if tags is not None:
         t["tags"] = tags
     if comment_body:
-        _comments_rows().append({
+        _store_insert("comments", {
             "id": _next_id(_comments_rows()),
             "ticket_id": t["id"],
             "author_id": _to_int(comment_author_id) if comment_author_id is not None else t["assignee_id"],
@@ -268,7 +283,7 @@ def create_comment(ticket_id, body, author_id=None, public=True):
         "public": bool(public),
         "created_at": _now(),
     }
-    _comments_rows().append(comment)
+    _store_insert("comments", comment)
     t["updated_at"] = _now()
     return {"comment": comment}
 

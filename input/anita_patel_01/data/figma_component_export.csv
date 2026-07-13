@@ -1,9 +1,0 @@
-component_id,component_name,frame,file_key,type,created_by,last_modified
-c:201,Login SSO Button,12:01,FK_PPR26A_stepper,button,Raj Mehta,2026-10-14
-c:202,Refill Step Indicator,12:14,FK_PPR26A_stepper,progress,Raj Mehta,2026-10-14
-c:203,Message Send Modal,12:27,FK_PPR26A_stepper,modal,Raj Mehta,2026-10-15
-c:204,Stepper Nav Arrow,12:01,FK_PPR26A_stepper,icon,Raj Mehta,2026-10-14
-c:205,Step Label Text,12:14,FK_PPR26A_stepper,text,Raj Mehta,2026-10-14
-c:101,SSO Integration Panel,11:01,FK_PPR26A_sprint4,panel,Anita Patel,2026-10-02
-c:102,Refill Inline Tracker,11:14,FK_PPR26A_sprint4,tracker,Anita Patel,2026-10-05
-c:103,Messaging Thread View,11:27,FK_PPR26A_sprint4,thread,Anita Patel,2026-10-10

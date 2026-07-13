@@ -18,6 +18,11 @@ from pathlib import Path
 from typing import Any, Mapping
 from dotenv import load_dotenv
 
+# Load .env BEFORE importing src.utils modules: several resolve env at import time
+# (e.g. grading._DEFAULT_COUNCIL_MEMBERS reads JUDGE_COUNCIL_*_ARN on import), so
+# .env must populate os.environ first or those overrides are silently missed.
+load_dotenv()
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from src.agents.base import AgentTaskSpec, BaseAgent
@@ -34,6 +39,7 @@ from src.utils.docker_utils import (
     remove_container,
     close_proc_log,
     collect_output_from_container,
+    snapshot_persona_and_data_from_container,
     TMP_WORKSPACE,
 )
 from src.utils.grading import (
@@ -67,12 +73,11 @@ from src.utils.litellm_sidecar import (
     verify_litellm_upstream_reachable,
     wait_for_litellm_healthy,
 )
-from src.utils.trajectory.builder import build_trajectory_from_jsonl
+from src.utils.trajectory.builder import build_published_trajectory, build_trajectory_from_jsonl
 from src.utils.trajectory.local_media import replace_inline_media_with_files
 from src.utils.store import Task as StoreTask
 from src.utils.env_overlay_snapshot import stage_environment_with_overlays
 
-load_dotenv()
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -244,6 +249,143 @@ def recompute_combined(sources: dict[str, dict], task_id: str = "") -> dict:
     return combined
 
 
+# Set once during batch setup to the host dir holding the agent headroom
+# telemetry sink (headroom.jsonl). save_usage reads it to surface agent
+# context-compression stats into usage.json (IAN report Pointer 3); the JSONL
+# was previously written but never read back into any artifact.
+_HEADROOM_LOG_DIR: str = ""
+
+# Set once during batch setup to the sidecar per-request usage sink
+# (usage.jsonl). _build_trajectory reads it to back-fill the per-message cost
+# blocks in output.json, which OpenClaw's chat.jsonl always writes as zero on
+# this image build (its internal LiteLLM provider doesn't populate usage).
+_USAGE_LOG_PATH: str = ""
+
+# Relative per-token price weights used ONLY to split a request's known total
+# cost across categories for the per-message breakdown (Anthropic ratios:
+# output 5x input, cache-read 0.1x, cache-write 1.25x). The summed total is the
+# real billed cost; the split is a faithful proportional apportionment.
+_COST_WEIGHTS = {"input": 1.0, "output": 5.0, "cacheRead": 0.1, "cacheWrite": 1.25}
+
+
+def _parse_iso(ts: str):
+    from datetime import datetime
+    try:
+        return datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return None
+
+
+def _backfill_per_message_cost(traj: dict, usage_log_path: str) -> int:
+    """Populate each assistant message's token + cost block in ``traj`` from the
+    sidecar per-request usage log (usage.jsonl), order-matched within the agent
+    run's time window. Returns the number of messages back-filled.
+
+    OpenClaw writes all-zero per-message usage/cost into chat.jsonl on this
+    image build (IAN report Pointer 5); the real per-request numbers live only
+    in the sidecar log. We isolate the agent's requests by the assistant
+    message timestamp window (excluding earlier testgen / later judge rows) and
+    assign rows to assistant messages in chronological order.
+    """
+    if not usage_log_path or not Path(usage_log_path).is_file():
+        return 0
+    msgs = [m for m in (traj.get("messages") or []) if isinstance(m, dict)]
+    def _inner(m):
+        return m.get("message") if isinstance(m.get("message"), dict) else m
+    assistants = [m for m in msgs if str(_inner(m).get("role", "")).lower() == "assistant"]
+    if not assistants:
+        return 0
+    # Agent window from message timestamps.
+    mts = [_parse_iso(m.get("timestamp", "")) for m in msgs]
+    mts = [t for t in mts if t is not None]
+    lo = min(mts) if mts else None
+    hi = max(mts) if mts else None
+    rows = []
+    for line in Path(usage_log_path).read_text(encoding="utf-8", errors="replace").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            r = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        rts = _parse_iso(r.get("ts", ""))
+        if rts is None:
+            continue
+        # Keep rows within the agent window (with a small margin for the final
+        # completion logged just after the last assistant message timestamp).
+        if lo is not None and hi is not None:
+            from datetime import timedelta
+            if rts < lo - timedelta(seconds=10) or rts > hi + timedelta(seconds=180):
+                continue
+        rows.append((rts, r))
+    rows.sort(key=lambda x: x[0])
+    n = 0
+    for msg, (_, r) in zip(assistants, rows):
+        inner = _inner(msg)
+        it = int(r.get("input_tokens", 0) or 0)
+        ot = int(r.get("output_tokens", 0) or 0)
+        cr = int(r.get("cache_read_tokens", 0) or 0)
+        cw = int(r.get("cache_write_tokens", 0) or 0)
+        total_cost = float(r.get("cost_usd", 0.0) or 0.0)
+        toks = {"input": it, "output": ot, "cacheRead": cr, "cacheWrite": cw}
+        wsum = sum(_COST_WEIGHTS[k] * toks[k] for k in toks) or 1.0
+        cost = {k: round(total_cost * (_COST_WEIGHTS[k] * toks[k]) / wsum, 8) for k in toks}
+        cost["total"] = round(total_cost, 8)
+        usage = inner.get("usage") if isinstance(inner.get("usage"), dict) else {}
+        usage.update({
+            "input": it, "output": ot, "cacheRead": cr, "cacheWrite": cw,
+            "totalTokens": int(r.get("total_tokens", it + ot) or (it + ot)),
+            "cost": cost,
+        })
+        inner["usage"] = usage
+        n += 1
+    return n
+
+
+def _aggregate_headroom(log_dir: str) -> dict | None:
+    """Aggregate the agent headroom telemetry (headroom.jsonl) into a compact
+    summary: whether compression ran, how many requests it touched, and the
+    tokens it saved. Returns None when headroom was disabled / produced no rows.
+    """
+    if not log_dir:
+        return None
+    path = Path(log_dir) / "headroom.jsonl"
+    if not path.is_file():
+        return None
+    events = 0
+    tokens_before = tokens_after = tokens_saved = 0
+    try:
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            events += 1
+            tokens_before += int(row.get("tokens_before", 0) or 0)
+            tokens_after += int(row.get("tokens_after", 0) or 0)
+            tokens_saved += int(row.get("tokens_saved", 0) or 0)
+    except OSError:
+        return None
+    if events == 0:
+        return None
+    ratio = round(tokens_after / tokens_before, 4) if tokens_before else 0.0
+    return {
+        "enabled": True,
+        # headroom.jsonl is the batch-wide sink; for the common one-task-per-run
+        # invocation this equals the task. Marked so a reader knows the scope.
+        "scope": "batch",
+        "compression_events": events,
+        "tokens_before_total": tokens_before,
+        "tokens_after_total": tokens_after,
+        "tokens_saved_total": tokens_saved,
+        "compression_ratio": ratio,
+    }
+
+
 def save_usage(
     output_dir: Path,
     result: dict,
@@ -275,6 +417,9 @@ def save_usage(
         if k not in out and k not in _USAGE_NUMERIC_KEYS and k != "cost_usd":
             out[k] = v
 
+    _hr = _aggregate_headroom(_HEADROOM_LOG_DIR)
+    if _hr:
+        out["headroom"] = _hr
     result["usage"] = out
     if out["request_count"] > 0:
         # Include preflight in the breakdown so the sidecar-startup ping is visible
@@ -325,6 +470,55 @@ def collect_task_output(
         logger.warning("[%s] Failed to collect task output: %s", task_id, exc)
 
 
+def _snapshot_persona_and_data_before(
+    task: dict, dest_dir: Path
+) -> dict:
+    """Write the PRISTINE persona/ and data/ folders into ``dest_dir`` from the
+    on-disk task source (the exact state before turn 0 / first prompt).
+
+    persona/ is copied from ``task['persona_dir']`` (input/<task>/persona); data/
+    is copied from the staged attachments (their ``storedAs`` rel paths), which
+    already exclude graders/solutions/scaffolding. Returns counts.
+    """
+    import shutil
+
+    persona_dest = dest_dir / "persona"
+    data_dest = dest_dir / "data"
+    persona_dest.mkdir(parents=True, exist_ok=True)
+    data_dest.mkdir(parents=True, exist_ok=True)
+
+    n_persona = 0
+    persona_dir = task.get("persona_dir") or ""
+    if persona_dir and Path(persona_dir).is_dir():
+        for item in Path(persona_dir).iterdir():
+            if item.name == ".DS_Store":
+                continue
+            target = persona_dest / item.name
+            try:
+                if item.is_dir():
+                    shutil.copytree(item, target, dirs_exist_ok=True)
+                else:
+                    shutil.copy2(item, target)
+                n_persona += 1
+            except OSError as exc:
+                logger.debug("before-snapshot persona copy failed (%s): %s", item, exc)
+
+    n_data = 0
+    for att in task.get("attachments") or []:
+        src = Path(att.get("path", ""))
+        rel = att.get("storedAs") or att.get("name") or src.name
+        if not src.is_file() or rel.startswith("/") or ".." in Path(rel).parts:
+            continue
+        dst = data_dest / rel
+        try:
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dst)
+            n_data += 1
+        except OSError as exc:
+            logger.debug("before-snapshot data copy failed (%s): %s", src, exc)
+    return {"persona": n_persona, "data": n_data}
+
+
 def load_models_config(models_config_path: Path) -> dict:
     raw_config = models_config_path.read_text(encoding="utf-8")
     proxy_api_key = os.environ.get("MY_PROXY_API_KEY")
@@ -356,6 +550,15 @@ def _stage_native_workspace(task: dict, config) -> str:
     exec_dir = staging / "exec"
     exec_dir.mkdir(parents=True, exist_ok=True)
     return str(staging)
+
+
+def _normalize_api_name(name: str) -> str:
+    """Map a declared API name to its environment dir name (``<name>-api``).
+    'gmail' -> 'gmail-api'; 'gmail-api' -> 'gmail-api' (idempotent)."""
+    n = str(name or "").strip()
+    if not n:
+        return ""
+    return n if n.endswith("-api") else f"{n}-api"
 
 
 def _resolve_task_apis(task: dict, config) -> "tuple[set[str], list[str], dict]":
@@ -407,6 +610,7 @@ def _resolve_task_apis(task: dict, config) -> "tuple[set[str], list[str], dict]"
 
     task_dir = task.get("task_dir", "")
     overlays: dict[str, dict[str, str]] = {}
+    mock_data_apis: set[str] = set()
     if task_dir:
         mock_root = Path(task_dir) / "mock_data"
         if mock_root.is_dir():
@@ -505,10 +709,28 @@ def _augment_task_with_mocks(task: dict, config, mock_env_dict: dict | None) -> 
     task["required_apis"] = sorted(required)
     task["mock_overlays"] = overlays
     task["distractor_apis"] = distractor
-    # Expose the shared mock-stack URLs to the task (the full service map; the
-    # extra entries are inert env vars for APIs this task doesn't call).
+    # Expose ONLY the task's own APIs (required + distractor + overlays) as
+    # URLs — not the full ~104-service catalog — so the agent can't call URLs
+    # whose servers this task's stack never starts and the mock-health logger
+    # doesn't spam warnings for intentionally-disabled services.
+    enabled_apis = (
+        set(task.get("required_apis") or [])
+        | set(task.get("distractor_apis") or [])
+        | set((task.get("mock_overlays") or {}).keys())
+    )
     if mock_env_dict:
-        task["env_dict"] = dict(mock_env_dict)
+        if enabled_apis:
+            filtered: dict[str, str] = {}
+            for k, v in mock_env_dict.items():
+                if k.endswith("_API_URL"):
+                    # GMAIL_API_URL -> gmail-api ; GOOGLE_CALENDAR_API_URL -> google-calendar-api
+                    api = k[:-4].lower().replace("_", "-")
+                    if api not in enabled_apis:
+                        continue
+                filtered[k] = v
+            task["env_dict"] = filtered
+        else:
+            task["env_dict"] = dict(mock_env_dict)
     else:
         task.setdefault("env_dict", {})
 
@@ -892,6 +1114,20 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
         extra={
             "required_apis": list(task.get("required_apis") or []),
             "distractor_apis": list(task.get("distractor_apis") or []),
+            # CHECKERS module + conftest for fixture-based suites; bundle.py
+            # deploys these to data/tests/task/task.py and data/tests/conftest.py
+            # so the published bundle's real-pytest test.sh can import them.
+            "checkers_code": task.get("checkers_code", "") or "",
+            "conftest_code": task.get("conftest_code", "") or "",
+            # Full multi-turn wake-up script so the bundle's instruction.md
+            # renders every turn, not just turn 0.
+            "turn_messages": list(task.get("turn_messages") or []),
+            # Declared API sets (task.yaml required_apis/distractor_apis) so the
+            # published data/task.toml lists ONLY the task's own APIs instead of
+            # the runtime required∪mock_data union or the full ~104 catalog that
+            # compute_distractor_skills returns as a fallback.
+            "required_apis_declared": task.get("required_apis_declared"),
+            "distractor_apis_declared": task.get("distractor_apis_declared"),
         },
     )
     artifacts_dir = task_bundle_dir / "artifacts"
@@ -946,10 +1182,51 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
         next_idx += 1
     traj["output_artifacts"] = artifacts_list
 
+    # Back-fill real per-message token + cost numbers from the sidecar usage log
+    # (OpenClaw's chat.jsonl writes them as zero on this image build).
+    try:
+        _n = _backfill_per_message_cost(traj, _USAGE_LOG_PATH)
+        if _n:
+            logger.info("[%s] per-message cost back-filled for %d assistant message(s)",
+                        task["task_id"], _n)
+    except Exception as exc:
+        logger.warning("[%s] per-message cost back-fill failed: %s", task["task_id"], exc)
+
     _normalize_display_model(traj)
 
+    # output.json is the PUBLISHED trajectory: a slim {messages, meta_info} doc
+    # (the reference Claude_Opus_4_7.json schema). The rich `traj` dict is kept
+    # in-memory below for grading + the harbor bundle; only the on-disk/bundle
+    # form is projected. completion_status is run-level (agent finished w/o a
+    # fatal error); the rubric grade is computed later and lives in score.json.
+    completion_status = "failure" if result.get("error") else "success"
+    # Multi-agent: embed captured sub-agent trajectories. The spawn runtime
+    # writes these under /tmp_workspace/, collected into workspace_full/.
+    # build_published_trajectory omits the key when there are no sub-agents, so
+    # single-agent output.json stays byte-identical.
+    _ws_full = output_dir / "task_output" / "workspace_full"
+    published = build_published_trajectory(
+        traj, st, completion_status,
+        subagents_dir=_ws_full / "subagents",
+        spawn_tree_path=_ws_full / "spawn_tree.jsonl",
+    )
+    # Native multi-agent: harvest the collected OpenClaw session store into the
+    # Larry_Bates layout — adds meta_info.agents to output.json and writes
+    # subagents/NN_<label>.json + spawn_tree/parent_spawn_tree.txt. No-op for
+    # single-agent runs (no sessions.json), so their output.json is unchanged.
+    try:
+        from src.utils.trajectory.builder import attach_native_subagents
+        published = attach_native_subagents(
+            published,
+            output_dir / "task_output" / "sessions",
+            output_dir,
+            cluster=str(task.get("cluster") or task.get("category") or ""),
+        )
+    except Exception as exc:  # never let harvest break the run
+        logger.warning("[%s] native sub-agent harvest failed: %s",
+                       task["task_id"], exc)
     (output_dir / "output.json").write_text(
-        json.dumps(traj, indent=2, ensure_ascii=False), encoding="utf-8",
+        json.dumps(published, indent=2, ensure_ascii=False), encoding="utf-8",
     )
     n_thinking = sum(
         1
@@ -994,6 +1271,19 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
                 use_council=task.get("__use_judge_council__"),
             )
             result["scores"] = scores
+            # tests_* in score.json are the DETERMINISTIC pytest counts, not a
+            # copy of the rubric criteria_*. grade_with_rubric() can only emit
+            # the criteria counts as a placeholder alias (it never sees the
+            # tests); now that the deterministic suite has already run, overwrite
+            # them with the real ctrf/test_executor counts so tests_* and
+            # criteria_* are no longer accidentally identical. Falls back to the
+            # criteria alias only when no deterministic suite ran.
+            if isinstance(scores, dict):
+                te = result.get("test_result") or {}
+                if isinstance(te, dict) and te.get("tests_total") is not None:
+                    scores["tests_total"] = int(te.get("tests_total", 0) or 0)
+                    scores["tests_passed"] = int(te.get("tests_passed", 0) or 0)
+                    scores["tests_failed"] = int(te.get("tests_failed", 0) or 0)
             if isinstance(scores, dict) and scores.get("usage"):
                 result["__judge_usage__"] = dict(scores["usage"])
             _augment_score_with_combined_rewards(scores, result)
@@ -1251,6 +1541,24 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
             logger.warning("[%s] Auto-bundle preparation failed: %s", task["task_id"], exc)
 
 
+def _apply_no_subagents(task: dict, args) -> None:
+    """Force sub-agent spawning OFF for this run when --no-subagents was passed.
+
+    Overrides every enablement source in task_parser (explicit task_config.yaml
+    multi_agent blocks, multi_agent_complex_turns, the WCB_MULTI_AGENT_DEFAULT
+    capability default). With multi_agent_enabled False the runner never grants
+    the session tools via tools.alsoAllow AND explicitly denies them (see
+    deny_native_subagents), so the model is never offered sessions_spawn.
+    """
+    if not getattr(args, "no_subagents", False):
+        return
+    if task.get("multi_agent_enabled"):
+        logger.info("[%s] --no-subagents: forcing multi-agent OFF "
+                    "(was enabled via task/default config)", task.get("task_id", "?"))
+    task["multi_agent_enabled"] = False
+    task["multi_agent_config"] = {"enabled": False, "forced_off_by": "--no-subagents"}
+
+
 def run_single_task(
     task: dict,
     model: str,
@@ -1412,8 +1720,26 @@ def run_single_task(
                 pass
 
     prompt          = task["prompt"]
-    system_prompt = f"You are an expert in a restricted, non-interactive environment. Solve the task efficiently before the timeout ({timeout_seconds}s). Run all processes in the foreground without user input or background services. Provide a complete, functional solution in a single pass with no placeholders. \n"
-    prompt = system_prompt + prompt
+    # The "expert in a restricted, non-interactive environment / single pass /
+    # timeout" preamble frames the task as a one-shot solver problem. That is
+    # correct for single-turn coding-style tasks but actively contradicts the
+    # multi-turn persona tasks (inject/stages/drift + prompts.txt wake-up
+    # script), where the agent is a turn-by-turn personal assistant operating
+    # over a multi-day simulation. Prepending it there gave the agent
+    # conflicting role instructions ("solver" vs "assistant") and a false
+    # "single pass" urgency (IAN report H1/H7). Only prepend for genuinely
+    # single-pass, non-persona tasks.
+    _turns = task.get("turn_messages") or []
+    is_multiturn_persona = bool(
+        task.get("inject_path")
+        or task.get("stages_path")
+        or task.get("drift_script_path")
+        or task.get("persona_dir")
+        or len(_turns) > 1
+    )
+    if not is_multiturn_persona:
+        system_prompt = f"You are an expert in a restricted, non-interactive environment. Solve the task efficiently before the timeout ({timeout_seconds}s). Run all processes in the foreground without user input or background services. Provide a complete, functional solution in a single pass with no placeholders. \n"
+        prompt = system_prompt + prompt
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M")
     run_id = uuid.uuid4().hex[:6]
@@ -1442,7 +1768,113 @@ def run_single_task(
     gateway_proc = None
     agent_proc = None
     elapsed_time = float(timeout_seconds)
-    drift_director = _start_drift_director(task, drift_info, output_dir) if drift_info else None
+    # Two mutually-exclusive injection models share the admin-plane substrate:
+    #  * stages.yaml -> ClawMark-style: invoke the agent across turns, injecting
+    #    SILENTLY between turns while the agent is idle (no race, no notification).
+    #  * drift.yaml  -> racing: a background DriftDirector mutates state DURING a
+    #    single continuous run. Staged mode wins when both are present.
+    drift_director = None
+    stage_applier = None
+    inject_applier = None
+    agent_state_json: str | None = None
+    stage_turns: tuple[str, ...] | None = None
+    stage_before_turn = None
+    # Loud guard: a task shipping an injection config but no live admin plane
+    # (per-task mock stack failed to come up) would silently degrade to a single
+    # no-injection turn. Make that unmistakable rather than reporting a clean run.
+    _wants_injection = task.get("inject_path") or task.get("stages_path") or task.get("drift_script_path")
+    if _wants_injection and not drift_info:
+        logger.error(
+            "[%s] INJECTION DISABLED: task ships an injection config (%s) but the per-task "
+            "mock admin plane is not available; running a single NON-INJECTED turn. The score "
+            "is NOT a valid measurement of the injection scenario.",
+            task_id,
+            "inject" if task.get("inject_path") else
+            ("stages.yaml" if task.get("stages_path") else "drift.yaml"),
+        )
+    if drift_info and task.get("inject_path"):
+        # Talos inject-format: a fixed multi-turn wake-up script (prompts.txt)
+        # with silent mutations applied at specific turn boundaries via the
+        # admin plane. The mock_data overlays already hold the canonical
+        # pre-T0 baseline, so the stage0 `loud` seed is NOT replayed; only the
+        # `silent` mutations fire (kept out of the agent-visible audit feed).
+        try:
+            from src.utils.inject_director import InjectScript, InjectApplier
+            from src.utils.docker_utils import copy_file_into_workspace
+            _is = InjectScript.load(task["inject_path"])
+
+            def _copy_into_workspace(host_src, dst, mkdir=False, _tid=task_id):
+                # Drop per-turn inject artifacts (emails, PDFs, silent file
+                # swaps) into the running agent container's workspace. The pre-T0
+                # seed fires before the container exists -> hook returns False and
+                # the op is logged skipped (baseline already mounted at /app).
+                return copy_file_into_workspace(_tid, host_src, dst, mkdir=mkdir)
+
+            inject_applier = InjectApplier(
+                host_api_to_url=drift_info.get("host_api_to_url") or {},
+                admin_token=drift_info.get("admin_token"),
+                timeline_path=output_dir / "inject_timeline.jsonl",
+                inject_root=Path(task["inject_path"]),
+                copy_into_workspace=_copy_into_workspace,
+            )
+            inject_applier.seed(_is)
+            # INITIAL mock-data-state snapshot: capture the pristine workspace
+            # BEFORE the first prompt is injected — persona/, data/ (from the
+            # on-disk task source) and mock_data/ (the live mock-API store right
+            # after seed, before any silent mutation). Mirrored by the
+            # workspace_after snapshot taken once all turns have run.
+            _ws_before = output_dir / "snapshot" / "workspace_before"
+            try:
+                _snapshot_persona_and_data_before(task, _ws_before)
+                inject_applier.snapshot_state(
+                    _ws_before / "mock_data", label="before_injection")
+            except Exception as exc:
+                logger.warning("[%s] before-injection snapshot failed: %s", task_id, exc)
+            raw_turns = list(task.get("turn_messages") or [])
+            # `prompt` already carries the system-prompt prefix + workspace hint
+            # for turn 0; later turns are fed verbatim from prompts.txt.
+            stage_turns = tuple([prompt] + raw_turns[1:]) if raw_turns else (prompt,)
+
+            def _inject_before_turn(turn_index: int, _is=_is, _ap=inject_applier):
+                # Agent is idle here; apply the stage whose boundary ends at this turn.
+                st = _is.stage_for_boundary(turn_index)
+                if st is not None:
+                    _ap.apply_stage(st, turn_index)
+
+            stage_before_turn = _inject_before_turn
+            logger.info("[%s] inject-format injection enabled: %d turns, %d stage(s)",
+                        task_id, len(stage_turns), len(_is.stages))
+        except Exception as exc:
+            logger.error("[%s] inject/ setup failed (continuing single-turn): %s",
+                         task_id, exc)
+            stage_turns = None
+            stage_before_turn = None
+    elif drift_info and task.get("stages_path"):
+        try:
+            from src.utils.stage_director import StageScript, StageApplier
+            _ss = StageScript.load(task["stages_path"])
+            stage_applier = StageApplier(
+                host_api_to_url=drift_info.get("host_api_to_url") or {},
+                admin_token=drift_info.get("admin_token"),
+                timeline_path=output_dir / "stage_timeline.jsonl",
+            )
+            stage_turns = _ss.turn_messages(prompt)
+
+            def _before_turn(turn_index: int, _ss=_ss, _ap=stage_applier):
+                # Agent is idle here; apply the matching stage's silent injection.
+                _ap.record_turn(turn_index, "start")
+                _ap.apply(_ss.stages[turn_index - 1], turn_index)
+
+            stage_before_turn = _before_turn
+            logger.info("[%s] staged injection enabled: %d turns, %d silent stage(s)",
+                        task_id, len(stage_turns), len(_ss.stages))
+        except Exception as exc:
+            logger.error("[%s] stages.yaml setup failed (continuing single-turn): %s",
+                         task_id, exc)
+            stage_turns = None
+            stage_before_turn = None
+    elif drift_info:
+        drift_director = _start_drift_director(task, drift_info, output_dir)
     mock_health_logger = _start_mock_health_logger(task, task_id, output_dir)
 
     try:
@@ -1458,6 +1890,10 @@ def run_single_task(
                 thinking=thinking,
                 models_config=models_config,
                 lobster=lobster,
+                turns=stage_turns,
+                before_turn=stage_before_turn,
+                multi_agent_enabled=bool(task.get("multi_agent_enabled")),
+                multi_agent_config=task.get("multi_agent_config") or None,
             )
         )
         gateway_proc = execution.gateway_proc
@@ -1512,6 +1948,122 @@ def run_single_task(
         except Exception as exc:
             logger.warning("[%s] Failed to collect task output: %s", task_id, exc)
 
+        # FINAL mock-data-state snapshot: once all turns have run, capture the
+        # last state of persona/, data/ (from the live agent container) and
+        # mock_data/ (the post-injection mock-API store). Must happen here while
+        # BOTH the agent container (removed below) and the per-task mock stack
+        # (stopped further down) are still alive. Paired with workspace_before.
+        if inject_applier is not None:
+            _ws_after = output_dir / "snapshot" / "workspace_after"
+            try:
+                persona_entries = []
+                _pdir = task.get("persona_dir") or ""
+                if _pdir and Path(_pdir).is_dir():
+                    persona_entries = [p.name for p in Path(_pdir).iterdir()
+                                       if p.name != ".DS_Store"]
+                data_rel = [
+                    (att.get("storedAs") or att.get("name") or "")
+                    for att in (task.get("attachments") or [])
+                ]
+                data_rel = [r for r in data_rel if r]
+                snapshot_persona_and_data_from_container(
+                    task_id, persona_entries, data_rel, _ws_after)
+                inject_applier.snapshot_state(
+                    _ws_after / "mock_data", label="after_injection")
+            except Exception as exc:
+                logger.warning("[%s] after-injection snapshot failed: %s", task_id, exc)
+
+            # Assemble the post-run agent_state.json from live artifacts (the
+            # /audit/summary feed + the after-injection mock-store snapshot +
+            # the agent transcript) so fixture-based CHECKERS have real data to
+            # evaluate instead of an empty golden-state stub (IAN Pointer 2).
+            try:
+                from src.utils.state_extractor import (
+                    build_agent_state, extract_assistant_text,
+                )
+                _audit = {}
+                try:
+                    _audit = inject_applier.audit_summary()
+                except Exception as exc:
+                    logger.debug("[%s] audit summary fetch failed: %s", task_id, exc)
+                # Also capture the FULL request diary (bodies included) and fold
+                # it into each service's audit entry under "requests", so the
+                # saved agent_state.json can re-run body-inspecting tests OFFLINE
+                # (no live mock stack). audit_summary keeps only counts; this
+                # adds the request/response bodies the body-checking tests read.
+                try:
+                    _full = inject_applier.audit_full()
+                    for _api, _blob in (_full or {}).items():
+                        if not isinstance(_blob, dict):
+                            continue
+                        _reqs = _blob.get("requests")
+                        if _reqs is None:
+                            continue
+                        _entry = _audit.get(_api)
+                        if isinstance(_entry, dict):
+                            _entry["requests"] = _reqs
+                        else:
+                            _audit[_api] = {
+                                "total_requests": _blob.get("total", len(_reqs)),
+                                "endpoints": {},
+                                "requests": _reqs,
+                            }
+                except Exception as exc:
+                    logger.debug("[%s] audit full fetch failed: %s", task_id, exc)
+                _tpaths = []
+                # Prefer the HOST-copied transcripts over grading_transcript_path:
+                # prepare_grading_transcript() falls back to the raw in-container
+                # path (/root/.openclaw/.../chat.jsonl) when its docker-cp snapshot
+                # fails. The non-root harness user cannot stat that path, and
+                # Path.is_file() does NOT swallow EACCES (only ENOENT/ENOTDIR), so
+                # probing it directly raised PermissionError and aborted the whole
+                # agent_state build (-> no agent_state.json). Order the readable
+                # host copies first and guard every probe so one unreadable
+                # candidate can never sink the build.
+                def _readable_file(_p) -> bool:
+                    try:
+                        return _p is not None and Path(_p).is_file()
+                    except OSError:
+                        return False
+                for _cand in (output_dir / "chat.jsonl",
+                              output_dir / "task_output" / "chat.jsonl",
+                              grading_transcript_path):
+                    if _readable_file(_cand):
+                        _tpaths.append(Path(_cand))
+                _last = extract_assistant_text(_tpaths) if _tpaths else ""
+                _state = build_agent_state(
+                    audit=_audit,
+                    store_snapshot_dir=_ws_after / "mock_data",
+                    last_response=_last,
+                )
+                # Multi-agent: fold per-turn spawn-tree checker results into the
+                # agent-state fixture under the standard "checkers" key, so
+                # test_outputs.py scores them via the normal `state` fixture
+                # exactly as june-7 does:
+                #   def test_ma(state): assert state["checkers"]["MA_C1"]
+                # build_checker_state returns {"checkers": {id: bool}}; merging it
+                # into the agent state composes with june-10's other state keys.
+                if task.get("multi_agent_enabled"):
+                    try:
+                        from src.utils.spawn_tree_checks import build_checker_state
+                        _state.update(build_checker_state(
+                            output_dir / "task_output" / "workspace_full" / "spawn_tree.jsonl",
+                            task.get("multi_agent_config"),
+                        ))
+                    except Exception as exc:
+                        logger.warning("[%s] multi_agent checker state failed: %s",
+                                       task_id, exc)
+                agent_state_json = json.dumps(_state, ensure_ascii=False, default=str)
+                # Persist alongside the run + into the tests dir the bundle ships.
+                (output_dir / "agent_state.json").write_text(
+                    agent_state_json, encoding="utf-8")
+                _tests_state_dir = output_dir / "data" / "tests"
+                _tests_state_dir.mkdir(parents=True, exist_ok=True)
+                (_tests_state_dir / "agent_state.json").write_text(
+                    agent_state_json, encoding="utf-8")
+            except Exception as exc:
+                logger.warning("[%s] agent_state build failed: %s", task_id, exc)
+
         startup_failed = isinstance(result.get("error"), str) and "Container startup failed" in result["error"]
         if startup_failed:
             logger.error(
@@ -1532,6 +2084,8 @@ def run_single_task(
                     network=network or None,
                     image=getattr(config, "docker_image", "wildclawbench-ubuntu:v1.3") if config else "wildclawbench-ubuntu:v1.3",
                     timeout=testexec_timeout,
+                    checkers_code=task.get("checkers_code"),
+                    agent_state_json=agent_state_json,
                 )
                 result["test_result"] = te
                 verifier_dir = output_dir / "task_output" / "logs" / "verifier"
@@ -1627,6 +2181,18 @@ def run_single_task(
             except Exception as exc:
                 logger.warning("[%s] Drift director shutdown failed: %s", task_id, exc)
 
+        if stage_applier is not None:
+            try:
+                stage_applier.close()
+            except Exception as exc:
+                logger.warning("[%s] Stage applier shutdown failed: %s", task_id, exc)
+
+        if inject_applier is not None:
+            try:
+                inject_applier.close()
+            except Exception as exc:
+                logger.warning("[%s] Inject applier shutdown failed: %s", task_id, exc)
+
         if mock_health_logger is not None:
             try:
                 mock_health_logger.stop()
@@ -1679,7 +2245,7 @@ def run_single_task(
     return result
 
 
-LITELLM_MODEL_IDS = {"claude-opus-4.7", "gpt-5.5"}
+LITELLM_MODEL_IDS = {"claude-opus-4.8", "claude-opus-4.7", "gpt-5.5"}
 
 
 def _run_cleanups(cleanups: list) -> None:
@@ -1764,6 +2330,9 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
         use_claude_oauth=use_oauth,
         bridge_url=cc_bridge_url,
         enable_oauth_usage_callback=use_oauth,
+        meta_api_key=config.meta_api_key,
+        meta_base_url=config.meta_base_url,
+        meta_model=config.meta_model,
     )
     if not litellm_yaml:
         raise RuntimeError(
@@ -1825,6 +2394,9 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
         usage_dir.mkdir(parents=True, exist_ok=True)
         usage_log_path = usage_dir / "usage.jsonl"
         usage_log_path.touch(exist_ok=True)
+    # Surface to _build_trajectory so it can back-fill per-message cost blocks
+    # (chat.jsonl writes them as zero on this image build; IAN Pointer 5).
+    globals()["_USAGE_LOG_PATH"] = str(usage_log_path)
     # S-003 hardening: the LiteLLM sidecar writes back to these paths via
     # the `/var/litellm_usage` bind mount. Previously these were 0o666/0o777
     # (world-writable) to sidestep container-UID mismatch. The owner-only
@@ -1861,6 +2433,9 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
                 batch_id, _chmod_err,
             )
         headroom_log_dir_str = str(headroom_log_dir)
+        # Surface this sink to save_usage so agent headroom stats land in
+        # usage.json (IAN report Pointer 3).
+        globals()["_HEADROOM_LOG_DIR"] = headroom_log_dir_str
 
     if shared_mode:
         logger.info(
@@ -1883,6 +2458,7 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
             aws_region=config.bedrock_region,
             openai_api_key=config.openai_api_key,
             openai_whisper_api_key=config.openai_whisper_api_key,
+            meta_api_key=config.meta_api_key,
             usage_callback_host_path=str(callback_src),
             usage_log_host_dir=str(usage_dir),
             headroom_callback_host_path=headroom_callback_src,
@@ -1901,6 +2477,7 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
         probe_model = (
             "claude-opus-4.7" if (config.aws_bearer_token and config.bedrock_inference_arn) or config.anthropic_api_key
             else "gpt-5.5" if config.openai_api_key
+            else config.meta_model if (config.meta_api_key and config.meta_model)
             else ""
         )
         if probe_model:
@@ -1985,10 +2562,10 @@ def _start_task_mock_stack(task: dict, network: str, environment_dir) -> tuple[d
     """
     overlays = task.get("mock_overlays") or {}
     if not overlays or not network or not environment_dir:
-        if task.get("drift_script_path"):
+        if task.get("drift_script_path") or task.get("stages_path") or task.get("inject_path"):
             logger.error(
-                "[%s] drift.yaml requires per-task mock stack but task ships no overlays / "
-                "mock-stack disabled; refusing to start director",
+                "[%s] drift.yaml/stages.yaml/inject requires per-task mock stack but task ships "
+                "no overlays / mock-stack disabled; refusing to enable admin plane",
                 task.get("task_id"),
             )
         return {}, None, {}
@@ -2015,18 +2592,31 @@ def _start_task_mock_stack(task: dict, network: str, environment_dir) -> tuple[d
         for s in services if s.get("port") and s.get("name")
     }
 
-    # Configure admin plane + port-publishing only when the task ships a drift
-    # script. Quiescent runs keep the existing zero-port-exposure surface.
+    # Configure admin plane + port-publishing when the task ships a drift script
+    # OR a stages script — both mutate mock state via the admin plane and need
+    # host-reachable ports. Quiescent runs keep the existing zero-port-exposure
+    # surface.
     drift_path = task.get("drift_script_path")
+    stages_path = task.get("stages_path")
+    inject_path = task.get("inject_path")
+    needs_admin = bool(drift_path or stages_path or inject_path)
     admin_env: dict[str, str] | None = None
     publish_ports: list[int] | None = None
     admin_token: str | None = None
-    if drift_path:
+    if needs_admin:
         gateway = get_network_gateway(network) or "127.0.0.1"
+        # The host-side applier reaches the admin plane through published ports
+        # on 127.0.0.1; docker-proxy SNATs those to the DEFAULT-BRIDGE gateway
+        # (the per-task container is dual-homed onto the bridge so its ports are
+        # host-reachable). The admin plane's IP allowlist therefore sees the
+        # bridge gateway, not the task-network gateway. Allowlist BOTH so the
+        # applier's requests are accepted regardless of ingress path.
+        bridge_gateway = get_network_gateway("bridge")
+        allow = ",".join(dict.fromkeys(g for g in (gateway, bridge_gateway) if g))
         admin_token = uuid.uuid4().hex
         admin_env = {
             "MOCK_ADMIN_ENABLED": "1",
-            "MOCK_ADMIN_ALLOWLIST": gateway,
+            "MOCK_ADMIN_ALLOWLIST": allow,
             "MOCK_ADMIN_TOKEN": admin_token,
         }
         publish_ports = list(overlaid_ports)
@@ -2039,14 +2629,14 @@ def _start_task_mock_stack(task: dict, network: str, environment_dir) -> tuple[d
         set(task.get("required_apis") or [])
         | set(task.get("distractor_apis") or [])
         | set(overlays.keys())
-    ) or None
+    )
     try:
         start_mock_stack(
             container, network,
             overlays=overlays,
             admin_env=admin_env,
             publish_ports=publish_ports,
-            enabled_apis=enabled_apis,
+            enabled_apis=enabled_apis or None,
         )
     except Exception as exc:
         logger.error("[%s] per-task mock stack failed to start: %s", task.get("task_id"), exc)
@@ -2059,9 +2649,30 @@ def _start_task_mock_stack(task: dict, network: str, environment_dir) -> tuple[d
         )
 
     # Wait only for the overlaid API(s) to answer /health inside the container.
-    if not wait_for_ports_healthy(container, overlaid_ports, timeout=180.0):
-        logger.error("[%s] per-task mock stack %s: overlaid ports %s not healthy; tearing down",
-                     task.get("task_id"), container, overlaid_ports)
+    # A per-task container cold-starts one uvicorn process per overlaid API, so
+    # the budget must scale with the API count (a 15-overlay task booting amd64
+    # services under emulation routinely needs >180s on the first cold start).
+    # Floor 180s, ~20s/API, override via KENSEI_TASK_MOCK_HEALTH_TIMEOUT.
+    try:
+        health_timeout = float(os.environ.get("KENSEI_TASK_MOCK_HEALTH_TIMEOUT", "0")) or \
+            max(180.0, 20.0 * len(overlaid_ports))
+    except ValueError:
+        health_timeout = max(180.0, 20.0 * len(overlaid_ports))
+    if not wait_for_ports_healthy(container, overlaid_ports, timeout=health_timeout):
+        logger.error("[%s] per-task mock stack %s: overlaid ports %s not healthy within %.0fs; "
+                     "tearing down (set KENSEI_TASK_MOCK_HEALTH_TIMEOUT to raise the budget)",
+                     task.get("task_id"), container, overlaid_ports, health_timeout)
+        # Capture the container's own logs before teardown so a crashing overlaid
+        # service (vs merely slow boot) is diagnosable from the run log.
+        try:
+            _dl = subprocess.run(["docker", "logs", "--tail", "60", container],
+                                 capture_output=True, text=True, timeout=15)
+            _tail = ((_dl.stdout or "") + (_dl.stderr or "")).strip()[-2000:]
+            if _tail:
+                logger.error("[%s] per-task mock stack logs (tail):\n%s",
+                             task.get("task_id"), _tail)
+        except Exception:
+            pass
         logs = _dump_mock_logs(container, overlays.keys())
         stop_mock_stack(container)
         raise RuntimeError(
@@ -2071,12 +2682,24 @@ def _start_task_mock_stack(task: dict, network: str, environment_dir) -> tuple[d
             + (f"\n{logs}" if logs else "")
         )
 
-    env_dict = {ev: f"http://{container}:{port}" for ev, port in env_dict_template.items()}
-    logger.info("[%s] per-task mock stack %s ready (%d overlay APIs, ports %s)",
-                task.get("task_id"), container, len(overlays), overlaid_ports)
+    # Expose ONLY this task's enabled APIs (required + distractor + overlays) as
+    # URLs — not the full ~104 baked catalog. The container only boots the
+    # enabled set (above), so handing the agent + health logger all 104 URLs
+    # yields 87 dead endpoints and the "17/104 healthy (failed: ...)" probe spam
+    # in mock_health.log. Empty enabled set => keep all (full-catalog fallback,
+    # matching start_mock_stack's own behavior).
+    env_dict = {
+        s["env_var_name"]: f"http://{container}:{int(s['port'])}"
+        for s in services
+        if s.get("env_var_name") and s.get("port")
+        and (not enabled_apis or s.get("name") in enabled_apis)
+    }
+    logger.info("[%s] per-task mock stack %s ready (%d overlay APIs, ports %s, %d/%d URLs enabled)",
+                task.get("task_id"), container, len(overlays), overlaid_ports,
+                len(env_dict), len(env_dict_template))
 
     drift_info: dict = {}
-    if drift_path:
+    if needs_admin:
         host_ports = get_published_ports(container, overlaid_ports)
         host_api_to_url: dict[str, str] = {}
         for internal_port, host_port in host_ports.items():
@@ -2084,15 +2707,18 @@ def _start_task_mock_stack(task: dict, network: str, environment_dir) -> tuple[d
             if api_name:
                 host_api_to_url[api_name] = f"http://127.0.0.1:{host_port}"
         if host_api_to_url:
+            # script_path is None for a stages-only task; _start_drift_director
+            # returns None in that case, so no DriftDirector is started. The
+            # StageApplier consumes host_api_to_url + admin_token directly.
             drift_info = {
                 "script_path": drift_path,
                 "host_api_to_url": host_api_to_url,
                 "admin_token": admin_token,
             }
-            logger.info("[%s] drift director will target %d APIs via 127.0.0.1",
+            logger.info("[%s] admin plane will target %d APIs via 127.0.0.1",
                         task.get("task_id"), len(host_api_to_url))
         else:
-            logger.error("[%s] drift requested but no host ports resolved; director disabled",
+            logger.error("[%s] injection requested but no host ports resolved; admin plane disabled",
                          task.get("task_id"))
 
     return env_dict, container, drift_info
@@ -2287,10 +2913,26 @@ def _run_main_body(args) -> None:
                 image_model=args.openclaw_image_model,
             )
 
-    # In LiteLLM mode the model must be a sidecar model id (claude-opus-4.7 / gpt-5.5).
+    # In LiteLLM mode the model must be a sidecar model id (claude-opus-4.7 /
+    # gpt-5.5 / the configured Meta vendor model). The Meta id is dynamic
+    # (config.meta_model), so it's checked alongside the static set.
+    sidecar_model_ids = set(LITELLM_MODEL_IDS)
+    if config.meta_api_key and config.meta_model:
+        sidecar_model_ids.add(config.meta_model)
     effective_model = args.model
-    if use_litellm and args.model not in LITELLM_MODEL_IDS and not args.model.startswith("litellm/"):
-        effective_model = os.environ.get("LITELLM_DEFAULT_MODEL", "claude-opus-4.7")
+    if use_litellm and args.model not in sidecar_model_ids and not args.model.startswith("litellm/"):
+        # Pick a default that is actually REGISTERED in the sidecar. The historic
+        # default is claude-opus-4.7, but on a Meta-only (no Bedrock/OpenAI) run
+        # that id isn't in the model_list, so fall back to the configured Meta id.
+        if config.aws_bearer_token and config.bedrock_inference_arn:
+            _fallback = "claude-opus-4.7"
+        elif config.openai_api_key:
+            _fallback = "gpt-5.5"
+        elif config.meta_api_key and config.meta_model:
+            _fallback = config.meta_model
+        else:
+            _fallback = "claude-opus-4.7"
+        effective_model = os.environ.get("LITELLM_DEFAULT_MODEL", _fallback)
         logger.info("LiteLLM mode: '%s' is not a sidecar model id; using '%s'", args.model, effective_model)
 
     # Per-task mock isolation is available only when the shared litellm/mock
@@ -2382,6 +3024,7 @@ def _run_dispatch(args, backend, config: Config, mock_env_dict: dict, effective_
         task = load_task(task_file)
         task["__use_judge_council__"] = use_judge_council
         task["__force_testgen__"] = bool(getattr(args, "force_testgen", False))
+        _apply_no_subagents(task, args)
         logger.info("Single task mode: %s (format=%s)", task["task_id"], task.get("format", "md"))
         # ISOLATION INVARIANT (b6/m0192): one task or rep failure must NEVER
         # cascade to other reps or other -P parallel tasks. The legacy code
@@ -2474,6 +3117,7 @@ def _run_dispatch(args, backend, config: Config, mock_env_dict: dict, effective_
                 t = load_task(tf)
                 t["__use_judge_council__"] = use_judge_council
                 t["__force_testgen__"] = bool(getattr(args, "force_testgen", False))
+                _apply_no_subagents(t, args)
                 tasks.append(t)
             except Exception as exc:
                 logger.error("Parse failed %s: %s", tf, exc)

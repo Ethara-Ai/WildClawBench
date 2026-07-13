@@ -1,7 +1,0 @@
-file_key,file_name,owner,last_modified,status,frame_count,project_code
-FK_PPR26A_sprint2,Patient Portal Redesign - Sprint 2,Anita Patel,2026-09-01,archived,5,PPR-26A
-FK_PPR26A_sprint3,Patient Portal Redesign - Sprint 3,Anita Patel,2026-09-28,archived,4,PPR-26A
-FK_PPR26A_sprint4,Patient Portal Redesign - Sprint 4,Anita Patel,2026-10-14,active,3,PPR-26A
-FK_PPR26A_stepper,PPR-26A Stepper Explorations,Raj Mehta,2026-10-15,active,3,PPR-26A
-FK_PPR26A_concepts,Patient Portal Concepts,Anita Patel,2026-07-15,archived,8,PPR-24A
-FK_PPR26B_sprint1,Provider Portal Redesign - Sprint 1,Marcus Webb,2026-10-10,active,4,PPR-26B

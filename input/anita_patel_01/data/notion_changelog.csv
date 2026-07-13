@@ -1,6 +1,0 @@
-timestamp,page_id,field_changed,old_value,new_value,changed_by,reason
-2026-10-16T09:00:00Z,page_PPR26A_gt01,severity,high,critical,Tanya Brooks,Aligned with whiteboard consensus
-2026-10-16T09:05:00Z,page_PPR26A_gt02,severity,critical,high,Tanya Brooks,Whiteboard was too aggressive
-2026-10-16T09:10:00Z,page_PPR26A_gt03,severity,high,medium,Tanya Brooks,"Low usage volume, medium appropriate"
-2026-10-14T14:00:00Z,page_PPR26A_orphan,frame_node_id,,12:88,Tanya Brooks,Added frame reference from stepper
-2026-10-14T13:00:00Z,page_PPRZ6A_ghost,project_code,PPR-Z6A,PPR-Z6A,Tanya Brooks,"Kept as-is, may be intentional"

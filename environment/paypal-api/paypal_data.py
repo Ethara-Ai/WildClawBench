@@ -22,6 +22,19 @@ from _mutable_store import (
 _store = get_store("paypal-api")
 _API = "paypal-api"
 
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("orders", primary_key="id",
                 initial_loader=lambda: _coerce_orders(_load("orders.json", "orders")))
 _store.register("captures", primary_key="id",
@@ -205,7 +218,7 @@ def create_order(intent="CAPTURE", amount_value="0.00", currency_code="USD",
         }],
         "create_time": _now(),
     }
-    _orders_rows().append(order)
+    _store_insert("orders", order)
     return order
 
 
@@ -231,7 +244,7 @@ def capture_order(order_id):
         "final_capture": True,
         "create_time": _now(),
     }
-    _captures_rows().append(capture)
+    _store_insert("captures", capture)
     order["status"] = "COMPLETED"
     return {
         "id": order_id,
@@ -262,7 +275,7 @@ def create_refund(capture_id, amount_value=None, currency_code="USD", note_to_pa
         "note_to_payer": note_to_payer or "",
         "create_time": _now(),
     }
-    _refunds_rows().append(refund)
+    _store_insert("refunds", refund)
     return refund
 
 
@@ -301,7 +314,7 @@ def create_invoice(invoice_number=None, recipient_email=None, amount_value="0.00
         "amount": _money(amount_value, currency_code),
         "due_date": due_date,
     }
-    _invoices_rows().append(invoice)
+    _store_insert("invoices", invoice)
     return invoice
 
 
@@ -324,7 +337,7 @@ def create_payout(sender_batch_id=None, amount_value="0.00", currency_code="USD"
         "recipient_email": recipient_email or "",
         "create_time": _now(),
     }
-    _payouts_rows().append(payout)
+    _store_insert("payouts", payout)
     return payout
 
 _store.eager_load()

@@ -638,6 +638,11 @@ class _FakeProc:
         self.waited = False
         self.killed = False
 
+    def poll(self):
+        # Gateway-readiness polling treats a live process as None (still
+        # running); the fakes never "exit" during the readiness window.
+        return None
+
     def wait(self, timeout=None):
         self.waited = True
         return self.returncode

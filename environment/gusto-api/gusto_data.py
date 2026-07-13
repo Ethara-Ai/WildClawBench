@@ -25,6 +25,19 @@ from _mutable_store import (
 _store = get_store("gusto-api")
 _API = "gusto-api"
 
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("employees", primary_key="id",
                 initial_loader=lambda: _coerce_employees(_load("employees.json", "employees")))
 _store.register("compensations", primary_key="id",
@@ -55,6 +68,9 @@ def _contractors_rows():
 def _company_doc():
     return _store.document("company").get()
 
+
+
+_API = "gusto-api"
 
 
 def _load(filename, table):
@@ -226,7 +242,7 @@ def create_payroll(company_id, pay_period_start, pay_period_end, check_date=None
         "employee_count": len([e for e in _employees_rows()
                                if e["company_id"] == company_id and not e["terminated"]]),
     }
-    _payrolls_rows().append(p)
+    _store_insert("payrolls", p)
     return p
 
 

@@ -14,6 +14,19 @@ from _mutable_store import read_seed_with_ctx, get_store, opt_str  # noqa: E402
 _store = get_store("okta-api")
 _API = "okta-api"
 
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("users", primary_key="id",
                 initial_loader=lambda: _coerce_users(_load("users.json", "users")))
 _store.register("groups", primary_key="id",
@@ -171,7 +184,7 @@ def create_user(first_name, last_name, email, login=None, activate=True):
         "activated": _now() if activate else None,
         "last_login": None,
     }
-    _users_rows().append(user)
+    _store_insert("users", user)
     return _serialize_user(user)
 
 

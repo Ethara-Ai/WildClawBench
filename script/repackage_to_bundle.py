@@ -843,6 +843,64 @@ def _stage_verifier_test_sources(
     return wrote_test_sh, wrote_outputs, wrote_weights
 
 
+# Harness-injected wall-clock prefix on subagent context messages, e.g.
+# `[Thu 2026-06-25 14:38 UTC] `. Stripped for published-trajectory hygiene.
+_CLOCKSTAMP_RE = re.compile(
+    r"\[(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC\] ?")
+
+
+def _strip_clockstamps_in_dir(root: Path) -> int:
+    """Remove the harness-injected ``[Day YYYY-MM-DD HH:MM UTC]`` wall-clock
+    prefix from subagent trajectory JSON (published-trajectory hygiene).
+
+    Operates on raw file text so JSON formatting is preserved verbatim and only
+    the stamp token is removed; legitimate clock references inside deliverable
+    prose (e.g. a cron time "12:00 UTC") never match the bracketed pattern.
+    Returns the number of files modified."""
+    n = 0
+    if not root.is_dir():
+        return 0
+    for jf in root.rglob("*.json"):
+        text = jf.read_text(encoding="utf-8")
+        cleaned = _CLOCKSTAMP_RE.sub("", text)
+        if cleaned != text:
+            jf.write_text(cleaned, encoding="utf-8")
+            n += 1
+    return n
+
+
+def copy_subagent_artifacts(run_dir: Path, dest_run: Path) -> int:
+    """Copy native multi-agent artifacts into the bundle run dir.
+
+    subagents/ holds the child trajectories written by attach_native_subagents
+    (always created so the multi-agent validator passes; empty for single-agent
+    runs). spawn_tree/ (parent_spawn_tree.txt) is carried through when present.
+    """
+    dest_sub = dest_run / "subagents"
+    dest_sub.mkdir(parents=True, exist_ok=True)
+    count = 0
+    src_sub = run_dir / "subagents"
+    if src_sub.is_dir():
+        shutil.copytree(
+            src_sub, dest_sub,
+            dirs_exist_ok=True,
+            ignore=shutil.ignore_patterns(".DS_Store"),
+        )
+        count += sum(1 for _ in dest_sub.rglob("*") if _.is_file())
+        # Strip harness-injected wall-clock prefixes from the published
+        # subagent trajectories (hygiene); leaves all else byte-identical.
+        _strip_clockstamps_in_dir(dest_sub)
+    src_tree = run_dir / "spawn_tree"
+    if src_tree.is_dir():
+        shutil.copytree(
+            src_tree, dest_run / "spawn_tree",
+            dirs_exist_ok=True,
+            ignore=shutil.ignore_patterns(".DS_Store"),
+        )
+        count += sum(1 for _ in (dest_run / "spawn_tree").rglob("*") if _.is_file())
+    return count
+
+
 def copy_verifier_logs(run_dir: Path, dest_run: Path) -> int:
     """Copy task_output/logs/verifier/* into the bundle at run_N/logs/verifier/*.
 
@@ -1968,6 +2026,7 @@ def convert_task(
     input_root: Path,
     infer_meta: bool,
     verbose: bool,
+    latest_only: bool = False,
 ) -> Path | None:
     trajectories = task_dir / "trajectories"
     if not trajectories.is_dir():
@@ -2054,6 +2113,8 @@ def convert_task(
             (p for p in harness_dir.iterdir() if p.is_dir() and re.match(r"run_\d+", p.name)),
             key=lambda p: _run_index_of(p.name),
         )
+        if latest_only and run_dirs:
+            run_dirs = [run_dirs[-1]]
         per_run_summ: list[dict[str, Any]] = []
         for run_dir in run_dirs:
             ridx = _run_index_of(run_dir.name)
@@ -2078,6 +2139,11 @@ def convert_task(
 
             # 4) output_media
             n_media = copy_output_media(run_dir, dest_run)
+
+            # 5) subagents/ + spawn_tree/ — native multi-agent child
+            #    trajectories and the spawn tree (empty subagents/ dir for
+            #    single-agent runs so the multi-agent validator passes)
+            copy_subagent_artifacts(run_dir, dest_run)
 
             per_run_summ.append(
                 {
@@ -2253,6 +2319,20 @@ def main(argv: list[str] | None = None) -> int:
         "output/<task>/data/ tree (no bundle written; --dest-root ignored).",
     )
     ap.add_argument("-v", "--verbose", action="store_true", help="Per-run detail.")
+    # All valid runs are published by default. --all-runs is kept as a no-op
+    # alias for backward compatibility with older invocations/scripts.
+    ap.add_argument(
+        "--all-runs",
+        action="store_true",
+        help="(Default) Publish every valid run per model. Retained for "
+        "backward compatibility; all runs are emitted unless --latest-only.",
+    )
+    ap.add_argument(
+        "--latest-only",
+        action="store_true",
+        help="Publish only the single latest valid run per model (highest "
+        "run_N). Default is to publish all runs.",
+    )
     args = ap.parse_args(argv)
 
     source_root = Path(args.source_root).resolve()
@@ -2294,7 +2374,8 @@ def main(argv: list[str] | None = None) -> int:
     dest_root.mkdir(parents=True, exist_ok=True)
     produced = 0
     for task_dir in tasks:
-        if convert_task(task_dir, dest_root, input_root, args.infer_rubric_meta, args.verbose):
+        if convert_task(task_dir, dest_root, input_root, args.infer_rubric_meta, args.verbose,
+                        latest_only=args.latest_only):
             produced += 1
     print(f"done: {produced}/{len(tasks)} task bundle(s) written under {dest_root}")
     return 0 if produced else 1

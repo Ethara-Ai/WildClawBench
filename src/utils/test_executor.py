@@ -10,7 +10,7 @@ Returns a dict shaped for `bundle.write_bundle`'s `__test_result__` consumer:
   test_scores (JSON str: {qualified_name: "passed"|"failed"|"errored"}),
   test_output (raw stdout/stderr text),
   test_code (verbatim copy of the executed code, for the harbor bundle),
-  reward (float, 0..1; sum(weight × pass) / sum(|weight|)).
+  reward (float, unclamped; (Σ passed_positive_w − Σ |triggered_negative_w|) / Σ positive_w).
 """
 from __future__ import annotations
 
@@ -82,6 +82,48 @@ _RUNNER_SCRIPT = textwrap.dedent('''
                 return False
         sys.modules["pytest"] = _PytestStub()
 
+    # ------------------------------------------------------------------ #
+    # Built-in fixtures. Persona/inject suites authored against the Talos
+    # CHECKERS contract take two pytest fixtures the no-fixture runner used to
+    # reject outright (every test -> errored, IAN report H5):
+    #   state         -> the live agent state dict (audit, per-service store,
+    #                    last_response), shipped as /tests/agent_state.json
+    #   task_checkers -> {checker_id: checker} from the sibling task.py CHECKERS
+    #                    list, shipped as /tests/task/task.py
+    # We synthesize both here so the suite runs as authored. Anything the
+    # runner cannot supply still errors (below), preserving the old behavior
+    # for genuinely unsatisfiable fixtures.
+    import os as _os
+    _FIXTURES = {}
+    try:
+        _sp = "/tests/agent_state.json"
+        if _os.path.exists(_sp):
+            with open(_sp) as _f:
+                _FIXTURES["state"] = json.load(_f)
+        else:
+            _FIXTURES["state"] = {}
+    except Exception as _e:
+        print(f"[runner] state fixture load failed: {_e}", file=sys.stderr)
+        _FIXTURES["state"] = {}
+    try:
+        if _os.path.isdir("/tests/task"):
+            sys.path.insert(0, "/tests/task")
+            import task as _taskmod  # /tests/task/task.py
+            _FIXTURES["task_checkers"] = {c["id"]: c for c in _taskmod.CHECKERS}
+    except Exception as _e:
+        print(f"[runner] task_checkers fixture load failed: {_e}", file=sys.stderr)
+
+    def _kwargs_for(req):
+        # Return (kwargs, missing). kwargs supplies every required param the
+        # runner knows how to build; missing lists the rest.
+        kwargs, missing = {}, []
+        for p in req:
+            if p in _FIXTURES:
+                kwargs[p] = _FIXTURES[p]
+            else:
+                missing.append(p)
+        return kwargs, missing
+
     def _is_skip_exc(e):
         # Recognize our stub skip, real pytest/unittest skips by class name.
         if isinstance(e, _Skipped):
@@ -124,11 +166,11 @@ _RUNNER_SCRIPT = textwrap.dedent('''
                 req.append(p.name)
         return req
 
-    def _record(results, full, callable_fn, is_async=False):
-        print(f"[runner] running {full.split('::')[-1]}", file=sys.stderr, flush=True)
+    def _record(results, full, callable_fn, is_async=False, kwargs=None):
+        print(f"[runner] running {full}", file=sys.stderr, flush=True)
         signal.alarm(PER_TEST_TIMEOUT)
         try:
-            res = callable_fn()
+            res = callable_fn(**(kwargs or {}))
             if inspect.iscoroutine(res):  # (F) async test or sync fn returning a coroutine
                 asyncio.run(res)
             results[full] = {"status": "passed"}
@@ -166,19 +208,21 @@ _RUNNER_SCRIPT = textwrap.dedent('''
         fn = getattr(inst, m)
         if not callable(fn):
             return False
-        # (D) fixture-style signature: required params we cannot supply.
+        # (D) fixture-style signature: supply known fixtures (state,
+        # task_checkers); error only on params the runner can't build.
         req = _required_param_names(fn)
-        if req:
+        kwargs, missing = _kwargs_for(req)
+        if missing:
             results[full] = {
                 "status": "errored",
-                "error": ("requires fixtures/params " + ", ".join(req)
-                          + "; the no-fixture runner cannot supply them "
+                "error": ("requires fixtures/params " + ", ".join(missing)
+                          + "; the runner cannot supply them "
                           + "(remove pytest fixtures or make the test self-contained)"),
                 "traceback": "",
             }
             return True
         is_async = inspect.iscoroutinefunction(fn)
-        _record(results, full, fn, is_async=is_async)
+        _record(results, full, fn, is_async=is_async, kwargs=kwargs)
         return True
 
     # ---- Collect & run Test* classes (incl. unittest.TestCase) ----
@@ -229,24 +273,25 @@ _RUNNER_SCRIPT = textwrap.dedent('''
                 if not callable(fn):
                     continue
                 req = _required_param_names(fn)
-                if req:
+                _kw, _missing = _kwargs_for(req)
+                if _missing:
                     out["collected"] += 1
                     out["results"][full] = {
                         "status": "errored",
-                        "error": "requires fixtures/params " + ", ".join(req),
+                        "error": "requires fixtures/params " + ", ".join(_missing),
                         "traceback": "",
                     }
                     continue
                 out["collected"] += 1
-                def _drive(_fn=fn, _inst=inst):
+                def _drive(_fn=fn, _inst=inst, **_kwargs):
                     _inst.setUp()
                     try:
-                        r = _fn()
+                        r = _fn(**_kwargs)
                         if inspect.iscoroutine(r):
                             asyncio.run(r)
                     finally:
                         _inst.tearDown()
-                _record(out["results"], full, _drive)
+                _record(out["results"], full, _drive, kwargs=_kw)
             else:
                 if _run_method(out["results"], cls, inst, cls_name, m):
                     out["collected"] += 1
@@ -266,17 +311,18 @@ _RUNNER_SCRIPT = textwrap.dedent('''
             continue
         full = f"<module>::{fn_name}"
         req = _required_param_names(fn)
-        if req:
+        kwargs, missing = _kwargs_for(req)
+        if missing:
             out["collected"] += 1
             out["results"][full] = {
                 "status": "errored",
-                "error": ("requires fixtures/params " + ", ".join(req)
-                          + "; the no-fixture runner cannot supply them"),
+                "error": ("requires fixtures/params " + ", ".join(missing)
+                          + "; the runner cannot supply them"),
                 "traceback": "",
             }
             continue
         out["collected"] += 1
-        _record(out["results"], full, fn, is_async=inspect.iscoroutinefunction(fn))
+        _record(out["results"], full, fn, is_async=inspect.iscoroutinefunction(fn), kwargs=kwargs)
 
     print(json.dumps(out))
 ''').strip()
@@ -285,10 +331,20 @@ _RUNNER_SCRIPT = textwrap.dedent('''
 def _compute_reward(results: Mapping[str, dict], weights: Mapping[str, float]) -> float:
     """Kensei2 canonical: (pos_earned - neg_penalty) / pos_total.
 
-    Mirrors `Kensei2._compute_test_reward` (kensei2.py:3202).
     - pos_total: sum of positive weights (desired behaviours)
     - pos_earned: sum of positive weights whose test passed
-    - neg_penalty: sum of |w| for negative-weight tests that passed (triggered)
+    - neg_penalty: sum of |w| for negative-weight tests that PASSED (triggered).
+      The negative tests in this corpus are VIOLATION-DETECTORS: written so
+      PASS == the forbidden behaviour occurred (e.g. `assert distractor_touched
+      > 0`, `assert stale_value_present`). So a negative test that PASSES means
+      the agent did the bad thing → penalise |w|; a negative test that FAILS
+      means the agent avoided it → no penalty. This matches the june-7 canonical
+      (Kensei2) reward and the rubric grader, which likewise penalises a
+      negative criterion only when it is *satisfied* (fired). Penalising failed
+      negatives instead — as a prior cut did — inverts the polarity and punishes
+      good behaviour (every avoided distractor scored as a failure). The
+      `max(0, …)` floor means a violation spree zeroes the run rather than going
+      negative.
     - falls back to tests_passed/tests_total when pos_total <= 0
     Returns the raw signed ratio; negative when penalties outweigh earned
     points. No clamp — downstream consumers see the true polarity of the run.
@@ -331,6 +387,9 @@ def _compute_reward(results: Mapping[str, dict], weights: Mapping[str, float]) -
         total = len(scored)
         passed = sum(1 for r in scored if r.get("status") == "passed")
         return round(passed / total, 4) if total else 0.0
+    # User formula (verbatim, no clamp): a violation spree may drive the reward
+    # below 0 to reflect the true magnitude of guardrail breaches.
+    #   final_reward = (Σ passed_positive_w − Σ |triggered_negative_w|) / Σ positive_w
     return round((pos_earned - neg_penalty) / pos_total, 4)
 
 
@@ -343,14 +402,23 @@ def execute_tests(
     network: Optional[str] = None,
     image: str = "wildclawbench-ubuntu:v1.3",
     timeout: int = 300,
+    checkers_code: Optional[str] = None,
+    agent_state_json: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Run `test_code` against the live mock stack. Returns a test_result dict.
 
-    `workspace_dir` is mounted read-only at /workspace inside the runner so
-    `file_exists("path/file")` and `read_file("path/file")` resolve relative to
-    the agent's produced artifacts. `mock_env_dict` carries <SVC>_URL env vars
+    `workspace_dir` is mounted read-only at BOTH /tmp_workspace (the cwd) and
+    /workspace, with WORKSPACE=/tmp_workspace exported, so the generated
+    `test_outputs.py` (which reads `WORKSPACE`, default "/workspace") and any
+    relative-path / hardcoded-/workspace readers all resolve against the agent's
+    produced artifacts. `mock_env_dict` carries <SVC>_URL env vars
     pointing at the running mock-stack container hostnames; `network` is the
     docker network those containers live on.
+
+    `checkers_code` (a task.py defining a CHECKERS list) and `agent_state_json`
+    (the live agent state dict) are shipped into the sandbox so fixture-based
+    suites authored against the Talos CHECKERS contract — `def test_x(state,
+    task_checkers)` — run as authored instead of erroring on missing fixtures.
     """
     if not test_code.strip():
         return {
@@ -373,6 +441,13 @@ def execute_tests(
         (tmp / "test_outputs.py").write_text(test_code, encoding="utf-8")
         (tmp / "test_weights.json").write_text(test_weights_json or "{}", encoding="utf-8")
         (tmp / "runner.py").write_text(_RUNNER_SCRIPT, encoding="utf-8")
+        # Ship the CHECKERS module + live agent state so fixture-based suites
+        # (state, task_checkers) run as authored (see _RUNNER_SCRIPT fixtures).
+        if checkers_code and checkers_code.strip():
+            (tmp / "task").mkdir(parents=True, exist_ok=True)
+            (tmp / "task" / "task.py").write_text(checkers_code, encoding="utf-8")
+        if agent_state_json and agent_state_json.strip():
+            (tmp / "agent_state.json").write_text(agent_state_json, encoding="utf-8")
 
         from src.utils.docker_utils import (
             build_env_args,
@@ -384,7 +459,18 @@ def execute_tests(
             "docker", "run", "--rm",
             "-v", f"{tmp}:/tests:ro",
             "-v", f"{ws_mount}:/tmp_workspace:ro",
+            # Generated test_outputs.py resolves deliverables via
+            # WORKSPACE = os.environ.get("WORKSPACE", "/workspace") + _file_content().
+            # The agent's workspace is mounted at /tmp_workspace, so without these
+            # two lines every absolute-path read landed on the empty default
+            # /workspace and ALL content assertions failed "<file> not found"
+            # even when the file existed (ROSE_002 glassy_lagoon: 0/42, files
+            # present in workspace_full/). Expose the SAME workspace at /workspace
+            # too (honors the default + the docstring) and pin WORKSPACE to the
+            # real mount so both relative- and absolute-path readers resolve.
+            "-v", f"{ws_mount}:/workspace:ro",
             "-w", "/tmp_workspace",
+            "-e", "WORKSPACE=/tmp_workspace",
         ]
         if network:
             _validate_docker_token("network", network)

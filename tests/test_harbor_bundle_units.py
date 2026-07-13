@@ -609,10 +609,13 @@ class TestWriteBundleTrajectories:
         run_dir = out_dir / "trajectories" / "claude" / "run_3"
         assert (run_dir / "output.json").is_file()
         assert not (out_dir / "trajectories" / "claude" / "run_1").exists()
-        # internal keys stripped from output.json
+        # internal keys stripped from output.json; the entry is normalized
+        # into the published-trajectory shape (messages + meta_info) by
+        # build_published_trajectory rather than copied through raw.
         out = _read_json(run_dir / "output.json")
         assert "__run_index__" not in out
-        assert out == {"sid": "x"}
+        assert "sid" not in out
+        assert "messages" in out and "meta_info" in out
 
     def test_verifier_files_from_pytest_result(self, tmp_path, store, config):
         task = _make_task()
@@ -704,7 +707,9 @@ class TestWriteBundleTrajectories:
         out = _read_json(
             out_dir / "trajectories" / "claude" / "run_1" / "output.json"
         )
-        assert out == {"from": "extra"}
+        # Normalized into the published-trajectory shape (messages + meta_info),
+        # not the raw task.extra entry.
+        assert "messages" in out and "meta_info" in out
 
 
 class TestWriteBundleDiscoveryFallback:

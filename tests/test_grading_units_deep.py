@@ -420,14 +420,16 @@ def test_all_negative_rubric_guardrails_held_scores_zero(monkeypatch):
 def test_all_negative_rubric_guardrail_breached_scores_zero(monkeypatch):
     # NOTE: pins current behavior — see SCORING_AUDIT_REPORT.md
     # Same all-negative rubric but forbidden behavior OCCURRED (satisfied=Yes
-    # unanimously). Numerator subtracts |weight| -> -3, clamped to 0.0.
+    # unanimously). Numerator subtracts |weight| -> -3; the formula is
+    # deliberately UNCLAMPED (negative-weight violation checkers must pull the
+    # reward below zero), so overall is -3/1.0 = -3.0.
     rubrics = [{"criterion": "forbidden thing", "weight": -3}]
     out = _grade(monkeypatch, rubrics, [
         _ok(_SONNET, "sonnet", _verdicts(True)),
         _ok(_GLM, "glm", _verdicts(True)),
         _ok(_KIMI, "kimi", _verdicts(True)),
     ])
-    assert out["overall_score"] == 0.0
+    assert out["overall_score"] == -3.0
     assert out["criteria"][0]["passed"] is False
 
 
@@ -436,16 +438,16 @@ def test_mixed_dict_and_string_rubric_inflates_numerator(monkeypatch):
     # A bare-string rubric entry is treated as a positive weight-1.0 criterion
     # in the NUMERATOR (its satisfied verdict adds +1.0 to `weighted`) but a
     # string is NOT a dict, so it is EXCLUDED from `total_w` (denominator only
-    # sums dict positive weights). Numerator 2+1=3 over denominator 2 = 1.5,
-    # then clamped to 1.0. The string entry silently inflates the score.
+    # sums dict positive weights). Numerator 2+1=3 over denominator 2 = 1.5
+    # (no clamp). The string entry silently inflates the score.
     rubrics = [{"criterion": "c0", "weight": 2}, "just a string criterion"]
     out = _grade(monkeypatch, rubrics, [
         _ok(_SONNET, "sonnet", _verdicts(True, True)),
         _ok(_GLM, "glm", _verdicts(True, True)),
         _ok(_KIMI, "kimi", _verdicts(True, True)),
     ])
-    # Denominator would be 2; numerator 3 -> clamps to 1.0.
-    assert out["overall_score"] == 1.0
+    # Denominator 2; numerator 3 -> unclamped 1.5.
+    assert out["overall_score"] == 1.5
     # String criterion rendered as positive weight 1.0.
     assert out["criteria"][1]["weight"] == 1.0
     assert out["criteria"][1]["is_positive"] is True
@@ -456,17 +458,16 @@ def test_nan_weight_propagates_to_overall_one(monkeypatch):
     # NOTE: pins current behavior — see SCORING_AUDIT_REPORT.md
     # A NaN weight (e.g. rubric weight literally "nan") is excluded from total_w
     # because `nan > 0` is False, so total_w falls back to 1.0. `weighted`
-    # becomes NaN (0 + nan). Then max(0.0, min(1.0, nan/1.0)) short-circuits to
-    # 1.0 because ALL nan comparisons are False: min(1.0, nan) -> 1.0, and
-    # max(0.0, 1.0) -> 1.0. A NaN-weighted criterion therefore silently scores
-    # a PERFECT 1.0.
+    # becomes NaN (0 + nan) and the unclamped nan/1.0 stays NaN — the poison
+    # value now PROPAGATES (previously the clamp silently converted it to a
+    # perfect 1.0).
     rubrics = [{"criterion": "c", "weight": "nan"}]
     out = _grade(monkeypatch, rubrics, [
         _ok(_SONNET, "sonnet", _verdicts(True)),
         _ok(_GLM, "glm", _verdicts(True)),
         _ok(_KIMI, "kimi", _verdicts(True)),
     ])
-    assert out["overall_score"] == 1.0
+    assert math.isnan(out["overall_score"])
     assert math.isnan(out["criteria"][0]["weight"])
 
 

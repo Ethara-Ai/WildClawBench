@@ -20,6 +20,33 @@ from _mutable_store import (
 _store = get_store("google-calendar-api")
 _API = "google-calendar-api"
 
+
+
+def _store_patch(_table, _row_or_pk, _updates):
+    """Persist field updates to a stored row (was: in-place mutation of a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
+
+def _store_delete(_table, _row_or_pk):
+    """Persist a row deletion (was: pop/remove on a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.delete(_pk)
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("calendars", primary_key="id",
                 initial_loader=lambda: _coerce_calendars(_load("calendars.json", "calendars")))
 _store.register("events", primary_key="id",
@@ -190,7 +217,7 @@ def create_event(calendar_id, payload):
         "recurrence": payload.get("recurrence", []) or [],
         "visibility": payload.get("visibility", "default"),
     }
-    _events_rows().append(event)
+    _store_insert("events", event)
     if payload.get("attendees"):
         _attendees_doc()[event["id"]] = [{
             "email": a.get("email"),
@@ -204,36 +231,45 @@ def create_event(calendar_id, payload):
 
 def update_event(calendar_id, event_id, payload):
     resolved = _resolve_calendar(calendar_id)
-    for i, e in enumerate(_events_rows()):
+    for e in _events_rows():
         if e["calendar_id"] == resolved and e["id"] == event_id:
+            _changes = {}
             for field in ("summary", "description", "location", "status", "visibility"):
                 if field in payload:
-                    _events_rows()[i][field] = payload[field]
+                    _changes[field] = payload[field]
             if "start" in payload:
                 s = payload["start"]
-                _events_rows()[i]["start"] = s.get("dateTime") or s.get("date") or e["start"]
-                _events_rows()[i]["all_day"] = "date" in s
+                _changes["start"] = s.get("dateTime") or s.get("date") or e["start"]
+                _changes["all_day"] = "date" in s
             if "end" in payload:
                 en = payload["end"]
-                _events_rows()[i]["end"] = en.get("dateTime") or en.get("date") or e["end"]
+                _changes["end"] = en.get("dateTime") or en.get("date") or e["end"]
             if "attendees" in payload:
-                _attendees_doc()[event_id] = [{
+                _att = _store.document("attendees")
+                _att_v = _att.get()
+                _att_v[event_id] = [{
                     "email": a.get("email"),
                     "displayName": a.get("displayName", ""),
                     "responseStatus": a.get("responseStatus", "needsAction"),
                     "optional": bool(a.get("optional", False)),
                     "organizer": bool(a.get("organizer", False)),
                 } for a in payload["attendees"]]
-            return _serialize_event(_events_rows()[i])
+                _att.set(_att_v)
+            e.update(_changes)
+            _store_patch("events", e, _changes)
+            return _serialize_event(e)
     return {"error": f"Event {event_id} not found"}
 
 
 def delete_event(calendar_id, event_id):
     resolved = _resolve_calendar(calendar_id)
-    for i, e in enumerate(_events_rows()):
+    for e in _events_rows():
         if e["calendar_id"] == resolved and e["id"] == event_id:
-            _events_rows().pop(i)
-            _attendees_doc().pop(event_id, None)
+            _store_delete("events", e)
+            _att = _store.document("attendees")
+            _att_v = _att.get()
+            _att_v.pop(event_id, None)
+            _att.set(_att_v)
             return {"deleted": True, "id": event_id}
     return {"error": f"Event {event_id} not found"}
 

@@ -8,11 +8,25 @@ DATA_DIR = Path(__file__).parent
 
 import sys as _sys
 _sys.path.insert(0, str(DATA_DIR.parent))
-from _mutable_store import (
+from _mutable_store import (  # noqa: E402
     read_seed_with_ctx, get_store, opt_str, strict_int)
 
 _store = get_store("sentry-api")
 _API = "sentry-api"
+
+
+def _store_patch(_table, _row_or_pk, _updates):
+    """Persist field updates to a stored row (was: in-place mutation of a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
+
+def _store_delete(_table, _row_or_pk):
+    """Persist a row deletion (was: pop/remove on a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.delete(_pk)
 
 _store.register("organizations", primary_key="id",
                 initial_loader=lambda: _coerce_organizations(_load("organizations.json", "organizations")))
@@ -220,11 +234,12 @@ def update_issue_status(org_slug, issue_id, status):
         return {"error": f"Organization {org_slug} not found"}
     if status not in _VALID_STATUSES:
         return {"error": f"Invalid status {status}", "valid": sorted(_VALID_STATUSES)}
-    for idx, i in enumerate(_issues_rows()):
+    for i in _issues_rows():
         if i["org_slug"] == org_slug and str(i["id"]) == str(issue_id):
-            _issues_rows()[idx]["status"] = status
-            _issues_rows()[idx]["last_seen"] = _now()
-            return _serialize_issue(_issues_rows()[idx])
+            _changes = {"status": status, "last_seen": _now()}
+            i.update(_changes)
+            _store_patch("issues", i, _changes)
+            return _serialize_issue(i)
     return {"error": f"Issue {issue_id} not found"}
 
 

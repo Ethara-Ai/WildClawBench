@@ -25,6 +25,33 @@ from _mutable_store import (
 _store = get_store("linear-api")
 _API = "linear-api"
 
+
+
+def _store_patch(_table, _row_or_pk, _updates):
+    """Persist field updates to a stored row (was: in-place mutation of a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
+
+def _store_delete(_table, _row_or_pk):
+    """Persist a row deletion (was: pop/remove on a copy)."""
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.delete(_pk)
+
+def _store_insert(_table, _row):
+    """Persist a newly-created row into the shared store (drift/injection-safe).
+
+    Synthesizes the table's registered primary key from the row's ``id`` field
+    when the row doesn't already carry it, so creates work regardless of whether
+    the table was registered with primary_key="id" or a domain-specific key.
+    """
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
 _store.register("teams", primary_key="id",
                 initial_loader=lambda: _coerce_teams(_load("teams.json", "teams")))
 _store.register("users", primary_key="id",
@@ -474,7 +501,7 @@ def create_label(data: dict):
         "createdAt": now,
         "updatedAt": now,
     }
-    _labels_rows().append(label)
+    _store_insert("labels", label)
     return {"type": "label", "label": label}
 
 
@@ -522,20 +549,23 @@ def create_project(data: dict):
         "createdAt": now,
         "updatedAt": now,
     }
-    _projects_rows().append(project)
+    _store_insert("projects", project)
     return {"type": "project", "project": project}
 
 
 def update_project(project_id: str, data: dict):
-    for i, project in enumerate(_projects_rows()):
+    for project in _projects_rows():
         if project["id"] == project_id:
             updatable = {"name", "description", "state", "leadId", "teamIds",
                          "startDate", "targetDate"}
+            _changes = {}
             for k, v in data.items():
                 if k in updatable:
-                    _projects_rows()[i][k] = v
-            _projects_rows()[i]["updatedAt"] = _now()
-            return {"type": "project", "project": _projects_rows()[i]}
+                    _changes[k] = v
+            _changes["updatedAt"] = _now()
+            project.update(_changes)
+            _store_patch("projects", project, _changes)
+            return {"type": "project", "project": project}
     return {"error": f"Project {project_id} not found"}
 
 
@@ -613,7 +643,7 @@ def create_cycle(data: dict):
         "createdAt": now,
         "updatedAt": now,
     }
-    _cycles_rows().append(cycle)
+    _store_insert("cycles", cycle)
     return {"type": "cycle", "cycle": cycle}
 
 
@@ -737,59 +767,66 @@ def create_issue(data: dict):
         "completedAt": None,
         "canceledAt": None,
     }
-    _issues_rows().append(issue)
+    _store_insert("issues", issue)
     _next_issue_number += 1
     return {"type": "issue", "issue": issue}
 
 
 def update_issue(issue_id: str, data: dict):
-    for i, issue in enumerate(_issues_rows()):
+    for issue in _issues_rows():
         if issue["id"] == issue_id:
+            _changes = {}
             updatable = {"title", "description", "priority", "estimate", "stateId",
                          "assigneeId", "projectId", "cycleId", "labelIds", "dueDate",
                          "sortOrder"}
             for k, v in data.items():
                 if k in updatable:
                     if k == "priority" and v is not None:
-                        _issues_rows()[i][k] = int(v)
+                        _changes[k] = int(v)
                     elif k == "estimate" and v is not None:
-                        _issues_rows()[i][k] = int(v)
+                        _changes[k] = int(v)
                     elif k == "sortOrder" and v is not None:
-                        _issues_rows()[i][k] = float(v)
+                        _changes[k] = float(v)
                     else:
-                        _issues_rows()[i][k] = v
+                        _changes[k] = v
+            issue.update(_changes)
 
             # Handle state transitions
             if "stateId" in data:
                 new_state = next((s for s in _workflow_states_rows() if s["id"] == data["stateId"]), None)
                 if new_state:
                     now = _now()
-                    if new_state["type"] == "started" and not _issues_rows()[i]["startedAt"]:
-                        _issues_rows()[i]["startedAt"] = now
+                    if new_state["type"] == "started" and not issue["startedAt"]:
+                        _changes["startedAt"] = now
                     elif new_state["type"] == "completed":
-                        _issues_rows()[i]["completedAt"] = now
-                        if not _issues_rows()[i]["startedAt"]:
-                            _issues_rows()[i]["startedAt"] = now
+                        _changes["completedAt"] = now
+                        if not issue["startedAt"]:
+                            _changes["startedAt"] = now
                     elif new_state["type"] == "cancelled":
-                        _issues_rows()[i]["canceledAt"] = now
+                        _changes["canceledAt"] = now
+                    issue.update(_changes)
 
-            _issues_rows()[i]["updatedAt"] = _now()
+            _changes["updatedAt"] = _now()
+            issue.update(_changes)
 
             # Update branch name if assignee changed
             if "assigneeId" in data and data["assigneeId"]:
                 assignee = next((u for u in _users_rows() if u["id"] == data["assigneeId"]), None)
                 if assignee:
-                    slug = _issues_rows()[i]["title"].lower().replace(" ", "-")[:40]
-                    _issues_rows()[i]["branchName"] = f"{assignee['name']}/{_issues_rows()[i]['identifier'].lower()}-{slug}"
+                    slug = issue["title"].lower().replace(" ", "-")[:40]
+                    _changes["branchName"] = f"{assignee['name']}/{issue['identifier'].lower()}-{slug}"
+                    issue.update(_changes)
 
-            return {"type": "issue", "issue": _issues_rows()[i]}
+            _store_patch("issues", issue, _changes)
+            return {"type": "issue", "issue": issue}
     return {"error": f"Issue {issue_id} not found"}
 
 
 def delete_issue(issue_id: str):
-    for i, issue in enumerate(_issues_rows()):
+    for issue in _issues_rows():
         if issue["id"] == issue_id:
-            removed = _issues_rows().pop(i)
+            removed = issue
+            _store_delete("issues", issue)
             return {"type": "issue", "deleted": True, "issueId": issue_id}
     return {"error": f"Issue {issue_id} not found"}
 
@@ -862,24 +899,27 @@ def create_comment(data: dict):
         "createdAt": now,
         "updatedAt": now,
     }
-    _comments_rows().append(comment)
+    _store_insert("comments", comment)
     _next_comment_id += 1
     return {"type": "comment", "comment": comment}
 
 
 def update_comment(comment_id: str, data: dict):
-    for i, comment in enumerate(_comments_rows()):
+    for comment in _comments_rows():
         if comment["id"] == comment_id:
+            _changes = {}
             if "body" in data:
-                _comments_rows()[i]["body"] = data["body"]
-            _comments_rows()[i]["updatedAt"] = _now()
-            return {"type": "comment", "comment": _comments_rows()[i]}
+                _changes["body"] = data["body"]
+            _changes["updatedAt"] = _now()
+            comment.update(_changes)
+            _store_patch("comments", comment, _changes)
+            return {"type": "comment", "comment": comment}
     return {"error": f"Comment {comment_id} not found"}
 
 
 def delete_comment(comment_id: str):
-    for i, comment in enumerate(_comments_rows()):
+    for comment in _comments_rows():
         if comment["id"] == comment_id:
-            _comments_rows().pop(i)
+            _store_delete("comments", comment)
             return {"type": "comment", "deleted": True, "commentId": comment_id}
     return {"error": f"Comment {comment_id} not found"}
