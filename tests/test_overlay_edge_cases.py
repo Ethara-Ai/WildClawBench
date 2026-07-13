@@ -635,8 +635,23 @@ def test_real_api_figma_ragged_csv_overlay_surfaces_coerce_error(
         "C1,FK,u1,Edge,oops, extra comma,0:0,false,2026-06-17T00:00:00Z\n",
         encoding="utf-8",
     )
-    with pytest.raises(CoerceError) as excinfo:
+    # NOTE: The CoerceError raised here originates from the _mutable_store that
+    # figma_data resolves at (re)import time. When an earlier test in the same
+    # session evicts _mutable_store from sys.modules (e.g.
+    # test_drift_plane_smoke.py does exactly this in its fixture), the module
+    # is re-imported under a fresh identity and its CoerceError becomes a
+    # DISTINCT class object from the one bound at the top of THIS file -- so a
+    # `pytest.raises(CoerceError)` keyed on the top-level import silently fails
+    # to catch it (proven: the re-imported class is not even a subclass). We
+    # therefore match on the exception's class NAME + message, which is robust
+    # to import-order-dependent class identity. This still fully pins the
+    # contract: a ragged overlay CSV must abort store load with a CoerceError
+    # naming api+table.
+    with pytest.raises(Exception) as excinfo:
         isolated_api_import(sandbox, "figma_data", "figma-api")
+    assert type(excinfo.value).__name__ == "CoerceError", (
+        f"expected CoerceError, got {type(excinfo.value).__name__}: {excinfo.value}"
+    )
     msg = str(excinfo.value)
     assert "ragged row" in msg
     assert "figma-api" in msg
