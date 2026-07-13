@@ -5,7 +5,7 @@
     "description": "Primary calendar",
     "time_zone": "America/Los_Angeles",
     "access_role": "owner",
-    "primary": "true",
+    "primary": true,
     "color_id": "1"
   },
   {
@@ -14,7 +14,7 @@
     "description": "Team-wide engineering events",
     "time_zone": "America/Los_Angeles",
     "access_role": "writer",
-    "primary": "false",
+    "primary": false,
     "color_id": "2"
   },
   {
@@ -23,7 +23,7 @@
     "description": "Holidays and PTO",
     "time_zone": "America/Los_Angeles",
     "access_role": "reader",
-    "primary": "false",
+    "primary": false,
     "color_id": "8"
   },
   {
@@ -32,7 +32,7 @@
     "description": "",
     "time_zone": "America/Los_Angeles",
     "access_role": "owner",
-    "primary": "false",
+    "primary": false,
     "color_id": "5"
   }
 ]

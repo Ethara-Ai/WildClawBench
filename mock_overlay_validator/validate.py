@@ -398,7 +398,7 @@ class TableContract:
 class ApiContract:
     api: str
     tables: dict[str, TableContract] = field(default_factory=dict)
-    documents: dict[str, str] = field(default_factory=dict)
+    documents: dict[str, "TableContract | str"] = field(default_factory=dict)
 
 
 _CONTRACT_CACHE: dict[str, ApiContract | None] = {}
@@ -424,7 +424,27 @@ def _build_api_contract(stem: str, raw: dict) -> ApiContract:
             pk_synthetic=tspec.get("pk_synthetic", False),
             columns=cols,
         )
-    contract.documents = dict(raw.get("documents", {}))
+    for doc_name, dspec in raw.get("documents", {}).items():
+        if isinstance(dspec, dict):
+            cols = {
+                col: ColumnContract(
+                    coercer=cspec["coercer"],
+                    required=cspec["required"],
+                    sep=cspec.get("sep"),
+                )
+                for col, cspec in dspec.get("columns", {}).items()
+            }
+            contract.documents[doc_name] = TableContract(
+                api=stem,
+                table=doc_name,
+                file=dspec["file"],
+                coercer_func=dspec.get("coercer_func"),
+                primary_key=None,
+                pk_synthetic=False,
+                columns=cols,
+            )
+        else:
+            contract.documents[doc_name] = dspec
     return contract
 
 
@@ -449,6 +469,10 @@ def _table_contract_for(api: str, filename: str) -> TableContract | None:
     for tc in contract.tables.values():
         if tc.file in target_stems or Path(tc.file).stem == Path(filename).stem:
             return tc
+    for dc in contract.documents.values():
+        if isinstance(dc, TableContract):
+            if dc.file in target_stems or Path(dc.file).stem == Path(filename).stem:
+                return dc
     return None
 
 
@@ -504,16 +528,29 @@ def _csv_list_parseable(v: Any) -> bool:
 
 
 def _coercer_check(coercer: str, v: Any) -> bool:
-    if v is None:
+    is_opt = coercer.startswith("opt_")
+    is_blank_str = isinstance(v, str) and v.strip() == ""
+    if v is None or is_blank_str:
+        # runtime: strict_* raises on None/blank; opt_* returns its default silently.
+        # strict_str is the exception -- it accepts "" (only None raises), but we
+        # never enter here for None because callers pre-check that case.
+        if coercer == "strict_str":
+            return v is not None
+        return is_opt
+    if is_opt:
+        # opt_int/opt_float/opt_bool/opt_csv_list/opt_str silently return the default
+        # on unrecognized/unparseable input -- runtime never raises, so overlay is fine.
         return True
-    if coercer in ("strict_int", "opt_int"):
+    if coercer == "strict_int":
         return _int_parseable(v)
-    if coercer in ("strict_float", "opt_float"):
+    if coercer == "strict_float":
         return _float_parseable(v)
-    if coercer in ("strict_bool", "opt_bool"):
+    if coercer == "strict_bool":
         return _bool_parseable(v)
-    if coercer in ("strict_csv_list", "opt_csv_list"):
+    if coercer == "strict_csv_list":
         return _csv_list_parseable(v)
+    if coercer == "strict_str":
+        return True
     return True
 
 

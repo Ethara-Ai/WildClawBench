@@ -5,7 +5,7 @@
     "name_surname": "Robinson",
     "name_display": "Maya Robinson",
     "email": "maya.robinson@example.com",
-    "email_verified": "true",
+    "email_verified": true,
     "country": "US",
     "locale": "en",
     "account_type": "business"

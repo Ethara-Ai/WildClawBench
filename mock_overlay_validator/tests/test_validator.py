@@ -539,6 +539,58 @@ class CoercerContractTests(unittest.TestCase):
     def test_unknown_api_returns_none(self):
         self.assertIsNone(V._load_api_contract("this-api-does-not-exist"))
 
+    def test_opt_bool_accepts_blank_string(self):
+        self.assertTrue(V._coercer_check("opt_bool", ""))
+        self.assertTrue(V._coercer_check("opt_bool", "   "))
+        self.assertTrue(V._coercer_check("opt_bool", None))
+
+    def test_opt_bool_accepts_unrecognized_token(self):
+        self.assertTrue(V._coercer_check("opt_bool", "maybe"))
+        self.assertTrue(V._coercer_check("opt_bool", "kinda"))
+
+    def test_opt_bool_accepts_native_and_recognized_strings(self):
+        self.assertTrue(V._coercer_check("opt_bool", True))
+        self.assertTrue(V._coercer_check("opt_bool", False))
+        self.assertTrue(V._coercer_check("opt_bool", "true"))
+        self.assertTrue(V._coercer_check("opt_bool", "0"))
+
+    def test_strict_bool_rejects_blank_string(self):
+        self.assertFalse(V._coercer_check("strict_bool", ""))
+        self.assertFalse(V._coercer_check("strict_bool", "   "))
+        self.assertFalse(V._coercer_check("strict_bool", None))
+
+    def test_strict_bool_accepts_native_and_recognized(self):
+        self.assertTrue(V._coercer_check("strict_bool", True))
+        self.assertTrue(V._coercer_check("strict_bool", False))
+        self.assertTrue(V._coercer_check("strict_bool", "yes"))
+        self.assertTrue(V._coercer_check("strict_bool", "n"))
+
+    def test_strict_bool_rejects_unrecognized_token(self):
+        self.assertFalse(V._coercer_check("strict_bool", "maybe"))
+        self.assertFalse(V._coercer_check("strict_bool", "sometimes"))
+
+    def test_opt_int_accepts_blank_and_unrecognized(self):
+        self.assertTrue(V._coercer_check("opt_int", ""))
+        self.assertTrue(V._coercer_check("opt_int", "not-a-number"))
+        self.assertTrue(V._coercer_check("opt_int", None))
+        self.assertTrue(V._coercer_check("opt_int", 42))
+        self.assertTrue(V._coercer_check("opt_int", "42"))
+
+    def test_strict_int_rejects_blank_and_unrecognized(self):
+        self.assertFalse(V._coercer_check("strict_int", ""))
+        self.assertFalse(V._coercer_check("strict_int", "not-a-number"))
+        self.assertFalse(V._coercer_check("strict_int", None))
+        self.assertTrue(V._coercer_check("strict_int", 42))
+        self.assertTrue(V._coercer_check("strict_int", "42"))
+
+    def test_notion_blocks_checked_empty_string_valid(self):
+        blocks_path = V.EXAMPLES_DIR / "notion-api" / "blocks.json"
+        issues = V._validate_table(blocks_path, blocks_path, "notion-api")
+        self.assertFalse(
+            any(i.code == "SCHEMA_COERCE_MISMATCH" for i in issues),
+            msg=f"opt_bool 'checked' should accept blank strings: {[i.message for i in issues]}",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
