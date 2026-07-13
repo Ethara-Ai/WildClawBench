@@ -50,6 +50,10 @@ PARALLEL_TASKS=1         # >1 = run that many TASKS concurrently via the failure
 INPUT_DIR=""             # --input-dir DIR: queue every task subdir under DIR
 AUTO_BUNDLE=1            # 1 = auto-repackage to output_bundle/ after each task, 0 = omit
 BUNDLE_ROOT="output_bundle"  # dest-root for the auto-bundler; overridable via KENSEI_BUNDLE_ROOT
+STREAM=0                 # 1 = live-stream LLM output to the terminal (--stream). Single-run
+                         # foreground only (1 task × 1 model × K=1 × -P 1); display-only
+                         # observability — never touches grading/deliverables. See
+                         # docs/STREAMING_PLAN.md.
 
 print_help() {
     cat <<'EOF'
@@ -109,6 +113,11 @@ ADVANCED
       --no-bundle           Skip auto-repackage to output_bundle/ after each task
       --bundle-root DIR     Destination for auto-bundle (default: output_bundle; env: KENSEI_BUNDLE_ROOT)
       --parallel-reps       Run all K reps of a (task,model) CONCURRENTLY (default: sequential)
+      --stream              Live-stream LLM output (agent thinking+text, judge verdicts) to the
+                            terminal while the run executes. Single-run only (1 task × 1 model ×
+                            K=1 × -P 1) — silently downgraded otherwise. Display-only: never
+                            affects grading, scores, or bundles. Default: off.
+      --no-stream           Force streaming off (default)
       --skip-preflight      Skip docker/image/.env checks (DANGEROUS; for re-entry only)
 
 NOTES
@@ -397,6 +406,7 @@ cleanup_orphans() {
 : "${WCB_SHARED_CC_BRIDGE:=}"
 : "${WCB_SHARED_CC_BRIDGE_URL:=}"
 : "${WCB_SHARED_CC_BRIDGE_HOST_URL:=}"
+: "${WCB_SHARED_SIDECAR_STREAM_LOG:=}"
 # WCB_SHARED_OWNER_PID is the PID of the process that ran bootstrap_shared_sidecar
 # (always the parent run.sh). Workers under -P >1 inherit this via export. The
 # teardown_shared_sidecar guard at the top of that function uses this to refuse
@@ -442,6 +452,7 @@ bootstrap_shared_sidecar() {
             cc_bridge)     WCB_SHARED_CC_BRIDGE="$v" ;;
             cc_bridge_url) WCB_SHARED_CC_BRIDGE_URL="$v" ;;
             cc_bridge_host_url) WCB_SHARED_CC_BRIDGE_HOST_URL="$v" ;;
+            stream_log)  WCB_SHARED_SIDECAR_STREAM_LOG="$v" ;;
         esac
     done < "$tmpfile"
     rm -f "$tmpfile"
@@ -456,7 +467,7 @@ bootstrap_shared_sidecar() {
            WCB_SHARED_SIDECAR_USAGE_LOG WCB_SHARED_SIDECAR_YAML \
            WCB_SHARED_LITELLM_MASTER_KEY WCB_SHARED_OWNER_PID \
            WCB_SHARED_CC_BRIDGE WCB_SHARED_CC_BRIDGE_URL \
-           WCB_SHARED_CC_BRIDGE_HOST_URL
+           WCB_SHARED_CC_BRIDGE_HOST_URL WCB_SHARED_SIDECAR_STREAM_LOG
     log::ok "Shared sidecar=$WCB_SHARED_SIDECAR network=$WCB_SHARED_NETWORK owner_pid=$WCB_SHARED_OWNER_PID"
 
     # Route the HOST-side Sonnet judge through the OAuth subscription bridge.
@@ -860,6 +871,8 @@ parse_args() {
             --use-claude-oauth)   USE_CLAUDE_OAUTH=1; shift ;;
             --no-bundle)          AUTO_BUNDLE=0; shift ;;
             --bundle-root)        BUNDLE_ROOT="$2"; shift 2 ;;
+            --stream)             STREAM=1; shift ;;
+            --no-stream)          STREAM=0; shift ;;
             --parallel-reps)      PARALLEL_REPS=1; shift ;;
             -P|--parallel-tasks)
                 [[ -n "${2:-}" ]] || { log::err "$1 requires a value"; exit 2; }
@@ -1025,6 +1038,25 @@ main() {
         log::err "--parallel-tasks must be a positive integer, got: $PARALLEL_TASKS"; exit 2
     fi
 
+    # Live-stream gate (docs/STREAMING_PLAN.md D6/R6). Token streaming is
+    # single-run foreground only: with fan-out (multi task/model/rep) the
+    # shared feed interleaves runs unreadably, so the flag downgrades with a
+    # warning instead of half-working. Must be decided (and exported) BEFORE
+    # bootstrap_shared_sidecar below — the gate is batch-scoped: it controls
+    # whether the shared sidecar mounts the stream callback at all.
+    if (( STREAM == 1 )) && (( K == 1 && ${#models[@]} == 1 && ${#TASKS[@]} == 1 && PARALLEL_TASKS == 1 )); then
+        export WCB_STREAM=1
+    else
+        if (( STREAM == 1 )); then
+            log::warn "--stream: live token streaming is single-run only (1 task × 1 model × K=1 × -P 1); disabled for this batch"
+        fi
+        STREAM=0
+        # run.sh is AUTHORITATIVE over the gate: a stale WCB_STREAM inherited
+        # from the caller's environment must not leak token-mode into fan-out
+        # batches (D6) or into flag-off runs (R6 byte-identical contract).
+        unset WCB_STREAM 2>/dev/null || true
+    fi
+
     log::section "WildClawBench runner"
     log::kv "Mode"     "$MODE"
     log::kv "Tasks"    "${#TASKS[@]}"
@@ -1039,6 +1071,7 @@ main() {
     (( JUDGE_COUNCIL == 1 ))  && feats+=("judge-council")
     (( PARALLEL_REPS == 1 ))  && feats+=("parallel-reps")
     (( AUTO_BUNDLE == 1 ))    && feats+=("auto-bundle→${KENSEI_BUNDLE_ROOT:-$BUNDLE_ROOT}/")
+    (( STREAM == 1 ))         && feats+=("stream")
     log::kv "Features" "${feats[*]:-none}"
     log::kv "Cwd"      "$(pwd)"
 

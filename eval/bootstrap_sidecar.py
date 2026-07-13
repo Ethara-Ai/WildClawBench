@@ -150,6 +150,13 @@ def main() -> int:
         os.environ.get("KENSEI_AGENT_HEADROOM_ENABLED", "").strip().lower()
         in ("1", "true", "yes", "on")
     )
+    # Live-token stream tap (docs/STREAMING_PLAN.md). Batch-scoped gate (R6):
+    # evaluated once here; run.sh sets WCB_STREAM=1 only for single-run
+    # foreground batches (--stream flag + K==1 gate).
+    _stream_enabled = (
+        os.environ.get("WCB_STREAM", "").strip().lower()
+        in ("1", "true", "yes", "on")
+    )
 
     use_oauth = config.use_claude_oauth and bool(config.cc_account_pool)
     bridge_secret = config.cc_bridge_secret
@@ -187,6 +194,11 @@ def main() -> int:
         use_claude_oauth=use_oauth,
         bridge_url=cc_bridge_url,
         enable_oauth_usage_callback=use_oauth,
+        # §1.5 (docs/STREAMING_PLAN.md): on the OAuth agent path the sidecar
+        # sits IN FRONT of the buffering cc-bridge, so its hook would only see
+        # an end-of-turn burst — the real-time tap there is the bridge tee.
+        # Register the sidecar callback only on the non-OAuth (Bedrock) path.
+        enable_stream_callback=_stream_enabled and not use_oauth,
     )
     if not litellm_yaml:
         _log(
@@ -203,6 +215,28 @@ def main() -> int:
 
     _log(f"creating network {network}…")
     create_network(network)
+
+    # Live-stream feed (docs/STREAMING_PLAN.md §2.2) — resolved BEFORE the
+    # cc-bridge start: on this branch the bridge tee is the real-time token
+    # tap and needs the feed dir mounted at container start. Separate sink
+    # from usage.jsonl / usage_oauth.jsonl (m0130).
+    stream_callback_src = ""
+    stream_log_dir_str = ""
+    stream_log_path = None
+    if _stream_enabled:
+        stream_callback_src = str(
+            Path(__file__).resolve().parent.parent / "src" / "utils" / "litellm_stream_callback.py"
+        )
+        stream_log_dir = config.work_dir / f"litellm-stream-shared-{suffix}"
+        stream_log_dir.mkdir(parents=True, exist_ok=True)
+        stream_log_path = stream_log_dir / "stream.jsonl"
+        stream_log_path.touch(exist_ok=True)
+        try:
+            os.chmod(stream_log_path, 0o600)
+            os.chmod(stream_log_dir, 0o700)
+        except OSError as exc:
+            _log(f"warning: chmod failed on stream log dir/file ({exc})")
+        stream_log_dir_str = str(stream_log_dir)
 
     if use_oauth:
         pool_paths = [p.strip() for p in config.cc_account_pool.split(":") if p.strip()]
@@ -233,6 +267,9 @@ def main() -> int:
                     network=network,
                     pool_host_dir=pool_host_dir,
                     bridge_secret=bridge_secret,
+                    # Real-time tee sink (docs/STREAMING_PLAN.md §3.2); empty
+                    # when streaming off → tee inert, bridge unchanged.
+                    stream_log_host_dir=stream_log_dir_str,
                 )
             except Exception as exc:
                 _log(f"start_bridge failed: {exc}")
@@ -315,6 +352,8 @@ def main() -> int:
             _log(f"warning: chmod failed on headroom log dir ({exc})")
         headroom_log_dir_str = str(headroom_log_dir)
 
+    # (Live-stream feed dir was resolved ABOVE the cc-bridge start.)
+
     _log(f"starting sidecar {sidecar} on network {network}…")
     oauth_cb_src = ""
     if use_oauth:
@@ -338,6 +377,8 @@ def main() -> int:
             enable_headroom=_agent_headroom,
             anthropic_api_key=config.anthropic_api_key,
             oauth_usage_callback_host_path=oauth_cb_src,
+            stream_callback_host_path=stream_callback_src,
+            stream_log_host_dir=stream_log_dir_str,
         )
     except Exception as exc:
         _log(f"start_litellm failed: {exc}")
@@ -389,6 +430,7 @@ def main() -> int:
         "cc_bridge_host_url",
         f"http://127.0.0.1:{cc_bridge_host_port}" if cc_bridge_host_port else "",
     )
+    _emit("stream_log", str(stream_log_path) if stream_log_path else "")
     return 0
 
 
