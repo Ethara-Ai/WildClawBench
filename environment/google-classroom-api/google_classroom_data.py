@@ -71,6 +71,26 @@ def _materials_rows():
     return _store.table("materials").rows()
 
 
+# Store write-through helpers. `rows()` returns DEEP COPIES, so mutating the
+# returned list/dicts is a lost write (the exact idiom
+# tests/test_store_persistence.py bans — turn_in_submission's docstring below
+# documents the same trap). All writes must land through the table API so
+# drift injection, the admin plane, and post-run state checks see them.
+def _store_insert(_table, _row):
+    _t = _store.table(_table)
+    if _t.primary_key not in _row and "id" in _row:
+        _row = {**_row, _t.primary_key: _row["id"]}
+    return _t.upsert(_row)
+
+
+def _store_patch(_table, _pk, _updates):
+    return _store.table(_table).patch(_pk, _updates)
+
+
+def _store_delete(_table, _pk):
+    return _store.table(_table).delete(_pk)
+
+
 
 def _load(filename, table):
     return read_seed_with_ctx(DATA_DIR / filename, _API, table)
@@ -322,31 +342,28 @@ def create_course(data):
         "guardiansEnabled": False,
         "calendarId": f"calendar_{_next_course_id:03d}",
     }
-    _courses_rows().append(course)
+    _store_insert("courses", course)
     _next_course_id += 1
     return {"course": course}
 
 
 def update_course(course_id, data):
-    for i, c in enumerate(_courses_rows()):
-        if c["id"] == course_id:
-            updatable = {"name", "section", "descriptionHeading", "description",
-                         "room", "courseState", "guardiansEnabled"}
-            for k, v in data.items():
-                if k in updatable:
-                    _courses_rows()[i][k] = v
-            _courses_rows()[i]["updateTime"] = _now()
-            return {"course": _courses_rows()[i]}
-    return {"error": f"Course {course_id} not found"}
+    updatable = {"name", "section", "descriptionHeading", "description",
+                 "room", "courseState", "guardiansEnabled"}
+    updates = {k: v for k, v in data.items() if k in updatable}
+    updates["updateTime"] = _now()
+    updated = _store_patch("courses", course_id, updates)
+    if updated is None:
+        return {"error": f"Course {course_id} not found"}
+    return {"course": updated}
 
 
 def archive_course(course_id):
-    for i, c in enumerate(_courses_rows()):
-        if c["id"] == course_id:
-            _courses_rows()[i]["courseState"] = "ARCHIVED"
-            _courses_rows()[i]["updateTime"] = _now()
-            return {"course": _courses_rows()[i]}
-    return {"error": f"Course {course_id} not found"}
+    updated = _store_patch("courses", course_id,
+                           {"courseState": "ARCHIVED", "updateTime": _now()})
+    if updated is None:
+        return {"error": f"Course {course_id} not found"}
+    return {"course": updated}
 
 
 # ---------------------------------------------------------------------------
@@ -424,7 +441,7 @@ def create_coursework(course_id, data):
         "dueTime": data.get("dueTime"),
         "alternateLink": f"https://classroom.google.com/c/{course_id}/a/cw_{_next_cw_id}",
     }
-    _coursework_rows().append(cw)
+    _store_insert("coursework", cw)
     _next_cw_id += 1
     return {"courseWork": cw}
 
@@ -432,27 +449,26 @@ def create_coursework(course_id, data):
 def update_coursework(course_id, coursework_id, data):
     if not any(c["id"] == course_id for c in _courses_rows()):
         return {"error": f"Course {course_id} not found"}
-    for i, cw in enumerate(_coursework_rows()):
+    for cw in _coursework_rows():
         if cw["courseId"] == course_id and cw["id"] == coursework_id:
             updatable = {"title", "description", "state", "maxPoints",
                          "dueDate", "dueTime", "topicId"}
+            updates = {}
             for k, v in data.items():
                 if k in updatable:
-                    if k == "maxPoints" and v is not None:
-                        _coursework_rows()[i][k] = float(v)
-                    else:
-                        _coursework_rows()[i][k] = v
-            _coursework_rows()[i]["updateTime"] = _now()
-            return {"courseWork": _coursework_rows()[i]}
+                    updates[k] = float(v) if (k == "maxPoints" and v is not None) else v
+            updates["updateTime"] = _now()
+            updated = _store_patch("coursework", coursework_id, updates)
+            return {"courseWork": updated}
     return {"error": f"CourseWork {coursework_id} not found in course {course_id}"}
 
 
 def delete_coursework(course_id, coursework_id):
     if not any(c["id"] == course_id for c in _courses_rows()):
         return {"error": f"Course {course_id} not found"}
-    for i, cw in enumerate(_coursework_rows()):
+    for cw in _coursework_rows():
         if cw["courseId"] == course_id and cw["id"] == coursework_id:
-            _coursework_rows().pop(i)
+            _store_delete("coursework", coursework_id)
             return {"deleted": True}
     return {"error": f"CourseWork {coursework_id} not found in course {course_id}"}
 
@@ -499,7 +515,8 @@ def create_topic(course_id, data):
         "name": data["name"],
         "updateTime": _now(),
     }
-    _topics_rows().append(topic)
+    # topics table keys on the synthetic composite "_pk" (see register above).
+    _store_insert("topics", {**topic, "_pk": f"{course_id}@{topic['topicId']}"})
     _next_topic_id += 1
     return {"topic": topic}
 
@@ -507,23 +524,21 @@ def create_topic(course_id, data):
 def update_topic(course_id, topic_id, data):
     if not any(c["id"] == course_id for c in _courses_rows()):
         return {"error": f"Course {course_id} not found"}
-    for i, t in enumerate(_topics_rows()):
-        if t["courseId"] == course_id and t["topicId"] == topic_id:
-            if "name" in data:
-                _topics_rows()[i]["name"] = data["name"]
-            _topics_rows()[i]["updateTime"] = _now()
-            return {"topic": _topics_rows()[i]}
-    return {"error": f"Topic {topic_id} not found in course {course_id}"}
+    updates = {"updateTime": _now()}
+    if "name" in data:
+        updates["name"] = data["name"]
+    updated = _store_patch("topics", f"{course_id}@{topic_id}", updates)
+    if updated is None:
+        return {"error": f"Topic {topic_id} not found in course {course_id}"}
+    return {"topic": updated}
 
 
 def delete_topic(course_id, topic_id):
     if not any(c["id"] == course_id for c in _courses_rows()):
         return {"error": f"Course {course_id} not found"}
-    for i, t in enumerate(_topics_rows()):
-        if t["courseId"] == course_id and t["topicId"] == topic_id:
-            _topics_rows().pop(i)
-            return {"deleted": True}
-    return {"error": f"Topic {topic_id} not found in course {course_id}"}
+    if not _store_delete("topics", f"{course_id}@{topic_id}"):
+        return {"error": f"Topic {topic_id} not found in course {course_id}"}
+    return {"deleted": True}
 
 
 # ---------------------------------------------------------------------------
@@ -570,39 +585,40 @@ def get_submission(course_id, coursework_id, submission_id):
 def grade_submission(course_id, coursework_id, submission_id, data):
     if not any(c["id"] == course_id for c in _courses_rows()):
         return {"error": f"Course {course_id} not found"}
-    for i, s in enumerate(_submissions_rows()):
+    for s in _submissions_rows():
         if (s["courseId"] == course_id and s["courseWorkId"] == coursework_id
                 and s["id"] == submission_id):
+            updates = {"updateTime": _now()}
             if "assignedGrade" in data and data["assignedGrade"] is not None:
-                _submissions_rows()[i]["assignedGrade"] = float(data["assignedGrade"])
+                updates["assignedGrade"] = float(data["assignedGrade"])
             if "draftGrade" in data and data["draftGrade"] is not None:
-                _submissions_rows()[i]["draftGrade"] = float(data["draftGrade"])
-            _submissions_rows()[i]["updateTime"] = _now()
-            return {"studentSubmission": _submissions_rows()[i]}
+                updates["draftGrade"] = float(data["draftGrade"])
+            updated = _store_patch("submissions", submission_id, updates)
+            return {"studentSubmission": updated}
     return {"error": f"Submission {submission_id} not found"}
 
 
 def return_submission(course_id, coursework_id, submission_id):
     if not any(c["id"] == course_id for c in _courses_rows()):
         return {"error": f"Course {course_id} not found"}
-    for i, s in enumerate(_submissions_rows()):
+    for s in _submissions_rows():
         if (s["courseId"] == course_id and s["courseWorkId"] == coursework_id
                 and s["id"] == submission_id):
-            _submissions_rows()[i]["state"] = "RETURNED"
-            _submissions_rows()[i]["updateTime"] = _now()
-            return {"studentSubmission": _submissions_rows()[i]}
+            updated = _store_patch("submissions", submission_id,
+                                   {"state": "RETURNED", "updateTime": _now()})
+            return {"studentSubmission": updated}
     return {"error": f"Submission {submission_id} not found"}
 
 
 def reclaim_submission(course_id, coursework_id, submission_id):
     if not any(c["id"] == course_id for c in _courses_rows()):
         return {"error": f"Course {course_id} not found"}
-    for i, s in enumerate(_submissions_rows()):
+    for s in _submissions_rows():
         if (s["courseId"] == course_id and s["courseWorkId"] == coursework_id
                 and s["id"] == submission_id):
-            _submissions_rows()[i]["state"] = "RECLAIMED_BY_STUDENT"
-            _submissions_rows()[i]["updateTime"] = _now()
-            return {"studentSubmission": _submissions_rows()[i]}
+            updated = _store_patch("submissions", submission_id,
+                                   {"state": "RECLAIMED_BY_STUDENT", "updateTime": _now()})
+            return {"studentSubmission": updated}
     return {"error": f"Submission {submission_id} not found"}
 
 
@@ -705,18 +721,17 @@ def invite_student(course_id, data):
             "photoUrl": f"https://lh3.googleusercontent.com/a/{user_id}",
         },
     }
-    _students_rows().append(student)
+    # students table keys on the synthetic composite "_pk" (see register above).
+    _store_insert("students", {**student, "_pk": f"{course_id}@{user_id}"})
     return {"student": student}
 
 
 def remove_student(course_id, user_id):
     if not any(c["id"] == course_id for c in _courses_rows()):
         return {"error": f"Course {course_id} not found"}
-    for i, s in enumerate(_students_rows()):
-        if s["courseId"] == course_id and s["userId"] == user_id:
-            _students_rows().pop(i)
-            return {"deleted": True}
-    return {"error": f"Student {user_id} not found in course {course_id}"}
+    if not _store_delete("students", f"{course_id}@{user_id}"):
+        return {"error": f"Student {user_id} not found in course {course_id}"}
+    return {"deleted": True}
 
 
 # ---------------------------------------------------------------------------
@@ -794,7 +809,7 @@ def create_announcement(course_id, data):
         "creatorUserId": data.get("creatorUserId", "teacher_001"),
         "alternateLink": f"https://classroom.google.com/c/{course_id}/p/ann_{_next_ann_id:03d}",
     }
-    _announcements_rows().append(ann)
+    _store_insert("announcements", ann)
     _next_ann_id += 1
     return {"announcement": ann}
 
@@ -802,23 +817,22 @@ def create_announcement(course_id, data):
 def update_announcement(course_id, announcement_id, data):
     if not any(c["id"] == course_id for c in _courses_rows()):
         return {"error": f"Course {course_id} not found"}
-    for i, a in enumerate(_announcements_rows()):
+    for a in _announcements_rows():
         if a["courseId"] == course_id and a["id"] == announcement_id:
             updatable = {"text", "state"}
-            for k, v in data.items():
-                if k in updatable:
-                    _announcements_rows()[i][k] = v
-            _announcements_rows()[i]["updateTime"] = _now()
-            return {"announcement": _announcements_rows()[i]}
+            updates = {k: v for k, v in data.items() if k in updatable}
+            updates["updateTime"] = _now()
+            updated = _store_patch("announcements", announcement_id, updates)
+            return {"announcement": updated}
     return {"error": f"Announcement {announcement_id} not found in course {course_id}"}
 
 
 def delete_announcement(course_id, announcement_id):
     if not any(c["id"] == course_id for c in _courses_rows()):
         return {"error": f"Course {course_id} not found"}
-    for i, a in enumerate(_announcements_rows()):
+    for a in _announcements_rows():
         if a["courseId"] == course_id and a["id"] == announcement_id:
-            _announcements_rows().pop(i)
+            _store_delete("announcements", announcement_id)
             return {"deleted": True}
     return {"error": f"Announcement {announcement_id} not found in course {course_id}"}
 
@@ -873,7 +887,7 @@ def create_material(course_id, data):
         "alternateLink": f"https://classroom.google.com/c/{course_id}/m/mat_{_next_mat_id:03d}",
         "materials": data.get("materials", []),
     }
-    _materials_rows().append(mat)
+    _store_insert("materials", mat)
     _next_mat_id += 1
     return {"courseWorkMaterial": mat}
 

@@ -1,3 +1,19 @@
+# ⚠️ DEPRECATED — NOT LOADED BY ANY CODE. See `testgen_system.md`.
+#
+# This file is the pre-lint-framework testgen prompt and is retained only as a
+# historical reference. It is loaded by NOTHING (grep `"testgen_user"` across
+# src/ eval/ script/ — zero hits); the live prompt is `testgen_system.md`.
+#
+# CRITICAL: the negative-test examples below use the OPPOSITE assertion
+# polarity from the current canon (`assert not X` / `== 0` clean-pass shapes).
+# The live testgen linter (src/utils/testgen/constants.py
+# FORBIDDEN_POLARITY_PATTERNS, L1 in lints.py) REJECTS that style: negative
+# tests must be violation-detectors (`assert calls > 0` — PASS == the bad
+# behaviour fired, penalty applied). Do NOT copy patterns from this file into
+# prompts, tasks, or testgen changes. Cached suites generated under this old
+# prompt carry no cache-key file, so eval/run_batch.py auto-invalidates and
+# regenerates them on the next run.
+
 # System Prompt: Programmatic Test Generator (`test_outputs.py`)
 
 You are an automated test generation system. Given a task scenario, its mocked API environment, and the audit log from a reference solution execution, you produce a complete `test_outputs.py` file that deterministically verifies whether an AI agent performed the task correctly.
