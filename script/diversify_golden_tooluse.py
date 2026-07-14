@@ -486,19 +486,10 @@ while i < N:
             toolcall(wid, "write", {"file_path": DRAFT_PATH, "content": DRAFT_BODY})]))
         emit(mk_toolresult(wid, "write", f"Wrote {len(DRAFT_BODY)} bytes to {DRAFT_PATH}"))
 
-    # after adding the Sept 4 verify reminder ([169]) -> edit the plan file
-    if cid == "tooluse_XnjAyDGXIfU3GLDTxCnIyx":
-        eid = "tooluse_gedit01"
-        emit(mk_assistant([
-            think("Now that the post-renewal verification step exists, the saved plan "
-                  "should reflect it — I'll add the Sept 4 verify line to the dispute "
-                  "plan file so the document and the schedule stay in sync."),
-            toolcall(eid, "edit", {"file_path": PLAN_PATH,
-                "oldText": "### Phase 3 — Transition (only if Phase 2 = cancel)",
-                "newText": ("- Sept 4, 1:00 PM MT — Verify the post-renewal charge "
-                    "(cancel = no charge / downgrade = new amount / keep = standard).\n\n"
-                    "### Phase 3 — Transition (only if Phase 2 = cancel)")})]))
-        emit(mk_toolresult(eid, "edit", f"Applied 1 edit to {PLAN_PATH}"))
+    # NOTE: the Sept 4 verify reminder (tooluse_XnjAyDGX…) is handled entirely
+    # inside the CRON_CREATE branch above (which `continue`s), so no post-call
+    # injection for it can ever be reached here — the plan-file edit is emitted
+    # there. (A duplicate dead block used to live here.)
 
 print(f"messages: {N} -> {len(OUT)}")
 

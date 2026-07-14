@@ -38,6 +38,7 @@ def build_litellm_config_yaml(
     meta_api_key: str = "",
     meta_base_url: str = "https://api.ai.meta.com/v1",
     meta_model: str = "",
+    enable_stream_callback: bool = False,
 ) -> str:
     whisper_env_ref = (
         "os.environ/OPENAI_API_KEY_WHISPER"
@@ -647,6 +648,8 @@ def start_litellm(
     anthropic_api_key: str = "",
     oauth_usage_callback_host_path: str = "",
     meta_api_key: str = "",
+    stream_callback_host_path: str = "",
+    stream_log_host_dir: str = "",
 ) -> None:
     from src.utils.docker_utils import (
         build_env_args,

@@ -321,6 +321,29 @@ preflight_headroom_image() {
     fi
 }
 
+# Backfill richer references/ + scripts/ into the 91 thin mock-API connectors
+# so every bundle produced by this batch ships the rich connector shape.
+# Idempotent (skip-exists) and fully offline. A first-time write bumps the
+# environment/ content hash (it covers skills/ too), so
+# build_mock_image_if_needed auto-rebuilds the mock image once at the next
+# stack start — expected, one-off cost. Fail-soft: thin connectors degrade
+# bundle quality, not run correctness.
+# NOTE: the talos-multiagent merge (405fa39) once dropped this definition while
+# keeping its call site — run.sh then emitted "command not found" every
+# preflight. tests/test_backfill_wiring_invariants.py pins definition + call.
+preflight_connector_docs() {
+    local out
+    if out=$(python3 script/backfill_connector_docs.py 2>&1); then
+        if grep -qE '^written     : [1-9]' <<<"$out"; then
+            log::ok "Connector docs backfilled (mock image auto-rebuilds once on next stack start)"
+        else
+            log::info "Connector docs already rich (nothing to backfill)"
+        fi
+    else
+        log::warn "backfill_connector_docs.py failed — bundles may ship thin connectors"
+    fi
+}
+
 preflight_env_file() {
     log::step 5 6 ".env credentials"
     if [[ ! -f .env ]]; then
@@ -858,9 +881,25 @@ bundle_task() {
             >> "$backfill_log" 2>&1; then
         log::warn "bundle: run-data backfill failed for ${task_name} (see ${backfill_log}); bundle may lack mock APIs"
     fi
+    # (c) subagent roster: re-attach meta_info.agents/subagents to output.json
+    #     for runs emitted before the bundle.py clobber fix (no-op when the run
+    #     has no sessions.json). Must precede repackage so the bundle copies a
+    #     roster-complete output.json.
+    if ! python3 script/backfill_subagent_meta.py "${source_root}/${task_name}" \
+            >> "$backfill_log" 2>&1; then
+        log::warn "bundle: subagent-meta backfill failed for ${task_name} (see ${backfill_log}); roster may be missing"
+    fi
     if ! python3 script/backfill_pass_summary.py "${source_root}/${task_name}" \
             >> "$backfill_log" 2>&1; then
         log::warn "bundle: pass_summary backfill failed for ${task_name} (see ${backfill_log}); continuing"
+    fi
+    # (d) bundle meta: overwrite score.json tests_* with the REAL ctrf counts
+    #     (pre-fix runs aliased them to criteria_*). Ordered AFTER pass_summary
+    #     on purpose: on those old score.json files pass_summary's criteria
+    #     fallback reads tests_* — rewriting first would corrupt criteria counts.
+    if ! python3 script/backfill_bundle_meta.py "${source_root}/${task_name}" \
+            >> "$backfill_log" 2>&1; then
+        log::warn "bundle: bundle-meta backfill failed for ${task_name} (see ${backfill_log}); continuing"
     fi
 
     log::substep "Bundling → ${bundle_root}/${task_name} (input_root=${input_root})"
@@ -887,6 +926,21 @@ bundle_task() {
                 --bundle-root "$bundle_root" \
                 >> "$bundle_log" 2>&1; then
             log::warn "bundle: connector-docs enrich failed (see ${bundle_log}); thin connectors may remain"
+        fi
+        # Post-repackage repairs inside the fresh bundle (idempotent — no-ops
+        # on bundles the fixed harness produced):
+        #   bundle-meta   : fill report.json rubric type/evaluation_target from
+        #                   the task's rubric.json.
+        #   test-scoring  : re-derive test_weights_percentage + final_reward
+        #                   with correct guardrail polarity, rebuild the
+        #                   bundle-side pass_summary.json.
+        if ! python3 script/backfill_bundle_meta.py "$bundle_root" \
+                >> "$bundle_log" 2>&1; then
+            log::warn "bundle: bundle-meta repair failed (see ${bundle_log}); report meta may be empty"
+        fi
+        if ! python3 script/backfill_test_scoring.py "$bundle_root" \
+                >> "$bundle_log" 2>&1; then
+            log::warn "bundle: test-scoring repair failed (see ${bundle_log}); guardrail polarity may be stale"
         fi
     else
         log::warn "bundle: repackage failed for ${task_name} (see ${bundle_log}); continuing"

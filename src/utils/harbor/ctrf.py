@@ -189,6 +189,11 @@ def compute_test_reward(
     neg_penalty = sum(abs(w) for n, w in weights.items() if w < 0 and _key_passed(n))
 
     if pos_total > 0:
+        # NOTE: deliberately UNCLAMPED (signed) per the "Negative reward
+        # calculation update" decision pinned by tests/test_signed_reward.py —
+        # penalties beyond earned positives go negative. This contradicts the
+        # docstring above and CLAUDE.md's max(0, …) formula; reconcile there
+        # before adding a clamp here.
         return (pos_earned - neg_penalty) / pos_total
     if tests_total > 0:
         return tests_passed / tests_total

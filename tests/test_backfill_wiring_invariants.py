@@ -31,6 +31,9 @@ DELIVER_SH = REPO_ROOT / "deliver.sh"
 BF_RUN_DATA = REPO_ROOT / "script" / "backfill_run_data.py"
 BF_PASS_SUMMARY = REPO_ROOT / "script" / "backfill_pass_summary.py"
 BF_CONNECTOR = REPO_ROOT / "script" / "backfill_connector_docs.py"
+BF_SUBAGENT = REPO_ROOT / "script" / "backfill_subagent_meta.py"
+BF_BUNDLE_META = REPO_ROOT / "script" / "backfill_bundle_meta.py"
+BF_TEST_SCORING = REPO_ROOT / "script" / "backfill_test_scoring.py"
 
 
 # ---------- helpers ----------
@@ -64,7 +67,8 @@ def _call_lines(src: str, token: str) -> list[str]:
 def test_backfill_scripts_exist() -> None:
     """The three wiring targets must exist — a rename would silently turn every
     hook into a warn-and-continue no-op in run.sh."""
-    for p in (BF_RUN_DATA, BF_PASS_SUMMARY, BF_CONNECTOR):
+    for p in (BF_RUN_DATA, BF_PASS_SUMMARY, BF_CONNECTOR,
+              BF_SUBAGENT, BF_BUNDLE_META, BF_TEST_SCORING):
         assert p.is_file(), f"wiring target missing: {p}"
 
 
@@ -124,6 +128,37 @@ def test_bundle_task_backfills_run_data_and_pass_summary_before_repackage() -> N
     assert body.index("backfill_pass_summary.py") < repack, (
         "pass_summary backfill must run BEFORE repackage_to_bundle.py"
     )
+    assert body.index("backfill_subagent_meta.py") < repack, (
+        "subagent-meta backfill must run BEFORE repackage (bundle copies "
+        "output.json)"
+    )
+
+
+def test_bundle_task_bundle_meta_after_pass_summary_before_repackage() -> None:
+    """Order contract: pre-fix score.json aliased tests_* to criteria_*, and
+    pass_summary's criteria fallback reads tests_* — so bundle_meta (which
+    overwrites tests_* with real ctrf counts) must run AFTER pass_summary and
+    BEFORE repackage."""
+    body = _fn_body(_read(RUN_SH), "bundle_task")
+    repack = body.index("repackage_to_bundle.py")
+    meta = re.search(r"python3 script/backfill_bundle_meta\.py", body)
+    assert meta, "bundle_task must invoke backfill_bundle_meta.py"
+    assert body.index("backfill_pass_summary.py") < meta.start() < repack, (
+        "bundle_meta must run after pass_summary and before repackage"
+    )
+
+
+def test_bundle_task_repairs_bundle_scoring_after_repackage() -> None:
+    body = _fn_body(_read(RUN_SH), "bundle_task")
+    repack = body.index("repackage_to_bundle.py")
+    scoring = re.search(r"backfill_test_scoring\.py \"\$bundle_root\"", body)
+    assert scoring, "bundle_task must run test-scoring repair on the bundle root"
+    assert scoring.start() > repack, "test-scoring repair must run AFTER repackage"
+    meta_on_bundle = re.search(r"backfill_bundle_meta\.py \"\$bundle_root\"", body)
+    assert meta_on_bundle, "bundle_task must run bundle-meta repair on the bundle root"
+    assert meta_on_bundle.start() > repack, (
+        "bundle-root bundle-meta repair must run AFTER repackage"
+    )
 
 
 def test_bundle_task_enriches_bundle_after_repackage() -> None:
@@ -142,7 +177,8 @@ def test_bundle_task_backfill_hooks_are_fail_soft() -> None:
     assert "log::die" not in body, "bundle_task must not log::die"
     assert not re.search(r"^\s*exit\b", body, re.M), "bundle_task must not exit"
     for hook in ("backfill_run_data.py", "backfill_pass_summary.py",
-                 "backfill_connector_docs.py"):
+                 "backfill_connector_docs.py", "backfill_subagent_meta.py",
+                 "backfill_bundle_meta.py", "backfill_test_scoring.py"):
         # Anchor on the invocation, not the first mention (comments name the
         # scripts too).
         m = re.search(rf"python3 script/{re.escape(hook)}", body)
@@ -210,6 +246,31 @@ def test_deliver_sh_data_backfills_are_fatal_but_connector_docs_warn() -> None:
         r"backfill_connector_docs\.py\"?\s*>/dev/null[\s\S]{0,120}?\|\|\s*log::warn", src
     )
     assert gen, "connector-docs generation failure must be warn-only in deliver.sh"
+    assert re.search(r"backfill_subagent_meta\.py[\s\S]{0,300}?\|\|\s*log::die", src), (
+        "subagent-meta backfill failure must be FATAL in deliver.sh"
+    )
+    assert re.search(r"backfill_bundle_meta\.py[\s\S]{0,300}?\|\|\s*log::die", src), (
+        "bundle-meta backfill failure must be FATAL in deliver.sh"
+    )
+    assert re.search(r"backfill_test_scoring\.py[\s\S]{0,300}?\|\|\s*log::die", src), (
+        "test-scoring repair failure must be FATAL in deliver.sh"
+    )
+
+
+def test_deliver_sh_repairs_staged_bundles_after_convert_before_clone() -> None:
+    """The staged-bundle scoring/meta repairs must land between conversion and
+    the delivery-repo clone (cwd is still REPO_ROOT; STAGING is copied into the
+    clone afterwards)."""
+    src = _read(DELIVER_SH)
+    clone = src.index("git clone")
+    convert = src.index("repackage_to_bundle.py")
+    for token in (r'backfill_bundle_meta\.py" "\$STAGING"',
+                  r'backfill_test_scoring\.py" "\$STAGING"'):
+        m = re.search(token, src)
+        assert m, f"deliver.sh must run {token} on the staging dir"
+        assert convert < m.start() < clone, (
+            f"{token} must run after conversion and before the clone"
+        )
 
 
 def test_deliver_sh_enriches_staging_after_convert_before_clone() -> None:

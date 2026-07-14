@@ -228,9 +228,18 @@ log::substep "Run-data backfill: data/environment/ into run dirs missing it"
 python3 "$REPO_ROOT/script/backfill_run_data.py" \
     --output-root "$SOURCE_ROOT" --input-root "$INPUT_ROOT" \
     || log::die "backfill_run_data.py failed — bundles would ship without mock APIs"
+log::substep "Sub-agent roster: re-attach meta_info.subagents to output.json"
+python3 "$REPO_ROOT/script/backfill_subagent_meta.py" "$SOURCE_ROOT" >/dev/null \
+    || log::die "backfill_subagent_meta.py failed — bundles would ship without the sub-agent roster"
 log::substep "pass_summary.json rebuild (real tests_* counts + combined_reward)"
 python3 "$REPO_ROOT/script/backfill_pass_summary.py" "$SOURCE_ROOT" >/dev/null \
     || log::die "backfill_pass_summary.py failed"
+log::substep "score.json tests_* repair from ctrf.json (real deterministic counts)"
+# Ordered after pass_summary: pre-fix score.json aliased tests_* to criteria_*,
+# and pass_summary's criteria fallback reads tests_* — rewrite them only after
+# that snapshot is taken.
+python3 "$REPO_ROOT/script/backfill_bundle_meta.py" "$SOURCE_ROOT" >/dev/null \
+    || log::die "backfill_bundle_meta.py failed"
 log::substep "Connector docs: generate references/+scripts/ for thin connectors"
 python3 "$REPO_ROOT/script/backfill_connector_docs.py" >/dev/null \
     || log::warn "connector-docs generation failed; bundles may ship thin connectors"
@@ -279,6 +288,15 @@ log::substep "Enriching bundle connector docs from live skills tree"
 python3 "$REPO_ROOT/script/backfill_connector_docs.py" \
     --bundle-root "$STAGING" --skills-root "$REPO_ROOT/environment/skills" >/dev/null \
     || log::warn "bundle connector enrich failed; thin connectors may remain"
+
+# Scoring/meta integrity inside the staged bundles — fatal: publishing wrong
+# guardrail polarity or empty rubric meta is exactly the class of bug the
+# backfills exist to stop. Both are idempotent no-ops on fixed-harness output.
+log::substep "Staged-bundle repairs: report meta + guardrail-polarity scoring"
+python3 "$REPO_ROOT/script/backfill_bundle_meta.py" "$STAGING" >/dev/null \
+    || log::die "backfill_bundle_meta.py failed on staged bundles"
+python3 "$REPO_ROOT/script/backfill_test_scoring.py" "$STAGING" >/dev/null \
+    || log::die "backfill_test_scoring.py failed on staged bundles"
 
 # ---- STAGE: clone delivery repo & copy bundles in --------------------------
 next_step "Clone delivery repo + stage bundles"

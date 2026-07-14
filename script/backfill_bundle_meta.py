@@ -97,7 +97,10 @@ def fix_report(report_path: Path, dry_run: bool) -> tuple[int, int, str]:
         changed = (
             item.get("type") != new_type
             or item.get("evaluation_target") != new_target
-            or item.get("importance") != new_imp
+            # Only count importance when there is a value to write: the writer
+            # below skips empty new_imp, so comparing None != "" here would
+            # flag such items as changed on EVERY pass (idempotency contract).
+            or (bool(new_imp) and item.get("importance") != new_imp)
         )
         if changed:
             item["type"] = new_type
