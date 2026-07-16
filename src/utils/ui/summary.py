@@ -6,14 +6,18 @@ shaped like ``{"task_id", "scores": {...}, "usage": {...}, "error": ...}`` (see
 
   * a per-task results table with a clear ✓ / ✗ indicator, final score, output
     tokens and cost, and any error, and
-  * a summary panel with total / passed / failed counts, pass & fail rates, and
-    the wall-clock execution time.
+  * a summary panel with, in order: total / passed / failed task counts, pass &
+    fail rates, wall-clock execution time, agents & sub-agents spawned, rubric
+    criteria (total / passed / failed / pass rate), and test cases (total /
+    passed / failed / pass rate).
 
 A task counts as **passed** when it executed without error AND its final score
-(``overall_score``; None when absent) is at least ``PASS_THRESHOLD``. The threshold is overridable via the ``WCB_PASS_THRESHOLD``
-env var so callers can align it with their own reward cut-off. Everything else
-(agent error, grading error, no scores, sub-threshold score) counts as failed —
-which is surfaced explicitly in the table so the classification is transparent.
+(``overall_score``; None when absent) is at least a cut-off score. The cut-off is
+an internal classification detail only (overridable via the ``WCB_PASS_THRESHOLD``
+env var); it is deliberately NOT surfaced anywhere in the rendered summary.
+Everything else (agent error, grading error, no scores, sub-cutoff score) counts
+as failed — which is surfaced explicitly in the table so the classification is
+transparent.
 """
 from __future__ import annotations
 
@@ -67,28 +71,134 @@ def classify(result: Dict[str, Any], threshold: Optional[float] = None) -> Tuple
         return False, None, "no scores"
     if score >= threshold:
         return True, score, ""
-    return False, score, f"score {score:.2f} < {threshold:.2f}"
+    # Reason conveys the qualitative fail cause WITHOUT exposing the numeric
+    # cut-off — the summary never displays a pass-threshold value/metric.
+    return False, score, f"score {score:.2f} below pass cut-off"
+
+
+def _agent_spawned(result: Dict[str, Any]) -> bool:
+    """True when the task launched its primary (main) agent.
+
+    Each task spawns exactly one main agent; the only case where none is spawned
+    is a container-startup failure, which the runner surfaces verbatim as
+    "Container startup failed" in ``result['error']``.
+    """
+    err = result.get("error")
+    if isinstance(err, str) and "Container startup failed" in err:
+        return False
+    return True
+
+
+def _subagent_count(result: Dict[str, Any]) -> int:
+    """Number of sub-agents this task spawned.
+
+    The openclaw runner folds the spawn-tree row count into
+    ``usage['subagent_count']`` (see runner ``_collect_output``); single-agent
+    tasks never set the key, so the default of 0 is correct.
+    """
+    usage = result.get("usage")
+    if not isinstance(usage, dict):
+        return 0
+    try:
+        return max(0, int(usage.get("subagent_count", 0) or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _criteria_counts(scores: Dict[str, Any]) -> Tuple[int, int, int]:
+    """(total, passed, failed) rubric criteria for one task (Channel B).
+
+    Prefers the canonical integer counts grading.py always emits
+    (``criteria_*``; ``tests_*`` are their deprecated aliases in score.json).
+    Falls back to deriving from the per-criterion ``criteria`` list, excluding
+    abstentions ("Human Evaluation required") from passed/failed the same way
+    ``build_criteria_table`` does.
+    """
+    if not isinstance(scores, dict):
+        return 0, 0, 0
+    total = int(scores.get("criteria_total", scores.get("tests_total", 0)) or 0)
+    passed = int(scores.get("criteria_passed", scores.get("tests_passed", 0)) or 0)
+    failed = int(scores.get("criteria_failed", scores.get("tests_failed", 0)) or 0)
+    if total == 0 and not passed and not failed:
+        criteria = scores.get("criteria")
+        if isinstance(criteria, list) and criteria:
+            total = len(criteria)
+            for c in criteria:
+                if not isinstance(c, dict):
+                    continue
+                abstained = (
+                    c.get("resolved_by") == "human_eval"
+                    or str(c.get("human_eval") or "").strip() != ""
+                )
+                if abstained:
+                    continue
+                if bool(c.get("passed", c.get("satisfied"))):
+                    passed += 1
+                else:
+                    failed += 1
+    return total, passed, failed
+
+
+def _test_case_counts(test_result: Dict[str, Any]) -> Tuple[int, int, int]:
+    """(total, passed, failed) executed test cases for one task (Channel A)."""
+    if not isinstance(test_result, dict):
+        return 0, 0, 0
+    total = int(test_result.get("tests_total", 0) or 0)
+    passed = int(test_result.get("tests_passed", 0) or 0)
+    failed = int(test_result.get("tests_failed", 0) or 0)
+    return total, passed, failed
 
 
 def compute_stats(results: List[Dict[str, Any]], threshold: Optional[float] = None) -> Dict[str, Any]:
-    """Aggregate pass/fail counts and rates over ``results``."""
+    """Aggregate task, agent, rubric-criteria and test-case counts over ``results``.
+
+    ``threshold`` is retained ONLY as the internal pass/fail cut-off used by
+    ``classify``; it is never displayed in the rendered summary.
+    """
     if threshold is None:
         threshold = _pass_threshold()
     total = len(results)
     passed = 0
+    agents = subagents = 0
+    rubric_total = rubric_passed = rubric_failed = 0
+    tests_total = tests_passed = tests_failed = 0
     for r in results:
         ok, _, _ = classify(r, threshold)
         if ok:
             passed += 1
+        if _agent_spawned(r):
+            agents += 1
+        subagents += _subagent_count(r)
+        c_t, c_p, c_f = _criteria_counts(r.get("scores") or {})
+        rubric_total += c_t
+        rubric_passed += c_p
+        rubric_failed += c_f
+        t_t, t_p, t_f = _test_case_counts(r.get("test_result") or {})
+        tests_total += t_t
+        tests_passed += t_p
+        tests_failed += t_f
     failed = total - passed
     pass_rate = (passed / total * 100.0) if total else 0.0
     fail_rate = (failed / total * 100.0) if total else 0.0
+    rubric_pass_rate = (rubric_passed / rubric_total * 100.0) if rubric_total else 0.0
+    tests_pass_rate = (tests_passed / tests_total * 100.0) if tests_total else 0.0
     return {
         "total": total,
         "passed": passed,
         "failed": failed,
         "pass_rate": pass_rate,
         "fail_rate": fail_rate,
+        "agents_spawned": agents,
+        "subagents_spawned": subagents,
+        "rubric_total": rubric_total,
+        "rubric_passed": rubric_passed,
+        "rubric_failed": rubric_failed,
+        "rubric_pass_rate": rubric_pass_rate,
+        "tests_total": tests_total,
+        "tests_passed": tests_passed,
+        "tests_failed": tests_failed,
+        "tests_pass_rate": tests_pass_rate,
+        # Internal-only classification cut-off; never rendered (see module docstring).
         "threshold": threshold,
     }
 
@@ -117,12 +227,11 @@ def build_results_table(results: List[Dict[str, Any]], threshold: Optional[float
         threshold = _pass_threshold()
 
     # Caption makes the PASS/FAIL column self-documenting: it is a UI-side
-    # threshold classification (WCB_PASS_THRESHOLD), NOT part of the harness's
-    # scalar reward — the harness has no binary pass/fail verdict.
+    # classification, NOT part of the harness's scalar reward — the harness has
+    # no binary pass/fail verdict. The numeric cut-off is deliberately not shown.
     table = Table(
         title="Task Results",
-        caption=(f"PASS = score ≥ {threshold:.2f} · UI threshold "
-                 f"(WCB_PASS_THRESHOLD), not a harness verdict"),
+        caption="PASS/FAIL is a UI classification, not a harness scalar reward",
         caption_style="dim",
         box=box.SIMPLE_HEAVY,
         header_style="bold",
@@ -289,24 +398,36 @@ def build_summary_panel(stats: Dict[str, Any], elapsed_seconds: Optional[float] 
     grid = Table.grid(padding=(0, 2))
     grid.add_column(justify="right", style="bold")
     grid.add_column(justify="left")
+    # --- Tasks ---
     grid.add_row("Total tasks", str(stats["total"]))
     grid.add_row("Passed", f"[bold green]{stats['passed']}[/]")
     grid.add_row("Failed", f"[bold red]{stats['failed']}[/]")
     grid.add_row("Pass rate", f"[bold green]{stats['pass_rate']:.1f}%[/]")
     grid.add_row("Fail rate", f"[bold red]{stats['fail_rate']:.1f}%[/]")
     grid.add_row("Execution time", _fmt_elapsed(elapsed_seconds))
-    grid.add_row("Pass threshold", f"score ≥ {stats['threshold']:.2f} (UI, not a harness verdict)")
+    # --- Agents ---
+    grid.add_row("", "")
+    grid.add_row("Agents spawned", str(stats["agents_spawned"]))
+    grid.add_row("Sub-agents spawned", str(stats["subagents_spawned"]))
+    # --- Rubric criteria (Channel B) ---
+    grid.add_row("", "")
+    grid.add_row("Rubric criteria", str(stats["rubric_total"]))
+    grid.add_row("  passed", f"[green]{stats['rubric_passed']}[/]")
+    grid.add_row("  failed", f"[red]{stats['rubric_failed']}[/]")
+    grid.add_row("Rubric pass rate", f"{stats['rubric_pass_rate']:.1f}%")
+    # --- Test cases (Channel A) ---
+    grid.add_row("", "")
+    grid.add_row("Test cases", str(stats["tests_total"]))
+    grid.add_row("  passed", f"[green]{stats['tests_passed']}[/]")
+    grid.add_row("  failed", f"[red]{stats['tests_failed']}[/]")
+    grid.add_row("Test case pass rate", f"{stats['tests_pass_rate']:.1f}%")
 
     border = "green" if stats["failed"] == 0 and stats["total"] > 0 else (
         "red" if stats["failed"] else "cyan"
     )
-    # Subtitle reiterates that pass/fail here is a UI threshold classification,
-    # so the pass rate isn't mistaken for a harness scoring outcome.
     return Panel(
         grid,
         title="Execution Summary",
-        subtitle="[dim]pass rate is vs a UI threshold, not a harness verdict[/]",
-        subtitle_align="right",
         border_style=border,
         box=box.ROUNDED,
         expand=False,
@@ -348,13 +469,22 @@ def render_execution_summary(
     if console is None or table is None or panel is None:
         # Plain-text fallback (rich unavailable).
         print("\n=== Execution Summary ===")
-        print(f"Total tasks   : {stats['total']}")
-        print(f"Passed        : {stats['passed']}")
-        print(f"Failed        : {stats['failed']}")
-        print(f"Pass rate     : {stats['pass_rate']:.1f}%")
-        print(f"Fail rate     : {stats['fail_rate']:.1f}%")
-        print(f"Pass threshold: score >= {stats['threshold']:.2f} (UI threshold, not a harness verdict)")
-        print(f"Execution time: {_fmt_elapsed(elapsed_seconds)}")
+        print(f"Total tasks         : {stats['total']}")
+        print(f"Passed              : {stats['passed']}")
+        print(f"Failed              : {stats['failed']}")
+        print(f"Pass rate           : {stats['pass_rate']:.1f}%")
+        print(f"Fail rate           : {stats['fail_rate']:.1f}%")
+        print(f"Execution time      : {_fmt_elapsed(elapsed_seconds)}")
+        print(f"Agents spawned      : {stats['agents_spawned']}")
+        print(f"Sub-agents spawned  : {stats['subagents_spawned']}")
+        print(f"Rubric criteria     : {stats['rubric_total']}")
+        print(f"  passed            : {stats['rubric_passed']}")
+        print(f"  failed            : {stats['rubric_failed']}")
+        print(f"Rubric pass rate    : {stats['rubric_pass_rate']:.1f}%")
+        print(f"Test cases          : {stats['tests_total']}")
+        print(f"  passed            : {stats['tests_passed']}")
+        print(f"  failed            : {stats['tests_failed']}")
+        print(f"Test case pass rate : {stats['tests_pass_rate']:.1f}%")
         _print_details_plain(results)
         return stats
 

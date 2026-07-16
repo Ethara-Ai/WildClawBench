@@ -445,6 +445,7 @@ class DriftDirector(threading.Thread):
         poll_interval: float = 0.5,
         admin_token: Optional[str] = None,
         gateway_log_path: Optional[Path] = None,
+        task_id: str = "",
     ):
         super().__init__(name="DriftDirector", daemon=True)
         self._script = script
@@ -454,6 +455,7 @@ class DriftDirector(threading.Thread):
         self._poll_interval = float(poll_interval)
         self._admin_token = admin_token
         self._gateway_log_path = gateway_log_path
+        self._task_id = task_id
         self._stop_evt = threading.Event()
         self._session = requests.Session()
         self._cursors: Dict[str, float] = {name: 0.0 for name in targets}
@@ -696,6 +698,12 @@ class DriftDirector(threading.Thread):
         with self._timeline_lock:
             with open(self._timeline_path, "a", encoding="utf-8") as f:
                 f.write(line)
+        # Mirror onto the UI bus for the Data Injection pane (bus-only, fail-open).
+        try:
+            from src.utils.ui.lifecycle import emit_inject
+            emit_inject(self._task_id, entry)
+        except Exception:
+            pass
 
 
 def build_targets_from_env(

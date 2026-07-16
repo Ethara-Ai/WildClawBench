@@ -205,14 +205,26 @@ def build_run_batch_parser(default_model: str, default_parallel: int) -> argpars
         action="store_false",
         help="Force-disable the judge council even if JUDGE_COUNCIL=1 in env.",
     )
-    parser.add_argument(
+    # Terminal UI / live-streaming (src/utils/ui + stream_*). Both are opt-in
+    # and default-OFF; a plain run is byte-identical to before.
+    ui = parser.add_argument_group("terminal UI")
+    ui.add_argument(
         "--tui",
         dest="tui",
         action="store_true",
-        default=False,
-        help="Launch the full-screen Textual live dashboard (container lifecycle, "
-             "live log, progress, and final summary). Interactive terminals only; "
-             "auto-falls back to Rich logging when piped/tee'd. Equivalent to WCB_TUI=1.",
+        help="Run the full-screen Textual dashboard (live log + container "
+             "lifecycle table + Live Stream pane + progress + in-app execution "
+             "summary). Requires a real terminal and the 'textual' package; "
+             "falls back to Rich logging otherwise. Equivalent to WCB_TUI=1.",
+    )
+    ui.add_argument(
+        "--stream",
+        dest="stream",
+        action="store_true",
+        help="Enable the live LLM-response stream feed + terminal renderer "
+             "(agent thinking/text + judge output stream live). Batch-scoped and "
+             "default-OFF; when unset the LiteLLM config/containers are "
+             "byte-identical to a non-streaming build. Equivalent to WCB_STREAM=1.",
     )
     return parser
 

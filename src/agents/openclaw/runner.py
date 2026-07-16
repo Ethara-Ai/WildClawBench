@@ -320,11 +320,42 @@ class OpenClawAgent(BaseAgent):
             # overlap edge case) the connector is only copied once.
             _required = spec.task.get("required_apis", []) or []
             _distractors = spec.task.get("distractor_apis", []) or []
+            _connectors = list(dict.fromkeys(list(_required) + list(_distractors)))
             inject_api_connectors(
                 spec.task_id,
                 spec.task.get("env_dir", ""),
-                list(dict.fromkeys(list(_required) + list(_distractors))),
+                _connectors,
             )
+
+            # Data-injection lifecycle marker: surface exactly WHAT was staged
+            # into the container this run — the persona files, the legacy data/
+            # input documents, and the required+distractor API connectors — as a
+            # distinct STATUS stage plus detailed logs. Display-only; never raises
+            # into the run (the underlying injections already happened above).
+            try:
+                _inj_bits = []
+                if persona_dir:
+                    _inj_bits.append("persona")
+                if data_dir:
+                    _inj_bits.append("data/")
+                _inj_bits.append(f"{len(_connectors)} connector(s)")
+                _ui_lifecycle.emit_stage(
+                    spec.task_id, _ui_lifecycle.STAGE_STATUS,
+                    ", ".join(_inj_bits),
+                    status="injecting data",
+                )
+                logger.info(
+                    "[%s] DATA INJECTION — persona=%s data_dir=%s connectors=%d "
+                    "(required=%d, distractor=%d)",
+                    spec.task_id, "yes" if persona_dir else "no",
+                    "yes" if data_dir else "no", len(_connectors),
+                    len(_required), len(_distractors),
+                )
+                if _connectors:
+                    logger.info("[%s]   connectors: %s",
+                                spec.task_id, ", ".join(sorted(_connectors)))
+            except Exception:
+                pass
 
             run_warmup(spec.task_id, spec.task.get("warmup", ""))
 
@@ -440,7 +471,7 @@ class OpenClawAgent(BaseAgent):
             _ui_lifecycle.emit_stage(spec.task_id, _ui_lifecycle.STAGE_EXEC,
                                      f"agent running (timeout {spec.timeout_seconds}s)")
             agent_proc = None
-            timed_out = False
+            _ui_timed_out = False  # UI-only flag; does not affect elapsed/exec logic
             for turn_index, message in enumerate(turn_messages):
                 if turn_index > 0 and spec.before_turn is not None:
                     # Agent is idle here -> apply this stage's injection.
@@ -476,10 +507,10 @@ class OpenClawAgent(BaseAgent):
                     logger.warning("[%s] Agent turn %d timed out", spec.task_id, turn_index + 1)
                     agent_proc.kill()
                     agent_proc.wait()
-                    timed_out = True
+                    _ui_timed_out = True
                     break
             elapsed_time = time.perf_counter() - start_time
-            if timed_out:
+            if _ui_timed_out:
                 # Timeout contract: elapsed reports the budget that was spent,
                 # not the (possibly frozen/short) wall-clock measurement.
                 elapsed_time = float(spec.timeout_seconds)
@@ -499,6 +530,9 @@ class OpenClawAgent(BaseAgent):
             # container open until those children quiesce, otherwise teardown
             # kills them mid-run and their trajectories are never written.
             if spec.multi_agent_enabled:
+                _ui_lifecycle.emit_stage(spec.task_id, _ui_lifecycle.STAGE_STATUS,
+                                         "waiting for sub-agents to finish",
+                                         status="spawning sub-agents")
                 self._wait_for_subagents(spec.task_id)
                 # Repair the fan-out-then-stop failure: the parent occasionally
                 # ends its turn right after spawning, believing it will be

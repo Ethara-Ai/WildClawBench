@@ -23,7 +23,9 @@ import threading
 from typing import Any, Callable, Dict, Optional
 
 from . import lifecycle
-from .events import EV_LOG, EV_PROGRESS, EV_STAGE, EV_SUMMARY, EV_TOKEN, Event, get_bus
+from .events import (
+    EV_INJECT, EV_LOG, EV_PROGRESS, EV_STAGE, EV_SUMMARY, EV_TOKEN, Event, get_bus,
+)
 
 try:
     from textual.app import App, ComposeResult
@@ -60,6 +62,89 @@ def token_markup(payload: Dict[str, Any]) -> str:
     return f"[dim italic]{text}[/]"
 
 
+def _esc(v: Any) -> str:
+    """Stringify + neutralize Rich markup so injected task content (email
+    bodies, field values) can never open live style tags in the pane."""
+    return str(v).replace("[", "\\[")
+
+
+# Compact per-record summary for the Data Injection pane. Keys are drawn from
+# whatever the emitting director put in the timeline entry; unknown shapes still
+# render their `type` so nothing is silently dropped.
+_INJECT_TYPE_STYLE = {
+    "inject.seed.start": "yellow",
+    "inject.seed.done": "yellow",
+    "inject.stage.applied": "bold yellow",
+    "inject.api": "magenta",
+    "inject.fs": "cyan",
+    "inject.snapshot": "dim",
+    # stage_director (stages.yaml) + drift_director record types.
+    "stage.applied": "bold yellow",
+    "turn": "dim",
+    "event.fired": "magenta",
+    "director.start": "dim",
+    "director.stop": "dim",
+    "director.error": "red",
+    "event.error": "red",
+}
+
+
+def inject_markup(payload: Dict[str, Any]) -> str:
+    """Rich markup for one EV_INJECT payload in the Data Injection pane.
+
+    Pure function (no textual dependency) so it is unit-testable everywhere.
+    ``payload`` = {task_id, record: dict, values: dict|None}. Renders a header
+    line (type · stage · target · status) plus one indented line per injected
+    value when ``values`` is present. All interpolated text is markup-escaped.
+    """
+    rec = payload.get("record") or {}
+    values = payload.get("values") or {}
+    rtype = str(rec.get("type", "inject"))
+    style = _INJECT_TYPE_STYLE.get(rtype, "yellow")
+
+    # Header: type, then whichever locating fields exist, then status.
+    parts = [f"[{style}]▸ {_esc(rtype)}[/]"]
+    stage = rec.get("stage") or rec.get("stage_id")
+    if stage:
+        parts.append(f"[dim]{_esc(stage)}[/]")
+    turn = rec.get("turn_index", rec.get("turn", rec.get("applied_before_turn")))
+    if turn is not None and turn != "":
+        parts.append(f"[dim]@turn {_esc(turn)}[/]")
+    api = rec.get("api")
+    table = rec.get("table")
+    if api or table:
+        tgt = "·".join(_esc(x) for x in (api, table) if x)
+        pk = rec.get("pk")
+        parts.append(f"{tgt}" + (f" pk={_esc(pk)}" if pk not in (None, "") else ""))
+    path = rec.get("path")
+    if path:
+        parts.append(_esc(path))
+    keys = rec.get("action_keys")
+    if isinstance(keys, (list, tuple)) and keys:
+        parts.append(f"[dim]keys={_esc(','.join(str(k) for k in keys))}[/]")
+    # Volume counts on seed/stage records. Guard against bool (a subclass of
+    # int): on inject.api records ``silent`` is a flag, rendered in the status
+    # tag below, not a count.
+    for label in ("silent", "loud", "fs", "ops"):
+        n = rec.get(label)
+        if isinstance(n, int) and not isinstance(n, bool):
+            parts.append(f"[dim]{label}={n}[/]")
+    status = rec.get("status")
+    if status:
+        sstyle = "green" if status in ("applied", "ok") else (
+            "red" if status in ("unresolved", "failed") else "dim")
+        silent = rec.get("silent")
+        tag = f"{status}" + (" · silent" if silent is True else
+                             " · loud" if silent is False else "")
+        parts.append(f"[{sstyle}]{_esc(tag)}[/]")
+
+    line = "  ".join(parts)
+    # Injected values (display-only; already truncated by emit_inject).
+    for k, v in values.items():
+        line += f"\n    [dim]{_esc(k)}:[/] {_esc(v)}"
+    return line
+
+
 class _BusLogHandler(logging.Handler):
     """Logging handler that forwards records to the event bus as EV_LOG events."""
 
@@ -87,6 +172,7 @@ if _TEXTUAL_AVAILABLE:
         #body { height: 1fr; }
         #left { width: 2fr; }
         #stream { height: 2fr; border: round $success; padding: 0 1; }
+        #inject { height: 1fr; border: round $warning; padding: 0 1; }
         #log { height: 1fr; border: round $accent; padding: 0 1; }
         #status { width: 1fr; border: round $primary; padding: 0 1; }
         #progress { height: auto; padding: 0 1; }
@@ -121,6 +207,10 @@ if _TEXTUAL_AVAILABLE:
                     # renderer's bus mode) above the harness log. Empty until
                     # a --stream run emits; harmless otherwise.
                     yield RichLog(id="stream", highlight=False, markup=True, wrap=True)
+                    # Mid-run data-injection feed (EV_INJECT): what the drift/
+                    # inject/stage directors mutate, when, and the injected
+                    # values. Empty until an inject-enabled task fires.
+                    yield RichLog(id="inject", highlight=False, markup=True, wrap=True)
                     yield RichLog(id="log", highlight=False, markup=True, wrap=True)
                 yield Static(self._render_status(), id="status")
             yield ProgressBar(id="progress", total=max(1, self._total_hint))
@@ -129,6 +219,13 @@ if _TEXTUAL_AVAILABLE:
         def on_mount(self) -> None:
             self.title = "Kensei Harness"
             self.sub_title = "live dashboard"
+            # Border titles label each pane (Textual RichLog supports these).
+            try:
+                self.query_one("#stream", RichLog).border_title = "Live Stream"
+                self.query_one("#inject", RichLog).border_title = "Data Injection"
+                self.query_one("#log", RichLog).border_title = "Log"
+            except Exception:
+                pass
             # Reroute all logging into the dashboard log pane.
             self._log_handler = _BusLogHandler()
             self._log_handler.setFormatter(logging.Formatter("%(message)s"))
@@ -203,6 +300,17 @@ if _TEXTUAL_AVAILABLE:
                 self._handle_summary(evt.payload)
             elif evt.kind == EV_TOKEN:
                 self._handle_token(evt.payload)
+            elif evt.kind == EV_INJECT:
+                self._handle_inject(evt.payload)
+
+        def _handle_inject(self, p: Dict[str, Any]) -> None:
+            # Data Injection pane: one entry per director timeline record.
+            # inject_markup escapes all task content; failures are swallowed so
+            # a display problem never reaches the harness worker.
+            try:
+                self.query_one("#inject", RichLog).write(inject_markup(p))
+            except Exception:
+                pass
 
         def _handle_token(self, p: Dict[str, Any]) -> None:
             # Live Stream pane: display-ready text from the stream renderer's

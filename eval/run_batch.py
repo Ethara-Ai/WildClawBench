@@ -1559,6 +1559,45 @@ def _apply_no_subagents(task: dict, args) -> None:
     task["multi_agent_config"] = {"enabled": False, "forced_off_by": "--no-subagents"}
 
 
+def _render_injection_details(task_id: str, mode: str, n_turns: int, n_stages: int,
+                              script=None) -> None:
+    """Emit a lifecycle STATUS + detailed per-stage logs for the data-injection
+    step so the operator can see exactly what is injected and when.
+
+    Display-only (mirrors tui_demo._demo_injection); never raises into the run.
+    """
+    try:
+        from src.utils.ui import lifecycle as _ui_lifecycle
+        _ui_lifecycle.emit_stage(
+            task_id, _ui_lifecycle.STAGE_STATUS,
+            f"inject:{mode} — {n_turns} turn(s), {n_stages} stage(s)",
+            status="injecting data",
+        )
+    except Exception:
+        pass
+    logger.info("[%s] DATA INJECTION plan — mode=%s, turns=%d, stages=%d",
+                task_id, mode, n_turns, n_stages)
+    stages = getattr(script, "stages", None)
+    if isinstance(stages, (list, tuple)):
+        for i, st in enumerate(stages):
+            try:
+                # Best-effort per-stage descriptor across InjectScript/StageScript
+                # schemas: surface whatever identifying + volume fields exist.
+                name = getattr(st, "name", None) or getattr(st, "id", None) or f"stage_{i}"
+                at = (getattr(st, "at", None) or getattr(st, "boundary", None)
+                      or getattr(st, "turn", ""))
+                silent = len(getattr(st, "silent", []) or []) if hasattr(st, "silent") else "?"
+                loud = len(getattr(st, "loud", []) or []) if hasattr(st, "loud") else "?"
+                fs = getattr(st, "files", None)
+                if fs is None:
+                    fs = getattr(st, "fs", None)
+                fs_n = len(fs) if isinstance(fs, (list, tuple)) else "?"
+                logger.info("[%s]   stage #%d %r @ %s — silent=%s loud=%s fs=%s",
+                            task_id, i, name, at, silent, loud, fs_n)
+            except Exception:
+                logger.info("[%s]   stage #%d (details unavailable)", task_id, i)
+
+
 def run_single_task(
     task: dict,
     model: str,
@@ -1816,6 +1855,7 @@ def run_single_task(
                 timeline_path=output_dir / "inject_timeline.jsonl",
                 inject_root=Path(task["inject_path"]),
                 copy_into_workspace=_copy_into_workspace,
+                task_id=task_id,
             )
             inject_applier.seed(_is)
             # INITIAL mock-data-state snapshot: capture the pristine workspace
@@ -1844,6 +1884,8 @@ def run_single_task(
             stage_before_turn = _inject_before_turn
             logger.info("[%s] inject-format injection enabled: %d turns, %d stage(s)",
                         task_id, len(stage_turns), len(_is.stages))
+            _render_injection_details(task_id, "inject-format",
+                                      len(stage_turns), len(_is.stages), _is)
         except Exception as exc:
             logger.error("[%s] inject/ setup failed (continuing single-turn): %s",
                          task_id, exc)
@@ -1857,6 +1899,7 @@ def run_single_task(
                 host_api_to_url=drift_info.get("host_api_to_url") or {},
                 admin_token=drift_info.get("admin_token"),
                 timeline_path=output_dir / "stage_timeline.jsonl",
+                task_id=task_id,
             )
             stage_turns = _ss.turn_messages(prompt)
 
@@ -1868,6 +1911,8 @@ def run_single_task(
             stage_before_turn = _before_turn
             logger.info("[%s] staged injection enabled: %d turns, %d silent stage(s)",
                         task_id, len(stage_turns), len(_ss.stages))
+            _render_injection_details(task_id, "stages",
+                                      len(stage_turns), len(_ss.stages), _ss)
         except Exception as exc:
             logger.error("[%s] stages.yaml setup failed (continuing single-turn): %s",
                          task_id, exc)
@@ -1892,6 +1937,23 @@ def run_single_task(
         )
     except Exception as exc:
         logger.warning("[%s] stream renderer start failed (display-only): %s", task_id, exc)
+
+    # Live-stream renderer (STREAMING_IMPLEMENTATION_GUIDE §4/§5). Display-only
+    # daemon: token mode over the batch feed (WCB_STREAM_LOG_PATH) when the
+    # sidecar tap is mounted, else turn-level tailing of THIS run's agent.log.
+    # None when WCB_STREAM is off (default) — start_renderer gates internally and
+    # never raises. Nothing graded reads it or waits on it (R1).
+    stream_renderer = None
+    try:
+        from src.utils.stream_renderer import start_renderer as _start_stream_renderer
+        _stream_feed = os.environ.get("WCB_STREAM_LOG_PATH", "").strip()
+        stream_renderer = _start_stream_renderer(
+            Path(_stream_feed) if _stream_feed else None,
+            output_dir / "agent.log",
+            run_label=f"{task_id}/run_{run_index}",
+        )
+    except Exception as exc:
+        logger.debug("[%s] stream renderer not started: %s", task_id, exc)
 
     try:
         execution = backend.run_task(
@@ -2186,6 +2248,17 @@ def run_single_task(
                 except Exception:
                     pass
 
+        # Container shutdown lifecycle marker (display-only, fail-open): make the
+        # teardown of the agent container a visible stage rather than only a log
+        # line, closing the create → start → exec → shutdown lifecycle view.
+        try:
+            from src.utils.ui import lifecycle as _ui_lifecycle
+            _ui_lifecycle.emit_stage(
+                task_id, _ui_lifecycle.STAGE_STATUS,
+                "removing agent container", status="container shutdown",
+            )
+        except Exception:
+            pass
         remove_container(task_id)
         logger.info("[%s] Container cleaned up", task_id)
 
@@ -2215,6 +2288,15 @@ def run_single_task(
                 mock_health_logger.join(timeout=5.0)
             except Exception as exc:
                 logger.warning("[%s] Mock health logger shutdown failed: %s", task_id, exc)
+
+        # Stop the display renderer AFTER grading/trajectory (so judge/turn
+        # deltas render) — a bounded join (≤5s, R3). It can delay this teardown
+        # tail slightly but can never gate grading, which already completed.
+        if stream_renderer is not None:
+            try:
+                stream_renderer.stop(timeout=5.0)
+            except Exception as exc:
+                logger.warning("[%s] Stream renderer shutdown failed: %s", task_id, exc)
 
         if task_mock_container:
             try:
@@ -2344,10 +2426,10 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
 
     _agent_headroom = (os.environ.get("KENSEI_AGENT_HEADROOM_ENABLED", "").strip().lower()
                        in ("1", "true", "yes", "on"))
-    # Live-stream observability gate (docs/STREAMING_PLAN.md). Batch-scoped
-    # (R6): evaluated once here, decides callback registration + mounts for
-    # the whole batch. Default OFF — an unset WCB_STREAM yields containers
-    # and a config yaml byte-identical to pre-streaming builds.
+    # Live-stream observability gate (STREAMING_IMPLEMENTATION_GUIDE §2/§7).
+    # Batch-scoped (R6): evaluated once here, decides sidecar-callback
+    # registration + mounts for the whole batch. Default OFF — an unset
+    # WCB_STREAM yields a config yaml + container byte-identical to today.
     _stream_enabled = (os.environ.get("WCB_STREAM", "").strip().lower()
                        in ("1", "true", "yes", "on"))
     shared_stream_log = os.environ.get("WCB_SHARED_SIDECAR_STREAM_LOG", "").strip()
@@ -2366,6 +2448,7 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
         meta_api_key=config.meta_api_key,
         meta_base_url=config.meta_base_url,
         meta_model=config.meta_model,
+        enable_stream_callback=_stream_enabled,
     )
     if not litellm_yaml:
         raise RuntimeError(
@@ -2883,6 +2966,7 @@ def _start_drift_director(task: dict, drift_info: dict, output_dir):
             workspace_dir=output_dir,
             timeline_path=timeline_path,
             gateway_log_path=output_dir / "gateway.log",
+            task_id=task.get("task_id", ""),
         )
         director.start()
         logger.info("[%s] Drift director started (%d targets, script=%s)",
@@ -2898,35 +2982,29 @@ def main() -> None:
         default_model=DEFAULT_MODEL,
         default_parallel=DEFAULT_PARALLEL,
     )
-    _select_ui_and_run(args)
 
+    # Live-stream gate (STREAMING_IMPLEMENTATION_GUIDE §7). Batch-scoped and
+    # default-OFF: --stream (or WCB_STREAM=1) turns on the observability feed +
+    # sidecar tap + renderer for the whole batch. Set BEFORE any sidecar setup
+    # so _setup_litellm_and_mocks sees it.
+    if getattr(args, "stream", False):
+        os.environ["WCB_STREAM"] = "1"
 
-def _select_ui_and_run(args) -> None:
-    """Choose the UI mode, then run the harness body.
-
-    Two modes (see src/utils/ui/):
-      * TUI (opt-in): ``--tui`` / ``WCB_TUI=1`` AND stdout is a real terminal AND
-        textual is importable -> run the whole harness inside the full-screen
-        Textual dashboard. Falls through to Rich if the dashboard can't start.
-      * Rich (default): attach a RichHandler to the root logger so every existing
-        ``logger.*`` call is colorized. Rich auto-degrades to ANSI-free text on a
-        non-tty sink, so ``run.sh``'s ``tee``'d logs stay clean.
-
-    UI wiring is intentionally additive: the harness body (``_run_main_body``) is
-    unchanged in behavior, and exit-code semantics are preserved on the default
-    (main-thread) path used by ``run.sh``.
-    """
-    from src.utils.ui import console as ui_console, tui as ui_tui
-
-    want_tui = bool(
-        getattr(args, "tui", False)
-        or os.environ.get("WCB_TUI", "").strip().lower() in ("1", "true", "yes")
-    )
-    if want_tui and ui_console.is_interactive() and ui_tui.textual_available():
-        if ui_tui.run_with_dashboard(lambda: _run_main_body(args)):
+    # Terminal UI layer (src/utils/ui). Two mutually-exclusive rendering modes:
+    #   * Textual dashboard: --tui / WCB_TUI=1 AND stdout is a real terminal AND
+    #     textual is importable. Runs the whole batch on a worker thread while a
+    #     full-screen dashboard renders off the shared event bus.
+    #   * Rich logging (default): install a RichHandler so every existing
+    #     logging call site is colorized; the batch runs inline.
+    from src.utils.ui import console as _ui_console, tui as _ui_tui
+    _want_tui = (getattr(args, "tui", False)
+                 or os.environ.get("WCB_TUI", "").strip().lower() in ("1", "true", "yes"))
+    if _want_tui and _ui_console.is_interactive() and _ui_tui.textual_available():
+        # run_with_dashboard returns truthy when it drove the dashboard; if the
+        # UI could not start it returns False and we fall through to inline mode.
+        if _ui_tui.run_with_dashboard(lambda: _run_main_body(args)):
             return
-        # Dashboard declined to start (e.g. textual import failed at runtime).
-    ui_console.install_rich_logging()
+    _ui_console.install_rich_logging()
     _run_main_body(args)
 
 
@@ -3029,20 +3107,13 @@ def _run_main_body(args) -> None:
 
 def _run_dispatch(args, backend, config: Config, mock_env_dict: dict, effective_model: str,
                   network: str = "", enable_mock_stack: bool = False) -> None:
-    # UI layer (Rich summary + lifecycle). Imported lazily so importing this
-    # module for unit tests never pulls in the UI stack. All calls are additive
-    # and never change scoring/outputs.
+    # UI layer (Rich execution summary + lifecycle + progress). Imported lazily
+    # so importing this module never hard-requires the ui package. All calls are
+    # display-only and fail-open — they never affect scoring or the run.
     import time as _time
     from src.utils.ui import lifecycle as _ui_lifecycle, summary as _ui_summary
     from src.utils.ui.events import EV_PROGRESS as _EV_PROGRESS, get_bus as _get_bus
     _dispatch_start = _time.time()
-
-    def _emit_progress(done: int, total: int) -> None:
-        # Drives the Textual dashboard's progress bar. No-op without a subscriber.
-        try:
-            _get_bus().emit(_EV_PROGRESS, completed=done, total=max(1, total))
-        except Exception:
-            pass
 
     gen_tests = args.generate_tests
     if gen_tests is None:
@@ -3107,23 +3178,10 @@ def _run_dispatch(args, backend, config: Config, mock_env_dict: dict, effective_
         task["__force_testgen__"] = bool(getattr(args, "force_testgen", False))
         _apply_no_subagents(task, args)
         logger.info("Single task mode: %s (format=%s)", task["task_id"], task.get("format", "md"))
-        # ISOLATION INVARIANT (b6/m0192): one task or rep failure must NEVER
-        # cascade to other reps or other -P parallel tasks. The legacy code
-        # called run_single_task() unguarded, so a RuntimeError from
-        # _start_task_mock_stack (overlay CSV malformed, mock container
-        # unhealthy, etc.) propagated as an unhandled exception, killing the
-        # whole python process for this rep BEFORE `result` was even
-        # constructed. From script/run.sh's POV the rep just exits with a
-        # traceback; with PARALLEL_REPS=1 + -P 5 the failure window can
-        # straddle other reps' setup phases. The category-mode threadpool
-        # path at lines ~2197-2226 already wraps future.result() in
-        # try/except and produces a soft {"task_id": tid, "scores": {},
-        # "error": str(exc)} record — mirror that contract here so the
-        # --task entry point converges on the same fail-soft semantics.
-        # script/AGENTS.md invariant: run.sh and `python3 eval/run_batch.py`
-        # must converge on identical artifacts for the same args; that
-        # includes failure-mode artifacts (non-zero exit + structured error
-        # log) not raw tracebacks.
+        # ISOLATION INVARIANT (b6/m0192): a single task/rep failure must NEVER
+        # escape as a raw traceback — mirror the category-mode soft-failure shape
+        # so script/run.sh + deliver.sh see a clean rc=1 with a structured error
+        # record instead of an unhandled exception.
         try:
             result = run_single_task(
                 task,
@@ -3143,10 +3201,6 @@ def _run_dispatch(args, backend, config: Config, mock_env_dict: dict, effective_
                 testexec_timeout=testexec_timeout,
             )
         except Exception as exc:
-            # Mirror the category-mode soft-failure shape so callers
-            # (script/run.sh::run_one_rep, deliver.sh) see a clean rc=1
-            # instead of a raw traceback. This is the only place the
-            # --task entry path can leak unhandled exceptions.
             logger.error(
                 "[%s] run_single_task raised (isolating rep): %s",
                 task.get("task_id", "<unknown>"), exc, exc_info=True,
@@ -3156,17 +3210,18 @@ def _run_dispatch(args, backend, config: Config, mock_env_dict: dict, effective_
                 "scores": {},
                 "error": str(exc),
             }
-        # Terminal lifecycle stage + execution summary for the single-task path
-        # (the flow script/run.sh always takes). Display-only; no behavior change.
-        _tid = result.get("task_id", "<unknown>")
         _errored = bool(result.get("error") or (result.get("scores") or {}).get("error"))
-        _ui_lifecycle.emit_stage(_tid, _ui_lifecycle.STAGE_FAIL if _errored else _ui_lifecycle.STAGE_DONE,
-                                 result.get("error") or "")
-        _emit_progress(1, 1)
+        # Terminal lifecycle stage + Rich execution summary for the single-task
+        # path (fail-open; never blocks the exit code below).
         try:
+            _ui_lifecycle.emit_stage(
+                result.get("task_id", task.get("task_id", "?")),
+                _ui_lifecycle.STAGE_FAIL if _errored else _ui_lifecycle.STAGE_DONE,
+                "run complete")
+            _get_bus().emit(_EV_PROGRESS, completed=1, total=1)
             _ui_summary.render_execution_summary([result], _time.time() - _dispatch_start)
-        except Exception as _sx:
-            logger.debug("execution summary render failed: %s", _sx)
+        except Exception:
+            pass
         if _errored:
             sys.exit(1)
         return
@@ -3177,6 +3232,30 @@ def _run_dispatch(args, backend, config: Config, mock_env_dict: dict, effective_
 
     all_results: list[dict] = []
     safe_model_name = re.sub(r'[^a-zA-Z0-9.\-_]', '_', effective_model)
+
+    # Progress-bar denominator: total tasks across all categories.
+    _total_tasks = 0
+    for _cat in categories:
+        _cdir = TASKS_DIR / _cat
+        if _cdir.exists():
+            _total_tasks += len(sorted(_cdir.glob("*task_*.md")))
+    _total_tasks = max(1, _total_tasks)
+    _completed = 0
+
+    def _mark_done(_res: dict) -> None:
+        """Advance the progress bar + emit a terminal lifecycle stage for one
+        finished task (fail-open display-only)."""
+        nonlocal _completed
+        _completed += 1
+        try:
+            _err = bool(_res.get("error") or (_res.get("scores") or {}).get("error"))
+            _ui_lifecycle.emit_stage(
+                _res.get("task_id", "?"),
+                _ui_lifecycle.STAGE_FAIL if _err else _ui_lifecycle.STAGE_DONE,
+                "run complete")
+            _get_bus().emit(_EV_PROGRESS, completed=_completed, total=_total_tasks)
+        except Exception:
+            pass
 
     for category in categories:
         category_dir = TASKS_DIR / category
@@ -3210,33 +3289,35 @@ def _run_dispatch(args, backend, config: Config, mock_env_dict: dict, effective_
         if args.parallel <= 1:
             for task in tasks:
                 tid = task.get("task_id", "<unknown>")
+                # ISOLATION INVARIANT (b6/m0192): one task's failure must not
+                # kill the whole category batch — record a soft error and
+                # continue to the next task.
                 try:
-                    results.append(
-                        run_single_task(
-                            task,
-                            effective_model,
-                            backend=backend,
-                            output_root=output_root,
-                            lobster=lobster,
-                            models_config=models_config,
-                            thinking=args.thinking,
-                            config=config,
-                            mock_env_dict=mock_env_dict,
-                            network=network,
-                            enable_mock_stack=enable_mock_stack,
-                            generate_tests=gen_tests,
-                            testgen_max_attempts=testgen_max_attempts,
-                            execute_tests=exec_tests,
-                            testexec_timeout=testexec_timeout,
-                        )
+                    _r = run_single_task(
+                        task,
+                        effective_model,
+                        backend=backend,
+                        output_root=output_root,
+                        lobster=lobster,
+                        models_config=models_config,
+                        thinking=args.thinking,
+                        config=config,
+                        mock_env_dict=mock_env_dict,
+                        network=network,
+                        enable_mock_stack=enable_mock_stack,
+                        generate_tests=gen_tests,
+                        testgen_max_attempts=testgen_max_attempts,
+                        execute_tests=exec_tests,
+                        testexec_timeout=testexec_timeout,
                     )
                 except Exception as exc:
                     logger.error(
                         "[%s] run_single_task raised (isolating task, continuing loop): %s",
                         tid, exc, exc_info=True,
                     )
-                    results.append({"task_id": tid, "scores": {}, "error": str(exc)})
-                _emit_progress(len(results), len(tasks))
+                    _r = {"task_id": tid, "scores": {}, "error": str(exc)}
+                results.append(_r)
+                _mark_done(_r)
         else:
             with ThreadPoolExecutor(max_workers=args.parallel) as pool:
                 futures = {
@@ -3263,11 +3344,12 @@ def _run_dispatch(args, backend, config: Config, mock_env_dict: dict, effective_
                 for future in as_completed(futures):
                     tid = futures[future]
                     try:
-                        results.append(future.result())
+                        _r = future.result()
                     except Exception as exc:
                         logger.error("[%s] Thread exception: %s", tid, exc)
-                        results.append({"task_id": tid, "scores": {}, "error": str(exc)})
-                    _emit_progress(len(results), len(tasks))
+                        _r = {"task_id": tid, "scores": {}, "error": str(exc)}
+                    results.append(_r)
+                    _mark_done(_r)
 
         summary_label = f"{lobster['name']}_{safe_model_name}" if lobster else safe_model_name
         # quiet=True: keep the summary_<model>.json write, but let the Rich
@@ -3279,11 +3361,17 @@ def _run_dispatch(args, backend, config: Config, mock_env_dict: dict, effective_
         summary_label = f"{lobster['name']}_{safe_model_name}" if lobster else safe_model_name
         print_global_summary(all_results, output_root, summary_label, quiet=True)
 
+    # Rich execution summary (per-task table + rubric/test roll-ups): total /
+    # passed / failed tasks, pass & fail rates, execution time, agents &
+    # sub-agents spawned, and rubric-criteria / test-case roll-ups. The
+    # operator-facing summary; additive to the plain-text print_summary above.
+    # Fail-open so a rendering issue never affects the batch outcome.
     if all_results:
         try:
             _ui_summary.render_execution_summary(all_results, _time.time() - _dispatch_start)
         except Exception as _sx:
             logger.debug("execution summary render failed: %s", _sx)
+
 
 if __name__ == "__main__":
     main()

@@ -284,6 +284,7 @@ class InjectApplier:
         inject_root: Optional[Path] = None,
         copy_into_workspace=None,
         replay_loud: bool = False,
+        task_id: str = "",
     ):
         self._urls = dict(host_api_to_url)
         self._token = admin_token
@@ -292,6 +293,7 @@ class InjectApplier:
         self._inject_root = Path(inject_root) if inject_root else None
         self._copy = copy_into_workspace
         self._replay_loud = replay_loud
+        self._task_id = task_id
         self._session = requests.Session()
 
     # -- public API ---------------------------------------------------------
@@ -732,7 +734,10 @@ class InjectApplier:
                 rec.update(ok=False, status="unresolved", reason=f"unknown admin op '{kind}'")
         except Exception as exc:  # pragma: no cover - defensive
             rec.update(ok=False, status="error", reason=str(exc))
-        self._append({"type": "inject.api", **rec, "ts": time.time()})
+        # Show the post-injection values in the pane when the op captured them.
+        _after = rec.get("after")
+        self._append({"type": "inject.api", **rec, "ts": time.time()},
+                     ui_values=_after if isinstance(_after, dict) else None)
         return rec
 
     def _admin_doc_set(self, api: str, doc: str, path: List[Any], value: Any) -> Dict[str, Any]:
@@ -802,7 +807,9 @@ class InjectApplier:
         result = self._admin_patch(api, table, pk, fields)
         rec.update(result)
         rec["status"] = rec.get("status", "applied" if result.get("ok") else "failed")
-        self._append({"type": "inject.api", **rec, "ts": time.time()})
+        # Persist only field KEYS (rec["fields"]); ship the injected VALUES to
+        # the Data Injection pane display-only via ui_values.
+        self._append({"type": "inject.api", **rec, "ts": time.time()}, ui_values=fields)
         return rec
 
     def _resolve_target(self, api: str, op: Dict[str, Any]
@@ -956,12 +963,20 @@ class InjectApplier:
 
     # -- timeline -----------------------------------------------------------
 
-    def _append(self, entry: Dict[str, Any]) -> None:
+    def _append(self, entry: Dict[str, Any], *, ui_values=None) -> None:
         entry.setdefault("ts", time.time())
         entry.setdefault("ts_iso", time.strftime(
             "%Y-%m-%dT%H:%M:%SZ", time.gmtime(entry.get("ts", time.time()))))
         with open(self._timeline_path, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry, default=str) + "\n")
+        # Mirror onto the UI bus for the Data Injection pane. Bus-only, fail-open;
+        # ``ui_values`` (injected field values) are display-only and are NOT
+        # written to the timeline above.
+        try:
+            from src.utils.ui.lifecycle import emit_inject
+            emit_inject(self._task_id, entry, ui_values)
+        except Exception:
+            pass
 
 
 def _flatten_property_value(v: Any) -> Any:

@@ -15,7 +15,7 @@ die(){ printf '\033[1;31mFATAL: %s\033[0m\n' "$1"; exit 1; }
 
 step "0. sanity"
 [[ "$(uname -m)" == "x86_64" ]] || echo "WARNING: arch=$(uname -m); agent image is linux/amd64 — expect emulation/failures on arm64"
-[[ -f run.sh ]] || die "run from the repo root (run.sh not found)"
+[[ -f script/run.sh ]] || die "run from the repo root (script/run.sh not found)"
 [[ -f .env ]] || echo "WARNING: .env missing — copy your credentials file here before the full run (--run will fail without Bedrock creds)"
 
 step "1. packages (docker, git, python3, pip)"
@@ -56,9 +56,9 @@ python3 script/check_injection.py "$TASK" || die "check_injection failed — sto
 
 if [[ "$RUN_FULL" -eq 1 ]]; then
   step "5. FULL RUN ($MODEL, ~80 min, billable)"
-  ./run.sh "$TASK" "$MODEL" 1
+  bash script/run.sh "$TASK" "$MODEL" 1
 else
   step "DONE — setup + injection check passed"
-  echo "Launch the full task with:   ./run.sh $TASK $MODEL 1"
+  echo "Launch the full task with:   bash script/run.sh $TASK $MODEL 1"
   echo "(use tmux so it survives an SSH drop)"
 fi

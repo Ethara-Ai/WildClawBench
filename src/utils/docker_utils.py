@@ -187,22 +187,50 @@ def copy_file_into_workspace(task_id: str, host_src: "Path | None",
         return False
 
 
+def resolve_image_id(image: str) -> str:
+    """Return the local image ID for a reference, or "" if absent.
+
+    Works under BOTH Docker image stores. `docker image inspect NAME:TAG`
+    fails to resolve a *reference* under the containerd image store in Docker
+    28/29 (returns `[]` / "No such image" even when `docker images` lists the
+    tag), so we resolve names with `docker image ls -q <ref>` which honors the
+    reference filter in both the classic graphdriver and containerd stores.
+    A bare image ID/digest still resolves via the `docker image inspect`
+    fallback below.
+    """
+    r = subprocess.run(
+        ["docker", "image", "ls", "-q", image],
+        capture_output=True, text=True,
+    )
+    if r.returncode == 0 and (r.stdout or "").strip():
+        return r.stdout.strip().splitlines()[0].strip()
+    # Fallback: covers references passed as a bare image ID or digest, which
+    # `docker image ls -q <filter>` does not match but `inspect` resolves.
+    r2 = subprocess.run(
+        ["docker", "image", "inspect", "--format", "{{.Id}}", image],
+        capture_output=True, text=True,
+    )
+    return r2.stdout.strip() if r2.returncode == 0 else ""
+
+
+def image_present(image: str) -> bool:
+    """Store-agnostic presence check for a local image reference."""
+    return bool(resolve_image_id(image))
+
+
 def require_image_present(image: str) -> None:
     # Strict precheck for images that must already exist locally (the agent
     # image is loaded from the HuggingFace tar via `docker load`; we never
     # pull-on-run). Any miss raises so the harness fails fast at startup
     # instead of silently letting `docker run` try and fail mid-task with
     # `manifest unknown`.
-    r = subprocess.run(
-        ["docker", "image", "inspect", image],
-        capture_output=True, text=True,
-    )
-    if r.returncode != 0:
+    if not image_present(image):
         raise RuntimeError(
             f"Required Docker image not present locally: {image}\n"
             f"Load it first (e.g. `docker load -i Images/wildclawbench-ubuntu_v1.3.tar`)\n"
-            f"or set DOCKER_IMAGE to a tag that exists. docker inspect said:\n"
-            f"{(r.stderr or '').strip()}"
+            f"or set DOCKER_IMAGE to a tag that exists.\n"
+            f"(Checked with `docker image ls -q {image}` and an inspect fallback; "
+            f"both came back empty.)"
         )
     logger.info("Agent image %s present", image)
 
@@ -1918,6 +1946,21 @@ def inject_data_into_workspace(task_id: str, data_dir: str) -> None:
     n = (count_r.stdout or "").strip() or "?"
     logger.info("[%s] Legacy data/ staged into workspace: %s → %s/ (%s files)",
                 task_id, data_dir, home, n)
+    # Detailed per-file listing so the operator can see exactly which input
+    # documents reached the agent (bounded to keep logs readable). Best-effort:
+    # a listing failure never affects the injection, which already succeeded.
+    list_r = subprocess.run(
+        ["docker", "exec", task_id, "/bin/bash", "-c",
+         f"cd {home} && find . -type f 2>/dev/null | sed 's|^\\./||' | sort"],
+        capture_output=True, text=True,
+    )
+    files = [f for f in (list_r.stdout or "").splitlines() if f.strip()]
+    if files:
+        _cap = 40
+        for f in files[:_cap]:
+            logger.info("[%s]   data file: %s", task_id, f)
+        if len(files) > _cap:
+            logger.info("[%s]   … and %d more file(s)", task_id, len(files) - _cap)
 
 
 def _copy_dir_from_container(task_id: str, src: str, dest: str) -> bool:

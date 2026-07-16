@@ -101,27 +101,46 @@ def _install_scripted_run(monkeypatch, results):
 
 
 class TestRequireImagePresent:
-    def test_present_image_issues_inspect_and_returns_none(self, monkeypatch):
-        calls = _install_scripted_run(monkeypatch, [_FakeCompleted(returncode=0)])
+    def test_present_image_resolves_by_name_and_returns_none(self, monkeypatch):
+        # `docker image ls -q <ref>` returns the ID → present. This resolution
+        # path works under BOTH the classic graphdriver and the containerd image
+        # store (where `docker image inspect <ref>` wrongly returns []).
+        calls = _install_scripted_run(
+            monkeypatch, [_FakeCompleted(returncode=0, stdout="60eec8752cb5\n")]
+        )
         assert du.require_image_present("wildclawbench-ubuntu:v1.3") is None
-        # Exactly one `docker image inspect <image>` call.
-        assert calls == [["docker", "image", "inspect", "wildclawbench-ubuntu:v1.3"]]
+        # A non-empty `docker image ls -q` short-circuits — no inspect fallback.
+        assert calls == [["docker", "image", "ls", "-q", "wildclawbench-ubuntu:v1.3"]]
 
-    def test_missing_image_raises_runtimeerror_with_stderr(self, monkeypatch):
-        _install_scripted_run(
+    def test_missing_image_raises_runtimeerror(self, monkeypatch):
+        # `image ls -q` empty (rc 0) then the inspect-by-id fallback also misses.
+        calls = _install_scripted_run(
             monkeypatch,
-            [_FakeCompleted(returncode=1, stderr="Error: No such image: foo:bar\n")],
+            [
+                _FakeCompleted(returncode=0, stdout=""),   # image ls -q
+                _FakeCompleted(returncode=1, stdout=""),   # inspect --format {{.Id}}
+            ],
         )
         with pytest.raises(RuntimeError) as exc:
             du.require_image_present("foo:bar")
         msg = str(exc.value)
         assert "Required Docker image not present locally: foo:bar" in msg
-        # The captured docker stderr is surfaced (stripped) into the message.
-        assert "No such image: foo:bar" in msg
+        # Both resolution strategies were attempted before failing.
+        assert calls == [
+            ["docker", "image", "ls", "-q", "foo:bar"],
+            ["docker", "image", "inspect", "--format", "{{.Id}}", "foo:bar"],
+        ]
 
-    def test_missing_image_with_empty_stderr_still_raises(self, monkeypatch):
-        # stderr may be None/empty; the helper coalesces to "" — no crash.
-        _install_scripted_run(monkeypatch, [_FakeCompleted(returncode=125, stderr="")])
+    def test_missing_image_nonzero_ls_still_falls_back_and_raises(self, monkeypatch):
+        # Even when `image ls -q` itself errors, the inspect fallback runs; both
+        # empty → raise. No crash on empty/None output.
+        _install_scripted_run(
+            monkeypatch,
+            [
+                _FakeCompleted(returncode=125, stdout=""),
+                _FakeCompleted(returncode=1, stdout=""),
+            ],
+        )
         with pytest.raises(RuntimeError, match="not present locally: img:x"):
             du.require_image_present("img:x")
 

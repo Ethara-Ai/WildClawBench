@@ -425,15 +425,12 @@ def build_litellm_config_yaml(
         _cbs.append("litellm_headroom_callback.headroom_callback_instance")
     if enable_oauth_usage_callback:
         _cbs.append("litellm_usage_oauth_callback.oauth_usage_callback_instance")
+    # Live-stream observability tap (docs STREAMING_PLAN / STREAMING_IMPLEMENTATION_GUIDE
+    # §4 Pattern A). Registered LAST — it only reads streamed chunks and
+    # re-yields the original object (R5), so it never affects the usage/headroom
+    # callbacks' billing view. Default-OFF: unset ⇒ this line is absent and the
+    # yaml is byte-identical to a pre-streaming build (R6).
     if enable_stream_callback:
-        # Live-token observability tap (docs/STREAMING_PLAN.md): pure
-        # pass-through iterator hook writing to its OWN sink
-        # (/var/litellm_stream/stream.jsonl) — never usage.jsonl NOR
-        # usage_oauth.jsonl (m0130 sink separation). Batch-scoped: registered
-        # only when WCB_STREAM was on at setup (R6). NOTE: on the OAuth agent
-        # path callers pass enable_stream_callback=False — the cc-bridge tee
-        # is the real-time tap there; the sidecar would only see the bridge's
-        # end-of-turn burst (docs/STREAMING_PLAN.md §1.5).
         _cbs.append("litellm_stream_callback.stream_handler_instance")
     if _cbs:
         callback_line = "  callbacks: [" + ", ".join(f'"{c}"' for c in _cbs) + "]\n"
@@ -477,11 +474,34 @@ def build_litellm_config_yaml(
     )
 
 
+def _resolve_image_id(image: str) -> str:
+    """Local image ID for a reference, or "" if absent — works under both the
+    classic graphdriver and the containerd image store. `docker image inspect
+    NAME:TAG` fails to resolve a reference under the containerd store (Docker
+    28/29), so names are resolved with `docker image ls -q <ref>`; a bare ID or
+    digest still resolves through the inspect fallback.
+    """
+    r = subprocess.run(
+        ["docker", "image", "ls", "-q", image],
+        capture_output=True, text=True,
+    )
+    if r.returncode == 0 and (r.stdout or "").strip():
+        return r.stdout.strip().splitlines()[0].strip()
+    r2 = subprocess.run(
+        ["docker", "image", "inspect", "--format", "{{.Id}}", image],
+        capture_output=True, text=True,
+    )
+    return r2.stdout.strip() if (r2.returncode == 0 and r2.stdout) else ""
+
+
 def _image_present_locally(image: str) -> bool:
-    return subprocess.run(
+    if subprocess.run(
         ["docker", "image", "inspect", image],
         capture_output=True,
-    ).returncode == 0
+    ).returncode == 0:
+        return True
+    # containerd store: inspect-by-name may miss even when the tag exists.
+    return bool(_resolve_image_id(image))
 
 
 def pull_litellm_image(image: str = LITELLM_IMAGE) -> None:
@@ -551,11 +571,7 @@ def ensure_litellm_headroom_image(image: str = LITELLM_HEADROOM_IMAGE) -> None:
     # inside the first `docker run` where it gets misattributed to a task error.
     # The image is local-build-only, so we auto-build from the committed
     # Dockerfile when absent (build is deterministic + context-independent).
-    inspect = subprocess.run(
-        ["docker", "image", "inspect", image],
-        capture_output=True, text=True,
-    )
-    if inspect.returncode == 0:
+    if _image_present_locally(image):
         logger.info("LiteLLM headroom image %s present", image)
         return
 
@@ -723,16 +739,24 @@ def start_litellm(
             *build_env_args(headroom_pairs),
         ]
 
-    # Live-token stream tap (docs/STREAMING_PLAN.md): its OWN sink dir,
-    # mounted separately from /var/litellm_usage so the feeds can never
-    # collide (m0130 sink-separation invariant).
+    # Live-stream feed tap (STREAMING_IMPLEMENTATION_GUIDE §4 Pattern A). Mounts
+    # the standalone stream callback module + a writable feed dir and points it
+    # at the shared stream.jsonl via WCB_STREAM_LOG_PATH. Strictly separate from
+    # the usage/headroom sinks (sink separation, m0130). Default-OFF: with both
+    # args empty this list stays empty and the container is byte-identical to a
+    # pre-streaming build (R6).
     stream_args: list[str] = []
     if stream_callback_host_path and stream_log_host_dir:
         stream_args = [
             "-v", f"{stream_callback_host_path}:/app/litellm_stream_callback.py:ro",
             "-v", f"{stream_log_host_dir}:/var/litellm_stream",
-            *build_env_args([("WCB_STREAM_LOG_PATH", "/var/litellm_stream/stream.jsonl")]),
+            "-e", "WCB_STREAM=1",
+            "-e", "WCB_STREAM_LOG_PATH=/var/litellm_stream/stream.jsonl",
         ]
+        for _k in ("WCB_STREAM_MAX_BYTES",):
+            _v = os.environ.get(_k)
+            if _v:
+                stream_args += ["-e", f"{_k}={_v}"]
 
     image_to_run = _validate_docker_token("litellm image", image_to_run)
     cmd = [
@@ -866,11 +890,7 @@ CC_BRIDGE_INTERNAL_PORT = 8765
 
 
 def ensure_cc_bridge_image(image: str = CC_BRIDGE_IMAGE) -> None:
-    r = subprocess.run(
-        ["docker", "image", "inspect", image],
-        capture_output=True,
-    )
-    if r.returncode == 0:
+    if _image_present_locally(image):
         return
     repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     dockerfile = os.path.join(repo_root, "docker", "cc-bridge", "Dockerfile")

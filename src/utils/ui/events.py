@@ -30,6 +30,13 @@ EV_TOKEN = "token"        # live LLM stream chunk for the dashboard's stream pan
                           # payload: {style: thinking|text|judge|status, text: str}
                           # producer: src/utils/stream_renderer.py in bus mode
                           # (docs/STREAMING_PLAN.md — display-only, fail-open)
+EV_INJECT = "inject"      # mid-run data-injection timeline record for the
+                          # dashboard's Data Injection pane. payload:
+                          # {task_id: str, record: dict (one *_timeline.jsonl
+                          # entry), values: dict|None (injected field values,
+                          # display-only, truncated — never persisted)}.
+                          # producers: inject/stage/drift directors via
+                          # lifecycle.emit_inject (fail-open, bus-only).
 
 
 @dataclass

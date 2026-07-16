@@ -15,10 +15,10 @@ and it never raises into the caller.
 """
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Dict, Mapping, Optional
 
 from .console import get_console
-from .events import EV_STAGE, get_bus
+from .events import EV_INJECT, EV_STAGE, get_bus
 
 # Ordered lifecycle stages with a glyph + Rich style each.
 STAGE_CREATE = "CREATE"
@@ -99,3 +99,60 @@ def emit_stage(
     # markup=False so a bracketed task id (e.g. "[alden-croft_MB]") is printed
     # verbatim instead of being parsed as a Rich style tag.
     console.print(text, style=style, markup=False)
+
+
+# Bound the size of injected values shipped over the bus + rendered in the pane:
+# a single mutation can carry a whole email body, so cap value length and count.
+_INJECT_VALUE_MAXLEN = 200
+_INJECT_VALUE_MAXCOUNT = 16
+
+
+def _truncate_inject_values(
+    values: Optional[Mapping[str, Any]]
+) -> Optional[Dict[str, str]]:
+    """Return a display-safe copy of ``values``: each value stringified and
+    truncated, at most ``_INJECT_VALUE_MAXCOUNT`` entries. ``None``/empty in →
+    ``None`` out. Never raises (returns None on any surprise)."""
+    if not values:
+        return None
+    try:
+        out: Dict[str, str] = {}
+        for i, (k, v) in enumerate(values.items()):
+            if i >= _INJECT_VALUE_MAXCOUNT:
+                out["…"] = f"(+{len(values) - _INJECT_VALUE_MAXCOUNT} more)"
+                break
+            s = str(v)
+            if len(s) > _INJECT_VALUE_MAXLEN:
+                s = s[:_INJECT_VALUE_MAXLEN] + "…"
+            out[str(k)] = s
+        return out or None
+    except Exception:
+        return None
+
+
+def emit_inject(
+    task_id: str,
+    record: Mapping[str, Any],
+    values: Optional[Mapping[str, Any]] = None,
+) -> None:
+    """Publish one data-injection timeline record onto the bus so the Textual
+    dashboard's Data Injection pane can render it live (see events.EV_INJECT).
+
+    ``record`` is a single ``*_timeline.jsonl`` entry (as written by the
+    inject/stage/drift directors). ``values`` optionally carries the injected
+    field values for display only — they are truncated here and are NOT
+    persisted to the timeline file.
+
+    Bus-only (no console echo, unlike ``emit_stage``): outside the TUI the
+    directors already log a summary line, and per-op echoes would be noisy.
+    Fully fail-open — a display path must never break a run.
+    """
+    try:
+        get_bus().emit(
+            EV_INJECT,
+            task_id=task_id or "?",
+            record=dict(record or {}),
+            values=_truncate_inject_values(values),
+        )
+    except Exception:
+        pass

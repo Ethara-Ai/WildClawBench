@@ -41,7 +41,9 @@ def test_classify_pass_and_fail_by_threshold():
     assert ok is True and score == pytest.approx(0.83) and reason == ""
 
     ok, score, reason = summary.classify(_r("b", 0.20), threshold=0.5)
-    assert ok is False and score == pytest.approx(0.20) and "0.50" in reason
+    # Fail reason names the score but must NOT expose the numeric cut-off.
+    assert ok is False and score == pytest.approx(0.20)
+    assert "0.20" in reason and "below pass cut-off" in reason and "0.50" not in reason
 
 
 def test_classify_agent_error_is_fail():
@@ -106,8 +108,41 @@ def test_compute_stats_counts_and_rates():
 
 def test_compute_stats_empty():
     stats = summary.compute_stats([], threshold=0.5)
-    assert stats == {"total": 0, "passed": 0, "failed": 0,
-                     "pass_rate": 0.0, "fail_rate": 0.0, "threshold": 0.5}
+    assert stats == {
+        "total": 0, "passed": 0, "failed": 0,
+        "pass_rate": 0.0, "fail_rate": 0.0,
+        "agents_spawned": 0, "subagents_spawned": 0,
+        "rubric_total": 0, "rubric_passed": 0, "rubric_failed": 0,
+        "rubric_pass_rate": 0.0,
+        "tests_total": 0, "tests_passed": 0, "tests_failed": 0,
+        "tests_pass_rate": 0.0,
+        "threshold": 0.5,
+    }
+
+
+def test_compute_stats_aggregates_agents_rubric_and_tests():
+    # Two tasks: one with rubric criteria + test cases + a sub-agent, one that
+    # never started its container (no primary agent spawned).
+    results = [
+        {
+            "task_id": "a",
+            "scores": {"overall_score": 0.8, "criteria_total": 4,
+                       "criteria_passed": 3, "criteria_failed": 1},
+            "test_result": {"tests_total": 5, "tests_passed": 4, "tests_failed": 1},
+            "usage": {"subagent_count": 2},
+        },
+        {"task_id": "b", "scores": {}, "error": "Container startup failed: boom"},
+    ]
+    stats = summary.compute_stats(results, threshold=0.5)
+    # Primary agents: task a spawned one; task b's container never started.
+    assert stats["agents_spawned"] == 1
+    assert stats["subagents_spawned"] == 2
+    # Rubric roll-up (Channel B).
+    assert (stats["rubric_total"], stats["rubric_passed"], stats["rubric_failed"]) == (4, 3, 1)
+    assert stats["rubric_pass_rate"] == pytest.approx(75.0)
+    # Test-case roll-up (Channel A).
+    assert (stats["tests_total"], stats["tests_passed"], stats["tests_failed"]) == (5, 4, 1)
+    assert stats["tests_pass_rate"] == pytest.approx(80.0)
 
 
 # --- render smoke ------------------------------------------------------------
@@ -401,18 +436,30 @@ def test_criteria_abstention_detection_matches_grading_schema():
     assert render_has_human("sonnet", "") is False
 
 
-# --- summary labels flag PASS/FAIL as a UI threshold, not a harness verdict ----
+# --- summary never displays a pass-threshold field/metric ---------------------
 
-def test_summary_clarifies_pass_is_a_ui_threshold():
-    results = [{"task_id": "t1", "scores": {"overall_score": 0.8},
-                "usage": {"output_tokens": 10, "cost_usd": 0.01}}]
+def test_summary_does_not_display_pass_threshold():
+    # The execution summary must NOT surface any pass-threshold field or metric;
+    # the numeric cut-off is an internal classification detail only.
+    results = [{"task_id": "t1",
+                "scores": {"overall_score": 0.8, "criteria_total": 2,
+                           "criteria_passed": 2, "criteria_failed": 0},
+                "test_result": {"tests_total": 3, "tests_passed": 3, "tests_failed": 0},
+                "usage": {"output_tokens": 10, "cost_usd": 0.01, "subagent_count": 1}}]
     from rich.console import Console
     buf = io.StringIO()
     stats = summary.render_execution_summary(
         results, 1.0, console=Console(file=buf, width=110))
     out = buf.getvalue()
-    # The clarifier is present so readers don't mistake it for a harness score.
-    assert "UI threshold" in out and "not a harness verdict" in out
-    # ...and the stats data/keys are unchanged (no scoring or key drift).
-    assert set(stats) == {"total", "passed", "failed",
-                          "pass_rate", "fail_rate", "threshold"}
+    # No threshold wording anywhere in the rendered summary.
+    lowered = out.lower()
+    assert "threshold" not in lowered
+    assert "pass threshold" not in lowered
+    # The requested metrics ARE surfaced.
+    for label in ("Total tasks", "Pass rate", "Fail rate", "Execution time",
+                  "Agents spawned", "Sub-agents spawned", "Rubric criteria",
+                  "Rubric pass rate", "Test cases", "Test case pass rate"):
+        assert label in out, f"missing summary label: {label}"
+    # The internal cut-off is still available to callers for classification, but
+    # is not rendered.
+    assert "threshold" in stats

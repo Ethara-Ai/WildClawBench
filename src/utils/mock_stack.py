@@ -50,14 +50,56 @@ def _compute_mock_content_hash(env_dir: Path) -> str:
     return h.hexdigest()[:16]
 
 
-def _image_content_hash(image: str) -> str:
+def _resolve_image_id(image: str) -> str:
+    """Local image ID for a reference, or "" if absent — works under both the
+    classic graphdriver and the containerd image store. `docker image inspect
+    NAME:TAG` fails to resolve a reference under the containerd store (Docker
+    28/29), so names are resolved with `docker image ls -q <ref>`; a bare ID or
+    digest still resolves through the inspect fallback.
+    """
     r = subprocess.run(
-        ["docker", "image", "inspect", image, "--format",
-         "{{ index .Config.Labels \"" + _CONTENT_HASH_LABEL + "\" }}"],
+        ["docker", "image", "ls", "-q", image],
+        capture_output=True, text=True,
+    )
+    if r.returncode == 0 and (r.stdout or "").strip():
+        return r.stdout.strip().splitlines()[0].strip()
+    r2 = subprocess.run(
+        ["docker", "image", "inspect", "--format", "{{.Id}}", image],
+        capture_output=True, text=True,
+    )
+    return r2.stdout.strip() if (r2.returncode == 0 and r2.stdout) else ""
+
+
+def _image_present(image: str) -> bool:
+    """Store-agnostic presence check (see _resolve_image_id)."""
+    r = subprocess.run(
+        ["docker", "image", "inspect", image],
+        capture_output=True,
+    )
+    if r.returncode == 0:
+        return True
+    # containerd store: inspect-by-name may miss even when the tag exists.
+    return bool(_resolve_image_id(image))
+
+
+def _image_content_hash(image: str) -> str:
+    fmt = "{{ index .Config.Labels \"" + _CONTENT_HASH_LABEL + "\" }}"
+    r = subprocess.run(
+        ["docker", "image", "inspect", image, "--format", fmt],
         capture_output=True, text=True,
     )
     if r.returncode != 0:
-        return ""
+        # containerd store: inspect-by-name may miss; resolve name->ID and retry
+        # the label read against the concrete ID (inspect-by-ID works there).
+        img_id = _resolve_image_id(image)
+        if not img_id:
+            return ""
+        r = subprocess.run(
+            ["docker", "image", "inspect", img_id, "--format", fmt],
+            capture_output=True, text=True,
+        )
+        if r.returncode != 0:
+            return ""
     return (r.stdout or "").strip()
 
 
@@ -273,11 +315,7 @@ def _build_mock_image_locked(env_dir: Path, image: str = MOCK_IMAGE,
         logger.info("Force-rebuilding mock image %s (removing cached tag)", image)
         subprocess.run(["docker", "rmi", "-f", image], capture_output=True)
     else:
-        r = subprocess.run(
-            ["docker", "image", "inspect", image],
-            capture_output=True,
-        )
-        if r.returncode == 0:
+        if _image_present(image):
             cached_hash = _image_content_hash(image)
             if current_hash and cached_hash == current_hash:
                 logger.info("Mock image %s already built (content_hash=%s)", image, cached_hash)

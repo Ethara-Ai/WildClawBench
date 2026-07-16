@@ -148,11 +148,13 @@ class StageApplier:
         host_api_to_url: Dict[str, str],
         admin_token: Optional[str],
         timeline_path: Path,
+        task_id: str = "",
     ):
         self._urls = dict(host_api_to_url)
         self._token = admin_token
         self._timeline_path = Path(timeline_path)
         self._timeline_path.parent.mkdir(parents=True, exist_ok=True)
+        self._task_id = task_id
         self._session = requests.Session()
 
     def _headers(self) -> Dict[str, str]:
@@ -210,3 +212,9 @@ class StageApplier:
             "%Y-%m-%dT%H:%M:%SZ", time.gmtime(entry.get("ts", time.time()))))
         with open(self._timeline_path, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry, default=str) + "\n")
+        # Mirror onto the UI bus for the Data Injection pane (bus-only, fail-open).
+        try:
+            from src.utils.ui.lifecycle import emit_inject
+            emit_inject(self._task_id, entry)
+        except Exception:
+            pass
