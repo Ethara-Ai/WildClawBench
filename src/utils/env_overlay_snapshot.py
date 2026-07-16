@@ -19,9 +19,11 @@ invariant in script/AGENTS.md ("run.sh and python3 eval/run_batch.py
 should converge on identical artifacts").
 
 Stdlib only by design: repackage_to_bundle.py is stdlib-only per
-script/AGENTS.md and reads the manifest this module writes; keeping this
-module stdlib-only means we could later move the dedup logic across the
-boundary without dependency churn.
+script/AGENTS.md; it inherits the staged tree via copytree and intentionally
+never reads the manifest this module writes (stripped via ignore_patterns in
+script/repackage_to_bundle.py). Keeping this module stdlib-only means we
+could later move the dedup logic across the boundary without dependency
+churn.
 
 The dict that drives the overlay (task["mock_overlays"]) is built in
 eval/run_batch.py:_resolve_task_apis (lines 404-418) directly from
@@ -230,21 +232,3 @@ def stage_environment_with_overlays(
         )
 
     return manifest
-
-
-def read_overlay_manifest(env_dir: Path) -> dict | None:
-    """Read {MANIFEST_FILENAME} from env_dir; return None if absent/malformed.
-
-    Provided as a single read path so any future consumer (test harness,
-    audit script, regrade) doesn't reinvent the parse + tolerate-missing
-    pattern. Currently unused by the bundler (it inherits the staged tree
-    via copytree and intentionally never sees the manifest -- see
-    script/repackage_to_bundle.py:788 ignore_patterns).
-    """
-    p = env_dir / MANIFEST_FILENAME
-    if not p.is_file():
-        return None
-    try:
-        return json.loads(p.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None

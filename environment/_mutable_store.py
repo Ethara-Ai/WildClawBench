@@ -906,11 +906,6 @@ def get_store(api_name: str) -> Store:
         return _STORES[api_name]
 
 
-def known_stores() -> List[str]:
-    with _REGISTRY_LOCK:
-        return sorted(_STORES.keys())
-
-
 # ---------------------------------------------------------------------------
 # File-blob download helper (shared by drive-like APIs: box, google-drive, dropbox)
 # ---------------------------------------------------------------------------

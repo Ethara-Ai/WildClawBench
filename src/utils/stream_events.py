@@ -46,9 +46,6 @@ _MAX_ERRORS = 3
 _DEFAULT_MAX_BYTES = 64 * 1024 * 1024  # 64 MiB per feed file
 _SIZE_CHECK_EVERY = 32  # stat() the file every N writes, not every write
 
-VALID_EVENTS = ("message_start", "delta", "message_stop", "error", "status")
-VALID_KINDS = ("text", "thinking", "status")
-
 
 def _enabled_from_env() -> bool:
     return (

@@ -52,11 +52,6 @@ _console: "Optional[Console]" = None
 _logging_installed = False
 
 
-def rich_available() -> bool:
-    """True when the ``rich`` package imported successfully."""
-    return _RICH_AVAILABLE
-
-
 def is_interactive() -> bool:
     """True when stdout is a real terminal and the user has not set NO_COLOR.
 
@@ -129,33 +124,3 @@ def install_rich_logging(level: int = logging.INFO) -> bool:
         root.setLevel(level)
     _logging_installed = True
     return True
-
-
-# --- semantic one-line helpers ------------------------------------------------
-# These are convenience wrappers for harness code that wants to print a styled
-# status line directly (as opposed to going through `logging`). They no-op
-# gracefully to plain print when rich is unavailable.
-
-def _emit(style: str, prefix: str, message: str, *, err: bool = False) -> None:
-    console = get_console()
-    if console is None:
-        stream = sys.stderr if err else sys.stdout
-        print(f"{prefix} {message}", file=stream)
-        return
-    console.print(f"{prefix} {message}", style=style, stderr=err)
-
-
-def ui_info(message: str) -> None:
-    _emit("info", "•", message)
-
-
-def ui_success(message: str) -> None:
-    _emit("success", "✓", message)
-
-
-def ui_warn(message: str) -> None:
-    _emit("warning", "!", message, err=True)
-
-
-def ui_error(message: str) -> None:
-    _emit("error", "✗", message, err=True)

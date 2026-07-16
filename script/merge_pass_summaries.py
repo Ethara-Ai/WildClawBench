@@ -124,21 +124,6 @@ def _load(path: Path) -> dict:
     return data
 
 
-LEGACY_TOP_KEYS = (
-    "model",
-    "runs",
-    "average_test_weights_percentage",
-    "average_rubric_weights_percentage",
-    "per_run",
-)
-LEGACY_PER_RUN_KEYS = (
-    "run_index",
-    "include_multimodal",
-    "test_weights_percentage",
-    "rubric_weights_percentage",
-)
-
-
 def merge_pass_summaries(
     inputs: list[Path],
     dedup: bool = False,

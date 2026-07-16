@@ -51,6 +51,11 @@ review_docs/
 # Per-run telemetry written by run.sh tee — local, timestamped, machine-specific.
 logs/
 
+# Editor/refactor backup files (bridge.py.pre-headport incident, 2026-07).
+*.bak
+*.orig
+*.py.pre-*
+
 # macOS Finder duplicate-on-copy directories ("foo copy/", "foo copy 2/").
 *\ copy/
 *\ copy\ [0-9]*/
