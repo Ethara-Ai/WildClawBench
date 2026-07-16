@@ -173,7 +173,7 @@ def compute_test_reward(
                       if w < 0 and _norm(n) in passed_names)
 
     if pos_total > 0:
-        return max(0.0, (pos_earned - neg_penalty) / pos_total)
+        return (pos_earned - neg_penalty) / pos_total
     if tests_total > 0:
         return tests_passed / tests_total
     return 0.0

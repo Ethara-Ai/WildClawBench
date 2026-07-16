@@ -101,7 +101,7 @@ neg_penalty = sum(abs(w) for n, w in weights_map.items()
                   if w < 0 and _norm(n) in passed_names)
 
 if pos_total > 0:
-    reward = max(0.0, (pos_earned - neg_penalty) / pos_total)
+    reward = (pos_earned - neg_penalty) / pos_total
 elif tests_total > 0:
     reward = tests_passed / tests_total
 else:
