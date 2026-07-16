@@ -406,10 +406,22 @@ def start_mock_stack(container_name: str, network: str,
         # localhost; we must not expose the admin plane on the host's public
         # interfaces.
         publish_args += ["-p", f"127.0.0.1::{int(port)}"]
+    # Port publishing (-p) only binds to the host when the container's
+    # CREATION-TIME network can route to the host. The task `network` is created
+    # with --internal, so a container whose primary network is that internal net
+    # gets NO host port binding on Docker Desktop (macOS/Windows): `docker port`
+    # returns nothing, get_published_ports() -> {}, and the host-side admin plane
+    # is disabled ("no host ports resolved"), silently killing data injection.
+    # Attaching to `bridge` AFTER `docker run` cannot fix it -- publishing is
+    # fixed at run time. So when we need published admin ports, create the
+    # container on the host-routable default bridge FIRST (so -p binds), then
+    # attach the internal task network below. Quiescent runs (no publish_ports)
+    # keep the zero-host-exposure internal-only surface unchanged.
+    primary_network = "bridge" if publish_ports else network
     cmd = [
         "docker", "run", "-d",
         "--name", container_name,
-        "--network", network,
+        "--network", primary_network,
         *mount_args,
         *env_args,
         *publish_args,
@@ -420,24 +432,22 @@ def start_mock_stack(container_name: str, network: str,
         raise RuntimeError(f"mock-stack start failed:\n{r.stderr}")
     logger.info("[%s] mock-stack container started", container_name)
     if publish_ports:
-        # Published ports (-p) only route from the host when the container is
-        # reachable on a host-connected network. The task network is created
-        # with --internal, so an internal-only container is isolated and
-        # `docker port` reports nothing -- the host-side admin plane then has
-        # no URL and injection is disabled ("no host ports resolved").
-        # Dual-home onto the default bridge (mirrors the LiteLLM sidecar) so the
-        # published admin ports become reachable on 127.0.0.1.
+        # Came up on the default bridge so the published admin ports actually
+        # bind on 127.0.0.1. Now attach the (internal) task network so the agent
+        # and other task containers can reach this mock by container name with no
+        # egress path of their own. The agent stays isolated; only this mock is
+        # dual-homed (mirrors the LiteLLM sidecar).
         rb = subprocess.run(
-            ["docker", "network", "connect", "bridge", container_name],
+            ["docker", "network", "connect", network, container_name],
             capture_output=True, text=True,
         )
         if rb.returncode != 0:
-            logger.warning("[%s] could not dual-home to default bridge "
-                           "(published admin ports may be unreachable): %s",
-                           container_name, (rb.stderr or "").strip())
+            logger.warning("[%s] could not attach task network %s "
+                           "(agent may not reach the mock by name): %s",
+                           container_name, network, (rb.stderr or "").strip())
         else:
-            logger.info("[%s] dual-homed to default bridge for published admin ports",
-                        container_name)
+            logger.info("[%s] attached task network %s (admin ports stay on 127.0.0.1)",
+                        container_name, network)
 
 
 def get_published_ports(container_name: str, internal_ports: list[int]) -> dict[int, int]:
