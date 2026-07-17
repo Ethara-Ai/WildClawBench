@@ -1858,18 +1858,10 @@ def run_single_task(
                 task_id=task_id,
             )
             inject_applier.seed(_is)
-            # INITIAL mock-data-state snapshot: capture the pristine workspace
-            # BEFORE the first prompt is injected — persona/, data/ (from the
-            # on-disk task source) and mock_data/ (the live mock-API store right
-            # after seed, before any silent mutation). Mirrored by the
-            # workspace_after snapshot taken once all turns have run.
-            _ws_before = output_dir / "snapshot" / "workspace_before"
-            try:
-                _snapshot_persona_and_data_before(task, _ws_before)
-                inject_applier.snapshot_state(
-                    _ws_before / "mock_data", label="before_injection")
-            except Exception as exc:
-                logger.warning("[%s] before-injection snapshot failed: %s", task_id, exc)
+            # The pristine BEFORE snapshot (persona/ + data/ + mock_data/) is
+            # taken below, after this branch, so it runs for every task — not
+            # just injection ones. For inject tasks it still lands after seed()
+            # (post-seed baseline, pre-silent-mutation) as before.
             raw_turns = list(task.get("turn_messages") or [])
             # `prompt` already carries the system-prompt prefix + workspace hint
             # for turn 0; later turns are fed verbatim from prompts.txt.
@@ -1920,6 +1912,40 @@ def run_single_task(
             stage_before_turn = None
     elif drift_info:
         drift_director = _start_drift_director(task, drift_info, output_dir)
+
+    # Unified snapshot handle. Reuse the inject applier when injection is active;
+    # otherwise build a snapshot-only applier against the mock admin plane so the
+    # workspace_before/after snapshots always include the mock_data/ store dump,
+    # regardless of whether this task ships an inject/ folder. inject_root and
+    # copy_into_workspace are unused by snapshot_state, so None is fine here.
+    snapshot_applier = inject_applier
+    if snapshot_applier is None and drift_info.get("host_api_to_url"):
+        try:
+            from src.utils.inject_director import InjectApplier
+            snapshot_applier = InjectApplier(
+                host_api_to_url=drift_info.get("host_api_to_url") or {},
+                admin_token=drift_info.get("admin_token"),
+                timeline_path=output_dir / "inject_timeline.jsonl",
+                inject_root=None,
+                copy_into_workspace=None,
+            )
+        except Exception as exc:
+            logger.warning("[%s] snapshot applier init failed: %s", task_id, exc)
+            snapshot_applier = None
+
+    # INITIAL snapshot — taken for EVERY task before the agent runs. persona/ and
+    # data/ come from the on-disk task source (pristine, pre-turn-0 state);
+    # mock_data/ is the live mock-API store (dumped when an admin plane exists).
+    # For inject tasks this runs after seed() above, matching the prior baseline.
+    _ws_before = output_dir / "snapshot" / "workspace_before"
+    try:
+        _snapshot_persona_and_data_before(task, _ws_before)
+        if snapshot_applier is not None:
+            snapshot_applier.snapshot_state(
+                _ws_before / "mock_data", label="before_injection")
+    except Exception as exc:
+        logger.warning("[%s] before snapshot failed: %s", task_id, exc)
+
     mock_health_logger = _start_mock_health_logger(task, task_id, output_dir)
     # Live-stream renderer (docs/STREAMING_PLAN.md §4). Display-only daemon
     # thread: token mode over the batch feed when the sidecar tap is mounted,
@@ -2031,26 +2057,27 @@ def run_single_task(
         # mock_data/ (the post-injection mock-API store). Must happen here while
         # BOTH the agent container (removed below) and the per-task mock stack
         # (stopped further down) are still alive. Paired with workspace_before.
-        if inject_applier is not None:
-            _ws_after = output_dir / "snapshot" / "workspace_after"
-            try:
-                persona_entries = []
-                _pdir = task.get("persona_dir") or ""
-                if _pdir and Path(_pdir).is_dir():
-                    persona_entries = [p.name for p in Path(_pdir).iterdir()
-                                       if p.name != ".DS_Store"]
-                data_rel = [
-                    (att.get("storedAs") or att.get("name") or "")
-                    for att in (task.get("attachments") or [])
-                ]
-                data_rel = [r for r in data_rel if r]
-                snapshot_persona_and_data_from_container(
-                    task_id, persona_entries, data_rel, _ws_after)
-                inject_applier.snapshot_state(
+        _ws_after = output_dir / "snapshot" / "workspace_after"
+        try:
+            persona_entries = []
+            _pdir = task.get("persona_dir") or ""
+            if _pdir and Path(_pdir).is_dir():
+                persona_entries = [p.name for p in Path(_pdir).iterdir()
+                                   if p.name != ".DS_Store"]
+            data_rel = [
+                (att.get("storedAs") or att.get("name") or "")
+                for att in (task.get("attachments") or [])
+            ]
+            data_rel = [r for r in data_rel if r]
+            snapshot_persona_and_data_from_container(
+                task_id, persona_entries, data_rel, _ws_after)
+            if snapshot_applier is not None:
+                snapshot_applier.snapshot_state(
                     _ws_after / "mock_data", label="after_injection")
-            except Exception as exc:
-                logger.warning("[%s] after-injection snapshot failed: %s", task_id, exc)
+        except Exception as exc:
+            logger.warning("[%s] after snapshot failed: %s", task_id, exc)
 
+        if inject_applier is not None:
             # Assemble the post-run agent_state.json from live artifacts (the
             # /audit/summary feed + the after-injection mock-store snapshot +
             # the agent transcript) so fixture-based CHECKERS have real data to
@@ -2764,6 +2791,13 @@ def _start_task_mock_stack(task: dict, network: str, environment_dir) -> tuple[d
     stages_path = task.get("stages_path")
     inject_path = task.get("inject_path")
     needs_admin = bool(drift_path or stages_path or inject_path)
+    # The before/after workspace snapshot dumps the live mock-API store via the
+    # admin plane (see InjectApplier.snapshot_state). That snapshot is taken for
+    # EVERY task, not just injection ones, so enable the admin plane + publish
+    # ports whenever this task ships overlays even when no drift/stages/inject
+    # script is configured. Without this, a plain task exposes no admin plane and
+    # workspace_before/after would be missing their mock_data/ dump.
+    needs_admin = needs_admin or bool(overlaid_ports)
     admin_env: dict[str, str] | None = None
     publish_ports: list[int] | None = None
     admin_token: str | None = None
