@@ -1199,7 +1199,16 @@ def _grade_council(
             "is_positive": wt >= 0,
         })
 
-    overall = max(0.0, min(1.0, weighted / total_w))
+    # No clamp — mirror Channel A's `test_executor._compute_reward` polarity so
+    # a rubric run that triggers more negative-weight (forbidden-behavior)
+    # criteria than it earns positive ones returns a negative overall_score.
+    # Range is (-inf, 1] in principle; in practice bounded by the negative-
+    # weight budget (walkthrough §4: total |negative| < 50% total positive, so
+    # floor is ~-0.5). Downstream aggregators (`script/aggregate_runs.py`,
+    # bundlers) pass the signed value through unchanged. The error-path
+    # returns `overall_score: 0.0` as a distinct "no-signal" sentinel — do
+    # NOT confuse that with a floor of this reward.
+    overall = weighted / total_w
     council_usage = _ZERO_USAGE.copy()
     # Per-member usage breakdown: the flat sum below collapses all members into
     # one cost line, hiding which model spent what. Preserve each member's own

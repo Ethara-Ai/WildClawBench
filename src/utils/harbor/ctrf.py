@@ -137,14 +137,17 @@ def compute_test_reward(
     test_output: str = "",
     test_code: str = "",
 ) -> float:
-    """Return reward in [0, 1].
+    """Return signed reward (unclamped; ≈`[-0.5, 1]` in practice).
 
-    Mirrors `_compute_test_reward` (kensei2.py:3202).
+    Byte-aligned with `src/utils/test_executor._compute_reward` — MUST stay
+    aligned so exported task bundles compute the same reward as the harness.
 
-    - No positive weights configured → fall back to passed / total ratio.
-    - With weights → reward = max(0, (pos_earned - neg_penalty) / pos_total),
-      where pos_earned sums positive weights whose tests passed, and
-      neg_penalty sums |w| for negative-weighted tests that passed (triggered).
+    - No positive weights configured → fall back to `passed / total` ratio.
+    - With weights → `reward = (pos_earned - neg_penalty) / pos_total` (no clamp),
+      where `pos_earned` sums positive weights whose tests passed, and
+      `neg_penalty` sums `|w|` for negative-weighted tests that passed (triggered
+      guardrails). Reward is negative when penalties outweigh earned points;
+      downstream consumers see the true polarity of the run.
     """
     tests_total = int(tests_total or 0)
     tests_passed = int(tests_passed or 0)
