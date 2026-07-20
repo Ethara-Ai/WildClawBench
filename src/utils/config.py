@@ -55,8 +55,8 @@ class Config:
     # machines where the Bedrock IAM access has been rotated/revoked.
     anthropic_api_key: str = ""
 
-    # ---- Meta vendor (Llama API, OpenAI-compatible, routed via LiteLLM) ----
-    # An internal OpenAI-compatible relay (https://api.ai.meta.com/v1). The
+    # ---- First-party vendor (OpenAI-compatible relay, routed via LiteLLM) ----
+    # An internal OpenAI-compatible relay (base URL supplied via config). The
     # vendor onboarding guide is explicit: keep ALL inference params at their
     # defaults (never override reasoning_effort/temperature/top_p/top_k), so the
     # sidecar model block for this provider carries only routing fields. The
@@ -183,9 +183,9 @@ class Config:
             openai_api_key=s("KENSEI_OPENAI_API_KEY", "OPENAI_API_KEY"),
             openai_whisper_api_key=s("KENSEI_OPENAI_WHISPER_API_KEY", "OPENAI_WHISPER_API_KEY"),
             anthropic_api_key=s("KENSEI_ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY"),
-            meta_api_key=s("KENSEI_META_API_KEY", "META_API_KEY"),
-            meta_base_url=s("KENSEI_META_BASE_URL", "META_API_BASE_URL", default="https://api.ai.meta.com/v1"),
-            meta_model=s("KENSEI_META_MODEL", "META_MODEL"),
+            meta_api_key=s("KENSEI_1P_API_KEY", "ONEP_API_KEY"),
+            meta_base_url=s("KENSEI_1P_BASE_URL", "ONEP_API_BASE_URL", default="https://api.ai.meta.com/v1"),
+            meta_model=s("KENSEI_1P_MODEL", "ONEP_MODEL"),
             openrouter_api_key=s("OPENROUTER_API_KEY"),
             openrouter_base_url=s("OPENROUTER_BASE_URL", default="https://openrouter.ai/api/v1"),
             brave_api_key=s("BRAVE_API_KEY", default="placeholder"),

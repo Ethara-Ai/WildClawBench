@@ -302,8 +302,8 @@ def build_litellm_config_yaml(
                 f"      api_key: {whisper_env_ref}"
             )
     if meta_api_key and meta_model:
-        # Meta vendor model (internal Llama API) exposed through the sidecar as
-        # an OpenAI-compatible upstream. LiteLLM reaches it via the `openai/`
+        # First-party vendor model exposed through the sidecar as an
+        # OpenAI-compatible upstream. LiteLLM reaches it via the `openai/`
         # provider prefix + an explicit api_base, the same OpenAI-compatible
         # bridge used for any non-OpenAI /v1/chat/completions relay.
         #
@@ -315,7 +315,7 @@ def build_litellm_config_yaml(
         # streaming. The global `litellm_settings.drop_params: true` (set below)
         # is what makes this safe end-to-end: any of those params an upstream
         # caller (openclaw, judge, testgen) emits are silently dropped before
-        # the request reaches api.ai.meta.com instead of 400-ing the relay.
+        # the request reaches the relay instead of 400-ing it.
         # Intentionally NO `stream_options.include_usage` and NO input/output
         # cost overrides — both are non-default request shaping the guide tells
         # us not to add; usage is still recorded post-call by the LiteLLM usage
@@ -326,7 +326,7 @@ def build_litellm_config_yaml(
             "    litellm_params:\n"
             f"      model: openai/{meta_model}\n"
             f"      api_base: {meta_base_url}\n"
-            "      api_key: os.environ/META_API_KEY"
+            "      api_key: os.environ/ONEP_API_KEY"
         )
     # OpenClaw's memory tool POSTs model=text-embedding-3-small to the sidecar
     # /v1/embeddings on session-start, on memory search, and from our explicit
@@ -380,13 +380,13 @@ def build_litellm_config_yaml(
             + cache_marker.rstrip("\n")
         )
     elif meta_api_key and meta_model:
-        # Meta-only run: route openclaw's built-in image fallback ids to the
-        # vendor model (Llama is multimodal). Same default-params policy — only
+        # First-party-only run: route openclaw's built-in image fallback ids to
+        # the vendor model (it is multimodal). Same default-params policy — only
         # routing fields, no inference param overrides.
         image_alias = (
             f"      model: openai/{meta_model}\n"
             f"      api_base: {meta_base_url}\n"
-            "      api_key: os.environ/META_API_KEY"
+            "      api_key: os.environ/ONEP_API_KEY"
         )
     else:
         image_alias = ""
@@ -694,10 +694,10 @@ def start_litellm(
         env_pairs.append(("WCB_CC_BRIDGE_SECRET", _cc_secret))
     _cc_stub = os.environ.get("WCB_CC_STUB_KEY", "").strip() or "sk-wcb-oauth-stub"
     env_pairs.append(("WCB_CC_STUB_KEY", _cc_stub))
-    # Meta vendor key: read by the meta model block via
-    # `api_key: os.environ/META_API_KEY`.
+    # First-party vendor key: read by the vendor model block via
+    # `api_key: os.environ/ONEP_API_KEY`.
     if meta_api_key:
-        env_pairs.append(("META_API_KEY", meta_api_key))
+        env_pairs.append(("ONEP_API_KEY", meta_api_key))
     env_args = build_env_args(env_pairs)
 
     callback_args: list[str] = []

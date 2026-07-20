@@ -3073,7 +3073,7 @@ def _run_main_body(args) -> None:
             )
 
     # In LiteLLM mode the model must be a sidecar model id (claude-opus-4.7 /
-    # gpt-5.5 / the configured Meta vendor model). The Meta id is dynamic
+    # gpt-5.5 / the configured first-party vendor model). That id is dynamic
     # (config.meta_model), so it's checked alongside the static set.
     sidecar_model_ids = set(LITELLM_MODEL_IDS)
     if config.meta_api_key and config.meta_model:
@@ -3081,8 +3081,8 @@ def _run_main_body(args) -> None:
     effective_model = args.model
     if use_litellm and args.model not in sidecar_model_ids and not args.model.startswith("litellm/"):
         # Pick a default that is actually REGISTERED in the sidecar. The historic
-        # default is claude-opus-4.7, but on a Meta-only (no Bedrock/OpenAI) run
-        # that id isn't in the model_list, so fall back to the configured Meta id.
+        # default is claude-opus-4.7, but on a first-party-only (no Bedrock/
+        # OpenAI) run that id isn't in the model_list, so fall back to that id.
         if config.aws_bearer_token and config.bedrock_inference_arn:
             _fallback = "claude-opus-4.7"
         elif config.openai_api_key:
