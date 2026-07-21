@@ -7,8 +7,9 @@ exercises exactly what a real bridged request would send. max_tokens=1.
 import json
 import os
 import sys
+from pathlib import Path
 
-sys.path.insert(0, "/Users/anzar/Desktop/WildClawBench")
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 os.environ.setdefault("SSL_CERT_FILE", __import__("certifi").where())
 
 import httpx
