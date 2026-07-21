@@ -42,6 +42,7 @@ import platform
 import subprocess
 import threading
 import time
+from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -55,6 +56,13 @@ _LOG = logging.getLogger(__name__)
 CLAUDE_CODE_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
 REFRESH_ENDPOINT = "https://console.anthropic.com/v1/oauth/token"
 REFRESH_LEEWAY_SECONDS = 60
+# Back-off window for a pool slot whose token refresh failed transiently
+# (network outage / upstream 5xx). The slot becomes selectable again after
+# this window instead of being permanently invalidated.
+TRANSIENT_REFRESH_BACKOFF_SECONDS = 60.0
+# Distinct access tokens each provider remembers for error attribution
+# (see MultiAccountCredentialProvider._find_slot_by_prefix_locked).
+_TOKEN_HISTORY_SIZE = 8
 
 _KEYCHAIN_SERVICE = "Claude Code-credentials"
 _CACHE_PATH = Path.home() / ".cache" / "wildclawbench" / "claude_creds.json"
@@ -62,6 +70,17 @@ _CACHE_PATH = Path.home() / ".cache" / "wildclawbench" / "claude_creds.json"
 
 class CredentialsError(RuntimeError):
     """Raised when credentials cannot be loaded or refreshed."""
+
+
+class TransientCredentialsError(CredentialsError):
+    """A refresh failure that is likely to heal on its own (network outage,
+    upstream 5xx, garbled/non-JSON proxy response).
+
+    The multi-account pool backs the slot off for
+    ``TRANSIENT_REFRESH_BACKOFF_SECONDS`` instead of permanently invalidating
+    it; genuinely fatal failures (4xx = refresh token revoked, protocol
+    violations) keep raising the base ``CredentialsError``.
+    """
 
 
 @dataclass
@@ -251,7 +270,7 @@ def refresh_credentials(
         except (httpx.HTTPError, OSError) as e:
             last_error = e
             if attempt >= max_attempts:
-                raise CredentialsError(
+                raise TransientCredentialsError(
                     f"OAuth refresh network error after {attempt} attempts: {e}"
                 ) from e
             sleep_s = backoff_base * (2 ** (attempt - 1))
@@ -268,7 +287,7 @@ def refresh_credentials(
             raise CredentialsError(
                 f"OAuth refresh failed (non-retryable): HTTP {r.status_code} {r.text[:200]}"
             )
-        last_error = CredentialsError(
+        last_error = TransientCredentialsError(
             f"OAuth refresh failed: HTTP {r.status_code} {r.text[:200]}"
         )
         if attempt >= max_attempts:
@@ -280,14 +299,18 @@ def refresh_credentials(
         )
         time.sleep(sleep_s)
     else:  # pragma: no cover - exhausted loop with no break
-        raise CredentialsError(
+        raise TransientCredentialsError(
             f"OAuth refresh failed after {max_attempts} attempts: {last_error}"
         )
 
     try:
         body = r.json()
     except ValueError as e:
-        raise CredentialsError(f"OAuth refresh returned non-JSON: {e}") from e
+        # Non-JSON on a 200 is almost always an interposing proxy / captive
+        # portal / truncation, not a revoked account -- recoverable.
+        raise TransientCredentialsError(
+            f"OAuth refresh returned non-JSON: {e}"
+        ) from e
 
     access_token = body.get("access_token")
     if not access_token:
@@ -327,6 +350,31 @@ class CredentialProvider:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._creds: Optional[OAuthCredentials] = None
+        # Last _TOKEN_HISTORY_SIZE *distinct* access tokens this provider
+        # vended, so pool error-attribution still matches a token that was
+        # rotated away between a request being issued and its error arriving.
+        self._recent_tokens: deque[str] = deque(maxlen=_TOKEN_HISTORY_SIZE)
+
+    def _remember_locked(self, token: str) -> None:
+        """Record a vended token. Caller must hold ``self._lock``.
+
+        Deduped: repeat vends of the current token must not evict older
+        rotations from the bounded history.
+        """
+        if token and token not in self._recent_tokens:
+            self._recent_tokens.append(token)
+
+    def _vend_locked(self) -> str:
+        """Return the current access token, recording it in the history.
+        Caller must hold ``self._lock``."""
+        token = self._creds.access_token
+        self._remember_locked(token)
+        return token
+
+    def knows_token(self, token: str) -> bool:
+        """True if this provider recently vended exactly ``token``."""
+        with self._lock:
+            return bool(token) and token in self._recent_tokens
 
     def get_access_token(self) -> str:
         with self._lock:
@@ -339,7 +387,7 @@ class CredentialProvider:
                     write_cache(self._creds)
                 except OSError as e:
                     _LOG.warning("Could not persist refreshed creds to cache: %s", e)
-            return self._creds.access_token
+            return self._vend_locked()
 
     def force_reload(self) -> None:
         with self._lock:
@@ -377,7 +425,7 @@ class _FileCredentialProvider(CredentialProvider):
             if self._creds is None:
                 self._creds = self._load()
             if not self._creds.is_expired():
-                return self._creds.access_token
+                return self._vend_locked()
             # Cross-process serialization: only one bridge process should hit
             # the refresh endpoint; others wait, then re-read the rotated
             # token. Without this, concurrent harness runs sharing the same
@@ -391,13 +439,24 @@ class _FileCredentialProvider(CredentialProvider):
                 except OSError as e:
                     _LOG.warning("flock failed on %s: %s; proceeding unlocked", lock_path, e)
                 # Re-load -- another process may have refreshed while we waited.
+                # Adopt the on-disk pair whenever it is at least as new as the
+                # in-memory one: Anthropic rotates the refresh_token on every
+                # exchange, so refreshing from a pair OLDER than what's on disk
+                # burns an already-consumed refresh_token (upstream 401, account
+                # then needs a manual re-login). The newness guard covers the
+                # reverse case: if OUR last write-back failed (OSError swallowed
+                # below), memory holds the only live pair and disk is stale --
+                # adopting disk unconditionally would burn the token the same way.
                 try:
                     fresh = self._load()
-                    if not fresh.is_expired():
-                        self._creds = fresh
-                        return self._creds.access_token
                 except CredentialsError:
                     pass
+                else:
+                    if fresh.expires_at_ms >= self._creds.expires_at_ms:
+                        self._creds = fresh
+                if not self._creds.is_expired():
+                    # Another process already rotated -- no second refresh.
+                    return self._vend_locked()
                 _LOG.info("Refreshing OAuth token from %s", self._path)
                 self._creds = refresh_credentials(self._creds)
                 try:
@@ -408,7 +467,7 @@ class _FileCredentialProvider(CredentialProvider):
                     os.chmod(self._path, 0o600)
                 except OSError as e:
                     _LOG.warning("Could not persist refreshed creds to %s: %s", self._path, e)
-            return self._creds.access_token
+            return self._vend_locked()
 
     def token_prefix(self) -> Optional[str]:
         with self._lock:
@@ -455,7 +514,7 @@ class _KeychainCredentialProvider(CredentialProvider):
                     write_cache(self._creds)
                 except OSError as e:
                     _LOG.warning("Could not persist refreshed creds to cache: %s", e)
-            return self._creds.access_token
+            return self._vend_locked()
 
     def token_prefix(self) -> Optional[str]:
         with self._lock:
@@ -496,15 +555,40 @@ class MultiAccountCredentialProvider:
         self._last_used_index: int = 0
 
     def get_access_token(self) -> str:
-        with self._lock:
-            slot, idx = self._select_slot_locked()
-            self._last_used_index = idx
-        try:
-            return slot.provider.get_access_token()
-        except CredentialsError:
+        # Iterative with a per-call tried-set, NOT recursive: a slot's
+        # transient backoff (60s) is SHORTER than a worst-case slow-timeout
+        # refresh (~93s: 3 x 30s httpx timeouts + 1s+2s backoff), so during a
+        # persistent outage slot A can become selectable again while slot B is
+        # still failing -- naive recursion then ping-pongs between slots
+        # forever. Each slot gets at most ONE attempt per call.
+        tried: set[int] = set()
+        while True:
             with self._lock:
-                slot.invalid = True
-            return self.get_access_token()
+                slot, idx = self._select_slot_locked()
+                if id(slot) in tried:
+                    raise CredentialsError(
+                        f"all {len(tried)} available accounts failed this call"
+                    )
+                self._last_used_index = idx
+                tried.add(id(slot))
+            try:
+                return slot.provider.get_access_token()
+            except TransientCredentialsError as e:
+                # Recoverable failure (network / upstream 5xx during refresh):
+                # back the slot off instead of killing it for the process
+                # lifetime -- nothing in the run path ever clears `invalid`.
+                with self._lock:
+                    slot.exhausted_until = max(
+                        slot.exhausted_until,
+                        time.time() + TRANSIENT_REFRESH_BACKOFF_SECONDS,
+                    )
+                _LOG.warning(
+                    "account %s refresh failed transiently (%s); backing off %.0fs",
+                    slot.label, e, TRANSIENT_REFRESH_BACKOFF_SECONDS,
+                )
+            except CredentialsError:
+                with self._lock:
+                    slot.invalid = True
 
     def _select_slot_locked(self) -> tuple[_AccountSlot, int]:
         now = time.time()
@@ -590,6 +674,15 @@ class MultiAccountCredentialProvider:
             ]
 
     def _find_slot_by_prefix_locked(self, token_prefix: str) -> Optional[_AccountSlot]:
+        # Exact pass first: match against each provider's recent-token history,
+        # which still attributes correctly when a refresh rotated the slot's
+        # current token between a request being issued and its error arriving.
+        for slot in self._slots:
+            knows = getattr(slot.provider, "knows_token", None)
+            if callable(knows) and knows(token_prefix):
+                return slot
+        # Prefix fallback: providers without a history (external duck-typed
+        # providers) or callers passing a truncated token.
         for slot in self._slots:
             if not hasattr(slot.provider, "token_prefix"):
                 continue
