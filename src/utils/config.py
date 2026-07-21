@@ -102,6 +102,18 @@ class Config:
     # it (Authorization: Bearer <oauth-token> is stamped bridge-side).
     cc_stub_key: str = "sk-wcb-oauth-stub"
 
+    # ---- Codex ChatGPT-plan OAuth path (opt-in; codex backend only) ----
+    # When enabled, codex runs on a ChatGPT/Codex subscription instead of an
+    # OpenRouter API key, via the MITM forward proxy in src/utils/codex_oauth/
+    # (codex 0.121's chatgpt_base_url does not redirect inference, so a base-url
+    # bridge like the Claude path cannot be reused). Gated by --use-codex-oauth
+    # (or WCB_USE_CODEX_OAUTH=1) AND WCB_CX_ACCOUNT_POOL.
+    use_codex_oauth: bool = False
+    # Colon-separated list of codex auth.json files (ChatGPT-plan credentials:
+    # {"tokens": {"access_token", "refresh_token", "account_id", ...}}). The
+    # proxy rotates across them on a 429 subscription cap.
+    cx_account_pool: str = ""
+
     # ---- Sandbox runtime ----
     tmp_workspace: str = "/tmp_workspace"
     gateway_port: int = 18789
@@ -204,6 +216,8 @@ class Config:
             cc_account_pool=s("WCB_CC_ACCOUNT_POOL"),
             cc_bridge_secret=s("WCB_CC_BRIDGE_SECRET"),
             cc_stub_key=s("WCB_CC_STUB_KEY", default="sk-wcb-oauth-stub"),
+            use_codex_oauth=b("WCB_USE_CODEX_OAUTH", False),
+            cx_account_pool=s("WCB_CX_ACCOUNT_POOL"),
         )
 
     def litellm_enabled(self) -> bool:
