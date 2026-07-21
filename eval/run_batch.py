@@ -3063,13 +3063,7 @@ def _run_main_body(args) -> None:
             openrouter_base_url=OPENROUTER_BASE_URL_CLAUDECODE
         )
     elif args.agent_backend == "codex":
-        _use_codex_oauth = args.use_codex_oauth
-        if _use_codex_oauth is None:
-            _use_codex_oauth = config.use_codex_oauth
-        backend = CodexAgent(
-            use_codex_oauth=_use_codex_oauth,
-            codex_account_pool=config.cx_account_pool,
-        )
+        backend = CodexAgent()
     elif args.agent_backend == "hermesagent":
         from src.agents.hermesagent import HermesAgentAgent
         backend = HermesAgentAgent(

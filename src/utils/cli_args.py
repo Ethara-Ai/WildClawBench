@@ -117,16 +117,6 @@ def build_run_batch_parser(default_model: str, default_parallel: int) -> argpars
              "JSON files. Equivalent to WCB_USE_CLAUDE_OAUTH=1.",
     )
     parser.add_argument(
-        "--use-codex-oauth",
-        dest="use_codex_oauth",
-        action="store_true",
-        default=None,
-        help="Run the codex backend on a ChatGPT/Codex subscription via the "
-             "src/utils/codex_oauth MITM proxy instead of an OpenRouter API key. "
-             "Requires WCB_CX_ACCOUNT_POOL to point at one or more codex "
-             "auth.json files. Equivalent to WCB_USE_CODEX_OAUTH=1.",
-    )
-    parser.add_argument(
         "--mock-stack",
         dest="mock_stack",
         action="store_true",

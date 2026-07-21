@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import json
 import logging
 import os
@@ -101,92 +100,6 @@ def setup_codex_auth(task_id: str, host_codex_home: str | Path | None = None) ->
     else:
         logger.warning("[%s] Codex auth file copy disabled and OPENROUTER_API_KEY is empty", task_id)
     return []
-
-
-# ---------------------------------------------------------------------------
-# ChatGPT-plan OAuth support (see src/utils/codex_oauth/).
-#
-# Codex 0.121 routes all traffic through HTTPS_PROXY and trusts a system CA, but
-# `chatgpt_base_url` does NOT redirect its inference endpoints -- so the OAuth
-# path uses a MITM forward proxy instead of a base-url bridge. Codex gets a
-# *stub* auth.json (so it enters ChatGPT mode + never self-refreshes) while the
-# proxy owns the real pooled tokens and rotates them. These helpers place the
-# stub credential + install the proxy CA into the container's trust store.
-# ---------------------------------------------------------------------------
-
-CODEX_OAUTH_CA_PATH_IN_CONTAINER = "/usr/local/share/ca-certificates/wcb-codex-oauth.crt"
-CODEX_AUTH_PATH = f"{CONTAINER_CODEX_HOME}/auth.json"
-# Far-future expiry (year 2100) so codex never proactively refreshes the stub.
-_STUB_EXP = 4102444800
-
-
-def _b64url(obj: Any) -> str:
-    raw = obj if isinstance(obj, (bytes, bytearray)) else json.dumps(obj).encode()
-    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
-
-
-def _stub_jwt(extra_claims: dict[str, Any]) -> str:
-    header = _b64url({"alg": "HS256", "typ": "JWT", "kid": "wcb-stub"})
-    payload = {"sub": "wcb-stub", "email": "stub@wildclawbench.local", "iat": 1700000000, "exp": _STUB_EXP}
-    payload.update(extra_claims)
-    sig = base64.urlsafe_b64encode(b"wcb-codex-oauth-stub-signature").rstrip(b"=").decode()
-    return f"{header}.{_b64url(payload)}.{sig}"
-
-
-def build_codex_stub_auth_json(account_id: str = "wcb-codex-oauth-stub") -> str:
-    """A non-expiring ChatGPT-mode stub auth.json. Values are overwritten per
-    request by the MITM proxy with the selected pooled account's real token."""
-    id_token = _stub_jwt(
-        {"https://api.openai.com/auth": {"chatgpt_account_id": account_id, "chatgpt_plan_type": "pro", "user_id": "wcb-stub"}}
-    )
-    return json.dumps(
-        {
-            "tokens": {
-                "id_token": id_token,
-                "access_token": _stub_jwt({}),
-                "refresh_token": "wcb-codex-oauth-stub-refresh",
-                "account_id": account_id,
-            },
-            "last_refresh": "2030-01-01T00:00:00Z",
-            "OPENAI_API_KEY": None,
-        }
-    )
-
-
-def install_ca_in_container(task_id: str, ca_cert_host_path: str | Path) -> None:
-    copy_result = subprocess.run(
-        ["docker", "cp", str(ca_cert_host_path), f"{task_id}:{CODEX_OAUTH_CA_PATH_IN_CONTAINER}"],
-        capture_output=True,
-        text=True,
-    )
-    if copy_result.returncode != 0:
-        raise RuntimeError(f"Failed to copy codex OAuth CA into container:\n{copy_result.stderr}")
-    update_result = subprocess.run(
-        ["docker", "exec", "-u", "0", task_id, "update-ca-certificates"],
-        capture_output=True,
-        text=True,
-    )
-    if update_result.returncode != 0:
-        raise RuntimeError(
-            f"update-ca-certificates failed in container:\n{update_result.stderr or update_result.stdout}"
-        )
-    logger.info("[%s] Installed codex OAuth proxy CA into container trust store", task_id)
-
-
-def setup_codex_oauth(
-    task_id: str,
-    ca_cert_host_path: str | Path,
-    account_id: str = "wcb-codex-oauth-stub",
-) -> None:
-    """Install the MITM proxy CA + write the stub auth.json into the container."""
-    install_ca_in_container(task_id, ca_cert_host_path)
-    _copy_text_to_container(task_id, CODEX_AUTH_PATH, build_codex_stub_auth_json(account_id))
-    subprocess.run(
-        ["docker", "exec", "-u", "0", task_id, "chmod", "600", CODEX_AUTH_PATH],
-        capture_output=True,
-        text=True,
-    )
-    logger.info("[%s] Wrote codex stub auth.json (ChatGPT mode; proxy owns real tokens)", task_id)
 
 
 def normalize_codex_model(model: str) -> str:

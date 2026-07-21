@@ -17,7 +17,6 @@ from src.agents.codex.backend import (
     CODEX_PROMPT_PATH,
     load_skill_documents,
     prepare_codex_prompt,
-    setup_codex_oauth,
 )
 from src.utils.docker_utils import run_warmup, setup_skills, snapshot_workspace_state
 from src.utils.endpoint_utils import normalize_openrouter_base_url_for_openclaw
@@ -116,8 +115,6 @@ class CodexAgent(BaseAgent):
         openrouter_api_key: str = "",
         openrouter_base_url: str = "",
         reasoning_effort_default: str = DEFAULT_REASONING_EFFORT,
-        use_codex_oauth: bool | None = None,
-        codex_account_pool: str = "",
     ) -> None:
         resolved_image = image or os.environ.get("DOCKER_IMAGE_CODEX") or "wildclawbench-codex-ubuntu:v0.0"
         self.image: str = resolved_image
@@ -129,26 +126,6 @@ class CodexAgent(BaseAgent):
         )
         self.reasoning_effort_default = reasoning_effort_default
 
-        # ---- ChatGPT-plan OAuth path (opt-in; see src/utils/codex_oauth/) ----
-        if use_codex_oauth is None:
-            use_codex_oauth = os.environ.get("WCB_USE_CODEX_OAUTH", "").strip().lower() in ("1", "true", "yes")
-        self.codex_account_pool = (codex_account_pool or os.environ.get("WCB_CX_ACCOUNT_POOL", "")).strip()
-        # Only enable when a pool is actually configured (mirrors the claude
-        # OAuth gate: flag without a pool falls back to the API-key path).
-        self.use_codex_oauth = bool(use_codex_oauth and self.codex_account_pool)
-        self.codex_proxy_port = int(os.environ.get("WCB_CX_PROXY_PORT", "8770"))
-        self.codex_proxy_image = os.environ.get("DOCKER_IMAGE_CX_PROXY", "wildclawbench-cx-proxy:v1")
-        # The proxy runs as a CONTAINER on a shared docker network and is reached
-        # by container name (portable across Linux/macOS -- no host.docker.internal).
-        # An explicit WCB_CX_PROXY_URL still wins if set.
-        self._proxy_url_override = os.environ.get("WCB_CX_PROXY_URL", "").strip()
-        self.codex_proxy_url = ""  # resolved in _start_oauth_proxy
-        # Transient per-run state populated in run_task when OAuth is active.
-        self._oauth_proxy_container: str = ""
-        self._oauth_network: str = ""
-        self._oauth_ca_path: str = ""
-        self._oauth_pool_staging: str = ""
-
     @property
     def expects_gateway(self) -> bool:
         return False
@@ -156,133 +133,6 @@ class CodexAgent(BaseAgent):
     @property
     def transcript_container_path(self) -> str:
         return CODEX_SESSIONS_DIR
-
-    # ---- ChatGPT-plan OAuth proxy lifecycle (see src/utils/codex_oauth/) ----
-    def _ensure_cx_proxy_image(self) -> None:
-        r = subprocess.run(["docker", "image", "inspect", self.codex_proxy_image], capture_output=True)
-        if r.returncode == 0:
-            return
-        repo_root = Path(__file__).resolve().parents[3]
-        dockerfile = repo_root / "docker" / "cx-proxy" / "Dockerfile"
-        logger.info("[codex-oauth] building proxy image %s (first run)", self.codex_proxy_image)
-        b = subprocess.run(
-            ["docker", "build", "-t", self.codex_proxy_image, "-f", str(dockerfile), str(repo_root)],
-            capture_output=True, text=True,
-        )
-        if b.returncode != 0:
-            raise RuntimeError(f"Failed to build codex proxy image:\n{b.stderr[-1500:]}")
-
-    def _stage_pool_for_container(self) -> tuple[str, str, str]:
-        """Return (host_mount_dir, container_pool_spec, staging_dir_or_empty).
-
-        The proxy container reads the pool at ``/cx_pool``. If all pool files
-        share one host dir, mount it directly (so refreshed tokens persist back
-        to the real files). Otherwise stage read-only copies and warn.
-        """
-        paths = [Path(p.strip()).expanduser() for p in self.codex_account_pool.split(":") if p.strip()]
-        if not paths:
-            raise RuntimeError("WCB_CX_ACCOUNT_POOL resolves to no files")
-        parents = {p.parent for p in paths}
-        if len(parents) == 1:
-            host_dir = str(next(iter(parents)))
-            spec = ":".join(f"/cx_pool/{p.name}" for p in paths)
-            return host_dir, spec, ""
-        staging = tempfile.mkdtemp(prefix="cx-pool-")
-        container_paths = []
-        for i, p in enumerate(paths):
-            dest = Path(staging) / f"acct{i}_{p.name}"
-            shutil.copy2(p, dest)
-            os.chmod(dest, 0o600)
-            container_paths.append(f"/cx_pool/{dest.name}")
-        logger.warning("[codex-oauth] pool spans multiple dirs; staged copies (token refresh won't persist to originals)")
-        return staging, ":".join(container_paths), staging
-
-    def _start_oauth_proxy(self, task_id: str, output_dir: Path) -> None:
-        """Start the MITM proxy as a container on a shared network.
-
-        Portable across Linux/macOS: codex reaches the proxy by container name
-        (no host.docker.internal). The proxy mints an ephemeral CA and writes
-        only the public cert to a host-mounted dir for the harness to install.
-        """
-        from src.utils.docker_utils import _validate_docker_token
-
-        output_dir.mkdir(parents=True, exist_ok=True)
-        self._ensure_cx_proxy_image()
-        proxy_name = _validate_docker_token("proxy", f"wcb-cxp-{task_id}"[:60])
-        net_name = f"wcb-cxnet-{task_id}"[:60]
-        self._oauth_proxy_container = proxy_name
-        self._oauth_network = net_name
-        # Non-internal network: the proxy needs egress to chatgpt.com. codex
-        # reaches the proxy by name via docker's embedded DNS on this network.
-        subprocess.run(["docker", "network", "create", net_name], capture_output=True, text=True)
-
-        ca_dir = tempfile.mkdtemp(prefix="cx-ca-")
-        ca_path = str(Path(ca_dir) / "ca.pem")
-        self._oauth_ca_path = ca_path
-        pool_host_dir, container_pool_spec, staging = self._stage_pool_for_container()
-        self._oauth_pool_staging = staging
-
-        log_fh = open(output_dir / "codex_oauth_proxy.log", "w", encoding="utf-8")
-        self._oauth_proxy_log_fh = log_fh
-        cmd = [
-            "docker", "run", "-d", "--name", proxy_name, "--network", net_name,
-            "-v", f"{pool_host_dir}:/cx_pool",
-            "-v", f"{ca_dir}:/cx_ca",
-            "-e", f"WCB_CX_ACCOUNT_POOL={container_pool_spec}",
-            self.codex_proxy_image,
-            "--host", "0.0.0.0", "--port", str(self.codex_proxy_port),
-            "--pool", container_pool_spec, "--ca-out", "/cx_ca/ca.pem",
-        ]
-        log_fh.write("[codex-oauth] " + " ".join(cmd) + "\n")
-        log_fh.flush()
-        r = subprocess.run(cmd, capture_output=True, text=True)
-        if r.returncode != 0:
-            raise RuntimeError(f"codex OAuth proxy container start failed:\n{r.stderr}")
-
-        deadline = time.time() + 30
-        while time.time() < deadline:
-            alive = subprocess.run(
-                ["docker", "inspect", "-f", "{{.State.Running}}", proxy_name], capture_output=True, text=True
-            )
-            if alive.stdout.strip() != "true":
-                logs = subprocess.run(["docker", "logs", proxy_name], capture_output=True, text=True)
-                log_fh.write(logs.stdout + logs.stderr)
-                log_fh.flush()
-                raise RuntimeError(
-                    f"codex OAuth proxy container exited early; see {output_dir / 'codex_oauth_proxy.log'}"
-                )
-            if os.path.exists(ca_path) and os.path.getsize(ca_path) > 0:
-                self.codex_proxy_url = self._proxy_url_override or f"http://{proxy_name}:{self.codex_proxy_port}"
-                logger.info("[codex-oauth] proxy container ready at %s", self.codex_proxy_url)
-                return
-            time.sleep(0.3)
-        raise RuntimeError(
-            f"codex OAuth proxy did not become ready in 30s; see {output_dir / 'codex_oauth_proxy.log'}"
-        )
-
-    def _stop_oauth_proxy(self) -> None:
-        fh = getattr(self, "_oauth_proxy_log_fh", None)
-        if self._oauth_proxy_container:
-            logs = subprocess.run(["docker", "logs", self._oauth_proxy_container], capture_output=True, text=True)
-            if fh is not None:
-                fh.write(logs.stdout + logs.stderr)
-            subprocess.run(["docker", "rm", "-f", self._oauth_proxy_container], capture_output=True, text=True)
-            self._oauth_proxy_container = ""
-        if fh is not None:
-            try:
-                fh.close()
-            except OSError:
-                pass
-            self._oauth_proxy_log_fh = None
-        if self._oauth_network:
-            subprocess.run(["docker", "network", "rm", self._oauth_network], capture_output=True, text=True)
-            self._oauth_network = ""
-        if self._oauth_ca_path:
-            shutil.rmtree(str(Path(self._oauth_ca_path).parent), ignore_errors=True)
-            self._oauth_ca_path = ""
-        if self._oauth_pool_staging:
-            shutil.rmtree(self._oauth_pool_staging, ignore_errors=True)
-            self._oauth_pool_staging = ""
 
     def run_task(self, spec: AgentTaskSpec) -> AgentExecution:
         elapsed_time = float(spec.timeout_seconds)
@@ -297,17 +147,11 @@ class CodexAgent(BaseAgent):
 
         try:
             try:
-                if self.use_codex_oauth:
-                    write_execution_status(spec.output_dir, status="starting_oauth_proxy")
-                    self._start_oauth_proxy(task_id, spec.output_dir)
                 write_execution_status(spec.output_dir, status="starting_container")
                 self._start_container(task_id, spec.workspace_path, spec.task, spec.lobster)
                 write_execution_status(spec.output_dir, status="container_started")
                 write_execution_status(spec.output_dir, status="preparing_workspace")
                 self._prepare_workspace(task_id, spec.workspace_path)
-                if self.use_codex_oauth:
-                    write_execution_status(spec.output_dir, status="installing_oauth_auth")
-                    setup_codex_oauth(task_id, self._oauth_ca_path)
                 skills_text = spec.task.get("skills", "") if spec.task else ""
                 skills_path = spec.task.get("skills_path", "") if spec.task else ""
                 setup_skills(
@@ -412,11 +256,6 @@ class CodexAgent(BaseAgent):
                     agent_proc=None,
                 )
         finally:
-            if self.use_codex_oauth:
-                try:
-                    self._stop_oauth_proxy()
-                except Exception as exc:
-                    logger.warning("[%s] codex OAuth proxy shutdown failed: %s", task_id, exc)
             sanitize_agent_log(spec.output_dir / "agent.log")
             try:
                 self._install_openclaw_transcript_shim(task_id, spec.output_dir)
@@ -485,39 +324,21 @@ class CodexAgent(BaseAgent):
         )
         _validate_docker_token("task_id", task_id)
 
-        if self.use_codex_oauth:
-            # Route ALL codex traffic through the host MITM proxy (which swaps
-            # the stub Bearer for a pooled account) and trust its CA. No
-            # OpenRouter key on this path -- codex runs on the ChatGPT plan.
-            proxy_http = proxy_https = self.codex_proxy_url
-            no_proxy = "localhost,127.0.0.1,host.docker.internal"
-            env_map: dict[str, str] = {
-                "http_proxy": proxy_http,
-                "https_proxy": proxy_https,
-                "HTTP_PROXY": proxy_http,
-                "HTTPS_PROXY": proxy_https,
-                "no_proxy": no_proxy,
-                "NO_PROXY": no_proxy,
-                "SSL_CERT_FILE": "/etc/ssl/certs/ca-certificates.crt",
-                "SSL_CERT_DIR": "/etc/ssl/certs",
-                "BRAVE_API_KEY": os.environ.get("BRAVE_API_KEY", ""),
-            }
-        else:
-            proxy_http = os.environ.get("HTTP_PROXY_INNER", "").strip()
-            proxy_https = os.environ.get("HTTPS_PROXY_INNER", "").strip()
-            no_proxy = "" if not proxy_http else os.environ.get("NO_PROXY_INNER", "").strip()
-            env_map = {
-                "OPENROUTER_API_KEY": self.openrouter_api_key,
-                "OPENROUTER_BASE_URL": self.openrouter_base_url,
-                "OPENROUTER_IMAGE_MODEL": os.environ.get("OPENROUTER_IMAGE_MODEL", "").strip(),
-                "WILDCLAW_IMAGE_MODEL": os.environ.get("WILDCLAW_IMAGE_MODEL", "").strip(),
-                "BRAVE_API_KEY": os.environ.get("BRAVE_API_KEY", ""),
-                "http_proxy": proxy_http,
-                "https_proxy": proxy_https,
-                "HTTP_PROXY": proxy_http,
-                "HTTPS_PROXY": proxy_https,
-                "no_proxy": no_proxy,
-            }
+        proxy_http = os.environ.get("HTTP_PROXY_INNER", "").strip()
+        proxy_https = os.environ.get("HTTPS_PROXY_INNER", "").strip()
+        no_proxy = "" if not proxy_http else os.environ.get("NO_PROXY_INNER", "").strip()
+        env_map: dict[str, str] = {
+            "OPENROUTER_API_KEY": self.openrouter_api_key,
+            "OPENROUTER_BASE_URL": self.openrouter_base_url,
+            "OPENROUTER_IMAGE_MODEL": os.environ.get("OPENROUTER_IMAGE_MODEL", "").strip(),
+            "WILDCLAW_IMAGE_MODEL": os.environ.get("WILDCLAW_IMAGE_MODEL", "").strip(),
+            "BRAVE_API_KEY": os.environ.get("BRAVE_API_KEY", ""),
+            "http_proxy": proxy_http,
+            "https_proxy": proxy_https,
+            "HTTP_PROXY": proxy_http,
+            "HTTPS_PROXY": proxy_https,
+            "no_proxy": no_proxy,
+        }
 
         # Static env_map: pairs with truthy values only (preserves original semantic).
         env_pairs: list[tuple[str, str]] = [
@@ -551,21 +372,12 @@ class CodexAgent(BaseAgent):
         env_args = build_env_args(env_pairs)
         image = _validate_docker_token("image", self.image)
 
-        # OAuth mode: join the shared network so codex reaches the MITM proxy
-        # by container name (portable Linux/macOS -- no host.docker.internal).
-        network_args = (
-            ["--network", self._oauth_network]
-            if self.use_codex_oauth and self._oauth_network
-            else []
-        )
-
         cmd = [
             "docker",
             "run",
             "-d",
             "--name",
             task_id,
-            *network_args,
             *env_args,
             "-v",
             f"{exec_path}:/workspace:ro",
@@ -696,8 +508,6 @@ class CodexAgent(BaseAgent):
         reasoning_effort: str | None,
         wire_api: str | None,
     ) -> str:
-        if self.use_codex_oauth:
-            return self._render_codex_oauth_config(model, reasoning_effort)
         bare_model = model.split("/", 1)[1] if model.startswith("openrouter/") else model
         safe_base_url = self.openrouter_base_url.replace('"', '\\"')
         reasoning_line = (
@@ -722,31 +532,6 @@ class CodexAgent(BaseAgent):
             f'env_key = "OPENROUTER_API_KEY"\n'
             f"{provider_wire_api_line}"
         )
-
-    def _render_codex_oauth_config(
-        self, model: str, reasoning_effort: str | None
-    ) -> str:
-        """config.toml for the ChatGPT-plan OAuth path.
-
-        No custom provider block: codex uses its builtin ChatGPT auth (the stub
-        auth.json + real tokens injected by the MITM proxy). ``cli_auth_credentials_store
-        = "file"`` keeps codex from deleting auth.json via the OS keyring. The
-        served model is codex's ChatGPT default unless ``WCB_CX_MODEL`` overrides.
-        """
-        lines = [
-            'forced_login_method = "chatgpt"',
-            'cli_auth_credentials_store = "file"',
-            'approval_policy = "never"',
-            'sandbox_mode = "danger-full-access"',
-            'model_reasoning_summary = "none"',
-            'hide_agent_reasoning = true',
-        ]
-        cx_model = os.environ.get("WCB_CX_MODEL", "").strip()
-        if cx_model:
-            lines.insert(0, f'model = "{cx_model}"')
-        if reasoning_effort:
-            lines.append(f'model_reasoning_effort = "{reasoning_effort}"')
-        return "\n".join(lines) + "\n"
 
     def _install_image_helper(self, task_id: str, model: str) -> None:
         """Install a recoverable OpenRouter chat-completions image helper.
