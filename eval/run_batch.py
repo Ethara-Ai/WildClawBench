@@ -60,15 +60,18 @@ from src.utils.skills_inference import (
 from src.utils.testgen import generate_task_tests
 from src.utils.litellm_sidecar import (
     CC_BRIDGE_INTERNAL_PORT,
+    CODEX_BRIDGE_INTERNAL_PORT,
     build_litellm_config_yaml,
     create_network,
     ensure_litellm_headroom_image,
     pull_litellm_image,
     remove_network,
     start_bridge,
+    start_codex_bridge,
     start_litellm,
     stop_bridge,
     wait_for_bridge_healthy,
+    wait_for_codex_bridge_healthy,
     stop_litellm,
     verify_litellm_upstream_reachable,
     wait_for_litellm_healthy,
@@ -2383,6 +2386,27 @@ def run_single_task(
 LITELLM_MODEL_IDS = {"claude-opus-4.8", "claude-opus-4.7", "claude-fable-5", "gpt-5.5"}
 
 
+def _codex_oauth_enabled(args) -> bool:
+    """Whether gpt-5.6 traffic should route through the ChatGPT/Codex
+    subscription bridge (``--use-codex-oauth`` or ``WCB_USE_CODEX_OAUTH=1``)."""
+    if getattr(args, "use_codex_oauth", None):
+        return True
+    return os.environ.get("WCB_USE_CODEX_OAUTH", "").strip().lower() in (
+        "1", "true", "yes", "on",
+    )
+
+
+def _codex_model() -> str:
+    """The sidecar model id exposed for the Codex subscription path.
+
+    Defaults to ``gpt-5.6-sol`` — the ChatGPT/Codex backend rejects the bare
+    ``gpt-5.6`` ("model is not supported"); the real GPT-5.6 family it serves is
+    the -luna/-sol/-terra variants (see ``~/.codex/models_cache.json`` for the
+    exact set on your subscription). Override via ``WCB_CODEX_MODEL`` and run
+    ``--model <that-id>`` to match."""
+    return os.environ.get("WCB_CODEX_MODEL", "").strip() or "gpt-5.6-sol"
+
+
 def _run_cleanups(cleanups: list) -> None:
     """Run registered teardown callables in reverse order, swallowing errors."""
     for fn in reversed(cleanups):
@@ -2451,6 +2475,21 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
             cc_bridge_name = f"wcbsh-cc-bridge-{batch_id}"
             cc_bridge_url = f"http://{cc_bridge_name}:{CC_BRIDGE_INTERNAL_PORT}"
 
+    # OpenAI Codex (ChatGPT subscription) bridge — sibling of the cc-bridge
+    # above, fronting gpt-5.6 with a subscription instead of a metered key.
+    use_codex_oauth = _codex_oauth_enabled(args)
+    codex_model = _codex_model()
+    codex_bridge_name = ""
+    codex_bridge_url = ""
+    if use_codex_oauth:
+        if shared_mode:
+            raise RuntimeError(
+                "codex-oauth (gpt-5.6 subscription) is not supported in shared-infra "
+                "mode; run without WCB_SHARED_* so this process owns the sidecar."
+            )
+        codex_bridge_name = f"wcbsh-codex-bridge-{batch_id}"
+        codex_bridge_url = f"http://{codex_bridge_name}:{CODEX_BRIDGE_INTERNAL_PORT}"
+
     _agent_headroom = (os.environ.get("KENSEI_AGENT_HEADROOM_ENABLED", "").strip().lower()
                        in ("1", "true", "yes", "on"))
     # Live-stream observability gate (STREAMING_IMPLEMENTATION_GUIDE §2/§7).
@@ -2471,6 +2510,8 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
         anthropic_api_key=config.anthropic_api_key,
         use_claude_oauth=use_oauth,
         bridge_url=cc_bridge_url,
+        codex_bridge_url=codex_bridge_url,
+        codex_model=codex_model,
         enable_oauth_usage_callback=use_oauth,
         meta_api_key=config.meta_api_key,
         meta_base_url=config.meta_base_url,
@@ -2567,6 +2608,36 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
                 f"cc-bridge {cc_bridge_name} did not become healthy in time. "
                 f"Override budget via WCB_CC_BRIDGE_HEALTH_TIMEOUT env (seconds)."
             )
+
+    if use_codex_oauth:
+        # Bring up the Codex subscription bridge before the sidecar so the shared
+        # secret is in this process's env when start_litellm copies it into the
+        # sidecar (the gpt-5.6 block reads os.environ/WCB_CODEX_BRIDGE_SECRET).
+        auth_dir = (
+            os.environ.get("WCB_CODEX_AUTH_DIR", "").strip()
+            or os.path.expanduser("~/.codex")
+        )
+        codex_secret = os.environ.get("WCB_CODEX_BRIDGE_SECRET", "").strip()
+        if not codex_secret:
+            import secrets as _secrets
+            codex_secret = _secrets.token_hex(32)
+            os.environ["WCB_CODEX_BRIDGE_SECRET"] = codex_secret
+        start_codex_bridge(
+            container_name=codex_bridge_name,
+            network=network,
+            auth_host_dir=auth_dir,
+            bridge_secret=codex_secret,
+            codex_model_override=os.environ.get("KAIJU_CODEX_MODEL", "").strip(),
+        )
+        cleanups.append(lambda: stop_bridge(codex_bridge_name))
+        if not wait_for_codex_bridge_healthy(codex_bridge_name):
+            raise RuntimeError(
+                f"codex-bridge {codex_bridge_name} did not become healthy. Ensure "
+                "`codex login` has been run so ~/.codex/auth.json is present and "
+                "unexpired (or set WCB_CODEX_AUTH_DIR). Override budget via "
+                "WCB_CODEX_BRIDGE_HEALTH_TIMEOUT env (seconds)."
+            )
+
     config.work_dir.mkdir(parents=True, exist_ok=True)
     if shared_mode and shared_yaml_path and Path(shared_yaml_path).is_file():
         cfg_path = Path(shared_yaml_path)
@@ -2666,7 +2737,11 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
                 f"Override budget via KENSEI_LITELLM_HEALTH_TIMEOUT env (seconds)."
             )
         probe_model = (
-            "claude-opus-4.7" if (config.aws_bearer_token and config.bedrock_inference_arn) or config.anthropic_api_key
+            # For a codex-oauth run the agent LLM is gpt-5.6 through the codex
+            # bridge, so validate THAT path end-to-end here rather than probing an
+            # unrelated Bedrock/OpenAI upstream the agent won't use.
+            codex_model if use_codex_oauth
+            else "claude-opus-4.7" if (config.aws_bearer_token and config.bedrock_inference_arn) or config.anthropic_api_key
             else "gpt-5.5" if config.openai_api_key
             else config.meta_model if (config.meta_api_key and config.meta_model)
             else ""
@@ -3112,6 +3187,10 @@ def _run_main_body(args) -> None:
     sidecar_model_ids = set(LITELLM_MODEL_IDS)
     if config.meta_api_key and config.meta_model:
         sidecar_model_ids.add(config.meta_model)
+    if _codex_oauth_enabled(args):
+        # gpt-5.6 is registered dynamically by the codex-oauth path; recognize it
+        # so it isn't swapped out by the not-a-sidecar-model fallback below.
+        sidecar_model_ids.add(_codex_model())
     effective_model = args.model
     if use_litellm and args.model not in sidecar_model_ids and not args.model.startswith("litellm/"):
         # Pick a default that is actually REGISTERED in the sidecar. The historic

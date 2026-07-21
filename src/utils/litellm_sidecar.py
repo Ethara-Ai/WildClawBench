@@ -34,6 +34,8 @@ def build_litellm_config_yaml(
     anthropic_api_key: str = "",
     use_claude_oauth: bool = False,
     bridge_url: str = "",
+    codex_bridge_url: str = "",
+    codex_model: str = "gpt-5.6",
     enable_oauth_usage_callback: bool = False,
     meta_api_key: str = "",
     meta_base_url: str = "https://api.ai.meta.com/v1",
@@ -325,6 +327,48 @@ def build_litellm_config_yaml(
                 "      model: openai/whisper-1\n"
                 f"      api_key: {whisper_env_ref}"
             )
+    if codex_bridge_url:
+        # ---------------------------------------------------------------
+        # OpenAI Codex (ChatGPT/Codex subscription) trajectory path.
+        #
+        # Sibling of the use_claude_oauth branch above: instead of a metered
+        # OpenAI API key, gpt-5.6 traffic is fronted by the
+        # wcbsh-codex-bridge-<suffix> sidecar (src/utils/codex_oauth). That
+        # bridge swaps the stub Bearer for a live ChatGPT OAuth token (from
+        # ~/.codex/auth.json, written by `codex login`), injects the codex_cli_rs
+        # headers, and forwards to https://chatgpt.com/backend-api/codex/responses
+        # under the subscription — so a flat monthly fee replaces per-token cost.
+        #
+        # `openai/responses/` prefix: routes every call through /v1/responses
+        # (same rationale as the gpt-5.5 block above), which the bridge serves
+        # natively and proxies to the codex backend. api_base carries the `/v1`
+        # suffix so the request lands on the bridge's /v1/responses route.
+        #
+        # reasoning_effort uses the plain STRING form ("high"), NOT the
+        # {effort,summary:auto} dict the metered gpt-5.5 block uses. The Codex
+        # subscription backend runs with reasoning SUMMARIES OFF (cf. the codex
+        # agent runner: model_reasoning_summary="none"), so requesting
+        # summary:auto risks a 400; the string form asks for high effort without
+        # a summary dependency. Tune here if a run needs a different effort.
+        #
+        # api_key is the shared bridge secret (WCB_CODEX_BRIDGE_SECRET, injected
+        # into this sidecar's env by start_litellm). The bridge validates it with
+        # hmac.compare_digest; a missing/mismatched value → 401.
+        #
+        # cost_per_token = 0: the subscription is prepaid, so per-request cost is
+        # zero (mirrors the use_claude_oauth block's cost policy).
+        model_blocks.append(
+            f"  - model_name: {codex_model}\n"
+            "    litellm_params:\n"
+            f"      model: openai/responses/{codex_model}\n"
+            f"      api_base: {codex_bridge_url}/v1\n"
+            "      api_key: os.environ/WCB_CODEX_BRIDGE_SECRET\n"
+            "      reasoning_effort: \"high\"\n"
+            "      stream_options:\n"
+            "        include_usage: true\n"
+            "      input_cost_per_token: 0\n"
+            "      output_cost_per_token: 0"
+        )
     if meta_api_key and meta_model:
         # First-party vendor model exposed through the sidecar as an
         # OpenAI-compatible upstream. LiteLLM reaches it via the `openai/`
@@ -718,6 +762,12 @@ def start_litellm(
         env_pairs.append(("WCB_CC_BRIDGE_SECRET", _cc_secret))
     _cc_stub = os.environ.get("WCB_CC_STUB_KEY", "").strip() or "sk-wcb-oauth-stub"
     env_pairs.append(("WCB_CC_STUB_KEY", _cc_stub))
+    # Codex subscription bridge secret: read by the gpt-5.6 model block via
+    # `api_key: os.environ/WCB_CODEX_BRIDGE_SECRET`. Only present when the
+    # codex-oauth path is active; otherwise this env var is simply absent.
+    _codex_secret = os.environ.get("WCB_CODEX_BRIDGE_SECRET", "").strip()
+    if _codex_secret:
+        env_pairs.append(("WCB_CODEX_BRIDGE_SECRET", _codex_secret))
     # First-party vendor key: read by the vendor model block via
     # `api_key: os.environ/ONEP_API_KEY`.
     if meta_api_key:
@@ -1140,3 +1190,179 @@ def wait_for_bridge_host_port(host_port: str, timeout: float = 15.0) -> bool:
 
 def stop_bridge(container_name: str) -> None:
     subprocess.run(["docker", "rm", "-f", container_name], capture_output=True)
+
+
+# ---------------------------------------------------------------------------
+# OpenAI Codex (ChatGPT/Codex subscription) bridge.
+#
+# Direct sibling of the cc-bridge above: a container on the sidecar network that
+# fronts gpt-5.6 traffic with a ChatGPT/Codex subscription (OAuth from
+# ~/.codex/auth.json) instead of a metered OpenAI key. LiteLLM routes the
+# gpt-5.6 model at http://<name>:8788/v1; the bridge injects the codex_cli_rs
+# headers + OAuth Bearer and forwards to chatgpt.com/backend-api/codex/responses.
+# The bridge code lives at src/utils/codex_oauth (packaged as top-level
+# `codex_oauth` in the image). See docs/OPENAI_CODEX_SUBSCRIPTION.md.
+# ---------------------------------------------------------------------------
+CODEX_BRIDGE_IMAGE = "wildclawbench-codex-bridge:v1"
+CODEX_BRIDGE_INTERNAL_PORT = 8788
+
+
+def ensure_codex_bridge_image(image: str = CODEX_BRIDGE_IMAGE) -> None:
+    if _image_present_locally(image):
+        return
+    repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    dockerfile = os.path.join(repo_root, "docker", "codex-bridge", "Dockerfile")
+    if not os.path.isfile(dockerfile):
+        raise RuntimeError(
+            f"codex-bridge image {image} not present locally and Dockerfile missing at {dockerfile}. "
+            f"Build manually: docker build -t {image} -f {dockerfile} {repo_root}"
+        )
+    logger.info("Building codex-bridge image %s", image)
+    r = subprocess.run(
+        ["docker", "build", "-t", image, "-f", dockerfile, repo_root],
+        capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        raise RuntimeError(
+            f"codex-bridge image build failed:\n{r.stderr}\n"
+            f"Manual: docker build -t {image} -f {dockerfile} {repo_root}"
+        )
+    logger.info("codex-bridge image %s built", image)
+
+
+def start_codex_bridge(
+    container_name: str,
+    network: str,
+    auth_host_dir: str,
+    bridge_secret: str,
+    port: int = CODEX_BRIDGE_INTERNAL_PORT,
+    image: str = CODEX_BRIDGE_IMAGE,
+    codex_model_override: str = "",
+) -> None:
+    """Start the Codex subscription bridge container on ``network``.
+
+    ``auth_host_dir`` is the host directory holding ``auth.json`` (normally
+    ``~/.codex``); it is mounted read-write at ``/root/.codex`` so the bridge
+    reads the OAuth token and can persist a refreshed one. The container is
+    dual-homed (sidecar network + default bridge) so it can egress to
+    chatgpt.com / auth.openai.com. ``bridge_secret`` gates every request
+    (co-tenant threat): LiteLLM must present it as the Bearer api_key.
+    """
+    from src.utils.docker_utils import (
+        build_env_args,
+        _validate_docker_token,
+    )
+    _validate_docker_token("container_name", container_name)
+    _validate_docker_token("network", network)
+    if not auth_host_dir or not os.path.isdir(auth_host_dir):
+        raise RuntimeError(
+            f"start_codex_bridge: auth_host_dir must exist ({auth_host_dir!r}). "
+            "Run `codex login` so ~/.codex/auth.json exists, or set WCB_CODEX_AUTH_DIR."
+        )
+    if not os.path.isfile(os.path.join(auth_host_dir, "auth.json")):
+        raise RuntimeError(
+            f"start_codex_bridge: no auth.json under {auth_host_dir!r}. Run `codex login`."
+        )
+    if not bridge_secret:
+        raise RuntimeError("start_codex_bridge: bridge_secret required (co-tenant threat)")
+
+    env_pairs: list[tuple[str, str]] = [
+        ("KAIJU_CODEX_BRIDGE_SECRET", bridge_secret),
+    ]
+    if codex_model_override:
+        # Pin the upstream model the codex backend receives (the bridge otherwise
+        # forwards whatever LiteLLM sent, minus any trailing date snapshot).
+        env_pairs.append(("KAIJU_CODEX_MODEL", codex_model_override))
+    # Pass-through tunables (account pool, upstream override, keep-alive, etc.).
+    for _k in (
+        "KAIJU_CODEX_ACCOUNT_POOL",
+        "KAIJU_CODEX_UPSTREAM",
+        "KAIJU_CODEX_USER_AGENT",
+        "KAIJU_CODEX_KEEPALIVE_SEC",
+        "KAIJU_CODEX_MAX_INLINE_RETRIES",
+        "KAIJU_CODEX_STRIP_PARAMS",
+        "KAIJU_CODEX_CLIENT_ID",
+    ):
+        _v = os.environ.get(_k)
+        if _v:
+            env_pairs.append((_k, _v))
+    env_args = build_env_args(env_pairs)
+    image = _validate_docker_token("codex-bridge image", image)
+
+    ensure_codex_bridge_image(image)
+
+    cmd = [
+        "docker", "run", "-d",
+        "--name", container_name,
+        "--network", network,
+        *env_args,
+        "-v", f"{auth_host_dir}:/root/.codex:rw",
+        image,
+        "--host", "0.0.0.0",
+        "--port", str(port),
+    ]
+    logger.info(
+        "[%s] Starting codex-bridge on network %s (image=%s auth_dir=%s)",
+        container_name, network, image, auth_host_dir,
+    )
+    subprocess.run(["docker", "rm", "-f", container_name], capture_output=True)
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError(f"codex-bridge container start failed:\n{r.stderr}")
+    # Dual-home to the default bridge for chatgpt.com / auth.openai.com egress
+    # (the sidecar network is --internal / no egress). Idempotent.
+    connect_default_bridge(container_name)
+    logger.info(
+        "[%s] codex-bridge dual-homed (internal + default bridge for chatgpt.com egress)",
+        container_name,
+    )
+
+
+def wait_for_codex_bridge_healthy(
+    container_name: str,
+    port: int = CODEX_BRIDGE_INTERNAL_PORT,
+    timeout: float | None = None,
+) -> bool:
+    """Poll the bridge's /healthz from INSIDE the container until it reports 200.
+
+    A 503 means the bridge is up but has no valid subscription credentials
+    (``codex login`` not run / expired token); we surface that fast via the
+    probe's distinct exit code so the caller can give a precise error.
+    """
+    if timeout is None:
+        try:
+            timeout = float(os.environ.get("WCB_CODEX_BRIDGE_HEALTH_TIMEOUT", "60"))
+        except ValueError:
+            timeout = 60.0
+    # exit 0 = healthy (200); exit 42 = up-but-no-creds (503); else not ready.
+    probe = (
+        "import sys,urllib.request,urllib.error\n"
+        f"try:\n"
+        f"    urllib.request.urlopen('http://localhost:{port}/healthz', timeout=2); sys.exit(0)\n"
+        "except urllib.error.HTTPError as e:\n"
+        "    sys.exit(42 if e.code==503 else 1)\n"
+        "except Exception:\n"
+        "    sys.exit(1)\n"
+    )
+    deadline = time.time() + timeout
+    interval = 1.5
+    while time.time() < deadline:
+        r = subprocess.run(
+            ["docker", "exec", container_name, "python3", "-c", probe],
+            capture_output=True,
+        )
+        if r.returncode == 0:
+            logger.info("[%s] codex-bridge healthy", container_name)
+            return True
+        if r.returncode == 42:
+            logger.error(
+                "[%s] codex-bridge is up but has NO valid subscription credentials. "
+                "Run `codex login` (ChatGPT account) so ~/.codex/auth.json is present "
+                "and unexpired, then retry.", container_name,
+            )
+            return False
+        time.sleep(interval)
+    logger.warning(
+        "[%s] codex-bridge did not become healthy within %.0fs", container_name, timeout
+    )
+    return False
