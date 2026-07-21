@@ -586,6 +586,8 @@ def test_proxy_handler_instance_is_usage_writer():
 @pytest.mark.parametrize("model,expected", [
     ("anthropic/claude-opus-4-5", True),
     ("bedrock/claude-OPUS-4-6", True),  # case-insensitive
+    ("claude-fable-5", True),
+    ("anthropic/claude-FABLE-5", True),  # case-insensitive
     ("claude-sonnet-4-5", False),
     ("gpt-5.5", False),
     ("", False),
@@ -593,6 +595,15 @@ def test_proxy_handler_instance_is_usage_writer():
 ])
 def test_is_oauth_route(model, expected):
     assert oc._is_oauth_route(model) is expected
+
+
+def test_bedrock_equivalent_cost_uses_fable_rates_for_fable():
+    # 1M uncached input tokens: $10 on fable rates vs $5 on opus rates.
+    assert oc._bedrock_equivalent_cost(1_000_000, 0, 0, 0, model="claude-fable-5") == pytest.approx(10.0)
+    assert oc._bedrock_equivalent_cost(0, 1_000_000, 0, 0, model="anthropic/claude-fable-5") == pytest.approx(50.0)
+    # Default/opus path unchanged.
+    assert oc._bedrock_equivalent_cost(1_000_000, 0, 0, 0) == pytest.approx(5.0)
+    assert oc._bedrock_equivalent_cost(1_000_000, 0, 0, 0, model="claude-opus-4-8") == pytest.approx(5.0)
 
 
 # ============================================================================

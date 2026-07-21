@@ -449,6 +449,28 @@ def normalize_body_for_anthropic_direct(body: dict[str, Any]) -> dict[str, Any]:
         return body
     if "output_config" in body:
         body.pop("output_config", None)
+    model = body.get("model")
+    if isinstance(model, str) and "fable" in model.lower():
+        # Claude Fable 5: thinking is ALWAYS ON upstream and only the adaptive
+        # shape is accepted -- both {type:enabled,budget_tokens} (the opus
+        # rewrite below) and {type:disabled} return 400 on api.anthropic.com.
+        # Rewrite any caller-supplied shape to adaptive, preserving/defaulting
+        # `display` so reasoning text stays readable (same rationale as the
+        # opus display note below). When the field is ABSENT (openclaw's
+        # thinking allowlist doesn't recognize fable, so it emits no
+        # directive), inject adaptive+summarized: fable thinks regardless,
+        # but display defaults to "omitted" upstream and the recorded
+        # thinking text would be EMPTY -- the same failure the opus display
+        # fix below solves.
+        thinking = body.get("thinking")
+        if isinstance(thinking, dict):
+            display = thinking.get("display")
+            if display not in ("summarized", "omitted"):
+                display = "summarized"
+            body["thinking"] = {"type": "adaptive", "display": display}
+        else:
+            body["thinking"] = {"type": "adaptive", "display": "summarized"}
+        return body
     thinking = body.get("thinking")
     if isinstance(thinking, dict):
         ttype = thinking.get("type")
@@ -554,9 +576,12 @@ def _apply_classification_to_provider(
     provider we just ``force_reload`` on a token-invalid signal so the next
     request re-fetches from Keychain (in case the ``claude`` CLI rotated it).
     """
-    # Pass the FULL token so the provider can attribute the error to the exact
-    # slot that produced it (it matches on slot.last_token); a 20-char prefix is
-    # ambiguous because all OAuth tokens share the `sk-ant-oat01-` prefix.
+    # Pass the FULL token: the pool matches it against each provider's
+    # recent-token history (knows_token), which still attributes correctly when
+    # a refresh rotated the slot's current token between this request being
+    # issued and its error arriving. Prefix-matching the slot's CURRENT token
+    # is only the fallback -- a 20-char prefix is ambiguous because all OAuth
+    # tokens share the `sk-ant-oat01-` literal.
     # B5: stash the cap reset on the provider so /quota can surface it even for a
     # SINGLE account (whose /quota otherwise always reports next_reset_at=None,
     # forcing recovery to a 300s guess and premature give-up against a 5h cap).

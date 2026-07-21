@@ -108,6 +108,30 @@ def build_litellm_config_yaml(
         )
         model_blocks.append("  - model_name: claude-opus-4.7\n" + opus_oauth_params)
         model_blocks.append("  - model_name: claude-opus-4-6\n" + opus_oauth_params)
+        # Claude Fable 5 on the same bridge route. Deliberately NO `thinking`
+        # directive here: fable's thinking is always-on adaptive upstream, and
+        # the opus enabled+budget_tokens shape 400s on it. Whatever thinking
+        # shape the agent sends passes through LiteLLM and is normalized to
+        # {type:adaptive, display:summarized} by the bridge
+        # (normalize_body_for_anthropic_direct fable branch). Zero-cost params
+        # for the same subscription-billing reason as opus; the audit-trail
+        # pricing lives in litellm_usage_oauth_callback.py.
+        fable_oauth_params = (
+            "    litellm_params:\n"
+            "      model: anthropic/claude-fable-5\n"
+            f"      api_base: {bridge_url}\n"
+            "      api_key: os.environ/WCB_CC_STUB_KEY\n"
+            "      stream_options:\n"
+            "        include_usage: true\n"
+            "      extra_headers:\n"
+            "        x-wcb-bridge-secret: os.environ/WCB_CC_BRIDGE_SECRET\n"
+            + cache_marker
+            + "      input_cost_per_token: 0\n"
+            "      output_cost_per_token: 0\n"
+            "      cache_read_input_token_cost: 0\n"
+            "      cache_creation_input_token_cost: 0"
+        )
+        model_blocks.append("  - model_name: claude-fable-5\n" + fable_oauth_params)
     elif bedrock_arn:
         # Extended-thinking visibility on opus-4-6/4-7 via Bedrock Converse needs the
         # EXACT pair thinking:{type:adaptive} + output_config:{effort}. Three shapes

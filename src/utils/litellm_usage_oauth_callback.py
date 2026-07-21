@@ -56,6 +56,15 @@ _ANTHROPIC_OPUS_PRICE = {
     "cache_creation": 6.25e-6,
 }
 
+# Claude Fable 5 public rates ($10/$50 per MTok; cache read 0.1x input, cache
+# write 1.25x input at the default 5-minute TTL).
+_ANTHROPIC_FABLE_PRICE = {
+    "input": 1e-5,
+    "output": 5e-5,
+    "cache_read": 1e-6,
+    "cache_creation": 1.25e-5,
+}
+
 
 def _int(value: Any, default: int = 0) -> int:
     try:
@@ -87,7 +96,14 @@ def _usage_to_dict(usage: Any) -> dict[str, Any]:
 def _is_oauth_route(model: str) -> bool:
     if not model:
         return False
-    return "opus" in model.lower()
+    m = model.lower()
+    return "opus" in m or "fable" in m
+
+
+def _price_table(model: str) -> dict[str, float]:
+    if "fable" in (model or "").lower():
+        return _ANTHROPIC_FABLE_PRICE
+    return _ANTHROPIC_OPUS_PRICE
 
 
 def _bedrock_equivalent_cost(
@@ -95,12 +111,14 @@ def _bedrock_equivalent_cost(
     output_tokens: int,
     cache_read: int,
     cache_write: int,
+    model: str = "",
 ) -> float:
+    price = _price_table(model)
     return (
-        input_tokens * _ANTHROPIC_OPUS_PRICE["input"]
-        + output_tokens * _ANTHROPIC_OPUS_PRICE["output"]
-        + cache_read * _ANTHROPIC_OPUS_PRICE["cache_read"]
-        + cache_write * _ANTHROPIC_OPUS_PRICE["cache_creation"]
+        input_tokens * price["input"]
+        + output_tokens * price["output"]
+        + cache_read * price["cache_read"]
+        + cache_write * price["cache_creation"]
     )
 
 
@@ -131,7 +149,9 @@ def _write_row(kwargs: dict, response_obj: Any, start_time: Any, end_time: Any) 
             non_cached = 0
         input_tokens = non_cached
 
-        cost_equiv = _bedrock_equivalent_cost(input_tokens, output_tokens, cache_read, cache_write)
+        cost_equiv = _bedrock_equivalent_cost(
+            input_tokens, output_tokens, cache_read, cache_write, model=model
+        )
 
         duration = 0.0
         try:

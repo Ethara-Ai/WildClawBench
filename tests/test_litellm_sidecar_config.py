@@ -239,6 +239,37 @@ class TestOAuthBranch:
         assert p["cache_read_input_token_cost"] == 0
         assert p["cache_creation_input_token_cost"] == 0
 
+    def test_oauth_fable_block_registered(self):
+        doc = _parse(
+            sidecar.build_litellm_config_yaml(
+                use_claude_oauth=True, bridge_url="http://bridge:8765"
+            )
+        )
+        p = _params(doc, "claude-fable-5")
+        assert p["model"] == "anthropic/claude-fable-5"
+        assert p["api_base"] == "http://bridge:8765"
+        assert p["api_key"] == "os.environ/WCB_CC_STUB_KEY"
+        assert p["extra_headers"] == {
+            "x-wcb-bridge-secret": "os.environ/WCB_CC_BRIDGE_SECRET"
+        }
+        assert p["input_cost_per_token"] == 0
+        assert p["output_cost_per_token"] == 0
+
+    def test_oauth_fable_block_has_no_thinking_directive(self):
+        # Fable's thinking is always-on adaptive upstream; the opus
+        # enabled+budget_tokens shape 400s on it. The block must NOT pin a
+        # thinking shape — the bridge normalizes whatever the agent sends.
+        doc = _parse(
+            sidecar.build_litellm_config_yaml(
+                use_claude_oauth=True, bridge_url="http://b"
+            )
+        )
+        assert "thinking" not in _params(doc, "claude-fable-5")
+
+    def test_oauth_fable_absent_without_oauth(self):
+        doc = _parse(sidecar.build_litellm_config_yaml(bedrock_arn="arn:x"))
+        assert "claude-fable-5" not in _model_names(doc)
+
     def test_oauth_beats_bedrock_when_both_present(self):
         # use_claude_oauth+bridge_url is the FIRST branch; Bedrock ARN present
         # simultaneously must NOT win.

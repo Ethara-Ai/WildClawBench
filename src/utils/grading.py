@@ -1711,6 +1711,7 @@ _MODEL_COST_PER_TOKEN: dict[str, tuple[float, float]] = {
     "gpt-4o":             (0.0000025, 0.00001),
     "claude-opus-4.7":    (0.000005,  0.000025),
     "claude-sonnet-4.6":  (0.000003,  0.000015),
+    "claude-fable-5":     (0.00001,   0.00005),
 }
 
 

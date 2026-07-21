@@ -13,6 +13,7 @@ from src.utils.claude_oauth.bridge import (
     SYSTEM_PREFIX,
     TOOL_NAME_PREFIX,
     apply_billing_attribution,
+    normalize_body_for_anthropic_direct,
     rename_tools_outbound,
     strip_tool_prefix_bytes,
     _build_forward_headers,
@@ -288,3 +289,46 @@ def test_strip_tool_prefix_bytes_untouched_when_no_prefix():
     raw = b'{"content":[{"type":"text","text":"just text"}]}'
     assert strip_tool_prefix_bytes(raw) == raw
     assert strip_tool_prefix_bytes(b"") == b""
+
+
+# ---------------------------------------------------------------------------
+# normalize_body_for_anthropic_direct — fable branch
+# ---------------------------------------------------------------------------
+
+
+def test_normalize_fable_rewrites_adaptive_with_display():
+    body = {"model": "claude-fable-5", "thinking": {"type": "adaptive"},
+            "output_config": {"effort": "high"}, "messages": []}
+    out = normalize_body_for_anthropic_direct(body)
+    assert out["thinking"] == {"type": "adaptive", "display": "summarized"}
+    assert "output_config" not in out
+
+
+def test_normalize_fable_strips_budget_tokens_shape():
+    # The opus fixed-budget rewrite 400s on fable; any enabled+budget shape
+    # must come out as adaptive.
+    body = {"model": "anthropic/claude-fable-5",
+            "thinking": {"type": "enabled", "budget_tokens": 32000}, "messages": []}
+    out = normalize_body_for_anthropic_direct(body)
+    assert out["thinking"] == {"type": "adaptive", "display": "summarized"}
+
+
+def test_normalize_fable_preserves_omitted_display_and_injects_when_absent():
+    body = {"model": "claude-fable-5",
+            "thinking": {"type": "adaptive", "display": "omitted"}, "messages": []}
+    assert normalize_body_for_anthropic_direct(body)["thinking"] == {
+        "type": "adaptive", "display": "omitted"}
+    # Absent thinking gets adaptive+summarized injected: openclaw's allowlist
+    # doesn't recognize fable so it sends no directive, and fable's upstream
+    # display default ("omitted") would record EMPTY thinking text.
+    body2 = {"model": "claude-fable-5", "messages": []}
+    assert normalize_body_for_anthropic_direct(body2)["thinking"] == {
+        "type": "adaptive", "display": "summarized"}
+
+
+def test_normalize_opus_path_unchanged_by_fable_branch():
+    body = {"model": "claude-opus-4-8",
+            "thinking": {"type": "adaptive", "budget_tokens": 1000}, "messages": []}
+    out = normalize_body_for_anthropic_direct(body)
+    assert out["thinking"] == {"type": "enabled", "budget_tokens": 1000,
+                               "display": "summarized"}

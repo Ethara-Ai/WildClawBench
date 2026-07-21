@@ -919,7 +919,17 @@ class OpenClawAgent(BaseAgent):
             # via LiteLLM (litellm_sidecar.py routes both names to the same
             # bedrock/converse ARN). self.model_id stays "claude-opus-4.7" so the
             # output dir + usage threading are unaffected.
-            openclaw_model_id = "claude-opus-4-6" if is_anthropic_model else model_id
+            # claude-fable-5 is EXEMPT from the dash-shim rewrite: the rewrite
+            # exists solely so openclaw's hardcoded thinking allowlist emits a
+            # thinking directive, but fable's thinking is always-on server-side
+            # (the bridge injects adaptive+summarized when the field is absent
+            # -- see normalize_body_for_anthropic_direct). Rewriting fable to
+            # claude-opus-4-6 would route it to the OPUS sidecar block and
+            # silently run the wrong model.
+            if is_anthropic_model and "fable" not in model_id.lower():
+                openclaw_model_id = "claude-opus-4-6"
+            else:
+                openclaw_model_id = model_id
             # openclaw 2026.3.11 gates thinking-capability on the PROVIDER KEY too,
             # not only the model id. supportsXHighThinking does an exact Set.has on
             # `${provider}/${model}` and XHIGH_MODEL_SET contains only `anthropic/...`
