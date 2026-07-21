@@ -1,0 +1,111 @@
+id,name,parent_id,owner_id,description,created_at,modified_at,item_count
+folder-appeals-2026,Insurance Appeals 2026,0,box-greg,Appeal attachments for 2026.,2026-01-05,2026-11-12,2
+folder-100,Folder 0,0,box-greg,Misc.,2025-01-01,2026-06-01,26
+folder-101,Folder 1,0,box-greg,Misc.,2025-01-01,2026-06-01,47
+folder-102,Folder 2,0,box-greg,Misc.,2025-01-01,2026-06-01,18
+folder-103,Folder 3,0,box-greg,Misc.,2025-01-01,2026-06-01,0
+folder-104,Folder 4,0,box-greg,Misc.,2025-01-01,2026-06-01,1
+folder-105,Folder 5,0,box-greg,Misc.,2025-01-01,2026-06-01,34
+folder-106,Folder 6,0,box-greg,Misc.,2025-01-01,2026-06-01,18
+folder-107,Folder 7,0,box-greg,Misc.,2025-01-01,2026-06-01,39
+folder-108,Folder 8,0,box-greg,Misc.,2025-01-01,2026-06-01,21
+folder-109,Folder 9,0,box-greg,Misc.,2025-01-01,2026-06-01,47
+folder-110,Folder 10,0,box-greg,Misc.,2025-01-01,2026-06-01,13
+folder-111,Folder 11,0,box-greg,Misc.,2025-01-01,2026-06-01,24
+folder-112,Folder 12,0,box-greg,Misc.,2025-01-01,2026-06-01,38
+folder-113,Folder 13,0,box-greg,Misc.,2025-01-01,2026-06-01,35
+folder-114,Folder 14,0,box-greg,Misc.,2025-01-01,2026-06-01,13
+folder-115,Folder 15,0,box-greg,Misc.,2025-01-01,2026-06-01,1
+folder-116,Folder 16,0,box-greg,Misc.,2025-01-01,2026-06-01,1
+folder-117,Folder 17,0,box-greg,Misc.,2025-01-01,2026-06-01,34
+folder-118,Folder 18,0,box-greg,Misc.,2025-01-01,2026-06-01,6
+folder-119,Folder 19,0,box-greg,Misc.,2025-01-01,2026-06-01,19
+folder-2000,Folder 0,0,box-greg,Archived appeal attachments.,2025-01-01,2026-06-01,7
+folder-2001,Folder 1,0,box-greg,Archived appeal attachments.,2025-01-02,2026-06-02,15
+folder-2002,Folder 2,0,box-greg,Archived appeal attachments.,2025-01-03,2026-06-03,14
+folder-2003,Folder 3,0,box-greg,Archived appeal attachments.,2025-01-04,2026-06-04,31
+folder-2004,Folder 4,0,box-greg,Archived appeal attachments.,2025-01-05,2026-06-05,20
+folder-2005,Folder 5,0,box-greg,Archived appeal attachments.,2025-01-06,2026-06-06,14
+folder-2006,Folder 6,0,box-greg,Archived appeal attachments.,2025-01-07,2026-06-07,21
+folder-2007,Folder 7,0,box-greg,Archived appeal attachments.,2025-01-08,2026-06-08,35
+folder-2008,Folder 8,0,box-greg,Archived appeal attachments.,2025-01-09,2026-06-09,10
+folder-2009,Folder 9,0,box-greg,Archived appeal attachments.,2025-01-10,2026-06-10,29
+folder-2010,Folder 10,0,box-greg,Archived appeal attachments.,2025-01-11,2026-06-11,12
+folder-2011,Folder 11,0,box-greg,Archived appeal attachments.,2025-01-12,2026-06-12,15
+folder-2012,Folder 12,0,box-greg,Archived appeal attachments.,2025-01-13,2026-06-13,27
+folder-2013,Folder 13,0,box-greg,Archived appeal attachments.,2025-01-14,2026-06-14,18
+folder-2014,Folder 14,0,box-greg,Archived appeal attachments.,2025-01-15,2026-06-15,35
+folder-2015,Folder 15,0,box-greg,Archived appeal attachments.,2025-01-16,2026-06-16,26
+folder-2016,Folder 16,0,box-greg,Archived appeal attachments.,2025-01-17,2026-06-17,21
+folder-2017,Folder 17,0,box-greg,Archived appeal attachments.,2025-01-18,2026-06-18,9
+folder-2018,Folder 18,0,box-greg,Archived appeal attachments.,2025-01-19,2026-06-19,25
+folder-2019,Folder 19,0,box-greg,Archived appeal attachments.,2025-01-20,2026-06-20,27
+folder-2020,Folder 20,0,box-greg,Archived appeal attachments.,2025-01-21,2026-06-21,2
+folder-2021,Folder 21,0,box-greg,Archived appeal attachments.,2025-01-22,2026-06-22,10
+folder-2022,Folder 22,0,box-greg,Archived appeal attachments.,2025-01-23,2026-06-23,35
+folder-2023,Folder 23,0,box-greg,Archived appeal attachments.,2025-01-24,2026-06-24,30
+folder-2024,Folder 24,0,box-greg,Archived appeal attachments.,2025-01-25,2026-06-25,3
+folder-2025,Folder 25,0,box-greg,Archived appeal attachments.,2025-01-26,2026-06-26,13
+folder-2026,Folder 26,0,box-greg,Archived appeal attachments.,2025-01-27,2026-06-27,13
+folder-2027,Folder 27,0,box-greg,Archived appeal attachments.,2025-01-01,2026-06-01,23
+folder-2028,Folder 28,0,box-greg,Archived appeal attachments.,2025-01-02,2026-06-02,7
+folder-2029,Folder 29,0,box-greg,Archived appeal attachments.,2025-01-03,2026-06-03,37
+folder-2030,Folder 30,0,box-greg,Archived appeal attachments.,2025-01-04,2026-06-04,10
+folder-2031,Folder 31,0,box-greg,Archived appeal attachments.,2025-01-05,2026-06-05,1
+folder-2032,Folder 32,0,box-greg,Archived appeal attachments.,2025-01-06,2026-06-06,12
+folder-2033,Folder 33,0,box-greg,Archived appeal attachments.,2025-01-07,2026-06-07,18
+folder-2034,Folder 34,0,box-greg,Archived appeal attachments.,2025-01-08,2026-06-08,3
+folder-2035,Folder 35,0,box-greg,Archived appeal attachments.,2025-01-09,2026-06-09,2
+folder-2036,Folder 36,0,box-greg,Archived appeal attachments.,2025-01-10,2026-06-10,28
+folder-2037,Folder 37,0,box-greg,Archived appeal attachments.,2025-01-11,2026-06-11,33
+folder-2038,Folder 38,0,box-greg,Archived appeal attachments.,2025-01-12,2026-06-12,27
+folder-2039,Folder 39,0,box-greg,Archived appeal attachments.,2025-01-13,2026-06-13,13
+folder-2040,Folder 40,0,box-greg,Archived appeal attachments.,2025-01-14,2026-06-14,40
+folder-2041,Folder 41,0,box-greg,Archived appeal attachments.,2025-01-15,2026-06-15,17
+folder-2042,Folder 42,0,box-greg,Archived appeal attachments.,2025-01-16,2026-06-16,15
+folder-2043,Folder 43,0,box-greg,Archived appeal attachments.,2025-01-17,2026-06-17,14
+folder-2044,Folder 44,0,box-greg,Archived appeal attachments.,2025-01-18,2026-06-18,32
+folder-2045,Folder 45,0,box-greg,Archived appeal attachments.,2025-01-19,2026-06-19,26
+folder-2046,Folder 46,0,box-greg,Archived appeal attachments.,2025-01-20,2026-06-20,1
+folder-2047,Folder 47,0,box-greg,Archived appeal attachments.,2025-01-21,2026-06-21,39
+folder-2048,Folder 48,0,box-greg,Archived appeal attachments.,2025-01-22,2026-06-22,33
+folder-2049,Folder 49,0,box-greg,Archived appeal attachments.,2025-01-23,2026-06-23,9
+folder-2050,Folder 50,0,box-greg,Archived appeal attachments.,2025-01-24,2026-06-24,13
+folder-2051,Folder 51,0,box-greg,Archived appeal attachments.,2025-01-25,2026-06-25,6
+folder-2052,Folder 52,0,box-greg,Archived appeal attachments.,2025-01-26,2026-06-26,29
+folder-2053,Folder 53,0,box-greg,Archived appeal attachments.,2025-01-27,2026-06-27,4
+folder-2054,Folder 54,0,box-greg,Archived appeal attachments.,2025-01-01,2026-06-01,28
+folder-2055,Folder 55,0,box-greg,Archived appeal attachments.,2025-01-02,2026-06-02,13
+folder-2056,Folder 56,0,box-greg,Archived appeal attachments.,2025-01-03,2026-06-03,25
+folder-2057,Folder 57,0,box-greg,Archived appeal attachments.,2025-01-04,2026-06-04,36
+folder-2058,Folder 58,0,box-greg,Archived appeal attachments.,2025-01-05,2026-06-05,24
+folder-2059,Folder 59,0,box-greg,Archived appeal attachments.,2025-01-06,2026-06-06,15
+folder-2060,Folder 60,0,box-greg,Archived appeal attachments.,2025-01-07,2026-06-07,14
+folder-2061,Folder 61,0,box-greg,Archived appeal attachments.,2025-01-08,2026-06-08,20
+folder-2062,Folder 62,0,box-greg,Archived appeal attachments.,2025-01-09,2026-06-09,13
+folder-2063,Folder 63,0,box-greg,Archived appeal attachments.,2025-01-10,2026-06-10,4
+folder-2064,Folder 64,0,box-greg,Archived appeal attachments.,2025-01-11,2026-06-11,9
+folder-2065,Folder 65,0,box-greg,Archived appeal attachments.,2025-01-12,2026-06-12,24
+folder-2066,Folder 66,0,box-greg,Archived appeal attachments.,2025-01-13,2026-06-13,39
+folder-2067,Folder 67,0,box-greg,Archived appeal attachments.,2025-01-14,2026-06-14,3
+folder-2068,Folder 68,0,box-greg,Archived appeal attachments.,2025-01-15,2026-06-15,16
+folder-2069,Folder 69,0,box-greg,Archived appeal attachments.,2025-01-16,2026-06-16,1
+folder-2070,Folder 70,0,box-greg,Archived appeal attachments.,2025-01-17,2026-06-17,30
+folder-2071,Folder 71,0,box-greg,Archived appeal attachments.,2025-01-18,2026-06-18,15
+folder-2072,Folder 72,0,box-greg,Archived appeal attachments.,2025-01-19,2026-06-19,20
+folder-2073,Folder 73,0,box-greg,Archived appeal attachments.,2025-01-20,2026-06-20,25
+folder-2074,Folder 74,0,box-greg,Archived appeal attachments.,2025-01-21,2026-06-21,18
+folder-2075,Folder 75,0,box-greg,Archived appeal attachments.,2025-01-22,2026-06-22,11
+folder-2076,Folder 76,0,box-greg,Archived appeal attachments.,2025-01-23,2026-06-23,4
+folder-2077,Folder 77,0,box-greg,Archived appeal attachments.,2025-01-24,2026-06-24,34
+folder-2078,Folder 78,0,box-greg,Archived appeal attachments.,2025-01-25,2026-06-25,35
+folder-2079,Folder 79,0,box-greg,Archived appeal attachments.,2025-01-26,2026-06-26,8
+folder-2080,Folder 80,0,box-greg,Archived appeal attachments.,2025-01-27,2026-06-27,34
+folder-2081,Folder 81,0,box-greg,Archived appeal attachments.,2025-01-01,2026-06-01,20
+folder-2082,Folder 82,0,box-greg,Archived appeal attachments.,2025-01-02,2026-06-02,28
+folder-2083,Folder 83,0,box-greg,Archived appeal attachments.,2025-01-03,2026-06-03,18
+folder-2084,Folder 84,0,box-greg,Archived appeal attachments.,2025-01-04,2026-06-04,40
+folder-2085,Folder 85,0,box-greg,Archived appeal attachments.,2025-01-05,2026-06-05,32
+folder-2086,Folder 86,0,box-greg,Archived appeal attachments.,2025-01-06,2026-06-06,37
+folder-2087,Folder 87,0,box-greg,Archived appeal attachments.,2025-01-07,2026-06-07,32
+folder-2088,Folder 88,0,box-greg,Archived appeal attachments.,2025-01-08,2026-06-08,34

@@ -1,0 +1,116 @@
+Id,FirstName,LastName,Company,Email,Phone,Status,LeadSource,Industry,Rating
+00QLEAD000,Priya,Diaz,Lead Org 0,lead0@example.org,,Open,,,
+00QLEAD001,Marcus,Park,Lead Org 1,lead1@example.org,,Open,,,
+00QLEAD002,Dana,Stone,Lead Org 2,lead2@example.org,,Open,,,
+00QLEAD003,Evan,Anand,Lead Org 3,lead3@example.org,,Open,,,
+00QLEAD004,Grace,Vela,Lead Org 4,lead4@example.org,,Open,,,
+00QLEAD005,Nadia,Lin,Lead Org 5,lead5@example.org,,Open,,,
+00QLEAD006,Sam,Wolfe,Lead Org 6,lead6@example.org,,Open,,,
+00QLEAD007,Tomas,Fox,Lead Org 7,lead7@example.org,,Open,,,
+00QLEAD008,Wendy,Nair,Lead Org 8,lead8@example.org,,Open,,,
+00QLEAD009,Omar,Reed,Lead Org 9,lead9@example.org,,Open,,,
+00QLEAD010,Lena,Bell,Lead Org 10,lead10@example.org,,Open,,,
+00QLEAD011,Ravi,Ash,Lead Org 11,lead11@example.org,,Open,,,
+00QLEAD012,Aisha,Webb,Lead Org 12,lead12@example.org,,Open,,,
+00QLEAD013,Diego,Quinn,Lead Org 13,lead13@example.org,,Open,,,
+00QLEAD014,Mei,Osei,Lead Org 14,lead14@example.org,,Open,,,
+00QLEAD015,Noah,Bello,Lead Org 15,lead15@example.org,,Open,,,
+00QLEAD016,Zoe,Frost,Lead Org 16,lead16@example.org,,Open,,,
+00QLEAD017,Caleb,Cho,Lead Org 17,lead17@example.org,,Open,,,
+00QLEAD018,Ivy,Khan,Lead Org 18,lead18@example.org,,Open,,,
+00QLEAD019,Jonah,Hart,Lead Org 19,lead19@example.org,,Open,,,
+00QLEAD020,Kira,Rhodes,Lead Org 20,lead20@example.org,,Open,,,
+00QLEAD021,Leo,Reyes,Lead Org 21,lead21@example.org,,Open,,,
+00QLEAD022,Maya,Cruz,Lead Org 22,lead22@example.org,,Open,,,
+00QLEAD023,Nolan,Vance,Lead Org 23,lead23@example.org,,Open,,,
+00QLEAD024,Priya,Diaz,Lead Org 24,lead24@example.org,,Open,,,
+00QLEAD025,Marcus,Park,Lead Org 25,lead25@example.org,,Open,,,
+00QLEAD026,Dana,Stone,Lead Org 26,lead26@example.org,,Open,,,
+00QLEAD027,Evan,Anand,Lead Org 27,lead27@example.org,,Open,,,
+00QLEAD028,Grace,Vela,Lead Org 28,lead28@example.org,,Open,,,
+00QLEAD029,Nadia,Lin,Lead Org 29,lead29@example.org,,Open,,,
+00QLEAD030,Sam,Wolfe,Lead Org 30,lead30@example.org,,Open,,,
+00QLEAD031,Tomas,Fox,Lead Org 31,lead31@example.org,,Open,,,
+00QLEAD032,Wendy,Nair,Lead Org 32,lead32@example.org,,Open,,,
+00QLEAD033,Omar,Reed,Lead Org 33,lead33@example.org,,Open,,,
+00QLEAD034,Lena,Bell,Lead Org 34,lead34@example.org,,Open,,,
+00QLEAD035,Ravi,Ash,Lead Org 35,lead35@example.org,,Open,,,
+00QLEAD036,Aisha,Webb,Lead Org 36,lead36@example.org,,Open,,,
+00QLEAD037,Diego,Quinn,Lead Org 37,lead37@example.org,,Open,,,
+00QLEAD038,Mei,Osei,Lead Org 38,lead38@example.org,,Open,,,
+00QLEAD039,Noah,Bello,Lead Org 39,lead39@example.org,,Open,,,
+00QLEAD040,Zoe,Frost,Lead Org 40,lead40@example.org,,Open,,,
+00QLEAD041,Caleb,Cho,Lead Org 41,lead41@example.org,,Open,,,
+00QLEAD042,Ivy,Khan,Lead Org 42,lead42@example.org,,Open,,,
+00QLEAD043,Jonah,Hart,Lead Org 43,lead43@example.org,,Open,,,
+00QLEAD044,Kira,Rhodes,Lead Org 44,lead44@example.org,,Open,,,
+00QLEAD045,Leo,Reyes,Lead Org 45,lead45@example.org,,Open,,,
+00QLEAD046,Maya,Cruz,Lead Org 46,lead46@example.org,,Open,,,
+00QLEAD047,Nolan,Vance,Lead Org 47,lead47@example.org,,Open,,,
+00QLEAD048,Priya,Diaz,Lead Org 48,lead48@example.org,,Open,,,
+00QLEAD049,Marcus,Park,Lead Org 49,lead49@example.org,,Open,,,
+00Qgen0050,Emerson,Underwood,Org 50 Partners,emerson.underwood@partner50.example.org,6145551050,Closed - Converted,Community Event,Education,Hot
+00Qgen0051,Xen,Mills,Org 51 Partners,xen.mills@partner51.example.org,6145551051,Open - Not Contacted,Trade Show,Healthcare,Cold
+00Qgen0052,Jordan,Zimmer,Org 52 Partners,jordan.zimmer@partner52.example.org,6145551052,Closed - Converted,Community Event,Fitness,Cold
+00Qgen0053,Cameron,Hayes,Org 53 Partners,cameron.hayes@partner53.example.org,6145551053,Working - Contacted,Phone Inquiry,Community Services,Hot
+00Qgen0054,Emerson,Diaz,Org 54 Partners,emerson.diaz@partner54.example.org,6145551054,Closed - Converted,Phone Inquiry,Community Services,Cold
+00Qgen0055,Gray,Ingram,Org 55 Partners,gray.ingram@partner55.example.org,6145551055,Open - Not Contacted,Trade Show,Nonprofit,Hot
+00Qgen0056,Jordan,Mills,Org 56 Partners,jordan.mills@partner56.example.org,6145551056,Open - Not Contacted,Web,Fitness,Cold
+00Qgen0057,Logan,Vance,Org 57 Partners,logan.vance@partner57.example.org,6145551057,Open - Not Contacted,Trade Show,Fitness,Warm
+00Qgen0058,Sage,Hayes,Org 58 Partners,sage.hayes@partner58.example.org,6145551058,Open - Not Contacted,Partner Referral,Education,Warm
+00Qgen0059,Harper,Zimmer,Org 59 Partners,harper.zimmer@partner59.example.org,6145551059,Working - Contacted,Partner Referral,Nonprofit,Cold
+00Qgen0060,Xen,Evans,Org 60 Partners,xen.evans@partner60.example.org,6145551060,Closed - Not Converted,Trade Show,Fitness,Hot
+00Qgen0061,Xen,Brooks,Org 61 Partners,xen.brooks@partner61.example.org,6145551061,Closed - Converted,Trade Show,Community Services,Hot
+00Qgen0062,Jordan,Carter,Org 62 Partners,jordan.carter@partner62.example.org,6145551062,Open - Not Contacted,Trade Show,Fitness,Hot
+00Qgen0063,Kai,Vance,Org 63 Partners,kai.vance@partner63.example.org,6145551063,Open - Not Contacted,Web,Community Services,Hot
+00Qgen0064,Reese,Dunn,Org 64 Partners,reese.dunn@partner64.example.org,6145551064,Closed - Converted,Trade Show,Community Services,Cold
+00Qgen0065,Logan,Jensen,Org 65 Partners,logan.jensen@partner65.example.org,6145551065,Closed - Not Converted,Community Event,Education,Warm
+00Qgen0066,Zion,Young,Org 66 Partners,zion.young@partner66.example.org,6145551066,Closed - Converted,Community Event,Healthcare,Cold
+00Qgen0067,Wren,Zimmer,Org 67 Partners,wren.zimmer@partner67.example.org,6145551067,Open - Not Contacted,Web,Healthcare,Cold
+00Qgen0068,Ellis,Kelly,Org 68 Partners,ellis.kelly@partner68.example.org,6145551068,Closed - Converted,Phone Inquiry,Education,Cold
+00Qgen0069,Harper,Mills,Org 69 Partners,harper.mills@partner69.example.org,6145551069,Open - Not Contacted,Partner Referral,Fitness,Cold
+00Qgen0070,Adrian,Reed,Org 70 Partners,adrian.reed@partner70.example.org,6145551070,Open - Not Contacted,Phone Inquiry,Education,Hot
+00Qgen0071,Kai,Reed,Org 71 Partners,kai.reed@partner71.example.org,6145551071,Closed - Not Converted,Trade Show,Healthcare,Cold
+00Qgen0072,Tatum,Patel,Org 72 Partners,tatum.patel@partner72.example.org,6145551072,Closed - Not Converted,Partner Referral,Community Services,Hot
+00Qgen0073,Adrian,Ingram,Org 73 Partners,adrian.ingram@partner73.example.org,6145551073,Closed - Converted,Web,Nonprofit,Cold
+00Qgen0074,Adrian,Hayes,Org 74 Partners,adrian.hayes@partner74.example.org,6145551074,Working - Contacted,Phone Inquiry,Nonprofit,Cold
+00Qgen0075,Finley,Torres,Org 75 Partners,finley.torres@partner75.example.org,6145551075,Working - Contacted,Web,Community Services,Hot
+00Qgen0076,Jordan,Ellison,Org 76 Partners,jordan.ellison@partner76.example.org,6145551076,Working - Contacted,Partner Referral,Healthcare,Cold
+00Qgen0077,Oakley,Vance,Org 77 Partners,oakley.vance@partner77.example.org,6145551077,Closed - Converted,Trade Show,Healthcare,Warm
+00Qgen0078,Frankie,Baker,Org 78 Partners,frankie.baker@partner78.example.org,6145551078,Working - Contacted,Community Event,Education,Cold
+00Qgen0079,Emerson,Evans,Org 79 Partners,emerson.evans@partner79.example.org,6145551079,Working - Contacted,Trade Show,Community Services,Hot
+00Qgen0080,Kai,Nolan,Org 80 Partners,kai.nolan@partner80.example.org,6145551080,Closed - Converted,Partner Referral,Community Services,Hot
+00Qgen0081,Dakota,Ellison,Org 81 Partners,dakota.ellison@partner81.example.org,6145551081,Working - Contacted,Partner Referral,Education,Cold
+00Qgen0082,Val,Quinn,Org 82 Partners,val.quinn@partner82.example.org,6145551082,Open - Not Contacted,Web,Community Services,Cold
+00Qgen0083,Ellis,Patel,Org 83 Partners,ellis.patel@partner83.example.org,6145551083,Working - Contacted,Partner Referral,Nonprofit,Cold
+00Qgen0084,Wren,Lopez,Org 84 Partners,wren.lopez@partner84.example.org,6145551084,Working - Contacted,Phone Inquiry,Nonprofit,Cold
+00Qgen0085,Indigo,Carter,Org 85 Partners,indigo.carter@partner85.example.org,6145551085,Working - Contacted,Web,Community Services,Warm
+00Qgen0086,Frankie,Ford,Org 86 Partners,frankie.ford@partner86.example.org,6145551086,Closed - Not Converted,Trade Show,Nonprofit,Warm
+00Qgen0087,Yael,Reed,Org 87 Partners,yael.reed@partner87.example.org,6145551087,Working - Contacted,Web,Education,Hot
+00Qgen0088,Yael,Reed,Org 88 Partners,yael.reed@partner88.example.org,6145551088,Open - Not Contacted,Phone Inquiry,Nonprofit,Warm
+00Qgen0089,Devon,Ingram,Org 89 Partners,devon.ingram@partner89.example.org,6145551089,Open - Not Contacted,Community Event,Education,Hot
+00Qgen0090,Parker,Adams,Org 90 Partners,parker.adams@partner90.example.org,6145551090,Closed - Not Converted,Web,Fitness,Cold
+00Qgen0091,Adrian,Ford,Org 91 Partners,adrian.ford@partner91.example.org,6145551091,Working - Contacted,Trade Show,Healthcare,Warm
+00Qgen0092,Dakota,Evans,Org 92 Partners,dakota.evans@partner92.example.org,6145551092,Closed - Converted,Web,Education,Cold
+00Qgen0093,Tatum,Patel,Org 93 Partners,tatum.patel@partner93.example.org,6145551093,Working - Contacted,Trade Show,Education,Warm
+00Qgen0094,Wren,Ellison,Org 94 Partners,wren.ellison@partner94.example.org,6145551094,Working - Contacted,Community Event,Education,Warm
+00Qgen0095,Oakley,Quinn,Org 95 Partners,oakley.quinn@partner95.example.org,6145551095,Open - Not Contacted,Phone Inquiry,Nonprofit,Cold
+00Qgen0096,Dakota,Jensen,Org 96 Partners,dakota.jensen@partner96.example.org,6145551096,Working - Contacted,Web,Healthcare,Warm
+00Qgen0097,Parker,Hayes,Org 97 Partners,parker.hayes@partner97.example.org,6145551097,Closed - Not Converted,Phone Inquiry,Nonprofit,Warm
+00Qgen0098,Uriel,Zimmer,Org 98 Partners,uriel.zimmer@partner98.example.org,6145551098,Closed - Not Converted,Community Event,Community Services,Hot
+00Qgen0099,Ellis,Ellison,Org 99 Partners,ellis.ellison@partner99.example.org,6145551099,Closed - Not Converted,Partner Referral,Nonprofit,Warm
+00Qgen0100,Dakota,Owens,Org 100 Partners,dakota.owens@partner100.example.org,6145551100,Open - Not Contacted,Web,Healthcare,Hot
+00Qgen0101,Yael,Hayes,Org 101 Partners,yael.hayes@partner101.example.org,6145551101,Working - Contacted,Phone Inquiry,Community Services,Cold
+00Qgen0102,Uriel,Hayes,Org 102 Partners,uriel.hayes@partner102.example.org,6145551102,Open - Not Contacted,Trade Show,Community Services,Warm
+00Qgen0103,Harper,Torres,Org 103 Partners,harper.torres@partner103.example.org,6145551103,Open - Not Contacted,Phone Inquiry,Nonprofit,Warm
+00Qgen0104,Casey,Ingram,Org 104 Partners,casey.ingram@partner104.example.org,6145551104,Closed - Converted,Partner Referral,Healthcare,Warm
+00Qgen0105,Bailey,Ingram,Org 105 Partners,bailey.ingram@partner105.example.org,6145551105,Open - Not Contacted,Trade Show,Healthcare,Cold
+00Qgen0106,Oakley,Lopez,Org 106 Partners,oakley.lopez@partner106.example.org,6145551106,Closed - Not Converted,Phone Inquiry,Community Services,Warm
+00Qgen0107,Reese,Mills,Org 107 Partners,reese.mills@partner107.example.org,6145551107,Closed - Converted,Web,Nonprofit,Cold
+00Qgen0108,Reese,Hayes,Org 108 Partners,reese.hayes@partner108.example.org,6145551108,Working - Contacted,Web,Nonprofit,Warm
+00Qgen0109,Uriel,Evans,Org 109 Partners,uriel.evans@partner109.example.org,6145551109,Working - Contacted,Trade Show,Community Services,Cold
+00Qgen0110,Parker,Vance,Org 110 Partners,parker.vance@partner110.example.org,6145551110,Working - Contacted,Community Event,Nonprofit,Warm
+00Qgen0111,Oakley,Evans,Org 111 Partners,oakley.evans@partner111.example.org,6145551111,Working - Contacted,Partner Referral,Community Services,Warm
+00Qgen0112,Oakley,Zimmer,Org 112 Partners,oakley.zimmer@partner112.example.org,6145551112,Open - Not Contacted,Trade Show,Healthcare,Hot
+00Qgen0113,Kris,Carter,Org 113 Partners,kris.carter@partner113.example.org,6145551113,Closed - Converted,Phone Inquiry,Fitness,Warm
+00Qgen0114,Lane,Patel,Org 114 Partners,lane.patel@partner114.example.org,6145551114,Closed - Not Converted,Web,Fitness,Cold

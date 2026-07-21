@@ -1,0 +1,15 @@
+{
+  "id": "zoom-user-7710",
+  "first_name": "Zoom",
+  "last_name": "User",
+  "email": "user@example.com",
+  "type": 1,
+  "role_name": "Member",
+  "pmi": 0,
+  "timezone": "America/New_York",
+  "verified": 0,
+  "dept": "",
+  "account_id": "acc-zoom-0001",
+  "status": "active",
+  "created_at": "2025-01-01T00:00:00Z"
+}

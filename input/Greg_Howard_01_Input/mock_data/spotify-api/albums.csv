@@ -1,0 +1,13 @@
+album_id,name,artist_id,album_type,release_date,total_tracks,label
+al-0,Album 0,ar-0,compilation,2015-01-01,7,Capitol
+al-1,Album 1,ar-1,single,2016-02-02,5,Atlantic
+al-2,Album 2,ar-2,single,2017-03-03,9,Atlantic
+al-3,Album 3,ar-3,compilation,2018-04-04,6,Sony
+al-4,Album 4,ar-4,single,2019-05-05,15,Sony
+al-5,Album 5,ar-5,compilation,2020-06-06,1,Atlantic
+al-6,Album 6,ar-6,single,2021-07-07,9,Capitol
+al-7,Album 7,ar-7,compilation,2022-08-08,13,Capitol
+al-8,Album 8,ar-8,compilation,2023-09-09,7,Capitol
+al-9,Album 9,ar-9,single,2024-10-10,14,Capitol
+al-10,Album 10,ar-10,single,2015-11-11,1,Atlantic
+al-11,Album 11,ar-11,compilation,2016-12-12,14,Capitol

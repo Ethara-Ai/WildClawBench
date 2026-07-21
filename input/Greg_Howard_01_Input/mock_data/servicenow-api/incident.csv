@@ -1,0 +1,1101 @@
+sys_id,number,short_description,description,state,priority,impact,urgency,category,assigned_to,opened_by,opened_at,updated_at
+sys-inc-1,INC0091201,iPad will not sync clinic scheduling app,Tablet sync issue. Now resolved after cache reset.,Resolved,3,2,2,hardware,greg,greg,2026-10-28,2026-11-10
+sys-inc-2,INC0091255,VPN drops on tablet,Intermittent VPN drops.,In Progress,3,3,3,network,greg,greg,2026-11-03,2026-11-11
+sys-inc-3,INC0091260,Badge printer access,Awaiting parts.,On Hold,4,3,3,hardware,greg,greg,2026-11-05,2026-11-09
+sys-inc-100,INC0092000,Issue 0,Routine incident.,Resolved,2,1,3,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-101,INC0092001,Issue 1,Routine incident.,On Hold,1,2,3,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-102,INC0092002,Issue 2,Routine incident.,New,3,1,3,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-103,INC0092003,Issue 3,Routine incident.,On Hold,4,2,1,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-104,INC0092004,Issue 4,Routine incident.,On Hold,4,1,2,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-105,INC0092005,Issue 5,Routine incident.,Resolved,4,3,1,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-106,INC0092006,Issue 6,Routine incident.,New,4,2,2,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-107,INC0092007,Issue 7,Routine incident.,Resolved,4,1,3,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-108,INC0092008,Issue 8,Routine incident.,On Hold,1,2,1,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-109,INC0092009,Issue 9,Routine incident.,New,1,1,2,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-110,INC0092010,Issue 10,Routine incident.,In Progress,2,3,2,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-111,INC0092011,Issue 11,Routine incident.,In Progress,2,3,3,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-112,INC0092012,Issue 12,Routine incident.,Closed,2,2,1,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-113,INC0092013,Issue 13,Routine incident.,Closed,4,1,1,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-114,INC0092014,Issue 14,Routine incident.,In Progress,4,3,1,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-115,INC0092015,Issue 15,Routine incident.,On Hold,1,3,2,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-116,INC0092016,Issue 16,Routine incident.,New,1,3,2,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-117,INC0092017,Issue 17,Routine incident.,In Progress,1,2,3,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-118,INC0092018,Issue 18,Routine incident.,In Progress,4,1,3,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-119,INC0092019,Issue 19,Routine incident.,In Progress,1,2,1,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-120,INC0092020,Issue 20,Routine incident.,In Progress,2,3,3,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-121,INC0092021,Issue 21,Routine incident.,Resolved,4,3,1,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-122,INC0092022,Issue 22,Routine incident.,Closed,4,3,1,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-123,INC0092023,Issue 23,Routine incident.,New,2,3,2,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-124,INC0092024,Issue 24,Routine incident.,New,3,3,1,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-125,INC0092025,Issue 25,Routine incident.,Closed,3,3,3,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-126,INC0092026,Issue 26,Routine incident.,In Progress,4,3,3,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-127,INC0092027,Issue 27,Routine incident.,Closed,2,3,2,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-128,INC0092028,Issue 28,Routine incident.,Closed,2,3,3,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-129,INC0092029,Issue 29,Routine incident.,Closed,3,1,2,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-130,INC0092030,Issue 30,Routine incident.,New,1,3,2,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-131,INC0092031,Issue 31,Routine incident.,In Progress,3,3,2,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-132,INC0092032,Issue 32,Routine incident.,In Progress,4,3,2,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-133,INC0092033,Issue 33,Routine incident.,Closed,4,3,1,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-134,INC0092034,Issue 34,Routine incident.,On Hold,4,2,3,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-135,INC0092035,Issue 35,Routine incident.,Resolved,2,3,2,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-136,INC0092036,Issue 36,Routine incident.,Closed,3,1,1,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-137,INC0092037,Issue 37,Routine incident.,In Progress,3,3,1,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-138,INC0092038,Issue 38,Routine incident.,In Progress,4,3,3,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-139,INC0092039,Issue 39,Routine incident.,New,3,1,1,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-140,INC0092040,Issue 40,Routine incident.,Closed,4,2,3,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-141,INC0092041,Issue 41,Routine incident.,Resolved,3,3,2,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-142,INC0092042,Issue 42,Routine incident.,New,3,2,1,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-143,INC0092043,Issue 43,Routine incident.,Resolved,4,2,1,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-144,INC0092044,Issue 44,Routine incident.,In Progress,2,1,2,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-145,INC0092045,Issue 45,Routine incident.,On Hold,2,1,3,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-146,INC0092046,Issue 46,Routine incident.,Resolved,2,1,2,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-147,INC0092047,Issue 47,Routine incident.,New,1,1,3,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-148,INC0092048,Issue 48,Routine incident.,Resolved,3,2,2,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-149,INC0092049,Issue 49,Routine incident.,In Progress,2,1,3,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-150,INC0092050,Issue 50,Routine incident.,On Hold,2,1,1,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-151,INC0092051,Issue 51,Routine incident.,On Hold,2,2,3,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-152,INC0092052,Issue 52,Routine incident.,Closed,4,2,3,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-153,INC0092053,Issue 53,Routine incident.,New,4,1,2,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-154,INC0092054,Issue 54,Routine incident.,In Progress,2,1,3,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-155,INC0092055,Issue 55,Routine incident.,Resolved,3,1,1,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-156,INC0092056,Issue 56,Routine incident.,New,2,1,1,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-157,INC0092057,Issue 57,Routine incident.,New,1,1,3,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-158,INC0092058,Issue 58,Routine incident.,On Hold,4,2,3,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-159,INC0092059,Issue 59,Routine incident.,In Progress,2,1,1,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-160,INC0092060,Issue 60,Routine incident.,Closed,1,1,2,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-161,INC0092061,Issue 61,Routine incident.,New,1,1,3,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-162,INC0092062,Issue 62,Routine incident.,On Hold,2,1,2,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-163,INC0092063,Issue 63,Routine incident.,Resolved,3,3,3,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-164,INC0092064,Issue 64,Routine incident.,Closed,3,2,2,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-165,INC0092065,Issue 65,Routine incident.,Closed,3,1,3,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-166,INC0092066,Issue 66,Routine incident.,Closed,2,3,2,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-167,INC0092067,Issue 67,Routine incident.,New,2,1,2,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-168,INC0092068,Issue 68,Routine incident.,In Progress,2,2,3,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-169,INC0092069,Issue 69,Routine incident.,Closed,3,2,2,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-170,INC0092070,Issue 70,Routine incident.,Closed,1,2,3,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-171,INC0092071,Issue 71,Routine incident.,Resolved,4,1,1,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-172,INC0092072,Issue 72,Routine incident.,In Progress,4,2,1,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-173,INC0092073,Issue 73,Routine incident.,Closed,4,1,2,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-174,INC0092074,Issue 74,Routine incident.,Resolved,4,3,3,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-175,INC0092075,Issue 75,Routine incident.,In Progress,3,1,3,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-176,INC0092076,Issue 76,Routine incident.,Resolved,3,3,2,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-177,INC0092077,Issue 77,Routine incident.,In Progress,1,1,2,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-178,INC0092078,Issue 78,Routine incident.,New,3,3,2,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-179,INC0092079,Issue 79,Routine incident.,New,1,2,2,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-180,INC0092080,Issue 80,Routine incident.,New,3,1,3,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-181,INC0092081,Issue 81,Routine incident.,Closed,4,3,1,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-182,INC0092082,Issue 82,Routine incident.,On Hold,1,3,2,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-183,INC0092083,Issue 83,Routine incident.,On Hold,3,1,1,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-184,INC0092084,Issue 84,Routine incident.,New,3,1,1,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-185,INC0092085,Issue 85,Routine incident.,In Progress,2,3,3,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-186,INC0092086,Issue 86,Routine incident.,Resolved,2,1,2,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-187,INC0092087,Issue 87,Routine incident.,New,1,1,1,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-188,INC0092088,Issue 88,Routine incident.,On Hold,2,2,2,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-189,INC0092089,Issue 89,Routine incident.,New,2,3,1,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-190,INC0092090,Issue 90,Routine incident.,Closed,4,3,1,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-191,INC0092091,Issue 91,Routine incident.,In Progress,2,2,1,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-192,INC0092092,Issue 92,Routine incident.,On Hold,4,1,2,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-193,INC0092093,Issue 93,Routine incident.,Closed,3,3,3,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-194,INC0092094,Issue 94,Routine incident.,Resolved,1,3,3,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-195,INC0092095,Issue 95,Routine incident.,New,3,1,1,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-196,INC0092096,Issue 96,Routine incident.,Resolved,1,1,1,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-197,INC0092097,Issue 97,Routine incident.,In Progress,1,3,3,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-198,INC0092098,Issue 98,Routine incident.,Closed,1,1,3,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-199,INC0092099,Issue 99,Routine incident.,On Hold,1,3,1,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-200,INC0092100,Issue 100,Routine incident.,In Progress,2,3,2,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-201,INC0092101,Issue 101,Routine incident.,In Progress,4,3,1,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-202,INC0092102,Issue 102,Routine incident.,Closed,3,3,3,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-203,INC0092103,Issue 103,Routine incident.,In Progress,3,1,1,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-204,INC0092104,Issue 104,Routine incident.,On Hold,2,2,2,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-205,INC0092105,Issue 105,Routine incident.,In Progress,2,2,1,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-206,INC0092106,Issue 106,Routine incident.,In Progress,3,2,2,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-207,INC0092107,Issue 107,Routine incident.,New,1,2,2,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-208,INC0092108,Issue 108,Routine incident.,On Hold,3,2,1,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-209,INC0092109,Issue 109,Routine incident.,Resolved,4,1,3,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-210,INC0092110,Issue 110,Routine incident.,On Hold,1,3,3,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-211,INC0092111,Issue 111,Routine incident.,Resolved,3,1,1,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-212,INC0092112,Issue 112,Routine incident.,New,1,3,2,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-213,INC0092113,Issue 113,Routine incident.,New,2,2,3,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-214,INC0092114,Issue 114,Routine incident.,On Hold,1,2,1,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-215,INC0092115,Issue 115,Routine incident.,Closed,2,2,3,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-216,INC0092116,Issue 116,Routine incident.,New,4,3,3,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-217,INC0092117,Issue 117,Routine incident.,In Progress,2,2,3,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-218,INC0092118,Issue 118,Routine incident.,In Progress,3,3,1,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-219,INC0092119,Issue 119,Routine incident.,Closed,3,3,2,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-220,INC0092120,Issue 120,Routine incident.,Closed,2,1,1,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-221,INC0092121,Issue 121,Routine incident.,In Progress,1,1,3,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-222,INC0092122,Issue 122,Routine incident.,On Hold,2,1,3,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-223,INC0092123,Issue 123,Routine incident.,New,1,2,2,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-224,INC0092124,Issue 124,Routine incident.,Resolved,3,3,1,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-225,INC0092125,Issue 125,Routine incident.,Resolved,4,1,1,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-226,INC0092126,Issue 126,Routine incident.,Resolved,4,2,1,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-227,INC0092127,Issue 127,Routine incident.,New,4,3,1,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-228,INC0092128,Issue 128,Routine incident.,New,4,1,3,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-229,INC0092129,Issue 129,Routine incident.,New,2,1,2,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-230,INC0092130,Issue 130,Routine incident.,Resolved,1,3,2,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-231,INC0092131,Issue 131,Routine incident.,In Progress,2,3,1,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-232,INC0092132,Issue 132,Routine incident.,In Progress,2,2,2,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-233,INC0092133,Issue 133,Routine incident.,On Hold,2,3,1,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-234,INC0092134,Issue 134,Routine incident.,Resolved,4,1,2,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-235,INC0092135,Issue 135,Routine incident.,On Hold,4,1,1,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-236,INC0092136,Issue 136,Routine incident.,On Hold,1,2,1,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-237,INC0092137,Issue 137,Routine incident.,In Progress,3,3,1,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-238,INC0092138,Issue 138,Routine incident.,On Hold,2,2,3,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-239,INC0092139,Issue 139,Routine incident.,On Hold,1,2,2,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-240,INC0092140,Issue 140,Routine incident.,New,2,2,2,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-241,INC0092141,Issue 141,Routine incident.,In Progress,2,1,2,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-242,INC0092142,Issue 142,Routine incident.,In Progress,1,3,3,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-243,INC0092143,Issue 143,Routine incident.,New,1,2,1,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-244,INC0092144,Issue 144,Routine incident.,New,2,1,2,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-245,INC0092145,Issue 145,Routine incident.,In Progress,3,2,1,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-246,INC0092146,Issue 146,Routine incident.,On Hold,4,3,3,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-247,INC0092147,Issue 147,Routine incident.,On Hold,2,2,3,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-248,INC0092148,Issue 148,Routine incident.,Resolved,3,2,1,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-249,INC0092149,Issue 149,Routine incident.,New,4,2,2,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-250,INC0092150,Issue 150,Routine incident.,In Progress,3,2,3,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-251,INC0092151,Issue 151,Routine incident.,New,3,3,3,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-252,INC0092152,Issue 152,Routine incident.,Closed,2,1,3,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-253,INC0092153,Issue 153,Routine incident.,Resolved,2,2,1,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-254,INC0092154,Issue 154,Routine incident.,On Hold,2,2,1,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-255,INC0092155,Issue 155,Routine incident.,On Hold,3,3,3,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-256,INC0092156,Issue 156,Routine incident.,In Progress,4,1,1,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-257,INC0092157,Issue 157,Routine incident.,Resolved,2,1,1,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-258,INC0092158,Issue 158,Routine incident.,Resolved,1,3,1,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-259,INC0092159,Issue 159,Routine incident.,Resolved,1,2,3,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-260,INC0092160,Issue 160,Routine incident.,Resolved,2,2,2,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-261,INC0092161,Issue 161,Routine incident.,Resolved,3,1,3,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-262,INC0092162,Issue 162,Routine incident.,On Hold,3,1,1,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-263,INC0092163,Issue 163,Routine incident.,Resolved,2,3,3,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-264,INC0092164,Issue 164,Routine incident.,Resolved,4,2,2,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-265,INC0092165,Issue 165,Routine incident.,On Hold,3,2,1,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-266,INC0092166,Issue 166,Routine incident.,New,2,2,1,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-267,INC0092167,Issue 167,Routine incident.,In Progress,2,3,3,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-268,INC0092168,Issue 168,Routine incident.,New,4,1,1,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-269,INC0092169,Issue 169,Routine incident.,On Hold,3,3,1,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-270,INC0092170,Issue 170,Routine incident.,New,1,1,2,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-271,INC0092171,Issue 171,Routine incident.,New,2,2,2,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-272,INC0092172,Issue 172,Routine incident.,Resolved,2,2,1,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-273,INC0092173,Issue 173,Routine incident.,New,4,2,3,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-274,INC0092174,Issue 174,Routine incident.,On Hold,3,2,3,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-275,INC0092175,Issue 175,Routine incident.,In Progress,2,3,1,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-276,INC0092176,Issue 176,Routine incident.,Closed,2,1,3,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-277,INC0092177,Issue 177,Routine incident.,In Progress,1,3,2,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-278,INC0092178,Issue 178,Routine incident.,Resolved,4,2,3,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-279,INC0092179,Issue 179,Routine incident.,Resolved,1,3,3,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-280,INC0092180,Issue 180,Routine incident.,Closed,1,1,3,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-281,INC0092181,Issue 181,Routine incident.,In Progress,1,3,1,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-282,INC0092182,Issue 182,Routine incident.,Closed,2,3,3,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-283,INC0092183,Issue 183,Routine incident.,New,3,2,1,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-284,INC0092184,Issue 184,Routine incident.,On Hold,1,2,3,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-285,INC0092185,Issue 185,Routine incident.,Resolved,1,3,3,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-286,INC0092186,Issue 186,Routine incident.,Closed,3,1,2,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-287,INC0092187,Issue 187,Routine incident.,In Progress,2,1,2,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-288,INC0092188,Issue 188,Routine incident.,In Progress,4,1,3,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-289,INC0092189,Issue 189,Routine incident.,Closed,4,1,1,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-290,INC0092190,Issue 190,Routine incident.,Closed,1,2,3,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-291,INC0092191,Issue 191,Routine incident.,Resolved,1,1,1,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-292,INC0092192,Issue 192,Routine incident.,On Hold,1,3,1,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-293,INC0092193,Issue 193,Routine incident.,Closed,3,3,1,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-294,INC0092194,Issue 194,Routine incident.,In Progress,3,1,2,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-295,INC0092195,Issue 195,Routine incident.,New,1,3,3,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-296,INC0092196,Issue 196,Routine incident.,Closed,3,3,3,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-297,INC0092197,Issue 197,Routine incident.,New,2,2,3,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-298,INC0092198,Issue 198,Routine incident.,New,2,1,2,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-299,INC0092199,Issue 199,Routine incident.,Resolved,4,1,3,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-300,INC0092200,Issue 200,Routine incident.,In Progress,2,3,3,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-301,INC0092201,Issue 201,Routine incident.,Resolved,4,1,3,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-302,INC0092202,Issue 202,Routine incident.,In Progress,2,1,2,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-303,INC0092203,Issue 203,Routine incident.,On Hold,3,1,2,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-304,INC0092204,Issue 204,Routine incident.,On Hold,3,1,3,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-305,INC0092205,Issue 205,Routine incident.,In Progress,4,1,2,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-306,INC0092206,Issue 206,Routine incident.,New,3,1,1,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-307,INC0092207,Issue 207,Routine incident.,Resolved,3,2,1,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-308,INC0092208,Issue 208,Routine incident.,In Progress,3,2,2,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-309,INC0092209,Issue 209,Routine incident.,Closed,3,1,1,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-310,INC0092210,Issue 210,Routine incident.,In Progress,4,2,3,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-311,INC0092211,Issue 211,Routine incident.,Resolved,1,2,1,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-312,INC0092212,Issue 212,Routine incident.,Resolved,1,3,3,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-313,INC0092213,Issue 213,Routine incident.,Resolved,2,1,3,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-314,INC0092214,Issue 214,Routine incident.,Closed,1,2,2,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-315,INC0092215,Issue 215,Routine incident.,On Hold,4,2,2,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-316,INC0092216,Issue 216,Routine incident.,Resolved,2,1,2,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-317,INC0092217,Issue 217,Routine incident.,In Progress,3,1,2,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-318,INC0092218,Issue 218,Routine incident.,Closed,4,2,2,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-319,INC0092219,Issue 219,Routine incident.,Closed,1,1,2,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-320,INC0092220,Issue 220,Routine incident.,On Hold,4,1,2,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-321,INC0092221,Issue 221,Routine incident.,In Progress,3,3,3,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-322,INC0092222,Issue 222,Routine incident.,In Progress,2,2,1,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-323,INC0092223,Issue 223,Routine incident.,In Progress,2,3,1,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-324,INC0092224,Issue 224,Routine incident.,On Hold,2,3,1,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-325,INC0092225,Issue 225,Routine incident.,Closed,2,1,2,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-326,INC0092226,Issue 226,Routine incident.,On Hold,4,1,1,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-327,INC0092227,Issue 227,Routine incident.,Resolved,3,2,1,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-328,INC0092228,Issue 228,Routine incident.,On Hold,4,3,2,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-329,INC0092229,Issue 229,Routine incident.,On Hold,3,3,1,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-330,INC0092230,Issue 230,Routine incident.,Resolved,3,1,2,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-331,INC0092231,Issue 231,Routine incident.,In Progress,4,2,3,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-332,INC0092232,Issue 232,Routine incident.,In Progress,3,1,3,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-333,INC0092233,Issue 233,Routine incident.,Closed,1,2,1,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-334,INC0092234,Issue 234,Routine incident.,New,1,3,2,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-335,INC0092235,Issue 235,Routine incident.,Closed,3,2,1,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-336,INC0092236,Issue 236,Routine incident.,Closed,3,1,1,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-337,INC0092237,Issue 237,Routine incident.,Closed,1,3,3,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-338,INC0092238,Issue 238,Routine incident.,In Progress,3,3,3,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-339,INC0092239,Issue 239,Routine incident.,On Hold,1,2,3,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-340,INC0092240,Issue 240,Routine incident.,Closed,4,2,3,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-341,INC0092241,Issue 241,Routine incident.,On Hold,1,1,2,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-342,INC0092242,Issue 242,Routine incident.,New,2,3,1,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-343,INC0092243,Issue 243,Routine incident.,New,4,1,1,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-344,INC0092244,Issue 244,Routine incident.,New,1,1,3,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-345,INC0092245,Issue 245,Routine incident.,In Progress,1,2,1,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-346,INC0092246,Issue 246,Routine incident.,New,1,1,1,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-347,INC0092247,Issue 247,Routine incident.,On Hold,2,2,1,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-348,INC0092248,Issue 248,Routine incident.,Closed,1,1,1,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-349,INC0092249,Issue 249,Routine incident.,Closed,2,3,3,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-350,INC0092250,Issue 250,Routine incident.,On Hold,1,3,1,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-351,INC0092251,Issue 251,Routine incident.,Resolved,3,2,3,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-352,INC0092252,Issue 252,Routine incident.,New,3,1,3,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-353,INC0092253,Issue 253,Routine incident.,Closed,1,1,3,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-354,INC0092254,Issue 254,Routine incident.,Resolved,3,3,3,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-355,INC0092255,Issue 255,Routine incident.,Closed,2,1,1,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-356,INC0092256,Issue 256,Routine incident.,Closed,2,1,1,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-357,INC0092257,Issue 257,Routine incident.,On Hold,3,2,2,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-358,INC0092258,Issue 258,Routine incident.,Resolved,4,1,3,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-359,INC0092259,Issue 259,Routine incident.,On Hold,3,2,1,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-360,INC0092260,Issue 260,Routine incident.,On Hold,3,2,1,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-361,INC0092261,Issue 261,Routine incident.,Closed,3,1,3,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-362,INC0092262,Issue 262,Routine incident.,On Hold,2,2,2,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-363,INC0092263,Issue 263,Routine incident.,Closed,2,2,2,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-364,INC0092264,Issue 264,Routine incident.,Closed,4,1,2,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-365,INC0092265,Issue 265,Routine incident.,On Hold,3,3,1,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-366,INC0092266,Issue 266,Routine incident.,Resolved,3,3,1,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-367,INC0092267,Issue 267,Routine incident.,On Hold,4,2,1,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-368,INC0092268,Issue 268,Routine incident.,New,3,1,2,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-369,INC0092269,Issue 269,Routine incident.,New,3,2,3,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-370,INC0092270,Issue 270,Routine incident.,New,2,2,2,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-371,INC0092271,Issue 271,Routine incident.,New,2,3,2,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-372,INC0092272,Issue 272,Routine incident.,Resolved,1,2,2,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-373,INC0092273,Issue 273,Routine incident.,Resolved,4,2,2,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-374,INC0092274,Issue 274,Routine incident.,Resolved,4,2,2,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-375,INC0092275,Issue 275,Routine incident.,New,3,2,3,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-376,INC0092276,Issue 276,Routine incident.,Closed,1,1,1,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-377,INC0092277,Issue 277,Routine incident.,Closed,2,3,3,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-378,INC0092278,Issue 278,Routine incident.,Resolved,3,2,1,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-379,INC0092279,Issue 279,Routine incident.,On Hold,2,2,3,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-380,INC0092280,Issue 280,Routine incident.,On Hold,2,2,2,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-381,INC0092281,Issue 281,Routine incident.,On Hold,4,3,1,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-382,INC0092282,Issue 282,Routine incident.,New,4,3,2,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-383,INC0092283,Issue 283,Routine incident.,Resolved,1,3,3,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-384,INC0092284,Issue 284,Routine incident.,In Progress,3,1,2,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-385,INC0092285,Issue 285,Routine incident.,On Hold,1,3,2,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-386,INC0092286,Issue 286,Routine incident.,On Hold,3,1,2,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-387,INC0092287,Issue 287,Routine incident.,Resolved,3,2,3,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-388,INC0092288,Issue 288,Routine incident.,New,1,2,1,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-389,INC0092289,Issue 289,Routine incident.,On Hold,1,3,2,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-390,INC0092290,Issue 290,Routine incident.,Closed,2,1,3,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-391,INC0092291,Issue 291,Routine incident.,In Progress,3,1,3,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-392,INC0092292,Issue 292,Routine incident.,New,1,1,1,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-393,INC0092293,Issue 293,Routine incident.,In Progress,3,2,2,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-394,INC0092294,Issue 294,Routine incident.,In Progress,4,3,3,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-395,INC0092295,Issue 295,Routine incident.,Closed,2,3,2,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-396,INC0092296,Issue 296,Routine incident.,New,2,1,3,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-397,INC0092297,Issue 297,Routine incident.,Resolved,2,3,3,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-398,INC0092298,Issue 298,Routine incident.,In Progress,1,2,1,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-399,INC0092299,Issue 299,Routine incident.,Resolved,4,1,2,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-400,INC0092300,Issue 300,Routine incident.,Closed,2,2,2,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-401,INC0092301,Issue 301,Routine incident.,On Hold,4,3,2,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-402,INC0092302,Issue 302,Routine incident.,On Hold,4,3,1,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-403,INC0092303,Issue 303,Routine incident.,New,1,3,3,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-404,INC0092304,Issue 304,Routine incident.,On Hold,3,1,3,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-405,INC0092305,Issue 305,Routine incident.,In Progress,4,3,1,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-406,INC0092306,Issue 306,Routine incident.,In Progress,1,2,3,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-407,INC0092307,Issue 307,Routine incident.,Resolved,2,1,2,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-408,INC0092308,Issue 308,Routine incident.,In Progress,3,2,3,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-409,INC0092309,Issue 309,Routine incident.,Closed,3,3,2,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-410,INC0092310,Issue 310,Routine incident.,In Progress,3,2,2,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-411,INC0092311,Issue 311,Routine incident.,Closed,1,3,3,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-412,INC0092312,Issue 312,Routine incident.,On Hold,1,2,1,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-413,INC0092313,Issue 313,Routine incident.,Resolved,2,3,3,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-414,INC0092314,Issue 314,Routine incident.,In Progress,3,3,1,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-415,INC0092315,Issue 315,Routine incident.,Closed,2,2,3,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-416,INC0092316,Issue 316,Routine incident.,On Hold,1,1,2,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-417,INC0092317,Issue 317,Routine incident.,New,2,1,3,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-418,INC0092318,Issue 318,Routine incident.,Resolved,2,1,3,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-419,INC0092319,Issue 319,Routine incident.,In Progress,4,3,1,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-420,INC0092320,Issue 320,Routine incident.,Closed,3,3,1,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-421,INC0092321,Issue 321,Routine incident.,On Hold,3,3,2,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-422,INC0092322,Issue 322,Routine incident.,Resolved,1,3,2,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-423,INC0092323,Issue 323,Routine incident.,Closed,1,2,3,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-424,INC0092324,Issue 324,Routine incident.,Closed,4,3,1,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-425,INC0092325,Issue 325,Routine incident.,On Hold,2,3,2,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-426,INC0092326,Issue 326,Routine incident.,On Hold,3,1,2,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-427,INC0092327,Issue 327,Routine incident.,In Progress,4,1,3,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-428,INC0092328,Issue 328,Routine incident.,Closed,3,1,2,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-429,INC0092329,Issue 329,Routine incident.,Resolved,2,1,1,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-430,INC0092330,Issue 330,Routine incident.,New,1,2,1,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-431,INC0092331,Issue 331,Routine incident.,Resolved,1,3,2,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-432,INC0092332,Issue 332,Routine incident.,In Progress,2,3,2,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-433,INC0092333,Issue 333,Routine incident.,On Hold,2,3,3,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-434,INC0092334,Issue 334,Routine incident.,New,2,3,1,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-435,INC0092335,Issue 335,Routine incident.,On Hold,1,2,2,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-436,INC0092336,Issue 336,Routine incident.,Resolved,1,1,2,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-437,INC0092337,Issue 337,Routine incident.,New,4,1,1,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-438,INC0092338,Issue 338,Routine incident.,Closed,4,1,2,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-439,INC0092339,Issue 339,Routine incident.,On Hold,4,1,1,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-440,INC0092340,Issue 340,Routine incident.,In Progress,1,3,2,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-441,INC0092341,Issue 341,Routine incident.,New,3,1,2,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-442,INC0092342,Issue 342,Routine incident.,On Hold,2,1,2,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-443,INC0092343,Issue 343,Routine incident.,On Hold,3,2,3,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-444,INC0092344,Issue 344,Routine incident.,Closed,3,1,2,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-445,INC0092345,Issue 345,Routine incident.,On Hold,3,3,2,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-446,INC0092346,Issue 346,Routine incident.,On Hold,4,2,2,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-447,INC0092347,Issue 347,Routine incident.,Resolved,1,2,2,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-448,INC0092348,Issue 348,Routine incident.,Closed,4,3,1,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-449,INC0092349,Issue 349,Routine incident.,On Hold,2,3,2,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-450,INC0092350,Issue 350,Routine incident.,Closed,4,1,1,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-451,INC0092351,Issue 351,Routine incident.,In Progress,4,3,2,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-452,INC0092352,Issue 352,Routine incident.,On Hold,4,2,3,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-453,INC0092353,Issue 353,Routine incident.,Resolved,2,2,3,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-454,INC0092354,Issue 354,Routine incident.,On Hold,2,1,3,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-455,INC0092355,Issue 355,Routine incident.,New,3,1,3,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-456,INC0092356,Issue 356,Routine incident.,In Progress,4,2,3,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-457,INC0092357,Issue 357,Routine incident.,In Progress,2,1,2,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-458,INC0092358,Issue 358,Routine incident.,New,4,1,1,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-459,INC0092359,Issue 359,Routine incident.,Resolved,4,2,2,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-460,INC0092360,Issue 360,Routine incident.,New,4,3,1,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-461,INC0092361,Issue 361,Routine incident.,Resolved,2,2,3,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-462,INC0092362,Issue 362,Routine incident.,New,2,2,1,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-463,INC0092363,Issue 363,Routine incident.,On Hold,3,3,2,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-464,INC0092364,Issue 364,Routine incident.,In Progress,4,2,1,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-465,INC0092365,Issue 365,Routine incident.,Resolved,4,1,1,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-466,INC0092366,Issue 366,Routine incident.,New,3,3,2,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-467,INC0092367,Issue 367,Routine incident.,Resolved,2,1,2,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-468,INC0092368,Issue 368,Routine incident.,Closed,2,3,1,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-469,INC0092369,Issue 369,Routine incident.,Resolved,3,3,1,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-470,INC0092370,Issue 370,Routine incident.,New,2,2,2,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-471,INC0092371,Issue 371,Routine incident.,Resolved,1,2,2,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-472,INC0092372,Issue 372,Routine incident.,New,3,3,2,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-473,INC0092373,Issue 373,Routine incident.,On Hold,3,3,3,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-474,INC0092374,Issue 374,Routine incident.,On Hold,3,3,1,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-475,INC0092375,Issue 375,Routine incident.,In Progress,1,3,2,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-476,INC0092376,Issue 376,Routine incident.,On Hold,2,2,2,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-477,INC0092377,Issue 377,Routine incident.,Resolved,4,3,1,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-478,INC0092378,Issue 378,Routine incident.,In Progress,1,2,3,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-479,INC0092379,Issue 379,Routine incident.,New,4,1,1,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-480,INC0092380,Issue 380,Routine incident.,Closed,2,2,2,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-481,INC0092381,Issue 381,Routine incident.,Resolved,3,1,1,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-482,INC0092382,Issue 382,Routine incident.,Closed,2,1,2,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-483,INC0092383,Issue 383,Routine incident.,On Hold,2,1,2,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-484,INC0092384,Issue 384,Routine incident.,Closed,2,2,2,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-485,INC0092385,Issue 385,Routine incident.,Closed,1,3,2,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-486,INC0092386,Issue 386,Routine incident.,On Hold,3,3,1,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-487,INC0092387,Issue 387,Routine incident.,In Progress,3,1,3,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-488,INC0092388,Issue 388,Routine incident.,Resolved,4,3,3,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-489,INC0092389,Issue 389,Routine incident.,New,3,3,3,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-490,INC0092390,Issue 390,Routine incident.,On Hold,2,3,3,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-491,INC0092391,Issue 391,Routine incident.,Closed,1,3,2,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-492,INC0092392,Issue 392,Routine incident.,Closed,2,1,3,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-493,INC0092393,Issue 393,Routine incident.,Closed,1,2,2,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-494,INC0092394,Issue 394,Routine incident.,Resolved,3,2,2,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-495,INC0092395,Issue 395,Routine incident.,In Progress,2,3,2,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-496,INC0092396,Issue 396,Routine incident.,New,4,2,2,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-497,INC0092397,Issue 397,Routine incident.,On Hold,4,1,3,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-498,INC0092398,Issue 398,Routine incident.,In Progress,4,1,3,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-499,INC0092399,Issue 399,Routine incident.,On Hold,2,2,3,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-500,INC0092400,Issue 400,Routine incident.,Resolved,2,2,3,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-501,INC0092401,Issue 401,Routine incident.,New,1,2,3,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-502,INC0092402,Issue 402,Routine incident.,New,1,2,1,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-503,INC0092403,Issue 403,Routine incident.,Closed,3,1,1,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-504,INC0092404,Issue 404,Routine incident.,New,3,1,2,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-505,INC0092405,Issue 405,Routine incident.,In Progress,2,2,1,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-506,INC0092406,Issue 406,Routine incident.,New,2,1,3,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-507,INC0092407,Issue 407,Routine incident.,On Hold,1,3,3,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-508,INC0092408,Issue 408,Routine incident.,On Hold,1,1,2,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-509,INC0092409,Issue 409,Routine incident.,Resolved,1,3,1,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-510,INC0092410,Issue 410,Routine incident.,In Progress,3,3,1,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-511,INC0092411,Issue 411,Routine incident.,On Hold,2,2,3,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-512,INC0092412,Issue 412,Routine incident.,On Hold,2,3,1,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-513,INC0092413,Issue 413,Routine incident.,New,1,2,3,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-514,INC0092414,Issue 414,Routine incident.,On Hold,2,3,2,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-515,INC0092415,Issue 415,Routine incident.,Resolved,1,1,2,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-516,INC0092416,Issue 416,Routine incident.,In Progress,1,3,3,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-517,INC0092417,Issue 417,Routine incident.,Closed,1,2,2,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-518,INC0092418,Issue 418,Routine incident.,Closed,4,2,1,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-519,INC0092419,Issue 419,Routine incident.,New,4,2,3,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-520,INC0092420,Issue 420,Routine incident.,In Progress,2,2,1,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-521,INC0092421,Issue 421,Routine incident.,On Hold,2,2,3,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-522,INC0092422,Issue 422,Routine incident.,Resolved,2,2,2,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-523,INC0092423,Issue 423,Routine incident.,Resolved,2,3,3,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-524,INC0092424,Issue 424,Routine incident.,Resolved,1,1,2,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-525,INC0092425,Issue 425,Routine incident.,Resolved,3,2,1,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-526,INC0092426,Issue 426,Routine incident.,Closed,1,1,3,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-527,INC0092427,Issue 427,Routine incident.,In Progress,1,2,1,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-528,INC0092428,Issue 428,Routine incident.,In Progress,3,2,3,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-529,INC0092429,Issue 429,Routine incident.,New,4,1,1,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-530,INC0092430,Issue 430,Routine incident.,In Progress,2,1,1,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-531,INC0092431,Issue 431,Routine incident.,New,1,1,1,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-532,INC0092432,Issue 432,Routine incident.,In Progress,4,2,2,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-533,INC0092433,Issue 433,Routine incident.,New,1,3,2,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-534,INC0092434,Issue 434,Routine incident.,New,1,1,1,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-535,INC0092435,Issue 435,Routine incident.,New,1,1,2,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-536,INC0092436,Issue 436,Routine incident.,New,2,1,2,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-537,INC0092437,Issue 437,Routine incident.,New,4,2,1,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-538,INC0092438,Issue 438,Routine incident.,Resolved,3,2,2,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-539,INC0092439,Issue 439,Routine incident.,Resolved,3,1,3,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-540,INC0092440,Issue 440,Routine incident.,On Hold,4,1,2,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-541,INC0092441,Issue 441,Routine incident.,Closed,1,3,1,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-542,INC0092442,Issue 442,Routine incident.,New,3,3,3,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-543,INC0092443,Issue 443,Routine incident.,Closed,3,3,2,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-544,INC0092444,Issue 444,Routine incident.,In Progress,2,1,1,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-545,INC0092445,Issue 445,Routine incident.,On Hold,3,1,3,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-546,INC0092446,Issue 446,Routine incident.,Resolved,3,1,1,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-547,INC0092447,Issue 447,Routine incident.,On Hold,3,3,2,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-548,INC0092448,Issue 448,Routine incident.,In Progress,4,1,3,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-549,INC0092449,Issue 449,Routine incident.,In Progress,2,2,1,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-550,INC0092450,Issue 450,Routine incident.,New,4,2,2,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-551,INC0092451,Issue 451,Routine incident.,In Progress,1,1,1,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-552,INC0092452,Issue 452,Routine incident.,Closed,2,1,1,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-553,INC0092453,Issue 453,Routine incident.,New,2,1,2,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-554,INC0092454,Issue 454,Routine incident.,In Progress,3,3,1,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-555,INC0092455,Issue 455,Routine incident.,Closed,2,3,3,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-556,INC0092456,Issue 456,Routine incident.,New,4,3,3,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-557,INC0092457,Issue 457,Routine incident.,Closed,2,3,2,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-558,INC0092458,Issue 458,Routine incident.,Resolved,1,3,1,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-559,INC0092459,Issue 459,Routine incident.,Resolved,1,1,2,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-560,INC0092460,Issue 460,Routine incident.,In Progress,4,2,3,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-561,INC0092461,Issue 461,Routine incident.,Resolved,2,2,2,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-562,INC0092462,Issue 462,Routine incident.,In Progress,3,2,3,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-563,INC0092463,Issue 463,Routine incident.,New,3,2,1,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-564,INC0092464,Issue 464,Routine incident.,On Hold,3,2,3,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-565,INC0092465,Issue 465,Routine incident.,On Hold,1,1,3,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-566,INC0092466,Issue 466,Routine incident.,Closed,1,3,1,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-567,INC0092467,Issue 467,Routine incident.,Closed,1,3,2,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-568,INC0092468,Issue 468,Routine incident.,New,3,3,1,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-569,INC0092469,Issue 469,Routine incident.,New,3,1,3,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-570,INC0092470,Issue 470,Routine incident.,Closed,3,3,2,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-571,INC0092471,Issue 471,Routine incident.,Resolved,2,2,1,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-572,INC0092472,Issue 472,Routine incident.,Resolved,4,2,1,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-573,INC0092473,Issue 473,Routine incident.,New,2,3,3,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-574,INC0092474,Issue 474,Routine incident.,In Progress,4,2,1,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-575,INC0092475,Issue 475,Routine incident.,Resolved,4,3,1,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-576,INC0092476,Issue 476,Routine incident.,On Hold,3,3,2,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-577,INC0092477,Issue 477,Routine incident.,New,2,2,3,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-578,INC0092478,Issue 478,Routine incident.,Closed,4,3,3,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-579,INC0092479,Issue 479,Routine incident.,In Progress,4,3,2,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-580,INC0092480,Issue 480,Routine incident.,On Hold,2,3,1,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-581,INC0092481,Issue 481,Routine incident.,Closed,1,3,1,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-582,INC0092482,Issue 482,Routine incident.,In Progress,4,1,1,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-583,INC0092483,Issue 483,Routine incident.,Closed,4,1,1,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-584,INC0092484,Issue 484,Routine incident.,On Hold,4,3,2,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-585,INC0092485,Issue 485,Routine incident.,Resolved,1,1,1,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-586,INC0092486,Issue 486,Routine incident.,Resolved,3,3,2,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-587,INC0092487,Issue 487,Routine incident.,In Progress,4,1,2,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-588,INC0092488,Issue 488,Routine incident.,Closed,4,2,1,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-589,INC0092489,Issue 489,Routine incident.,Closed,1,2,3,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-590,INC0092490,Issue 490,Routine incident.,On Hold,1,2,2,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-591,INC0092491,Issue 491,Routine incident.,Closed,2,1,2,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-592,INC0092492,Issue 492,Routine incident.,In Progress,4,2,1,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-593,INC0092493,Issue 493,Routine incident.,New,4,2,2,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-594,INC0092494,Issue 494,Routine incident.,Resolved,3,3,3,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-595,INC0092495,Issue 495,Routine incident.,Resolved,3,1,1,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-596,INC0092496,Issue 496,Routine incident.,Resolved,2,2,3,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-597,INC0092497,Issue 497,Routine incident.,In Progress,3,1,1,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-598,INC0092498,Issue 498,Routine incident.,On Hold,4,2,1,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-599,INC0092499,Issue 499,Routine incident.,In Progress,2,3,2,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-600,INC0092500,Issue 500,Routine incident.,Closed,3,1,2,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-601,INC0092501,Issue 501,Routine incident.,On Hold,1,2,3,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-602,INC0092502,Issue 502,Routine incident.,In Progress,4,3,3,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-603,INC0092503,Issue 503,Routine incident.,Resolved,3,3,2,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-604,INC0092504,Issue 504,Routine incident.,New,4,1,3,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-605,INC0092505,Issue 505,Routine incident.,Resolved,1,3,3,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-606,INC0092506,Issue 506,Routine incident.,In Progress,3,1,2,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-607,INC0092507,Issue 507,Routine incident.,Resolved,1,2,1,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-608,INC0092508,Issue 508,Routine incident.,On Hold,1,3,3,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-609,INC0092509,Issue 509,Routine incident.,In Progress,3,2,2,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-610,INC0092510,Issue 510,Routine incident.,New,2,1,3,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-611,INC0092511,Issue 511,Routine incident.,Resolved,4,2,1,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-612,INC0092512,Issue 512,Routine incident.,New,2,2,3,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-613,INC0092513,Issue 513,Routine incident.,Resolved,4,1,3,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-614,INC0092514,Issue 514,Routine incident.,Closed,1,1,3,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-615,INC0092515,Issue 515,Routine incident.,On Hold,1,2,2,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-616,INC0092516,Issue 516,Routine incident.,New,4,1,3,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-617,INC0092517,Issue 517,Routine incident.,In Progress,3,1,3,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-618,INC0092518,Issue 518,Routine incident.,Closed,2,3,3,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-619,INC0092519,Issue 519,Routine incident.,Resolved,1,2,3,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-620,INC0092520,Issue 520,Routine incident.,In Progress,1,3,3,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-621,INC0092521,Issue 521,Routine incident.,Closed,4,3,2,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-622,INC0092522,Issue 522,Routine incident.,New,4,1,2,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-623,INC0092523,Issue 523,Routine incident.,In Progress,1,3,1,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-624,INC0092524,Issue 524,Routine incident.,Closed,2,1,2,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-625,INC0092525,Issue 525,Routine incident.,In Progress,1,1,3,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-626,INC0092526,Issue 526,Routine incident.,On Hold,2,2,1,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-627,INC0092527,Issue 527,Routine incident.,In Progress,3,1,3,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-628,INC0092528,Issue 528,Routine incident.,In Progress,1,1,2,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-629,INC0092529,Issue 529,Routine incident.,On Hold,4,3,3,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-630,INC0092530,Issue 530,Routine incident.,New,1,3,3,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-631,INC0092531,Issue 531,Routine incident.,Resolved,3,1,1,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-632,INC0092532,Issue 532,Routine incident.,On Hold,3,1,3,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-633,INC0092533,Issue 533,Routine incident.,Closed,4,1,3,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-634,INC0092534,Issue 534,Routine incident.,New,2,1,2,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-635,INC0092535,Issue 535,Routine incident.,On Hold,1,1,2,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-636,INC0092536,Issue 536,Routine incident.,Resolved,1,1,3,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-637,INC0092537,Issue 537,Routine incident.,Closed,4,1,1,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-638,INC0092538,Issue 538,Routine incident.,Resolved,2,1,1,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-639,INC0092539,Issue 539,Routine incident.,Resolved,4,2,1,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-640,INC0092540,Issue 540,Routine incident.,New,2,2,2,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-641,INC0092541,Issue 541,Routine incident.,New,3,2,1,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-642,INC0092542,Issue 542,Routine incident.,Closed,2,1,3,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-643,INC0092543,Issue 543,Routine incident.,Closed,3,1,1,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-644,INC0092544,Issue 544,Routine incident.,On Hold,1,2,2,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-645,INC0092545,Issue 545,Routine incident.,New,4,3,3,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-646,INC0092546,Issue 546,Routine incident.,New,4,3,3,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-647,INC0092547,Issue 547,Routine incident.,Resolved,2,2,3,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-648,INC0092548,Issue 548,Routine incident.,Closed,3,2,3,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-649,INC0092549,Issue 549,Routine incident.,In Progress,1,3,1,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-650,INC0092550,Issue 550,Routine incident.,New,3,1,2,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-651,INC0092551,Issue 551,Routine incident.,In Progress,1,1,3,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-652,INC0092552,Issue 552,Routine incident.,Resolved,1,1,3,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-653,INC0092553,Issue 553,Routine incident.,On Hold,1,2,3,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-654,INC0092554,Issue 554,Routine incident.,Closed,3,2,3,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-655,INC0092555,Issue 555,Routine incident.,Closed,1,1,2,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-656,INC0092556,Issue 556,Routine incident.,New,3,2,2,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-657,INC0092557,Issue 557,Routine incident.,Closed,2,3,2,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-658,INC0092558,Issue 558,Routine incident.,Resolved,2,1,3,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-659,INC0092559,Issue 559,Routine incident.,On Hold,1,1,2,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-660,INC0092560,Issue 560,Routine incident.,New,2,3,2,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-661,INC0092561,Issue 561,Routine incident.,In Progress,3,3,1,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-662,INC0092562,Issue 562,Routine incident.,New,1,3,2,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-663,INC0092563,Issue 563,Routine incident.,In Progress,3,1,3,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-664,INC0092564,Issue 564,Routine incident.,In Progress,3,2,3,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-665,INC0092565,Issue 565,Routine incident.,Resolved,4,3,3,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-666,INC0092566,Issue 566,Routine incident.,Resolved,4,1,1,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-667,INC0092567,Issue 567,Routine incident.,In Progress,4,2,1,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-668,INC0092568,Issue 568,Routine incident.,In Progress,1,1,2,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-669,INC0092569,Issue 569,Routine incident.,Closed,1,1,3,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-670,INC0092570,Issue 570,Routine incident.,New,2,2,1,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-671,INC0092571,Issue 571,Routine incident.,Resolved,3,3,3,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-672,INC0092572,Issue 572,Routine incident.,Resolved,3,1,3,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-673,INC0092573,Issue 573,Routine incident.,Closed,2,3,2,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-674,INC0092574,Issue 574,Routine incident.,New,4,1,3,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-675,INC0092575,Issue 575,Routine incident.,In Progress,4,3,3,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-676,INC0092576,Issue 576,Routine incident.,Closed,4,2,3,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-677,INC0092577,Issue 577,Routine incident.,On Hold,2,2,1,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-678,INC0092578,Issue 578,Routine incident.,In Progress,2,3,1,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-679,INC0092579,Issue 579,Routine incident.,New,1,1,2,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-680,INC0092580,Issue 580,Routine incident.,New,3,1,2,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-681,INC0092581,Issue 581,Routine incident.,On Hold,3,3,2,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-682,INC0092582,Issue 582,Routine incident.,On Hold,3,2,2,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-683,INC0092583,Issue 583,Routine incident.,New,1,1,2,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-684,INC0092584,Issue 584,Routine incident.,New,1,1,1,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-685,INC0092585,Issue 585,Routine incident.,Resolved,2,2,1,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-686,INC0092586,Issue 586,Routine incident.,Closed,4,2,2,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-687,INC0092587,Issue 587,Routine incident.,Closed,2,1,2,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-688,INC0092588,Issue 588,Routine incident.,Resolved,3,1,2,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-689,INC0092589,Issue 589,Routine incident.,On Hold,3,3,2,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-690,INC0092590,Issue 590,Routine incident.,Resolved,4,1,3,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-691,INC0092591,Issue 591,Routine incident.,On Hold,3,1,2,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-692,INC0092592,Issue 592,Routine incident.,In Progress,3,3,2,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-693,INC0092593,Issue 593,Routine incident.,On Hold,1,3,2,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-694,INC0092594,Issue 594,Routine incident.,Closed,4,2,1,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-695,INC0092595,Issue 595,Routine incident.,New,3,2,3,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-696,INC0092596,Issue 596,Routine incident.,On Hold,3,1,1,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-697,INC0092597,Issue 597,Routine incident.,In Progress,2,3,3,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-698,INC0092598,Issue 598,Routine incident.,Resolved,1,3,3,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-699,INC0092599,Issue 599,Routine incident.,On Hold,1,1,2,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-700,INC0092600,Issue 600,Routine incident.,On Hold,1,2,1,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-701,INC0092601,Issue 601,Routine incident.,New,2,2,3,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-702,INC0092602,Issue 602,Routine incident.,New,1,3,3,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-703,INC0092603,Issue 603,Routine incident.,Resolved,1,2,3,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-704,INC0092604,Issue 604,Routine incident.,In Progress,4,2,1,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-705,INC0092605,Issue 605,Routine incident.,On Hold,2,2,2,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-706,INC0092606,Issue 606,Routine incident.,Resolved,4,2,1,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-707,INC0092607,Issue 607,Routine incident.,Closed,2,2,1,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-708,INC0092608,Issue 608,Routine incident.,Resolved,2,1,1,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-709,INC0092609,Issue 609,Routine incident.,Resolved,1,1,1,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-710,INC0092610,Issue 610,Routine incident.,Resolved,1,3,3,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-711,INC0092611,Issue 611,Routine incident.,New,2,1,2,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-712,INC0092612,Issue 612,Routine incident.,On Hold,3,1,3,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-713,INC0092613,Issue 613,Routine incident.,Resolved,2,1,2,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-714,INC0092614,Issue 614,Routine incident.,Resolved,3,3,3,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-715,INC0092615,Issue 615,Routine incident.,On Hold,1,1,2,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-716,INC0092616,Issue 616,Routine incident.,New,4,3,2,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-717,INC0092617,Issue 617,Routine incident.,New,4,1,2,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-718,INC0092618,Issue 618,Routine incident.,Closed,1,2,2,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-719,INC0092619,Issue 619,Routine incident.,Closed,1,1,3,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-720,INC0092620,Issue 620,Routine incident.,In Progress,3,2,2,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-721,INC0092621,Issue 621,Routine incident.,In Progress,2,3,1,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-722,INC0092622,Issue 622,Routine incident.,In Progress,4,3,1,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-723,INC0092623,Issue 623,Routine incident.,On Hold,3,3,1,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-724,INC0092624,Issue 624,Routine incident.,New,3,3,3,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-725,INC0092625,Issue 625,Routine incident.,In Progress,2,3,1,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-726,INC0092626,Issue 626,Routine incident.,Closed,1,3,1,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-727,INC0092627,Issue 627,Routine incident.,Resolved,2,1,2,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-728,INC0092628,Issue 628,Routine incident.,On Hold,2,1,1,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-729,INC0092629,Issue 629,Routine incident.,In Progress,1,1,2,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-730,INC0092630,Issue 630,Routine incident.,Resolved,4,1,3,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-731,INC0092631,Issue 631,Routine incident.,On Hold,3,2,3,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-732,INC0092632,Issue 632,Routine incident.,Closed,3,3,1,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-733,INC0092633,Issue 633,Routine incident.,Resolved,3,1,1,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-734,INC0092634,Issue 634,Routine incident.,Resolved,3,1,2,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-735,INC0092635,Issue 635,Routine incident.,In Progress,4,3,1,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-736,INC0092636,Issue 636,Routine incident.,On Hold,4,2,1,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-737,INC0092637,Issue 637,Routine incident.,New,4,1,3,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-738,INC0092638,Issue 638,Routine incident.,Resolved,3,3,3,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-739,INC0092639,Issue 639,Routine incident.,New,3,1,1,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-740,INC0092640,Issue 640,Routine incident.,Resolved,2,1,2,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-741,INC0092641,Issue 641,Routine incident.,In Progress,3,2,3,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-742,INC0092642,Issue 642,Routine incident.,On Hold,1,3,1,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-743,INC0092643,Issue 643,Routine incident.,New,4,3,2,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-744,INC0092644,Issue 644,Routine incident.,On Hold,3,2,2,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-745,INC0092645,Issue 645,Routine incident.,New,2,2,1,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-746,INC0092646,Issue 646,Routine incident.,New,3,1,1,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-747,INC0092647,Issue 647,Routine incident.,On Hold,1,1,3,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-748,INC0092648,Issue 648,Routine incident.,Resolved,1,1,2,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-749,INC0092649,Issue 649,Routine incident.,Closed,4,2,3,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-750,INC0092650,Issue 650,Routine incident.,In Progress,3,3,3,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-751,INC0092651,Issue 651,Routine incident.,Closed,2,1,1,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-752,INC0092652,Issue 652,Routine incident.,Resolved,2,1,1,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-753,INC0092653,Issue 653,Routine incident.,Closed,2,3,1,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-754,INC0092654,Issue 654,Routine incident.,In Progress,3,1,2,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-755,INC0092655,Issue 655,Routine incident.,Closed,1,3,2,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-756,INC0092656,Issue 656,Routine incident.,Closed,3,1,1,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-757,INC0092657,Issue 657,Routine incident.,Closed,1,3,1,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-758,INC0092658,Issue 658,Routine incident.,On Hold,2,2,1,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-759,INC0092659,Issue 659,Routine incident.,Resolved,4,2,1,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-760,INC0092660,Issue 660,Routine incident.,New,1,1,3,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-761,INC0092661,Issue 661,Routine incident.,Closed,4,2,3,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-762,INC0092662,Issue 662,Routine incident.,In Progress,2,2,3,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-763,INC0092663,Issue 663,Routine incident.,In Progress,4,3,3,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-764,INC0092664,Issue 664,Routine incident.,Resolved,3,3,1,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-765,INC0092665,Issue 665,Routine incident.,Closed,2,1,3,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-766,INC0092666,Issue 666,Routine incident.,Closed,3,2,2,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-767,INC0092667,Issue 667,Routine incident.,Closed,4,2,2,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-768,INC0092668,Issue 668,Routine incident.,In Progress,3,2,2,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-769,INC0092669,Issue 669,Routine incident.,Resolved,2,3,2,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-770,INC0092670,Issue 670,Routine incident.,On Hold,4,1,2,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-771,INC0092671,Issue 671,Routine incident.,New,3,2,2,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-772,INC0092672,Issue 672,Routine incident.,New,4,1,3,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-773,INC0092673,Issue 673,Routine incident.,In Progress,4,3,3,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-774,INC0092674,Issue 674,Routine incident.,Resolved,3,3,3,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-775,INC0092675,Issue 675,Routine incident.,In Progress,3,3,3,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-776,INC0092676,Issue 676,Routine incident.,Closed,1,1,1,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-777,INC0092677,Issue 677,Routine incident.,New,3,1,1,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-778,INC0092678,Issue 678,Routine incident.,On Hold,2,3,2,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-779,INC0092679,Issue 679,Routine incident.,Closed,3,3,2,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-780,INC0092680,Issue 680,Routine incident.,Resolved,2,3,2,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-781,INC0092681,Issue 681,Routine incident.,Closed,4,1,2,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-782,INC0092682,Issue 682,Routine incident.,In Progress,4,2,3,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-783,INC0092683,Issue 683,Routine incident.,On Hold,4,1,2,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-784,INC0092684,Issue 684,Routine incident.,New,3,2,2,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-785,INC0092685,Issue 685,Routine incident.,Resolved,1,3,3,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-786,INC0092686,Issue 686,Routine incident.,New,3,3,2,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-787,INC0092687,Issue 687,Routine incident.,In Progress,3,1,1,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-788,INC0092688,Issue 688,Routine incident.,On Hold,1,2,2,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-789,INC0092689,Issue 689,Routine incident.,In Progress,2,3,3,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-790,INC0092690,Issue 690,Routine incident.,New,3,1,2,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-791,INC0092691,Issue 691,Routine incident.,In Progress,4,3,3,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-792,INC0092692,Issue 692,Routine incident.,New,1,3,2,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-793,INC0092693,Issue 693,Routine incident.,On Hold,1,3,3,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-794,INC0092694,Issue 694,Routine incident.,In Progress,4,1,3,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-795,INC0092695,Issue 695,Routine incident.,Resolved,1,3,1,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-796,INC0092696,Issue 696,Routine incident.,On Hold,1,1,2,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-797,INC0092697,Issue 697,Routine incident.,Closed,4,3,3,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-798,INC0092698,Issue 698,Routine incident.,On Hold,3,2,3,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-799,INC0092699,Issue 699,Routine incident.,On Hold,2,1,3,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-800,INC0092700,Issue 700,Routine incident.,In Progress,4,1,2,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-801,INC0092701,Issue 701,Routine incident.,In Progress,3,3,1,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-802,INC0092702,Issue 702,Routine incident.,In Progress,1,1,1,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-803,INC0092703,Issue 703,Routine incident.,Closed,3,2,1,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-804,INC0092704,Issue 704,Routine incident.,In Progress,3,2,3,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-805,INC0092705,Issue 705,Routine incident.,On Hold,2,2,3,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-806,INC0092706,Issue 706,Routine incident.,On Hold,3,1,2,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-807,INC0092707,Issue 707,Routine incident.,New,1,1,3,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-808,INC0092708,Issue 708,Routine incident.,Resolved,3,2,2,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-809,INC0092709,Issue 709,Routine incident.,New,2,2,2,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-810,INC0092710,Issue 710,Routine incident.,Closed,2,2,1,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-811,INC0092711,Issue 711,Routine incident.,New,1,1,3,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-812,INC0092712,Issue 712,Routine incident.,Resolved,2,3,1,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-813,INC0092713,Issue 713,Routine incident.,In Progress,4,3,1,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-814,INC0092714,Issue 714,Routine incident.,On Hold,4,3,1,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-815,INC0092715,Issue 715,Routine incident.,Closed,2,2,3,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-816,INC0092716,Issue 716,Routine incident.,Closed,4,1,3,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-817,INC0092717,Issue 717,Routine incident.,New,4,3,1,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-818,INC0092718,Issue 718,Routine incident.,Closed,2,1,3,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-819,INC0092719,Issue 719,Routine incident.,New,2,1,3,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-820,INC0092720,Issue 720,Routine incident.,Resolved,1,1,1,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-821,INC0092721,Issue 721,Routine incident.,New,3,1,2,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-822,INC0092722,Issue 722,Routine incident.,On Hold,2,1,1,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-823,INC0092723,Issue 723,Routine incident.,Resolved,4,3,3,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-824,INC0092724,Issue 724,Routine incident.,Resolved,1,2,2,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-825,INC0092725,Issue 725,Routine incident.,In Progress,1,1,2,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-826,INC0092726,Issue 726,Routine incident.,New,3,1,2,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-827,INC0092727,Issue 727,Routine incident.,New,4,1,1,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-828,INC0092728,Issue 728,Routine incident.,On Hold,1,2,1,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-829,INC0092729,Issue 729,Routine incident.,On Hold,3,3,3,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-830,INC0092730,Issue 730,Routine incident.,Closed,2,1,2,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-831,INC0092731,Issue 731,Routine incident.,On Hold,3,1,1,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-832,INC0092732,Issue 732,Routine incident.,Resolved,4,3,3,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-833,INC0092733,Issue 733,Routine incident.,On Hold,3,3,2,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-834,INC0092734,Issue 734,Routine incident.,Closed,1,2,3,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-835,INC0092735,Issue 735,Routine incident.,New,1,1,3,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-836,INC0092736,Issue 736,Routine incident.,Resolved,4,2,2,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-837,INC0092737,Issue 737,Routine incident.,New,1,3,3,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-838,INC0092738,Issue 738,Routine incident.,Resolved,2,1,3,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-839,INC0092739,Issue 739,Routine incident.,Resolved,2,1,2,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-840,INC0092740,Issue 740,Routine incident.,Resolved,3,2,2,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-841,INC0092741,Issue 741,Routine incident.,New,3,1,3,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-842,INC0092742,Issue 742,Routine incident.,New,2,3,3,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-843,INC0092743,Issue 743,Routine incident.,On Hold,4,3,1,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-844,INC0092744,Issue 744,Routine incident.,Resolved,2,2,2,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-845,INC0092745,Issue 745,Routine incident.,Resolved,3,2,3,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-846,INC0092746,Issue 746,Routine incident.,On Hold,1,1,3,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-847,INC0092747,Issue 747,Routine incident.,Resolved,2,2,1,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-848,INC0092748,Issue 748,Routine incident.,New,2,1,2,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-849,INC0092749,Issue 749,Routine incident.,Closed,1,1,1,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-850,INC0092750,Issue 750,Routine incident.,In Progress,1,2,2,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-851,INC0092751,Issue 751,Routine incident.,New,1,2,2,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-852,INC0092752,Issue 752,Routine incident.,Resolved,2,2,2,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-853,INC0092753,Issue 753,Routine incident.,New,3,3,2,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-854,INC0092754,Issue 754,Routine incident.,On Hold,3,1,1,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-855,INC0092755,Issue 755,Routine incident.,New,2,3,3,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-856,INC0092756,Issue 756,Routine incident.,Resolved,2,3,2,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-857,INC0092757,Issue 757,Routine incident.,New,1,2,1,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-858,INC0092758,Issue 758,Routine incident.,On Hold,4,2,3,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-859,INC0092759,Issue 759,Routine incident.,Resolved,4,3,1,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-860,INC0092760,Issue 760,Routine incident.,Resolved,1,1,1,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-861,INC0092761,Issue 761,Routine incident.,On Hold,3,3,3,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-862,INC0092762,Issue 762,Routine incident.,Resolved,2,1,2,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-863,INC0092763,Issue 763,Routine incident.,Closed,3,3,1,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-864,INC0092764,Issue 764,Routine incident.,New,1,1,3,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-865,INC0092765,Issue 765,Routine incident.,On Hold,1,1,2,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-866,INC0092766,Issue 766,Routine incident.,Resolved,4,1,1,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-867,INC0092767,Issue 767,Routine incident.,On Hold,2,1,1,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-868,INC0092768,Issue 768,Routine incident.,On Hold,2,1,2,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-869,INC0092769,Issue 769,Routine incident.,On Hold,2,2,1,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-870,INC0092770,Issue 770,Routine incident.,In Progress,1,1,3,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-871,INC0092771,Issue 771,Routine incident.,In Progress,4,3,3,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-872,INC0092772,Issue 772,Routine incident.,Resolved,1,2,2,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-873,INC0092773,Issue 773,Routine incident.,Closed,4,2,3,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-874,INC0092774,Issue 774,Routine incident.,On Hold,4,2,2,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-875,INC0092775,Issue 775,Routine incident.,On Hold,3,3,3,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-876,INC0092776,Issue 776,Routine incident.,New,2,1,1,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-877,INC0092777,Issue 777,Routine incident.,Resolved,2,2,2,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-878,INC0092778,Issue 778,Routine incident.,Resolved,3,1,1,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-879,INC0092779,Issue 779,Routine incident.,New,2,1,3,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-880,INC0092780,Issue 780,Routine incident.,In Progress,3,2,3,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-881,INC0092781,Issue 781,Routine incident.,Closed,1,2,3,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-882,INC0092782,Issue 782,Routine incident.,Resolved,1,2,1,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-883,INC0092783,Issue 783,Routine incident.,On Hold,2,3,3,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-884,INC0092784,Issue 784,Routine incident.,New,3,2,3,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-885,INC0092785,Issue 785,Routine incident.,Closed,3,3,1,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-886,INC0092786,Issue 786,Routine incident.,Closed,3,3,3,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-887,INC0092787,Issue 787,Routine incident.,Closed,1,3,2,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-888,INC0092788,Issue 788,Routine incident.,In Progress,3,2,2,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-889,INC0092789,Issue 789,Routine incident.,In Progress,4,2,3,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-890,INC0092790,Issue 790,Routine incident.,Resolved,2,3,1,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-891,INC0092791,Issue 791,Routine incident.,In Progress,2,1,2,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-892,INC0092792,Issue 792,Routine incident.,In Progress,4,2,1,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-893,INC0092793,Issue 793,Routine incident.,New,3,3,2,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-894,INC0092794,Issue 794,Routine incident.,Closed,1,1,3,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-895,INC0092795,Issue 795,Routine incident.,Closed,4,1,3,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-896,INC0092796,Issue 796,Routine incident.,New,2,2,1,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-897,INC0092797,Issue 797,Routine incident.,Closed,2,2,1,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-898,INC0092798,Issue 798,Routine incident.,On Hold,3,3,1,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-899,INC0092799,Issue 799,Routine incident.,On Hold,3,1,1,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-900,INC0092800,Issue 800,Routine incident.,In Progress,4,2,1,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-901,INC0092801,Issue 801,Routine incident.,On Hold,3,1,1,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-902,INC0092802,Issue 802,Routine incident.,Resolved,1,3,3,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-903,INC0092803,Issue 803,Routine incident.,Closed,1,1,1,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-904,INC0092804,Issue 804,Routine incident.,In Progress,2,3,2,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-905,INC0092805,Issue 805,Routine incident.,On Hold,3,2,2,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-906,INC0092806,Issue 806,Routine incident.,On Hold,4,1,2,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-907,INC0092807,Issue 807,Routine incident.,On Hold,2,3,1,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-908,INC0092808,Issue 808,Routine incident.,New,1,2,3,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-909,INC0092809,Issue 809,Routine incident.,Closed,3,2,1,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-910,INC0092810,Issue 810,Routine incident.,In Progress,2,2,3,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-911,INC0092811,Issue 811,Routine incident.,Resolved,2,1,3,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-912,INC0092812,Issue 812,Routine incident.,New,1,2,2,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-913,INC0092813,Issue 813,Routine incident.,Closed,2,1,2,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-914,INC0092814,Issue 814,Routine incident.,In Progress,1,3,3,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-915,INC0092815,Issue 815,Routine incident.,Closed,4,3,3,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-916,INC0092816,Issue 816,Routine incident.,Closed,2,3,2,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-917,INC0092817,Issue 817,Routine incident.,New,3,2,1,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-918,INC0092818,Issue 818,Routine incident.,Closed,2,2,1,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-919,INC0092819,Issue 819,Routine incident.,On Hold,2,1,3,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-920,INC0092820,Issue 820,Routine incident.,New,2,2,3,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-921,INC0092821,Issue 821,Routine incident.,On Hold,2,2,3,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-922,INC0092822,Issue 822,Routine incident.,Resolved,4,2,2,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-923,INC0092823,Issue 823,Routine incident.,Closed,2,1,1,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-924,INC0092824,Issue 824,Routine incident.,In Progress,3,1,2,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-925,INC0092825,Issue 825,Routine incident.,Resolved,3,2,1,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-926,INC0092826,Issue 826,Routine incident.,New,2,1,1,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-927,INC0092827,Issue 827,Routine incident.,In Progress,1,1,1,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-928,INC0092828,Issue 828,Routine incident.,Closed,3,1,1,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-929,INC0092829,Issue 829,Routine incident.,Closed,4,1,3,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-930,INC0092830,Issue 830,Routine incident.,Resolved,4,2,2,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-931,INC0092831,Issue 831,Routine incident.,Resolved,4,1,2,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-932,INC0092832,Issue 832,Routine incident.,Resolved,3,3,1,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-933,INC0092833,Issue 833,Routine incident.,In Progress,3,3,2,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-934,INC0092834,Issue 834,Routine incident.,In Progress,1,3,1,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-935,INC0092835,Issue 835,Routine incident.,Resolved,1,3,2,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-936,INC0092836,Issue 836,Routine incident.,New,4,2,3,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-937,INC0092837,Issue 837,Routine incident.,In Progress,1,1,3,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-938,INC0092838,Issue 838,Routine incident.,On Hold,1,2,3,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-939,INC0092839,Issue 839,Routine incident.,Resolved,1,1,3,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-940,INC0092840,Issue 840,Routine incident.,In Progress,4,2,3,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-941,INC0092841,Issue 841,Routine incident.,Resolved,1,2,2,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-942,INC0092842,Issue 842,Routine incident.,New,4,1,3,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-943,INC0092843,Issue 843,Routine incident.,New,1,2,2,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-944,INC0092844,Issue 844,Routine incident.,New,3,2,3,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-945,INC0092845,Issue 845,Routine incident.,Resolved,3,2,3,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-946,INC0092846,Issue 846,Routine incident.,New,2,1,3,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-947,INC0092847,Issue 847,Routine incident.,On Hold,4,1,2,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-948,INC0092848,Issue 848,Routine incident.,In Progress,1,1,2,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-949,INC0092849,Issue 849,Routine incident.,Closed,3,3,3,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-950,INC0092850,Issue 850,Routine incident.,New,3,3,3,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-951,INC0092851,Issue 851,Routine incident.,Closed,4,1,3,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-952,INC0092852,Issue 852,Routine incident.,Resolved,4,3,1,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-953,INC0092853,Issue 853,Routine incident.,Closed,3,3,3,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-954,INC0092854,Issue 854,Routine incident.,On Hold,3,3,3,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-955,INC0092855,Issue 855,Routine incident.,Closed,3,1,1,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-956,INC0092856,Issue 856,Routine incident.,New,2,2,2,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-957,INC0092857,Issue 857,Routine incident.,In Progress,3,2,3,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-958,INC0092858,Issue 858,Routine incident.,Resolved,1,3,1,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-959,INC0092859,Issue 859,Routine incident.,In Progress,2,3,3,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-960,INC0092860,Issue 860,Routine incident.,New,2,3,1,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-961,INC0092861,Issue 861,Routine incident.,New,1,2,3,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-962,INC0092862,Issue 862,Routine incident.,In Progress,1,3,2,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-963,INC0092863,Issue 863,Routine incident.,Resolved,1,3,2,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-964,INC0092864,Issue 864,Routine incident.,Closed,2,2,1,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-965,INC0092865,Issue 865,Routine incident.,Resolved,1,2,3,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-966,INC0092866,Issue 866,Routine incident.,In Progress,1,3,1,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-967,INC0092867,Issue 867,Routine incident.,Resolved,2,1,2,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-968,INC0092868,Issue 868,Routine incident.,Closed,4,3,2,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-969,INC0092869,Issue 869,Routine incident.,Closed,1,3,2,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-970,INC0092870,Issue 870,Routine incident.,In Progress,1,2,3,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-971,INC0092871,Issue 871,Routine incident.,Closed,3,3,3,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-972,INC0092872,Issue 872,Routine incident.,New,3,2,1,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-973,INC0092873,Issue 873,Routine incident.,Closed,2,2,1,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-974,INC0092874,Issue 874,Routine incident.,In Progress,3,2,2,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-975,INC0092875,Issue 875,Routine incident.,New,4,2,1,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-976,INC0092876,Issue 876,Routine incident.,In Progress,3,2,3,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-977,INC0092877,Issue 877,Routine incident.,Closed,1,3,3,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-978,INC0092878,Issue 878,Routine incident.,On Hold,4,2,2,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-979,INC0092879,Issue 879,Routine incident.,Resolved,2,3,1,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-980,INC0092880,Issue 880,Routine incident.,Resolved,2,3,3,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-981,INC0092881,Issue 881,Routine incident.,Closed,1,3,2,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-982,INC0092882,Issue 882,Routine incident.,In Progress,3,2,2,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-983,INC0092883,Issue 883,Routine incident.,In Progress,2,2,2,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-984,INC0092884,Issue 884,Routine incident.,New,4,3,1,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-985,INC0092885,Issue 885,Routine incident.,Closed,2,2,1,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-986,INC0092886,Issue 886,Routine incident.,New,3,2,2,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-987,INC0092887,Issue 887,Routine incident.,Resolved,4,1,3,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-988,INC0092888,Issue 888,Routine incident.,Closed,4,1,3,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-989,INC0092889,Issue 889,Routine incident.,Resolved,2,2,3,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-990,INC0092890,Issue 890,Routine incident.,In Progress,4,3,3,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-991,INC0092891,Issue 891,Routine incident.,Resolved,2,2,2,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-992,INC0092892,Issue 892,Routine incident.,In Progress,3,1,2,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-993,INC0092893,Issue 893,Routine incident.,Closed,4,2,3,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-994,INC0092894,Issue 894,Routine incident.,Resolved,4,1,3,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-995,INC0092895,Issue 895,Routine incident.,New,1,2,3,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-996,INC0092896,Issue 896,Routine incident.,Closed,1,3,1,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-997,INC0092897,Issue 897,Routine incident.,New,4,2,2,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-998,INC0092898,Issue 898,Routine incident.,New,1,3,3,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-999,INC0092899,Issue 899,Routine incident.,Resolved,4,2,2,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-1000,INC0092900,Issue 900,Routine incident.,Resolved,3,2,1,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-1001,INC0092901,Issue 901,Routine incident.,Closed,4,3,3,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1002,INC0092902,Issue 902,Routine incident.,On Hold,3,1,1,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-1003,INC0092903,Issue 903,Routine incident.,New,1,3,3,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-1004,INC0092904,Issue 904,Routine incident.,Closed,4,2,1,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1005,INC0092905,Issue 905,Routine incident.,Closed,3,1,2,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-1006,INC0092906,Issue 906,Routine incident.,Closed,1,2,2,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-1007,INC0092907,Issue 907,Routine incident.,On Hold,2,2,1,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-1008,INC0092908,Issue 908,Routine incident.,On Hold,3,2,2,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1009,INC0092909,Issue 909,Routine incident.,New,4,2,2,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1010,INC0092910,Issue 910,Routine incident.,On Hold,1,1,2,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-1011,INC0092911,Issue 911,Routine incident.,Resolved,4,3,3,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-1012,INC0092912,Issue 912,Routine incident.,New,3,3,2,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1013,INC0092913,Issue 913,Routine incident.,Closed,3,1,2,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1014,INC0092914,Issue 914,Routine incident.,New,1,1,2,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1015,INC0092915,Issue 915,Routine incident.,In Progress,3,1,3,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1016,INC0092916,Issue 916,Routine incident.,In Progress,2,3,1,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-1017,INC0092917,Issue 917,Routine incident.,On Hold,1,1,3,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-1018,INC0092918,Issue 918,Routine incident.,Closed,3,2,2,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-1019,INC0092919,Issue 919,Routine incident.,Resolved,1,3,3,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1020,INC0092920,Issue 920,Routine incident.,On Hold,2,2,1,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-1021,INC0092921,Issue 921,Routine incident.,In Progress,2,2,1,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-1022,INC0092922,Issue 922,Routine incident.,Resolved,4,1,1,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-1023,INC0092923,Issue 923,Routine incident.,Resolved,1,1,2,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-1024,INC0092924,Issue 924,Routine incident.,In Progress,4,2,3,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-1025,INC0092925,Issue 925,Routine incident.,On Hold,3,3,3,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-1026,INC0092926,Issue 926,Routine incident.,New,1,1,3,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1027,INC0092927,Issue 927,Routine incident.,On Hold,3,3,1,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-1028,INC0092928,Issue 928,Routine incident.,Resolved,1,1,2,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1029,INC0092929,Issue 929,Routine incident.,In Progress,3,2,2,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1030,INC0092930,Issue 930,Routine incident.,In Progress,4,2,2,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-1031,INC0092931,Issue 931,Routine incident.,In Progress,4,1,2,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-1032,INC0092932,Issue 932,Routine incident.,New,2,2,1,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-1033,INC0092933,Issue 933,Routine incident.,Closed,1,3,1,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-1034,INC0092934,Issue 934,Routine incident.,In Progress,3,2,2,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-1035,INC0092935,Issue 935,Routine incident.,Closed,3,3,3,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-1036,INC0092936,Issue 936,Routine incident.,On Hold,1,2,3,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1037,INC0092937,Issue 937,Routine incident.,New,1,3,2,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-1038,INC0092938,Issue 938,Routine incident.,In Progress,1,2,2,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1039,INC0092939,Issue 939,Routine incident.,Resolved,1,3,3,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1040,INC0092940,Issue 940,Routine incident.,In Progress,1,3,2,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-1041,INC0092941,Issue 941,Routine incident.,In Progress,1,1,1,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-1042,INC0092942,Issue 942,Routine incident.,New,1,1,2,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1043,INC0092943,Issue 943,Routine incident.,Resolved,2,3,2,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1044,INC0092944,Issue 944,Routine incident.,On Hold,4,2,1,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-1045,INC0092945,Issue 945,Routine incident.,New,4,3,2,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-1046,INC0092946,Issue 946,Routine incident.,On Hold,1,3,2,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-1047,INC0092947,Issue 947,Routine incident.,In Progress,4,2,3,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-1048,INC0092948,Issue 948,Routine incident.,On Hold,4,1,3,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1049,INC0092949,Issue 949,Routine incident.,Closed,3,1,1,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-1050,INC0092950,Issue 950,Routine incident.,New,2,3,3,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-1051,INC0092951,Issue 951,Routine incident.,Resolved,4,2,3,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-1052,INC0092952,Issue 952,Routine incident.,Resolved,3,2,3,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1053,INC0092953,Issue 953,Routine incident.,New,4,1,2,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-1054,INC0092954,Issue 954,Routine incident.,New,3,3,2,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-1055,INC0092955,Issue 955,Routine incident.,On Hold,1,3,3,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-1056,INC0092956,Issue 956,Routine incident.,Resolved,1,3,3,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-1057,INC0092957,Issue 957,Routine incident.,New,4,2,3,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1058,INC0092958,Issue 958,Routine incident.,Closed,4,3,3,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-1059,INC0092959,Issue 959,Routine incident.,On Hold,4,1,3,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1060,INC0092960,Issue 960,Routine incident.,Resolved,4,2,2,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1061,INC0092961,Issue 961,Routine incident.,New,4,2,2,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-1062,INC0092962,Issue 962,Routine incident.,In Progress,2,2,1,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1063,INC0092963,Issue 963,Routine incident.,Closed,4,2,2,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1064,INC0092964,Issue 964,Routine incident.,On Hold,2,3,2,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-1065,INC0092965,Issue 965,Routine incident.,Resolved,4,3,1,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-1066,INC0092966,Issue 966,Routine incident.,Resolved,2,2,1,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-1067,INC0092967,Issue 967,Routine incident.,On Hold,3,1,1,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1068,INC0092968,Issue 968,Routine incident.,Closed,4,2,3,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1069,INC0092969,Issue 969,Routine incident.,Closed,3,3,1,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-1070,INC0092970,Issue 970,Routine incident.,New,4,3,1,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-1071,INC0092971,Issue 971,Routine incident.,Resolved,3,2,1,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1072,INC0092972,Issue 972,Routine incident.,Closed,3,2,3,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-1073,INC0092973,Issue 973,Routine incident.,Closed,3,1,1,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-1074,INC0092974,Issue 974,Routine incident.,Closed,2,1,1,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-1075,INC0092975,Issue 975,Routine incident.,New,4,2,2,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1076,INC0092976,Issue 976,Routine incident.,On Hold,2,3,1,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-1077,INC0092977,Issue 977,Routine incident.,On Hold,4,3,2,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1078,INC0092978,Issue 978,Routine incident.,On Hold,3,1,3,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1079,INC0092979,Issue 979,Routine incident.,New,4,1,2,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1080,INC0092980,Issue 980,Routine incident.,On Hold,2,2,1,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-1081,INC0092981,Issue 981,Routine incident.,Resolved,2,2,3,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1082,INC0092982,Issue 982,Routine incident.,In Progress,1,3,3,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-1083,INC0092983,Issue 983,Routine incident.,Resolved,4,3,3,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1084,INC0092984,Issue 984,Routine incident.,Resolved,3,1,2,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1085,INC0092985,Issue 985,Routine incident.,Closed,1,1,2,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-1086,INC0092986,Issue 986,Routine incident.,In Progress,1,3,2,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1087,INC0092987,Issue 987,Routine incident.,On Hold,3,2,1,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-1088,INC0092988,Issue 988,Routine incident.,Closed,3,2,2,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-1089,INC0092989,Issue 989,Routine incident.,Resolved,1,2,1,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-1090,INC0092990,Issue 990,Routine incident.,New,3,3,2,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-1091,INC0092991,Issue 991,Routine incident.,On Hold,4,3,2,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-1092,INC0092992,Issue 992,Routine incident.,New,3,3,1,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-1093,INC0092993,Issue 993,Routine incident.,In Progress,1,3,2,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-1094,INC0092994,Issue 994,Routine incident.,Closed,4,3,3,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1095,INC0092995,Issue 995,Routine incident.,In Progress,2,3,2,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1096,INC0092996,Issue 996,Routine incident.,New,3,1,2,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-1097,INC0092997,Issue 997,Routine incident.,New,4,2,3,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-1098,INC0092998,Issue 998,Routine incident.,New,3,2,2,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1099,INC0092999,Issue 999,Routine incident.,In Progress,3,2,3,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1100,INC0093000,Issue 1000,Routine incident.,Resolved,1,3,3,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1101,INC0093001,Issue 1001,Routine incident.,Resolved,1,1,2,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-1102,INC0093002,Issue 1002,Routine incident.,In Progress,2,2,3,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-1103,INC0093003,Issue 1003,Routine incident.,In Progress,3,3,3,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-1104,INC0093004,Issue 1004,Routine incident.,On Hold,4,2,3,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1105,INC0093005,Issue 1005,Routine incident.,New,2,2,3,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-1106,INC0093006,Issue 1006,Routine incident.,On Hold,1,3,2,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-1107,INC0093007,Issue 1007,Routine incident.,On Hold,4,3,2,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1108,INC0093008,Issue 1008,Routine incident.,In Progress,2,2,2,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-1109,INC0093009,Issue 1009,Routine incident.,Closed,1,2,1,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1110,INC0093010,Issue 1010,Routine incident.,In Progress,4,2,1,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-1111,INC0093011,Issue 1011,Routine incident.,Resolved,3,1,1,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-1112,INC0093012,Issue 1012,Routine incident.,New,4,2,1,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-1113,INC0093013,Issue 1013,Routine incident.,In Progress,3,3,1,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1114,INC0093014,Issue 1014,Routine incident.,In Progress,1,1,3,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1115,INC0093015,Issue 1015,Routine incident.,Resolved,2,3,3,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-1116,INC0093016,Issue 1016,Routine incident.,Resolved,1,3,2,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-1117,INC0093017,Issue 1017,Routine incident.,On Hold,4,1,3,network,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-1118,INC0093018,Issue 1018,Routine incident.,On Hold,4,3,3,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-1119,INC0093019,Issue 1019,Routine incident.,New,3,2,1,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1120,INC0093020,Issue 1020,Routine incident.,On Hold,3,2,1,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1121,INC0093021,Issue 1021,Routine incident.,Resolved,3,1,1,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1122,INC0093022,Issue 1022,Routine incident.,On Hold,2,1,2,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1123,INC0093023,Issue 1023,Routine incident.,New,4,3,3,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1124,INC0093024,Issue 1024,Routine incident.,Resolved,4,3,3,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-1125,INC0093025,Issue 1025,Routine incident.,On Hold,1,3,2,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-1126,INC0093026,Issue 1026,Routine incident.,On Hold,4,1,3,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1127,INC0093027,Issue 1027,Routine incident.,In Progress,1,3,2,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-1128,INC0093028,Issue 1028,Routine incident.,Resolved,4,3,1,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-1129,INC0093029,Issue 1029,Routine incident.,In Progress,2,3,1,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-1130,INC0093030,Issue 1030,Routine incident.,Closed,2,2,3,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-1131,INC0093031,Issue 1031,Routine incident.,Resolved,1,2,2,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-1132,INC0093032,Issue 1032,Routine incident.,New,1,1,1,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1133,INC0093033,Issue 1033,Routine incident.,On Hold,4,1,2,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1134,INC0093034,Issue 1034,Routine incident.,New,2,2,3,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-1135,INC0093035,Issue 1035,Routine incident.,New,2,2,3,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-1136,INC0093036,Issue 1036,Routine incident.,New,1,3,1,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-1137,INC0093037,Issue 1037,Routine incident.,New,2,1,2,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-1138,INC0093038,Issue 1038,Routine incident.,On Hold,2,3,1,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1139,INC0093039,Issue 1039,Routine incident.,In Progress,2,3,2,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-1140,INC0093040,Issue 1040,Routine incident.,On Hold,3,1,1,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-1141,INC0093041,Issue 1041,Routine incident.,In Progress,4,2,3,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-1142,INC0093042,Issue 1042,Routine incident.,Closed,4,1,3,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-1143,INC0093043,Issue 1043,Routine incident.,Resolved,3,2,2,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1144,INC0093044,Issue 1044,Routine incident.,On Hold,2,3,3,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1145,INC0093045,Issue 1045,Routine incident.,New,3,2,3,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1146,INC0093046,Issue 1046,Routine incident.,New,1,2,3,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-1147,INC0093047,Issue 1047,Routine incident.,Resolved,3,3,2,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-1148,INC0093048,Issue 1048,Routine incident.,On Hold,1,2,2,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-1149,INC0093049,Issue 1049,Routine incident.,Closed,3,3,2,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-1150,INC0093050,Issue 1050,Routine incident.,Resolved,1,1,2,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-1151,INC0093051,Issue 1051,Routine incident.,Resolved,1,1,1,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1152,INC0093052,Issue 1052,Routine incident.,New,4,2,2,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-1153,INC0093053,Issue 1053,Routine incident.,In Progress,4,2,1,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-1154,INC0093054,Issue 1054,Routine incident.,On Hold,3,2,1,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1155,INC0093055,Issue 1055,Routine incident.,Resolved,1,2,1,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-1156,INC0093056,Issue 1056,Routine incident.,Resolved,3,3,1,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-1157,INC0093057,Issue 1057,Routine incident.,On Hold,4,2,2,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1158,INC0093058,Issue 1058,Routine incident.,In Progress,4,2,1,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-1159,INC0093059,Issue 1059,Routine incident.,In Progress,4,3,1,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1160,INC0093060,Issue 1060,Routine incident.,On Hold,1,1,2,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-1161,INC0093061,Issue 1061,Routine incident.,In Progress,3,3,2,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-1162,INC0093062,Issue 1062,Routine incident.,On Hold,1,1,1,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-1163,INC0093063,Issue 1063,Routine incident.,On Hold,4,3,3,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-1164,INC0093064,Issue 1064,Routine incident.,In Progress,3,3,2,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-1165,INC0093065,Issue 1065,Routine incident.,Closed,4,2,3,hardware,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1166,INC0093066,Issue 1066,Routine incident.,New,1,1,2,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-1167,INC0093067,Issue 1067,Routine incident.,New,2,3,1,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1168,INC0093068,Issue 1068,Routine incident.,New,1,1,2,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-1169,INC0093069,Issue 1069,Routine incident.,On Hold,4,1,2,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-1170,INC0093070,Issue 1070,Routine incident.,Closed,2,3,3,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1171,INC0093071,Issue 1071,Routine incident.,Closed,4,1,2,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1172,INC0093072,Issue 1072,Routine incident.,Resolved,1,1,2,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1173,INC0093073,Issue 1073,Routine incident.,Closed,2,2,2,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-1174,INC0093074,Issue 1074,Routine incident.,Resolved,4,1,1,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-1175,INC0093075,Issue 1075,Routine incident.,Resolved,3,1,3,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-1176,INC0093076,Issue 1076,Routine incident.,Resolved,2,2,1,software,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1177,INC0093077,Issue 1077,Routine incident.,On Hold,1,1,3,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1178,INC0093078,Issue 1078,Routine incident.,New,2,3,3,network,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1179,INC0093079,Issue 1079,Routine incident.,Closed,4,1,1,hardware,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1180,INC0093080,Issue 1080,Routine incident.,In Progress,3,2,1,software,greg,greg,2026-10-01,2026-11-01
+sys-inc-1181,INC0093081,Issue 1081,Routine incident.,New,2,1,3,software,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-1182,INC0093082,Issue 1082,Routine incident.,In Progress,3,1,1,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-1183,INC0093083,Issue 1083,Routine incident.,In Progress,4,1,2,hardware,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-1184,INC0093084,Issue 1084,Routine incident.,Closed,1,3,3,network,greg,greg,2026-10-01,2026-11-01
+sys-inc-1185,INC0093085,Issue 1085,Routine incident.,On Hold,1,1,3,hardware,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-1186,INC0093086,Issue 1086,Routine incident.,On Hold,2,1,1,network,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-1187,INC0093087,Issue 1087,Routine incident.,New,3,2,2,hardware,greg,greg,2026-10-01,2026-11-01
+sys-inc-1188,INC0093088,Issue 1088,Routine incident.,Closed,3,3,1,network,it-agent-2,greg,2026-10-01,2026-11-01
+sys-inc-1189,INC0093089,Issue 1089,Routine incident.,Resolved,4,1,2,software,greg,user-x,2026-10-01,2026-11-01
+sys-inc-1190,INC0093090,Issue 1090,Routine incident.,New,2,1,2,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-1191,INC0093091,Issue 1091,Routine incident.,Closed,2,1,3,hardware,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-1192,INC0093092,Issue 1092,Routine incident.,On Hold,2,2,2,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1193,INC0093093,Issue 1093,Routine incident.,On Hold,2,3,3,network,it-agent-3,greg,2026-10-01,2026-11-01
+sys-inc-1194,INC0093094,Issue 1094,Routine incident.,Resolved,2,3,2,software,it-agent-2,user-x,2026-10-01,2026-11-01
+sys-inc-1195,INC0093095,Issue 1095,Routine incident.,Closed,3,2,2,software,it-agent-3,user-x,2026-10-01,2026-11-01
+sys-inc-1196,INC0093096,Issue 1096,Routine incident.,In Progress,4,2,2,hardware,it-agent-3,user-x,2026-10-01,2026-11-01

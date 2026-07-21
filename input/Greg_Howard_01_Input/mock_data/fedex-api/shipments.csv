@@ -1,0 +1,13 @@
+tracking_number,service_type,service_name,ship_date,origin_zip,dest_zip,weight_lb,currency,net_charge,label_url
+794800000000,FEDEX_GROUND,FedEx Ground,2026-01-01,43085,20000,1,USD,63.95,https://fedex.example.com/label
+794800000001,FEDEX_GROUND,FedEx Ground,2026-02-02,43085,20003,7,USD,86.5,https://fedex.example.com/label
+794800000002,FEDEX_GROUND,FedEx Ground,2026-03-03,43085,20006,28,USD,77.15,https://fedex.example.com/label
+794800000003,FEDEX_GROUND,FedEx Ground,2026-04-04,43085,20009,2,USD,16.14,https://fedex.example.com/label
+794800000004,FEDEX_GROUND,FedEx Ground,2026-05-05,43085,20012,38,USD,60.64,https://fedex.example.com/label
+794800000005,FEDEX_GROUND,FedEx Ground,2026-06-06,43085,20015,1,USD,36.18,https://fedex.example.com/label
+794800000006,FEDEX_GROUND,FedEx Ground,2026-07-07,43085,20018,40,USD,46.25,https://fedex.example.com/label
+794800000007,FEDEX_GROUND,FedEx Ground,2026-08-08,43085,20021,3,USD,59.05,https://fedex.example.com/label
+794800000008,FEDEX_GROUND,FedEx Ground,2026-09-09,43085,20024,38,USD,13.93,https://fedex.example.com/label
+794800000009,FEDEX_GROUND,FedEx Ground,2026-10-10,43085,20027,23,USD,73.14,https://fedex.example.com/label
+794800000010,FEDEX_GROUND,FedEx Ground,2026-11-11,43085,20030,37,USD,61.96,https://fedex.example.com/label
+794800000011,FEDEX_GROUND,FedEx Ground,2026-12-12,43085,20033,16,USD,61.69,https://fedex.example.com/label

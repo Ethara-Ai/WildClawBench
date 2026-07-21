@@ -1,0 +1,187 @@
+id,application_id,candidate_id,interviewer,stage,overall_recommendation,rating,submitted_at,notes
+sc-330,app-4002,cand-1062,Greg Howard,Onsite,no_hire,3,2026-11-05,Panel scorecard filed by Greg Howard.
+sc-341,app-4003,cand-1078,Greg Howard,Onsite,yes,4,2026-11-05,Panel scorecard filed by Greg Howard.
+sc-500,app-4017,cand-2105,Karen Whitfield,Phone Screen,strong_yes,2,2026-11-10,Interview feedback.
+sc-501,app-4054,cand-2146,Panelist D,Phone Screen,yes,3,2026-11-09,Interview feedback.
+sc-502,app-4279,cand-2064,Panelist D,Onsite,no_hire,2,2026-11-02,Interview feedback.
+sc-503,app-4169,cand-2005,Sarah Mitchell,Phone Screen,no_hire,4,2026-11-05,Interview feedback.
+sc-504,app-4339,cand-2081,Karen Whitfield,Phone Screen,no_hire,3,2026-11-07,Interview feedback.
+sc-505,app-4342,cand-2023,Panelist D,Onsite,yes,5,2026-11-05,Interview feedback.
+sc-506,app-4382,cand-2058,Sarah Mitchell,Onsite,yes,5,2026-11-10,Interview feedback.
+sc-507,app-4327,cand-2227,Karen Whitfield,Onsite,no_hire,2,2026-11-05,Interview feedback.
+sc-508,app-4155,cand-2155,Karen Whitfield,Onsite,yes,2,2026-11-07,Interview feedback.
+sc-509,app-4262,cand-2061,Karen Whitfield,Phone Screen,strong_yes,5,2026-11-03,Interview feedback.
+sc-510,app-4168,cand-2167,Karen Whitfield,Phone Screen,strong_yes,4,2026-11-01,Interview feedback.
+sc-511,app-4150,cand-2141,Sarah Mitchell,Phone Screen,strong_yes,4,2026-11-03,Interview feedback.
+sc-512,app-4184,cand-2127,Karen Whitfield,Phone Screen,yes,5,2026-11-02,Interview feedback.
+sc-513,app-4322,cand-2066,Sarah Mitchell,Onsite,yes,2,2026-11-03,Interview feedback.
+sc-514,app-4177,cand-2100,Panelist D,Phone Screen,strong_yes,2,2026-11-06,Interview feedback.
+sc-515,app-4172,cand-2088,Karen Whitfield,Phone Screen,no_hire,4,2026-11-02,Interview feedback.
+sc-516,app-4356,cand-2080,Karen Whitfield,Onsite,no_hire,2,2026-11-10,Interview feedback.
+sc-517,app-4163,cand-2196,Sarah Mitchell,Phone Screen,yes,3,2026-11-04,Interview feedback.
+sc-518,app-4142,cand-2124,Sarah Mitchell,Onsite,strong_yes,5,2026-11-07,Interview feedback.
+sc-519,app-4151,cand-2050,Karen Whitfield,Onsite,no_hire,5,2026-11-10,Interview feedback.
+sc-520,app-4321,cand-2005,Sarah Mitchell,Phone Screen,no_hire,2,2026-11-07,Interview feedback.
+sc-521,app-4164,cand-2033,Panelist D,Onsite,strong_yes,4,2026-11-05,Interview feedback.
+sc-522,app-4331,cand-2154,Panelist D,Phone Screen,strong_yes,5,2026-11-04,Interview feedback.
+sc-523,app-4365,cand-2113,Panelist D,Phone Screen,yes,2,2026-11-02,Interview feedback.
+sc-524,app-4339,cand-2019,Sarah Mitchell,Onsite,yes,5,2026-11-10,Interview feedback.
+sc-525,app-4260,cand-2189,Panelist D,Phone Screen,no_hire,5,2026-11-05,Interview feedback.
+sc-526,app-4346,cand-2095,Sarah Mitchell,Phone Screen,strong_yes,3,2026-11-07,Interview feedback.
+sc-527,app-4051,cand-2007,Karen Whitfield,Onsite,no_hire,2,2026-11-07,Interview feedback.
+sc-528,app-4113,cand-2059,Panelist D,Phone Screen,yes,3,2026-11-06,Interview feedback.
+sc-529,app-4296,cand-2195,Sarah Mitchell,Onsite,strong_yes,5,2026-11-05,Interview feedback.
+sc-530,app-4108,cand-2018,Panelist D,Onsite,strong_yes,5,2026-11-01,Interview feedback.
+sc-531,app-4281,cand-2237,Karen Whitfield,Phone Screen,no_hire,3,2026-11-04,Interview feedback.
+sc-532,app-4098,cand-2039,Sarah Mitchell,Onsite,strong_yes,2,2026-11-07,Interview feedback.
+sc-533,app-4340,cand-2038,Sarah Mitchell,Phone Screen,no_hire,2,2026-11-10,Interview feedback.
+sc-534,app-4370,cand-2070,Karen Whitfield,Phone Screen,yes,2,2026-11-02,Interview feedback.
+sc-535,app-4309,cand-2166,Panelist D,Onsite,yes,5,2026-11-04,Interview feedback.
+sc-536,app-4242,cand-2063,Sarah Mitchell,Phone Screen,no_hire,4,2026-11-09,Interview feedback.
+sc-537,app-4282,cand-2000,Panelist D,Phone Screen,yes,2,2026-11-06,Interview feedback.
+sc-538,app-4170,cand-2071,Karen Whitfield,Phone Screen,strong_yes,2,2026-11-06,Interview feedback.
+sc-539,app-4048,cand-2098,Panelist D,Onsite,yes,2,2026-11-08,Interview feedback.
+sc-540,app-4017,cand-2081,Karen Whitfield,Phone Screen,strong_yes,4,2026-11-02,Interview feedback.
+sc-541,app-4376,cand-2013,Panelist D,Phone Screen,no_hire,2,2026-11-05,Interview feedback.
+sc-542,app-4299,cand-2246,Sarah Mitchell,Phone Screen,yes,2,2026-11-03,Interview feedback.
+sc-543,app-4295,cand-2020,Sarah Mitchell,Phone Screen,strong_yes,2,2026-11-01,Interview feedback.
+sc-544,app-4336,cand-2070,Karen Whitfield,Phone Screen,no_hire,3,2026-11-02,Interview feedback.
+sc-545,app-4192,cand-2244,Panelist D,Phone Screen,strong_yes,2,2026-11-08,Interview feedback.
+sc-546,app-4195,cand-2049,Sarah Mitchell,Onsite,no_hire,3,2026-11-09,Interview feedback.
+sc-547,app-4310,cand-2101,Sarah Mitchell,Phone Screen,yes,2,2026-11-04,Interview feedback.
+sc-548,app-4219,cand-2053,Sarah Mitchell,Phone Screen,yes,2,2026-11-09,Interview feedback.
+sc-549,app-4374,cand-2115,Panelist D,Onsite,no_hire,3,2026-11-09,Interview feedback.
+sc-550,app-4075,cand-2180,Karen Whitfield,Phone Screen,strong_yes,4,2026-11-05,Interview feedback.
+sc-551,app-4392,cand-2112,Karen Whitfield,Onsite,strong_yes,5,2026-11-08,Interview feedback.
+sc-552,app-4083,cand-2154,Panelist D,Phone Screen,strong_yes,5,2026-11-06,Interview feedback.
+sc-553,app-4187,cand-2173,Panelist D,Onsite,no_hire,4,2026-11-04,Interview feedback.
+sc-554,app-4025,cand-2106,Panelist D,Onsite,yes,4,2026-11-04,Interview feedback.
+sc-555,app-4157,cand-2242,Karen Whitfield,Onsite,strong_yes,2,2026-11-06,Interview feedback.
+sc-556,app-4186,cand-2089,Sarah Mitchell,Onsite,strong_yes,3,2026-11-02,Interview feedback.
+sc-557,app-4241,cand-2118,Panelist D,Onsite,yes,2,2026-11-03,Interview feedback.
+sc-558,app-4119,cand-2066,Karen Whitfield,Onsite,no_hire,3,2026-11-03,Interview feedback.
+sc-559,app-4156,cand-2149,Panelist D,Onsite,no_hire,4,2026-11-04,Interview feedback.
+sc-560,app-4138,cand-2212,Panelist D,Phone Screen,yes,2,2026-11-08,Interview feedback.
+sc-561,app-4174,cand-2162,Karen Whitfield,Onsite,strong_yes,3,2026-11-07,Interview feedback.
+sc-562,app-4354,cand-2102,Panelist D,Phone Screen,no_hire,2,2026-11-07,Interview feedback.
+sc-563,app-4383,cand-2176,Panelist D,Phone Screen,yes,4,2026-11-09,Interview feedback.
+sc-564,app-4367,cand-2090,Panelist D,Phone Screen,strong_yes,4,2026-11-10,Interview feedback.
+sc-565,app-4134,cand-2015,Karen Whitfield,Onsite,strong_yes,5,2026-11-07,Interview feedback.
+sc-566,app-4305,cand-2136,Karen Whitfield,Phone Screen,yes,4,2026-11-05,Interview feedback.
+sc-567,app-4061,cand-2083,Sarah Mitchell,Onsite,no_hire,2,2026-11-02,Interview feedback.
+sc-568,app-4220,cand-2137,Karen Whitfield,Onsite,yes,2,2026-11-01,Interview feedback.
+sc-569,app-4153,cand-2046,Karen Whitfield,Onsite,yes,3,2026-11-10,Interview feedback.
+sc-570,app-4380,cand-2119,Karen Whitfield,Phone Screen,no_hire,5,2026-11-04,Interview feedback.
+sc-571,app-4203,cand-2136,Sarah Mitchell,Phone Screen,strong_yes,4,2026-11-04,Interview feedback.
+sc-572,app-4203,cand-2102,Panelist D,Phone Screen,no_hire,2,2026-11-08,Interview feedback.
+sc-573,app-4243,cand-2169,Karen Whitfield,Phone Screen,no_hire,2,2026-11-10,Interview feedback.
+sc-574,app-4281,cand-2001,Karen Whitfield,Onsite,strong_yes,4,2026-11-04,Interview feedback.
+sc-575,app-4113,cand-2080,Sarah Mitchell,Onsite,no_hire,2,2026-11-07,Interview feedback.
+sc-576,app-4043,cand-2017,Panelist D,Phone Screen,yes,3,2026-11-09,Interview feedback.
+sc-577,app-4263,cand-2057,Sarah Mitchell,Phone Screen,yes,5,2026-11-08,Interview feedback.
+sc-578,app-4214,cand-2018,Panelist D,Onsite,no_hire,4,2026-11-06,Interview feedback.
+sc-579,app-4282,cand-2139,Panelist D,Phone Screen,no_hire,3,2026-11-05,Interview feedback.
+sc-580,app-4311,cand-2105,Panelist D,Phone Screen,strong_yes,2,2026-11-09,Interview feedback.
+sc-581,app-4156,cand-2239,Karen Whitfield,Onsite,yes,3,2026-11-03,Interview feedback.
+sc-582,app-4319,cand-2066,Sarah Mitchell,Onsite,no_hire,5,2026-11-03,Interview feedback.
+sc-583,app-4144,cand-2020,Sarah Mitchell,Onsite,no_hire,3,2026-11-09,Interview feedback.
+sc-584,app-4345,cand-2023,Sarah Mitchell,Onsite,yes,2,2026-11-07,Interview feedback.
+sc-585,app-4209,cand-2208,Karen Whitfield,Onsite,yes,2,2026-11-03,Interview feedback.
+sc-586,app-4379,cand-2238,Sarah Mitchell,Onsite,no_hire,2,2026-11-07,Interview feedback.
+sc-587,app-4271,cand-2179,Panelist D,Phone Screen,no_hire,5,2026-11-08,Interview feedback.
+sc-588,app-4084,cand-2091,Karen Whitfield,Phone Screen,yes,4,2026-11-03,Interview feedback.
+sc-589,app-4011,cand-2040,Karen Whitfield,Onsite,no_hire,4,2026-11-05,Interview feedback.
+sc-590,app-4207,cand-2147,Sarah Mitchell,Onsite,strong_yes,2,2026-11-07,Interview feedback.
+sc-591,app-4127,cand-2035,Panelist D,Onsite,strong_yes,2,2026-11-06,Interview feedback.
+sc-592,app-4137,cand-2021,Karen Whitfield,Onsite,yes,4,2026-11-10,Interview feedback.
+sc-593,app-4176,cand-2076,Sarah Mitchell,Onsite,yes,2,2026-11-09,Interview feedback.
+sc-594,app-4004,cand-2216,Karen Whitfield,Onsite,strong_yes,2,2026-11-05,Interview feedback.
+sc-595,app-4379,cand-2117,Karen Whitfield,Onsite,yes,4,2026-11-01,Interview feedback.
+sc-596,app-4273,cand-2234,Sarah Mitchell,Onsite,yes,3,2026-11-10,Interview feedback.
+sc-597,app-4074,cand-2154,Sarah Mitchell,Phone Screen,strong_yes,4,2026-11-04,Interview feedback.
+sc-598,app-4265,cand-2158,Karen Whitfield,Phone Screen,no_hire,2,2026-11-08,Interview feedback.
+sc-599,app-4003,cand-2050,Panelist D,Onsite,no_hire,4,2026-11-07,Interview feedback.
+sc-600,app-4057,cand-2217,Karen Whitfield,Onsite,no_hire,5,2026-11-03,Interview feedback.
+sc-601,app-4077,cand-2156,Sarah Mitchell,Phone Screen,no_hire,2,2026-11-03,Interview feedback.
+sc-602,app-4328,cand-2027,Sarah Mitchell,Onsite,no_hire,3,2026-11-08,Interview feedback.
+sc-603,app-4163,cand-2121,Sarah Mitchell,Onsite,no_hire,3,2026-11-01,Interview feedback.
+sc-604,app-4297,cand-2254,Sarah Mitchell,Onsite,yes,4,2026-11-01,Interview feedback.
+sc-605,app-4265,cand-2237,Sarah Mitchell,Phone Screen,yes,2,2026-11-05,Interview feedback.
+sc-606,app-4084,cand-1041,Sarah Mitchell,Phone Screen,strong_yes,3,2026-11-05,Interview feedback.
+sc-607,app-4243,cand-2122,Panelist D,Onsite,no_hire,4,2026-11-06,Interview feedback.
+sc-608,app-4048,cand-2209,Panelist D,Phone Screen,no_hire,5,2026-11-04,Interview feedback.
+sc-609,app-4051,cand-2228,Sarah Mitchell,Phone Screen,no_hire,3,2026-11-01,Interview feedback.
+sc-610,app-4356,cand-2246,Karen Whitfield,Onsite,no_hire,2,2026-11-10,Interview feedback.
+sc-611,app-4267,cand-2206,Sarah Mitchell,Onsite,no_hire,5,2026-11-04,Interview feedback.
+sc-612,app-4127,cand-2137,Sarah Mitchell,Onsite,yes,5,2026-11-08,Interview feedback.
+sc-613,app-4003,cand-2242,Sarah Mitchell,Phone Screen,no_hire,3,2026-11-09,Interview feedback.
+sc-614,app-4128,cand-2030,Karen Whitfield,Phone Screen,strong_yes,4,2026-11-01,Interview feedback.
+sc-615,app-4035,cand-2161,Sarah Mitchell,Onsite,strong_yes,4,2026-11-09,Interview feedback.
+sc-616,app-4137,cand-2025,Panelist D,Phone Screen,no_hire,2,2026-11-02,Interview feedback.
+sc-617,app-4322,cand-2128,Panelist D,Onsite,strong_yes,5,2026-11-05,Interview feedback.
+sc-618,app-4003,cand-2122,Panelist D,Phone Screen,no_hire,5,2026-11-07,Interview feedback.
+sc-619,app-4127,cand-2189,Panelist D,Onsite,strong_yes,5,2026-11-05,Interview feedback.
+sc-620,app-4240,cand-2241,Panelist D,Phone Screen,no_hire,4,2026-11-09,Interview feedback.
+sc-621,app-4386,cand-2226,Panelist D,Onsite,strong_yes,2,2026-11-02,Interview feedback.
+sc-622,app-4293,cand-2076,Karen Whitfield,Onsite,yes,4,2026-11-08,Interview feedback.
+sc-623,app-4318,cand-2019,Karen Whitfield,Phone Screen,yes,4,2026-11-01,Interview feedback.
+sc-624,app-4189,cand-2230,Sarah Mitchell,Onsite,yes,3,2026-11-03,Interview feedback.
+sc-625,app-4350,cand-2015,Sarah Mitchell,Phone Screen,yes,2,2026-11-10,Interview feedback.
+sc-626,app-4112,cand-2149,Panelist D,Phone Screen,yes,5,2026-11-06,Interview feedback.
+sc-627,app-4216,cand-2136,Sarah Mitchell,Onsite,strong_yes,2,2026-11-07,Interview feedback.
+sc-628,app-4385,cand-2218,Panelist D,Onsite,yes,5,2026-11-07,Interview feedback.
+sc-629,app-4274,cand-2217,Panelist D,Phone Screen,strong_yes,5,2026-11-06,Interview feedback.
+sc-630,app-4166,cand-2135,Panelist D,Onsite,strong_yes,5,2026-11-01,Interview feedback.
+sc-631,app-4328,cand-2136,Karen Whitfield,Phone Screen,no_hire,4,2026-11-02,Interview feedback.
+sc-632,app-4004,cand-2196,Sarah Mitchell,Onsite,strong_yes,2,2026-11-01,Interview feedback.
+sc-633,app-4294,cand-2120,Karen Whitfield,Onsite,strong_yes,4,2026-11-01,Interview feedback.
+sc-634,app-4163,cand-2007,Panelist D,Onsite,strong_yes,5,2026-11-06,Interview feedback.
+sc-635,app-4031,cand-2190,Panelist D,Onsite,strong_yes,2,2026-11-06,Interview feedback.
+sc-636,app-4346,cand-2009,Sarah Mitchell,Onsite,no_hire,3,2026-11-02,Interview feedback.
+sc-637,app-4055,cand-2168,Panelist D,Onsite,strong_yes,2,2026-11-01,Interview feedback.
+sc-638,app-4195,cand-2011,Sarah Mitchell,Onsite,strong_yes,2,2026-11-04,Interview feedback.
+sc-639,app-4313,cand-2036,Sarah Mitchell,Onsite,yes,4,2026-11-08,Interview feedback.
+sc-640,app-4184,cand-2196,Panelist D,Phone Screen,yes,2,2026-11-03,Interview feedback.
+sc-641,app-4060,cand-2114,Karen Whitfield,Onsite,strong_yes,3,2026-11-02,Interview feedback.
+sc-642,app-4108,cand-2080,Panelist D,Onsite,no_hire,3,2026-11-02,Interview feedback.
+sc-643,app-4235,cand-2068,Karen Whitfield,Phone Screen,strong_yes,2,2026-11-01,Interview feedback.
+sc-644,app-4111,cand-2130,Panelist D,Onsite,yes,4,2026-11-02,Interview feedback.
+sc-645,app-4198,cand-2116,Panelist D,Onsite,strong_yes,2,2026-11-04,Interview feedback.
+sc-646,app-4217,cand-2229,Karen Whitfield,Onsite,no_hire,5,2026-11-10,Interview feedback.
+sc-647,app-4277,cand-2100,Karen Whitfield,Onsite,strong_yes,5,2026-11-07,Interview feedback.
+sc-648,app-4055,cand-2021,Panelist D,Onsite,strong_yes,4,2026-11-06,Interview feedback.
+sc-649,app-4333,cand-2066,Panelist D,Onsite,no_hire,2,2026-11-09,Interview feedback.
+sc-650,app-4122,cand-2036,Karen Whitfield,Onsite,strong_yes,2,2026-11-09,Interview feedback.
+sc-651,app-4258,cand-2067,Karen Whitfield,Onsite,no_hire,3,2026-11-01,Interview feedback.
+sc-652,app-4290,cand-2006,Karen Whitfield,Onsite,no_hire,2,2026-11-01,Interview feedback.
+sc-653,app-4221,cand-2174,Karen Whitfield,Phone Screen,strong_yes,5,2026-11-08,Interview feedback.
+sc-654,app-4074,cand-2048,Panelist D,Onsite,no_hire,4,2026-11-08,Interview feedback.
+sc-655,app-4223,cand-2235,Karen Whitfield,Onsite,no_hire,4,2026-11-02,Interview feedback.
+sc-656,app-4318,cand-2008,Sarah Mitchell,Phone Screen,strong_yes,5,2026-11-04,Interview feedback.
+sc-657,app-4157,cand-2119,Panelist D,Onsite,yes,3,2026-11-04,Interview feedback.
+sc-658,app-4307,cand-2026,Karen Whitfield,Onsite,yes,4,2026-11-10,Interview feedback.
+sc-659,app-4060,cand-2173,Panelist D,Phone Screen,strong_yes,4,2026-11-03,Interview feedback.
+sc-660,app-4008,cand-2221,Sarah Mitchell,Phone Screen,yes,2,2026-11-10,Interview feedback.
+sc-661,app-4326,cand-2142,Karen Whitfield,Onsite,strong_yes,4,2026-11-07,Interview feedback.
+sc-662,app-4154,cand-2056,Karen Whitfield,Onsite,strong_yes,5,2026-11-05,Interview feedback.
+sc-663,app-4241,cand-2236,Sarah Mitchell,Phone Screen,yes,2,2026-11-03,Interview feedback.
+sc-664,app-4058,cand-2208,Karen Whitfield,Phone Screen,strong_yes,5,2026-11-08,Interview feedback.
+sc-665,app-4306,cand-2101,Karen Whitfield,Phone Screen,yes,2,2026-11-07,Interview feedback.
+sc-666,app-4121,cand-2096,Panelist D,Onsite,yes,2,2026-11-01,Interview feedback.
+sc-667,app-4096,cand-2177,Karen Whitfield,Onsite,strong_yes,5,2026-11-10,Interview feedback.
+sc-668,app-4127,cand-2168,Karen Whitfield,Onsite,yes,5,2026-11-05,Interview feedback.
+sc-669,app-4299,cand-2018,Sarah Mitchell,Onsite,no_hire,4,2026-11-05,Interview feedback.
+sc-670,app-4375,cand-2169,Sarah Mitchell,Phone Screen,no_hire,3,2026-11-10,Interview feedback.
+sc-671,app-4119,cand-2001,Sarah Mitchell,Phone Screen,no_hire,4,2026-11-07,Interview feedback.
+sc-672,app-4360,cand-2020,Karen Whitfield,Phone Screen,yes,4,2026-11-09,Interview feedback.
+sc-673,app-4203,cand-2163,Karen Whitfield,Phone Screen,strong_yes,4,2026-11-06,Interview feedback.
+sc-674,app-4058,cand-2221,Karen Whitfield,Onsite,no_hire,3,2026-11-01,Interview feedback.
+sc-675,app-4377,cand-2090,Karen Whitfield,Phone Screen,yes,2,2026-11-01,Interview feedback.
+sc-676,app-4183,cand-2155,Sarah Mitchell,Phone Screen,strong_yes,4,2026-11-06,Interview feedback.
+sc-677,app-4030,cand-2239,Karen Whitfield,Phone Screen,yes,5,2026-11-07,Interview feedback.
+sc-678,app-4400,cand-2255,Sarah Mitchell,Phone Screen,yes,4,2026-11-08,Interview feedback.
+sc-679,app-4401,cand-2256,Karen Whitfield,Application Review,strong_yes,5,2026-11-08,Interview feedback.
+sc-680,app-4402,cand-2257,Sarah Mitchell,Phone Screen,no,2,2026-11-07,Interview feedback.
+sc-681,app-4403,cand-2258,David Cho,Application Review,yes,4,2026-11-09,Interview feedback.
+sc-682,app-4404,cand-2259,Karen Whitfield,Phone Screen,yes,3,2026-11-09,Interview feedback.
+sc-683,app-4405,cand-2260,David Cho,Application Review,strong_yes,5,2026-11-10,Interview feedback.

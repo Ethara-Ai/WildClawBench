@@ -1,0 +1,13 @@
+id,dealname,pipeline,dealstage,amount,closedate,dealtype,associated_company,associated_contact,createdate,lastmodifieddate
+7000,Deal 0,default,closedwon,70610,2026-01-01,newbusiness,5000,6000,2025-01-01,2026-01-01
+7001,Deal 1,default,appointmentscheduled,11572,2026-02-02,newbusiness,5001,6001,2025-02-02,2026-01-02
+7002,Deal 2,default,appointmentscheduled,83116,2026-03-03,newbusiness,5002,6002,2025-03-03,2026-01-03
+7003,Deal 3,default,qualifiedtobuy,41598,2026-04-04,newbusiness,5003,6003,2025-04-04,2026-01-04
+7004,Deal 4,default,qualifiedtobuy,18206,2026-05-05,newbusiness,5004,6004,2025-05-05,2026-01-05
+7005,Deal 5,default,appointmentscheduled,20032,2026-06-06,newbusiness,5005,6005,2025-06-06,2026-01-06
+7006,Deal 6,default,qualifiedtobuy,40703,2026-07-07,newbusiness,5006,6006,2025-07-07,2026-01-07
+7007,Deal 7,default,appointmentscheduled,51643,2026-08-08,newbusiness,5007,6007,2025-08-08,2026-01-08
+7008,Deal 8,default,qualifiedtobuy,3752,2026-09-09,newbusiness,5008,6008,2025-09-09,2026-01-09
+7009,Deal 9,default,appointmentscheduled,40511,2026-10-10,newbusiness,5009,6009,2025-10-10,2026-01-10
+7010,Deal 10,default,appointmentscheduled,11148,2026-11-11,newbusiness,5010,6010,2025-11-11,2026-01-11
+7011,Deal 11,default,qualifiedtobuy,48786,2026-12-12,newbusiness,5011,6011,2025-12-12,2026-01-12

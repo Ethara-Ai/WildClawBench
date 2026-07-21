@@ -1,0 +1,402 @@
+id,candidate_id,job_id,status,current_stage,applied_at,last_activity_at
+app-4000,cand-1041,job-PED-PT-01,active,Onsite,2026-09-20,2026-11-12
+app-4001,cand-1055,job-PED-PT-01,active,Offer,2026-09-20,2026-11-12
+app-4002,cand-1062,job-PED-PT-01,rejected,Rejected,2026-09-20,2026-11-12
+app-4003,cand-1078,job-PED-PT-01,withdrawn,Withdrawn,2026-09-20,2026-11-12
+app-4004,cand-1090,job-PED-PT-01,active,Onsite,2026-09-20,2026-11-12
+app-4005,cand-2021,job-2005,active,Onsite,2026-09-24,2026-11-02
+app-4006,cand-2121,job-2003,hired,Application Review,2026-09-11,2026-11-10
+app-4007,cand-2015,job-2004,hired,Phone Screen,2026-09-17,2026-11-12
+app-4008,cand-1090,job-2005,active,Withdrawn,2026-09-11,2026-11-04
+app-4009,cand-2157,job-2002,rejected,Rejected,2026-09-06,2026-11-05
+app-4010,cand-2146,job-2003,active,Onsite,2026-09-22,2026-11-03
+app-4011,cand-2227,job-2001,hired,Rejected,2026-09-22,2026-11-11
+app-4012,cand-2166,job-2003,hired,Rejected,2026-09-28,2026-11-01
+app-4013,cand-2178,job-2003,hired,Withdrawn,2026-09-02,2026-11-09
+app-4014,cand-2149,job-PED-PT-01,active,Rejected,2026-09-24,2026-11-10
+app-4015,cand-2153,job-2002,active,Withdrawn,2026-09-10,2026-11-08
+app-4016,cand-2070,job-2004,active,Onsite,2026-09-01,2026-11-09
+app-4017,cand-2190,job-2002,hired,Application Review,2026-09-17,2026-11-12
+app-4018,cand-2091,job-PED-PT-01,active,Onsite,2026-09-22,2026-11-03
+app-4019,cand-2044,job-2003,active,Onsite,2026-09-13,2026-11-08
+app-4020,cand-2076,job-2001,rejected,Rejected,2026-09-03,2026-11-11
+app-4021,cand-2187,job-2001,active,Offer,2026-09-27,2026-11-12
+app-4022,cand-2094,job-PED-PT-01,active,Application Review,2026-09-16,2026-11-01
+app-4023,cand-2044,job-PED-PT-01,active,Onsite,2026-09-01,2026-11-09
+app-4024,cand-2213,job-2004,active,Offer,2026-09-27,2026-11-08
+app-4025,cand-2239,job-2002,rejected,Rejected,2026-09-12,2026-11-03
+app-4026,cand-2169,job-2004,active,Application Review,2026-09-03,2026-11-09
+app-4027,cand-2040,job-2001,active,Offer,2026-09-13,2026-11-03
+app-4028,cand-2231,job-2001,rejected,Rejected,2026-09-09,2026-11-05
+app-4029,cand-2027,job-2001,rejected,Application Review,2026-09-09,2026-11-11
+app-4030,cand-2153,job-PED-PT-01,active,Offer,2026-09-01,2026-11-01
+app-4031,cand-2186,job-PED-PT-01,rejected,Withdrawn,2026-09-15,2026-11-02
+app-4032,cand-2230,job-2002,active,Rejected,2026-09-20,2026-11-10
+app-4033,cand-2150,job-PED-PT-01,withdrawn,Withdrawn,2026-09-04,2026-11-12
+app-4034,cand-2243,job-2004,active,Application Review,2026-09-20,2026-11-07
+app-4035,cand-2154,job-2002,active,Onsite,2026-09-12,2026-11-08
+app-4036,cand-2137,job-2003,hired,Application Review,2026-09-20,2026-11-03
+app-4037,cand-2128,job-2002,active,Rejected,2026-09-01,2026-11-06
+app-4038,cand-2148,job-2002,hired,Offer,2026-09-05,2026-11-08
+app-4039,cand-2201,job-2003,rejected,Onsite,2026-09-03,2026-11-06
+app-4040,cand-2155,job-PED-PT-01,rejected,Withdrawn,2026-09-21,2026-11-10
+app-4041,cand-2211,job-2003,active,Offer,2026-09-08,2026-11-02
+app-4042,cand-2024,job-2003,rejected,Phone Screen,2026-09-09,2026-11-08
+app-4043,cand-2182,job-PED-PT-01,active,Withdrawn,2026-09-06,2026-11-05
+app-4044,cand-2163,job-2005,rejected,Application Review,2026-09-01,2026-11-03
+app-4045,cand-2158,job-2003,active,Withdrawn,2026-09-05,2026-11-04
+app-4046,cand-2108,job-PED-PT-01,active,Phone Screen,2026-09-20,2026-11-12
+app-4047,cand-2102,job-PED-PT-01,active,Offer,2026-09-02,2026-11-09
+app-4048,cand-2001,job-2005,rejected,Offer,2026-09-17,2026-11-05
+app-4049,cand-2095,job-PED-PT-01,withdrawn,Withdrawn,2026-09-15,2026-11-11
+app-4050,cand-2026,job-2004,hired,Phone Screen,2026-09-14,2026-11-01
+app-4051,cand-2006,job-2001,hired,Application Review,2026-09-20,2026-11-08
+app-4052,cand-2082,job-PED-PT-01,active,Rejected,2026-09-01,2026-11-12
+app-4053,cand-2220,job-2002,hired,Application Review,2026-09-03,2026-11-05
+app-4054,cand-2150,job-2003,active,Rejected,2026-09-13,2026-11-01
+app-4055,cand-2190,job-2005,active,Onsite,2026-09-22,2026-11-08
+app-4056,cand-2030,job-2005,active,Phone Screen,2026-09-21,2026-11-03
+app-4057,cand-2190,job-2004,hired,Onsite,2026-09-01,2026-11-03
+app-4058,cand-2032,job-2002,rejected,Withdrawn,2026-09-14,2026-11-05
+app-4059,cand-2056,job-2001,hired,Application Review,2026-09-27,2026-11-09
+app-4060,cand-2112,job-2004,active,Withdrawn,2026-09-28,2026-11-06
+app-4061,cand-2174,job-2003,hired,Withdrawn,2026-09-28,2026-11-08
+app-4062,cand-2117,job-2002,active,Application Review,2026-09-02,2026-11-07
+app-4063,cand-2202,job-PED-PT-01,rejected,Offer,2026-09-14,2026-11-02
+app-4064,cand-2214,job-2004,active,Phone Screen,2026-09-26,2026-11-06
+app-4065,cand-2134,job-2001,active,Application Review,2026-09-02,2026-11-02
+app-4066,cand-2074,job-2005,rejected,Application Review,2026-09-08,2026-11-02
+app-4067,cand-2242,job-2005,active,Phone Screen,2026-09-14,2026-11-09
+app-4068,cand-2146,job-2003,rejected,Rejected,2026-09-22,2026-11-05
+app-4069,cand-2126,job-2004,rejected,Offer,2026-09-25,2026-11-04
+app-4070,cand-2145,job-2001,active,Rejected,2026-09-24,2026-11-05
+app-4071,cand-2168,job-2004,hired,Offer,2026-09-16,2026-11-01
+app-4072,cand-2191,job-2005,active,Rejected,2026-09-17,2026-11-06
+app-4073,cand-2250,job-2001,active,Rejected,2026-09-02,2026-11-12
+app-4074,cand-2047,job-2002,hired,Phone Screen,2026-09-21,2026-11-04
+app-4075,cand-2120,job-2004,hired,Rejected,2026-09-17,2026-11-10
+app-4076,cand-2131,job-2005,active,Rejected,2026-09-23,2026-11-08
+app-4077,cand-2078,job-PED-PT-01,active,Application Review,2026-09-17,2026-11-11
+app-4078,cand-2119,job-PED-PT-01,active,Phone Screen,2026-09-21,2026-11-02
+app-4079,cand-2085,job-PED-PT-01,active,Onsite,2026-09-10,2026-11-12
+app-4080,cand-2116,job-2004,rejected,Offer,2026-09-28,2026-11-05
+app-4081,cand-2042,job-2002,hired,Onsite,2026-09-04,2026-11-10
+app-4082,cand-2055,job-2002,active,Withdrawn,2026-09-15,2026-11-04
+app-4083,cand-2156,job-2003,active,Application Review,2026-09-19,2026-11-04
+app-4084,cand-2247,job-2004,rejected,Offer,2026-09-14,2026-11-03
+app-4085,cand-2185,job-2004,hired,Rejected,2026-09-28,2026-11-12
+app-4086,cand-2000,job-2001,hired,Onsite,2026-09-22,2026-11-05
+app-4087,cand-2086,job-PED-PT-01,active,Onsite,2026-09-05,2026-11-08
+app-4088,cand-2014,job-2005,active,Offer,2026-09-25,2026-11-01
+app-4089,cand-2140,job-2005,rejected,Rejected,2026-09-02,2026-11-06
+app-4090,cand-2079,job-2005,active,Application Review,2026-09-14,2026-11-01
+app-4091,cand-2185,job-2001,active,Phone Screen,2026-09-16,2026-11-03
+app-4092,cand-2093,job-2004,active,Application Review,2026-09-14,2026-11-08
+app-4093,cand-2187,job-2004,hired,Rejected,2026-09-26,2026-11-02
+app-4094,cand-2086,job-PED-PT-01,active,Withdrawn,2026-09-15,2026-11-04
+app-4096,cand-2235,job-2002,hired,Offer,2026-09-28,2026-11-09
+app-4097,cand-2232,job-2002,hired,Offer,2026-09-21,2026-11-03
+app-4098,cand-2202,job-2001,hired,Application Review,2026-09-15,2026-11-05
+app-4099,cand-2038,job-2001,active,Withdrawn,2026-09-14,2026-11-09
+app-4100,cand-2215,job-2003,rejected,Application Review,2026-09-11,2026-11-11
+app-4101,cand-2088,job-PED-PT-01,rejected,Phone Screen,2026-09-03,2026-11-07
+app-4102,cand-2099,job-2005,active,Rejected,2026-09-23,2026-11-09
+app-4103,cand-2135,job-PED-PT-01,active,Offer,2026-09-11,2026-11-03
+app-4104,cand-2065,job-2005,hired,Onsite,2026-09-12,2026-11-07
+app-4105,cand-2178,job-PED-PT-01,active,Offer,2026-09-11,2026-11-05
+app-4106,cand-2212,job-PED-PT-01,active,Application Review,2026-09-03,2026-11-04
+app-4107,cand-2049,job-2004,hired,Withdrawn,2026-09-04,2026-11-12
+app-4108,cand-2091,job-2004,active,Application Review,2026-09-06,2026-11-02
+app-4109,cand-2043,job-2005,rejected,Application Review,2026-09-09,2026-11-05
+app-4110,cand-2125,job-2001,hired,Rejected,2026-09-27,2026-11-02
+app-4111,cand-2100,job-2002,rejected,Onsite,2026-09-08,2026-11-05
+app-4112,cand-1078,job-PED-PT-01,withdrawn,Withdrawn,2026-09-11,2026-11-11
+app-4113,cand-2090,job-2005,rejected,Withdrawn,2026-09-16,2026-11-04
+app-4114,cand-2082,job-2002,active,Rejected,2026-09-26,2026-11-08
+app-4115,cand-2079,job-2004,hired,Onsite,2026-09-05,2026-11-12
+app-4116,cand-2207,job-2004,active,Offer,2026-09-05,2026-11-08
+app-4117,cand-2191,job-2005,rejected,Phone Screen,2026-09-05,2026-11-07
+app-4118,cand-2204,job-2001,active,Rejected,2026-09-09,2026-11-08
+app-4119,cand-2168,job-2003,rejected,Withdrawn,2026-09-11,2026-11-02
+app-4120,cand-2070,job-2001,rejected,Onsite,2026-09-15,2026-11-05
+app-4121,cand-2129,job-2002,rejected,Phone Screen,2026-09-16,2026-11-11
+app-4122,cand-2143,job-2001,active,Onsite,2026-09-26,2026-11-06
+app-4123,cand-2197,job-2001,hired,Rejected,2026-09-11,2026-11-09
+app-4124,cand-2242,job-2005,active,Onsite,2026-09-09,2026-11-11
+app-4125,cand-2228,job-2004,rejected,Offer,2026-09-02,2026-11-04
+app-4126,cand-2070,job-2003,active,Onsite,2026-09-21,2026-11-11
+app-4127,cand-2250,job-2003,active,Rejected,2026-09-19,2026-11-10
+app-4128,cand-2006,job-2004,hired,Offer,2026-09-15,2026-11-03
+app-4129,cand-2021,job-2005,rejected,Offer,2026-09-04,2026-11-05
+app-4130,cand-2174,job-2004,active,Offer,2026-09-28,2026-11-12
+app-4131,cand-2240,job-2005,active,Application Review,2026-09-21,2026-11-10
+app-4132,cand-2233,job-2001,hired,Offer,2026-09-24,2026-11-08
+app-4133,cand-2228,job-2002,hired,Application Review,2026-09-21,2026-11-11
+app-4134,cand-2184,job-2005,active,Onsite,2026-09-18,2026-11-06
+app-4136,cand-2084,job-PED-PT-01,rejected,Rejected,2026-09-21,2026-11-12
+app-4137,cand-2130,job-2003,rejected,Rejected,2026-09-19,2026-11-01
+app-4138,cand-2233,job-2003,rejected,Rejected,2026-09-03,2026-11-09
+app-4139,cand-2157,job-2001,rejected,Rejected,2026-09-10,2026-11-10
+app-4140,cand-2143,job-2002,active,Withdrawn,2026-09-06,2026-11-12
+app-4141,cand-2113,job-2005,rejected,Phone Screen,2026-09-22,2026-11-01
+app-4142,cand-2013,job-2003,active,Offer,2026-09-24,2026-11-01
+app-4143,cand-2102,job-PED-PT-01,rejected,Rejected,2026-09-12,2026-11-08
+app-4144,cand-2133,job-2001,rejected,Withdrawn,2026-09-25,2026-11-04
+app-4145,cand-2009,job-2003,active,Offer,2026-09-19,2026-11-09
+app-4146,cand-2228,job-2001,rejected,Withdrawn,2026-09-03,2026-11-01
+app-4147,cand-2186,job-PED-PT-01,active,Onsite,2026-09-18,2026-11-03
+app-4148,cand-2168,job-2003,active,Onsite,2026-09-10,2026-11-09
+app-4149,cand-2193,job-2004,rejected,Onsite,2026-09-17,2026-11-11
+app-4150,cand-2169,job-2002,hired,Application Review,2026-09-06,2026-11-11
+app-4151,cand-2083,job-2004,active,Rejected,2026-09-01,2026-11-09
+app-4152,cand-2192,job-2005,hired,Phone Screen,2026-09-04,2026-11-04
+app-4153,cand-2173,job-2003,hired,Onsite,2026-09-07,2026-11-02
+app-4154,cand-2158,job-2005,active,Offer,2026-09-04,2026-11-07
+app-4155,cand-2065,job-2002,active,Application Review,2026-09-28,2026-11-10
+app-4156,cand-2206,job-2004,active,Rejected,2026-09-23,2026-11-07
+app-4157,cand-2202,job-2004,hired,Application Review,2026-09-16,2026-11-01
+app-4159,cand-2212,job-2001,hired,Application Review,2026-09-11,2026-11-06
+app-4160,cand-2106,job-2004,rejected,Phone Screen,2026-09-01,2026-11-06
+app-4161,cand-2171,job-2005,active,Offer,2026-09-03,2026-11-01
+app-4162,cand-2068,job-PED-PT-01,active,Onsite,2026-09-20,2026-11-12
+app-4163,cand-2197,job-2005,hired,Withdrawn,2026-09-25,2026-11-10
+app-4164,cand-2131,job-2003,active,Offer,2026-09-18,2026-11-09
+app-4165,cand-2099,job-2002,hired,Onsite,2026-09-02,2026-11-01
+app-4166,cand-2059,job-2004,hired,Phone Screen,2026-09-08,2026-11-02
+app-4167,cand-2127,job-2001,active,Application Review,2026-09-11,2026-11-04
+app-4168,cand-2202,job-PED-PT-01,active,Offer,2026-09-03,2026-11-02
+app-4169,cand-2080,job-2001,hired,Application Review,2026-09-24,2026-11-02
+app-4170,cand-2001,job-2003,active,Rejected,2026-09-11,2026-11-05
+app-4171,cand-2083,job-2004,active,Phone Screen,2026-09-21,2026-11-09
+app-4172,cand-2181,job-2003,rejected,Onsite,2026-09-25,2026-11-05
+app-4173,cand-2016,job-2001,hired,Application Review,2026-09-25,2026-11-12
+app-4174,cand-2090,job-2002,hired,Onsite,2026-09-23,2026-11-12
+app-4175,cand-2081,job-2001,hired,Withdrawn,2026-09-16,2026-11-12
+app-4176,cand-2228,job-2004,hired,Phone Screen,2026-09-19,2026-11-09
+app-4177,cand-2110,job-2003,active,Phone Screen,2026-09-17,2026-11-10
+app-4178,cand-2174,job-2002,rejected,Application Review,2026-09-24,2026-11-11
+app-4179,cand-2006,job-2003,active,Phone Screen,2026-09-11,2026-11-02
+app-4180,cand-2147,job-2004,hired,Rejected,2026-09-25,2026-11-02
+app-4181,cand-2161,job-PED-PT-01,rejected,Onsite,2026-09-05,2026-11-06
+app-4182,cand-2225,job-2001,active,Application Review,2026-09-12,2026-11-09
+app-4183,cand-2132,job-2002,active,Offer,2026-09-23,2026-11-03
+app-4184,cand-2114,job-2002,rejected,Withdrawn,2026-09-07,2026-11-06
+app-4185,cand-2072,job-2005,hired,Phone Screen,2026-09-25,2026-11-02
+app-4186,cand-2063,job-PED-PT-01,rejected,Application Review,2026-09-22,2026-11-12
+app-4187,cand-2076,job-2003,hired,Rejected,2026-09-21,2026-11-08
+app-4188,cand-2034,job-2001,hired,Rejected,2026-09-24,2026-11-08
+app-4189,cand-2180,job-2005,rejected,Offer,2026-09-18,2026-11-12
+app-4190,cand-2115,job-2002,hired,Withdrawn,2026-09-09,2026-11-03
+app-4191,cand-2238,job-2001,hired,Onsite,2026-09-17,2026-11-11
+app-4192,cand-2131,job-2003,rejected,Withdrawn,2026-09-25,2026-11-08
+app-4193,cand-2226,job-2001,rejected,Rejected,2026-09-11,2026-11-05
+app-4194,cand-2219,job-2003,active,Phone Screen,2026-09-17,2026-11-02
+app-4195,cand-2051,job-2004,rejected,Rejected,2026-09-18,2026-11-09
+app-4196,cand-2108,job-2005,active,Application Review,2026-09-27,2026-11-05
+app-4197,cand-2238,job-2005,active,Phone Screen,2026-09-02,2026-11-08
+app-4198,cand-2014,job-2002,rejected,Phone Screen,2026-09-10,2026-11-06
+app-4199,cand-2078,job-2005,hired,Offer,2026-09-15,2026-11-04
+app-4200,cand-2015,job-2004,rejected,Application Review,2026-09-01,2026-11-05
+app-4201,cand-2023,job-PED-PT-01,active,Application Review,2026-09-08,2026-11-10
+app-4202,cand-2238,job-2001,active,Onsite,2026-09-23,2026-11-11
+app-4203,cand-2063,job-PED-PT-01,rejected,Phone Screen,2026-09-28,2026-11-12
+app-4204,cand-2045,job-2005,active,Withdrawn,2026-09-05,2026-11-12
+app-4205,cand-2158,job-2003,rejected,Rejected,2026-09-28,2026-11-06
+app-4206,cand-2053,job-2002,active,Phone Screen,2026-09-17,2026-11-08
+app-4207,cand-2162,job-2001,active,Offer,2026-09-18,2026-11-12
+app-4208,cand-2098,job-PED-PT-01,rejected,Rejected,2026-09-24,2026-11-08
+app-4209,cand-2192,job-2004,rejected,Phone Screen,2026-09-09,2026-11-04
+app-4210,cand-2111,job-PED-PT-01,active,Application Review,2026-09-18,2026-11-08
+app-4211,cand-2126,job-2002,rejected,Application Review,2026-09-03,2026-11-11
+app-4212,cand-2242,job-2001,hired,Rejected,2026-09-22,2026-11-11
+app-4213,cand-2132,job-PED-PT-01,active,Withdrawn,2026-09-05,2026-11-05
+app-4214,cand-2097,job-2003,rejected,Offer,2026-09-10,2026-11-10
+app-4215,cand-2024,job-2003,rejected,Withdrawn,2026-09-12,2026-11-12
+app-4216,cand-2106,job-2005,rejected,Onsite,2026-09-01,2026-11-07
+app-4217,cand-2079,job-2005,hired,Onsite,2026-09-14,2026-11-07
+app-4218,cand-2170,job-PED-PT-01,rejected,Withdrawn,2026-09-13,2026-11-07
+app-4219,cand-2156,job-2003,active,Rejected,2026-09-18,2026-11-04
+app-4220,cand-2175,job-2004,hired,Offer,2026-09-21,2026-11-09
+app-4221,cand-2088,job-2002,active,Onsite,2026-09-01,2026-11-12
+app-4222,cand-2214,job-2005,active,Application Review,2026-09-16,2026-11-02
+app-4223,cand-2011,job-2003,active,Onsite,2026-09-06,2026-11-07
+app-4224,cand-2115,job-2001,active,Withdrawn,2026-09-10,2026-11-12
+app-4225,cand-2047,job-PED-PT-01,active,Offer,2026-09-06,2026-11-05
+app-4226,cand-2137,job-2002,active,Offer,2026-09-28,2026-11-03
+app-4227,cand-2029,job-PED-PT-01,rejected,Offer,2026-09-25,2026-11-08
+app-4228,cand-2139,job-PED-PT-01,active,Offer,2026-09-15,2026-11-12
+app-4229,cand-2078,job-2001,hired,Application Review,2026-09-23,2026-11-03
+app-4230,cand-2180,job-2005,active,Phone Screen,2026-09-22,2026-11-10
+app-4231,cand-2223,job-PED-PT-01,active,Rejected,2026-09-25,2026-11-09
+app-4232,cand-2137,job-2003,active,Rejected,2026-09-09,2026-11-02
+app-4233,cand-2177,job-2004,rejected,Withdrawn,2026-09-13,2026-11-07
+app-4234,cand-2046,job-PED-PT-01,active,Application Review,2026-09-16,2026-11-02
+app-4235,cand-2054,job-2001,hired,Offer,2026-09-13,2026-11-07
+app-4236,cand-2248,job-2005,rejected,Onsite,2026-09-08,2026-11-06
+app-4237,cand-2025,job-PED-PT-01,active,Phone Screen,2026-09-21,2026-11-01
+app-4238,cand-2114,job-PED-PT-01,rejected,Offer,2026-09-01,2026-11-07
+app-4239,cand-2086,job-2001,rejected,Application Review,2026-09-06,2026-11-06
+app-4240,cand-2148,job-2005,active,Onsite,2026-09-13,2026-11-10
+app-4241,cand-2182,job-2004,hired,Withdrawn,2026-09-08,2026-11-01
+app-4242,cand-2124,job-2001,rejected,Application Review,2026-09-20,2026-11-01
+app-4243,cand-2076,job-2003,rejected,Offer,2026-09-03,2026-11-07
+app-4244,cand-2248,job-2005,active,Onsite,2026-09-18,2026-11-12
+app-4245,cand-2131,job-2003,hired,Withdrawn,2026-09-09,2026-11-11
+app-4246,cand-2234,job-2005,hired,Withdrawn,2026-09-25,2026-11-01
+app-4247,cand-2003,job-PED-PT-01,active,Phone Screen,2026-09-23,2026-11-02
+app-4248,cand-2109,job-2002,rejected,Onsite,2026-09-14,2026-11-10
+app-4249,cand-2156,job-2003,rejected,Phone Screen,2026-09-12,2026-11-10
+app-4250,cand-2053,job-PED-PT-01,withdrawn,Withdrawn,2026-09-10,2026-11-06
+app-4251,cand-2042,job-2004,rejected,Offer,2026-09-01,2026-11-08
+app-4252,cand-2097,job-2005,rejected,Application Review,2026-09-23,2026-11-01
+app-4253,cand-2197,job-2005,rejected,Rejected,2026-09-25,2026-11-08
+app-4254,cand-2004,job-2001,active,Offer,2026-09-07,2026-11-07
+app-4255,cand-2247,job-2005,active,Phone Screen,2026-09-21,2026-11-04
+app-4256,cand-2069,job-2004,hired,Application Review,2026-09-11,2026-11-07
+app-4257,cand-1090,job-PED-PT-01,rejected,Rejected,2026-09-18,2026-11-08
+app-4258,cand-2149,job-2002,active,Application Review,2026-09-14,2026-11-07
+app-4259,cand-2058,job-2002,active,Application Review,2026-09-25,2026-11-05
+app-4260,cand-2125,job-2002,active,Withdrawn,2026-09-24,2026-11-03
+app-4261,cand-2142,job-2001,hired,Withdrawn,2026-09-23,2026-11-07
+app-4262,cand-2061,job-2004,rejected,Rejected,2026-09-21,2026-11-02
+app-4263,cand-2234,job-2002,rejected,Rejected,2026-09-02,2026-11-01
+app-4264,cand-2024,job-PED-PT-01,rejected,Phone Screen,2026-09-26,2026-11-03
+app-4265,cand-2038,job-2005,rejected,Withdrawn,2026-09-23,2026-11-10
+app-4266,cand-2038,job-2004,hired,Withdrawn,2026-09-07,2026-11-05
+app-4267,cand-2197,job-2005,hired,Withdrawn,2026-09-01,2026-11-04
+app-4268,cand-2114,job-2003,active,Offer,2026-09-15,2026-11-02
+app-4269,cand-2155,job-2005,hired,Withdrawn,2026-09-06,2026-11-05
+app-4270,cand-2053,job-2003,rejected,Offer,2026-09-25,2026-11-07
+app-4271,cand-2023,job-2005,active,Rejected,2026-09-26,2026-11-06
+app-4272,cand-2006,job-2004,active,Application Review,2026-09-21,2026-11-09
+app-4273,cand-2209,job-PED-PT-01,withdrawn,Withdrawn,2026-09-11,2026-11-12
+app-4274,cand-2145,job-2005,active,Offer,2026-09-07,2026-11-01
+app-4275,cand-2195,job-2005,rejected,Onsite,2026-09-06,2026-11-10
+app-4276,cand-2177,job-2002,active,Application Review,2026-09-12,2026-11-07
+app-4277,cand-2115,job-2004,active,Rejected,2026-09-09,2026-11-05
+app-4278,cand-2044,job-2003,active,Application Review,2026-09-19,2026-11-08
+app-4279,cand-2250,job-2004,rejected,Withdrawn,2026-09-24,2026-11-07
+app-4280,cand-2114,job-2002,hired,Offer,2026-09-14,2026-11-10
+app-4281,cand-2193,job-PED-PT-01,withdrawn,Withdrawn,2026-09-28,2026-11-06
+app-4282,cand-2110,job-2005,hired,Phone Screen,2026-09-26,2026-11-03
+app-4283,cand-2192,job-2001,active,Phone Screen,2026-09-09,2026-11-11
+app-4284,cand-2231,job-2005,rejected,Application Review,2026-09-06,2026-11-10
+app-4285,cand-2107,job-2001,rejected,Phone Screen,2026-09-15,2026-11-05
+app-4286,cand-2232,job-PED-PT-01,rejected,Rejected,2026-09-01,2026-11-11
+app-4287,cand-2218,job-2005,active,Application Review,2026-09-01,2026-11-07
+app-4288,cand-2093,job-2004,hired,Offer,2026-09-26,2026-11-04
+app-4289,cand-2076,job-PED-PT-01,active,Onsite,2026-09-08,2026-11-07
+app-4290,cand-2091,job-2004,hired,Rejected,2026-09-13,2026-11-01
+app-4291,cand-2063,job-2002,hired,Offer,2026-09-15,2026-11-10
+app-4292,cand-2188,job-2005,hired,Offer,2026-09-19,2026-11-03
+app-4293,cand-2077,job-2002,rejected,Withdrawn,2026-09-24,2026-11-11
+app-4294,cand-2233,job-2002,active,Phone Screen,2026-09-22,2026-11-09
+app-4295,cand-2079,job-2001,rejected,Onsite,2026-09-15,2026-11-05
+app-4296,cand-2206,job-PED-PT-01,rejected,Phone Screen,2026-09-17,2026-11-03
+app-4297,cand-2000,job-2002,active,Application Review,2026-09-10,2026-11-05
+app-4298,cand-2037,job-2001,active,Application Review,2026-09-24,2026-11-05
+app-4299,cand-2091,job-2001,rejected,Withdrawn,2026-09-19,2026-11-07
+app-4300,cand-2025,job-2003,active,Phone Screen,2026-09-02,2026-11-12
+app-4301,cand-2250,job-2004,hired,Withdrawn,2026-09-12,2026-11-08
+app-4302,cand-2110,job-2003,active,Withdrawn,2026-09-20,2026-11-04
+app-4303,cand-2185,job-2001,active,Withdrawn,2026-09-05,2026-11-12
+app-4304,cand-2039,job-2005,hired,Withdrawn,2026-09-04,2026-11-08
+app-4305,cand-2176,job-2004,hired,Phone Screen,2026-09-08,2026-11-09
+app-4306,cand-2241,job-PED-PT-01,active,Phone Screen,2026-09-05,2026-11-07
+app-4307,cand-2233,job-2002,hired,Withdrawn,2026-09-20,2026-11-10
+app-4308,cand-2236,job-PED-PT-01,rejected,Offer,2026-09-17,2026-11-02
+app-4309,cand-2037,job-PED-PT-01,active,Phone Screen,2026-09-12,2026-11-04
+app-4310,cand-2246,job-2004,rejected,Offer,2026-09-19,2026-11-12
+app-4311,cand-2244,job-PED-PT-01,rejected,Withdrawn,2026-09-01,2026-11-10
+app-4312,cand-2071,job-2002,active,Application Review,2026-09-24,2026-11-05
+app-4313,cand-2198,job-2003,active,Offer,2026-09-22,2026-11-06
+app-4314,cand-2191,job-2005,active,Onsite,2026-09-20,2026-11-01
+app-4315,cand-2173,job-2001,hired,Phone Screen,2026-09-19,2026-11-01
+app-4316,cand-2126,job-2003,rejected,Application Review,2026-09-02,2026-11-03
+app-4317,cand-2089,job-2002,hired,Phone Screen,2026-09-11,2026-11-03
+app-4318,cand-2109,job-2003,rejected,Phone Screen,2026-09-01,2026-11-08
+app-4319,cand-2187,job-2002,hired,Onsite,2026-09-14,2026-11-10
+app-4320,cand-2210,job-2005,active,Onsite,2026-09-27,2026-11-11
+app-4321,cand-2088,job-2005,rejected,Offer,2026-09-09,2026-11-01
+app-4322,cand-2017,job-2004,rejected,Rejected,2026-09-03,2026-11-07
+app-4323,cand-2241,job-PED-PT-01,active,Phone Screen,2026-09-21,2026-11-02
+app-4324,cand-2076,job-2002,active,Rejected,2026-09-04,2026-11-10
+app-4325,cand-2053,job-2005,rejected,Onsite,2026-09-17,2026-11-02
+app-4326,cand-2115,job-2004,hired,Phone Screen,2026-09-17,2026-11-08
+app-4327,cand-2221,job-2005,active,Withdrawn,2026-09-01,2026-11-06
+app-4328,cand-2126,job-2005,active,Withdrawn,2026-09-06,2026-11-03
+app-4329,cand-2202,job-2004,rejected,Phone Screen,2026-09-17,2026-11-01
+app-4330,cand-2033,job-2003,rejected,Offer,2026-09-23,2026-11-10
+app-4331,cand-2194,job-2003,hired,Withdrawn,2026-09-07,2026-11-08
+app-4332,cand-2190,job-2003,hired,Rejected,2026-09-13,2026-11-05
+app-4333,cand-2004,job-PED-PT-01,active,Offer,2026-09-15,2026-11-01
+app-4334,cand-2154,job-2003,rejected,Application Review,2026-09-05,2026-11-02
+app-4336,cand-2102,job-2001,hired,Onsite,2026-09-25,2026-11-05
+app-4337,cand-2217,job-2005,hired,Phone Screen,2026-09-23,2026-11-10
+app-4338,cand-2250,job-2003,hired,Withdrawn,2026-09-26,2026-11-07
+app-4339,cand-2054,job-2005,active,Application Review,2026-09-28,2026-11-08
+app-4340,cand-2004,job-2001,hired,Offer,2026-09-20,2026-11-06
+app-4341,cand-2179,job-2001,active,Phone Screen,2026-09-12,2026-11-07
+app-4342,cand-2203,job-2003,active,Onsite,2026-09-18,2026-11-11
+app-4343,cand-2228,job-2001,rejected,Withdrawn,2026-09-10,2026-11-09
+app-4344,cand-2059,job-2002,active,Offer,2026-09-14,2026-11-12
+app-4345,cand-2170,job-2003,active,Phone Screen,2026-09-16,2026-11-06
+app-4346,cand-2158,job-2003,hired,Withdrawn,2026-09-19,2026-11-05
+app-4347,cand-2218,job-2001,active,Withdrawn,2026-09-11,2026-11-10
+app-4348,cand-2230,job-PED-PT-01,rejected,Offer,2026-09-20,2026-11-07
+app-4349,cand-2237,job-2004,rejected,Application Review,2026-09-03,2026-11-10
+app-4350,cand-2218,job-2002,rejected,Withdrawn,2026-09-24,2026-11-11
+app-4351,cand-2181,job-2002,hired,Phone Screen,2026-09-20,2026-11-08
+app-4352,cand-2032,job-2002,rejected,Offer,2026-09-20,2026-11-12
+app-4353,cand-2145,job-2003,rejected,Application Review,2026-09-14,2026-11-12
+app-4354,cand-2087,job-2005,rejected,Offer,2026-09-01,2026-11-04
+app-4355,cand-2225,job-2003,active,Application Review,2026-09-14,2026-11-09
+app-4356,cand-2157,job-2004,active,Application Review,2026-09-10,2026-11-06
+app-4357,cand-2222,job-2003,hired,Offer,2026-09-19,2026-11-03
+app-4358,cand-2240,job-PED-PT-01,rejected,Rejected,2026-09-03,2026-11-10
+app-4359,cand-2149,job-2005,active,Phone Screen,2026-09-03,2026-11-08
+app-4360,cand-2161,job-PED-PT-01,rejected,Withdrawn,2026-09-05,2026-11-06
+app-4361,cand-1078,job-2003,rejected,Withdrawn,2026-09-09,2026-11-05
+app-4362,cand-2093,job-2005,hired,Rejected,2026-09-23,2026-11-11
+app-4363,cand-2083,job-PED-PT-01,rejected,Phone Screen,2026-09-02,2026-11-12
+app-4364,cand-2006,job-2005,rejected,Phone Screen,2026-09-07,2026-11-02
+app-4365,cand-2004,job-2003,hired,Rejected,2026-09-25,2026-11-11
+app-4366,cand-2066,job-2002,rejected,Application Review,2026-09-12,2026-11-05
+app-4367,cand-2116,job-2002,active,Offer,2026-09-21,2026-11-12
+app-4368,cand-2138,job-PED-PT-01,withdrawn,Withdrawn,2026-09-26,2026-11-06
+app-4369,cand-2212,job-2001,hired,Application Review,2026-09-28,2026-11-12
+app-4370,cand-2234,job-2001,rejected,Offer,2026-09-28,2026-11-02
+app-4371,cand-2199,job-2005,active,Offer,2026-09-16,2026-11-08
+app-4372,cand-2005,job-2004,hired,Onsite,2026-09-24,2026-11-10
+app-4373,cand-2201,job-2005,active,Rejected,2026-09-01,2026-11-12
+app-4374,cand-2079,job-2005,hired,Onsite,2026-09-26,2026-11-07
+app-4375,cand-2229,job-2005,rejected,Offer,2026-09-19,2026-11-08
+app-4376,cand-2023,job-2002,rejected,Withdrawn,2026-09-19,2026-11-01
+app-4377,cand-2135,job-2001,active,Onsite,2026-09-17,2026-11-08
+app-4378,cand-2040,job-PED-PT-01,rejected,Onsite,2026-09-22,2026-11-06
+app-4379,cand-2151,job-PED-PT-01,rejected,Offer,2026-09-10,2026-11-06
+app-4380,cand-2166,job-2002,active,Offer,2026-09-04,2026-11-10
+app-4381,cand-2062,job-2005,rejected,Rejected,2026-09-21,2026-11-11
+app-4382,cand-2194,job-2002,rejected,Withdrawn,2026-09-19,2026-11-08
+app-4383,cand-2141,job-2004,hired,Withdrawn,2026-09-25,2026-11-09
+app-4384,cand-2097,job-2005,hired,Application Review,2026-09-10,2026-11-03
+app-4385,cand-2053,job-2005,hired,Withdrawn,2026-09-07,2026-11-12
+app-4386,cand-2210,job-2005,hired,Rejected,2026-09-04,2026-11-08
+app-4387,cand-2091,job-PED-PT-01,rejected,Application Review,2026-09-27,2026-11-02
+app-4388,cand-2158,job-2004,hired,Offer,2026-09-17,2026-11-12
+app-4389,cand-2237,job-2002,hired,Offer,2026-09-14,2026-11-07
+app-4390,cand-2098,job-2005,hired,Offer,2026-09-28,2026-11-09
+app-4391,cand-2204,job-2001,hired,Onsite,2026-09-18,2026-11-12
+app-4392,cand-2144,job-2001,rejected,Offer,2026-09-07,2026-11-11
+app-4394,cand-2195,job-2002,rejected,Offer,2026-09-14,2026-11-04
+app-4395,cand-2224,job-2002,active,Phone Screen,2026-09-21,2026-11-07
+app-4396,cand-2070,job-2001,active,Application Review,2026-09-09,2026-11-12
+app-4397,cand-2095,job-PED-PT-01,active,Offer,2026-09-20,2026-11-02
+app-4398,cand-2089,job-2004,rejected,Phone Screen,2026-09-12,2026-11-06
+app-4399,cand-2095,job-2002,hired,Application Review,2026-09-27,2026-11-11
+app-4400,cand-2255,job-2002,active,Phone Screen,2026-09-12,2026-11-10
+app-4401,cand-2256,job-2003,active,Application Review,2026-09-16,2026-11-11
+app-4402,cand-2257,job-2005,rejected,Phone Screen,2026-09-19,2026-11-07
+app-4403,cand-2258,job-2001,active,Application Review,2026-09-22,2026-11-09
+app-4404,cand-2259,job-2003,active,Phone Screen,2026-09-24,2026-11-10
+app-4405,cand-2260,job-2005,hired,Application Review,2026-09-27,2026-11-12

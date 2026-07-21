@@ -1,0 +1,13 @@
+id,name,address1,city,region,postal_code,country,latitude,longitude
+ven-0,Venue 0,100 Main St,Columbus,OH,43200,US,39.96,-83.00
+ven-1,Venue 1,101 Main St,Columbus,OH,43201,US,39.96,-83.00
+ven-2,Venue 2,102 Main St,Columbus,OH,43202,US,39.96,-83.00
+ven-3,Venue 3,103 Main St,Columbus,OH,43203,US,39.96,-83.00
+ven-4,Venue 4,104 Main St,Columbus,OH,43204,US,39.96,-83.00
+ven-5,Venue 5,105 Main St,Columbus,OH,43205,US,39.96,-83.00
+ven-6,Venue 6,106 Main St,Columbus,OH,43206,US,39.96,-83.00
+ven-7,Venue 7,107 Main St,Columbus,OH,43207,US,39.96,-83.00
+ven-8,Venue 8,108 Main St,Columbus,OH,43208,US,39.96,-83.00
+ven-9,Venue 9,109 Main St,Columbus,OH,43209,US,39.96,-83.00
+ven-10,Venue 10,110 Main St,Columbus,OH,43210,US,39.96,-83.00
+ven-11,Venue 11,111 Main St,Columbus,OH,43211,US,39.96,-83.00

@@ -1,0 +1,13 @@
+playlist_id,name,description,owner_id,public,collaborative
+pl-0,Playlist 0,Mix.,user-0,True,False
+pl-1,Playlist 1,Mix.,user-1,True,False
+pl-2,Playlist 2,Mix.,user-2,True,False
+pl-3,Playlist 3,Mix.,user-3,True,False
+pl-4,Playlist 4,Mix.,user-4,True,False
+pl-5,Playlist 5,Mix.,user-5,True,False
+pl-6,Playlist 6,Mix.,user-6,True,False
+pl-7,Playlist 7,Mix.,user-7,True,False
+pl-8,Playlist 8,Mix.,user-8,True,False
+pl-9,Playlist 9,Mix.,user-9,True,False
+pl-10,Playlist 10,Mix.,user-10,False,False
+pl-11,Playlist 11,Mix.,user-11,True,False

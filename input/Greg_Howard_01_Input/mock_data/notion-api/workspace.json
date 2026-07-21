@@ -1,0 +1,14 @@
+{
+  "id": "ws-greg",
+  "name": "Greg Year-End Notes",
+  "domain": "greg-howard",
+  "owner_user_id": "user-greg",
+  "plan": "personal",
+  "created_time": "2025-09-01T10:00:00.000Z",
+  "icon": "https://www.notion.so/icons/note_gray.svg",
+  "settings": {
+    "default_page_size": 50,
+    "ai_blocks_enabled": true,
+    "public_sharing_enabled": false
+  }
+}

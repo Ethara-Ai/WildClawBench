@@ -1,0 +1,13 @@
+item_id,store_id,name,description,category,price,calories,popular,available
+mi-0,st-0,Item 0,Tasty.,Entree,8.99,278,True,True
+mi-1,st-1,Item 1,Tasty.,Dessert,15.99,622,False,True
+mi-2,st-2,Item 2,Tasty.,Dessert,7.99,572,False,True
+mi-3,st-3,Item 3,Tasty.,Drink,22.99,1073,True,True
+mi-4,st-4,Item 4,Tasty.,Entree,5.99,950,False,True
+mi-5,st-5,Item 5,Tasty.,Drink,7.99,370,True,True
+mi-6,st-6,Item 6,Tasty.,Dessert,9.99,655,True,True
+mi-7,st-7,Item 7,Tasty.,Drink,23.99,159,False,True
+mi-8,st-8,Item 8,Tasty.,Entree,18.99,378,True,True
+mi-9,st-9,Item 9,Tasty.,Dessert,20.99,637,True,True
+mi-10,st-10,Item 10,Tasty.,Entree,8.99,1004,True,True
+mi-11,st-11,Item 11,Tasty.,Side,9.99,1053,False,True

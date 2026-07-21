@@ -1,0 +1,13 @@
+movie_id,person_id,credit_type,character,job,order
+mv-0,pe-0,crew,Character 0,Actor,0
+mv-1,pe-1,cast,Character 1,Actor,1
+mv-2,pe-2,cast,Character 2,Writer,2
+mv-3,pe-3,cast,Character 3,Director,3
+mv-4,pe-4,crew,Character 4,Actor,4
+mv-5,pe-5,crew,Character 5,Director,5
+mv-6,pe-6,crew,Character 6,Director,6
+mv-7,pe-7,cast,Character 7,Writer,7
+mv-8,pe-8,crew,Character 8,Writer,8
+mv-9,pe-9,cast,Character 9,Director,9
+mv-10,pe-10,crew,Character 10,Actor,10
+mv-11,pe-11,cast,Character 11,Director,11

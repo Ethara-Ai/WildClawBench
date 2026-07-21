@@ -1,0 +1,13 @@
+store_id,name,cuisine,rating,review_count,price_range,delivery_fee,eta_minutes,latitude,longitude,address,is_open
+st-0,Restaurant 0,Mexican,4.1,2337,$,3.99,30,39.96,-83.00,100 High St,True
+st-1,Restaurant 1,Burgers,4.9,841,$,3.99,15,39.96,-83.00,101 High St,True
+st-2,Restaurant 2,Thai,4.2,979,$,3.99,40,39.96,-83.00,102 High St,True
+st-3,Restaurant 3,Thai,4.6,1477,$$,3.99,29,39.96,-83.00,103 High St,True
+st-4,Restaurant 4,Mexican,4.0,51,$$$,3.99,27,39.96,-83.00,104 High St,True
+st-5,Restaurant 5,Mexican,4.9,1475,$$,3.99,33,39.96,-83.00,105 High St,True
+st-6,Restaurant 6,Italian,3.7,2592,$$,3.99,40,39.96,-83.00,106 High St,True
+st-7,Restaurant 7,Burgers,4.6,690,$$$,3.99,21,39.96,-83.00,107 High St,True
+st-8,Restaurant 8,Burgers,4.9,2110,$$$,3.99,26,39.96,-83.00,108 High St,True
+st-9,Restaurant 9,Italian,3.6,1440,$$$,3.99,32,39.96,-83.00,109 High St,True
+st-10,Restaurant 10,Thai,4.7,2538,$$$,3.99,50,39.96,-83.00,110 High St,True
+st-11,Restaurant 11,Mexican,4.5,2420,$,3.99,48,39.96,-83.00,111 High St,True

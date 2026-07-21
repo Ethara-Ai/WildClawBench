@@ -1,0 +1,13 @@
+id,symbol,name,exchange,asset_class,tradable,fractionable
+asset-0,SYM0,Company 0 Inc,NYSE,us_equity,True,True
+asset-1,SYM1,Company 1 Inc,NYSE,us_equity,True,True
+asset-2,SYM2,Company 2 Inc,NASDAQ,us_equity,True,True
+asset-3,SYM3,Company 3 Inc,NASDAQ,us_equity,True,True
+asset-4,SYM4,Company 4 Inc,NASDAQ,us_equity,True,True
+asset-5,SYM5,Company 5 Inc,NASDAQ,us_equity,True,True
+asset-6,SYM6,Company 6 Inc,NASDAQ,us_equity,True,True
+asset-7,SYM7,Company 7 Inc,NYSE,us_equity,True,True
+asset-8,SYM8,Company 8 Inc,NYSE,us_equity,True,True
+asset-9,SYM9,Company 9 Inc,NYSE,us_equity,True,True
+asset-10,SYM10,Company 10 Inc,NYSE,us_equity,True,True
+asset-11,SYM11,Company 11 Inc,NASDAQ,us_equity,True,True

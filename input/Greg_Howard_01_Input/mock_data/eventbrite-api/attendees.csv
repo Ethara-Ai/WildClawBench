@@ -1,0 +1,13 @@
+id,event_id,ticket_class_id,name,email,status,checked_in,created
+att-0,ev-0,tc-0,Priya Diaz,priya@example.com,attending,True,2026-01-01
+att-1,ev-1,tc-1,Marcus Diaz,marcus@example.com,attending,True,2026-02-02
+att-2,ev-2,tc-2,Dana Diaz,dana@example.com,attending,False,2026-03-03
+att-3,ev-3,tc-3,Evan Diaz,evan@example.com,attending,False,2026-04-04
+att-4,ev-4,tc-4,Grace Diaz,grace@example.com,attending,True,2026-05-05
+att-5,ev-5,tc-5,Nadia Diaz,nadia@example.com,attending,False,2026-06-06
+att-6,ev-6,tc-6,Sam Diaz,sam@example.com,attending,True,2026-07-07
+att-7,ev-7,tc-7,Tomas Diaz,tomas@example.com,attending,True,2026-08-08
+att-8,ev-8,tc-8,Wendy Diaz,wendy@example.com,attending,True,2026-09-09
+att-9,ev-9,tc-9,Leo Diaz,leo@example.com,attending,False,2026-10-10
+att-10,ev-10,tc-10,Aisha Diaz,aisha@example.com,attending,True,2026-11-11
+att-11,ev-11,tc-11,Ravi Diaz,ravi@example.com,attending,True,2026-12-12

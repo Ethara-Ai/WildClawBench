@@ -1,0 +1,13 @@
+order_id,store_id,customer_name,status,subtotal,delivery_fee,service_fee,tip,total,placed_at,dasher_name
+ord-0,st-0,Priya Diaz,delivered,58.00,3.99,2.50,9.00,73.00,2026-01-01T00:00:00Z,Dasher 0
+ord-1,st-1,Marcus Diaz,delivered,41.00,3.99,2.50,10.00,73.00,2026-02-02T00:00:00Z,Dasher 1
+ord-2,st-2,Dana Diaz,delivered,32.00,3.99,2.50,6.00,41.00,2026-03-03T00:00:00Z,Dasher 2
+ord-3,st-3,Evan Diaz,delivered,24.00,3.99,2.50,1.00,36.00,2026-04-04T00:00:00Z,Dasher 3
+ord-4,st-4,Grace Diaz,delivered,52.00,3.99,2.50,1.00,40.00,2026-05-05T00:00:00Z,Dasher 4
+ord-5,st-5,Nadia Diaz,delivered,52.00,3.99,2.50,7.00,77.00,2026-06-06T00:00:00Z,Dasher 5
+ord-6,st-6,Sam Diaz,cancelled,60.00,3.99,2.50,9.00,65.00,2026-07-07T00:00:00Z,Dasher 6
+ord-7,st-7,Tomas Diaz,delivered,31.00,3.99,2.50,10.00,26.00,2026-08-08T00:00:00Z,Dasher 7
+ord-8,st-8,Wendy Diaz,delivered,10.00,3.99,2.50,9.00,61.00,2026-09-09T00:00:00Z,Dasher 8
+ord-9,st-9,Leo Diaz,delivered,51.00,3.99,2.50,10.00,77.00,2026-10-10T00:00:00Z,Dasher 9
+ord-10,st-10,Aisha Diaz,cancelled,22.00,3.99,2.50,6.00,17.00,2026-11-11T00:00:00Z,Dasher 10
+ord-11,st-11,Ravi Diaz,delivered,21.00,3.99,2.50,1.00,22.00,2026-12-12T00:00:00Z,Dasher 11

@@ -1,0 +1,13 @@
+id,firstname,lastname,email,phone,jobtitle,company,lifecyclestage,createdate,lastmodifieddate
+6000,Priya,Diaz,priya@company0.example.com,614-555-2000,Rep,Company 0,opportunity,2023-01-01,2026-01-01
+6001,Marcus,Diaz,marcus@company1.example.com,614-555-2001,Manager,Company 1,opportunity,2023-02-02,2026-01-02
+6002,Dana,Diaz,dana@company2.example.com,614-555-2002,Rep,Company 2,lead,2023-03-03,2026-01-03
+6003,Evan,Diaz,evan@company3.example.com,614-555-2003,Rep,Company 3,lead,2023-04-04,2026-01-04
+6004,Grace,Diaz,grace@company4.example.com,614-555-2004,Analyst,Company 4,lead,2023-05-05,2026-01-05
+6005,Nadia,Diaz,nadia@company5.example.com,614-555-2005,Analyst,Company 5,lead,2023-06-06,2026-01-06
+6006,Sam,Diaz,sam@company6.example.com,614-555-2006,Rep,Company 6,opportunity,2023-07-07,2026-01-07
+6007,Tomas,Diaz,tomas@company7.example.com,614-555-2007,Manager,Company 7,customer,2023-08-08,2026-01-08
+6008,Wendy,Diaz,wendy@company8.example.com,614-555-2008,Rep,Company 8,lead,2023-09-09,2026-01-09
+6009,Leo,Diaz,leo@company9.example.com,614-555-2009,Rep,Company 9,lead,2023-10-10,2026-01-10
+6010,Aisha,Diaz,aisha@company10.example.com,614-555-2010,Manager,Company 10,lead,2023-11-11,2026-01-11
+6011,Ravi,Diaz,ravi@company11.example.com,614-555-2011,Analyst,Company 11,customer,2023-12-12,2026-01-12

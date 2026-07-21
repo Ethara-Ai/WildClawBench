@@ -1,0 +1,14 @@
+{
+  "subdomain": "kestrelhealth",
+  "name": "Kestrel Healthcare",
+  "employeeCount": 300,
+  "industry": "Healthcare",
+  "headquarters": "Worthington, OH",
+  "fiscalYearStart": "01-01",
+  "timeOffPolicies": [
+    "PTO",
+    "Sick",
+    "Personal",
+    "Holiday"
+  ]
+}

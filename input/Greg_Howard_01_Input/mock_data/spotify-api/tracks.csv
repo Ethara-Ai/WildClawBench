@@ -1,0 +1,13 @@
+track_id,name,artist_id,album_id,duration_ms,popularity,explicit,track_number
+tr-0,Track 0,ar-0,al-0,196454,89,True,1
+tr-1,Track 1,ar-1,al-1,277218,95,True,2
+tr-2,Track 2,ar-2,al-2,172486,9,False,3
+tr-3,Track 3,ar-3,al-3,286258,97,False,4
+tr-4,Track 4,ar-4,al-4,285134,87,True,5
+tr-5,Track 5,ar-5,al-5,138542,44,True,6
+tr-6,Track 6,ar-6,al-6,231541,29,False,7
+tr-7,Track 7,ar-7,al-7,262989,78,False,8
+tr-8,Track 8,ar-8,al-8,100494,53,False,9
+tr-9,Track 9,ar-9,al-9,238776,90,False,10
+tr-10,Track 10,ar-10,al-10,196385,77,False,11
+tr-11,Track 11,ar-11,al-11,218954,4,True,12

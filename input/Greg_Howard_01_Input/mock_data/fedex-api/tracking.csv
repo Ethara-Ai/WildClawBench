@@ -1,0 +1,13 @@
+tracking_number,status_code,status_description,carrier_code,service_name,ship_date,estimated_delivery,latest_event,latest_event_location,latest_event_time
+794800000000,DL,Out for delivery,FDXG,FedEx Ground,2026-01-01,2026-01-03,Scan,Columbus OH,2026-01-01T00:00:00Z
+794800000001,IT,Out for delivery,FDXG,FedEx Ground,2026-02-02,2026-02-04,Scan,Columbus OH,2026-02-02T00:00:00Z
+794800000002,DL,Out for delivery,FDXG,FedEx Ground,2026-03-03,2026-03-05,Scan,Columbus OH,2026-03-03T00:00:00Z
+794800000003,IT,Delivered,FDXG,FedEx Ground,2026-04-04,2026-04-06,Scan,Columbus OH,2026-04-04T00:00:00Z
+794800000004,IT,Out for delivery,FDXG,FedEx Ground,2026-05-05,2026-05-07,Scan,Columbus OH,2026-05-05T00:00:00Z
+794800000005,OD,Out for delivery,FDXG,FedEx Ground,2026-06-06,2026-06-08,Scan,Columbus OH,2026-06-06T00:00:00Z
+794800000006,OD,Out for delivery,FDXG,FedEx Ground,2026-07-07,2026-07-09,Scan,Columbus OH,2026-07-07T00:00:00Z
+794800000007,DL,Out for delivery,FDXG,FedEx Ground,2026-08-08,2026-08-10,Scan,Columbus OH,2026-08-08T00:00:00Z
+794800000008,DL,Out for delivery,FDXG,FedEx Ground,2026-09-09,2026-09-11,Scan,Columbus OH,2026-09-09T00:00:00Z
+794800000009,IT,In transit,FDXG,FedEx Ground,2026-10-10,2026-10-12,Scan,Columbus OH,2026-10-10T00:00:00Z
+794800000010,OD,Delivered,FDXG,FedEx Ground,2026-11-11,2026-08-19,Scan,Columbus OH,2026-11-11T00:00:00Z
+794800000011,IT,Out for delivery,FDXG,FedEx Ground,2026-12-12,2026-12-14,Scan,Columbus OH,2026-12-12T00:00:00Z

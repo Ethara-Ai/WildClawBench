@@ -1,0 +1,116 @@
+id,name,label,status,sign_on_mode,created
+okta-app-ceu-legacy,ceu_legacy_portal,CEU Legacy Portal,ACTIVE,SAML_2_0,2021-01-01
+okta-app-0,app_0,App 0,ACTIVE,SAML_2_0,2021-01-01
+okta-app-1,app_1,App 1,ACTIVE,SAML_2_0,2021-01-01
+okta-app-2,app_2,App 2,ACTIVE,SAML_2_0,2021-01-01
+okta-app-3,app_3,App 3,ACTIVE,SAML_2_0,2021-01-01
+okta-app-4,app_4,App 4,ACTIVE,SAML_2_0,2021-01-01
+okta-app-5,app_5,App 5,ACTIVE,SAML_2_0,2021-01-01
+okta-app-6,app_6,App 6,ACTIVE,SAML_2_0,2021-01-01
+okta-app-7,app_7,App 7,ACTIVE,SAML_2_0,2021-01-01
+okta-app-8,app_8,App 8,ACTIVE,SAML_2_0,2021-01-01
+okta-app-9,app_9,App 9,ACTIVE,SAML_2_0,2021-01-01
+okta-app-10,app_10,App 10,ACTIVE,SAML_2_0,2021-01-01
+okta-app-11,app_11,App 11,ACTIVE,SAML_2_0,2021-01-01
+okta-app-12,app_12,App 12,ACTIVE,SAML_2_0,2021-01-01
+okta-app-13,app_13,App 13,ACTIVE,SAML_2_0,2021-01-01
+okta-app-14,app_14,App 14,ACTIVE,SAML_2_0,2021-01-01
+okta-app-15,app_15,App 15,ACTIVE,SAML_2_0,2021-01-01
+okta-app-16,app_16,App 16,ACTIVE,SAML_2_0,2021-01-01
+okta-app-17,app_17,App 17,ACTIVE,SAML_2_0,2021-01-01
+okta-app-18,app_18,App 18,ACTIVE,SAML_2_0,2021-01-01
+okta-app-19,app_19,App 19,ACTIVE,SAML_2_0,2021-01-01
+okta-app-20,app_20,App 20,ACTIVE,SAML_2_0,2021-01-01
+okta-app-21,app_21,App 21,ACTIVE,SAML_2_0,2021-01-01
+okta-app-22,app_22,App 22,ACTIVE,SAML_2_0,2021-01-01
+okta-app-23,app_23,App 23,ACTIVE,SAML_2_0,2021-01-01
+okta-app-24,app_24,App 24,ACTIVE,SAML_2_0,2021-01-01
+okta-app-25,app_25,App 25,ACTIVE,SAML_2_0,2021-01-01
+okta-app-26,app_26,App 26,ACTIVE,SAML_2_0,2021-01-01
+okta-app-27,app_27,App 27,ACTIVE,SAML_2_0,2021-01-01
+okta-app-28,app_28,App 28,ACTIVE,SAML_2_0,2021-01-01
+okta-app-29,app_29,App 29,ACTIVE,SAML_2_0,2021-01-01
+okta-app-30,app_30,App 30,ACTIVE,SAML_2_0,2021-01-01
+okta-app-31,app_31,App 31,ACTIVE,SAML_2_0,2021-01-01
+okta-app-32,app_32,App 32,ACTIVE,SAML_2_0,2021-01-01
+okta-app-33,app_33,App 33,ACTIVE,SAML_2_0,2021-01-01
+okta-app-34,app_34,App 34,ACTIVE,SAML_2_0,2021-01-01
+okta-app-35,app_35,App 35,ACTIVE,SAML_2_0,2021-01-01
+okta-app-36,app_36,App 36,ACTIVE,SAML_2_0,2021-01-01
+okta-app-37,app_37,App 37,ACTIVE,SAML_2_0,2021-01-01
+okta-app-38,app_38,App 38,ACTIVE,SAML_2_0,2021-01-01
+okta-app-gen-40,app_generic_40,Generic App 40,ACTIVE,SECURE_PASSWORD_STORE,2025-01-15T00:00:00Z
+okta-app-gen-41,app_generic_41,Generic App 41,ACTIVE,AUTO_LOGIN,2025-01-15T00:00:00Z
+okta-app-gen-42,app_generic_42,Generic App 42,ACTIVE,SECURE_PASSWORD_STORE,2025-01-15T00:00:00Z
+okta-app-gen-43,app_generic_43,Generic App 43,ACTIVE,SECURE_PASSWORD_STORE,2025-01-15T00:00:00Z
+okta-app-gen-44,app_generic_44,Generic App 44,ACTIVE,SECURE_PASSWORD_STORE,2025-01-15T00:00:00Z
+okta-app-gen-45,app_generic_45,Generic App 45,ACTIVE,OPENID_CONNECT,2025-01-15T00:00:00Z
+okta-app-gen-46,app_generic_46,Generic App 46,ACTIVE,AUTO_LOGIN,2025-01-15T00:00:00Z
+okta-app-gen-47,app_generic_47,Generic App 47,ACTIVE,AUTO_LOGIN,2025-01-15T00:00:00Z
+okta-app-gen-48,app_generic_48,Generic App 48,ACTIVE,OPENID_CONNECT,2025-01-15T00:00:00Z
+okta-app-gen-49,app_generic_49,Generic App 49,ACTIVE,OPENID_CONNECT,2025-01-15T00:00:00Z
+okta-app-gen-50,app_generic_50,Generic App 50,ACTIVE,SAML_2_0,2025-01-15T00:00:00Z
+okta-app-gen-51,app_generic_51,Generic App 51,ACTIVE,SECURE_PASSWORD_STORE,2025-01-15T00:00:00Z
+okta-app-gen-52,app_generic_52,Generic App 52,ACTIVE,SAML_2_0,2025-01-15T00:00:00Z
+okta-app-gen-53,app_generic_53,Generic App 53,ACTIVE,OPENID_CONNECT,2025-01-15T00:00:00Z
+okta-app-gen-54,app_generic_54,Generic App 54,ACTIVE,OPENID_CONNECT,2025-01-15T00:00:00Z
+okta-app-gen-55,app_generic_55,Generic App 55,ACTIVE,OPENID_CONNECT,2025-01-15T00:00:00Z
+okta-app-gen-56,app_generic_56,Generic App 56,ACTIVE,SECURE_PASSWORD_STORE,2025-01-15T00:00:00Z
+okta-app-gen-57,app_generic_57,Generic App 57,ACTIVE,OPENID_CONNECT,2025-01-15T00:00:00Z
+okta-app-gen-58,app_generic_58,Generic App 58,ACTIVE,OPENID_CONNECT,2025-01-15T00:00:00Z
+okta-app-gen-59,app_generic_59,Generic App 59,ACTIVE,SAML_2_0,2025-01-15T00:00:00Z
+okta-app-gen-60,app_generic_60,Generic App 60,ACTIVE,OPENID_CONNECT,2025-01-15T00:00:00Z
+okta-app-gen-61,app_generic_61,Generic App 61,ACTIVE,AUTO_LOGIN,2025-01-15T00:00:00Z
+okta-app-gen-62,app_generic_62,Generic App 62,ACTIVE,OPENID_CONNECT,2025-01-15T00:00:00Z
+okta-app-gen-63,app_generic_63,Generic App 63,ACTIVE,SAML_2_0,2025-01-15T00:00:00Z
+okta-app-gen-64,app_generic_64,Generic App 64,ACTIVE,OPENID_CONNECT,2025-01-15T00:00:00Z
+okta-app-gen-65,app_generic_65,Generic App 65,ACTIVE,OPENID_CONNECT,2025-01-15T00:00:00Z
+okta-app-gen-66,app_generic_66,Generic App 66,ACTIVE,OPENID_CONNECT,2025-01-15T00:00:00Z
+okta-app-gen-67,app_generic_67,Generic App 67,ACTIVE,SECURE_PASSWORD_STORE,2025-01-15T00:00:00Z
+okta-app-gen-68,app_generic_68,Generic App 68,ACTIVE,SAML_2_0,2025-01-15T00:00:00Z
+okta-app-gen-69,app_generic_69,Generic App 69,ACTIVE,SAML_2_0,2025-01-15T00:00:00Z
+okta-app-gen-70,app_generic_70,Generic App 70,ACTIVE,SAML_2_0,2025-01-15T00:00:00Z
+okta-app-gen-71,app_generic_71,Generic App 71,ACTIVE,AUTO_LOGIN,2025-01-15T00:00:00Z
+okta-app-gen-72,app_generic_72,Generic App 72,ACTIVE,SAML_2_0,2025-01-15T00:00:00Z
+okta-app-gen-73,app_generic_73,Generic App 73,ACTIVE,AUTO_LOGIN,2025-01-15T00:00:00Z
+okta-app-gen-74,app_generic_74,Generic App 74,ACTIVE,OPENID_CONNECT,2025-01-15T00:00:00Z
+okta-app-gen-75,app_generic_75,Generic App 75,ACTIVE,AUTO_LOGIN,2025-01-15T00:00:00Z
+okta-app-gen-76,app_generic_76,Generic App 76,ACTIVE,SAML_2_0,2025-01-15T00:00:00Z
+okta-app-gen-77,app_generic_77,Generic App 77,ACTIVE,SECURE_PASSWORD_STORE,2025-01-15T00:00:00Z
+okta-app-gen-78,app_generic_78,Generic App 78,ACTIVE,OPENID_CONNECT,2025-01-15T00:00:00Z
+okta-app-gen-79,app_generic_79,Generic App 79,ACTIVE,OPENID_CONNECT,2025-01-15T00:00:00Z
+okta-app-gen-80,app_generic_80,Generic App 80,ACTIVE,SAML_2_0,2025-01-15T00:00:00Z
+okta-app-gen-81,app_generic_81,Generic App 81,ACTIVE,SECURE_PASSWORD_STORE,2025-01-15T00:00:00Z
+okta-app-gen-82,app_generic_82,Generic App 82,ACTIVE,SAML_2_0,2025-01-15T00:00:00Z
+okta-app-gen-83,app_generic_83,Generic App 83,ACTIVE,OPENID_CONNECT,2025-01-15T00:00:00Z
+okta-app-gen-84,app_generic_84,Generic App 84,ACTIVE,SECURE_PASSWORD_STORE,2025-01-15T00:00:00Z
+okta-app-gen-85,app_generic_85,Generic App 85,ACTIVE,SECURE_PASSWORD_STORE,2025-01-15T00:00:00Z
+okta-app-gen-86,app_generic_86,Generic App 86,ACTIVE,SECURE_PASSWORD_STORE,2025-01-15T00:00:00Z
+okta-app-gen-87,app_generic_87,Generic App 87,ACTIVE,SAML_2_0,2025-01-15T00:00:00Z
+okta-app-gen-88,app_generic_88,Generic App 88,ACTIVE,OPENID_CONNECT,2025-01-15T00:00:00Z
+okta-app-gen-89,app_generic_89,Generic App 89,ACTIVE,SECURE_PASSWORD_STORE,2025-01-15T00:00:00Z
+okta-app-gen-90,app_generic_90,Generic App 90,ACTIVE,OPENID_CONNECT,2025-01-15T00:00:00Z
+okta-app-gen-91,app_generic_91,Generic App 91,ACTIVE,OPENID_CONNECT,2025-01-15T00:00:00Z
+okta-app-gen-92,app_generic_92,Generic App 92,ACTIVE,SAML_2_0,2025-01-15T00:00:00Z
+okta-app-gen-93,app_generic_93,Generic App 93,ACTIVE,SECURE_PASSWORD_STORE,2025-01-15T00:00:00Z
+okta-app-gen-94,app_generic_94,Generic App 94,ACTIVE,SECURE_PASSWORD_STORE,2025-01-15T00:00:00Z
+okta-app-gen-95,app_generic_95,Generic App 95,ACTIVE,SAML_2_0,2025-01-15T00:00:00Z
+okta-app-gen-96,app_generic_96,Generic App 96,ACTIVE,SAML_2_0,2025-01-15T00:00:00Z
+okta-app-gen-97,app_generic_97,Generic App 97,ACTIVE,AUTO_LOGIN,2025-01-15T00:00:00Z
+okta-app-gen-98,app_generic_98,Generic App 98,ACTIVE,SECURE_PASSWORD_STORE,2025-01-15T00:00:00Z
+okta-app-gen-99,app_generic_99,Generic App 99,ACTIVE,OPENID_CONNECT,2025-01-15T00:00:00Z
+okta-app-gen-100,app_generic_100,Generic App 100,ACTIVE,SECURE_PASSWORD_STORE,2025-01-15T00:00:00Z
+okta-app-gen-101,app_generic_101,Generic App 101,ACTIVE,OPENID_CONNECT,2025-01-15T00:00:00Z
+okta-app-gen-102,app_generic_102,Generic App 102,ACTIVE,OPENID_CONNECT,2025-01-15T00:00:00Z
+okta-app-gen-103,app_generic_103,Generic App 103,ACTIVE,AUTO_LOGIN,2025-01-15T00:00:00Z
+okta-app-gen-104,app_generic_104,Generic App 104,ACTIVE,AUTO_LOGIN,2025-01-15T00:00:00Z
+okta-app-gen-105,app_generic_105,Generic App 105,ACTIVE,AUTO_LOGIN,2025-01-15T00:00:00Z
+okta-app-gen-106,app_generic_106,Generic App 106,ACTIVE,AUTO_LOGIN,2025-01-15T00:00:00Z
+okta-app-gen-107,app_generic_107,Generic App 107,ACTIVE,AUTO_LOGIN,2025-01-15T00:00:00Z
+okta-app-gen-108,app_generic_108,Generic App 108,ACTIVE,OPENID_CONNECT,2025-01-15T00:00:00Z
+okta-app-gen-109,app_generic_109,Generic App 109,ACTIVE,OPENID_CONNECT,2025-01-15T00:00:00Z
+okta-app-gen-110,app_generic_110,Generic App 110,ACTIVE,SAML_2_0,2025-01-15T00:00:00Z
+okta-app-gen-111,app_generic_111,Generic App 111,ACTIVE,AUTO_LOGIN,2025-01-15T00:00:00Z
+okta-app-gen-112,app_generic_112,Generic App 112,ACTIVE,SAML_2_0,2025-01-15T00:00:00Z
+okta-app-gen-113,app_generic_113,Generic App 113,ACTIVE,SAML_2_0,2025-01-15T00:00:00Z
+okta-app-gen-114,app_generic_114,Generic App 114,ACTIVE,SAML_2_0,2025-01-15T00:00:00Z

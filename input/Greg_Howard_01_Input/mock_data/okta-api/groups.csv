@@ -1,0 +1,116 @@
+id,name,description,type,created
+grp-clinical,Clinical Staff,Clinical,OKTA_GROUP,2019-01-01
+grp-0,Group 0,Dept group,OKTA_GROUP,2020-01-01
+grp-1,Group 1,Dept group,OKTA_GROUP,2020-01-01
+grp-2,Group 2,Dept group,OKTA_GROUP,2020-01-01
+grp-3,Group 3,Dept group,OKTA_GROUP,2020-01-01
+grp-4,Group 4,Dept group,OKTA_GROUP,2020-01-01
+grp-5,Group 5,Dept group,OKTA_GROUP,2020-01-01
+grp-6,Group 6,Dept group,OKTA_GROUP,2020-01-01
+grp-7,Group 7,Dept group,OKTA_GROUP,2020-01-01
+grp-8,Group 8,Dept group,OKTA_GROUP,2020-01-01
+grp-9,Group 9,Dept group,OKTA_GROUP,2020-01-01
+grp-10,Group 10,Dept group,OKTA_GROUP,2020-01-01
+grp-11,Group 11,Dept group,OKTA_GROUP,2020-01-01
+grp-12,Group 12,Dept group,OKTA_GROUP,2020-01-01
+grp-13,Group 13,Dept group,OKTA_GROUP,2020-01-01
+grp-14,Group 14,Dept group,OKTA_GROUP,2020-01-01
+grp-15,Group 15,Dept group,OKTA_GROUP,2020-01-01
+grp-16,Group 16,Dept group,OKTA_GROUP,2020-01-01
+grp-17,Group 17,Dept group,OKTA_GROUP,2020-01-01
+grp-18,Group 18,Dept group,OKTA_GROUP,2020-01-01
+grp-19,Group 19,Dept group,OKTA_GROUP,2020-01-01
+grp-20,Group 20,Dept group,OKTA_GROUP,2020-01-01
+grp-21,Group 21,Dept group,OKTA_GROUP,2020-01-01
+grp-22,Group 22,Dept group,OKTA_GROUP,2020-01-01
+grp-23,Group 23,Dept group,OKTA_GROUP,2020-01-01
+grp-24,Group 24,Dept group,OKTA_GROUP,2020-01-01
+grp-25,Group 25,Dept group,OKTA_GROUP,2020-01-01
+grp-26,Group 26,Dept group,OKTA_GROUP,2020-01-01
+grp-27,Group 27,Dept group,OKTA_GROUP,2020-01-01
+grp-28,Group 28,Dept group,OKTA_GROUP,2020-01-01
+okta-group-gen-30,Group Generic 30,Auto-provisioned group 30,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-31,Group Generic 31,Auto-provisioned group 31,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-32,Group Generic 32,Auto-provisioned group 32,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-33,Group Generic 33,Auto-provisioned group 33,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-34,Group Generic 34,Auto-provisioned group 34,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-35,Group Generic 35,Auto-provisioned group 35,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-36,Group Generic 36,Auto-provisioned group 36,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-37,Group Generic 37,Auto-provisioned group 37,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-38,Group Generic 38,Auto-provisioned group 38,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-39,Group Generic 39,Auto-provisioned group 39,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-40,Group Generic 40,Auto-provisioned group 40,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-41,Group Generic 41,Auto-provisioned group 41,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-42,Group Generic 42,Auto-provisioned group 42,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-43,Group Generic 43,Auto-provisioned group 43,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-44,Group Generic 44,Auto-provisioned group 44,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-45,Group Generic 45,Auto-provisioned group 45,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-46,Group Generic 46,Auto-provisioned group 46,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-47,Group Generic 47,Auto-provisioned group 47,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-48,Group Generic 48,Auto-provisioned group 48,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-49,Group Generic 49,Auto-provisioned group 49,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-50,Group Generic 50,Auto-provisioned group 50,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-51,Group Generic 51,Auto-provisioned group 51,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-52,Group Generic 52,Auto-provisioned group 52,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-53,Group Generic 53,Auto-provisioned group 53,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-54,Group Generic 54,Auto-provisioned group 54,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-55,Group Generic 55,Auto-provisioned group 55,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-56,Group Generic 56,Auto-provisioned group 56,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-57,Group Generic 57,Auto-provisioned group 57,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-58,Group Generic 58,Auto-provisioned group 58,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-59,Group Generic 59,Auto-provisioned group 59,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-60,Group Generic 60,Auto-provisioned group 60,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-61,Group Generic 61,Auto-provisioned group 61,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-62,Group Generic 62,Auto-provisioned group 62,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-63,Group Generic 63,Auto-provisioned group 63,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-64,Group Generic 64,Auto-provisioned group 64,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-65,Group Generic 65,Auto-provisioned group 65,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-66,Group Generic 66,Auto-provisioned group 66,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-67,Group Generic 67,Auto-provisioned group 67,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-68,Group Generic 68,Auto-provisioned group 68,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-69,Group Generic 69,Auto-provisioned group 69,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-70,Group Generic 70,Auto-provisioned group 70,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-71,Group Generic 71,Auto-provisioned group 71,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-72,Group Generic 72,Auto-provisioned group 72,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-73,Group Generic 73,Auto-provisioned group 73,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-74,Group Generic 74,Auto-provisioned group 74,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-75,Group Generic 75,Auto-provisioned group 75,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-76,Group Generic 76,Auto-provisioned group 76,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-77,Group Generic 77,Auto-provisioned group 77,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-78,Group Generic 78,Auto-provisioned group 78,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-79,Group Generic 79,Auto-provisioned group 79,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-80,Group Generic 80,Auto-provisioned group 80,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-81,Group Generic 81,Auto-provisioned group 81,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-82,Group Generic 82,Auto-provisioned group 82,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-83,Group Generic 83,Auto-provisioned group 83,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-84,Group Generic 84,Auto-provisioned group 84,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-85,Group Generic 85,Auto-provisioned group 85,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-86,Group Generic 86,Auto-provisioned group 86,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-87,Group Generic 87,Auto-provisioned group 87,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-88,Group Generic 88,Auto-provisioned group 88,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-89,Group Generic 89,Auto-provisioned group 89,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-90,Group Generic 90,Auto-provisioned group 90,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-91,Group Generic 91,Auto-provisioned group 91,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-92,Group Generic 92,Auto-provisioned group 92,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-93,Group Generic 93,Auto-provisioned group 93,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-94,Group Generic 94,Auto-provisioned group 94,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-95,Group Generic 95,Auto-provisioned group 95,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-96,Group Generic 96,Auto-provisioned group 96,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-97,Group Generic 97,Auto-provisioned group 97,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-98,Group Generic 98,Auto-provisioned group 98,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-99,Group Generic 99,Auto-provisioned group 99,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-100,Group Generic 100,Auto-provisioned group 100,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-101,Group Generic 101,Auto-provisioned group 101,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-102,Group Generic 102,Auto-provisioned group 102,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-103,Group Generic 103,Auto-provisioned group 103,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-104,Group Generic 104,Auto-provisioned group 104,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-105,Group Generic 105,Auto-provisioned group 105,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-106,Group Generic 106,Auto-provisioned group 106,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-107,Group Generic 107,Auto-provisioned group 107,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-108,Group Generic 108,Auto-provisioned group 108,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-109,Group Generic 109,Auto-provisioned group 109,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-110,Group Generic 110,Auto-provisioned group 110,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-111,Group Generic 111,Auto-provisioned group 111,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-112,Group Generic 112,Auto-provisioned group 112,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-113,Group Generic 113,Auto-provisioned group 113,OKTA_GROUP,2025-01-10T00:00:00Z
+okta-group-gen-114,Group Generic 114,Auto-provisioned group 114,OKTA_GROUP,2025-01-10T00:00:00Z

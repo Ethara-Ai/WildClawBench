@@ -1,0 +1,13 @@
+id,meeting_id,recording_type,file_type,file_size,recording_start,recording_end,play_url,status
+rec-0,80000000,shared_screen,MP4,70122667,2026-01-01T15:00:00Z,2026-01-01T15:45:00Z,https://zoom.example.com/rec,completed
+rec-1,80000001,shared_screen,MP4,41303615,2026-02-02T15:00:00Z,2026-02-02T15:45:00Z,https://zoom.example.com/rec,completed
+rec-2,80000002,shared_screen,MP4,18581966,2026-03-03T15:00:00Z,2026-03-03T15:45:00Z,https://zoom.example.com/rec,completed
+rec-3,80000003,shared_screen,MP4,86337330,2026-04-04T15:00:00Z,2026-04-04T15:45:00Z,https://zoom.example.com/rec,completed
+rec-4,80000004,shared_screen,MP4,66287993,2026-05-05T15:00:00Z,2026-05-05T15:45:00Z,https://zoom.example.com/rec,completed
+rec-5,80000005,shared_screen,MP4,5751192,2026-06-06T15:00:00Z,2026-06-06T15:45:00Z,https://zoom.example.com/rec,completed
+rec-6,80000006,shared_screen,MP4,87665084,2026-07-07T15:00:00Z,2026-07-07T15:45:00Z,https://zoom.example.com/rec,completed
+rec-7,80000007,shared_screen,MP4,4904157,2026-08-08T15:00:00Z,2026-08-08T15:45:00Z,https://zoom.example.com/rec,completed
+rec-8,80000008,shared_screen,MP4,20798307,2026-09-09T15:00:00Z,2026-09-09T15:45:00Z,https://zoom.example.com/rec,completed
+rec-9,80000009,shared_screen,MP4,72976597,2026-10-10T15:00:00Z,2026-10-10T15:45:00Z,https://zoom.example.com/rec,completed
+rec-10,80000010,shared_screen,MP4,35919050,2026-11-11T15:00:00Z,2026-11-11T15:45:00Z,https://zoom.example.com/rec,completed
+rec-11,80000011,shared_screen,MP4,31314506,2026-12-12T15:00:00Z,2026-12-12T15:45:00Z,https://zoom.example.com/rec,completed
