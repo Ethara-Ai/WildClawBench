@@ -102,8 +102,8 @@ MODEL_LABELS: dict[str, str] = {
     "claude": "Claude Opus 4.7",
     "claudecode": "Claude Opus 4.7",
     "openclaw": "Claude Opus 4.7",
-    "gpt": "GPT 5.5",
-    "codex": "GPT 5.5",
+    "gpt": "GPT 5.6",
+    "codex": "GPT 5.6",
     "hermes": "Hermes",
     "hermesagent": "Hermes",
 }
