@@ -329,6 +329,18 @@ class CredentialProvider:
         except Exception as e:  # noqa: BLE001 — persistence is best-effort
             _LOG.debug("token write-back skipped: %s", e)
 
+    def reload(self) -> None:
+        """Force a re-read of the credential from disk, discarding the cached
+        token. Lets the bridge's cap-wait loop pick up an account hot-swapped
+        mid-run — whether via ``codex login`` (which rewrites ~/.codex/auth.json)
+        or by replacing that file with a pre-saved second account's copy."""
+        with self._refresh_lock:
+            fresh = load_credentials()
+            with self._lock:
+                self._creds = fresh
+        _LOG.info("Codex credentials reloaded from disk (account %s...)",
+                  fresh.account_id[:8])
+
 
 
 class _FileCredentialProvider(CredentialProvider):
@@ -342,6 +354,13 @@ class _FileCredentialProvider(CredentialProvider):
             raise CredentialsError(f"account auth.json not found: {path}")
         self._creds = _parse_auth_json(p.read_text(), str(p))
         self._persist_path = str(p)
+
+    def reload(self) -> None:
+        """Re-read THIS slot's own auth.json from disk (pool member hot-swap)."""
+        p = Path(self._persist_path).expanduser()
+        fresh = _parse_auth_json(p.read_text(), str(p))
+        with self._lock:
+            self._creds = fresh
 
 
 class MultiAccountCredentialProvider:
@@ -505,6 +524,24 @@ class MultiAccountCredentialProvider:
             self._invalid[i] = True
             self._save_state()
         _LOG.warning("codex account %d marked invalid (revoked/401); will not be retried", i)
+
+    def reload(self) -> None:
+        """Re-read every slot's auth.json and clear cooldown/invalid state. Called
+        by the bridge's cap-wait loop after the operator swaps accounts on disk;
+        the swapped files carry fresh tokens, so stale cooldowns/invalids no
+        longer apply."""
+        with self._lock:
+            for p in self._providers:
+                try:
+                    p.reload()
+                except Exception as e:  # noqa: BLE001 — best-effort per slot
+                    _LOG.warning("codex pool slot reload failed: %s", e)
+            n = len(self._providers)
+            self._cooldown_until = [0.0] * n
+            self._invalid = [False] * n
+            self._last_token = [None] * n
+            self._save_state()
+        _LOG.info("codex account pool reloaded from disk; cooldowns cleared")
 
     def next_reset_at(self) -> Optional[float]:
         """Soonest Unix-time at which any account becomes available, or ``None``

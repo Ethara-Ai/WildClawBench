@@ -56,7 +56,7 @@ from .credentials import (
     MultiAccountCredentialProvider,
     load_account_pool,
 )
-from .errors import classify_openai_error
+from .errors import ErrorKind, classify_openai_error
 from . import translate as _xlate
 
 _LOG = logging.getLogger(__name__)
@@ -221,6 +221,57 @@ async def _stream_with_keepalive(
         raise
     finally:
         await aclose()
+
+
+# ---------------------------------------------------------------------------
+# Cap-wait ("hot-swap the account") feature.
+#
+# When an account hits its subscription cap and there is no other account to
+# rotate to (single account, or the whole pool is exhausted), instead of failing
+# the agent's turn the bridge can HOLD the request open for a configurable window
+# — emitting SSE keep-alives so the client (OpenClaw/LiteLLM) doesn't time out —
+# during which the operator swaps the codex account on disk (either `codex login`
+# with another ChatGPT account, or replacing ~/.codex/auth.json with a pre-saved
+# one). The bridge then reloads the credential from disk and retries the SAME
+# request, so the trajectory continues on the fresh account. Opt-in: default 0
+# (disabled) keeps the original fail-fast behaviour.
+# ---------------------------------------------------------------------------
+def _cap_wait_sec() -> float:
+    """Seconds to pause on an un-rotatable cap so the operator can swap accounts.
+    0 (default) disables the feature. Set via KAIJU_CODEX_CAP_WAIT_SEC."""
+    try:
+        return max(0.0, float(os.environ.get("KAIJU_CODEX_CAP_WAIT_SEC", "0")))
+    except ValueError:
+        return 0.0
+
+
+def _cap_max_waits() -> int:
+    """Max swap-and-retry cycles before surfacing the cap. Set via
+    KAIJU_CODEX_CAP_MAX_WAITS (default 10)."""
+    try:
+        return max(0, int(os.environ.get("KAIJU_CODEX_CAP_MAX_WAITS", "10")))
+    except ValueError:
+        return 10
+
+
+def _err_is_limit(err_resp) -> bool:
+    """True if an error Response from _open_upstream is a cap / rate-limit (i.e.
+    a 429-class limit worth pausing to swap the account for)."""
+    try:
+        status = getattr(err_resp, "status_code", None)
+        body = getattr(err_resp, "body", b"") or b""
+        return classify_openai_error(status, body).kind in (
+            ErrorKind.CAP, ErrorKind.RATE_LIMIT)
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _err_text(err_resp) -> str:
+    body = getattr(err_resp, "body", b"") or b""
+    if isinstance(body, (bytes, bytearray)):
+        body = body.decode("utf-8", "ignore")
+    return ("kaiju-bridge: subscription cap not cleared within the account-swap "
+            f"window; {str(body)[:200]}")
 
 
 def _secret_eq(candidate: str, secret: str) -> bool:
@@ -525,6 +576,78 @@ def build_app(provider=None) -> FastAPI:
             # Non-failover error (400/404/single-account/etc.): return immediately.
             return None, err_resp
 
+    async def _open_unary_with_cap_wait(request: Request, body: bytes):
+        """Non-streaming open with cap-wait: on an un-rotatable cap, sleep the
+        swap window, reload the credential from disk, and retry. No keep-alive is
+        needed — the unary client (LiteLLM, request_timeout 24h) simply waits."""
+        cycle = 0
+        while True:
+            upstream, err_resp = await _open_upstream(request, body)
+            if upstream is not None or not (
+                _cap_wait_sec() > 0 and _err_is_limit(err_resp) and cycle < _cap_max_waits()
+            ):
+                return upstream, err_resp
+            cycle += 1
+            _LOG.warning(
+                "codex cap hit — SWAP YOUR ACCOUNT NOW (`codex login` with another "
+                "account, or replace ~/.codex/auth.json). Waiting %.0fs then retrying "
+                "(cycle %d/%d).", _cap_wait_sec(), cycle, _cap_max_waits())
+            await asyncio.sleep(_cap_wait_sec())
+            try:
+                await asyncio.to_thread(provider.reload)
+            except Exception as e:  # noqa: BLE001 — reload is best-effort; retry anyway
+                _LOG.warning("codex credential reload failed: %s", e)
+
+    async def _stream_with_cap_wait(request: Request, body: bytes,
+                                    chat_model: Optional[str] = None,
+                                    created: int = 0) -> AsyncIterator[bytes]:
+        """Streaming open with cap-wait. Emits SSE keep-alives during each swap
+        window so the client can't time out while the operator hot-swaps the codex
+        account; then reloads the credential from disk and retries the SAME
+        request. ``chat_model`` set => translate the upstream Responses SSE into
+        Chat-Completions SSE; else forward the Responses SSE raw."""
+        cycle = 0
+        while True:
+            upstream, err_resp = await _open_upstream(request, body)
+            if upstream is not None:
+                if chat_model is not None:
+                    try:
+                        async for chunk in _xlate.aiter_responses_sse_as_chat(
+                                upstream.aiter_lines(), chat_model, created):
+                            yield chunk
+                    finally:
+                        await upstream.aclose()
+                else:
+                    async for chunk in _stream_with_keepalive(
+                            upstream.aiter_raw(), upstream.aclose, _keepalive_interval()):
+                        yield chunk
+                return
+            # Error opening upstream. Only a cap/rate-limit is worth a swap-wait.
+            if not (_cap_wait_sec() > 0 and _err_is_limit(err_resp)
+                    and cycle < _cap_max_waits()):
+                if chat_model is not None:
+                    yield _xlate.chat_truncation_error_sse(_err_text(err_resp))
+                    yield b"data: [DONE]\n\n"
+                else:
+                    yield _xlate.responses_truncation_error_sse(_err_text(err_resp))
+                return
+            cycle += 1
+            _LOG.warning(
+                "codex cap hit — SWAP YOUR ACCOUNT NOW (`codex login` with another "
+                "account, or replace ~/.codex/auth.json). Holding the turn open, "
+                "waiting %.0fs then retrying (cycle %d/%d).",
+                _cap_wait_sec(), cycle, _cap_max_waits())
+            waited = 0.0
+            while waited < _cap_wait_sec():
+                yield _KEEPALIVE_LINE  # keep OpenClaw/LiteLLM alive during the swap
+                step = min(float(_STREAM_KEEPALIVE_SECS), _cap_wait_sec() - waited)
+                await asyncio.sleep(step)
+                waited += step
+            try:
+                await asyncio.to_thread(provider.reload)
+            except Exception as e:  # noqa: BLE001 — reload is best-effort; retry anyway
+                _LOG.warning("codex credential reload failed: %s", e)
+
     async def _stream_buffered_with_retry(request: Request, body: bytes) -> Response:
         """Option D — buffer the ENTIRE upstream Responses SSE stream and re-issue
         on a mid-stream drop, so the client only ever receives a COMPLETE response
@@ -607,16 +730,16 @@ def build_app(provider=None) -> FastAPI:
         body, client_wanted_stream = _prepare_body(raw)
         if client_wanted_stream and _buffer_and_retry_enabled():
             return await _stream_buffered_with_retry(request, body)
-        upstream, err_resp = await _open_upstream(request, body)
+        if client_wanted_stream:
+            # cap-wait aware: opens upstream inside the generator so a cap can be
+            # ridden out (keep-alive + account swap + reload) mid-stream.
+            return StreamingResponse(
+                _stream_with_cap_wait(request, body),
+                status_code=200, media_type="text/event-stream")
+
+        upstream, err_resp = await _open_unary_with_cap_wait(request, body)
         if err_resp is not None:
             return err_resp
-
-        if client_wanted_stream:
-            media = upstream.headers.get("content-type", "text/event-stream")
-            gen = _stream_with_keepalive(
-                upstream.aiter_raw(), upstream.aclose, _keepalive_interval())
-            return StreamingResponse(gen, status_code=200, media_type=media)
-
         raw_sse = await upstream.aread()
         await upstream.aclose()
         final, err = _aggregate_sse(raw_sse)
@@ -653,24 +776,20 @@ def build_app(provider=None) -> FastAPI:
         except json.JSONDecodeError:
             pass
 
-        upstream, err_resp = await _open_upstream(request, prepared)
-        if err_resp is not None:
-            return err_resp
-
         created = _xlate.now_ts()
         if client_wanted_stream:
             # Translate the upstream Responses SSE into Chat-Completions SSE
             # INCREMENTALLY (do not buffer the whole turn) so incremental output
             # keeps a log-based liveness watchdog fed and latency stays low.
-            async def _gen():
-                try:
-                    async for chunk in _xlate.aiter_responses_sse_as_chat(
-                        upstream.aiter_lines(), model, created):
-                        yield chunk
-                finally:
-                    await upstream.aclose()
-            return StreamingResponse(_gen(), status_code=200, media_type="text/event-stream")
+            # cap-wait aware: the open happens inside the generator so a cap can
+            # be ridden out (keep-alive + account swap + reload) mid-stream.
+            return StreamingResponse(
+                _stream_with_cap_wait(request, prepared, chat_model=model, created=created),
+                status_code=200, media_type="text/event-stream")
 
+        upstream, err_resp = await _open_unary_with_cap_wait(request, prepared)
+        if err_resp is not None:
+            return err_resp
         raw_sse = await upstream.aread()
         await upstream.aclose()
         final, err = _aggregate_sse(raw_sse)

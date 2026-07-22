@@ -1273,6 +1273,16 @@ def start_codex_bridge(
         # Pin the upstream model the codex backend receives (the bridge otherwise
         # forwards whatever LiteLLM sent, minus any trailing date snapshot).
         env_pairs.append(("KAIJU_CODEX_MODEL", codex_model_override))
+    # Cap-wait ("hot-swap the account"): on a subscription cap that can't be
+    # rotated away, the bridge holds the trajectory open (SSE keep-alives),
+    # pauses so the operator can `codex login` another account OR replace
+    # ~/.codex/auth.json, then reloads the credential and retries. Enabled by
+    # default (60s window, 10 cycles); override via the host env of the same
+    # names, or set KAIJU_CODEX_CAP_WAIT_SEC=0 to disable.
+    env_pairs.append(("KAIJU_CODEX_CAP_WAIT_SEC",
+                      os.environ.get("KAIJU_CODEX_CAP_WAIT_SEC", "60")))
+    env_pairs.append(("KAIJU_CODEX_CAP_MAX_WAITS",
+                      os.environ.get("KAIJU_CODEX_CAP_MAX_WAITS", "10")))
     # Pass-through tunables (account pool, upstream override, keep-alive, etc.).
     for _k in (
         "KAIJU_CODEX_ACCOUNT_POOL",
