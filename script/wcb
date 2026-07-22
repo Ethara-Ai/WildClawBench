@@ -267,7 +267,10 @@ _wcb_setup() {
     # --- 2b) Python venv + deps (needed by run.sh, which calls bare python3) --
     if [ ! -x "$_wcb_root/.venv/bin/python3" ]; then
         _wcb_warn "no .venv found — creating one (this is a one-time step)"
-        if python3 -m venv "$_wcb_root/.venv" 2>/dev/null; then
+        # Prefer a modern Python (3.10+); bare python3 may be 3.9, which builds a
+        # broken venv (incompatible litellm/pytest) -> every run silently scores 0.
+        _wcb_py="$(command -v python3.12 || command -v python3.11 || command -v python3.13 || command -v python3)"
+        if "$_wcb_py" -m venv "$_wcb_root/.venv" 2>/dev/null; then
             if [ -f "$_wcb_root/requirements.txt" ]; then
                 "$_wcb_root/.venv/bin/python3" -m pip install -q --upgrade pip >/dev/null 2>&1
                 if "$_wcb_root/.venv/bin/python3" -m pip install -q -r "$_wcb_root/requirements.txt" >/dev/null 2>&1; then

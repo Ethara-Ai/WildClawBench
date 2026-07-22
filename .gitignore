@@ -90,7 +90,7 @@ trajectories/
 
 # Accidentally-added scratch task (holds a mock Twilio value flagged by GitHub push
 # protection). The rest of input/ is the tracked benchmark suite — do NOT ignore all of input/.
-input/cecilia_burnett_01/
+input/
 
 # Node tooling pulled in locally — not part of the benchmark.
 node_modules/
