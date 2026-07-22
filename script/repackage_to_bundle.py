@@ -2151,6 +2151,14 @@ def convert_task(
                     "include_multimodal": report["include_multimodal"],
                     "test_weights_percentage": report["test_weights_percentage"],
                     "rubric_weights_percentage": report["rubric_weights_percentage"],
+                    # Combined score = the mean of the two channel percentages
+                    # (same blend as report.json's final_reward). Kept as a
+                    # percentage here to match the pass_summary's *_percentage
+                    # fields.
+                    "combined_score": round(
+                        (report["test_weights_percentage"]
+                         + report["rubric_weights_percentage"]) / 2, 2
+                    ),
                 }
             )
             produced_any = True
@@ -2165,11 +2173,13 @@ def convert_task(
             n = len(per_run_summ)
             avg_test = sum(r["test_weights_percentage"] for r in per_run_summ) / n
             avg_rub = sum(r["rubric_weights_percentage"] for r in per_run_summ) / n
+            avg_combined = sum(r["combined_score"] for r in per_run_summ) / n
             _write_json(
                 dest_model / "pass_summary.json",
                 {
                     "model": pretty,
                     "runs": n,
+                    "average_combined_score": round(avg_combined, 2),
                     "average_test_weights_percentage": round(avg_test, 2),
                     "average_rubric_weights_percentage": round(avg_rub, 2),
                     "per_run": per_run_summ,
