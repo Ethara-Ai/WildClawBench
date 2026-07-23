@@ -942,6 +942,22 @@ def copy_verifier_logs(run_dir: Path, dest_run: Path) -> int:
     return count
 
 
+def copy_snapshot(run_dir: Path, dest_run: Path) -> int:
+    """Mirror the run's workspace snapshot (``snapshot/workspace_before`` +
+    ``snapshot/workspace_after``) into the bundle so it matches the output tree's
+    forensic before/after capture. No-op when the run has no snapshot dir.
+    Returns the number of files copied."""
+    src = run_dir / "snapshot"
+    if not src.is_dir():
+        return 0
+    dest = dest_run / "snapshot"
+    shutil.copytree(
+        src, dest, dirs_exist_ok=True,
+        ignore=shutil.ignore_patterns(".DS_Store"),
+    )
+    return sum(1 for _ in dest.rglob("*") if _.is_file())
+
+
 def copy_output_media(run_dir: Path, dest_run: Path) -> int:
     artifacts = run_dir / "task_output" / "artifacts"
     media_dest = dest_run / "output_media"
@@ -2163,6 +2179,10 @@ def convert_task(
             #    trajectories and the spawn tree (empty subagents/ dir for
             #    single-agent runs so the multi-agent validator passes)
             copy_subagent_artifacts(run_dir, dest_run)
+
+            # 6) snapshot/ — workspace before/after capture (parity with the
+            #    output tree; useful for audit/diff of what the agent changed)
+            n_snap = copy_snapshot(run_dir, dest_run)
 
             per_run_summ.append(
                 {
