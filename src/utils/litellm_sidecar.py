@@ -1254,14 +1254,35 @@ def start_codex_bridge(
     )
     _validate_docker_token("container_name", container_name)
     _validate_docker_token("network", network)
+
+    # Multi-account pool (optional): point WCB_CODEX_POOL_DIR at a host dir that
+    # holds several codex auth.json files (one per ChatGPT account). The bridge
+    # round-robins across them and, when one hits its subscription cap mid-run,
+    # rotates to the next available account IN-REQUEST so the trajectory
+    # continues automatically (see MultiAccountCredentialProvider). When every
+    # account is drained, the cap-wait feature takes over (pause + manual swap).
+    _pool_dir = os.environ.get("WCB_CODEX_POOL_DIR", "").strip()
+    _pool_files: list[str] = []
+    if _pool_dir:
+        _pool_dir = os.path.expanduser(_pool_dir)
+        if not os.path.isdir(_pool_dir):
+            raise RuntimeError(
+                f"start_codex_bridge: WCB_CODEX_POOL_DIR is not a directory ({_pool_dir!r})")
+        _pool_files = sorted(f for f in os.listdir(_pool_dir) if f.endswith(".json"))
+        if not _pool_files:
+            raise RuntimeError(
+                f"start_codex_bridge: no *.json account files under {_pool_dir!r}")
+
     if not auth_host_dir or not os.path.isdir(auth_host_dir):
         raise RuntimeError(
             f"start_codex_bridge: auth_host_dir must exist ({auth_host_dir!r}). "
             "Run `codex login` so ~/.codex/auth.json exists, or set WCB_CODEX_AUTH_DIR."
         )
-    if not os.path.isfile(os.path.join(auth_host_dir, "auth.json")):
+    # Single-account mode requires auth.json; pool mode reads the pool files.
+    if not _pool_files and not os.path.isfile(os.path.join(auth_host_dir, "auth.json")):
         raise RuntimeError(
-            f"start_codex_bridge: no auth.json under {auth_host_dir!r}. Run `codex login`."
+            f"start_codex_bridge: no auth.json under {auth_host_dir!r}. Run `codex login` "
+            "(or set WCB_CODEX_POOL_DIR to a dir of account files)."
         )
     if not bridge_secret:
         raise RuntimeError("start_codex_bridge: bridge_secret required (co-tenant threat)")
@@ -1283,9 +1304,17 @@ def start_codex_bridge(
                       os.environ.get("KAIJU_CODEX_CAP_WAIT_SEC", "60")))
     env_pairs.append(("KAIJU_CODEX_CAP_MAX_WAITS",
                       os.environ.get("KAIJU_CODEX_CAP_MAX_WAITS", "10")))
-    # Pass-through tunables (account pool, upstream override, keep-alive, etc.).
+    # Multi-account pool spec, in CONTAINER paths (the dir is mounted at
+    # /codex_pool below). Built from WCB_CODEX_POOL_DIR so callers never have to
+    # know the in-container paths; a raw KAIJU_CODEX_ACCOUNT_POOL is intentionally
+    # NOT passed through (host paths don't exist inside the container).
+    if _pool_files:
+        env_pairs.append(("KAIJU_CODEX_ACCOUNT_POOL",
+                          ":".join(f"/codex_pool/{f}" for f in _pool_files)))
+        logger.info("[%s] codex multi-account pool: %d account(s) from %s",
+                    container_name, len(_pool_files), _pool_dir)
+    # Pass-through tunables (upstream override, keep-alive, etc.).
     for _k in (
-        "KAIJU_CODEX_ACCOUNT_POOL",
         "KAIJU_CODEX_UPSTREAM",
         "KAIJU_CODEX_USER_AGENT",
         "KAIJU_CODEX_KEEPALIVE_SEC",
@@ -1301,12 +1330,14 @@ def start_codex_bridge(
 
     ensure_codex_bridge_image(image)
 
+    pool_mount = ["-v", f"{_pool_dir}:/codex_pool:rw"] if _pool_files else []
     cmd = [
         "docker", "run", "-d",
         "--name", container_name,
         "--network", network,
         *env_args,
         "-v", f"{auth_host_dir}:/root/.codex:rw",
+        *pool_mount,
         image,
         "--host", "0.0.0.0",
         "--port", str(port),
