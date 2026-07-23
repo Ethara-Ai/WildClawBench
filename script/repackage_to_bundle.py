@@ -20,14 +20,16 @@ Given our raw layout (produced by eval/run_batch.py):
                     artifacts/<written files>        (+ _tmp/ scratch)
                     logs/verifier/{ctrf.json,reward.txt,test_weights.json}
 
-it emits the published bundle layout (like the amanda_webb_01 reference):
+it emits the published bundle layout (like the andrew-santos-... reference):
 
     <dest-root>/<bundle_name>/
-        prompt.txt, rubric.json, data/ ...           (skeleton copied as-is)
-        ground-truth.md                              (input golden_steer_flow.md,
-                                                       sliced to Focal Event +
-                                                       Canonical Solve Path +
-                                                       Value Lock sections)
+        PROMPT.md, rubric.json, data/ ...            (skeleton; prompt re-sourced
+                                                       from input PROMPT.md/prompt.txt)
+        TRUTH.md                                      (input TRUTH.md/GTFA.md/
+                                                       golden_steer_flow.md copied
+                                                       VERBATIM, no slicing)
+        golden-trajectory/.gitkeep                    (reserved empty dir; we do
+                                                       not generate a golden trajectory)
         trajectories/<Pretty Model>/                 (e.g. "Claude Opus 4.7")
             pass_summary.json                         (REBUILT schema)
             run_N/
@@ -117,14 +119,24 @@ ARTIFACTS_SCRATCH_DIRNAME = "_tmp"
 # Where staged inputs live inside the bundle's environment dir.
 ARTIFACTS_INPUTS_SUBPATH = ("artifacts", "inputs", "files")
 
-# Grader "golden steer flow" re-sourced from the original input task dir and
-# published into the bundle root under a stable, consumer-facing name. Renamed
-# (not relocated) so downstream tooling can rely on "ground-truth.md". Contents
-# are NOT byte-copied: only three target sections are extracted (Focal Event,
-# Canonical Solve Path, Value Lock) so the published bundle does not leak the
-# full author-side flow doc. See extract_ground_truth_sections() below.
+# Grader "golden truth" doc re-sourced from the original input task dir and
+# published VERBATIM into the bundle root as "TRUTH.md" (matches the reference
+# bundle layout, e.g. andrew-santos-...). The doc is byte-copied as-is: no
+# section slicing is performed. (The historical slicer,
+# extract_ground_truth_sections(), is retained below for callers/tests but is
+# no longer used on the publish path.)
 GOLDEN_STEER_FILENAME = "golden_steer_flow.md"
-GROUND_TRUTH_FILENAME = "ground-truth.md"
+GROUND_TRUTH_FILENAME = "TRUTH.md"
+
+# Input-side prompt filename candidates, newest convention first. Newer tasks
+# ship "PROMPT.md"; older ones "prompt.txt"; a few use the pluralized
+# "prompts.txt". First match wins. Published to the bundle root as "PROMPT.md".
+PROMPT_SOURCE_CANDIDATES: tuple[str, ...] = (
+    "PROMPT.md",
+    "prompt.txt",
+    "prompts.txt",
+)
+PROMPT_FILENAME = "PROMPT.md"
 
 # Source-file lookup order for the slice. Upstream authoring tools have
 # emitted the same content under three different filenames over time, so we
@@ -135,6 +147,7 @@ GROUND_TRUTH_FILENAME = "ground-truth.md"
 # the three target sections from a file that already only contains them is a
 # no-op other than re-emitting them in canonical order.
 GROUND_TRUTH_SOURCE_CANDIDATES: tuple[str, ...] = (
+    "TRUTH.md",
     "GTFA.md",
     "golden_steer_flow.md",
     "ground-truth.md",
@@ -986,6 +999,19 @@ def _find_ground_truth_source(input_task_dir: Path) -> Path | None:
     return None
 
 
+def _find_prompt_source(input_task_dir: Path) -> Path | None:
+    """First-match-wins resolution over PROMPT_SOURCE_CANDIDATES.
+
+    Newer inputs ship ``PROMPT.md``; older ones ``prompt.txt`` / ``prompts.txt``.
+    Returns the first candidate that exists as a regular file, else None.
+    """
+    for name in PROMPT_SOURCE_CANDIDATES:
+        candidate = input_task_dir / name
+        if candidate.is_file():
+            return candidate
+    return None
+
+
 def stage_persona_and_artifacts(
     input_task_dir: Path, bundle: Path, verbose: bool
 ) -> tuple[int, int]:
@@ -1704,15 +1730,16 @@ def _stage_data_instruction(
     bundle: Path,
     verbose: bool,
 ) -> bool:
-    """Emit bundle/data/instruction.md = prompt.txt + (workspace_hint if attachments).
+    """Emit bundle/data/instruction.md = prompt + (workspace_hint if attachments).
 
     Mirrors what the agent received at runtime via task_parser._append_workspace_hint.
-    No-op when input_task_dir missing or input_task_dir/prompt.txt missing.
+    Prompt source is resolved via PROMPT_SOURCE_CANDIDATES (PROMPT.md > prompt.txt
+    > prompts.txt). No-op when input_task_dir missing or no prompt file present.
     """
     if input_task_dir is None:
         return False
-    prompt_src = input_task_dir / "prompt.txt"
-    if not prompt_src.is_file():
+    prompt_src = _find_prompt_source(input_task_dir)
+    if prompt_src is None:
         return False
     try:
         prompt_text = prompt_src.read_text(encoding="utf-8")
@@ -1818,12 +1845,13 @@ def _stage_task_toml(
       - required_skills = [f'{n}-connector' for n in required]
       - distractor_skills = [f'{n}-connector' for n in distractor]
       - multimodal = bool(attachments_present)
-    No-op when input_task_dir missing OR input_task_dir/prompt.txt missing.
+    Prompt source is resolved via PROMPT_SOURCE_CANDIDATES (PROMPT.md > prompt.txt
+    > prompts.txt). No-op when input_task_dir missing OR no prompt file present.
     """
     if input_task_dir is None:
         return False
-    prompt_src = input_task_dir / "prompt.txt"
-    if not prompt_src.is_file():
+    prompt_src = _find_prompt_source(input_task_dir)
+    if prompt_src is None:
         return False
     try:
         prompt_text = prompt_src.read_text(encoding="utf-8")
@@ -2052,15 +2080,16 @@ def convert_task(
     # run output) from the original input task dir, fuzzy-matched by persona core.
     input_task_dir = _find_input_task_dir(input_root, task_dir.name)
     if input_task_dir is not None:
-        prompt_src = input_task_dir / "prompt.txt"
-        if prompt_src.exists():
+        prompt_src = _find_prompt_source(input_task_dir)
+        if prompt_src is not None:
             bundle.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(prompt_src, bundle / "prompt.txt")
-        # Ground truth: publish a SLICE of the source flow doc as ground-truth.md.
-        # Source is whichever of GROUND_TRUTH_SOURCE_CANDIDATES exists first.
-        # Only the Focal Event / Canonical Solve Path / Value Lock sections are
-        # extracted; the rest of the author-side flow doc is intentionally not
-        # leaked into the bundle. See extract_ground_truth_sections().
+            shutil.copy2(prompt_src, bundle / PROMPT_FILENAME)
+            if verbose and prompt_src.name != PROMPT_FILENAME:
+                print(f"    staged prompt: {prompt_src.name} -> {PROMPT_FILENAME}")
+        # Ground truth: publish the source truth doc VERBATIM as TRUTH.md.
+        # Source is whichever of GROUND_TRUTH_SOURCE_CANDIDATES exists first
+        # (TRUTH.md > GTFA.md > golden_steer_flow.md > ground-truth.md). The
+        # whole doc is byte-copied as-is -- no section slicing.
         steer_src = _find_ground_truth_source(input_task_dir)
         if steer_src is None:
             print(
@@ -2071,34 +2100,24 @@ def convert_task(
                 file=sys.stderr,
             )
         else:
-            try:
-                steer_text = steer_src.read_text(encoding="utf-8")
-            except OSError as exc:
-                steer_text = ""
+            bundle.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(steer_src, bundle / GROUND_TRUTH_FILENAME)
+            if verbose:
                 print(
-                    f"  ! {task_dir.name}: failed to read {steer_src.name} "
-                    f"({exc}); skipping {GROUND_TRUTH_FILENAME}",
-                    file=sys.stderr,
-                )
-            extracted = extract_ground_truth_sections(steer_text)
-            if extracted:
-                bundle.mkdir(parents=True, exist_ok=True)
-                (bundle / GROUND_TRUTH_FILENAME).write_text(extracted, encoding="utf-8")
-                if verbose:
-                    print(
-                        f"    staged ground truth: {steer_src.name} -> "
-                        f"{GROUND_TRUTH_FILENAME} (sliced)"
-                    )
-            elif steer_text:
-                print(
-                    f"  ! {task_dir.name}: {steer_src.name} present but "
-                    f"no target sections (Focal Event / Canonical Solve Path / "
-                    f"Value Lock) matched; skipping {GROUND_TRUTH_FILENAME}",
-                    file=sys.stderr,
+                    f"    staged ground truth: {steer_src.name} -> "
+                    f"{GROUND_TRUTH_FILENAME} (verbatim)"
                 )
         stage_persona_and_artifacts(input_task_dir, bundle, verbose)
     elif verbose:
         print(f"    (no input dir matched under {input_root}; prompt/persona/artifacts skipped)")
+
+    # Empty golden-trajectory/ scaffold. We do not generate a golden trajectory,
+    # but the published bundle layout (reference: andrew-santos-...) reserves the
+    # directory. A .gitkeep is dropped so the otherwise-empty dir survives git /
+    # tar / LFS packaging (empty dirs are not tracked by git).
+    golden_dir = bundle / "golden-trajectory"
+    golden_dir.mkdir(parents=True, exist_ok=True)
+    (golden_dir / ".gitkeep").touch()
 
     _stage_test_runners_and_solver(input_task_dir, bundle, verbose)
     _stage_data_instruction(input_task_dir, bundle, verbose)

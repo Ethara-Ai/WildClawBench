@@ -1,19 +1,21 @@
 """Ground-truth publishing in the raw-output -> published-bundle repackager.
 
 `script/repackage_to_bundle.py` re-sources a handful of files from the ORIGINAL
-input task dir (prompt.txt, persona/, staged inputs). This suite pins the
-golden_steer_flow.md -> ground-truth.md feature added on top of that flow:
+input task dir (prompt, persona/, staged inputs). This suite pins the
+truth-doc -> TRUTH.md feature added on top of that flow:
 
-  1. When the input task dir ships golden_steer_flow.md, the bundle root gets a
-     ground-truth.md containing ONLY the Focal Event, Canonical Solve Path, and
-     Value Lock sections (sliced, not byte-copied).
-  2. When it does NOT ship the file, no ground-truth.md is emitted and the
-     conversion still succeeds (the file is optional, like prompt.txt/persona/).
+  1. When the input task dir ships a truth doc (TRUTH.md / GTFA.md /
+     golden_steer_flow.md / ground-truth.md, resolved first-match-wins), the
+     bundle root gets a TRUTH.md that is a VERBATIM byte-copy of the source
+     (no section slicing — the whole doc is published).
+  2. When it does NOT ship any such file, no TRUTH.md is emitted and the
+     conversion still succeeds (the file is optional, like the prompt/persona/).
   3. The publish is keyed off the fuzzy persona-core match: if the run-output
      task dir can't be matched back to an input dir, nothing is re-sourced.
-  4. The extractor is regex-tolerant: it must accept ATX/setext headings,
-     section-number prefixes, bold/italic decorations, code-fence "VALUE_LOCK:"
-     markers, and case/separator variants (VALUE_LOCK, Value-Lock, Value Lock).
+
+The legacy heading-slicer (`extract_ground_truth_sections`) is retained in the
+module and still unit-tested below (it is no longer on the publish path, but is
+kept for callers/back-compat); this suite also still pins its regex tolerance.
 
 `script/` is not an importable package, so the module is loaded by path the
 same way tests/test_connector_ssrf_guard.py loads connector scripts.
@@ -138,7 +140,7 @@ def _assert_leakage_sections_absent(body: str) -> None:
     assert "more private notes" not in body
 
 
-def test_ground_truth_emitted_with_sliced_sections(rp, tmp_path):
+def test_ground_truth_emitted_verbatim(rp, tmp_path):
     source_root = tmp_path / "src"
     input_root = tmp_path / "input"
     dest_root = tmp_path / "out"
@@ -148,20 +150,24 @@ def test_ground_truth_emitted_with_sliced_sections(rp, tmp_path):
     bundle = rp.convert_task(task_dir, dest_root, input_root, False, False)
 
     assert bundle is not None
-    gt = bundle / "ground-truth.md"
-    assert gt.is_file(), "ground-truth.md not emitted at bundle root"
+    gt = bundle / "TRUTH.md"
+    assert gt.is_file(), "TRUTH.md not emitted at bundle root"
     body = gt.read_text(encoding="utf-8")
+    # Verbatim: the FULL author doc is published byte-for-byte, INCLUDING the
+    # sections the old slicer used to drop.
+    assert body == _CANONICAL_STEER
     _assert_three_sections_present(body)
-    _assert_leakage_sections_absent(body)
-    assert "VALUE_LOCK:" in body, "code-block value-lock payload must be preserved"
-    assert body.endswith("\n")
+    assert "Fairness Ledger" in body, "verbatim copy must keep all sections"
+    assert "Phase-2 Fingerprint" in body
+    assert "VALUE_LOCK:" in body
+    assert not (bundle / "ground-truth.md").exists()
     assert not (bundle / "golden_steer_flow.md").exists()
 
 
 def test_no_ground_truth_when_source_absent(rp, tmp_path, capsys):
-    """When NONE of the three accepted source filenames exist in the input
-    task dir, ground-truth.md is skipped AND an unconditional stderr warning
-    is emitted naming all three candidates."""
+    """When NONE of the accepted source filenames exist in the input task dir,
+    TRUTH.md is skipped AND an unconditional stderr warning is emitted naming
+    all candidates. The prompt (PROMPT.md) is still published."""
     source_root = tmp_path / "src"
     input_root = tmp_path / "input"
     dest_root = tmp_path / "out"
@@ -171,8 +177,8 @@ def test_no_ground_truth_when_source_absent(rp, tmp_path, capsys):
     bundle = rp.convert_task(task_dir, dest_root, input_root, False, False)
 
     assert bundle is not None
-    assert not (bundle / "ground-truth.md").exists()
-    assert (bundle / "prompt.txt").is_file()
+    assert not (bundle / "TRUTH.md").exists()
+    assert (bundle / "PROMPT.md").is_file()
     err = capsys.readouterr().err
     assert "no ground-truth source file found" in err, (
         f"missing-source warning not on stderr; got: {err!r}"
@@ -183,9 +189,9 @@ def test_no_ground_truth_when_source_absent(rp, tmp_path, capsys):
 
 @pytest.mark.parametrize(
     "steer_filename",
-    ["GTFA.md", "golden_steer_flow.md", "ground-truth.md"],
+    ["TRUTH.md", "GTFA.md", "golden_steer_flow.md", "ground-truth.md"],
 )
-def test_ground_truth_accepts_all_three_source_filenames(rp, tmp_path, steer_filename):
+def test_ground_truth_accepts_all_source_filenames(rp, tmp_path, steer_filename):
     source_root = tmp_path / "src"
     input_root = tmp_path / "input"
     dest_root = tmp_path / "out"
@@ -199,45 +205,47 @@ def test_ground_truth_accepts_all_three_source_filenames(rp, tmp_path, steer_fil
 
     bundle = rp.convert_task(task_dir, dest_root, input_root, False, False)
 
-    gt = bundle / "ground-truth.md"
+    gt = bundle / "TRUTH.md"
     assert gt.is_file(), (
-        f"ground-truth.md not emitted when source is {steer_filename!r}"
+        f"TRUTH.md not emitted when source is {steer_filename!r}"
     )
-    body = gt.read_text(encoding="utf-8")
-    _assert_three_sections_present(body)
-    _assert_leakage_sections_absent(body)
+    # Verbatim regardless of which source filename supplied it.
+    assert gt.read_text(encoding="utf-8") == _CANONICAL_STEER
 
 
-def test_ground_truth_source_priority_gtfa_wins_over_legacy(rp, tmp_path):
+def test_ground_truth_source_priority_truth_wins_over_gtfa(rp, tmp_path):
     """First-match-wins resolution: when multiple candidates coexist, the
-    earliest in GROUND_TRUTH_SOURCE_CANDIDATES (GTFA.md) is selected."""
+    earliest in GROUND_TRUTH_SOURCE_CANDIDATES (TRUTH.md) is selected and
+    published verbatim."""
     source_root = tmp_path / "src"
     input_root = tmp_path / "input"
     dest_root = tmp_path / "out"
     task_dir = _mk_source_run_tree(source_root, _RUN_TASK_ID)
     input_task_dir = _mk_input_dir(input_root, _INPUT_TASK_ID, steer=None)
     # Marker text distinguishes which file actually got picked.
+    truth_text = "## Focal Event\nfrom-truth\n"
     gtfa_text = "## Focal Event\nfrom-gtfa\n"
     legacy_text = "## Focal Event\nfrom-legacy\n"
     fallback_text = "## Focal Event\nfrom-fallback\n"
+    (input_task_dir / "TRUTH.md").write_text(truth_text, encoding="utf-8")
     (input_task_dir / "GTFA.md").write_text(gtfa_text, encoding="utf-8")
     (input_task_dir / "golden_steer_flow.md").write_text(legacy_text, encoding="utf-8")
     (input_task_dir / "ground-truth.md").write_text(fallback_text, encoding="utf-8")
 
     bundle = rp.convert_task(task_dir, dest_root, input_root, False, False)
 
-    body = (bundle / "ground-truth.md").read_text(encoding="utf-8")
-    assert "from-gtfa" in body, "GTFA.md must win when all three coexist"
-    assert "from-legacy" not in body
-    assert "from-fallback" not in body
+    body = (bundle / "TRUTH.md").read_text(encoding="utf-8")
+    assert body == truth_text, "TRUTH.md must win when all candidates coexist"
 
 
-def test_ground_truth_source_priority_legacy_wins_over_fallback(rp, tmp_path):
+def test_ground_truth_source_priority_gtfa_wins_over_legacy(rp, tmp_path):
     source_root = tmp_path / "src"
     input_root = tmp_path / "input"
     dest_root = tmp_path / "out"
     task_dir = _mk_source_run_tree(source_root, _RUN_TASK_ID)
     input_task_dir = _mk_input_dir(input_root, _INPUT_TASK_ID, steer=None)
+    gtfa_text = "## Focal Event\nfrom-gtfa\n"
+    (input_task_dir / "GTFA.md").write_text(gtfa_text, encoding="utf-8")
     (input_task_dir / "golden_steer_flow.md").write_text(
         "## Focal Event\nfrom-legacy\n", encoding="utf-8"
     )
@@ -247,14 +255,13 @@ def test_ground_truth_source_priority_legacy_wins_over_fallback(rp, tmp_path):
 
     bundle = rp.convert_task(task_dir, dest_root, input_root, False, False)
 
-    body = (bundle / "ground-truth.md").read_text(encoding="utf-8")
-    assert "from-legacy" in body
-    assert "from-fallback" not in body
+    body = (bundle / "TRUTH.md").read_text(encoding="utf-8")
+    assert body == gtfa_text, "GTFA.md must win over legacy/fallback when TRUTH.md absent"
 
 
-def test_ground_truth_fallback_to_existing_ground_truth_md(rp, tmp_path):
-    """When only ground-truth.md exists (already-sliced fallback), the
-    extractor is idempotent — three target sections re-emit cleanly."""
+def test_ground_truth_verbatim_from_ground_truth_md(rp, tmp_path):
+    """When only ground-truth.md exists (lowest-priority fallback), it is
+    published verbatim as TRUTH.md."""
     source_root = tmp_path / "src"
     input_root = tmp_path / "input"
     dest_root = tmp_path / "out"
@@ -269,8 +276,7 @@ def test_ground_truth_fallback_to_existing_ground_truth_md(rp, tmp_path):
 
     bundle = rp.convert_task(task_dir, dest_root, input_root, False, False)
 
-    body = (bundle / "ground-truth.md").read_text(encoding="utf-8")
-    assert "body-fe" in body and "body-csp" in body and "body-vl" in body
+    assert (bundle / "TRUTH.md").read_text(encoding="utf-8") == pre_sliced
 
 
 def test_ground_truth_source_candidates_constant_is_exact():
@@ -282,6 +288,7 @@ def test_ground_truth_source_candidates_constant_is_exact():
     rp = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(rp)
     assert rp.GROUND_TRUTH_SOURCE_CANDIDATES == (
+        "TRUTH.md",
         "GTFA.md",
         "golden_steer_flow.md",
         "ground-truth.md",
@@ -298,62 +305,54 @@ def test_no_ground_truth_when_input_dir_unmatched(rp, tmp_path):
     bundle = rp.convert_task(task_dir, dest_root, input_root, False, False)
 
     assert bundle is not None
-    assert not (bundle / "ground-truth.md").exists()
-    assert not (bundle / "prompt.txt").exists()
+    assert not (bundle / "TRUTH.md").exists()
+    assert not (bundle / "PROMPT.md").exists()
 
 
-def test_no_ground_truth_when_no_target_sections_match(rp, tmp_path, capsys):
+def test_ground_truth_emitted_even_without_target_sections(rp, tmp_path, capsys):
+    """Verbatim publish is unconditional on content: a truth doc that contains
+    NONE of the old target sections is still copied to TRUTH.md as-is (the old
+    'no target sections' skip no longer applies), and no skip warning fires."""
     source_root = tmp_path / "src"
     input_root = tmp_path / "input"
     dest_root = tmp_path / "out"
     task_dir = _mk_source_run_tree(source_root, _RUN_TASK_ID)
-    _mk_input_dir(
-        input_root,
-        _INPUT_TASK_ID,
-        steer="# golden\n## Fairness Ledger\nnothing relevant.\n",
-    )
+    steer = "# golden\n## Fairness Ledger\nnothing relevant.\n"
+    _mk_input_dir(input_root, _INPUT_TASK_ID, steer=steer)
 
     bundle = rp.convert_task(task_dir, dest_root, input_root, False, False)
 
     assert bundle is not None
-    assert not (bundle / "ground-truth.md").exists()
-    # The rest of the bundle MUST still be built when the slice is empty.
-    assert (bundle / "prompt.txt").is_file()
+    assert (bundle / "TRUTH.md").read_text(encoding="utf-8") == steer
+    assert (bundle / "PROMPT.md").is_file()
     assert (bundle / "rubric.json").is_file()
     err = capsys.readouterr().err
-    assert "ground-truth.md" in err and "no target sections" in err, (
-        f"expected stderr warning about missing target sections; got: {err!r}"
+    assert "no ground-truth source file found" not in err, (
+        f"unexpected missing-source warning when source present; got: {err!r}"
     )
-    assert "Focal Event" in err
-    assert "Canonical Solve Path" in err
-    assert "Value Lock" in err
 
 
 def test_ground_truth_skip_warning_is_unconditional(rp, tmp_path, capsys):
-    """The skip warning must fire even when verbose=False so operators always
-    see it during auto-bundle runs (script/run.sh and deliver.sh both call
-    convert_task with verbose=False by default)."""
+    """The missing-source skip warning must fire even when verbose=False so
+    operators always see it during auto-bundle runs (script/run.sh and
+    deliver.sh both call convert_task with verbose=False by default)."""
     source_root = tmp_path / "src"
     input_root = tmp_path / "input"
     dest_root = tmp_path / "out"
     task_dir = _mk_source_run_tree(source_root, _RUN_TASK_ID)
-    _mk_input_dir(
-        input_root,
-        _INPUT_TASK_ID,
-        steer="# unrelated\n\nno target headings here at all.\n",
-    )
+    _mk_input_dir(input_root, _INPUT_TASK_ID, steer=None)
 
     rp.convert_task(task_dir, dest_root, input_root, False, False)
 
     captured = capsys.readouterr()
-    assert "no target sections" in captured.err, (
+    assert "no ground-truth source file found" in captured.err, (
         "unconditional skip warning must go to stderr, "
         f"not stdout; stdout={captured.out!r} stderr={captured.err!r}"
     )
 
 
-def test_ground_truth_no_warning_on_clean_extraction(rp, tmp_path, capsys):
-    """Conversely, a successful slice must NOT print the skip warning."""
+def test_ground_truth_no_warning_when_source_present(rp, tmp_path, capsys):
+    """Conversely, a present source must NOT print the missing-source warning."""
     source_root = tmp_path / "src"
     input_root = tmp_path / "input"
     dest_root = tmp_path / "out"
@@ -362,13 +361,36 @@ def test_ground_truth_no_warning_on_clean_extraction(rp, tmp_path, capsys):
 
     bundle = rp.convert_task(task_dir, dest_root, input_root, False, False)
     err = capsys.readouterr().err
-    assert (bundle / "ground-truth.md").is_file()
-    assert "no target sections" not in err, f"unexpected warning on clean run: {err!r}"
+    assert (bundle / "TRUTH.md").is_file()
+    assert "no ground-truth source file found" not in err, (
+        f"unexpected warning on clean run: {err!r}"
+    )
+
+
+def test_golden_trajectory_dir_reserved_empty(rp, tmp_path):
+    """An empty golden-trajectory/ dir (with .gitkeep so it survives packaging)
+    is always reserved -- we do not generate a golden trajectory."""
+    source_root = tmp_path / "src"
+    input_root = tmp_path / "input"
+    dest_root = tmp_path / "out"
+    task_dir = _mk_source_run_tree(source_root, _RUN_TASK_ID)
+    _mk_input_dir(input_root, _INPUT_TASK_ID, steer=_CANONICAL_STEER)
+
+    bundle = rp.convert_task(task_dir, dest_root, input_root, False, False)
+
+    golden = bundle / "golden-trajectory"
+    assert golden.is_dir(), "golden-trajectory/ must be reserved"
+    assert (golden / ".gitkeep").is_file(), ".gitkeep must keep the empty dir"
+    # No trajectory content is emitted.
+    assert not (golden / "trajectory.json").exists()
+    non_keep = [p.name for p in golden.iterdir() if p.name != ".gitkeep"]
+    assert non_keep == [], f"golden-trajectory/ must be empty; found {non_keep}"
 
 
 def test_filename_constants_wired(rp):
     assert rp.GOLDEN_STEER_FILENAME == "golden_steer_flow.md"
-    assert rp.GROUND_TRUTH_FILENAME == "ground-truth.md"
+    assert rp.GROUND_TRUTH_FILENAME == "TRUTH.md"
+    assert rp.PROMPT_FILENAME == "PROMPT.md"
 
 
 @pytest.mark.parametrize(
