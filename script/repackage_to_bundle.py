@@ -797,7 +797,11 @@ def build_report(
         "include_multimodal": _detect_multimodal(task_dir, output_json),
         "pytest": pytest_block,
         "rubric": rubric_block,
-        "final_reward": round(float(final_reward), 4),
+        # final_reward as a PERCENTAGE (0–100) so it's consistent with
+        # test_/rubric_weights_percentage and pass_summary.combined_score
+        # (e.g. 52.84, not 0.5284). combined_reward from score.json is a 0–1
+        # fraction, so scale it up.
+        "final_reward": round(float(final_reward) * 100.0, 2),
         "test_weights_percentage": round(float(test_pct), 2),
         "rubric_weights_percentage": round(float(rubric_pct), 2),
     }
