@@ -98,12 +98,13 @@ from pathlib import Path
 from typing import Any
 
 
-# Extend as new harnesses/models are published. Default direct-Anthropic path
-# runs Opus 4.7, so "claude" -> "Claude Opus 4.7".
+# Extend as new harnesses/models are published. The openclaw/"claude" harness
+# dir does NOT encode the model, so this maps the harness name to the model we
+# run through it — currently Claude Fable 5 (via --model claude-fable-5 / OAuth).
 MODEL_LABELS: dict[str, str] = {
-    "claude": "Claude Opus 4.7",
-    "claudecode": "Claude Opus 4.7",
-    "openclaw": "Claude Opus 4.7",
+    "claude": "Claude Fable 5",
+    "claudecode": "Claude Fable 5",
+    "openclaw": "Claude Fable 5",
     "gpt": "GPT 5.6",
     "codex": "GPT 5.6",
     "hermes": "Hermes",
