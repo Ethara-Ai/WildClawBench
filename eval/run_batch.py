@@ -2407,6 +2407,30 @@ def _codex_model() -> str:
     return os.environ.get("WCB_CODEX_MODEL", "").strip() or "gpt-5.6-sol"
 
 
+def _harvest_codex_account(auth_dir: str, pool_dir: str) -> int:
+    """Snapshot the currently-logged-in codex account into the pool dir, keyed by
+    account_id. Re-running with the SAME account just refreshes its file; a
+    DIFFERENT account (after you log out + log in) adds a new file — so the pool
+    accumulates every account you run with. Returns the pool's account count."""
+    import json as _json
+    import shutil as _shutil
+    src = os.path.join(auth_dir, "auth.json")
+    if not os.path.isfile(src):
+        raise RuntimeError(f"no auth.json at {src} to snapshot (run `codex login`)")
+    data = _json.loads(Path(src).read_text(encoding="utf-8"))
+    account_id = (data.get("tokens") or {}).get("account_id")
+    if not account_id:
+        raise RuntimeError(f"auth.json at {src} has no tokens.account_id")
+    os.makedirs(pool_dir, exist_ok=True)
+    dest = os.path.join(pool_dir, f"{account_id}.json")
+    _shutil.copy2(src, dest)
+    try:
+        os.chmod(dest, 0o600)  # OAuth tokens — never world-readable
+    except OSError:
+        pass
+    return sum(1 for f in os.listdir(pool_dir) if f.endswith(".json"))
+
+
 def _run_cleanups(cleanups: list) -> None:
     """Run registered teardown callables in reverse order, swallowing errors."""
     for fn in reversed(cleanups):
@@ -2617,6 +2641,28 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
             os.environ.get("WCB_CODEX_AUTH_DIR", "").strip()
             or os.path.expanduser("~/.codex")
         )
+        # Auto-pool: snapshot the account you're logged into RIGHT NOW into a pool
+        # dir (keyed by account_id), then point the bridge at that pool. Over
+        # time — log out, log into another account, run again — the pool
+        # accumulates every account, and the bridge rotates across them when one
+        # caps. Enable with WCB_CODEX_AUTO_POOL=1 (pool defaults to ~/.codex_pool).
+        if os.environ.get("WCB_CODEX_AUTO_POOL", "").strip().lower() in (
+            "1", "true", "yes", "on"
+        ):
+            _pool_dir = (
+                os.environ.get("WCB_CODEX_POOL_DIR", "").strip()
+                or os.path.expanduser("~/.codex_pool")
+            )
+            try:
+                _cnt = _harvest_codex_account(auth_dir, _pool_dir)
+                os.environ["WCB_CODEX_POOL_DIR"] = _pool_dir
+                logger.info(
+                    "codex auto-pool: active account snapshotted → %s "
+                    "(pool now holds %d account(s); bridge will rotate across them)",
+                    _pool_dir, _cnt,
+                )
+            except Exception as _e:  # noqa: BLE001 — snapshot is best-effort
+                logger.warning("codex auto-pool snapshot skipped: %s", _e)
         codex_secret = os.environ.get("WCB_CODEX_BRIDGE_SECRET", "").strip()
         if not codex_secret:
             import secrets as _secrets
