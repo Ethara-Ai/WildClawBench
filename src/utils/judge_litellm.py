@@ -77,6 +77,50 @@ def _judge_oauth_bridge_model() -> str:
     ).strip()
 
 
+def preflight_judge_oauth(timeout_s: float = 25.0) -> tuple[bool, str]:
+    """Validate the Sonnet judge's Claude-Max OAuth grading path END-TO-END.
+
+    The startup cc-bridge health check (`wait_for_bridge_healthy`) only probes
+    `/healthz` from INSIDE the container against a cached access token, so it
+    passes even when (a) Docker Desktop silently dropped the host loopback
+    publish, or (b) the OAuth refresh token is dead and only fails once a refresh
+    is forced. Both surface later as a hard failure at GRADE time — after the
+    (expensive) trajectory has already been generated. This issues ONE real,
+    minimal completion (max_tokens=1) through the exact route the grader uses
+    (host -> cc-bridge -> api.anthropic.com), so a broken Claude auth can be
+    flagged up front instead.
+
+    Returns (ok, detail). ok=True with detail="not configured" when the OAuth
+    judge route is not in use (grading falls back to Bedrock/OpenAI), so callers
+    can invoke it unconditionally.
+    """
+    bridge_url = _judge_oauth_bridge_url()
+    if not bridge_url:
+        return True, "not configured (judge uses Bedrock/OpenAI, not the OAuth bridge)"
+    try:
+        import litellm
+    except Exception as exc:  # noqa: BLE001
+        return False, f"litellm import failed: {exc}"
+    kwargs: dict[str, Any] = {
+        "model": _judge_oauth_bridge_model(),
+        "messages": [{"role": "user", "content": "ping"}],
+        "max_tokens": 1,
+        "temperature": 0,
+        "stream": False,
+        "drop_params": True,
+        "api_base": bridge_url,
+        "api_key": os.environ.get("WCB_CC_STUB_KEY", "sk-wcb-oauth-stub"),
+        "extra_headers": {"x-wcb-bridge-secret": os.environ.get("WCB_CC_BRIDGE_SECRET", "")},
+        "timeout": timeout_s,
+        "num_retries": 0,
+    }
+    try:
+        litellm.completion(**kwargs)
+        return True, f"ok ({bridge_url})"
+    except Exception as exc:  # noqa: BLE001 — litellm error hierarchy is dynamic
+        return False, f"{type(exc).__name__}: {str(exc)[:400]}"
+
+
 def judge_headroom_enabled() -> bool:
     """Compression switch. Default on when set empty/unset; allows A/B
     testing LiteLLM-without-compression by setting this to false explicitly."""
