@@ -1265,13 +1265,37 @@ def start_codex_bridge(
     _pool_files: list[str] = []
     if _pool_dir:
         _pool_dir = os.path.expanduser(_pool_dir)
-        if not os.path.isdir(_pool_dir):
-            raise RuntimeError(
-                f"start_codex_bridge: WCB_CODEX_POOL_DIR is not a directory ({_pool_dir!r})")
+        # Self-heal: create the pool dir if missing, and if it's empty seed it
+        # with the currently logged-in account (~/.codex/auth.json, keyed by
+        # account_id). So pointing WCB_CODEX_POOL_DIR at a not-yet-existing dir
+        # "just works" — it starts single-account and grows as you add more —
+        # instead of hard-failing the run (a common footgun). A single seeded
+        # account has no rotation, but cap-wait still pauses for a hot-swap on a
+        # cap, so this is never a silent dead-end.
+        import shutil as _shutil
+        os.makedirs(_pool_dir, exist_ok=True)
         _pool_files = sorted(f for f in os.listdir(_pool_dir) if f.endswith(".json"))
         if not _pool_files:
+            _seed = os.path.join(auth_host_dir, "auth.json")
+            if os.path.isfile(_seed):
+                try:
+                    _aid = ((json.loads(open(_seed, encoding="utf-8").read())
+                             .get("tokens") or {}).get("account_id") or "account")
+                    _dest = os.path.join(_pool_dir, f"{_aid}.json")
+                    _shutil.copy2(_seed, _dest)
+                    os.chmod(_dest, 0o600)
+                    _pool_files = [f"{_aid}.json"]
+                    logger.info(
+                        "[%s] codex pool at %s was empty; seeded with the active "
+                        "account %s... (add more accounts for rotation)",
+                        container_name, _pool_dir, _aid[:8])
+                except Exception as _e:  # noqa: BLE001 — seeding is best-effort
+                    logger.warning("codex pool seed failed: %s", _e)
+        if not _pool_files:
             raise RuntimeError(
-                f"start_codex_bridge: no *.json account files under {_pool_dir!r}")
+                f"WCB_CODEX_POOL_DIR={_pool_dir!r} has no *.json account files and "
+                f"there is no auth.json under {auth_host_dir!r} to seed it from. "
+                "Run `codex login`, or drop WCB_CODEX_POOL_DIR to use single-account mode.")
 
     if not auth_host_dir or not os.path.isdir(auth_host_dir):
         raise RuntimeError(

@@ -71,6 +71,7 @@ from src.utils.litellm_sidecar import (
     start_litellm,
     stop_bridge,
     wait_for_bridge_healthy,
+    wait_for_bridge_host_port,
     wait_for_codex_bridge_healthy,
     stop_litellm,
     verify_litellm_upstream_reachable,
@@ -2697,6 +2698,45 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
                 f"cc-bridge {cc_bridge_name} did not become healthy in time. "
                 f"Override budget via WCB_CC_BRIDGE_HEALTH_TIMEOUT env (seconds)."
             )
+
+        # Fail-fast preflight of the GRADING Claude path. wait_for_bridge_healthy
+        # above only checks /healthz from INSIDE the container against a cached
+        # access token; it does NOT catch (a) a dropped host loopback publish or
+        # (b) a dead OAuth refresh token — both of which otherwise surface only at
+        # GRADE time, AFTER the (expensive) trajectory has already run. When the
+        # Sonnet judge is routed through the OAuth bridge
+        # (KENSEI_JUDGE_OAUTH_BRIDGE_URL set), validate that exact
+        # host -> bridge -> anthropic path end-to-end here so broken Claude auth
+        # aborts the run up front and asks for a re-login. Opt out with
+        # WCB_SKIP_JUDGE_PREFLIGHT=1.
+        _skip_preflight = os.environ.get(
+            "WCB_SKIP_JUDGE_PREFLIGHT", ""
+        ).strip().lower() in ("1", "true", "yes", "on")
+        if not _skip_preflight and os.environ.get("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "").strip():
+            _host_port = os.environ.get("WCB_CC_BRIDGE_HOST_PORT", "").strip()
+            if _host_port and not wait_for_bridge_host_port(_host_port):
+                raise RuntimeError(
+                    f"cc-bridge is healthy inside the container but its host "
+                    f"loopback publish 127.0.0.1:{_host_port} is unreachable "
+                    f"(Docker Desktop dropped the -p forward). The Sonnet judge "
+                    f"dials this port to grade the rubric, so grading would fail "
+                    f"AFTER the trajectory runs. Re-run (a fresh bridge usually "
+                    f"rebinds the forward); skip with WCB_SKIP_JUDGE_PREFLIGHT=1."
+                )
+            from src.utils.judge_litellm import preflight_judge_oauth
+            _ok, _detail = preflight_judge_oauth()
+            if not _ok:
+                raise RuntimeError(
+                    "Claude OAuth grading preflight FAILED — the Sonnet judge "
+                    f"cannot reach Claude via your Max subscription: {_detail}. "
+                    "This is the auth that grades the rubric (Channel B); refusing "
+                    "to run the trajectory only to fail at grade time. Fix the "
+                    "Claude login first:  source script/wcb setup  (re-copy the "
+                    "Keychain token into the OAuth pool), or sign back into the "
+                    "Claude Code app if the Keychain token is also stale. Skip this "
+                    "check with WCB_SKIP_JUDGE_PREFLIGHT=1."
+                )
+            logger.info("Claude OAuth grading preflight OK (%s)", _detail)
 
     if use_codex_oauth:
         # Bring up the Codex subscription bridge before the sidecar so the shared
