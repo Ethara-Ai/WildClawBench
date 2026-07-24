@@ -236,6 +236,20 @@ def build_run_batch_parser(default_model: str, default_parallel: int) -> argpars
              "default-OFF; when unset the LiteLLM config/containers are "
              "byte-identical to a non-streaming build. Equivalent to WCB_STREAM=1.",
     )
+    ui.add_argument(
+        "--interactive",
+        dest="interactive",
+        action="store_true",
+        help="Multi-turn human-intervention mode (Mode 2, SFT collection): the "
+             "harness pauses at every turn boundary; the scripted stage message "
+             "is shown as the suggestion (Enter sends it, typed text overrides "
+             "it, /exit ends the session). Requires a ClawMark-format task, a "
+             "single --task, --parallel 1, a controlling terminal, and direct "
+             "invocation (NOT via run.sh, which tees stdout and backgrounds "
+             "runs). Mutually exclusive with --tui. Environment mutation and "
+             "grading are IDENTICAL to the static mode — only the prompt "
+             "source changes.",
+    )
     return parser
 
 

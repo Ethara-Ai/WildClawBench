@@ -230,7 +230,7 @@ def test_write_subagent_delivery_basic_shape(tmp_path: Path):
     assert meta["task_description"] == "Pull totals."
     assert meta["task_completion_status"] == "completed"
     assert meta["system_prompt"] == "SYS"
-    assert meta["platform"] == "linux"
+    assert meta["platform"] == "Linux"
     msgs = payload["messages"]
     assert msgs[0]["message"]["role"] == "system"
     assert msgs[0]["message"]["content"][0]["text"] == "SYS"

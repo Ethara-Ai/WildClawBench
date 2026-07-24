@@ -292,7 +292,7 @@ def build_trajectory_meta_info(
     """Build the `trajectory.meta_info` block.
 
     Reference shape (exact 5 keys): platform, modality_tags, taxonomy_l1,
-    taxonomy_l2, modalities_fused. `platform` is always "linux" (containers
+    taxonomy_l2, modalities_fused. `platform` is always "Linux" (containers; Skoll KNOWN_PLATFORMS casing
     run linux). taxonomy_l1 preserves the original L1 string (case +
     punctuation); taxonomy_l2 is the snake_case slug of L2.
     """
@@ -319,7 +319,7 @@ def build_trajectory_meta_info(
         fused = ["text"]
 
     return {
-        "platform": "linux",
+        "platform": "Linux",
         "modality_tags": modality_tags,
         "taxonomy_l1": task.l1 or "",
         "taxonomy_l2": slug_taxonomy_l2(task.l2 or ""),

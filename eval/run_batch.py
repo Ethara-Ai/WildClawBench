@@ -1256,13 +1256,7 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
         # wrote there. Fall back to `workspace_full/` (forensic full copy)
         # only when artifacts/ is missing or empty so older trajectories and
         # backends that don't snapshot still get judged.
-        artifacts_dir = output_dir / "task_output" / "artifacts"
-        results_dir = artifacts_dir
-        try:
-            if not artifacts_dir.exists() or not any(artifacts_dir.iterdir()):
-                results_dir = output_dir / "task_output" / "workspace_full"
-        except OSError:
-            results_dir = output_dir / "task_output" / "workspace_full"
+        results_dir = _pick_evidence_dir(output_dir)
         try:
             from src.utils.grading import grade_with_rubric
             transcript_text = _condense_transcript_for_judge(traj)
@@ -1601,6 +1595,58 @@ def _render_injection_details(task_id: str, mode: str, n_turns: int, n_stages: i
                 logger.info("[%s]   stage #%d (details unavailable)", task_id, i)
 
 
+def _pick_evidence_dir(output_dir: Path) -> Path:
+    """Judge evidence dir: artifacts/ when present+non-empty, else workspace_full/.
+    Single source of truth for the native judge evidence path."""
+    artifacts_dir = output_dir / "task_output" / "artifacts"
+    try:
+        if artifacts_dir.exists() and any(artifacts_dir.iterdir()):
+            return artifacts_dir
+    except OSError:
+        pass
+    return output_dir / "task_output" / "workspace_full"
+
+
+def _make_reply_fn(task_id: str, backend):
+    """Reply callback for Mode-2 display: returns the agent's NEW assistant
+    text since the previous turn (docker-cp of the transcript + delta). Backend-
+    agnostic — used by interactive Mode 2 to echo the agent's prior reply."""
+    from src.utils.state_extractor import extract_assistant_text
+    import tempfile as _tempfile
+    seen = {"n": 0}
+    cpath = backend.transcript_container_path
+
+    def _last_reply():
+        tmp = Path(_tempfile.gettempdir()) / f"wcb_interactive_{task_id}.jsonl"
+        try:
+            r = subprocess.run(["docker", "cp", f"{task_id}:{cpath}", str(tmp)],
+                               capture_output=True, text=True, timeout=30)
+            if r.returncode != 0 or not tmp.is_file():
+                return ""
+            full = extract_assistant_text([tmp])
+        except Exception:
+            return ""
+        delta = full[seen["n"]:]
+        seen["n"] = len(full)
+        return delta
+
+    return _last_reply
+
+
+def _make_record_fn(timeline_path: Path):
+    """Turn-record callback: appends each delivered human/scripted prompt to
+    turn_timeline.jsonl (verbatim, for replay / session_to_prompts)."""
+    def _record(entry: dict):
+        try:
+            entry.setdefault("ts", datetime.now().timestamp())
+            timeline_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(timeline_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(entry, default=str) + "\n")
+        except Exception:
+            pass
+    return _record
+
+
 def run_single_task(
     task: dict,
     model: str,
@@ -1658,7 +1704,8 @@ def run_single_task(
             "yes" if (task.get("test_weights") or "").strip() else "none",
         )
 
-    if generate_tests and config is not None and not (task.get("test_code") or "").strip():
+    if (generate_tests and config is not None
+            and not (task.get("test_code") or "").strip()):
         force_testgen = bool(task.get("__force_testgen__"))
         cached_tests_dir = output_root / task_id_ori / "data" / "tests"
         cached_code_path = cached_tests_dir / "test_outputs.py"
@@ -1936,6 +1983,27 @@ def run_single_task(
             logger.warning("[%s] snapshot applier init failed: %s", task_id, exc)
             snapshot_applier = None
 
+    # Mode 2 (interactive SFT): wrap the multi-turn schedule (stage_turns from
+    # prompts.txt / inject, else turn_messages) in a HumanTurnSource so a human
+    # paces the turns. The inject before_turn closure still fires the silent
+    # mutations between turns; scoring stays Channel A (test_outputs.py) +
+    # optional judge. The human sees each scripted turn as an overridable
+    # suggestion and the agent's prior reply. None = static (non-interactive).
+    interactive_source = None
+    if task.get("__interactive__"):
+        _src_turns = stage_turns or (
+            tuple(task.get("turn_messages") or ())
+            if len(task.get("turn_messages") or []) > 1 else (prompt,))
+        from src.utils.turn_source import StaticTurnSource, HumanTurnSource
+        interactive_source = HumanTurnSource(
+            StaticTurnSource(_src_turns),
+            reply_fn=_make_reply_fn(task_id, backend),
+            record_fn=_make_record_fn(output_dir / "turn_timeline.jsonl"),
+        )
+        logger.info("[%s] interactive Mode 2 over %d scripted turn(s); "
+                    "silent mutations still fire at boundaries",
+                    task_id, len(_src_turns))
+
     # INITIAL snapshot — taken for EVERY task before the agent runs. persona/ and
     # data/ come from the on-disk task source (pristine, pre-turn-0 state);
     # mock_data/ is the live mock-API store (dumped when an admin plane exists).
@@ -2001,6 +2069,7 @@ def run_single_task(
                 before_turn=stage_before_turn,
                 multi_agent_enabled=bool(task.get("multi_agent_enabled")),
                 multi_agent_config=task.get("multi_agent_config") or None,
+                turn_source=interactive_source,
             )
         )
         gateway_proc = execution.gateway_proc
@@ -3336,6 +3405,29 @@ def _run_dispatch(args, backend, config: Config, mock_env_dict: dict, effective_
         task["__use_judge_council__"] = use_judge_council
         task["__force_testgen__"] = bool(getattr(args, "force_testgen", False))
         _apply_no_subagents(task, args)
+        if getattr(args, "interactive", False):
+            # Mode 2 (human intervention / SFT) gating: any MULTI-TURN task —
+            # the Talos native format (prompts.txt with >1 turn, and/or
+            # inject/ / stages.yaml). The flag only selects static vs human
+            # WITHIN multi-turn; single-turn tasks are rejected. --tui owns the
+            # terminal (Textual), so the /dev/tty REPL cannot coexist with it.
+            _is_multiturn = (
+                len(task.get("turn_messages") or []) > 1
+                or task.get("inject_path") or task.get("stages_path"))
+            if not _is_multiturn:
+                logger.error(
+                    "--interactive requires a multi-turn task (prompts.txt >1 "
+                    "turn / inject/ / stages.yaml); %s is format=%s with %d "
+                    "turn(s)", task.get("task_id"), task.get("format"),
+                    len(task.get("turn_messages") or []) or 1)
+                sys.exit(2)
+            if getattr(args, "tui", False):
+                logger.error("--interactive is mutually exclusive with --tui")
+                sys.exit(2)
+            if int(getattr(args, "parallel", 1) or 1) != 1:
+                logger.error("--interactive requires --parallel 1")
+                sys.exit(2)
+            task["__interactive__"] = True
         logger.info("Single task mode: %s (format=%s)", task["task_id"], task.get("format", "md"))
         # ISOLATION INVARIANT (b6/m0192): a single task/rep failure must NEVER
         # escape as a raw traceback — mirror the category-mode soft-failure shape

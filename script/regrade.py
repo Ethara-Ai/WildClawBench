@@ -93,7 +93,29 @@ def _find_rubric_path(task_id: str, override: Path | None) -> Path:
 
 def _find_prompt_path(task_id: str) -> Path | None:
     candidate = REPO_ROOT / "input" / task_id / "prompt.txt"
-    return candidate if candidate.is_file() else None
+    if candidate.is_file():
+        return candidate
+    # Multi-turn script formats: fall back to the turn-0 wake-up message so a
+    # regrade never silently judges against an EMPTY <question> (historical
+    # multi-turn regrades did exactly that — a None prompt path was tolerated
+    # and score.json was still written).
+    for name in ("prompts.txt", "PROMPT.md"):
+        cand = REPO_ROOT / "input" / task_id / name
+        if cand.is_file():
+            return cand
+    return None
+
+
+def _read_task_description(prompt_path: Path) -> str:
+    if prompt_path.name in ("prompts.txt", "PROMPT.md"):
+        try:
+            from src.utils.inject_director import parse_prompts_file
+            turns = parse_prompts_file(prompt_path)
+            if turns:
+                return turns[0].strip()
+        except Exception:
+            pass
+    return prompt_path.read_text(encoding="utf-8").strip()
 
 
 def _load_rubrics(path: Path) -> list:
@@ -144,7 +166,7 @@ def regrade(run_dir: Path, rubric_override: Path | None = None) -> dict:
 
     task_description = ""
     if prompt_path is not None:
-        task_description = prompt_path.read_text(encoding="utf-8").strip()
+        task_description = _read_task_description(prompt_path)
 
     print(f"[regrade] task_id      = {task_id}", file=sys.stderr)
     print(f"[regrade] rubric       = {rubric_path} ({len(rubrics)} criteria)", file=sys.stderr)

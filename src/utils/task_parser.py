@@ -776,6 +776,11 @@ _YAML_METADATA_KEYS = frozenset({
     "required_apis", "required_mock_apis",
     "distractor_apis", "distractor_mock_apis",
     "multi_agent_complex_turns",
+    # Author-DECLARED system prompt (Skoll meta_info.system_prompt — the
+    # validator's most-failed check when empty). Retained as metadata only:
+    # the harness never injects it into the agent's runtime system prompt
+    # (persona bootstrap files drive that).
+    "system_prompt",
 })
 
 
@@ -803,6 +808,9 @@ def _overlay_yaml_metadata(base: dict, yaml_path: Path) -> dict:
     if task_type:
         base["task_type"] = str(task_type)
         base["category"] = str(task_type)
+
+    if raw.get("system_prompt"):
+        base["system_prompt"] = str(raw["system_prompt"])
 
     required = _normalize_declared_api_list(raw, "required_apis", "required_mock_apis")
     if required != _ABSENT_SENTINEL:

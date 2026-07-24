@@ -623,7 +623,7 @@ def build_published_trajectory(
     messages = _project_published_messages(traj.get("messages") or [])
 
     inner_meta = (traj.get("trajectory") or {}).get("meta_info") or {}
-    platform = inner_meta.get("platform") or "linux"
+    platform = inner_meta.get("platform") or "Linux"
     # task_type prefers the explicit field, else falls back to the L2 taxonomy
     # slug the internal meta already computed (snake_case, e.g. research_and_analysis).
     task_type = _task_attr(task, "task_type") or inner_meta.get("taxonomy_l2") or ""
@@ -759,7 +759,7 @@ def build_child_trajectory(
     name: str,
     description: str,
     parent_session: str,
-    platform: str = "linux",
+    platform: str = "Linux",
     completion_status: str = "success",
 ) -> dict:
     """Project one native sub-agent session into the golden child schema.
@@ -836,7 +836,7 @@ def write_golden_layout(
     children_sessions: List[Mapping[str, Any]],
     root_session: str,
     cluster: str = "",
-    platform: str = "linux",
+    platform: str = "Linux",
 ) -> dict:
     """Write parent.json + children/NN_<name>.json + spawn_tree/ to ``output_dir``.
 
@@ -1040,7 +1040,7 @@ def attach_native_subagents(
         return published
 
     label_to_task = extract_spawn_label_tasks(published.get("messages") or [])
-    platform = (published.get("meta_info") or {}).get("platform") or "linux"
+    platform = (published.get("meta_info") or {}).get("platform") or "Linux"
 
     # Spawn order: updatedAt ascending (stable for ties).
     ordered = sorted(subs.items(), key=lambda kv: kv[1].get("updatedAt", 0))

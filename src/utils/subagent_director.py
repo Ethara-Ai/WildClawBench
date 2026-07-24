@@ -702,7 +702,7 @@ def write_subagent_delivery(
             result.status, result.status,
         ),
         "system_prompt": sys_prompt,
-        "platform": "linux",
+        "platform": "Linux",
         "usage": {
             "input_tokens":       result.tokens_in,
             "output_tokens":      result.tokens_out,

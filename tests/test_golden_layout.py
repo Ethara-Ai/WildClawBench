@@ -27,7 +27,7 @@ def _parent_with_spawns():
             "task_description": "Assemble the packet.",
             "task_completion_status": "success",
             "system_prompt": "You are an assistant.",
-            "platform": "linux",
+            "platform": "Linux",
         },
         "messages": [
             {"type": "message", "id": "m0", "message": {"role": "user",
@@ -125,7 +125,7 @@ def test_write_golden_layout_no_children(tmp_path: Path):
     """Zero spawns: parent.json written, no children/ dir, empty spawned list."""
     parent = {
         "meta_info": {"task_type": "t", "task_description": "d",
-                      "task_completion_status": "success", "system_prompt": "s", "platform": "linux"},
+                      "task_completion_status": "success", "system_prompt": "s", "platform": "Linux"},
         "messages": [{"type": "message", "id": "m0",
                       "message": {"role": "user", "content": [{"type": "text", "text": "hi"}]}}],
     }

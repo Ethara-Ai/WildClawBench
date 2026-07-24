@@ -37,6 +37,12 @@ class AgentTaskSpec:
     # openclaw backend honours these fields; other backends ignore them.
     multi_agent_enabled: bool = False
     multi_agent_config: dict[str, Any] | None = None
+    # Pull-based turn feed (see ``src/utils/turn_source.py``). When set, the
+    # openclaw runner pulls each turn's message from it instead of iterating the
+    # static ``turns`` tuple — used by interactive Mode 2 (HumanTurnSource) to
+    # let a human pace the turns. ``before_turn`` still fires per boundary.
+    # None = static path. Openclaw-only, like ``turns``.
+    turn_source: Any | None = None
 
 
 @dataclass
@@ -45,6 +51,15 @@ class AgentExecution:
     error: str | None = None
     gateway_proc: subprocess.Popen[str] | None = None
     agent_proc: subprocess.Popen[str] | None = None
+    # Turn accounting (additive). ``turns_completed`` = number of turns whose
+    # agent invocation completed without timing out; a turn-0 timeout yields 0.
+    # ``timed_out_turn`` = index of the turn that timed out (remaining turns
+    # were dropped), None otherwise. The openclaw runner sets these
+    # accurately; single-shot backends leave the defaults (1 = the one
+    # successful turn) and set turns_completed=0 only via their error paths
+    # if they ever adopt the fields.
+    turns_completed: int = 1
+    timed_out_turn: int | None = None
 
 
 class BaseAgent(ABC):

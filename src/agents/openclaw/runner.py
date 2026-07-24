@@ -12,6 +12,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from src.agents.base import AgentExecution, AgentTaskSpec, BaseAgent
+from src.utils.turn_source import StaticTurnSource
 from src.utils.docker_utils import (
     configure_native_subagents,
     deny_native_subagents,
@@ -462,17 +463,41 @@ class OpenClawAgent(BaseAgent):
             # the SAME session ("chat") so context carries across turns. Turn 0
             # is the task prompt; each later turn is a follow-up message, and
             # before each later turn the agent is idle while before_turn(i)
-            # applies that stage's silent mock-data injection. Single-turn runs
-            # (spec.turns is None) execute exactly one iteration with spec.prompt,
-            # behaviour-identical to the prior single-shot path.
-            turn_messages: tuple[str, ...] = spec.turns or (spec.prompt,)
+            # applies that stage's silent mock-data injection. The turn feed is
+            # PULL-BASED: spec.turn_source when set (ClawMark-format tasks —
+            # stage functions mutate the environment inside next_message while
+            # the agent is idle), else a static adapter over spec.turns.
+            # Single-turn runs (turn_source and turns both unset) execute
+            # exactly one iteration with spec.prompt, behaviour-identical to
+            # the prior single-shot path — the `spec.turns or (spec.prompt,)`
+            # falsy fallback (empty tuple -> one prompt turn) is preserved
+            # inside the adapter construction.
+            turn_source = spec.turn_source or StaticTurnSource(
+                spec.turns or (spec.prompt,))
+            total_turns = turn_source.total()  # int | None (None = open-ended)
             start_time = time.perf_counter()
             wall_start = time.time()
             _ui_lifecycle.emit_stage(spec.task_id, _ui_lifecycle.STAGE_EXEC,
                                      f"agent running (timeout {spec.timeout_seconds}s)")
             agent_proc = None
             _ui_timed_out = False  # UI-only flag; does not affect elapsed/exec logic
-            for turn_index, message in enumerate(turn_messages):
+            turns_executed = 0          # turns whose invocation finished (no timeout)
+            timed_out_turn: int | None = None
+            turn_index = 0
+            while True:
+                try:
+                    # Agent is idle here — the source may mutate the
+                    # environment (ClawMark stage semantics) before returning
+                    # the next message. None ends the run. Pulled at the TOP
+                    # of the loop so a timeout break never pre-consumes (or
+                    # pre-mutates for) a turn that will not run.
+                    message = turn_source.next_message(turn_index)
+                except Exception as exc:
+                    logger.error("[%s] turn source failed at turn %d: %s",
+                                 spec.task_id, turn_index, exc)
+                    break
+                if message is None:
+                    break
                 if turn_index > 0 and spec.before_turn is not None:
                     # Agent is idle here -> apply this stage's injection.
                     try:
@@ -484,12 +509,20 @@ class OpenClawAgent(BaseAgent):
                     # Correlate sub-agent spawns landing in this turn to its index.
                     write_turn_marker(spec.task_id, turn_index)
                 safe_msg = message.replace("'", "'\\''")
-                if len(turn_messages) > 1:
-                    logger.info("[%s] Agent turn %d/%d starting",
-                                spec.task_id, turn_index + 1, len(turn_messages))
+                if total_turns is None:
+                    # Open-ended source (interactive): no denominator exists.
+                    # Only reachable in Mode 2 runs, which bypass run.sh/TUI.
+                    logger.info("[%s] Agent turn %d starting",
+                                spec.task_id, turn_index + 1)
                     _ui_lifecycle.emit_stage(
                         spec.task_id, _ui_lifecycle.STAGE_STATUS,
-                        f"agent turn {turn_index + 1}/{len(turn_messages)}")
+                        f"agent turn {turn_index + 1}")
+                elif total_turns > 1:
+                    logger.info("[%s] Agent turn %d/%d starting",
+                                spec.task_id, turn_index + 1, total_turns)
+                    _ui_lifecycle.emit_stage(
+                        spec.task_id, _ui_lifecycle.STAGE_STATUS,
+                        f"agent turn {turn_index + 1}/{total_turns}")
                 agent_proc = run_background(
                     spec.task_id,
                     bash_cmd=(
@@ -508,7 +541,10 @@ class OpenClawAgent(BaseAgent):
                     agent_proc.kill()
                     agent_proc.wait()
                     _ui_timed_out = True
+                    timed_out_turn = turn_index
                     break
+                turns_executed += 1
+                turn_index += 1
             elapsed_time = time.perf_counter() - start_time
             if _ui_timed_out:
                 # Timeout contract: elapsed reports the budget that was spent,
@@ -521,8 +557,12 @@ class OpenClawAgent(BaseAgent):
                 _ui_lifecycle.emit_stage(spec.task_id, _ui_lifecycle.STAGE_STATUS,
                                          f"agent finished in {elapsed_time:.1f}s")
             self._task_windows[spec.task_id] = (wall_start, time.time())
+            # Legacy contract: report the PLANNED turn count when the source
+            # knows it (even after a timeout break — matches the old
+            # len(turn_messages)); open-ended sources report executed turns.
+            reported_turns = total_turns if total_turns is not None else turns_executed
             logger.info("[%s] Agent finished (%.2fs, %d turn(s))",
-                        spec.task_id, elapsed_time, len(turn_messages))
+                        spec.task_id, elapsed_time, reported_turns)
 
             # Native multi-agent: the parent turn returns as soon as it issues
             # its async sessions_spawn calls (mode=run), but the spawned child
@@ -544,8 +584,11 @@ class OpenClawAgent(BaseAgent):
                 # children and assembles the outputs. Already-synthesized runs
                 # are left untouched. Disable via
                 # OPENCLAW_SUBAGENT_SYNTH_RECOVERY=0.
+                # turns_done feeds the recovery turn's write_turn_marker index
+                # (spawn correlation) — reported_turns preserves the legacy
+                # len(turn_messages) value for sources with a known total.
                 recovered = self._recover_synthesis_if_stalled(
-                    spec, len(turn_messages))
+                    spec, reported_turns)
                 if recovered is not None:
                     agent_proc = recovered
                     # Extend the usage window + elapsed so the recovery turn's
@@ -561,6 +604,8 @@ class OpenClawAgent(BaseAgent):
                 error=None,
                 gateway_proc=gateway_proc,
                 agent_proc=agent_proc,
+                turns_completed=turns_executed,
+                timed_out_turn=timed_out_turn,
             )
 
         except Exception as exc:
@@ -571,6 +616,7 @@ class OpenClawAgent(BaseAgent):
                 error=str(exc),
                 gateway_proc=gateway_proc,
                 agent_proc=agent_proc,
+                turns_completed=0,
             )
 
     def _wait_for_subagents(
