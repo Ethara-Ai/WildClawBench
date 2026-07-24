@@ -37,6 +37,23 @@ EV_INJECT = "inject"      # mid-run data-injection timeline record for the
                           # display-only, truncated — never persisted)}.
                           # producers: inject/stage/drift directors via
                           # lifecycle.emit_inject (fail-open, bus-only).
+EV_CHAT = "chat"          # one human-in-the-loop conversation line for the
+                          # dashboard's Conversation pane. payload: {text: str}
+                          # (already a readable, role-labelled line — the
+                          # scripted suggestion, the agent's prior reply, or a
+                          # harness notice). producer: the interactive Mode-2
+                          # io adapter (src/utils/ui/interactive.tui_io) which
+                          # feeds HumanTurnSource's print_fn. Display-only,
+                          # fail-open, bus-only. Empty during static runs.
+EV_INPUT_REQUEST = "input_request"  # worker -> UI: the harness is idle at a
+                          # turn boundary and needs a human line. payload:
+                          # {prompt: str} (the prompt label). The dashboard
+                          # reveals + focuses its #prompt Input; the worker
+                          # thread blocks in InputBridge.request() until the
+                          # human submits. Only ever emitted in interactive
+                          # Mode 2 while the dashboard is active.
+EV_INPUT_END = "input_end"  # UI hint to hide the #prompt Input again (after a
+                          # submit, or when the session ends). payload: {}.
 
 
 @dataclass

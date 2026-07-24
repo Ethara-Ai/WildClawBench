@@ -178,6 +178,59 @@ def test_session_roundtrip_to_static_prompts(tmp_path):
     assert reparsed == delivered
 
 
+# ── HumanTurnSource over the unified-TUI io (bridge + bus, no textual) ───────
+
+def test_human_turn_source_over_tui_io_bridge():
+    """HumanTurnSource drives identically over the dashboard's bridge io: a
+    background 'UI' submits one line per input request. Enter (empty) accepts
+    the scripted suggestion, typed overrides, /exit ends — the recorded turn
+    timeline is unchanged, and the suggestion reaches the Conversation pane."""
+    import threading
+
+    from src.utils.ui import input_bridge as ib
+    from src.utils.ui.interactive import tui_io
+    from src.utils.ui.events import EV_CHAT, EV_INPUT_REQUEST, get_bus
+
+    ib.reset()
+    bridge = ib.get_input_bridge()
+    submits = ["", "make it shorter", "/exit"]   # accept, override, end
+    chat_lines: list[str] = []
+
+    def _on_chat(e):
+        if e.kind == EV_CHAT:
+            chat_lines.append(e.payload.get("text") or "")
+
+    def _fake_ui(e):
+        # Production shape: the UI submits only in response to a request, on its
+        # own thread (never blocking the emitter).
+        if e.kind == EV_INPUT_REQUEST and submits:
+            nxt = submits.pop(0)
+            threading.Thread(target=lambda: bridge.submit(nxt), daemon=True).start()
+
+    unsub_chat = get_bus().subscribe(_on_chat)
+    unsub_req = get_bus().subscribe(_fake_ui)
+
+    records: list[dict] = []
+    inner = StaticTurnSource(("scripted greeting", "scripted second"))
+    src = HumanTurnSource(inner, record_fn=records.append, io=tui_io())
+    try:
+        delivered, i = [], 0
+        while (m := src.next_message(i)) is not None:
+            delivered.append(m)
+            i += 1
+    finally:
+        unsub_req()
+        unsub_chat()
+        ib.reset()
+
+    assert delivered == ["scripted greeting", "make it shorter"]
+    assert [(r["type"], r.get("override")) for r in records] == [
+        ("human.message", False), ("human.message", True), ("human.exit", None)]
+    assert src.total() is None and src.source_name() == "human"
+    # the scripted suggestion was surfaced to the Conversation pane
+    assert any("scripted greeting" in t for t in chat_lines)
+
+
 # ── StaticTurnSource (the schedule adapter the runner + HumanTurnSource wrap) ─
 
 def test_static_turn_source_sequence():

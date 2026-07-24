@@ -1995,14 +1995,27 @@ def run_single_task(
             tuple(task.get("turn_messages") or ())
             if len(task.get("turn_messages") or []) > 1 else (prompt,))
         from src.utils.turn_source import StaticTurnSource, HumanTurnSource
+        # One TUI for every mode: when the unified Textual dashboard owns the
+        # screen, route the human's turns through it (input bar + Conversation
+        # pane) rather than a second /dev/tty REPL. Off-dashboard (piped output,
+        # NO_COLOR, or textual missing) io=None keeps the preserved /dev/tty
+        # REPL. HumanTurnSource's turn logic is identical either way — only the
+        # io backend changes.
+        from src.utils.ui import lifecycle as _ui_lifecycle
+        _human_io = None
+        if _ui_lifecycle.is_dashboard_active():
+            from src.utils.ui.interactive import tui_io
+            _human_io = tui_io()
         interactive_source = HumanTurnSource(
             StaticTurnSource(_src_turns),
             reply_fn=_make_reply_fn(task_id, backend),
             record_fn=_make_record_fn(output_dir / "turn_timeline.jsonl"),
+            io=_human_io,
         )
-        logger.info("[%s] interactive Mode 2 over %d scripted turn(s); "
+        logger.info("[%s] interactive Mode 2 over %d scripted turn(s) via %s; "
                     "silent mutations still fire at boundaries",
-                    task_id, len(_src_turns))
+                    task_id, len(_src_turns),
+                    "dashboard" if _human_io is not None else "/dev/tty")
 
     # INITIAL snapshot — taken for EVERY task before the agent runs. persona/ and
     # data/ come from the on-disk task source (pristine, pre-turn-0 state);
@@ -2034,23 +2047,6 @@ def run_single_task(
         )
     except Exception as exc:
         logger.warning("[%s] stream renderer start failed (display-only): %s", task_id, exc)
-
-    # Live-stream renderer (STREAMING_IMPLEMENTATION_GUIDE §4/§5). Display-only
-    # daemon: token mode over the batch feed (WCB_STREAM_LOG_PATH) when the
-    # sidecar tap is mounted, else turn-level tailing of THIS run's agent.log.
-    # None when WCB_STREAM is off (default) — start_renderer gates internally and
-    # never raises. Nothing graded reads it or waits on it (R1).
-    stream_renderer = None
-    try:
-        from src.utils.stream_renderer import start_renderer as _start_stream_renderer
-        _stream_feed = os.environ.get("WCB_STREAM_LOG_PATH", "").strip()
-        stream_renderer = _start_stream_renderer(
-            Path(_stream_feed) if _stream_feed else None,
-            output_dir / "agent.log",
-            run_label=f"{task_id}/run_{run_index}",
-        )
-    except Exception as exc:
-        logger.debug("[%s] stream renderer not started: %s", task_id, exc)
 
     try:
         execution = backend.run_task(
@@ -3215,13 +3211,17 @@ def main() -> None:
         os.environ["WCB_STREAM"] = "1"
 
     # Terminal UI layer (src/utils/ui). Two mutually-exclusive rendering modes:
-    #   * Textual dashboard: --tui / WCB_TUI=1 AND stdout is a real terminal AND
-    #     textual is importable. Runs the whole batch on a worker thread while a
-    #     full-screen dashboard renders off the shared event bus.
+    #   * Textual dashboard: --tui / WCB_TUI=1 (or --interactive, which now runs
+    #     inside the SAME dashboard) AND stdout is a real terminal AND textual is
+    #     importable. Runs the whole batch on a worker thread while a full-screen
+    #     dashboard renders off the shared event bus. Interactive Mode 2 adds the
+    #     input bar + Conversation pane; static runs never show them.
     #   * Rich logging (default): install a RichHandler so every existing
-    #     logging call site is colorized; the batch runs inline.
+    #     logging call site is colorized; the batch runs inline. --interactive
+    #     here (piped / NO_COLOR / no textual) falls back to the /dev/tty REPL.
     from src.utils.ui import console as _ui_console, tui as _ui_tui
     _want_tui = (getattr(args, "tui", False)
+                 or getattr(args, "interactive", False)
                  or os.environ.get("WCB_TUI", "").strip().lower() in ("1", "true", "yes"))
     if _want_tui and _ui_console.is_interactive() and _ui_tui.textual_available():
         # run_with_dashboard returns truthy when it drove the dashboard; if the
@@ -3409,8 +3409,11 @@ def _run_dispatch(args, backend, config: Config, mock_env_dict: dict, effective_
             # Mode 2 (human intervention / SFT) gating: any MULTI-TURN task —
             # the Talos native format (prompts.txt with >1 turn, and/or
             # inject/ / stages.yaml). The flag only selects static vs human
-            # WITHIN multi-turn; single-turn tasks are rejected. --tui owns the
-            # terminal (Textual), so the /dev/tty REPL cannot coexist with it.
+            # WITHIN multi-turn; single-turn tasks are rejected. --interactive
+            # now runs inside the SAME unified dashboard as static runs (the
+            # human's turns flow through the input bar + Conversation pane);
+            # off-dashboard it falls back to the /dev/tty REPL. No longer
+            # mutually exclusive with --tui.
             _is_multiturn = (
                 len(task.get("turn_messages") or []) > 1
                 or task.get("inject_path") or task.get("stages_path"))
@@ -3420,9 +3423,6 @@ def _run_dispatch(args, backend, config: Config, mock_env_dict: dict, effective_
                     "turn / inject/ / stages.yaml); %s is format=%s with %d "
                     "turn(s)", task.get("task_id"), task.get("format"),
                     len(task.get("turn_messages") or []) or 1)
-                sys.exit(2)
-            if getattr(args, "tui", False):
-                logger.error("--interactive is mutually exclusive with --tui")
                 sys.exit(2)
             if int(getattr(args, "parallel", 1) or 1) != 1:
                 logger.error("--interactive requires --parallel 1")

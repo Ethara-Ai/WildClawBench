@@ -36,7 +36,17 @@ context carries across turns.
   **SFT** collection. OpenClaw backend only; direct invocation only (not via
   `run.sh` — it tees stdout and backgrounds runs). Gate: any multi-turn task
   (`prompts.txt` >1 turn / `inject/` / `stages.yaml`), single `--task`,
-  `--parallel 1`, not `--tui`.
+  `--parallel 1`.
+
+  Runs inside the **same unified TUI** as static runs. `--interactive`
+  auto-enables the full-screen Textual dashboard (`src/utils/ui/tui.py`) when a
+  real terminal + `textual` are available: the scripted suggestion, the agent's
+  prior reply, and your own turns render in a dedicated **Conversation** pane,
+  and an **input bar** appears at each turn boundary (Enter/type/`/exit` as
+  above). When the dashboard can't run (piped output, `NO_COLOR`, or `textual`
+  missing) it falls back to the original `/dev/tty` REPL — same behaviour, no
+  dashboard. Either way `HumanTurnSource`'s turn logic and the recorded
+  `turn_timeline.jsonl` are identical; only the input/echo backend changes.
 
 `script/session_to_prompts.py` promotes an interactive session's
 `turn_timeline.jsonl` back into a static `prompts.txt` (one HITL session → SFT
@@ -84,8 +94,9 @@ RUN=$(ls -dt output/openclaw/*/trajectories/*/run_* | head -1)
 | Piece | File |
 |---|---|
 | Pull-based runner loop (`while (msg := source.next_message(i))`) | `src/agents/openclaw/runner.py` (`AgentTaskSpec.turn_source` field in `src/agents/base.py`) |
-| Turn sources | `src/utils/turn_source.py` — `StaticTurnSource` (the schedule) + `HumanTurnSource` (Mode-2 `/dev/tty` REPL) |
-| Interactive wiring (reply echo, turn record, gate) | `eval/run_batch.py` (`_make_reply_fn` / `_make_record_fn`, `--interactive` gate) |
+| Turn sources | `src/utils/turn_source.py` — `StaticTurnSource` (the schedule) + `HumanTurnSource` (Mode-2, io-injectable: dashboard or `/dev/tty`) |
+| Unified TUI (Conversation pane + input bar) | `src/utils/ui/tui.py` (`HarnessDashboard`), `src/utils/ui/input_bridge.py` (worker↔UI channel), `src/utils/ui/interactive.py` (`tui_io` → HumanTurnSource `io`) |
+| Interactive wiring (io selection, reply echo, turn record, gate) | `eval/run_batch.py` (`_make_reply_fn` / `_make_record_fn`, `tui_io` vs `/dev/tty` by `lifecycle.is_dashboard_active()`, `--interactive` gate) |
 | Session → static task | `script/session_to_prompts.py` |
 
 The inject silent-mutation system, the deterministic checkers, and the judge are

@@ -24,13 +24,15 @@ from typing import Any, Callable, Dict, Optional
 
 from . import lifecycle
 from .events import (
-    EV_INJECT, EV_LOG, EV_PROGRESS, EV_STAGE, EV_SUMMARY, EV_TOKEN, Event, get_bus,
+    EV_CHAT, EV_INJECT, EV_INPUT_END, EV_INPUT_REQUEST, EV_LOG, EV_PROGRESS,
+    EV_STAGE, EV_SUMMARY, EV_TOKEN, Event, get_bus,
 )
+from .input_bridge import get_input_bridge
 
 try:
     from textual.app import App, ComposeResult
     from textual.containers import Horizontal, Vertical
-    from textual.widgets import Footer, Header, ProgressBar, RichLog, Static
+    from textual.widgets import Footer, Header, Input, ProgressBar, RichLog, Static
     from rich.table import Table
     from rich import box
     _TEXTUAL_AVAILABLE = True
@@ -60,6 +62,29 @@ def token_markup(payload: Dict[str, Any]) -> str:
     if style == "judge":
         return f"[cyan]{text}[/]"
     return f"[dim italic]{text}[/]"
+
+
+def chat_markup(payload: Dict[str, Any]) -> str:
+    """Rich markup for one EV_CHAT payload in the Conversation pane (HITL).
+
+    Pure function (no textual dependency) so it is unit-testable everywhere.
+    ``payload`` = {text: str}. The text is already a readable, role-labelled
+    line from HumanTurnSource (the agent's prior reply, the scripted suggestion,
+    a harness notice) or the dashboard's own "you ›" echo; this only tints by a
+    known prefix and escapes the text so model/user content can never inject
+    live Rich markup into the pane.
+    """
+    text = str(payload.get("text", "")).replace("[", "\\[")
+    stripped = text.lstrip()
+    if stripped.startswith("── agent"):
+        return f"[cyan]{text}[/]"
+    if stripped.startswith("── scripted"):
+        return f"[yellow]{text}[/]"
+    if stripped.startswith("you ›"):
+        return f"[green]{text}[/]"
+    if stripped.startswith("("):  # (empty …) / (message too long …) notices
+        return f"[dim italic]{text}[/]"
+    return text
 
 
 def _esc(v: Any) -> str:
@@ -172,10 +197,13 @@ if _TEXTUAL_AVAILABLE:
         #body { height: 1fr; }
         #left { width: 2fr; }
         #stream { height: 2fr; border: round $success; padding: 0 1; }
+        #chat { height: 2fr; border: round $secondary; padding: 0 1; }
         #inject { height: 1fr; border: round $warning; padding: 0 1; }
         #log { height: 1fr; border: round $accent; padding: 0 1; }
         #status { width: 1fr; border: round $primary; padding: 0 1; }
         #progress { height: auto; padding: 0 1; }
+        /* HITL input bar: hidden until a turn boundary requests a human line. */
+        #prompt { display: none; border: round $primary; margin: 0 1; }
         """
 
         BINDINGS = [("q", "quit", "Quit")]
@@ -207,12 +235,21 @@ if _TEXTUAL_AVAILABLE:
                     # renderer's bus mode) above the harness log. Empty until
                     # a --stream run emits; harmless otherwise.
                     yield RichLog(id="stream", highlight=False, markup=True, wrap=True)
+                    # Human-in-the-loop conversation (EV_CHAT): the scripted
+                    # suggestion, the agent's prior reply, and the human's own
+                    # turns. Empty during static runs — consistent with the
+                    # other panes that stay empty until their mode fires.
+                    yield RichLog(id="chat", highlight=False, markup=True, wrap=True)
                     # Mid-run data-injection feed (EV_INJECT): what the drift/
                     # inject/stage directors mutate, when, and the injected
                     # values. Empty until an inject-enabled task fires.
                     yield RichLog(id="inject", highlight=False, markup=True, wrap=True)
                     yield RichLog(id="log", highlight=False, markup=True, wrap=True)
                 yield Static(self._render_status(), id="status")
+            # HITL input bar: hidden (display:none) until an EV_INPUT_REQUEST
+            # reveals it at a turn boundary. Present in every run so the layout
+            # is identical across modes; it simply never appears in static runs.
+            yield Input(id="prompt", placeholder="type your message — Enter sends")
             yield ProgressBar(id="progress", total=max(1, self._total_hint))
             yield Footer()
 
@@ -222,6 +259,7 @@ if _TEXTUAL_AVAILABLE:
             # Border titles label each pane (Textual RichLog supports these).
             try:
                 self.query_one("#stream", RichLog).border_title = "Live Stream"
+                self.query_one("#chat", RichLog).border_title = "Conversation"
                 self.query_one("#inject", RichLog).border_title = "Data Injection"
                 self.query_one("#log", RichLog).border_title = "Log"
             except Exception:
@@ -302,6 +340,12 @@ if _TEXTUAL_AVAILABLE:
                 self._handle_token(evt.payload)
             elif evt.kind == EV_INJECT:
                 self._handle_inject(evt.payload)
+            elif evt.kind == EV_CHAT:
+                self._handle_chat(evt.payload)
+            elif evt.kind == EV_INPUT_REQUEST:
+                self._handle_input_request(evt.payload)
+            elif evt.kind == EV_INPUT_END:
+                self._handle_input_end(evt.payload)
 
         def _handle_inject(self, p: Dict[str, Any]) -> None:
             # Data Injection pane: one entry per director timeline record.
@@ -311,6 +355,59 @@ if _TEXTUAL_AVAILABLE:
                 self.query_one("#inject", RichLog).write(inject_markup(p))
             except Exception:
                 pass
+
+        def _handle_chat(self, p: Dict[str, Any]) -> None:
+            # Conversation pane (HITL): one role-labelled line. chat_markup
+            # escapes all text; failures swallowed so a display problem never
+            # reaches the harness worker.
+            try:
+                self.query_one("#chat", RichLog).write(chat_markup(p))
+            except Exception:
+                pass
+
+        def _handle_input_request(self, p: Dict[str, Any]) -> None:
+            # A turn boundary needs a human line: reveal + focus the input bar
+            # and label it with the prompt HumanTurnSource passed. The worker
+            # thread is parked in InputBridge.request() until on_input_submitted.
+            prompt = str(p.get("prompt", "")).strip()
+            try:
+                inp = self.query_one("#prompt", Input)
+                inp.border_title = prompt or "your message"
+                inp.value = ""
+                inp.display = True
+                self.set_focus(inp)
+            except Exception:
+                pass
+
+        def _handle_input_end(self, _p: Dict[str, Any]) -> None:
+            try:
+                inp = self.query_one("#prompt", Input)
+                inp.value = ""
+                inp.display = False
+            except Exception:
+                pass
+
+        def on_input_submitted(self, event: "Input.Submitted") -> None:
+            # Human hit Enter in the #prompt bar. Echo their turn into the
+            # Conversation pane (the input clears, so this is the record of what
+            # they sent), hide the bar, then hand the RAW value to the bridge —
+            # an empty value is a bare Enter, which HumanTurnSource maps to
+            # "accept the scripted suggestion" (semantics live there, not here).
+            if getattr(event, "input", None) is not None and event.input.id != "prompt":
+                return
+            value = event.value
+            echo = f"you › {value}" if value.strip() else "you › (sent scripted message)"
+            try:
+                self.query_one("#chat", RichLog).write(chat_markup({"text": echo}))
+            except Exception:
+                pass
+            try:
+                inp = self.query_one("#prompt", Input)
+                inp.value = ""
+                inp.display = False
+            except Exception:
+                pass
+            get_input_bridge().submit(value)
 
         def _handle_token(self, p: Dict[str, Any]) -> None:
             # Live Stream pane: display-ready text from the stream renderer's
@@ -404,6 +501,14 @@ if _TEXTUAL_AVAILABLE:
             return table
 
         def on_unmount(self) -> None:
+            # Unblock any worker parked in InputBridge.request() (interactive
+            # Mode 2) so quitting the dashboard mid-input can never hang the
+            # harness worker thread — request() raises EOFError, which
+            # HumanTurnSource treats as end-of-session.
+            try:
+                get_input_bridge().close()
+            except Exception:
+                pass
             # Restore logging + unsubscribe so a second run is clean.
             try:
                 if self._unsub:

@@ -223,9 +223,11 @@ def build_run_batch_parser(default_model: str, default_parallel: int) -> argpars
         dest="tui",
         action="store_true",
         help="Run the full-screen Textual dashboard (live log + container "
-             "lifecycle table + Live Stream pane + progress + in-app execution "
-             "summary). Requires a real terminal and the 'textual' package; "
-             "falls back to Rich logging otherwise. Equivalent to WCB_TUI=1.",
+             "lifecycle table + Live Stream + Conversation panes + progress + "
+             "in-app execution summary). The single UI for every mode, static "
+             "or human-in-the-loop. Requires a real terminal and the 'textual' "
+             "package; falls back to Rich logging otherwise. Equivalent to "
+             "WCB_TUI=1. (--interactive auto-enables this dashboard.)",
     )
     ui.add_argument(
         "--stream",
@@ -243,12 +245,13 @@ def build_run_batch_parser(default_model: str, default_parallel: int) -> argpars
         help="Multi-turn human-intervention mode (Mode 2, SFT collection): the "
              "harness pauses at every turn boundary; the scripted stage message "
              "is shown as the suggestion (Enter sends it, typed text overrides "
-             "it, /exit ends the session). Requires a ClawMark-format task, a "
-             "single --task, --parallel 1, a controlling terminal, and direct "
-             "invocation (NOT via run.sh, which tees stdout and backgrounds "
-             "runs). Mutually exclusive with --tui. Environment mutation and "
-             "grading are IDENTICAL to the static mode — only the prompt "
-             "source changes.",
+             "it, /exit ends the session). Runs inside the unified Textual "
+             "dashboard (input bar + Conversation pane) when a real terminal and "
+             "'textual' are available; otherwise falls back to a /dev/tty REPL. "
+             "Requires a multi-turn task, a single --task, --parallel 1, and a "
+             "controlling terminal (NOT via run.sh, which tees stdout and "
+             "backgrounds runs). Environment mutation and grading are IDENTICAL "
+             "to the static mode — only the prompt source changes.",
     )
     return parser
 
