@@ -50,6 +50,13 @@ from src.utils.grading import (
     write_error_score as write_error_score_file,
 )
 from src.utils.config import Config
+from src.utils.harness_logging import (
+    install_debug_logfile,
+    attach_run_logfile,
+    detach_run_logfile,
+    stage,
+    event,
+)
 from src.utils.task_parser import load_task
 from src.utils.docker_utils import discover_services, require_image_present, DOCKER_IMAGE
 from src.utils.skills_inference import (
@@ -1855,6 +1862,20 @@ def run_single_task(
 
     result = {"task_id": task_id, "scores": {}, "error": None}
 
+    # Per-run debug log: a focused DEBUG trace written next to this run's
+    # score.json (output_dir/harness_debug.log). Everything logged during this
+    # run — agent dispatch, grading, both scoring channels — lands here as well
+    # as in the process-wide session log. Detached at the single return below.
+    _run_dbg_handler = attach_run_logfile(output_dir)
+    event(
+        "run.begin",
+        logger="harness.stage",
+        task_id=task_id,
+        run_index=run_index,
+        model=model,
+        output_dir=str(output_dir),
+    )
+
     gateway_proc = None
     agent_proc = None
     elapsed_time = float(timeout_seconds)
@@ -2049,6 +2070,14 @@ def run_single_task(
     except Exception as exc:
         logger.warning("[%s] stream renderer start failed (display-only): %s", task_id, exc)
 
+    event(
+        "agent.dispatch.begin",
+        logger="harness.stage",
+        task_id=task_id,
+        backend=type(backend).__name__,
+        model=model,
+        timeout_s=timeout_seconds,
+    )
     try:
         execution = backend.run_task(
             AgentTaskSpec(
@@ -2072,11 +2101,19 @@ def run_single_task(
         gateway_proc = execution.gateway_proc
         agent_proc = execution.agent_proc
         elapsed_time = execution.elapsed_time
+        event(
+            "agent.dispatch.end",
+            logger="harness.stage",
+            task_id=task_id,
+            elapsed_s=round(elapsed_time or 0.0, 2),
+            error=execution.error,
+        )
         if execution.error:
             result["error"] = execution.error
     except Exception as exc:
         result["error"] = str(exc)
-        logger.error("[%s] Unexpected backend error: %s", task_id, exc)
+        logger.error("[%s] Unexpected backend error: %s", task_id, exc, exc_info=True)
+        event("agent.dispatch.error", logger="harness.stage", task_id=task_id, error=str(exc))
 
     finally:
         grading_transcript_path = backend.transcript_container_path
@@ -2095,6 +2132,14 @@ def run_single_task(
                     exc,
                 )
 
+        event(
+            "grade.begin",
+            logger="harness.stage",
+            task_id=task_id,
+            has_rubric=bool(task.get("rubrics")),
+            has_test_code=bool(task.get("test_code")),
+            agent_error=result.get("error"),
+        )
         result = grade_the_task(
             task_id,
             workspace_path,
@@ -2105,6 +2150,13 @@ def run_single_task(
             transcript_container_path=grading_transcript_path,
             grade_on_error=grade_on_error,
             write_error_score_on_failure=grade_on_error,
+        )
+        event(
+            "grade.end",
+            logger="harness.stage",
+            task_id=task_id,
+            scores=result.get("scores"),
+            error=result.get("error"),
         )
         usage = backend.collect_usage(
             task_id=task_id,
@@ -2446,6 +2498,15 @@ def run_single_task(
         except Exception as exc:
             logger.error("[%s] last-resort score.json write failed: %s", task_id, exc, exc_info=True)
 
+    event(
+        "run.end",
+        logger="harness.stage",
+        task_id=task_id,
+        run_index=run_index,
+        scores=result.get("scores"),
+        error=result.get("error"),
+    )
+    detach_run_logfile(_run_dbg_handler)
     return result
 
 
@@ -2533,6 +2594,17 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
     use_litellm = args.litellm if args.litellm is not None else config.litellm_enabled()
     if not use_litellm:
         return False, "", "", "", {}, ""
+
+    # Auth/connection setup phase begins here: docker network, LiteLLM sidecar
+    # (+ OAuth bridge), upstream (Bedrock/OpenAI) reachability, and the mock-API
+    # stack. The detailed per-step INFO logs come from litellm_sidecar.py and
+    # mock_stack.py; this marker just brackets the phase in the debug trace.
+    event(
+        "infra.setup.begin",
+        logger="harness.stage",
+        backend=getattr(args, "agent_backend", None),
+        model=getattr(args, "model", None),
+    )
 
     shared_network = os.environ.get("WCB_SHARED_NETWORK", "").strip()
     shared_sidecar = os.environ.get("WCB_SHARED_SIDECAR", "").strip()
@@ -3242,6 +3314,26 @@ def main() -> None:
         default_model=DEFAULT_MODEL,
         default_parallel=DEFAULT_PARALLEL,
     )
+
+    # --- Harness debug logging -------------------------------------------
+    # Open a single, process-wide DEBUG log capturing the ENTIRE pipeline:
+    # auth/connection setup (LiteLLM sidecar, OAuth bridges, mock stack), task
+    # load, workspace staging, agent dispatch (trajectory creation), and both
+    # scoring channels (pytest reward + rubric judge). Every module logs via the
+    # root logger, so this one handler records them all; install_rich_logging()
+    # below deliberately preserves FileHandlers, so it survives.
+    try:
+        _dbg_path = install_debug_logfile()
+        event(
+            "harness.start",
+            logger="harness.stage",
+            model=getattr(args, "model", None),
+            backend=getattr(args, "agent_backend", None),
+            parallel=getattr(args, "parallel", None),
+        )
+        logger.info("Harness debug log -> %s", _dbg_path)
+    except Exception:
+        logger.exception("failed to open harness debug log (continuing without it)")
 
     # Live-stream gate (STREAMING_IMPLEMENTATION_GUIDE §7). Batch-scoped and
     # default-OFF: --stream (or WCB_STREAM=1) turns on the observability feed +

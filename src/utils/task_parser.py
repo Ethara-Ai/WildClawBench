@@ -606,7 +606,12 @@ def _load_native_task(task_dir: Path) -> dict:
         rubrics = json.loads((task_dir / "rubric.json").read_text(encoding="utf-8")) or []
         if isinstance(rubrics, dict):
             rubrics = rubrics.get("rubrics") or []
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, OSError) as exc:
+        logger.warning(
+            "[task_parser] rubric.json missing or malformed in %s (%s) -> rubrics=[]; "
+            "Channel B will score 0.0 with 'no rubric criteria'",
+            task_dir, exc,
+        )
         rubrics = []
 
     parts = task_dir.name.split("__")

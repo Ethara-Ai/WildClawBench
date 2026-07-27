@@ -421,6 +421,10 @@ def execute_tests(
     task_checkers)` — run as authored instead of erroring on missing fixtures.
     """
     if not test_code.strip():
+        logger.warning(
+            "[testexec] empty test_code -> reward=0.0 "
+            "(Channel A produced no tests; check test generation upstream)"
+        )
         return {
             "tests_total": 0, "tests_passed": 0, "tests_failed": 0, "tests_errored": 0,
             "test_scores": "{}", "test_output": "", "test_code": "",
@@ -502,6 +506,15 @@ def execute_tests(
             cmd, capture_output=True, text=True, timeout=timeout, check=False,
         )
         output = (proc.stdout or "") + ("\n[stderr]\n" + proc.stderr if proc.stderr else "")
+        # Full raw runner output, verbatim (DEBUG -> harness_debug.log file). This
+        # is the pytest-in-docker stdout/stderr the payload parser reads below; use
+        # it to debug collection errors, import failures, or an empty test set.
+        logger.debug(
+            "[testexec] raw runner output: rc=%s\n"
+            "<<<TESTEXEC_RAW rc=%s>>>\n%s\n<<<END_TESTEXEC_RAW>>>",
+            getattr(proc, "returncode", "?"), getattr(proc, "returncode", "?"),
+            output,
+        )
         last_line = (proc.stdout or "").strip().splitlines()
         payload: Dict[str, Any] = {}
         for line in reversed(last_line):
@@ -587,6 +600,12 @@ def execute_tests(
             "error": "",
         }
     except subprocess.TimeoutExpired:
+        logger.warning(
+            "[testexec] docker test runner timed out after %ss -> reward=0.0 "
+            "(suite hung; last output tail: %s)",
+            timeout,
+            " / ".join((output or "").strip().splitlines()[-3:]) or "<none>",
+        )
         return {
             "tests_total": 0, "tests_passed": 0, "tests_failed": 0, "tests_errored": 0,
             "test_scores": "{}", "test_output": output, "test_code": test_code,

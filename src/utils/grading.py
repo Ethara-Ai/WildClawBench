@@ -1034,6 +1034,16 @@ def _run_council(
         out_tok = int(usage.get("output_tokens", 0) or 0)
         c_read = int(usage.get("cache_read_tokens", 0) or 0)
         c_write = int(usage.get("cache_write_tokens", 0) or 0)
+        # Full raw judge response, verbatim — DEBUG so it lands in harness_debug.log
+        # (file) without flooding the console. This is the exact text the verdict
+        # parser sees; pair it with the "parsed verdicts" line below to debug any
+        # grading discrepancy.
+        logger.debug(
+            "Judge raw response: model=%s family=%s chars=%d\n"
+            "<<<JUDGE_RAW model=%s family=%s>>>\n%s\n<<<END_JUDGE_RAW>>>",
+            label, family, len(raw or "") if isinstance(raw, str) else -1,
+            label, family, raw,
+        )
         try:
             verdicts = _parse_verdict_text(raw, n_criteria)
         except Exception as exc:
@@ -1041,6 +1051,11 @@ def _run_council(
                 "Judge call fail: model=%s family=%s elapsed=%.2fs stage=parse "
                 "tokens=in:%d/out:%d/cR:%d/cW:%d error=%s",
                 label, family, elapsed, in_tok, out_tok, c_read, c_write, str(exc)[:200],
+            )
+            logger.debug(
+                "Judge parse FAILED — raw response that could not be parsed "
+                "(model=%s family=%s):\n<<<JUDGE_RAW_UNPARSED>>>\n%s\n<<<END>>>",
+                label, family, raw,
             )
             return {
                 "model": model, "effective_model": effective_model,
@@ -1055,6 +1070,21 @@ def _run_council(
             label, family, elapsed, in_tok, out_tok, c_read, c_write,
             len(verdicts), n_criteria,
         )
+        # Per-criterion parsed verdicts (DEBUG -> harness_debug.log). Shows exactly
+        # what the parser extracted from the raw response above, so a "why is this
+        # criterion Yes/No" question is answerable straight from the log.
+        try:
+            logger.debug(
+                "Judge parsed verdicts: model=%s family=%s -> %s",
+                label, family,
+                [
+                    (str(v.get("criterion") or v.get("id") or idx)[:60],
+                     v.get("verdict") if isinstance(v, dict) else v)
+                    for idx, v in enumerate(verdicts)
+                ] if isinstance(verdicts, list) else verdicts,
+            )
+        except Exception:
+            logger.debug("Judge parsed verdicts (raw): model=%s -> %r", label, verdicts)
         return {
             "model": model, "effective_model": effective_model,
             "family": family, "ok": True,
@@ -1433,11 +1463,19 @@ def grade_with_rubric(
     or {overall_score:0.0, error:...} when no rubrics or no council members
     are configured (never raises)."""
     if not rubrics:
+        logger.warning(
+            "[grading] no rubric criteria -> overall_score=0.0 "
+            "(rubric.json missing/empty/malformed, or task_parser produced rubrics=[])"
+        )
         return {"overall_score": 0.0, "error": "no rubric criteria"}
     system = _judge_system_prompt()
 
     members = council_members()
     if not members:
+        logger.error(
+            "[grading] no judge council members configured -> overall_score=0.0; "
+            "set JUDGE_COUNCIL_SONNET_ARN / _GLM_ARN / _KIMI_ARN (or JUDGE_COUNCIL_MEMBERS) in .env"
+        )
         return {
             "overall_score": 0.0,
             "error": "no judge council members configured (set JUDGE_COUNCIL_SONNET_ARN / _GLM_ARN / _KIMI_ARN, or JUDGE_COUNCIL_MEMBERS) in .env",

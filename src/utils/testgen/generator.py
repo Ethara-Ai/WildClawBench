@@ -428,17 +428,39 @@ def generate_task_tests(
             total_usage[_k] += int(usage.get(_k, 0) or 0)
         total_usage["cost_usd"] += float(usage.get("cost_usd", 0.0) or 0.0)
 
+        # Full raw testgen LLM response, verbatim (DEBUG -> harness_debug.log file,
+        # off-console). This is what _extract_json_object parses below; pair it with
+        # the "parsed" line to debug empty/broken test generation (Channel A).
+        _logger.debug(
+            "[TESTGEN] raw LLM response: attempt=%d task=%s chars=%d\n"
+            "<<<TESTGEN_RAW attempt=%d>>>\n%s\n<<<END_TESTGEN_RAW>>>",
+            attempt, task_identifier,
+            len(response_text or "") if isinstance(response_text, str) else -1,
+            attempt, response_text,
+        )
+
         parsed = _extract_json_object(response_text)
         if parsed is None:
             _logger.warning(
                 "[TESTGEN] No JSON in LLM response on attempt %d (task=%s)",
                 attempt, task_identifier,
             )
+            _logger.debug(
+                "[TESTGEN] unparseable raw response (no JSON) attempt=%d task=%s:\n"
+                "<<<TESTGEN_RAW_UNPARSED>>>\n%s\n<<<END>>>",
+                attempt, task_identifier, response_text,
+            )
             lint_failures = ["No JSON object found in LLM response — emit valid {code, weights} JSON"]
             continue
 
         llm_code = parsed.get("code", "")
         raw_weights = parsed.get("weights", {})
+        _logger.debug(
+            "[TESTGEN] parsed draft: attempt=%d task=%s code_chars=%d weight_keys=%s",
+            attempt, task_identifier,
+            len(llm_code) if isinstance(llm_code, str) else -1,
+            list(raw_weights.keys()) if isinstance(raw_weights, dict) else type(raw_weights).__name__,
+        )
 
         if not llm_code or not isinstance(llm_code, str) or not llm_code.strip():
             lint_failures = ["LLM returned empty test code"]
