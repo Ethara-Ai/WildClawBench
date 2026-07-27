@@ -1,0 +1,62 @@
+# Stage script for davis_hitl_catering_invoice — authored for interactive
+# Mode-2 (human-in-the-loop) sessions per docs/TASK_STANDARD.md.
+#
+# HITL design note: in --interactive runs each `turn` below is shown to the
+# human operator as an overridable suggestion (Enter = send as-is, type =
+# override, /exit = end). The silent mutation between T0 and T1 fires either
+# way, so the T1 decision point ("confirm if it matches now, dispute if not")
+# is only answerable correctly by an agent that re-reads the inbox — which is
+# what the human operator gets to probe, steer, or stress.
+#
+# Pre-T0 state lives in the overlays (mock_data/gmail-api/messages.json holds
+# the original overbilled invoice msg-hitl-2001, $2,150 vs the agreed $1,850
+# in data/home/Desktop/catering_agreement_notes.txt). Stage0 is the
+# documentation-only seed marker; stage0 API ops are never applied.
+
+[[stages]]
+name = "initial_seed"
+description = "Baseline before T0, carried by the overlays: Copper Kettle's invoice CK-2214 (msg-hitl-2001, total $2,150.00 — includes a $300 rush-staffing surcharge that contradicts the agreed $1,850 all-in) sits in the inbox; Brian's agreement notes on the Desktop record the $1,850 all-in deal. This block carries no ops by design."
+applied_at = "2026-07-25T08:00:00-05:00"
+turn_label = "Day 1, 08:50"
+
+
+[[stages]]
+turn = "any update from copper kettle? if the billing matches my notes now, reply to them confirming we'll pay it. if it still doesnt, reply asking them to fix it"
+turn_label = "Day 1, 15:20"
+name = "silent_corrected_invoice"
+description = "Between T0 and T1 Copper Kettle silently sends corrected invoice CK-2214-R1: the surcharge is dropped and the total now matches the agreed $1,850.00. An agent that re-reads the inbox lands on the 'confirm payment' branch; one that trusts its T0 conclusion wrongly disputes."
+applied_at = "2026-07-25T13:35:00-05:00"
+
+[[stages.silent]]
+id = "sm-001"
+service = "gmail"
+method = "POST"
+path = "/gmail/v1/users/me/messages"
+description = "Corrected invoice CK-2214-R1 (total $1,850.00, surcharge removed) as msg-hitl-2002; supersedes msg-hitl-2001."
+
+[stages.silent.admin]
+op = "upsert"
+table = "messages"
+
+[stages.silent.admin.row]
+id = "msg-hitl-2002"
+thread_id = "thr-hitl-200"
+from_addr = "billing@copperkettlecatering.com"
+to_addr = "brian.davis@Greenridertech.com"
+cc_addr = ""
+subject = "CORRECTED: invoice #CK-2214-R1, launch dinner"
+snippet = "Corrected invoice CK-2214-R1 replacing CK-2214. Total due: $1,850.00, net 15."
+body = "Hi Brian,\n\nApologies - the rush staffing surcharge on CK-2214 was added in error; your agreement with Dana is all-in. Corrected invoice CK-2214-R1 below, replacing CK-2214.\n\nCatering service, launch dinner (all-in): $1,850.00\nTotal due: $1,850.00 (net 15)\n\nBest,\nAccounts, Copper Kettle Catering"
+date = "2026-07-25T13:35:00-05:00"
+internal_date = 1785004500000
+size_estimate = 1450
+labels = ["INBOX"]
+is_unread = true
+is_starred = false
+
+
+[[stages]]
+turn = "log it for me - add a line to vendor_ledger.csv on my desktop with date, vendor, final amount, status. then give me the one-liner for standup"
+turn_label = "Day 2, 09:10"
+name = "t2_ledger_and_summary"
+description = "Turn-only wake-up; no environment mutation at this boundary. The deliverable is a ledger row (date, vendor, final amount, status — in that order) plus a final one-line answer carrying the settled $1,850."

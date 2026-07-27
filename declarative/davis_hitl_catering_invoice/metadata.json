@@ -1,0 +1,17 @@
+{
+  "task_id": "davis_hitl_catering_invoice",
+  "difficulty": "medium",
+  "modalities": ["text", "document"],
+  "l1": "office_productivity",
+  "l2": "email_triage",
+  "task_type": "invoice_reconciliation",
+  "required_apis": ["gmail"],
+  "distractor_apis": "auto",
+  "banner": {
+    "task_id": "davis_hitl_catering_invoice",
+    "persona": "brian-davis",
+    "window": "Day 1 through Day 2 (2 simulated days)",
+    "timezone": "America/Chicago",
+    "note": "authored for interactive Mode-2 (human-in-the-loop SFT) sessions; the T1 branch (confirm vs dispute) depends on re-reading the inbox after the silent correction, which gives a human operator a real steering decision. Runs identically as a static eval task."
+  }
+}

@@ -6,8 +6,8 @@ Multi-turn tasks use the **Talos native format** — a task directory with:
 
 | File / dir | Role |
 |---|---|
-| `prompts.txt` | the per-turn wake-up script — `--- TURN T0 (Day 1, 05:30) ---` blocks, one user message per turn (a multi-day simulation) |
-| `inject/stage0..N/mutations.json` | silent environment mutations applied at turn boundaries (`applies_between_turns: ["T15","T16"]`): `filesystem` drops, `loud` visible API changes, and `silent` admin-plane drifts (e.g. a meeting moves without an email) |
+| `prompts.txt` | the per-turn wake-up script — `--- TURN T0 (Day 1, 05:30) ---` blocks, one user message per turn (a multi-day simulation). **Takes priority over `prompt.txt`** when both exist (`prompt.txt` is only the T0 mirror); before 2026-07-27 the loader had this backwards, so every corpus task shipping both files silently ran a single turn with zero injections — treat multi-turn scores from before that fix as suspect |
+| `inject/stage0..N/mutations.json` | silent environment mutations applied at turn boundaries (`applies_between_turns: ["T15","T16"]`): `filesystem` drops, `loud` visible API changes, and `silent` admin-plane drifts (e.g. a meeting moves without an email). Give each API op an explicit `admin` block (`{op: patch\|upsert\|update_where\|doc_set, table, pk, set/row}`) — it dispatches directly against the store; the bare REST form (`method`/`path`/`body`) relies on fuzzy row resolution that needs an `id`/`pk` column and silently logs `unresolved` on domain-keyed tables (e.g. doordash `orders` keys on `order_id`). Verify firings in the run's `inject_timeline.jsonl` (`status: applied`, before/after values) |
 | `rubric.json` | rubric criteria for the LLM judge (Channel B) |
 | `test_outputs.py` + `test_weights.json` | deterministic pytest checkers (Channel A); weights are signed (`±1/±3/±5`; negative = guardrail) |
 | `persona/` | 7 OpenClaw bootstrap `.md` files (IDENTITY/SOUL/AGENTS/MEMORY/USER/TOOLS/HEARTBEAT) |
@@ -15,7 +15,32 @@ Multi-turn tasks use the **Talos native format** — a task directory with:
 
 `task_parser.load_task` routes this as `native+yaml` and, with an `inject/` dir +
 a per-task mock stack, runs the multi-turn loop (`run_batch.py`). Example task:
-`input/input`.
+`input/davis_meal_calorie_check` (4 turns, 2 silent drift stages, 10 checkers).
+
+## Authoring: the declarative compiler
+
+Hand-writing the format above is error-prone (turn numbering,
+`applies_between_turns`, weight vocab, test-name ↔ weight-key matching). The
+preferred path is to author **four data files, no Python** under
+`declarative/<task_id>/` — `metadata.json`, `prompt.txt`, `stages.toml`,
+`rubrics.json`, plus passthrough `persona/` `data/` `mock_data/` — and compile:
+
+```bash
+python3 script/compile_declarative_task.py declarative/<task_id> [--force]
+python3 script/preflight_task.py declarative/_build/<task_id>
+cp -R declarative/_build/<task_id>/ input/<task_id>/     # promote to the corpus
+```
+
+The compiler generates all the bookkeeping positionally (a stage that never
+fires cannot be authored), normalizes service names, emits admin-block
+mutations, and compiles `rubrics.json` "checks" into a hermetic
+`test_outputs.py` + `test_weights.json`. Full format reference:
+`declarative/README.md`. **`input/` is gitignored** — the declarative source is
+the only version-controlled representation of a compiled task, so edit the
+source and recompile; never hand-edit the compiled copy in `input/`.
+`input/davis_meal_calorie_check` is compiled from
+`declarative/davis_meal_calorie_check/` (the pre-conversion originals are kept
+in its `original_snapshot/`).
 
 ## How it runs
 
@@ -56,13 +81,17 @@ trajectory + a reusable static task).
 
 Credentials: the OAuth bridge uses the pool file `~/.wcb/oauth_pool/account_a.json`
 (export from the Claude Code Keychain entry; `.env`'s `WCB_CC_ACCOUNT_POOL` may
-point elsewhere — the override below wins).
+point elsewhere — the override below wins). If bootstrap aborts with `rc=7`
+(bridge not healthy) and the bridge log shows `HTTP 400` on the token refresh,
+the pool's refresh token has been burned by a rotation elsewhere — re-export the
+Keychain pair: `security find-generic-password -s "Claude Code-credentials" -w
+> ~/.wcb/oauth_pool/account_a.json` (back the old file up first).
 
 **Eval — static multi-turn, one run** (checkers + judge):
 
 ```bash
 WCB_CC_ACCOUNT_POOL=$HOME/.wcb/oauth_pool/account_a.json \
-.venv/bin/python eval/run_batch.py --task input/input \
+.venv/bin/python eval/run_batch.py --task input/davis_meal_calorie_check \
   --agent-backend openclaw --model claude-opus-4.7 \
   --litellm --use-claude-oauth --mock-stack --parallel 1 --judge-council
 ```
@@ -70,14 +99,16 @@ WCB_CC_ACCOUNT_POOL=$HOME/.wcb/oauth_pool/account_a.json \
 **RL — static, K rollouts (pass@K):**
 
 ```bash
-bash script/run.sh input/input claude-opus-4.7 4   # per-rollout reward.txt + pass_summary.json
+WCB_USE_CLAUDE_OAUTH=1 WCB_CC_ACCOUNT_POOL=$HOME/.wcb/oauth_pool/account_a.json \
+bash script/run.sh input/davis_meal_calorie_check claude-opus-4.7 4 --use-claude-oauth
+# per-rollout reward.txt + pass_summary.json; drop the OAuth env/flag to use Bedrock
 ```
 
 **SFT — interactive human session (real terminal only, not run.sh):**
 
 ```bash
 WCB_CC_ACCOUNT_POOL=$HOME/.wcb/oauth_pool/account_a.json \
-.venv/bin/python eval/run_batch.py --task input/input \
+.venv/bin/python eval/run_batch.py --task input/davis_meal_calorie_check \
   --agent-backend openclaw --model claude-opus-4.7 \
   --litellm --use-claude-oauth --mock-stack --parallel 1 --interactive
 ```

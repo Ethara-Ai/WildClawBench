@@ -1,0 +1,17 @@
+{
+  "task_id": "standard_task_template",
+  "difficulty": "medium",
+  "modalities": ["text", "document"],
+  "l1": "office_productivity",
+  "l2": "email_triage",
+  "task_type": "event_planning_reconciliation",
+  "required_apis": ["gmail"],
+  "distractor_apis": "auto",
+  "banner": {
+    "task_id": "standard_task_template",
+    "persona": "brian-davis",
+    "window": "Day 1 through Day 2 (2 simulated days)",
+    "timezone": "America/Chicago",
+    "note": "STANDARD TEMPLATE - copy this task as the starting point for every new task; see docs/TASK_STANDARD.md"
+  }
+}

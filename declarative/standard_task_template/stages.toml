@@ -1,0 +1,85 @@
+# ============================================================================
+# STANDARD TEMPLATE stage script. This file is the reference for how stages
+# should be authored. Rules it demonstrates:
+#
+#   * First [[stages]] block = the pre-T0 seed MARKER (no `turn` key).
+#     Pre-T0 world state does NOT go here: the harness's seed() applies no
+#     API ops from stage0 — the canonical pre-T0 baseline lives in the
+#     mock_data/ overlays (API state) and data/ (workspace files). The seed
+#     block only documents that baseline. API mutations belong in later
+#     blocks, which fire at the boundary BEFORE their turn. Turn numbering,
+#     applies_between_turns, and fires_at_turn are all generated positionally
+#     by the compiler — never write them by hand.
+#   * EVERY silent/loud API op carries an explicit [stages.silent.admin]
+#     block ({op, table, pk, set/row}). The bare REST form (method/path/body)
+#     is kept as human-readable provenance, but the admin block is what the
+#     applier dispatches — fuzzy REST resolution fails on tables whose rows
+#     have no `id` column and CANNOT insert new rows at all.
+#   * Values in admin set/row are TYPED to match the store's coerced schema
+#     (ints for epochs/sizes, bools for flags, arrays for label lists) —
+#     admin writes bypass load-time coercion, so strings would corrupt state.
+#   * A block with a `turn` but no mutation lists is a turn-only stage
+#     (contributes a prompts.txt turn, no inject dir).
+#   * Verify what actually fired in the run's inject_timeline.jsonl: every op
+#     logs a status (applied / unresolved / failed / no-match / error; fs ops
+#     log copied / skipped / missing_src). Patches log before/after values;
+#     upserts log the inserted pk. Anything not "applied" is an authoring bug.
+# ============================================================================
+
+[[stages]]
+name = "initial_seed"
+description = "Baseline before T0, carried entirely by the overlays: mock_data/gmail-api/messages.json holds the original Fern Room quote (msg-std-1001, $600.00) plus distractor mail, and data/home/ holds Brian's stale planning notes. This block documents that state; it deliberately carries no ops (stage0 API ops are never applied by the harness)."
+applied_at = "2026-07-25T08:30:00-05:00"
+turn_label = "Day 1, 09:05"
+
+
+[[stages]]
+turn = "the fern room called, they said the quote changed and they emailed a new one. check the inbox again and reply to them confirming the right total. update the plan file too - just the total, dont touch the rest"
+turn_label = "Day 1, 16:40"
+name = "silent_revised_quote"
+description = "Between T0 and T1 the venue silently sends a REVISED quote ($750.00, menu upgrade) and a copy of the revised quote sheet appears in the workspace. The agent must re-read the inbox instead of trusting the stale $600 figure from its first pass or from the notes file."
+applied_at = "2026-07-25T14:10:00-05:00"
+
+[[stages.silent]]
+id = "sm-002"
+service = "gmail"
+method = "POST"
+path = "/gmail/v1/users/me/messages"
+description = "Revised Fern Room quote (total $750.00) as msg-std-1002; supersedes msg-std-1001."
+
+[stages.silent.admin]
+op = "upsert"
+table = "messages"
+
+[stages.silent.admin.row]
+id = "msg-std-1002"
+thread_id = "thr-std-100"
+from_addr = "events@thefernroom.com"
+to_addr = "brian.davis@Greenridertech.com"
+cc_addr = ""
+subject = "REVISED: Saturday team dinner quote"
+snippet = "Revised quote for Saturday - harvest tasting menu upgrade. Total $750.00."
+body = "Hi Brian,\n\nQuick update - the kitchen can do the harvest tasting menu for your group after all, so we have revised the quote. This replaces the earlier one.\n\nRevised total for the evening: $750.00 (room hire, harvest tasting menu for 12, service included).\n\nReply to this note to confirm and we will pencil you in.\n\nWarmly,\nMara\nThe Fern Room events"
+date = "2026-07-25T14:10:00-05:00"
+internal_date = 1785006600000
+size_estimate = 1510
+labels = ["INBOX"]
+is_unread = true
+is_starred = false
+
+# Filesystem drop: a file appears in the live workspace at the same boundary.
+# `src` is relative to this task's source dir; the compiler copies it into the
+# stage dir. `dst` must be an absolute container path under /root/workspace/.
+[[stages.filesystem]]
+id = "fs-001"
+action = "copy"
+src = "assets/fern_room_revised_quote.txt"
+dst = "/root/workspace/home/Desktop/fern_room_revised_quote.txt"
+description = "The venue also sent the revised quote sheet directly; it lands on the Desktop."
+
+
+[[stages]]
+turn = "morning - did the dinner stuff get sorted? whats the final number i should say at standup"
+turn_label = "Day 2, 08:30"
+name = "t2_final_checkin"
+description = "Turn-only wake-up; no environment mutation at this boundary. The agent should answer $750 from its (re-verified) knowledge."
