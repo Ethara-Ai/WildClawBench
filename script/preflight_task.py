@@ -75,7 +75,8 @@ def check_structure(task: Path) -> None:
         rec(PASS if not missing else FAIL,
             "persona/ has all 7 core files" if not missing else f"persona/ missing {sorted(missing)}")
     data = task / "data"
-    n = len([p for p in data.iterdir() if p.is_file()]) if data.is_dir() else 0
+    # corpus convention stages inputs under data/home/**, so count recursively
+    n = len([p for p in data.rglob("*") if p.is_file()]) if data.is_dir() else 0
     rec(PASS if n else FAIL, f"data/ has {n} files")
 
 
@@ -109,6 +110,9 @@ def check_task_yaml(task: Path) -> tuple[list[str], list[str]]:
         required, distractor = _parse_api_lists(text)
     for key in ("task_type", "system_prompt"):
         rec(PASS if re.search(rf"^{key}:", text, re.MULTILINE) else FAIL, f"task.yaml has {key}")
+    if isinstance(distractor, str):
+        # 'auto' is the documented full-catalog sentinel, not an API list
+        distractor = [] if distractor.strip().lower() in ("auto", "__auto__") else [distractor]
     rec(PASS if required else FAIL, f"required_apis: {required}")
     rec(PASS, f"distractor_apis: {distractor}")
     for api in list(required) + list(distractor):

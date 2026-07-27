@@ -583,15 +583,18 @@ def _load_native_task(task_dir: Path) -> dict:
     # trajectory/harbor/multimodal metadata. (persona/ still supplies SOUL/MEMORY/AGENTS
     # via inject_persona_into_workspace independently of the input-artifact source.)
     turn_messages: list[str] = []
-    if (task_dir / "prompt.txt").is_file():
-        prompt = (task_dir / "prompt.txt").read_text(encoding="utf-8").strip()
-    elif (task_dir / "prompts.txt").is_file():
+    if (task_dir / "prompts.txt").is_file():
         # Talos inject-format task: prompts.txt holds the per-turn wake-up script.
         # Turn 0 is the initial prompt; later turns drive the multi-turn silent-
         # injection loop applied at stage boundaries (see inject_director.py).
+        # Checked BEFORE prompt.txt: corpus tasks ship prompt.txt as a T0
+        # mirror alongside it, and letting the mirror win drops turn_messages
+        # and silently degrades every multi-turn task to a single turn.
         from src.utils.inject_director import parse_prompts_file
         turn_messages = parse_prompts_file(task_dir / "prompts.txt")
         prompt = (turn_messages[0] if turn_messages else "").strip()
+    elif (task_dir / "prompt.txt").is_file():
+        prompt = (task_dir / "prompt.txt").read_text(encoding="utf-8").strip()
     elif (task_dir / "PROMPT.md").is_file():
         # Newer authoring format: prompt ships as PROMPT.md (TURN-delimited or plain).
         from src.utils.inject_director import parse_prompts_file

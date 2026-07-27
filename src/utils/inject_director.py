@@ -643,11 +643,13 @@ class InjectApplier:
         return row["fields"] if isinstance(row.get("fields"), dict) else row
 
     def _patch_row(self, api: str, table: str, row: Dict[str, Any],
-                   set_: Dict[str, Any]) -> Dict[str, Any]:
+                   set_: Dict[str, Any], fallback_pk: Optional[str] = None) -> Dict[str, Any]:
         """Patch one row, nested-``fields`` aware. The admin PATCH shallow-merges
         top-level keys, so an airtable-style nested ``fields`` object must be
-        resent whole (existing + overrides)."""
-        pk = row.get("id") or row.get("pk")
+        resent whole (existing + overrides). ``fallback_pk`` covers stores whose
+        rows key on a domain column (order_id, store_id, ...) and expose no
+        ``id``/``pk`` — the explicit-admin caller already knows the true pk."""
+        pk = row.get("id") or row.get("pk") or fallback_pk
         if pk is None:
             return {"ok": False, "error": "no pk"}
         if isinstance(row.get("fields"), dict):
@@ -678,7 +680,7 @@ class InjectApplier:
                 else:
                     bag = self._row_bag(row)
                     before = {k: bag.get(k) for k in set_}
-                    res = self._patch_row(api, table, row, set_)
+                    res = self._patch_row(api, table, row, set_, fallback_pk=pk)
                     after = {k: v for k, v in set_.items()} if res.get("ok") else before
                     rec.update(table=table, pk=pk, ok=bool(res.get("ok")),
                                http=res.get("status"), before=before, after=after,
