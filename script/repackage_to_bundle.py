@@ -994,14 +994,44 @@ def _run_index_of(run_dirname: str) -> int:
 def _find_input_task_dir(input_root: Path, task_dir_name: str) -> Path | None:
     if not input_root.is_dir():
         return None
-    want = persona_core(task_dir_name)
     candidates = [p for p in input_root.iterdir() if p.is_dir()]
+
+    # 1. Exact directory-name match wins first. This deterministically resolves
+    #    each task to its own dir and removes any iterdir()-order dependency.
+    #    Critical for personas with sibling tasks that differ only by a numeric
+    #    suffix (e.g. jordan-mcdaniel_01 vs jordan-mcdaniel_02), which collapse
+    #    to the same persona_core() key.
     for p in candidates:
-        if persona_core(p.name) == want:
+        if p.name == task_dir_name:
             return p
-    for p in candidates:
-        if want and want in persona_core(p.name):
-            return p
+
+    # 2. Lossy persona_core fallback — bridges legitimate cases where a run
+    #    instance dir carries a uuid/hex suffix that maps back to a plain
+    #    _NN input dir. Collect ALL matches; never silently guess between
+    #    colliding siblings.
+    want = persona_core(task_dir_name)
+    if not want:
+        return None
+    exact_core = [p for p in candidates if persona_core(p.name) == want]
+    if len(exact_core) > 1:
+        raise ValueError(
+            f"Ambiguous input task dir for {task_dir_name!r}: persona_core "
+            f"{want!r} matches multiple candidates "
+            f"{sorted(p.name for p in exact_core)}. Refusing to guess."
+        )
+    if exact_core:
+        return exact_core[0]
+
+    substr_core = [p for p in candidates if want in persona_core(p.name)]
+    if len(substr_core) > 1:
+        raise ValueError(
+            f"Ambiguous input task dir for {task_dir_name!r}: persona_core "
+            f"{want!r} is a substring of multiple candidates "
+            f"{sorted(p.name for p in substr_core)}. Refusing to guess."
+        )
+    if substr_core:
+        return substr_core[0]
+
     return None
 
 
