@@ -3309,11 +3309,14 @@ def _start_drift_director(task: dict, drift_info: dict, output_dir):
         return None
 
 
-def main() -> None:
-    args = parse_run_batch_args(
-        default_model=DEFAULT_MODEL,
-        default_parallel=DEFAULT_PARALLEL,
-    )
+def main(args=None) -> None:
+    # eval/wcb.py (the TUI launcher) passes a prebuilt namespace; direct CLI
+    # invocation parses sys.argv as before.
+    if args is None:
+        args = parse_run_batch_args(
+            default_model=DEFAULT_MODEL,
+            default_parallel=DEFAULT_PARALLEL,
+        )
 
     # --- Harness debug logging -------------------------------------------
     # Open a single, process-wide DEBUG log capturing the ENTIRE pipeline:

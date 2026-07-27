@@ -135,6 +135,22 @@ _wcb_status() {
 }
 
 _wcb_run() {
+    # TUI path: `wcb run [task]` (or just `wcb <task-dir>`) opens the
+    # full-screen config launcher (eval/wcb.py). Backend / model / OAuth
+    # account / parallel workers / advanced options are all picked there;
+    # streaming is always on and interactive mode is auto-detected from the
+    # task layout — no flags to remember. Auto-logins from .env first so the
+    # OAuth dropdown works without a separate `wcb login`.
+    if [ "${WCB_USE_CLAUDE_OAUTH:-0}" != "1" ]; then
+        _wcb_login || _wcb_warn "continuing without OAuth login (API key / Bedrock routing)"
+    fi
+    local _py="$_wcb_root/.venv/bin/python3"
+    [ -x "$_py" ] || _py="$(command -v python3)"
+    ( cd "$_wcb_root" && "$_py" eval/wcb.py "$@" )
+}
+
+# Pre-TUI batch path (script/run.sh + preflight + reps), kept for automation.
+_wcb_run_legacy() {
     if [ "${WCB_USE_CLAUDE_OAUTH:-0}" != "1" ]; then
         _wcb_err "not logged in — run 'source script/wcb login' first"
         return 1
@@ -370,16 +386,25 @@ case "${1:-help}" in
     logout) _wcb_logout ;;
     status) _wcb_status ;;
     run)    shift; _wcb_run "$@" ;;
+    run-legacy) shift; _wcb_run_legacy "$@" ;;
     help|-h|--help)
         cat <<EOF
-wcb — Claude Max subscription login wrapper (reads all values from .env)
+wcb — WildClawBench launcher + Claude Max OAuth wrapper (reads values from .env)
+
+Run (TUI — the normal path):
+  wcb run [task]             open the full-screen config screen, pick backend /
+                             model / OAuth account / parallel from dropdowns,
+                             press Start. Streaming is always on; interactive
+                             mode is auto-detected from the task layout.
+  wcb <task-dir>             same — a task path is treated as 'wcb run <task>'
+  wcb run                    open the TUI and pick the task there
 
 Subcommands:
   source script/wcb setup                 ONE-TIME per-laptop onboarding (auto)
   source script/wcb login                 load OAuth vars from .env (subscription ON)
   source script/wcb logout                unset OAuth vars (subscription OFF)
   wcb status                              show login state
-  wcb run <task> [--reps N] [--model M]   run a trajectory on the subscription
+  wcb run-legacy <task> [--reps N] [--model M]   old script/run.sh batch path
 
 New machine (one time):
   source script/wcb setup    # extracts token from this OS's store (macOS Keychain
@@ -388,10 +413,17 @@ New machine (one time):
   source ~/.zshrc            # (or ~/.bashrc on Linux/bash — setup prints the file)
 
 Examples:
-  wcb login
-  wcb run input/kayla_morgan_9b8f1d3c-f1f0-40b7-bdbe-f55045abc016 --reps 3
-  wcb logout
+  wcb run input/input1
+  wcb input/input1
+  wcb run-legacy input/kayla_morgan_9b8f1d3c-f1f0-40b7-bdbe-f55045abc016 --reps 3
 EOF
         ;;
-    *) _wcb_err "unknown subcommand: $1 (try: setup | login | logout | status | run | help)" ;;
+    *)
+        # A task path is a run: `wcb input/input1` == `wcb run input/input1`.
+        if [ -d "$1" ] || [ -d "$_wcb_root/$1" ]; then
+            _wcb_run "$@"
+        else
+            _wcb_err "unknown subcommand: $1 (try: run | setup | login | logout | status | help)"
+        fi
+        ;;
 esac

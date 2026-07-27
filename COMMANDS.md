@@ -2,6 +2,14 @@
 
 A single-source guide to **every** custom command / script / CLI entry point in this repository, why it exists, what it does, and every flag it accepts.
 
+> **TL;DR — the normal way to run a task is now one line:**
+>
+> ```bash
+> wcb run input/<task>        # or just: wcb input/<task>
+> ```
+>
+> This opens the full-screen config TUI (`eval/wcb.py` → `src/utils/ui/launcher.py`): Agent Backend, Model, OAuth Account, Parallel Workers are dropdowns; less-used options live under an **Advanced** collapsible; press **Start** to run. `--stream` is always on, `--interactive` is auto-detected from the task layout (multi-turn `prompts.txt` ⇒ interactive), and the OAuth pool (`WCB_CC_ACCOUNT_POOL`) is set from the dropdown. Last-used selections persist to `~/.wcb/launcher.json`. Extra flags after the task are forwarded verbatim to `run_batch.py` as an escape hatch. The old batch path is still available as `wcb run-legacy …`, and `eval/run_batch.py` continues to accept the full flag set for automation.
+
 Commands fall into these tiers:
 
 | Tier | Location | Purpose |
