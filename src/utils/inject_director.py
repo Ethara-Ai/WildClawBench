@@ -250,6 +250,30 @@ def parse_prompts_file(path: Path | str) -> List[str]:
     return ordered
 
 
+def is_defect(rec: Dict[str, Any], phase: str = "stage") -> bool:
+    """Classify a per-op outcome record as a genuine injection defect.
+
+    Defect = the op did not verifiably land: ``ok`` falsy (covers status
+    unresolved / failed / error / no-match / missing_src, and fs ops whose
+    copy hook returned False), with ONE documented benign exception:
+    seed-time FILESYSTEM ops that could not run because the agent container
+    does not exist yet — the copy hook is absent ("no workspace copy hook")
+    or returns False (status stays "copied"/"mkdir" with ok=False), and the
+    baseline is already mounted via the workspace/mock_data overlays (see
+    run_batch's _copy_into_workspace note). Seed fs ops that fail for real
+    authoring reasons (missing_src, missing src/dst, exception) still count.
+    """
+    if rec.get("ok"):
+        return False
+    if phase == "seed" and "action" in rec:  # filesystem op (has no 'service')
+        reason = str(rec.get("reason") or "")
+        if rec.get("status") in ("copied", "mkdir"):
+            return False  # hook returned False: container not up yet
+        if rec.get("status") == "skipped" and "workspace copy hook" in reason:
+            return False
+    return True
+
+
 # ---------------------------------------------------------------------------
 # Applier
 # ---------------------------------------------------------------------------
@@ -298,20 +322,23 @@ class InjectApplier:
 
     # -- public API ---------------------------------------------------------
 
-    def seed(self, script: InjectScript) -> None:
+    def seed(self, script: InjectScript) -> List[Dict[str, Any]]:
+        outcomes: List[Dict[str, Any]] = []
         stage = script.seed_stage()
         if stage is None:
-            return
+            return outcomes
         self._append({"type": "inject.seed.start", "ts": time.time(),
                       "stage": stage.name,
                       "fs": len(stage.filesystem), "loud": len(stage.loud)})
         for op in stage.filesystem:
-            self._apply_filesystem(op, stage)
+            outcomes.append(self._apply_filesystem(op, stage))
         if self._replay_loud:
             for op in stage.loud:
-                self._apply_api_mutation(op, stage, turn_index=0, silent=False)
+                outcomes.append(
+                    self._apply_api_mutation(op, stage, turn_index=0, silent=False))
         self._append({"type": "inject.seed.done", "ts": time.time(),
                       "stage": stage.name})
+        return outcomes
 
     def apply_stage(self, stage: InjectStage, turn_index: int) -> List[Dict[str, Any]]:
         outcomes: List[Dict[str, Any]] = []
@@ -332,6 +359,12 @@ class InjectApplier:
         # list-form stages may also carry filesystem drops mid-run
         for op in stage.filesystem:
             outcomes.append(self._apply_filesystem(op, stage))
+        # Honest accounting: count SUCCESSES, not attempts. The old log line
+        # said "applied: N op(s)" for N attempted ops even when every one
+        # resolved `unresolved` — that silence let broken task specs survive
+        # multiple runs unnoticed (2026-07-30 injection audit).
+        failed = [rec for rec in outcomes if is_defect(rec, phase="stage")]
+        n_ok = len(outcomes) - len(failed)
         self._append({
             "type": "inject.stage.applied",
             "ts": time.time(),
@@ -339,10 +372,23 @@ class InjectApplier:
             "applied_before_turn": turn_index,
             "silent_ops": len(stage.silent),
             "loud_ops": len(stage.loud),
+            "applied_ops": n_ok,
+            "failed_ops": len(failed),
             "outcomes": outcomes,
         })
-        LOG.info("inject stage '%s' applied before turn %d: %d silent op(s), %d loud op(s)",
-                 stage.name, turn_index, len(stage.silent), len(stage.loud))
+        if failed:
+            first = failed[0]
+            LOG.warning(
+                "inject stage '%s' before turn %d: %d op(s) — %d applied, "
+                "%d FAILED (first: id=%s status=%s reason=%s)",
+                stage.name, turn_index, len(outcomes), n_ok, len(failed),
+                first.get("id"), first.get("status"),
+                first.get("reason") or first.get("error") or "")
+        else:
+            LOG.info("inject stage '%s' applied before turn %d: %d op(s), all verified "
+                     "(%d silent, %d loud)",
+                     stage.name, turn_index, len(outcomes),
+                     len(stage.silent), len(stage.loud))
         return outcomes
 
     def close(self) -> None:
@@ -642,6 +688,39 @@ class InjectApplier:
     def _row_bag(row: Dict[str, Any]) -> Dict[str, Any]:
         return row["fields"] if isinstance(row.get("fields"), dict) else row
 
+    def _read_back_row(self, api: str, table: str, pk: Any,
+                       expected: Dict[str, Any]
+                       ) -> Tuple[Optional[Dict[str, Any]], bool]:
+        """Post-write verification: re-read the row through the ADMIN plane and
+        report (live values for the touched fields, all-values-match?).
+
+        Admin reads never enter the agent-visible /audit feed
+        (tracking_middleware short-circuits /admin/*), so this is side-effect
+        free. NEVER use the public port here — public GETs are audit-logged
+        and would corrupt the request counts the deterministic checkers grade.
+
+        Honest limitation: this re-reads the SAME target the write went to, so
+        a fuzzy-resolver write to the wrong table still "verifies" — that
+        class is caught statically by preflight's bare-REST-form warning.
+        """
+        row = self._admin_get(api, f"/admin/data/{table}/{pk}")
+        if not isinstance(row, dict):
+            return None, False
+        bag = self._row_bag(row)
+        # Only scalar expectations are comparable; nested dict/list values
+        # (rich notion property objects, etc.) are reported but not asserted.
+        comparable = {k: v for k, v in expected.items()
+                      if not isinstance(v, (dict, list))}
+        after = {k: bag.get(k) for k in expected}
+        verified = all(self._loose_eq(bag.get(k), v) for k, v in comparable.items())
+        return after, verified
+
+    @staticmethod
+    def _mark_unverified(rec: Dict[str, Any]) -> None:
+        """A 2xx write whose values are absent on read-back did NOT land."""
+        rec.update(ok=False, status="failed", verified=False,
+                   reason="write not observed on read-back")
+
     def _patch_row(self, api: str, table: str, row: Dict[str, Any],
                    set_: Dict[str, Any], fallback_pk: Optional[str] = None) -> Dict[str, Any]:
         """Patch one row, nested-``fields`` aware. The admin PATCH shallow-merges
@@ -681,11 +760,19 @@ class InjectApplier:
                     bag = self._row_bag(row)
                     before = {k: bag.get(k) for k in set_}
                     res = self._patch_row(api, table, row, set_, fallback_pk=pk)
-                    after = {k: v for k, v in set_.items()} if res.get("ok") else before
                     rec.update(table=table, pk=pk, ok=bool(res.get("ok")),
-                               http=res.get("status"), before=before, after=after,
-                               changed=res.get("ok") and before != after,
+                               http=res.get("status"), before=before,
                                status="applied" if res.get("ok") else "failed")
+                    if res.get("ok"):
+                        # Read back LIVE values — not an optimistic echo of the
+                        # request — so a 200 that didn't stick is a failure.
+                        after, verified = self._read_back_row(api, table, pk, set_)
+                        rec.update(after=after, verified=verified,
+                                   changed=before != after)
+                        if not verified:
+                            self._mark_unverified(rec)
+                    else:
+                        rec.update(after=before, changed=False)
             elif kind in ("update_where", "bulk"):
                 table = self._resolve_store_table(api, spec.get("table"))
                 where = spec.get("where") or {}
@@ -693,6 +780,7 @@ class InjectApplier:
                 rows = self._admin_get_rows(api, table)
                 matched = ok = 0
                 before = after = None
+                first_pk = None
                 for row in rows:
                     if not isinstance(row, dict):
                         continue
@@ -701,14 +789,23 @@ class InjectApplier:
                         continue
                     if before is None:
                         before = {k: bag.get(k) for k in set_}
+                        first_pk = row.get("id") or row.get("pk")
                     res = self._patch_row(api, table, row, set_)
                     matched += 1
                     ok += 1 if res.get("ok") else 0
-                after = dict(set_) if ok else before
                 rec.update(table=table, matched=matched, patched=ok,
-                           before=before, after=after,
-                           changed=ok > 0 and before != after,
-                           ok=ok > 0, status="applied" if ok else "no-match")
+                           before=before, ok=ok > 0,
+                           status="applied" if ok else "no-match")
+                if ok and first_pk is not None:
+                    # Verify on the first matched row (representative sample).
+                    after, verified = self._read_back_row(api, table, first_pk, set_)
+                    rec.update(after=after, verified=verified,
+                               changed=before != after)
+                    if not verified:
+                        self._mark_unverified(rec)
+                else:
+                    rec.update(after=dict(set_) if ok else before,
+                               changed=ok > 0 and before != (dict(set_) if ok else before))
             elif kind == "upsert":
                 # Inject a new row (an incoming email / slack message / page) so it
                 # appears when the agent next READS that service — silent (no audit
@@ -724,11 +821,19 @@ class InjectApplier:
                            after=pk,
                            changed=res.get("ok") and not isinstance(existed, dict),
                            status="applied" if res.get("ok") else "failed")
+                if res.get("ok") and pk is not None:
+                    # Verify the new row is actually readable with its values.
+                    row_expect = row["fields"] if isinstance(row.get("fields"), dict) else row
+                    after, verified = self._read_back_row(api, table, pk, row_expect)
+                    rec.update(after=after, verified=verified)
+                    if not verified:
+                        self._mark_unverified(rec)
             elif kind in ("doc_set", "doc_merge", "doc.merge"):
                 doc = spec.get("document") or spec.get("doc")
                 res = self._admin_doc_set(api, doc, spec.get("path") or [], spec.get("value"))
                 rec.update(document=doc, before=res.get("before"), after=res.get("after"),
                            changed=res.get("changed"), ok=res.get("ok"), http=res.get("status"),
+                           verified=res.get("verified"),
                            status=("applied" if res.get("ok") and res.get("changed")
                                    else ("no-change" if res.get("ok") else "failed")),
                            reason=res.get("reason"))
@@ -760,13 +865,26 @@ class InjectApplier:
         leaf = path[-1]
         before = node.get(leaf) if isinstance(node, dict) else None
         if before == value:
-            return {"ok": True, "before": before, "after": before, "changed": False}
+            return {"ok": True, "before": before, "after": before, "changed": False,
+                    "verified": True}
         node[leaf] = value
         top = path[0]
         res = self._admin_post(api, f"/admin/doc/{doc}/merge", {"fields": {top: cur[top]}})
-        return {"ok": bool(res.get("ok")), "before": before,
-                "after": value if res.get("ok") else before,
-                "changed": bool(res.get("ok")), "status": res.get("status")}
+        if not res.get("ok"):
+            return {"ok": False, "before": before, "after": before,
+                    "changed": False, "status": res.get("status")}
+        # Read the LIVE document back and confirm the leaf actually holds the
+        # new value — a 200 merge that didn't stick must not report success.
+        live = self._admin_get(api, f"/admin/doc/{doc}")
+        node2 = live
+        for key in path[:-1]:
+            node2 = node2.get(key) if isinstance(node2, dict) else None
+        observed = node2.get(leaf) if isinstance(node2, dict) else None
+        verified = observed == value
+        return {"ok": verified, "before": before, "after": observed,
+                "changed": before != observed, "status": res.get("status"),
+                "verified": verified,
+                "reason": None if verified else "write not observed on read-back"}
 
     @staticmethod
     def _loose_eq(a: Any, b: Any) -> bool:
@@ -806,9 +924,26 @@ class InjectApplier:
             return rec
         table, pk, fields = resolved
         rec.update(table=table, pk=pk, fields=list(fields.keys()))
+        row_before = self._admin_get(api, f"/admin/data/{table}/{pk}")
+        before = ({k: self._row_bag(row_before).get(k) for k in fields}
+                  if isinstance(row_before, dict) else None)
         result = self._admin_patch(api, table, pk, fields)
-        rec.update(result)
-        rec["status"] = rec.get("status", "applied" if result.get("ok") else "failed")
+        # `result` carries {"ok", "status": <int http code>, ...}. Historically
+        # rec.update(result) clobbered `status` with the int so the string
+        # "applied"/"failed" branch below never fired — REST-path recs carried
+        # a bare 200 where every other path carries a semantic status. Keep the
+        # code under `http` and make `status` a string like the admin path.
+        rec.update({k: v for k, v in result.items() if k != "status"})
+        rec["http"] = result.get("status")
+        rec["ok"] = bool(result.get("ok"))
+        rec["status"] = "applied" if rec["ok"] else "failed"
+        rec["before"] = before
+        if rec["ok"]:
+            after, verified = self._read_back_row(api, table, pk, fields)
+            rec.update(after=after, verified=verified,
+                       changed=before != after)
+            if not verified:
+                self._mark_unverified(rec)
         # Persist only field KEYS (rec["fields"]); ship the injected VALUES to
         # the Data Injection pane display-only via ui_values.
         self._append({"type": "inject.api", **rec, "ts": time.time()}, ui_values=fields)

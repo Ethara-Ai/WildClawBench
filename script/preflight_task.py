@@ -259,6 +259,17 @@ def check_inject(task: Path, required: list[str], distractor: list[str]) -> None
                         rec(PASS, f"{label} {bucket}[{op.get('id')}] service={svc} (OpenClaw native tool, not a mock API)")
                     else:
                         rec(FAIL, f"{label} {bucket}[{op.get('id')}] UNKNOWN service={svc}")
+                # Bare REST-form ops (no explicit admin block) rely on fuzzy
+                # row resolution at apply time: it only scans TABLES (never
+                # document stores) and passes unmatched fields through
+                # verbatim — a write can land in the wrong storage object and
+                # still report 200 (hotsauce, 2026-07-30 audit). Warn authors
+                # toward the explicit admin encoding (docs/MULTITURN.md).
+                if not st.is_seed and svc not in NATIVE_SERVICES \
+                        and not isinstance(op.get("admin"), dict):
+                    rec(WARN, f"{label} {bucket}[{op.get('id')}] bare REST form "
+                              f"(no admin block) — fuzzy resolution may write to "
+                              f"the wrong table/document; use an explicit admin op")
                 raw = (op.get("body") or {}).get("raw_eml_path") if isinstance(op.get("body"), dict) else None
                 if raw:
                     rec(PASS if (sd / raw).is_file() else FAIL,

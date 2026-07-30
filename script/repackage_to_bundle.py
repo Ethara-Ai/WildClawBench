@@ -780,6 +780,19 @@ def build_report(
     score = _load_json(run_dir / "score.json") or {}
     output_json = _load_json(run_dir / "output.json")
 
+    # Injection-integrity gate (2026-07-30 audit): a run whose silent
+    # mutations failed measured a DIFFERENT scenario than the task defines.
+    # Warn loudly at bundling time so a defective run is never delivered
+    # unnoticed. (report.json schema deliberately unchanged.)
+    if score.get("injection_ok") is False:
+        n = len(score.get("injection_defects") or [])
+        print(
+            f"    WARNING: {run_dir.name} has {n} injection defect(s) — "
+            f"silent mutations did not land; scores are NOT a valid "
+            f"measurement of the injection scenario (see inject_timeline.jsonl)",
+            file=sys.stderr,
+        )
+
     pytest_block, ctrf_summary, reward_txt = _build_pytest_block(verifier)
     rubric_block = _build_rubric_block(score, infer_meta)
 

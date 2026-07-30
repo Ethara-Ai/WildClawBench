@@ -223,7 +223,8 @@ def inject_markup(payload: Dict[str, Any]) -> str:
     status = rec.get("status")
     if status:
         sstyle = "green" if status in ("applied", "ok") else (
-            "red" if status in ("unresolved", "failed") else "dim")
+            "red" if status in ("unresolved", "failed", "error",
+                                "no-match", "missing_src") else "dim")
         silent = rec.get("silent")
         tag = f"{status}" + (" · silent" if silent is True else
                              " · loud" if silent is False else "")

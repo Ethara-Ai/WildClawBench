@@ -184,6 +184,16 @@ def regrade(run_dir: Path, rubric_override: Path | None = None) -> dict:
     )
 
     score_path = run_dir / "score.json"
+    # Preserve run-level injection-integrity keys from the ORIGINAL score.json:
+    # regrade re-judges Channel B only — whether the run's silent mutations
+    # landed is a fact about the run, not the rubric, and must survive.
+    try:
+        prev = json.loads(score_path.read_text(encoding="utf-8"))
+        for k in ("injection_ok", "injection_defects"):
+            if k in prev and k not in scores:
+                scores[k] = prev[k]
+    except (OSError, json.JSONDecodeError):
+        pass
     score_path.write_text(json.dumps(scores, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"[regrade] wrote {score_path}", file=sys.stderr)
 

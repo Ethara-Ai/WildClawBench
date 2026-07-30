@@ -122,7 +122,7 @@ def _entry(run_index: int, scores: dict, test_result: dict) -> dict:
         else:
             combined = rubric_reward
     authoritative = combined if combined is not None else (rubric_reward or 0.0)
-    return {
+    entry = {
         "run_index": run_index,
         "criteria_total": crit_total,
         "criteria_passed": crit_passed,
@@ -138,6 +138,11 @@ def _entry(run_index: int, scores: dict, test_result: dict) -> dict:
         "combined_reward": combined,
         "reward": authoritative,
     }
+    if s.get("__last_resort_stub__"):
+        entry["__last_resort_stub__"] = True
+    if s.get("injection_ok") is False:
+        entry["injection_ok"] = False
+    return entry
 
 
 def _doc(model_type: str, per_run: list) -> dict:

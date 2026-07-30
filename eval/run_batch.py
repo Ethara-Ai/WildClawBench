@@ -889,6 +889,10 @@ def _pass_summary_entry(run_index: int, scores: dict | None, test_result: dict |
     # distinguish "grader wrote 0" from "no grader ran; stub emitted by finally".
     if s.get("__last_resort_stub__"):
         entry["__last_resort_stub__"] = True
+    # Same for the injection-integrity flag: a run whose silent mutations
+    # failed is not a valid measurement of the injection scenario.
+    if s.get("injection_ok") is False:
+        entry["injection_ok"] = False
     return entry
 
 
@@ -1101,6 +1105,13 @@ def _augment_score_with_combined_rewards(scores: dict, result: dict) -> None:
     scores["test_based_reward"] = test_reward
     scores["rubric_based_reward"] = rubric_reward
     scores["combined_reward"] = combined_reward
+    # Injection integrity stamp (2026-07-30 audit): a run whose silent
+    # mutations failed to land must carry an on-disk marker so it can never
+    # silently reach aggregation/delivery. injection_ok is True for tasks
+    # with no injection at all (nothing was supposed to fire).
+    defects = (result or {}).get("injection_defects") or []
+    scores["injection_ok"] = not defects
+    scores["injection_defects"] = defects
 
 
 def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
@@ -1905,6 +1916,11 @@ def run_single_task(
     # Loud guard: a task shipping an injection config but no live admin plane
     # (per-task mock stack failed to come up) would silently degrade to a single
     # no-injection turn. Make that unmistakable rather than reporting a clean run.
+    # Per-run injection-defect accumulator: every failed/unresolved silent op
+    # lands here (compact form) and is stamped into score.json as
+    # injection_ok/injection_defects by _augment_score_with_combined_rewards.
+    injection_defects: list[dict] = []
+    result["injection_defects"] = injection_defects
     _wants_injection = task.get("inject_path") or task.get("stages_path") or task.get("drift_script_path")
     if _wants_injection and not drift_info:
         logger.error(
@@ -1915,6 +1931,10 @@ def run_single_task(
             "inject" if task.get("inject_path") else
             ("stages.yaml" if task.get("stages_path") else "drift.yaml"),
         )
+        injection_defects.append({
+            "stage": "(setup)", "id": None, "status": "disabled",
+            "reason": "injection config present but mock admin plane unavailable",
+        })
     if drift_info and task.get("inject_path"):
         # Talos inject-format: a fixed multi-turn wake-up script (prompts.txt)
         # with silent mutations applied at specific turn boundaries via the
@@ -1922,9 +1942,19 @@ def run_single_task(
         # pre-T0 baseline, so the stage0 `loud` seed is NOT replayed; only the
         # `silent` mutations fire (kept out of the agent-visible audit feed).
         try:
-            from src.utils.inject_director import InjectScript, InjectApplier
+            from src.utils.inject_director import InjectScript, InjectApplier, is_defect
             from src.utils.docker_utils import copy_file_into_workspace
             _is = InjectScript.load(task["inject_path"])
+
+            def _record_defects(outcomes, stage_name, phase):
+                for _rec in outcomes or []:
+                    if is_defect(_rec, phase=phase):
+                        injection_defects.append({
+                            "stage": stage_name, "id": _rec.get("id"),
+                            "status": str(_rec.get("status")),
+                            "reason": (_rec.get("reason") or _rec.get("error")
+                                       or ""),
+                        })
 
             def _copy_into_workspace(host_src, dst, mkdir=False, _tid=task_id):
                 # Drop per-turn inject artifacts (emails, PDFs, silent file
@@ -1941,7 +1971,8 @@ def run_single_task(
                 copy_into_workspace=_copy_into_workspace,
                 task_id=task_id,
             )
-            inject_applier.seed(_is)
+            _record_defects(inject_applier.seed(_is),
+                            stage_name="stage0(seed)", phase="seed")
             # The pristine BEFORE snapshot (persona/ + data/ + mock_data/) is
             # taken below, after this branch, so it runs for every task — not
             # just injection ones. For inject tasks it still lands after seed()
@@ -1955,7 +1986,8 @@ def run_single_task(
                 # Agent is idle here; apply the stage whose boundary ends at this turn.
                 st = _is.stage_for_boundary(turn_index)
                 if st is not None:
-                    _ap.apply_stage(st, turn_index)
+                    _record_defects(_ap.apply_stage(st, turn_index),
+                                    stage_name=st.name, phase="stage")
 
             stage_before_turn = _inject_before_turn
             logger.info("[%s] inject-format injection enabled: %d turns, %d stage(s)",
@@ -1965,6 +1997,10 @@ def run_single_task(
         except Exception as exc:
             logger.error("[%s] inject/ setup failed (continuing single-turn): %s",
                          task_id, exc)
+            injection_defects.append({
+                "stage": "(setup)", "id": None, "status": "error",
+                "reason": f"inject/ setup failed: {exc}",
+            })
             stage_turns = None
             stage_before_turn = None
     elif drift_info and task.get("stages_path"):
@@ -2143,6 +2179,23 @@ def run_single_task(
                     grading_transcript_path,
                     exc,
                 )
+
+        # Opt-in strict mode: a run whose injections failed is a run of a
+        # DIFFERENT (non-injected) scenario. WCB_STRICT_INJECTION=1 promotes
+        # the defect flag to a hard run error BEFORE grading, so the existing
+        # error path suppresses grading and score.json records the failure.
+        # Default off: the run is scored but stamped injection_ok: false.
+        if result.get("injection_defects") and not result.get("error"):
+            _strict = os.environ.get("WCB_STRICT_INJECTION", "").strip().lower()
+            if _strict in ("1", "true", "yes", "on"):
+                _first = result["injection_defects"][0]
+                result["error"] = (
+                    f"injection defect (WCB_STRICT_INJECTION): "
+                    f"{len(result['injection_defects'])} failed op(s); first: "
+                    f"stage={_first.get('stage')} id={_first.get('id')} "
+                    f"status={_first.get('status')} reason={_first.get('reason')}"
+                )
+                logger.error("[%s] %s", task_id, result["error"])
 
         event(
             "grade.begin",
@@ -2498,6 +2551,8 @@ def run_single_task(
                     "source": "run_single_task last-resort stub",
                     "task_id": task_id,
                     "__last_resort_stub__": True,
+                    "injection_ok": not result.get("injection_defects"),
+                    "injection_defects": result.get("injection_defects") or [],
                 }
                 score_path.write_text(
                     json.dumps(last_resort, indent=2, ensure_ascii=False, default=str),

@@ -873,3 +873,30 @@ class TestBackfillMain:
         monkeypatch.setattr(backfill_mod, "load_task", boom)
         rc = backfill_mod.main([str(temp)])
         assert rc == 1
+
+
+class TestRegradePreservesInjectionFlags:
+    def test_injection_keys_survive_regrade(self, regrade_mod, tmp_path, monkeypatch):
+        # Injection integrity is a fact about the RUN, not the rubric: a
+        # regrade (Channel B only) must not erase it. Contrast with
+        # test_regrade_writes_score_json_verbatim above, which pins that other
+        # stale keys ARE dropped — the merge is a narrow allowlist.
+        run_dir = _mk_run_dir(tmp_path)
+        (run_dir / "output.json").write_text(json.dumps({"messages": []}), encoding="utf-8")
+        rubric = tmp_path / "rubric.json"
+        rubric.write_text(json.dumps([{"criterion": "c", "weight": 5}]), encoding="utf-8")
+        defects = [{"stage": "s1", "id": "op", "status": "unresolved", "reason": "r"}]
+        (run_dir / "score.json").write_text(
+            json.dumps({"combined_reward": 0.9, "injection_ok": False,
+                        "injection_defects": defects}),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(regrade_mod, "grade_with_rubric",
+                            lambda *a, **k: {"overall_score": 0.42, "usage": {}})
+
+        regrade_mod.regrade(run_dir, rubric_override=rubric)
+
+        on_disk = json.loads((run_dir / "score.json").read_text(encoding="utf-8"))
+        assert on_disk["injection_ok"] is False
+        assert on_disk["injection_defects"] == defects
+        assert "combined_reward" not in on_disk  # verbatim-drop behavior intact
