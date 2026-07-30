@@ -1254,6 +1254,9 @@ def _grade_council(
     # Hoisted out of the per-criterion loop below (it was rebuilt once per rubric
     # item; the surviving set is constant for the whole aggregation).
     survivor_lookup = {r["model"]: vs for r, vs in zip(surviving, verdicts_per_member)}
+    # Verbatim member error keyed like survivor_lookup — surfaced as-is in the
+    # per-member rationale when a member cast no verdict (no custom wording).
+    error_lookup = {r["model"]: str(r.get("error") or "") for r in results if not r.get("ok")}
     # Sonnet is the tiebreaker / source of truth on any non-unanimous criterion:
     # it is the largest-context (1M) and most capable council member. Located by
     # stable FAMILY, never the rotating ARN (see the FAMILY decoupling block).
@@ -1301,7 +1304,7 @@ def _grade_council(
             if vs is None:
                 per_voted.append(False)
                 per_satisfied.append(False)
-                per_rationale.append("(abstained — judge call failed)")
+                per_rationale.append(error_lookup.get(m.model, ""))
                 per_truncation.append(False)
                 continue
             if i < len(vs):

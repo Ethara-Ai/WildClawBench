@@ -399,7 +399,7 @@ def test_quiet_summary_keeps_greppable_anchor_and_writes_json(tmp_path):
     assert (tmp_path / "alden-croft_MB" / "summary_claude-opus-4.7.json").exists()
 
 
-# --- criteria table: abstention renders as HUMAN, matching grading.py schema ---
+# --- criteria table: abstention renders the exact judge error verbatim ---
 
 def _render(renderable, width=100):
     from rich.console import Console
@@ -408,32 +408,37 @@ def _render(renderable, width=100):
     return buf.getvalue()
 
 
-def test_criteria_table_marks_real_abstention_as_human():
+def test_criteria_table_abstention_shows_exact_error():
     # grading.py records an abstention as resolved_by="human_eval",
-    # human_eval="required" (NOT the literal "abstain"). The table must show it
-    # as HUMAN, not FAIL.
+    # human_eval="required" (NOT the literal "abstain"), carrying the verbatim
+    # member error in rationales_by_judge. The table must surface that exact
+    # error string, not a custom "HUMAN"/"abstained" label.
     criteria = [
         {"id": 0, "weight": 3, "is_positive": True, "passed": True,
          "resolved_by": "unanimous", "human_eval": "", "criterion": "ok"},
         {"id": 1, "weight": 5, "is_positive": True, "passed": False,
          "resolved_by": "human_eval", "human_eval": "required",
+         "rationales_by_judge": ["call: BedrockException 403 Forbidden", "", ""],
          "criterion": "needs a human"},
     ]
     out = _render(summary.build_criteria_table({"criteria": criteria}))
-    assert "HUMAN" in out
+    assert "call: BedrockException 403 Forbidden" in out
+    assert "HUMAN" not in out
 
 
 def test_criteria_abstention_detection_matches_grading_schema():
     # Behaviour parity check on the three real resolved_by values: only the
-    # human_eval one is treated as an abstention.
-    def render_has_human(resolved_by, human_eval):
+    # human_eval one surfaces the verbatim judge error.
+    def render_has_error(resolved_by, human_eval):
         c = [{"id": 0, "weight": 1, "is_positive": True, "passed": False,
               "resolved_by": resolved_by, "human_eval": human_eval,
+              "rationales_by_judge": ["parse: no verdict block", "", ""],
               "criterion": "c"}]
-        return "HUMAN" in _render(summary.build_criteria_table({"criteria": c}))
-    assert render_has_human("human_eval", "required") is True
-    assert render_has_human("unanimous", "") is False
-    assert render_has_human("sonnet", "") is False
+        return "parse: no verdict block" in _render(
+            summary.build_criteria_table({"criteria": c}))
+    assert render_has_error("human_eval", "required") is True
+    assert render_has_error("unanimous", "") is False
+    assert render_has_error("sonnet", "") is False
 
 
 # --- summary never displays a pass-threshold field/metric ---------------------

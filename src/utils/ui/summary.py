@@ -270,6 +270,21 @@ def _short(text: str, n: int = 78) -> str:
     return text if len(text) <= n else text[: n - 1] + "…"
 
 
+def _abstain_error(c: Dict[str, Any]) -> str:
+    rationales = c.get("rationales_by_judge")
+    if not isinstance(rationales, list):
+        return ""
+    voted = c.get("voted_by_judge")
+    voted = voted if isinstance(voted, list) else []
+    for idx, r in enumerate(rationales):
+        if idx < len(voted) and voted[idx]:
+            continue
+        text = str(r or "").strip()
+        if text:
+            return _short(text)
+    return ""
+
+
 def build_criteria_table(scores: Dict[str, Any]):
     """Per-rubric-criterion pass/fail table from a task's judge scores.
 
@@ -308,7 +323,7 @@ def build_criteria_table(scores: Dict[str, Any]):
             or str(c.get("human_eval") or "").strip() != ""
         )
         if abstained:
-            glyph, verdict = "[yellow]?[/]", "[yellow]HUMAN[/]"
+            glyph, verdict = "[yellow]?[/]", f"[yellow]{_abstain_error(c)}[/]"
         elif passed:
             glyph, verdict = "[bold green]✓[/]", "[green]PASS[/]"
         else:
