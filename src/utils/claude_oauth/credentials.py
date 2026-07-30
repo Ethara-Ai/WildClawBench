@@ -744,3 +744,113 @@ def load_account_pool(spec: str) -> Optional[MultiAccountCredentialProvider]:
     if not slots:
         return None
     return MultiAccountCredentialProvider(slots)
+
+def _read_os_credential_store() -> Optional[str]:
+    """Raw credential blob from the OS store the `claude` CLI writes to.
+
+    Same sources, same order, as ``CredentialProvider``'s ladder — minus the
+    bridge's own refresh cache, which is what we are trying to correct here.
+    """
+    for reader in (
+        _read_inline_env,
+        _read_credentials_file,
+        _read_keychain_macos,
+        _read_secretservice_linux,
+    ):
+        raw = reader()
+        if raw:
+            return raw
+    return None
+
+
+def sync_pool_from_os_store(pool_dir: "str | Path") -> list[str]:
+    """Re-point expired pool slot files at the OS credential store.
+
+    A pool slot file is a *snapshot* of the OAuth blob. Refresh tokens are
+    single-use, so whenever the `claude` CLI refreshes (which happens just by
+    using Claude Code) the chain rotates and the snapshot's refresh token is
+    burned. The bridge then starts, tries to refresh with a token the server
+    has already retired, gets HTTP 400, exits — and the only symptom the
+    operator sees is `cc-bridge did not become healthy in time`, 60s later,
+    naming nothing that would point at credentials.
+
+    This restores for the pool path the invariant the module docstring already
+    promises for the single-account ladder: the OS store is canonical and is
+    re-read on every bridge start.
+
+    Deliberately total: every failure is swallowed and logged. A pool that
+    cannot be improved is left exactly as it was, so this can only convert a
+    would-be failure into a success, never the reverse. Returns the labels of
+    the slots that were rewritten (empty when everything was already current).
+    """
+    resynced: list[str] = []
+    try:
+        pdir = Path(str(pool_dir)).expanduser()
+        if not pdir.is_dir():
+            return resynced
+        slots = sorted(p for p in pdir.glob("*.json") if p.is_file())
+        if not slots:
+            return resynced
+
+        stale = []
+        for slot in slots:
+            try:
+                creds = OAuthCredentials.from_claude_payload(
+                    json.loads(slot.read_text(encoding="utf-8"))
+                )
+            except (OSError, ValueError, CredentialsError) as e:
+                _LOG.debug("pool slot %s unreadable (%s); leaving alone", slot.name, e)
+                continue
+            if creds.is_expired():
+                stale.append((slot, creds))
+        if not stale:
+            return resynced
+
+        raw = _read_os_credential_store()
+        if not raw:
+            _LOG.warning(
+                "pool slot(s) %s hold an expired token and no OS credential "
+                "store is readable — the bridge will fail to refresh. Sign in "
+                "with the `claude` CLI, then re-run.",
+                ", ".join(s.name for s, _ in stale),
+            )
+            return resynced
+        try:
+            fresh = OAuthCredentials.from_claude_payload(json.loads(raw))
+        except (ValueError, CredentialsError) as e:
+            _LOG.warning("OS credential store holds a malformed blob (%s)", e)
+            return resynced
+        if fresh.is_expired():
+            _LOG.warning(
+                "OS credential store token is itself expired — nothing fresher "
+                "to copy. Sign in with the `claude` CLI, then re-run."
+            )
+            return resynced
+
+        payload = json.dumps(fresh.to_claude_payload(), indent=2)
+        for slot, creds in stale:
+            if creds.refresh_token == fresh.refresh_token:
+                # Same chain: copying would not buy a usable refresh token.
+                continue
+            try:
+                backup = slot.with_suffix(
+                    slot.suffix + ".bak." + time.strftime("%Y%m%d_%H%M%S")
+                )
+                if not backup.exists():
+                    backup.write_text(
+                        slot.read_text(encoding="utf-8"), encoding="utf-8"
+                    )
+                    os.chmod(backup, 0o600)
+                slot.write_text(payload, encoding="utf-8")
+                os.chmod(slot, 0o600)
+                resynced.append(slot.name)
+            except OSError as e:
+                _LOG.warning("could not resync pool slot %s: %s", slot.name, e)
+        if resynced:
+            _LOG.info(
+                "resynced expired OAuth pool slot(s) from the OS credential "
+                "store: %s", ", ".join(resynced),
+            )
+    except Exception as e:  # noqa: BLE001 - must never break bridge startup
+        _LOG.warning("pool resync skipped (%s)", e)
+    return resynced

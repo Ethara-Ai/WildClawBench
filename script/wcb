@@ -104,12 +104,17 @@ _wcb_login() {
     export WCB_USE_CLAUDE_OAUTH="${_use:-1}"
     export WCB_CC_ACCOUNT_POOL="$_pool"
     export WCB_CC_BRIDGE_SECRET="$_secret"
+    # Pin the auth provider for this shell. Everything downstream (sidecar
+    # branch, judge roster) reads this one value; the providers are independent
+    # and never fall back to one another.
+    export WCB_AUTH_PROVIDER="oauth"
     [ -n "$_stub" ] && export WCB_CC_STUB_KEY="$_stub"
     if [ -n "$_arn" ]; then
         export JUDGE_COUNCIL_SONNET_ARN="$_arn"
     fi
 
     _wcb_ok "logged in — Claude Max subscription ACTIVE"
+    _wcb_ok "  WCB_AUTH_PROVIDER=$WCB_AUTH_PROVIDER (judge council: sonnet only)"
     _wcb_ok "  WCB_USE_CLAUDE_OAUTH=$WCB_USE_CLAUDE_OAUTH"
     _wcb_ok "  WCB_CC_ACCOUNT_POOL=$WCB_CC_ACCOUNT_POOL"
     _wcb_ok "  WCB_CC_STUB_KEY=$WCB_CC_STUB_KEY (bridge secret set, hidden)"
@@ -123,6 +128,8 @@ _wcb_logout() {
     unset WCB_USE_CLAUDE_OAUTH WCB_CC_ACCOUNT_POOL WCB_CC_BRIDGE_SECRET WCB_CC_STUB_KEY
     unset JUDGE_COUNCIL_SONNET_ARN
     unset KENSEI_JUDGE_OAUTH_BRIDGE_URL KENSEI_JUDGE_USE_LITELLM
+    # Back to the inferred default (Bedrock) rather than a stale 'oauth' pin.
+    unset WCB_AUTH_PROVIDER
     _wcb_ok "logged out — subscription vars cleared (login again to re-enable)"
 }
 
@@ -132,6 +139,26 @@ _wcb_status() {
     else
         _wcb_warn "status: LOGGED OUT — run 'source script/wcb login'"
     fi
+    _wcb_status_provider
+}
+
+# Report the auth provider that a run would resolve to right now, mirroring
+# auth_provider.resolve_provider(): explicit WCB_AUTH_PROVIDER wins, else infer
+# from WCB_USE_CLAUDE_OAUTH + WCB_CC_ACCOUNT_POOL. The judge roster follows the
+# provider, so it is printed alongside.
+_wcb_status_provider() {
+    local _p
+    if [ -n "${WCB_AUTH_PROVIDER:-}" ]; then
+        _p="$WCB_AUTH_PROVIDER"
+    elif [ "${WCB_USE_CLAUDE_OAUTH:-0}" = "1" ] && [ -n "${WCB_CC_ACCOUNT_POOL:-}" ]; then
+        _p="oauth (inferred)"
+    else
+        _p="bedrock (inferred)"
+    fi
+    case "$_p" in
+        oauth*) _wcb_ok "auth provider: $_p — judge council: sonnet only" ;;
+        *)      _wcb_ok "auth provider: $_p — judge council: sonnet + glm + kimi" ;;
+    esac
 }
 
 _wcb_run() {
@@ -375,6 +402,7 @@ _wcb_doctor() {
     else
         _wcb_err "docker not found — $_dockeri_hint"; _ok=1
     fi
+    _wcb_status_provider
     if [ "$_ok" -eq 0 ]; then _wcb_ok "doctor: all checks passed — ready to 'wcb login' and 'wcb run'"; else _wcb_err "doctor: some checks FAILED (see above)"; fi
     return "$_ok"
 }

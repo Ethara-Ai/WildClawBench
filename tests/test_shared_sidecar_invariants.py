@@ -465,3 +465,72 @@ def test_teardown_shared_sidecar_has_owner_pid_guard():
         "value from the parent's export. Same parameter-default-expansion "
         "rule as the other WCB_SHARED_* globals."
     )
+
+
+# ---------- OAuth judge transport: bridge publish + judge URL ----------
+
+
+def test_run_batch_publishes_bridge_host_port_and_points_judge_at_it() -> None:
+    """run_batch must wire the OAuth judge itself, not rely on script/run.sh.
+
+    grading.py runs on the HOST, so the Sonnet-via-OAuth judge reaches the
+    in-network cc-bridge only through a published loopback port. script/run.sh
+    gets that port from bootstrap_sidecar.py, but eval/wcb.py's TUI calls
+    run_batch.main() in-process and never touches either — so when this wiring
+    lived only in run.sh, TUI runs silently graded against Bedrock and every
+    rubric criterion abstained (rubric-zero) on a dead credential.
+    """
+    src = _read(RUN_BATCH)
+    assert "WCB_CC_BRIDGE_HOST_PORT" in src, (
+        "run_batch.py must set WCB_CC_BRIDGE_HOST_PORT before start_bridge; "
+        "start_bridge reads it from os.environ to add the -p publish"
+    )
+    assert re.search(
+        r'os\.environ\[\s*["\']KENSEI_JUDGE_OAUTH_BRIDGE_URL["\']\s*\]\s*=',
+        src,
+    ), "run_batch.py must point the Sonnet judge at the bridge it published"
+    assert re.search(r'f["\']http://127\.0\.0\.1:\{cc_bridge_host_port\}', src), (
+        "judge bridge URL must be a bare loopback origin — LiteLLM appends "
+        "/v1/messages itself, so a trailing /v1 here yields /v1/v1/messages"
+    )
+
+
+def test_run_batch_does_not_leak_derived_judge_bridge_url() -> None:
+    """The derived URL must be torn down, mirroring run.sh's unset.
+
+    eval/wcb.py calls run_batch.main() repeatedly IN-PROCESS for multi-rep
+    runs; each rep builds a new bridge on a new port, so a leftover URL would
+    aim rep 2 at rep 1's dead port.
+    """
+    src = _read(RUN_BATCH)
+    assert re.search(
+        r'os\.environ\.pop\(\s*["\']KENSEI_JUDGE_OAUTH_BRIDGE_URL["\']', src
+    ), "run_batch.py must unset the KENSEI_JUDGE_OAUTH_BRIDGE_URL it derived"
+
+
+def test_run_sh_handles_every_key_bootstrap_emits() -> None:
+    """Every _emit() key needs a `case` arm, or the value is silently dropped.
+
+    cc_bridge_host_port was emitted but unhandled, so WCB_CC_BRIDGE_HOST_PORT
+    never reached run_batch and the loopback-publish half of the judge
+    preflight no-oped on the run.sh path.
+    """
+    emitted = set(re.findall(r'_emit\(\s*["\']([a-z_]+)["\']', _read(BOOTSTRAP)))
+    handled = set(re.findall(r"^\s*([a-z_]+)\)\s*WCB", _read(RUN_SH), re.M))
+    assert emitted, "no _emit() keys found — did the contract move?"
+    assert not (emitted - handled), (
+        f"bootstrap_sidecar.py emits {sorted(emitted - handled)} but script/run.sh "
+        f"has no matching `case` arm, so the value is parsed and thrown away"
+    )
+
+
+def test_run_sh_routes_sonnet_judge_to_oauth_bridge() -> None:
+    """The run.sh path's judge wiring, pinned so a refactor can't drop it."""
+    src = _read(RUN_SH)
+    assert re.search(
+        r'export\s+KENSEI_JUDGE_OAUTH_BRIDGE_URL="\$WCB_SHARED_CC_BRIDGE_HOST_URL"',
+        src,
+    ), "run.sh must export KENSEI_JUDGE_OAUTH_BRIDGE_URL on the OAuth path"
+    assert re.search(r"unset\s+KENSEI_JUDGE_OAUTH_BRIDGE_URL", src), (
+        "run.sh teardown must unset KENSEI_JUDGE_OAUTH_BRIDGE_URL"
+    )

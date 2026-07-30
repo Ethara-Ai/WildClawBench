@@ -24,7 +24,7 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
 from src.utils.ui.launcher import (  # noqa: E402
-    config_to_argv, launcher_available, oauth_env_overrides, run_launcher,
+    config_to_argv, launcher_available, provider_env_overrides, run_launcher,
 )
 
 
@@ -89,10 +89,29 @@ def main() -> None:
         print("[wcb] cancelled — nothing was run.")
         raise SystemExit(0)
 
-    # Env first: the OAuth selection must be in os.environ before run_batch's
-    # import-time load_dotenv() (which never overrides existing vars) and
-    # before the sidecar/bridge setup reads it.
-    os.environ.update(oauth_env_overrides(config))
+    # Docker before anything else: every backend runs the agent in a container,
+    # and a stopped daemon does not fail with "start Docker" — `docker image
+    # ls -q` returns empty when it cannot reach the daemon, so the harness
+    # reports the agent image as missing and tells the operator to `docker load`
+    # a 13 GB tar they already have. Someone who picked a task from a dropdown
+    # should not have to know that. Starting it here, right after Start, means
+    # the wait is visible on the plain terminal before the dashboard takes over
+    # the screen.
+    from src.utils.docker_daemon import ensure_daemon  # noqa: E402
+
+    status = ensure_daemon(on_progress=lambda msg: print(f"[wcb] {msg}", flush=True))
+    if not status.ok:
+        print(f"[wcb] {status.detail}", file=sys.stderr)
+        raise SystemExit(1)
+    if status.started_by_us:
+        print(f"[wcb] {status.detail}")
+
+    # Env next: the auth-provider selection must be in os.environ before
+    # run_batch's import-time load_dotenv() (which never overrides existing
+    # vars) and before the sidecar/bridge setup reads it. This also carries
+    # WCB_AUTH_PROVIDER, which grading.council_members() reads live to restrict
+    # the judge roster to the provider chosen in the form.
+    os.environ.update(provider_env_overrides(config))
     os.environ["WCB_STREAM"] = "1"
 
     argv = config_to_argv(config, ROOT_DIR, isatty=isatty) + passthrough

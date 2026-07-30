@@ -697,3 +697,30 @@ class TestModuleConstants:
     def test_internal_ports(self):
         assert sidecar.LITELLM_INTERNAL_PORT == 4000
         assert sidecar.CC_BRIDGE_INTERNAL_PORT == 8765
+
+
+# ---------- Section K: loopback port picker ----------
+
+
+class TestPickFreeLoopbackPort:
+    """start_bridge publishes on whatever this returns, so it must be a real,
+    currently-free port rendered as a string (it goes straight into the
+    `-p 127.0.0.1:<port>:8765` argv)."""
+
+    def test_returns_numeric_string_in_valid_range(self):
+        port = sidecar.pick_free_loopback_port()
+        assert isinstance(port, str) and port.isdigit()
+        assert 1024 < int(port) <= 65535
+
+    def test_port_is_actually_bindable(self):
+        import socket
+        port = sidecar.pick_free_loopback_port()
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            s.bind(("127.0.0.1", int(port)))  # released, so this must succeed
+        finally:
+            s.close()
+
+    def test_successive_calls_do_not_collide(self):
+        ports = {sidecar.pick_free_loopback_port() for _ in range(5)}
+        assert len(ports) > 1, "kernel handed back one port repeatedly"

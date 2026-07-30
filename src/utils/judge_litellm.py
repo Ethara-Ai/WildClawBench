@@ -77,7 +77,30 @@ def _judge_oauth_bridge_model() -> str:
     ).strip()
 
 
-def preflight_judge_oauth(timeout_s: float = 25.0) -> tuple[bool, str]:
+def _judge_preflight_timeout() -> float:
+    """Budget for the one-shot preflight completion.
+
+    Measured cost of the `max_tokens=1` ping through a warm bridge is ~13s (TLS
+    handshake + cold connection pool + one upstream round trip), and it climbs
+    under load — a full run has the agent container, two mock stacks and the
+    sidecar competing for the same Docker VM. The original 25s left almost no
+    margin, so a machine that was merely BUSY failed the preflight and aborted
+    the run, which is the opposite of what this check is for: it exists to catch
+    broken auth, not to police latency. Generous by design — a healthy path
+    returns as soon as the call completes and never spends this budget.
+    """
+    raw = (os.environ.get("KENSEI_JUDGE_PREFLIGHT_TIMEOUT") or "").strip()
+    if raw:
+        try:
+            v = float(raw)
+            if v > 0:
+                return v
+        except ValueError:
+            pass
+    return 90.0
+
+
+def preflight_judge_oauth(timeout_s: float | None = None) -> tuple[bool, str]:
     """Validate the Sonnet judge's Claude-Max OAuth grading path END-TO-END.
 
     The startup cc-bridge health check (`wait_for_bridge_healthy`) only probes
@@ -97,6 +120,8 @@ def preflight_judge_oauth(timeout_s: float = 25.0) -> tuple[bool, str]:
     bridge_url = _judge_oauth_bridge_url()
     if not bridge_url:
         return True, "not configured (judge uses Bedrock/OpenAI, not the OAuth bridge)"
+    if timeout_s is None:
+        timeout_s = _judge_preflight_timeout()
     try:
         import litellm
     except Exception as exc:  # noqa: BLE001
@@ -114,11 +139,29 @@ def preflight_judge_oauth(timeout_s: float = 25.0) -> tuple[bool, str]:
         "timeout": timeout_s,
         "num_retries": 0,
     }
-    try:
-        litellm.completion(**kwargs)
-        return True, f"ok ({bridge_url})"
-    except Exception as exc:  # noqa: BLE001 — litellm error hierarchy is dynamic
-        return False, f"{type(exc).__name__}: {str(exc)[:400]}"
+    # The FIRST request through a cold bridge pays TLS setup and connection-pool
+    # warm-up, so a timeout on attempt 1 says little about whether auth works.
+    # Retry once; a genuine auth failure (401/403) is not retried because it
+    # would fail identically and only delay the abort.
+    last = ""
+    for _attempt in (1, 2):
+        try:
+            litellm.completion(**kwargs)
+            return True, f"ok ({bridge_url})"
+        except Exception as exc:  # noqa: BLE001 — litellm error hierarchy is dynamic
+            last = f"{type(exc).__name__}: {str(exc)[:400]}"
+            blob = (type(exc).__name__ + " " + str(exc)).lower()
+            timed_out = "timeout" in blob or "timed out" in blob
+            if not timed_out:
+                return False, last
+    return False, (
+        f"{last} — timed out twice at {timeout_s:g}s each. This is a LATENCY "
+        f"failure, not proof of broken auth: the bridge answered /healthz, so "
+        f"the usual cause is a loaded or memory-starved Docker host. Raise the "
+        f"budget with KENSEI_JUDGE_PREFLIGHT_TIMEOUT=<seconds>, or skip the "
+        f"check with WCB_SKIP_JUDGE_PREFLIGHT=1 (grading then fails late "
+        f"instead of early if auth really is broken)."
+    )
 
 
 def judge_headroom_enabled() -> bool:
@@ -470,6 +513,31 @@ def call_judge_via_litellm(
         raw = response.choices[0].message.content or ""
     except (AttributeError, IndexError) as exc:
         raise RuntimeError(f"litellm response shape unexpected: {exc}") from exc
+
+    # An upstream safety refusal returns HTTP 200 with content:[] and
+    # stop_reason "refusal", which LiteLLM then remaps to finish_reason "stop"
+    # ("Unmapped finish_reason 'refusal'"). Downstream that is indistinguishable
+    # from a judge that simply said nothing, so it surfaced as the misleading
+    # "empty judge response" and every criterion abstained with no hint that the
+    # grader had been blocked. Name it here, where the provider fields are still
+    # visible. Detection only — the call still fails, just legibly.
+    if not raw.strip():
+        _reason = ""
+        try:
+            _fr = getattr(response.choices[0], "finish_reason", "") or ""
+            _sd = (getattr(response, "_hidden_params", None) or {}).get(
+                "stop_details"
+            ) or {}
+            _cat = _sd.get("category") or ""
+            if "refus" in str(_fr).lower() or _sd.get("type") == "refusal":
+                _reason = f" (upstream refusal{f', category={_cat}' if _cat else ''})"
+        except Exception:  # noqa: BLE001 - diagnostics must not mask the error
+            pass
+        if _reason:
+            raise RuntimeError(
+                f"judge returned no content{_reason} — the grader was blocked by "
+                f"an upstream safety filter, not by anything in the rubric"
+            )
 
     # Extract usage. LiteLLM normalizes to OpenAI shape but Bedrock under
     # the hood may fold cache_read/cache_write back INTO prompt_tokens. The

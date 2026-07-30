@@ -462,6 +462,10 @@ cleanup_orphans() {
 : "${WCB_SHARED_CC_BRIDGE:=}"
 : "${WCB_SHARED_CC_BRIDGE_URL:=}"
 : "${WCB_SHARED_CC_BRIDGE_HOST_URL:=}"
+# Loopback port the cc-bridge is published on. bootstrap_sidecar.py emits it and
+# run_batch.py's judge preflight reads it to prove the forward is actually live
+# before the trajectory runs; without capturing it here that check no-ops.
+: "${WCB_CC_BRIDGE_HOST_PORT:=}"
 : "${WCB_SHARED_SIDECAR_STREAM_LOG:=}"
 # WCB_SHARED_OWNER_PID is the PID of the process that ran bootstrap_shared_sidecar
 # (always the parent run.sh). Workers under -P >1 inherit this via export. The
@@ -508,6 +512,7 @@ bootstrap_shared_sidecar() {
             cc_bridge)     WCB_SHARED_CC_BRIDGE="$v" ;;
             cc_bridge_url) WCB_SHARED_CC_BRIDGE_URL="$v" ;;
             cc_bridge_host_url) WCB_SHARED_CC_BRIDGE_HOST_URL="$v" ;;
+            cc_bridge_host_port) WCB_CC_BRIDGE_HOST_PORT="$v" ;;
             stream_log)  WCB_SHARED_SIDECAR_STREAM_LOG="$v" ;;
         esac
     done < "$tmpfile"
@@ -523,7 +528,8 @@ bootstrap_shared_sidecar() {
            WCB_SHARED_SIDECAR_USAGE_LOG WCB_SHARED_SIDECAR_YAML \
            WCB_SHARED_LITELLM_MASTER_KEY WCB_SHARED_OWNER_PID \
            WCB_SHARED_CC_BRIDGE WCB_SHARED_CC_BRIDGE_URL \
-           WCB_SHARED_CC_BRIDGE_HOST_URL WCB_SHARED_SIDECAR_STREAM_LOG
+           WCB_SHARED_CC_BRIDGE_HOST_URL WCB_SHARED_SIDECAR_STREAM_LOG \
+           WCB_CC_BRIDGE_HOST_PORT
     log::ok "Shared sidecar=$WCB_SHARED_SIDECAR network=$WCB_SHARED_NETWORK owner_pid=$WCB_SHARED_OWNER_PID"
 
     # Route the HOST-side Sonnet judge through the OAuth subscription bridge.
@@ -570,6 +576,7 @@ teardown_shared_sidecar() {
     WCB_SHARED_CC_BRIDGE=""; WCB_SHARED_CC_BRIDGE_URL=""
     WCB_SHARED_CC_BRIDGE_HOST_URL=""
     unset KENSEI_JUDGE_OAUTH_BRIDGE_URL 2>/dev/null || true
+    unset WCB_CC_BRIDGE_HOST_PORT 2>/dev/null || true
     log::info "Tearing down shared sidecar=${sc} network=${nw}${cb:+ cc_bridge=$cb}"
     [[ -n "$sc" ]] && docker rm -f "$sc" >/dev/null 2>&1 || true
     [[ -n "$cb" ]] && docker rm -f "$cb" >/dev/null 2>&1 || true

@@ -58,6 +58,14 @@ def _clean_env_and_state(monkeypatch):
         "KENSEI_JUDGE_HEADROOM_TARGET_RATIO",
         "KENSEI_JUDGE_HEADROOM_PROTECT_RECENT",
         "KENSEI_JUDGE_HEADROOM_MIN_TOKENS",
+        # Provider selection: judge routing is now provider-scoped (the urllib
+        # fallback is Bedrock-only), so a developer .env carrying
+        # WCB_USE_CLAUDE_OAUTH=1 would otherwise flip these tests' expectations
+        # depending on whose machine they run on. Cleared => resolves to
+        # bedrock; tests that care set their own value explicitly.
+        "WCB_AUTH_PROVIDER",
+        "WCB_USE_CLAUDE_OAUTH",
+        "WCB_CC_ACCOUNT_POOL",
     ):
         monkeypatch.delenv(var, raising=False)
     # Reset the per-tail idempotency latch — otherwise the first test that
@@ -323,7 +331,11 @@ def test_litellm_failure_falls_back_to_urllib(monkeypatch):
     """Any exception inside the LiteLLM path must NOT propagate — the
     dispatcher logs + falls through to urllib. This is the m0039 'follow the
     code at all times' contract: grading cannot fail because LiteLLM had a
-    bad day."""
+    bad day.
+
+    Scoped to the Bedrock provider. OAuth runs deliberately opt out of this
+    fallback (it would dial a provider the operator excluded and mask the real
+    error) — see test_oauth_run_reraises_instead_of_falling_back_to_bedrock."""
     monkeypatch.setenv("KENSEI_JUDGE_USE_LITELLM", "true")
 
     def _explode(*a, **k):
@@ -356,6 +368,12 @@ def test_register_model_called_for_all_judges(monkeypatch):
     monkeypatch.setenv("JUDGE_COUNCIL_GLM_ARN", GLM_ARN)
     monkeypatch.setenv("JUDGE_COUNCIL_KIMI_ARN", KIMI_ARN)
     monkeypatch.delenv("JUDGE_COUNCIL_MEMBERS", raising=False)
+    # Pin the auth provider: council_members() now restricts the roster to the
+    # families the selected provider can serve (OAuth => sonnet only), and this
+    # test is specifically about the full 3-judge Bedrock council. Without the
+    # pin the result would depend on whether the developer's .env happens to
+    # have WCB_USE_CLAUDE_OAUTH set. See src/utils/auth_provider.py.
+    monkeypatch.setenv("WCB_AUTH_PROVIDER", "bedrock")
 
     members = grading.council_members()
     assert {m.family for m in members} == {"sonnet", "glm", "kimi"}
@@ -540,3 +558,114 @@ def test_oauth_bridge_not_injected_for_non_sonnet(monkeypatch):
     _bridge_env(monkeypatch)
     kwargs = _capture_completion_kwargs(monkeypatch, GLM_ARN, "glm")
     assert "api_base" not in kwargs
+
+
+# ---------- Test 8: the urllib fallback must not dial Bedrock on an OAuth run ----------
+#
+# _call_one_judge catches any exception from the LiteLLM/bridge path and falls
+# through to _call_judge_bedrock. Under the OAuth provider that fallback dials
+# the provider the operator opted out of, and it destroys the diagnostic: a
+# broken cc-bridge surfaced as "Bedrock HTTP 403 / API Key is valid?" against a
+# credential the run never intended to use, with every rubric criterion then
+# abstaining for a reason nothing in the output named. Regression pin for that.
+
+
+def _explode_litellm(monkeypatch, exc):
+    """Make the LiteLLM judge path raise, forcing the fallback decision."""
+    monkeypatch.setattr(
+        judge_litellm, "call_judge_via_litellm",
+        mock.MagicMock(side_effect=exc),
+    )
+
+
+def test_oauth_run_reraises_instead_of_falling_back_to_bedrock(monkeypatch):
+    monkeypatch.setenv("KENSEI_JUDGE_USE_LITELLM", "true")
+    monkeypatch.setenv("WCB_AUTH_PROVIDER", "oauth")
+    boom = RuntimeError("BedrockException - Authentication failed")
+    _explode_litellm(monkeypatch, boom)
+    bedrock = mock.MagicMock(return_value=("text", {}))
+    monkeypatch.setattr(grading, "_call_judge_bedrock", bedrock)
+
+    with pytest.raises(RuntimeError, match="Authentication failed"):
+        grading._call_one_judge(SONNET_ARN, "sys", "user", "sonnet")
+
+    assert bedrock.call_count == 0, (
+        "OAuth run fell back to Bedrock — the operator opted out of it, and the "
+        "resulting 403 masks the real (bridge) failure as an all-abstain score"
+    )
+
+
+def test_bedrock_run_still_falls_back(monkeypatch):
+    """The fallback is load-bearing for Bedrock runs; only OAuth opts out."""
+    monkeypatch.setenv("KENSEI_JUDGE_USE_LITELLM", "true")
+    monkeypatch.setenv("WCB_AUTH_PROVIDER", "bedrock")
+    monkeypatch.setenv("WCB_USE_CLAUDE_OAUTH", "0")
+    _explode_litellm(monkeypatch, RuntimeError("transient litellm blip"))
+    bedrock = mock.MagicMock(return_value=("verdict text", {"total_tokens": 5}))
+    monkeypatch.setattr(grading, "_call_judge_bedrock", bedrock)
+
+    text, _usage = grading._call_one_judge(SONNET_ARN, "sys", "user", "sonnet")
+
+    assert text == "verdict text"
+    assert bedrock.call_count == 1
+
+
+# ---------- Test 9: preflight budget + retry ----------
+#
+# The preflight exists to catch broken AUTH before an expensive trajectory. A
+# 25s budget meant a merely-busy machine (agent + 2 mock stacks + sidecar on one
+# Docker VM) failed it and aborted the run — a measured warm-bridge ping is ~13s.
+
+
+def test_preflight_timeout_default_and_override(monkeypatch):
+    monkeypatch.delenv("KENSEI_JUDGE_PREFLIGHT_TIMEOUT", raising=False)
+    assert judge_litellm._judge_preflight_timeout() == 90.0
+    monkeypatch.setenv("KENSEI_JUDGE_PREFLIGHT_TIMEOUT", "150")
+    assert judge_litellm._judge_preflight_timeout() == 150.0
+    for bad in ("garbage", "0", "-5", ""):
+        monkeypatch.setenv("KENSEI_JUDGE_PREFLIGHT_TIMEOUT", bad)
+        assert judge_litellm._judge_preflight_timeout() == 90.0
+
+
+def _preflight_with(monkeypatch, exc, url="http://127.0.0.1:18765"):
+    monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", url)
+    calls = {"n": 0}
+
+    def _boom(**kwargs):
+        calls["n"] += 1
+        raise exc
+
+    monkeypatch.setitem(sys.modules, "litellm", SimpleNamespace(completion=_boom))
+    ok, detail = judge_litellm.preflight_judge_oauth(timeout_s=1.0)
+    return ok, detail, calls["n"]
+
+
+def test_preflight_retries_once_on_timeout(monkeypatch):
+    ok, detail, n = _preflight_with(monkeypatch, RuntimeError("litellm timeout"))
+    assert ok is False
+    assert n == 2, "a cold-bridge timeout must be retried once"
+    assert "LATENCY" in detail
+    assert "KENSEI_JUDGE_PREFLIGHT_TIMEOUT" in detail
+
+
+def test_preflight_does_not_retry_auth_failure(monkeypatch):
+    ok, detail, n = _preflight_with(monkeypatch, RuntimeError("401 Unauthorized"))
+    assert ok is False
+    assert n == 1, "an auth rejection would fail identically; retrying only stalls"
+    assert "401" in detail
+
+
+def test_preflight_succeeds_on_retry(monkeypatch):
+    monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "http://127.0.0.1:18765")
+    calls = {"n": 0}
+
+    def _flaky(**kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("APITimeoutError: timed out")
+        return _make_litellm_response()
+
+    monkeypatch.setitem(sys.modules, "litellm", SimpleNamespace(completion=_flaky))
+    ok, detail = judge_litellm.preflight_judge_oauth(timeout_s=1.0)
+    assert ok is True and calls["n"] == 2
+    assert detail.startswith("ok (")

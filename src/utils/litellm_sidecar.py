@@ -33,6 +33,7 @@ def build_litellm_config_yaml(
     enable_headroom_callback: bool = False,
     anthropic_api_key: str = "",
     use_claude_oauth: bool = False,
+    auth_provider: str = "",
     bridge_url: str = "",
     codex_bridge_url: str = "",
     codex_model: str = "gpt-5.6",
@@ -216,6 +217,22 @@ def build_litellm_config_yaml(
         # the openclaw-facing id stay decoupled.
         model_blocks.append("  - model_name: claude-opus-4-6\n" + opus_params)
     elif anthropic_api_key:
+        # PROVIDER ISOLATION: when the operator explicitly selected AWS Bedrock,
+        # reaching this branch means the Bedrock credentials did not resolve.
+        # Quietly swapping the transport to Anthropic-direct is exactly the
+        # cross-provider fallback the auth-provider feature forbids -- a rotated
+        # bearer token must surface as an auth error, not as a silently
+        # different upstream (and a silently different bill). Terminate instead.
+        if auth_provider == "bedrock":
+            raise RuntimeError(
+                "auth provider 'bedrock' was selected but no Bedrock inference "
+                "ARN + bearer token resolved, so no Bedrock model could be "
+                "registered. Refusing to fall back to the Anthropic-direct "
+                "transport: the providers are independent and there is no "
+                "fallback between them. Fix KENSEI_AWS_BEARER_TOKEN / "
+                "KENSEI_BEDROCK_MODEL_ARN in .env, or select a different "
+                "--auth-provider."
+            )
         # Fallback upstream for opus when no Bedrock ARN is available. Routes
         # the same claude-opus-4.7 / claude-opus-4-6 aliases through Anthropic
         # direct using `model: anthropic/claude-opus-4-20250514`. Keeps the
@@ -246,7 +263,13 @@ def build_litellm_config_yaml(
         )
         model_blocks.append("  - model_name: claude-opus-4.7\n" + opus_anthropic_params)
         model_blocks.append("  - model_name: claude-opus-4-6\n" + opus_anthropic_params)
-    if bedrock_sonnet_arn:
+    # PROVIDER ISOLATION: this block sits OUTSIDE the opus if/elif chain above,
+    # so before the auth-provider work it was registered even on an OAuth run --
+    # handing the agent a Bedrock-routed model while the operator believed they
+    # were on the Claude Max subscription. Gate it to the Bedrock provider.
+    # The Sonnet *judge* is unaffected: judge_litellm.py dials the cc-bridge via
+    # an api_base override, not through this sidecar model_name.
+    if bedrock_sonnet_arn and auth_provider != "oauth":
         model_blocks.append(
             "  - model_name: claude-sonnet-4-6\n"
             "    litellm_params:\n"
@@ -986,6 +1009,23 @@ def ensure_cc_bridge_image(image: str = CC_BRIDGE_IMAGE) -> None:
     logger.info("cc-bridge image %s built", image)
 
 
+def pick_free_loopback_port() -> str:
+    """Return a currently-free loopback port as a string.
+
+    Binds :0, reads what the kernel assigned, then releases it. There is an
+    inherent TOCTOU window between the release here and the subsequent
+    `docker run -p` — callers publish, probe with `wait_for_bridge_host_port`,
+    and retry on a fresh port rather than trying to hold the reservation.
+    """
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.bind(("127.0.0.1", 0))
+        return str(s.getsockname()[1])
+    finally:
+        s.close()
+
+
 def start_bridge(
     container_name: str,
     network: str,
@@ -1010,6 +1050,18 @@ def start_bridge(
         )
     if not bridge_secret:
         raise RuntimeError("start_bridge: bridge_secret required (co-tenant threat)")
+
+    # Pool slot files are snapshots of the OAuth blob, and refresh tokens are
+    # single-use — so merely USING Claude Code rotates the chain and burns the
+    # snapshot's token. The bridge would then start, get HTTP 400 from the
+    # refresh endpoint, and exit; all the operator sees is "cc-bridge did not
+    # become healthy in time" 60s later, naming nothing about credentials.
+    # Re-reading the OS store here makes the pool path honour the same
+    # "OS store is canonical, re-read every start" rule credentials.py already
+    # documents for the single-account ladder. No-op when the pool is current,
+    # and it swallows its own errors, so it can never break a working start.
+    from src.utils.claude_oauth.credentials import sync_pool_from_os_store
+    sync_pool_from_os_store(pool_host_dir)
 
     if not account_pool_spec:
         account_pool_spec = ":".join(

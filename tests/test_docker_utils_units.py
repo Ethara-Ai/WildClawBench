@@ -113,23 +113,45 @@ class TestRequireImagePresent:
         assert calls == [["docker", "image", "ls", "-q", "wildclawbench-ubuntu:v1.3"]]
 
     def test_missing_image_raises_runtimeerror(self, monkeypatch):
-        # `image ls -q` empty (rc 0) then the inspect-by-id fallback also misses.
+        # `image ls -q` empty (rc 0) then the inspect-by-id fallback also misses,
+        # with the daemon UP — so this really is a missing image. The daemon
+        # probe is what keeps that distinct from the daemon being down, where
+        # `image ls -q` returns exactly the same empty output.
         calls = _install_scripted_run(
             monkeypatch,
             [
-                _FakeCompleted(returncode=0, stdout=""),   # image ls -q
-                _FakeCompleted(returncode=1, stdout=""),   # inspect --format {{.Id}}
+                _FakeCompleted(returncode=0, stdout=""),        # image ls -q
+                _FakeCompleted(returncode=1, stdout=""),        # inspect --format {{.Id}}
+                _FakeCompleted(returncode=0, stdout="29.3.1"),  # docker info
             ],
         )
         with pytest.raises(RuntimeError) as exc:
             du.require_image_present("foo:bar")
         msg = str(exc.value)
         assert "Required Docker image not present locally: foo:bar" in msg
-        # Both resolution strategies were attempted before failing.
+        # Both resolution strategies were attempted, then the daemon was probed.
         assert calls == [
             ["docker", "image", "ls", "-q", "foo:bar"],
             ["docker", "image", "inspect", "--format", "{{.Id}}", "foo:bar"],
+            ["docker", "info", "--format", "{{.ServerVersion}}"],
         ]
+
+    def test_missing_image_with_daemon_down_blames_the_daemon(self, monkeypatch):
+        # Same empty output, opposite cause. Telling this operator to `docker
+        # load` a 13 GB tar sends them down a long road for nothing.
+        _install_scripted_run(
+            monkeypatch,
+            [
+                _FakeCompleted(returncode=0, stdout=""),   # image ls -q
+                _FakeCompleted(returncode=1, stdout=""),   # inspect
+                _FakeCompleted(returncode=1, stdout=""),   # docker info: down
+            ],
+        )
+        with pytest.raises(RuntimeError) as exc:
+            du.require_image_present("foo:bar")
+        msg = str(exc.value)
+        assert "daemon is not reachable" in msg
+        assert "docker load" not in msg
 
     def test_missing_image_nonzero_ls_still_falls_back_and_raises(self, monkeypatch):
         # Even when `image ls -q` itself errors, the inspect fallback runs; both
@@ -139,6 +161,7 @@ class TestRequireImagePresent:
             [
                 _FakeCompleted(returncode=125, stdout=""),
                 _FakeCompleted(returncode=1, stdout=""),
+                _FakeCompleted(returncode=0, stdout="29.3.1"),  # daemon is up
             ],
         )
         with pytest.raises(RuntimeError, match="not present locally: img:x"):

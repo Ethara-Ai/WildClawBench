@@ -12,6 +12,11 @@ from collections.abc import Sequence
 from typing import Literal
 from dotenv import load_dotenv
 
+# Imported as a module (not `from ... import resolve_provider`) so tests can
+# monkeypatch the resolver, and to make the one-way dependency obvious:
+# auth_provider must never import grading back (see its module docstring).
+from src.utils import auth_provider
+
 logger = logging.getLogger(__name__)
 
 load_dotenv()
@@ -297,16 +302,43 @@ def council_members() -> list[CouncilMember]:
 
     Precedence: JUDGE_COUNCIL_MEMBERS ("family=arn" CSV) overrides the per-family
     JUDGE_COUNCIL_{SONNET,GLM,KIMI}_ARN vars. Unset per-family vars are dropped.
+
+    The roster is then restricted to the families the *selected auth provider*
+    can serve (src/utils/auth_provider.py). This is load-bearing for provider
+    isolation: run_batch calls load_dotenv() at import, so on an OAuth run all
+    three JUDGE_COUNCIL_*_ARN values are still present in env, and without this
+    filter the Kimi and GLM members would go straight to Bedrock via
+    _call_judge_bedrock -- silently billing the provider the operator opted out
+    of. Only the Sonnet member has an OAuth route (judge_litellm.py sends
+    `family == "sonnet"` through the cc-bridge), so OAuth necessarily grades with
+    a Sonnet-only council.
     """
     raw = os.environ.get("JUDGE_COUNCIL_MEMBERS", "").strip()
     if raw:
-        return [_parse_council_member_override(m) for m in raw.split(",") if m.strip()]
-    out: list[CouncilMember] = []
-    for fam, var in _FAMILY_ENV_VARS:
-        val = (os.environ.get(var) or "").strip()
-        if val:
-            out.append(CouncilMember(family=fam, model=val))  # type: ignore[arg-type]
-    return out
+        out = [_parse_council_member_override(m) for m in raw.split(",") if m.strip()]
+    else:
+        out = []
+        for fam, var in _FAMILY_ENV_VARS:
+            val = (os.environ.get(var) or "").strip()
+            if val:
+                out.append(CouncilMember(family=fam, model=val))  # type: ignore[arg-type]
+
+    provider = auth_provider.resolve_provider()
+    allowed = set(auth_provider.available_judge_families(provider))
+    filtered = [m for m in out if m.family in allowed]
+
+    if out and not filtered:
+        # Every configured member was filtered out. Returning [] here would make
+        # grade_with_rubric report overall_score=0.0 with a generic error, which
+        # reads as "the agent failed" rather than "your council is misconfigured".
+        raise RuntimeError(
+            f"auth provider {provider!r} supports judge families "
+            f"{sorted(allowed)}, but the configured council is "
+            f"{sorted({m.family for m in out})} -- no usable judge remains. "
+            f"Configure {', '.join(var for fam, var in _FAMILY_ENV_VARS if fam in allowed)} "
+            f"or select a different auth provider."
+        )
+    return filtered
 
 
 def _judge_system_prompt() -> str:
@@ -871,7 +903,14 @@ _VERDICT_RE = re.compile(
 
 def _parse_verdict_text(response: str, n_criteria: int) -> list[dict]:
     if not response:
-        raise ValueError(f"empty judge response (expected up to {n_criteria} verdicts)")
+        # Most common real cause is an upstream safety refusal (HTTP 200,
+        # content:[], stop_reason "refusal"), which reads as "the judge said
+        # nothing". Say so, so this is not mistaken for a rubric or prompt bug.
+        raise ValueError(
+            f"empty judge response (expected up to {n_criteria} verdicts) — "
+            f"usually an upstream safety refusal on the grading call, not a "
+            f"rubric problem; check the raw judge response for stop_reason"
+        )
     # Tolerate judges that wrap the entire block in <judgment>...</judgment> or
     # emit it bare; either way the verdict items themselves are what we match.
     matches = _VERDICT_RE.findall(response)
@@ -955,6 +994,22 @@ def _call_one_judge(
                 family=family,
             )
         except Exception as exc:  # pragma: no cover - fallback path
+            # Under OAuth the urllib fallback below would dial Bedrock — the
+            # provider the operator explicitly opted out of. Besides the
+            # billing question, it destroys the diagnostic: a broken bridge
+            # surfaces as "Bedrock HTTP 403 / API Key is valid?" pointing at a
+            # credential the run never intended to use, and every criterion
+            # then abstains (rubric-zero) for a reason nothing in the output
+            # names. Re-raise so the real error is what the operator sees.
+            # Same reasoning as council_members()'s provider filter above.
+            if auth_provider.resolve_provider() == auth_provider.OAUTH:
+                logger.error(
+                    "Judge LiteLLM path failed for %s under the OAuth provider: %s "
+                    "— NOT falling back to Bedrock (opted out). Check the cc-bridge "
+                    "at KENSEI_JUDGE_OAUTH_BRIDGE_URL.",
+                    _short_judge_label(m), str(exc)[:200],
+                )
+                raise
             logger.warning(
                 "Judge LiteLLM path failed for %s: %s — falling back to direct urllib path",
                 _short_judge_label(m), str(exc)[:200],

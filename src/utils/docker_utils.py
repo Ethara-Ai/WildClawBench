@@ -225,6 +225,20 @@ def require_image_present(image: str) -> None:
     # instead of silently letting `docker run` try and fail mid-task with
     # `manifest unknown`.
     if not image_present(image):
+        # A stopped daemon looks exactly like a missing image here: `docker
+        # image ls -q` exits 0 with empty output when it cannot reach the
+        # daemon. Saying "load the 13 GB tar" to someone whose image is already
+        # on disk sends them down a long and pointless road, so check.
+        from src.utils.docker_daemon import daemon_ready, start_command
+
+        if not daemon_ready():
+            _, hint = start_command()
+            raise RuntimeError(
+                f"Docker daemon is not reachable, so {image} cannot be found.\n"
+                f"{hint}, then retry — the image itself may well be present.\n"
+                f"(`docker image ls -q` returns empty when the daemon is down, "
+                f"which is indistinguishable from a missing image.)"
+            )
         raise RuntimeError(
             f"Required Docker image not present locally: {image}\n"
             f"Load it first (e.g. `docker load -i Images/wildclawbench-ubuntu_v1.3.tar`)\n"

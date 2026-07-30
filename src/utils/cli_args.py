@@ -107,6 +107,20 @@ def build_run_batch_parser(default_model: str, default_parallel: int) -> argpars
         help="Override the AWS region for Bedrock (else AWS_REGION env, default ap-south-1).",
     )
     parser.add_argument(
+        "--auth-provider",
+        dest="auth_provider",
+        choices=["oauth", "bedrock"],
+        default=None,
+        help="Authentication provider for the ENTIRE run: 'oauth' (Claude Max "
+        "subscription via the wcbsh-cc-bridge sidecar) or 'bedrock' (AWS "
+        "Bedrock bearer token). The two are independent -- there is NO "
+        "fallback between them: if the selected provider fails to "
+        "authenticate the run terminates. Also selects the judge council: "
+        "oauth -> Sonnet only; bedrock -> Sonnet + Kimi + GLM. Omit to infer "
+        "from WCB_USE_CLAUDE_OAUTH/WCB_CC_ACCOUNT_POOL as before. Equivalent "
+        "to WCB_AUTH_PROVIDER=<p>.",
+    )
+    parser.add_argument(
         "--use-claude-oauth",
         dest="use_claude_oauth",
         action="store_true",

@@ -733,6 +733,35 @@ class TestTriStateGroups:
         ns = parser.parse_args(["--task", "x", "--use-claude-oauth"])
         assert ns.use_claude_oauth is True
 
+    def test_auth_provider_defaults_to_none(self):
+        """Tri-state: absent means 'infer', preserving pre-flag behaviour."""
+        parser = build_run_batch_parser("m", 1)
+        ns = parser.parse_args(["--task", "x"])
+        assert ns.auth_provider is None
+
+    @pytest.mark.parametrize("value", ["oauth", "bedrock"])
+    def test_auth_provider_accepts_known_providers(self, value):
+        parser = build_run_batch_parser("m", 1)
+        ns = parser.parse_args(["--task", "x", "--auth-provider", value])
+        assert ns.auth_provider == value
+
+    def test_auth_provider_rejects_unknown(self):
+        parser = build_run_batch_parser("m", 1)
+        with pytest.raises(SystemExit):
+            parser.parse_args(["--task", "x", "--auth-provider", "openrouter"])
+
+    def test_auth_provider_conflict_with_use_claude_oauth_raises(self):
+        """argparse accepts both; resolve_provider is where it must fail, so a
+        contradictory pair is reported rather than silently resolved."""
+        from src.utils.auth_provider import AuthProviderError, resolve_provider
+
+        parser = build_run_batch_parser("m", 1)
+        ns = parser.parse_args(
+            ["--task", "x", "--auth-provider", "bedrock", "--use-claude-oauth"]
+        )
+        with pytest.raises(AuthProviderError, match="conflicting auth selection"):
+            resolve_provider(ns)
+
 
 # ===========================================================================
 # cli_args.py — value-taking flags and type coercion

@@ -50,6 +50,17 @@ from src.utils.grading import (
     write_error_score as write_error_score_file,
 )
 from src.utils.config import Config
+from src.utils.auth_provider import (
+    OAUTH,
+    PROVIDER_ENV_VAR,
+    AuthProviderError,
+    available_judge_families,
+    provider_label,
+    resolve_provider,
+    served_trajectory_models,
+    validate_model_for_provider,
+    validate_provider_auth,
+)
 from src.utils.harness_logging import (
     install_debug_logfile,
     attach_run_logfile,
@@ -71,6 +82,7 @@ from src.utils.litellm_sidecar import (
     build_litellm_config_yaml,
     create_network,
     ensure_litellm_headroom_image,
+    pick_free_loopback_port,
     pull_litellm_image,
     remove_network,
     start_bridge,
@@ -2614,9 +2626,13 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
     shared_cc_bridge_url = os.environ.get("WCB_SHARED_CC_BRIDGE_URL", "").strip()
     shared_mode = bool(shared_network and shared_sidecar)
 
-    use_oauth = bool(getattr(args, "use_claude_oauth", None)) or (
-        config.use_claude_oauth and bool(config.cc_account_pool)
-    )
+    # Single source of truth (src/utils/auth_provider.py). Honours an explicit
+    # --auth-provider / WCB_AUTH_PROVIDER, falls back to --use-claude-oauth, and
+    # otherwise infers from WCB_USE_CLAUDE_OAUTH + WCB_CC_ACCOUNT_POOL exactly as
+    # this expression used to -- so callers that never pass the new flag are
+    # unaffected.
+    auth_provider_id = resolve_provider(args)
+    use_oauth = auth_provider_id == OAUTH
 
     import uuid as _uuid
     batch_id = _uuid.uuid4().hex[:12]
@@ -2671,6 +2687,7 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
         enable_headroom_callback=_agent_headroom,
         anthropic_api_key=config.anthropic_api_key,
         use_claude_oauth=use_oauth,
+        auth_provider=auth_provider_id,
         bridge_url=cc_bridge_url,
         codex_bridge_url=codex_bridge_url,
         codex_model=codex_model,
@@ -2752,23 +2769,93 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
             import secrets as _secrets
             bridge_secret = _secrets.token_hex(32)
             os.environ["WCB_CC_BRIDGE_SECRET"] = bridge_secret
-        start_bridge(
-            container_name=cc_bridge_name,
-            network=network,
-            pool_host_dir=pool_host_dir,
-            bridge_secret=bridge_secret,
-            # Real-time tee sink (docs/STREAMING_PLAN.md §3.2). Empty when
-            # streaming is off → tee inert, bridge byte-identical to today.
-            stream_log_host_dir=(
-                stream_log_dir_str
-                or (str(stream_log_path.parent) if stream_log_path is not None else "")
-            ),
-        )
+        # Publish the in-network bridge on a host loopback port. grading.py runs
+        # on the HOST, so the Sonnet-via-OAuth judge can only reach the bridge
+        # through 127.0.0.1 — without this the judge silently falls back to
+        # Bedrock (the all-abstain / rubric-zero failure). script/run.sh gets
+        # this port from eval/bootstrap_sidecar.py; every other entry point
+        # (eval/wcb.py's in-process TUI, a direct `python3 eval/run_batch.py`)
+        # lands here, so the port has to be chosen in this block too.
+        #
+        # Honour a preset WCB_CC_BRIDGE_HOST_PORT; otherwise pick a free one.
+        # start_bridge reads the var from os.environ, not from an argument, and
+        # the flag is load-bearing beyond `-p`: it also flips container-creation
+        # network order to dodge a Docker Desktop for Mac bug where publishing
+        # on a user-defined network binds silently (litellm_sidecar.py).
+        cc_bridge_host_port = os.environ.get("WCB_CC_BRIDGE_HOST_PORT", "").strip()
+        if not cc_bridge_host_port:
+            cc_bridge_host_port = pick_free_loopback_port()
+        os.environ["WCB_CC_BRIDGE_HOST_PORT"] = cc_bridge_host_port
+
+        # Docker Desktop intermittently drops the loopback forward: the publish
+        # is present in `docker inspect` but nothing is listening on the host.
+        # Only that failure is retried (on a FRESH port — reusing the dropped
+        # one just fails again); a start error or an unhealthy container still
+        # aborts immediately. Mirrors eval/bootstrap_sidecar.py's retry ladder.
+        # Registered once, not per attempt: cc_bridge_name is stable across
+        # retries, and a retry already stops the container inline.
         cleanups.append(lambda: stop_bridge(cc_bridge_name))
-        if not wait_for_bridge_healthy(cc_bridge_name):
+        bridge_ok = False
+        for _attempt in range(1, 4):
+            start_bridge(
+                container_name=cc_bridge_name,
+                network=network,
+                pool_host_dir=pool_host_dir,
+                bridge_secret=bridge_secret,
+                # Real-time tee sink (docs/STREAMING_PLAN.md §3.2). Empty when
+                # streaming is off → tee inert, bridge byte-identical to today.
+                stream_log_host_dir=(
+                    stream_log_dir_str
+                    or (str(stream_log_path.parent) if stream_log_path is not None else "")
+                ),
+            )
+            if not wait_for_bridge_healthy(cc_bridge_name):
+                raise RuntimeError(
+                    f"cc-bridge {cc_bridge_name} did not become healthy in time. "
+                    f"Override budget via WCB_CC_BRIDGE_HEALTH_TIMEOUT env (seconds)."
+                )
+            if wait_for_bridge_host_port(cc_bridge_host_port):
+                bridge_ok = True
+                break
+            logger.warning(
+                "cc-bridge host port 127.0.0.1:%s unreachable (Docker Desktop "
+                "dropped the loopback publish); recreating on a fresh port "
+                "(attempt %d/3)", cc_bridge_host_port, _attempt,
+            )
+            stop_bridge(cc_bridge_name)
+            cc_bridge_host_port = pick_free_loopback_port()
+            os.environ["WCB_CC_BRIDGE_HOST_PORT"] = cc_bridge_host_port
+
+        if not bridge_ok:
             raise RuntimeError(
-                f"cc-bridge {cc_bridge_name} did not become healthy in time. "
-                f"Override budget via WCB_CC_BRIDGE_HEALTH_TIMEOUT env (seconds)."
+                f"cc-bridge {cc_bridge_name} never became reachable on a host "
+                f"loopback port after 3 attempts. The host-side Sonnet judge "
+                f"dials this port to grade the rubric, so grading would fail "
+                f"AFTER the trajectory runs. Restarting Docker Desktop usually "
+                f"clears it."
+            )
+
+        # Point the host-side Sonnet judge at the bridge we just published —
+        # the same wiring script/run.sh does after bootstrap_sidecar.py reports
+        # its port. Bare origin, NO trailing /v1: LiteLLM appends /v1/messages
+        # itself for the `anthropic/` prefix the bridge dispatches on.
+        #
+        # An explicit operator value always wins. What we derive is torn down in
+        # cleanups (as run.sh unsets it), which is load-bearing rather than
+        # tidy: eval/wcb.py calls run_batch.main() repeatedly IN-PROCESS for
+        # multi-rep runs, and each rep builds a new bridge on a new port — a
+        # leftover URL would point rep 2 at rep 1's dead port.
+        if not os.environ.get("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "").strip():
+            os.environ["KENSEI_JUDGE_OAUTH_BRIDGE_URL"] = (
+                f"http://127.0.0.1:{cc_bridge_host_port}"
+            )
+            os.environ["KENSEI_JUDGE_USE_LITELLM"] = "1"
+            cleanups.append(
+                lambda: os.environ.pop("KENSEI_JUDGE_OAUTH_BRIDGE_URL", None)
+            )
+            logger.info(
+                "Sonnet judge -> OAuth bridge http://127.0.0.1:%s",
+                cc_bridge_host_port,
             )
 
         # Fail-fast preflight of the GRADING Claude path. wait_for_bridge_healthy
@@ -3358,13 +3445,21 @@ def main(args=None) -> None:
     _want_tui = (getattr(args, "tui", False)
                  or getattr(args, "interactive", False)
                  or os.environ.get("WCB_TUI", "").strip().lower() in ("1", "true", "yes"))
-    if _want_tui and _ui_console.is_interactive() and _ui_tui.textual_available():
-        # run_with_dashboard returns truthy when it drove the dashboard; if the
-        # UI could not start it returns False and we fall through to inline mode.
-        if _ui_tui.run_with_dashboard(lambda: _run_main_body(args)):
-            return
-    _ui_console.install_rich_logging()
-    _run_main_body(args)
+    # An auth/model selection error is a USER error, not a harness crash: report
+    # it as one clear line and exit non-zero rather than dumping a traceback
+    # that buries the actionable message under harness frames.
+    try:
+        if _want_tui and _ui_console.is_interactive() and _ui_tui.textual_available():
+            # run_with_dashboard returns truthy when it drove the dashboard; if
+            # the UI could not start it returns False and we fall through to
+            # inline mode.
+            if _ui_tui.run_with_dashboard(lambda: _run_main_body(args)):
+                return
+        _ui_console.install_rich_logging()
+        _run_main_body(args)
+    except AuthProviderError as exc:
+        print(f"\nauth error: {exc}\n", file=sys.stderr)
+        raise SystemExit(2)
 
 
 def _run_main_body(args) -> None:
@@ -3373,6 +3468,38 @@ def _run_main_body(args) -> None:
         config.bedrock_inference_arn = args.bedrock_arn
     if getattr(args, "aws_region", None):
         config.bedrock_region = args.aws_region
+
+    # ---- Auth provider: resolved ONCE, then fixed for the whole run ----------
+    # Everything downstream (sidecar branch, bridge startup, judge roster, model
+    # validation) reads this single value. Exported to os.environ because
+    # grading.council_members() reads the provider live from env -- it runs in a
+    # worker thread long after this frame is gone.
+    #
+    # Validated BEFORE require_image_present / any container start so a bad
+    # provider+credential pair costs seconds instead of a full trajectory. On
+    # failure this raises and the run terminates: it never retries against the
+    # other provider.
+    auth_provider_id = resolve_provider(args)
+    validate_provider_auth(auth_provider_id, config)
+    os.environ[PROVIDER_ENV_VAR] = auth_provider_id
+    logger.info(
+        "Auth provider: %s (%s) -- judge council: %s",
+        auth_provider_id,
+        provider_label(auth_provider_id),
+        ", ".join(available_judge_families(auth_provider_id)),
+    )
+
+    # Validate an EXPLICIT provider/model pair here too, not only at the later
+    # substitution site: that one runs after the sidecar and mock stack are
+    # already up, so a mismatch would cost a full container spin-up before
+    # surfacing. The default model is exempt for the same back-compat reason
+    # documented at the later check.
+    if (
+        args.model != DEFAULT_MODEL
+        and not args.model.startswith("litellm/")
+        and (args.litellm if args.litellm is not None else config.litellm_enabled())
+    ):
+        validate_model_for_provider(auth_provider_id, args.model, config)
 
     require_image_present(DOCKER_IMAGE)
 
@@ -3434,7 +3561,13 @@ def _run_main_body(args) -> None:
     # In LiteLLM mode the model must be a sidecar model id (claude-opus-4.7 /
     # gpt-5.5 / the configured first-party vendor model). That id is dynamic
     # (config.meta_model), so it's checked alongside the static set.
-    sidecar_model_ids = set(LITELLM_MODEL_IDS)
+    #
+    # Derived from the SELECTED auth provider rather than the old module-level
+    # LITELLM_MODEL_IDS constant, which had drifted out of sync with the sidecar
+    # (it was missing claude-opus-4-6 and claude-sonnet-4-6, so those ids were
+    # silently swapped for opus-4.7 even though the sidecar registered them).
+    # tests/test_auth_provider.py pins this set to what the sidecar actually emits.
+    sidecar_model_ids = served_trajectory_models(auth_provider_id, config)
     if config.meta_api_key and config.meta_model:
         sidecar_model_ids.add(config.meta_model)
     if _codex_oauth_enabled(args):
@@ -3443,6 +3576,24 @@ def _run_main_body(args) -> None:
         sidecar_model_ids.add(_codex_model())
     effective_model = args.model
     if use_litellm and args.model not in sidecar_model_ids and not args.model.startswith("litellm/"):
+        # An EXPLICIT --model that the selected provider cannot serve is a
+        # validation error, not something to quietly rewrite. Silently swapping
+        # it (the old behaviour, INFO-log only) meant a typo -- or a
+        # provider/model mismatch such as `--auth-provider oauth --model
+        # claude-opus-4.8` -- produced a full, expensive run of the WRONG model.
+        #
+        # The default is exempt: DEFAULT_MODEL is an openrouter/ id that is never
+        # a sidecar model_name, so hard-failing it would break every bare
+        # `run_batch.py --litellm` invocation that never passed --model. Only a
+        # caller-chosen value is validated. The launcher TUI always passes an
+        # explicit --model, so every TUI selection is checked.
+        if args.model != DEFAULT_MODEL:
+            raise AuthProviderError(
+                f"model {args.model!r} is not served under auth provider "
+                f"{auth_provider_id!r} ({provider_label(auth_provider_id)}). "
+                f"Available: {', '.join(sorted(sidecar_model_ids)) or '<none>'}. "
+                f"Refusing to silently reroute to a different model."
+            )
         # Pick a default that is actually REGISTERED in the sidecar. The historic
         # default is claude-opus-4.7, but on a first-party-only (no Bedrock/
         # OpenAI) run that id isn't in the model_list, so fall back to that id.
