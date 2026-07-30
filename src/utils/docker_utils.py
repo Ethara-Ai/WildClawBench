@@ -1651,9 +1651,13 @@ def run_warmup(
             raise RuntimeError(f"Warmup command failed: {cmd!r}\n{r.stderr}")
 
 
-def run_background(task_id: str, bash_cmd: str, log_path: Path) -> subprocess.Popen:
+def run_background(
+    task_id: str, bash_cmd: str, log_path: Path, *, append: bool = False
+) -> subprocess.Popen:
+    # append=True lets per-turn relaunches (the openclaw multi-turn loop)
+    # accumulate into one log instead of truncating away the earlier turns.
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    log_file = log_path.open("w", encoding="utf-8")
+    log_file = log_path.open("a" if append else "w", encoding="utf-8")
     proc = subprocess.Popen(
         ["docker", "exec", task_id, "/bin/bash", "-c",
          f"cd {TMP_WORKSPACE} && {bash_cmd}"],

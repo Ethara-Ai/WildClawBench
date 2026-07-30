@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 from src.agents.base import AgentExecution, AgentTaskSpec, BaseAgent
 from src.utils.turn_source import StaticTurnSource
 from src.utils.docker_utils import (
+    close_proc_log,
     configure_native_subagents,
     deny_native_subagents,
     inject_api_connectors,
@@ -531,6 +532,10 @@ class OpenClawAgent(BaseAgent):
                         f"--message '{safe_msg}'"
                     ),
                     log_path=spec.output_dir / "agent.log",
+                    # Turn 0 truncates (a retried run_N starts clean); later
+                    # turns append so agent.log aggregates the WHOLE run
+                    # instead of keeping only the last turn.
+                    append=turn_index > 0,
                 )
                 logger.info("[%s] Waiting for agent to finish...", spec.task_id)
                 try:
@@ -543,6 +548,10 @@ class OpenClawAgent(BaseAgent):
                     _ui_timed_out = True
                     timed_out_turn = turn_index
                     break
+                finally:
+                    # Runs on success, timeout-break and any raise: releases the
+                    # per-turn log handle (previously leaked every turn).
+                    close_proc_log(agent_proc)
                 turns_executed += 1
                 turn_index += 1
             elapsed_time = time.perf_counter() - start_time

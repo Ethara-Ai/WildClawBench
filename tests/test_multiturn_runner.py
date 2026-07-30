@@ -233,3 +233,55 @@ def test_source_exception_ends_run_gracefully(monkeypatch, tmp_path):
     assert result.turns_completed == 1
     assert len(cmds) == 1
     assert ("pull_raise", 1) in events
+
+
+def test_agent_log_aggregates_across_turns(monkeypatch, tmp_path):
+    """Per-turn relaunches must append to agent.log, not truncate it.
+
+    Regression for the ops-reported bug where a 5-turn run's agent.log held
+    only the last turn: run_background opened the log with mode "w" on every
+    turn. The turn loop now passes append=turn_index > 0 (turn 0 truncates so
+    a retried run_N starts clean; later turns append). This fake honors the
+    append flag by actually writing to log_path in the requested mode.
+    """
+    events, cmds, append_flags = [], [], []
+    src = _ScriptedSource(["m0", "m1", "m2"], events)
+    for name in (
+        "start_container", "inject_lobster_workspace", "inject_data_into_workspace",
+        "inject_persona_into_workspace", "inject_openclaw_models",
+        "inject_api_connectors", "run_warmup", "setup_skills",
+        "setup_workspace", "snapshot_workspace_state",
+    ):
+        monkeypatch.setattr(ocr, name, lambda *a, **k: None)
+
+    def fake_run_background(task_id, bash_cmd=None, log_path=None, *, append=False, **k):
+        if bash_cmd and "openclaw agent" in bash_cmd:
+            n = len(cmds)
+            cmds.append(bash_cmd)
+            append_flags.append(append)
+            Path(log_path).parent.mkdir(parents=True, exist_ok=True)
+            with open(log_path, "a" if append else "w", encoding="utf-8") as fh:
+                fh.write(f"turn-{n} output\n")
+        return _FakeProc()
+
+    monkeypatch.setattr(ocr, "run_background", fake_run_background)
+    monkeypatch.setattr(ocr, "write_turn_marker", lambda *a, **k: None)
+    monkeypatch.setattr(ocr.time, "sleep", lambda *a, **k: None)
+    monkeypatch.setattr(ocr.time, "perf_counter", lambda: 1000.0)
+    monkeypatch.setattr(ocr.time, "time", lambda: 5000.0)
+    a = _agent(monkeypatch)
+    spec = _spec(tmp_path, turn_source=src)
+
+    # Stale content from a previous attempt in the same run_N dir: turn 0's
+    # truncating open must wipe it.
+    agent_log = spec.output_dir / "agent.log"
+    agent_log.write_text("stale content from previous attempt\n", encoding="utf-8")
+
+    result = a.run_task(spec)
+
+    assert result.error is None
+    assert result.turns_completed == 3
+    assert append_flags == [False, True, True]
+    text = agent_log.read_text(encoding="utf-8")
+    assert "stale content" not in text
+    assert text == "turn-0 output\nturn-1 output\nturn-2 output\n"
