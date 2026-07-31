@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import json
 import logging
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -40,10 +41,27 @@ def _resolve_slug(service: Optional[str], urls: Dict[str, Any]) -> Optional[str]
     return None
 
 
+_ADMIN_DATA_POST_RE = re.compile(r"^/admin/data/([^/]+)/?$")
+_ADMIN_DATA_PATCH_RE = re.compile(r"^/admin/data/([^/]+)/([^/]+)/?$")
+
+
 def _op_kind(op: Dict[str, Any]) -> str:
     admin = op.get("admin")
     if isinstance(admin, dict):
         return str(admin.get("op") or "patch").lower()
+    # Admin-plane-addressed REST ops are replayed verbatim by the applier
+    # (_replay_admin_rest); classify them by shape so create ops are not
+    # rejected for carrying no mutation fields.
+    path = str(op.get("path") or "")
+    if path.startswith("/admin/"):
+        method = str(op.get("method") or "POST").upper()
+        body = op.get("body") if isinstance(op.get("body"), dict) else {}
+        if (method == "POST" and _ADMIN_DATA_POST_RE.match(path)
+                and isinstance(body.get("row"), dict)):
+            return "upsert"
+        if method == "PATCH" and _ADMIN_DATA_PATCH_RE.match(path):
+            return "patch"
+        return "admin_raw"
     return "rest"
 
 
@@ -51,6 +69,10 @@ def _admin_target_key(op: Dict[str, Any]) -> Optional[str]:
     admin = op.get("admin")
     if isinstance(admin, dict) and admin.get("pk") is not None:
         return str(admin["pk"])
+    if not isinstance(admin, dict):
+        m = _ADMIN_DATA_PATCH_RE.match(str(op.get("path") or ""))
+        if m and str(op.get("method") or "").upper() == "PATCH":
+            return m.group(2)
     return InjectApplier._extract_key_from_op(op)
 
 
@@ -70,6 +92,37 @@ def _created_ids(op: Dict[str, Any]) -> Set[str]:
             path = admin.get("path")
             if path is not None:
                 out.add(str(path))
+        return out
+    # Bare admin-plane REST creates (replayed verbatim by the applier).
+    body = op.get("body") if isinstance(op.get("body"), dict) else {}
+    path = str(op.get("path") or "")
+    method = str(op.get("method") or "POST").upper()
+    if method == "POST" and path.startswith("/admin/"):
+        if _ADMIN_DATA_POST_RE.match(path) and isinstance(body.get("row"), dict):
+            out.update(_row_ids(body["row"]))
+        for raw in (body.get("operations") or []):
+            if isinstance(raw, dict) and raw.get("op") == "data.upsert" \
+                    and isinstance(raw.get("row"), dict):
+                out.update(_row_ids(raw["row"]))
+    return out
+
+
+def _row_ids(row: Dict[str, Any]) -> Set[str]:
+    """All identifier-ish values on a row, case-insensitively.
+
+    Stores key rows by heterogeneous pk columns (``Id`` for quickbooks,
+    ``item_id`` for monday, ``sys_id`` for servicenow, ``objectID`` for
+    algolia, ...). A static validator has no /admin/tables to consult, so it
+    collects every scalar under a key that lowercases to ``pk`` or ends in
+    ``id`` — over-collecting only relaxes the missing-target check, never
+    breaks a valid op."""
+    out: Set[str] = set()
+    for k, v in row.items():
+        if not isinstance(v, (str, int)):
+            continue
+        kl = str(k).lower()
+        if kl == "pk" or kl.endswith("id"):
+            out.add(str(v))
     return out
 
 
@@ -93,15 +146,11 @@ def _seed_ids_for_service(mock_data_root: Path, service: str) -> Set[str]:
                 if isinstance(rows, list):
                     for row in rows:
                         if isinstance(row, dict):
-                            rid = row.get("id") or row.get("pk")
-                            if rid is not None:
-                                ids.add(str(rid))
+                            ids.update(_row_ids(row))
             elif path.suffix == ".csv":
                 with path.open(newline="") as fh:
                     for row in csv.DictReader(fh):
-                        rid = row.get("id") or row.get("pk")
-                        if rid is not None:
-                            ids.add(str(rid))
+                        ids.update(_row_ids(row))
         except (OSError, ValueError):
             continue
     return ids

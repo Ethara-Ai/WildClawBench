@@ -134,7 +134,7 @@ def test_seed_returns_outcomes(tmp_path):
 def _rest_applier(tmp_path, live_rows):
     """Applier with a scripted admin plane: live_rows is mutated by 'patch'."""
     ap = _applier(tmp_path)
-    ap._resolve_target = lambda api, op: ("pages", "pk1", {"msrp": 15.99})  # type: ignore
+    ap._resolve_target = lambda api, op: ("pages", "pk1", {"msrp": 15.99}, [])  # type: ignore
 
     def fake_admin_get(api, suffix):
         return dict(live_rows)

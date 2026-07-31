@@ -361,7 +361,7 @@ def test_ci_main_full_pass_and_partial(ci, tmp_path, capsys, monkeypatch):
                       "matched": 1, "before": {"a": 1}, "after": {"a": 2},
                       "status": 200}},
             {"id": "m2", "api": "gmail-api",
-             "_resolved": ("inv", "r2", {"amount": 99})},
+             "_resolved": ("inv", "r2", {"amount": 99}, [])},
         ]),
     ]
     monkeypatch.setattr(ci, "InjectScript",
@@ -381,7 +381,7 @@ def test_ci_main_full_pass_and_partial(ci, tmp_path, capsys, monkeypatch):
              "_rec": {"ok": True, "changed": False, "table": "inv", "status": 200}},
             {"id": "unresolved", "api": "gmail-api", "path": "/x", "_resolved": None},
             {"id": "patch-fail", "api": "gmail-api",
-             "_resolved": ("inv", "r9", {"_fail": True})},
+             "_resolved": ("inv", "r9", {"_fail": True}, [])},
             {"id": "no-base", "api": "unknown-api", "_resolved": None},
         ]),
     ]

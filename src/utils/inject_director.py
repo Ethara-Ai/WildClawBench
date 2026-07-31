@@ -426,6 +426,9 @@ class InjectApplier:
         self._replay_loud = replay_loud
         self._task_id = task_id
         self._session = requests.Session()
+        # api -> {table -> primary_key} as declared by each store via
+        # /admin/tables. Lazily filled by _table_pk.
+        self._pk_cache: Dict[str, Dict[str, str]] = {}
 
     # -- public API ---------------------------------------------------------
 
@@ -828,6 +831,105 @@ class InjectApplier:
         rec.update(ok=False, status="failed", verified=False,
                    reason="write not observed on read-back")
 
+    def _replay_admin_rest(self, api: str, op: Dict[str, Any],
+                           silent: bool) -> Dict[str, Any]:
+        """Replay an op addressed directly to the environment's admin plane.
+
+        Three shapes, all verified after the write:
+          * ``POST /admin/data/<table>`` + ``body.row``      -> store upsert
+          * ``PATCH /admin/data/<table>/<pk>`` + ``fields``  -> store patch
+          * any other ``POST /admin/*`` (inject/raw, ...)    -> replayed as-is;
+            per-op ``results`` in the response are checked when present.
+        """
+        method = str(op.get("method") or "POST").upper()
+        path = str(op.get("path") or "")
+        body = op.get("body") if isinstance(op.get("body"), dict) else {}
+        rec: Dict[str, Any] = {"id": op.get("id"), "service": api, "method": method,
+                               "path": path, "silent": silent,
+                               "admin_op": "rest-replay"}
+        ui_values: Optional[Dict[str, Any]] = None
+        m_post = re.match(r"^/admin/data/([^/]+)/?$", path) if method == "POST" else None
+        m_patch = re.match(r"^/admin/data/([^/]+)/([^/]+)/?$", path) if method == "PATCH" else None
+        if m_post and isinstance(body.get("row"), dict):
+            table, row = m_post.group(1), body["row"]
+            pk_field = self._table_pk(api, table)
+            pk = (row.get(pk_field) if pk_field else None) or row.get("id") or row.get("pk")
+            res = self._admin_post(api, f"/admin/data/{table}", {"row": row})
+            rec.update(table=table, pk=pk, http=res.get("status"), ok=bool(res.get("ok")),
+                       status="applied" if res.get("ok") else "failed",
+                       reason=None if res.get("ok")
+                       else str(res.get("error") or res.get("body"))[:200])
+            ui_values = row
+            if res.get("ok") and pk is not None:
+                expect = row["fields"] if isinstance(row.get("fields"), dict) else row
+                after, verified = self._read_back_row(api, table, str(pk), expect)
+                rec.update(after=after, verified=verified, changed=True)
+                if not verified:
+                    self._mark_unverified(rec)
+        elif m_patch:
+            table, pk = m_patch.group(1), m_patch.group(2)
+            fields = body.get("fields") if isinstance(body.get("fields"), dict) else dict(body)
+            row_before = self._admin_get(api, f"/admin/data/{table}/{pk}")
+            before = ({k: self._row_bag(row_before).get(k) for k in fields}
+                      if isinstance(row_before, dict) else None)
+            res = self._admin_patch(api, table, pk, fields)
+            rec.update(table=table, pk=pk, before=before, http=res.get("status"),
+                       ok=bool(res.get("ok")),
+                       status="applied" if res.get("ok") else "failed",
+                       reason=None if res.get("ok")
+                       else str(res.get("error") or res.get("body"))[:200])
+            ui_values = fields
+            if res.get("ok"):
+                after, verified = self._read_back_row(api, table, pk, fields)
+                rec.update(after=after, verified=verified, changed=before != after)
+                if not verified:
+                    self._mark_unverified(rec)
+        elif method == "POST":
+            res = self._admin_post(api, path, body)
+            ok = bool(res.get("ok"))
+            results = (res.get("body") or {}).get("results") if isinstance(res.get("body"), dict) else None
+            if ok and isinstance(results, list):
+                failed = [r for r in results if isinstance(r, dict) and not r.get("ok")]
+                if failed:
+                    ok = False
+                    rec["reason"] = f"{len(failed)}/{len(results)} raw op(s) failed"
+                rec["results"] = len(results)
+            rec.update(http=res.get("status"), ok=ok,
+                       status="applied" if ok else "failed")
+            if not ok and "reason" not in rec:
+                rec["reason"] = str(res.get("error") or res.get("body"))[:200]
+        else:
+            rec.update(ok=False, status="unresolved",
+                       reason=f"unsupported admin-plane replay: {method} {path}")
+        self._append({"type": "inject.api", **rec, "ts": time.time()},
+                     ui_values=ui_values)
+        return rec
+
+    def _table_pk(self, api: str, table: str) -> Optional[str]:
+        """Primary-key column NAME the store declares for (api, table).
+
+        ``/admin/tables`` advertises each table's ``primary_key`` (``Id`` for
+        quickbooks/salesforce, ``item_id`` for monday, ``sys_id`` for
+        servicenow, ...). Hardcoding ``id``/``pk`` misses every such table, so
+        row lookups consult the declared name first. Cached per api."""
+        cache = self._pk_cache.get(api)
+        if cache is None:
+            cache = {}
+            resp = self._admin_get(api, "/admin/tables")
+            tlist = resp.get("tables", []) if isinstance(resp, dict) else (resp or [])
+            for t in tlist:
+                if isinstance(t, dict) and t.get("name") and t.get("primary_key"):
+                    cache[str(t["name"])] = str(t["primary_key"])
+            self._pk_cache[api] = cache
+        return cache.get(table)
+
+    def _row_pk(self, api: str, table: str, row: Dict[str, Any]) -> Optional[Any]:
+        """Extract a row's pk value: declared primary_key first, then id/pk."""
+        declared = self._table_pk(api, table)
+        if declared and row.get(declared) is not None:
+            return row.get(declared)
+        return row.get("id") or row.get("pk")
+
     def _patch_row(self, api: str, table: str, row: Dict[str, Any],
                    set_: Dict[str, Any], fallback_pk: Optional[str] = None) -> Dict[str, Any]:
         """Patch one row, nested-``fields`` aware. The admin PATCH shallow-merges
@@ -835,7 +937,7 @@ class InjectApplier:
         resent whole (existing + overrides). ``fallback_pk`` covers stores whose
         rows key on a domain column (order_id, store_id, ...) and expose no
         ``id``/``pk`` — the explicit-admin caller already knows the true pk."""
-        pk = row.get("id") or row.get("pk") or fallback_pk
+        pk = self._row_pk(api, table, row) or fallback_pk
         if pk is None:
             return {"ok": False, "error": "no pk"}
         if isinstance(row.get("fields"), dict):
@@ -896,7 +998,7 @@ class InjectApplier:
                         continue
                     if before is None:
                         before = {k: bag.get(k) for k in set_}
-                        first_pk = row.get("id") or row.get("pk")
+                        first_pk = self._row_pk(api, table, row)
                     res = self._patch_row(api, table, row, set_)
                     matched += 1
                     ok += 1 if res.get("ok") else 0
@@ -1015,6 +1117,14 @@ class InjectApplier:
         # and the values to set. Dispatched directly — no fuzzy path resolution.
         if isinstance(op.get("admin"), dict):
             return self._apply_admin_op(api, op["admin"], op, silent)
+        # Admin-plane-addressed REST op: the task team authors against
+        # environment/ as the source of truth, and the admin plane's endpoints
+        # (POST /admin/data/<table>, PATCH /admin/data/<table>/<pk>,
+        # POST /admin/inject/raw, ...) are part of that surface. Replay these
+        # verbatim (with read-back verification) instead of routing them through
+        # fuzzy row-resolution — which cannot express row creates at all.
+        if str(op.get("path") or "").startswith("/admin/"):
+            return self._replay_admin_rest(api, op, silent)
         resolved = self._resolve_target(api, op)
         if resolved is None:
             params = op.get("params") if isinstance(op.get("params"), dict) else None
@@ -1102,7 +1212,7 @@ class InjectApplier:
                 # actually holds the columns.
                 nested = isinstance(row.get("fields"), dict)
                 bag = row["fields"] if nested else row
-                pk = row.get("id") or row.get("pk")
+                pk = self._row_pk(api, table, row)
                 if pk is None:
                     continue
                 if key is not None:

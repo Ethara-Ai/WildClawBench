@@ -1,0 +1,6 @@
+# Multi-turn batch 1 — sourced from kensei-dataset/multi-turn-samples (sparse clone, 2026-07-31)
+# input/abilene_ross_739804de-22ab-49ae-b800-e15602c9c67c  — DISCARDED 2026-07-31
+input/abilene_ross_c4350ef7-4af0-4836-8499-2c45e482acb1
+input/adelina_santos_reyes_335aecc7-491b-438c-b727-aba078abcb8f
+input/amelia_blackburn_f7627970-d881-4984-8a34-c1736fdcb849
+input/annika_borg_wells_4c153075-ef15-4dd4-983a-32dfe39e6d8a
