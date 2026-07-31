@@ -15,6 +15,8 @@ What it recovers
   data/<f>            <- <bundle>/data/environment/artifacts/inputs/files/<f>
   test_outputs.py     <- <bundle>/data/tests/test_outputs.py
   test_weights.json   <- <bundle>/data/tests/test_weights.json
+  inject/<stage>/<f>  <- <bundle>/inject/ (staged verbatim by the repackager;
+                          absent for tasks that ship no inject spec)
   mock_data/<api>/<f> <- the OVERLAY, isolated by diffing each seed file
                           (.json/.csv) under <bundle>/data/environment/<api>/
                           against a pristine baseline environment/<api>/<f>:
@@ -195,6 +197,14 @@ def reconstruct(bundle: Path, out_dir: Path, baseline_env: Path, verbose: bool) 
     # tests
     _copy_file(bundle / "data" / "tests" / "test_outputs.py", out_dir / "test_outputs.py", log, "test_outputs.py")
     _copy_file(bundle / "data" / "tests" / "test_weights.json", out_dir / "test_weights.json", log, "test_weights.json")
+
+    # inject/ (staged verbatim into the bundle root; absent for no-inject tasks)
+    src_inject = bundle / "inject"
+    if src_inject.is_dir():
+        shutil.copytree(src_inject, out_dir / "inject", dirs_exist_ok=True,
+                        ignore=shutil.ignore_patterns(".DS_Store"))
+        n_inject = sum(1 for f in (out_dir / "inject").rglob("*") if f.is_file())
+        log.append(f"  ok   inject/               <- {n_inject} file(s)")
 
     # mock_data/<api>/ via baseline diff
     overlays, warnings = extract_overlays(env_dir, baseline_env, out_dir / "mock_data")

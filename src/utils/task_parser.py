@@ -122,10 +122,12 @@ def load_task(path: str | Path) -> dict:
         md = p / "task.md"
         if md.is_file():
             return _attach_drift_script(load_task(md), p)
-        # Native layout accepts prompt.txt (single prompt), prompts.txt (Talos
-        # inject-format per-turn wake-up script; see inject_director.py) or
-        # PROMPT.md (TURN-delimited or plain), always alongside rubric.json.
+        # Native layout accepts prompts.json (structured turn schedule),
+        # prompt.txt (single prompt), prompts.txt (Talos inject-format per-turn
+        # wake-up script; see inject_director.py) or PROMPT.md (TURN-delimited
+        # or plain), always alongside rubric.json.
         if ((p / "prompt.txt").is_file() or (p / "prompts.txt").is_file()
+                or (p / "prompts.json").is_file()
                 or (p / "PROMPT.md").is_file()) and (p / "rubric.json").is_file():
             base = _load_native_task(p)
             for cand in ("task.yaml", "task.yml"):
@@ -136,8 +138,8 @@ def load_task(path: str | Path) -> dict:
             return _attach_drift_script(base, p)
         raise FileNotFoundError(
             f"No task content in {p}: native layout requires prompt.txt (or "
-            "prompts.txt / PROMPT.md) + rubric.json. task.yaml alone is not a "
-            "valid task (it is a metadata sidecar)."
+            "prompts.json / prompts.txt / PROMPT.md) + rubric.json. task.yaml "
+            "alone is not a valid task (it is a metadata sidecar)."
         )
     suffix = p.suffix.lower()
     if suffix in (".yaml", ".yml"):
@@ -583,7 +585,62 @@ def _load_native_task(task_dir: Path) -> dict:
     # trajectory/harbor/multimodal metadata. (persona/ still supplies SOUL/MEMORY/AGENTS
     # via inject_persona_into_workspace independently of the input-artifact source.)
     turn_messages: list[str] = []
-    if (task_dir / "prompts.txt").is_file():
+    turn_schedule: dict | None = None
+    if (task_dir / "prompts.json").is_file():
+        # Structured turn schedule: {task_id, persona, window, turn_count,
+        # turns:[{turn, day, time, message}]}. Replaces prompt.txt+prompts.txt
+        # for newer multi-turn tasks. Checked FIRST for the same reason
+        # prompts.txt beats prompt.txt below. day/time/window are preserved as
+        # metadata only (turn_schedule) — never surfaced to the agent, matching
+        # the txt format where the header parenthetical is discarded.
+        from src.utils.inject_director import parse_prompts_json
+        turn_messages, turn_schedule = parse_prompts_json(task_dir / "prompts.json")
+        prompt = turn_messages[0]
+        _declared_id = str(turn_schedule.get("task_id") or "").strip()
+        if _declared_id and _declared_id != task_dir.name:
+            logger.warning(
+                "[task_parser] prompts.json task_id %r != directory name %r in %s",
+                _declared_id, task_dir.name, task_dir,
+            )
+        # Finalized convention: prompts.json (trajectory) ALWAYS ships with a
+        # companion prompts.txt (published verbatim in the delivery bundle).
+        # A json without its companion is an incomplete delivery -> loud fail.
+        # Pair CONTENT correctness is owned by the task team; we only warn on
+        # drift (count or text) so a stale companion is visible, not fatal.
+        if not (task_dir / "prompts.txt").is_file():
+            raise FileNotFoundError(
+                f"{task_dir}: prompts.json requires a companion prompts.txt "
+                f"(the txt is shipped verbatim in the output bundle; the json "
+                f"drives the trajectory). Ask the task team for the pair."
+            )
+        try:
+            from src.utils.inject_director import parse_prompts_file
+            _txt_turns = parse_prompts_file(task_dir / "prompts.txt")
+            if len(_txt_turns) != len(turn_messages):
+                logger.warning(
+                    "[task_parser] companion prompts.txt has %d turn(s) but "
+                    "authoritative prompts.json has %d in %s — companion is "
+                    "stale (JSON is used)",
+                    len(_txt_turns), len(turn_messages), task_dir,
+                )
+            else:
+                for _i, (_a, _b) in enumerate(zip(_txt_turns, turn_messages)):
+                    if _a.strip() != _b.strip():
+                        logger.warning(
+                            "[task_parser] companion prompts.txt turn T%d text "
+                            "differs from prompts.json in %s — the bundle will "
+                            "show the txt, the agent ran the json",
+                            _i, task_dir,
+                        )
+                        break
+        except FileNotFoundError:
+            raise
+        except Exception as exc:
+            logger.warning(
+                "[task_parser] companion prompts.txt unreadable in %s: %s "
+                "(JSON is used)", task_dir, exc,
+            )
+    elif (task_dir / "prompts.txt").is_file():
         # Talos inject-format task: prompts.txt holds the per-turn wake-up script.
         # Turn 0 is the initial prompt; later turns drive the multi-turn silent-
         # injection loop applied at stage boundaries (see inject_director.py).
@@ -700,6 +757,9 @@ def _load_native_task(task_dir: Path) -> dict:
         # Full per-turn wake-up script for Talos inject-format tasks (empty for
         # single-prompt tasks). run_batch feeds these to the multi-turn runner.
         "turn_messages": turn_messages,
+        # prompts.json metadata (task_id/persona/window + per-turn day/time),
+        # None for txt-format tasks. Metadata only — never sent to the agent.
+        "turn_schedule": turn_schedule,
         # Reference golden trajectory (optional). Flows to the Harbor bundle's
         # golden_trajectory.json via write_bundle.
         "golden_trajectory": _load_golden_trajectory(task_dir),

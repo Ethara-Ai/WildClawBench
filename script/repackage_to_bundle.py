@@ -98,18 +98,74 @@ from pathlib import Path
 from typing import Any
 
 
-# Extend as new harnesses/models are published. The openclaw/"claude" harness
-# dir does NOT encode the model, so this maps the harness name to the model we
-# run through it — currently Claude Fable 5 (via --model claude-fable-5 / OAuth).
+# Fallback only: used when a run's actual model id can't be recovered from its
+# logs (see _pretty_model_for_run / MODEL_ID_LABELS below). The openclaw/"claude"
+# harness dir does NOT encode the model, so this maps the harness name to the
+# current default model run through it — DEFAULT_MODEL in script/run.sh, today
+# Claude Opus 4.7. Keep this in sync with that default.
 MODEL_LABELS: dict[str, str] = {
-    "claude": "Claude Fable 5",
-    "claudecode": "Claude Fable 5",
-    "openclaw": "Claude Fable 5",
+    "claude": "Claude Opus 4.7",
+    "claudecode": "Claude Opus 4.7",
+    "openclaw": "Claude Opus 4.7",
     "gpt": "GPT 5.6",
     "codex": "GPT 5.6",
     "hermes": "Hermes",
     "hermesagent": "Hermes",
 }
+
+# Map the *actual agent model id* (as dispatched by the harness, e.g. via
+# --model / OAuth) to its display name. This is the source of truth for the
+# trajectory label: the openclaw/"claude" harness dir does NOT encode the model,
+# so keying off the backend (MODEL_LABELS above) mislabels every run whose model
+# isn't the backend's historical default. We recover the real id from the run's
+# harness_debug.log and look it up here; MODEL_LABELS is only a last-resort
+# fallback when the id can't be recovered. Ids are matched case-insensitively
+# with '.'/'-' treated as equivalent (so "claude-opus-4.7" == "claude-opus-4-7").
+MODEL_ID_LABELS: dict[str, str] = {
+    "claude-opus-4-8": "Claude Opus 4.8",
+    "claude-opus-4-7": "Claude Opus 4.7",
+    "claude-opus-4-6": "Claude Opus 4.6",
+    "claude-fable-5": "Claude Fable 5",
+    "claude-sonnet-4-6": "Claude Sonnet 4.6",
+    "claude-sonnet-4-5": "Claude Sonnet 4.5",
+    "gpt-5-6": "GPT 5.6",
+    "gpt-5-5": "GPT 5.5",
+}
+
+# Recover the agent model from a run's harness log. The harness stamps
+# `agent.dispatch.begin ... backend='...' model='<id>'` exactly once per run; we
+# anchor on `agent.dispatch.begin` so we never pick up judge/testgen model ids
+# that also appear in the same log.
+_AGENT_MODEL_RE = re.compile(r"agent\.dispatch\.begin\b[^\n]*?\bmodel='([^']+)'")
+
+
+def _norm_model_id(model_id: str) -> str:
+    return model_id.strip().lower().replace(".", "-")
+
+
+def _detect_agent_model(run_dir: Path) -> str | None:
+    log = run_dir / "harness_debug.log"
+    try:
+        text = log.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    m = _AGENT_MODEL_RE.search(text)
+    return m.group(1).strip() if m else None
+
+
+def _pretty_model_for_run(harness_dirname: str, run_dirs: list[Path]) -> str:
+    """Prefer the real agent model id (from the run logs) over the backend name.
+
+    Falls back to the legacy backend->label map when no run exposes a model id.
+    An unknown-but-real id is returned verbatim rather than silently mislabeled.
+    """
+    norm_labels = {_norm_model_id(k): v for k, v in MODEL_ID_LABELS.items()}
+    for run_dir in run_dirs:
+        model_id = _detect_agent_model(run_dir)
+        if model_id:
+            return norm_labels.get(_norm_model_id(model_id), model_id)
+    return _pretty_model(harness_dirname)
+
 
 # Scratch subdir inside artifacts/ that must never be published.
 ARTIFACTS_SCRATCH_DIRNAME = "_tmp"
@@ -129,10 +185,13 @@ ARTIFACTS_INPUTS_SUBPATH = ("artifacts", "inputs", "files")
 GOLDEN_STEER_FILENAME = "golden_steer_flow.md"
 GROUND_TRUTH_FILENAME = "TRUTH.md"
 
-# Input-side prompt filename candidates, newest convention first. Newer tasks
-# ship "PROMPT.md"; older ones "prompt.txt"; a few use the pluralized
-# "prompts.txt". First match wins. Published to the bundle root as "PROMPT.md".
+# Input-side prompt filename candidates, newest convention first. Newest tasks
+# ship "prompts.json" (structured turn schedule — rendered to text, never
+# byte-copied); then "PROMPT.md"; older ones "prompt.txt"; a few use the
+# pluralized "prompts.txt". First match wins. Published to the bundle root as
+# "PROMPT.md". Consume via _read_prompt_text(), not raw file reads.
 PROMPT_SOURCE_CANDIDATES: tuple[str, ...] = (
+    "prompts.json",
     "PROMPT.md",
     "prompt.txt",
     "prompts.txt",
@@ -976,6 +1035,27 @@ def copy_snapshot(run_dir: Path, dest_run: Path) -> int:
     return sum(1 for _ in dest.rglob("*") if _.is_file())
 
 
+def copy_inject(input_task_dir: Path | None, bundle: Path, verbose: bool) -> int:
+    """Mirror the task's ``inject/`` spec (stageN/mutations.json + verify.sh)
+    verbatim into the bundle root, next to the runs whose ``inject_timeline.jsonl``
+    it explains. No-op when the task ships no inject dir (the common case).
+    Returns the number of files copied."""
+    if input_task_dir is None:
+        return 0
+    src = input_task_dir / "inject"
+    if not src.is_dir():
+        return 0
+    dest = bundle / "inject"
+    shutil.copytree(
+        src, dest, dirs_exist_ok=True,
+        ignore=shutil.ignore_patterns(".DS_Store"),
+    )
+    n = sum(1 for _ in dest.rglob("*") if _.is_file())
+    if verbose:
+        print(f"    staged inject/ ({n} files)")
+    return n
+
+
 def copy_output_media(run_dir: Path, dest_run: Path) -> int:
     artifacts = run_dir / "task_output" / "artifacts"
     media_dest = dest_run / "output_media"
@@ -1074,6 +1154,76 @@ def _find_prompt_source(input_task_dir: Path) -> Path | None:
         if candidate.is_file():
             return candidate
     return None
+
+
+def _render_prompts_json_text(path: Path) -> str:
+    """Render a ``prompts.json`` turn schedule to the canonical TURN-delimited
+    text form (same header shape compile_declarative_task.py emits), so the
+    published PROMPT.md / instruction.md stay human-readable.
+
+    Header labels come from the finalized per-turn ``timestamp`` (ISO-8601
+    with offset): Day N is the calendar distance from the FIRST turn's date
+    (+1), HH:MM is the local wall time as authored — reproducing the
+    companion prompts.txt headers. The draft ``day``/``time`` pair is still
+    honored for older files. A label failure is cosmetic here (hard schedule
+    validation lives in parse_prompts_json), so it degrades to no label.
+    """
+    from datetime import datetime
+
+    raw = json.loads(path.read_text(encoding="utf-8-sig"))
+    turns = raw.get("turns") or []
+
+    def _ts(turn):
+        t = turn.get("timestamp")
+        if not isinstance(t, str) or not t.strip():
+            return None
+        try:
+            return datetime.fromisoformat(t.strip().replace("Z", "+00:00"))
+        except ValueError:
+            return None
+
+    ts0 = _ts(turns[0]) if turns else None
+    lines: list[str] = []
+    for pos, turn in enumerate(turns):
+        day = turn.get("day")
+        tod = turn.get("time")
+        if (day is None or not tod):
+            ts = _ts(turn)
+            if ts is not None and ts0 is not None:
+                day = (ts.date() - ts0.date()).days + 1
+                tod = ts.strftime("%H:%M")
+        label = f" (Day {day}, {tod})" if day is not None and tod else ""
+        lines.append(f"--- TURN T{pos}{label} ---")
+        lines.append(str(turn.get("message", "")).strip())
+        lines.append("")
+    return "\n".join(lines).strip() + "\n"
+
+
+def _read_prompt_text(input_task_dir: Path) -> str | None:
+    """Prompt-source text for publication.
+
+    Finalized pair convention: when a task ships prompts.json + prompts.txt,
+    the json drives the trajectory and the AUTHORED txt is what the client
+    receives — publish it verbatim (it is the human-verification contract).
+    A json without its companion (legacy artifacts only; the loader hard-fails
+    new runs) falls back to rendering the json to TURN-delimited text — raw
+    JSON must never be published as PROMPT.md/instruction.md."""
+    pj = input_task_dir / "prompts.json"
+    pt = input_task_dir / "prompts.txt"
+    if pj.is_file() and pt.is_file():
+        try:
+            return pt.read_text(encoding="utf-8")
+        except OSError:
+            return None
+    src = _find_prompt_source(input_task_dir)
+    if src is None:
+        return None
+    try:
+        if src.name == "prompts.json":
+            return _render_prompts_json_text(src)
+        return src.read_text(encoding="utf-8")
+    except (OSError, ValueError, json.JSONDecodeError):
+        return None
 
 
 def stage_persona_and_artifacts(
@@ -1802,14 +1952,10 @@ def _stage_data_instruction(
     """
     if input_task_dir is None:
         return False
-    prompt_src = _find_prompt_source(input_task_dir)
-    if prompt_src is None:
-        return False
-    try:
-        prompt_text = prompt_src.read_text(encoding="utf-8")
-    except OSError as exc:
+    prompt_text = _read_prompt_text(input_task_dir)
+    if prompt_text is None:
         if verbose:
-            print(f"    instruction.md skipped: {exc}", file=sys.stderr)
+            print("    instruction.md skipped: no readable prompt source", file=sys.stderr)
         return False
     attachments = _detect_attachments_present(input_task_dir)
     final_text = _append_workspace_hint(prompt_text, attachments)
@@ -1917,10 +2063,7 @@ def _stage_task_toml(
     prompt_src = _find_prompt_source(input_task_dir)
     if prompt_src is None:
         return False
-    try:
-        prompt_text = prompt_src.read_text(encoding="utf-8")
-    except OSError:
-        prompt_text = ""
+    prompt_text = _read_prompt_text(input_task_dir) or ""
 
     used_apis = _resolve_used_apis(input_task_dir)
     bundle_env_dir = bundle / "data" / "environment"
@@ -2145,9 +2288,12 @@ def convert_task(
     input_task_dir = _find_input_task_dir(input_root, task_dir.name)
     if input_task_dir is not None:
         prompt_src = _find_prompt_source(input_task_dir)
-        if prompt_src is not None:
+        prompt_text = _read_prompt_text(input_task_dir)
+        if prompt_src is not None and prompt_text is not None:
             bundle.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(prompt_src, bundle / PROMPT_FILENAME)
+            # Write text, don't byte-copy: a prompts.json source is rendered
+            # to TURN-delimited text (raw JSON must never ship as PROMPT.md).
+            (bundle / PROMPT_FILENAME).write_text(prompt_text, encoding="utf-8")
             if verbose and prompt_src.name != PROMPT_FILENAME:
                 print(f"    staged prompt: {prompt_src.name} -> {PROMPT_FILENAME}")
         # Ground truth: publish the source truth doc VERBATIM as TRUTH.md.
@@ -2187,17 +2333,20 @@ def convert_task(
     _stage_data_instruction(input_task_dir, bundle, verbose)
     _stage_environment_dockerfile_and_compose(bundle, verbose)
     _stage_task_toml(input_task_dir, bundle, verbose)
+    copy_inject(input_task_dir, bundle, verbose)
 
     produced_any = False
     for harness_dir in sorted(p for p in trajectories.iterdir() if p.is_dir()):
-        pretty = _pretty_model(harness_dir.name)
-        dest_model = bundle / "trajectories" / pretty
         run_dirs = sorted(
             (p for p in harness_dir.iterdir() if p.is_dir() and re.match(r"run_\d+", p.name)),
             key=lambda p: _run_index_of(p.name),
         )
         if latest_only and run_dirs:
             run_dirs = [run_dirs[-1]]
+        # Label the trajectory by the model that actually ran (from run logs),
+        # not the backend dir name. See _pretty_model_for_run.
+        pretty = _pretty_model_for_run(harness_dir.name, run_dirs)
+        dest_model = bundle / "trajectories" / pretty
         per_run_summ: list[dict[str, Any]] = []
         for run_dir in run_dirs:
             ridx = _run_index_of(run_dir.name)
@@ -2367,6 +2516,7 @@ def stage_output_data(
     _stage_data_instruction(input_task_dir, task_dir, verbose)
     _stage_environment_dockerfile_and_compose(task_dir, verbose)
     _stage_task_toml(input_task_dir, task_dir, verbose)
+    copy_inject(input_task_dir, task_dir, verbose)
     return True
 
 

@@ -64,9 +64,19 @@ def check_structure(task: Path) -> None:
     section("1. Bundle structure")
     expected = ["data", "persona", "inject", "mock_data", "prompts.txt",
                 "rubric.json", "task.yaml", "test_outputs.py", "test_weights.json"]
+    has_json = (task / "prompts.json").is_file()
     for name in expected:
-        rec(PASS if (task / name).exists() else FAIL, f"{name} present" if (task / name).exists()
-            else f"{name} MISSING")
+        present = (task / name).exists()
+        if name == "prompts.txt" and has_json:
+            # Finalized pair convention: prompts.json (trajectory) MUST ship
+            # with a companion prompts.txt (published in the output bundle).
+            rec(PASS if present else FAIL,
+                "prompts.json + companion prompts.txt present" if present
+                else "prompts.json present but companion prompts.txt MISSING "
+                     "(required — the txt is what the client receives)")
+            continue
+        rec(PASS if present else FAIL,
+            f"{name} present" if present else f"{name} MISSING")
     persona = task / "persona"
     if persona.is_dir():
         need = {"AGENTS.md", "HEARTBEAT.md", "IDENTITY.md", "MEMORY.md", "SOUL.md", "TOOLS.md", "USER.md"}
@@ -303,16 +313,29 @@ def _check_fires(label: str, op: dict, st, next_boundary: int) -> None:
 # 5. prompts / turns / rubric / weights / checkers
 # --------------------------------------------------------------------------- #
 def check_turns_and_grading(task: Path) -> None:
-    section("5. prompts.txt / rubric / weights / checkers")
+    section("5. prompts / rubric / weights / checkers")
+    pj = task / "prompts.json"
     pt = task / "prompts.txt"
     turns = []
-    if pt.is_file():
+    if pj.is_file():
+        # JSON turn schedule: parse_prompts_json enforces contiguous T0..TN and
+        # turn_count agreement; report its verdict here instead of duplicating.
+        try:
+            if str(REPO) not in sys.path:
+                sys.path.insert(0, str(REPO))
+            from src.utils.inject_director import parse_prompts_json
+            messages, _meta = parse_prompts_json(pj)
+            rec(PASS, f"prompts.json has {len(messages)} turns (T0..T{len(messages) - 1})")
+            rec(PASS, "turn labels contiguous from T0 (validated by parser)")
+        except Exception as exc:  # noqa: BLE001
+            rec(FAIL, f"prompts.json invalid: {exc}")
+    elif pt.is_file():
         turns = [int(m.group(1)) for m in re.finditer(r"^---\s*TURN\s+T(\d+)", pt.read_text(encoding="utf-8"), re.MULTILINE)]
         contig = turns == list(range(len(turns)))
         rec(PASS if turns else FAIL, f"prompts.txt has {len(turns)} turns (T0..T{turns[-1] if turns else '?'})")
         rec(PASS if contig else WARN, "turn indices contiguous from T0" if contig else f"turn gaps: {turns}")
     else:
-        rec(FAIL, "prompts.txt missing")
+        rec(FAIL, "prompts.txt missing (no prompts.json either)")
 
     for fn in ("rubric.json", "test_weights.json"):
         p = task / fn

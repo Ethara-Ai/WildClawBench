@@ -150,6 +150,17 @@ def _compute_testgen_cache_key(task: dict) -> str:
                 h.update(f.read_bytes())
             except OSError:
                 h.update(b"<unreadable>")
+    # prompts.json is hashed ONLY when present: the loop above folds a marker
+    # in even for missing files, and appending a new name to that tuple would
+    # change the cache key of every existing task and force a corpus-wide
+    # testgen regeneration. Conditional add keeps legacy keys byte-identical.
+    pj = p / "prompts.json"
+    if pj.is_file():
+        h.update(b"\x00prompts.json\x00")
+        try:
+            h.update(pj.read_bytes())
+        except OSError:
+            h.update(b"<unreadable>")
     mock_root = p / "mock_data"
     if mock_root.is_dir():
         # Key on each mock-data file's CONTENT, not its size. Two fixtures of
@@ -1369,7 +1380,7 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
     import shutil
     td = task.get("task_dir", "")
     if td:
-        for fn in ("prompt.txt", "rubric.json"):
+        for fn in ("prompt.txt", "prompts.json", "rubric.json"):
             src = Path(td) / fn
             if src.is_file():
                 try:
@@ -2011,6 +2022,17 @@ def run_single_task(
                                     stage_name=st.name, phase="stage")
 
             stage_before_turn = _inject_before_turn
+            # Dangling-reference guard: a non-seed stage whose to_turn is
+            # beyond the schedule never fires (stage_for_boundary matches by
+            # integer position) — historically a silent no-op. Warn loudly.
+            for _st in _is.stages:
+                if not _st.is_seed and _st.to_turn is not None \
+                        and _st.to_turn >= len(stage_turns):
+                    logger.warning(
+                        "[%s] inject stage %r targets turn boundary T%s but the "
+                        "schedule has only %d turn(s) — this stage will NEVER "
+                        "fire", task_id, getattr(_st, "name", "?"),
+                        _st.to_turn, len(stage_turns))
             logger.info("[%s] inject-format injection enabled: %d turns, %d stage(s)",
                         task_id, len(stage_turns), len(_is.stages))
             _render_injection_details(task_id, "inject-format",
@@ -2120,6 +2142,20 @@ def run_single_task(
                 _ws_before / "mock_data", label="before_injection")
     except Exception as exc:
         logger.warning("[%s] before snapshot failed: %s", task_id, exc)
+
+    # Verbatim copy of the task's inject/ spec next to its receipt
+    # (inject_timeline.jsonl). Replace, never merge — a retried run_N must not
+    # keep stage files from a previous inject version.
+    if task.get("inject_path") and Path(task["inject_path"]).is_dir():
+        import shutil
+        try:
+            _inject_dest = output_dir / "inject"
+            if _inject_dest.exists():
+                shutil.rmtree(_inject_dest)
+            shutil.copytree(task["inject_path"], _inject_dest,
+                            ignore=shutil.ignore_patterns(".DS_Store"))
+        except OSError as exc:
+            logger.warning("[%s] inject/ copy failed: %s", task_id, exc)
 
     mock_health_logger = _start_mock_health_logger(task, task_id, output_dir)
     # Live-stream renderer (docs/STREAMING_PLAN.md §4). Display-only daemon
