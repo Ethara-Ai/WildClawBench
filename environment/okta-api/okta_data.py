@@ -192,10 +192,15 @@ def _set_user_status(user_id, status, set_activated=False):
     u = _find_user(user_id)
     if not u:
         return {"error": f"User {user_id} not found"}
-    u["status"] = status
+    # _find_user returns a DEEP COPY (store reads copy to protect internal
+    # state), so mutating it in place is lost. Persist via the table's patch()
+    # so lifecycle transitions (suspend/activate/deactivate) actually stick —
+    # this is what the agent's reads AND injected drift depend on.
+    changes = {"status": status}
     if set_activated and not u["activated"]:
-        u["activated"] = _now()
-    return _serialize_user(u)
+        changes["activated"] = _now()
+    updated = _store.table("users").patch(user_id, changes)
+    return _serialize_user(updated if updated else {**u, **changes})
 
 
 def activate_user(user_id):

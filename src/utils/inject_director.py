@@ -795,11 +795,19 @@ class InjectApplier:
                    "body": op.get("body"), "query": params}
         result = self._admin_post(api, "/admin/apply_as_api", payload)
         inner = result.get("body") if isinstance(result.get("body"), dict) else {}
+        # Require BOTH a 2xx from the real endpoint AND a verified store change.
+        # `changed` guards against endpoints that return 200 without persisting
+        # (e.g. mutate-a-copy bugs) — without it, this path can report a false
+        # "applied". If unverified, return None so the op falls through to the
+        # honest "unresolved" outcome instead of silently claiming success.
         if not (result.get("ok") and isinstance(inner, dict) and inner.get("ok")):
+            return None
+        if not inner.get("changed"):
             return None
         rec = {"id": op.get("id"), "service": api, "method": op.get("method"),
                "path": path, "silent": silent, "via": "apply_as_api",
-               "ok": True, "status": "applied", "http": inner.get("status_code")}
+               "ok": True, "status": "applied", "verified": True,
+               "http": inner.get("status_code")}
         self._append({"type": "inject.api", **rec, "ts": time.time()})
         return rec
 

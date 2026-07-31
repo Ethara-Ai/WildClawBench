@@ -80,6 +80,7 @@ small amount of code duplication across processes, which is fine.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -506,6 +507,20 @@ def _build_router(store: Store, registry: _OneShotRegistry) -> APIRouter:
         if path.startswith(ADMIN_PREFIX) or path.startswith("/audit"):
             return JSONResponse(status_code=400, content={"ok": False, "reason": "target not allowed"})
 
+        # Persistence check: fingerprint the store before/after the replay so the
+        # caller can tell a real mutation from a 200 that didn't stick (e.g. an
+        # endpoint that mutates a copy without persisting). Uses public rows() and
+        # only runs on the injector's fallback path, so the per-op cost is fine.
+        def _fingerprint() -> str:
+            try:
+                blob = {t: store.table(t).rows() for t in store.list_tables()}
+                return hashlib.md5(
+                    json.dumps(blob, sort_keys=True, default=str).encode()
+                ).hexdigest()
+            except Exception:
+                return ""
+        fp_before = _fingerprint()
+
         qs = urllib.parse.urlencode(query, doseq=True).encode() if query else b""
         body_bytes = json.dumps(body).encode() if body is not None else b""
         headers = [(b"content-type", b"application/json"), (b"accept", b"application/json")]
@@ -546,7 +561,9 @@ def _build_router(store: Store, registry: _OneShotRegistry) -> APIRouter:
         except Exception:
             resp_body = {"_raw": captured["body"][:2000].decode("utf-8", "replace")}
         status = captured["status"]
-        return {"ok": 200 <= status < 300, "status_code": status, "body": resp_body}
+        ok = 200 <= status < 300
+        changed = ok and _fingerprint() != fp_before
+        return {"ok": ok, "status_code": status, "changed": changed, "body": resp_body}
 
     @router.get("/health")
     def health():

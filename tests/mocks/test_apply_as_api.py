@@ -60,8 +60,21 @@ def client(monkeypatch):
         state["messages"][key]["text"] = b.get("text", "")
         return {"ok": True, **state["messages"][key]}
 
+    # A store-backed endpoint that ACTUALLY persists (via store.patch) — used to
+    # prove the persistence-verification 'changed' flag fires on real mutations,
+    # vs the dict-mutating endpoints above which mimic the okta copy-bug (200 but
+    # nothing persisted → changed must be False).
+    store = Store("test")
+    store.register("widgets", primary_key="id",
+                   initial_loader=lambda: [{"id": "w1", "status": "NEW"}])
+
+    @app.post("/api/widgets/{wid}/ship")
+    def ship(wid: str):
+        store.table("widgets").patch(wid, {"status": "SHIPPED"})
+        return {"ok": True, "id": wid, "status": "SHIPPED"}
+
     install_tracker(app)
-    install_admin_plane(app, Store("test"))
+    install_admin_plane(app, store)
 
     return TestClient(app), state
 
@@ -106,6 +119,23 @@ def test_agent_cannot_forge_suppression(client):
     diary = client.get("/audit/requests").json()
     reqs = diary.get("requests", diary if isinstance(diary, list) else [])
     assert any(r.get("path") == "/api/users/u1/suspend" for r in reqs)
+
+
+def test_changed_true_when_store_actually_persists(client):
+    client, state = client
+    r = _apply(client, "POST", "/api/widgets/w1/ship", body={})
+    assert r.status_code == 200 and r.json()["ok"] is True
+    assert r.json()["changed"] is True  # store.patch persisted -> verified
+
+
+def test_changed_false_when_mutation_not_persisted(client):
+    client, state = client
+    # /suspend mutates a plain dict, NOT the admin store (the okta copy-bug shape):
+    # returns 200 but nothing persisted -> the guard must report changed=False so
+    # the injector does NOT falsely mark it applied.
+    r = _apply(client, "POST", "/api/users/u1/suspend", body={})
+    assert r.status_code == 200 and r.json()["ok"] is True
+    assert r.json()["changed"] is False
 
 
 def test_apply_as_api_rejects_admin_target(client):
