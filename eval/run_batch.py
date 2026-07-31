@@ -1944,7 +1944,28 @@ def run_single_task(
         try:
             from src.utils.inject_director import InjectScript, InjectApplier, is_defect
             from src.utils.docker_utils import copy_file_into_workspace
+            from src.utils.inject_validator import (
+                run_authoring_validation, InjectAuthoringError,
+            )
             _is = InjectScript.load(task["inject_path"])
+
+            # Static authoring pre-flight (no live container) -> injection_defects.
+            _mock_data_root = Path(task["inject_path"]).parent / "mock_data"
+            try:
+                run_authoring_validation(
+                    _is,
+                    host_api_to_url=drift_info.get("host_api_to_url") or {},
+                    mock_data_root=_mock_data_root,
+                    task_id=task_id,
+                )
+            except InjectAuthoringError as _ave:
+                for _d in _ave.defects:
+                    injection_defects.append({
+                        "stage": _d.get("stage") or "authoring-validation",
+                        "id": _d.get("id"),
+                        "status": str(_d.get("status") or "authoring-invalid"),
+                        "reason": _d.get("reason") or "",
+                    })
 
             def _record_defects(outcomes, stage_name, phase):
                 for _rec in outcomes or []:

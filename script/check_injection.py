@@ -153,7 +153,7 @@ def main() -> int:
                     unresolved += 1
                     print(f"   [UNRESOLVED] {op.get('id')}  {api}  {op.get('path')}")
                     continue
-                table, pk, patch_fields = resolved
+                table, pk, patch_fields, unmapped = resolved
                 before = _target_value(base, token, table, pk, patch_fields)
                 result = applier._admin_patch(api, table, pk, patch_fields)
                 after = _target_value(base, token, table, pk, patch_fields)
@@ -161,9 +161,13 @@ def main() -> int:
                 did_change = before != after
                 applied += 1 if ok else 0
                 changed += 1 if did_change else 0
-                flag = "APPLIED" if (ok and did_change) else ("NO-CHANGE" if ok else "PATCH-FAIL")
+                # unmapped fields = op targeted live columns that don't exist (partial defect)
+                flag = "PARTIAL" if (ok and unmapped) else (
+                    "APPLIED" if (ok and did_change) else ("NO-CHANGE" if ok else "PATCH-FAIL"))
                 print(f"   [{flag}] {op.get('id')}  {api}  {table}/{pk}")
                 print(f"        before={before}  ->  after={after}  (http={result.get('status')})")
+                if unmapped:
+                    print(f"        unmapped_fields={sorted(unmapped)}")
             print()
 
         print(f"== summary ==  silent_ops={total}  resolved={total - unresolved}  "

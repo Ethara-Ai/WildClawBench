@@ -287,6 +287,12 @@ _SERVICE_RESOLUTION = {
     "confluence-api": (("pages",), ("title", "Name", "name", "id")),
 }
 
+# Op-envelope control keys that must never be treated as row field values when
+# the whole-body branch of _extract_fields falls through.
+_INJECT_ENVELOPE_KEYS = frozenset(
+    {"fires_at_turn", "raw_eml_path", "service", "api", "method", "path", "id", "admin"}
+)
+
 
 class InjectApplier:
     """Applies a stage's silent mutations through each API's ``/admin/*`` plane.
@@ -922,7 +928,7 @@ class InjectApplier:
             rec.update(ok=False, status="unresolved", reason=reason)
             self._append({"type": "inject.api", **rec, "ts": time.time()})
             return rec
-        table, pk, fields = resolved
+        table, pk, fields, unmapped = resolved
         rec.update(table=table, pk=pk, fields=list(fields.keys()))
         row_before = self._admin_get(api, f"/admin/data/{table}/{pk}")
         before = ({k: self._row_bag(row_before).get(k) for k in fields}
@@ -944,13 +950,17 @@ class InjectApplier:
                        changed=before != after)
             if not verified:
                 self._mark_unverified(rec)
+        if rec["ok"] and unmapped:
+            rec.update(ok=False, status="partial", verified=False,
+                       unmapped_fields=sorted(unmapped),
+                       reason=f"unmapped fields dropped: {sorted(unmapped)}")
         # Persist only field KEYS (rec["fields"]); ship the injected VALUES to
         # the Data Injection pane display-only via ui_values.
         self._append({"type": "inject.api", **rec, "ts": time.time()}, ui_values=fields)
         return rec
 
     def _resolve_target(self, api: str, op: Dict[str, Any]
-                        ) -> Optional[Tuple[str, str, Dict[str, Any]]]:
+                        ) -> Optional[Tuple[str, str, Dict[str, Any], List[str]]]:
         """Resolve a Talos REST mutation to (table, pk, fields) against live state.
 
         Strategy: pull the flat field map from the op body (supports the airtable
@@ -1000,7 +1010,7 @@ class InjectApplier:
                     pk_match = str(pk).strip().lower() == key.strip().lower()
                     if not pk_match and not self._bag_matches_key(bag, key, key_cols):
                         continue
-                mapped = self._map_fields_to_row(new_fields, bag)
+                mapped, unmapped = self._map_fields_to_row(new_fields, bag)
                 if not mapped:
                     continue
                 if nested:
@@ -1009,7 +1019,7 @@ class InjectApplier:
                     patch_fields = {"fields": {**row["fields"], **mapped}}
                 else:
                     patch_fields = mapped
-                return table, str(pk), patch_fields
+                return table, str(pk), patch_fields, unmapped
         return None
 
     @staticmethod
@@ -1031,9 +1041,8 @@ class InjectApplier:
             for k, v in body["properties"].items():
                 flat[k] = _flatten_property_value(v)
             return flat
-        # whole-body scalar fields (rare)
         return {k: v for k, v in body.items()
-                if isinstance(v, (str, int, float, bool)) and not k.startswith("_")}
+                if k not in _INJECT_ENVELOPE_KEYS and not str(k).startswith("_")}
 
     @classmethod
     def _extract_key_from_op(cls, op: Dict[str, Any]) -> Optional[str]:
@@ -1083,20 +1092,28 @@ class InjectApplier:
         return False
 
     @staticmethod
-    def _map_fields_to_row(fields: Dict[str, Any], row: Dict[str, Any]) -> Dict[str, Any]:
+    def _map_fields_to_row(fields: Dict[str, Any], row: Dict[str, Any]
+                           ) -> Tuple[Dict[str, Any], List[str]]:
         """Map mutation field names to the row's real column casing.
 
         ``{"yield_kg_m2": 16.8}`` against a row with column ``Yield_kg_m2`` ->
-        ``{"Yield_kg_m2": 16.8}``. Unmatched fields are passed through verbatim
-        (the admin plane will add them as-is) so a deliberately new column still
-        lands, but matched ones avoid creating a dead duplicate-cased column.
+        ``{"Yield_kg_m2": 16.8}``. Returns (mapped, unmapped): ``mapped`` holds
+        only fields that matched a real live column (case-insensitive); an
+        unmatched field name (no such live column) is collected in ``unmapped``
+        rather than passed through, so a silent-injection whose author targeted a
+        seed-file column that the load-time coercer renamed/dropped surfaces as a
+        defect instead of landing a dead top-level key.
         """
         lower_to_real = {k.lower(): k for k in row.keys()}
         mapped: Dict[str, Any] = {}
+        unmapped: List[str] = []
         for k, v in fields.items():
-            real = lower_to_real.get(k.lower(), k)
-            mapped[real] = v
-        return mapped
+            real = lower_to_real.get(k.lower())
+            if real is None:
+                unmapped.append(k)
+            else:
+                mapped[real] = v
+        return mapped, unmapped
 
     # -- timeline -----------------------------------------------------------
 
