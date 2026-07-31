@@ -58,6 +58,7 @@ from __future__ import annotations
 import csv
 import json
 import logging
+import os
 import re
 import time
 from dataclasses import dataclass, field
@@ -650,6 +651,13 @@ class InjectApplier:
                     if p.is_file() and "_placeholders" not in p.parts]
             if hits:
                 host_src = hits[0].resolve()
+        # Ops often author ``src`` relative to the TASK ROOT (e.g. "Data/" living
+        # at <task>/Data), not the stage dir. inject/<stage>/ -> task root is two
+        # levels up; try it before giving up so a valid task-root path resolves.
+        if not host_src.exists():
+            task_root_src = (stage_dir.parent.parent / src).resolve()
+            if task_root_src.exists():
+                host_src = task_root_src
         # Placeholder stand-ins are never load-bearing content; skip with a note.
         if not host_src.exists():
             rec.update(ok=False, status="missing_src", reason=str(host_src))
@@ -763,6 +771,37 @@ class InjectApplier:
                     "body": r.json() if ctype.startswith("application/json") else r.text[:200]}
         except requests.RequestException as exc:
             return {"ok": False, "error": str(exc)}
+
+    def _apply_as_api(self, api: str, op: Dict[str, Any], silent: bool) -> Optional[Dict[str, Any]]:
+        """Fallback applier: replay a REST-form mutation through the mock's OWN
+        endpoint via ``POST /admin/apply_as_api`` (audit-suppressed server-side).
+
+        This reproduces the API's real field-name / path-action / key-location
+        semantics that the store-level resolver cannot, fixing environment/code
+        mismatches universally. Returns an ``applied`` rec ONLY on success; on any
+        non-success (feature off, no URL, transport error, non-2xx from the real
+        endpoint) returns None so the caller keeps its original outcome — making
+        this strictly additive: it can turn a failure into a success, never the
+        reverse. Disable with WCB_INJECT_APPLY_AS_API=0.
+        """
+        if os.environ.get("WCB_INJECT_APPLY_AS_API", "1").strip() == "0":
+            return None
+        base = self._urls.get(api)
+        path = str(op.get("path") or "")
+        if not base or not path.startswith("/"):
+            return None
+        params = op.get("params") if isinstance(op.get("params"), dict) else None
+        payload = {"method": op.get("method") or "POST", "path": path,
+                   "body": op.get("body"), "query": params}
+        result = self._admin_post(api, "/admin/apply_as_api", payload)
+        inner = result.get("body") if isinstance(result.get("body"), dict) else {}
+        if not (result.get("ok") and isinstance(inner, dict) and inner.get("ok")):
+            return None
+        rec = {"id": op.get("id"), "service": api, "method": op.get("method"),
+               "path": path, "silent": silent, "via": "apply_as_api",
+               "ok": True, "status": "applied", "http": inner.get("status_code")}
+        self._append({"type": "inject.api", **rec, "ts": time.time()})
+        return rec
 
     def _list_tables(self, api: str) -> List[str]:
         resp = self._admin_get(api, "/admin/tables")
@@ -1127,6 +1166,13 @@ class InjectApplier:
             return self._replay_admin_rest(api, op, silent)
         resolved = self._resolve_target(api, op)
         if resolved is None:
+            # Store-level resolution failed (field-name/key-location/path-action
+            # mismatch). Before giving up, replay the mutation through the mock's
+            # OWN endpoint, which owns the correct semantics. Strictly additive:
+            # only reached when the legacy path already failed.
+            replayed = self._apply_as_api(api, op, silent)
+            if replayed is not None:
+                return replayed
             params = op.get("params") if isinstance(op.get("params"), dict) else None
             if params and params.get("filter") and not params.get("field_updates"):
                 # e.g. SM8 "archive 53 rows matching <filter>": a bulk op with no

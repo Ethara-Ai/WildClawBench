@@ -12,10 +12,28 @@ This installs:
     4. GET /audit/summary - returns counts by method/path/status
 """
 
+import os
 import time
 import json
 from io import BytesIO
 from typing import List, Optional
+
+# Header a trusted server-side caller (the admin plane's /admin/apply_as_api
+# replay) sets to keep a synthetic request out of the agent-visible audit log,
+# so "silent" injected mutations stay silent even when applied through the
+# mock's own endpoint. Honored ONLY when it matches the configured admin token
+# (MOCK_ADMIN_TOKEN) — the agent never holds that token, so it cannot suppress
+# its own audit trail. Keep this literal in sync with SUPPRESS_AUDIT_HEADER in
+# admin_plane.py.
+_SUPPRESS_AUDIT_HEADER = "x-wcb-suppress-audit"
+
+
+def _audit_suppressed(request) -> bool:
+    supplied = request.headers.get(_SUPPRESS_AUDIT_HEADER)
+    if not supplied:
+        return False
+    token = os.environ.get("MOCK_ADMIN_TOKEN", "").strip()
+    return bool(token) and supplied == token
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -36,6 +54,11 @@ class RequestTracker(BaseHTTPMiddleware):
         if request.url.path.startswith("/admin"):
             return await call_next(request)
         if request.url.path == "/health":
+            return await call_next(request)
+        # Trusted server-side replay (admin plane): apply the mutation through the
+        # real endpoint but keep it out of the agent-visible audit — silent stays
+        # silent. Gated on the admin token so the agent cannot forge it.
+        if _audit_suppressed(request):
             return await call_next(request)
 
         start_time = time.time()

@@ -85,6 +85,7 @@ import os
 import re
 import threading
 import time
+import urllib.parse
 import uuid
 from typing import Any, Callable, Dict, List, Optional
 
@@ -103,6 +104,11 @@ ENV_TOKEN = "MOCK_ADMIN_TOKEN"
 ENV_TRUST_FORWARDED_FOR = "MOCK_ADMIN_TRUST_FORWARDED_FOR"
 
 ADMIN_PREFIX = "/admin"
+
+# Header the /admin/apply_as_api replay sets so the tracking middleware keeps the
+# synthetic request out of the agent-visible audit (silent stays silent). Value
+# is the admin token; keep this literal in sync with tracking_middleware.py.
+SUPPRESS_AUDIT_HEADER = "x-wcb-suppress-audit"
 
 
 def admin_enabled() -> bool:
@@ -477,6 +483,70 @@ def install_admin_plane(
 
 def _build_router(store: Store, registry: _OneShotRegistry) -> APIRouter:
     router = APIRouter(prefix=ADMIN_PREFIX)
+
+    @router.post("/apply_as_api")
+    async def apply_as_api(request: Request):
+        """Apply a mutation through the mock's OWN endpoint (in-process), audit-
+        suppressed. Lets the injector drive drift using the API's real field-name
+        / path-action / key-location semantics instead of reverse-engineering the
+        store. See src/utils/inject_director._apply_as_api. Dispatched via raw
+        ASGI (no httpx / no self-port dependency) so it runs the full route +
+        middleware stack; the suppress header keeps it out of the agent audit."""
+        try:
+            payload = await request.json()
+        except Exception:
+            return JSONResponse(status_code=400, content={"ok": False, "reason": "invalid JSON"})
+        method = str(payload.get("method") or "POST").upper()
+        path = str(payload.get("path") or "")
+        body = payload.get("body")
+        query = payload.get("query") if isinstance(payload.get("query"), dict) else None
+        if not path.startswith("/"):
+            return JSONResponse(status_code=400, content={"ok": False, "reason": "path must be absolute"})
+        # Never let this hatch target the admin/audit surfaces.
+        if path.startswith(ADMIN_PREFIX) or path.startswith("/audit"):
+            return JSONResponse(status_code=400, content={"ok": False, "reason": "target not allowed"})
+
+        qs = urllib.parse.urlencode(query, doseq=True).encode() if query else b""
+        body_bytes = json.dumps(body).encode() if body is not None else b""
+        headers = [(b"content-type", b"application/json"), (b"accept", b"application/json")]
+        token = _expected_token()
+        if token:
+            headers.append((SUPPRESS_AUDIT_HEADER.encode(), token.encode()))
+
+        scope = {
+            "type": "http", "asgi": {"version": "3.0", "spec_version": "2.3"},
+            "http_version": "1.1", "method": method, "scheme": "http",
+            "path": path, "raw_path": path.encode(), "query_string": qs,
+            "root_path": "", "headers": headers,
+            "client": ("127.0.0.1", 0), "server": ("127.0.0.1", 80),
+        }
+        _sent = {"done": False}
+
+        async def receive():
+            if not _sent["done"]:
+                _sent["done"] = True
+                return {"type": "http.request", "body": body_bytes, "more_body": False}
+            return {"type": "http.disconnect"}
+
+        captured = {"status": 500, "body": b""}
+
+        async def send(message):
+            if message["type"] == "http.response.start":
+                captured["status"] = message["status"]
+            elif message["type"] == "http.response.body":
+                captured["body"] += message.get("body", b"")
+
+        try:
+            await request.app(scope, receive, send)
+        except Exception as exc:  # pragma: no cover - defensive
+            return JSONResponse(status_code=502, content={"ok": False, "reason": f"replay failed: {exc}"})
+
+        try:
+            resp_body = json.loads(captured["body"].decode() or "null")
+        except Exception:
+            resp_body = {"_raw": captured["body"][:2000].decode("utf-8", "replace")}
+        status = captured["status"]
+        return {"ok": 200 <= status < 300, "status_code": status, "body": resp_body}
 
     @router.get("/health")
     def health():

@@ -31,6 +31,7 @@ from src.utils.docker_utils import (
     start_container,
     write_turn_marker,
 )
+from src.utils.sim_clock import compute_sim_clock
 from src.utils.grading import (
     extract_preflight_usage_from_litellm_log,
     extract_usage_from_jsonl,
@@ -264,6 +265,19 @@ class OpenClawAgent(BaseAgent):
                     "LITELLM_API_KEY", self.litellm_master_key or "sk-litellm")
                 extra_env_dict.setdefault("WILDCLAW_MODEL", spec.model)
 
+            # Simulated persona clock: shift the agent's Date reads to the task's
+            # first-turn instant so OpenClaw's wake-up stamp matches the prompt
+            # timeline instead of the real host date. No-op when the task has no
+            # resolvable simulated time; that skew is logged loudly below.
+            sim = compute_sim_clock(spec.task)
+            if sim is not None:
+                logger.info("[%s] persona clock=%s (%s) — shifting agent Date reads",
+                            spec.task_id, sim.iso, sim.tz)
+            else:
+                logger.warning("[%s] no simulated persona clock resolved — agent runs "
+                               "on REAL host time; wake-up stamps will not match the "
+                               "prompt's window", spec.task_id)
+
             _ui_lifecycle.emit_stage(spec.task_id, _ui_lifecycle.STAGE_CREATE,
                                      "openclaw agent container")
             start_container(
@@ -274,6 +288,8 @@ class OpenClawAgent(BaseAgent):
                 lobster_env=spec.lobster.get("env") if spec.lobster else None,
                 extra_env_dict=extra_env_dict or None,
                 network=self.litellm_network,
+                sim_clock_epoch_ms=sim.epoch_ms if sim else None,
+                sim_tz=sim.tz if sim else "",
             )
             _ui_lifecycle.emit_stage(spec.task_id, _ui_lifecycle.STAGE_START,
                                      "container up, staging workspace")

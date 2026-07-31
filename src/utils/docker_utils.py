@@ -251,7 +251,9 @@ def require_image_present(image: str) -> None:
 def start_container(task_id: str, workspace_path: str, extra_env: str = "",
                     tmp_path: str = "", lobster_env: list[str] | None = None,
                     extra_env_dict: dict[str, str] | None = None,
-                    network: str = "") -> None:
+                    network: str = "",
+                    sim_clock_epoch_ms: int | None = None,
+                    sim_tz: str = "") -> None:
     workspace = Path(workspace_path).expanduser()
     if not workspace.is_dir():
         raise RuntimeError(f"Workspace path does not exist or is not a directory: {workspace}")
@@ -325,6 +327,42 @@ def start_container(task_id: str, workspace_path: str, extra_env: str = "",
         logger.info("[%s] Injected %d extra env vars: %s",
                     task_id, len(_injected_keys), ",".join(sorted(_injected_keys)))
 
+    # --- Simulated agent clock (docker/agent_faketime_shim.js) --------------
+    # Shift the agent's Date reads to the persona's simulated start instant so
+    # OpenClaw's per-turn "[Www YYYY-MM-DD HH:MM UTC]" wake-up stamp matches the
+    # prompt's timeline instead of the real host clock. No native lib / image
+    # rebuild: OpenClaw runs under node, which honors NODE_OPTIONS=--require, and
+    # the shim leaves the monotonic clock untouched so timeouts stay in real time.
+    sim_args: list[str] = []
+    if sim_clock_epoch_ms is not None:
+        shim_host = Path(__file__).resolve().parents[2] / "docker" / "agent_faketime_shim.js"
+        if not shim_host.is_file():
+            logger.warning(
+                "[%s] simulated clock requested but shim missing at %s — agent "
+                "runs on REAL host clock", task_id, shim_host)
+        else:
+            shim_ctr = "/opt/wcb/faketime_shim.js"
+            # Fold our --require into any NODE_OPTIONS the caller already set,
+            # pulling it out of the validated env_pairs: build_env_args' S-001
+            # guard rejects any value starting with '-' (so NODE_OPTIONS can't go
+            # through it). The KEY=VALUE token we emit here starts with the key,
+            # so it can never be read by docker as a stray flag.
+            node_opts = f"--require {shim_ctr}"
+            for i in range(len(env_pairs) - 1, -1, -1):
+                if env_pairs[i][0] == "NODE_OPTIONS":
+                    prior = env_pairs.pop(i)[1].strip()
+                    if prior:
+                        node_opts = f"{prior} {node_opts}"
+            if any(c in node_opts for c in _FORBIDDEN_VALUE_CHARS):
+                raise ValueError("NODE_OPTIONS contains a forbidden control char")
+            sim_args = ["-v", f"{shim_host}:{shim_ctr}:ro", "-e", f"NODE_OPTIONS={node_opts}"]
+            env_pairs.append(("WCB_FAKE_CLOCK_EPOCH_MS", str(int(sim_clock_epoch_ms))))
+            if sim_tz:
+                env_pairs.append(("TZ", sim_tz))
+            logger.info(
+                "[%s] Simulated agent clock ON: epoch_ms=%d tz=%s (shim=%s)",
+                task_id, int(sim_clock_epoch_ms), sim_tz or "(host default)", shim_ctr)
+
     env_args = build_env_args(env_pairs)
     image = _validate_docker_token("image", os.environ.get("DOCKER_IMAGE", DOCKER_IMAGE))
     network_args = ["--network", network] if network else []
@@ -333,6 +371,7 @@ def start_container(task_id: str, workspace_path: str, extra_env: str = "",
         "--name", task_id,
         *network_args,
         *env_args,
+        *sim_args,
         "-v", f"{workspace}:/app:ro",
         image,
         "/bin/bash", "-c", "tail -f /dev/null",
