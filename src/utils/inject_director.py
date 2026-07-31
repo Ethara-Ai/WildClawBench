@@ -274,6 +274,107 @@ def is_defect(rec: Dict[str, Any], phase: str = "stage") -> bool:
     return True
 
 
+def parse_prompts_json(path: Path | str) -> Tuple[List[str], Dict[str, Any]]:
+    """Parse a ``prompts.json`` turn schedule into ``(messages, meta)``.
+
+    Expected shape (finalized 2026-07-31)::
+
+        {"task_id": ..., "persona": ..., "timezone": "America/New_York",
+         "turn_count": N, "source": ...,
+         "turns": [{"turn": "T0",
+                    "timestamp": "2026-10-20T09:30:00-04:00",
+                    "message": "..."}, ...]}
+
+    The draft shape (per-turn ``day``/``time``, top-level ``window``) is still
+    accepted — unknown keys pass through into ``meta`` untouched.
+
+    ``messages`` is the ordered list of per-turn wake-up messages — the same
+    shape ``parse_prompts_file`` returns, so downstream consumers are format
+    agnostic. ``meta`` preserves everything else (task_id/persona/window/source
+    plus per-turn day/time, messages excluded) for the record; day/time are
+    metadata only and are never surfaced to the agent, matching the txt format
+    where the ``(Day 1, 08:20)`` header text is discarded.
+
+    Validation is deliberately loud (``ValueError`` naming the file): inject
+    stages fire by integer turn position, so a label gap or a ``turn_count``
+    mismatch would silently shift every injection boundary.
+    """
+    p = Path(path)
+    try:
+        raw = json.loads(p.read_text(encoding="utf-8-sig"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{p}: not valid JSON: {exc}") from exc
+    if not isinstance(raw, dict):
+        raise ValueError(f"{p}: top level must be a JSON object")
+    turns = raw.get("turns")
+    if not isinstance(turns, list) or not turns:
+        raise ValueError(f"{p}: 'turns' must be a non-empty list")
+
+    from datetime import datetime
+
+    messages: List[str] = []
+    turn_meta: List[Dict[str, Any]] = []
+    prev_ts = None
+    for pos, entry in enumerate(turns):
+        if not isinstance(entry, dict):
+            raise ValueError(f"{p}: turns[{pos}] must be an object")
+        msg = entry.get("message")
+        if not isinstance(msg, str) or not msg.strip():
+            raise ValueError(f"{p}: turns[{pos}] has no non-empty 'message'")
+        # `timestamp` (finalized schema) is optional, but when present it must
+        # be a valid ISO-8601 datetime and the schedule must be chronological —
+        # an out-of-order schedule is an authoring bug that would silently
+        # misrepresent the simulated timeline.
+        raw_ts = entry.get("timestamp")
+        if raw_ts is not None:
+            if not isinstance(raw_ts, str):
+                raise ValueError(f"{p}: turns[{pos}] timestamp must be a string")
+            try:
+                ts = datetime.fromisoformat(raw_ts.strip().replace("Z", "+00:00"))
+            except ValueError as exc:
+                raise ValueError(
+                    f"{p}: turns[{pos}] has unparseable timestamp {raw_ts!r}"
+                ) from exc
+            if prev_ts is not None:
+                try:
+                    out_of_order = ts < prev_ts
+                except TypeError as exc:  # naive vs offset-aware mix
+                    raise ValueError(
+                        f"{p}: turns[{pos}] mixes offset-aware and naive "
+                        f"timestamps — use one convention throughout"
+                    ) from exc
+                if out_of_order:
+                    raise ValueError(
+                        f"{p}: turns[{pos}] timestamp {raw_ts!r} precedes the "
+                        f"previous turn's — schedule is out of order")
+            prev_ts = ts
+        label = entry.get("turn")
+        # Labels must agree with position (T0..TN contiguous) because inject
+        # applies_between_turns matches by integer position, not label text.
+        # A missing label is tolerated and inferred from position.
+        if label is not None:
+            m = re.match(r"\s*T?(\d+)\s*$", str(label), re.IGNORECASE)
+            if not m:
+                raise ValueError(
+                    f"{p}: turns[{pos}] has unparseable turn label {label!r}")
+            if int(m.group(1)) != pos:
+                raise ValueError(
+                    f"{p}: turn label {label!r} at position {pos} breaks the "
+                    f"contiguous T0..TN order (expected T{pos}) — inject "
+                    f"boundaries would fire at the wrong turns")
+        messages.append(msg.strip())
+        turn_meta.append({k: v for k, v in entry.items() if k != "message"})
+
+    declared = raw.get("turn_count")
+    if declared is not None and declared != len(turns):
+        raise ValueError(
+            f"{p}: turn_count={declared} but {len(turns)} turns present")
+
+    meta = {k: v for k, v in raw.items() if k != "turns"}
+    meta["turns"] = turn_meta
+    return messages, meta
+
+
 # ---------------------------------------------------------------------------
 # Applier
 # ---------------------------------------------------------------------------

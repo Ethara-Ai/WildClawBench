@@ -99,7 +99,7 @@ def _find_prompt_path(task_id: str) -> Path | None:
     # regrade never silently judges against an EMPTY <question> (historical
     # multi-turn regrades did exactly that — a None prompt path was tolerated
     # and score.json was still written).
-    for name in ("prompts.txt", "PROMPT.md"):
+    for name in ("prompts.json", "prompts.txt", "PROMPT.md"):
         cand = REPO_ROOT / "input" / task_id / name
         if cand.is_file():
             return cand
@@ -107,6 +107,14 @@ def _find_prompt_path(task_id: str) -> Path | None:
 
 
 def _read_task_description(prompt_path: Path) -> str:
+    if prompt_path.name == "prompts.json":
+        try:
+            from src.utils.inject_director import parse_prompts_json
+            turns, _meta = parse_prompts_json(prompt_path)
+            if turns:
+                return turns[0].strip()
+        except Exception:
+            pass
     if prompt_path.name in ("prompts.txt", "PROMPT.md"):
         try:
             from src.utils.inject_director import parse_prompts_file
