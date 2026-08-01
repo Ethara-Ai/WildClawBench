@@ -593,10 +593,26 @@ def _build_router(store: Store, registry: _OneShotRegistry) -> APIRouter:
         except StoreError as e:
             raise HTTPException(404, str(e))
 
+    def _pk_candidates(pk: str):
+        """URL path params are always strings, but stores key rows by the pk
+        value's ORIGINAL type — tasks are authored inconsistently (etsy
+        listing_id 7102 as int in one task, "800000" as str in another).
+        Try the string form first, then the int form, so a path pk reaches
+        int-keyed rows too. Exact-match precedence keeps str-keyed stores
+        unaffected."""
+        yield pk
+        if isinstance(pk, str) and pk.lstrip("-").isdigit():
+            yield int(pk)
+
     @router.get("/data/{table}/{pk}")
     def get_row(table: str, pk: str):
+        row = None
         try:
-            row = store.table(table).get(pk)
+            t = store.table(table)
+            for cand in _pk_candidates(pk):
+                row = t.get(cand)
+                if row is not None:
+                    break
         except StoreError as e:
             raise HTTPException(404, str(e))
         if row is None:
@@ -617,29 +633,43 @@ def _build_router(store: Store, registry: _OneShotRegistry) -> APIRouter:
 
     @router.patch("/data/{table}/{pk}")
     def patch_row(table: str, pk: str, body: _PatchIn):
+        row = None
+        before = None
+        used_pk = pk
         try:
             t = store.table(table)
-            before = t.get(pk)
-            row = t.patch(pk, body.fields)
+            for cand in _pk_candidates(pk):
+                before = t.get(cand)
+                row = t.patch(cand, body.fields)
+                if row is not None:
+                    used_pk = cand
+                    break
         except StoreError as e:
             raise HTTPException(400, str(e))
         if row is None:
             raise HTTPException(404, f"row '{pk}' not in table '{table}'")
-        store.record("data.patch", table=table, pk=pk, before=before, after=row)
+        store.record("data.patch", table=table, pk=used_pk, before=before, after=row)
         return row
 
     @router.delete("/data/{table}/{pk}")
     def delete_row(table: str, pk: str):
+        ok = False
+        before = None
+        used_pk = pk
         try:
             t = store.table(table)
-            before = t.get(pk)
-            ok = t.delete(pk)
+            for cand in _pk_candidates(pk):
+                before = t.get(cand)
+                ok = t.delete(cand)
+                if ok:
+                    used_pk = cand
+                    break
         except StoreError as e:
             raise HTTPException(400, str(e))
         if not ok:
             raise HTTPException(404, f"row '{pk}' not in table '{table}'")
-        store.record("data.delete", table=table, pk=pk, before=before)
-        return {"deleted": pk}
+        store.record("data.delete", table=table, pk=used_pk, before=before)
+        return {"deleted": used_pk}
 
     @router.post("/data/{table}/bulk")
     def bulk(table: str, body: _BulkIn):
