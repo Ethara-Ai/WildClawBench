@@ -156,6 +156,96 @@ def _seed_ids_for_service(mock_data_root: Path, service: str) -> Set[str]:
     return ids
 
 
+_FS_ALLOWED_ACTIONS = ("copy", "mkdir")
+
+
+def _resolve_fs_src(stage: InjectStage, src: str) -> Tuple[Optional[Path], List[Dict[str, Any]]]:
+    """Resolve a filesystem op's ``src`` the way the runtime hook does.
+
+    Mirrors ``InjectApplier._apply_filesystem``'s 3-step chain exactly:
+      (1) stage_dir/src, (2) basename rglob within stage_dir (skip
+      ``_placeholders``), (3) task-root fallback stage_dir.parent.parent/src.
+    Returns ``(resolved_path_or_None, footgun_warnings)``. Only usable when the
+    stage carries a real on-disk ``source`` (unit stages use source="").
+    """
+    warnings: List[Dict[str, Any]] = []
+    if not stage.source:
+        return None, warnings
+    stage_dir = Path(stage.source).parent
+    if not stage_dir.is_dir():
+        return None, warnings
+    host_src = stage_dir / src
+    if host_src.exists():
+        return host_src.resolve(), warnings
+    hits = [p for p in stage_dir.rglob(Path(src).name)
+            if p.is_file() and "_placeholders" not in p.parts]
+    if len(hits) > 1:
+        warnings.append({"status": "fs-src-ambiguous",
+                         "reason": f"{len(hits)} files match basename {Path(src).name!r} "
+                                   "under the stage dir (rglob order is unstable; use an "
+                                   "explicit relative path)"})
+    if hits:
+        return hits[0].resolve(), warnings
+    task_root_src = (stage_dir.parent.parent / src)
+    if task_root_src.exists():
+        resolved = task_root_src.resolve()
+        if stage_dir.resolve() not in resolved.parents:
+            warnings.append({"status": "fs-src-outside-stage",
+                             "reason": f"src {src!r} resolved outside the stage dir "
+                                       f"({resolved}); prefer a file under inject/stage<N>/"})
+        return resolved, warnings
+    return None, warnings
+
+
+def _validate_filesystem_op(
+    stage: InjectStage, op: Dict[str, Any], mock_data_root: Optional[Path],
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """Statically validate one ``mutations.filesystem`` op. Returns (fatal, warnings)."""
+    fatal: List[Dict[str, Any]] = []
+    warnings: List[Dict[str, Any]] = []
+    oid = op.get("id")
+    action = op.get("action")
+    dst = op.get("dst")
+
+    if action not in _FS_ALLOWED_ACTIONS:
+        fatal.append({
+            "stage": stage.name, "id": oid, "status": "fs-invalid-action",
+            "reason": f"unsupported filesystem action {action!r} (allowed: copy, "
+                      "mkdir; 'patch'/in-place edit is not supported — author a full "
+                      "replacement file under inject/stage<N>/ and use action:copy)",
+        })
+        return fatal, warnings
+
+    if action == "mkdir":
+        if not dst:
+            fatal.append({"stage": stage.name, "id": oid, "status": "fs-missing-dst",
+                          "reason": "mkdir op has no dst"})
+        if op.get("src"):
+            warnings.append({"stage": stage.name, "id": oid, "status": "fs-mkdir-with-src",
+                             "reason": "mkdir op also sets src (ignored by the copy hook)"})
+        return fatal, warnings
+
+    src = op.get("src")
+    if not src:
+        fatal.append({
+            "stage": stage.name, "id": oid, "status": "fs-missing-src",
+            "reason": "filesystem copy op has no src (author a real replacement file "
+                      "under inject/stage<N>/ and reference it)",
+        })
+    if not dst:
+        fatal.append({"stage": stage.name, "id": oid, "status": "fs-missing-dst",
+                      "reason": "filesystem copy op has no dst"})
+    if src and dst and stage.source:
+        resolved, fg = _resolve_fs_src(stage, src)
+        warnings.extend({**w, "stage": stage.name, "id": oid} for w in fg)
+        if resolved is None:
+            fatal.append({
+                "stage": stage.name, "id": oid, "status": "fs-src-not-found",
+                "reason": f"src {src!r} not found under {Path(stage.source).parent}",
+            })
+    return fatal, warnings
+
+
 def validate_inject_script(
     script: InjectScript,
     host_api_to_url: Dict[str, Any],
@@ -190,11 +280,20 @@ def validate_inject_script(
         for op in list(seed_stage.silent) + list(seed_stage.loud):
             svc = _resolve_slug(_op_service(op), urls) or (_op_service(op) or "")
             _snap(svc).update(_created_ids(op))
+        for op in seed_stage.filesystem:
+            f, w = _validate_filesystem_op(seed_stage, op, mock_data_root)
+            fatal.extend(f)
+            warnings.extend(w)
 
     for stage_pos, stage in enumerate(ordered):
         # stage_pos 0 == the first non-seed stage (validated against seed only).
         is_first_boundary = stage_pos == 0
         pending_creates: Dict[str, Set[str]] = {}
+
+        for op in stage.filesystem:
+            f, w = _validate_filesystem_op(stage, op, mock_data_root)
+            fatal.extend(f)
+            warnings.extend(w)
 
         for op in list(stage.silent) + list(stage.loud):
             oid = op.get("id")
