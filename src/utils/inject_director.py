@@ -623,10 +623,27 @@ class InjectApplier:
 
     # -- filesystem ---------------------------------------------------------
 
+    # COPY-ONLY hook (ClawMark-aligned): an "edit" is a full replacement file
+    # copied over the same dst, never in-place. Any other action ('patch',
+    # 'delete', typo, null) is rejected as status='invalid' instead of the old
+    # silent no-op that let mid-run edits vanish (is_defect -> True both phases).
+    _FS_ALLOWED_ACTIONS = ("copy", "mkdir")
+
     def _apply_filesystem(self, op: Dict[str, Any], stage: InjectStage) -> Dict[str, Any]:
         action = op.get("action")
         dst = op.get("dst")
         rec = {"id": op.get("id"), "action": action, "dst": dst}
+        if action not in self._FS_ALLOWED_ACTIONS:
+            rec.update(
+                ok=False, status="invalid",
+                reason=(
+                    f"unsupported filesystem action {action!r} "
+                    "(allowed: copy, mkdir; 'patch' is not supported — author a "
+                    "full replacement file and use action:copy)"
+                ),
+            )
+            self._append({"type": "inject.fs", **rec, "ts": time.time()})
+            return rec
         if self._copy is None or self._inject_root is None:
             rec.update(ok=False, status="skipped", reason="no workspace copy hook")
             self._append({"type": "inject.fs", **rec, "ts": time.time()})
