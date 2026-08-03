@@ -75,11 +75,12 @@ def test_sm3_resolves_against_live_store_despite_placeholder_and_casing():
     ap = FakeApplier({"airtable-api": "http://x"}, None, Path("/tmp/inj_test_timeline.jsonl"))
     resolved = ap._resolve_target("airtable-api", sm3)
     assert resolved is not None, "SM3 must resolve against the live store"
-    table, pk, fields = resolved
+    table, pk, fields, unmapped = resolved
     assert pk == "recUDI007"                 # {rec_UDI-2026-007} -> real record id
     assert fields.get("Yield_kg_m2") == 16.8  # yield_kg_m2 -> real column casing
     assert "_last_modified_by" not in fields  # underscore meta stripped
     assert "_last_modified_at" not in fields
+    assert unmapped == []                     # every SM3 field maps to a live column
 
 
 def test_mid_run_loud_op_is_applied_visibly(tmp_path):
@@ -110,3 +111,81 @@ def test_mid_run_loud_op_is_applied_visibly(tmp_path):
     import json
     entry = json.loads(line)
     assert entry["silent_ops"] == 1 and entry["loud_ops"] == 1
+
+
+# --------------------------------------------------------------------------- #
+# Filesystem-op allowlist dispatch (_apply_filesystem). The copy hook supports
+# ONLY {copy, mkdir}; any other action is rejected as status='invalid' (a
+# defect) instead of the old silent no-op that let mid-run edits vanish.
+# --------------------------------------------------------------------------- #
+
+def _fs_stage(tmp_path, fs_ops):
+    stage_dir = tmp_path / "inject" / "stage1"
+    stage_dir.mkdir(parents=True, exist_ok=True)
+    (stage_dir / "mutations.json").write_text("{}", encoding="utf-8")
+    return InjectStage(
+        index=1, name="s1", from_turn=0, to_turn=1,
+        filesystem=list(fs_ops), loud=[], silent=[],
+        source=str(stage_dir / "mutations.json"),
+    )
+
+
+def _fs_applier(tmp_path, copies):
+    def hook(host_src, dst, mkdir=False):
+        copies.append({"src": str(host_src) if host_src else None,
+                       "dst": dst, "mkdir": mkdir})
+        return True
+    return InjectApplier(
+        {}, None, tmp_path / "timeline.jsonl",
+        inject_root=tmp_path / "inject",
+        copy_into_workspace=hook,
+    )
+
+
+@pytest.mark.parametrize("bad_action", ["patch", "delete", "append", "move", None])
+def test_fs_disallowed_action_is_rejected_as_invalid(tmp_path, bad_action):
+    copies = []
+    ap = _fs_applier(tmp_path, copies)
+    stage = _fs_stage(tmp_path, [
+        {"id": "fs-bad", "action": bad_action,
+         "src": "note.txt", "dst": "/workspace/note.txt"}])
+    rec = ap._apply_filesystem(stage.filesystem[0], stage)
+    assert rec["ok"] is False
+    assert rec["status"] == "invalid"
+    assert "not supported" in rec["reason"]
+    # the copy hook must NEVER have been invoked for a rejected action
+    assert copies == []
+    # a rejected op is a defect in BOTH phases (mid-run and seed)
+    from src.utils.inject_director import is_defect
+    assert is_defect(rec, phase="stage") is True
+    assert is_defect(rec, phase="seed") is True
+
+
+def test_fs_copy_action_lands_via_hook(tmp_path):
+    # a real source file must exist under the stage dir for the copy path
+    stage_dir = tmp_path / "inject" / "stage1"
+    stage_dir.mkdir(parents=True, exist_ok=True)
+    (stage_dir / "mutations.json").write_text("{}", encoding="utf-8")
+    (stage_dir / "note.txt").write_text("hello from inject", encoding="utf-8")
+    copies = []
+    ap = _fs_applier(tmp_path, copies)
+    stage = InjectStage(
+        index=1, name="s1", from_turn=0, to_turn=1,
+        filesystem=[{"id": "fs-ok", "action": "copy",
+                     "src": "note.txt", "dst": "/workspace/note.txt"}],
+        loud=[], silent=[], source=str(stage_dir / "mutations.json"))
+    rec = ap._apply_filesystem(stage.filesystem[0], stage)
+    assert rec["ok"] is True and rec["status"] == "copied"
+    assert len(copies) == 1
+    assert copies[0]["dst"] == "/workspace/note.txt"
+    assert copies[0]["src"].endswith("note.txt")
+
+
+def test_fs_mkdir_action_lands_via_hook(tmp_path):
+    copies = []
+    ap = _fs_applier(tmp_path, copies)
+    stage = _fs_stage(tmp_path, [
+        {"id": "fs-mk", "action": "mkdir", "dst": "/workspace/newdir"}])
+    rec = ap._apply_filesystem(stage.filesystem[0], stage)
+    assert rec["ok"] is True and rec["status"] == "mkdir"
+    assert copies == [{"src": None, "dst": "/workspace/newdir", "mkdir": True}]

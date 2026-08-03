@@ -57,6 +57,7 @@ def _stage(name="s1", silent=None, loud=None, fs=None, index=1):
      "stage", True),
     ({"ok": False, "status": "failed"}, "stage", True),
     ({"ok": False, "status": "no-match"}, "stage", True),
+    ({"ok": False, "status": "partial"}, "stage", True),
     # seed-time fs op, copy hook absent -> benign by design
     ({"ok": False, "status": "skipped", "action": "copy",
       "reason": "no workspace copy hook"}, "seed", False),
@@ -185,6 +186,102 @@ def test_unresolved_service_still_unresolved(tmp_path):
          "path": "/admin/messages/upsert"}, _stage(), 1, silent=True)
     assert rec["ok"] is False and rec["status"] == "unresolved"
     assert "no admin URL for gmail" in rec["reason"]
+    assert is_defect(rec) is True
+
+
+# --------------------------------------------------------------------------- #
+# 4b. C1 slug-normalization + C2 nested-body survival + C3 strict mapping,
+#     end-to-end through the REAL _resolve_target/_extract_fields/_map path.
+#     Only the admin HTTP plane (_admin_get/_admin_patch) is stubbed.
+# --------------------------------------------------------------------------- #
+def _live_store_applier(tmp_path, tables, urls=None):
+    """Applier whose admin plane serves `tables` ({table: [rows]}) and applies
+    shallow top-level patches to the matching row in place."""
+    ap = _applier(tmp_path, urls=urls)
+
+    def fake_admin_get(api, suffix):
+        if suffix == "/admin/tables":
+            return {"tables": [{"name": t} for t in tables]}
+        if suffix.startswith("/admin/data/"):
+            rest = suffix[len("/admin/data/"):]
+            if "/" in rest:
+                table, pk = rest.split("/", 1)
+                for row in tables.get(table, []):
+                    if str(row.get("id") or row.get("pk")) == pk:
+                        return dict(row)
+                return None
+            return {"rows": tables.get(rest, [])}
+        return None
+
+    def fake_admin_patch(api, table, pk, fields):
+        for row in tables.get(table, []):
+            if str(row.get("id") or row.get("pk")) == pk:
+                row.update(fields)
+                return {"ok": True, "status": 200}
+        return {"ok": False, "status": 404}
+
+    ap._admin_get = fake_admin_get          # type: ignore
+    ap._admin_patch = fake_admin_patch      # type: ignore
+    return ap
+
+
+def test_v1_nested_body_reaches_live_nested_column(tmp_path):
+    # Classroom V1 hazard: seed flat dueDate_* is lifted to nested dueDate{} at
+    # load, so the live row carries a nested "dueDate" column. A canonical-slug op
+    # with a bare top-level nested body must (C2+C3) resolve and patch it.
+    tables = {"coursework": [{
+        "id": "901110051",
+        "title": "Reading the Chart",
+        "dueDate": {"year": 2027, "month": 1, "day": 20},
+    }]}
+    ap = _live_store_applier(
+        tmp_path, tables, urls={"google-classroom-api": "http://x"})
+    rec = ap._apply_api_mutation(
+        {"id": "s2_due_move", "service": "google-classroom-api", "method": "PATCH",
+         "path": "/v1/courses/801110001/courseWork/901110051",
+         "body": {"dueDate": {"year": 2027, "month": 1, "day": 27}}},
+        _stage(), 5, silent=True)
+    assert "resolved_service" not in rec
+    assert rec["service"] == "google-classroom-api"
+    assert rec["ok"] is True and rec["status"] == "applied"
+    assert "unmapped_fields" not in rec                        # C3: clean
+    assert tables["coursework"][0]["dueDate"] == {            # C2: nested landed
+        "year": 2027, "month": 1, "day": 27}
+    assert is_defect(rec) is False
+
+
+def test_v2_rename_drop_unmapped_field_is_partial_defect(tmp_path):
+    # V2 hazard: author targets a seed column name that the coercer renamed away.
+    # One field maps (title), one does not (subject_line -> no live column).
+    # C3 Interpretation-B: patch the mapped one, flag the op as a partial defect.
+    tables = {"campaigns": [{"id": "c1", "title": "old"}]}
+    ap = _live_store_applier(
+        tmp_path, tables, urls={"mailchimp-api": "http://x"})
+    rec = ap._apply_api_mutation(
+        {"id": "s1", "service": "mailchimp-api", "method": "PATCH",
+         "path": "/campaigns/c1",
+         "body": {"fields": {"title": "new", "subject_line": "hello"}}},
+        _stage(), 3, silent=True)
+    assert rec["ok"] is False
+    assert rec["status"] == "partial"
+    assert rec["verified"] is False
+    assert rec["unmapped_fields"] == ["subject_line"]
+    assert "unmapped fields dropped" in rec["reason"]
+    assert tables["campaigns"][0]["title"] == "new"   # mapped field still landed
+    assert is_defect(rec) is True
+
+
+def test_all_fields_unmapped_is_unresolved(tmp_path):
+    # If NOTHING maps to a live column, the row can't be located -> unresolved.
+    tables = {"campaigns": [{"id": "c1", "title": "old"}]}
+    ap = _live_store_applier(
+        tmp_path, tables, urls={"mailchimp-api": "http://x"})
+    rec = ap._apply_api_mutation(
+        {"id": "s1", "service": "mailchimp-api", "method": "PATCH",
+         "path": "/campaigns/c1",
+         "body": {"fields": {"subject_line": "hello", "from_name": "x"}}},
+        _stage(), 3, silent=True)
+    assert rec["ok"] is False and rec["status"] == "unresolved"
     assert is_defect(rec) is True
 
 
