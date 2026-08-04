@@ -24,6 +24,7 @@ Strips, which Textual cannot address by character without help. See
 from __future__ import annotations
 
 import logging
+import os
 import sys
 import threading
 from typing import Any, Callable, Dict, Optional
@@ -634,6 +635,10 @@ if _TEXTUAL_AVAILABLE:
         # appear to freeze the UI.
         BINDINGS = [
             ("q", "quit", "Quit"),
+            # ctrl+q always quits even when the HITL Input holds focus (a bare q
+            # would be typed into it). It uses a SEPARATE action so check_action's
+            # bare-q veto (active during an input request) never disables it.
+            Binding("ctrl+q", "force_quit", "Quit", priority=True, show=False),
             # Drag the mouse over any pane to select, then ctrl+c. Textual
             # binds ctrl+c to help_quit by default, so without this override a
             # selection can be made but never copied. Quit stays on q / ctrl+q.
@@ -668,6 +673,11 @@ if _TEXTUAL_AVAILABLE:
             self._total_hint = total_hint
             self._stages: Dict[str, Dict[str, str]] = {}
             self._done = False
+            # True once the user pressed q WHILE the harness worker was still
+            # running (run abandoned). Textual thread workers cannot be
+            # preempted, so run_with_dashboard hard-exits the process when this
+            # is set — see action_quit + run_with_dashboard.
+            self._abandoned = False
             self._completed = 0
             self._total = total_hint
             self._unsub: Optional[Callable[[], None]] = None
@@ -892,6 +902,16 @@ if _TEXTUAL_AVAILABLE:
                 self.query_one("#log", RichLog).border_title = "Log"
             except Exception:
                 pass
+            # Keep the hidden HITL Input out of the auto-focus walk so a bare q
+            # reaches the app-level quit binding during a run (it only becomes
+            # focusable when a turn boundary reveals it — see
+            # _handle_input_request). set_focus(None) clears Textual's default
+            # focus-first-focusable so nothing swallows q on mount.
+            try:
+                self.query_one("#prompt", Input).can_focus = False
+                self.set_focus(None)
+            except Exception:
+                pass
             # Reroute all logging into the dashboard log pane.
             self._log_handler = _BusLogHandler()
             self._log_handler.setFormatter(logging.Formatter("%(message)s"))
@@ -1003,6 +1023,7 @@ if _TEXTUAL_AVAILABLE:
                 inp.border_title = prompt or "your message"
                 inp.value = ""
                 inp.display = True
+                inp.can_focus = True
                 self.set_focus(inp)
             except Exception:
                 pass
@@ -1012,6 +1033,8 @@ if _TEXTUAL_AVAILABLE:
                 inp = self.query_one("#prompt", Input)
                 inp.value = ""
                 inp.display = False
+                inp.can_focus = False
+                self.set_focus(None)
             except Exception:
                 pass
 
@@ -1033,6 +1056,8 @@ if _TEXTUAL_AVAILABLE:
                 inp = self.query_one("#prompt", Input)
                 inp.value = ""
                 inp.display = False
+                inp.can_focus = False
+                self.set_focus(None)
             except Exception:
                 pass
             get_input_bridge().submit(value)
@@ -1128,6 +1153,43 @@ if _TEXTUAL_AVAILABLE:
                 )
             return table
 
+        def _quit(self) -> None:
+            # Quit while the run is still going = abandon it. Textual thread
+            # workers run a blocking callable that cannot be preempted, so we
+            # flag the abandonment and let run_with_dashboard() hard-exit the
+            # process (os._exit) once app.run() returns — a plain self.exit()
+            # would leave _run_main_body executing in the background and its
+            # logs spilling to the terminal. Set the flag + exit code BEFORE
+            # self.exit() so on_unmount and run_with_dashboard both observe it.
+            if not self._done:
+                self._abandoned = True
+                self._exit_code = 130
+                try:
+                    get_input_bridge().close()
+                except Exception:
+                    pass
+            self.exit()
+
+        async def action_quit(self) -> None:
+            self._quit()
+
+        async def action_force_quit(self) -> None:
+            self._quit()
+
+        def check_action(self, action: str, parameters: "tuple[object, ...]"):
+            # Suppress the bare-q quit binding while the HITL prompt is visible
+            # and focused, so a human can type a message containing 'q'. Returning
+            # False skips the app binding without consuming the key, so it falls
+            # through to the Input. ctrl+q (priority) still quits regardless.
+            if action == "quit":
+                try:
+                    inp = self.query_one("#prompt", Input)
+                    if inp.display and self.focused is inp:
+                        return False
+                except Exception:
+                    pass
+            return True
+
         def on_unmount(self) -> None:
             # Unblock any worker parked in InputBridge.request() (interactive
             # Mode 2) so quitting the dashboard mid-input can never hang the
@@ -1145,11 +1207,49 @@ if _TEXTUAL_AVAILABLE:
                 root = logging.getLogger()
                 if self._log_handler:
                     root.removeHandler(self._log_handler)
-                for h in getattr(self, "_saved_handlers", []):
-                    root.addHandler(h)
-                root.setLevel(getattr(self, "_saved_level", logging.INFO))
+                # On abandonment do NOT re-point root logging at stdout: the
+                # worker is still alive until run_with_dashboard's os._exit, and
+                # restoring the stream handlers here would let its next log line
+                # spill to the terminal in that window. A dying process needs no
+                # handlers. The restore only matters for the normal path, where
+                # eval/wcb.py runs the next task/rep in the same process.
+                if not self._abandoned:
+                    for h in getattr(self, "_saved_handlers", []):
+                        root.addHandler(h)
+                    root.setLevel(getattr(self, "_saved_level", logging.INFO))
             except Exception:
                 pass
+
+
+def _abandon_cleanup_bestefforts(timeout_s: float = 2.0) -> None:
+    # Bounded best-effort kill of the harness's own containers before os._exit
+    # abandons the run. Only matches the harness naming prefixes (t_/mocks-/ll-/
+    # k3net-, per script/run.sh cleanup_orphans); wcbsh-* is deliberately left
+    # alone (bash-owned shared sidecar). Anything missed is reaped by the next
+    # run's cleanup_orphans. Stdlib-only: the presentation layer must not import
+    # the container plane.
+    import shutil
+    import subprocess
+
+    if not shutil.which("docker"):
+        return
+    prefixes = ("t_", "mocks-", "ll-", "k3net-")
+    filters: list[str] = []
+    for p in prefixes:
+        filters += ["--filter", f"name=^{p}"]
+    try:
+        out = subprocess.run(
+            ["docker", "ps", "-q", *filters],
+            capture_output=True, text=True, timeout=timeout_s,
+        )
+        ids = [x for x in out.stdout.split() if x]
+        if ids:
+            subprocess.run(
+                ["docker", "kill", *ids],
+                capture_output=True, timeout=timeout_s,
+            )
+    except Exception:
+        pass
 
 
 def run_with_dashboard(work: Callable[[], Any], total_hint: int = 0) -> bool:
@@ -1157,11 +1257,26 @@ def run_with_dashboard(work: Callable[[], Any], total_hint: int = 0) -> bool:
 
     Returns True if the dashboard ran, False if Textual is unavailable (caller
     should then fall back to the plain Rich logging path).
+
+    Two exit paths after ``app.run()``:
+      * normal — the worker finished; ``sys.exit(code)`` propagates its exit
+        intent (a failed ``--tui`` run must exit non-zero, like the default).
+      * abandonment — the user pressed q mid-run. The harness worker still
+        runs in a non-daemon executor thread that ``sys.exit`` would block on,
+        so we ``os._exit(130)`` to stop it dead (after a bounded best-effort
+        container sweep). This is the only way to guarantee no further log
+        spill to the terminal.
     """
     if not _TEXTUAL_AVAILABLE:
         return False
     app = HarnessDashboard(work, total_hint=total_hint)
     app.run()
+    if getattr(app, "_abandoned", False):
+        try:
+            _abandon_cleanup_bestefforts()
+        except Exception:
+            pass
+        os._exit(130)
     # app.run() has returned, so we are back on the main thread. Propagate the
     # harness's exit intent that the worker thread captured; without this a
     # failed run under --tui would exit 0 (the worker's SystemExit is lost).

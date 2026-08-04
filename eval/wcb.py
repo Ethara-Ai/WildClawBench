@@ -103,8 +103,6 @@ def main() -> None:
     if not status.ok:
         print(f"[wcb] {status.detail}", file=sys.stderr)
         raise SystemExit(1)
-    if status.started_by_us:
-        print(f"[wcb] {status.detail}")
 
     # Env next: the auth-provider selection must be in os.environ before
     # run_batch's import-time load_dotenv() (which never overrides existing
@@ -113,8 +111,14 @@ def main() -> None:
     # the judge roster to the provider chosen in the form.
     os.environ.update(provider_env_overrides(config))
     os.environ["WCB_STREAM"] = "1"
+    # Default launcher runs to the full-screen dashboard (logs/tests/rubrics/
+    # summary render in-TUI, not on the terminal). setdefault so an explicit
+    # WCB_TUI=0 still wins; run_batch's gate still safely falls back to Rich
+    # logging when there is no real terminal or textual is absent.
+    os.environ.setdefault("WCB_TUI", "1")
+    _tui_default = os.environ.get("WCB_TUI", "").strip().lower() in ("1", "true", "yes")
 
-    argv = config_to_argv(config, ROOT_DIR, isatty=isatty) + passthrough
+    tasks = config.get("tasks") or ([config["task"]] if config.get("task") else [])
 
     import run_batch  # noqa: E402  (heavy import deferred until after the form)
     from src.utils.cli_args import build_run_batch_parser  # noqa: E402
@@ -124,16 +128,23 @@ def main() -> None:
         default_parallel=run_batch.DEFAULT_PARALLEL,
     )
 
-    # Reps = sequential re-invocations of the same config (run.sh semantics:
-    # one run_batch per rep; output dirs auto-increment run_N). Re-parse per
-    # rep so one rep's namespace mutations never leak into the next.
+    # run_batch takes ONE --task, so a multi-task selection is a sequential
+    # outer loop (one run_batch invocation per task) wrapping the reps loop.
+    # Reps = sequential re-invocations of the same task (run.sh semantics: one
+    # run_batch per rep; output dirs auto-increment run_N). Re-parse per rep so
+    # one namespace's mutations never leak into the next.
     reps = max(1, int(config.get("reps", 1)))
-    print(f"[wcb] starting: run_batch {' '.join(argv)}"
-          + (f"  × {reps} reps" if reps > 1 else ""))
-    for rep in range(1, reps + 1):
-        if reps > 1:
-            print(f"[wcb] ── rep {rep}/{reps} ──")
-        run_batch.main(parser.parse_args(argv))
+    multi = len(tasks) > 1
+    for ti, task in enumerate(tasks, start=1):
+        argv = config_to_argv(config, ROOT_DIR, isatty=isatty, task=task) + passthrough
+        if not _tui_default:
+            prefix = f"[wcb] ({ti}/{len(tasks)}) " if multi else "[wcb] "
+            print(f"{prefix}starting: run_batch {' '.join(argv)}"
+                  + (f"  × {reps} reps" if reps > 1 else ""))
+        for rep in range(1, reps + 1):
+            if reps > 1:
+                print(f"[wcb] ── {task} rep {rep}/{reps} ──")
+            run_batch.main(parser.parse_args(argv))
 
 
 if __name__ == "__main__":

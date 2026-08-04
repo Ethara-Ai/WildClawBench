@@ -102,8 +102,9 @@ def test_copyable_richlog_mirrors_unwrapped_text():
 def test_panels_text_and_key_bindings(tmp_path, monkeypatch):
     """End-to-end: real dashboard, real key presses, real file on disk.
 
-    ctrl+o / ctrl+y are priority bindings specifically because the HITL Input
-    holds focus — a bare letter would be typed into the prompt instead.
+    The hidden HITL Input is kept out of the auto-focus walk during a run so a
+    bare ``q`` reaches the quit binding; ctrl+o / ctrl+y stay priority bindings
+    so they still fire once a turn boundary DOES focus the Input.
     """
     from textual.widgets import Input, RichLog
     from src.utils.ui import tui
@@ -119,19 +120,19 @@ def test_panels_text_and_key_bindings(tmp_path, monkeypatch):
             await pilot.pause()
 
             text = app.panels_text()
-            focused_is_input = isinstance(app.focused, Input)
+            input_focused = isinstance(app.focused, Input)
 
             await pilot.press("ctrl+o")
             await pilot.pause()
             await pilot.press("ctrl+y")   # must not raise even with no clipboard
             await pilot.pause()
-            return text, focused_is_input
+            return text, input_focused
 
-    text, focused_is_input = asyncio.run(_run())
+    text, input_focused = asyncio.run(_run())
 
-    assert focused_is_input, (
-        "precondition changed: the Input no longer holds focus, so the "
-        "priority bindings this test guards may no longer be necessary"
+    assert not input_focused, (
+        "the hidden HITL Input must NOT hold focus during a run, or a bare q "
+        "would be typed into it instead of quitting the dashboard"
     )
     assert "===== Live Stream =====" in text
     assert "ERROR LLM request timed out." in text

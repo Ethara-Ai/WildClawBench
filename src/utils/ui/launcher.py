@@ -42,7 +42,8 @@ try:
     from textual.binding import Binding
     from textual.containers import Horizontal, Vertical, VerticalScroll
     from textual.widgets import (
-        Button, Collapsible, Footer, Header, Input, Label, Select, Static, Switch,
+        Button, Collapsible, Footer, Header, Input, Label, Select,
+        SelectionList, Static, Switch,
     )
     _TEXTUAL_AVAILABLE = True
 except Exception:  # pragma: no cover - exercised only when textual is missing
@@ -98,16 +99,31 @@ def launcher_available() -> bool:
 
 
 def discover_tasks(root: Path) -> List[str]:
-    """Task dirs under input/ that look runnable (prompt.txt or prompts.txt)."""
+    """Every task dir under input/ (any subfolder is shown, not just runnable ones)."""
     tasks: List[str] = []
     input_dir = root / "input"
     if input_dir.is_dir():
         for entry in sorted(input_dir.iterdir()):
-            if entry.is_dir() and (
-                (entry / "prompt.txt").is_file() or (entry / "prompts.txt").is_file()
-            ):
+            if entry.is_dir():
                 tasks.append(str(entry.relative_to(root)))
     return tasks
+
+
+def resolve_first_n(tasks: List[str], n: int) -> Tuple[List[str], Optional[str]]:
+    """First *n* tasks in discovery order, plus a warning when *n* exceeds supply.
+
+    Returns (selected, warning). ``n`` is clamped to the number of tasks present
+    so the run never fails; the warning is a label the form shows inline.
+    """
+    total = len(tasks)
+    if n <= 0:
+        return [], None
+    if n > total:
+        return list(tasks), (
+            f"Only {total} task{'s' if total != 1 else ''} in input/ — "
+            f"running all {total} (requested {n})."
+        )
+    return list(tasks[:n]), None
 
 
 def discover_oauth_accounts() -> List[Tuple[str, str]]:
@@ -147,25 +163,46 @@ def save_prefs(prefs: Dict[str, Any]) -> None:
         pass  # prefs are a convenience, never fatal
 
 
-def resolve_interactive(config: Dict[str, Any], root: Path, isatty: bool) -> bool:
-    """Auto mode: interactive iff multi-turn task + openclaw + parallel 1 + tty."""
+def resolve_interactive(
+    config: Dict[str, Any], root: Path, isatty: bool, task: Optional[str] = None
+) -> bool:
+    """Auto mode: interactive iff multi-turn task + openclaw + parallel 1 + tty.
+
+    ``task`` is the single task this argv is being built for. When more than one
+    task was selected the caller passes each in turn; auto-interactive still only
+    fires for a task whose layout is multi-turn. Falls back to ``config['task']``
+    for the legacy single-task call shape.
+    """
     mode = config.get("interactive", AUTO)
     if mode == ON:
         return True
     if mode == OFF:
         return False
+    task = task or config.get("task")
     return (
         isatty
         and config.get("backend") == "openclaw"
         and int(config.get("parallel", 1)) == 1
-        and bool(config.get("task"))
-        and is_multiturn_task(root, config["task"])
+        and bool(task)
+        and is_multiturn_task(root, task)
     )
 
 
-def config_to_argv(config: Dict[str, Any], root: Path, isatty: bool = True) -> List[str]:
-    """Map launcher selections onto the canonical run_batch argv."""
-    argv = ["--task", config["task"]]
+def config_to_argv(
+    config: Dict[str, Any], root: Path, isatty: bool = True, task: Optional[str] = None
+) -> List[str]:
+    """Map launcher selections onto the canonical run_batch argv (one --task).
+
+    ``task`` overrides ``config['task']`` so the caller can iterate a multi-task
+    selection, emitting one argv per task. Falls back to ``config['task']`` (and
+    then the first of ``config['tasks']``) for backward compatibility.
+    """
+    if task is None:
+        task = config.get("task")
+        if task is None:
+            tasks = config.get("tasks") or []
+            task = tasks[0] if tasks else None
+    argv = ["--task", str(task)]
     argv += ["--agent-backend", config["backend"]]
     model = (config.get("custom_model") or "").strip() or config["model"]
     argv += ["--model", model]
@@ -201,7 +238,7 @@ def config_to_argv(config: Dict[str, Any], root: Path, isatty: bool = True) -> L
         argv += ["--thinking", thinking]
     # Streaming is the launcher default; interactive is resolved, not asked.
     argv.append("--stream")
-    if resolve_interactive(config, root, isatty):
+    if resolve_interactive(config, root, isatty, task=str(task)):
         argv.append("--interactive")
     return argv
 
@@ -306,6 +343,15 @@ if _TEXTUAL_AVAILABLE:
             color: $error;
             height: auto;
         }
+        .warn-label {
+            color: $warning;
+            height: auto;
+        }
+        #tasks {
+            height: auto;
+            max-height: 12;
+            margin-top: 1;
+        }
         Collapsible {
             margin-top: 1;
         }
@@ -326,6 +372,16 @@ if _TEXTUAL_AVAILABLE:
         @staticmethod
         def _sel(options: List[str], wanted: Any, fallback: str) -> str:
             return wanted if wanted in options else fallback
+
+        def _initial_selection(
+            self, task_options: List[str], task_value: Optional[str]
+        ) -> List[str]:
+            saved = self._pref("tasks", None)
+            if isinstance(saved, list):
+                keep = [t for t in saved if t in task_options]
+                if keep:
+                    return keep
+            return [task_value] if task_value in task_options else []
 
         # -- auth provider / judge council ---------------------------------
         def _default_provider(self) -> str:
@@ -426,13 +482,21 @@ if _TEXTUAL_AVAILABLE:
                     value=self._judge_value(self._initial_provider()),
                     allow_blank=False, id="judge_models",
                 )
-                yield Label("Task", classes="field-label")
-                yield Select(
-                    [(t, t) for t in task_options],
-                    value=task_value if task_value else Select.BLANK,
-                    prompt="choose a task under input/",
-                    id="task",
+                yield Label("Tasks  (check one or more to run at once)",
+                            classes="field-label")
+                selected_pref = self._initial_selection(task_options, task_value)
+                yield SelectionList[str](
+                    *[(t, t, t in selected_pref) for t in task_options],
+                    id="tasks",
                 )
+                yield Label("Or run the first N tasks from input/ (overrides checks)",
+                            classes="field-label")
+                yield Input(
+                    value=str(self._pref("first_n", "") or ""),
+                    placeholder="e.g. 5  — leave blank to use the checkboxes above",
+                    id="first_n",
+                )
+                yield Static("", id="task_warning", classes="warn-label")
                 yield Label("Agent Backend", classes="field-label")
                 yield Select(
                     [(b, b) for b in BACKENDS],
@@ -519,11 +583,28 @@ if _TEXTUAL_AVAILABLE:
             yield Footer()
 
         # -- collect + validate -------------------------------------------
+        def _resolve_selected_tasks(self) -> List[str]:
+            warn = self.query_one("#task_warning", Static)
+            warn.update("")
+            raw = str(self.query_one("#first_n", Input).value or "").strip()
+            if raw:
+                try:
+                    n = int(raw)
+                except ValueError:
+                    warn.update(f"'{raw}' is not a number — using the checkboxes instead.")
+                else:
+                    selected, message = resolve_first_n(self._tasks, n)
+                    if message:
+                        warn.update(message)
+                    if selected or n > 0:
+                        return selected
+            return list(self.query_one("#tasks", SelectionList).selected)
+
         def _collect(self) -> Optional[Dict[str, Any]]:
-            task = self.query_one("#task", Select).value
-            if task in (None, Select.BLANK):
+            tasks = self._resolve_selected_tasks()
+            if not tasks:
                 self.query_one("#error", Static).update(
-                    "Pick a task first (no runnable dirs found under input/?)")
+                    "Pick at least one task (check a box or enter a first-N count).")
                 return None
             provider = str(self.query_one("#auth_provider", Select).value)
             judge_value = str(self.query_one("#judge_models", Select).value)
@@ -553,7 +634,9 @@ if _TEXTUAL_AVAILABLE:
                 return None
 
             return {
-                "task": str(task),
+                "tasks": tasks,
+                "task": tasks[0],
+                "first_n": str(self.query_one("#first_n", Input).value or "").strip(),
                 "auth_provider": provider,
                 "judge_models": judge_value,
                 "backend": str(self.query_one("#backend", Select).value),
@@ -623,6 +706,7 @@ if _TEXTUAL_AVAILABLE:
                 return
             prefs = dict(config)
             prefs["oauth_account"] = config["oauth_account"] or _OAUTH_NONE
+            prefs["tasks"] = config["tasks"]
             save_prefs(prefs)
             self.exit(config)
 
