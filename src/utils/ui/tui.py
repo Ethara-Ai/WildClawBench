@@ -300,7 +300,8 @@ if _TEXTUAL_AVAILABLE:
                 if n and n not in line.lower():
                     continue
                 self._shown.append(line)
-                opts.add_option(Option(f"[dim]{pane}[/] {line.replace('[', '\\[')}"))
+                safe_line = line.replace("[", "\\[")
+                opts.add_option(Option(f"[dim]{pane}[/] {safe_line}"))
             if self._shown:
                 opts.highlighted = 0
 

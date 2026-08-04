@@ -615,6 +615,26 @@ _wcb_fix_venv() {
     return 0
 }
 
+# ---- .venv Python version advisory -----------------------------------------
+# The launcher TUI (src/utils/ui/tui.py) and some deps are happiest on Python
+# 3.12+. Older interpreters (<=3.11) parse f-strings more strictly and have
+# tripped `wcb run` on real machines. This is a NON-fatal heads-up only: if the
+# .venv already imports litellm+textual we do not rebuild it, so warn loudly and
+# tell the user how to upgrade if they hit trouble.
+_wcb_warn_venv_pyver() {
+    local _py="$_wcb_root/.venv/bin/python3"
+    [ -x "$_py" ] || return 0
+    local _v; _v="$("$_py" -c 'import sys;print("%d.%d"%sys.version_info[:2])' 2>/dev/null)"
+    [ -n "$_v" ] || return 0
+    local _major="${_v%%.*}" _minor="${_v#*.}"
+    # Warn when the venv Python is older than 3.12 (i.e. 3.x where x < 12).
+    if [ "$_major" = "3" ] && [ "$_minor" -lt 12 ] 2>/dev/null; then
+        _wcb_warn ".venv uses Python $_v; 3.12+ is recommended (older versions have tripped the 'wcb run' TUI)."
+        _wcb_warn "If 'wcb run' errors on launch, rebuild the venv with 3.12: rm -rf .venv && wcb install"
+    fi
+    return 0
+}
+
 # ---- OAuth pool (tolerant: skip re-extract if already valid) ---------------
 _WCB_POOL_DIR="$HOME/.wcb/oauth_pool"
 _WCB_POOL_FILE="$_WCB_POOL_DIR/account_a.json"
@@ -844,6 +864,7 @@ _wcb_install() {
     # Phase 2: .venv + pip (LOUD + fatal on hard failure, with tiered retries).
     _wcb_phase "python venv + requirements"
     _wcb_ensure _wcb_check_venv _wcb_fix_venv ".venv + requirements" || _fail=1
+    _wcb_warn_venv_pyver  # non-fatal heads-up if the venv Python is < 3.12
 
     # Phase 3: .env + secrets.
     _wcb_phase ".env + secrets"
