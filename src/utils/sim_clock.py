@@ -24,7 +24,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["compute_sim_clock", "SimClock"]
+__all__ = ["compute_sim_clock", "compute_sim_clock_for_turn", "SimClock"]
 
 
 class SimClock:
@@ -52,11 +52,20 @@ def _window_start_date(window: object) -> str | None:
     return None
 
 
-def _from_prompts_json(data: dict) -> SimClock | None:
+def _from_prompts_json(data: dict, turn_index: int = 0) -> SimClock | None:
+    """Resolve the simulated instant for ``turns[turn_index]``.
+
+    ``turn_index`` defaults to 0 (the run's initial anchor). Multi-turn tasks
+    declare a distinct timestamp per turn; the harness re-anchors the agent
+    clock at each turn boundary so a task narrating three days does not collapse
+    into three consecutive real minutes.
+    """
     turns = data.get("turns")
     if not isinstance(turns, list) or not turns:
         return None
-    t0 = turns[0]
+    if not 0 <= turn_index < len(turns):
+        return None
+    t0 = turns[turn_index]
     if not isinstance(t0, dict):
         return None
 
@@ -109,7 +118,17 @@ def _offset_tz_label(dt: datetime) -> str:
 
 
 def compute_sim_clock(task: dict) -> SimClock | None:
-    """Resolve the simulated start instant for a task, or None if undetermined."""
+    """Resolve the simulated START instant for a task, or None if undetermined."""
+    return compute_sim_clock_for_turn(task, 0)
+
+
+def compute_sim_clock_for_turn(task: dict, turn_index: int) -> SimClock | None:
+    """Resolve the simulated instant for turn ``turn_index``.
+
+    Returns None when the turn carries no resolvable timestamp (callers keep the
+    previous anchor rather than guessing). Turn 0 is the run's initial anchor,
+    applied at container creation; later turns are applied at turn boundaries.
+    """
     task_dir = task.get("task_dir")
     if not task_dir:
         return None
@@ -121,4 +140,4 @@ def compute_sim_clock(task: dict) -> SimClock | None:
     except (OSError, ValueError) as exc:
         logger.warning("[sim_clock] could not read %s: %s", pj, exc)
         return None
-    return _from_prompts_json(data)
+    return _from_prompts_json(data, turn_index)

@@ -13,7 +13,13 @@
 //     stay in real seconds — a far-future shift does not stall or fast-forward
 //     the run.
 //   * A single fixed offset is applied, so simulated time still ADVANCES in real
-//     time from the base instant (not frozen).
+//     time from the base anchor (not frozen).
+//   * The anchor is RE-READABLE at runtime. Multi-turn tasks declare a distinct
+//     timestamp per turn (prompts.json turns[i].timestamp), and the harness
+//     re-anchors at each turn boundary. Env vars cannot be mutated on a running
+//     container, so the live value is read from WCB_FAKE_CLOCK_FILE; the env
+//     var remains the initial value and the fallback. Each re-anchor restarts
+//     the "advances in real time" clock from the new instant.
 //   * A Proxy over the real Date preserves `instanceof Date`, the prototype
 //     chain, and the static surface (Date.parse / Date.UTC / etc.), so only
 //     the "what time is it now" reads change.
@@ -29,11 +35,48 @@
   const target = Number(raw);
   if (!Number.isFinite(target)) return;
 
+  const fs = require("fs");
   const RealDate = Date;
-  const offset = target - RealDate.now();
-  if (offset === 0) return;
+  const EPOCH_FILE = process.env.WCB_FAKE_CLOCK_FILE || "/opt/wcb/clock_epoch";
+  // Re-stat at most this often: Date.now() is hot, a syscall per call is not
+  // acceptable. Turn boundaries are seconds apart at minimum, so 1s is ample.
+  const RESTAT_INTERVAL_MS = 1000;
 
-  const shiftedNow = () => RealDate.now() + offset;
+  // (anchorTarget, anchorReal) define the mapping. simulated = anchorTarget +
+  // (realNow - anchorReal). Re-anchoring rewrites both, which is what makes a
+  // per-turn jump land exactly on the declared instant.
+  let anchorTarget = target;
+  let anchorReal = RealDate.now();
+  let lastStat = 0;
+  let lastMtimeMs = -1;
+
+  function maybeReanchor() {
+    const realNow = RealDate.now();
+    if (realNow - lastStat < RESTAT_INTERVAL_MS) return;
+    lastStat = realNow;
+    try {
+      const st = fs.statSync(EPOCH_FILE);
+      if (st.mtimeMs === lastMtimeMs) return;
+      const next = Number(fs.readFileSync(EPOCH_FILE, "utf8").trim());
+      lastMtimeMs = st.mtimeMs;
+      if (!Number.isFinite(next) || next === anchorTarget) return;
+      anchorTarget = next;
+      anchorReal = realNow;
+      if (process.env.WCB_FAKE_CLOCK_DEBUG === "1") {
+        // eslint-disable-next-line no-console
+        console.error(
+          `[wcb-clock-shim] re-anchored: simulated_now=${new RealDate(next).toISOString()}`
+        );
+      }
+    } catch (_) {
+      // File absent/unreadable -> keep the current anchor (env-only mode).
+    }
+  }
+
+  const shiftedNow = () => {
+    maybeReanchor();
+    return anchorTarget + (RealDate.now() - anchorReal);
+  };
 
   const FakeDate = new Proxy(RealDate, {
     // `new Date()` with no args -> simulated now; any explicit args pass through.

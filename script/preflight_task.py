@@ -17,6 +17,7 @@ from __future__ import annotations
 import csv
 import importlib.util
 import json
+import mimetypes
 import os
 import re
 import shutil
@@ -129,7 +130,56 @@ def check_task_yaml(task: Path) -> tuple[list[str], list[str]]:
         d = ENV / f"{api}-api"
         rec(PASS if d.is_dir() else FAIL,
             f"environment/{api}-api present" if d.is_dir() else f"environment/{api}-api MISSING")
+    _check_modality_assets(task, text)
     return list(required), list(distractor)
+
+
+# MIME prefix that must be present for a declared non-text modality to be real.
+_MODALITY_MIME_PREFIX = {
+    "image": "image/",
+    "audio": "audio/",
+    "video": "video/",
+}
+_TEXT_MODALITIES = {"text", "txt", "plain"}
+
+
+def _bundle_mimes(task: Path) -> set[str]:
+    """Guessed MIME types of every file in the bundle (by extension)."""
+    out: set[str] = set()
+    for p in task.rglob("*"):
+        if p.is_file():
+            mt, _ = mimetypes.guess_type(p.name)
+            if mt:
+                out.add(mt)
+    return out
+
+
+def _check_modality_assets(task: Path, task_yaml_text: str) -> None:
+    """Assert every declared non-text modality is backed by a real asset.
+
+    A bundle that declares ``modalities: [text, image]`` while shipping only
+    .txt placeholders still gets flagged multimodal downstream (harbor
+    task.toml `[dimensions] multimodal`), so the false claim reaches delivery.
+    Nothing else in the harness cross-checks the declaration against content.
+    """
+    m = re.search(r"^modalities:\s*\[(.*?)\]", task_yaml_text, re.MULTILINE)
+    if not m:
+        return
+    declared = [s.strip().strip("'\"").lower() for s in m.group(1).split(",") if s.strip()]
+    non_text = [d for d in declared if d and d not in _TEXT_MODALITIES]
+    if not non_text:
+        return
+    mimes = _bundle_mimes(task)
+    for mod in non_text:
+        prefix = _MODALITY_MIME_PREFIX.get(mod)
+        if prefix is None:
+            rec(WARN, f"task.yaml declares unknown modality {mod!r}")
+            continue
+        hit = sorted(mt for mt in mimes if mt.startswith(prefix))
+        rec(PASS if hit else FAIL,
+            f"modality {mod!r} backed by {hit[:3]}" if hit else
+            f"task.yaml declares modality {mod!r} but NO {prefix}* file exists in "
+            f"the bundle — delivery will still mark it multimodal")
 
 
 # --------------------------------------------------------------------------- #
@@ -254,9 +304,12 @@ def check_inject(task: Path, required: list[str], distractor: list[str]) -> None
                 rec(PASS if p.is_file() else FAIL,
                     f"{label} fs[{op.get('id')}] src exists: {src}" if p.is_file()
                     else f"{label} fs[{op.get('id')}] src MISSING: {src}")
+                _check_op_modality(label, op, p)
             dst = op.get("dst", "")
             if dst and not str(dst).startswith("/"):
                 rec(WARN, f"{label} fs[{op.get('id')}] dst not absolute: {dst}")
+            if st.is_seed:
+                _check_seed_payload_mirrored(task, label, op)
             _check_fires(label, op, st, nb)
         # loud/silent: service known, raw_eml_path resolves, timing
         for bucket in ("loud", "silent"):
@@ -295,6 +348,65 @@ def check_inject(task: Path, required: list[str], distractor: list[str]) -> None
         vs = Path(st.source).parent / "verify.sh"
         rec(PASS if vs.is_file() and vs.stat().st_size > 0 else WARN,
             f"stage{st.index}/verify.sh present" if vs.is_file() else f"stage{st.index}/verify.sh missing")
+
+
+def _check_op_modality(label: str, op: dict, host_src: Path) -> None:
+    """Assert a filesystem op's declared ``modality`` matches its payload MIME.
+
+    The field is authored per the kit's M-3 schema but no runtime code reads it
+    (copy_file_into_workspace does a plain docker cp), so an op could declare
+    modality:image and ship a .txt with nothing complaining.
+    """
+    declared = str(op.get("modality") or "").strip().lower()
+    if not declared or declared in _TEXT_MODALITIES:
+        return
+    prefix = _MODALITY_MIME_PREFIX.get(declared)
+    if prefix is None:
+        rec(WARN, f"{label} fs[{op.get('id')}] unknown modality {declared!r}")
+        return
+    if not host_src.is_file():
+        return  # already reported by the src-exists check
+    mt, _ = mimetypes.guess_type(host_src.name)
+    rec(PASS if (mt or "").startswith(prefix) else FAIL,
+        f"{label} fs[{op.get('id')}] modality={declared!r} matches {mt}"
+        if (mt or "").startswith(prefix) else
+        f"{label} fs[{op.get('id')}] declares modality={declared!r} but src is "
+        f"{mt or 'unknown'}: {op.get('src')}")
+
+
+def _seed_dst_to_data_rel(dst: str) -> str | None:
+    """Map a seed op's container dst to its expected ``data/`` counterpart.
+
+    ``data/`` is staged by copying its CONTENTS into ``{TMP_WORKSPACE}/home``,
+    so ``/workspace/home/<rel>`` is mounted from ``data/<rel>``.
+    """
+    p = str(dst or "").strip()
+    for prefix in ("/workspace/home/", "/app/home/"):
+        if p.startswith(prefix):
+            return p[len(prefix):]
+    return None
+
+
+def _check_seed_payload_mirrored(task: Path, label: str, op: dict) -> None:
+    """Seed fs ops never execute — assert the payload is mounted via data/.
+
+    The pre-T0 seed stage fires before the agent container exists, so the copy
+    hook cannot run and the op is recorded "skipped_container_down" (benign,
+    exempted from injection defects). That exemption is only sound when the
+    payload also ships in data/; otherwise the file silently never appears and
+    the run still reports injection_ok=true.
+    """
+    if op.get("action") != "copy":
+        return
+    rel = _seed_dst_to_data_rel(op.get("dst", ""))
+    if rel is None:
+        return
+    mounted = task / "data" / rel
+    rec(PASS if mounted.is_file() else FAIL,
+        f"{label} fs[{op.get('id')}] payload mirrored in data/{rel}"
+        if mounted.is_file() else
+        f"{label} fs[{op.get('id')}] NOT mirrored in data/{rel} — seed ops do not "
+        f"execute (container not up), so this payload will never appear")
 
 
 def _check_fires(label: str, op: dict, st, next_boundary: int) -> None:

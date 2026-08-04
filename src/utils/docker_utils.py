@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -15,6 +16,10 @@ logger = logging.getLogger(__name__)
 DOCKER_IMAGE  = os.environ.get("DOCKER_IMAGE",   "wildclawbench-ubuntu:v1.3")
 TMP_WORKSPACE = os.environ.get("TMP_WORKSPACE",  "/tmp_workspace")
 WORKSPACE_BASELINE_PATH = "/tmp/wildclaw_workspace_baseline.json"
+# In-container file holding the agent's current simulated-clock anchor (epoch
+# ms). Read live by docker/agent_faketime_shim.js so the harness can re-anchor
+# at each turn boundary — env vars cannot be mutated on a running container.
+AGENT_SIM_CLOCK_FILE = "/opt/wcb/clock_epoch"
 
 BRAVE_API_KEY = os.environ.get("BRAVE_API_KEY", "")
 
@@ -149,18 +154,29 @@ def _map_workspace_dst(container_dst: str) -> str:
 
 
 def copy_file_into_workspace(task_id: str, host_src: "Path | None",
-                             container_dst: str, mkdir: bool = False) -> bool:
+                             container_dst: str, mkdir: bool = False) -> "bool | None":
     """InjectDirector filesystem hook: place a host file (or mkdir) inside the
     running agent container's workspace via ``docker cp`` / ``docker exec``.
 
-    Returns False (the caller logs it as a skipped fs op) when the container is
-    not running — e.g. the pre-T0 seed stage, which fires before the agent
-    container starts and whose drops are redundant with the mounted ``/app``
-    baseline. Per-turn drops fire mid-run while the container is up.
+    Tri-state return, because "the container does not exist yet" and "the copy
+    was attempted and failed" are different facts and the caller records them
+    differently:
+
+    * ``None``  — the container is not running, so nothing was attempted. This
+      is the pre-T0 seed stage, which fires before the agent container starts
+      and whose drops are redundant with the mounted ``/app`` baseline. The
+      caller logs ``status="skipped_container_down"``.
+    * ``False`` — a copy/mkdir was attempted and failed. A genuine defect.
+    * ``True``  — applied.
+
+    Collapsing the first two onto ``False`` (the pre-2026-08 behaviour) made a
+    dropped payload indistinguishable from a benign seed skip, so a stage0 file
+    with no ``data/`` counterpart vanished under a green ``injection_ok``.
+    Per-turn drops fire mid-run while the container is up.
     """
     if not _container_running(task_id):
         logger.info("[%s] inject fs: container not up; skip %s", task_id, container_dst)
-        return False
+        return None
     dst = _map_workspace_dst(container_dst)
     try:
         if mkdir:
@@ -185,6 +201,35 @@ def copy_file_into_workspace(task_id: str, host_src: "Path | None",
     except Exception as exc:  # pragma: no cover - defensive
         logger.warning("[%s] inject fs: error placing %s: %s", task_id, dst, exc)
         return False
+
+
+def set_agent_sim_clock(task_id: str, epoch_ms: int) -> bool:
+    """Re-anchor the agent's simulated clock to ``epoch_ms`` mid-run.
+
+    Writes AGENT_SIM_CLOCK_FILE inside the running container; the shim picks the
+    new anchor up within ~1s and simulated time resumes advancing in real time
+    from there. Used at turn boundaries so a multi-turn task whose prompts.json
+    declares one timestamp per turn actually presents those days to the agent,
+    instead of every turn landing minutes after turn 0.
+
+    Returns False (logged, non-fatal) if the container is gone or the write
+    fails — the agent then keeps its previous anchor, which is the pre-2026-08
+    behaviour rather than a broken clock.
+    """
+    if not _container_running(task_id):
+        logger.info("[%s] sim clock: container not up; skip re-anchor", task_id)
+        return False
+    parent = str(PurePosixPath(AGENT_SIM_CLOCK_FILE).parent)
+    r = subprocess.run(
+        ["docker", "exec", task_id, "/bin/sh", "-c",
+         f"mkdir -p {parent} && printf '%s' '{int(epoch_ms)}' > {AGENT_SIM_CLOCK_FILE}"],
+        capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        logger.warning("[%s] sim clock re-anchor failed: %s",
+                       task_id, (r.stderr or "").strip())
+        return False
+    return True
 
 
 def resolve_image_id(image: str) -> str:
@@ -357,6 +402,10 @@ def start_container(task_id: str, workspace_path: str, extra_env: str = "",
                 raise ValueError("NODE_OPTIONS contains a forbidden control char")
             sim_args = ["-v", f"{shim_host}:{shim_ctr}:ro", "-e", f"NODE_OPTIONS={node_opts}"]
             env_pairs.append(("WCB_FAKE_CLOCK_EPOCH_MS", str(int(sim_clock_epoch_ms))))
+            # Turn-0 anchor rides the env var; later turns re-anchor by writing
+            # AGENT_SIM_CLOCK_FILE (env is immutable on a running container).
+            # The shim falls back to the env value while the file is absent.
+            env_pairs.append(("WCB_FAKE_CLOCK_FILE", AGENT_SIM_CLOCK_FILE))
             if sim_tz:
                 env_pairs.append(("TZ", sim_tz))
             logger.info(
@@ -1765,6 +1814,7 @@ def collect_output_from_container(
     output_dir: Path,
     *,
     include_workspace_changes: bool = False,
+    inject_timeline: "Path | None" = None,
 ) -> None:
     """Collect task output files from the container to output_dir/task_output/.
 
@@ -1779,6 +1829,14 @@ def collect_output_from_container(
          the agent ran. This is the canonical place to look for what the
          model produced. If no baseline was taken (legacy backends), this
          dir is silently skipped and workspace_full/ remains the source.
+
+    ``inject_timeline`` (inject_timeline.jsonl) lets step 3 subtract files the
+    INJECTOR wrote mid-run. The baseline predates every mid-run stage, so
+    without it each inject drop is credited to the agent. A dropped path is
+    withheld only while its content still MATCHES the injected payload; once
+    the agent edits that file it is agent work again and is collected. Whatever
+    is withheld is listed in ``artifacts_excluded.json`` so an empty artifacts/
+    stays diagnosable. Everything withheld remains in workspace_full/.
     """
     task_output_dir = output_dir / "task_output"
     task_output_dir.mkdir(parents=True, exist_ok=True)
@@ -1814,7 +1872,19 @@ def collect_output_from_container(
 
     artifacts_out = task_output_dir / "artifacts"
     artifacts_out.mkdir(parents=True, exist_ok=True)
-    _copy_changed_workspace_outputs_from_container(task_id, artifacts_out)
+    payloads = _injected_payloads(inject_timeline)
+    injected = set(payloads)
+    excluded = _copy_changed_workspace_outputs_from_container(
+        task_id, artifacts_out, exclude=injected, payloads=payloads)
+    if excluded:
+        (task_output_dir / "artifacts_excluded.json").write_text(
+            json.dumps({
+                "note": "Changed under the agent's workspace but NOT agent-produced; "
+                        "still present in workspace_full/.",
+                "injected_by_harness": sorted(p for p in excluded if p in injected),
+                "harness_bookkeeping": sorted(p for p in excluded if p not in injected),
+            }, indent=2),
+            encoding="utf-8")
 
 
 def snapshot_workspace_state(task_id: str) -> None:
@@ -1851,7 +1921,107 @@ def snapshot_workspace_state(task_id: str) -> None:
     logger.info("[%s] Workspace baseline saved at %s", task_id, WORKSPACE_BASELINE_PATH)
 
 
-def _copy_changed_workspace_outputs_from_container(task_id: str, dest: Path) -> None:
+# Files the HARNESS writes into the workspace after the baseline snapshot, so
+# they always show up in the diff as if the agent had produced them. Kept to
+# names that are unambiguously ours: persona .md files are deliberately NOT
+# listed, because an agent editing MEMORY.md is real work we must not hide.
+_HARNESS_BOOKKEEPING = {
+    ".wildclaw_current_turn",
+    ".wildclaw_spawn_steering.md",
+    "spawn_tree.jsonl",
+}
+# AGENTS.md is rewritten by the harness only when native-spawn steering is
+# injected, which is detectable by its marker file landing in the same diff.
+_SPAWN_STEERING_MARKER = ".wildclaw_spawn_steering.md"
+_SPAWN_STEERING_TARGET = "AGENTS.md"
+
+
+def _injected_payloads(inject_timeline: "Path | None") -> "dict[str, str]":
+    """Workspace-relative dst -> host src path, for every fs op the injector APPLIED.
+
+    Same selection rule as `_injected_paths` (type == "inject.fs" and a truthy
+    ok); this variant additionally carries the payload so the collector can tell
+    "still exactly what the injector wrote" from "the agent edited it after the
+    drop". Last applied op wins when a path is written more than once. mkdir ops
+    carry no src and map to "" -- directories never appear in the changed-file
+    list, and a payload-less entry falls back to unconditional exclusion.
+    """
+    out: "dict[str, str]" = {}
+    if not inject_timeline:
+        return out
+    p = Path(inject_timeline)
+    if not p.is_file():
+        return out
+    try:
+        lines = p.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return out
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            rec = json.loads(line)
+        except (ValueError, TypeError):
+            continue
+        if not isinstance(rec, dict) or rec.get("type") != "inject.fs":
+            continue
+        if not rec.get("ok"):
+            continue
+        mapped = _map_workspace_dst(str(rec.get("dst") or ""))
+        if not mapped.startswith(TMP_WORKSPACE):
+            continue
+        rel = mapped[len(TMP_WORKSPACE):].lstrip("/")
+        if rel:
+            out[rel] = str(rec.get("src") or "")
+    return out
+
+
+def _injected_paths(inject_timeline: "Path | None") -> set[str]:
+    """Workspace-relative dsts of every filesystem op the injector APPLIED.
+
+    The artifacts diff is computed against a baseline taken before the agent
+    runs, so mid-run inject drops land on the agent's side of the diff and get
+    credited to the model. inject_timeline.jsonl already records every dst, so
+    the correction needs no new bookkeeping.
+
+    Only ops with ok=true are excluded: an op that did not land created no file,
+    so excluding it could mask a real agent-created file at the same path.
+    """
+    return set(_injected_payloads(inject_timeline))
+
+
+def _same_bytes(a: Path, b: Path) -> bool:
+    """True when both files exist and hash identically.
+
+    An unreadable side returns False, and callers must treat False as "cannot
+    tell" -> fall back to path-based exclusion. Returning True on error would
+    silently drop a file we failed to verify.
+    """
+    digests = []
+    for p in (a, b):
+        try:
+            digests.append(hashlib.sha256(p.read_bytes()).hexdigest())
+        except OSError:
+            return False
+    return digests[0] == digests[1]
+
+
+def _prune_empty_parents(path: Path, stop: Path) -> None:
+    """Remove directories left empty after withdrawing a probed file."""
+    parent = path.parent
+    while parent != stop and stop in parent.parents:
+        try:
+            parent.rmdir()          # raises when non-empty -> nothing left to do
+        except OSError:
+            return
+        parent = parent.parent
+
+
+def _copy_changed_workspace_outputs_from_container(
+    task_id: str, dest: Path, exclude: "set[str] | None" = None,
+    payloads: "dict[str, str] | None" = None,
+) -> "set[str]":
     list_cmd = "python3 - <<'PY'\n" + "\n".join([
         "import json",
         "from pathlib import Path",
@@ -1895,20 +2065,60 @@ def _copy_changed_workspace_outputs_from_container(task_id: str, dest: Path) -> 
     )
     if r.returncode != 0:
         logger.warning("[%s] Failed to list changed workspace outputs: %s", task_id, r.stderr.strip())
-        return
+        return set()
 
     try:
         changed_paths = json.loads(r.stdout.strip() or "[]")
     except json.JSONDecodeError:
         logger.warning("[%s] Failed to parse changed workspace output list: %s", task_id, r.stdout[:200])
-        return
+        return set()
 
+    drop = set(exclude or set()) | _HARNESS_BOOKKEEPING
+    # The harness only rewrites AGENTS.md when it injects native-spawn steering,
+    # which shows up as the marker file changing in this same diff. Without that
+    # signal an AGENTS.md edit is the agent's and must be kept.
+    if _SPAWN_STEERING_MARKER in set(changed_paths):
+        drop.add(_SPAWN_STEERING_TARGET)
+
+    excluded: set[str] = set()
     for rel_path in changed_paths:
         if not isinstance(rel_path, str) or rel_path.startswith("/") or ".." in Path(rel_path).parts:
+            continue
+        if rel_path in drop:
+            src = (payloads or {}).get(rel_path)
+            if not src:
+                # Harness bookkeeping, or an op that recorded no payload: no
+                # content to compare against, so withhold as before.
+                excluded.add(rel_path)
+                continue
+            host_src = Path(src)
+            if not host_src.is_file():
+                excluded.add(rel_path)   # payload gone -> cannot tell; withhold
+                continue
+            # Collect it, then decide by content: identical to the payload means
+            # the injector's file is untouched (withhold); different means the
+            # agent edited it after the drop, which IS agent work (keep).
+            probe = dest / rel_path
+            probe.parent.mkdir(parents=True, exist_ok=True)
+            if not _copy_file_from_container(task_id, f"{TMP_WORKSPACE}/{rel_path}", probe):
+                excluded.add(rel_path)
+                continue
+            if _same_bytes(probe, host_src):
+                probe.unlink(missing_ok=True)
+                _prune_empty_parents(probe, dest)
+                excluded.add(rel_path)
+            else:
+                logger.info("[%s] artifacts: %s was injected but the agent modified "
+                            "it afterwards -- keeping it as agent work",
+                            task_id, rel_path)
             continue
         dest_path = dest / rel_path
         dest_path.parent.mkdir(parents=True, exist_ok=True)
         _copy_file_from_container(task_id, f"{TMP_WORKSPACE}/{rel_path}", dest_path)
+    if excluded:
+        logger.info("[%s] artifacts: withheld %d harness/injected file(s) from the "
+                    "agent-produced diff", task_id, len(excluded))
+    return excluded
 
 
 def inject_lobster_workspace(task_id: str, workspace_path: str) -> None:

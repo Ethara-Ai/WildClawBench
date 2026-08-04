@@ -116,10 +116,35 @@ def test_task_parser_synthesizes_from_prompts(tmp_path):
     assert task["multi_agent_enabled"] is True
 
 
-def test_task_parser_no_multi_agent_disabled(tmp_path):
-    # Multi-agent is opt-in: a task that declares nothing gets the sub-agent
-    # tool disabled. Enable per-task via multi_agent_complex_turns / a
-    # task_config.yaml multi_agent block / a prompts.txt Multi-Agent label.
+def test_task_parser_no_declaration_enables_capability_unscored(tmp_path, monkeypatch):
+    # Sub-agent CAPABILITY is default-ON (task_parser._multi_agent_default_on):
+    # a task that declares nothing still gets the spawn tools exposed. The
+    # invariant that matters is that this adds no SCORING pressure — the
+    # synthesized config carries an empty expected_per_turn and no aggregate
+    # checker, so build_checker_state emits nothing.
+    monkeypatch.delenv("WCB_MULTI_AGENT_DEFAULT", raising=False)
+    (tmp_path / "prompts.txt").write_text("--- TURN 1 (Day 1, Light) ---\nhi\n")
+    task = _attach_drift_script({}, tmp_path)
+    assert task["multi_agent_enabled"] is True
+    cfg = task["multi_agent_config"]
+    assert cfg["expected_per_turn"] == {}
+    assert "aggregate_checker_id" not in cfg
+    assert build_checker_state(tmp_path / "absent.jsonl", cfg)["checkers"] == {}
+
+
+def test_task_parser_explicit_off_beats_default_on(tmp_path, monkeypatch):
+    # An explicit `multi_agent: {enabled: false}` opts the task out of the
+    # default-on fallback — the author's decision is authoritative.
+    monkeypatch.delenv("WCB_MULTI_AGENT_DEFAULT", raising=False)
+    (tmp_path / "prompts.txt").write_text("--- TURN 1 (Day 1, Light) ---\nhi\n")
+    (tmp_path / "task_config.yaml").write_text("multi_agent:\n  enabled: false\n")
+    task = _attach_drift_script({}, tmp_path)
+    assert task["multi_agent_enabled"] is False
+
+
+def test_task_parser_env_opt_out_disables(tmp_path, monkeypatch):
+    # WCB_MULTI_AGENT_DEFAULT=0 reverts the whole harness to strict opt-in.
+    monkeypatch.setenv("WCB_MULTI_AGENT_DEFAULT", "0")
     (tmp_path / "prompts.txt").write_text("--- TURN 1 (Day 1, Light) ---\nhi\n")
     task = _attach_drift_script({}, tmp_path)
     assert task["multi_agent_enabled"] is False

@@ -51,6 +51,18 @@ deterministic checkers (`test_outputs.py`, signed weights + guardrails) plus the
 optional 3-judge council over `rubric.json`. All on the same OpenClaw session so
 context carries across turns.
 
+### Clock scope — an authoring constraint
+
+The simulated clock shifts the **agent's** `Date` reads only (re-anchored to each
+turn's `prompts.json` timestamp; see `src/utils/sim_clock.py` +
+`docker/agent_faketime_shim.js`). **Mock-API records are stamped with real host
+UTC** — the mock fleet is a separate container with no clock plumbing. So:
+
+* Do not author rubric criteria or Channel-A checkers that read a timestamp out
+  of a mock record.
+* Keep authored inject message dates **earlier** than the run's real wall clock,
+  or the agent's own reply sorts *before* the message it is answering.
+
 ## Two modes (same pipeline; only the prompt source changes)
 
 - **Static (default)** — the scripted `prompts.txt` turns are fed automatically.

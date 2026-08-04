@@ -493,12 +493,19 @@ def collect_task_output(
     *,
     include_workspace_changes: bool = False,
 ) -> None:
-    """Collect task output files from the container to output_dir/task_output/."""
+    """Collect task output files from the container to output_dir/task_output/.
+
+    The inject timeline (written alongside the run) lets the artifacts diff
+    subtract files the injector placed mid-run, which would otherwise be
+    credited to the agent. Absent for non-inject tasks — the collector treats a
+    missing file as "nothing to subtract".
+    """
     try:
         collect_output_from_container(
             task_id,
             output_dir,
             include_workspace_changes=include_workspace_changes,
+            inject_timeline=output_dir / "inject_timeline.jsonl",
         )
     except Exception as exc:
         logger.warning("[%s] Failed to collect task output: %s", task_id, exc)
@@ -1081,6 +1088,31 @@ def _normalize_display_model(obj: Any) -> None:
     elif isinstance(obj, list):
         for item in obj:
             _normalize_display_model(item)
+
+
+def _reanchor_sim_clock(task_id: str, task: dict, turn_index: int) -> None:
+    """Move the agent's simulated clock to this turn's declared instant.
+
+    prompts.json carries a timestamp per turn, but the container clock can only
+    be anchored once at creation (env vars are immutable on a running
+    container), so without this every turn after T0 lands seconds after T0 — a
+    task narrating three days collapsed into three consecutive minutes. Best
+    effort: a turn with no resolvable timestamp, or a failed write, keeps the
+    previous anchor.
+    """
+    try:
+        from src.utils.docker_utils import set_agent_sim_clock
+        from src.utils.sim_clock import compute_sim_clock_for_turn
+
+        sim = compute_sim_clock_for_turn(task, turn_index)
+        if sim is None:
+            return
+        if set_agent_sim_clock(task_id, sim.epoch_ms):
+            logger.info("[%s] sim clock re-anchored for T%d: %s",
+                        task_id, turn_index, sim.iso)
+    except Exception as exc:  # pragma: no cover - never break a turn over this
+        logger.warning("[%s] sim clock re-anchor skipped for T%d: %s",
+                       task_id, turn_index, exc)
 
 
 def _augment_score_with_combined_rewards(scores: dict, result: dict) -> None:
@@ -1991,8 +2023,9 @@ def run_single_task(
             def _copy_into_workspace(host_src, dst, mkdir=False, _tid=task_id):
                 # Drop per-turn inject artifacts (emails, PDFs, silent file
                 # swaps) into the running agent container's workspace. The pre-T0
-                # seed fires before the container exists -> hook returns False and
-                # the op is logged skipped (baseline already mounted at /app).
+                # seed fires before the container exists -> hook returns None and
+                # the op is logged "skipped_container_down" (baseline already
+                # mounted at /app). False means a real, attempted copy failed.
                 return copy_file_into_workspace(_tid, host_src, dst, mkdir=mkdir)
 
             inject_applier = InjectApplier(
@@ -2014,8 +2047,10 @@ def run_single_task(
             # for turn 0; later turns are fed verbatim from prompts.txt.
             stage_turns = tuple([prompt] + raw_turns[1:]) if raw_turns else (prompt,)
 
-            def _inject_before_turn(turn_index: int, _is=_is, _ap=inject_applier):
+            def _inject_before_turn(turn_index: int, _is=_is, _ap=inject_applier,
+                                    _task=task, _tid=task_id):
                 # Agent is idle here; apply the stage whose boundary ends at this turn.
+                _reanchor_sim_clock(_tid, _task, turn_index)
                 st = _is.stage_for_boundary(turn_index)
                 if st is not None:
                     _record_defects(_ap.apply_stage(st, turn_index),
