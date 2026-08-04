@@ -258,12 +258,19 @@ _wcb_setup() {
             ;;
     esac
     mkdir -p "$_pool_dir"
-    if ! printf '%s' "$_raw" | python3 -c 'import sys,json;d=json.load(sys.stdin);inner=d.get("claudeAiOauth",d);assert inner.get("accessToken"),"no accessToken";json.dump({"claudeAiOauth":inner},open(sys.argv[1],"w"),indent=2)' "$_pool_file" 2>/dev/null; then
-        _wcb_err "Keychain payload was not valid Claude OAuth JSON — aborting."
+    # Tolerant: if the pool file already carries a valid accessToken, keep it
+    # rather than aborting on a Keychain blob whose accessToken happens to be
+    # empty/rotated. Only (re)write when the existing file is missing/invalid.
+    if python3 -c 'import sys,json;d=json.load(open(sys.argv[1]));i=d.get("claudeAiOauth",d);sys.exit(0 if i.get("accessToken") else 1)' "$_pool_file" 2>/dev/null; then
+        _wcb_ok "existing OAuth pool token is valid -> keeping $_pool_file"
+    elif ! printf '%s' "$_raw" | python3 -c 'import sys,json;d=json.load(sys.stdin);inner=d.get("claudeAiOauth",d);assert inner.get("accessToken"),"no accessToken";json.dump({"claudeAiOauth":inner},open(sys.argv[1],"w"),indent=2)' "$_pool_file" 2>/dev/null; then
+        _wcb_err "no valid Claude OAuth token available (Keychain payload invalid AND no valid pool file)."
+        _wcb_err "Re-authenticate in the Claude Code app / 'claude' CLI, then re-run."
         return 1
+    else
+        chmod 600 "$_pool_file"
+        _wcb_ok "wrote OAuth token -> $_pool_file (chmod 600)"
     fi
-    chmod 600 "$_pool_file"
-    _wcb_ok "wrote OAuth token -> $_pool_file (chmod 600)"
 
     # --- 2) .env with per-laptop values ------------------------------------
     if [ ! -f "$_wcb_env" ]; then
@@ -333,7 +340,7 @@ _wcb_setup() {
 
     # --- 2c) cc-bridge docker image (the OAuth proxy container) --------------
     if command -v docker >/dev/null 2>&1; then
-        if docker image inspect wildclawbench-cc-bridge:v1 >/dev/null 2>&1; then
+        if _wcb_image_present wildclawbench-cc-bridge:v1; then
             _wcb_ok "cc-bridge image wildclawbench-cc-bridge:v1 present"
         else
             _wcb_warn "cc-bridge image missing — building (one-time, ~1 min)"
@@ -371,6 +378,526 @@ _wcb_setup() {
     _wcb_ok "setup complete. Now run:  source $_rc  &&  wcb login"
 }
 
+# ===========================================================================
+# wcb install — hardened, self-healing, one-terminal onboarding
+# ---------------------------------------------------------------------------
+# A superset of `wcb setup`: same end-state, but every blocker is
+# detect -> auto-remediate -> re-check -> actionable-error-as-last-resort,
+# and it ALSO provisions the docker images `wcb run` needs (agent / mock /
+# optional headroom) which plain `setup` never did. When SOURCED it defines
+# wcb() in the live shell so `source script/wcb install; wcb run` works in the
+# SAME terminal — no new shell, no `source ~/.zshrc`.
+#
+# Sourced-safety: NEVER calls `exit` and NEVER enables errexit (this file is
+# sourced into the user's interactive shell — a hard exit would close their
+# terminal and errexit would kill it on the first failed probe). Everything
+# returns explicit codes.
+#
+# Flags:  --skip-images   provision nothing docker-heavy (venv/.env/oauth only)
+#         --headroom      also build the litellm-headroom image
+#         --force         re-extract OAuth token even if the pool already valid
+#         --offline       never reach the network (no rustup/brew/hf/pip-index)
+# ===========================================================================
+
+# --- image / path constants (mirrors root+script run.sh; single source here) --
+_WCB_AGENT_IMAGE="wildclawbench-ubuntu:v1.3"
+_WCB_AGENT_IMAGE_SHA="60eec8752cb597e180780ff08d7569c1892c169521f1f2b069c2efeb006a4078"
+_WCB_AGENT_TAR="Images/wildclawbench-ubuntu_v1.3.tar"
+_WCB_MOCK_IMAGE="kensei3-mocks:v1"
+_WCB_HEADROOM_IMAGE="wildclawbench-litellm-headroom:v2"
+_WCB_CCBRIDGE_IMAGE="wildclawbench-cc-bridge:v1"
+_WCB_MIN_RUSTC="1.94.1"
+
+# Robust "is this image present?" test. `docker image inspect <name:tag>` can
+# miss an image the containerd/snapshotter store still lists (stale reference
+# index), so fall back to matching `docker images` repo:tag output.
+_wcb_image_present() {
+    local _ref="$1"
+    docker image inspect "$_ref" >/dev/null 2>&1 && return 0
+    docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -qxF "$_ref"
+}
+
+# Install-run flags (set by _wcb_install arg parse; read by helpers).
+_WCB_INSTALL_SKIP_IMAGES=0
+_WCB_INSTALL_HEADROOM=0
+_WCB_INSTALL_FORCE=0
+_WCB_INSTALL_OFFLINE=0
+
+# Progress state (weighted 9-phase stepped bar).
+_WCB_PHASE_TOTAL=9
+_WCB_PHASE_N=0
+_wcb_is_tty() { [ -t 1 ]; }
+# Print a phase banner. TTY -> a filled/empty block bar; non-TTY -> plain text.
+_wcb_phase() {
+    _WCB_PHASE_N=$((_WCB_PHASE_N + 1))
+    local _label="$1" _n="$_WCB_PHASE_N" _t="$_WCB_PHASE_TOTAL"
+    if _wcb_is_tty; then
+        local _i _bar="" _filled="$_n"
+        for _i in $(seq 1 "$_t"); do
+            if [ "$_i" -le "$_filled" ]; then _bar="$_bar#"; else _bar="$_bar-"; fi
+        done
+        printf '\033[36m[wcb]\033[0m \033[1m[%s]\033[0m phase %s/%s: %s\n' "$_bar" "$_n" "$_t" "$_label"
+    else
+        printf '[wcb] [step %s/%s] %s\n' "$_n" "$_t" "$_label"
+    fi
+}
+
+# Generic self-healing gate: run <check_fn>; if it fails, run <fix_fn> and
+# re-check; only on a still-failing re-check do we surface the actionable
+# error (already emitted by the fix_fn as its last line). Returns 0/1.
+#   _wcb_ensure <check_fn> <fix_fn> <label>
+# Any function name may be empty ("") to skip that stage (e.g. no fixer).
+_wcb_ensure() {
+    local _check="$1" _fix="$2" _label="$3"
+    if "$_check" 2>/dev/null; then
+        _wcb_ok "$_label: ok"
+        return 0
+    fi
+    if [ -n "$_fix" ]; then
+        _wcb_warn "$_label: missing/degraded — attempting auto-remediation"
+        "$_fix"
+        if "$_check" 2>/dev/null; then
+            _wcb_ok "$_label: remediated"
+            return 0
+        fi
+    fi
+    _wcb_err "$_label: could NOT be auto-resolved (see hint above)"
+    return 1
+}
+
+# ---- disk precheck (non-fatal warn) ---------------------------------------
+_wcb_check_disk() {
+    # Warn (never fail) if the repo volume has < 20 GiB free — the agent image
+    # alone is ~13 GiB, so a fresh load needs headroom.
+    local _avail_kb
+    _avail_kb="$(df -Pk "$_wcb_root" 2>/dev/null | awk 'NR==2{print $4}')"
+    [ -n "$_avail_kb" ] || return 0
+    if [ "$_avail_kb" -lt 20971520 ]; then
+        _wcb_warn "low disk: only $((_avail_kb/1048576)) GiB free on repo volume (agent image needs ~13 GiB)"
+    fi
+    return 0
+}
+
+# ---- pv (progress tool) — install if missing, tolerate failure -------------
+_wcb_check_pv() { command -v pv >/dev/null 2>&1; }
+_wcb_fix_pv() {
+    [ "$_WCB_INSTALL_OFFLINE" = "1" ] && { _wcb_warn "pv missing (offline) — progress bars degrade to plain output"; return 0; }
+    case "$(uname -s)" in
+        Darwin) command -v brew >/dev/null 2>&1 && brew install pv >/dev/null 2>&1 || true ;;
+        Linux)
+            if sudo -n true 2>/dev/null; then
+                if   command -v apt-get >/dev/null 2>&1; then sudo -n apt-get install -y pv >/dev/null 2>&1 || true
+                elif command -v dnf     >/dev/null 2>&1; then sudo -n dnf install -y pv >/dev/null 2>&1 || true
+                elif command -v yum     >/dev/null 2>&1; then sudo -n yum install -y pv >/dev/null 2>&1 || true
+                elif command -v apk     >/dev/null 2>&1; then sudo -n apk add pv >/dev/null 2>&1 || true
+                fi
+            fi
+            ;;
+    esac
+    _wcb_check_pv || _wcb_warn "pv unavailable — heavy loads will run without a progress bar (harmless)"
+    return 0
+}
+
+# ---- rustc >= 1.94.1 (litellm wheel needs it) ------------------------------
+# Compare current rustc against _WCB_MIN_RUSTC. Return 0 iff present AND new
+# enough. This is what makes the pip step succeed on a fresh box.
+_wcb_check_rustc() {
+    command -v rustc >/dev/null 2>&1 || return 1
+    local _have _min
+    _have="$(rustc --version 2>/dev/null | awk '{print $2}')"
+    [ -n "$_have" ] || return 1
+    _min="$_WCB_MIN_RUSTC"
+    # version-sort: if the smaller of {have,min} is min, then have>=min.
+    [ "$(printf '%s\n%s\n' "$_have" "$_min" | sort -V | head -n1)" = "$_min" ]
+}
+_wcb_fix_rustc() {
+    if [ "$_WCB_INSTALL_OFFLINE" = "1" ]; then
+        _wcb_err "rustc >= $_WCB_MIN_RUSTC required for the litellm wheel but --offline set."
+        _wcb_err "Install/upgrade Rust manually: https://rustup.rs  then re-run 'wcb install'."
+        return 1
+    fi
+    # Prefer bumping an existing rustup toolchain; else bootstrap rustup.
+    if command -v rustup >/dev/null 2>&1; then
+        _wcb_warn "upgrading Rust toolchain via 'rustup update stable'"
+        rustup update stable >/dev/null 2>&1 || true
+    else
+        _wcb_warn "installing Rust via rustup (needed to build the litellm wheel)"
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs 2>/dev/null | sh -s -- -y >/dev/null 2>&1 || true
+        # Make the freshly-installed toolchain visible in THIS shell.
+        [ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env" 2>/dev/null || true
+    fi
+    # Ensure ~/.cargo/bin is on PATH for the rest of this install.
+    case ":$PATH:" in *":$HOME/.cargo/bin:"*) : ;; *) [ -d "$HOME/.cargo/bin" ] && export PATH="$HOME/.cargo/bin:$PATH" ;; esac
+    if ! _wcb_check_rustc; then
+        _wcb_err "rustc still < $_WCB_MIN_RUSTC after remediation. Upgrade manually (https://rustup.rs) then re-run 'wcb install'."
+    fi
+    return 0
+}
+
+# ---- a suitable python interpreter for the venv (3.10+, not 3.14) ----------
+# Resolve the best python and stash it in _WCB_PYBIN. Prefer 3.12/3.11/3.13.
+_WCB_PYBIN=""
+_wcb_check_python() {
+    local _c
+    for _c in python3.12 python3.11 python3.13; do
+        if command -v "$_c" >/dev/null 2>&1; then _WCB_PYBIN="$(command -v "$_c")"; return 0; fi
+    done
+    # Fall back to bare python3 ONLY if it is 3.10–3.13 (avoid 3.14 pin breaks / <3.10).
+    if command -v python3 >/dev/null 2>&1; then
+        local _v; _v="$(python3 -c 'import sys;print("%d.%d"%sys.version_info[:2])' 2>/dev/null)"
+        case "$_v" in
+            3.10|3.11|3.12|3.13) _WCB_PYBIN="$(command -v python3)"; return 0 ;;
+        esac
+    fi
+    return 1
+}
+_wcb_fix_python() {
+    if [ "$_WCB_INSTALL_OFFLINE" = "1" ]; then
+        _wcb_err "no suitable Python (3.10–3.13) found and --offline set — install Python 3.12 manually."
+        return 1
+    fi
+    case "$(uname -s)" in
+        Darwin) command -v brew >/dev/null 2>&1 && { _wcb_warn "installing python@3.12 via Homebrew"; brew install python@3.12 >/dev/null 2>&1 || true; } ;;
+        Linux)
+            if sudo -n true 2>/dev/null; then
+                if   command -v apt-get >/dev/null 2>&1; then sudo -n apt-get install -y python3.12 python3.12-venv >/dev/null 2>&1 || true
+                elif command -v dnf     >/dev/null 2>&1; then sudo -n dnf install -y python3.12 >/dev/null 2>&1 || true
+                fi
+            fi
+            # pyenv as a last resort if it is already installed.
+            if ! _wcb_check_python && command -v pyenv >/dev/null 2>&1; then
+                pyenv install -s 3.12 >/dev/null 2>&1 || true
+            fi
+            ;;
+    esac
+    _wcb_check_python || _wcb_err "could not obtain Python 3.10–3.13 automatically. Install python3.12 then re-run 'wcb install'."
+    return 0
+}
+
+# ---- .venv with requirements installed -------------------------------------
+# A "good" venv = the interpreter is executable AND litellm+textual import.
+_wcb_check_venv() {
+    local _py="$_wcb_root/.venv/bin/python3"
+    [ -x "$_py" ] || return 1
+    "$_py" -c 'import litellm, textual' >/dev/null 2>&1
+}
+_wcb_fix_venv() {
+    local _py="$_wcb_root/.venv/bin/python3"
+    # (1) create the venv if the interpreter is missing or unusable.
+    if [ ! -x "$_py" ]; then
+        _wcb_check_python || { _wcb_err "no python to build .venv"; return 1; }
+        _wcb_warn "creating .venv with $_WCB_PYBIN"
+        "$_WCB_PYBIN" -m venv "$_wcb_root/.venv" >/dev/null 2>&1 || {
+            _wcb_warn ".venv looked corrupt — recreating from scratch"
+            rm -rf "$_wcb_root/.venv"
+            "$_WCB_PYBIN" -m venv "$_wcb_root/.venv" >/dev/null 2>&1 || { _wcb_err "python -m venv failed — check your Python install"; return 1; }
+        }
+    fi
+    [ -x "$_py" ] || { _wcb_err ".venv/bin/python3 still absent after create"; return 1; }
+    [ -f "$_wcb_root/requirements.txt" ] || { _wcb_err "requirements.txt not found at repo root"; return 1; }
+    # (2) ensure the rust toolchain is new enough BEFORE building wheels.
+    _wcb_ensure _wcb_check_rustc _wcb_fix_rustc "rustc>=$_WCB_MIN_RUSTC" || \
+        _wcb_warn "proceeding to pip despite rustc check — a prebuilt wheel may still exist"
+    "$_py" -m pip install -q --upgrade pip >/dev/null 2>&1 || true
+    local _idx=""; [ "$_WCB_INSTALL_OFFLINE" = "1" ] && _idx="--no-index"
+    # (3) tiered pip install: normal -> binary-only -> no-cache. Each re-checks.
+    _wcb_warn "installing requirements.txt into .venv (this can take a few minutes)"
+    if "$_py" -m pip install $_idx -r "$_wcb_root/requirements.txt" >/dev/null 2>&1; then :; 
+    elif [ "$_WCB_INSTALL_OFFLINE" != "1" ] && "$_py" -m pip install --prefer-binary -r "$_wcb_root/requirements.txt" >/dev/null 2>&1; then
+        _wcb_warn "installed with --prefer-binary (avoided a source build)"
+    elif [ "$_WCB_INSTALL_OFFLINE" != "1" ] && "$_py" -m pip install --no-cache-dir -r "$_wcb_root/requirements.txt" >/dev/null 2>&1; then
+        _wcb_warn "installed with --no-cache-dir (retried after a cache miss)"
+    else
+        _wcb_err "pip install -r requirements.txt FAILED. Most common cause: the litellm wheel needs rustc>=$_WCB_MIN_RUSTC."
+        _wcb_err "Fix Rust (https://rustup.rs / 'rustup update stable') then re-run 'wcb install'; or inspect: $_py -m pip install -r requirements.txt"
+        return 1
+    fi
+    return 0
+}
+
+# ---- OAuth pool (tolerant: skip re-extract if already valid) ---------------
+_WCB_POOL_DIR="$HOME/.wcb/oauth_pool"
+_WCB_POOL_FILE="$_WCB_POOL_DIR/account_a.json"
+_wcb_check_oauth() {
+    [ -f "$_WCB_POOL_FILE" ] || return 1
+    python3 -c 'import sys,json;d=json.load(open(sys.argv[1]));i=d.get("claudeAiOauth",d);sys.exit(0 if i.get("accessToken") else 1)' "$_WCB_POOL_FILE" 2>/dev/null
+}
+_wcb_fix_oauth() {
+    # req 6: only (re)extract when the pool is missing/invalid OR --force.
+    local _svc="Claude Code-credentials" _os _raw=""
+    _os="$(uname -s)"
+    case "$_os" in
+        Darwin) _raw="$(security find-generic-password -s "$_svc" -w 2>/dev/null)" ;;
+        Linux)
+            local _cf="$HOME/.claude/.credentials.json"
+            [ -f "$_cf" ] && _raw="$(cat "$_cf" 2>/dev/null)"
+            [ -z "$_raw" ] && command -v secret-tool >/dev/null 2>&1 && _raw="$(secret-tool lookup service "$_svc" 2>/dev/null)"
+            ;;
+    esac
+    if [ -z "$_raw" ]; then
+        _wcb_err "no Claude Code credentials found in this OS's store."
+        _wcb_err "Sign into the Claude Code app / 'claude' CLI with your Max subscription, then re-run 'wcb install'."
+        return 1
+    fi
+    mkdir -p "$_WCB_POOL_DIR"
+    if printf '%s' "$_raw" | python3 -c 'import sys,json;d=json.load(sys.stdin);inner=d.get("claudeAiOauth",d);assert inner.get("accessToken"),"no accessToken";json.dump({"claudeAiOauth":inner},open(sys.argv[1],"w"),indent=2)' "$_WCB_POOL_FILE" 2>/dev/null; then
+        chmod 600 "$_WCB_POOL_FILE"
+        _wcb_ok "wrote OAuth token -> $_WCB_POOL_FILE (chmod 600)"
+    else
+        _wcb_err "credential payload was not valid Claude OAuth JSON."
+        _wcb_err "Re-authenticate in the Claude Code app, then re-run 'wcb install'."
+        return 1
+    fi
+    return 0
+}
+
+# ---- .env with the required OAuth secrets ----------------------------------
+_wcb_check_env() {
+    [ -f "$_wcb_env" ] || return 1
+    [ -n "$(_wcb_env_get WCB_CC_BRIDGE_SECRET)" ] && \
+    [ -n "$(_wcb_env_get WCB_CC_ACCOUNT_POOL)" ] && \
+    [ "$(_wcb_env_get WCB_USE_CLAUDE_OAUTH)" = "1" ]
+}
+_wcb_fix_env() {
+    if [ ! -f "$_wcb_env" ]; then
+        if [ -f "$_wcb_root/.env.example" ]; then cp "$_wcb_root/.env.example" "$_wcb_env"; _wcb_ok "created .env from .env.example"
+        else : > "$_wcb_env"; _wcb_warn "no .env.example — created empty .env"; fi
+    fi
+    _wcb_set_env() {
+        local _k="$1" _v="$2"
+        grep -vE "^[[:space:]]*#?[[:space:]]*$_k=" "$_wcb_env" > "$_wcb_env.tmp" 2>/dev/null || : > "$_wcb_env.tmp"
+        printf '%s=%s\n' "$_k" "$_v" >> "$_wcb_env.tmp"
+        mv "$_wcb_env.tmp" "$_wcb_env"
+    }
+    _wcb_set_env WCB_USE_CLAUDE_OAUTH 1
+    _wcb_set_env WCB_CC_ACCOUNT_POOL "$_WCB_POOL_FILE"
+    [ -n "$(_wcb_env_get WCB_CC_STUB_KEY)" ] || _wcb_set_env WCB_CC_STUB_KEY sk-wcb-oauth-stub
+    local _sec; _sec="$(_wcb_env_get WCB_CC_BRIDGE_SECRET)"
+    if [ -z "$_sec" ]; then
+        _sec="$(openssl rand -hex 32 2>/dev/null)"
+        [ -n "$_sec" ] || _sec="$(python3 -c 'import secrets;print(secrets.token_hex(32))' 2>/dev/null)"
+        _wcb_set_env WCB_CC_BRIDGE_SECRET "$_sec"
+        _wcb_ok "generated a fresh local WCB_CC_BRIDGE_SECRET"
+    fi
+    local _arn; _arn="$(_wcb_env_get JUDGE_COUNCIL_SONNET_ARN)"
+    [ -n "$_arn" ] || _wcb_set_env JUDGE_COUNCIL_SONNET_ARN "bedrock/arn:aws:bedrock:ap-south-1:426628337772:application-inference-profile/urg0zifsjiga"
+    _wcb_ok "updated .env with per-laptop OAuth values"
+    return 0
+}
+
+# ---- git-lfs pointers resolved (Images/ + data blobs) ----------------------
+_wcb_check_lfs() {
+    # Only a concern if the repo actually uses LFS. If there's no .gitattributes
+    # LFS filter or git-lfs isn't installed, treat as satisfied (nothing to do).
+    command -v git >/dev/null 2>&1 || return 0
+    git -C "$_wcb_root" lfs env >/dev/null 2>&1 || return 0
+    # Unresolved pointers show up as tiny "version https://git-lfs" files.
+    ! git -C "$_wcb_root" lfs status 2>/dev/null | grep -q '(.*pointer.*)'
+}
+_wcb_fix_lfs() {
+    [ "$_WCB_INSTALL_OFFLINE" = "1" ] && { _wcb_warn "LFS pointers unresolved but --offline set — skipping pull"; return 0; }
+    command -v git >/dev/null 2>&1 || { _wcb_warn "git not found — cannot resolve LFS pointers"; return 0; }
+    _wcb_warn "resolving git-lfs pointers (git lfs install + pull)"
+    git -C "$_wcb_root" lfs install >/dev/null 2>&1 || true
+    git -C "$_wcb_root" lfs pull >/dev/null 2>&1 || _wcb_warn "git lfs pull did not complete — large assets may be missing"
+    return 0
+}
+
+# ---- docker daemon up ------------------------------------------------------
+_wcb_check_dockerd() { command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; }
+_wcb_fix_dockerd() {
+    command -v docker >/dev/null 2>&1 || {
+        if [ "$(uname -s)" = "Darwin" ]; then _wcb_err "docker not installed — install Docker Desktop (https://www.docker.com/products/docker-desktop) then re-run 'wcb install'."
+        else _wcb_err "docker not installed — install Docker Engine (e.g. 'apt-get install docker.io') then re-run 'wcb install'."; fi
+        return 1
+    }
+    if [ "$(uname -s)" = "Darwin" ]; then
+        _wcb_warn "docker daemon down — launching Docker Desktop"
+        open -a Docker >/dev/null 2>&1 || true
+    else
+        _wcb_warn "docker daemon down — trying 'systemctl start docker'"
+        if sudo -n true 2>/dev/null; then sudo -n systemctl start docker >/dev/null 2>&1 || true
+        else systemctl start docker >/dev/null 2>&1 || true; fi
+    fi
+    # Give the daemon up to ~60s to come up.
+    local _i
+    for _i in $(seq 1 30); do docker info >/dev/null 2>&1 && break; sleep 2; done
+    _wcb_check_dockerd || _wcb_err "docker daemon still not reachable — start Docker manually then re-run 'wcb install'."
+    return 0
+}
+
+# ---- agent image (retag from SHA -> docker load tar -> HF hint) ------------
+_wcb_check_agent_image() { _wcb_image_present "$_WCB_AGENT_IMAGE"; }
+_wcb_fix_agent_image() {
+    _wcb_check_dockerd || { _wcb_err "docker daemon not up — cannot provision agent image"; return 1; }
+    # (1) retag from a dangling SHA if the layers are already present.
+    if docker image inspect "sha256:$_WCB_AGENT_IMAGE_SHA" >/dev/null 2>&1; then
+        _wcb_warn "agent image found by SHA — retagging as $_WCB_AGENT_IMAGE"
+        docker tag "sha256:$_WCB_AGENT_IMAGE_SHA" "$_WCB_AGENT_IMAGE" >/dev/null 2>&1 || true
+    fi
+    _wcb_check_agent_image && return 0
+    # (2) docker load from the local tar (with pv progress if available).
+    if [ -f "$_wcb_root/$_WCB_AGENT_TAR" ]; then
+        _wcb_ensure _wcb_check_pv _wcb_fix_pv "pv (progress)" || true
+        _wcb_warn "loading agent image from $_WCB_AGENT_TAR (~13 GiB — this takes a while)"
+        if command -v pv >/dev/null 2>&1 && _wcb_is_tty; then
+            pv "$_wcb_root/$_WCB_AGENT_TAR" | docker load >/dev/null 2>&1 || true
+        else
+            docker load -i "$_wcb_root/$_WCB_AGENT_TAR" >/dev/null 2>&1 || true
+        fi
+    fi
+    _wcb_check_agent_image && return 0
+    # (3) last resort: tell the user how to fetch the tar.
+    _wcb_err "agent image $_WCB_AGENT_IMAGE not present and no local tar to load."
+    _wcb_err "Fetch it, then re-run 'wcb install':"
+    _wcb_err "  hf download internlm/WildClawBench $_WCB_AGENT_TAR --repo-type dataset --local-dir ."
+    return 1
+}
+
+# ---- mock image (build via .venv python -> mock_stack) ---------------------
+_wcb_check_mock_image() { _wcb_image_present "$_WCB_MOCK_IMAGE"; }
+_wcb_fix_mock_image() {
+    _wcb_check_dockerd || { _wcb_err "docker daemon not up — cannot build mock image"; return 1; }
+    local _py="$_wcb_root/.venv/bin/python3"
+    [ -x "$_py" ] || { _wcb_err ".venv python missing — mock build needs the repo venv (run venv phase first)"; return 1; }
+    _wcb_warn "building mock image $_WCB_MOCK_IMAGE (~3-5 min)"
+    ( cd "$_wcb_root" && "$_py" -c 'from pathlib import Path
+from src.utils.mock_stack import build_mock_image_if_needed
+import sys
+sys.exit(0 if build_mock_image_if_needed(Path("environment")) else 1)' >/dev/null 2>&1 ) || true
+    _wcb_check_mock_image || _wcb_err "mock image build failed — inspect: (cd $_wcb_root && .venv/bin/python3 -c 'from src.utils.mock_stack import build_mock_image_if_needed; from pathlib import Path; build_mock_image_if_needed(Path(\"environment\"))')"
+    return 0
+}
+
+# ---- headroom image (opt-in via --headroom) --------------------------------
+_wcb_check_headroom_image() { _wcb_image_present "$_WCB_HEADROOM_IMAGE"; }
+_wcb_fix_headroom_image() {
+    _wcb_check_dockerd || { _wcb_err "docker daemon not up — cannot build headroom image"; return 1; }
+    _wcb_warn "building headroom image $_WCB_HEADROOM_IMAGE"
+    ( cd "$_wcb_root" && docker build -f docker/litellm-headroom.Dockerfile -t "$_WCB_HEADROOM_IMAGE" . >/dev/null 2>&1 ) || true
+    _wcb_check_headroom_image || _wcb_err "headroom build failed — build manually: docker build -f docker/litellm-headroom.Dockerfile -t $_WCB_HEADROOM_IMAGE ."
+    return 0
+}
+
+# ---- cc-bridge image -------------------------------------------------------
+_wcb_check_ccbridge_image() { _wcb_image_present "$_WCB_CCBRIDGE_IMAGE"; }
+_wcb_fix_ccbridge_image() {
+    _wcb_check_dockerd || { _wcb_err "docker daemon not up — cannot build cc-bridge image"; return 1; }
+    _wcb_warn "building cc-bridge image $_WCB_CCBRIDGE_IMAGE (one-time, ~1 min)"
+    ( cd "$_wcb_root" && docker build -f docker/cc-bridge/Dockerfile -t "$_WCB_CCBRIDGE_IMAGE" . >/dev/null 2>&1 ) || true
+    _wcb_check_ccbridge_image || _wcb_err "cc-bridge build failed — build manually: docker build -f docker/cc-bridge/Dockerfile -t $_WCB_CCBRIDGE_IMAGE ."
+    return 0
+}
+
+# ---- shell-rc wcb() function (+ live-shell definition) ---------------------
+_wcb_install_rc() {
+    local _os _rc
+    _os="$(uname -s)"
+    case "${SHELL:-}" in
+        */zsh)  _rc="$HOME/.zshrc" ;;
+        */bash) _rc="$HOME/.bashrc" ;;
+        *)      if [ "$_os" = "Darwin" ]; then _rc="$HOME/.zshrc"; else _rc="$HOME/.bashrc"; fi ;;
+    esac
+    local _fn="wcb() { source \"$_wcb_root/script/wcb\" \"\$@\"; }"
+    if touch "$_rc" 2>/dev/null; then
+        grep -vE '^[[:space:]]*wcb\(\)' "$_rc" > "$_rc.tmp" 2>/dev/null || : > "$_rc.tmp"
+        printf '%s\n' "$_fn" >> "$_rc.tmp"
+        mv "$_rc.tmp" "$_rc" 2>/dev/null && _wcb_ok "installed wcb() in $_rc" || _wcb_warn "could not write $_rc — using live-shell function only"
+    else
+        _wcb_warn "rc file $_rc not writable — using live-shell function only"
+    fi
+    # req 5: define wcb() in the LIVE shell right now (works because install is
+    # sourced). This is what makes `source script/wcb install; wcb run` work in
+    # the SAME terminal with no new shell / no `source ~/.zshrc`.
+    eval "$_fn"
+}
+
+# ---- THE install orchestrator ----------------------------------------------
+_wcb_install() {
+    # reset flags + parse args (unknown args ignored, never fatal).
+    _WCB_INSTALL_SKIP_IMAGES=0; _WCB_INSTALL_HEADROOM=0; _WCB_INSTALL_FORCE=0; _WCB_INSTALL_OFFLINE=0
+    _WCB_PHASE_N=0
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --skip-images) _WCB_INSTALL_SKIP_IMAGES=1 ;;
+            --headroom)    _WCB_INSTALL_HEADROOM=1 ;;
+            --force)       _WCB_INSTALL_FORCE=1 ;;
+            --offline)     _WCB_INSTALL_OFFLINE=1 ;;
+            -h|--help)     _wcb_ok "usage: wcb install [--skip-images] [--headroom] [--force] [--offline]"; return 0 ;;
+            *)             _wcb_warn "ignoring unknown install flag: $1" ;;
+        esac
+        shift
+    done
+    _wcb_ok "starting one-command install (self-healing) for $_wcb_root"
+
+    local _fail=0
+
+    # Phase 1: host preflight (python / docker / disk / rustc / pv).
+    _wcb_phase "host preflight (python, docker, disk, rustc)"
+    _wcb_check_disk
+    _wcb_ensure _wcb_check_python _wcb_fix_python "python 3.10-3.13" || _fail=1
+    _wcb_ensure _wcb_check_pv     _wcb_fix_pv     "pv (progress tool)" || true   # non-fatal
+    _wcb_ensure _wcb_check_dockerd _wcb_fix_dockerd "docker daemon" || _fail=1
+    _wcb_ensure _wcb_check_rustc  _wcb_fix_rustc  "rustc>=$_WCB_MIN_RUSTC" || \
+        _wcb_warn "continuing — a prebuilt litellm wheel may still install without local rustc"
+
+    # Phase 2: .venv + pip (LOUD + fatal on hard failure, with tiered retries).
+    _wcb_phase "python venv + requirements"
+    _wcb_ensure _wcb_check_venv _wcb_fix_venv ".venv + requirements" || _fail=1
+
+    # Phase 3: .env + secrets.
+    _wcb_phase ".env + secrets"
+    _wcb_ensure _wcb_check_env _wcb_fix_env ".env OAuth config" || _fail=1
+
+    # Phase 4: OAuth pool (tolerant — only extract if missing/invalid or --force).
+    _wcb_phase "OAuth token pool"
+    if [ "$_WCB_INSTALL_FORCE" = "1" ]; then
+        _wcb_warn "--force: re-extracting OAuth token from OS credential store"
+        _wcb_fix_oauth || _fail=1
+        _wcb_check_oauth && _wcb_ok "OAuth pool token present + valid" || _fail=1
+    else
+        _wcb_ensure _wcb_check_oauth _wcb_fix_oauth "OAuth pool token" || _fail=1
+    fi
+
+    # Phase 5: git-lfs assets (needed before the agent tar load path).
+    _wcb_phase "git-lfs assets"
+    _wcb_ensure _wcb_check_lfs _wcb_fix_lfs "git-lfs pointers" || true  # non-fatal
+
+    # Phases 6-8: docker images (skippable).
+    if [ "$_WCB_INSTALL_SKIP_IMAGES" = "1" ]; then
+        _wcb_phase "agent image (skipped: --skip-images)";   _wcb_warn "skipping agent image"
+        _wcb_phase "mock image (skipped: --skip-images)";    _wcb_warn "skipping mock image"
+        _wcb_phase "cc-bridge image (skipped: --skip-images)"; _wcb_warn "skipping cc-bridge image"
+    else
+        _wcb_phase "agent image ($_WCB_AGENT_IMAGE)"
+        _wcb_ensure _wcb_check_agent_image _wcb_fix_agent_image "agent image" || _fail=1
+        _wcb_phase "mock image ($_WCB_MOCK_IMAGE)"
+        _wcb_ensure _wcb_check_mock_image _wcb_fix_mock_image "mock image" || _fail=1
+        _wcb_phase "cc-bridge image ($_WCB_CCBRIDGE_IMAGE)"
+        _wcb_ensure _wcb_check_ccbridge_image _wcb_fix_ccbridge_image "cc-bridge image" || _fail=1
+        if [ "$_WCB_INSTALL_HEADROOM" = "1" ]; then
+            _wcb_ensure _wcb_check_headroom_image _wcb_fix_headroom_image "headroom image" || _fail=1
+        fi
+    fi
+
+    # Phase 9: shell-rc wcb() + live-shell fn, then doctor.
+    _wcb_phase "shell function + final doctor"
+    _wcb_install_rc
+
+    _wcb_ok "----------------------------------------------------------------"
+    if _wcb_doctor; then
+        if [ "$_fail" -eq 0 ]; then
+            _wcb_ok "install complete — you can run 'wcb run' in THIS terminal now."
+        else
+            _wcb_warn "install finished but some non-blocking steps failed; doctor is green. 'wcb run' should work."
+        fi
+        return 0
+    else
+        _wcb_err "install finished with problems — see the doctor report above and the hints for each failed step."
+        return 1
+    fi
+}
+
 # Read-only health check: verifies every prerequisite on THIS machine and
 # reports exactly what is missing, so onboarding issues are self-diagnosable.
 _wcb_doctor() {
@@ -398,7 +925,7 @@ _wcb_doctor() {
     if [ -x "$_wcb_root/.venv/bin/python3" ]; then _wcb_ok ".venv present"; else _wcb_err ".venv MISSING — run 'wcb setup'"; _ok=1; fi
     if command -v docker >/dev/null 2>&1; then
         docker info >/dev/null 2>&1 && _wcb_ok "docker daemon up" || { _wcb_err "docker installed but daemon not running — $_dockerd_hint"; _ok=1; }
-        docker image inspect wildclawbench-cc-bridge:v1 >/dev/null 2>&1 && _wcb_ok "cc-bridge image present" || { _wcb_err "cc-bridge image missing — run 'wcb setup'"; _ok=1; }
+        _wcb_image_present "wildclawbench-cc-bridge:v1" && _wcb_ok "cc-bridge image present" || { _wcb_err "cc-bridge image missing — run 'wcb install' (or 'wcb setup')"; _ok=1; }
     else
         _wcb_err "docker not found — $_dockeri_hint"; _ok=1
     fi
@@ -408,6 +935,7 @@ _wcb_doctor() {
 }
 
 case "${1:-help}" in
+    install) shift; _wcb_install "$@" ;;
     setup)  _wcb_setup ;;
     doctor) _wcb_doctor ;;
     login)  _wcb_login ;;
@@ -428,17 +956,23 @@ Run (TUI — the normal path):
   wcb run                    open the TUI and pick the task there
 
 Subcommands:
+  source script/wcb install [flags]       ONE-COMMAND self-healing onboarding.
+                                          Sets up venv+deps, .env, OAuth pool,
+                                          AND provisions docker images, then
+                                          defines wcb() in THIS shell so you can
+                                          'wcb run' in the SAME terminal.
+                                          flags: --skip-images  --headroom
+                                                 --force        --offline
   source script/wcb setup                 ONE-TIME per-laptop onboarding (auto)
   source script/wcb login                 load OAuth vars from .env (subscription ON)
   source script/wcb logout                unset OAuth vars (subscription OFF)
   wcb status                              show login state
   wcb run-legacy <task> [--reps N] [--model M]   old script/run.sh batch path
 
-New machine (one time):
-  source script/wcb setup    # extracts token from this OS's store (macOS Keychain
-                             # or Linux ~/.claude/.credentials.json), writes .env +
-                             # pool file, installs wcb() into your shell rc
-  source ~/.zshrc            # (or ~/.bashrc on Linux/bash — setup prints the file)
+New machine (one time — ONE terminal):
+  source script/wcb install  # self-healing: venv+deps, .env, OAuth pool, docker
+                             # images, and defines wcb() in THIS shell. Then just:
+  wcb run                    # ...in the SAME terminal (no new shell needed)
 
 Examples:
   wcb run input/input1
@@ -451,7 +985,7 @@ EOF
         if [ -d "$1" ] || [ -d "$_wcb_root/$1" ]; then
             _wcb_run "$@"
         else
-            _wcb_err "unknown subcommand: $1 (try: run | setup | login | logout | status | help)"
+            _wcb_err "unknown subcommand: $1 (try: run | install | setup | login | logout | status | doctor | help)"
         fi
         ;;
 esac
