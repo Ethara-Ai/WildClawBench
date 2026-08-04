@@ -259,17 +259,24 @@ def is_defect(rec: Dict[str, Any], phase: str = "stage") -> bool:
     copy hook returned False), with ONE documented benign exception:
     seed-time FILESYSTEM ops that could not run because the agent container
     does not exist yet — the copy hook is absent ("no workspace copy hook")
-    or returns False (status stays "copied"/"mkdir" with ok=False), and the
+    or reported the container down ("skipped_container_down"), and the
     baseline is already mounted via the workspace/mock_data overlays (see
     run_batch's _copy_into_workspace note). Seed fs ops that fail for real
     authoring reasons (missing_src, missing src/dst, exception) still count.
+
+    The exemption keys on an honest status. Before 2026-08 the copy hook
+    collapsed "container absent" and "copy failed" onto False, so the record
+    read ``status="copied", ok=False`` and this function had to whitelist that
+    shape — which also swallowed genuine copy failures. ``status`` values of
+    "copied"/"mkdir" with ok=False now mean the copy really was attempted and
+    really did fail, and are reported as defects.
     """
     if rec.get("ok"):
         return False
     if phase == "seed" and "action" in rec:  # filesystem op (has no 'service')
         reason = str(rec.get("reason") or "")
-        if rec.get("status") in ("copied", "mkdir"):
-            return False  # hook returned False: container not up yet
+        if rec.get("status") == "skipped_container_down":
+            return False  # container not up yet; payload is mounted via data/
         if rec.get("status") == "skipped" and "workspace copy hook" in reason:
             return False
     return True
@@ -404,8 +411,10 @@ class InjectApplier:
     skipped mutation is appended to ``inject_timeline.jsonl``.
 
     ``copy_into_workspace`` (optional) is ``fn(host_src: Path, container_dst:
-    str) -> bool`` used to seed stage0 filesystem drops; when absent, filesystem
-    ops are logged as ``skipped``.
+    str) -> bool | None`` used to seed stage0 filesystem drops; when absent,
+    filesystem ops are logged as ``skipped``. ``None`` means the agent
+    container is not running yet (logged ``skipped_container_down``, benign at
+    seed time); ``False`` means an attempted copy failed and is a defect.
     """
 
     def __init__(
@@ -650,7 +659,12 @@ class InjectApplier:
             return rec
         if action == "mkdir":
             ok = self._copy(None, dst, mkdir=True)
-            rec.update(ok=bool(ok), status="mkdir")
+            if ok is None:
+                # Hook reports "container not up" distinctly from "failed"; do
+                # not label an unattempted op as if it had been performed.
+                rec.update(ok=False, status="skipped_container_down")
+            else:
+                rec.update(ok=bool(ok), status="mkdir")
             self._append({"type": "inject.fs", **rec, "ts": time.time()})
             return rec
         src = op.get("src")
@@ -683,7 +697,10 @@ class InjectApplier:
         rec["src"] = str(host_src)
         try:
             ok = self._copy(host_src, dst)
-            rec.update(ok=bool(ok), status="copied")
+            if ok is None:
+                rec.update(ok=False, status="skipped_container_down")
+            else:
+                rec.update(ok=bool(ok), status="copied")
         except Exception as exc:  # pragma: no cover - defensive
             rec.update(ok=False, status="error", reason=str(exc))
         self._append({"type": "inject.fs", **rec, "ts": time.time()})

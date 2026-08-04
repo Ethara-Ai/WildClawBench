@@ -90,6 +90,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import mimetypes
 import re
 import shutil
 import sys
@@ -809,13 +810,23 @@ def _build_rubric_block(score: dict[str, Any], infer_meta: bool) -> list[dict[st
     return rubric
 
 
+_MULTIMODAL_MIME_PREFIXES = ("image/", "audio/", "video/")
+
+
 def _detect_multimodal(task_dir: Path, output_json: dict[str, Any] | None) -> bool:
-    # task.yaml / task.toml modalities
-    for fname in ("task.yaml", "data/task.toml", "task.toml"):
-        p = task_dir / fname
-        if p.exists():
-            txt = p.read_text(encoding="utf-8", errors="ignore").lower()
-            if "image" in txt or "document" in txt or "multimodal" in txt:
+    """True when the bundle actually CARRIES a non-text asset.
+
+    Asset-based on purpose, mirroring src/utils/harbor/bundle.py's
+    ``multimodal = "true" if attachments_present else "false"``. This used to
+    substring-match "image"/"document"/"multimodal" in task.yaml, which flagged
+    any text-only bundle whose task.yaml merely mentioned one of those words —
+    e.g. ``modalities: [text, image]`` with nothing but .txt placeholders, or an
+    unrelated taxonomy label. The two bundlers now agree.
+    """
+    for p in task_dir.rglob("*"):
+        if p.is_file():
+            mt, _ = mimetypes.guess_type(p.name)
+            if (mt or "").startswith(_MULTIMODAL_MIME_PREFIXES):
                 return True
     # input_files mimes in output.json
     if isinstance(output_json, dict):

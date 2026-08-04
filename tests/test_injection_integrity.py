@@ -61,11 +61,18 @@ def _stage(name="s1", silent=None, loud=None, fs=None, index=1):
     # seed-time fs op, copy hook absent -> benign by design
     ({"ok": False, "status": "skipped", "action": "copy",
       "reason": "no workspace copy hook"}, "seed", False),
-    # seed-time fs op, hook returned False (container not up) -> benign
-    ({"ok": False, "status": "copied", "action": "copy"}, "seed", False),
-    ({"ok": False, "status": "mkdir", "action": "mkdir"}, "seed", False),
+    # seed-time fs op, container not up yet -> benign, and says so explicitly
+    ({"ok": False, "status": "skipped_container_down", "action": "copy"}, "seed", False),
+    ({"ok": False, "status": "skipped_container_down", "action": "mkdir"}, "seed", False),
+    # A seed op that reports "copied"/"mkdir" with ok=False now means the copy
+    # really was ATTEMPTED and really FAILED -- a defect. Before the tri-state
+    # copy hook these were indistinguishable from "container not up" and were
+    # wrongly whitelisted, which silently swallowed dropped payloads.
+    ({"ok": False, "status": "copied", "action": "copy"}, "seed", True),
+    ({"ok": False, "status": "mkdir", "action": "mkdir"}, "seed", True),
     # same fs failure MID-RUN is a real defect
     ({"ok": False, "status": "copied", "action": "copy"}, "stage", True),
+    ({"ok": False, "status": "skipped_container_down", "action": "copy"}, "stage", True),
     # seed fs op with a genuine authoring problem stays a defect
     ({"ok": False, "status": "missing_src", "action": "copy",
       "reason": "/x/y"}, "seed", True),
@@ -350,3 +357,202 @@ def test_pass_summary_entry_forwards_injection_flag():
     good = rb._pass_summary_entry(1, {"overall_score": 0.5, "injection_ok": True},
                                   {"tests_total": 0})
     assert "injection_ok" not in good
+
+
+# --------------------------------------------------------------------------- #
+# Artifacts diff must not credit harness-injected files to the agent
+# --------------------------------------------------------------------------- #
+def test_injected_paths_extracts_applied_fs_dsts(tmp_path):
+    from src.utils.docker_utils import _injected_paths
+
+    tl = tmp_path / "inject_timeline.jsonl"
+    tl.write_text("\n".join([
+        json.dumps({"type": "inject.fs", "ok": True,
+                    "dst": "/workspace/home/home/Documents/order_update.txt"}),
+        json.dumps({"type": "inject.fs", "ok": True,
+                    "dst": "/workspace/home/home/Pictures/label.txt"}),
+        # not applied -> created no file -> must NOT be excluded
+        json.dumps({"type": "inject.fs", "ok": False,
+                    "dst": "/workspace/home/home/Documents/never.txt"}),
+        # non-fs events are irrelevant
+        json.dumps({"type": "inject.api", "ok": True, "pk": "msg-1"}),
+        "not json at all",
+    ]), encoding="utf-8")
+
+    assert _injected_paths(tl) == {
+        "home/home/Documents/order_update.txt",
+        "home/home/Pictures/label.txt",
+    }
+
+
+def test_injected_paths_missing_or_none_is_safe(tmp_path):
+    from src.utils.docker_utils import _injected_paths
+
+    assert _injected_paths(None) == set()
+    assert _injected_paths(tmp_path / "absent.jsonl") == set()
+
+
+def test_harness_bookkeeping_excludes_no_persona_markdown():
+    """An agent editing MEMORY.md is real work; only unambiguous harness files
+    may be withheld from artifacts/."""
+    from src.utils.docker_utils import _HARNESS_BOOKKEEPING
+
+    assert ".wildclaw_current_turn" in _HARNESS_BOOKKEEPING
+    assert "spawn_tree.jsonl" in _HARNESS_BOOKKEEPING
+    for persona in ("MEMORY.md", "SOUL.md", "USER.md", "IDENTITY.md"):
+        assert persona not in _HARNESS_BOOKKEEPING
+
+
+# --------------------------------------------------------------------------- #
+# ...but an agent EDIT to an injected path is agent work and must be kept
+# --------------------------------------------------------------------------- #
+def _timeline_with_payloads(tmp_path: Path) -> Path:
+    """Timeline whose applied copy ops carry a host `src` payload."""
+    payload_dir = tmp_path / "stage1" / "files"
+    payload_dir.mkdir(parents=True)
+    notes = payload_dir / "order_update_v2.txt"
+    notes.write_text("INJECTED v2\n", encoding="utf-8")
+
+    tl = tmp_path / "inject_timeline.jsonl"
+    tl.write_text("\n".join([
+        json.dumps({"type": "inject.fs", "ok": True, "src": str(notes),
+                    "dst": "/workspace/home/home/Documents/order_update.txt"}),
+        json.dumps({"type": "inject.fs", "ok": False, "src": str(notes),
+                    "dst": "/workspace/home/home/Documents/never.txt"}),
+    ]), encoding="utf-8")
+    return tl
+
+
+class _FakeProc:
+    def __init__(self, stdout: str = "", returncode: int = 0, stderr: str = ""):
+        self.stdout, self.returncode, self.stderr = stdout, returncode, stderr
+
+
+def _stub_container(monkeypatch, changed: list[str], container_files: dict[str, str]):
+    """Stub the two docker round-trips: the changed-path lister and the copier."""
+    from src.utils import docker_utils as du
+
+    monkeypatch.setattr(du.subprocess, "run",
+                        lambda *a, **k: _FakeProc(stdout=json.dumps(sorted(changed))))
+
+    def _cp(task_id, src, dest):
+        rel = src.split(du.TMP_WORKSPACE + "/", 1)[-1]
+        if rel not in container_files:
+            return False
+        Path(dest).parent.mkdir(parents=True, exist_ok=True)
+        Path(dest).write_text(container_files[rel], encoding="utf-8")
+        return True
+
+    monkeypatch.setattr(du, "_copy_file_from_container", _cp)
+
+
+def test_injected_payloads_maps_dst_to_src(tmp_path):
+    from src.utils.docker_utils import _injected_paths, _injected_payloads
+
+    tl = _timeline_with_payloads(tmp_path)
+    payloads = _injected_payloads(tl)
+
+    assert set(payloads) == {"home/home/Documents/order_update.txt"}
+    assert payloads["home/home/Documents/order_update.txt"].endswith("order_update_v2.txt")
+    # _injected_paths stays exactly the key set -- same selection rule as before.
+    assert _injected_paths(tl) == set(payloads)
+    assert _injected_payloads(None) == {}
+    assert _injected_payloads(tmp_path / "absent.jsonl") == {}
+
+
+def test_untouched_injected_file_is_withheld(tmp_path, monkeypatch):
+    """Content still identical to the payload -> the injector's file, not the agent's."""
+    from src.utils.docker_utils import (
+        _copy_changed_workspace_outputs_from_container,
+        _injected_payloads,
+    )
+
+    tl = _timeline_with_payloads(tmp_path)
+    payloads = _injected_payloads(tl)
+    rel = "home/home/Documents/order_update.txt"
+    dest = tmp_path / "artifacts"
+    dest.mkdir()
+
+    _stub_container(monkeypatch, [rel, "home/home/Documents/agent_made.txt"],
+                    {rel: "INJECTED v2\n", "home/home/Documents/agent_made.txt": "mine\n"})
+
+    excluded = _copy_changed_workspace_outputs_from_container(
+        "t", dest, exclude=set(payloads), payloads=payloads)
+
+    assert excluded == {rel}
+    assert not (dest / rel).exists()                        # probe withdrawn
+    assert not (dest / "home/home/Documents").exists() or \
+        list((dest / "home/home/Documents").iterdir())      # no empty dirs left behind
+    assert (dest / "home/home/Documents/agent_made.txt").read_text() == "mine\n"
+
+
+def test_agent_edited_injected_file_is_kept(tmp_path, monkeypatch):
+    """Content diverged from the payload -> the agent edited it after the drop."""
+    from src.utils.docker_utils import (
+        _copy_changed_workspace_outputs_from_container,
+        _injected_payloads,
+    )
+
+    tl = _timeline_with_payloads(tmp_path)
+    payloads = _injected_payloads(tl)
+    rel = "home/home/Documents/order_update.txt"
+    dest = tmp_path / "artifacts"
+    dest.mkdir()
+
+    _stub_container(monkeypatch, [rel], {rel: "INJECTED v2\nagent appended this\n"})
+
+    excluded = _copy_changed_workspace_outputs_from_container(
+        "t", dest, exclude=set(payloads), payloads=payloads)
+
+    assert excluded == set()
+    assert (dest / rel).read_text() == "INJECTED v2\nagent appended this\n"
+
+
+def test_bookkeeping_and_missing_payload_still_withheld(tmp_path, monkeypatch):
+    """No payload to compare against -> unconditional exclusion, as before."""
+    from src.utils.docker_utils import _copy_changed_workspace_outputs_from_container
+
+    dest = tmp_path / "artifacts"
+    dest.mkdir()
+    gone = "home/home/Documents/payload_deleted.txt"
+
+    _stub_container(monkeypatch, [".wildclaw_current_turn", "spawn_tree.jsonl", gone],
+                    {".wildclaw_current_turn": "2", "spawn_tree.jsonl": "{}",
+                     gone: "whatever"})
+
+    excluded = _copy_changed_workspace_outputs_from_container(
+        "t", dest, exclude={gone},
+        payloads={gone: str(tmp_path / "does_not_exist.txt")})
+
+    assert excluded == {".wildclaw_current_turn", "spawn_tree.jsonl", gone}
+    assert not (dest / gone).exists()
+
+
+# --------------------------------------------------------------------------- #
+# Per-turn simulated clock
+# --------------------------------------------------------------------------- #
+def test_compute_sim_clock_resolves_each_turn(tmp_path):
+    from src.utils.sim_clock import compute_sim_clock, compute_sim_clock_for_turn
+
+    (tmp_path / "prompts.json").write_text(json.dumps({
+        "timezone": "America/Chicago",
+        "turns": [
+            {"turn": "T0", "timestamp": "2026-08-03T08:45:00-05:00", "message": "a"},
+            {"turn": "T1", "timestamp": "2026-08-04T09:10:00-05:00", "message": "b"},
+            {"turn": "T2", "timestamp": "2026-08-05T10:00:00-05:00", "message": "c"},
+        ],
+    }), encoding="utf-8")
+    task = {"task_dir": str(tmp_path)}
+
+    t0 = compute_sim_clock_for_turn(task, 0)
+    t1 = compute_sim_clock_for_turn(task, 1)
+    t2 = compute_sim_clock_for_turn(task, 2)
+    assert t0.iso.startswith("2026-08-03T08:45")
+    assert t1.iso.startswith("2026-08-04T09:10")
+    assert t2.iso.startswith("2026-08-05T10:00")
+    # each turn is a distinct instant, a full day apart
+    assert t1.epoch_ms - t0.epoch_ms > 20 * 3600 * 1000
+    # out-of-range turn resolves to None (caller keeps the previous anchor)
+    assert compute_sim_clock_for_turn(task, 3) is None
+    # back-compat: compute_sim_clock is still the turn-0 anchor
+    assert compute_sim_clock(task).epoch_ms == t0.epoch_ms
