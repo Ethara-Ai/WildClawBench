@@ -207,7 +207,7 @@ class TestOAuthBranch:
             )
         )
         p = _params(doc, "claude-opus-4.7")
-        assert p["model"] == "anthropic/claude-opus-4-8"
+        assert p["model"] == "anthropic/claude-opus-5"
         assert p["api_base"] == "http://bridge:8765"
         assert p["api_key"] == "os.environ/WCB_CC_STUB_KEY"
 
@@ -278,7 +278,7 @@ class TestOAuthBranch:
                 use_claude_oauth=True, bridge_url="http://b", bedrock_arn="arn:x"
             )
         )
-        assert _params(doc, "claude-opus-4.7")["model"] == "anthropic/claude-opus-4-8"
+        assert _params(doc, "claude-opus-4.7")["model"] == "anthropic/claude-opus-5"
 
     def test_oauth_flag_without_bridge_url_falls_through_to_bedrock(self):
         # The branch guard is `use_claude_oauth AND bridge_url`; a missing

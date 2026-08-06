@@ -128,15 +128,31 @@ def main() -> None:
         default_parallel=run_batch.DEFAULT_PARALLEL,
     )
 
-    # run_batch takes ONE --task, so a multi-task selection is a sequential
-    # outer loop (one run_batch invocation per task) wrapping the reps loop.
-    # Reps = sequential re-invocations of the same task (run.sh semantics: one
-    # run_batch per rep; output dirs auto-increment run_N). Re-parse per rep so
-    # one namespace's mutations never leak into the next.
+    # run_batch takes ONE --task, so a multi-task selection loops one run_batch
+    # invocation per task. Reps = sequential re-invocations of the same task
+    # (run.sh semantics: one run_batch per rep; output dirs auto-increment
+    # run_N). Re-parse per rep so one namespace's mutations never leak.
     reps = max(1, int(config.get("reps", 1)))
     multi = len(tasks) > 1
+
+    # Run mode: "auto" = parallel when more than one task is selected, serial
+    # otherwise; explicit "parallel"/"serial" force the choice. Parallel only
+    # applies across DISTINCT tasks (reps of one task always stay sequential so
+    # their run_N dirs increment deterministically).
+    run_mode = str(config.get("run_mode", "auto")).strip().lower()
+    parallel_tasks = multi and run_mode in ("auto", "parallel")
+
+    per_task_argv = [
+        config_to_argv(config, ROOT_DIR, isatty=isatty, task=task) + passthrough
+        for task in tasks
+    ]
+
+    if parallel_tasks:
+        _run_tasks_parallel(tasks, per_task_argv, reps)
+        return
+
     for ti, task in enumerate(tasks, start=1):
-        argv = config_to_argv(config, ROOT_DIR, isatty=isatty, task=task) + passthrough
+        argv = per_task_argv[ti - 1]
         if not _tui_default:
             prefix = f"[wcb] ({ti}/{len(tasks)}) " if multi else "[wcb] "
             print(f"{prefix}starting: run_batch {' '.join(argv)}"
@@ -145,6 +161,53 @@ def main() -> None:
             if reps > 1:
                 print(f"[wcb] ── {task} rep {rep}/{reps} ──")
             run_batch.main(parser.parse_args(argv))
+
+
+def _run_tasks_parallel(tasks, per_task_argv, reps):
+    """Run each selected task concurrently as its own run_batch subprocess.
+
+    A subprocess (not a thread) is used because run_batch.main() hosts a
+    single-screen Textual dashboard and mutates process-global state; N of those
+    cannot share one terminal, so parallel workers run with WCB_TUI=0 and stream
+    plain logs. This matches the harness convergence invariant: each worker is a
+    direct ``python3 eval/run_batch.py <argv>`` invocation.
+    """
+    import concurrent.futures
+    import subprocess
+
+    child_env = dict(os.environ)
+    child_env["WCB_TUI"] = "0"  # dashboards cannot be multiplexed across workers
+
+    jobs = min(len(tasks), 4)  # cap fan-out (Bedrock throttling / local docker)
+    run_batch_py = str(ROOT_DIR / "eval" / "run_batch.py")
+
+    def _run_one(idx):
+        task = tasks[idx]
+        argv = per_task_argv[idx]
+        rc = 0
+        for rep in range(1, reps + 1):
+            proc = subprocess.run(
+                [sys.executable, run_batch_py, *argv],
+                cwd=str(ROOT_DIR), env=child_env,
+            )
+            if proc.returncode:
+                rc = proc.returncode
+        return task, rc
+
+    print(f"[wcb] running {len(tasks)} tasks in parallel (jobs={jobs}"
+          + (f", × {reps} reps each" if reps > 1 else "") + ")")
+    failures = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
+        futures = {pool.submit(_run_one, i): i for i in range(len(tasks))}
+        for fut in concurrent.futures.as_completed(futures):
+            task, rc = fut.result()
+            status = "ok" if rc == 0 else f"FAILED (rc={rc})"
+            print(f"[wcb] done: {task} — {status}")
+            if rc != 0:
+                failures.append(task)
+    if failures:
+        print(f"[wcb] {len(failures)} task(s) failed: {', '.join(failures)}")
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

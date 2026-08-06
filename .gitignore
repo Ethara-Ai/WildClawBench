@@ -73,8 +73,22 @@ audit/
 /AGENTS.md
 /environment/AGENTS.md
 /src/agents/AGENTS.md
+/src/agents/codex/AGENTS.md
 /src/utils/AGENTS.md
+/src/utils/claude_oauth/AGENTS.md
+/src/utils/codex_oauth/AGENTS.md
+/src/utils/harbor/AGENTS.md
+/src/utils/testgen/AGENTS.md
+/src/utils/trajectory/AGENTS.md
 /tests/AGENTS.md
+/docker/AGENTS.md
+/mock_overlay_validator/AGENTS.md
+/oauth_drills/AGENTS.md
+/system_prompts/AGENTS.md
+
+# Local-only docs / analysis notes — machine-specific, not required to run the harness.
+/docs/CLAWMARK_ANALYSIS.md
+/docs/prompt_generate_report_json.md
 
 # Local-only triage / verification notes that aren't required to run the harness.
 CRUCIBLE.md

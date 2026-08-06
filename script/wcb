@@ -746,7 +746,19 @@ _wcb_fix_dockerd() {
     return 0
 }
 
-# ---- agent image (retag from SHA -> docker load tar -> HF hint) ------------
+# ---- agent image (retag from SHA -> docker load tar -> hf download -> hint) ---
+# Locate the `hf` CLI (shipped by huggingface_hub, pinned in requirements.txt).
+# Prefer the repo's .venv (guaranteed by Phase 2), then a system-wide `hf`, then
+# the legacy `huggingface-cli`. Prints the invocation to stdout, or nothing.
+_wcb_locate_hf() {
+    local _venv_hf="$_wcb_root/.venv/bin/hf"
+    [ -x "$_venv_hf" ] && { printf '%s\n' "$_venv_hf"; return 0; }
+    local _venv_hfcli="$_wcb_root/.venv/bin/huggingface-cli"
+    [ -x "$_venv_hfcli" ] && { printf '%s download\n' "$_venv_hfcli"; return 0; }
+    command -v hf >/dev/null 2>&1 && { printf 'hf\n'; return 0; }
+    command -v huggingface-cli >/dev/null 2>&1 && { printf 'huggingface-cli download\n'; return 0; }
+    return 1
+}
 _wcb_check_agent_image() { _wcb_image_present "$_WCB_AGENT_IMAGE"; }
 _wcb_fix_agent_image() {
     _wcb_check_dockerd || { _wcb_err "docker daemon not up — cannot provision agent image"; return 1; }
@@ -767,9 +779,45 @@ _wcb_fix_agent_image() {
         fi
     fi
     _wcb_check_agent_image && return 0
-    # (3) last resort: tell the user how to fetch the tar.
-    _wcb_err "agent image $_WCB_AGENT_IMAGE not present and no local tar to load."
-    _wcb_err "Fetch it, then re-run 'wcb install':"
+    # (2b) hf download from the canonical HF dataset, then docker load.
+    # Skipped under --offline. Errors (gated repo, missing HF login, disk full,
+    # network) fall through to the tier-3 hint, which is now a fallback rather
+    # than a first-line handoff.
+    if [ "$_WCB_INSTALL_OFFLINE" != "1" ]; then
+        local _hf; _hf="$(_wcb_locate_hf)" || _hf=""
+        if [ -n "$_hf" ]; then
+            _wcb_ensure _wcb_check_pv _wcb_fix_pv "pv (progress)" || true
+            _wcb_warn "downloading $_WCB_AGENT_TAR from HF (~13 GiB; needs HF login for gated repos)"
+            # Ensure the destination dir exists so hf can materialize into it.
+            mkdir -p "$_wcb_root/Images" 2>/dev/null || true
+            # hf's own progress bars go to stderr; keep them visible on a TTY,
+            # silence them otherwise so batch runs stay clean.
+            local _hf_rc=1
+            if _wcb_is_tty; then
+                ( cd "$_wcb_root" && eval "$_hf internlm/WildClawBench '$_WCB_AGENT_TAR' --repo-type dataset --local-dir ." )
+                _hf_rc=$?
+            else
+                ( cd "$_wcb_root" && eval "$_hf internlm/WildClawBench '$_WCB_AGENT_TAR' --repo-type dataset --local-dir ." >/dev/null 2>&1 )
+                _hf_rc=$?
+            fi
+            if [ "$_hf_rc" -eq 0 ] && [ -f "$_wcb_root/$_WCB_AGENT_TAR" ]; then
+                _wcb_warn "loading agent image from freshly-downloaded $_WCB_AGENT_TAR"
+                if command -v pv >/dev/null 2>&1 && _wcb_is_tty; then
+                    pv "$_wcb_root/$_WCB_AGENT_TAR" | docker load >/dev/null 2>&1 || true
+                else
+                    docker load -i "$_wcb_root/$_WCB_AGENT_TAR" >/dev/null 2>&1 || true
+                fi
+            else
+                _wcb_warn "hf download did not complete (exit $_hf_rc) — falling back to the manual hint"
+            fi
+        else
+            _wcb_warn "no 'hf' or 'huggingface-cli' on PATH or in .venv — cannot auto-download the agent tar"
+        fi
+    fi
+    _wcb_check_agent_image && return 0
+    # (3) last resort: tell the user how to fetch the tar manually.
+    _wcb_err "agent image $_WCB_AGENT_IMAGE not present and auto-download did not resolve it."
+    _wcb_err "Fetch it manually (may require 'hf auth login' for the gated dataset), then re-run 'wcb install':"
     _wcb_err "  hf download internlm/WildClawBench $_WCB_AGENT_TAR --repo-type dataset --local-dir ."
     return 1
 }

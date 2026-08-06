@@ -352,6 +352,13 @@ if _TEXTUAL_AVAILABLE:
             max-height: 12;
             margin-top: 1;
         }
+        .task-buttons {
+            height: auto;
+            margin-top: 1;
+        }
+        .task-buttons Button {
+            margin-right: 2;
+        }
         Collapsible {
             margin-top: 1;
         }
@@ -489,6 +496,9 @@ if _TEXTUAL_AVAILABLE:
                     *[(t, t, t in selected_pref) for t in task_options],
                     id="tasks",
                 )
+                with Horizontal(classes="task-buttons"):
+                    yield Button("Select all", id="sel_all")
+                    yield Button("Clear all", id="clear_all")
                 yield Label("Or run the first N tasks from input/ (overrides checks)",
                             classes="field-label")
                 yield Input(
@@ -515,7 +525,16 @@ if _TEXTUAL_AVAILABLE:
                     [(label, value) for label, value in self._accounts],
                     value=account_value, allow_blank=False, id="oauth_account",
                 )
-                yield Label("Parallel Workers  (keep 1 — >1 races mock build / Bedrock throttling)",
+                yield Label("Multi-task run mode  (auto = parallel when >1 task is selected)",
+                            classes="field-label")
+                yield Select(
+                    [("auto (parallel for many, serial for one)", AUTO),
+                     ("parallel", "parallel"), ("serial", "serial")],
+                    value=self._sel([AUTO, "parallel", "serial"],
+                                    self._pref("run_mode", AUTO), AUTO),
+                    allow_blank=False, id="run_mode",
+                )
+                yield Label("Parallel Workers  (containers WITHIN one task — keep 1 for Bedrock throttling)",
                             classes="field-label")
                 yield Select(
                     [(str(n), n) for n in (1, 2, 3, 4)],
@@ -642,6 +661,7 @@ if _TEXTUAL_AVAILABLE:
                 "backend": str(self.query_one("#backend", Select).value),
                 "model": str(self.query_one("#model", Select).value),
                 "oauth_account": oauth,
+                "run_mode": str(self.query_one("#run_mode", Select).value),
                 "parallel": int(self.query_one("#parallel", Select).value),
                 "reps": int(self.query_one("#reps", Select).value),
                 "litellm": bool(self.query_one("#litellm", Switch).value),
@@ -711,8 +731,19 @@ if _TEXTUAL_AVAILABLE:
             self.exit(config)
 
         def on_button_pressed(self, event: "Button.Pressed") -> None:
-            if event.button.id == "start":
+            btn = event.button.id
+            if btn == "start":
                 self.action_start()
+            elif btn in ("sel_all", "clear_all"):
+                tasks = self.query_one("#tasks", SelectionList)
+                try:
+                    tasks.select_all() if btn == "sel_all" else tasks.deselect_all()
+                except Exception:
+                    pass
+                # first_n overrides the checkboxes on submit (see
+                # _resolve_selected_tasks); clear it so this bulk action wins.
+                self.query_one("#first_n", Input).value = ""
+                self.query_one("#task_warning", Static).update("")
 
 else:  # pragma: no cover
 
