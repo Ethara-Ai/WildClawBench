@@ -271,12 +271,12 @@ def served_trajectory_models(provider: str, config: Any) -> set[str]:
 
     if provider == OAUTH:
         # cc-bridge routes (litellm_sidecar.py, use_claude_oauth branch).
-        models.update({"claude-opus-4.7", "claude-opus-4-6", "claude-fable-5"})
+        models.update({"claude-opus-5", "claude-opus-4.7", "claude-opus-4-6", "claude-fable-5"})
     else:
         if bedrock_arn:
-            models.update({"claude-opus-4.8", "claude-opus-4.7", "claude-opus-4-6"})
+            models.update({"claude-opus-5", "claude-opus-4.8", "claude-opus-4.7", "claude-opus-4-6"})
         elif anthropic_key:
-            models.update({"claude-opus-4.7", "claude-opus-4-6"})
+            models.update({"claude-opus-5", "claude-opus-4.7", "claude-opus-4-6"})
         if sonnet_arn:
             models.add("claude-sonnet-4-6")
 

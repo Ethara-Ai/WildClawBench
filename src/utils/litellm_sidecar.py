@@ -111,6 +111,8 @@ def build_litellm_config_yaml(
         )
         model_blocks.append("  - model_name: claude-opus-4.7\n" + opus_oauth_params)
         model_blocks.append("  - model_name: claude-opus-4-6\n" + opus_oauth_params)
+        # claude-opus-5: harness-facing menu alias, same upstream as 4.7 here.
+        model_blocks.append("  - model_name: claude-opus-5\n" + opus_oauth_params)
         # Claude Fable 5 on the same bridge route. Deliberately NO `thinking`
         # directive here: fable's thinking is always-on adaptive upstream, and
         # the opus enabled+budget_tokens shape 400s on it. Whatever thinking
@@ -216,6 +218,8 @@ def build_litellm_config_yaml(
         # claude-opus-4.7. Both names alias one ARN so the harness model arg and
         # the openclaw-facing id stay decoupled.
         model_blocks.append("  - model_name: claude-opus-4-6\n" + opus_params)
+        # claude-opus-5: harness-facing menu alias for the same opus ARN.
+        model_blocks.append("  - model_name: claude-opus-5\n" + opus_params)
     elif anthropic_api_key:
         # PROVIDER ISOLATION: when the operator explicitly selected AWS Bedrock,
         # reaching this branch means the Bedrock credentials did not resolve.
@@ -263,6 +267,8 @@ def build_litellm_config_yaml(
         )
         model_blocks.append("  - model_name: claude-opus-4.7\n" + opus_anthropic_params)
         model_blocks.append("  - model_name: claude-opus-4-6\n" + opus_anthropic_params)
+        # claude-opus-5: harness-facing menu alias on the Anthropic-direct path.
+        model_blocks.append("  - model_name: claude-opus-5\n" + opus_anthropic_params)
     # PROVIDER ISOLATION: this block sits OUTSIDE the opus if/elif chain above,
     # so before the auth-provider work it was registered even on an OAuth run --
     # handing the agent a Bedrock-routed model while the operator believed they

@@ -96,6 +96,74 @@ class TestConfigToArgv:
 
 
 # ===========================================================================
+# model_choices  (first-party / Meta vendor model in the dropdown)
+# ===========================================================================
+
+
+class TestModelChoices:
+    _META = "Llama-4-Maverick-17B-128E-Instruct-FP8"
+
+    @pytest.fixture(autouse=True)
+    def _clear_meta_env(self, monkeypatch):
+        monkeypatch.delenv("KENSEI_1P_MODEL", raising=False)
+        monkeypatch.delenv("ONEP_MODEL", raising=False)
+
+    def test_no_vendor_env_returns_static_list(self):
+        assert L.model_choices() == L.MODEL_CHOICES
+
+    def test_kensei_var_appends_vendor_model(self, monkeypatch):
+        monkeypatch.setenv("KENSEI_1P_MODEL", self._META)
+        choices = L.model_choices()
+        assert choices[-1] == self._META
+        assert choices[: len(L.MODEL_CHOICES)] == L.MODEL_CHOICES
+
+    def test_onep_alias_also_works(self, monkeypatch):
+        monkeypatch.setenv("ONEP_MODEL", self._META)
+        assert self._META in L.model_choices()
+
+    def test_kensei_var_wins_over_onep_alias(self, monkeypatch):
+        monkeypatch.setenv("KENSEI_1P_MODEL", self._META)
+        monkeypatch.setenv("ONEP_MODEL", "ignored")
+        assert L.model_choices()[-1] == self._META
+
+    def test_whitespace_is_trimmed(self, monkeypatch):
+        monkeypatch.setenv("KENSEI_1P_MODEL", f"  {self._META}  ")
+        assert L.model_choices()[-1] == self._META
+
+    def test_vendor_id_colliding_with_builtin_is_not_duplicated(self, monkeypatch):
+        monkeypatch.setenv("KENSEI_1P_MODEL", "gpt-5.6")
+        choices = L.model_choices()
+        assert choices.count("gpt-5.6") == 1
+        assert choices == L.MODEL_CHOICES
+
+    def test_static_list_is_never_mutated(self, monkeypatch):
+        before = list(L.MODEL_CHOICES)
+        monkeypatch.setenv("KENSEI_1P_MODEL", self._META)
+        L.model_choices()
+        assert L.MODEL_CHOICES == before
+
+    def test_sel_retains_saved_vendor_model(self, monkeypatch):
+        monkeypatch.setenv("KENSEI_1P_MODEL", self._META)
+        options = L.model_choices()
+        assert L.LauncherApp._sel(options, self._META, "claude-opus-4.7") == self._META
+
+    def test_sel_falls_back_when_vendor_model_absent(self):
+        assert L.LauncherApp._sel(
+            L.MODEL_CHOICES, self._META, "claude-opus-4.7"
+        ) == "claude-opus-4.7"
+
+    def test_opus5_and_vendor_are_static_entries(self):
+        assert "claude-opus-5" in L.MODEL_CHOICES
+        assert "glassy_lagoon" in L.MODEL_CHOICES
+
+    def test_env_meta_matching_static_vendor_is_not_duplicated(self, monkeypatch):
+        monkeypatch.setenv("KENSEI_1P_MODEL", "glassy_lagoon")
+        choices = L.model_choices()
+        assert choices.count("glassy_lagoon") == 1
+        assert choices == L.MODEL_CHOICES
+
+
+# ===========================================================================
 # provider_env_overrides
 # ===========================================================================
 

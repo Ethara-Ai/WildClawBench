@@ -62,6 +62,7 @@ THINKING_LEVELS = ["default", "off", "minimal", "low", "medium", "high", "xhigh"
 
 # Sidecar-served model ids (see src/utils/litellm_sidecar.py model_list).
 MODEL_CHOICES = [
+    "claude-opus-5",
     "claude-opus-4.7",
     "claude-opus-4.8",
     "claude-opus-4-6",
@@ -69,7 +70,26 @@ MODEL_CHOICES = [
     "claude-sonnet-4-6",
     "gpt-5.5",
     "gpt-5.6",
+    "glassy_lagoon",
 ]
+
+
+def _configured_meta_model() -> str:
+    # Runtime/env-derived vendor id (relay's GET /v1/models); precedence MUST
+    # mirror src/utils/config.py's meta_model load order. "" when unconfigured.
+    return (os.environ.get("KENSEI_1P_MODEL")
+            or os.environ.get("ONEP_MODEL")
+            or "").strip()
+
+
+def model_choices() -> List[str]:
+    # Append-only + de-duplicated: keeps built-in order (Opus first) and never
+    # double-lists a vendor id that collides with a built-in.
+    choices = list(MODEL_CHOICES)
+    meta = _configured_meta_model()
+    if meta and meta not in choices:
+        choices.append(meta)
+    return choices
 
 PREFS_PATH = Path.home() / ".wcb" / "launcher.json"
 OAUTH_POOL_DIR = Path.home() / ".wcb" / "oauth_pool"
@@ -514,9 +534,10 @@ if _TEXTUAL_AVAILABLE:
                     allow_blank=False, id="backend",
                 )
                 yield Label("Model", classes="field-label")
+                _models = model_choices()
                 yield Select(
-                    [(m, m) for m in MODEL_CHOICES],
-                    value=self._sel(MODEL_CHOICES, self._pref("model", "claude-opus-4.7"),
+                    [(m, m) for m in _models],
+                    value=self._sel(_models, self._pref("model", "claude-opus-4.7"),
                                     "claude-opus-4.7"),
                     allow_blank=False, id="model",
                 )
@@ -591,7 +612,7 @@ if _TEXTUAL_AVAILABLE:
 
                 yield Static(self._summary_text(
                     self._initial_provider(),
-                    self._sel(MODEL_CHOICES, self._pref("model", "claude-opus-4.7"),
+                    self._sel(model_choices(), self._pref("model", "claude-opus-4.7"),
                               "claude-opus-4.7"),
                     self._judge_value(self._initial_provider()),
                 ), id="summary")
