@@ -1,9 +1,0 @@
-{
-  "subdomain": "telecorpng",
-  "name": "TelecorpNG",
-  "employeeCount": 11,
-  "industry": "Telecommunications",
-  "headquarters": "Abuja, Nigeria",
-  "fiscalYearStart": "01-01",
-  "timeOffPolicies": ["Vacation", "Sick", "Personal", "Maternity", "Paternity"]
-}
