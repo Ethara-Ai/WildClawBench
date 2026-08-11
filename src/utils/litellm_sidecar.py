@@ -98,7 +98,7 @@ def build_litellm_config_yaml(
             "      model: anthropic/claude-opus-5\n"
             f"      api_base: {bridge_url}\n"
             "      api_key: os.environ/WCB_CC_STUB_KEY\n"
-            "      thinking: {\"type\": \"enabled\", \"budget_tokens\": 32000}\n"
+            "      thinking: {\"type\": \"adaptive\", \"display\": \"summarized\"}\n"
             "      stream_options:\n"
             "        include_usage: true\n"
             "      extra_headers:\n"

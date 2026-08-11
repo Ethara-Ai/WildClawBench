@@ -41,6 +41,8 @@ python3 script/regrade.py --run output/openclaw/<task>/trajectories/<model>/run_
 ./deliver.sh --run --task input/<task>              # full; --dry-run skips the push
 ```
 
+**Trajectory models** (the `--model` / TUI *Model* dropdown values): `claude-opus-5`, `claude-opus-4.7`, `claude-opus-4.8`, `claude-opus-4-6`, `claude-fable-5`, `claude-sonnet-4-6`, `gpt-5.5`, `gpt-5.6`, `glassy_lagoon`. `claude-opus-5` is the current Opus and routes via whichever auth is active (the OAuth path upstreams `anthropic/claude-opus-5`); `claude-opus-4.7` remains the `script/run.sh` operator default. `glassy_lagoon` is the Meta OpenAI-compatible vendor model and needs the `KENSEI_1P_*` env block (see `RUNBOOK.md` §3.2). A direct `python3 eval/run_batch.py` with no `--model`/`DEFAULT_MODEL` falls back to the Python-level default `openrouter/anthropic/claude-sonnet-4.6`, whereas `script/run.sh` defaults to `claude-opus-4.7`. Full per-model routing table lives in `RUNBOOK.md` §1.
+
 Hot-edit any prompt in `system_prompts/*.md` without restarting Python: prefix the command with `WCB_PROMPT_NOCACHE=1` (the loader is LRU-cached otherwise).
 
 ## Architecture

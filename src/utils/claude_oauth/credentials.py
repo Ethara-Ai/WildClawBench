@@ -595,11 +595,20 @@ class MultiAccountCredentialProvider:
         for idx, slot in enumerate(self._slots):
             if slot.is_available(now):
                 return slot, idx
-        # All accounts exhausted/invalid -- raise with earliest reset hint.
-        soonest = min(
-            (s.exhausted_until for s in self._slots if not s.invalid),
-            default=0.0,
-        )
+        # invalid slots = dead login (refresh rejected, unrecoverable by
+        # waiting); exhausted slots = live account at its rate cap (self-heals
+        # at exhausted_until). Reporting the former as "reset in 0s" sent users
+        # chasing a reset that never comes, so the two cases raise distinctly.
+        waiting = [s for s in self._slots if not s.invalid]
+        if not waiting:
+            n = len(self._slots)
+            raise CredentialsError(
+                f"all {n} account(s) have an expired/revoked login (refresh "
+                f"rejected). Sign in again with the `claude` CLI/app, then "
+                f"re-run `source script/wcb setup` (or just `wcb run`) to pick "
+                f"up the new login."
+            )
+        soonest = min((s.exhausted_until for s in waiting), default=0.0)
         delta = max(0.0, soonest - now)
         raise CredentialsError(
             f"all {len(self._slots)} accounts exhausted; soonest reset in {delta:.0f}s"

@@ -371,6 +371,7 @@ if _TEXTUAL_AVAILABLE:
             height: auto;
             max-height: 12;
             margin-top: 1;
+            overflow-y: auto;
         }
         .task-buttons {
             height: auto;
@@ -569,6 +570,18 @@ if _TEXTUAL_AVAILABLE:
                     value=int(self._pref("reps", 1)) if int(self._pref("reps", 1)) in (1, 2, 3, 4, 5) else 1,
                     allow_blank=False, id="reps",
                 )
+                yield Label("Multi-turn mode  (openclaw multi-turn tasks only)",
+                            classes="field-label")
+                yield Select(
+                    [("auto — interactive for multi-turn tasks, else single-shot", AUTO),
+                     ("static — replay scripted prompts.txt turns, no human", OFF),
+                     ("interactive — human-in-the-loop (Mode 2 / SFT)", ON)],
+                    value=self._sel([AUTO, OFF, ON],
+                                    self._pref("multiturn_mode",
+                                               self._pref("interactive", AUTO)),
+                                    AUTO),
+                    allow_blank=False, id="multiturn_mode",
+                )
 
                 with Collapsible(title="Advanced", collapsed=True):
                     with Horizontal(classes="switch-row"):
@@ -592,13 +605,6 @@ if _TEXTUAL_AVAILABLE:
                         value=self._pref("generate_tests", AUTO),
                         allow_blank=False, id="generate_tests",
                     )
-                    yield Label("Interactive (Mode 2) — auto: on for multi-turn tasks",
-                                classes="field-label")
-                    yield Select(
-                        [("auto", AUTO), ("on", ON), ("off", OFF)],
-                        value=self._pref("interactive", AUTO),
-                        allow_blank=False, id="interactive",
-                    )
                     yield Label("Thinking level", classes="field-label")
                     yield Select(
                         [(lvl, lvl) for lvl in THINKING_LEVELS],
@@ -619,7 +625,8 @@ if _TEXTUAL_AVAILABLE:
                 yield Static("", id="error")
                 yield Button("▶  Start", variant="success", id="start")
                 yield Static("Enter/click Start (or Ctrl+S) to run — streaming is always on; "
-                             "interactive mode is detected from the task.", id="hint")
+                             "Multi-turn mode above picks static vs interactive (auto = "
+                             "interactive for multi-turn tasks).", id="hint")
             yield Footer()
 
         # -- collect + validate -------------------------------------------
@@ -658,6 +665,11 @@ if _TEXTUAL_AVAILABLE:
                 self.query_one("#error", Static).update(str(exc))
                 return None
 
+            # #multiturn_mode is user-facing framing that maps onto the existing
+            # `interactive` key (its values ARE AUTO/OFF/ON), so resolve_interactive
+            # and config_to_argv stay unchanged. static=OFF, interactive=ON.
+            multiturn_mode = str(self.query_one("#multiturn_mode", Select).value)
+
             oauth = self.query_one("#oauth_account", Select).value
             if oauth == _OAUTH_NONE:
                 oauth = None
@@ -690,7 +702,8 @@ if _TEXTUAL_AVAILABLE:
                 "rebuild_mocks": bool(self.query_one("#rebuild_mocks", Switch).value),
                 "judge_council": str(self.query_one("#judge_council", Select).value),
                 "generate_tests": str(self.query_one("#generate_tests", Select).value),
-                "interactive": str(self.query_one("#interactive", Select).value),
+                "multiturn_mode": multiturn_mode,
+                "interactive": multiturn_mode,
                 "thinking": str(self.query_one("#thinking", Select).value),
                 "custom_model": str(self.query_one("#custom_model", Input).value or ""),
             }

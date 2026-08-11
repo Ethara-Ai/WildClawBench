@@ -278,9 +278,6 @@ def build_state(R: Reqs, n_turns: int) -> dict:
     if R.drive_nonempty and not files:
         files.append({"name": "placeholder.md", "content": "x"})
 
-    docs = {doc: doc + " " + " ".join(sorted(kws)) for doc, kws in R.docs.items()}
-    sheets = {ss: {"_blob": ss + " " + " ".join(sorted(kws))} for ss, kws in R.sheets.items()}
-
     events = []
     for title, date, time in R.cal_events:
         dt = f"{date}T{time}:00-05:00" if time else f"{date}T08:30:00-05:00"
@@ -299,9 +296,6 @@ def build_state(R: Reqs, n_turns: int) -> dict:
         "gmail-api": {"messages": [], "drafts": drafts},
         "google-calendar-api": {"events": events},
         "google-drive-api": {"files": files},
-        "google-docs-api": {"documents": docs},
-        "google-sheets-api": {"spreadsheets": sheets},
-        "google-contacts-api": {"connections": []},  # no Brenda -> red-lines pass
     }
     return state
 

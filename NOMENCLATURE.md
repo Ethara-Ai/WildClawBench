@@ -21,6 +21,8 @@ Two independent scoring channels run per task per run. Historically both used `t
 | Best-of-K rollout score for one task | aggregator output | `by_task_model[].pass_at_k`, `by_task_model[].k` |
 | Eval-wide pass@K (mean of per-task best) | aggregator output | `by_model[].average_pass_at_k` |
 
+> **`<model>` path segment** — the trajectory model id passed via `--model` (or picked in the `wcb` TUI Model dropdown). Current values: `claude-opus-5`, `claude-opus-4.7`, `claude-opus-4.8`, `claude-opus-4-6`, `claude-fable-5`, `claude-sonnet-4-6`, `gpt-5.5`, `gpt-5.6`, and the Meta vendor id `glassy_lagoon` (plus any relay id set via `KENSEI_1P_MODEL`/`ONEP_MODEL`). `claude-opus-5` is the current Opus and routes via the active auth path (OAuth upstreams `anthropic/claude-opus-5`); `claude-opus-4.7` is the `script/run.sh` operator default. The sample JSON below uses `claude-opus-4.7` as an illustrative value — any of the above ids appears verbatim as the `model` field and the `<model>` directory name. Full per-model routing table lives in `RUNBOOK.md` §1.
+
 ## Agent-produced artifacts (canonical location)
 
 `task_output/artifacts/` is the standardized location where every file the agent created or modified during the run is stored, with input data and persona scratch filtered out.

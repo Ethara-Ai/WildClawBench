@@ -109,6 +109,11 @@ WCB_CC_ACCOUNT_POOL=$HOME/.wcb/oauth_pool/account_a.json \
   --litellm --use-claude-oauth --mock-stack --parallel 1 --judge-council
 ```
 
+> `--model claude-opus-4.7` above is a valid Opus alias on the OAuth bridge. To
+> run the current Opus, use `--model claude-opus-5` (OAuth upstreams
+> `anthropic/claude-opus-5`); both resolve through the same cc-bridge. The full
+> model list + per-model routing is in `RUNBOOK.md` §1.
+
 **RL — static, K rollouts (pass@K):**
 
 ```bash

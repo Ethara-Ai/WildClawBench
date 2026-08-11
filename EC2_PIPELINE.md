@@ -133,7 +133,7 @@ export GITHUB_TOKEN=ghp_your_real_token
 | `--all-tasks` | run every task under `input/` |
 | `--tasks-file <file>` | run a list of tasks (one path per line) |
 | `--persona "<name>"` | convert-only mode: package one existing task by fuzzy name |
-| `--model <m>` / `-k <N>` | override run.sh model / number of runs (default: `claude-opus-4.7`, K=1) |
+| `--model <m>` / `-k <N>` | override run.sh model / number of runs (default: `claude-opus-4.7`, K=1). Any trajectory model is valid, incl. `claude-opus-5` (current Opus, routes via active auth) and the Meta vendor id `glassy_lagoon` (needs `KENSEI_1P_*` in `.env` — see `RUNBOOK.md` §1/§3.2 for the full model list + per-model routing). |
 | `--deliverable <dir>` | target folder in the delivery repo (default: `test_deliverables`) |
 | `--branch <name>` | delivery branch (default: `main`) |
 | `--no-lfs` | disable Git LFS (default: LFS on) |

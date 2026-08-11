@@ -42,7 +42,9 @@ dependency. Evidence, by component:
    installs, ensure a CA store is available (`certifi` +
    `SSL_CERT_FILE=$(python3 -c 'import certifi; print(certifi.where())')`).
 5. Smoke: `bash script/run.sh input/<task> claude-opus-4.7 1` with OAuth env
-   set; verify `usage_oauth.jsonl` rows appear.
+   set; verify `usage_oauth.jsonl` rows appear. (`claude-opus-4.7` is a valid
+   Opus alias on the bridge; `claude-opus-5` is the current Opus and upstreams
+   `anthropic/claude-opus-5` — see `RUNBOOK.md` §1 for the full model list.)
 
 Remaining open item: an actual smoke run on the target Linux box (cannot be
 performed from this macOS machine).

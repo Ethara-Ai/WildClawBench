@@ -51,7 +51,7 @@ input/<task name>/
 ├── mock_data/           ← THE APPS. One folder per fake service, each becomes a
 │   ├── gmail-api/         live mock server with seeded data the agent can call.
 │   ├── google-calendar-api/
-│   ├── google-sheets-api/  … (16 services for Gloria)
+│   ├── google-drive-api/  … (16 services for Gloria)
 │   └── …
 │
 ├── inject/              ← THE CHANGES injected over time (see §5). NOT read by

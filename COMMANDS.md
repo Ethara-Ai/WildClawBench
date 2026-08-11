@@ -8,7 +8,11 @@ A single-source guide to **every** custom command / script / CLI entry point in 
 > wcb run input/<task>        # or just: wcb input/<task>
 > ```
 >
-> This opens the full-screen config TUI (`eval/wcb.py` → `src/utils/ui/launcher.py`): Agent Backend, Model, OAuth Account, Parallel Workers are dropdowns; less-used options live under an **Advanced** collapsible; press **Start** to run. `--stream` is always on, `--interactive` is auto-detected from the task layout (multi-turn `prompts.txt` ⇒ interactive), and the OAuth pool (`WCB_CC_ACCOUNT_POOL`) is set from the dropdown. Last-used selections persist to `~/.wcb/launcher.json`. Extra flags after the task are forwarded verbatim to `run_batch.py` as an escape hatch. The old batch path is still available as `wcb run-legacy …`, and `eval/run_batch.py` continues to accept the full flag set for automation.
+> This opens the full-screen config TUI (`eval/wcb.py` → `src/utils/ui/launcher.py`). The task list is a multi-select checklist with **Select all** / **Clear all** buttons (or type a "run first N" count). **Authentication Provider**, **Judge Council Models**, **Agent Backend**, **Model**, **OAuth Account**, **Multi-task run mode**, **Parallel Workers**, and **Repetitions** are dropdowns; less-used options live under an **Advanced** collapsible; press **Start** (or `Ctrl+S`) to run. `--stream` is always on, `--interactive` is auto-detected from the task layout (multi-turn `prompts.txt` ⇒ interactive), and the OAuth pool (`WCB_CC_ACCOUNT_POOL`) is set from the dropdown. Last-used selections persist to `~/.wcb/launcher.json`. Extra flags after the task are forwarded verbatim to `run_batch.py` as an escape hatch. The old batch path is still available as `wcb run-legacy …`, and `eval/run_batch.py` continues to accept the full flag set for automation.
+>
+> **Model dropdown** (in `MODEL_CHOICES` order): `claude-opus-5`, `claude-opus-4.7`, `claude-opus-4.8`, `claude-opus-4-6`, `claude-fable-5`, `claude-sonnet-4-6`, `gpt-5.5`, `gpt-5.6`, `glassy_lagoon`. A configured Meta relay id (`KENSEI_1P_MODEL` / `ONEP_MODEL`) is appended automatically if not already listed. `claude-opus-5` is the current Opus and routes via whichever auth is active (OAuth upstreams `anthropic/claude-opus-5`); `glassy_lagoon` is the Meta OpenAI-compatible vendor model and needs `KENSEI_1P_*` env (see RUNBOOK §3.2).
+>
+> **Multi-task run mode** (`run_mode`: `auto` | `parallel` | `serial`, persisted to `~/.wcb/launcher.json`): when more than one task is selected, `auto` and `parallel` run the tasks concurrently via `eval/wcb.py::_run_tasks_parallel` (a `ThreadPoolExecutor`, `jobs = min(#tasks, 4)`; each worker is a separate `python3 eval/run_batch.py` subprocess with `WCB_TUI=0`, reps sequential inside the worker); `serial` (and any single-task run) runs in-process one at a time. **Parallel Workers** is a *different* axis: it is the number of containers **within one task** (keep `1` for Bedrock throttling); cross-task concurrency is governed by **Multi-task run mode**, not by this dropdown.
 
 Commands fall into these tiers:
 
@@ -30,6 +34,7 @@ Commands fall into these tiers:
 
 ## Table of Contents
 
+0. [Onboarding — the `wcb` shell function](#0-onboarding--the-wcb-shell-function)
 1. [Pipeline shell scripts](#1-pipeline-shell-scripts)
    - [`deliver.sh`](#11-deliversh--run--convert--stage--push)
    - [`script/prepare.sh`](#12-scriptpreparesh--host-bootstrap)
@@ -55,6 +60,27 @@ Commands fall into these tiers:
 5. [Environment fleet tools](#5-environment-fleet-tools)
 6. [CRUCIBLE audit CLI (`audit/`)](#6-crucible-audit-cli-audit)
 7. [Environment variables at a glance](#7-environment-variables-at-a-glance)
+
+---
+
+## 0. Onboarding — the `wcb` shell function
+
+**Path:** `script/wcb` (sourced, installs a `wcb()` shell function).
+**Purpose:** One-command onboarding + launcher for a fresh laptop. Source it once (`source script/wcb setup`), then `wcb <subcommand>`.
+
+Subcommands (`script/wcb`): `install | setup | doctor | login | logout | status | run | run-legacy | help`. Bare `wcb <task-dir>` is an alias for `wcb run <task-dir>`.
+
+| Subcommand | What it does |
+| --- | --- |
+| `wcb install [--skip-images] [--headroom] [--force] [--offline]` | Nine-phase host bootstrap: preflight → venv+requirements → `.env`+secrets → OAuth token pool → git-lfs → agent image → mock image → cc-bridge (+headroom if `--headroom`) → shell fn + doctor. `--skip-images` skips the image phases; `--force` re-extracts the OAuth token; `--offline` suppresses **all** network fetches (rustup/brew/hf/pip). The agent image (`wildclawbench-ubuntu:v1.3`, ~13 GiB) is resolved in order: retag existing layers → `docker load Images/wildclawbench-ubuntu_v1.3.tar` → (unless `--offline`) Hugging Face auto-download `hf download internlm/WildClawBench Images/wildclawbench-ubuntu_v1.3.tar --repo-type dataset --local-dir .` then `docker load`. The HF dataset is gated — run `hf auth login` first. |
+| `source script/wcb setup` | Extracts the Claude Code / Claude Max OAuth token from the OS keychain (macOS Keychain `Claude Code-credentials`; Linux `~/.claude/.credentials.json` / `secret-tool`) → `~/.wcb/oauth_pool/account_a.json`; writes OAuth vars to `.env` (`WCB_USE_CLAUDE_OAUTH=1`, `WCB_CC_ACCOUNT_POOL`, `WCB_CC_STUB_KEY`, a freshly-generated `WCB_CC_BRIDGE_SECRET`, `JUDGE_COUNCIL_SONNET_ARN`); creates the venv; builds the cc-bridge; installs the `wcb()` shell function. Idempotent — never clobbers an existing `WCB_CC_BRIDGE_SECRET`. |
+| `source script/wcb login` / `logout` | Export (or unset) the OAuth env for the current shell; `login` pins `WCB_AUTH_PROVIDER=oauth`. |
+| `source script/wcb status` | Prints LOGGED IN/OUT + resolved provider + judge roster (Sonnet-only under OAuth; Sonnet+GLM+Kimi under Bedrock). |
+| `wcb doctor` | Read-only health check: repo path, `.env`, OAuth pool JSON, `WCB_CC_BRIDGE_SECRET`, `.venv/bin/python3`, docker, cc-bridge image, provider+judge line. |
+| `wcb run [<task>] [flags…]` | Opens the launcher TUI (see TL;DR above). Auto-logs-in from `.env` if `WCB_USE_CLAUDE_OAUTH != 1`. With no task, the TUI opens and you pick from the checklist. Extra flags after the task are forwarded verbatim to `run_batch.py`. |
+| `wcb run-legacy -t <task> [-m <model>] [-r <reps>]` | Old batch path: requires OAuth login; runs `script/run.sh --task … --model … --reps … --backend openclaw --use-claude-oauth`. `--model` defaults to `claude-opus-4.7`. |
+
+Fresh-laptop sequence: `git clone … && cd WildClawBench` → `git lfs install && git lfs pull` → `source script/wcb setup` → `source ~/.zshrc` → `source script/wcb login && source script/wcb status` (must print `auth provider: oauth`) → `wcb run input/<task>`. Verify `ls -la ~/.wcb/oauth_pool/*.json` shows `account_a.json`; if absent, log into Claude Code on the laptop first so the token is in the keychain, then re-run `source script/wcb setup`.
 
 ---
 
@@ -285,7 +311,7 @@ Exactly one of:
 | Flag | Arg | Default | Purpose |
 | --- | --- | --- | --- |
 | `--agent-backend` | `openclaw\|claudecode\|codex\|hermesagent` | `openclaw` | Agent backend implementation. |
-| `-m`, `--model` | `<NAME>` | env `DEFAULT_MODEL` or `openrouter/anthropic/claude-sonnet-4.6` | Model id. |
+| `-m`, `--model` | `<NAME>` | env `DEFAULT_MODEL` or `openrouter/anthropic/claude-sonnet-4.6` | Model id. Note: this `openrouter/anthropic/claude-sonnet-4.6` fallback is the **Python-level** default (`eval/run_batch.py`) that applies only to a *direct* `python3 eval/run_batch.py` call with no `--model`/`DEFAULT_MODEL`. The operator entry points set their own default: `script/run.sh` and `wcb run-legacy` default to `claude-opus-4.7`. Any model in the TUI **Model** dropdown (incl. `claude-opus-5`, `glassy_lagoon`) is valid here. |
 | `-p`, `--parallel` | `N` | env `DEFAULT_PARALLEL` or `1` | Number of parallel containers. |
 | `--lobster-name` | `<STR>` | `None` | Lobster name (used in output dir). |
 | `--lobster-workspace` | `<PATH>` | `None` | Personal OpenClaw workspace path (SOUL.md, USER.md, ...). |

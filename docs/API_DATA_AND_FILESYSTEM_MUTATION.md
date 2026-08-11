@@ -11,14 +11,26 @@ delivery fork of WildClawBench:
    `artifacts/` vs. `workspace_full/`, and finally published into a delivery
    bundle.
 
-Every claim below is anchored to a concrete `file:line` reference. Where a line
-count or a symbol is cited, it was read directly from source (not from a stale
-`AGENTS.md` header — several of those line counts are known to be out of date).
+Every claim below is anchored to the relevant module and symbol. Where a symbol
+is cited, it was read directly from source.
 
 > **Scope note.** This covers the *mock API data plane* and the *workspace file
-> mutation plane*. It does not cover trajectory JSON construction, judging
+> mutation plane*, including **silent data mutations applied between turns**
+> (Part 2.5). It does not cover trajectory JSON construction, judging
 > (Channel A pytest / Channel B rubric council), or model routing except where
 > those planes touch data/filesystem flow.
+
+### Glossary
+
+Names used throughout this document:
+
+- **WildClawBench** — the benchmark harness itself (this codebase).
+- **OpenClaw** — the default agent backend that runs inside the task container.
+- **hermesagent / codex / claudecode** — the other supported agent backends.
+- **Channel A** — the deterministic pytest-based scoring channel.
+- **Channel B** — the rubric judge council (LLM graders).
+- **harbor** — the bundle library that assembles a delivery bundle.
+- **kensei3** — the mock-image lineage the API fleet is built from.
 
 ---
 
@@ -61,7 +73,7 @@ count or a symbol is cited, it was read directly from source (not from a stale
                        ├─ artifacts/        (baseline-diff: agent-produced only)
                        ├─ workspace_full/   (forensic: entire /tmp_workspace)
                        ├─ task_output/  sessions/  artifacts_excluded.json
-                       └─ ... → harbor bundle → deliver.sh → kensei-delievery
+                       └─ ... → harbor bundle → deliver.sh → delivery remote
 ```
 
 Two invariants hold this whole picture together:
@@ -81,9 +93,7 @@ Two invariants hold this whole picture together:
 ## 1.1 The fleet: `environment/`
 
 `environment/` contains **101 mock API services**, one directory per API named
-`<api>-api/` (e.g. `airbnb-api/`, `quickbooks-api/`, `gmail-api/`). There are
-104 directories in total; 3 are legacy stubs without a `service.toml` and are
-not part of the live fleet.
+`<api>-api/` (e.g. `airbnb-api/`, `quickbooks-api/`, `gmail-api/`).
 
 Each service directory carries a fixed contract:
 
@@ -97,8 +107,7 @@ Each service directory carries a fixed contract:
 | `*.json` / `*.csv` | **Baked seed data.** |
 | `<name>_api_postman_collection.json` | Endpoint documentation. |
 
-**Ports** run from `8000` to `8101` with a gap at `8069` (unassigned — do not
-reuse it).
+**Ports** are assigned per service by `service.toml`, in the `8000`+ range.
 
 At the `environment/` root sit the **shared planes** every service links against:
 
@@ -114,8 +123,7 @@ At the `environment/` root sit the **shared planes** every service links against
 ## 1.2 Storage model: pure in-memory, process-local
 
 There is **no database** behind the stores. Each service holds its data in
-plain Python dicts inside the uvicorn process. (`sqlite_mcp_server.db` exists in
-the tree but belongs to an unrelated MCP server, not the mock stores.)
+plain Python dicts inside the uvicorn process.
 
 `_mutable_store.py` defines three classes:
 
@@ -155,7 +163,7 @@ it deterministically replaces the baseline `.json`.
 ### Resilient loading
 
 When the environment variable `MOCK_RESILIENT_LOAD=1` is set — and the mock
-stack **always** sets it (`mock_stack.py:389`) — a seed/overlay that fails to
+stack **always** sets it (`mock_stack.py`) — a seed/overlay that fails to
 load **degrades to an empty table** instead of crashing uvicorn. This keeps a
 single bad per-task overlay from taking down the whole shared container (which
 would also disable the admin/injection plane). Host-side importers and
@@ -255,42 +263,36 @@ The fleet is **not** a single Python app mounting 101 sub-apps. Instead:
 - Inside one container, **each service is its own uvicorn process**, launched by
   **supervisord**.
 
-Image build (`build_mock_image_if_needed`, ~`mock_stack.py:296-366`):
+Image build (`build_mock_image_if_needed`):
 
-- A **content hash** (`_compute_mock_content_hash`, `:28-50`) is a sha256 over a
+- A **content hash** (`_compute_mock_content_hash`) is a sha256 over a
   manifest of `(relpath, size, mtime)` for `environment/` plus a builder-version
-  string (`_BUILDER_VERSION = "rt-filter-1"`), truncated to 16 hex chars.
+  string, truncated to 16 hex chars.
 - The built image is labeled `kensei3.content_hash=<hash>`
   (`_CONTENT_HASH_LABEL`). On the next run, the current content hash is compared
   to the image label; if they differ the image is **rebuilt**. Forcing:
   `KENSEI_MOCK_REBUILD=1` or `--rebuild-mocks` (does `docker rmi` then rebuild).
-- A cross-process **flock** on `/tmp/kensei3-mocks-build.lock` prevents
-  concurrent rebuilds.
-- The generated Dockerfile (`_generate_dockerfile`, `:215-265`) is
-  security-hardened:
-  - **Digest-pinned base** — `FROM python:3.11-slim@sha256:a3ab0b96...`
-    (`:244`); the `@sha256:` suffix defends against tag-mutation supply-chain
-    attacks and **must not** be removed (BUG-S-002, `:224-233`). Note the
-    *shared* image pins `3.11`, while the per-API standalone Dockerfiles pin
-    `3.12-slim@sha256:090ba77...`; the version mismatch is a known, separately
-    tracked item — both surfaces stay digest-pinned.
+- A cross-process **flock** prevents concurrent rebuilds.
+- The generated Dockerfile (`_generate_dockerfile`) is security-hardened:
+  - **Digest-pinned base** — `FROM python:<ver>-slim@sha256:...`; the `@sha256:`
+    suffix defends against tag-mutation supply-chain attacks and **must not** be
+    removed. Every image surface stays digest-pinned.
   - **Non-root runtime** — creates an `app` system user, does all root-only work
-    first, then `chown -R app:app /opt/mocks` and `USER app` before `CMD`
-    (`:245`, `:259`, `:263`; BUG-S-001). The 101 services bind non-privileged
-    ports 8000+, so no `CAP_NET_BIND_SERVICE` is needed.
+    first, then `chown -R app:app /opt/mocks` and `USER app` before `CMD`. The
+    services bind non-privileged ports 8000+, so no `CAP_NET_BIND_SERVICE` is
+    needed.
   - **Hash-pinned per-service install** — a loop over
     `/opt/mocks/*/requirements-locked.txt` with `pip install --require-hashes`
-    (`:250-253`; BUG-S-003) rejects any wheel whose sha256 diverges from the
-    lockfile.
-  - `COPY env_dir/ → /opt/mocks/` (`:249`), `ENV PYTHONPATH=/opt/mocks`
-    (`:260`), a `HEALTHCHECK` calling `/healthcheck.sh` (`:261-262`), and
-    `CMD ["/start.sh"]` (`:264`), which is what launches supervisord.
-- The generated supervisord config (`_GEN_SUPERVISORD_PY`, `:155-194`) reads
+    rejects any wheel whose sha256 diverges from the lockfile.
+  - `COPY env_dir/ → /opt/mocks/`, `ENV PYTHONPATH=/opt/mocks`, a `HEALTHCHECK`
+    calling `/healthcheck.sh`, and `CMD ["/start.sh"]`, which is what launches
+    supervisord.
+- The generated supervisord config (`_GEN_SUPERVISORD_PY`) reads
   `MOCK_ENABLED_APIS` (a comma list; empty ⇒ all; a zero-match list falls back
   to all) and emits one `[program:<api>]` uvicorn block per selected API, plus a
   `/tmp/mock_enabled_ports` manifest.
 
-## 1.7 Starting the stack (`start_mock_stack`, `mock_stack.py:369-450`)
+## 1.7 Starting the stack (`start_mock_stack`, `mock_stack.py`)
 
 ```python
 def start_mock_stack(container_name, network, image=MOCK_IMAGE,
@@ -302,18 +304,18 @@ What it does, verified against source:
 
 1. `docker rm -f <container_name>` (clean slate).
 2. **Overlay mounts** — for each `overlays[api][filename] = host_path`, add
-   `-v {host_path}:/opt/mocks/{api}/{filename}:ro` (`:377-384`). This bind-mounts
+   `-v {host_path}:/opt/mocks/{api}/{filename}:ro`. This bind-mounts
    the per-task overlay file **read-only over the baked baseline** inside the
    image. This is how task data reaches the mock.
-3. Always add `-e MOCK_RESILIENT_LOAD=1` (`:389`).
+3. Always add `-e MOCK_RESILIENT_LOAD=1`.
 4. If `enabled_apis` is non-empty, add
-   `-e MOCK_ENABLED_APIS=<sorted csv>` (`:392-394`) so supervisord starts only
+   `-e MOCK_ENABLED_APIS=<sorted csv>` so supervisord starts only
    those services.
-5. Add each `admin_env` var (token value never logged) (`:397-402`).
+5. Add each `admin_env` var (token value never logged).
 6. For each `publish_ports` entry, add `-p 127.0.0.1::<port>` — **bind to
-   loopback only** (`:404-408`); the host-side DriftDirector reaches the admin
+   loopback only**; the host-side DriftDirector reaches the admin
    plane via localhost, and it must never be exposed on public interfaces.
-7. **Dual-homing** (`:409-450`): the task network is created `--internal`
+7. **Dual-homing**: the task network is created `--internal`
    (no egress). Port publishing (`-p`) only binds if the container's
    creation-time network can route to the host — which the internal net cannot
    on Docker Desktop. So when `publish_ports` is requested, the container is
@@ -331,9 +333,8 @@ URL from the `<API>_API_URL` environment variable derived from `service.toml`'s
 
 `mock_overlay_validator/` is a **standalone, stdlib-only** author-time auditor
 (`validate.py` + `examples/<api>-api/` snapshots) that checks per-task overlays
-(e.g. `SCHEMA_MISSING_COLUMNS`) against the CSV-overlay-wins invariant. It is
-**not imported** by anything under `eval/` or `src/`. A companion
-`mock_overlay_validator_docker/` exists for containerized validation.
+(e.g. `SCHEMA_MISSING_COLUMNS`) against the CSV-overlay-wins invariant. It runs
+before authoring is finalized and is not part of the eval runtime.
 
 ---
 
@@ -344,7 +345,7 @@ live, overlaid mock stack the agent can call.
 
 ## 2.1 The task corpus: `input/<task>/`
 
-A representative task directory (`input/darren_weston_...`):
+A representative task directory (`input/<task>/`):
 
 | Path | Role | Sent to agent? |
 |---|---|---|
@@ -357,18 +358,17 @@ A representative task directory (`input/darren_weston_...`):
 | `data/` | Legacy input docs (xlsx/pdf/docx/jpg). | Yes (docker-cp'd, §2.6). |
 | `mock_data/<api>-api/*.csv\|json` | **Per-task API overlays.** | Indirectly — served *by the mock*, never copied into the agent. |
 
-Ground-truth values are baked into the mock overlays (e.g. a vendor `Balance` of
-`1247.50` that the rubric later checks). The agent obtains those values **only by
-querying the mock**, which is the whole point of the exercise.
+Ground-truth values are baked into the mock overlays (e.g. a vendor `Balance`
+that the rubric later checks). The agent obtains those values **only by querying
+the mock**, which is the whole point of the exercise.
 
-`task_parser.parse_native_task` (`task_parser.py:680-731`) reads the corpus into
-a typed task with `persona_dir` / `data_dir` / `gt_dir` fields, and
-`_append_workspace_hint` (`:716`) appends the list of staged `home/` files to
-the prompt so the agent knows what inputs it has. `_normalize_api_name`
-(`run_batch.py:596-602`) coerces bare names like `quickbooks` to the canonical
-`quickbooks-api`.
+`task_parser.parse_native_task` reads the corpus into a typed task with
+`persona_dir` / `data_dir` / `gt_dir` fields, and `_append_workspace_hint`
+appends the list of staged `home/` files to the prompt so the agent knows what
+inputs it has. `_normalize_api_name` coerces bare names like `quickbooks` to the
+canonical `quickbooks-api`.
 
-## 2.2 `_augment_task_with_mocks` (`run_batch.py:743-786`)
+## 2.2 `_augment_task_with_mocks` (`run_batch.py`)
 
 Called once per task from `run_single_task` (guarded by `if config is not None`).
 It **mutates the task dict in place** and does **not** edit the prompt.
@@ -406,23 +406,23 @@ URLs for the other ~100 services, so it cannot call servers its stack never
 starts, and the mock-health logger does not spam warnings for intentionally
 disabled services.
 
-## 2.3 API resolution: `_resolve_task_apis` (`run_batch.py:605`)
+## 2.3 API resolution: `_resolve_task_apis` (`run_batch.py`)
 
 Precedence for **required** APIs:
 
 1. `task['required_apis_declared']` — from `task.yaml` / `task.json`
-   (`task_parser` `:754` / `:885`).
+   (`task_parser`).
 2. The subdirectory names under `<task_dir>/mock_data/<api>/`
-   (`run_batch.py:656-668`).
-3. `infer_required_apis()` — keyword inference over the prompt
-   (`:645-650`), used only when nothing more explicit exists.
+   (`run_batch.py`).
+3. `infer_required_apis()` — keyword inference over the prompt,
+   used only when nothing more explicit exists.
 
 **Distractor** resolution:
 - `'auto'` ⇒ the full-catalog complement (via `compute_distractor_skills`).
 - an explicit list ⇒ those minus the required set.
 - missing / null / `[]` ⇒ no distractors.
 
-**Overlays** (`:661-668`) are built by walking `<task_dir>/mock_data/<api>/*`,
+**Overlays** are built by walking `<task_dir>/mock_data/<api>/*`,
 producing `{api: {filename: absolute_host_path}}` — exactly the shape
 `start_mock_stack` consumes at §1.7 step 2.
 
@@ -430,14 +430,14 @@ producing `{api: {filename: absolute_host_path}}` — exactly the shape
 
 There are two mock-stack tiers:
 
-**Shared/base stack** (`_setup_litellm_and_mocks`, `run_batch.py:3221-3247`):
+**Shared/base stack** (`_setup_litellm_and_mocks`, `run_batch.py`):
 `build_mock_image_if_needed` → `mock_container = f"mocks-{batch_id}"` →
 `start_mock_stack(..., enabled_apis=mock_enabled_apis)` →
 `wait_for_mock_stack_healthy(180s)`. Then `discover_services` populates
 `mock_env_dict[env_var_name] = f"http://{mock_container}:{port}"`.
 
-**Per-task stack** (`_start_task_mock_stack`, `run_batch.py:3269`, invoked from
-`run_single_task` `:1849-1857` **only** when `enable_mock_stack` and a network
+**Per-task stack** (`_start_task_mock_stack`, `run_batch.py`, invoked from
+`run_single_task` **only** when `enable_mock_stack` and a network
 exist and `task['mock_overlays']` is non-empty):
 
 - Container name `mocks-task-<safe_id>-<uuid[:6]>`.
@@ -472,15 +472,132 @@ container:
 
 | Function | Copies | Into | Notes |
 |---|---|---|---|
-| `inject_lobster_workspace` (`:2124-2147`) | `persona/.` | `task_id:/root/` | |
-| `inject_persona_into_workspace` (`:2150-2178`) | `persona/.` | `task_id:/tmp_workspace/` | OpenClaw reads context from the workspace, not `/root`; **must run after `setup_workspace`**. |
-| `inject_data_into_workspace` (`:2181-2230`) | `data/.` | `task_id:/tmp_workspace/home/` | |
+| `inject_lobster_workspace` | `persona/.` | `/root/` | |
+| `inject_persona_into_workspace` | `persona/.` | `/tmp_workspace/` | OpenClaw reads context from the workspace, not `/root`; **must run after `setup_workspace`**. |
+| `inject_data_into_workspace` | `data/.` | `/tmp_workspace/home/` | |
 
-The OpenClaw runner ordering (`src/agents/openclaw/runner.py:299-368`) is:
+The OpenClaw runner ordering (`src/agents/openclaw/runner.py`) is:
 `inject_lobster` → `inject_persona` → `inject_data` →
 `setup_skills`/`inject_api_connectors` → `run_warmup` → **workspace baseline
 snapshot LAST**. That final ordering is the linchpin of Part 3: the baseline is
 taken only after *every* input has been staged.
+
+---
+
+# PART 2.5 — Silent data mutations between turns
+
+The single-turn picture above (a fixed overlay served for the whole run) is only
+half the story. In a **multi-turn** task the environment can *change while the
+agent works* — a vendor balance updated between turn 5 and turn 6, a ticket
+silently moved to a new status, a new email that appears in the agent's inbox.
+This section is the direct answer to "how do you inject a data change between
+turns, and how do you make it invisible to the agent when you need to?"
+
+## 2.5.1 The three between-turn mechanisms
+
+A task can carry **any one** of three parallel, independently-parsed directives.
+The task loader detects them by presence and wires the matching director:
+
+| On disk | Director | Style |
+|---|---|---|
+| `drift.yaml` | `drift_director` | Background racing — state mutates continuously during the run. |
+| `stages.yaml` | `stage_director` | ClawMark-style — one nudge per stage, one extra turn per stage. |
+| `inject/stage<N>/mutations.json` | `inject_director` | Rich stage script — the format documented below. |
+
+All three are real and wired in the harness. In the **currently shipped corpus**,
+only the `inject/` form is present, and only as **empty stage-0 seed anchors**
+(e.g. `input/Shiela_Strokes_Input/inject/stage0/mutations.json` and
+`input/Greg_Howard_01_Input/inject/stage0/mutations.json`). No `drift.yaml` or
+`stages.yaml` instances ship today; the rest of this section documents the
+`inject/` schema, which is the one to use for new between-turn work.
+
+## 2.5.2 The `inject/` stage schema
+
+Each stage lives at `inject/stage<N>/mutations.json` and is parsed by
+`inject_director.py::InjectScript.load` (statically pre-flighted by
+`inject_validator.py`). The **canonical** shape:
+
+```json
+{
+  "stage": 1,
+  "stage_name": "day2_to_day3_drift",
+  "applies_between_turns": ["T5", "T6"],
+  "mutations": {
+    "filesystem": [],
+    "loud": [],
+    "silent": [
+      {
+        "id": "jira-status-flip",
+        "service": "jira-api",
+        "admin": {
+          "op": "patch",
+          "table": "issues",
+          "pk": 8021,
+          "set": { "status": "Changes Requested" }
+        }
+      }
+    ]
+  }
+}
+```
+
+Fields the parser actually reads:
+
+- **`applies_between_turns`** (alias `applied_between`) — a two-element list
+  `[from, to]`; each element is `"T<n>"`, a bare integer, or `null`. The stage
+  fires **immediately before the `to` turn** — `["T5", "T6"]` applies just before
+  turn 6. A stage whose `from` is `null` is a **seed** stage: it fires once
+  before turn 0 (baseline anchor), *not* between turns.
+- **`stage_name`** — free-form label (falls back to the directory name).
+- **`mutations`** — either the **dict-of-buckets** form shown above
+  (`filesystem` / `loud` / `silent`, canonical) or a **flat list** of ops that
+  the parser classifies into those same buckets.
+
+The three buckets:
+
+- **`silent`** — applied via the mock's `/admin/*` plane and **invisible to the
+  agent** (details in §2.5.3). Use this for the "the world changed and the agent
+  must notice on its own" case.
+- **`loud`** — applied through the **same** admin plane but **agent-visible**: a
+  new row/email/event the agent will read back through the normal public API on
+  its next turn.
+- **`filesystem`** — a `copy`/`mkdir` staged into the workspace between turns
+  (the only two filesystem actions permitted).
+
+A silent (or loud) op targets a store through an `admin` block, e.g.
+`{"op": "patch", "table": "issues", "pk": 8021, "set": {...}}`, applied by the
+mock's admin handler.
+
+## 2.5.3 Why "silent" is invisible to the agent but not to the grader
+
+Every between-turn op — silent **or** loud — is written through the mock's
+`/admin/*` endpoints, never the public API surface the agent uses. Two
+independent mechanisms keep silent mutations off the agent's radar:
+
+1. **Audit skip-list.** The request-tracking middleware short-circuits any path
+   under `/admin/*` before it is ever recorded, so silent writes never appear in
+   the agent-facing `/audit/requests` or `/audit/summary` feeds.
+2. **Admin-plane isolation.** The admin gate is loopback/allowlist-only and
+   returns **404 (not 403)** to any caller off the allow-list, so its existence
+   is not even discoverable from the agent's network position.
+
+Crucially, invisibility is **agent-only**. Every applied op is still recorded by
+the harness in `inject_timeline.jsonl`, which never traverses `/audit/*`, so the
+grader retains a complete, ordered record of exactly what changed and when. That
+is what makes a "silent" mutation both undetectable to the agent and fully
+auditable for scoring.
+
+## 2.5.4 Two schema caveats
+
+- **`fires_at_turn` and `expected_audit_summary_after_stage` are not read by the
+  parser.** Use `applies_between_turns` for timing. Any `fires_at_turn` /
+  `expected_audit_summary_after_stage` keys are ignored (they are treated as
+  envelope metadata, not directives), so don't rely on them to control behavior.
+- **Seed stubs use a flatter shape.** The shipped stage-0 anchors look like
+  `{"stage": 0, "description": "Seed anchor", "fires_after_turn": 0,
+  "mutations": []}`. Here `fires_after_turn` is **ignored**; the canonical,
+  parser-honored form for real between-turn work is the dict-of-buckets shape in
+  §2.5.2.
 
 ---
 
@@ -491,24 +608,24 @@ This part explains how that change set is captured.
 
 ## 3.1 The workspace and why `/root/workspace` is a symlink
 
-`setup_workspace` (`docker_utils.py:448-489`):
+`setup_workspace` (`docker_utils.py`):
 
 - `cp -r /app/. /tmp_workspace` then `chmod u+w` — `/tmp_workspace` is the real
   working directory.
-- Symlinks `/root/.openclaw/workspace → /tmp_workspace` (`:472`) and
-  `/root/workspace → /tmp_workspace` (`:485-489`).
+- Symlinks `/root/.openclaw/workspace → /tmp_workspace` and
+  `/root/workspace → /tmp_workspace`.
 
 Because `/root/workspace` is a **symlink** to `/tmp_workspace` (not a copy), the
 canonical deliverable location the agent writes to is the *exact same tree* that
 gets baselined, diffed, and collected. A copy would drift out of sync; a symlink
 cannot.
 
-Constants (`:17-18`):
+Constants:
 - `TMP_WORKSPACE` = `$TMP_WORKSPACE` or `/tmp_workspace`.
 - `WORKSPACE_BASELINE_PATH` = `/tmp/wildclaw_workspace_baseline.json` (inside the
   container).
 
-## 3.2 The baseline snapshot (`snapshot_workspace_state`, `:1890-1921`)
+## 3.2 The baseline snapshot (`snapshot_workspace_state`)
 
 Runs a `python3` heredoc via `docker exec`. It walks `root.rglob('*')`, and for
 each file or symlink records, keyed by posix relpath:
@@ -525,20 +642,20 @@ then `json.dumps(files, sort_keys=True)` into `WORKSPACE_BASELINE_PATH` **inside
 the container**. There is **no content hash** — the baseline is pure metadata
 (size + mtime + symlink flag).
 
-Callers (each taken *after* all input staging, *before* the agent runs):
-- `src/agents/openclaw/runner.py:387`
-- `src/agents/codex/runner.py:186`
-- `src/agents/claudecode/runner.py:156`
+The snapshot is taken by each backend that produces a baseline diff — `openclaw`,
+`codex`, and `claudecode` — *after* all input staging and *before* the agent
+runs (`src/agents/<backend>/runner.py`).
 
-> **`hermesagent` does not snapshot**, so its `artifacts/` is silently empty by
-> design (documented in `NOMENCLATURE.md:38`).
+> Backends that do not take a baseline snapshot produce no baseline-diff
+> `artifacts/`; their deliverables come from the explicit output paths the task
+> declares rather than from a workspace diff.
 
-## 3.3 The diff (`_copy_changed_workspace_outputs_from_container`, `:2021-2121`)
+## 3.3 The diff (`_copy_changed_workspace_outputs_from_container`)
 
 A `python3` heredoc runs **in the container** to compute the changed set, then a
 host-side loop copies survivors out.
 
-**Exclude list (verbatim, `:2034-2038`).** A relpath is dropped if it is in
+**Exclude list (verbatim).** A relpath is dropped if it is in
 `excluded_names` or starts with one of `excluded_prefixes`:
 
 ```
@@ -548,7 +665,7 @@ results/  gt/  tmp/  .git/  node_modules/  .venv/  venv/  __pycache__/  .cache/
 (These are scratch, dependency, and host-only directories that must never enter
 a deliverable.)
 
-**Change test (`:2056`).** A path is "changed" when:
+**Change test.** A path is "changed" when:
 
 ```python
 before.get(rel) != {size, mtime_ns, is_symlink}   # of current file
@@ -559,7 +676,7 @@ baseline file simply isn't in the current tree). Output is
 `print(json.dumps(sorted(changed)))`. A **missing baseline prints `'[]'`**
 (graceful — no baseline ⇒ no attributed changes).
 
-**Host-side survivor loop (`:2061-2121`).** For the changed set:
+**Host-side survivor loop.** For the changed set:
 
 1. Build `drop = exclude ∪ _HARNESS_BOOKKEEPING`.
 2. If `.wildclaw_spawn_steering.md` is present in the diff, also drop
@@ -578,7 +695,7 @@ baseline file simply isn't in the current tree). Output is
 Two mechanisms distinguish files the *harness* placed after the baseline from
 genuine agent output.
 
-**Harness bookkeeping (`_HARNESS_BOOKKEEPING`, `:1928-1932`):**
+**Harness bookkeeping (`_HARNESS_BOOKKEEPING`):**
 
 ```python
 {".wildclaw_current_turn", ".wildclaw_spawn_steering.md", "spawn_tree.jsonl"}
@@ -587,16 +704,16 @@ genuine agent output.
 Note persona `.md` files are **deliberately not** in this set — an agent editing
 `MEMORY.md` is real work and must not be hidden.
 
-**Injected payloads (`_injected_payloads`, `:1939-1977`):** reads
+**Injected payloads (`_injected_payloads`):** reads
 `inject_timeline.jsonl`, selecting records with `type == "inject.fs"` and a
 truthy `ok`, mapping each `dst → src` via `_map_workspace_dst`. `_same_bytes`
-(`:1994-2007`) sha256-compares; on any read error it returns `False`, which the
+sha256-compares; on any read error it returns `False`, which the
 caller treats as "cannot tell → fall back to exclusion" (never keep an
 unverified file as agent work). This is what corrects for mid-run injector drops
-(and `copy_file_into_workspace`, `:156-203`, tri-state
+(and `copy_file_into_workspace`, tri-state
 `None`/`False`/`True` drops) that land *after* the baseline.
 
-**`artifacts_excluded.json` (`:1879-1887`):** whenever anything is withheld, this
+**`artifacts_excluded.json`:** whenever anything is withheld, this
 manifest is written so an empty/thin `artifacts/` is *diagnosable*:
 
 ```json
@@ -607,32 +724,32 @@ manifest is written so an empty/thin `artifacts/` is *diagnosable*:
 }
 ```
 
-## 3.5 Collecting output (`collect_output_from_container`, `:1812-1887`)
+## 3.5 Collecting output (`collect_output_from_container`)
 
-Order of operations (verified against source, `:1812-1881`):
+Order of operations:
 
-1. `docker cp /tmp/openclaw/.` → `task_output/` (`:1844`) — agent session logs.
+1. `docker cp /tmp/openclaw/.` → `task_output/` — agent session logs.
 2. `docker cp /root/.openclaw/agents/main/sessions/.` → `sessions/`
-   (`:1851-1856`) — the native multi-agent session store (parent + spawned
+   — the native multi-agent session store (parent + spawned
    children), which would otherwise be lost on teardown.
-3. `_sweep_root_deliverables_to_workspace` (`:1858`) — sweep deliverable-shaped
+3. `_sweep_root_deliverables_to_workspace` — sweep deliverable-shaped
    files an agent left at top-level `/root/` back into `/tmp_workspace/`.
-4. `docker cp /tmp_workspace/.` → **`workspace_full/`** (`:1868-1871`) — the
+4. `docker cp /tmp_workspace/.` → **`workspace_full/`** — the
    complete forensic copy of the workspace.
 5. `_copy_changed_workspace_outputs_from_container` → **`artifacts/`**
-   (`:1873-1878`) — the baseline-diff, agent-attributed set.
-6. Write `artifacts_excluded.json` (`:1880`) if anything was withheld.
+   — the baseline-diff, agent-attributed set.
+6. Write `artifacts_excluded.json` if anything was withheld.
 
-> Note: an alternate `include_workspace_changes=True` mode (`:1860-1866`) copies
+> Note: an alternate `include_workspace_changes=True` mode copies
 > the raw workspace into `task_output/workspace/` and returns early *without*
 > computing the baseline-diff; the default path above (`include_workspace_changes
 > = False`) is what produces `artifacts/` + `workspace_full/`.
 
-The copy helpers `_copy_dir` / `_copy_file_from_container` (`:2233-2254`) are
+The copy helpers `_copy_dir` / `_copy_file_from_container` are
 plain `docker cp` shellouts (no Docker SDK). `run_batch.py` wraps this as
-`collect_task_output` (`:490-511`, passing
+`collect_task_output` (passing
 `inject_timeline = output_dir/inject_timeline.jsonl`), invoked in the main
-pipeline at `:2324-2331`.
+pipeline.
 
 ### `artifacts/` vs. `workspace_full/`
 
@@ -641,24 +758,21 @@ pipeline at `:2324-2331`.
 | `artifacts/` | **Only what the agent produced** (baseline-diff, minus excludes/harness/injected). | Judges & bundle — the *deliverable*. |
 | `workspace_full/` | The entire `/tmp_workspace`. | **Forensic only** — fallback and debugging. |
 
-`_pick_evidence_dir` (`:1672-1681`) chooses `artifacts/` when it exists and is
+`_pick_evidence_dir` chooses `artifacts/` when it exists and is
 non-empty, else falls back to `workspace_full/`. The grader
-(`grading.py:409`) and S3 uploader (`s3_artifacts.py:33`) share
+(`grading.py`) and S3 uploader (`s3_artifacts.py`) share
 `_DELIVERABLE_DIR_NAMES = ('results', 'deliverables', 'output', 'out',
 'artifacts')` — a dual invariant that must stay in sync.
-`s3_artifacts.py:66-69` additionally blocklists template filenames
+`s3_artifacts.py` additionally blocklists template filenames
 (`_TEMPLATE_FILE_NAMES`: IDENTITY/BOOTSTRAP/HEARTBEAT/USER/SOUL/AGENTS/TOOLS/
-AGENT/MEMORY.md). `upload_output_artifacts` (`:76-179`) uploads to
+AGENT/MEMORY.md). `upload_output_artifacts` uploads to
 `s3://<bucket>/<prefix>/output/tasks/<task_id>/<file>`.
 
 ## 3.6 Publishing to a delivery bundle
 
-Two byte-equal implementations exist:
-
-- **`src/utils/harbor/bundle.py::write_bundle`** — the library path, with a
-  `_KEEP_TOP_LEVEL` allow-list (`:49-50`).
-- **`script/repackage_to_bundle.py::convert_task`** — a standalone, stdlib-only
-  path used by `deliver.sh`.
+The canonical publish path (`src/utils/harbor/bundle.py::write_bundle`, with a
+`_KEEP_TOP_LEVEL` allow-list) assembles the bundle; `deliver.sh` uses an
+equivalent standalone, stdlib-only path (`script/repackage_to_bundle.py::convert_task`).
 
 Canonical file naming in the bundle:
 
@@ -668,22 +782,11 @@ Canonical file naming in the bundle:
 - **`TRUTH.md`** (`GROUND_TRUTH_FILENAME`) — sources: `TRUTH.md` → `GTFA.md` →
   `golden_steer_flow.md` → `ground-truth.md`.
 
-The **current** publish path is a **verbatim `shutil.copy2`** (`:2310-2330`)
-regardless of source. The ground-truth **slicer**
-`extract_ground_truth_sections` (`:653-693`) is retained for callers and tests
-but is **not** on the publish path. Its locked section allow-list
-(`GROUND_TRUTH_SECTION_ALIASES`, `:222-229`) is `Focal Event`,
-`Canonical Solve Path`, `Value Lock`. Author-private sections
-(`Fairness Ledger`, `Signal Set Declaration`, `Poison-Pill Record`,
-`Task.py Authoring Notes`, `Phase-2 Fingerprint`) **must never** be widened into
-the slice.
-
-**Bundle media reads `artifacts/` only.** `copy_output_media` (`:1070-1090`)
-reads only `run_dir/task_output/artifacts/` — `workspace_full/` is **never** read
-for a bundle. (Companions: `copy_verifier_logs` `:1005-1030`,
-`copy_subagent_artifacts` `:973-1002`, `copy_snapshot` `:1033-1046`; assembly in
-`convert_task` `:2270-2399`.) `final_reward` in bundles is a **percentage
-(0-100)**, while `score.json.combined_reward` stays `0-1`.
+**Bundle media reads `artifacts/` only.** `copy_output_media` reads only
+`run_dir/task_output/artifacts/` — `workspace_full/` is **never** read for a
+bundle. (Companions: `copy_verifier_logs`, `copy_subagent_artifacts`,
+`copy_snapshot`; assembly in `convert_task`.) `final_reward` in bundles is a
+**percentage (0-100)**, while `score.json.combined_reward` stays `0-1`.
 
 ### Media fork (`src/utils/trajectory/`)
 
@@ -693,7 +796,7 @@ Inline base64 media in a trajectory is externalized by **exactly one** of:
   `out_dir/media/<hash>.<ext>` with a bundle/local path (dev).
 - `s3_media.py::replace_inline_media_with_s3` — uploads to S3 (production).
 
-Pick one; never mix. `run_batch.py::_build_trajectory` (~`:1210`) calls the local
+Pick one; never mix. `run_batch.py::_build_trajectory` calls the local
 variant with `artifacts_dir`.
 
 ---
@@ -732,79 +835,3 @@ receives:
 
 Ground-truth values live only inside the mock's responses, so the agent must
 *earn* them by calling the API — exactly what the benchmark measures.
-
----
-
-# Appendix — file:line cross-reference
-
-### Mock API plane (`environment/`, `src/utils/mock_stack.py`)
-
-| Symbol / behavior | Location |
-|---|---|
-| In-memory `Table` / `Document` / `Store` / `get_store` | `environment/_mutable_store.py` |
-| CSV-overlay-wins invariant (`read_seed_with_ctx`) | `_mutable_store.py` (~`:234-273`, invariant `:235`) |
-| Audit plane `install_tracker`, `/audit/*` | `environment/tracking_middleware.py` |
-| Admin/drift plane `install_admin_plane`, `/admin/*` | `environment/admin_plane.py` |
-| Import gate over all 101 services | `environment/smoke_eager_load.py` |
-| Migration recipe | `environment/MIGRATION_RECIPE.md` |
-| `MOCK_IMAGE = "kensei3-mocks:v1"` | `mock_stack.py:17` |
-| Content-hash label / builder version | `mock_stack.py:19`, `:25` |
-| `_compute_mock_content_hash` | `mock_stack.py:28-50` |
-| supervisord generator (`MOCK_ENABLED_APIS`) | `mock_stack.py:155-194` |
-| Dockerfile generator (digest-pinned `python:3.11-slim`, non-root `app`, `--require-hashes`) | `mock_stack.py:215-265` (base `:244`, USER `:263`, hash install `:250-253`) |
-| `build_mock_image_if_needed` | `mock_stack.py:296-366` |
-| `start_mock_stack` (overlays, resilient load, dual-homing) | `mock_stack.py:369-450` |
-| `get_published_ports` | `mock_stack.py:453+` |
-
-### Data-injection path (`eval/run_batch.py`, `src/utils/`)
-
-| Symbol / behavior | Location |
-|---|---|
-| `_augment_task_with_mocks` | `run_batch.py:743-786` |
-| `_resolve_task_apis` (precedence, overlays) | `run_batch.py:605` (overlays `:656-668`) |
-| `infer_required_apis` keyword inference | `run_batch.py:645-650` |
-| `_normalize_api_name` | `run_batch.py:596-602` |
-| Shared/base mock stack bring-up | `run_batch.py:3221-3247` |
-| Per-task mock stack `_start_task_mock_stack` | `run_batch.py:3269` (invoked `:1849-1857`) |
-| Native task parse / workspace hint | `task_parser.py:680-731` (hint `:716`) |
-| Host-side env mirror `stage_environment_with_overlays` | `src/utils/env_overlay_snapshot.py` |
-| Persona/data docker-cp | `docker_utils.py:2124-2147`, `:2150-2178`, `:2181-2230` |
-| Runner staging order (baseline last) | `src/agents/openclaw/runner.py:299-368`, snapshot `:387` |
-
-### Filesystem mutation plane (`src/utils/docker_utils.py`)
-
-| Symbol / behavior | Location |
-|---|---|
-| `TMP_WORKSPACE`, `WORKSPACE_BASELINE_PATH` | `:17-18` |
-| `setup_workspace` (symlinks `/root/workspace`) | `:448-489` (symlinks `:472`, `:485-489`) |
-| `copy_file_into_workspace` (mid-run drop) | `:156-203` |
-| `snapshot_workspace_state` (baseline) | `:1890-1921` |
-| baseline callers | openclaw `:387`, codex `:186`, claudecode `:156` |
-| `_HARNESS_BOOKKEEPING` | `:1928-1932` |
-| `_injected_payloads` / `_injected_paths` | `:1939-1977` / `:1980-1991` |
-| `_same_bytes` | `:1994-2007` |
-| `_copy_changed_workspace_outputs_from_container` (diff) | `:2021-2121` (excludes `:2034-2038`, change test `:2056`) |
-| `collect_output_from_container` | `:1812-1887` (`workspace_full` `:1868`, `artifacts` `:1873`) |
-| `artifacts_excluded.json` | `:1879-1887` |
-| `_pick_evidence_dir` | `:1672-1681` |
-| `_copy_dir` / `_copy_file_from_container` | `:2233-2254` |
-| `collect_task_output` wrapper | `run_batch.py:490-511` (invoked `:2324-2331`) |
-
-### Grading / delivery
-
-| Symbol / behavior | Location |
-|---|---|
-| `_DELIVERABLE_DIR_NAMES` (grader) | `grading.py:409` |
-| `_DELIVERABLE_DIR_NAMES` / `_TEMPLATE_FILE_NAMES` / upload | `s3_artifacts.py:33`, `:66-69`, `:76-179` |
-| Harbor bundle `write_bundle` (`_KEEP_TOP_LEVEL`) | `src/utils/harbor/bundle.py:49-50` |
-| Standalone bundler `convert_task` | `script/repackage_to_bundle.py:2270-2399` |
-| `PROMPT.md` sources | `repackage_to_bundle.py:194-200` |
-| `TRUTH.md` sources / filename | `repackage_to_bundle.py:187`, `:210-215` |
-| Verbatim publish copy | `repackage_to_bundle.py:2310-2330` |
-| Ground-truth slicer + locked aliases | `repackage_to_bundle.py:653-693`, aliases `:222-229` |
-| Bundle media reads `artifacts/` only | `repackage_to_bundle.py:1070-1090` |
-| Media fork (local vs S3) | `src/utils/trajectory/local_media.py`, `s3_media.py` |
-
-> Line numbers are anchored to source as read during authoring. If a symbol has
-> moved, search by name — the *names* and *behaviors* are the stable contract;
-> the exact line is a convenience.

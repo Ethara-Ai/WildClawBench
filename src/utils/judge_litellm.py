@@ -164,6 +164,91 @@ def preflight_judge_oauth(timeout_s: float | None = None) -> tuple[bool, str]:
     )
 
 
+def preflight_opus_thinking(
+    bridge_url: str,
+    bridge_secret: str,
+    *,
+    model: str | None = None,
+    timeout_s: float = 60.0,
+) -> tuple[bool, str]:
+    """Validate the AGENT opus OAuth path returns POPULATED thinking text.
+
+    Unlike `preflight_judge_oauth` (Sonnet GRADING path), this probes the OPUS
+    AGENT path through the same cc-bridge: it sends `{type:adaptive,
+    display:summarized}` and PASSES iff HTTP 200 AND some returned block is a
+    thinking block with non-empty text. Catches both the `type:enabled`
+    silent-empty regression (Opus 4.7+ returns HTTP 200 with empty thinking +
+    signature, NOT a 400 — live-verified 2026-08-11) and the empty-string
+    redaction (`x-cc-atis` A/B blanking) up front. Non-fatal by contract;
+    bypass with `WCB_SKIP_OPUS_THINKING_PREFLIGHT=1`.
+    """
+    bridge_url = (bridge_url or "").strip()
+    if not bridge_url:
+        return True, "not configured (no OAuth bridge url)"
+    if model is None:
+        # Must match the model the AGENT path actually pins upstream
+        # (litellm_sidecar.py opus_oauth_params -> anthropic/claude-opus-5);
+        # probing a different opus literal makes the preflight unrepresentative.
+        model = (
+            os.environ.get("WCB_CC_OPUS_PREFLIGHT_MODEL")
+            or "anthropic/claude-opus-5"
+        ).strip()
+    try:
+        import litellm
+    except Exception as exc:  # noqa: BLE001
+        return False, f"litellm import failed: {exc}"
+    kwargs: dict[str, Any] = {
+        "model": model,
+        "messages": [
+            {"role": "user", "content": "Think briefly, then reply with the word OK."}
+        ],
+        "max_tokens": 256,
+        "temperature": 1,
+        "stream": False,
+        "drop_params": True,
+        "api_base": bridge_url,
+        "api_key": os.environ.get("WCB_CC_STUB_KEY", "sk-wcb-oauth-stub"),
+        "extra_headers": {
+            "x-wcb-bridge-secret": (bridge_secret or "").strip(),
+            "anthropic-beta": "oauth-2025-04-20",
+        },
+        "thinking": {"type": "adaptive", "display": "summarized"},
+        "timeout": timeout_s,
+        "num_retries": 0,
+    }
+    try:
+        resp = litellm.completion(**kwargs)
+    except Exception as exc:  # noqa: BLE001 — litellm error hierarchy is dynamic
+        return False, f"{type(exc).__name__}: {str(exc)[:400]}"
+    thinking_texts: list[str] = []
+    try:
+        choices = getattr(resp, "choices", None) or []
+        for ch in choices:
+            msg = getattr(ch, "message", None) or {}
+            rc = getattr(msg, "reasoning_content", None)
+            if isinstance(rc, str) and rc.strip():
+                thinking_texts.append(rc)
+            blocks = getattr(msg, "thinking_blocks", None) or []
+            for blk in blocks:
+                txt = (blk or {}).get("thinking") if isinstance(blk, dict) else None
+                if isinstance(txt, str) and txt.strip():
+                    thinking_texts.append(txt)
+    except Exception as exc:  # noqa: BLE001
+        return False, f"could not parse response for thinking blocks: {exc}"
+    if thinking_texts:
+        sample = thinking_texts[0].strip().replace("\n", " ")[:60]
+        return True, f"ok — thinking populated (len={len(thinking_texts[0])}: {sample!r})"
+    return False, (
+        "opus returned NO populated thinking text (empty thinking block + "
+        "signature only). The adaptive+display:summarized fix reached the bridge "
+        "but Anthropic still redacted reasoning — usual cause is the server-side "
+        "x-cc-atis A/B experiment blanking opus-4-8 (the bridge strips that "
+        "header, but a stale ~/.claude.json experiment slot can still enroll "
+        "you). Tokens/grading are unaffected; only reasoning text is blank. Skip "
+        "with WCB_SKIP_OPUS_THINKING_PREFLIGHT=1."
+    )
+
+
 def judge_headroom_enabled() -> bool:
     """Compression switch. Default on when set empty/unset; allows A/B
     testing LiteLLM-without-compression by setting this to false explicitly."""

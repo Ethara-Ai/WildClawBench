@@ -751,7 +751,7 @@ def _augment_task_with_mocks(task: dict, config, mock_env_dict: dict | None) -> 
     task["mock_overlays"] = overlays
     task["distractor_apis"] = distractor
     # Expose ONLY the task's own APIs (required + distractor + overlays) as
-    # URLs — not the full ~104-service catalog — so the agent can't call URLs
+    # URLs — not the full ~101-service catalog — so the agent can't call URLs
     # whose servers this task's stack never starts and the mock-health logger
     # doesn't spam warnings for intentionally-disabled services.
     enabled_apis = (
@@ -1201,7 +1201,7 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
             "turn_messages": list(task.get("turn_messages") or []),
             # Declared API sets (task.yaml required_apis/distractor_apis) so the
             # published data/task.toml lists ONLY the task's own APIs instead of
-            # the runtime required∪mock_data union or the full ~104 catalog that
+            # the runtime required∪mock_data union or the full ~101 catalog that
             # compute_distractor_skills returns as a fallback.
             "required_apis_declared": task.get("required_apis_declared"),
             "distractor_apis_declared": task.get("distractor_apis_declared"),
@@ -3044,6 +3044,34 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
                 )
             logger.info("Claude OAuth grading preflight OK (%s)", _detail)
 
+        # Opus thinking-visibility preflight (non-fatal). The grading preflight
+        # above proves the OAuth path REACHES Claude; it does not prove Opus
+        # returns READABLE thinking. Opus 4.7+ defaults display:omitted (empty
+        # thinking + signature) and a server-side x-cc-atis A/B can blank 4.8
+        # even with display:summarized. Probe the exact host -> bridge path once
+        # with {type:adaptive,display:summarized} and warn (do NOT abort) if the
+        # summary text comes back empty, so a redaction regression is visible in
+        # the log up front rather than discovered by eyeballing trajectories.
+        # Opt out with WCB_SKIP_OPUS_THINKING_PREFLIGHT=1.
+        _skip_thinking_pf = os.environ.get(
+            "WCB_SKIP_OPUS_THINKING_PREFLIGHT", ""
+        ).strip().lower() in ("1", "true", "yes", "on")
+        if not _skip_thinking_pf:
+            from src.utils.judge_litellm import preflight_opus_thinking
+            _tok, _tdetail = preflight_opus_thinking(
+                f"http://127.0.0.1:{cc_bridge_host_port}", bridge_secret
+            )
+            if _tok:
+                logger.info("Opus thinking preflight OK (%s)", _tdetail)
+            else:
+                logger.warning(
+                    "Opus thinking preflight: reasoning text came back EMPTY "
+                    "(%s). Tokens and grading are unaffected, but agent "
+                    "trajectories will show empty thinking blocks. Skip this "
+                    "check with WCB_SKIP_OPUS_THINKING_PREFLIGHT=1.",
+                    _tdetail,
+                )
+
     if use_codex_oauth:
         # Bring up the Codex subscription bridge before the sidecar so the shared
         # secret is in this process's env when start_litellm copies it into the
@@ -3413,8 +3441,8 @@ def _start_task_mock_stack(task: dict, network: str, environment_dir) -> tuple[d
         )
 
     # Expose ONLY this task's enabled APIs (required + distractor + overlays) as
-    # URLs — not the full ~104 baked catalog. The container only boots the
-    # enabled set (above), so handing the agent + health logger all 104 URLs
+    # URLs — not the full ~101 baked catalog. The container only boots the
+    # enabled set (above), so handing the agent + health logger all 101 URLs
     # yields 87 dead endpoints and the "17/104 healthy (failed: ...)" probe spam
     # in mock_health.log. Empty enabled set => keep all (full-catalog fallback,
     # matching start_mock_stack's own behavior).

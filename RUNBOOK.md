@@ -8,6 +8,20 @@ End-to-end operator guide for running the harness, from a cold machine to a grad
 
 WildClawBench runs an LLM agent (default: `claude-opus-4.7` via Bedrock through a LiteLLM sidecar) against a task that ships a prompt, a rubric, optional persona/data/mock-API overlays, and optional drift scripts. The agent runs inside a sandboxed Docker container with no internet egress, talking only to the LiteLLM sidecar (which has internet) and a 101-API mock stack on a private internal bridge. After the agent finishes, the harness generates tests (or reuses cached ones), executes them as a pytest reward signal, then asks a 3-judge Bedrock council to score the rubric as Yes/No verdicts. All outputs land under `output/<backend>/<task>/trajectories/<model>/run_N/`.
 
+**Available trajectory models** (pick one with `-m/--model`, or from the `wcb` TUI Model dropdown):
+
+| Model id | Transport | Notes |
+|----------|-----------|-------|
+| `claude-opus-5` | OAuth → `anthropic/claude-opus-5`; Bedrock → same ARN as 4-6; Anthropic-direct → `claude-opus-4-20250514` | Current Opus. Routes via whichever auth provider is active; no extra env. |
+| `claude-opus-4.7` | Bedrock ARN / OAuth bridge | Default model string in `script/run.sh`. |
+| `claude-opus-4.8` | Bedrock only | Not served on the OAuth path. |
+| `claude-opus-4-6` | Bedrock / OAuth / Anthropic-direct | Load-bearing thinking-activation alias. |
+| `claude-fable-5` | OAuth only | Bridge normalizes thinking to adaptive+summarized. |
+| `claude-sonnet-4-6` | Bedrock (needs Sonnet ARN) | Also the judge model. |
+| `gpt-5.5` | OpenAI (needs `KENSEI_OPENAI_API_KEY`) | |
+| `gpt-5.6` | OpenAI / codex path | |
+| `glassy_lagoon` | OpenAI-compatible Meta vendor relay (needs `KENSEI_1P_*`) | First-party vendor model; see §3.2. Its id equals whatever the relay's `GET /v1/models` returns. |
+
 ---
 
 ## 2. Prerequisites
@@ -24,7 +38,9 @@ WildClawBench runs an LLM agent (default: `claude-opus-4.7` via Bedrock through 
 
 ### Credentials you must have
 - **AWS Bedrock bearer token** with access to the inference-profile ARNs in your `.env` (agent + judge council).
-- **OpenAI API key** if you want `gpt-5.5` as the agent model or `openai/gpt-5.4` as a judge fallback.
+- **OpenAI API key** if you want `gpt-5.5`/`gpt-5.6` as the agent model or `openai/gpt-5.4` as a judge fallback.
+- **Claude Max OAuth** (via `wcb setup`, extracted from the Claude Code Keychain login) if you want `claude-opus-5` / `claude-fable-5` on the OAuth path instead of Bedrock.
+- **Meta vendor relay API key** (`KENSEI_1P_API_KEY`) if you want the first-party `glassy_lagoon` model. See §3.2.
 
 ---
 
@@ -51,14 +67,27 @@ KENSEI_BEDROCK_SONNET_ARN=arn:aws:bedrock:ap-south-1:<acct>:application-inferenc
 KENSEI_AWS_BEARER_TOKEN=ABSK...
 KENSEI_AWS_REGION=ap-south-1
 
-# OpenAI (for gpt-5.5 agent or gpt-5.4 judge fallback)
+# OpenAI (for gpt-5.5/gpt-5.6 agent or gpt-5.4 judge fallback)
 KENSEI_OPENAI_API_KEY=sk-proj-...
+
+# Meta first-party vendor model (OpenAI-compatible relay) — OPTIONAL.
+# Enables the `glassy_lagoon` trajectory model. All three read legacy ONEP_* aliases too.
+# KENSEI_1P_MODEL must equal exactly what the relay's GET /v1/models returns
+# (and match the static TUI dropdown entry). Params are sent defaults-only per the
+# vendor guide (no temperature/top_p/reasoning_effort overrides).
+KENSEI_1P_API_KEY=              # relay bearer token (alias: ONEP_API_KEY)
+KENSEI_1P_BASE_URL=https://api.ai.meta.com/v1   # optional; this is the default (alias: ONEP_API_BASE_URL)
+KENSEI_1P_MODEL=glassy_lagoon   # relay model id (alias: ONEP_MODEL)
 
 # Judge primary (Sonnet via Bedrock direct)
 JUDGE_MODEL=bedrock/arn:aws:bedrock:ap-south-1:<acct>:application-inference-profile/urg0zifsjiga
 JUDGE_MODEL_FALLBACK=openai/gpt-5.4
 
 # Defaults
+# NOTE: this is the operator default read by script/run.sh (readonly DEFAULT_MODEL="claude-opus-4.7").
+# A DIRECT `python3 eval/run_batch.py` with no --model and no DEFAULT_MODEL env falls back to the
+# Python-level default `openrouter/anthropic/claude-sonnet-4.6` instead — always pass --model (or use
+# run.sh / wcb) for the intended model. To make claude-opus-5 the default, set DEFAULT_MODEL=claude-opus-5.
 DEFAULT_MODEL=claude-opus-4.7
 WILDCLAW_DEFAULT_SKILLS=video-frames,pdf-extract,audio-extract
 BRAVE_API_KEY=placeholder

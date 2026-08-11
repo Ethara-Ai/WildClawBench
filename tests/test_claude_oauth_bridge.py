@@ -13,6 +13,7 @@ from src.utils.claude_oauth.bridge import (
     SYSTEM_PREFIX,
     TOOL_NAME_PREFIX,
     apply_billing_attribution,
+    iter_sse_frames,
     normalize_body_for_anthropic_direct,
     rename_tools_outbound,
     strip_tool_prefix_bytes,
@@ -326,9 +327,107 @@ def test_normalize_fable_preserves_omitted_display_and_injects_when_absent():
         "type": "adaptive", "display": "summarized"}
 
 
-def test_normalize_opus_path_unchanged_by_fable_branch():
+def test_normalize_opus_adaptive_stays_adaptive_summarized():
     body = {"model": "claude-opus-4-8",
-            "thinking": {"type": "adaptive", "budget_tokens": 1000}, "messages": []}
+            "thinking": {"type": "adaptive"}, "messages": []}
     out = normalize_body_for_anthropic_direct(body)
-    assert out["thinking"] == {"type": "enabled", "budget_tokens": 1000,
-                               "display": "summarized"}
+    assert out["thinking"] == {"type": "adaptive", "display": "summarized"}
+
+
+def test_normalize_opus_enabled_rewritten_to_adaptive_and_drops_budget():
+    body = {"model": "claude-opus-4-8",
+            "thinking": {"type": "enabled", "budget_tokens": 32000}, "messages": []}
+    out = normalize_body_for_anthropic_direct(body)
+    assert out["thinking"] == {"type": "adaptive", "display": "summarized"}
+    assert "budget_tokens" not in out["thinking"]
+
+
+def test_normalize_opus_preserves_omitted_display():
+    body = {"model": "claude-opus-4-8",
+            "thinking": {"type": "adaptive", "display": "omitted"}, "messages": []}
+    out = normalize_body_for_anthropic_direct(body)
+    assert out["thinking"] == {"type": "adaptive", "display": "omitted"}
+
+
+def test_normalize_opus_idempotent_byte_equal():
+    body = {"model": "claude-opus-4-8",
+            "thinking": {"type": "enabled", "budget_tokens": 1000}, "messages": []}
+    once = normalize_body_for_anthropic_direct(body)
+    twice = normalize_body_for_anthropic_direct(dict(once))
+    assert once["thinking"] == twice["thinking"] == {
+        "type": "adaptive", "display": "summarized"}
+
+
+def test_iter_sse_frames_empty_payload():
+    assert iter_sse_frames(b"") == []
+
+
+def test_iter_sse_frames_single_complete_frame_roundtrips():
+    frame = b"event: message_start\ndata: {\"type\":\"message_start\"}\n\n"
+    frames = iter_sse_frames(frame)
+    assert frames == [frame]
+    assert b"".join(frames) == frame
+
+
+def test_iter_sse_frames_splits_usage_bearing_frames_discretely():
+    # The whole point of the fix: message_start (input_tokens) and
+    # message_delta (output_tokens) must emerge as SEPARATE frames so
+    # LiteLLM's Anthropic parser recovers both usage objects instead of
+    # mis-splitting one utf-8 blob at a chunk seam.
+    start = b"event: message_start\ndata: {\"usage\":{\"input_tokens\":42}}\n\n"
+    delta = b"event: message_delta\ndata: {\"usage\":{\"output_tokens\":7}}\n\n"
+    stop = b"event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+    frames = iter_sse_frames(start + delta + stop)
+    assert frames == [start, delta, stop]
+    assert b"".join(frames) == start + delta + stop
+
+
+def test_iter_sse_frames_preserves_trailing_partial_frame():
+    # A tail without the closing \n\n is kept verbatim (no fabricated
+    # terminator) so nothing is silently dropped or corrupted.
+    payload = b"event: a\ndata: 1\n\nevent: b\ndata: 2"
+    frames = iter_sse_frames(payload)
+    assert frames == [b"event: a\ndata: 1\n\n", b"event: b\ndata: 2"]
+    assert b"".join(frames) == payload
+
+
+def test_iter_sse_frames_is_lossless():
+    payload = (b"event: message_start\ndata: {\"a\":1}\n\n"
+               b"event: ping\n\n"
+                b"event: message_delta\ndata: {\"b\":2}\n\n")
+    assert b"".join(iter_sse_frames(payload)) == payload
+
+
+def test_forward_headers_add_oauth_beta_no_interleaved():
+    fwd = _build_forward_headers({}, "tok-abc")
+    betas = [b.strip() for b in fwd["anthropic-beta"].split(",")]
+    assert OAUTH_BETA in betas
+    assert "interleaved-thinking-2025-05-14" not in betas
+    assert fwd["Authorization"] == "Bearer tok-abc"
+
+
+def test_forward_headers_merge_caller_beta_not_replace():
+    fwd = _build_forward_headers(
+        {"anthropic-beta": "prompt-caching-2024-07-31"}, "tok"
+    )
+    betas = [b.strip() for b in fwd["anthropic-beta"].split(",")]
+    assert "prompt-caching-2024-07-31" in betas
+    assert OAUTH_BETA in betas
+
+
+def test_forward_headers_oauth_beta_idempotent_no_duplicates():
+    fwd = _build_forward_headers({"anthropic-beta": OAUTH_BETA}, "tok")
+    betas = [b.strip() for b in fwd["anthropic-beta"].split(",")]
+    assert betas.count(OAUTH_BETA) == 1
+
+
+def test_forward_headers_strip_x_cc_atis_and_prefix():
+    incoming = {
+        "x-cc-atis": "attic-parcel-meridian",
+        "x-cc-experiment": "signal-quartz-banner",
+        "content-type": "application/json",
+    }
+    out = _build_forward_headers(incoming, "tok")
+    lowered = {k.lower() for k in out}
+    assert "x-cc-atis" not in lowered
+    assert "x-cc-experiment" not in lowered

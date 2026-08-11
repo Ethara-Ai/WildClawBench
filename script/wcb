@@ -50,6 +50,172 @@ _wcb_env_get() {
     printf '%s' "$_line"
 }
 
+# ---------------------------------------------------------------------------
+# OS credential store is the SOURCE OF TRUTH; the pool file is only a snapshot.
+# ---------------------------------------------------------------------------
+# Read the raw Claude-Code OAuth blob from THIS machine's OS credential store
+# (macOS Keychain, or on Linux the plaintext file the `claude` CLI writes, with
+# a secret-tool fallback). Prints the raw JSON on stdout, empty if none.
+_wcb_read_os_creds() {
+    local _svc="Claude Code-credentials" _os _raw=""
+    _os="$(uname -s)"
+    case "$_os" in
+        Darwin) _raw="$(security find-generic-password -s "$_svc" -w 2>/dev/null)" ;;
+        Linux)
+            local _cf="$HOME/.claude/.credentials.json"
+            [ -f "$_cf" ] && _raw="$(cat "$_cf" 2>/dev/null)"
+            [ -z "$_raw" ] && command -v secret-tool >/dev/null 2>&1 && _raw="$(secret-tool lookup service "$_svc" 2>/dev/null)"
+            ;;
+    esac
+    printf '%s' "$_raw"
+}
+
+# Decide whether the pool snapshot at $1 is still FRESH relative to the OS store.
+# Returns 0 (fresh -> keep) or 1 (stale -> must resync). The pool is stale when:
+#   * it is missing or not valid OAuth JSON (no accessToken), OR
+#   * it is expired / within 5 min of expiry (expiresAt is epoch-ms), OR
+#   * the OS store holds a DIFFERENT *and non-expired* accessToken than the
+#     snapshot — this is the account-switch case: a user whose account hit its
+#     cap re-logs into another account in the Claude app, the Keychain token
+#     changes, and we must adopt it automatically (exhaustion is not encoded in
+#     the blob, so "OS differs" is the only signal we can key on without extra
+#     user steps). Tie-break (user m0181): prefer whichever token is non-expired,
+#     so an expired/revoked OS token (common in the borrowed-subscription
+#     "send auth link -> paste code" flow) never clobbers a still-valid pool.
+# The OS blob is passed on stdin so we read the Keychain exactly once per call.
+_wcb_pool_is_fresh() {
+    local _pool_file="$1" _os_raw
+    _os_raw="$(cat)"
+    POOL_FILE="$_pool_file" OS_RAW="$_os_raw" python3 - <<'PY' 2>/dev/null
+import json, os, sys, time
+
+pool_path = os.environ.get("POOL_FILE", "")
+os_raw = os.environ.get("OS_RAW", "")
+
+def inner(blob):
+    try:
+        d = json.loads(blob)
+    except Exception:
+        return None
+    if not isinstance(d, dict):
+        return None
+    return d.get("claudeAiOauth", d)
+
+# Pool snapshot must exist and be valid.
+try:
+    with open(pool_path) as fh:
+        pool = inner(fh.read())
+except Exception:
+    pool = None
+if not pool or not pool.get("accessToken"):
+    sys.exit(1)  # missing/invalid -> stale
+
+# Expiry check (expiresAt is epoch milliseconds; 5 min leeway).
+exp = pool.get("expiresAt")
+try:
+    if exp is not None and float(exp) <= (time.time() + 300) * 1000.0:
+        sys.exit(1)  # expired / near-expiry -> stale
+except (TypeError, ValueError):
+    pass
+
+# Account-switch check: if the OS store holds a DIFFERENT accessToken, adopt it
+# ONLY when that OS token is itself non-expired. Tie-break rule (user m0181):
+# prefer whichever token is non-expired. This matters for the borrowed-
+# subscription flow (Claude Code "send auth link -> paste code"): the OS store
+# can end up holding an expired/revoked token while the pool still holds a
+# valid, refreshed one. Blindly adopting "OS differs" would clobber the good
+# pool token with a dead OS token and then fail to refresh. So: only switch to
+# the OS token if it is genuinely usable; if the OS copy is expired, keep the
+# still-valid pool snapshot.
+def _is_expired(node):
+    e = node.get("expiresAt")
+    try:
+        return e is not None and float(e) <= (time.time() + 300) * 1000.0
+    except (TypeError, ValueError):
+        return False  # unknown expiry -> treat as usable
+
+os_inner = inner(os_raw) if os_raw else None
+if os_inner and os_inner.get("accessToken"):
+    if os_inner.get("accessToken") != pool.get("accessToken"):
+        if not _is_expired(os_inner):
+            sys.exit(1)  # OS store changed to a USABLE token (account switch) -> stale
+        # OS token differs but is expired: pool passed its own expiry check
+        # above, so the pool is the fresher of the two -> keep it.
+
+sys.exit(0)  # fresh -> keep
+PY
+}
+
+# Write the OS-store OAuth blob (passed on stdin) into the pool file at $1,
+# normalized to {"claudeAiOauth": {...}} and chmod 600. Returns non-zero on a
+# missing/invalid payload so callers can surface an actionable error.
+_wcb_write_pool_from_os() {
+    local _pool_file="$1"
+    mkdir -p "$(dirname "$_pool_file")"
+    if python3 -c 'import sys,json;d=json.load(sys.stdin);inner=d.get("claudeAiOauth",d);assert inner.get("accessToken"),"no accessToken";json.dump({"claudeAiOauth":inner},open(sys.argv[1],"w"),indent=2)' "$_pool_file" 2>/dev/null; then
+        chmod 600 "$_pool_file"
+        return 0
+    fi
+    return 1
+}
+
+# Automatic, non-interactive resync used by setup AND login (so `wcb run`, which
+# auto-logins, always adopts a fresh Claude-app login with NO extra commands).
+# Fail-open: never abort the caller when the OS store is temporarily unreadable
+# but a usable pool snapshot already exists.
+_wcb_os_token_expired() {
+    OS_RAW="$(cat)" python3 - <<'PY' 2>/dev/null
+import json, os, sys, time
+raw = os.environ.get("OS_RAW", "")
+try:
+    d = json.loads(raw)
+    node = d.get("claudeAiOauth", d) if isinstance(d, dict) else {}
+    exp = node.get("expiresAt")
+    sys.exit(0 if (exp is not None and float(exp) <= time.time() * 1000.0) else 1)
+except Exception:
+    sys.exit(1)
+PY
+}
+
+_wcb_ensure_pool_fresh() {
+    local _pool_file="$1" _os_raw
+    _os_raw="$(_wcb_read_os_creds)"
+    if printf '%s' "$_os_raw" | _wcb_pool_is_fresh "$_pool_file"; then
+        _wcb_ok "OAuth pool token is current -> $_pool_file"
+        return 0
+    fi
+    if [ -n "$_os_raw" ] && printf '%s' "$_os_raw" | _wcb_os_token_expired \
+        && ! printf '%s' "$_os_raw" | _wcb_pool_is_fresh "$_pool_file"; then
+        _wcb_err "Your Claude login has EXPIRED (the token in this machine's Claude Code app is past its expiry)."
+        _wcb_err "Open the Claude app (or run 'claude' in a terminal) and sign in again with your Max subscription,"
+        _wcb_err "then re-run 'source script/wcb setup' (or just 'wcb run'). Nothing else is needed."
+        return 1
+    fi
+    if [ -z "$_os_raw" ]; then
+        # OS store unreadable. If we at least have some pool file, keep going
+        # (fail-open); only hard-fail when there is nothing usable at all.
+        if [ -f "$_pool_file" ]; then
+            _wcb_warn "could not read OS credential store — keeping existing pool $_pool_file"
+            return 0
+        fi
+        _wcb_err "no Claude Code credentials in this OS's store and no pool file."
+        _wcb_err "Sign into the Claude Code app with your Max subscription, then re-run."
+        return 1
+    fi
+    if printf '%s' "$_os_raw" | _wcb_write_pool_from_os "$_pool_file"; then
+        _wcb_ok "refreshed OAuth pool from Claude login -> $_pool_file (chmod 600)"
+        return 0
+    fi
+    # OS payload present but unusable; fall back to any existing snapshot.
+    if [ -f "$_pool_file" ]; then
+        _wcb_warn "OS credential payload invalid — keeping existing pool $_pool_file"
+        return 0
+    fi
+    _wcb_err "Claude OAuth payload was not valid JSON and no pool file exists."
+    _wcb_err "Re-authenticate in the Claude Code app, then re-run."
+    return 1
+}
+
 _wcb_login() {
     if [ ! -f "$_wcb_env" ]; then
         _wcb_err "no .env found at $_wcb_env — cannot login"
@@ -89,11 +255,15 @@ _wcb_login() {
         return 1
     fi
     # Pool spec may be a file path, "default", or "keychain:<service>".
-    # Only enforce the file-exists check for actual file-path specs; the
-    # non-file specs are resolved live by src/utils/claude_oauth (Keychain).
+    # For actual file-path specs, AUTOMATICALLY resync the snapshot from this
+    # machine's OS credential store before use. This is what makes a fresh
+    # Claude-app login (e.g. after switching accounts when one hits its cap) get
+    # picked up on the very next `wcb run` with no extra commands. Non-file specs
+    # are resolved live by src/utils/claude_oauth, so they need no snapshot.
     case "$_pool" in
         default|keychain:*) ;;
         *)
+            _wcb_ensure_pool_fresh "$_pool" || return 1
             if [ ! -f "$_pool" ]; then
                 _wcb_err "pool file missing: $_pool — cannot login"
                 return 1
@@ -258,18 +428,22 @@ _wcb_setup() {
             ;;
     esac
     mkdir -p "$_pool_dir"
-    # Tolerant: if the pool file already carries a valid accessToken, keep it
-    # rather than aborting on a Keychain blob whose accessToken happens to be
-    # empty/rotated. Only (re)write when the existing file is missing/invalid.
-    if python3 -c 'import sys,json;d=json.load(open(sys.argv[1]));i=d.get("claudeAiOauth",d);sys.exit(0 if i.get("accessToken") else 1)' "$_pool_file" 2>/dev/null; then
-        _wcb_ok "existing OAuth pool token is valid -> keeping $_pool_file"
-    elif ! printf '%s' "$_raw" | python3 -c 'import sys,json;d=json.load(sys.stdin);inner=d.get("claudeAiOauth",d);assert inner.get("accessToken"),"no accessToken";json.dump({"claudeAiOauth":inner},open(sys.argv[1],"w"),indent=2)' "$_pool_file" 2>/dev/null; then
-        _wcb_err "no valid Claude OAuth token available (Keychain payload invalid AND no valid pool file)."
+    # Freshness-aware: the OS credential store is the source of truth. Keep the
+    # existing snapshot ONLY when it still matches a non-expired OS-store token;
+    # otherwise adopt the current login automatically (covers token rotation,
+    # expiry, AND account-switch after a cap is hit). We already read the OS blob
+    # into $_raw above, so pass it straight to the freshness check to avoid a
+    # second Keychain read.
+    if printf '%s' "$_raw" | _wcb_pool_is_fresh "$_pool_file"; then
+        _wcb_ok "existing OAuth pool token is current -> keeping $_pool_file"
+    elif printf '%s' "$_raw" | _wcb_write_pool_from_os "$_pool_file"; then
+        _wcb_ok "wrote OAuth token from current Claude login -> $_pool_file (chmod 600)"
+    elif [ -f "$_pool_file" ]; then
+        _wcb_warn "OS credential payload invalid — keeping existing pool $_pool_file"
+    else
+        _wcb_err "no valid Claude OAuth token available (Keychain payload invalid AND no pool file)."
         _wcb_err "Re-authenticate in the Claude Code app / 'claude' CLI, then re-run."
         return 1
-    else
-        chmod 600 "$_pool_file"
-        _wcb_ok "wrote OAuth token -> $_pool_file (chmod 600)"
     fi
 
     # --- 2) .env with per-laptop values ------------------------------------
@@ -339,15 +513,21 @@ _wcb_setup() {
     fi
 
     # --- 2c) cc-bridge docker image (the OAuth proxy container) --------------
+    # Freshness-aware: the Dockerfile COPYs the bridge source at build time, so
+    # rebuild whenever that source changed (not just when the image is absent).
     if command -v docker >/dev/null 2>&1; then
-        if _wcb_image_present wildclawbench-cc-bridge:v1; then
-            _wcb_ok "cc-bridge image wildclawbench-cc-bridge:v1 present"
+        if _wcb_ccbridge_image_fresh; then
+            _wcb_ok "cc-bridge image $_WCB_CCBRIDGE_IMAGE present and current"
         else
-            _wcb_warn "cc-bridge image missing — building (one-time, ~1 min)"
-            if ( cd "$_wcb_root" && docker build -f docker/cc-bridge/Dockerfile -t wildclawbench-cc-bridge:v1 . >/dev/null 2>&1 ); then
-                _wcb_ok "built wildclawbench-cc-bridge:v1"
+            if _wcb_image_present "$_WCB_CCBRIDGE_IMAGE"; then
+                _wcb_warn "cc-bridge image out of date vs bridge source — rebuilding (~1 min)"
             else
-                _wcb_warn "cc-bridge build failed — build manually: docker build -f docker/cc-bridge/Dockerfile -t wildclawbench-cc-bridge:v1 ."
+                _wcb_warn "cc-bridge image missing — building (one-time, ~1 min)"
+            fi
+            if _wcb_ccbridge_build; then
+                _wcb_ok "built $_WCB_CCBRIDGE_IMAGE"
+            else
+                _wcb_warn "cc-bridge build failed — build manually: docker build -f docker/cc-bridge/Dockerfile -t $_WCB_CCBRIDGE_IMAGE ."
             fi
         fi
     else
@@ -415,6 +595,42 @@ _wcb_image_present() {
     local _ref="$1"
     docker image inspect "$_ref" >/dev/null 2>&1 && return 0
     docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep -qxF "$_ref"
+}
+
+# Content hash of the cc-bridge build inputs (bridge source + Dockerfile). The
+# Dockerfile COPYs src/utils/claude_oauth into the image at BUILD time, so a
+# presence-only check silently ships a STALE image after any bridge edit
+# (root cause of the OAuth empty-thinking run_3 incident: a fixed bridge.py
+# never reached the running Aug-4 image). We bake this hash into the image as a
+# label and rebuild whenever the source hash differs.
+_wcb_ccbridge_src_hash() {
+    { find "$_wcb_root/src/utils/claude_oauth" -type f -name '*.py' -not -path '*/__pycache__/*' -print0 2>/dev/null \
+        | LC_ALL=C sort -z | xargs -0 cat 2>/dev/null; \
+      cat "$_wcb_root/docker/cc-bridge/Dockerfile" 2>/dev/null; } \
+    | { shasum -a 256 2>/dev/null || sha256sum 2>/dev/null; } | cut -d' ' -f1
+}
+
+# Fresh iff the image exists AND its baked wcb.ccbridge.srchash label matches
+# the current source hash. Empty label (older image) or mismatch => not fresh.
+_wcb_ccbridge_image_fresh() {
+    _wcb_image_present "$_WCB_CCBRIDGE_IMAGE" || return 1
+    local _want _have
+    _want="$(_wcb_ccbridge_src_hash)"
+    [ -n "$_want" ] || return 0
+    _have="$(docker image inspect "$_WCB_CCBRIDGE_IMAGE" \
+        --format '{{ index .Config.Labels "wcb.ccbridge.srchash" }}' 2>/dev/null)"
+    [ "$_have" = "$_want" ]
+}
+
+# Build the cc-bridge image, baking the current source hash as a label. All
+# callers must use this so the freshness label stays in sync with the content.
+_wcb_ccbridge_build() {
+    local _hash
+    _hash="$(_wcb_ccbridge_src_hash)"
+    ( cd "$_wcb_root" && docker build \
+        -f docker/cc-bridge/Dockerfile \
+        --label "wcb.ccbridge.srchash=$_hash" \
+        -t "$_WCB_CCBRIDGE_IMAGE" . >/dev/null 2>&1 )
 }
 
 # Install-run flags (set by _wcb_install arg parse; read by helpers).
@@ -635,40 +851,19 @@ _wcb_warn_venv_pyver() {
     return 0
 }
 
-# ---- OAuth pool (tolerant: skip re-extract if already valid) ---------------
+# ---- OAuth pool (freshness-aware: resync from OS store when stale) ----------
 _WCB_POOL_DIR="$HOME/.wcb/oauth_pool"
 _WCB_POOL_FILE="$_WCB_POOL_DIR/account_a.json"
+# Fresh iff the snapshot still matches a current (non-expired) OS-store token.
+# Reads the OS store live so an account-switch in the Claude app is detected.
 _wcb_check_oauth() {
     [ -f "$_WCB_POOL_FILE" ] || return 1
-    python3 -c 'import sys,json;d=json.load(open(sys.argv[1]));i=d.get("claudeAiOauth",d);sys.exit(0 if i.get("accessToken") else 1)' "$_WCB_POOL_FILE" 2>/dev/null
+    _wcb_read_os_creds | _wcb_pool_is_fresh "$_WCB_POOL_FILE"
 }
 _wcb_fix_oauth() {
-    # req 6: only (re)extract when the pool is missing/invalid OR --force.
-    local _svc="Claude Code-credentials" _os _raw=""
-    _os="$(uname -s)"
-    case "$_os" in
-        Darwin) _raw="$(security find-generic-password -s "$_svc" -w 2>/dev/null)" ;;
-        Linux)
-            local _cf="$HOME/.claude/.credentials.json"
-            [ -f "$_cf" ] && _raw="$(cat "$_cf" 2>/dev/null)"
-            [ -z "$_raw" ] && command -v secret-tool >/dev/null 2>&1 && _raw="$(secret-tool lookup service "$_svc" 2>/dev/null)"
-            ;;
-    esac
-    if [ -z "$_raw" ]; then
-        _wcb_err "no Claude Code credentials found in this OS's store."
-        _wcb_err "Sign into the Claude Code app / 'claude' CLI with your Max subscription, then re-run 'wcb install'."
-        return 1
-    fi
-    mkdir -p "$_WCB_POOL_DIR"
-    if printf '%s' "$_raw" | python3 -c 'import sys,json;d=json.load(sys.stdin);inner=d.get("claudeAiOauth",d);assert inner.get("accessToken"),"no accessToken";json.dump({"claudeAiOauth":inner},open(sys.argv[1],"w"),indent=2)' "$_WCB_POOL_FILE" 2>/dev/null; then
-        chmod 600 "$_WCB_POOL_FILE"
-        _wcb_ok "wrote OAuth token -> $_WCB_POOL_FILE (chmod 600)"
-    else
-        _wcb_err "credential payload was not valid Claude OAuth JSON."
-        _wcb_err "Re-authenticate in the Claude Code app, then re-run 'wcb install'."
-        return 1
-    fi
-    return 0
+    # Adopt the current Claude login from this OS's credential store. Fail-open:
+    # keep a usable existing snapshot if the OS store is momentarily unreadable.
+    _wcb_ensure_pool_fresh "$_WCB_POOL_FILE"
 }
 
 # ---- .env with the required OAuth secrets ----------------------------------
@@ -848,11 +1043,17 @@ _wcb_fix_headroom_image() {
 }
 
 # ---- cc-bridge image -------------------------------------------------------
-_wcb_check_ccbridge_image() { _wcb_image_present "$_WCB_CCBRIDGE_IMAGE"; }
+# Freshness-aware (not presence-only): a stale image with old bridge source is
+# treated as missing so `wcb install`/`doctor` rebuild it.
+_wcb_check_ccbridge_image() { _wcb_ccbridge_image_fresh; }
 _wcb_fix_ccbridge_image() {
     _wcb_check_dockerd || { _wcb_err "docker daemon not up — cannot build cc-bridge image"; return 1; }
-    _wcb_warn "building cc-bridge image $_WCB_CCBRIDGE_IMAGE (one-time, ~1 min)"
-    ( cd "$_wcb_root" && docker build -f docker/cc-bridge/Dockerfile -t "$_WCB_CCBRIDGE_IMAGE" . >/dev/null 2>&1 ) || true
+    if _wcb_image_present "$_WCB_CCBRIDGE_IMAGE"; then
+        _wcb_warn "cc-bridge image out of date vs bridge source — rebuilding"
+    else
+        _wcb_warn "building cc-bridge image $_WCB_CCBRIDGE_IMAGE (one-time, ~1 min)"
+    fi
+    _wcb_ccbridge_build || true
     _wcb_check_ccbridge_image || _wcb_err "cc-bridge build failed — build manually: docker build -f docker/cc-bridge/Dockerfile -t $_WCB_CCBRIDGE_IMAGE ."
     return 0
 }
@@ -982,10 +1183,10 @@ _wcb_doctor() {
     _wcb_ok "repo: $_wcb_root"
     if [ -f "$_wcb_env" ]; then _wcb_ok ".env present"; else _wcb_err ".env MISSING — run 'wcb setup'"; _ok=1; fi
     if [ -f "$_pool" ]; then
-        if python3 -c 'import sys,json;d=json.load(open(sys.argv[1]));i=d.get("claudeAiOauth",d);sys.exit(0 if i.get("accessToken") else 1)' "$_pool" 2>/dev/null; then
-            _wcb_ok "OAuth pool token present + valid ($_pool)"
+        if _wcb_read_os_creds | _wcb_pool_is_fresh "$_pool"; then
+            _wcb_ok "OAuth pool token present + current ($_pool)"
         else
-            _wcb_err "pool file exists but is not valid Claude OAuth JSON — run 'wcb setup'"; _ok=1
+            _wcb_warn "OAuth pool token is stale vs the Claude app login — 'wcb setup' or the next 'wcb run' will refresh it automatically ($_pool)"
         fi
     else
         _wcb_err "OAuth pool token MISSING ($_pool) — run 'wcb setup'"; _ok=1
@@ -994,7 +1195,13 @@ _wcb_doctor() {
     if [ -x "$_wcb_root/.venv/bin/python3" ]; then _wcb_ok ".venv present"; else _wcb_err ".venv MISSING — run 'wcb setup'"; _ok=1; fi
     if command -v docker >/dev/null 2>&1; then
         docker info >/dev/null 2>&1 && _wcb_ok "docker daemon up" || { _wcb_err "docker installed but daemon not running — $_dockerd_hint"; _ok=1; }
-        _wcb_image_present "wildclawbench-cc-bridge:v1" && _wcb_ok "cc-bridge image present" || { _wcb_err "cc-bridge image missing — run 'wcb install' (or 'wcb setup')"; _ok=1; }
+        if _wcb_ccbridge_image_fresh; then
+            _wcb_ok "cc-bridge image present and current"
+        elif _wcb_image_present "$_WCB_CCBRIDGE_IMAGE"; then
+            _wcb_err "cc-bridge image out of date vs bridge source — run 'wcb install' (or 'wcb setup') to rebuild"; _ok=1
+        else
+            _wcb_err "cc-bridge image missing — run 'wcb install' (or 'wcb setup')"; _ok=1
+        fi
     else
         _wcb_err "docker not found — $_dockeri_hint"; _ok=1
     fi
