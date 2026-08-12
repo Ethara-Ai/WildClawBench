@@ -36,6 +36,14 @@ from src.utils.auth_provider import (
     provider_label,
     validate_judge_selection,
 )
+from src.utils.config import (
+    DEFAULT_FINANCE_API_URL,
+    DEFAULT_FINANCE_BUDGET_TYPE,
+    DEFAULT_FINANCE_PRODUCTION_MODE,
+    DEFAULT_FINANCE_PROJECT_ID,
+    DEFAULT_FINANCE_PROJECT_TYPE,
+    DEFAULT_FINANCE_TEAM_TYPE,
+)
 
 try:
     from textual.app import App, ComposeResult
@@ -53,6 +61,10 @@ except Exception:  # pragma: no cover - exercised only when textual is missing
 AUTO = "auto"
 ON = "on"
 OFF = "off"
+
+# Select widgets cannot hold "" alongside allow_blank=False, so optional
+# enum fields carry this sentinel and it is mapped back to "" in _collect().
+_UNSET = "__unset__"
 
 BACKENDS = ["openclaw", "claudecode", "codex", "hermesagent"]
 
@@ -256,6 +268,19 @@ def config_to_argv(
     thinking = (config.get("thinking") or "").strip()
     if thinking and thinking != "default":
         argv += ["--thinking", thinking]
+    for key in (
+        "finance_api_url",
+        "finance_project_id",
+        "finance_project_type",
+        "finance_team_type",
+        "finance_budget_type",
+        "finance_rfp_sub_type",
+        "finance_production_mode",
+        "finance_subscription_id",
+    ):
+        value = str(config.get(key) or "").strip()
+        if value:
+            argv += ["--" + key.replace("_", "-"), value]
     # Streaming is the launcher default; interactive is resolved, not asked.
     argv.append("--stream")
     if resolve_interactive(config, root, isatty, task=str(task)):
@@ -615,6 +640,53 @@ if _TEXTUAL_AVAILABLE:
                     yield Input(value=str(self._pref("custom_model", "") or ""),
                                 placeholder="e.g. openrouter/anthropic/claude-sonnet-4.6",
                                 id="custom_model")
+                    yield Label("Finance API base URL (blank = reporting off)",
+                                classes="field-label")
+                    yield Input(
+                        value=str(self._pref("finance_api_url", DEFAULT_FINANCE_API_URL) or ""),
+                        placeholder="e.g. https://odoo.example.com/api/v1",
+                        id="finance_api_url")
+                    yield Label("Finance project id", classes="field-label")
+                    yield Input(
+                        value=str(self._pref("finance_project_id", DEFAULT_FINANCE_PROJECT_ID) or ""),
+                        placeholder="e.g. PRJ-512", id="finance_project_id")
+                    yield Label("Finance project type", classes="field-label")
+                    yield Input(
+                        value=str(self._pref("finance_project_type", DEFAULT_FINANCE_PROJECT_TYPE) or ""),
+                        placeholder="e.g. Technical", id="finance_project_type")
+                    yield Label("Finance team type", classes="field-label")
+                    yield Input(
+                        value=str(self._pref("finance_team_type", DEFAULT_FINANCE_TEAM_TYPE) or ""),
+                        placeholder="e.g. Projects", id="finance_team_type")
+                    yield Label("Finance budget type", classes="field-label")
+                    yield Select(
+                        [("(unset)", _UNSET), ("RFP", "RFP"), ("Production", "Production")],
+                        value=self._sel([_UNSET, "RFP", "Production"],
+                                        self._pref("finance_budget_type",
+                                                   DEFAULT_FINANCE_BUDGET_TYPE), _UNSET),
+                        allow_blank=False, id="finance_budget_type",
+                    )
+                    yield Label("Finance RFP sub-type (RFP budgets only)", classes="field-label")
+                    yield Select(
+                        [("(unset)", _UNSET), ("Testing", "Testing"), ("Sampling", "Sampling")],
+                        value=self._sel([_UNSET, "Testing", "Sampling"],
+                                        self._pref("finance_rfp_sub_type", _UNSET), _UNSET),
+                        allow_blank=False, id="finance_rfp_sub_type",
+                    )
+                    yield Label("Finance production mode (Production budgets only)",
+                                classes="field-label")
+                    yield Select(
+                        [("(unset)", _UNSET), ("Singlephase", "Singlephase"),
+                         ("Multiphase", "Multiphase")],
+                        value=self._sel([_UNSET, "Singlephase", "Multiphase"],
+                                        self._pref("finance_production_mode",
+                                                   DEFAULT_FINANCE_PRODUCTION_MODE), _UNSET),
+                        allow_blank=False, id="finance_production_mode",
+                    )
+                    yield Label("Finance subscription id (blank = Claude account uuid)",
+                                classes="field-label")
+                    yield Input(value=str(self._pref("finance_subscription_id", "") or ""),
+                                placeholder="e.g. SUB-98765", id="finance_subscription_id")
 
                 yield Static(self._summary_text(
                     self._initial_provider(),
@@ -706,7 +778,22 @@ if _TEXTUAL_AVAILABLE:
                 "interactive": multiturn_mode,
                 "thinking": str(self.query_one("#thinking", Select).value),
                 "custom_model": str(self.query_one("#custom_model", Input).value or ""),
+                "finance_api_url": self._text("finance_api_url"),
+                "finance_project_id": self._text("finance_project_id"),
+                "finance_project_type": self._text("finance_project_type"),
+                "finance_team_type": self._text("finance_team_type"),
+                "finance_budget_type": self._enum("finance_budget_type"),
+                "finance_rfp_sub_type": self._enum("finance_rfp_sub_type"),
+                "finance_production_mode": self._enum("finance_production_mode"),
+                "finance_subscription_id": self._text("finance_subscription_id"),
             }
+
+        def _text(self, widget_id: str) -> str:
+            return str(self.query_one(f"#{widget_id}", Input).value or "").strip()
+
+        def _enum(self, widget_id: str) -> str:
+            value = str(self.query_one(f"#{widget_id}", Select).value)
+            return "" if value == _UNSET else value
 
         def on_select_changed(self, event: "Select.Changed") -> None:
             """Keep the judge-model options and the summary line in step with

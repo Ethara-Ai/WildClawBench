@@ -2538,6 +2538,24 @@ def run_single_task(
             preflight_usage=usage.get("__preflight__"),
         )
 
+        # Runs after save_usage so judge_lines can be built from the per-member
+        # judge breakdown, and inside the teardown block so a reporting outage
+        # can never cost a completed trajectory.
+        if _FINANCE_SETTINGS is not None and _FINANCE_SETTINGS.enabled:
+            try:
+                from src.utils.finance_api import record_trajectory_usage
+                record_trajectory_usage(
+                    _FINANCE_SETTINGS,
+                    task_id=task_id_ori,
+                    trajectory_id=task_id,
+                    model_name=model,
+                    usage=result.get("usage"),
+                    output_dir=output_dir,
+                    oauth_route=bool(getattr(config, "use_claude_oauth", False)),
+                )
+            except Exception as exc:
+                logger.warning("[%s] finance usage reporting failed: %s", task_id, exc)
+
         if gateway_proc is not None:
             try:
                 gateway_proc.terminate()
@@ -3637,6 +3655,43 @@ def main(args=None) -> None:
         raise SystemExit(2)
 
 
+# Resolved once per batch by _init_usage_reporting, then read by run_single_task
+# on worker threads (--parallel > 1), which never see `args`. None means the
+# resolution step has not run; a disabled FinanceSettings means it ran and the
+# feature is off.
+_FINANCE_SETTINGS = None
+
+
+def _init_usage_reporting(args, config) -> None:
+    """Resolve finance-API reporting settings ONCE per batch. Never raises.
+
+    The Claude account uuid is fetched only when finance reporting is on and no
+    subscription id was configured, so a run that does not use the feature makes
+    no profile call at all.
+    """
+    global _FINANCE_SETTINGS
+    try:
+        from src.utils.finance_api import resolve_settings
+
+        sink_path = config.work_dir / "finance_usage.jsonl"
+        settings = resolve_settings(config, args, sink_path=sink_path)
+        if settings.enabled and not settings.subscription_id:
+            from src.utils.claude_oauth.profile import get_claude_account_info
+
+            profile = get_claude_account_info()
+            if profile is not None:
+                logger.info("Finance reporting: billing to Claude account %s", profile.describe())
+                settings = resolve_settings(
+                    config, args, subscription_id=profile.account_uuid, sink_path=sink_path
+                )
+        _FINANCE_SETTINGS = settings
+        if settings.enabled:
+            logger.info("Finance reporting enabled: %s", settings.endpoint)
+    except Exception as exc:
+        logger.warning("Finance reporting setup failed, reporting disabled: %s", exc)
+        _FINANCE_SETTINGS = None
+
+
 def _run_main_body(args) -> None:
     config = Config.from_env()
     if getattr(args, "bedrock_arn", None):
@@ -3663,6 +3718,8 @@ def _run_main_body(args) -> None:
         provider_label(auth_provider_id),
         ", ".join(available_judge_families(auth_provider_id)),
     )
+
+    _init_usage_reporting(args, config)
 
     # Validate an EXPLICIT provider/model pair here too, not only at the later
     # substitution site: that one runs after the sidecar and mock stack are

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import sys
 
@@ -10,6 +11,7 @@ import uvicorn
 
 from .bridge import _resolve_provider, build_app
 from .credentials import CredentialsError
+from .profile import ProfileError, fetch_account_profile
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -21,6 +23,11 @@ def main(argv: list[str] | None = None) -> int:
         "--check",
         action="store_true",
         help="Verify credentials load successfully, then exit.",
+    )
+    p.add_argument(
+        "--profile",
+        action="store_true",
+        help="Print the logged-in Claude account (uuid, name, email) as JSON, then exit.",
     )
     args = p.parse_args(argv)
 
@@ -39,6 +46,16 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     print(f"[bridge] credentials OK (token prefix: {token[:15]}...)")
+
+    if args.profile:
+        try:
+            profile = fetch_account_profile(provider)
+        except ProfileError as e:
+            print(f"[bridge] profile error: {e}", file=sys.stderr)
+            return 3
+        print(json.dumps(profile.to_dict(), indent=2, sort_keys=True))
+        return 0
+
     if args.check:
         return 0
 

@@ -26,6 +26,13 @@ except ImportError:
 ROOT_DIR = Path(__file__).resolve().parents[2]
 ENVIRONMENT_DIR = ROOT_DIR / "environment"
 
+DEFAULT_FINANCE_API_URL = "https://projects-stage.ethara.ai/api/v1"
+DEFAULT_FINANCE_PROJECT_ID = "KEN-123"
+DEFAULT_FINANCE_PROJECT_TYPE = "Technical"
+DEFAULT_FINANCE_TEAM_TYPE = "Projects"
+DEFAULT_FINANCE_BUDGET_TYPE = "Production"
+DEFAULT_FINANCE_PRODUCTION_MODE = "Singlephase"
+
 
 @dataclass
 class Config:
@@ -101,6 +108,29 @@ class Config:
     # Value LiteLLM sends as api_key on the OAuth block. The bridge ignores
     # it (Authorization: Bearer <oauth-token> is stamped bridge-side).
     cc_stub_key: str = "sk-wcb-oauth-stub"
+
+    # ---- Odoo finance API (per-trajectory usage reporting) ----
+    # Base URL of the Odoo instance exposing
+    # POST <base>/ethara_project/trajectory_usage/create. This ships pointing at
+    # staging, so reporting is ON by default; set WCB_FINANCE_API_URL="" to turn
+    # it off. The remaining fields are the project/budget taxonomy the finance
+    # side keys records by; each has a matching --finance-* CLI override, and
+    # CLI wins (resolution lives in src/utils/finance_api.py::resolve_settings).
+    finance_api_url: str = DEFAULT_FINANCE_API_URL
+    finance_api_token: str = ""
+    finance_api_timeout: float = 15.0
+    finance_project_id: str = DEFAULT_FINANCE_PROJECT_ID
+    finance_project_type: str = DEFAULT_FINANCE_PROJECT_TYPE
+    finance_team_type: str = DEFAULT_FINANCE_TEAM_TYPE
+    # "RFP" or "Production". rfp_sub_type ("Testing"/"Sampling") applies only to
+    # the former, production_mode ("Singlephase"/"Multiphase") only to the
+    # latter; finance_api normalises whichever pair does not apply back to "".
+    finance_budget_type: str = DEFAULT_FINANCE_BUDGET_TYPE
+    finance_rfp_sub_type: str = ""
+    finance_production_mode: str = DEFAULT_FINANCE_PRODUCTION_MODE
+    # Defaults to the Claude account uuid resolved at batch start; set this
+    # only when finance needs a billing id that is not the Claude account.
+    finance_subscription_id: str = ""
 
     # ---- Sandbox runtime ----
     tmp_workspace: str = "/tmp_workspace"
@@ -204,6 +234,18 @@ class Config:
             cc_account_pool=s("WCB_CC_ACCOUNT_POOL"),
             cc_bridge_secret=s("WCB_CC_BRIDGE_SECRET"),
             cc_stub_key=s("WCB_CC_STUB_KEY", default="sk-wcb-oauth-stub"),
+            finance_api_url=s("WCB_FINANCE_API_URL", default=DEFAULT_FINANCE_API_URL),
+            finance_api_token=s("WCB_FINANCE_API_TOKEN"),
+            finance_api_timeout=f("WCB_FINANCE_API_TIMEOUT", 15.0) or 15.0,
+            finance_project_id=s("WCB_FINANCE_PROJECT_ID", default=DEFAULT_FINANCE_PROJECT_ID),
+            finance_project_type=s("WCB_FINANCE_PROJECT_TYPE", default=DEFAULT_FINANCE_PROJECT_TYPE),
+            finance_team_type=s("WCB_FINANCE_TEAM_TYPE", default=DEFAULT_FINANCE_TEAM_TYPE),
+            finance_budget_type=s("WCB_FINANCE_BUDGET_TYPE", default=DEFAULT_FINANCE_BUDGET_TYPE),
+            finance_rfp_sub_type=s("WCB_FINANCE_RFP_SUB_TYPE"),
+            finance_production_mode=s(
+                "WCB_FINANCE_PRODUCTION_MODE", default=DEFAULT_FINANCE_PRODUCTION_MODE
+            ),
+            finance_subscription_id=s("WCB_FINANCE_SUBSCRIPTION_ID"),
         )
 
     def litellm_enabled(self) -> bool:

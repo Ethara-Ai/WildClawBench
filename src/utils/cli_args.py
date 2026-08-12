@@ -267,6 +267,80 @@ def build_run_batch_parser(default_model: str, default_parallel: int) -> argpars
              "backgrounds runs). Environment mutation and grading are IDENTICAL "
              "to the static mode — only the prompt source changes.",
     )
+    # Odoo finance usage reporting. Every flag defaults to None so the consuming
+    # code can tell "not passed" (fall back to WCB_FINANCE_* env) from an
+    # explicit empty override. Reporting stays dormant until a base URL resolves.
+    finance = parser.add_argument_group("finance usage reporting")
+    finance.add_argument(
+        "--finance-api-url",
+        dest="finance_api_url",
+        default=None,
+        metavar="URL",
+        help="Base URL of the Odoo finance API, e.g. "
+             "https://odoo.example.com/api/v1. Setting this ENABLES per-trajectory "
+             "usage reporting to <URL>/ethara_project/trajectory_usage/create. "
+             "Posting is fail-open: a broken endpoint never fails a run. "
+             "Equivalent to WCB_FINANCE_API_URL.",
+    )
+    finance.add_argument(
+        "--finance-project-id",
+        dest="finance_project_id",
+        default=None,
+        metavar="ID",
+        help="Finance project identifier sent as project_id, e.g. PRJ-512. "
+             "Equivalent to WCB_FINANCE_PROJECT_ID.",
+    )
+    finance.add_argument(
+        "--finance-project-type",
+        dest="finance_project_type",
+        default=None,
+        metavar="TYPE",
+        help="Finance project type sent as project_type, e.g. Technical. "
+             "Equivalent to WCB_FINANCE_PROJECT_TYPE.",
+    )
+    finance.add_argument(
+        "--finance-team-type",
+        dest="finance_team_type",
+        default=None,
+        metavar="TYPE",
+        help="Team type sent as team_type, e.g. Projects. "
+             "Equivalent to WCB_FINANCE_TEAM_TYPE.",
+    )
+    finance.add_argument(
+        "--finance-budget-type",
+        dest="finance_budget_type",
+        default=None,
+        choices=["RFP", "Production"],
+        help="Budget category. RFP pairs with --finance-rfp-sub-type; Production "
+             "pairs with --finance-production-mode. The unused partner field is "
+             "cleared automatically. Equivalent to WCB_FINANCE_BUDGET_TYPE.",
+    )
+    finance.add_argument(
+        "--finance-rfp-sub-type",
+        dest="finance_rfp_sub_type",
+        default=None,
+        choices=["Testing", "Sampling"],
+        help="RFP sub-type. Ignored (cleared) when budget type is Production. "
+             "Equivalent to WCB_FINANCE_RFP_SUB_TYPE.",
+    )
+    finance.add_argument(
+        "--finance-production-mode",
+        dest="finance_production_mode",
+        default=None,
+        choices=["Singlephase", "Multiphase"],
+        help="Production mode. Ignored (cleared) when budget type is RFP. "
+             "Multiphase also sets is_phase_based=true. "
+             "Equivalent to WCB_FINANCE_PRODUCTION_MODE.",
+    )
+    finance.add_argument(
+        "--finance-subscription-id",
+        dest="finance_subscription_id",
+        default=None,
+        metavar="ID",
+        help="Billing subscription identifier. When omitted, the harness uses the "
+             "account uuid of the logged-in Claude Code subscription. "
+             "Equivalent to WCB_FINANCE_SUBSCRIPTION_ID.",
+    )
     return parser
 
 
