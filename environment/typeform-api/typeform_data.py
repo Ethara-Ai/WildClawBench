@@ -295,7 +295,9 @@ def delete_form(form_id):
     for r in [r for r in _responses_rows() if r["form_id"] == form_id]:
         _store_delete("responses", r)
     for a in [a for a in _answers_rows() if a["response_id"] in response_ids]:
-        _store_delete("answers", a)
+        # _answers_rows() strips the synthetic _pk, so pass the composite key
+        # explicitly — a stripped row resolves to pk None and deletes nothing.
+        _store_delete("answers", f"{a['response_id']}@{a['field_id']}")
     return {"deleted": True, "id": form_id}
 
 

@@ -198,8 +198,14 @@ def _primary_user():
     rows = _store.table("users").rows()
     return rows[0] if rows else {}
 
-_next_comment_id = 17800001051
-_next_media_id = 17900001029
+def _max_numeric_id(rows, field):
+    return max((int(r[field]) for r in rows if str(r.get(field, "")).isdigit()), default=0)
+
+
+# Derive from seed, never hardcode: a literal at/below the max seeded ID makes
+# the first create() upsert over a seed row — no error, no row-count change.
+_next_comment_id = _max_numeric_id(_comments_rows(), "id") + 1
+_next_media_id = _max_numeric_id(_media_rows(), "id") + 1
 _next_container_id = 17920001001
 
 

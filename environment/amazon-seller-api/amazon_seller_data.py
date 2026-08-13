@@ -227,8 +227,23 @@ def _coerce_pricing(rows):
 
 
 
-_next_report_id = 11
-_next_return_id = 6
+def _extract_numeric_id(id_str, prefix):
+    """Extract numeric suffix from IDs like 'REP-011'. Returns 0 for non-numeric IDs."""
+    stripped = str(id_str).replace(prefix, "", 1)
+    try:
+        return int(stripped)
+    except (ValueError, TypeError):
+        return 0
+
+
+# Derive from seed, never hardcode: a literal at/below the max seeded ID makes
+# the first create() upsert over a seed row — no error, no row-count change.
+_next_report_id = max(
+    (_extract_numeric_id(r["reportId"], "REP-") for r in _reports_rows()), default=0
+) + 1
+_next_return_id = max(
+    (_extract_numeric_id(r["returnId"], "RET-") for r in _returns_rows()), default=0
+) + 1
 
 
 # ---------------------------------------------------------------------------

@@ -283,12 +283,27 @@ def _coerce_materials(rows):
 
 
 
-_next_course_id = 5
-_next_cw_id = 400
-_next_topic_id = 400
-_next_sub_id = 100
-_next_ann_id = 20
-_next_mat_id = 10
+def _extract_numeric_id(id_str, prefix):
+    """Extract numeric suffix from IDs like 'course_005'. Returns 0 for non-numeric IDs."""
+    stripped = str(id_str).replace(prefix, "", 1)
+    try:
+        return int(stripped)
+    except (ValueError, TypeError):
+        return 0
+
+
+def _next_id(rows, field, prefix):
+    return max((_extract_numeric_id(r.get(field, ""), prefix) for r in rows), default=0) + 1
+
+
+# Derive from seed, never hardcode: a literal at/below the max seeded ID makes
+# the first create() upsert over a seed row — no error, no row-count change.
+_next_course_id = _next_id(_courses_rows(), "id", "course_")
+_next_cw_id = _next_id(_coursework_rows(), "id", "cw_")
+_next_topic_id = _next_id(_topics_rows(), "topicId", "topic_")
+_next_sub_id = _next_id(_submissions_rows(), "id", "sub_")
+_next_ann_id = _next_id(_announcements_rows(), "id", "ann_")
+_next_mat_id = _next_id(_materials_rows(), "id", "mat_")
 
 
 # ---------------------------------------------------------------------------
