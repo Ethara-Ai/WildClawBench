@@ -226,6 +226,14 @@ class OpenClawAgent(BaseAgent):
             # turns 41-57 where every fallback - whisper CLI, pip install,
             # OPENAI_API_KEY env probe - failed in turn).
             extra_env_dict = dict(spec.task.get("env_dict") or {})
+            # INVARIANT: a sub-agent spawn runs the SAME model as the main
+            # trajectory, unconditionally. Set outside every transport guard
+            # below - a spawn that resolves a LiteLLM base URL from the image
+            # (subagent_director accepts LITELLM_URL, which this runner never
+            # sets) used to fall through to a hardcoded default and silently
+            # bill a different model. Pinned by
+            # tests/test_subagent_model_parity.py.
+            extra_env_dict["WILDCLAW_MODEL"] = spec.model
             if self.litellm_config_yaml and self.litellm_container_name:
                 extra_env_dict.setdefault(
                     "WCB_AUDIO_TRANSCRIBE_URL",

@@ -954,11 +954,16 @@ def _make_invoker_from_env() -> LiteLLMInvoker:
         raise RuntimeError(
             "LITELLM_BASE_URL is not set in the sub-agent environment"
         )
-    model = (
-        os.environ.get("WILDCLAW_SUBAGENT_MODEL")
-        or os.environ.get("WILDCLAW_MODEL")
-        or "claude-opus-4-7"
-    )
+    model = os.environ.get("WILDCLAW_MODEL")
+    if not model:
+        raise RuntimeError(
+            "WILDCLAW_MODEL is not set in the sub-agent environment. "
+            "A spawn must run the same model as the main trajectory; there is "
+            "no default. The previous fallback ('claude-opus-4-7') is not a "
+            "registered sidecar model_name, so LiteLLM resolved it to a bare "
+            "Bedrock foundation-model invoke with no model_id and the request "
+            "was denied by IAM."
+        )
     return LiteLLMInvoker(
         base_url=base,
         default_model=model,
