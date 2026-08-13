@@ -591,8 +591,8 @@ if _TEXTUAL_AVAILABLE:
                 yield Label("Repetitions (reps — sequential runs of the same task, pass@K)",
                             classes="field-label")
                 yield Select(
-                    [(str(n), n) for n in (1, 2, 3, 4, 5)],
-                    value=int(self._pref("reps", 1)) if int(self._pref("reps", 1)) in (1, 2, 3, 4, 5) else 1,
+                    [(str(n), n) for n in (1, 2, 3, 4, 5, 6, 7, 8)],
+                    value=int(self._pref("reps", 1)) if int(self._pref("reps", 1)) in (1, 2, 3, 4, 5, 6, 7, 8) else 1,
                     allow_blank=False, id="reps",
                 )
                 yield Label("Multi-turn mode  (openclaw multi-turn tasks only)",
