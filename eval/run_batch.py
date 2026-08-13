@@ -429,6 +429,8 @@ def save_usage(
     testgen_usage: dict | None = None,
     judge_usage: dict | None = None,
     preflight_usage: dict | None = None,
+    model: str = "",
+    oauth_route: bool = False,
 ) -> dict:
     """Write usage.json with per-source breakdown (agent + testgen + judge + preflight)."""
     agent_usage = dict(usage)
@@ -442,6 +444,17 @@ def save_usage(
     # but must still persist so the failure is visible; only None = no judge ran.
     if judge_usage is not None:
         sources["judge"] = dict(judge_usage)
+
+    # Runs before recompute_combined so the aggregate derives from the repriced
+    # figures. A prepaid subscription records ~$0, which would otherwise leave
+    # usage.json disagreeing with the cost the finance API is sent.
+    from src.utils.oauth_pricing import reprice_zero_cost_sources
+
+    repriced = reprice_zero_cost_sources(
+        sources, model=model, oauth_route=oauth_route
+    )
+    if repriced:
+        logger.info("[%s] OAuth cost estimate: %s", task_id, ", ".join(repriced))
 
     combined = recompute_combined(sources, task_id)
 
@@ -2536,6 +2549,8 @@ def run_single_task(
             testgen_usage=task.get("__testgen_usage__"),
             judge_usage=result.get("__judge_usage__"),
             preflight_usage=usage.get("__preflight__"),
+            model=model,
+            oauth_route=bool(getattr(config, "use_claude_oauth", False)),
         )
 
         # Runs after save_usage so judge_lines can be built from the per-member

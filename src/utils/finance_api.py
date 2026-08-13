@@ -253,15 +253,63 @@ def _readable_model(raw: Any, fallback: str = "") -> str:
     return fallback.strip() or _UNKNOWN_JUDGE_MODEL
 
 
+def _judge_cost_usd(
+    model_name: str,
+    recorded: float,
+    *,
+    input_tokens: float,
+    output_tokens: float,
+    cache_read_tokens: float,
+    cache_write_tokens: float,
+) -> float:
+    """Recorded judge cost, or a Bedrock-rate estimate when it came back zero.
+
+    A council member graded over the Claude Max subscription is prepaid, so
+    ``grading.py::_judge_cost_usd`` deliberately records $0 for it. A Bedrock
+    member always carries a real non-zero cost, so a truthy ``recorded`` short
+    circuits here and that path is never repriced.
+    """
+    if recorded:
+        return recorded
+
+    estimated, priced_ok = estimate_cost_usd(
+        model_name,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cache_read_tokens=cache_read_tokens,
+        cache_write_tokens=cache_write_tokens,
+    )
+    if not priced_ok or not estimated:
+        return recorded
+
+    logger.info(
+        "[finance] judge %s reported $0 (prepaid); repriced at Bedrock rates to $%s",
+        model_name,
+        estimated,
+    )
+    return estimated
+
+
 def _judge_line(member: Mapping[str, Any], *, fallback_name: str = "") -> dict[str, Any]:
     model_name = _readable_model(member.get("model"), fallback_name)
+    input_tokens = _as_number(member.get("input_tokens"))
+    output_tokens = _as_number(member.get("output_tokens"))
+    cache_read_tokens = _as_number(member.get("cache_read_tokens"))
+    cache_write_tokens = _as_number(member.get("cache_write_tokens"))
     return {
         "model_name": model_name,
-        "judge_input_tokens": _as_number(member.get("input_tokens")),
-        "judge_output_tokens": _as_number(member.get("output_tokens")),
-        "judge_input_cache_tokens": _as_number(member.get("cache_read_tokens")),
-        "judge_output_cache_tokens": _as_number(member.get("cache_write_tokens")),
-        "judge_cost_usd": _as_number(member.get("cost_usd")),
+        "judge_input_tokens": input_tokens,
+        "judge_output_tokens": output_tokens,
+        "judge_input_cache_tokens": cache_read_tokens,
+        "judge_output_cache_tokens": cache_write_tokens,
+        "judge_cost_usd": _judge_cost_usd(
+            model_name,
+            _as_number(member.get("cost_usd")),
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cache_read_tokens=cache_read_tokens,
+            cache_write_tokens=cache_write_tokens,
+        ),
     }
 
 

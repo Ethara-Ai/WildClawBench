@@ -385,6 +385,99 @@ def test_judge_model_falls_back_when_nothing_is_readable():
     assert build_judge_lines(usage)[0]["model_name"] == "unknown-judge"
 
 
+def test_bedrock_judge_cost_is_reported_verbatim():
+    # A Bedrock member always carries a real charge. A truthy recorded cost is
+    # the only guard keeping this path out of the estimator, so pin it.
+    usage = {
+        "sources": {
+            "judge": {
+                "per_member": {
+                    "sonnet": {
+                        "model": "claude-sonnet-4-6",
+                        "input_tokens": 124791,
+                        "output_tokens": 2766,
+                        "cache_read_tokens": 0,
+                        "cache_write_tokens": 1572,
+                        "cost_usd": 0.421758,
+                    }
+                }
+            }
+        }
+    }
+    assert build_judge_lines(usage)[0]["judge_cost_usd"] == pytest.approx(0.421758)
+
+
+def test_oauth_judge_zero_cost_is_repriced_at_bedrock_rates():
+    # Real run_6 numbers: the Claude Max bridge is prepaid, so grading.py
+    # deliberately records $0 and the finance record has to reprice it.
+    usage = {
+        "sources": {
+            "judge": {
+                "per_member": {
+                    "sonnet": {
+                        "model": "claude-sonnet-4-5-20250929",
+                        "input_tokens": 101885,
+                        "output_tokens": 1267,
+                        "cache_read_tokens": 0,
+                        "cache_write_tokens": 0,
+                        "cost_usd": 0.0,
+                    }
+                }
+            }
+        }
+    }
+    expected, priced_ok = estimate_cost_usd(
+        "claude-sonnet-4-5-20250929",
+        input_tokens=101885,
+        output_tokens=1267,
+        cache_read_tokens=0,
+        cache_write_tokens=0,
+    )
+    assert priced_ok is True
+    cost = build_judge_lines(usage)[0]["judge_cost_usd"]
+    assert cost == pytest.approx(expected)
+    assert cost > 0.0
+
+
+def test_arn_judge_reprices_through_the_family_key():
+    arn = "bedrock/arn:aws:bedrock:ap-south-1:426628337772:application-inference-profile/urg0zifsjiga"
+    usage = {
+        "sources": {
+            "judge": {
+                "per_member": {
+                    "sonnet": {
+                        "model": arn,
+                        "input_tokens": 101885,
+                        "output_tokens": 1267,
+                        "cost_usd": 0.0,
+                    }
+                }
+            }
+        }
+    }
+    line = build_judge_lines(usage)[0]
+    assert line["model_name"] == "sonnet"
+    assert line["judge_cost_usd"] > 0.0
+
+
+def test_judge_without_a_rate_card_keeps_its_recorded_zero():
+    usage = {
+        "sources": {
+            "judge": {
+                "per_member": {
+                    "kimi": {
+                        "model": "kimi-k2",
+                        "input_tokens": 5000,
+                        "output_tokens": 200,
+                        "cost_usd": 0.0,
+                    }
+                }
+            }
+        }
+    }
+    assert build_judge_lines(usage)[0]["judge_cost_usd"] == pytest.approx(0.0)
+
+
 def test_judge_lines_fall_back_to_one_aggregate_line():
     usage = {"sources": {"judge": {"total_tokens": 120, "cost_usd": 0.4}}}
     lines = build_judge_lines(usage)
