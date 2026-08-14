@@ -147,67 +147,214 @@ def main() -> None:
         for task in tasks
     ]
 
+    total_units = len(tasks) * reps
+
+    if _tui_default:
+        from src.utils.ui.tui import run_with_dashboard, textual_available  # noqa: E402
+        from src.utils.ui.events import EV_LOG, EV_PROGRESS, EV_STAGE, get_bus  # noqa: E402
+        from src.utils.ui.console import is_interactive as _is_tty  # noqa: E402
+
+        if textual_available() and _is_tty():
+            # wcb.py owns the dashboard. Suppress run_batch's own TUI activation
+            # so it runs _run_main_body inline (plain-mode). The dashboard wraps
+            # ALL tasks × reps in one screen.
+            os.environ["WCB_TUI"] = "0"
+
+            def _dashboard_work():
+                import threading
+                bus = get_bus()
+                completed = 0
+                _lock = threading.Lock()
+                failures = []
+
+                def _stage(slug, state, detail=""):
+                    meta = {
+                        "running": ("\u25b6", "bold cyan", "running"),
+                        "ok": ("\u2713", "bold green", "completed"),
+                        "failed": ("\u2717", "bold red", "failed"),
+                        "queued": ("\u25cb", "dim", "queued"),
+                    }
+                    glyph, style, label = meta.get(state, ("\u00b7", "white", state))
+                    if detail:
+                        label = f"{label} \u2014 {detail}"
+                    bus.emit(EV_STAGE, task_id=slug, stage=state,
+                             label=label, detail="", glyph=glyph, style=style)
+
+                def _sep(text):
+                    bus.emit(EV_LOG, level="INFO",
+                             message=f"\u2500\u2500\u2500 {text} \u2500\u2500\u2500")
+
+                if parallel_tasks:
+                    import concurrent.futures
+                    jobs = min(len(tasks), 4)
+
+                    for t in tasks:
+                        _stage(Path(t).name, "queued")
+
+                    def _run_one_task(idx):
+                        nonlocal completed
+                        task = tasks[idx]
+                        slug = Path(task).name
+                        argv = per_task_argv[idx]
+                        task_failures = 0
+                        for rep in range(1, reps + 1):
+                            rep_label = f"rep {rep}/{reps}" if reps > 1 else ""
+                            display = f"{slug} {rep_label}".strip()
+                            _stage(slug, "running", rep_label)
+                            _sep(f"{display} started")
+                            try:
+                                run_batch.main(parser.parse_args(list(argv)))
+                            except SystemExit as exc:
+                                rc = exc.code if isinstance(exc.code, int) else 1
+                                if rc:
+                                    task_failures += 1
+                                    _stage(slug, "failed", rep_label)
+                                    bus.emit(EV_LOG, level="ERROR",
+                                             message=f"{display} failed (rc={rc})")
+                                else:
+                                    _stage(slug, "ok", rep_label)
+                                    bus.emit(EV_LOG, level="INFO", message=f"{display} ok")
+                            except Exception as exc:
+                                task_failures += 1
+                                _stage(slug, "failed", rep_label)
+                                bus.emit(EV_LOG, level="ERROR",
+                                         message=f"{display} error: {exc}")
+                            else:
+                                _stage(slug, "ok", rep_label)
+                                bus.emit(EV_LOG, level="INFO", message=f"{display} ok")
+                            with _lock:
+                                completed += 1
+                                bus.emit(EV_PROGRESS, completed=completed, total=total_units)
+                        return task, task_failures
+
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
+                        futs = {pool.submit(_run_one_task, i): i for i in range(len(tasks))}
+                        for fut in concurrent.futures.as_completed(futs):
+                            task, fails = fut.result()
+                            if fails:
+                                failures.append(task)
+                else:
+                    for ti, task in enumerate(tasks):
+                        slug = Path(task).name
+                        argv = per_task_argv[ti]
+                        for rep in range(1, reps + 1):
+                            rep_label = f"rep {rep}/{reps}" if reps > 1 else ""
+                            display = (f"({ti+1}/{len(tasks)}) {slug} {rep_label}".strip()
+                                       if multi else f"{slug} {rep_label}".strip())
+                            _stage(slug, "running", rep_label)
+                            _sep(f"{display} started")
+                            try:
+                                run_batch.main(parser.parse_args(list(argv)))
+                            except SystemExit as exc:
+                                rc = exc.code if isinstance(exc.code, int) else 1
+                                if rc:
+                                    failures.append(task)
+                                    _stage(slug, "failed", rep_label)
+                                    bus.emit(EV_LOG, level="ERROR",
+                                             message=f"{display} failed (rc={rc})")
+                                else:
+                                    _stage(slug, "ok", rep_label)
+                                    bus.emit(EV_LOG, level="INFO", message=f"{display} ok")
+                            except Exception as exc:
+                                failures.append(task)
+                                _stage(slug, "failed", rep_label)
+                                bus.emit(EV_LOG, level="ERROR",
+                                         message=f"{display} error: {exc}")
+                            else:
+                                _stage(slug, "ok", rep_label)
+                                bus.emit(EV_LOG, level="INFO", message=f"{display} ok")
+                            completed += 1
+                            bus.emit(EV_PROGRESS, completed=completed, total=total_units)
+
+                if failures:
+                    bus.emit(EV_LOG, level="WARNING",
+                             message=f"{len(set(failures))} task(s) had failures")
+                    raise SystemExit(1)
+
+            run_with_dashboard(_dashboard_work, total_hint=total_units)
+            return
+
+    # Fallback: no TUI (piped, WCB_TUI=0, textual absent). Plain-mode execution.
     if parallel_tasks:
-        _run_tasks_parallel(tasks, per_task_argv, reps)
+        _run_tasks_parallel(tasks, per_task_argv, reps, run_batch, parser)
         return
 
+    serial_failures: list[str] = []
     for ti, task in enumerate(tasks, start=1):
         argv = per_task_argv[ti - 1]
-        if not _tui_default:
-            prefix = f"[wcb] ({ti}/{len(tasks)}) " if multi else "[wcb] "
-            print(f"{prefix}starting: run_batch {' '.join(argv)}"
-                  + (f"  × {reps} reps" if reps > 1 else ""))
+        prefix = f"[wcb] ({ti}/{len(tasks)}) " if multi else "[wcb] "
+        print(f"{prefix}starting: run_batch {' '.join(argv)}"
+              + (f"  x {reps} reps" if reps > 1 else ""))
         for rep in range(1, reps + 1):
             if reps > 1:
                 print(f"[wcb] ── {task} rep {rep}/{reps} ──")
-            run_batch.main(parser.parse_args(argv))
+            try:
+                run_batch.main(parser.parse_args(list(argv)))
+            except SystemExit as exc:
+                rc = exc.code if isinstance(exc.code, int) else 1
+                if rc:
+                    serial_failures.append(task)
+                    print(f"[wcb] {task} rep {rep}/{reps} failed (rc={rc})")
+            else:
+                if reps > 1:
+                    print(f"[wcb] {task} rep {rep}/{reps} ok")
+
+    if serial_failures:
+        print(f"[wcb] {len(set(serial_failures))}/{len(tasks)} task(s) had failures")
+        raise SystemExit(1)
 
 
-def _run_tasks_parallel(tasks, per_task_argv, reps):
-    """Run each selected task concurrently as its own run_batch subprocess.
-
-    A subprocess (not a thread) is used because run_batch.main() hosts a
-    single-screen Textual dashboard and mutates process-global state; N of those
-    cannot share one terminal, so parallel workers run with WCB_TUI=0 and stream
-    plain logs. This matches the harness convergence invariant: each worker is a
-    direct ``python3 eval/run_batch.py <argv>`` invocation.
-    """
+def _run_tasks_parallel(tasks, per_task_argv, reps, run_batch, parser):
+    """Plain-mode parallel execution (no TUI). Uses threads since run_batch is
+    in-process and WCB_TUI=0 prevents any Textual activation."""
     import concurrent.futures
-    import subprocess
+    import threading
 
-    child_env = dict(os.environ)
-    child_env["WCB_TUI"] = "0"  # dashboards cannot be multiplexed across workers
+    jobs = min(len(tasks), 4)
+    print_lock = threading.Lock()
 
-    jobs = min(len(tasks), 4)  # cap fan-out (Bedrock throttling / local docker)
-    run_batch_py = str(ROOT_DIR / "eval" / "run_batch.py")
+    def _log(msg):
+        with print_lock:
+            print(msg, flush=True)
 
     def _run_one(idx):
         task = tasks[idx]
+        slug = Path(task).name
         argv = per_task_argv[idx]
-        rc = 0
+        task_failures = 0
         for rep in range(1, reps + 1):
-            proc = subprocess.run(
-                [sys.executable, run_batch_py, *argv],
-                cwd=str(ROOT_DIR), env=child_env,
-            )
-            if proc.returncode:
-                rc = proc.returncode
-        return task, rc
+            label = f"[{slug}] rep {rep}/{reps}" if reps > 1 else f"[{slug}]"
+            _log(f"[wcb] {label} started")
+            try:
+                run_batch.main(parser.parse_args(list(argv)))
+            except SystemExit as exc:
+                rc = exc.code if isinstance(exc.code, int) else 1
+                if rc:
+                    task_failures += 1
+                    _log(f"[wcb] {label} FAILED (rc={rc})")
+            except Exception as exc:
+                task_failures += 1
+                _log(f"[wcb] {label} ERROR: {exc}")
+            else:
+                _log(f"[wcb] {label} ok")
+        return task, task_failures
 
     print(f"[wcb] running {len(tasks)} tasks in parallel (jobs={jobs}"
-          + (f", × {reps} reps each" if reps > 1 else "") + ")")
+          + (f", x {reps} reps each" if reps > 1 else "") + ")")
     failures = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
-        futures = {pool.submit(_run_one, i): i for i in range(len(tasks))}
-        for fut in concurrent.futures.as_completed(futures):
-            task, rc = fut.result()
-            status = "ok" if rc == 0 else f"FAILED (rc={rc})"
-            print(f"[wcb] done: {task} — {status}")
-            if rc != 0:
+        futs = {pool.submit(_run_one, i): i for i in range(len(tasks))}
+        for fut in concurrent.futures.as_completed(futs):
+            task, fails = fut.result()
+            if fails:
                 failures.append(task)
+                _log(f"[wcb] DONE: {task} — {fails}/{reps} rep(s) failed")
+            else:
+                _log(f"[wcb] DONE: {task} — ok")
     if failures:
-        print(f"[wcb] {len(failures)} task(s) failed: {', '.join(failures)}")
+        print(f"[wcb] {len(failures)}/{len(tasks)} task(s) had failures: {', '.join(failures)}")
         raise SystemExit(1)
+    print(f"[wcb] all {len(tasks)} tasks completed successfully")
 
 
 if __name__ == "__main__":
