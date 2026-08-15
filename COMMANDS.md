@@ -47,7 +47,7 @@ Commands fall into these tiers:
    - [`coerce_dryrun.py`](#33-coerce_dryrunpy)
    - [`coerce_malformed_test.py`](#34-coerce_malformed_testpy)
    - [`extract_home_to_data.py`](#35-extract_home_to_datapy)
-   - [`kensei_tui.py`](#36-kensei_tuipy)
+   - [Harness Dashboard (`src/utils/ui/tui.py`)](#36-harness-dashboard-srcutilsuituitpy)
    - [`migrate_to_drift_plane.py`](#37-migrate_to_drift_planepy)
    - [`reconstruct_input_from_bundle.py`](#38-reconstruct_input_from_bundlepy)
    - [`regrade.py`](#39-regradepy)
@@ -190,7 +190,7 @@ bash script/prepare.sh --validate-overlays --strict
 **Mode-selecting flags** (mutually exclusive; exactly one active per invocation):
 
 - `--task` / positional `TASK` → **single** mode.
-- `-A`, `--all-input` → **all-input** mode.
+- `--input-dir DIR` → **input-dir** mode (queue every task subdir under DIR).
 - `-B`, `--bulk <FILE>` → **bulk** mode.
 - `-R`, `--regrade <DIR>` → **regrade** mode (short-circuits everything else; re-runs only the judge).
 
@@ -203,7 +203,8 @@ bash script/prepare.sh --validate-overlays --strict
 | `-m`, `--model`, `--models` | `NAME[,NAME...]` | Comma list; models run in parallel per task. |
 | `-k`, `--reps`, `--k` | `N` | Repetitions per (task, model). Sequential by default. |
 | `-B`, `--bulk` | `FILE` | Read tasks from file (one per line, `#` comments/blanks stripped). |
-| `-A`, `--all-input` | — | Every immediate subdir of `input/` becomes a task. |
+| `--input-dir` | `DIR` | Queue every task subdir under DIR. |
+| `-P`, `--parallel-tasks` | `N` | Run N tasks concurrently, each failure-isolated (one failing never stops the rest). |
 | `-R`, `--regrade` | `DIR` | Re-run judge phase only on an existing run dir. |
 | `--rubric` | `PATH` | Override rubric for `--regrade`. |
 
@@ -213,29 +214,28 @@ bash script/prepare.sh --validate-overlays --strict
 | --- | --- | --- |
 | `--backend` | `NAME` | Agent backend (default `openclaw`). Forwarded as `--agent-backend`. |
 | `--thinking` | `LEVEL` | Thinking budget (default `xhigh`; e.g. `medium`, `high`, `xhigh`). |
-| `--provider` | `auto\|bedrock\|anthropic\|vertex` | LiteLLM upstream provider for opus/sonnet aliases. `auto` = env-detect. |
-| `--gcp`, `--vertex` | — | Shortcut for `--provider vertex`. |
-| `--vertex-project` | `ID` | Override GCP project. |
-| `--vertex-location` | `REGION` | Override Vertex region (default `us-east5`). |
-| `--vertex-credentials` | `PATH` | Path to GCP SA JSON. |
+| `--tui` | — | Enable the full-screen Textual live dashboard (passes `--tui` to `run_batch.py`). |
+| `--stream` | — | Live-stream LLM output (agent thinking+text, judge verdicts) to the terminal / TUI. |
+| `--no-stream` | — | Force streaming off. |
+| `--use-claude-oauth` | — | Route opus through Claude Code OAuth bridge (Max plan) instead of Bedrock. |
 | `--no-judge-council` | — | Disable `--judge-council` (faster, single-judge). |
 | `--no-tests` | — | Disable `--generate-tests`/`--execute-tests`. |
 | `--no-litellm` | — | Disable LiteLLM sidecar (direct Bedrock). |
 | `--no-mock-stack` | — | Disable mock-stack docker fleet. |
+| `--no-subagents` | — | Force sub-agent spawning OFF (model never granted sessions_spawn). |
 | `--no-bundle` | — | Skip auto-repackage to `output_bundle/` after each task. |
 | `--bundle-root` | `DIR` | Destination for auto-bundle (default `output_bundle`; env `KENSEI_BUNDLE_ROOT`). |
 | `--parallel-reps` | — | Run all K reps of a (task, model) concurrently. |
-| `--no-tui` | — | Skip the Kensei live TUI. |
 | `--skip-preflight` | — | Skip docker/image/mock/.env checks (dangerous). |
 | `--` | — | End of options; remaining args are positional. |
 
 **Legacy positional shortcut:** `bash script/run.sh [TASK] [MODEL[,MODEL2,...]] [K]`, with defaults `TASK=input/alden-croft_MB`, `MODEL=claude-opus-4.7`, `K=1`.
 
-**Env vars read:** `KENSEI_BUNDLE_ROOT`, `KENSEI_NO_TUI`, `KENSEI_HOLD_TUI`, `KENSEI_QUIT_SENTINEL` (exported for the TUI), `WCB_QUIET`, `NO_COLOR`, `TMPDIR`, `KENSEI_AWS_BEARER_TOKEN`, `KENSEI_AWS_REGION`.
+**Env vars read:** `KENSEI_BUNDLE_ROOT`, `WCB_QUIET`, `NO_COLOR`, `TMPDIR`, `KENSEI_AWS_BEARER_TOKEN`, `KENSEI_AWS_REGION`.
 
 **Notable behavior:**
 - Logs at `logs/<task>_<model>_run<i>_<TS>.log`.
-- Tasks always sequential; models parallel per task; reps sequential (or concurrent with `--parallel-reps`).
+- Tasks always sequential by default; `-P N` runs N tasks concurrently (failure-isolated). Models parallel per task; reps sequential (or concurrent with `--parallel-reps`).
 - One automatic docker-recoverable retry per run.
 - Post-batch invokes `python3 script/aggregate_runs.py --backend <BACKEND>` if `K > 1` or multi-task/multi-model.
 - Post-task auto-bundle to `--bundle-root` unless `--no-bundle`.
@@ -248,9 +248,8 @@ bash script/run.sh --task input/amanda_hayes_01 --model claude-opus-4.7
 bash script/run.sh --model claude-opus-4.7,claude-sonnet-4.5 --reps 3      # 2 models × K=3 parallel
 bash script/run.sh --task input/amanda_hayes_01 --reps 2 --parallel-reps
 bash script/run.sh --bulk tasks.txt --model claude-opus-4.7 --reps 2
-bash script/run.sh --all-input --model claude-opus-4.7
+bash script/run.sh --input-dir input --parallel-tasks 3 --reps 4
 bash script/run.sh --regrade output/openclaw/amanda_hayes_01/trajectories/claude-opus-4.7/run_1
-bash script/run.sh --provider vertex --vertex-project my-gcp-proj --model claude-opus-4.7
 ```
 
 ---
@@ -534,19 +533,18 @@ python3 script/extract_home_to_data.py input/alden-croft_MB --verbose
 
 ---
 
-### 3.6 `kensei_tui.py`
+### 3.6 Harness Dashboard (`src/utils/ui/tui.py`)
 
-**Purpose:** The Kensei TUI — a Textual-based live dashboard for `bash script/run.sh …`. Launched by `run.sh` as a sibling process. Reads a `plan.json` describing the batch plus per-run log files and `output/<backend>/<task>/trajectories/<model>/run_N/` artifacts (`score.json`, `ctrf.json`, `usage.json`, `mock_health.jsonl`). Tabs: Overview (with progress + live log), Rubric, Tests, Usage, Judge, Mock Health. Falls back to a no-op sleep loop when stdout is not a TTY or when `KENSEI_NO_TUI=1`. Pressing `q`/`Esc`/`Ctrl+C`/`Ctrl+Q` writes `$KENSEI_QUIT_SENTINEL` so `run.sh`'s INT trap can tear down docker/LiteLLM/mocks.
+**Purpose:** The in-process Textual live dashboard for task execution. Activated by `--tui` flag to `eval/run_batch.py` or `WCB_TUI=1` env var (set automatically by `eval/wcb.py`). Renders a full-screen dashboard with panes: stream (LLM output), chat (conversation trace), inject (data injection events), log (harness messages), and status (stage/progress). Subscribes to an `EventBus` (`src/utils/ui/events.py`) for live metrics. Pressing `q` exits.
 
-**CLI library:** argparse.
+**Not a standalone CLI.** Launched in-process by `run_batch.py` via `src.utils.ui.tui.run_with_dashboard(work, total_hint)` when the `--tui` flag is active and a real TTY is detected. Falls back to Rich console logging otherwise.
 
-| Flag | Type | Default | Required | Purpose |
-| --- | --- | --- | --- | --- |
-| `--plan` | Path | — | **Yes** | Path to `plan.json` emitted by `script/run.sh`. |
-| `--watch` | Path | `logs` | No | Bash log directory. Overridable via `KENSEI_LOG_DIR`. |
-| `--no-tui` | flag | `False` | No | Force plain no-op fallback. |
+**Activation:**
+- `eval/run_batch.py --tui` or `WCB_TUI=1` (explicit)
+- `eval/wcb.py` sets `WCB_TUI=1` automatically for all launcher runs.
+- `script/run.sh --tui` passes `--tui` through to `run_batch.py`.
 
-**Env vars:** `KENSEI_NO_TUI`, `KENSEI_LOG_DIR`, `KENSEI_QUIT_SENTINEL`.
+**Env vars:** `WCB_TUI` (`1`/`0` — enable/disable the full-screen dashboard).
 
 ---
 
@@ -990,14 +988,11 @@ Comprehensive map of env vars honored by the pipeline. Only the *first non-empty
 | `GITHUB_TOKEN` / `GH_TOKEN` | `deliver.sh` | Non-interactive HTTPS auth for the delivery repo. |
 | `HF_TASKS_REPO` | `prepare.sh` | Override the HF `tasks/` dataset URL. |
 
-### Kensei TUI
+### Harness TUI
 
 | Var | Purpose |
 | --- | --- |
-| `KENSEI_NO_TUI` | Disable the TUI even on TTY (`kensei_tui.py`, `run.sh`). |
-| `KENSEI_HOLD_TUI` | Keep the TUI open after runs finish (`run.sh`). |
-| `KENSEI_LOG_DIR` | Override `--watch` for the log dir (`kensei_tui.py`). |
-| `KENSEI_QUIT_SENTINEL` | Path the TUI writes on quit so `run.sh` can shut things down (`run.sh`, `kensei_tui.py`). |
+| `WCB_TUI` | `1` enables the full-screen Textual dashboard; `0` disables (Rich console logging fallback). Set automatically by `eval/wcb.py`; also passable via `--tui` to `run_batch.py`. |
 | `KENSEI_BUNDLE_ROOT` | Default destination for the auto-bundler (`run.sh`, overridable by `--bundle-root`). |
 
 ### Harness runtime (`src/utils/config.py`)
@@ -1030,7 +1025,7 @@ See [§ 2.7 above](#27-env-var-contract-read-by-the-harness-at-runtime) for the 
 | --- | --- |
 | First-time setup on a fresh clone | `bash script/prepare.sh` |
 | Run one task end-to-end | `bash script/run.sh --task input/<name>` |
-| Run every task under `input/` | `bash script/run.sh --all-input` |
+| Run every task under a directory | `bash script/run.sh --input-dir input` |
 | K reps × N models per task | `bash script/run.sh --model m1,m2 --reps 3` |
 | Re-judge an existing run (no re-execution) | `bash script/run.sh --regrade <run_dir>` or `python3 script/regrade.py --run <run_dir>` |
 | Re-run only the tests | `python3 script/rerun_tests.py --run <run_dir>` |
