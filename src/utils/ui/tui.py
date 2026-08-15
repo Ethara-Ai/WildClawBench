@@ -1207,39 +1207,33 @@ if _TEXTUAL_AVAILABLE:
                 root = logging.getLogger()
                 if self._log_handler:
                     root.removeHandler(self._log_handler)
+                # On abandonment do NOT re-point root logging at stdout: the
+                # worker is still alive until run_with_dashboard's os._exit, and
+                # restoring the stream handlers here would let its next log line
+                # spill to the terminal in that window. A dying process needs no
+                # handlers. The restore only matters for the normal path, where
+                # eval/wcb.py runs the next task/rep in the same process.
                 if not self._abandoned:
                     for h in getattr(self, "_saved_handlers", []):
                         root.addHandler(h)
                     root.setLevel(getattr(self, "_saved_level", logging.INFO))
             except Exception:
                 pass
-            # On abandonment, hard-exit NOW. The worker thread is still alive
-            # inside run_batch.main() (possibly blocked on a Docker exec that
-            # takes minutes). Waiting for it to finish lets logs and container
-            # output spill to the terminal. Kill the process immediately after
-            # best-effort container cleanup.
-            if self._abandoned:
-                try:
-                    _abandon_cleanup_bestefforts()
-                except Exception:
-                    pass
-                import os as _os
-                _os._exit(130)
 
 
 def _abandon_cleanup_bestefforts(timeout_s: float = 2.0) -> None:
     # Bounded best-effort kill of the harness's own containers before os._exit
-    # abandons the run. Matches harness naming prefixes (t_/mocks-/ll-/k3net-/
-    # wcbsh-cc-bridge-, per script/run.sh cleanup_orphans); wcbsh-sidecar-* and
-    # wcbsh-net-* are deliberately left alone (bash-owned shared infra). Anything
-    # missed is reaped by the next run's cleanup_orphans. Stdlib-only: the
-    # presentation layer must not import the container plane.
+    # abandons the run. Only matches the harness naming prefixes (t_/mocks-/ll-/
+    # k3net-, per script/run.sh cleanup_orphans); wcbsh-* is deliberately left
+    # alone (bash-owned shared sidecar). Anything missed is reaped by the next
+    # run's cleanup_orphans. Stdlib-only: the presentation layer must not import
+    # the container plane.
     import shutil
     import subprocess
 
     if not shutil.which("docker"):
         return
-    prefixes = ("t_", "mocks-", "ll-", "k3net-", "wcbsh-cc-bridge-")
+    prefixes = ("t_", "mocks-", "ll-", "k3net-")
     filters: list[str] = []
     for p in prefixes:
         filters += ["--filter", f"name=^{p}"]
