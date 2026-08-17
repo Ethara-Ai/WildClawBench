@@ -28,6 +28,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from eval.run_batch import _condense_transcript_for_judge, recompute_combined  # noqa: E402
+from script.backfill_pass_summary import _ctrf_test_result, rebuild_model_dir  # noqa: E402
 from src.utils.grading import grade_with_rubric  # noqa: E402
 
 _USAGE_KEYS = (
@@ -203,6 +204,31 @@ def regrade(run_dir: Path, rubric_override: Path | None = None) -> dict:
     except (OSError, json.JSONDecodeError):
         pass
     score_path.write_text(json.dumps(scores, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    # --- Merge Channel A (pytest) fields from ctrf.json/reward.txt so score.json
+    # stays self-consistent. Without this, a regrade leaves tests_total/passed/
+    # failed and combined_reward stale or absent. Formula from run_batch.py:1154.
+    test_result = _ctrf_test_result(run_dir)
+    test_reward = test_result["reward"]
+    rubric_reward = scores.get("overall_score")
+    scores["tests_total"] = test_result["tests_total"]
+    scores["tests_passed"] = test_result["tests_passed"]
+    scores["tests_failed"] = test_result["tests_failed"]
+    scores["test_based_reward"] = test_reward
+    scores["rubric_based_reward"] = rubric_reward
+    scores["combined_reward"] = (
+        (test_reward + rubric_reward) / 2.0
+        if test_reward is not None and rubric_reward is not None
+        else test_reward if test_reward is not None else rubric_reward
+    )
+    score_path.write_text(json.dumps(scores, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    # Regenerate pass_summary.json for the model dir so aggregate is consistent.
+    try:
+        rebuild_model_dir(run_dir.parent)
+    except Exception as exc:
+        print(f"[regrade] WARNING: rebuild_model_dir failed: {exc}", file=sys.stderr)
+
     print(f"[regrade] wrote {score_path}", file=sys.stderr)
 
     _update_usage_json(run_dir, scores)
