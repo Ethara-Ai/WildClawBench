@@ -115,28 +115,26 @@ def _row_ids(row: Dict[str, Any]) -> Set[str]:
     algolia, ...). A static validator has no /admin/tables to consult, so it
     collects every scalar under a key that lowercases to ``pk`` or ends in
     ``id`` — over-collecting only relaxes the missing-target check, never
-    breaks a valid op.
-
-    Composite-pk synthesis: runtime loaders (e.g. monday_data.py) build
-    ``_pk = f"{a_id}@{b_id}"`` from multiple id fields. The static gate must
-    mirror this by joining id-field values with ``@`` in iteration order.
-    This is additive-only (superset of scalar ids), so it cannot introduce
-    new false positives — only removes structural false negatives on
-    synthesized-pk tables (column_values, groups, columns, etc.)."""
+    breaks a valid op."""
     out: Set[str] = set()
-    id_vals: list = []
     for k, v in row.items():
         if not isinstance(v, (str, int)):
             continue
         kl = str(k).lower()
         if kl == "pk" or kl.endswith("id"):
             out.add(str(v))
-            id_vals.append(str(v))
-    # Composite-pk synthesis: match runtime loaders that build
-    # _pk = f"{a_id}@{b_id}" from the row's id fields.
-    if len(id_vals) >= 2:
-        out.add("@".join(id_vals))
     return out
+
+
+def _synthesize_composite_pk(row: Dict[str, Any], ids: Set[str]) -> None:
+    """Synthesize composite primary keys into the snapshot set.
+
+    Runtime loaders build _pk from multiple id fields (e.g. f"{item_id}@{column_id}").
+    This mirrors that synthesis for the static validator's membership check only."""
+    id_vals = [str(v) for k, v in row.items()
+               if isinstance(v, (str, int)) and (str(k).lower() == "pk" or str(k).lower().endswith("id"))]
+    if len(id_vals) >= 2:
+        ids.add("@".join(id_vals))
 
 
 def _seed_ids_for_service(mock_data_root: Path, service: str) -> Set[str]:
@@ -160,10 +158,12 @@ def _seed_ids_for_service(mock_data_root: Path, service: str) -> Set[str]:
                     for row in rows:
                         if isinstance(row, dict):
                             ids.update(_row_ids(row))
+                            _synthesize_composite_pk(row, ids)
             elif path.suffix == ".csv":
                 with path.open(newline="") as fh:
                     for row in csv.DictReader(fh):
                         ids.update(_row_ids(row))
+                        _synthesize_composite_pk(row, ids)
         except (OSError, ValueError):
             continue
     return ids

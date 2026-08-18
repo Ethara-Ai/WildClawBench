@@ -506,6 +506,7 @@ def test_cache_control_survival_smoke():
 def _bridge_env(monkeypatch, url="http://127.0.0.1:18765", model=None):
     monkeypatch.setenv("KENSEI_JUDGE_USE_LITELLM", "true")
     monkeypatch.setenv("KENSEI_JUDGE_HEADROOM_ENABLED", "false")
+    monkeypatch.setenv("WCB_AUTH_PROVIDER", "oauth")
     if url is not None:
         monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", url)
     else:
@@ -629,6 +630,7 @@ def test_preflight_timeout_default_and_override(monkeypatch):
 
 def _preflight_with(monkeypatch, exc, url="http://127.0.0.1:18765"):
     monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", url)
+    monkeypatch.setenv("WCB_AUTH_PROVIDER", "oauth")
     calls = {"n": 0}
 
     def _boom(**kwargs):
@@ -657,6 +659,7 @@ def test_preflight_does_not_retry_auth_failure(monkeypatch):
 
 def test_preflight_succeeds_on_retry(monkeypatch):
     monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "http://127.0.0.1:18765")
+    monkeypatch.setenv("WCB_AUTH_PROVIDER", "oauth")
     calls = {"n": 0}
 
     def _flaky(**kwargs):

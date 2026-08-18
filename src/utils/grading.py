@@ -327,6 +327,14 @@ def council_members() -> list[CouncilMember]:
     allowed = set(auth_provider.available_judge_families(provider))
     filtered = [m for m in out if m.family in allowed]
 
+    if out and filtered and len(filtered) < len(out):
+        import logging as _logging
+        _logging.getLogger(__name__).warning(
+            "Judge council: %d→%d members under provider %r (dropped: %s)",
+            len(out), len(filtered), provider,
+            sorted({m.family for m in out} - {m.family for m in filtered}),
+        )
+
     if out and not filtered:
         # Every configured member was filtered out. Returning [] here would make
         # grade_with_rubric report overall_score=0.0 with a generic error, which

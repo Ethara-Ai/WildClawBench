@@ -3051,7 +3051,7 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
         _skip_preflight = os.environ.get(
             "WCB_SKIP_JUDGE_PREFLIGHT", ""
         ).strip().lower() in ("1", "true", "yes", "on")
-        if not _skip_preflight and os.environ.get("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "").strip():
+        if not _skip_preflight and use_oauth and os.environ.get("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "").strip():
             _host_port = os.environ.get("WCB_CC_BRIDGE_HOST_PORT", "").strip()
             if _host_port and not wait_for_bridge_host_port(_host_port):
                 raise RuntimeError(
@@ -3232,8 +3232,8 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
             network=network,
             host_config_path=str(cfg_path),
             master_key=config.litellm_master_key,
-            aws_bearer_token=config.aws_bearer_token,
-            aws_region=config.bedrock_region,
+            aws_bearer_token="" if use_oauth else config.aws_bearer_token,
+            aws_region="" if use_oauth else config.bedrock_region,
             openai_api_key=config.openai_api_key,
             openai_whisper_api_key=config.openai_whisper_api_key,
             meta_api_key=config.meta_api_key,
@@ -3259,6 +3259,7 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
             # bridge, so validate THAT path end-to-end here rather than probing an
             # unrelated Bedrock/OpenAI upstream the agent won't use.
             codex_model if use_codex_oauth
+            else "claude-opus-4.7" if use_oauth  # OAuth bridge registers this model name
             else "claude-opus-4.7" if (config.aws_bearer_token and config.bedrock_inference_arn) or config.anthropic_api_key
             else "gpt-5.5" if config.openai_api_key
             else config.meta_model if (config.meta_api_key and config.meta_model)
@@ -3878,7 +3879,10 @@ def _run_dispatch(args, backend, config: Config, mock_env_dict: dict, effective_
 
     gen_tests = args.generate_tests
     if gen_tests is None:
-        gen_tests = bool(config.bedrock_inference_arn and config.aws_bearer_token)
+        gen_tests = bool(
+            (config.bedrock_inference_arn and config.aws_bearer_token)
+            or use_oauth  # OAuth sidecar routes opus through bridge for testgen
+        )
     testgen_max_attempts = getattr(args, "testgen_max_attempts", 3)
     exec_tests = getattr(args, "execute_tests", None)
     if exec_tests is None:

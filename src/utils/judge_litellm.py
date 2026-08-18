@@ -64,7 +64,16 @@ def _judge_oauth_bridge_url() -> str:
     """Master gate for routing the Sonnet judge through the Claude Max OAuth
     bridge. Empty/unset = judge uses Bedrock/OpenAI as before. When set (e.g.
     http://127.0.0.1:<port>), the sonnet judge's litellm.completion is pointed
-    at the host-published cc-bridge instead of Bedrock."""
+    at the host-published cc-bridge instead of Bedrock.
+
+    Provider-gated: returns empty string when the active auth provider is NOT
+    OAuth, preventing Bedrock runs from accidentally routing the Sonnet judge
+    through the OAuth bridge even when KENSEI_JUDGE_OAUTH_BRIDGE_URL is set
+    in .env (provider isolation — see docs/ISSUE_oauth_bedrock_entanglement.md
+    CP-4)."""
+    from src.utils.auth_provider import OAUTH, PROVIDER_ENV_VAR
+    if os.environ.get(PROVIDER_ENV_VAR, "").strip().lower() != OAUTH:
+        return ""
     return (os.environ.get("KENSEI_JUDGE_OAUTH_BRIDGE_URL") or "").strip()
 
 

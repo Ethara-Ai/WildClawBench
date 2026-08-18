@@ -353,11 +353,13 @@ preflight_env_file() {
     fi
 
     local missing=()
-    for key in KENSEI_AWS_BEARER_TOKEN KENSEI_AWS_REGION; do
-        if ! grep -qE "^${key}=.+" .env; then
-            missing+=("$key")
-        fi
-    done
+    if [[ "${WCB_AUTH_PROVIDER:-bedrock}" != "oauth" ]]; then
+        for key in KENSEI_AWS_BEARER_TOKEN KENSEI_AWS_REGION; do
+            if ! grep -qE "^${key}=.+" .env; then
+                missing+=("$key")
+            fi
+        done
+    fi
     if (( ${#missing[@]} > 0 )); then
         log::warn ".env missing/empty: ${missing[*]} (Bedrock calls will fail if not set elsewhere)"
     fi
