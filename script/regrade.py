@@ -196,6 +196,7 @@ def regrade(run_dir: Path, rubric_override: Path | None = None) -> dict:
     # Preserve run-level injection-integrity keys from the ORIGINAL score.json:
     # regrade re-judges Channel B only — whether the run's silent mutations
     # landed is a fact about the run, not the rubric, and must survive.
+    prev = {}
     try:
         prev = json.loads(score_path.read_text(encoding="utf-8"))
         for k in ("injection_ok", "injection_defects"):
@@ -209,12 +210,20 @@ def regrade(run_dir: Path, rubric_override: Path | None = None) -> dict:
     # stays self-consistent. Without this, a regrade leaves tests_total/passed/
     # failed and combined_reward stale or absent. Formula from run_batch.py:1154.
     test_result = _ctrf_test_result(run_dir)
-    test_reward = test_result["reward"]
     rubric_reward = scores.get("overall_score")
-    scores["tests_total"] = test_result["tests_total"]
-    scores["tests_passed"] = test_result["tests_passed"]
-    scores["tests_failed"] = test_result["tests_failed"]
-    scores["test_based_reward"] = test_reward
+    if test_result["tests_total"] and test_result["tests_total"] > 0:
+        test_reward = test_result["reward"]
+        scores["tests_total"] = test_result["tests_total"]
+        scores["tests_passed"] = test_result["tests_passed"]
+        scores["tests_failed"] = test_result["tests_failed"]
+        scores["test_based_reward"] = test_reward
+    else:
+        test_reward = None
+        for k in ("tests_total", "tests_passed", "tests_failed", "test_based_reward"):
+            if prev.get(k) is not None:
+                scores[k] = prev[k]
+                if k == "test_based_reward":
+                    test_reward = prev[k]
     scores["rubric_based_reward"] = rubric_reward
     scores["combined_reward"] = (
         (test_reward + rubric_reward) / 2.0

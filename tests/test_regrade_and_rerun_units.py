@@ -214,8 +214,11 @@ class TestRegradeScoreOverwrite:
 
         on_disk = json.loads((run_dir / "score.json").read_text(encoding="utf-8"))
         assert on_disk["overall_score"] == 0.42
-        # verbatim overwrite: old keys are NOT preserved / merged.
-        assert "combined_reward" not in on_disk
+        # Channel A merge writes combined_reward (rubric-only when no tests ran)
+        assert on_disk["combined_reward"] == 0.42
+        assert on_disk["rubric_based_reward"] == 0.42
+        assert on_disk.get("test_based_reward") is None
+        # old stale keys ARE dropped
         assert "stale" not in on_disk
 
     def test_regrade_reads_prompt_into_task_description(self, regrade_mod, tmp_path, monkeypatch):
@@ -899,4 +902,5 @@ class TestRegradePreservesInjectionFlags:
         on_disk = json.loads((run_dir / "score.json").read_text(encoding="utf-8"))
         assert on_disk["injection_ok"] is False
         assert on_disk["injection_defects"] == defects
-        assert "combined_reward" not in on_disk  # verbatim-drop behavior intact
+        assert on_disk["combined_reward"] == 0.42
+        assert on_disk["rubric_based_reward"] == 0.42

@@ -2466,7 +2466,14 @@ def run_single_task(
                 "[%s] Agent container never started; skipping test execution to avoid grading an empty workspace. Error: %s",
                 task_id, result["error"],
             )
-        if execute_tests and task.get("test_code") and not startup_failed:
+        # Auto-enable test execution when task ships test_code (from any source:
+        # LLM-generated, cache, or pre-shipped via _load_provided_tests) and the
+        # mock network is reachable. This decouples test execution from the
+        # generation decision — pre-shipped suites run even if gen_tests was False.
+        effective_exec_tests = execute_tests or (
+            bool(task.get("test_code")) and bool(network)
+        )
+        if effective_exec_tests and task.get("test_code") and not startup_failed:
             try:
                 from src.utils.test_executor import execute_tests as _exec_tests
                 ws = output_dir / "task_output" / "workspace_full"
@@ -3886,7 +3893,7 @@ def _run_dispatch(args, backend, config: Config, mock_env_dict: dict, effective_
     testgen_max_attempts = getattr(args, "testgen_max_attempts", 3)
     exec_tests = getattr(args, "execute_tests", None)
     if exec_tests is None:
-        exec_tests = bool(gen_tests and enable_mock_stack)
+        exec_tests = bool(enable_mock_stack and (gen_tests or use_oauth))
     testexec_timeout = getattr(args, "testexec_timeout", 600)
     use_judge_council = getattr(args, "judge_council", None)
     if use_judge_council is True:
