@@ -1,6 +1,5 @@
 """Data access module for the Sentry API mock service."""
 
-import csv
 from datetime import datetime
 from pathlib import Path
 

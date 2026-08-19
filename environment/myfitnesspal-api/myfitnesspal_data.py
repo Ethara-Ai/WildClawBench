@@ -1,6 +1,5 @@
 """Data access module for MyFitnessPal API simulation."""
 
-import csv
 import json
 from datetime import datetime, timedelta
 from pathlib import Path

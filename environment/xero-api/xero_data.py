@@ -6,7 +6,6 @@ and Accounts. Xero wraps collections under a PascalCase key, e.g.
 resets on restart.
 """
 
-import csv
 import uuid
 import time
 from pathlib import Path

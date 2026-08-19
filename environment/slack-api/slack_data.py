@@ -3,7 +3,6 @@
 Mirrors a subset of Slack's Web API method-style endpoints (e.g. conversations.list).
 """
 
-import csv
 import json
 import time
 import uuid

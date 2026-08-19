@@ -5,7 +5,6 @@ generic CRUD plus a simplified SOQL query parser. IDs use Salesforce-style
 15/18-character identifiers. Mutations are held in process memory.
 """
 
-import csv
 import re
 import uuid
 from datetime import datetime

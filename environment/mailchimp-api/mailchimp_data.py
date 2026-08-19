@@ -5,7 +5,6 @@ reports. A member's ``id`` is the Mailchimp ``subscriber_hash`` = MD5 of the
 lowercased email address, so lookups accept either the hash or the raw email.
 """
 
-import csv
 import hashlib
 import uuid
 from datetime import datetime

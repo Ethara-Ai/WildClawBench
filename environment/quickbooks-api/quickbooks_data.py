@@ -1,6 +1,5 @@
 """Data access module for QuickBooks Online API simulation."""
 
-import csv
 import json
 import re
 from datetime import datetime

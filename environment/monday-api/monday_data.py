@@ -5,7 +5,6 @@ consistency with the other Kensei2 environments: workspaces, boards, groups,
 columns, items, column values and users.
 """
 
-import csv
 import uuid
 from datetime import datetime
 from pathlib import Path

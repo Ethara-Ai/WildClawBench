@@ -7,7 +7,6 @@ Every response is wrapped in Kraken's standard envelope:
     {"error": [], "result": {...}}
 """
 
-import csv
 import sys
 from pathlib import Path
 

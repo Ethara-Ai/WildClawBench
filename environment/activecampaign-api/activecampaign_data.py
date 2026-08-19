@@ -5,7 +5,6 @@ lists, campaigns, and deals. List responses use ActiveCampaign's convention of
 a top-level plural key plus a `meta` block containing the total count.
 """
 
-import csv
 from datetime import datetime, timezone
 from pathlib import Path
 

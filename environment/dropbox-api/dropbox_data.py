@@ -5,7 +5,6 @@ files/list_folder, files/get_metadata, files/search_v2, and
 sharing/list_shared_links.
 """
 
-import csv
 from copy import deepcopy
 from pathlib import Path
 

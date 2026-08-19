@@ -5,7 +5,6 @@ segmentation chart API, and the user-activity stream. Uploaded events are held
 in process memory and reset on container restart.
 """
 
-import csv
 from datetime import datetime, timezone
 from pathlib import Path
 

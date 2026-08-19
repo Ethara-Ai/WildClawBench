@@ -5,7 +5,6 @@ where value is a string decimal. Statuses follow PayPal conventions
 (CREATED / APPROVED / COMPLETED / VOIDED). Mutations are in-memory.
 """
 
-import csv
 import uuid
 from datetime import datetime
 from pathlib import Path

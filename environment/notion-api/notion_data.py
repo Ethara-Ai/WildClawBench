@@ -1,6 +1,5 @@
 """Data access module for the Notion API mock service."""
 
-import csv
 import json
 import uuid
 from datetime import datetime

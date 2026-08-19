@@ -1,6 +1,5 @@
 """Data access module for the Google Drive API mock service."""
 
-import csv
 import json
 import re
 import uuid

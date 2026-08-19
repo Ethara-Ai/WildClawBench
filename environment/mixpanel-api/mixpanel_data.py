@@ -4,7 +4,6 @@ Mirrors a subset of Mixpanel's ingestion + query surface: /track, events counts,
 funnels, segmentation, and engage (user profiles).
 """
 
-import csv
 import uuid
 from collections import defaultdict
 from datetime import datetime, timezone

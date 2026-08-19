@@ -5,7 +5,6 @@ HubSpot shape: {"id": ..., "properties": {...}, "createdAt": ..., "updatedAt": .
 Mutations (created/updated contacts and deals) reset on container restart.
 """
 
-import csv
 from copy import deepcopy
 import uuid
 from datetime import datetime

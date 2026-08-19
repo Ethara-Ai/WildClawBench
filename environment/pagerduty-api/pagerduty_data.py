@@ -1,6 +1,5 @@
 """Data access module for the PagerDuty API mock service."""
 
-import csv
 from copy import deepcopy
 import uuid
 from datetime import datetime

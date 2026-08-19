@@ -5,7 +5,6 @@ applications, scorecards. Records use stable string IDs. Mutations are held
 in process memory and reset on container restart.
 """
 
-import csv
 import uuid
 from datetime import datetime
 from pathlib import Path

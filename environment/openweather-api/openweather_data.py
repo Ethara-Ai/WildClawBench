@@ -3,7 +3,6 @@
 Returns OpenWeather-style JSON shapes (`weather`, `main`, `wind`, `name`, etc.).
 """
 
-import csv
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent

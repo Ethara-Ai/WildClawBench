@@ -4,7 +4,6 @@ Mirrors a subset of the Amadeus Self-Service APIs: flight offers search,
 reference data for locations/airports and airlines, and offer pricing.
 """
 
-import csv
 import json
 import uuid
 from pathlib import Path

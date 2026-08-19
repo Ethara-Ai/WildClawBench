@@ -3,7 +3,6 @@
 Helix collection responses wrap rows in {"data": [...]}.
 """
 
-import csv
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent

@@ -344,9 +344,8 @@ def _attach_drift_script(task: dict, task_dir: Path) -> dict:
 
 def _multi_agent_default_on() -> bool:
     """Whether sub-agent capability is enabled by default for tasks that declare
-    no multi_agent config. Default ON; set WCB_MULTI_AGENT_DEFAULT to a falsy
-    token (0/false/no/off/empty) to revert to strict opt-in."""
-    return os.environ.get("WCB_MULTI_AGENT_DEFAULT", "1").strip().lower() not in (
+    no multi_agent config. Default OFF; set WCB_MULTI_AGENT_DEFAULT=1 to opt in."""
+    return os.environ.get("WCB_MULTI_AGENT_DEFAULT", "0").strip().lower() not in (
         "0", "false", "no", "off", "",
     )
 

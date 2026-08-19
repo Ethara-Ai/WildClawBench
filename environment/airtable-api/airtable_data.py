@@ -6,7 +6,6 @@ driven by the field type declared in fields.json (number -> float, checkbox ->
 bool); everything else stays a string.
 """
 
-import csv
 import re
 import uuid
 from datetime import datetime

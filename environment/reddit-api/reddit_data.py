@@ -4,7 +4,6 @@ Mirrors a subset of Reddit's public/OAuth surface: subreddits, link posts,
 comment trees, users, and voting. Uses Reddit fullnames (t5_/t3_/t1_/t2_).
 """
 
-import csv
 import time
 import uuid
 from pathlib import Path

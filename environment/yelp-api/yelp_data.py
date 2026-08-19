@@ -1,6 +1,5 @@
 """Data access module for the Yelp Fusion API mock service."""
 
-import csv
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent

@@ -5,7 +5,6 @@ fiat-equivalent ("native") amounts accompany each balance. Buys/sells and the
 resulting transactions are held in process memory and reset on restart.
 """
 
-import csv
 import json
 import uuid
 from datetime import datetime

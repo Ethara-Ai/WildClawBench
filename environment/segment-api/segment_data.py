@@ -5,7 +5,6 @@ convenience endpoints. Ingested events are held in process memory and reset on
 container restart.
 """
 
-import csv
 import secrets
 from datetime import datetime, timezone
 from pathlib import Path

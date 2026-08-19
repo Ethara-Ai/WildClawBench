@@ -1,6 +1,5 @@
 """Data access module for the DocuSign eSignature API mock service."""
 
-import csv
 import uuid
 from datetime import datetime
 from pathlib import Path

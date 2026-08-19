@@ -1,6 +1,5 @@
 """Data access module for the Jira API mock service."""
 
-import csv
 from datetime import datetime
 from pathlib import Path
 

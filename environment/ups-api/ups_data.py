@@ -5,7 +5,6 @@ and tracking. Responses use UPS-style `{"RateResponse": {...}}`,
 `{"ShipmentResponse": {...}}`, and `{"trackResponse": {...}}` envelopes.
 """
 
-import csv
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 

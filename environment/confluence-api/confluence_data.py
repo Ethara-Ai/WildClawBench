@@ -5,7 +5,6 @@ parent/child relationships and version numbers. Mutations are held in
 process memory and reset on restart.
 """
 
-import csv
 from copy import deepcopy
 import uuid
 from datetime import datetime

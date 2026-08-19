@@ -91,6 +91,7 @@ from __future__ import annotations
 import argparse
 import json
 import mimetypes
+import os
 import re
 import shutil
 import sys
@@ -2390,7 +2391,14 @@ def convert_task(
 
             # 6) snapshot/ — workspace before/after capture (parity with the
             #    output tree; useful for audit/diff of what the agent changed)
-            n_snap = copy_snapshot(run_dir, dest_run)
+            n_snap = 0
+            if os.environ.get("WCB_BUNDLE_SNAPSHOT", "0") == "1":
+                n_snap = copy_snapshot(run_dir, dest_run)
+
+            # 7) usage.json — per-run token/cost/time data for independent audit
+            src_usage = run_dir / "usage.json"
+            if src_usage.exists():
+                shutil.copy2(src_usage, dest_run / "usage.json")
 
             per_run_summ.append(
                 {

@@ -4,7 +4,6 @@ Models headless-CMS objects (content types, entries, assets) Contentful-style
 with a ``sys`` envelope (id/type/contentType) plus a ``fields`` payload.
 """
 
-import csv
 from copy import deepcopy
 import json
 import uuid

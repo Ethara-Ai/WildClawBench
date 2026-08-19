@@ -1,6 +1,5 @@
 """Data access module for Ring API simulation."""
 
-import csv
 import json
 from datetime import datetime
 from pathlib import Path

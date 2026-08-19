@@ -5,7 +5,6 @@ Numeric fields are returned as strings to match Alpaca's JSON conventions
 memory and reset on restart.
 """
 
-import csv
 import json
 import uuid
 from datetime import datetime

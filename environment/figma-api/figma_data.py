@@ -4,7 +4,6 @@ Mirrors a subset of the Figma REST API: user, teams/projects, files (document
 node tree), nodes, comments, and components.
 """
 
-import csv
 import json
 import uuid
 from datetime import datetime

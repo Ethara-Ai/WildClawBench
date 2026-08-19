@@ -4,7 +4,6 @@ Mirrors a subset of the Mailgun Email API (api.mailgun.net/v3): sending
 messages, querying delivery events, total stats, and mailing-list members.
 """
 
-import csv
 import secrets
 from datetime import datetime, timezone
 from pathlib import Path

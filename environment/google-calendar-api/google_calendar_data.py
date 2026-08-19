@@ -1,6 +1,5 @@
 """Data access module for the Google Calendar API mock service."""
 
-import csv
 import uuid
 from datetime import datetime
 from pathlib import Path

@@ -6,7 +6,6 @@ campaigns. Responses use the JSON:API envelope, e.g.
 profile appends to an in-memory store that resets on restart.
 """
 
-import csv
 import secrets
 import string
 import time

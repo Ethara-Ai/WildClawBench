@@ -46,14 +46,14 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ENV_DIR = REPO_ROOT / "environment"
 
-# Module-name overrides (the 6 google/openweather cases the survey identified)
+# Module-name overrides (the 6 google/openweather cases use google_* / openweather_* prefix)
 DATA_MODULE_OVERRIDES = {
-    "google-analytics-api": "analytics_data",
-    "google-calendar-api": "calendar_data",
-    "google-classroom-api": "classroom_data",
-    "google-drive-api": "drive_data",
-    "google-maps-api": "maps_data",
-    "openweather-api": "weather_data",
+    "google-analytics-api": "google_analytics_data",
+    "google-calendar-api": "google_calendar_data",
+    "google-classroom-api": "google_classroom_data",
+    "google-drive-api": "google_drive_data",
+    "google-maps-api": "google_maps_data",
+    "openweather-api": "openweather_data",
 }
 
 IDIOSYNCRATIC = {"algolia-api", "quickbooks-api", "youtube-api", "ring-api"}

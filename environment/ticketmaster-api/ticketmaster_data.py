@@ -5,7 +5,6 @@ attractions, classifications. Records use stable string IDs. The server wraps
 list responses in the ``{"_embedded": {...}, "page": {...}}`` shape.
 """
 
-import csv
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent

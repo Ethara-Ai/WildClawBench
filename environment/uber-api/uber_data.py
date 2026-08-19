@@ -1,6 +1,5 @@
 """Data access module for the Uber API mock service."""
 
-import csv
 from copy import deepcopy
 import json
 import math

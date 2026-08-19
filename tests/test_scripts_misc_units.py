@@ -248,8 +248,8 @@ class TestBackfillConnectorDocs:
 class TestMigrateToDriftPlane:
     def test_data_module_name_default_and_override(self, migrate):
         assert migrate.data_module_name("gmail-api") == "gmail_data"
-        # Curated overrides win over the mechanical rule.
-        assert migrate.data_module_name("google-drive-api") == "drive_data"
+        # Curated overrides point to the canonical google_* prefixed modules.
+        assert migrate.data_module_name("google-drive-api") == "google_drive_data"
 
     def test_data_module_name_removesuffix_only_strips_one_api(self, migrate):
         # NOTE: pins current behavior — removesuffix("_api") strips exactly one

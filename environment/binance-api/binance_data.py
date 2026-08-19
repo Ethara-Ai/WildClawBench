@@ -4,7 +4,6 @@ Mirrors a subset of the Binance Spot REST API (api.binance.com): symbol price
 ticker, 24hr ticker, order book depth, klines (candles), and account balances.
 """
 
-import csv
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent

@@ -1,6 +1,5 @@
 """Data access module for the WhatsApp Cloud API mock service."""
 
-import csv
 import json
 import uuid
 from datetime import datetime

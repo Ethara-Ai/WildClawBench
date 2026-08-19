@@ -4,7 +4,6 @@ Mirrors a subset of The Movie Database (TMDB) v3 API: movies, TV shows,
 people/credits, genres, search, popular, and trending.
 """
 
-import csv
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent

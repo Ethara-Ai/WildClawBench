@@ -6,7 +6,6 @@ memory and reset on container restart. Responses are wrapped by the server in
 ``{"result": ...}``.
 """
 
-import csv
 import uuid
 from datetime import datetime
 from pathlib import Path

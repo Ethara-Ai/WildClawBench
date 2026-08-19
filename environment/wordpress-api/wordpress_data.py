@@ -3,7 +3,6 @@
 Mirrors a subset of the wp/v2 surface.
 """
 
-import csv
 from datetime import datetime
 from pathlib import Path
 

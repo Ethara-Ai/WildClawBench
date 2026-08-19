@@ -4,7 +4,6 @@ Mirrors a subset of api.nasa.gov: APOD, Mars Rover Photos, NeoWs (NEO feed),
 and EPIC natural imagery.
 """
 
-import csv
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent

@@ -1,6 +1,5 @@
 """Data access module for the Datadog API mock service."""
 
-import csv
 import math
 import time
 import uuid

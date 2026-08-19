@@ -1,6 +1,5 @@
 """Data access module for the DoorDash API mock service."""
 
-import csv
 import uuid
 from datetime import datetime
 from pathlib import Path

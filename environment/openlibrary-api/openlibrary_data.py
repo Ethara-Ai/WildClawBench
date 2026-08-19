@@ -4,7 +4,6 @@ Mirrors a subset of openlibrary.org: search, works, editions, authors and
 subjects, using Open Library style keys (/works/OL...W, /authors/OL...A).
 """
 
-import csv
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent

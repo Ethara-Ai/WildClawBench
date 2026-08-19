@@ -5,7 +5,6 @@ persons / feature flags read APIs, and the /decide flag-evaluation endpoint.
 Captured events are held in process memory and reset on container restart.
 """
 
-import csv
 from datetime import datetime, timezone
 from pathlib import Path
 

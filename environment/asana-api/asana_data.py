@@ -1,6 +1,5 @@
 """Data access module for the Asana API mock service."""
 
-import csv
 import json
 import uuid
 from datetime import datetime

@@ -126,29 +126,32 @@ def _row_ids(row: Dict[str, Any]) -> Set[str]:
     return out
 
 
-def _synthesize_composite_pk(row: Dict[str, Any], ids: Set[str]) -> None:
-    """Synthesize composite primary keys into the snapshot set.
-
-    Runtime loaders build _pk from multiple id fields (e.g. f"{item_id}@{column_id}").
-    This mirrors that synthesis for the static validator's membership check only."""
-    id_vals = [str(v) for k, v in row.items()
-               if isinstance(v, (str, int)) and (str(k).lower() == "pk" or str(k).lower().endswith("id"))]
-    if len(id_vals) >= 2:
-        ids.add("@".join(id_vals))
+_PK_SEPARATORS = re.compile(r"[@|/]")
 
 
-def _seed_ids_for_service(mock_data_root: Path, service: str) -> Set[str]:
-    """Collect row identifiers seeded on disk for a service's mock_data overlay.
+def _composite_components_present(key: str, values: Set[str]) -> bool:
+    """True when key decomposes into >=2 parts (split on @, |, /) all found in seed values."""
+    parts = _PK_SEPARATORS.split(key)
+    if len(parts) < 2 or not all(parts):
+        return False
+    return all(p in values for p in parts)
 
-    Reads the same per-task overlay files the runtime mounts, so the validator's
-    seed snapshot matches what the live store will hold before turn 1.
+
+def _seed_ids_for_service(
+    mock_data_root: Path, service: str,
+) -> Tuple[Set[str], Set[str]]:
+    """Collect row identifiers AND all scalar values seeded on disk.
+
+    Returns (ids, values) — ids for direct pk lookup, values for composite
+    component-presence fallback.
     """
     ids: Set[str] = set()
+    values: Set[str] = set()
     svc_dir = mock_data_root / service
     if not svc_dir.is_dir():
         svc_dir = mock_data_root / f"{service}-api"
         if not svc_dir.is_dir():
-            return ids
+            return ids, values
     for path in svc_dir.iterdir():
         try:
             if path.suffix == ".json":
@@ -158,15 +161,19 @@ def _seed_ids_for_service(mock_data_root: Path, service: str) -> Set[str]:
                     for row in rows:
                         if isinstance(row, dict):
                             ids.update(_row_ids(row))
-                            _synthesize_composite_pk(row, ids)
+                            for v in row.values():
+                                if isinstance(v, (str, int)):
+                                    values.add(str(v))
             elif path.suffix == ".csv":
                 with path.open(newline="") as fh:
                     for row in csv.DictReader(fh):
                         ids.update(_row_ids(row))
-                        _synthesize_composite_pk(row, ids)
+                        for v in row.values():
+                            if isinstance(v, (str, int)):
+                                values.add(str(v))
         except (OSError, ValueError):
             continue
-    return ids
+    return ids, values
 
 
 _FS_ALLOWED_ACTIONS = ("copy", "mkdir")
@@ -276,14 +283,22 @@ def validate_inject_script(
     warnings: List[Dict[str, Any]] = []
 
     snapshot: Dict[str, Set[str]] = {}
+    valset: Dict[str, Set[str]] = {}
 
     def _snap(service: str) -> Set[str]:
         if service not in snapshot:
-            base: Set[str] = set()
+            base_ids: Set[str] = set()
+            base_vals: Set[str] = set()
             if mock_data_root is not None:
-                base |= _seed_ids_for_service(mock_data_root, service)
-            snapshot[service] = base
+                base_ids, base_vals = _seed_ids_for_service(mock_data_root, service)
+            snapshot[service] = base_ids
+            valset[service] = base_vals
         return snapshot[service]
+
+    def _vals(service: str) -> Set[str]:
+        if service not in valset:
+            _snap(service)
+        return valset.get(service, set())
 
     non_seed = [s for s in script.stages if not s.is_seed]
     ordered = sorted(non_seed, key=lambda s: (s.from_turn if s.from_turn is not None else 0))
@@ -347,7 +362,7 @@ def validate_inject_script(
                 key = _admin_target_key(op)
                 if key is not None:
                     known = _snap(resolved)
-                    if key not in known:
+                    if key not in known and not _composite_components_present(key, _vals(resolved)):
                         entry = {
                             "stage": stage.name, "id": oid, "status": "missing-target",
                             "reason": f"target row {key!r} not found in seed/prior-inject snapshot for {resolved}",

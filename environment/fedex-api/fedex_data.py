@@ -5,7 +5,6 @@ shipment (label) creation, and tracking. Responses use FedEx-style
 `{"output": {...}}` envelopes.
 """
 
-import csv
 import secrets
 from datetime import datetime, timedelta, timezone
 from pathlib import Path

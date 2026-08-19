@@ -4,7 +4,6 @@ All public functions return the Telegram envelope: {"ok": true, "result": ...}
 or {"ok": false, "error_code": int, "description": str} on failure.
 """
 
-import csv
 from copy import deepcopy
 import json
 import time

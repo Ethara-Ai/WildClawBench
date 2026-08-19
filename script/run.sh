@@ -1179,6 +1179,19 @@ main() {
         log::err "--parallel-tasks must be a positive integer, got: $PARALLEL_TASKS"; exit 2
     fi
 
+    # Product-level concurrency ceiling (Issue #4). Prevents accidental
+    # resource multiplication that triggers Bedrock ThrottlingException / OOM.
+    local _n_models=${#models[@]}
+    local _reps_factor=$(( PARALLEL_REPS ? K : 1 ))
+    local _peak=$(( PARALLEL_TASKS * _n_models * _reps_factor ))
+    local _MAX_CONCURRENT="${WCB_MAX_CONCURRENT:-8}"
+    if (( _peak > _MAX_CONCURRENT )); then
+        log::err "Peak concurrent load = $_peak (${PARALLEL_TASKS} tasks × ${_n_models} models × ${_reps_factor} reps)"
+        log::err "  Exceeds WCB_MAX_CONCURRENT=$_MAX_CONCURRENT. Bedrock throttling and OOM likely."
+        log::err "  Set WCB_MAX_CONCURRENT=$_peak to override, or reduce parallelism."
+        exit 2
+    fi
+
     # Live-stream gate (docs/STREAMING_PLAN.md D6/R6). Token streaming is
     # single-run foreground only: with fan-out (multi task/model/rep) the
     # shared feed interleaves runs unreadably, so the flag downgrades with a

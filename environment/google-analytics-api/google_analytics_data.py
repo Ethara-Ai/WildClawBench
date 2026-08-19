@@ -6,7 +6,6 @@ eventCount). ``run_report`` groups and sums the seed rows by the requested
 dimensions and metrics, mimicking the GA4 ``runReport`` response shape.
 """
 
-import csv
 from copy import deepcopy
 import json
 from pathlib import Path

@@ -4,7 +4,6 @@ Mirrors a subset of the Strava v3 API: athlete, activities, segments, kudos,
 and athlete stats.
 """
 
-import csv
 import json
 from datetime import datetime, timezone
 from pathlib import Path

@@ -1,6 +1,5 @@
 """Data access module for the Zoom API mock service."""
 
-import csv
 import json
 import random
 from datetime import datetime

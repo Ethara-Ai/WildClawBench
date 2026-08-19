@@ -5,7 +5,6 @@ conversations (state open/closed) and their conversation parts (messages,
 replies, and admin actions such as assign/close).
 """
 
-import csv
 import uuid
 from copy import deepcopy
 from datetime import datetime
