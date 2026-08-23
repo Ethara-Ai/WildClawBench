@@ -514,7 +514,7 @@ def build_litellm_config_yaml(
     # is effectively first in the pre-call phase regardless of list position.
     # Post-call, the usage logger sees `kwargs["messages"]` AS COMPRESSED, so
     # it records the post-compression token count — exactly what Bedrock/OpenAI
-    # billed — preserving the existing 11-key JSONL schema unchanged.
+    # billed — preserving the existing 12-key JSONL schema unchanged.
     _cbs: list[str] = []
     if enable_usage_callback:
         _cbs.append("litellm_usage_callback.proxy_handler_instance")

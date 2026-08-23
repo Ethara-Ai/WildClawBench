@@ -1884,6 +1884,8 @@ def extract_usage_from_litellm_log(
             continue
         if row.get("kind") == "preflight":
             continue
+        if row.get("kind") == "failure":
+            continue
         totals["request_count"] += 1
         totals["input_tokens"]       += int(row.get("input_tokens", 0) or 0)
         totals["output_tokens"]      += int(row.get("output_tokens", 0) or 0)
@@ -1982,6 +1984,8 @@ def extract_oauth_usage_from_litellm_log(
         if window_start_ts and row.get("ts", "") < window_start_ts:
             continue
         if window_end_ts and row.get("ts", "") > window_end_ts:
+            continue
+        if row.get("kind") == "failure":
             continue
         totals["request_count"] += 1
         totals["input_tokens"]       += int(row.get("input_tokens", 0) or 0)

@@ -1,8 +1,8 @@
 """Behavioral tests for the two LiteLLM usage-callback modules.
 
-`litellm_usage_callback.py` is the SOLE writer of the 11-key `usage.jsonl`
+`litellm_usage_callback.py` is the SOLE writer of the 12-key `usage.jsonl`
 schema and `litellm_usage_oauth_callback.py` is its OAuth-path sibling that
-writes the separate `usage_oauth.jsonl` (9-key) audit trail. These callbacks run
+writes the separate `usage_oauth.jsonl` (11-key) audit trail. These callbacks run
 inside the LiteLLM sidecar container; nothing else in the harness may reproduce
 their row shape, so these tests pin:
 
@@ -356,15 +356,16 @@ def test_warn_once_per_day_distinct_models(monkeypatch):
 
 
 # ============================================================================
-# _write_row (primary callback) — the 11-key schema + math
+# _write_row (primary callback) — the 12-key schema + math
 # ============================================================================
 
-# The canonical 11 keys of usage.jsonl. Pinning this exact set is the whole
+# The canonical 12 keys of usage.jsonl. Pinning this exact set is the whole
 # point of this file: nothing else may reproduce or diverge from it.
 EXPECTED_KEYS = {
     "ts", "model", "kind",
     "input_tokens", "output_tokens", "total_tokens",
     "cache_read_tokens", "cache_write_tokens",
+    "reasoning_tokens",
     "audio_seconds", "cost_usd", "duration_s",
 }
 
@@ -626,11 +627,11 @@ def test_bedrock_equivalent_cost_input_only():
 
 
 # ============================================================================
-# OAuth callback: _write_row — 9-key schema, oauth gating, cost math
+# OAuth callback: _write_row — 11-key schema, oauth gating, cost math
 # ============================================================================
 
 EXPECTED_OAUTH_KEYS = {
-    "ts", "model", "route",
+    "ts", "model", "route", "kind",
     "input_tokens", "output_tokens",
     "cache_read_tokens", "cache_write_tokens",
     "cost_actual", "cost_bedrock_equivalent", "duration_s",

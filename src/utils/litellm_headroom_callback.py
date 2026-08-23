@@ -15,16 +15,17 @@ downstream provider customizations. The usage-callback in the slot above only
 overrides `async_log_success_event` (it never overrides `async_pre_call_hook`),
 so LiteLLM's pre-call dispatch loop SKIPS it; the two callbacks therefore do
 not contend in the pre-call phase. Post-call, the usage logger sees
-`kwargs["messages"]` AS COMPRESSED, so its 11-key JSONL row will record the
+`kwargs["messages"]` AS COMPRESSED, so its 12-key JSONL row will record the
 POST-compression `prompt_tokens` exactly as Bedrock/OpenAI billed them.
 
 # ────────────────────────────────────────────────────────────────────────────
 # TOKEN-TRACKING INVARIANT (user m0130 mandate)
 # ────────────────────────────────────────────────────────────────────────────
 # This module MUST NOT touch the usage-tracking pipeline:
-#   - The 11-key JSONL schema in `litellm_usage_callback.py` (ts, model, kind,
+#   - The 12-key JSONL schema in `litellm_usage_callback.py` (ts, model, kind,
 #     input_tokens, output_tokens, total_tokens, cache_read_tokens,
-#     cache_write_tokens, audio_seconds, cost_usd, duration_s) is canonical.
+#     cache_write_tokens, reasoning_tokens, audio_seconds, cost_usd, duration_s)
+#     is canonical.
 #   - The non-cached input math (`prompt_tokens - cache_read - cache_write`,
 #     clamped ≥0) at `litellm_usage_callback.py:166` is load-bearing.
 #   - `litellm.completion_cost()` over `kwargs["response_cost"]` cost path is

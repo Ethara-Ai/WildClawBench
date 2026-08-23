@@ -126,6 +126,10 @@ def _write_row(kwargs: dict, response_obj: Any, start_time: Any, end_time: Any) 
         if not cache_read:
             cache_read = _int(usage_dict.get("cache_read_input_tokens"))
         cache_write = _int(usage_dict.get("cache_creation_input_tokens"))
+        if not cache_write:
+            cache_write = _int(usage_dict.get("cacheCreationInputTokens"))
+        if not cache_write:
+            cache_write = _int(usage_dict.get("cacheWriteInputTokens"))
 
         # Audio transcription (/v1/audio/transcriptions) responses use a different
         # usage schema than chat completions. LiteLLM emits one of two shapes:
@@ -141,6 +145,10 @@ def _write_row(kwargs: dict, response_obj: Any, start_time: Any, end_time: Any) 
         output_tokens = _int(usage_dict.get("completion_tokens"))
         if not output_tokens:
             output_tokens = _int(usage_dict.get("output_tokens"))
+
+        reasoning_tokens = _int(
+            (usage_dict.get("completion_tokens_details") or {}).get("reasoning_tokens")
+        )
 
         # input_tokens = NON-cached input only. Across every provider shape
         # this callback sees, prompt_tokens already folds in cache_read AND
@@ -231,6 +239,7 @@ def _write_row(kwargs: dict, response_obj: Any, start_time: Any, end_time: Any) 
             "total_tokens":       total_tokens,
             "cache_read_tokens":  cache_read,
             "cache_write_tokens": cache_write,
+            "reasoning_tokens":   reasoning_tokens,
             "audio_seconds":      round(audio_seconds, 3),
             "cost_usd":           cost,
             "duration_s":         round(duration, 3),
@@ -246,6 +255,37 @@ def _write_row(kwargs: dict, response_obj: Any, start_time: Any, end_time: Any) 
             pass
 
 
+def _write_failure_row(kwargs: dict, start_time: Any, end_time: Any) -> None:
+    """Record that a call failed, for request-count accuracy and debugging."""
+    try:
+        duration = 0.0
+        try:
+            duration = (end_time - start_time).total_seconds()
+        except Exception:
+            pass
+
+        row = {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "model": kwargs.get("model") or "",
+            "kind": "failure",
+            "input_tokens":       0,
+            "output_tokens":      0,
+            "total_tokens":       0,
+            "cache_read_tokens":  0,
+            "cache_write_tokens": 0,
+            "reasoning_tokens":   0,
+            "audio_seconds":      0.0,
+            "cost_usd":           0.0,
+            "duration_s":         round(duration, 3),
+        }
+        os.makedirs(os.path.dirname(_PATH), exist_ok=True)
+        with _LOCK:
+            with open(_PATH, "a", encoding="utf-8") as fh:
+                fh.write(json.dumps(row) + "\n")
+    except Exception:  # pragma: no cover
+        pass
+
+
 class UsageWriter(CustomLogger):
     # async-only on purpose: LiteLLM's streaming_handler.run_success_logging_and_
     # cache_storage and its async stream finalizer dispatch BOTH success_handler
@@ -259,6 +299,9 @@ class UsageWriter(CustomLogger):
     # cache_write all matched 2x exactly until log_success_event was removed.
     async def async_log_success_event(self, kwargs, response_obj, start_time, end_time):
         _write_row(kwargs, response_obj, start_time, end_time)
+
+    async def async_log_failure_event(self, kwargs, response_obj, start_time, end_time):
+        _write_failure_row(kwargs, start_time, end_time)
 
 
 # Name expected by LiteLLM YAML config: callbacks: ["litellm_usage_callback.proxy_handler_instance"]

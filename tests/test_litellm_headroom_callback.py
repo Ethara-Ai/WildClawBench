@@ -347,7 +347,7 @@ def test_arn_tokenizer_hint(model, expected_hint):
 
 
 def test_telemetry_writes_to_separate_path(monkeypatch, tmp_path):
-    """Token-tracking invariant (user m0130): the 11-key LITELLM_USAGE_LOG_PATH
+    """Token-tracking invariant (user m0130): the 12-key LITELLM_USAGE_LOG_PATH
     must NEVER be touched. Headroom telemetry goes to its own JSONL keyed by
     KENSEI_AGENT_HEADROOM_LOG_PATH."""
     monkeypatch.setenv("KENSEI_AGENT_HEADROOM_ENABLED", "true")

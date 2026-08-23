@@ -1466,8 +1466,9 @@ if __name__ == "__main__":
         )
 
         # Codex's output_tokens already includes reasoning_output_tokens on
-        # recent versions, but we keep reasoning_tokens as a signal and fall
-        # back to adding it only when output looks too small.
+        # recent versions. max() is a no-op guard for that case; on older shapes
+        # where reasoning was reported separately, it prevents output from being
+        # smaller than reasoning alone (not a sum — addition would double-count).
         output_tokens = max(output_tokens, reasoning_tokens)
 
         return {

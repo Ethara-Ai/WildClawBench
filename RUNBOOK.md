@@ -350,7 +350,7 @@ LITELLM_LOG=DEBUG bash script/run.sh ...
 
 **Headroom telemetry (judge):** when `KENSEI_JUDGE_USE_LITELLM=true`, per-call compression stats land in `score.json.judge_council.headroom_per_member` and the cumulative `headroom_tokens_saved_total`. Inspect via `jq '.judge_council.headroom_per_member' output/**/score.json`.
 
-**Headroom telemetry (agent sidecar):** when `KENSEI_AGENT_HEADROOM_ENABLED=true`, the sidecar writes per-request compression rows to a SEPARATE JSONL at the host mount `config.work_dir/litellm-headroom-<batch_id>/headroom.jsonl` (8 keys: `ts, model, call_type, tokens_before, tokens_after, tokens_saved, compression_ratio, transforms_applied`). The 11-key `usage.jsonl` token-tracking schema is untouched.
+**Headroom telemetry (agent sidecar):** when `KENSEI_AGENT_HEADROOM_ENABLED=true`, the sidecar writes per-request compression rows to a SEPARATE JSONL at the host mount `config.work_dir/litellm-headroom-<batch_id>/headroom.jsonl` (8 keys: `ts, model, call_type, tokens_before, tokens_after, tokens_saved, compression_ratio, transforms_applied`). The 12-key `usage.jsonl` token-tracking schema is untouched.
 
 **Building the agent-path Headroom image (one-time, only needed when `KENSEI_AGENT_HEADROOM_ENABLED=true`):**
 ```bash

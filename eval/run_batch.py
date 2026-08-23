@@ -354,6 +354,7 @@ def _backfill_per_message_cost(traj: dict, usage_log_path: str) -> int:
                 continue
         rows.append((rts, r))
     rows.sort(key=lambda x: x[0])
+    rows = [(ts, r) for ts, r in rows if r.get("kind") not in ("failure", "preflight")]
     n = 0
     for msg, (_, r) in zip(assistants, rows):
         inner = _inner(msg)
@@ -1017,7 +1018,7 @@ def _project_agent_usage_top_level(agent_usage: Mapping[str, Any] | None) -> dic
     return {
         "input_tokens": _int("input_tokens"),
         "output_tokens": _int("output_tokens"),
-        "cached_input_tokens": _int("cache_read_tokens"),
+        "cached_input_tokens": _int("cache_read_tokens"),  # legacy alias
         "cache_read_tokens": _int("cache_read_tokens"),
         "cache_write_tokens": _int("cache_write_tokens"),
         "cost_usd": round(cost, 6),

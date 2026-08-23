@@ -3,7 +3,7 @@ Bedrock-equivalent cost of each OAuth-routed request.
 
 Rationale
 ---------
-`litellm_usage_callback.py` is the SOLE writer of the 11-key `usage.jsonl`
+`litellm_usage_callback.py` is the SOLE writer of the 12-key `usage.jsonl`
 schema (per src/utils/AGENTS.md invariant + tests/test_litellm_headroom_
 callback.py:351 enforcement). On the OAuth trajectory path, that row will
 legitimately show `cost_usd: 0` because the OAuth block sets all `*cost_per_
@@ -136,6 +136,10 @@ def _write_row(kwargs: dict, response_obj: Any, start_time: Any, end_time: Any) 
         if not cache_read:
             cache_read = _int(usage_dict.get("cache_read_input_tokens"))
         cache_write = _int(usage_dict.get("cache_creation_input_tokens"))
+        if not cache_write:
+            cache_write = _int(usage_dict.get("cacheCreationInputTokens"))
+        if not cache_write:
+            cache_write = _int(usage_dict.get("cacheWriteInputTokens"))
 
         prompt_tokens_raw = _int(usage_dict.get("prompt_tokens"))
         if not prompt_tokens_raw:
@@ -163,6 +167,7 @@ def _write_row(kwargs: dict, response_obj: Any, start_time: Any, end_time: Any) 
             "ts": datetime.now(timezone.utc).isoformat(),
             "model": model,
             "route": "claude_oauth_bridge",
+            "kind": "agent",
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
             "cache_read_tokens": cache_read,
@@ -182,9 +187,46 @@ def _write_row(kwargs: dict, response_obj: Any, start_time: Any, end_time: Any) 
             pass
 
 
+def _write_failure_row(kwargs: dict, start_time: Any, end_time: Any) -> None:
+    """Log failed OAuth-routed calls."""
+    try:
+        model = kwargs.get("model") or ""
+        if not _is_oauth_route(model):
+            return
+
+        duration = 0.0
+        try:
+            duration = (end_time - start_time).total_seconds()
+        except Exception:
+            pass
+
+        row = {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "model": model,
+            "route": "claude_oauth_bridge",
+            "kind": "failure",
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "cache_read_tokens": 0,
+            "cache_write_tokens": 0,
+            "cost_actual": 0.0,
+            "cost_bedrock_equivalent": 0.0,
+            "duration_s": round(duration, 3),
+        }
+        os.makedirs(os.path.dirname(_PATH), exist_ok=True)
+        with _LOCK:
+            with open(_PATH, "a", encoding="utf-8") as fh:
+                fh.write(json.dumps(row) + "\n")
+    except Exception:  # pragma: no cover
+        pass
+
+
 class OAuthUsageWriter(CustomLogger):
     async def async_log_success_event(self, kwargs, response_obj, start_time, end_time):
         _write_row(kwargs, response_obj, start_time, end_time)
+
+    async def async_log_failure_event(self, kwargs, response_obj, start_time, end_time):
+        _write_failure_row(kwargs, start_time, end_time)
 
 
 oauth_usage_callback_instance = OAuthUsageWriter()

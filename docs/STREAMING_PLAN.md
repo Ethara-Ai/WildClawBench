@@ -238,7 +238,7 @@ New `src/utils/stream_renderer.py`, host-side daemon thread following the `_star
 
 - `chat.jsonl` writing, the RC-2 early snapshot, atomic snap rename — untouched.
 - Grading trigger points, judge aggregation (unanimous-or-Sonnet-tiebreak), reward formulas — untouched.
-- `usage.jsonl` schema (11-key), usage attribution windows, preflight handling — untouched.
+- `usage.jsonl` schema (12-key), usage attribution windows, preflight handling — untouched.
 - Bridge buffer-and-retry, timeouts, truncation-detection, account failover — untouched.
 - LiteLLM image digest pin — untouched (both branches).
 - Bundle contents, `output_bundle/` layout, `deliver.sh` payload — untouched (verified §1.7; test added anyway).

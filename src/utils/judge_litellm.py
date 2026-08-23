@@ -34,7 +34,7 @@ exactly (8 keys: input_tokens, output_tokens, cache_read_tokens,
 cache_write_tokens, total_tokens, request_count, cost_usd, cost_priced_ok). The
 `headroom` sub-dict is purely additive and harmless to readers that don't expect it.
 
-The JSONL log at `litellm_usage_callback.py` (10-key schema) is for AGENT
+The JSONL log at `litellm_usage_callback.py` (12-key schema) is for AGENT
 calls through the per-batch sidecar — NOT touched by this module.
 """
 from __future__ import annotations
