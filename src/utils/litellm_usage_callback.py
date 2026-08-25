@@ -116,6 +116,36 @@ def _is_preflight_ping(kwargs: dict) -> bool:
         return False
 
 
+_RUN_KEY_PREFIX = "wcb::"
+
+
+def _extract_run_key(kwargs: dict) -> str:
+    """Per-run attribution key from the incoming request's credential headers.
+
+    The runner mints ``wcb::<task_id>::<uuid4>`` per attempt and (in no-auth
+    sidecar mode) sends it as the client bearer. Depending on the client API
+    it arrives as ``authorization: Bearer <key>`` (openai-completions) or
+    ``x-api-key: <key>`` (anthropic-messages). ``x-wcb-run-key`` is a reserved
+    explicit channel for master-key deployments. Only values with the
+    ``wcb::`` prefix are ever returned, so real credentials are never written
+    to the usage log. LiteLLM >=1.87 exposes the unredacted headers to
+    callbacks via kwargs["secret_fields"]["raw_headers"].
+    """
+    try:
+        raw = (kwargs.get("secret_fields") or {}).get("raw_headers") or {}
+        for header in ("x-wcb-run-key", "authorization", "x-api-key"):
+            value = raw.get(header) or ""
+            if not isinstance(value, str):
+                continue
+            if value.startswith("Bearer "):
+                value = value[7:]
+            if value.startswith(_RUN_KEY_PREFIX):
+                return value
+    except Exception:
+        pass
+    return ""
+
+
 def _write_row(kwargs: dict, response_obj: Any, start_time: Any, end_time: Any) -> None:
     try:
         usage_dict = _usage_to_dict(getattr(response_obj, "usage", None))
@@ -230,10 +260,12 @@ def _write_row(kwargs: dict, response_obj: Any, start_time: Any, end_time: Any) 
         if cost <= 0.0:
             cost = _float(kwargs.get("response_cost"))
 
+        run_key = _extract_run_key(kwargs)
         row = {
             "ts": datetime.now(timezone.utc).isoformat(),
             "model": kwargs.get("model") or "",
             "kind": "preflight" if _is_preflight_ping(kwargs) else "agent",
+            **({"run_key": run_key} if run_key else {}),
             "input_tokens":       input_tokens,
             "output_tokens":      output_tokens,
             "total_tokens":       total_tokens,

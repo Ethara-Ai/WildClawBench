@@ -1840,8 +1840,19 @@ def _estimate_tokens(text: str) -> int:
 
 
 def extract_usage_from_litellm_log(
-    log_path: Path, window_start: float, window_end: float
+    log_path: Path, window_start: float, window_end: float, run_key: str = ""
 ) -> dict:
+    """Sum agent usage rows for one run.
+
+    Attribution order:
+      1. ``run_key`` exact match — rows the usage callback tagged with this
+         run's per-attempt key. Immune to concurrent runs on a shared sidecar.
+      2. Time-window fallback (legacy) — ONLY when no tagged row matches.
+         Unsafe under parallelism: the ±2s-padded window sweeps in every
+         concurrent run's traffic (measured 1.4x-62.7x inflation on the
+         2026-08 deliveries). Retained for old logs and master-key
+         deployments where the bearer cannot carry the run key.
+    """
     totals = {
         "input_tokens": 0,
         "output_tokens": 0,
@@ -1867,6 +1878,7 @@ def extract_usage_from_litellm_log(
     except OSError:
         return totals
 
+    rows = []
     for line in lines:
         line = line.strip()
         if not line:
@@ -1875,17 +1887,31 @@ def extract_usage_from_litellm_log(
             row = json.loads(line)
         except json.JSONDecodeError:
             continue
-        ts_str = row.get("ts", "")
-        try:
-            ts = _dt.fromisoformat(ts_str.replace("Z", "+00:00")).timestamp()
-        except (ValueError, AttributeError):
+        if row.get("kind") in ("preflight", "failure"):
             continue
-        if ts < lo or ts > hi:
-            continue
-        if row.get("kind") == "preflight":
-            continue
-        if row.get("kind") == "failure":
-            continue
+        rows.append(row)
+
+    tagged = [r for r in rows if run_key and r.get("run_key") == run_key]
+    if tagged:
+        selected = tagged
+        totals["usage_source"] = "litellm_run_key"
+    else:
+        selected = []
+        for row in rows:
+            ts_str = row.get("ts", "")
+            try:
+                ts = _dt.fromisoformat(ts_str.replace("Z", "+00:00")).timestamp()
+            except (ValueError, AttributeError):
+                continue
+            if lo <= ts <= hi:
+                selected.append(row)
+        if run_key:
+            logger.warning(
+                "usage extraction: no rows tagged with run_key %s in %s — "
+                "falling back to the time window, which OVER-ATTRIBUTES under "
+                "parallel runs", run_key, log_path)
+
+    for row in selected:
         totals["request_count"] += 1
         totals["input_tokens"]       += int(row.get("input_tokens", 0) or 0)
         totals["output_tokens"]      += int(row.get("output_tokens", 0) or 0)
