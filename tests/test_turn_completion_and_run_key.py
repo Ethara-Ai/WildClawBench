@@ -351,6 +351,94 @@ class TestAgentBearerWiring:
         assert "t1" not in a._run_keys
 
 
+class TestSpawnTreeFold:
+    """Director spawn traffic already flows through the sidecar, so folding the
+    spawn ledger into litellm-sourced totals double-counts it."""
+
+    def _collect(self, monkeypatch, tmp_path, litellm_usage, ledger_rows):
+        from src.agents.openclaw import runner as ocr
+        from src.agents.openclaw.runner import OpenClawAgent
+        monkeypatch.setattr(
+            ocr, "extract_usage_from_litellm_log",
+            lambda p, s, e, run_key="": dict(litellm_usage))
+        monkeypatch.setattr(
+            ocr, "extract_preflight_usage_from_litellm_log",
+            lambda p: {"request_count": 0})
+        monkeypatch.setattr(
+            ocr, "extract_usage_from_jsonl",
+            lambda p: {"input_tokens": 100, "output_tokens": 50,
+                       "total_tokens": 150, "cost_usd": 1.0,
+                       "request_count": 4, "usage_source": "openclaw"})
+        monkeypatch.setattr(
+            ocr.subprocess, "run",
+            lambda *a, **k: type("R", (), {"returncode": 1, "stdout": "",
+                                           "stderr": ""})())
+        a = OpenClawAgent(gateway_port=1, litellm_master_key="mk")
+        a.litellm_usage_log = str(tmp_path / "u.jsonl") if litellm_usage else None
+        a._task_windows["t1"] = (1.0, 2.0)
+        out = tmp_path / "od"
+        ledger = out / "task_output" / "workspace_full" / "spawn_tree.jsonl"
+        ledger.parent.mkdir(parents=True, exist_ok=True)
+        ledger.write_text("\n".join(json.dumps(r) for r in ledger_rows) + "\n")
+        if not litellm_usage:
+            (out / "chat.jsonl").write_text("")
+            monkeypatch.setattr(
+                ocr.subprocess, "run",
+                lambda *a, **k: type("R", (), {"returncode": 0, "stdout": "",
+                                               "stderr": ""})())
+        return a.collect_usage("t1", out, 1.0)
+
+    SPAWNS = [
+        {"spawn_id": "spw_1", "tokens_in": 10, "tokens_out": 5,
+         "cost_usd": 0.5},
+        {"spawn_id": "spw_2", "tokens_in": 20, "tokens_out": 10,
+         "cost_usd": 0.25},
+        {"kind": "summary", "scope": "batch", "n_spawns": 2,
+         "input_tokens": 30, "output_tokens": 15, "cost_usd": 0.75},
+    ]
+
+    def test_summary_rows_do_not_inflate_count(self, monkeypatch, tmp_path):
+        u = self._collect(monkeypatch, tmp_path,
+                          {"input_tokens": 100, "output_tokens": 50,
+                           "total_tokens": 150, "cost_usd": 1.0,
+                           "request_count": 4, "usage_source": "litellm"},
+                          self.SPAWNS)
+        assert u["subagent_count"] == 2
+        assert u["subagent_tokens_in"] == 30
+        assert u["subagent_cost_usd"] == pytest.approx(0.75)
+
+    def test_no_fold_when_litellm_already_counted(self, monkeypatch, tmp_path):
+        for source in ("litellm", "litellm_run_key", "litellm_oauth"):
+            u = self._collect(monkeypatch, tmp_path,
+                              {"input_tokens": 100, "output_tokens": 50,
+                               "total_tokens": 150, "cost_usd": 1.0,
+                               "request_count": 4, "usage_source": source},
+                              self.SPAWNS)
+            assert u["subagent_usage_folded"] is False, source
+            assert u["input_tokens"] == 100, source
+            assert u["cost_usd"] == pytest.approx(1.0), source
+            assert u["subagent_cost_usd"] == pytest.approx(0.75), source
+
+    def test_fold_when_transcript_source_misses_spawns(
+            self, monkeypatch, tmp_path):
+        u = self._collect(monkeypatch, tmp_path, None, self.SPAWNS)
+        assert u["usage_source"] == "openclaw"
+        assert u["subagent_usage_folded"] is True
+        assert u["input_tokens"] == 130
+        assert u["output_tokens"] == 65
+        assert u["total_tokens"] == 195
+        assert u["cost_usd"] == pytest.approx(1.75)
+
+    def test_no_subagent_fields_without_spawns(self, monkeypatch, tmp_path):
+        u = self._collect(monkeypatch, tmp_path,
+                          {"input_tokens": 100, "output_tokens": 50,
+                           "total_tokens": 150, "cost_usd": 1.0,
+                           "request_count": 4, "usage_source": "litellm"},
+                          [{"kind": "summary", "n_spawns": 0}])
+        assert "subagent_count" not in u
+        assert "subagent_usage_folded" not in u
+
+
 class TestSidecarKeylessSwitch:
     def test_yaml_omits_master_key_when_switch_on(self, monkeypatch):
         from src.utils import litellm_sidecar as sc

@@ -980,9 +980,10 @@ class OpenClawAgent(BaseAgent):
                 }
 
         # Fold sub-agent token totals from spawn_tree.jsonl into parent usage so
-        # leaderboard cost math reflects the full call graph (not just the
-        # parent's LiteLLM hits). Missing/malformed file is silently treated as
-        # zero spawns — single-agent tasks remain byte-identical.
+        # leaderboard cost math reflects the full call graph. Ledger "summary"
+        # rows are aggregates of the per-spawn rows and are skipped outright
+        # (counting them inflated subagent_count and would double cost).
+        # Missing/malformed file is silently treated as zero spawns.
         spawn_tree = output_dir / "task_output" / "workspace_full" / "spawn_tree.jsonl"
         sub_in = sub_out = sub_count = 0
         sub_cost = 0.0
@@ -995,7 +996,7 @@ class OpenClawAgent(BaseAgent):
                     row = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                if not isinstance(row, dict):
+                if not isinstance(row, dict) or row.get("kind") == "summary":
                     continue
                 sub_count += 1
                 try:
@@ -1006,22 +1007,27 @@ class OpenClawAgent(BaseAgent):
                     sub_out += int(row.get("tokens_out") or 0)
                 except (TypeError, ValueError):
                     pass
-                # Cost lives on BOTH per-spawn and "summary" rows; only sum the
-                # per-spawn rows to avoid double-counting.
-                if row.get("kind") != "summary":
-                    try:
-                        sub_cost += float(row.get("cost_usd") or 0.0)
-                    except (TypeError, ValueError):
-                        pass
+                try:
+                    sub_cost += float(row.get("cost_usd") or 0.0)
+                except (TypeError, ValueError):
+                    pass
         if sub_count:
             usage["subagent_count"] = sub_count
             usage["subagent_tokens_in"] = sub_in
             usage["subagent_tokens_out"] = sub_out
             usage["subagent_cost_usd"] = round(sub_cost, 6)
-            usage["input_tokens"] = int(usage.get("input_tokens") or 0) + sub_in
-            usage["output_tokens"] = int(usage.get("output_tokens") or 0) + sub_out
-            usage["total_tokens"] = int(usage.get("total_tokens") or 0) + sub_in + sub_out
-            usage["cost_usd"] = round(float(usage.get("cost_usd") or 0.0) + sub_cost, 6)
+            # Director spawns call the LiteLLM sidecar, so any litellm-sourced
+            # extraction (window, run-key, or oauth) ALREADY counted their
+            # traffic — folding the ledger in again would double-count. Only
+            # transcript/estimated/none sources miss spawn traffic and need
+            # the fold. subagent_usage_folded records which case applied.
+            already_counted = str(usage.get("usage_source", "")).startswith("litellm")
+            usage["subagent_usage_folded"] = not already_counted
+            if not already_counted:
+                usage["input_tokens"] = int(usage.get("input_tokens") or 0) + sub_in
+                usage["output_tokens"] = int(usage.get("output_tokens") or 0) + sub_out
+                usage["total_tokens"] = int(usage.get("total_tokens") or 0) + sub_in + sub_out
+                usage["cost_usd"] = round(float(usage.get("cost_usd") or 0.0) + sub_cost, 6)
 
         self._task_windows.pop(task_id, None)
         self._run_keys.pop(task_id, None)
