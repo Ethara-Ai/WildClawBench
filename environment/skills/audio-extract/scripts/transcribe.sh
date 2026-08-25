@@ -85,6 +85,9 @@ auth_header=()
 if [[ -n "${WCB_AUDIO_TRANSCRIBE_AUTH:-}" ]]; then
   auth_header=(-H "Authorization: Bearer ${WCB_AUDIO_TRANSCRIBE_AUTH}")
 fi
+if [[ -n "${WCB_RUN_KEY:-}" ]]; then
+  auth_header+=(-H "x-wcb-run-key: ${WCB_RUN_KEY}")
+fi
 
 http_code="$(curl -sS \
   -w "%{http_code}" \

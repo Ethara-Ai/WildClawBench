@@ -566,8 +566,10 @@ def build_litellm_config_yaml(
         "    supported_call_types: [\"transcription\", \"atranscription\"]\n"
         + callback_line
         + "general_settings:\n"
-        "  master_key: os.environ/LITELLM_MASTER_KEY\n"
-        "  store_model_in_db: false\n"
+        + (""
+           if os.environ.get("WCB_SIDECAR_NO_MASTER_KEY", "").strip() == "1"
+           else "  master_key: os.environ/LITELLM_MASTER_KEY\n")
+        + "  store_model_in_db: false\n"
     )
 
 
@@ -771,7 +773,13 @@ def start_litellm(
     _validate_docker_token("container_name", container_name)
     _validate_docker_token("network", network)
 
-    env_pairs: list[tuple[str, str]] = [("LITELLM_MASTER_KEY", master_key)]
+    # Keyless mode (WCB_SIDECAR_NO_MASTER_KEY=1): the yaml omits master_key,
+    # so the env var must be omitted too — LiteLLM enables auth when either is
+    # present. Pairs with OpenClawAgent._run_key_bearer_live().
+    if os.environ.get("WCB_SIDECAR_NO_MASTER_KEY", "").strip() == "1":
+        env_pairs: list[tuple[str, str]] = []
+    else:
+        env_pairs = [("LITELLM_MASTER_KEY", master_key)]
     _litellm_log = os.environ.get("LITELLM_LOG", "").strip()
     if _litellm_log:
         env_pairs.append(("LITELLM_LOG", _litellm_log))

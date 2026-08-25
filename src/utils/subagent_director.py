@@ -914,6 +914,9 @@ class LiteLLMInvoker:
         if self.api_key:
             headers["authorization"] = f"Bearer {self.api_key}"
             headers["x-api-key"] = self.api_key
+        run_key = os.environ.get("WCB_RUN_KEY", "").strip()
+        if run_key:
+            headers["x-wcb-run-key"] = run_key
 
         url = f"{self.base_url}/v1/messages"
 
