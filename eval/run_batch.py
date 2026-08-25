@@ -189,6 +189,35 @@ ALL_CATEGORIES = [
     "06_Safety_Alignment",
 ]
 
+def _grade_incomplete_override() -> bool:
+    return os.environ.get("WCB_GRADE_INCOMPLETE_RUNS", "").strip().lower() in (
+        "1", "true", "yes", "on")
+
+
+def _eval_skip_reason(result: dict, messages: list | None = None) -> str | None:
+    """Why the eval phase (pytest grading + LLM judge) must not run, or None.
+
+    A partial or never-ran trajectory is not a measurement of the scenario:
+    judging it burns judge tokens on garbage and its score would be excluded
+    from averages anyway. WCB_GRADE_INCOMPLETE_RUNS=1 restores old behavior.
+    """
+    if _grade_incomplete_override():
+        return None
+    if result.get("run_incomplete"):
+        return (f"run incomplete: {result.get('turns_completed')} of "
+                f"{result.get('turns_planned')} scheduled turns executed")
+    if messages is not None:
+        ran = any(
+            isinstance(m, dict)
+            and isinstance(m.get("message", m), dict)
+            and (m.get("message", m)).get("role") == "assistant"
+            for m in messages
+        )
+        if not ran:
+            return "trajectory empty: no assistant messages"
+    return None
+
+
 def grade_the_task(
     task_id: str,
     workspace_path: str,
@@ -214,7 +243,25 @@ def grade_the_task(
     should_grade = task.get("automated_checks") and (
         not result.get("error") or grade_on_error
     )
-    if should_grade:
+    skip_reason = _eval_skip_reason(result) if should_grade else None
+    if skip_reason:
+        logger.warning(
+            "[%s] EVAL SKIPPED (deterministic grading): %s — set "
+            "WCB_GRADE_INCOMPLETE_RUNS=1 to grade anyway", task_id, skip_reason)
+        result["eval_skipped"] = skip_reason
+        # overall_score None (not 0.0): a skipped eval is "not measured", the
+        # same convention as the judge-skip and last-resort stubs. The turn
+        # stamps from _augment let every aggregator exclude the run.
+        stub = {
+            "overall_score": None,
+            "error": f"eval skipped: {skip_reason}",
+            "eval_skipped": skip_reason,
+        }
+        _augment_score_with_combined_rewards(stub, result)
+        (output_dir / "score.json").write_text(
+            json.dumps(stub, indent=2, ensure_ascii=False), encoding="utf-8")
+        result["scores"] = stub
+    elif should_grade:
         try:
             scores = run_grading(
                 task_id=task_id,
@@ -1372,7 +1419,30 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
     # judge the collected deliverables + transcript with the LLM judge.
     scores = result.get("scores") or {}
     rubrics = task.get("rubrics") or []
-    if rubrics and "overall_score" not in scores and not result.get("error"):
+    _judge_wanted = rubrics and "overall_score" not in scores and not result.get("error")
+    _judge_skip = (_eval_skip_reason(result, traj.get("messages") or [])
+                   if _judge_wanted else None)
+    if _judge_skip:
+        logger.warning(
+            "[%s] EVAL SKIPPED (rubric judge): %s — set "
+            "WCB_GRADE_INCOMPLETE_RUNS=1 to judge anyway",
+            task["task_id"], _judge_skip)
+        result["eval_skipped"] = _judge_skip
+        stub = {
+            "overall_score": None,
+            "rubric_weights_percentage": None,
+            "criteria_total": len(rubrics),
+            "criteria_passed": 0,
+            "criteria_failed": 0,
+            "criteria_abstained": len(rubrics),
+            "judge_model": None,
+            "eval_skipped": _judge_skip,
+        }
+        _augment_score_with_combined_rewards(stub, result)
+        (output_dir / "score.json").write_text(
+            json.dumps(stub, indent=2, ensure_ascii=False), encoding="utf-8")
+        result["scores"] = stub
+    elif _judge_wanted:
         # Judge reads agent-produced files from `task_output/artifacts/` (b99
         # canonical, baseline-diff agent-touched files only). The legacy
         # `workspace/results/` path was deleted in b99 because agents never

@@ -245,6 +245,83 @@ class TestRebuildScriptParity:
         assert doc["average_reward"] == pytest.approx(0.8)
 
 
+class TestEvalSkipGate:
+    """A broken/incomplete trajectory must never reach the eval phase: pytest
+    grading and the LLM judge both cost money and the score is excluded from
+    averages anyway."""
+
+    @pytest.fixture()
+    def rb(self):
+        sys.path.insert(0, str(REPO / "eval"))
+        import run_batch
+        return run_batch
+
+    def test_reason_for_incomplete_run(self, rb, monkeypatch):
+        monkeypatch.delenv("WCB_GRADE_INCOMPLETE_RUNS", raising=False)
+        r = {"run_incomplete": True, "turns_planned": 9, "turns_completed": 3}
+        assert "3 of 9" in rb._eval_skip_reason(r)
+
+    def test_no_reason_for_complete_run(self, rb, monkeypatch):
+        monkeypatch.delenv("WCB_GRADE_INCOMPLETE_RUNS", raising=False)
+        r = {"run_incomplete": False, "turns_planned": 9, "turns_completed": 9}
+        msgs = [{"message": {"role": "assistant", "content": []}}]
+        assert rb._eval_skip_reason(r, msgs) is None
+
+    def test_reason_for_empty_trajectory(self, rb, monkeypatch):
+        monkeypatch.delenv("WCB_GRADE_INCOMPLETE_RUNS", raising=False)
+        assert "no assistant messages" in rb._eval_skip_reason({}, [])
+        user_only = [{"message": {"role": "user", "content": []}}]
+        assert "no assistant messages" in rb._eval_skip_reason({}, user_only)
+
+    def test_override_env_disables_gate(self, rb, monkeypatch):
+        monkeypatch.setenv("WCB_GRADE_INCOMPLETE_RUNS", "1")
+        r = {"run_incomplete": True, "turns_planned": 9, "turns_completed": 3}
+        assert rb._eval_skip_reason(r, []) is None
+
+    def _grade(self, rb, monkeypatch, tmp_path, result):
+        called = {"n": 0}
+
+        def fake_run_grading(**kwargs):
+            called["n"] += 1
+            return {"overall_score": 1.0}
+
+        monkeypatch.setattr(rb, "run_grading", fake_run_grading)
+        task = {"task_id": "t1", "automated_checks": "assert True"}
+        out = rb.grade_the_task(
+            "t1", str(tmp_path / "ws"), tmp_path, task, result)
+        return called["n"], out
+
+    def test_grading_skipped_for_incomplete(self, rb, monkeypatch, tmp_path):
+        monkeypatch.delenv("WCB_GRADE_INCOMPLETE_RUNS", raising=False)
+        n, out = self._grade(rb, monkeypatch, tmp_path,
+                             {"run_incomplete": True, "turns_planned": 9,
+                              "turns_completed": 3})
+        assert n == 0
+        assert "run incomplete" in out["eval_skipped"]
+        assert "eval skipped" in out["scores"]["error"]
+        assert out["scores"]["overall_score"] is None
+        assert out["scores"]["run_incomplete"] is True
+        assert out["scores"]["turns_planned"] == 9
+        on_disk = json.loads((tmp_path / "score.json").read_text())
+        assert on_disk["run_incomplete"] is True
+
+    def test_grading_runs_for_complete(self, rb, monkeypatch, tmp_path):
+        monkeypatch.delenv("WCB_GRADE_INCOMPLETE_RUNS", raising=False)
+        n, out = self._grade(rb, monkeypatch, tmp_path,
+                             {"run_incomplete": False, "turns_planned": 9,
+                              "turns_completed": 9})
+        assert n == 1
+        assert "eval_skipped" not in out
+
+    def test_grading_runs_for_incomplete_with_override(
+            self, rb, monkeypatch, tmp_path):
+        monkeypatch.setenv("WCB_GRADE_INCOMPLETE_RUNS", "1")
+        n, out = self._grade(rb, monkeypatch, tmp_path,
+                             {"run_incomplete": True, "turns_planned": 9,
+                              "turns_completed": 3})
+        assert n == 1
+
+
 class TestMergeExclusion:
     def test_merge_stats_skip_incomplete(self, tmp_path, monkeypatch):
         monkeypatch.delenv("WCB_INCLUDE_INCOMPLETE_RUNS", raising=False)
