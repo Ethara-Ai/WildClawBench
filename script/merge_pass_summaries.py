@@ -59,9 +59,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
+
+
+def _include_incomplete_runs() -> bool:
+    return os.environ.get("WCB_INCLUDE_INCOMPLETE_RUNS", "").strip().lower() in (
+        "1", "true", "yes", "on")
 
 
 def _f(v: Any) -> float | None:
@@ -179,8 +185,14 @@ def merge_pass_summaries(
     for new_index, rec in enumerate(merged_runs, start=1):
         rec["run_index"] = new_index
 
+    if _include_incomplete_runs():
+        stat_runs = merged_runs
+    else:
+        stat_runs = [r for r in merged_runs if not r.get("run_incomplete")]
+    excluded_incomplete = len(merged_runs) - len(stat_runs)
+
     def col(field: str) -> list[float | None]:
-        return [_f(rec.get(field)) for rec in merged_runs]
+        return [_f(rec.get(field)) for rec in stat_runs]
 
     avg_rubric_pct = _mean(col("rubric_weights_percentage"))
     avg_test_pct = _mean(col("test_weights_percentage"))
@@ -194,14 +206,20 @@ def merge_pass_summaries(
                 "test_weights_percentage": rec.get("test_weights_percentage"),
                 "rubric_weights_percentage": rec.get("rubric_weights_percentage"),
             }
+            if rec.get("run_incomplete"):
+                out["run_incomplete"] = True
             legacy_per_run.append(out)
-        return {
+        legacy_doc = {
             "model": model,
             "runs": len(legacy_per_run),
             "average_test_weights_percentage": _round_or_none(avg_test_pct),
             "average_rubric_weights_percentage": _round_or_none(avg_rubric_pct),
             "per_run": legacy_per_run,
         }
+        if excluded_incomplete:
+            legacy_doc["runs_used"] = len(stat_runs)
+            legacy_doc["runs_excluded_incomplete"] = excluded_incomplete
+        return legacy_doc
 
     avg_reward = _mean(col("reward")) or 0.0
     avg_combined = _mean(col("combined_reward"))
@@ -212,7 +230,7 @@ def merge_pass_summaries(
     pass_at_k_reward = _pmax(col("reward"))
     pass_at_k_combined = _pmax(col("combined_reward"))
 
-    return {
+    doc = {
         "model": model,
         "runs": len(merged_runs),
         "average_reward": avg_reward,
@@ -228,6 +246,10 @@ def merge_pass_summaries(
         "merged_from": [str(p) for p in inputs],
         "per_run": merged_runs,
     }
+    if excluded_incomplete:
+        doc["runs_used"] = len(stat_runs)
+        doc["runs_excluded_incomplete"] = excluded_incomplete
+    return doc
 
 
 def main() -> int:

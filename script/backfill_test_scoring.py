@@ -23,6 +23,7 @@ Idempotent. Run:  python3 script/backfill_test_scoring.py [BUNDLE_DIR]
 from __future__ import annotations
 
 import json
+import os
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -78,20 +79,34 @@ def main() -> int:
             "test_weights_percentage": new_test,
             "rubric_weights_percentage": rubric_pct,
             "combined_score": new_final,
+            **({"run_incomplete": True} if report.get("run_incomplete") else {}),
         })
 
-    # Rebuild each pass_summary.json from corrected runs.
+    # Rebuild each pass_summary.json from corrected runs. Incomplete runs stay
+    # in per_run but are excluded from averages (WCB_INCLUDE_INCOMPLETE_RUNS=1
+    # overrides; all-incomplete falls back to all runs to avoid divide-by-zero).
+    include_incomplete = os.environ.get(
+        "WCB_INCLUDE_INCOMPLETE_RUNS", "").strip().lower() in (
+        "1", "true", "yes", "on")
     for model_dir, runs in per_model.items():
         runs.sort(key=lambda r: r["run_index"])
-        n = len(runs)
+        if include_incomplete:
+            stat_runs = runs
+        else:
+            stat_runs = [r for r in runs if not r.get("run_incomplete")] or runs
+        n = len(stat_runs)
         summary = {
             "model": model_dir.name,
-            "runs": n,
-            "average_combined_score": round(sum(r["combined_score"] for r in runs) / n, 2),
-            "average_test_weights_percentage": round(sum(r["test_weights_percentage"] for r in runs) / n, 2),
-            "average_rubric_weights_percentage": round(sum(r["rubric_weights_percentage"] for r in runs) / n, 2),
+            "runs": len(runs),
+            "average_combined_score": round(sum(r["combined_score"] for r in stat_runs) / n, 2),
+            "average_test_weights_percentage": round(sum(r["test_weights_percentage"] for r in stat_runs) / n, 2),
+            "average_rubric_weights_percentage": round(sum(r["rubric_weights_percentage"] for r in stat_runs) / n, 2),
             "per_run": runs,
         }
+        excluded = len(runs) - len(stat_runs)
+        if excluded:
+            summary["runs_used"] = len(stat_runs)
+            summary["runs_excluded_incomplete"] = excluded
         (model_dir / "pass_summary.json").write_text(json.dumps(summary, indent=2) + "\n")
 
     print(f"\nreport.json files changed: {changed}")

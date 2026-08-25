@@ -19,10 +19,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import statistics
 from collections import defaultdict
 from pathlib import Path
 from typing import Iterable
+
+
+def _include_incomplete_runs() -> bool:
+    return os.environ.get("WCB_INCLUDE_INCOMPLETE_RUNS", "").strip().lower() in (
+        "1", "true", "yes", "on")
 
 
 def _read_score(path: Path) -> dict | None:
@@ -91,9 +97,13 @@ def aggregate(output_root: Path, backend_filter: str | None = None) -> dict:
     per_task_model: dict[tuple[str, str, str], list[dict]] = defaultdict(list)
     per_model: dict[tuple[str, str], list[float]] = defaultdict(list)
 
+    excluded_incomplete: dict[tuple[str, str, str], int] = defaultdict(int)
     for backend, task_id, model, run_idx, score_path in _walk_score_files(output_root, backend_filter):
         score = _read_score(score_path)
         if score is None:
+            continue
+        if score.get("run_incomplete") and not _include_incomplete_runs():
+            excluded_incomplete[(backend, task_id, model)] += 1
             continue
         pct = _pct_from_score(score)
         if pct is None:
@@ -125,7 +135,7 @@ def aggregate(output_root: Path, backend_filter: str | None = None) -> dict:
         pcts = [r["rubric_weights_percentage"] for r in runs]
         pass_at_k = max(pcts)
         per_model_pass_at_k[(backend, model)].append(pass_at_k)
-        summary["by_task_model"].append({
+        task_entry = {
             "backend": backend,
             "task_id": task,
             "model": model,
@@ -136,7 +146,22 @@ def aggregate(output_root: Path, backend_filter: str | None = None) -> dict:
             # Walkthrough §4 pass@K: best-of-K rollout per task. K = run_count.
             "pass_at_k": round(pass_at_k, 2),
             "k": len(pcts),
-        })
+        }
+        n_excl = excluded_incomplete.get((backend, task, model), 0)
+        if n_excl:
+            task_entry["runs_excluded_incomplete"] = n_excl
+        summary["by_task_model"].append(task_entry)
+    # A task whose every run was excluded must not silently disappear.
+    for (backend, task, model), n_excl in sorted(excluded_incomplete.items()):
+        if (backend, task, model) not in per_task_model:
+            summary["by_task_model"].append({
+                "backend": backend,
+                "task_id": task,
+                "model": model,
+                "runs": [],
+                "run_count": 0,
+                "runs_excluded_incomplete": n_excl,
+            })
     for (backend, model), pcts in sorted(per_model.items()):
         task_pass_at_k_values = per_model_pass_at_k[(backend, model)]
         summary["by_model"].append({

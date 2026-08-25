@@ -863,6 +863,14 @@ def build_report(
             f"measurement of the injection scenario (see inject_timeline.jsonl)",
             file=sys.stderr,
         )
+    if score.get("run_incomplete"):
+        print(
+            f"    WARNING: {run_dir.name} is INCOMPLETE — "
+            f"{score.get('turns_completed')} of {score.get('turns_planned')} "
+            f"scheduled turns executed; excluded from the bundle "
+            f"pass_summary averages",
+            file=sys.stderr,
+        )
 
     pytest_block, ctrf_summary, reward_txt = _build_pytest_block(verifier)
     rubric_block = _build_rubric_block(score, infer_meta)
@@ -875,7 +883,7 @@ def build_report(
     if final_reward is None:
         final_reward = score.get("rubric_based_reward", 0.0)
 
-    return {
+    report: dict[str, Any] = {
         "model": pretty_model,
         "run_index": run_index,
         "include_multimodal": _detect_multimodal(task_dir, output_json),
@@ -889,6 +897,11 @@ def build_report(
         "test_weights_percentage": round(float(test_pct), 2),
         "rubric_weights_percentage": round(float(rubric_pct), 2),
     }
+    if score.get("run_incomplete"):
+        report["run_incomplete"] = True
+        report["turns_planned"] = score.get("turns_planned")
+        report["turns_completed"] = score.get("turns_completed")
+    return report
 
 
 def _stage_verifier_test_sources(
@@ -2400,22 +2413,23 @@ def convert_task(
             if src_usage.exists():
                 shutil.copy2(src_usage, dest_run / "usage.json")
 
-            per_run_summ.append(
-                {
-                    "run_index": ridx,
-                    "include_multimodal": report["include_multimodal"],
-                    "test_weights_percentage": report["test_weights_percentage"],
-                    "rubric_weights_percentage": report["rubric_weights_percentage"],
-                    # Combined score = the mean of the two channel percentages
-                    # (same blend as report.json's final_reward). Kept as a
-                    # percentage here to match the pass_summary's *_percentage
-                    # fields.
-                    "combined_score": round(
-                        (report["test_weights_percentage"]
-                         + report["rubric_weights_percentage"]) / 2, 2
-                    ),
-                }
-            )
+            run_summ = {
+                "run_index": ridx,
+                "include_multimodal": report["include_multimodal"],
+                "test_weights_percentage": report["test_weights_percentage"],
+                "rubric_weights_percentage": report["rubric_weights_percentage"],
+                # Combined score = the mean of the two channel percentages
+                # (same blend as report.json's final_reward). Kept as a
+                # percentage here to match the pass_summary's *_percentage
+                # fields.
+                "combined_score": round(
+                    (report["test_weights_percentage"]
+                     + report["rubric_weights_percentage"]) / 2, 2
+                ),
+            }
+            if report.get("run_incomplete"):
+                run_summ["run_incomplete"] = True
+            per_run_summ.append(run_summ)
             produced_any = True
             if verbose:
                 print(
@@ -2424,22 +2438,36 @@ def convert_task(
                 )
 
         # pass_summary.json REBUILT from the runs we actually emitted.
+        # Incomplete runs stay listed in per_run but are excluded from the
+        # averages (WCB_INCLUDE_INCOMPLETE_RUNS=1 folds them back in); when
+        # every run is incomplete the averages fall back to all runs so the
+        # doc never divides by zero.
         if per_run_summ:
-            n = len(per_run_summ)
-            avg_test = sum(r["test_weights_percentage"] for r in per_run_summ) / n
-            avg_rub = sum(r["rubric_weights_percentage"] for r in per_run_summ) / n
-            avg_combined = sum(r["combined_score"] for r in per_run_summ) / n
-            _write_json(
-                dest_model / "pass_summary.json",
-                {
-                    "model": pretty,
-                    "runs": n,
-                    "average_combined_score": round(avg_combined, 2),
-                    "average_test_weights_percentage": round(avg_test, 2),
-                    "average_rubric_weights_percentage": round(avg_rub, 2),
-                    "per_run": per_run_summ,
-                },
-            )
+            include_incomplete = os.environ.get(
+                "WCB_INCLUDE_INCOMPLETE_RUNS", "").strip().lower() in (
+                "1", "true", "yes", "on")
+            if include_incomplete:
+                stat_runs = per_run_summ
+            else:
+                stat_runs = [r for r in per_run_summ
+                             if not r.get("run_incomplete")] or per_run_summ
+            n = len(stat_runs)
+            avg_test = sum(r["test_weights_percentage"] for r in stat_runs) / n
+            avg_rub = sum(r["rubric_weights_percentage"] for r in stat_runs) / n
+            avg_combined = sum(r["combined_score"] for r in stat_runs) / n
+            summary_doc = {
+                "model": pretty,
+                "runs": len(per_run_summ),
+                "average_combined_score": round(avg_combined, 2),
+                "average_test_weights_percentage": round(avg_test, 2),
+                "average_rubric_weights_percentage": round(avg_rub, 2),
+                "per_run": per_run_summ,
+            }
+            excluded = len(per_run_summ) - len(stat_runs)
+            if excluded:
+                summary_doc["runs_used"] = len(stat_runs)
+                summary_doc["runs_excluded_incomplete"] = excluded
+            _write_json(dest_model / "pass_summary.json", summary_doc)
 
     if produced_any:
         print(f"  + {task_dir.name}  ->  {bundle}")

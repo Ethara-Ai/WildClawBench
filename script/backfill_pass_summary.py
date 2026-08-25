@@ -30,6 +30,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import re
 import sys
 from pathlib import Path
@@ -142,23 +143,41 @@ def _entry(run_index: int, scores: dict, test_result: dict) -> dict:
         entry["__last_resort_stub__"] = True
     if s.get("injection_ok") is False:
         entry["injection_ok"] = False
+    if s.get("run_incomplete"):
+        entry["run_incomplete"] = True
+        entry["turns_planned"] = s.get("turns_planned")
+        entry["turns_completed"] = s.get("turns_completed")
     return entry
+
+
+def _include_incomplete_runs() -> bool:
+    return os.environ.get("WCB_INCLUDE_INCOMPLETE_RUNS", "").strip().lower() in (
+        "1", "true", "yes", "on")
 
 
 def _doc(model_type: str, per_run: list) -> dict:
     per_run = sorted(per_run, key=lambda r: r["run_index"])
-    avg_reward = _mean_or_none([r.get("reward") for r in per_run]) or 0.0
-    avg_pct = _mean_or_none([r.get("rubric_weights_percentage") for r in per_run])
-    return {
+    if _include_incomplete_runs():
+        used = per_run
+    else:
+        used = [r for r in per_run if not r.get("run_incomplete")]
+    excluded = len(per_run) - len(used)
+    avg_reward = _mean_or_none([r.get("reward") for r in used]) or 0.0
+    avg_pct = _mean_or_none([r.get("rubric_weights_percentage") for r in used])
+    doc = {
         "model": model_type,
         "runs": len(per_run),
         "average_reward": avg_reward,
-        "average_combined_reward": _mean_or_none([r.get("combined_reward") for r in per_run]),
-        "average_rubric_reward": _mean_or_none([r.get("rubric_reward") for r in per_run]),
-        "average_test_reward": _mean_or_none([r.get("test_reward") for r in per_run]),
+        "average_combined_reward": _mean_or_none([r.get("combined_reward") for r in used]),
+        "average_rubric_reward": _mean_or_none([r.get("rubric_reward") for r in used]),
+        "average_test_reward": _mean_or_none([r.get("test_reward") for r in used]),
         "average_rubric_weights_percentage": round(avg_pct, 2) if avg_pct is not None else None,
         "per_run": per_run,
     }
+    if excluded:
+        doc["runs_used"] = len(used)
+        doc["runs_excluded_incomplete"] = excluded
+    return doc
 
 
 def _find_model_dirs(root: Path):
