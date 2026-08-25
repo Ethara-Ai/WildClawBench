@@ -925,17 +925,38 @@ def _pass_summary_entry(run_index: int, scores: dict | None, test_result: dict |
     # failed is not a valid measurement of the injection scenario.
     if s.get("injection_ok") is False:
         entry["injection_ok"] = False
+    # Turn-completion marker: _pass_summary_doc excludes flagged runs from
+    # averages; the entry itself is preserved so the run never silently
+    # disappears from per_run.
+    if s.get("run_incomplete"):
+        entry["run_incomplete"] = True
+        entry["turns_planned"] = s.get("turns_planned")
+        entry["turns_completed"] = s.get("turns_completed")
     return entry
+
+
+def _include_incomplete_runs() -> bool:
+    return os.environ.get("WCB_INCLUDE_INCOMPLETE_RUNS", "").strip().lower() in (
+        "1", "true", "yes", "on")
 
 
 def _pass_summary_doc(model_type: str, per_run: list) -> dict:
     per_run = sorted(per_run, key=lambda r: r["run_index"])
-    avg_reward = _mean_or_none([r.get("reward") for r in per_run]) or 0.0
-    avg_combined = _mean_or_none([r.get("combined_reward") for r in per_run])
-    avg_rubric = _mean_or_none([r.get("rubric_reward") for r in per_run])
-    avg_test = _mean_or_none([r.get("test_reward") for r in per_run])
-    avg_pct = _mean_or_none([r.get("rubric_weights_percentage") for r in per_run])
-    return {
+    # Incomplete runs (fewer scripted turns than the task defines) are kept in
+    # per_run for visibility but excluded from every average, so pass@K is
+    # computed over valid measurements only. WCB_INCLUDE_INCOMPLETE_RUNS=1
+    # folds them back in for debugging.
+    if _include_incomplete_runs():
+        used = per_run
+    else:
+        used = [r for r in per_run if not r.get("run_incomplete")]
+    excluded = len(per_run) - len(used)
+    avg_reward = _mean_or_none([r.get("reward") for r in used]) or 0.0
+    avg_combined = _mean_or_none([r.get("combined_reward") for r in used])
+    avg_rubric = _mean_or_none([r.get("rubric_reward") for r in used])
+    avg_test = _mean_or_none([r.get("test_reward") for r in used])
+    avg_pct = _mean_or_none([r.get("rubric_weights_percentage") for r in used])
+    doc = {
         "model": model_type,
         "runs": len(per_run),
         # average_reward is now the authoritative (combined) mean, not rubric-only
@@ -946,6 +967,10 @@ def _pass_summary_doc(model_type: str, per_run: list) -> dict:
         "average_rubric_weights_percentage": round(avg_pct, 2) if avg_pct is not None else None,
         "per_run": per_run,
     }
+    if excluded:
+        doc["runs_used"] = len(used)
+        doc["runs_excluded_incomplete"] = excluded
+    return doc
 
 
 def _write_pass_summary(model_dir: Path, model_type: str, run_index: int,
@@ -1169,6 +1194,16 @@ def _augment_score_with_combined_rewards(scores: dict, result: dict) -> None:
     defects = (result or {}).get("injection_defects") or []
     scores["injection_ok"] = not defects
     scores["injection_defects"] = defects
+    # Turn-completion stamp (same on-disk-marker pattern as injection_ok): a
+    # run that received fewer scripted turns than the task defines is not a
+    # valid measurement of the full scenario and must be excludable downstream.
+    r = result or {}
+    if "run_incomplete" in r:
+        scores["run_incomplete"] = bool(r.get("run_incomplete"))
+        scores["turns_planned"] = r.get("turns_planned")
+        scores["turns_completed"] = r.get("turns_completed")
+        if r.get("recovery_turn_fired"):
+            scores["recovery_turn_fired"] = True
 
 
 def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
@@ -2264,6 +2299,25 @@ def run_single_task(
         )
         if execution.error:
             result["error"] = execution.error
+        # Turn-completion verdict (BUGREPORT_turn_completion.md): gate purely
+        # on planned-vs-executed count, never on the timeout flag — a timeout
+        # is only one of several ways a run ends short. Flows into score.json
+        # via _augment_score_with_combined_rewards so no consumer can average
+        # a partial run as if it were complete.
+        result["turns_planned"] = execution.turns_planned
+        result["turns_completed"] = execution.turns_completed
+        result["timed_out_turn"] = execution.timed_out_turn
+        result["recovery_turn_fired"] = execution.recovery_turn_fired
+        result["run_incomplete"] = bool(
+            execution.turns_planned is not None
+            and execution.turns_completed is not None
+            and execution.turns_completed < execution.turns_planned
+        )
+        if result["run_incomplete"]:
+            logger.warning(
+                "[%s] RUN INCOMPLETE: %s of %s scheduled turns executed — "
+                "this run will be excluded from pass@K averages",
+                task_id, execution.turns_completed, execution.turns_planned)
     except Exception as exc:
         result["error"] = str(exc)
         logger.error("[%s] Unexpected backend error: %s", task_id, exc, exc_info=True)
@@ -2686,6 +2740,9 @@ def run_single_task(
                     "__last_resort_stub__": True,
                     "injection_ok": not result.get("injection_defects"),
                     "injection_defects": result.get("injection_defects") or [],
+                    "run_incomplete": bool(result.get("run_incomplete")),
+                    "turns_planned": result.get("turns_planned"),
+                    "turns_completed": result.get("turns_completed"),
                 }
                 score_path.write_text(
                     json.dumps(last_resort, indent=2, ensure_ascii=False, default=str),
