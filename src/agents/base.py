@@ -60,6 +60,16 @@ class AgentExecution:
     # if they ever adopt the fields.
     turns_completed: int = 1
     timed_out_turn: int | None = None
+    # ``turns_planned`` = the schedule's turn count when the turn source knows
+    # it (None for open-ended sources and single-shot backends, which cannot
+    # under-deliver). Gate incompleteness on turns_completed < turns_planned,
+    # NOT on timed_out_turn: a timeout is only one of several ways a run ends
+    # short (turn-source errors and unsupported multi-turn backends are others).
+    turns_planned: int | None = None
+    # True when the multi-agent stall-recovery hook injected an extra real
+    # turn (_recover_synthesis_if_stalled) — a legitimate repair, recorded so
+    # a reviewer counting messages sees why the transcript has one more turn.
+    recovery_turn_fired: bool = False
 
 
 class BaseAgent(ABC):

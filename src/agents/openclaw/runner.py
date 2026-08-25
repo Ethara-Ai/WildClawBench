@@ -7,6 +7,7 @@ import re
 import subprocess
 import tempfile
 import time
+import uuid
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -116,6 +117,25 @@ class OpenClawAgent(BaseAgent):
         )
         self.litellm_usage_log = litellm_usage_log
         self._task_windows: dict[str, tuple[float, float]] = {}
+        self._run_keys: dict[str, str] = {}
+
+    def _run_key_bearer_live(self) -> bool:
+        # The per-run key can ride the bearer only when the sidecar does NOT
+        # enforce a master key (any other bearer 401s). Config.from_env() can
+        # never yield an empty litellm_master_key (its s() helper substitutes
+        # the default), so WCB_SIDECAR_NO_MASTER_KEY=1 is the explicit operator
+        # switch — it also strips master-key auth from the sidecar itself
+        # (litellm_sidecar.py), keeping both sides consistent. Security note:
+        # keyless mode removes the only auth between co-tenant containers and
+        # the sidecar; enable deliberately.
+        if os.environ.get("WCB_SIDECAR_NO_MASTER_KEY", "").strip() == "1":
+            return True
+        return not self.litellm_master_key
+
+    def _agent_bearer(self, task_id: str) -> str:
+        if self._run_key_bearer_live():
+            return self._run_keys.get(task_id) or "sk-litellm"
+        return self.litellm_master_key
 
     @property
     def expects_gateway(self) -> bool:
@@ -210,11 +230,24 @@ class OpenClawAgent(BaseAgent):
         gateway_proc = None
         agent_proc = None
         elapsed_time = float(spec.timeout_seconds)
+        total_turns: int | None = None
+        turns_executed = 0
+        timed_out_turn: int | None = None
 
         try:
             exec_path = os.path.join(spec.workspace_path, "exec")
             tmp_path = os.path.join(spec.workspace_path, "tmp")
             os.makedirs(exec_path, exist_ok=True)
+
+            # Per-ATTEMPT usage-attribution key (never derived from task+run
+            # alone: retries and re-runs of the same run_N slot must not
+            # collide). Rides the sidecar bearer in no-auth mode; the usage
+            # callback records it per request and collect_usage extracts by
+            # exact key instead of the concurrency-unsafe time window.
+            self._run_keys[spec.task_id] = f"wcb::{spec.task_id}::{uuid.uuid4().hex}"
+            logger.info("[%s] usage attribution key: %s (bearer_live=%s)",
+                        spec.task_id, self._run_keys[spec.task_id],
+                        self._run_key_bearer_live())
 
             # WCB_AUDIO_TRANSCRIBE_URL points the audio-extract skill at the
             # in-cluster LiteLLM sidecar's /v1/audio/transcriptions endpoint
@@ -226,6 +259,10 @@ class OpenClawAgent(BaseAgent):
             # turns 41-57 where every fallback - whisper CLI, pip install,
             # OPENAI_API_KEY env probe - failed in turn).
             extra_env_dict = dict(spec.task.get("env_dict") or {})
+            # WCB_RUN_KEY lets in-container helpers we control (subagent
+            # director, audio-extract skill) tag their sidecar requests via the
+            # x-wcb-run-key header, which works even under master-key auth.
+            extra_env_dict["WCB_RUN_KEY"] = self._run_keys[spec.task_id]
             # INVARIANT: a sub-agent spawn runs the SAME model as the main
             # trajectory, unconditionally. Set outside every transport guard
             # below - a spawn that resolves a LiteLLM base URL from the image
@@ -242,7 +279,7 @@ class OpenClawAgent(BaseAgent):
                 )
                 extra_env_dict.setdefault(
                     "WCB_AUDIO_TRANSCRIBE_AUTH",
-                    self.litellm_master_key or "sk-litellm",
+                    self._agent_bearer(spec.task_id),
                 )
                 # openclaw's Anthropic-messages SDK client ignores the per-provider
                 # baseUrl in openclaw.json for provider_key 'anthropic' and dials
@@ -255,7 +292,7 @@ class OpenClawAgent(BaseAgent):
                     base_url_root = (
                         f"http://{self.litellm_container_name}:{self.litellm_port}"
                     )
-                    stub = self.litellm_master_key or "sk-litellm"
+                    stub = self._agent_bearer(spec.task_id)
                     extra_env_dict.setdefault("ANTHROPIC_BASE_URL", base_url_root)
                     extra_env_dict.setdefault("ANTHROPIC_API_BASE", base_url_root)
                     extra_env_dict.setdefault("ANTHROPIC_AUTH_TOKEN", stub)
@@ -270,7 +307,7 @@ class OpenClawAgent(BaseAgent):
                 base_url = f"http://{self.litellm_container_name}:{self.litellm_port}"
                 extra_env_dict.setdefault("LITELLM_BASE_URL", base_url)
                 extra_env_dict.setdefault(
-                    "LITELLM_API_KEY", self.litellm_master_key or "sk-litellm")
+                    "LITELLM_API_KEY", self._agent_bearer(spec.task_id))
                 extra_env_dict.setdefault("WILDCLAW_MODEL", spec.model)
 
             # Simulated persona clock: shift the agent's Date reads to the task's
@@ -596,12 +633,18 @@ class OpenClawAgent(BaseAgent):
             reported_turns = total_turns if total_turns is not None else turns_executed
             logger.info("[%s] Agent finished (%.2fs, %d turn(s))",
                         spec.task_id, elapsed_time, reported_turns)
+            if total_turns is not None and turns_executed < total_turns:
+                logger.warning(
+                    "[%s] RUN INCOMPLETE: %d of %d scheduled turns executed "
+                    "(timed_out_turn=%s) — score will be flagged run_incomplete",
+                    spec.task_id, turns_executed, total_turns, timed_out_turn)
 
             # Native multi-agent: the parent turn returns as soon as it issues
             # its async sessions_spawn calls (mode=run), but the spawned child
             # sessions keep running in the still-alive gateway. Hold the
             # container open until those children quiesce, otherwise teardown
             # kills them mid-run and their trajectories are never written.
+            recovery_fired = False
             if spec.multi_agent_enabled:
                 _ui_lifecycle.emit_stage(spec.task_id, _ui_lifecycle.STAGE_STATUS,
                                          "waiting for sub-agents to finish",
@@ -622,8 +665,11 @@ class OpenClawAgent(BaseAgent):
                 # len(turn_messages) value for sources with a known total.
                 recovered = self._recover_synthesis_if_stalled(
                     spec, reported_turns)
+                recovery_fired = recovered is not None
                 if recovered is not None:
                     agent_proc = recovered
+                    logger.info("[%s] recovery_turn_fired=True (stall-recovery "
+                                "synthesis turn injected)", spec.task_id)
                     # Extend the usage window + elapsed so the recovery turn's
                     # tokens and time are counted (window end was stamped
                     # above, before the recovery turn ran).
@@ -639,17 +685,23 @@ class OpenClawAgent(BaseAgent):
                 agent_proc=agent_proc,
                 turns_completed=turns_executed,
                 timed_out_turn=timed_out_turn,
+                turns_planned=total_turns,
+                recovery_turn_fired=recovery_fired,
             )
 
         except Exception as exc:
             logger.error("[%s] Execution error: %s", spec.task_id, exc)
             _ui_lifecycle.emit_stage(spec.task_id, _ui_lifecycle.STAGE_FAIL, str(exc))
+            # Carry the turn tally into the error return so a run that CRASHED
+            # mid-schedule is flagged run_incomplete exactly like a timeout.
             return AgentExecution(
                 elapsed_time=float(spec.timeout_seconds),
                 error=str(exc),
                 gateway_proc=gateway_proc,
                 agent_proc=agent_proc,
-                turns_completed=0,
+                turns_completed=turns_executed,
+                timed_out_turn=timed_out_turn,
+                turns_planned=total_turns,
             )
 
     def _wait_for_subagents(
@@ -892,7 +944,19 @@ class OpenClawAgent(BaseAgent):
             window = self._task_windows.get(task_id)
             if window is None:
                 window = (time.time() - max(elapsed_time, 1.0), time.time())
-            usage = extract_usage_from_litellm_log(Path(self.litellm_usage_log), window[0], window[1])
+            # Tagged extraction only when the MAIN agent's bearer carried the
+            # key: under master-key auth only subagent/audio helper requests
+            # are tagged (they send x-wcb-run-key explicitly), and matching on
+            # that subset would undercount worse than the window does.
+            run_key = (self._run_keys.get(task_id, "")
+                       if self._run_key_bearer_live() else "")
+            if run_key:
+                usage = extract_usage_from_litellm_log(
+                    Path(self.litellm_usage_log), window[0], window[1],
+                    run_key=run_key)
+            else:
+                usage = extract_usage_from_litellm_log(
+                    Path(self.litellm_usage_log), window[0], window[1])
             preflight_usage = extract_preflight_usage_from_litellm_log(Path(self.litellm_usage_log))
             if preflight_usage.get("request_count", 0) == 0:
                 preflight_usage = None
@@ -960,6 +1024,7 @@ class OpenClawAgent(BaseAgent):
             usage["cost_usd"] = round(float(usage.get("cost_usd") or 0.0) + sub_cost, 6)
 
         self._task_windows.pop(task_id, None)
+        self._run_keys.pop(task_id, None)
         usage["elapsed_time"] = round(elapsed_time, 2)
         if preflight_usage is not None:
             usage["__preflight__"] = preflight_usage
@@ -1030,7 +1095,7 @@ class OpenClawAgent(BaseAgent):
             if is_anthropic_model:
                 litellm_provider = {
                     "baseUrl": base_url_root,
-                    "apiKey": self.litellm_master_key or "sk-litellm",
+                    "apiKey": self._agent_bearer(task_id),
                     "api": "anthropic-messages",
                     "models": [
                         {"id": openclaw_model_id, "name": openclaw_model_id,
@@ -1047,7 +1112,7 @@ class OpenClawAgent(BaseAgent):
                 # the selected model.
                 litellm_provider = {
                     "baseUrl": base_url_v1,
-                    "apiKey": self.litellm_master_key or "sk-litellm",
+                    "apiKey": self._agent_bearer(task_id),
                     "auth": "api-key",
                     "api": "openai-completions",
                     "models": [
@@ -1070,7 +1135,7 @@ class OpenClawAgent(BaseAgent):
             # agent never reaches real OpenAI; this is a pure sidecar rewrite.
             openai_sidecar_provider = {
                 "baseUrl": base_url_v1,
-                "apiKey": self.litellm_master_key or "sk-litellm",
+                "apiKey": self._agent_bearer(task_id),
                 "auth": "api-key",
                 "api": "openai-completions",
                 "models": [
