@@ -190,6 +190,20 @@ class TestCallbackRunKeyTagging:
         row = json.loads((tmp_path / "u.jsonl").read_text().strip())
         assert row["run_key"] == "wcb::t::x"
 
+    def test_failure_row_records_error_and_run_key(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(cb, "_PATH", str(tmp_path / "u.jsonl"))
+        kwargs = {
+            "model": "m",
+            "exception": ValueError("boom " + "x" * 400),
+            "litellm_params": {"metadata": {"user_api_key": "wcb::t::fk"}},
+        }
+        cb._write_failure_row(kwargs, None, None)
+        row = json.loads((tmp_path / "u.jsonl").read_text().strip())
+        assert row["kind"] == "failure"
+        assert row["error_class"] == "ValueError"
+        assert row["error"].startswith("boom ") and len(row["error"]) <= 300
+        assert row["run_key"] == "wcb::t::fk"
+
     def test_write_row_omits_run_key_when_untagged(self, tmp_path, monkeypatch):
         monkeypatch.setattr(cb, "_PATH", str(tmp_path / "u.jsonl"))
         cb._write_row({"model": "m"},
