@@ -149,6 +149,36 @@ class TestCallbackRunKeyTagging:
         assert cb._extract_run_key({}) == ""
         assert cb._extract_run_key({"secret_fields": None}) == ""
 
+    def test_litellm_1_88_user_api_key_channel(self):
+        """secret_fields is None on the pinned image (litellm 1.88.1); in
+        keyless mode the raw bearer passes through metadata.user_api_key."""
+        k = {"model": "m", "secret_fields": None,
+             "litellm_params": {"metadata": {"user_api_key": "wcb::t::raw"}}}
+        assert cb._extract_run_key(k) == "wcb::t::raw"
+        k = {"model": "m",
+             "litellm_params": {"metadata": {"user_api_key_hash": "wcb::t::h"}}}
+        assert cb._extract_run_key(k) == "wcb::t::h"
+
+    def test_litellm_1_88_metadata_headers_channel(self):
+        k = {"model": "m",
+             "litellm_params": {"metadata": {"headers": {
+                 "x-wcb-run-key": "wcb::t::hdr", "user-agent": "curl"}}}}
+        assert cb._extract_run_key(k) == "wcb::t::hdr"
+
+    def test_litellm_1_88_proxy_server_request_channel(self):
+        k = {"model": "m",
+             "litellm_params": {"proxy_server_request": {"headers": {
+                 "x-wcb-run-key": "wcb::t::psr"}}}}
+        assert cb._extract_run_key(k) == "wcb::t::psr"
+
+    def test_hashed_master_key_never_returned(self):
+        k = {"model": "m",
+             "litellm_params": {"metadata": {
+                 "user_api_key": "88a145080d3b3b6d7a33a668f5d3b1a6",
+                 "user_api_key_hash": "88a145080d3b3b6d7a33a668f5d3b1a6",
+                 "headers": {"user-agent": "curl"}}}}
+        assert cb._extract_run_key(k) == ""
+
     def test_write_row_includes_run_key(self, tmp_path, monkeypatch):
         monkeypatch.setattr(cb, "_PATH", str(tmp_path / "u.jsonl"))
         kwargs = {

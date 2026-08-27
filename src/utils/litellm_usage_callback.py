@@ -128,13 +128,34 @@ def _extract_run_key(kwargs: dict) -> str:
     ``x-api-key: <key>`` (anthropic-messages). ``x-wcb-run-key`` is a reserved
     explicit channel for master-key deployments. Only values with the
     ``wcb::`` prefix are ever returned, so real credentials are never written
-    to the usage log. LiteLLM >=1.87 exposes the unredacted headers to
-    callbacks via kwargs["secret_fields"]["raw_headers"].
+    to the usage log.
+
+    Channel order (probed empirically on the pinned image, litellm 1.88.1):
+    1. secret_fields.raw_headers — None on 1.88.1, kept for newer builds.
+    2. metadata.user_api_key / user_api_key_hash — in no-auth mode the raw
+       bearer passes through unhashed; THE channel for main-agent traffic
+       (credential headers are redacted from every headers dict below).
+    3. metadata.headers / proxy_server_request.headers — sanitized, but the
+       custom x-wcb-run-key header survives redaction (subagent/audio calls).
     """
     try:
-        raw = (kwargs.get("secret_fields") or {}).get("raw_headers") or {}
-        for header in ("x-wcb-run-key", "authorization", "x-api-key"):
-            value = raw.get(header) or ""
+        lp = kwargs.get("litellm_params") or {}
+        md = lp.get("metadata") or {}
+        if not isinstance(md, dict):
+            md = {}
+        psr = lp.get("proxy_server_request") or {}
+        header_dicts = [
+            (kwargs.get("secret_fields") or {}).get("raw_headers") or {},
+            md.get("headers") or {},
+            (psr.get("headers") or {}) if isinstance(psr, dict) else {},
+        ]
+        candidates = [md.get("user_api_key"), md.get("user_api_key_hash")]
+        for raw in header_dicts:
+            if not isinstance(raw, dict):
+                continue
+            for header in ("x-wcb-run-key", "authorization", "x-api-key"):
+                candidates.append(raw.get(header))
+        for value in candidates:
             if not isinstance(value, str):
                 continue
             if value.startswith("Bearer "):
