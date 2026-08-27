@@ -317,10 +317,18 @@ def _write_failure_row(kwargs: dict, start_time: Any, end_time: Any) -> None:
         except Exception:
             pass
 
+        exc = kwargs.get("exception")
+        # Class name + truncated message only — never the request payload,
+        # which could carry credentials or user content into the usage log.
+        error_class = type(exc).__name__ if exc is not None else ""
+        error_str = str(exc)[:300] if exc is not None else ""
         row = {
             "ts": datetime.now(timezone.utc).isoformat(),
             "model": kwargs.get("model") or "",
             "kind": "failure",
+            "error_class": error_class,
+            "error": error_str,
+            "run_key": _extract_run_key(kwargs),
             "input_tokens":       0,
             "output_tokens":      0,
             "total_tokens":       0,
