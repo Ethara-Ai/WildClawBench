@@ -42,7 +42,7 @@ readonly SELF
 BACKEND="openclaw"
 THINKING="xhigh"
 JUDGE_COUNCIL=1          # 1 = --judge-council, 0 = omit
-USE_TESTS=1              # 1 = --generate-tests --execute-tests, 0 = omit
+USE_TESTS=0              # 0 = rubric-only (Channel A dropped, review §1); 1 = --generate-tests --execute-tests
 USE_LITELLM=1            # 1 = --litellm, 0 = omit
 USE_MOCK_STACK=1         # 1 = --mock-stack, 0 = omit
 USE_CLAUDE_OAUTH=0       # 1 = --use-claude-oauth (route opus through OAuth bridge), 0 = Bedrock

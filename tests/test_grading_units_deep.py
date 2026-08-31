@@ -234,6 +234,30 @@ def test_judge_user_prompt_empty_evidence_uses_placeholders():
     assert "(no deliverable files were collected)" in out
 
 
+def test_judge_user_prompt_tags_only_file_targets():
+    rubrics = [
+        {"criterion": "wrote report.pdf", "weight": 5, "evaluation_target": "workspace_artifact"},
+        {"criterion": "wrote data.csv", "weight": 3, "evaluation_target": "produced_file"},
+        {"criterion": "answer states X", "weight": 3, "evaluation_target": "final_answer"},
+        {"criterion": "called the API", "weight": 1, "evaluation_target": "trajectory"},
+        {"criterion": "changed the record", "weight": 1, "evaluation_target": "state_change"},
+        {"criterion": "messaged the user", "weight": 1, "evaluation_target": "user_facing_message"},
+        {"criterion": "no target key", "weight": 1},
+    ]
+    out = grading._judge_user_prompt("t", rubrics, "")
+    # File targets (canonical + alias) carry the normalized tag.
+    assert "1. wrote report.pdf  [points: 5.0]  [target: workspace_artifact]" in out
+    assert "2. wrote data.csv  [points: 3.0]  [target: workspace_artifact]" in out
+    # The four calibrated targets + a missing target render with NO tag.
+    assert "3. answer states X  [points: 3.0]" in out
+    assert "4. called the API  [points: 1.0]" in out
+    assert "5. changed the record  [points: 1.0]" in out
+    assert "6. messaged the user  [points: 1.0]" in out
+    assert "7. no target key  [points: 1.0]" in out
+    # Exactly two tags emitted (the two file-target criteria).
+    assert out.count("[target:") == 2
+
+
 # ---------------------------------------------------------------------------
 # _collect_deliverable_files / _gather_evidence — real tmp_path trees
 # ---------------------------------------------------------------------------
@@ -298,16 +322,12 @@ def test_collect_skips_oversized_binary(tmp_path):
     assert names == ["small.md"]
 
 
-def test_gather_evidence_orders_primary_first_and_dumps_binary_body(tmp_path):
-    # NOTE: pins current behavior — see SCORING_AUDIT_REPORT.md
+def test_gather_evidence_orders_primary_first_and_binary_is_presence_only(tmp_path):
     # Ordering: a 'report' stem sorts ahead of a larger, non-primary csv.
-    # Binary polarity: although _is_text_deliverable EXCLUDES pdf from the
-    # verbatim path, _gather_evidence iterates over the FULL deliverable list
-    # (text + binary, from _collect_deliverable_files) and read_text()s each
-    # with errors='replace'. So a collected .pdf's bytes ARE dumped verbatim
-    # here (as latin-ish text), contradicting the module docstring's
-    # "presence-only" intent for binaries. This is the mojibake-poisoning
-    # hazard the comments warn about, still live.
+    # Binary polarity: a collected .pdf appears as a presence-only marker
+    # ("contents not extractable"), NOT its raw bytes — the mojibake-poisoning
+    # hazard is closed. The judge_system.md file-target legend maps this marker
+    # to No + TRUNCATION_AFFECTED for binary content criteria.
     results = tmp_path / "task_output" / "artifacts" / "results"
     results.mkdir(parents=True)
     (results / "zdata.csv").write_text("x,y,z," * 200, encoding="utf-8")
@@ -317,9 +337,10 @@ def test_gather_evidence_orders_primary_first_and_dumps_binary_body(tmp_path):
     ev = grading._gather_evidence(results, "MY TRANSCRIPT", budget=None)
     # Primary 'report' sorts ahead of the larger, non-primary csv.
     assert ev.index("report.md") < ev.index("zdata.csv")
-    # PDF IS collected AND its (ASCII-decodable) bytes are dumped verbatim.
+    # PDF is listed for presence but its raw bytes are NOT dumped.
     assert "DELIVERABLE: notes.pdf" in ev
-    assert "secret-body-marker" in ev
+    assert "contents not extractable" in ev
+    assert "secret-body-marker" not in ev
     # Transcript appended under the condensed marker.
     assert "MY TRANSCRIPT" in ev
     assert "TRANSCRIPT (condensed)" in ev

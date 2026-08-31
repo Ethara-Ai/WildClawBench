@@ -341,7 +341,8 @@ def test_ts_weighted_percentage_math(ts):
     assert ts.weighted_test_percentage([]) == 0.0
 
 
-def _mk_bundle_report(bundle: Path, *, test_pct=99.9, rubric_pct=40.0) -> Path:
+def _mk_bundle_report(bundle: Path, *, test_pct=99.9, rubric_pct=40.0,
+                      test_channel_present=None) -> Path:
     run = bundle / "task1" / "trajectories" / "opus" / "run_1"
     run.mkdir(parents=True, exist_ok=True)
     rep = {
@@ -356,6 +357,11 @@ def _mk_bundle_report(bundle: Path, *, test_pct=99.9, rubric_pct=40.0) -> Path:
             {"weight": -2, "passed": False},
         ]},
     }
+    if test_channel_present is not None:
+        rep["test_channel_present"] = test_channel_present
+        if test_channel_present is False:
+            rep["pytest"] = {"tests": []}
+            rep["test_weights_percentage"] = 0.0
     p = run / "report.json"
     p.write_text(json.dumps(rep), encoding="utf-8")
     return p
@@ -384,6 +390,20 @@ def test_ts_main_fixes_reports_and_rebuilds_pass_summary(ts, tmp_path, capsys, m
     # Second run: idempotent (no report change; summary rebuilt identically)
     assert ts.main() == 0
     assert "report.json files changed: 0" in capsys.readouterr().out
+
+
+def test_ts_main_rubric_only_no_halving(ts, tmp_path, capsys, monkeypatch):
+    # Channel A dropped (review §1): a rubric-only run stamped
+    # test_channel_present=False must score final_reward == rubric_pct, NOT
+    # rubric_pct/2 (the pre-fix halving bug).
+    bundle = tmp_path / "bundle_rubric_only"
+    rp = _mk_bundle_report(bundle, rubric_pct=40.0, test_channel_present=False)
+    monkeypatch.setattr(sys, "argv", ["x", str(bundle)])
+    assert ts.main() == 0
+    rep = json.loads(rp.read_text())
+    assert rep["final_reward"] == pytest.approx(40.0)
+    summary = json.loads((rp.parent.parent / "pass_summary.json").read_text())
+    assert summary["average_combined_score"] == pytest.approx(40.0)
 
 
 def test_ts_dunder_main(ts, tmp_path, monkeypatch):

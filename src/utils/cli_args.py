@@ -155,7 +155,7 @@ def build_run_batch_parser(default_model: str, default_parallel: int) -> argpars
         default=None,
         help="Run kensei2 test generation via Bedrock for each task before the agent runs "
              "(populates task.test_code and task.test_weights so harbor can bundle them). "
-             "Default: auto-enable when Bedrock env is configured.",
+             "Default: OFF (runs are rubric-only, review §1); pass this flag to opt in.",
     )
     testgen.add_argument(
         "--no-generate-tests",
@@ -188,8 +188,8 @@ def build_run_batch_parser(default_model: str, default_parallel: int) -> argpars
         default=None,
         help="After the agent finishes, run the generated test_outputs.py against "
              "the workspace + live mock stack to compute a real pytest reward "
-             "(reward.txt + ctrf.json). Default: auto-enable when --generate-tests "
-             "and --mock-stack are both on.",
+             "(reward.txt + ctrf.json). Default: OFF (rubric-only, review §1); "
+             "pass this flag to opt in.",
     )
     testexec.add_argument(
         "--no-execute-tests",

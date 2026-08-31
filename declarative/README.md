@@ -119,6 +119,19 @@ weight sign, `importance` from |weight| unless the entry carries an explicit
 `importance`). Negative-weight criteria must be phrased as "the forbidden
 thing happened" (SATISFIED:Yes = violation).
 
+`evaluation_target` declares which evidence channel proves a judge criterion:
+`final_answer` (the agent's final chat message), `trajectory` (the tool-use
+log), `state_change` (a system-of-record mutation), `user_facing_message`, or
+`workspace_artifact` (a FILE the agent wrote under `/root/workspace/`). Only
+`workspace_artifact` changes how the judge is steered: file-target criteria are
+grounded to the `<output_files>` evidence — the judge grades the file's actual
+contents, not the agent's narration, and an existence-only requirement passes
+on the file's presence alone. Binary deliverables (pdf/xlsx/docx/pptx) surface
+as present-but-not-extractable, so a *content* requirement on a binary scores
+No until host-side text extraction lands; keep binary-file criteria
+existence-only. `file_output`, `produced_file`, and bare `workspace` are
+accepted aliases and normalize to `workspace_artifact`.
+
 Check types compiled into `test_outputs.py` (stdlib-only, hermetic):
 
 | type | params | passes when |

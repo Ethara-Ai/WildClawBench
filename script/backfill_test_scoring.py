@@ -62,7 +62,10 @@ def main() -> int:
         old_test = report.get("test_weights_percentage")
         new_test = weighted_test_percentage(tests)
         rubric_pct = float(report.get("rubric_weights_percentage", 0.0))
-        new_final = round((new_test + rubric_pct) / 2.0, 2)
+        present = report.get("test_channel_present")
+        if present is None:
+            present = bool(tests) or float(report.get("test_weights_percentage") or 0.0) != 0.0
+        new_final = round((new_test + rubric_pct) / 2.0, 2) if present else round(rubric_pct, 2)
 
         if (old_test != new_test) or (report.get("final_reward") != new_final):
             report["test_weights_percentage"] = new_test

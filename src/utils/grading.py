@@ -394,12 +394,19 @@ def _split_evidence(evidence: str) -> tuple[str, str]:
 
 def _judge_user_prompt(task_description: str, rubrics: list, evidence: str) -> str:
     from src.utils.prompt_loader import load_prompt
+    from src.utils.rubric_targets import FILE_TARGETS, normalize_target
     output_files, transcript = _split_evidence(evidence)
     crit_lines = []
     for i, r in enumerate(rubrics):
         crit = r.get("criterion") if isinstance(r, dict) else str(r)
         wt = _extract_weight(r) if isinstance(r, dict) else 1.0
-        crit_lines.append(f"{i + 1}. {crit}  [points: {wt}]")
+        # File-target criteria carry an ordinal-safe [target: ...] tag routing
+        # the judge to output_files evidence (see judge_system.md legend). The
+        # tag lands inside _VERDICT_RE's `\d+\.\s.*?` capture and is discarded on
+        # parse. Untagged criteria (the four calibrated targets) grade by wording.
+        tgt = normalize_target(r.get("evaluation_target")) if isinstance(r, dict) else ""
+        tag = f"  [target: {tgt}]" if tgt in FILE_TARGETS else ""
+        crit_lines.append(f"{i + 1}. {crit}  [points: {wt}]{tag}")
     return load_prompt(
         "judge_user",
         task_description=task_description,
@@ -541,6 +548,16 @@ def _gather_evidence(
         return (rank, size, path.name)
 
     for f in sorted(deliverables, key=_priority):
+        # Binaries reach here via _collect_deliverable_files for presence, but
+        # read_text(errors="replace") would dump mojibake that poisons the judge
+        # (and invites hallucinated content grades). Emit a presence-only marker;
+        # the judge_system.md file-target legend maps this to No + truncation.
+        if _is_binary_deliverable(f):
+            parts.append(
+                f"\n----- DELIVERABLE: {f.name} "
+                "(binary — present, contents not extractable) -----\n"
+            )
+            continue
         try:
             body = f.read_text(encoding="utf-8", errors="replace")
         except Exception:

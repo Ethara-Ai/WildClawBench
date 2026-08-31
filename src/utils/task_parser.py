@@ -466,10 +466,11 @@ def _derive_taxonomy_for_native_task(
         except (json.JSONDecodeError, OSError):
             pass
 
+    from src.utils.rubric_targets import normalize_target
     targets: dict[str, int] = {}
     for r in rubrics if isinstance(rubrics, list) else []:
         if isinstance(r, dict):
-            t = str(r.get("evaluation_target") or "").strip()
+            t = normalize_target(r.get("evaluation_target"))
             if t:
                 targets[t] = targets.get(t, 0) + 1
     dominant_target = max(targets, key=lambda k: targets[k]) if targets else ""

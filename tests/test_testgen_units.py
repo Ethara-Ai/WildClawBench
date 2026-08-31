@@ -457,6 +457,10 @@ class TestDeriveTaskOutputFormat:
         rubrics = [{"evaluation_target": "file_output"}, {"evaluation_target": "file_output"}]
         assert _derive_task_output_format(rubrics) == "workspace_artifact"
 
+    def test_produced_file_alias_maps_to_workspace_artifact(self):
+        rubrics = [{"evaluation_target": "produced_file"}, {"evaluation_target": "PRODUCED_FILE"}]
+        assert _derive_task_output_format(rubrics) == "workspace_artifact"
+
     def test_final_answer_with_file_is_mixed(self):
         rubrics = [
             {"evaluation_target": "final_answer"},

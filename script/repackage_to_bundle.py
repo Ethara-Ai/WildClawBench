@@ -699,6 +699,16 @@ def _method_of(test_name: str) -> str:
     return test_name.split("::")[-1]
 
 
+def _blend_combined_score(report: dict[str, Any]) -> float:
+    """Mean of both channel percentages when Channel A ran; rubric alone when it
+    did not. Legacy reports lacking test_channel_present default to the
+    two-channel mean so historical bundles stay byte-identical."""
+    rubric = float(report.get("rubric_weights_percentage", 0.0))
+    if not report.get("test_channel_present", True):
+        return round(rubric, 2)
+    return round((float(report.get("test_weights_percentage", 0.0)) + rubric) / 2.0, 2)
+
+
 def _build_pytest_block(verifier_dir: Path) -> dict[str, Any]:
     ctrf = _load_json(verifier_dir / "ctrf.json") or {}
     weights = _load_json(verifier_dir / "test_weights.json") or {}
@@ -875,6 +885,20 @@ def build_report(
     pytest_block, ctrf_summary, reward_txt = _build_pytest_block(verifier)
     rubric_block = _build_rubric_block(score, infer_meta)
 
+    # Channel-A presence is a DECISION/artifact question, never a value question:
+    # a real test channel that legitimately scored 0.0 MUST stay distinguishable
+    # from a rubric-only run. run_batch writes test_based_reward=None exactly when
+    # no test channel ran (gated on tests_total), so score.json is authoritative.
+    # ctrf/reward.txt are the fallback for legacy score.json predating the key.
+    # test_weights.json is NOT evidence — it is mirrored in from the input task
+    # dir even for rubric-only runs.
+    if "test_based_reward" in score:
+        test_channel_present = score.get("test_based_reward") is not None
+    else:
+        test_channel_present = (
+            bool(ctrf_summary) or reward_txt is not None or bool(pytest_block["tests"])
+        )
+
     test_pct = ctrf_summary.get("weighted_percentage")
     if test_pct is None:
         test_pct = (reward_txt * 100.0) if reward_txt is not None else 0.0
@@ -896,6 +920,7 @@ def build_report(
         "final_reward": round(float(final_reward) * 100.0, 2),
         "test_weights_percentage": round(float(test_pct), 2),
         "rubric_weights_percentage": round(float(rubric_pct), 2),
+        "test_channel_present": test_channel_present,
     }
     if score.get("run_incomplete"):
         report["run_incomplete"] = True
@@ -2418,14 +2443,7 @@ def convert_task(
                 "include_multimodal": report["include_multimodal"],
                 "test_weights_percentage": report["test_weights_percentage"],
                 "rubric_weights_percentage": report["rubric_weights_percentage"],
-                # Combined score = the mean of the two channel percentages
-                # (same blend as report.json's final_reward). Kept as a
-                # percentage here to match the pass_summary's *_percentage
-                # fields.
-                "combined_score": round(
-                    (report["test_weights_percentage"]
-                     + report["rubric_weights_percentage"]) / 2, 2
-                ),
+                "combined_score": _blend_combined_score(report),
             }
             if report.get("run_incomplete"):
                 run_summ["run_incomplete"] = True

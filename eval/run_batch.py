@@ -1201,6 +1201,58 @@ def _reanchor_sim_clock(task_id: str, task: dict, turn_index: int) -> None:
                        task_id, turn_index, exc)
 
 
+def _turn_completion_verdict(task: dict, execution, interactive: bool) -> dict:
+    """Compute the run_incomplete verdict against the AUTHORITATIVE turn count.
+
+    `execution.turns_planned` is only what the harness *dispatched* — three
+    collapse paths (inject setup failure :2201, stages.yaml setup failure :2228,
+    admin-plane-down skip :2087-2099) silently downgrade the schedule to a single
+    prompt turn while the task still defines N turns via task["turn_messages"].
+    Gating on the dispatched count alone therefore reports a 9-turn task that only
+    ran 1 turn as COMPLETE. The real denominator is the larger of what the harness
+    dispatched and what the task defines: `max(dispatched, task_defined)`.
+
+    max() (not task-always-wins) is load-bearing: stages.yaml tasks source their
+    prompt from prompt.txt/PROMPT.md and carry turn_messages == [], so the planned
+    count comes from 1 + len(stages) — task-defined-always-wins would compute a 0
+    denominator and disable the check for those tasks. `... or None` maps 0 back to
+    None so single-turn tasks (turn_messages == []) never flag.
+
+    KNOWN LIMITATION: because stages-sourced tasks carry turn_messages == [], this
+    denominator does NOT cover a stages.yaml collapse (:2228) — that path needs
+    `1 + len(StageScript.stages)` captured before the except clears stage_turns
+    (separate change). It DOES cover inject-format and admin-plane-down collapse,
+    whose tasks carry a populated turn_messages.
+
+    Interactive runs (HumanTurnSource) have no fixed denominator — the human paces
+    and overrides turns — so they are exempt. `interactive` MUST be derived from the
+    in-scope `interactive_source is not None`, NOT from `turns_planned is None`
+    (which would also exempt every multi-turn task on the single-shot backends,
+    which is exactly the under-delivery we want to flag).
+    """
+    task_defined = len(task.get("turn_messages") or [])
+    dispatched = getattr(execution, "turns_planned", None)
+    effective = None if interactive else (max(dispatched or 0, task_defined) or None)
+    completed = getattr(execution, "turns_completed", None)
+    verdict = {
+        "turns_planned": effective,
+        "turns_completed": completed,
+        "timed_out_turn": getattr(execution, "timed_out_turn", None),
+        "recovery_turn_fired": getattr(execution, "recovery_turn_fired", False),
+    }
+    # Collapse forensics: only when the harness dispatched fewer turns than the
+    # task defines (harness collapse), distinct from an agent timeout mid-schedule
+    # (dispatched == effective). Lets score.json tell the two apart.
+    if effective is not None and dispatched is not None and dispatched < effective:
+        verdict["turns_planned_dispatched"] = dispatched
+    verdict["run_incomplete"] = bool(
+        effective is not None
+        and completed is not None
+        and completed < effective
+    )
+    return verdict
+
+
 def _augment_score_with_combined_rewards(scores: dict, result: dict) -> None:
     if not isinstance(scores, dict):
         return
@@ -1251,6 +1303,8 @@ def _augment_score_with_combined_rewards(scores: dict, result: dict) -> None:
         scores["turns_completed"] = r.get("turns_completed")
         if r.get("recovery_turn_fired"):
             scores["recovery_turn_fired"] = True
+        if r.get("turns_planned_dispatched") is not None:
+            scores["turns_planned_dispatched"] = r.get("turns_planned_dispatched")
 
 
 def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
@@ -2225,6 +2279,11 @@ def run_single_task(
         except Exception as exc:
             logger.error("[%s] stages.yaml setup failed (continuing single-turn): %s",
                          task_id, exc)
+            # KNOWN GAP: _turn_completion_verdict's authoritative denominator is
+            # task["turn_messages"], which is EMPTY for stages-sourced tasks (their
+            # prompt comes from prompt.txt/PROMPT.md). So this collapse to 1 turn is
+            # NOT flagged run_incomplete. Closing it needs 1 + len(_ss.stages)
+            # captured here before stage_turns is cleared (separate change).
             stage_turns = None
             stage_before_turn = None
     elif drift_info:
@@ -2370,24 +2429,15 @@ def run_single_task(
         if execution.error:
             result["error"] = execution.error
         # Turn-completion verdict (BUGREPORT_turn_completion.md): gate purely
-        # on planned-vs-executed count, never on the timeout flag — a timeout
-        # is only one of several ways a run ends short. Flows into score.json
-        # via _augment_score_with_combined_rewards so no consumer can average
-        # a partial run as if it were complete.
-        result["turns_planned"] = execution.turns_planned
-        result["turns_completed"] = execution.turns_completed
-        result["timed_out_turn"] = execution.timed_out_turn
-        result["recovery_turn_fired"] = execution.recovery_turn_fired
-        result["run_incomplete"] = bool(
-            execution.turns_planned is not None
-            and execution.turns_completed is not None
-            and execution.turns_completed < execution.turns_planned
-        )
+        # on planned-vs-executed count, never on the timeout flag. Denominator
+        # is the authoritative task-defined count; see _turn_completion_verdict.
+        result.update(_turn_completion_verdict(
+            task, execution, interactive=interactive_source is not None))
         if result["run_incomplete"]:
             logger.warning(
                 "[%s] RUN INCOMPLETE: %s of %s scheduled turns executed — "
                 "this run will be excluded from pass@K averages",
-                task_id, execution.turns_completed, execution.turns_planned)
+                task_id, result["turns_completed"], result["turns_planned"])
     except Exception as exc:
         result["error"] = str(exc)
         logger.error("[%s] Unexpected backend error: %s", task_id, exc, exc_info=True)
@@ -2591,13 +2641,10 @@ def run_single_task(
                 "[%s] Agent container never started; skipping test execution to avoid grading an empty workspace. Error: %s",
                 task_id, result["error"],
             )
-        # Auto-enable test execution when task ships test_code (from any source:
-        # LLM-generated, cache, or pre-shipped via _load_provided_tests) and the
-        # mock network is reachable. This decouples test execution from the
-        # generation decision — pre-shipped suites run even if gen_tests was False.
-        effective_exec_tests = execute_tests or (
-            bool(task.get("test_code")) and bool(network)
-        )
+        # Channel A runs ONLY when execution was explicitly requested
+        # (--execute-tests). Pre-shipped test_code no longer auto-enables it:
+        # runs are rubric-only by default (review §1).
+        effective_exec_tests = bool(execute_tests) and bool(task.get("test_code")) and bool(network)
         if effective_exec_tests and task.get("test_code") and not startup_failed:
             try:
                 from src.utils.test_executor import execute_tests as _exec_tests
@@ -4012,16 +4059,9 @@ def _run_dispatch(args, backend, config: Config, mock_env_dict: dict, effective_
     from src.utils.ui.events import EV_PROGRESS as _EV_PROGRESS, get_bus as _get_bus
     _dispatch_start = _time.time()
 
-    gen_tests = args.generate_tests
-    if gen_tests is None:
-        gen_tests = bool(
-            (config.bedrock_inference_arn and config.aws_bearer_token)
-            or use_oauth  # OAuth sidecar routes opus through bridge for testgen
-        )
+    gen_tests = bool(args.generate_tests)
     testgen_max_attempts = getattr(args, "testgen_max_attempts", 3)
-    exec_tests = getattr(args, "execute_tests", None)
-    if exec_tests is None:
-        exec_tests = bool(enable_mock_stack and (gen_tests or use_oauth))
+    exec_tests = bool(getattr(args, "execute_tests", None))
     testexec_timeout = getattr(args, "testexec_timeout", 600)
     use_judge_council = getattr(args, "judge_council", None)
     if use_judge_council is True:

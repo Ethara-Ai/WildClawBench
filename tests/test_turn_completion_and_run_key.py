@@ -605,3 +605,66 @@ class TestAggregateExclusion:
         entry = summary["by_task_model"][0]
         assert entry["run_count"] == 0
         assert entry["runs_excluded_incomplete"] == 1
+
+
+class TestTurnCompletionVerdict:
+    """The authoritative-denominator verdict: run_incomplete is gated on the
+    TASK-defined turn count (task["turn_messages"]), not just what the harness
+    dispatched, so a collapsed schedule (inject/admin-plane setup failure ->
+    single-turn fallback) cannot masquerade as complete. Pins the pure helper
+    that the container-bound dispatch site could not otherwise test."""
+
+    @pytest.fixture()
+    def rb(self):
+        sys.path.insert(0, str(REPO / "eval"))
+        import run_batch
+        return run_batch
+
+    def test_collapse_flags_incomplete_with_forensics(self, rb):
+        task = {"turn_messages": [f"t{i}" for i in range(9)]}
+        ex = AgentExecution(elapsed_time=1.0, turns_planned=1, turns_completed=1)
+        v = rb._turn_completion_verdict(task, ex, interactive=False)
+        assert v["run_incomplete"] is True
+        assert v["turns_planned"] == 9
+        assert v["turns_planned_dispatched"] == 1
+        assert "1 of 9" in rb._eval_skip_reason(v)
+
+    def test_dispatched_superset_not_clobbered_by_task_defined(self, rb):
+        task = {"turn_messages": []}
+        ex = AgentExecution(elapsed_time=1.0, turns_planned=5, turns_completed=5)
+        v = rb._turn_completion_verdict(task, ex, interactive=False)
+        assert v["turns_planned"] == 5
+        assert v["run_incomplete"] is False
+        assert "turns_planned_dispatched" not in v
+
+    def test_interactive_is_exempt(self, rb):
+        task = {"turn_messages": [f"t{i}" for i in range(9)]}
+        ex = AgentExecution(elapsed_time=1.0, turns_planned=None, turns_completed=2)
+        v = rb._turn_completion_verdict(task, ex, interactive=True)
+        assert v["turns_planned"] is None
+        assert v["run_incomplete"] is False
+
+    def test_single_turn_non_openclaw_backcompat(self, rb):
+        task = {"turn_messages": []}
+        ex = AgentExecution(elapsed_time=1.0)
+        v = rb._turn_completion_verdict(task, ex, interactive=False)
+        assert v["turns_planned"] is None
+        assert v["run_incomplete"] is False
+        assert "turns_planned_dispatched" not in v
+
+    def test_multiturn_on_non_openclaw_flags_without_dispatched_key(self, rb):
+        task = {"turn_messages": [f"t{i}" for i in range(9)]}
+        ex = AgentExecution(elapsed_time=1.0)
+        v = rb._turn_completion_verdict(task, ex, interactive=False)
+        assert v["run_incomplete"] is True
+        assert v["turns_planned"] == 9
+        assert "turns_planned_dispatched" not in v
+
+    def test_timeout_mid_schedule_flags_without_dispatched_key(self, rb):
+        task = {"turn_messages": [f"t{i}" for i in range(9)]}
+        ex = AgentExecution(elapsed_time=1.0, turns_planned=9,
+                            turns_completed=4, timed_out_turn=4)
+        v = rb._turn_completion_verdict(task, ex, interactive=False)
+        assert v["run_incomplete"] is True
+        assert v["turns_planned"] == 9
+        assert "turns_planned_dispatched" not in v

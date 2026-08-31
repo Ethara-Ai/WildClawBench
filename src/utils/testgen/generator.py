@@ -121,30 +121,30 @@ def _clean_weights(raw_weights: object) -> dict:
 
 
 def _derive_task_output_format(rubrics: object) -> str:
+    from ..rubric_targets import FILE_TARGETS, normalize_target
     if not isinstance(rubrics, list):
         return "unknown"
     counts: dict[str, int] = {}
     for r in rubrics:
         if isinstance(r, dict):
-            t = str(r.get("evaluation_target") or "").strip()
+            t = normalize_target(r.get("evaluation_target"))
             if t:
                 counts[t] = counts.get(t, 0) + 1
     if not counts:
         return "unknown"
     dominant = max(counts, key=lambda k: counts[k])
-    # Only `workspace_artifact` and `file_output` evaluate against a file on
-    # disk. `state_change` and `trajectory` evaluate against the tool-use
+    # Only file targets (FILE_TARGETS, alias-normalized) evaluate against a file
+    # on disk. `state_change` and `trajectory` evaluate against the tool-use
     # transcript (e.g. "did agent call this API?", "did agent NOT call this
     # forbidden endpoint?") and are satisfied by `TestBehavioral*`/`TestNegativeWeight*`
-    # tests \u2014 not `file_exists()`. Misclassifying them as file targets would
+    # tests — not `file_exists()`. Misclassifying them as file targets would
     # silently steer the LLM into emitting useless file-existence assertions
     # for behavioral-audit criteria.
-    file_targets = ("workspace_artifact", "file_output")
-    has_file = any(k in counts for k in file_targets)
+    has_file = any(k in counts for k in FILE_TARGETS)
     has_text = "final_answer" in counts or "user_facing_message" in counts
     if dominant == "final_answer" and not has_file:
         return "final_answer"
-    if dominant in file_targets and not has_text:
+    if dominant in FILE_TARGETS and not has_text:
         return "workspace_artifact"
     return "mixed"
 
