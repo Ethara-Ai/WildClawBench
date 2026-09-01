@@ -58,6 +58,12 @@ def main() -> int:
 
     for report_path in sorted(bundle.glob("*/trajectories/*/run_*/report.json")):
         report = json.loads(report_path.read_text())
+        # Rubric-only bundles no longer carry a pytest block; leave their
+        # report.json and pass_summary.json byte-identical (skipping the
+        # per_model append below also suppresses the pass_summary rebuild).
+        # Same discriminator as repackage_to_bundle._blend_combined_score.
+        if "pytest" not in report:
+            continue
         tests = report.get("pytest", {}).get("tests", [])
         old_test = report.get("test_weights_percentage")
         new_test = weighted_test_percentage(tests)

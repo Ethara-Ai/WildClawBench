@@ -694,68 +694,20 @@ def extract_ground_truth_sections(text: str) -> str:
     return "\n\n".join(ordered) + "\n"
 
 
-def _method_of(test_name: str) -> str:
-    """ctrf name is 'Class::method'; weights key is bare 'method'."""
-    return test_name.split("::")[-1]
-
-
 def _blend_combined_score(report: dict[str, Any]) -> float:
     """Mean of both channel percentages when Channel A ran; rubric alone when it
-    did not. Legacy reports lacking test_channel_present default to the
-    two-channel mean so historical bundles stay byte-identical."""
+    did not.
+
+    Channel-A presence is keyed off the presence of the ``pytest`` block in the
+    report: rubric-only bundles no longer emit ``pytest`` / ``test_weights_percentage``
+    (nor the former ``test_channel_present`` discriminator), so their combined
+    score is the rubric percentage alone. Legacy two-channel reports still carry
+    the ``pytest`` block, so they stay byte-identical under the two-channel mean.
+    """
     rubric = float(report.get("rubric_weights_percentage", 0.0))
-    if not report.get("test_channel_present", True):
+    if "pytest" not in report:
         return round(rubric, 2)
     return round((float(report.get("test_weights_percentage", 0.0)) + rubric) / 2.0, 2)
-
-
-def _build_pytest_block(verifier_dir: Path) -> dict[str, Any]:
-    ctrf = _load_json(verifier_dir / "ctrf.json") or {}
-    weights = _load_json(verifier_dir / "test_weights.json") or {}
-    results = ctrf.get("results", {}) if isinstance(ctrf, dict) else {}
-    summary = results.get("summary", {}) if isinstance(results, dict) else {}
-    raw_tests = results.get("tests", []) if isinstance(results, dict) else []
-
-    # Weights keys may be bare ("test_x") or qualified ("TestFoo::test_x",
-    # "tests/test_outputs.py::TestFoo::test_x"); fold them to bare names so
-    # they resolve against the bare ctrf test names.
-    bare_weights = {_method_of(k): v for k, v in weights.items()}
-
-    tests: list[dict[str, Any]] = []
-    for t in raw_tests:
-        name = t.get("name", "")
-        method = _method_of(name)
-        weight = weights.get(name, bare_weights.get(method, 1))
-        tests.append(
-            {
-                "name": method,
-                "weight": int(weight),
-                "passed": t.get("status") == "passed",
-            }
-        )
-
-    # reward.txt fallback for percentage if ctrf summary missing.
-    reward_txt = None
-    rtxt = verifier_dir / "reward.txt"
-    if rtxt.exists():
-        try:
-            reward_txt = float(rtxt.read_text().strip())
-        except ValueError:
-            reward_txt = None
-
-    passed = int(summary.get("passed", sum(1 for t in tests if t["passed"])))
-    failed = int(summary.get("failed", sum(1 for t in tests if not t["passed"])))
-    reward = summary.get("overall_score")
-    if reward is None:
-        reward = reward_txt if reward_txt is not None else 0.0
-
-    return {
-        "passed": passed,
-        "failed": failed,
-        "exit_code": 0 if failed == 0 else 1,
-        "reward": float(reward),
-        "tests": tests,
-    }, summary, reward_txt
 
 
 def _infer_meta(criterion: str, is_positive: bool) -> tuple[str, str]:
@@ -857,7 +809,6 @@ def build_report(
     run_index: int,
     infer_meta: bool,
 ) -> dict[str, Any]:
-    verifier = run_dir / "task_output" / "logs" / "verifier"
     score = _load_json(run_dir / "score.json") or {}
     output_json = _load_json(run_dir / "output.json")
 
@@ -882,26 +833,8 @@ def build_report(
             file=sys.stderr,
         )
 
-    pytest_block, ctrf_summary, reward_txt = _build_pytest_block(verifier)
     rubric_block = _build_rubric_block(score, infer_meta)
 
-    # Channel-A presence is a DECISION/artifact question, never a value question:
-    # a real test channel that legitimately scored 0.0 MUST stay distinguishable
-    # from a rubric-only run. run_batch writes test_based_reward=None exactly when
-    # no test channel ran (gated on tests_total), so score.json is authoritative.
-    # ctrf/reward.txt are the fallback for legacy score.json predating the key.
-    # test_weights.json is NOT evidence — it is mirrored in from the input task
-    # dir even for rubric-only runs.
-    if "test_based_reward" in score:
-        test_channel_present = score.get("test_based_reward") is not None
-    else:
-        test_channel_present = (
-            bool(ctrf_summary) or reward_txt is not None or bool(pytest_block["tests"])
-        )
-
-    test_pct = ctrf_summary.get("weighted_percentage")
-    if test_pct is None:
-        test_pct = (reward_txt * 100.0) if reward_txt is not None else 0.0
     rubric_pct = score.get("rubric_weights_percentage", 0.0)
     final_reward = score.get("combined_reward")
     if final_reward is None:
@@ -911,16 +844,14 @@ def build_report(
         "model": pretty_model,
         "run_index": run_index,
         "include_multimodal": _detect_multimodal(task_dir, output_json),
-        "pytest": pytest_block,
         "rubric": rubric_block,
         # final_reward as a PERCENTAGE (0–100) so it's consistent with
-        # test_/rubric_weights_percentage and pass_summary.combined_score
+        # rubric_weights_percentage and pass_summary.combined_score
         # (e.g. 52.84, not 0.5284). combined_reward from score.json is a 0–1
-        # fraction, so scale it up.
+        # fraction, so scale it up. When no test channel ran, run_batch writes
+        # combined_reward == rubric_based_reward, so this equals the rubric pct.
         "final_reward": round(float(final_reward) * 100.0, 2),
-        "test_weights_percentage": round(float(test_pct), 2),
         "rubric_weights_percentage": round(float(rubric_pct), 2),
-        "test_channel_present": test_channel_present,
     }
     if score.get("run_incomplete"):
         report["run_incomplete"] = True
@@ -934,53 +865,14 @@ def _stage_verifier_test_sources(
     dest_verifier: Path,
     verbose: bool,
 ) -> tuple[bool, bool, bool]:
-    """Mirror `test.sh` + `test_outputs.py` + `test_weights.json` into
-    each per-rep `logs/verifier/` next to the run outputs (ctrf, reward,
-    test_output.log, test_function_outputs).
+    """DEPRECATED / UNUSED. Retained only so any external importer does not break.
 
-    Symmetrical with the host-side mirror in
-    `eval/run_batch.py` (post-execution write next to `test_output.log`).
-    The bundle's `copy_verifier_logs()` will already inherit these three
-    files when present in the source `output/<backend>/<task>/.../logs/verifier/`;
-    this helper is the BACKFILL path for two cases:
-      (1) older output trees that pre-date the run_batch.py mirror, and
-      (2) standalone `repackage_to_bundle.py` runs that import-by-bash.
-    On a fresh run the writes here are no-ops (target already populated
-    by `copy_verifier_logs`); idempotent.
-
-    Source resolution:
-      - `test.sh`           -> re-emit via `_generate_test_sh()` (stdlib-only)
-      - `test_outputs.py`   -> `input_task_dir/test_outputs.py` (task ROOT, NOT data/tests/)
-      - `test_weights.json` -> `input_task_dir/test_weights.json`
-
-    When `input_task_dir` is None we still emit `test.sh` because it has
-    zero input-side dependency.
+    Delivered bundles carry no pytest surface, so the per-rep ``logs/verifier/``
+    mirror is no longer written on the bundle side (its call site in
+    ``convert_task`` was removed). ``copy_verifier_logs`` still mirrors whatever
+    the harness actually emitted; with Channel A off there is nothing to copy.
     """
-    dest_verifier.mkdir(parents=True, exist_ok=True)
-    wrote_test_sh = False
-    wrote_outputs = False
-    wrote_weights = False
-    test_sh_path = dest_verifier / TEST_SH_FILENAME
-    if not test_sh_path.exists():
-        test_sh_path.write_text(_generate_test_sh(), encoding="utf-8")
-        wrote_test_sh = True
-    if input_task_dir is not None:
-        src_outputs = _resolve_test_outputs_source(input_task_dir)
-        dst_outputs = dest_verifier / TEST_OUTPUTS_FILENAME
-        if src_outputs is not None and not dst_outputs.exists():
-            shutil.copy2(src_outputs, dst_outputs)
-            wrote_outputs = True
-        src_weights = input_task_dir / TEST_WEIGHTS_FILENAME
-        dst_weights = dest_verifier / TEST_WEIGHTS_FILENAME
-        if src_weights.is_file() and not dst_weights.exists():
-            shutil.copy2(src_weights, dst_weights)
-            wrote_weights = True
-    if verbose:
-        print(
-            f"      logs/verifier mirror: test.sh={wrote_test_sh} "
-            f"test_outputs.py={wrote_outputs} test_weights.json={wrote_weights}"
-        )
-    return wrote_test_sh, wrote_outputs, wrote_weights
+    return False, False, False
 
 
 # Harness-injected wall-clock prefix on subagent context messages, e.g.
@@ -2177,33 +2069,40 @@ def _stage_test_runners_and_solver(
     input_task_dir: Path | None,
     bundle: Path,
     verbose: bool,
+    *,
+    include_tests: bool = True,
 ) -> tuple[bool, bool, bool, bool]:
-    """Stage data/tests/{test_outputs.py,test_weights.json,test.sh} + data/solution/solve.sh.
+    """Stage data/solution/solve.sh, and (when include_tests) data/tests/{test_outputs.py,test_weights.json,test.sh}.
 
     Returns (had_outputs, had_weights, wrote_test_sh, wrote_solve_sh) for verbose reporting.
-    test.sh and solve.sh are always emitted (zero-dep on input/). test_outputs.py
-    and test_weights.json are emitted only when present at the input task root.
+    solve.sh is always emitted (zero-dep on input/). The test surface (test.sh +
+    test_outputs.py + test_weights.json) is emitted only when include_tests is
+    True. The default True keeps the output-side stage_output_data() path
+    unchanged; convert_task() passes include_tests=False so delivered bundles
+    carry no pytest surface.
     """
     tests_dir = bundle / "data" / TESTS_SUBDIR
     solution_dir = bundle / "data" / SOLUTION_SUBDIR
 
     had_outputs = False
     had_weights = False
-    if input_task_dir is not None:
-        src_outputs = _resolve_test_outputs_source(input_task_dir)
-        if src_outputs is not None:
-            tests_dir.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(src_outputs, tests_dir / TEST_OUTPUTS_FILENAME)
-            had_outputs = True
-        src_weights = input_task_dir / TEST_WEIGHTS_FILENAME
-        if src_weights.is_file():
-            tests_dir.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(src_weights, tests_dir / TEST_WEIGHTS_FILENAME)
-            had_weights = True
+    wrote_test_sh = False
+    if include_tests:
+        if input_task_dir is not None:
+            src_outputs = _resolve_test_outputs_source(input_task_dir)
+            if src_outputs is not None:
+                tests_dir.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src_outputs, tests_dir / TEST_OUTPUTS_FILENAME)
+                had_outputs = True
+            src_weights = input_task_dir / TEST_WEIGHTS_FILENAME
+            if src_weights.is_file():
+                tests_dir.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src_weights, tests_dir / TEST_WEIGHTS_FILENAME)
+                had_weights = True
 
-    tests_dir.mkdir(parents=True, exist_ok=True)
-    (tests_dir / TEST_SH_FILENAME).write_text(_generate_test_sh(), encoding="utf-8")
-    wrote_test_sh = True
+        tests_dir.mkdir(parents=True, exist_ok=True)
+        (tests_dir / TEST_SH_FILENAME).write_text(_generate_test_sh(), encoding="utf-8")
+        wrote_test_sh = True
 
     bundle_env_dir = bundle / "data" / "environment"
     env_vars = _discover_service_env_vars(bundle_env_dir, enabled_apis=None)
@@ -2379,7 +2278,13 @@ def convert_task(
     golden_dir.mkdir(parents=True, exist_ok=True)
     (golden_dir / ".gitkeep").touch()
 
-    _stage_test_runners_and_solver(input_task_dir, bundle, verbose)
+    _stage_test_runners_and_solver(input_task_dir, bundle, verbose, include_tests=False)
+    # The data/ copytree above carries data/tests/ through from the (output-side)
+    # source tree, which legitimately holds the test surface. Delivered bundles
+    # must carry none, so prune it here — on the local `bundle` dir only, NEVER a
+    # shared helper (there `bundle` is the output tree). data/solution/solve.sh is
+    # a separate dir and is untouched.
+    shutil.rmtree(bundle / "data" / TESTS_SUBDIR, ignore_errors=True)
     _stage_data_instruction(input_task_dir, bundle, verbose)
     _stage_environment_dockerfile_and_compose(bundle, verbose)
     _stage_task_toml(input_task_dir, bundle, verbose)
@@ -2411,9 +2316,6 @@ def convert_task(
             # 2) logs/verifier/ copied as-is (raw ctrf.json, test_weights.json,
             #    reward.txt and siblings — see copy_verifier_logs docstring)
             n_verifier = copy_verifier_logs(run_dir, dest_run)
-            _stage_verifier_test_sources(
-                input_task_dir, dest_run / "logs" / "verifier", verbose
-            )
 
             # 3) report.json built
             report = build_report(run_dir, task_dir, pretty, ridx, infer_meta)
@@ -2441,7 +2343,6 @@ def convert_task(
             run_summ = {
                 "run_index": ridx,
                 "include_multimodal": report["include_multimodal"],
-                "test_weights_percentage": report["test_weights_percentage"],
                 "rubric_weights_percentage": report["rubric_weights_percentage"],
                 "combined_score": _blend_combined_score(report),
             }
@@ -2470,14 +2371,12 @@ def convert_task(
                 stat_runs = [r for r in per_run_summ
                              if not r.get("run_incomplete")] or per_run_summ
             n = len(stat_runs)
-            avg_test = sum(r["test_weights_percentage"] for r in stat_runs) / n
             avg_rub = sum(r["rubric_weights_percentage"] for r in stat_runs) / n
             avg_combined = sum(r["combined_score"] for r in stat_runs) / n
             summary_doc = {
                 "model": pretty,
                 "runs": len(per_run_summ),
                 "average_combined_score": round(avg_combined, 2),
-                "average_test_weights_percentage": round(avg_test, 2),
                 "average_rubric_weights_percentage": round(avg_rub, 2),
                 "per_run": per_run_summ,
             }

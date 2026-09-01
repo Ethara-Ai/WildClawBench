@@ -1,22 +1,18 @@
-"""Invariant tests pinning the 4-file emission contract added to
-script/repackage_to_bundle.py:
+"""Invariant tests for script/repackage_to_bundle.py test-runner / solver staging.
 
-    bundle/data/tests/test_outputs.py     (copied from input/<task>/)
-    bundle/data/tests/test_weights.json   (copied from input/<task>/)
-    bundle/data/tests/test.sh             (generated, verbatim Harbor template)
-    bundle/data/solution/solve.sh         (generated from discovered env_vars)
-
-These were silently lost during the b1 refactor that routed auto-bundle through
-the standalone stdlib script. Restored 2026-06-27 per user request: "Combine
-both paths to make sure everything is fulfilled and add it to bundle.py file."
+Delivered bundles carry NO pytest surface (bundle-only test-surface strip): the
+bundle emits only ``data/solution/solve.sh``. The full 4-file test surface
+(``data/tests/{test_outputs.py,test_weights.json,test.sh}`` + solve.sh) is still
+staged on the OUTPUT side via ``stage_output_data`` (``--stage-output-data``),
+so ``output/<task>/data`` and the delivered bundle differ by ``data/tests/**``
+as a by-design asymmetry.
 
 The tests are static (no docker, no network). They cover:
-  1. test.sh byte-equal with src/utils/harbor/test_sh.py::_TEST_SH.
-  2. solve.sh byte-equal with src/utils/harbor/solve_sh.py::generate_harbor_solve_sh.
-  3. End-to-end convert_task emits all 4 files in canonical paths.
+  1. test.sh / solve.sh generators byte-equal with src/utils/harbor/.
+  2. convert_task emits solve.sh but NO data/tests/ (delivered bundle).
+  3. stage_output_data emits the full 4-file surface into output/<task>/data/.
   4. solve.sh contains one os.environ.get per discovered service env_var.
-  5. test_outputs.py / test_weights.json sources are at input/<task>/ ROOT
-     (NOT under data/tests/) - this matches src/utils/task_parser.py loading.
+  5. test_outputs.py / test_weights.json sources are at input/<task>/ ROOT.
 """
 from __future__ import annotations
 
@@ -116,7 +112,7 @@ def _stage_minimal_task(tmp_path: Path, task_id: str = "ben_cox_8fc24d4b") -> tu
     return src_root, dst_root, inp_root
 
 
-def test_convert_task_emits_all_four_files(tmp_path):
+def test_convert_task_emits_no_test_surface_only_solve_sh(tmp_path):
     rp = _load_repackage_module()
     src_root, dst_root, inp_root = _stage_minimal_task(tmp_path)
     task_id = "ben_cox_8fc24d4b"
@@ -130,42 +126,36 @@ def test_convert_task_emits_all_four_files(tmp_path):
     )
     assert bundle is not None, "convert_task returned None"
 
-    test_outputs = bundle / "data" / "tests" / "test_outputs.py"
-    test_weights = bundle / "data" / "tests" / "test_weights.json"
-    test_sh = bundle / "data" / "tests" / "test.sh"
     solve_sh = bundle / "data" / "solution" / "solve.sh"
-
-    assert test_outputs.is_file(), f"missing {test_outputs}"
-    assert test_weights.is_file(), f"missing {test_weights}"
-    assert test_sh.is_file(), f"missing {test_sh}"
     assert solve_sh.is_file(), f"missing {solve_sh}"
 
+    tests_dir = bundle / "data" / "tests"
+    assert not tests_dir.exists(), (
+        "delivered bundle must carry NO pytest surface — data/tests/ removed "
+        "deliberately (bundle-only test-surface strip); do NOT restore"
+    )
 
-def test_convert_task_test_outputs_source_is_input_root(tmp_path):
+
+def test_stage_output_data_test_outputs_source_is_input_root(tmp_path):
     rp = _load_repackage_module()
-    src_root, dst_root, inp_root = _stage_minimal_task(tmp_path)
+    src_root, _dst, inp_root = _stage_minimal_task(tmp_path)
     task_id = "ben_cox_8fc24d4b"
+    task_dir = src_root / task_id
 
     src_text = (inp_root / task_id / "test_outputs.py").read_text()
     src_weights = (inp_root / task_id / "test_weights.json").read_text()
 
-    bundle = rp.convert_task(
-        task_dir=src_root / task_id,
-        dest_root=dst_root,
-        input_root=inp_root,
-        infer_meta=False,
-        verbose=False,
-    )
-    assert bundle is not None
+    assert rp.stage_output_data(task_dir=task_dir, input_root=inp_root, verbose=False)
 
-    assert (bundle / "data" / "tests" / "test_outputs.py").read_text() == src_text
-    assert (bundle / "data" / "tests" / "test_weights.json").read_text() == src_weights
+    assert (task_dir / "data" / "tests" / "test_outputs.py").read_text() == src_text
+    assert (task_dir / "data" / "tests" / "test_weights.json").read_text() == src_weights
 
 
-def test_convert_task_accepts_legacy_test_output_singular_filename(tmp_path):
+def test_stage_output_data_accepts_legacy_test_output_singular_filename(tmp_path):
     rp = _load_repackage_module()
-    src_root, dst_root, inp_root = _stage_minimal_task(tmp_path)
+    src_root, _dst, inp_root = _stage_minimal_task(tmp_path)
     task_id = "ben_cox_8fc24d4b"
+    task_dir = src_root / task_id
 
     canonical = inp_root / task_id / "test_outputs.py"
     legacy = inp_root / task_id / "test_output.py"
@@ -173,19 +163,12 @@ def test_convert_task_accepts_legacy_test_output_singular_filename(tmp_path):
     canonical.unlink()
     legacy.write_text(legacy_content)
 
-    bundle = rp.convert_task(
-        task_dir=src_root / task_id,
-        dest_root=dst_root,
-        input_root=inp_root,
-        infer_meta=False,
-        verbose=False,
-    )
-    assert bundle is not None
-    dst = bundle / "data" / "tests" / "test_outputs.py"
+    assert rp.stage_output_data(task_dir=task_dir, input_root=inp_root, verbose=False)
+    dst = task_dir / "data" / "tests" / "test_outputs.py"
     assert dst.is_file(), (
         "legacy singular-typo test_output.py at input root must still produce "
-        "canonical bundle/data/tests/test_outputs.py (mirrors task_parser.py:190 "
-        "which accepts both names)"
+        "canonical data/tests/test_outputs.py on the output side (mirrors "
+        "task_parser.py:190 which accepts both names)"
     )
     assert dst.read_text() == legacy_content
 
@@ -238,7 +221,7 @@ def test_solve_sh_references_discovered_env_vars(tmp_path):
     assert "http://xero-api:8088" in solve
 
 
-def test_test_sh_and_solve_sh_emit_even_when_input_root_missing(tmp_path):
+def test_solve_sh_emits_but_no_test_surface_when_input_root_missing(tmp_path):
     rp = _load_repackage_module()
     src_root = tmp_path / "src"
     dst_root = tmp_path / "dst"
@@ -259,17 +242,11 @@ def test_test_sh_and_solve_sh_emit_even_when_input_root_missing(tmp_path):
         verbose=False,
     )
     assert bundle is not None
-    assert (bundle / "data" / "tests" / "test.sh").is_file(), (
-        "test.sh must emit unconditionally (no input dir dependency)"
-    )
     assert (bundle / "data" / "solution" / "solve.sh").is_file(), (
         "solve.sh must emit unconditionally (no input dir dependency)"
     )
-    assert not (bundle / "data" / "tests" / "test_outputs.py").exists(), (
-        "test_outputs.py must NOT emit when input/<task>/ is unmatched"
-    )
-    assert not (bundle / "data" / "tests" / "test_weights.json").exists(), (
-        "test_weights.json must NOT emit when input/<task>/ is unmatched"
+    assert not (bundle / "data" / "tests").exists(), (
+        "delivered bundle must carry NO pytest surface, even for orphan tasks"
     )
 
 
@@ -312,7 +289,7 @@ def test_discover_service_env_vars_skips_missing_toml(tmp_path):
     assert out == {}
 
 
-def test_per_rep_logs_verifier_has_test_sources(tmp_path):
+def test_per_rep_logs_verifier_has_no_fabricated_test_sources(tmp_path):
     rp = _load_repackage_module()
     src_root, dst_root, inp_root = _stage_minimal_task(tmp_path)
     task_id = "ben_cox_8fc24d4b"
@@ -326,55 +303,11 @@ def test_per_rep_logs_verifier_has_test_sources(tmp_path):
     )
     assert bundle is not None
     verifier = bundle / "trajectories" / "Claude Opus 4.7" / "run_1" / "logs" / "verifier"
-    assert (verifier / "test.sh").is_file(), (
-        "test.sh must mirror into each per-rep logs/verifier/ next to the run outputs"
-    )
-    assert (verifier / "test_outputs.py").is_file(), (
-        "test_outputs.py must mirror into each per-rep logs/verifier/ from input root"
-    )
-    assert (verifier / "test_weights.json").is_file(), (
-        "test_weights.json must mirror into each per-rep logs/verifier/ from input root"
-    )
-
-
-def test_per_rep_logs_verifier_test_sh_byte_equal_with_harbor(tmp_path):
-    rp = _load_repackage_module()
-    src_root, dst_root, inp_root = _stage_minimal_task(tmp_path)
-    task_id = "ben_cox_8fc24d4b"
-
-    bundle = rp.convert_task(
-        task_dir=src_root / task_id,
-        dest_root=dst_root,
-        input_root=inp_root,
-        infer_meta=False,
-        verbose=False,
-    )
-    verifier_test_sh = (
-        bundle / "trajectories" / "Claude Opus 4.7" / "run_1" / "logs" / "verifier" / "test.sh"
-    ).read_text()
-    harbor_test_sh = _load_harbor_test_sh()()
-    assert verifier_test_sh == harbor_test_sh, (
-        "per-rep logs/verifier/test.sh must stay byte-equal with src/utils/harbor/test_sh.py"
-    )
-
-
-def test_per_rep_logs_verifier_test_outputs_byte_equal_with_input(tmp_path):
-    rp = _load_repackage_module()
-    src_root, dst_root, inp_root = _stage_minimal_task(tmp_path)
-    task_id = "ben_cox_8fc24d4b"
-
-    bundle = rp.convert_task(
-        task_dir=src_root / task_id,
-        dest_root=dst_root,
-        input_root=inp_root,
-        infer_meta=False,
-        verbose=False,
-    )
-    verifier_dir = bundle / "trajectories" / "Claude Opus 4.7" / "run_1" / "logs" / "verifier"
-    src_outputs = (inp_root / task_id / "test_outputs.py").read_bytes()
-    src_weights = (inp_root / task_id / "test_weights.json").read_bytes()
-    assert (verifier_dir / "test_outputs.py").read_bytes() == src_outputs
-    assert (verifier_dir / "test_weights.json").read_bytes() == src_weights
+    for name in ("test.sh", "test_outputs.py", "test_weights.json"):
+        assert not (verifier / name).exists(), (
+            f"{name} must NOT be fabricated into the bundle per-rep logs/verifier/ "
+            "for a rubric-only run (bundle-side _stage_verifier_test_sources removed)"
+        )
 
 
 # ---- stage_output_data parity tests ----
@@ -431,9 +364,10 @@ def test_stage_output_data_still_emits_test_sh_when_input_missing(tmp_path):
 
 
 def test_stage_output_data_then_convert_task_parity(tmp_path):
-    """End-to-end: after stage_output_data writes into output/<task>/data/,
-    a subsequent convert_task on that task produces bundle/data/ that matches
-    output/<task>/data/ for the 5 staged artifact paths."""
+    """End-to-end: after stage_output_data writes into output/<task>/data/, a
+    subsequent convert_task produces a bundle whose data/solution/solve.sh is
+    byte-equal with the output side, while data/tests/** is a by-design
+    asymmetry (present in output, stripped from the delivered bundle)."""
     rp = _load_repackage_module()
     src_root, dst_root, inp_root = _stage_minimal_task(tmp_path)
     task_id = "ben_cox_8fc24d4b"
@@ -455,18 +389,24 @@ def test_stage_output_data_then_convert_task_parity(tmp_path):
     )
     assert bundle is not None
 
-    # The 5 mirrored artifacts must appear in BOTH trees.
+    # solve.sh is byte-equal on both sides.
+    assert (task_dir / "data" / "solution" / "solve.sh").is_file()
+    assert (bundle / "data" / "solution" / "solve.sh").is_file()
+    assert (task_dir / "data" / "solution" / "solve.sh").read_bytes() == (
+        bundle / "data" / "solution" / "solve.sh"
+    ).read_bytes()
+
+    # data/tests/** is the by-design asymmetry: present on the output side,
+    # stripped from the delivered bundle.
     for rel in (
         "data/tests/test.sh",
         "data/tests/test_outputs.py",
         "data/tests/test_weights.json",
-        "data/solution/solve.sh",
     ):
         assert (task_dir / rel).is_file(), f"output side missing {rel}"
-        assert (bundle / rel).is_file(), f"bundle side missing {rel}"
-        assert (task_dir / rel).read_bytes() == (bundle / rel).read_bytes(), (
-            f"output/{rel} differs from bundle/{rel}"
-        )
+    assert not (bundle / "data" / "tests").exists(), (
+        "delivered bundle must carry NO data/tests/ (bundle-only test-surface strip)"
+    )
 
 
 def test_stage_output_data_cli_flag_in_argparse():
@@ -694,3 +634,91 @@ def test_convert_task_emits_all_four_harbor_files(tmp_path):
         "data/task.toml",
     ):
         assert (bundle / rel).is_file(), f"convert_task did not emit {rel}"
+
+
+# ============================================================================
+# Bundle-only test-surface strip: delivered bundles carry NO pytest surface,
+# and report.json / pass_summary.json carry NO test-scoring keys.
+# ============================================================================
+
+
+def test_bundle_has_no_pytest_surface_anywhere(tmp_path):
+    rp = _load_repackage_module()
+    src_root, dst_root, inp_root = _stage_minimal_task(tmp_path)
+    task_id = "ben_cox_8fc24d4b"
+
+    bundle = rp.convert_task(
+        task_dir=src_root / task_id,
+        dest_root=dst_root,
+        input_root=inp_root,
+        infer_meta=False,
+        verbose=False,
+    )
+    assert bundle is not None
+
+    forbidden = {"test.sh", "test_outputs.py", "test_weights.json", "ctrf.json", "reward.txt"}
+    offenders = [str(p.relative_to(bundle)) for p in bundle.rglob("*")
+                 if p.is_file() and p.name in forbidden]
+    assert not offenders, f"delivered bundle must carry no pytest surface; found: {offenders}"
+    assert not any(p.is_dir() and p.name == "tests" and p.parent.name == "data"
+                   for p in bundle.rglob("*")), "no data/tests/ dir anywhere in the bundle"
+    assert (bundle / "data" / "solution" / "solve.sh").is_file()
+
+
+def test_report_json_has_no_test_keys(tmp_path):
+    rp = _load_repackage_module()
+    src_root, dst_root, inp_root = _stage_minimal_task(tmp_path)
+    task_id = "ben_cox_8fc24d4b"
+    run_dir = src_root / task_id / "trajectories" / "claude" / "run_1"
+    (run_dir / "score.json").write_text(json.dumps({
+        "criteria": [],
+        "rubric_weights_percentage": 42.0,
+        "rubric_based_reward": 0.42,
+        "combined_reward": 0.42,
+    }))
+
+    bundle = rp.convert_task(
+        task_dir=src_root / task_id,
+        dest_root=dst_root,
+        input_root=inp_root,
+        infer_meta=False,
+        verbose=False,
+    )
+    assert bundle is not None
+    report = json.loads(
+        (bundle / "trajectories" / "Claude Opus 4.7" / "run_1" / "report.json").read_text()
+    )
+    for key in ("pytest", "test_weights_percentage", "test_channel_present"):
+        assert key not in report, f"report.json must not carry {key}"
+    assert "final_reward" in report and "rubric_weights_percentage" in report
+    assert abs(report["final_reward"] - report["rubric_weights_percentage"]) <= 0.01
+
+
+def test_pass_summary_has_no_test_keys(tmp_path):
+    rp = _load_repackage_module()
+    src_root, dst_root, inp_root = _stage_minimal_task(tmp_path)
+    task_id = "ben_cox_8fc24d4b"
+    run_dir = src_root / task_id / "trajectories" / "claude" / "run_1"
+    (run_dir / "score.json").write_text(json.dumps({
+        "criteria": [],
+        "rubric_weights_percentage": 42.0,
+        "rubric_based_reward": 0.42,
+        "combined_reward": 0.42,
+    }))
+
+    bundle = rp.convert_task(
+        task_dir=src_root / task_id,
+        dest_root=dst_root,
+        input_root=inp_root,
+        infer_meta=False,
+        verbose=False,
+    )
+    assert bundle is not None
+    summary = json.loads(
+        (bundle / "trajectories" / "Claude Opus 4.7" / "pass_summary.json").read_text()
+    )
+    assert "average_test_weights_percentage" not in summary
+    for rec in summary.get("per_run", []):
+        assert "test_weights_percentage" not in rec
+    assert "average_combined_score" in summary
+    assert "average_rubric_weights_percentage" in summary

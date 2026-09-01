@@ -406,6 +406,31 @@ def test_ts_main_rubric_only_no_halving(ts, tmp_path, capsys, monkeypatch):
     assert summary["average_combined_score"] == pytest.approx(40.0)
 
 
+def test_ts_main_noop_on_rubric_only_bundle(ts, tmp_path, capsys, monkeypatch):
+    # New-style rubric-only bundles carry NO pytest block; the backfill must be
+    # a per-report no-op (report.json byte-identical, pass_summary not rewritten).
+    bundle = tmp_path / "bundle_no_pytest"
+    run = bundle / "task1" / "trajectories" / "opus" / "run_1"
+    run.mkdir(parents=True, exist_ok=True)
+    rep_path = run / "report.json"
+    rep = {
+        "run_index": 1,
+        "include_multimodal": False,
+        "rubric_weights_percentage": 40.0,
+        "final_reward": 40.0,
+    }
+    rep_path.write_text(json.dumps(rep), encoding="utf-8")
+    before = rep_path.read_bytes()
+
+    monkeypatch.setattr(sys, "argv", ["x", str(bundle)])
+    assert ts.main() == 0
+    assert "report.json files changed: 0" in capsys.readouterr().out
+    assert rep_path.read_bytes() == before, "rubric-only report.json must be untouched"
+    assert not (run.parent / "pass_summary.json").exists(), (
+        "backfill must not fabricate a pass_summary.json for a rubric-only bundle"
+    )
+
+
 def test_ts_dunder_main(ts, tmp_path, monkeypatch):
     bundle = tmp_path / "b2"
     _mk_bundle_report(bundle)
