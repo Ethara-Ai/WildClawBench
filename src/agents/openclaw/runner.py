@@ -226,6 +226,109 @@ class OpenClawAgent(BaseAgent):
         )
         return False
 
+    def _count_run_key_rows(self, run_key: str) -> int:
+        try:
+            with open(self.litellm_usage_log, "r", encoding="utf-8") as fh:
+                return fh.read().count(run_key)
+        except OSError:
+            return 0
+
+    # Floor for WCB_TURN_STALL_SECONDS: usage rows land at request COMPLETION,
+    # so one legitimately long streaming call (or a long local tool exec)
+    # produces zero rows for its whole duration. Anything under this floor
+    # would misread healthy long calls as wedges.
+    _STALL_FLOOR_S = 600.0
+
+    @staticmethod
+    def _terminate_agent_invocations(task_id: str) -> None:
+        """Kill the IN-CONTAINER `openclaw agent` CLI processes. Killing the
+        host-side `docker exec` Popen does NOT reach them (same pathology the
+        codex runner fixed with _terminate_codex_processes). Pattern is scoped
+        to 'openclaw agent' so the long-lived `openclaw gateway` survives."""
+        subprocess.run(
+            ["docker", "exec", task_id, "/bin/bash", "-lc",
+             "pkill -TERM -f 'openclaw agent' 2>/dev/null || true; "
+             "sleep 2; "
+             "pkill -KILL -f 'openclaw agent' 2>/dev/null || true"],
+            capture_output=True, text=True, timeout=30,
+        )
+
+    def _break_stuck_llm_connections(self, task_id: str) -> None:
+        """Best-effort RST of the container's sockets to the sidecar so the
+        gateway's silently dead in-flight request errors out. Requires
+        iproute2's ss with kernel SOCK_DESTROY + CAP_NET_ADMIN, which the
+        production image may not have — report honestly either way. dport
+        scoping means concurrent subagent/audio calls to the sidecar are also
+        reset; acceptable because the main turn is already wedged."""
+        try:
+            r = subprocess.run(
+                ["docker", "exec", "-u", "0", task_id, "sh", "-c",
+                 f"command -v ss >/dev/null 2>&1 && "
+                 f"ss -K dport = {self.litellm_port} 2>&1 "
+                 f"|| echo WCB_SS_UNAVAILABLE"],
+                capture_output=True, text=True, timeout=20,
+            )
+            out = (r.stdout or r.stderr or "").strip()
+            if "WCB_SS_UNAVAILABLE" in out or r.returncode != 0:
+                logger.warning(
+                    "[%s] stall-guard: ss unavailable/failed in container — "
+                    "relying on process kill only (%s)", task_id, out[:120])
+            else:
+                logger.warning("[%s] stall-guard: reset sidecar connections "
+                               "(%s)", task_id, out[:120])
+        except Exception as exc:
+            logger.warning("[%s] stall-guard: connection kill failed: %s",
+                           task_id, exc)
+
+    @staticmethod
+    def _stall_seconds() -> float:
+        try:
+            stall_s = float(os.environ.get("WCB_TURN_STALL_SECONDS", "0") or 0)
+        except ValueError:
+            return 0.0
+        if stall_s <= 0:
+            return 0.0
+        return max(stall_s, OpenClawAgent._STALL_FLOOR_S)
+
+    def _turn_wait_outcome(self, agent_proc, spec: AgentTaskSpec,
+                           deadline: float) -> str:
+        """Wait for a turn's agent invocation: 'ok' | 'timeout' | 'stalled'.
+
+        `deadline` is the TURN's wall-clock budget shared across retry
+        attempts (a stalled+retried turn never exceeds one turn budget).
+        Stall detection (WCB_TURN_STALL_SECONDS>0, run-key tagging live): the
+        run's tagged sidecar rows are the liveness signal — success AND failure
+        rows both count as progress (either proves the in-flight request
+        completed). No new row for the stall window while the invocation is
+        still running = a silently dead in-flight request."""
+        stall_s = self._stall_seconds()
+        run_key = self._run_keys.get(spec.task_id, "")
+        guarded = (stall_s > 0 and run_key and self.litellm_usage_log
+                   and self._run_key_bearer_live())
+        if not guarded:
+            try:
+                agent_proc.wait(timeout=max(0.0, deadline - time.time()))
+                return "ok"
+            except subprocess.TimeoutExpired:
+                return "timeout"
+        seen = self._count_run_key_rows(run_key)
+        last_progress = time.time()
+        while True:
+            remaining = deadline - time.time()
+            if remaining <= 0:
+                return "timeout"
+            try:
+                agent_proc.wait(timeout=min(15.0, remaining))
+                return "ok"
+            except subprocess.TimeoutExpired:
+                pass
+            n = self._count_run_key_rows(run_key)
+            if n != seen:
+                seen = n
+                last_progress = time.time()
+            elif time.time() - last_progress > stall_s:
+                return "stalled"
+
     def run_task(self, spec: AgentTaskSpec) -> AgentExecution:
         gateway_proc = None
         agent_proc = None
@@ -585,34 +688,66 @@ class OpenClawAgent(BaseAgent):
                     _ui_lifecycle.emit_stage(
                         spec.task_id, _ui_lifecycle.STAGE_STATUS,
                         f"agent turn {turn_index + 1}/{total_turns}")
-                agent_proc = run_background(
-                    spec.task_id,
-                    bash_cmd=(
-                        f"openclaw agent --session-id chat "
-                        f"--timeout {spec.timeout_seconds} "
-                        f"--message '{safe_msg}'"
-                    ),
-                    log_path=spec.output_dir / "agent.log",
-                    # Turn 0 truncates (a retried run_N starts clean); later
-                    # turns append so agent.log aggregates the WHOLE run
-                    # instead of keeping only the last turn.
-                    append=turn_index > 0,
-                )
-                logger.info("[%s] Waiting for agent to finish...", spec.task_id)
-                try:
-                    agent_proc.wait(timeout=spec.timeout_seconds)
-                    logger.info("[%s] Agent turn %d finished", spec.task_id, turn_index + 1)
-                except subprocess.TimeoutExpired:
-                    logger.warning("[%s] Agent turn %d timed out", spec.task_id, turn_index + 1)
+                # A silently dead in-flight request wedges openclaw with no
+                # surfaced error (stochastic ~0.1%/request; killed 39 delivery
+                # runs + 3 repro runs). One stall-guarded retry of the SAME
+                # turn converts a lost run into a recovered turn. Retry may
+                # duplicate the user message in-session if the gateway kept
+                # the aborted exchange — accepted: better than a dead run. The
+                # turn deadline is shared across attempts so a stalled+retried
+                # turn never exceeds a single turn budget.
+                outcome = "timeout"
+                turn_deadline = time.time() + spec.timeout_seconds
+                for turn_attempt in range(2):
+                    attempt_budget = max(60, int(turn_deadline - time.time()))
+                    agent_proc = run_background(
+                        spec.task_id,
+                        bash_cmd=(
+                            f"openclaw agent --session-id chat "
+                            f"--timeout {attempt_budget} "
+                            f"--message '{safe_msg}'"
+                        ),
+                        log_path=spec.output_dir / "agent.log",
+                        # Turn 0 truncates (a retried run_N starts clean); later
+                        # turns and stall retries append so agent.log aggregates
+                        # the WHOLE run instead of keeping only the last turn.
+                        append=turn_index > 0 or turn_attempt > 0,
+                    )
+                    logger.info("[%s] Waiting for agent to finish...", spec.task_id)
+                    try:
+                        outcome = self._turn_wait_outcome(
+                            agent_proc, spec, turn_deadline)
+                    finally:
+                        # Runs on success, timeout-break and any raise: releases
+                        # the per-turn log handle (previously leaked every turn).
+                        close_proc_log(agent_proc)
+                    if outcome == "ok":
+                        logger.info("[%s] Agent turn %d finished",
+                                    spec.task_id, turn_index + 1)
+                        break
+                    if outcome == "stalled" and turn_attempt == 0:
+                        logger.warning(
+                            "[%s] Agent turn %d STALLED (no sidecar traffic for "
+                            "WCB_TURN_STALL_SECONDS) — breaking dead connections "
+                            "and retrying the turn once",
+                            spec.task_id, turn_index + 1)
+                        self._break_stuck_llm_connections(spec.task_id)
+                        self._terminate_agent_invocations(spec.task_id)
+                        agent_proc.kill()
+                        agent_proc.wait()
+                        continue
+                    logger.warning("[%s] Agent turn %d %s", spec.task_id,
+                                   turn_index + 1,
+                                   "timed out" if outcome == "timeout"
+                                   else "stalled twice — giving up")
+                    self._terminate_agent_invocations(spec.task_id)
                     agent_proc.kill()
                     agent_proc.wait()
+                    break
+                if outcome != "ok":
                     _ui_timed_out = True
                     timed_out_turn = turn_index
                     break
-                finally:
-                    # Runs on success, timeout-break and any raise: releases the
-                    # per-turn log handle (previously leaked every turn).
-                    close_proc_log(agent_proc)
                 turns_executed += 1
                 turn_index += 1
             elapsed_time = time.perf_counter() - start_time

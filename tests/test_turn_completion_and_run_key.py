@@ -12,7 +12,9 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import subprocess
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -544,6 +546,139 @@ class TestSpawnTreeFold:
                           [{"kind": "summary", "n_spawns": 0}])
         assert "subagent_count" not in u
         assert "subagent_usage_folded" not in u
+
+
+class _FakeProc:
+    def __init__(self, waits_before_exit=None):
+        self.waits_before_exit = waits_before_exit
+        self.calls = 0
+
+    def wait(self, timeout=None):
+        self.calls += 1
+        if (self.waits_before_exit is not None
+                and self.calls > self.waits_before_exit):
+            return 0
+        raise subprocess.TimeoutExpired(cmd="fake", timeout=timeout or 0)
+
+
+class TestStallGuard:
+    def _agent(self, tmp_path, run_key="wcb::t1::k"):
+        from src.agents.openclaw.runner import OpenClawAgent
+        a = OpenClawAgent(gateway_port=1, litellm_master_key="")
+        a.litellm_usage_log = str(tmp_path / "usage.jsonl")
+        (tmp_path / "usage.jsonl").write_text("")
+        a._run_keys["t1"] = run_key
+        return a
+
+    def _spec(self):
+        from src.agents.base import AgentTaskSpec
+        return AgentTaskSpec(task_id="t1", task={}, workspace_path="/tmp",
+                             prompt="p", timeout_seconds=30,
+                             output_dir=Path("/tmp"), model="m")
+
+    def test_stall_seconds_floor_and_disable(self, monkeypatch):
+        from src.agents.openclaw.runner import OpenClawAgent
+        monkeypatch.delenv("WCB_TURN_STALL_SECONDS", raising=False)
+        assert OpenClawAgent._stall_seconds() == 0.0
+        monkeypatch.setenv("WCB_TURN_STALL_SECONDS", "0")
+        assert OpenClawAgent._stall_seconds() == 0.0
+        monkeypatch.setenv("WCB_TURN_STALL_SECONDS", "120")
+        assert OpenClawAgent._stall_seconds() == 600.0
+        monkeypatch.setenv("WCB_TURN_STALL_SECONDS", "900")
+        assert OpenClawAgent._stall_seconds() == 900.0
+        monkeypatch.setenv("WCB_TURN_STALL_SECONDS", "garbage")
+        assert OpenClawAgent._stall_seconds() == 0.0
+
+    def test_disabled_guard_ok_and_timeout(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("WCB_TURN_STALL_SECONDS", raising=False)
+        a = self._agent(tmp_path)
+        assert a._turn_wait_outcome(_FakeProc(waits_before_exit=0),
+                                    self._spec(),
+                                    time.time() + 30) == "ok"
+        assert a._turn_wait_outcome(_FakeProc(), self._spec(),
+                                    time.time() - 1) == "timeout"
+
+    def test_guarded_stall_detected(self, tmp_path, monkeypatch):
+        from src.agents.openclaw import runner as ocr
+        monkeypatch.setenv("WCB_SIDECAR_NO_MASTER_KEY", "1")
+        monkeypatch.setenv("WCB_TURN_STALL_SECONDS", "1")
+        monkeypatch.setattr(ocr.OpenClawAgent, "_STALL_FLOOR_S", 0.2)
+        a = self._agent(tmp_path)
+        assert a._turn_wait_outcome(_FakeProc(), self._spec(),
+                                    time.time() + 30) == "stalled"
+
+    def test_guarded_progress_prevents_stall(self, tmp_path, monkeypatch):
+        from src.agents.openclaw import runner as ocr
+        monkeypatch.setenv("WCB_SIDECAR_NO_MASTER_KEY", "1")
+        monkeypatch.setenv("WCB_TURN_STALL_SECONDS", "1")
+        monkeypatch.setattr(ocr.OpenClawAgent, "_STALL_FLOOR_S", 5.0)
+        a = self._agent(tmp_path)
+        log = Path(a.litellm_usage_log)
+
+        class _ProgressProc(_FakeProc):
+            def wait(self, timeout=None):
+                with open(log, "a") as fh:
+                    fh.write('{"run_key": "wcb::t1::k"}\n')
+                return super().wait(timeout)
+
+        assert a._turn_wait_outcome(_ProgressProc(waits_before_exit=3),
+                                    self._spec(),
+                                    time.time() + 30) == "ok"
+
+    def test_log_truncation_counts_as_progress(self, tmp_path, monkeypatch):
+        """m6 regression: rows count DECREASING (rotation) must not read as
+        an instant stall — any change resets the progress clock."""
+        from src.agents.openclaw import runner as ocr
+        monkeypatch.setenv("WCB_SIDECAR_NO_MASTER_KEY", "1")
+        monkeypatch.setenv("WCB_TURN_STALL_SECONDS", "1")
+        monkeypatch.setattr(ocr.OpenClawAgent, "_STALL_FLOOR_S", 5.0)
+        a = self._agent(tmp_path)
+        log = Path(a.litellm_usage_log)
+        log.write_text('{"run_key": "wcb::t1::k"}\n' * 5)
+
+        class _TruncProc(_FakeProc):
+            def wait(self, timeout=None):
+                if self.calls == 1:
+                    log.write_text('{"run_key": "wcb::t1::k"}\n')
+                return super().wait(timeout)
+
+        assert a._turn_wait_outcome(_TruncProc(waits_before_exit=2),
+                                    self._spec(),
+                                    time.time() + 30) == "ok"
+
+    def test_terminate_agent_invocations_scoped(self, monkeypatch):
+        from src.agents.openclaw import runner as ocr
+        captured = {}
+
+        def fake_run(cmd, **kw):
+            captured["cmd"] = cmd
+            return type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+
+        monkeypatch.setattr(ocr.subprocess, "run", fake_run)
+        ocr.OpenClawAgent._terminate_agent_invocations("task-x")
+        joined = " ".join(captured["cmd"])
+        assert "docker exec task-x" in joined
+        assert "pkill -TERM -f 'openclaw agent'" in joined
+        assert "pkill -KILL -f 'openclaw agent'" in joined
+        assert "openclaw gateway" not in joined
+
+    def test_break_connections_honest_when_ss_missing(self, tmp_path,
+                                                      monkeypatch, caplog):
+        import logging
+        from src.agents.openclaw import runner as ocr
+
+        def fake_run(cmd, **kw):
+            return type("R", (), {"returncode": 0,
+                                  "stdout": "WCB_SS_UNAVAILABLE\n",
+                                  "stderr": ""})()
+
+        monkeypatch.setattr(ocr.subprocess, "run", fake_run)
+        a = self._agent(tmp_path)
+        with caplog.at_level(logging.WARNING):
+            a._break_stuck_llm_connections("t1")
+        assert any("ss unavailable" in r.message for r in caplog.records)
+        assert not any("reset sidecar connections" in r.message
+                       for r in caplog.records)
 
 
 class TestSidecarKeylessSwitch:
