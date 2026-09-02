@@ -148,6 +148,8 @@ def _pass_summary_entry(run_index: int, scores: dict | None, test_result: dict |
         entry["run_incomplete"] = True
         entry["turns_planned"] = s.get("turns_planned")
         entry["turns_completed"] = s.get("turns_completed")
+    if s.get("turns_duplicated"):
+        entry["turns_duplicated"] = list(s["turns_duplicated"])
     return entry
 
 

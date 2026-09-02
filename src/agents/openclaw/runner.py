@@ -336,6 +336,7 @@ class OpenClawAgent(BaseAgent):
         total_turns: int | None = None
         turns_executed = 0
         timed_out_turn: int | None = None
+        turns_duplicated: list[int] = []
 
         try:
             exec_path = os.path.join(spec.workspace_path, "exec")
@@ -648,6 +649,7 @@ class OpenClawAgent(BaseAgent):
             _ui_timed_out = False  # UI-only flag; does not affect elapsed/exec logic
             turns_executed = 0          # turns whose invocation finished (no timeout)
             timed_out_turn: int | None = None
+            turns_duplicated = []
             turn_index = 0
             while True:
                 try:
@@ -735,6 +737,7 @@ class OpenClawAgent(BaseAgent):
                         self._terminate_agent_invocations(spec.task_id)
                         agent_proc.kill()
                         agent_proc.wait()
+                        turns_duplicated.append(turn_index)
                         continue
                     logger.warning("[%s] Agent turn %d %s", spec.task_id,
                                    turn_index + 1,
@@ -822,6 +825,7 @@ class OpenClawAgent(BaseAgent):
                 timed_out_turn=timed_out_turn,
                 turns_planned=total_turns,
                 recovery_turn_fired=recovery_fired,
+                turns_duplicated=turns_duplicated,
             )
 
         except Exception as exc:
@@ -837,6 +841,7 @@ class OpenClawAgent(BaseAgent):
                 turns_completed=turns_executed,
                 timed_out_turn=timed_out_turn,
                 turns_planned=total_turns,
+                turns_duplicated=turns_duplicated,
             )
 
     def _wait_for_subagents(

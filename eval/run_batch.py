@@ -979,6 +979,8 @@ def _pass_summary_entry(run_index: int, scores: dict | None, test_result: dict |
         entry["run_incomplete"] = True
         entry["turns_planned"] = s.get("turns_planned")
         entry["turns_completed"] = s.get("turns_completed")
+    if s.get("turns_duplicated"):
+        entry["turns_duplicated"] = list(s["turns_duplicated"])
     return entry
 
 
@@ -1251,6 +1253,8 @@ def _augment_score_with_combined_rewards(scores: dict, result: dict) -> None:
         scores["turns_completed"] = r.get("turns_completed")
         if r.get("recovery_turn_fired"):
             scores["recovery_turn_fired"] = True
+        if r.get("turns_duplicated"):
+            scores["turns_duplicated"] = list(r["turns_duplicated"])
 
 
 def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
@@ -2378,6 +2382,7 @@ def run_single_task(
         result["turns_completed"] = execution.turns_completed
         result["timed_out_turn"] = execution.timed_out_turn
         result["recovery_turn_fired"] = execution.recovery_turn_fired
+        result["turns_duplicated"] = list(execution.turns_duplicated)
         result["run_incomplete"] = bool(
             execution.turns_planned is not None
             and execution.turns_completed is not None

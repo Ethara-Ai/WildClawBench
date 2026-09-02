@@ -575,6 +575,54 @@ class _FakeProc:
         raise subprocess.TimeoutExpired(cmd="fake", timeout=timeout or 0)
 
 
+class TestTurnsDuplicated:
+    """BUGREPORT §2.3/§4.4: a stall-retried turn is recorded at the moment it
+    fires — included in averages, visible in every report."""
+
+    def test_agent_execution_default(self):
+        ex = AgentExecution(elapsed_time=1.0)
+        assert ex.turns_duplicated == []
+        a = AgentExecution(elapsed_time=1.0, turns_duplicated=[3])
+        b = AgentExecution(elapsed_time=1.0)
+        assert a.turns_duplicated == [3] and b.turns_duplicated == []
+
+    def test_augment_stamps_when_present(self):
+        sys.path.insert(0, str(REPO / "eval"))
+        import run_batch as rb
+        scores = {"overall_score": 0.9}
+        rb._augment_score_with_combined_rewards(
+            scores, {"run_incomplete": False, "turns_planned": 9,
+                     "turns_completed": 9, "turns_duplicated": [6]})
+        assert scores["turns_duplicated"] == [6]
+        clean = {"overall_score": 0.9}
+        rb._augment_score_with_combined_rewards(
+            clean, {"run_incomplete": False, "turns_planned": 9,
+                    "turns_completed": 9, "turns_duplicated": []})
+        assert "turns_duplicated" not in clean
+
+    def test_entry_carries_flag_and_stays_in_average(self, monkeypatch):
+        monkeypatch.delenv("WCB_INCLUDE_INCOMPLETE_RUNS", raising=False)
+        sys.path.insert(0, str(REPO / "eval"))
+        import run_batch as rb
+        dup = rb._pass_summary_entry(
+            1, {"overall_score": 0.8, "rubric_weights_percentage": 80.0,
+                "turns_duplicated": [4]}, None)
+        clean = rb._pass_summary_entry(
+            2, {"overall_score": 0.6, "rubric_weights_percentage": 60.0}, None)
+        assert dup["turns_duplicated"] == [4]
+        assert "turns_duplicated" not in clean
+        doc = rb._pass_summary_doc("claude", [dup, clean])
+        assert doc.get("runs_excluded_incomplete") is None
+        assert doc["average_reward"] == pytest.approx(0.7)
+
+    def test_rebuild_script_carries_flag(self):
+        rps = _load_script("rebuild_pass_summary")
+        e = rps._pass_summary_entry(1, {"overall_score": 0.8,
+                                        "rubric_weights_percentage": 80.0,
+                                        "turns_duplicated": [2, 7]}, None)
+        assert e["turns_duplicated"] == [2, 7]
+
+
 class TestStallGuard:
     def _agent(self, tmp_path, run_key="wcb::t1::k"):
         from src.agents.openclaw.runner import OpenClawAgent

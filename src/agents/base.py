@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 import subprocess
 from typing import Any, Callable
@@ -70,6 +70,12 @@ class AgentExecution:
     # turn (_recover_synthesis_if_stalled) — a legitimate repair, recorded so
     # a reviewer counting messages sees why the transcript has one more turn.
     recovery_turn_fired: bool = False
+    # Turn indices whose stall-guarded retry re-sent the scripted message on
+    # the same session (BUGREPORT_turn_completion.md §2.3). The retry may leave
+    # the turn duplicated in-session; only the runner can distinguish that
+    # from a turn-source scripting bug, so it is recorded at the moment the
+    # retry fires rather than re-derived from the transcript.
+    turns_duplicated: list[int] = field(default_factory=list)
 
 
 class BaseAgent(ABC):
