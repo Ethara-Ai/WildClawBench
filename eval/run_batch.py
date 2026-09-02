@@ -984,6 +984,8 @@ def _pass_summary_entry(run_index: int, scores: dict | None, test_result: dict |
     # averages so a no-signal run is not folded in as a 0.0.
     if s.get("eval_skipped"):
         entry["eval_skipped"] = s.get("eval_skipped")
+    if s.get("turns_duplicated"):
+        entry["turns_duplicated"] = list(s["turns_duplicated"])
     return entry
 
 
@@ -1360,6 +1362,8 @@ def _augment_score_with_combined_rewards(scores: dict, result: dict) -> None:
             scores["recovery_turn_fired"] = True
         if r.get("turns_planned_dispatched") is not None:
             scores["turns_planned_dispatched"] = r.get("turns_planned_dispatched")
+        if r.get("turns_duplicated"):
+            scores["turns_duplicated"] = list(r["turns_duplicated"])
 
 
 def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
@@ -2488,6 +2492,8 @@ def run_single_task(
         # is the authoritative task-defined count; see _turn_completion_verdict.
         result.update(_turn_completion_verdict(
             task, execution, interactive=interactive_source is not None))
+        result["turns_duplicated"] = list(
+            getattr(execution, "turns_duplicated", []) or [])
         if result["run_incomplete"]:
             logger.warning(
                 "[%s] RUN INCOMPLETE: %s of %s scheduled turns executed — "

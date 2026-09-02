@@ -149,6 +149,8 @@ def _entry(run_index: int, scores: dict, test_result: dict) -> dict:
         entry["turns_completed"] = s.get("turns_completed")
     if s.get("eval_skipped"):
         entry["eval_skipped"] = s.get("eval_skipped")
+    if s.get("turns_duplicated"):
+        entry["turns_duplicated"] = list(s["turns_duplicated"])
     return entry
 
 

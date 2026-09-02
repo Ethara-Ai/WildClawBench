@@ -138,6 +138,8 @@ def aggregate(output_root: Path, backend_filter: str | None = None) -> dict:
             "criteria_failed": failed,
             "score_path": str(score_path),
         }
+        if score.get("turns_duplicated"):
+            entry["turns_duplicated"] = list(score["turns_duplicated"])
         per_task_model[(backend, task_id, model)].append(entry)
         per_model[(backend, model)].append(pct)
 
