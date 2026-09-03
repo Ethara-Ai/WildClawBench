@@ -70,6 +70,23 @@ def _include_incomplete_runs() -> bool:
         "1", "true", "yes", "on")
 
 
+def _include_invalid_runs() -> bool:
+    return os.environ.get("WCB_INCLUDE_INVALID_RUNS", "").strip().lower() in (
+        "1", "true", "yes", "on")
+
+
+def _run_exclusion_reason(r: dict) -> str | None:
+    # Mirror of run_batch.py:_run_exclusion_reason (fail-closed; `is False` keeps legacy).
+    if r.get("run_incomplete") and not _include_incomplete_runs():
+        return "incomplete"
+    if not _include_invalid_runs():
+        if r.get("injection_ok") is False:
+            return "injection_failed"
+        if r.get("eval_skipped"):
+            return "unmeasured"
+    return None
+
+
 def _f(v: Any) -> float | None:
     if v is None:
         return None
@@ -185,10 +202,12 @@ def merge_pass_summaries(
     for new_index, rec in enumerate(merged_runs, start=1):
         rec["run_index"] = new_index
 
-    if _include_incomplete_runs():
-        stat_runs = merged_runs
-    else:
-        stat_runs = [r for r in merged_runs if not r.get("run_incomplete")]
+    reasons = {id(r): _run_exclusion_reason(r) for r in merged_runs}
+    stat_runs = [r for r in merged_runs if reasons[id(r)] is None]
+    reason_counts: dict[str, int] = {}
+    for _v in reasons.values():
+        if _v:
+            reason_counts[_v] = reason_counts.get(_v, 0) + 1
     excluded_incomplete = len(merged_runs) - len(stat_runs)
 
     def col(field: str) -> list[float | None]:
@@ -208,6 +227,10 @@ def merge_pass_summaries(
             }
             if rec.get("run_incomplete"):
                 out["run_incomplete"] = True
+            if rec.get("eval_skipped"):
+                out["eval_skipped"] = rec.get("eval_skipped")
+            if rec.get("injection_ok") is False:
+                out["injection_ok"] = False
             legacy_per_run.append(out)
         legacy_doc = {
             "model": model,
@@ -218,7 +241,15 @@ def merge_pass_summaries(
         }
         if excluded_incomplete:
             legacy_doc["runs_used"] = len(stat_runs)
-            legacy_doc["runs_excluded_incomplete"] = excluded_incomplete
+            for _reason, _key in (
+                ("incomplete", "runs_excluded_incomplete"),
+                ("injection_failed", "runs_excluded_injection_failed"),
+                ("unmeasured", "runs_excluded_unmeasured"),
+            ):
+                if reason_counts.get(_reason):
+                    legacy_doc[_key] = reason_counts[_reason]
+            if not stat_runs:
+                legacy_doc["all_runs_excluded"] = True
         return legacy_doc
 
     avg_reward = _mean(col("reward")) or 0.0
@@ -248,7 +279,15 @@ def merge_pass_summaries(
     }
     if excluded_incomplete:
         doc["runs_used"] = len(stat_runs)
-        doc["runs_excluded_incomplete"] = excluded_incomplete
+        for _reason, _key in (
+            ("incomplete", "runs_excluded_incomplete"),
+            ("injection_failed", "runs_excluded_injection_failed"),
+            ("unmeasured", "runs_excluded_unmeasured"),
+        ):
+            if reason_counts.get(_reason):
+                doc[_key] = reason_counts[_reason]
+        if not stat_runs:
+            doc["all_runs_excluded"] = True
     return doc
 
 

@@ -4,8 +4,11 @@ import json
 import logging
 import os
 import re
+import struct
 import subprocess
 import tempfile
+import zipfile
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
 from collections.abc import Sequence
@@ -445,8 +448,21 @@ _DELIVERABLE_EXTS = {
 _BINARY_DELIVERABLE_EXTS = {
     ".pdf", ".xlsx", ".docx", ".pptx",
 }
-_ALL_DELIVERABLE_EXTS = _DELIVERABLE_EXTS | _BINARY_DELIVERABLE_EXTS
+# Image deliverables: surfaced to the judge with a stdlib dimension marker
+# (PNG IHDR / JPEG SOF read with `struct` — NO Pillow, preserving the stdlib-only
+# extractor posture). Content pixels are not sent (that is a capability-gated
+# vision path, out of scope); the marker unblocks "did the agent generate an
+# image of size WxH?" criteria that previously abstained because the file was
+# silently dropped.
+_IMAGE_DELIVERABLE_EXTS = {
+    ".png", ".jpg", ".jpeg", ".webp", ".gif",
+}
+_ALL_DELIVERABLE_EXTS = _DELIVERABLE_EXTS | _BINARY_DELIVERABLE_EXTS | _IMAGE_DELIVERABLE_EXTS
 _ROOT_SCAN_MAX_FILE_BYTES = 512_000   # skip oversized files in the root scan
+# Cap on extracted-text length per binary deliverable (docx/pdf). Bounds the
+# per-member evidence budget so a large extraction cannot bury report.md for the
+# smaller-context council members (Kimi 225 KB / GLM 175 KB).
+_EXTRACT_CHAR_CAP = 100_000
 
 
 def _looks_like_deliverable(path: Path, root: Path) -> bool:
@@ -494,7 +510,7 @@ def _collect_deliverable_files(workspace_results: Path) -> list[Path]:
             if _is_text_deliverable(f):
                 seen.add(f)
                 files.append(f)
-            elif _is_binary_deliverable(f):
+            elif _is_binary_deliverable(f) or _is_image_deliverable(f):
                 try:
                     if f.stat().st_size <= _ROOT_SCAN_MAX_FILE_BYTES:
                         seen.add(f)
@@ -525,6 +541,202 @@ def _collect_deliverable_files(workspace_results: Path) -> list[Path]:
     return files
 
 
+def _is_image_deliverable(path: Path) -> bool:
+    return path.suffix.lower() in _IMAGE_DELIVERABLE_EXTS
+
+
+_DOCX_W_T = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t"
+_XLSX_SS_T = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}t"
+_XLSX_NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+_PPTX_A_T = "{http://schemas.openxmlformats.org/drawingml/2006/main}t"
+
+
+def _image_dimensions(path: Path) -> tuple[int, int] | None:
+    # Stdlib width/height read from the file header (NO Pillow). PNG: IHDR at a
+    # fixed offset after the 8-byte signature. JPEG: scan segments for a SOF
+    # marker (0xFFC0-0xFFCF except C4/C8/CC) whose payload carries height/width.
+    try:
+        data = path.read_bytes()
+    except Exception:
+        return None
+    try:
+        if data[:8] == b"\x89PNG\r\n\x1a\n" and data[12:16] == b"IHDR":
+            w, h = struct.unpack(">II", data[16:24])
+            return (int(w), int(h))
+        if data[:2] == b"\xff\xd8":
+            i, n = 2, len(data)
+            while i + 9 < n:
+                if data[i] != 0xFF:
+                    i += 1
+                    continue
+                marker = data[i + 1]
+                if 0xC0 <= marker <= 0xCF and marker not in (0xC4, 0xC8, 0xCC):
+                    h, w = struct.unpack(">HH", data[i + 5:i + 9])
+                    return (int(w), int(h))
+                seg = struct.unpack(">H", data[i + 2:i + 4])[0]
+                i += 2 + seg
+    except Exception:
+        return None
+    return None
+
+
+def _extract_text_deliverable(path: Path) -> str | None:
+    # Stdlib-only text extraction for binary deliverables (NO python-docx/openpyxl
+    # /python-pptx). OOXML formats are ZIPs of XML: .docx reads word/document.xml
+    # <w:t> nodes; .xlsx reads sharedStrings + worksheet <t> nodes; .pptx reads
+    # ppt/slides/slideN.xml <a:t> nodes. .pdf uses a GUARDED optional import
+    # (pypdf) — absent by default, degrading to None (-> presence marker); pypdf is
+    # NEVER a hard requirements pin. Returns extracted text (char-capped) or None.
+    # NEVER raises.
+    ext = path.suffix.lower()
+    try:
+        if ext == ".docx":
+            with zipfile.ZipFile(path) as z:
+                xml = z.read("word/document.xml")
+            root = ET.fromstring(xml)
+            text = "".join(n.text or "" for n in root.iter(_DOCX_W_T)).strip()
+            return text[:_EXTRACT_CHAR_CAP] or None
+        if ext == ".xlsx":
+            with zipfile.ZipFile(path) as z:
+                names = set(z.namelist())
+                shared: list[str] = []
+                if "xl/sharedStrings.xml" in names:
+                    ss = ET.fromstring(z.read("xl/sharedStrings.xml"))
+                    for si in ss.iter(f"{_XLSX_NS}si"):
+                        shared.append("".join(t.text or "" for t in si.iter(_XLSX_SS_T)))
+                rows_out: list[str] = []
+                for name in sorted(n for n in names
+                                   if n.startswith("xl/worksheets/") and n.endswith(".xml")):
+                    sheet = ET.fromstring(z.read(name))
+                    for row in sheet.iter(f"{_XLSX_NS}row"):
+                        cells: list[str] = []
+                        for c in row.iter(f"{_XLSX_NS}c"):
+                            ctype = c.get("t")
+                            v = c.find(f"{_XLSX_NS}v")
+                            if ctype == "s" and v is not None and v.text is not None:
+                                try:
+                                    cells.append(shared[int(v.text)])
+                                except (ValueError, IndexError):
+                                    pass
+                            elif ctype == "inlineStr":
+                                cells.append("".join(t.text or "" for t in c.iter(_XLSX_SS_T)))
+                            elif v is not None and v.text:
+                                cells.append(v.text)
+                        if cells:
+                            rows_out.append(" | ".join(cells))
+            text = "\n".join(rows_out).strip()
+            return text[:_EXTRACT_CHAR_CAP] or None
+        if ext == ".pptx":
+            slide_parts: list[str] = []
+            with zipfile.ZipFile(path) as z:
+                for name in sorted(z.namelist()):
+                    if name.startswith("ppt/slides/slide") and name.endswith(".xml"):
+                        slide = ET.fromstring(z.read(name))
+                        slide_parts.extend(n.text or "" for n in slide.iter(_PPTX_A_T))
+            text = " ".join(p for p in slide_parts if p).strip()
+            return text[:_EXTRACT_CHAR_CAP] or None
+        if ext == ".pdf":
+            try:
+                import pypdf
+            except ImportError:
+                return None
+            reader = pypdf.PdfReader(str(path))
+            text = "".join((pg.extract_text() or "") for pg in reader.pages).strip()
+            return text[:_EXTRACT_CHAR_CAP] or None
+    except Exception:
+        return None
+    return None
+
+
+def _deliverable_evidence_marker(path: Path) -> str | None:
+    # Single dispatch point turning one collected deliverable into an evidence
+    # block. Returns the block text, or None to skip. Text deliverables read
+    # verbatim; extractable binaries (docx/pdf) route through
+    # _extract_text_deliverable; images emit a stdlib dimension marker; other
+    # binaries emit a presence-only marker (verbatim bytes would be mojibake).
+    # NEVER raises (grading-must-never-fail).
+    try:
+        if _is_text_deliverable(path):
+            body = path.read_text(encoding="utf-8", errors="replace")
+            return f"\n----- DELIVERABLE: {path.name} -----\n{body}"
+        if _is_image_deliverable(path):
+            dims = _image_dimensions(path)
+            size = f"image {dims[0]}x{dims[1]}" if dims else "image"
+            return (
+                f"\n----- DELIVERABLE: {path.name} "
+                f"({size}, presence only) -----\n"
+            )
+        if _is_binary_deliverable(path):
+            extracted = _extract_text_deliverable(path)
+            if extracted:
+                return f"\n----- DELIVERABLE: {path.name} (extracted text) -----\n{extracted}"
+            return (
+                f"\n----- DELIVERABLE: {path.name} "
+                "(binary — present, contents not extractable) -----\n"
+            )
+    except Exception:
+        return None
+    return None
+
+
+_TRANSCRIPT_MARKER = "\n----- TRANSCRIPT (condensed) -----\n"
+# Terminal-turn landmarks emitted by _condense_transcript_for_judge (see
+# eval/run_batch.py) and named in system_prompts/judge_system.md. A task can end
+# on an assistant message OR a submit-tool action, so a boundary-aware cut must
+# recognise both to keep the final turn whole.
+_TERMINAL_LANDMARKS = ("[FINAL ASSISTANT MESSAGE]", "[SUBMIT TOOL OUTPUT]")
+
+
+def _budget_transcript(transcript: str, budget: int) -> str:
+    # Middle-drop on physical-line boundaries: keep a head window, an explicit
+    # truncation marker, and a tail window anchored on the terminal landmark so
+    # the final turn survives. INVARIANT: the return is ALWAYS <= budget chars
+    # (the OAuth judge 200K ceiling, AGENTS.md #18, is a hard gate — an
+    # over-budget transcript makes _gather_evidence exceed the member budget and
+    # every criterion abstains). When the final turn alone exceeds budget we keep
+    # its END (most-recent content) clamped to budget, never the whole transcript.
+    if budget <= 0:
+        return ""
+    if len(transcript) <= budget:
+        return transcript
+    lines = transcript.split("\n")
+    # LAST landmark, not first: agent text can echo a landmark string earlier; a
+    # first-match anchor grows the tail from that decoy back to ~whole transcript
+    # (measured 7x over budget). `-1` sentinel honors a landmark at line 0.
+    anchor = -1
+    for i in range(len(lines) - 1, -1, -1):
+        if any(mark in lines[i] for mark in _TERMINAL_LANDMARKS):
+            anchor = i
+            break
+    tail_start = anchor if anchor >= 0 else len(lines) - 1
+    tail = "\n".join(lines[tail_start:])
+    marker = "\n... [truncated {n} lines] ...\n"
+    # If the final turn alone can't fit, drop the head entirely and keep the END
+    # of the tail so the return stays <= budget (the marker + turn-end, not the
+    # whole transcript). rendered with n=tail_start (all prior lines dropped).
+    rendered_marker = marker.format(n=tail_start)
+    if len(tail) + len(rendered_marker) >= budget:
+        room = budget - len(rendered_marker)
+        if room <= 0:
+            return tail[-budget:]
+        return rendered_marker + tail[-room:]
+    head: list[str] = []
+    head_len = 0
+    tail_len = len(tail) + 1
+    i = 0
+    while i < tail_start:
+        add = len(lines[i]) + 1
+        if head_len + add + tail_len + len(marker.format(n=tail_start - i)) >= budget:
+            break
+        head.append(lines[i])
+        head_len += add
+        i += 1
+    dropped = tail_start - i
+    if dropped <= 0:
+        return "\n".join(head + [tail])[:budget]
+    return "\n".join(head) + marker.format(n=dropped) + tail
+
+
 def _gather_evidence(
     workspace_results: Path,
     transcript_text: str,
@@ -548,32 +760,40 @@ def _gather_evidence(
         return (rank, size, path.name)
 
     for f in sorted(deliverables, key=_priority):
-        # Binaries reach here via _collect_deliverable_files for presence, but
-        # read_text(errors="replace") would dump mojibake that poisons the judge
-        # (and invites hallucinated content grades). Emit a presence-only marker;
-        # the judge_system.md file-target legend maps this to No + truncation.
-        if _is_binary_deliverable(f):
-            parts.append(
-                f"\n----- DELIVERABLE: {f.name} "
-                "(binary — present, contents not extractable) -----\n"
-            )
-            continue
-        try:
-            body = f.read_text(encoding="utf-8", errors="replace")
-        except Exception:
-            continue
-        parts.append(f"\n----- DELIVERABLE: {f.name} -----\n{body}")
+        marker = _deliverable_evidence_marker(f)
+        if marker is not None:
+            parts.append(marker)
     if not parts:
         parts.append(
             "\n(no deliverable files were collected under any of: "
             + ", ".join(f"{n}/" for n in _DELIVERABLE_DIR_NAMES)
             + ")\n"
         )
-    if transcript_text:
-        parts.append(f"\n----- TRANSCRIPT (condensed) -----\n{transcript_text}")
-    blob = "".join(parts)
+    deliv_blob = "".join(parts)
     effective = _JUDGE_MAX_EVIDENCE if budget is None else budget
-    return blob if effective is None else blob[:effective]
+    # Budget deliverables and transcript SEPARATELY. The transcript marker can
+    # then never be sliced off (so _split_evidence never silently returns ""),
+    # and the boundary-aware cut keeps the final turn whole. A tiny transcript
+    # floor is reserved so the marker + final turn survive even when deliverables
+    # are large; realistic per-family budgets (175K-1.35M) are the operative path.
+    if effective is None or not transcript_text:
+        blob = deliv_blob + (
+            f"{_TRANSCRIPT_MARKER}{transcript_text}" if transcript_text else ""
+        )
+        return blob if effective is None else blob[:effective]
+    floor = min(
+        len(_TRANSCRIPT_MARKER) + len(transcript_text),
+        max(2000, effective // 5),
+    )
+    deliv_budget = max(0, effective - floor)
+    deliv_out = deliv_blob if len(deliv_blob) <= deliv_budget else deliv_blob[:deliv_budget]
+    t_budget = effective - len(deliv_out) - len(_TRANSCRIPT_MARKER)
+    t_out = _budget_transcript(transcript_text, max(0, t_budget))
+    # Defensive final clamp: the OAuth 200K ceiling (AGENTS.md #18) is a hard gate,
+    # so the assembled evidence must NEVER exceed `effective` even if a component
+    # budget math drifts. _split_evidence still finds the marker because deliv_out
+    # + marker are budgeted to fit before the transcript tail.
+    return (deliv_out + _TRANSCRIPT_MARKER + t_out)[:effective]
 
 
 _ZERO_USAGE = {
@@ -1523,6 +1743,174 @@ def _grade_council(
     }
 
 
+_DEFAULT_RUBRIC_BATCH_SIZE = 40
+
+
+def _rubric_batch_size() -> int:
+    # Max criteria per judge call. Chosen so a full verdict list fits under the
+    # smallest family output cap (8192 tokens). Guarded: a non-int or <=0 value
+    # falls back to the default (never 0 -> infinite loop, never raises).
+    raw = os.environ.get("WCB_JUDGE_RUBRIC_BATCH_SIZE", "").strip()
+    if not raw:
+        return _DEFAULT_RUBRIC_BATCH_SIZE
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        return _DEFAULT_RUBRIC_BATCH_SIZE
+    return n if n > 0 else _DEFAULT_RUBRIC_BATCH_SIZE
+
+
+def _synthetic_abstain_criterion(global_id: int, rubric, members: list) -> dict:
+    # Faithful crit_out shape (see _grade_council) for a criterion in a chunk
+    # whose council call errored: abstain, contribute 0 to the numerator, keep
+    # the positive weight in the denominator so the score is honestly depressed.
+    # `judges` MUST mirror _grade_council's [m.family for m in members] (NOT [])
+    # so consumers zipping judges with the per-judge arrays stay aligned.
+    n_members = len(members)
+    wt = _extract_weight(rubric) if isinstance(rubric, dict) else 1.0
+    return {
+        "id": global_id,
+        "weight": wt,
+        "satisfied": False,
+        "passed": False,
+        "resolved_by": "human_eval",
+        "human_eval": "required",
+        "voters": 0,
+        "criterion": (rubric.get("criterion") if isinstance(rubric, dict) else str(rubric)),
+        "votes": "/".join(["Abstain"] * n_members),
+        "satisfied_by_judge": [False] * n_members,
+        "voted_by_judge": [False] * n_members,
+        "rationales_by_judge": ["(chunk grading failed)"] * n_members,
+        "truncation_affected_by_judge": [False] * n_members,
+        "judges": [m.family for m in members],
+        "is_positive": wt >= 0,
+    }
+
+
+def _merge_batched_grades(rubrics: list, members: list, chunk_results: list) -> dict:
+    # Merge per-chunk _grade_council outputs into one aggregate for the full
+    # rubric (Oracle design ses_f992b8cb9): remap positional ids by a running
+    # offset; RECOMPUTE numerator from merged `satisfied`; denominator from the
+    # ORIGINAL full rubrics (never criteria[].weight — string-rubric + `or 1.0`
+    # non-additivity trap); re-derive counts; sum usage but recompute total_tokens;
+    # surviving=intersection, failed=union, per_member_user_chars=max. A failed
+    # chunk degrades to synthetic abstains; top-level error ONLY if ALL failed.
+    n_members = len(members)
+    merged_criteria: list[dict] = []
+    abstention_flags: list[int] = []
+    truncation_flags: list[int] = []
+    offset = 0
+    all_failed = True
+    surviving_sets: list[set] = []
+    failed_by_model: dict[str, str] = {}
+    per_member_agg: dict[str, dict] = {}
+    per_member_user_chars: dict[str, int] = {}
+    per_member_verdict_count: dict[str, int] = {}
+    headroom_per_member: dict[str, dict] = {}
+    headroom_saved = 0
+    headroom_enabled = False
+    usage_sum = _ZERO_USAGE.copy()
+
+    for chunk, res in chunk_results:
+        if res.get("error"):
+            for j, rb in enumerate(chunk):
+                gid = offset + j
+                merged_criteria.append(_synthetic_abstain_criterion(gid, rb, members))
+                abstention_flags.append(gid)
+            offset += len(chunk)
+            continue
+        all_failed = False
+        for c in res.get("criteria", []):
+            gid = offset + int(c.get("id", 0))
+            merged_criteria.append({**c, "id": gid})
+        for idx in res.get("abstention_flags", []):
+            abstention_flags.append(offset + int(idx))
+        for idx in res.get("truncation_flags", []):
+            truncation_flags.append(offset + int(idx))
+        council = res.get("judge_council", {}) or {}
+        surviving_sets.append(set(council.get("surviving", []) or []))
+        for f in council.get("failed", []) or []:
+            failed_by_model.setdefault(f.get("model", ""), str(f.get("error", ""))[:200])
+        for fam, cnt in (council.get("per_member_verdict_count", {}) or {}).items():
+            per_member_verdict_count[fam] = per_member_verdict_count.get(fam, 0) + int(cnt or 0)
+        for fam, chars in (council.get("per_member_user_chars", {}) or {}).items():
+            per_member_user_chars[fam] = max(per_member_user_chars.get(fam, 0), int(chars or 0))
+        if council.get("headroom_enabled"):
+            headroom_enabled = True
+            headroom_saved += int(council.get("headroom_tokens_saved_total", 0) or 0)
+            for fam, h in (council.get("headroom_per_member", {}) or {}).items():
+                if h:
+                    headroom_per_member[fam] = h
+        u = res.get("usage", {}) or {}
+        for k in ("input_tokens", "output_tokens", "cache_read_tokens",
+                  "cache_write_tokens", "request_count", "cost_usd"):
+            usage_sum[k] = usage_sum.get(k, 0) + (u.get(k, 0) or 0)
+        for fam, pm in (u.get("per_member", {}) or {}).items():
+            agg = per_member_agg.setdefault(fam, {
+                "model": pm.get("model", ""), "input_tokens": 0, "output_tokens": 0,
+                "cache_read_tokens": 0, "cache_write_tokens": 0, "total_tokens": 0,
+                "request_count": 0, "cost_usd": 0.0, "ok": True,
+            })
+            for k in ("input_tokens", "output_tokens", "cache_read_tokens",
+                      "cache_write_tokens", "request_count", "cost_usd"):
+                agg[k] = agg.get(k, 0) + (pm.get(k, 0) or 0)
+            agg["ok"] = bool(agg["ok"]) and bool(pm.get("ok"))
+            if "cost_priced_ok" in pm:
+                agg["cost_priced_ok"] = bool(agg.get("cost_priced_ok", True)) and bool(pm.get("cost_priced_ok"))
+            if pm.get("error") and "error" not in agg:
+                agg["error"] = str(pm.get("error"))[:200]
+        offset += len(chunk)
+
+    for fam, agg in per_member_agg.items():
+        agg["total_tokens"] = (agg["input_tokens"] + agg["output_tokens"]
+                               + agg["cache_read_tokens"] + agg["cache_write_tokens"])
+    usage_sum["total_tokens"] = (usage_sum["input_tokens"] + usage_sum["output_tokens"]
+                                 + usage_sum["cache_read_tokens"] + usage_sum["cache_write_tokens"])
+    usage_sum["per_member"] = per_member_agg
+
+    total_w = sum(_extract_weight(r) for r in rubrics
+                  if isinstance(r, dict) and _extract_weight(r) > 0) or 1.0
+    weighted = sum(c["weight"] for c in merged_criteria if c.get("satisfied") is True)
+    overall = weighted / total_w
+    n = len(rubrics)
+    passed = sum(1 for c in merged_criteria if c.get("passed") is True)
+    n_abstained = len(abstention_flags)
+    failed = n - passed - n_abstained
+
+    first_council = next((r.get("judge_council", {}) for _c, r in chunk_results
+                          if not r.get("error")), {}) or {}
+    surviving = sorted(set.intersection(*surviving_sets)) if surviving_sets else []
+    merged: dict = {
+        "overall_score": round(overall, 4),
+        "rubric_weights_percentage": round(overall * 100.0, 2),
+        "criteria_total": n,
+        "criteria_passed": passed,
+        "criteria_failed": failed,
+        "criteria_abstained": n_abstained,
+        "criteria": merged_criteria,
+        "judge_model": "council",
+        "judge_council": {
+            "members": first_council.get("members", []),
+            "surviving": surviving,
+            "failed": [{"model": m, "error": e} for m, e in failed_by_model.items()],
+            "aggregation": first_council.get("aggregation", "unanimous_or_sonnet_tiebreak"),
+            "per_member_user_chars": per_member_user_chars,
+            "per_member_verdict_count": per_member_verdict_count,
+            "headroom_enabled": headroom_enabled,
+            "headroom_tokens_saved_total": headroom_saved,
+            "headroom_per_member": headroom_per_member,
+            "rubric_batch_size": _rubric_batch_size(),
+            "rubric_batches": len(chunk_results),
+        },
+        "truncation_flags": sorted(truncation_flags),
+        "abstention_flags": sorted(abstention_flags),
+        "usage": usage_sum,
+    }
+    if all_failed:
+        merged["error"] = "all rubric batches failed to grade"
+    return merged
+
+
 def grade_with_rubric(
     rubrics: list,
     task_description: str,
@@ -1567,12 +1955,38 @@ def grade_with_rubric(
 
     validate_judge_pricing(members)
 
-    user_for_member: dict[str, str] = {}
+    # Rubric batching (Issue 1): the judge output-token cap (_FAMILY_EVIDENCE, e.g.
+    # Sonnet 8192) truncates verdict lists on large rubrics, so tail criteria
+    # abstain. Splitting into <=batch_size chunks keeps each verdict list under the
+    # cap. Threshold read ONCE (env WCB_JUDGE_RUBRIC_BATCH_SIZE, guarded); rubrics
+    # at/under it take the single-call path (byte-identical to pre-batching).
+    batch_size = _rubric_batch_size()
+    # Hoist per-member evidence out of the chunk loop: _gather_evidence walks the
+    # filesystem + extracts binaries once per member; only the rubric block varies
+    # per chunk (system prompt is identical, so Sonnet cachePoint still reused).
+    evidence_for_member: dict[str, str] = {}
     for m in members:
         budget = _member_evidence_budget(m.model, m.family)
-        ev = _gather_evidence(workspace_results, transcript_text, budget=budget)
-        user_for_member[m.model] = _judge_user_prompt(task_description, rubrics, ev)
-    return _grade_council(rubrics, system, user_for_member, members)
+        evidence_for_member[m.model] = _gather_evidence(
+            workspace_results, transcript_text, budget=budget
+        )
+
+    def _grade_chunk(chunk: list) -> dict:
+        user_for_member = {
+            m.model: _judge_user_prompt(task_description, chunk, evidence_for_member[m.model])
+            for m in members
+        }
+        return _grade_council(chunk, system, user_for_member, members)
+
+    if len(rubrics) <= batch_size:
+        return _grade_chunk(rubrics)
+
+    chunk_results: list[tuple[list, dict]] = []
+    for start in range(0, len(rubrics), batch_size):
+        chunk = rubrics[start:start + batch_size]
+        chunk_results.append((chunk, _grade_chunk(chunk)))
+    return _merge_batched_grades(rubrics, members, chunk_results)
+
 
 def _write_score(output_dir: Path, task_id: str, scores: dict) -> None:
     score_path = output_dir / "score.json"

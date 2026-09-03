@@ -359,6 +359,83 @@ def test_pass_summary_entry_forwards_injection_flag():
     assert "injection_ok" not in good
 
 
+def test_pass_summary_doc_excludes_injection_failed_by_default(monkeypatch):
+    rb = _run_batch_mod()
+    monkeypatch.delenv("WCB_INCLUDE_INVALID_RUNS", raising=False)
+    monkeypatch.delenv("WCB_INCLUDE_INCOMPLETE_RUNS", raising=False)
+    per_run = [
+        {"run_index": 1, "reward": 1.0, "combined_reward": 1.0,
+         "rubric_reward": 1.0, "rubric_weights_percentage": 100.0},
+        {"run_index": 2, "reward": 0.0, "combined_reward": 0.0,
+         "rubric_reward": 0.0, "rubric_weights_percentage": 0.0,
+         "injection_ok": False},
+    ]
+    doc = rb._pass_summary_doc("m", [dict(r) for r in per_run])
+    assert doc["average_reward"] == 1.0
+    assert doc["runs_used"] == 1
+    assert doc["runs_excluded_injection_failed"] == 1
+    assert doc["runs"] == 2
+
+
+def test_pass_summary_doc_include_invalid_folds_injection_back(monkeypatch):
+    rb = _run_batch_mod()
+    monkeypatch.setenv("WCB_INCLUDE_INVALID_RUNS", "1")
+    per_run = [
+        {"run_index": 1, "reward": 1.0, "combined_reward": 1.0,
+         "rubric_reward": 1.0, "rubric_weights_percentage": 100.0},
+        {"run_index": 2, "reward": 0.0, "combined_reward": 0.0,
+         "rubric_reward": 0.0, "rubric_weights_percentage": 0.0,
+         "injection_ok": False},
+    ]
+    doc = rb._pass_summary_doc("m", [dict(r) for r in per_run])
+    assert doc["average_reward"] == 0.5
+    assert "runs_excluded_injection_failed" not in doc
+
+
+def test_pass_summary_doc_excludes_eval_skipped_by_default(monkeypatch):
+    rb = _run_batch_mod()
+    monkeypatch.delenv("WCB_INCLUDE_INVALID_RUNS", raising=False)
+    entry = rb._pass_summary_entry(
+        2, {"overall_score": None, "eval_skipped": "trajectory empty: no assistant messages"},
+        {"tests_total": 0})
+    assert entry["eval_skipped"] == "trajectory empty: no assistant messages"
+    per_run = [
+        {"run_index": 1, "reward": 0.8, "combined_reward": 0.8,
+         "rubric_reward": 0.8, "rubric_weights_percentage": 80.0},
+        entry,
+    ]
+    doc = rb._pass_summary_doc("m", per_run)
+    assert doc["average_reward"] == 0.8
+    assert doc["runs_excluded_unmeasured"] == 1
+
+
+def test_pass_summary_doc_legacy_entry_without_flags_not_excluded(monkeypatch):
+    rb = _run_batch_mod()
+    monkeypatch.delenv("WCB_INCLUDE_INVALID_RUNS", raising=False)
+    monkeypatch.delenv("WCB_INCLUDE_INCOMPLETE_RUNS", raising=False)
+    per_run = [
+        {"run_index": 1, "reward": 0.5, "combined_reward": 0.5,
+         "rubric_reward": 0.5, "rubric_weights_percentage": 50.0},
+    ]
+    doc = rb._pass_summary_doc("m", per_run)
+    assert doc["average_reward"] == 0.5
+    assert "runs_used" not in doc
+    assert "runs_excluded_injection_failed" not in doc
+
+
+def test_pass_summary_doc_all_runs_excluded_flag(monkeypatch):
+    rb = _run_batch_mod()
+    monkeypatch.delenv("WCB_INCLUDE_INVALID_RUNS", raising=False)
+    per_run = [
+        {"run_index": 1, "reward": 0.0, "combined_reward": 0.0,
+         "rubric_reward": 0.0, "rubric_weights_percentage": 0.0,
+         "injection_ok": False},
+    ]
+    doc = rb._pass_summary_doc("m", per_run)
+    assert doc["all_runs_excluded"] is True
+    assert doc["runs_used"] == 0
+
+
 # --------------------------------------------------------------------------- #
 # Artifacts diff must not credit harness-injected files to the agent
 # --------------------------------------------------------------------------- #

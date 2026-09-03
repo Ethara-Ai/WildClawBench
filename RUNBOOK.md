@@ -261,7 +261,7 @@ Shared cache (read across runs of same task): `output/<backend>/<task>/data/test
 
 ### 6.1 What "good" looks like
 
-- `score.json` exists, no `error` field, `overall_score` between 0.0 and 1.0.
+- `score.json` exists, no `error` field, `overall_score` is a finite float (signed; ≈`[-0.5, 1]` — unclamped since 2026-07, byte-aligned with Channel A pytest reward).
 - `task_output/artifacts/` has the deliverables the rubric expects.
 - `usage.json` shows `agent.request_count > 0` and `judge.request_count` ≥ 1 (3 if council survived).
 - `reward.txt` in verifier dir is non-zero (depends on test pass rate).
@@ -420,7 +420,7 @@ These are non-obvious facts that protect you from cargo-culting bad behavior:
 
 1. **No internet egress from the agent.** Agent container is on `--internal` bridge. Only the LiteLLM sidecar is dual-homed to reach Bedrock/OpenAI. Empirical test: `docker run --rm --network k3net-* wildclawbench-ubuntu:v1.3 curl https://api.ipify.org` returns exit 7.
 2. **`/root/workspace/` is the only deliverable location.** Files written to `/tmp/` or other `/root/<dir>/` paths are NOT collected (Fix 9 prompt hint covers this, but the agent might disobey). The artifacts/ baseline-diff is your evidence of what the agent actually produced — empty `artifacts/` is a true signal, not a bug.
-3. **Reward formula is binary, not fractional.** Council resolves each criterion by unanimous-or-Sonnet-tiebreak: unanimous verdict if all members voted and agree, else Sonnet's verdict (source of truth for both genuine splits and partial coverage), else Human Evaluation (abstain). Abstained (human-eval-required) criteria are excluded. Reward = `sum(weight where resolved satisfied) / sum(weight where weight > 0)`. No fractional credit possible (the b78 rewrite eliminated the b51 leak structurally).
+3. **Reward formula is binary, not fractional, and unclamped.** Council resolves each criterion by unanimous-or-Sonnet-tiebreak: unanimous verdict if all members voted and agree, else Sonnet's verdict (source of truth for both genuine splits and partial coverage), else Human Evaluation (abstain). Abstained (human-eval-required) criteria are excluded. Reward = `sum(weight where resolved satisfied) / sum(weight where weight > 0)` — a satisfied negative-weight (guardrail) criterion contributes `-|weight|` to the numerator, so `overall_score` can be negative when triggered guardrails outweigh earned positives. Byte-aligned with Channel A `_compute_reward` (both channels unclamped since 2026-07). No fractional credit possible (the b78 rewrite eliminated the b51 leak structurally). The error-path `overall_score: 0.0` (`{error: ...}` in score.json) is a **no-signal sentinel**, distinct from a genuine zero reward.
 4. **Testgen cache is hash-keyed.** Editing `rubric.json`, `prompt.txt`, `task_config.yaml`, or anything under `mock_data/` invalidates the cache automatically. The cache key lives at `output/<backend>/<task>/data/tests/cache_key.txt`. `--force-testgen` bypasses.
 5. **score.json `criteria_*` is canonical; `tests_*` is a deprecated alias.** Both shipped for back-compat. `aggregate_runs.py` falls back to `tests_*` and `overall_score * 100` for legacy files.
 6. **Persona files in `/root/` are NOT swept as deliverables** even though their extensions (`.md`) are in the whitelist. The sweep skip-set explicitly excludes `AGENTS.md SOUL.md MEMORY.md USER.md IDENTITY.md HEARTBEAT.md TOOLS.md API_DOCUMENTATION.md`.

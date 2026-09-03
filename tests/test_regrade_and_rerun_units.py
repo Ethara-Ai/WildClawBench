@@ -891,7 +891,8 @@ class TestRegradePreservesInjectionFlags:
         defects = [{"stage": "s1", "id": "op", "status": "unresolved", "reason": "r"}]
         (run_dir / "score.json").write_text(
             json.dumps({"combined_reward": 0.9, "injection_ok": False,
-                        "injection_defects": defects}),
+                        "injection_defects": defects,
+                        "eval_skipped": "trajectory empty: no assistant messages"}),
             encoding="utf-8",
         )
         monkeypatch.setattr(regrade_mod, "grade_with_rubric",
@@ -902,5 +903,6 @@ class TestRegradePreservesInjectionFlags:
         on_disk = json.loads((run_dir / "score.json").read_text(encoding="utf-8"))
         assert on_disk["injection_ok"] is False
         assert on_disk["injection_defects"] == defects
+        assert on_disk["eval_skipped"] == "trajectory empty: no assistant messages"
         assert on_disk["combined_reward"] == 0.42
         assert on_disk["rubric_based_reward"] == 0.42

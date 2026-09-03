@@ -270,7 +270,7 @@ def _make_results_tree(tmp_path: Path) -> Path:
     Layout:
       <root>/task_output/artifacts/results/report.md           (text, primary)
       <root>/task_output/artifacts/results/notes.pdf           (binary presence)
-      <root>/task_output/artifacts/results/pic.png             (unsupported ext)
+      <root>/task_output/artifacts/results/pic.png             (image deliverable)
       <root>/task_output/workspace_full/output/flagged.csv     (named-dir sweep)
       <root>/task_output/workspace_full/top.txt                (root-level glob)
     """
@@ -279,7 +279,7 @@ def _make_results_tree(tmp_path: Path) -> Path:
     results.mkdir(parents=True)
     (results / "report.md").write_text("the report body", encoding="utf-8")
     (results / "notes.pdf").write_bytes(b"%PDF-1.4 secret binary bytes")
-    (results / "pic.png").write_bytes(b"\x89PNG unsupported")
+    (results / "pic.png").write_bytes(b"\x89PNG image bytes")
     wf = task_output / "workspace_full"
     (wf / "output").mkdir(parents=True)
     (wf / "output" / "flagged.csv").write_text("a,b,c", encoding="utf-8")
@@ -291,11 +291,9 @@ def test_collect_deliverable_files_text_binary_and_sibling_sweep(tmp_path):
     results = _make_results_tree(tmp_path)
     files = grading._collect_deliverable_files(results)
     names = sorted(f.name for f in files)
-    # report.md (text) + notes.pdf (binary presence) from results/,
-    # flagged.csv from workspace_full/output/, top.txt from workspace_full root.
-    assert names == ["flagged.csv", "notes.pdf", "report.md", "top.txt"]
-    # Unsupported .png is never collected.
-    assert "pic.png" not in names
+    # report.md (text) + notes.pdf (binary presence) + pic.png (image) from
+    # results/, flagged.csv from workspace_full/output/, top.txt from wf root.
+    assert names == ["flagged.csv", "notes.pdf", "pic.png", "report.md", "top.txt"]
 
 
 def test_collect_deliverable_files_empty_dir_returns_empty(tmp_path):
@@ -347,11 +345,37 @@ def test_gather_evidence_orders_primary_first_and_binary_is_presence_only(tmp_pa
 
 
 def test_gather_evidence_budget_truncates(tmp_path):
+    # Boundary-aware budget (Issue 5): deliverables are bounded by the budget,
+    # but the transcript marker + content are NEVER sliced away — the marker
+    # must always survive so _split_evidence never silently returns "".
     results = tmp_path / "task_output" / "artifacts" / "results"
     results.mkdir(parents=True)
     (results / "report.md").write_text("A" * 5000, encoding="utf-8")
-    ev = grading._gather_evidence(results, "transcript", budget=50)
-    assert len(ev) == 50
+    ev = grading._gather_evidence(results, "the transcript body", budget=2100)
+    # Deliverable portion is bounded; transcript marker + body preserved.
+    assert "----- TRANSCRIPT (condensed) -----" in ev
+    assert "the transcript body" in ev
+    files_part, transcript = grading._split_evidence(ev)
+    assert transcript == "the transcript body"
+
+
+def test_gather_evidence_tiny_budget_preserves_transcript_marker(tmp_path):
+    # Hard-clamp contract (OAuth 200K gate #18): total evidence is ALWAYS
+    # <= budget. At a pathologically small budget the marker survives and the
+    # transcript tail is non-empty (END of the final turn, so the judge never
+    # grades against "(no transcript captured)") — but never unbounded overshoot.
+    results = tmp_path / "task_output" / "artifacts" / "results"
+    results.mkdir(parents=True)
+    (results / "report.md").write_text("A" * 5000, encoding="utf-8")
+    ev = grading._gather_evidence(results, "final answer here", budget=50)
+    assert len(ev) <= 50
+    assert grading._TRANSCRIPT_MARKER.strip() in ev
+    _files, transcript = grading._split_evidence(ev)
+    assert transcript  # non-empty: keeps the end of the final turn
+    # At a realistic budget the entire final turn survives whole.
+    ev2 = grading._gather_evidence(results, "final answer here", budget=6000)
+    _f2, transcript2 = grading._split_evidence(ev2)
+    assert "final answer here" in transcript2
 
 
 def test_gather_evidence_no_deliverables_placeholder(tmp_path):
@@ -373,6 +397,299 @@ def test_gather_evidence_split_roundtrips_through_split_evidence(tmp_path):
     assert transcript == "THE TRANSCRIPT"
     assert "TRANSCRIPT (condensed)" not in files_part
     assert "BODY" in files_part
+
+
+def test_budget_transcript_middle_drop_emits_marker_and_keeps_final_turn():
+    body = "\n".join(f"[user] msg {i} " + "w" * 100 for i in range(100))
+    transcript = body + "\n[FINAL ASSISTANT MESSAGE] [assistant] done"
+    out = grading._budget_transcript(transcript, 3000)
+    assert "... [truncated" in out and "lines] ..." in out
+    assert out.rstrip().endswith("done")
+    assert len(out) <= 3000
+
+
+def test_budget_transcript_spurious_early_landmark_stays_bounded():
+    filler = "\n".join(f"line {i} " + "x" * 80 for i in range(400))
+    decoy = "[FINAL ASSISTANT MESSAGE] echoed by an agent tool result"
+    real_final = "[FINAL ASSISTANT MESSAGE] [assistant] the real final answer"
+    transcript = filler + "\n" + decoy + "\n" + filler + "\n" + real_final
+    out = grading._budget_transcript(transcript, 5000)
+    assert len(out) <= 5000
+    assert "the real final answer" in out
+
+
+def test_budget_transcript_landmark_at_line_zero_stays_bounded():
+    transcript = (
+        "[FINAL ASSISTANT MESSAGE] final-para-1\nfinal-para-2\nfinal-para-3\n"
+        + "z" * 5000
+    )
+    out = grading._budget_transcript(transcript, 200)
+    assert len(out) <= 200
+
+
+def test_budget_transcript_huge_final_turn_clamped_to_budget():
+    # Final [SUBMIT TOOL OUTPUT] turn alone dwarfs the budget: must clamp to the
+    # END of that turn, never return the whole transcript (OAuth 200K gate #18).
+    head = "\n".join(f"[user] q{i} " + "a" * 50 for i in range(50))
+    big_final = "[SUBMIT TOOL OUTPUT] [toolResult] " + "Z" * 400_000 + " END_OF_OUTPUT"
+    transcript = head + "\n" + big_final
+    out = grading._budget_transcript(transcript, 175_000)
+    assert len(out) <= 175_000
+    assert out.rstrip().endswith("END_OF_OUTPUT")
+
+
+def test_budget_transcript_zero_or_negative_budget_returns_empty():
+    assert grading._budget_transcript("anything\nhere", 0) == ""
+    assert grading._budget_transcript("anything\nhere", -5) == ""
+
+
+def test_gather_evidence_never_exceeds_effective_budget(tmp_path):
+    # Assembled evidence must NEVER exceed the member budget (OAuth 200K gate #18),
+    # even when both deliverables and transcript are individually huge.
+    results = tmp_path / "task_output" / "artifacts" / "results"
+    results.mkdir(parents=True)
+    (results / "report.md").write_text("R" * 500_000, encoding="utf-8")
+    transcript = "\n".join(f"[user] t{i} " + "x" * 200 for i in range(3000))
+    transcript += "\n[FINAL ASSISTANT MESSAGE] [assistant] final"
+    ev = grading._gather_evidence(results, transcript, budget=300_000)
+    assert len(ev) <= 300_000
+
+
+def _png_bytes(w, h):
+    import struct
+    sig = b"\x89PNG\r\n\x1a\n"
+    ihdr = struct.pack(">II", w, h) + b"\x08\x06\x00\x00\x00"
+    return sig + struct.pack(">I", len(ihdr)) + b"IHDR" + ihdr
+
+
+def test_image_deliverable_is_collected_and_gets_dimension_marker(tmp_path):
+    # Issue 2: .png must be collected (not silently dropped) and surfaced with
+    # stdlib-parsed dimensions (no Pillow).
+    results = tmp_path / "task_output" / "artifacts" / "results"
+    results.mkdir(parents=True)
+    (results / "chart.png").write_bytes(_png_bytes(640, 480))
+    collected = grading._collect_deliverable_files(results)
+    assert any(p.name == "chart.png" for p in collected)
+    ev = grading._gather_evidence(results, "", budget=None)
+    assert "chart.png" in ev
+    assert "image 640x480" in ev
+
+
+def _docx_bytes(tmp_path, body, name="summary.docx"):
+    import zipfile
+    p = tmp_path / name
+    ns = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+    doc = (f'<?xml version="1.0"?><w:document xmlns:w="{ns}"><w:body>'
+           f'<w:p><w:r><w:t>{body}</w:t></w:r></w:p></w:body></w:document>')
+    with zipfile.ZipFile(p, "w") as z:
+        z.writestr("word/document.xml", doc)
+    return p
+
+
+def test_docx_deliverable_stdlib_text_extraction(tmp_path):
+    # Issue 3: .docx content is extracted via stdlib zipfile+xml (no python-docx).
+    results = tmp_path / "task_output" / "artifacts" / "results"
+    results.mkdir(parents=True)
+    _docx_bytes(results, "QUARTERLY_REVENUE_4200")
+    ev = grading._gather_evidence(results, "", budget=None)
+    assert "QUARTERLY_REVENUE_4200" in ev
+    assert "extracted text" in ev
+
+
+def test_docx_corrupt_degrades_to_presence_marker(tmp_path):
+    # Issue 3: a corrupt .docx must never raise; it degrades to presence-only.
+    results = tmp_path / "task_output" / "artifacts" / "results"
+    results.mkdir(parents=True)
+    (results / "broken.docx").write_bytes(b"not a zip")
+    assert grading._extract_text_deliverable(results / "broken.docx") is None
+    ev = grading._gather_evidence(results, "", budget=None)
+    assert "broken.docx" in ev
+    assert "contents not extractable" in ev
+
+
+def test_pdf_guarded_extraction_degrades_when_pypdf_absent(tmp_path):
+    # Issue 4: guarded optional pypdf. When absent (default), extraction returns
+    # None and the deliverable degrades to a presence marker (never raises).
+    results = tmp_path / "task_output" / "artifacts" / "results"
+    results.mkdir(parents=True)
+    (results / "invoice.pdf").write_bytes(b"%PDF-1.4\n%stub\n")
+    try:
+        import pypdf  # noqa: F401
+        pytest.skip("pypdf is installed; guarded-degrade branch not exercised")
+    except ImportError:
+        pass
+    assert grading._extract_text_deliverable(results / "invoice.pdf") is None
+    ev = grading._gather_evidence(results, "", budget=None)
+    assert "invoice.pdf" in ev
+    assert "contents not extractable" in ev
+
+
+def _xlsx_bytes(tmp_path, name="report.xlsx"):
+    # Real-writer shape (openpyxl/pandas): string cells reference sharedStrings by
+    # INDEX (<c t="s"><v>i</v>), numeric cells store the number bare (<c><v>N</v>),
+    # inline strings use <c t="inlineStr"><is><t>. Numbers NEVER go in sharedStrings.
+    import zipfile
+    ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+    p = tmp_path / name
+    with zipfile.ZipFile(p, "w") as z:
+        z.writestr(
+            "xl/sharedStrings.xml",
+            f'<?xml version="1.0"?><sst xmlns="{ns}"><si><t>Revenue</t></si></sst>',
+        )
+        z.writestr(
+            "xl/worksheets/sheet1.xml",
+            f'<?xml version="1.0"?><worksheet xmlns="{ns}"><sheetData>'
+            '<row><c t="s"><v>0</v></c><c><v>42000</v></c>'
+            '<c t="inlineStr"><is><t>InlineCell</t></is></c></row>'
+            "</sheetData></worksheet>",
+        )
+    return p
+
+
+def _pptx_bytes(tmp_path, texts, name="deck.pptx"):
+    import zipfile
+    a = "http://schemas.openxmlformats.org/drawingml/2006/main"
+    p = tmp_path / name
+    body = "".join(f"<a:t>{t}</a:t>" for t in texts)
+    with zipfile.ZipFile(p, "w") as z:
+        z.writestr("ppt/slides/slide1.xml", f'<?xml version="1.0"?><sld xmlns:a="{a}">{body}</sld>')
+    return p
+
+
+def test_xlsx_deliverable_stdlib_text_extraction(tmp_path):
+    results = tmp_path / "task_output" / "artifacts" / "results"
+    results.mkdir(parents=True)
+    _xlsx_bytes(results)
+    ev = grading._gather_evidence(results, "", budget=None)
+    assert "Revenue" in ev and "42000" in ev and "InlineCell" in ev
+    assert "extracted text" in ev
+
+
+def test_pptx_deliverable_stdlib_text_extraction(tmp_path):
+    results = tmp_path / "task_output" / "artifacts" / "results"
+    results.mkdir(parents=True)
+    _pptx_bytes(results, ["Q3 Launch Plan", "Budget"])
+    ev = grading._gather_evidence(results, "", budget=None)
+    assert "Q3 Launch Plan" in ev and "Budget" in ev
+    assert "extracted text" in ev
+
+
+def test_xlsx_corrupt_and_empty_degrade_without_raising(tmp_path):
+    import zipfile
+    (tmp_path / "bad.xlsx").write_bytes(b"not a zip")
+    assert grading._extract_text_deliverable(tmp_path / "bad.xlsx") is None
+    empty = tmp_path / "empty.xlsx"
+    with zipfile.ZipFile(empty, "w") as z:
+        z.writestr("xl/other.xml", "<x/>")
+    assert grading._extract_text_deliverable(empty) is None
+
+
+def test_synthetic_abstain_judges_match_member_families():
+    class _M:
+        def __init__(self, fam):
+            self.family = fam
+    members = [_M("sonnet"), _M("kimi"), _M("glm")]
+    crit = grading._synthetic_abstain_criterion(0, {"criterion": "x", "weight": 5}, members)
+    assert crit["judges"] == ["sonnet", "kimi", "glm"]
+    assert len(crit["judges"]) == len(crit["satisfied_by_judge"]) == len(members)
+
+
+# ---------------------------------------------------------------------------
+# Issue 1: rubric batching (_merge_batched_grades, threshold gate)
+# ---------------------------------------------------------------------------
+
+
+def test_rubric_batch_size_env_guard(monkeypatch):
+    monkeypatch.delenv("WCB_JUDGE_RUBRIC_BATCH_SIZE", raising=False)
+    assert grading._rubric_batch_size() == grading._DEFAULT_RUBRIC_BATCH_SIZE
+    monkeypatch.setenv("WCB_JUDGE_RUBRIC_BATCH_SIZE", "notanint")
+    assert grading._rubric_batch_size() == grading._DEFAULT_RUBRIC_BATCH_SIZE
+    monkeypatch.setenv("WCB_JUDGE_RUBRIC_BATCH_SIZE", "0")
+    assert grading._rubric_batch_size() == grading._DEFAULT_RUBRIC_BATCH_SIZE
+    monkeypatch.setenv("WCB_JUDGE_RUBRIC_BATCH_SIZE", "7")
+    assert grading._rubric_batch_size() == 7
+
+
+def _fake_council_result(rubrics, satisfied_ids=()):
+    # Build a _grade_council-shaped dict for a chunk: ids are POSITIONAL (0..n-1),
+    # matching the real aggregator. satisfied_ids are the positional indices that
+    # passed (positive-weight satisfied).
+    crit, abst = [], []
+    weighted = 0.0
+    passed = 0
+    for i, r in enumerate(rubrics):
+        wt = r["weight"] if isinstance(r, dict) else 1.0
+        sat = i in satisfied_ids
+        crit.append({"id": i, "weight": wt, "satisfied": sat,
+                     "passed": sat, "resolved_by": "unanimous", "is_positive": wt >= 0})
+        if sat:
+            weighted += wt
+            passed += 1
+    total_w = sum(r["weight"] for r in rubrics if isinstance(r, dict) and r["weight"] > 0) or 1.0
+    return {
+        "overall_score": round(weighted / total_w, 4),
+        "rubric_weights_percentage": round(weighted / total_w * 100, 2),
+        "criteria_total": len(rubrics), "criteria_passed": passed,
+        "criteria_failed": len(rubrics) - passed, "criteria_abstained": 0,
+        "criteria": crit, "judge_model": "council",
+        "judge_council": {"members": ["sonnet"], "surviving": ["sonnet"], "failed": [],
+                          "aggregation": "unanimous_or_sonnet_tiebreak",
+                          "per_member_user_chars": {"sonnet": 1000},
+                          "per_member_verdict_count": {"sonnet": len(rubrics)}},
+        "truncation_flags": [], "abstention_flags": abst,
+        "usage": {"input_tokens": 10, "output_tokens": 5, "cache_read_tokens": 0,
+                  "cache_write_tokens": 0, "total_tokens": 15, "request_count": 1,
+                  "cost_usd": 0.01, "per_member": {"sonnet": {
+                      "model": "sonnet-x", "input_tokens": 10, "output_tokens": 5,
+                      "cache_read_tokens": 0, "cache_write_tokens": 0, "total_tokens": 15,
+                      "request_count": 1, "cost_usd": 0.01, "ok": True}}},
+    }
+
+
+class _M:
+    def __init__(self, family):
+        self.family = family
+        self.model = f"{family}-x"
+
+
+def test_batching_merge_remaps_ids_and_recomputes_denominator_once():
+    rubrics = [{"criterion": f"c{i}", "weight": 1} for i in range(100)]
+    members = [_M("sonnet")]
+    chunks = [rubrics[0:40], rubrics[40:80], rubrics[80:100]]
+    # Each chunk passes all its criteria (positional ids within the chunk).
+    chunk_results = [(ch, _fake_council_result(ch, satisfied_ids=range(len(ch)))) for ch in chunks]
+    merged = grading._merge_batched_grades(rubrics, members, chunk_results)
+    assert merged["criteria_total"] == 100
+    assert merged["criteria_passed"] == 100
+    assert merged["criteria_abstained"] == 0
+    ids = [c["id"] for c in merged["criteria"]]
+    assert ids == list(range(100))  # global remap, each exactly once
+    assert merged["overall_score"] == 1.0
+    assert merged["judge_council"]["per_member_verdict_count"]["sonnet"] == 100
+
+
+def test_batching_one_chunk_failure_degrades_to_abstain_not_zero():
+    rubrics = [{"criterion": f"c{i}", "weight": 1} for i in range(80)]
+    members = [_M("sonnet")]
+    good = (rubrics[0:40], _fake_council_result(rubrics[0:40], satisfied_ids=range(40)))
+    bad = (rubrics[40:80], {"overall_score": 0.0, "error": "chunk council failed"})
+    merged = grading._merge_batched_grades(rubrics, members, [good, bad])
+    assert merged["criteria_total"] == 80
+    assert merged["criteria_passed"] == 40
+    assert merged["criteria_abstained"] == 40
+    assert set(merged["abstention_flags"]) == set(range(40, 80))
+    assert "error" not in merged  # partial failure must NOT set top-level error
+    assert merged["overall_score"] == 0.5  # 40 passed / 80 positive weight
+
+
+def test_batching_all_chunks_fail_sets_error():
+    rubrics = [{"criterion": f"c{i}", "weight": 1} for i in range(20)]
+    members = [_M("sonnet")]
+    fail = {"overall_score": 0.0, "error": "boom"}
+    merged = grading._merge_batched_grades(
+        rubrics, members, [(rubrics[0:10], fail), (rubrics[10:20], fail)])
+    assert merged.get("error") == "all rubric batches failed to grade"
+    assert merged["criteria_abstained"] == 20
 
 
 # ---------------------------------------------------------------------------
@@ -538,9 +855,13 @@ def test_looks_like_deliverable_wrong_ext_and_oversize(tmp_path):
     good = tmp_path / "a.md"
     good.write_text("hi", encoding="utf-8")
     assert grading._looks_like_deliverable(good, tmp_path) is True
-    # Unsupported extension -> False regardless of size.
-    bad = tmp_path / "a.png"
-    bad.write_bytes(b"\x89PNG")
+    # Image extension is now supported (Issue 2) -> True.
+    img = tmp_path / "a.png"
+    img.write_bytes(b"\x89PNG")
+    assert grading._looks_like_deliverable(img, tmp_path) is True
+    # Genuinely-unsupported extension -> False regardless of size.
+    bad = tmp_path / "a.bin"
+    bad.write_bytes(b"\x00\x01\x02")
     assert grading._looks_like_deliverable(bad, tmp_path) is False
     # Supported extension but oversized -> False (size gate).
     big = tmp_path / "b.csv"

@@ -16,7 +16,7 @@ _STRIP_IMPORT_RE = re.compile(
     re.MULTILINE,
 )
 _STRIP_HELPER_RE = re.compile(
-    r"^def\s+(?:_get|_post|_request|api_get|api_post|read_file|file_exists)\s*\(.*?(?=\nclass\s|\ndef\s[^_]|\Z)",
+    r"^def\s+(?:_get|_post|_request|api_get|api_post|read_file|file_exists|find_files|find_file)\s*\(.*?(?=\nclass\s|\ndef\s[^_]|\Z)",
     re.MULTILINE | re.DOTALL,
 )
 _STRIP_ENVIRON_RE = re.compile(

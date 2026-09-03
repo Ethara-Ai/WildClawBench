@@ -612,7 +612,7 @@ class TestCondenseTranscript:
 
     def test_plain_string_content(self):
         traj = {"messages": [{"message": {"role": "user", "content": "hello"}}]}
-        assert _condense_transcript_for_judge(traj) == "[user] hello"
+        assert _condense_transcript_for_judge(traj) == "[FINAL ASSISTANT MESSAGE] [user] hello"
 
     def test_text_block_content(self):
         traj = {
@@ -621,7 +621,7 @@ class TestCondenseTranscript:
                              "content": [{"type": "text", "text": "answer"}]}}
             ]
         }
-        assert _condense_transcript_for_judge(traj) == "[assistant] answer"
+        assert _condense_transcript_for_judge(traj) == "[FINAL ASSISTANT MESSAGE] [assistant] answer"
 
     def test_tool_call_block(self):
         traj = {
@@ -632,7 +632,7 @@ class TestCondenseTranscript:
             ]
         }
         out = _condense_transcript_for_judge(traj)
-        assert out == '[assistant:tool] ls {"path": "/"}'
+        assert out == '[FINAL ASSISTANT MESSAGE] [assistant:tool] ls {"path": "/"}'
 
     def test_tool_result_block(self):
         traj = {
@@ -641,7 +641,7 @@ class TestCondenseTranscript:
                              "content": [{"type": "toolResult", "text": "file listing"}]}}
             ]
         }
-        assert _condense_transcript_for_judge(traj) == "[toolResult] file listing"
+        assert _condense_transcript_for_judge(traj) == "[SUBMIT TOOL OUTPUT] [toolResult] file listing"
 
     def test_whitespace_only_string_skipped(self):
         traj = {"messages": [{"message": {"role": "user", "content": "   "}}]}
@@ -652,12 +652,28 @@ class TestCondenseTranscript:
         long = "x" * 5000
         traj = {"messages": [{"message": {"role": "user", "content": long}}]}
         out = _condense_transcript_for_judge(traj, limit=10)
-        assert out == f"[user] {long}"
+        assert out == f"[FINAL ASSISTANT MESSAGE] [user] {long}"
 
     def test_message_without_wrapper(self):
         # entries where role/content live at top level (no `message` wrapper).
         traj = {"messages": [{"role": "user", "content": "top-level"}]}
-        assert _condense_transcript_for_judge(traj) == "[user] top-level"
+        assert _condense_transcript_for_judge(traj) == "[FINAL ASSISTANT MESSAGE] [user] top-level"
+
+    def test_landmark_only_on_last_entry(self):
+        traj = {"messages": [
+            {"message": {"role": "user", "content": "first"}},
+            {"message": {"role": "assistant", "content": "final"}},
+        ]}
+        out = _condense_transcript_for_judge(traj)
+        assert out == "[user] first\n[FINAL ASSISTANT MESSAGE] [assistant] final"
+
+    def test_submit_tool_landmark_when_ending_on_toolresult(self):
+        traj = {"messages": [
+            {"message": {"role": "assistant", "content": "doing"}},
+            {"message": {"role": "user", "content": [{"type": "toolResult", "text": "done"}]}},
+        ]}
+        out = _condense_transcript_for_judge(traj)
+        assert out.endswith("[SUBMIT TOOL OUTPUT] [toolResult] done")
 
 
 # ---------------------------------------------------------------------------

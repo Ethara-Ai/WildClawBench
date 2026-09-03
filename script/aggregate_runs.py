@@ -31,6 +31,25 @@ def _include_incomplete_runs() -> bool:
         "1", "true", "yes", "on")
 
 
+def _include_invalid_runs() -> bool:
+    return os.environ.get("WCB_INCLUDE_INVALID_RUNS", "").strip().lower() in (
+        "1", "true", "yes", "on")
+
+
+def _run_exclusion_reason(score: dict) -> str | None:
+    # Mirror of run_batch.py:_run_exclusion_reason. Fail-closed: incomplete,
+    # injection-failed, and unmeasured (empty-trajectory) runs never average in.
+    # `is False` (not falsy) so a legacy score.json lacking the key is kept.
+    if score.get("run_incomplete") and not _include_incomplete_runs():
+        return "incomplete"
+    if not _include_invalid_runs():
+        if score.get("injection_ok") is False:
+            return "injection_failed"
+        if score.get("eval_skipped"):
+            return "unmeasured"
+    return None
+
+
 def _read_score(path: Path) -> dict | None:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -46,7 +65,9 @@ def _pct_from_score(score: dict) -> float | None:
     pct = score.get("rubric_weights_percentage")
     if isinstance(pct, (int, float)):
         return float(pct)
-    # Fallback: derive from `overall_score` (always present, in [0,1]).
+    # Fallback: derive from `overall_score` (always present; signed/unclamped
+    # since 2026-07 — may be negative when triggered negative-weight rubric
+    # criteria outweigh positives, byte-aligned with Channel A pytest reward).
     overall = score.get("overall_score")
     if isinstance(overall, (int, float)):
         return float(overall) * 100.0
@@ -102,7 +123,7 @@ def aggregate(output_root: Path, backend_filter: str | None = None) -> dict:
         score = _read_score(score_path)
         if score is None:
             continue
-        if score.get("run_incomplete") and not _include_incomplete_runs():
+        if _run_exclusion_reason(score) is not None:
             excluded_incomplete[(backend, task_id, model)] += 1
             continue
         pct = _pct_from_score(score)

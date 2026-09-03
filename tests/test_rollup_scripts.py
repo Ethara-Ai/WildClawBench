@@ -319,6 +319,51 @@ class TestAggregateMain:
         assert "by (backend, task, model)" in out
 
 
+class TestAggregateInvalidRunExclusion:
+    def test_run_exclusion_reason_matches_run_batch(self, agg, monkeypatch):
+        monkeypatch.delenv("WCB_INCLUDE_INVALID_RUNS", raising=False)
+        monkeypatch.delenv("WCB_INCLUDE_INCOMPLETE_RUNS", raising=False)
+        assert agg._run_exclusion_reason({"run_incomplete": True}) == "incomplete"
+        assert agg._run_exclusion_reason({"injection_ok": False}) == "injection_failed"
+        assert agg._run_exclusion_reason({"eval_skipped": "x"}) == "unmeasured"
+        assert agg._run_exclusion_reason({"rubric_weights_percentage": 50.0}) is None
+        # legacy score without the keys is never excluded
+        assert agg._run_exclusion_reason({"injection_ok": True}) is None
+
+    def test_aggregate_drops_injection_failed_by_default(self, agg, tmp_path, monkeypatch):
+        monkeypatch.delenv("WCB_INCLUDE_INVALID_RUNS", raising=False)
+        out_root = tmp_path / "output"
+        _mk_run_dir(out_root, "openclaw", "t", "m", 1,
+                    score={"rubric_weights_percentage": 100.0})
+        _mk_run_dir(out_root, "openclaw", "t", "m", 2,
+                    score={"rubric_weights_percentage": 0.0, "injection_ok": False})
+        summary = agg.aggregate(out_root, "openclaw")
+        by_model = summary["by_model"][0]
+        assert by_model["average_rubric_weights_percentage"] == 100.0
+
+    def test_aggregate_drops_eval_skipped_by_default(self, agg, tmp_path, monkeypatch):
+        monkeypatch.delenv("WCB_INCLUDE_INVALID_RUNS", raising=False)
+        out_root = tmp_path / "output"
+        _mk_run_dir(out_root, "openclaw", "t", "m", 1,
+                    score={"rubric_weights_percentage": 80.0})
+        _mk_run_dir(out_root, "openclaw", "t", "m", 2,
+                    score={"overall_score": None, "eval_skipped": "trajectory empty: no assistant messages"})
+        summary = agg.aggregate(out_root, "openclaw")
+        by_model = summary["by_model"][0]
+        assert by_model["average_rubric_weights_percentage"] == 80.0
+
+    def test_aggregate_include_invalid_folds_back(self, agg, tmp_path, monkeypatch):
+        monkeypatch.setenv("WCB_INCLUDE_INVALID_RUNS", "1")
+        out_root = tmp_path / "output"
+        _mk_run_dir(out_root, "openclaw", "t", "m", 1,
+                    score={"rubric_weights_percentage": 100.0})
+        _mk_run_dir(out_root, "openclaw", "t", "m", 2,
+                    score={"rubric_weights_percentage": 0.0, "injection_ok": False})
+        summary = agg.aggregate(out_root, "openclaw")
+        by_model = summary["by_model"][0]
+        assert by_model["average_rubric_weights_percentage"] == 50.0
+
+
 # =========================================================================== #
 # merge_pass_summaries.py
 # =========================================================================== #

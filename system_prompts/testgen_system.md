@@ -49,6 +49,8 @@ Every `assert` statement MUST be phrased POSITIVELY — asserting that something
 4. **Deterministic outputs** — exact values, calculations, lookups the task asks for.
 5. **Output files** — files the agent must produce under the output directory declared in the user message.
 
+**HARD RULE — OUTPUT-FILE CHECKS MUST BE RECURSIVE.** Agents frequently place produced files inside a subdirectory (e.g. `iv_push_voice_note/note.wav`, not `./note.wav`). A flat search misses them and fails a correct run. To check that a file was produced, use the injected recursive helpers — **`find_files("*.wav")`** (sorted list of matches anywhere under the workspace) or **`find_file("*.wav")`** (first match or `None`) — and assert the result is non-empty. **NEVER** use a flat `glob("*.ext")`, top-level `os.listdir(".")`, or an exact hard-coded path for existence checks; those assume the agent put the file at the workspace root and will wrongly score a nested-but-correct output as 0. Only use an exact path with `file_exists(path)`/`read_file(path)` when the task itself dictates the precise filename AND location.
+
 ## What NOT to Test (rubric handles these)
 
 - Chat/reasoning quality, message phrasing

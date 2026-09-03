@@ -199,7 +199,7 @@ def regrade(run_dir: Path, rubric_override: Path | None = None) -> dict:
     prev = {}
     try:
         prev = json.loads(score_path.read_text(encoding="utf-8"))
-        for k in ("injection_ok", "injection_defects"):
+        for k in ("injection_ok", "injection_defects", "eval_skipped"):
             if k in prev and k not in scores:
                 scores[k] = prev[k]
     except (OSError, json.JSONDecodeError):

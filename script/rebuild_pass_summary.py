@@ -148,6 +148,8 @@ def _pass_summary_entry(run_index: int, scores: dict | None, test_result: dict |
         entry["run_incomplete"] = True
         entry["turns_planned"] = s.get("turns_planned")
         entry["turns_completed"] = s.get("turns_completed")
+    if s.get("eval_skipped"):
+        entry["eval_skipped"] = s.get("eval_skipped")
     return entry
 
 
@@ -156,13 +158,32 @@ def _include_incomplete_runs() -> bool:
         "1", "true", "yes", "on")
 
 
+def _include_invalid_runs() -> bool:
+    return os.environ.get("WCB_INCLUDE_INVALID_RUNS", "").strip().lower() in (
+        "1", "true", "yes", "on")
+
+
+def _run_exclusion_reason(r: dict) -> str | None:
+    # Mirror of run_batch.py:_run_exclusion_reason (fail-closed; `is False` keeps legacy).
+    if r.get("run_incomplete") and not _include_incomplete_runs():
+        return "incomplete"
+    if not _include_invalid_runs():
+        if r.get("injection_ok") is False:
+            return "injection_failed"
+        if r.get("eval_skipped"):
+            return "unmeasured"
+    return None
+
+
 def _pass_summary_doc(model_type: str, per_run: list) -> dict:
     """Verbatim port of eval/run_batch.py::_pass_summary_doc."""
     per_run = sorted(per_run, key=lambda r: r["run_index"])
-    if _include_incomplete_runs():
-        used = per_run
-    else:
-        used = [r for r in per_run if not r.get("run_incomplete")]
+    reasons = {r["run_index"]: _run_exclusion_reason(r) for r in per_run}
+    used = [r for r in per_run if reasons[r["run_index"]] is None]
+    reason_counts: dict[str, int] = {}
+    for _v in reasons.values():
+        if _v:
+            reason_counts[_v] = reason_counts.get(_v, 0) + 1
     excluded = len(per_run) - len(used)
     avg_reward = _mean_or_none([r.get("reward") for r in used]) or 0.0
     avg_combined = _mean_or_none([r.get("combined_reward") for r in used])
@@ -181,7 +202,15 @@ def _pass_summary_doc(model_type: str, per_run: list) -> dict:
     }
     if excluded:
         doc["runs_used"] = len(used)
-        doc["runs_excluded_incomplete"] = excluded
+        for _reason, _key in (
+            ("incomplete", "runs_excluded_incomplete"),
+            ("injection_failed", "runs_excluded_injection_failed"),
+            ("unmeasured", "runs_excluded_unmeasured"),
+        ):
+            if reason_counts.get(_reason):
+                doc[_key] = reason_counts[_reason]
+        if not used:
+            doc["all_runs_excluded"] = True
     return doc
 
 

@@ -979,6 +979,11 @@ def _pass_summary_entry(run_index: int, scores: dict | None, test_result: dict |
         entry["run_incomplete"] = True
         entry["turns_planned"] = s.get("turns_planned")
         entry["turns_completed"] = s.get("turns_completed")
+    # Unmeasured marker: the eval phase refused to grade (empty trajectory or
+    # never-ran). overall_score is None; _pass_summary_doc excludes it from
+    # averages so a no-signal run is not folded in as a 0.0.
+    if s.get("eval_skipped"):
+        entry["eval_skipped"] = s.get("eval_skipped")
     return entry
 
 
@@ -987,16 +992,44 @@ def _include_incomplete_runs() -> bool:
         "1", "true", "yes", "on")
 
 
+def _include_invalid_runs() -> bool:
+    # Opt-OUT of the fail-closed exclusion of invalid runs (injection failed /
+    # unmeasured). Default is fail-CLOSED: an injects-never-landed run or an
+    # empty-trajectory run is NOT a valid measurement of the scenario, so it
+    # must not contaminate pass@K averages. WCB_INCLUDE_INVALID_RUNS=1 folds
+    # them back in for debugging (mirror of WCB_INCLUDE_INCOMPLETE_RUNS).
+    return os.environ.get("WCB_INCLUDE_INVALID_RUNS", "").strip().lower() in (
+        "1", "true", "yes", "on")
+
+
+def _run_exclusion_reason(r: dict) -> str | None:
+    # Why this per_run entry must NOT count toward averages, or None.
+    # Fail-closed: only valid measurements average in.
+    if r.get("run_incomplete") and not _include_incomplete_runs():
+        return "incomplete"
+    if not _include_invalid_runs():
+        # `is False` (not falsy): a missing key on a legacy run must NOT exclude.
+        if r.get("injection_ok") is False:
+            return "injection_failed"
+        # eval_skipped is a non-empty reason string when the eval phase refused
+        # to grade (empty trajectory / never-ran): overall_score is None, so the
+        # run carries no signal and would otherwise be averaged in as a 0.0.
+        if r.get("eval_skipped"):
+            return "unmeasured"
+    return None
+
+
 def _pass_summary_doc(model_type: str, per_run: list) -> dict:
     per_run = sorted(per_run, key=lambda r: r["run_index"])
-    # Incomplete runs (fewer scripted turns than the task defines) are kept in
+    # Invalid runs (incomplete / injection-failed / unmeasured) are kept in
     # per_run for visibility but excluded from every average, so pass@K is
-    # computed over valid measurements only. WCB_INCLUDE_INCOMPLETE_RUNS=1
-    # folds them back in for debugging.
-    if _include_incomplete_runs():
-        used = per_run
-    else:
-        used = [r for r in per_run if not r.get("run_incomplete")]
+    # computed over valid measurements only. The opt-out envs fold them back.
+    reasons = {r["run_index"]: _run_exclusion_reason(r) for r in per_run}
+    used = [r for r in per_run if reasons[r["run_index"]] is None]
+    reason_counts: dict[str, int] = {}
+    for _v in reasons.values():
+        if _v:
+            reason_counts[_v] = reason_counts.get(_v, 0) + 1
     excluded = len(per_run) - len(used)
     avg_reward = _mean_or_none([r.get("reward") for r in used]) or 0.0
     avg_combined = _mean_or_none([r.get("combined_reward") for r in used])
@@ -1016,7 +1049,17 @@ def _pass_summary_doc(model_type: str, per_run: list) -> dict:
     }
     if excluded:
         doc["runs_used"] = len(used)
-        doc["runs_excluded_incomplete"] = excluded
+        for _reason, _key in (
+            ("incomplete", "runs_excluded_incomplete"),
+            ("injection_failed", "runs_excluded_injection_failed"),
+            ("unmeasured", "runs_excluded_unmeasured"),
+        ):
+            if reason_counts.get(_reason):
+                doc[_key] = reason_counts[_reason]
+        # Every rep excluded: average_reward is a placeholder 0.0, NOT a real
+        # measurement. Surface it so delivery does not read it as a genuine zero.
+        if not used:
+            doc["all_runs_excluded"] = True
     return doc
 
 
@@ -1040,11 +1083,14 @@ def _write_pass_summary(model_dir: Path, model_type: str, run_index: int,
 def _condense_transcript_for_judge(traj: dict, limit: int | None = None) -> str:
     """Flatten the trajectory messages into a text the judge can read.
 
-    By user policy (2026-06-02): trajectory is NEVER truncated when fed to the
-    judge. No per-call args cap, no per-tool-result cap, no overall cap. The
-    `limit` kwarg is retained only for API compatibility and is ignored.
-    Grading._gather_evidence is responsible for stitching this together with
-    deliverables; it also no longer applies an overall cap."""
+    By user policy (2026-06-02): the trajectory is NEVER truncated HERE. No
+    per-call-args cap, no per-tool-result cap. The `limit` kwarg is retained
+    only for API compatibility and is ignored. The last flattened entry is
+    tagged with a terminal-turn landmark ([FINAL ASSISTANT MESSAGE] or
+    [SUBMIT TOOL OUTPUT]) so a downstream boundary-aware evidence cut can keep
+    the final turn whole. Grading._gather_evidence stitches this together with
+    deliverables and applies a boundary-aware per-member evidence budget that
+    preserves the transcript marker + final turn (never a blind character cut)."""
     out: list[str] = []
     for m in traj.get("messages") or []:
         msg = m.get("message", m) if isinstance(m, dict) else {}
@@ -1069,6 +1115,15 @@ def _condense_transcript_for_judge(traj: dict, limit: int | None = None) -> str:
                 txt = b.get("text") or b.get("content") or ""
                 if isinstance(txt, str) and txt.strip():
                     out.append(f"[toolResult] {txt.strip()}")
+    # Emit a terminal-turn landmark on the last flattened entry so the judge (and
+    # grading._budget_transcript's boundary-aware tail anchor) can locate the
+    # final turn even when a boundary-aware evidence cut drops middle lines. The
+    # never-truncate policy is preserved: this only PREPENDS a label, drops
+    # nothing. judge_system.md names both landmarks.
+    if out:
+        last = out[-1]
+        landmark = "[SUBMIT TOOL OUTPUT]" if last.startswith("[toolResult]") else "[FINAL ASSISTANT MESSAGE]"
+        out[-1] = f"{landmark} {last}"
     return "\n".join(out)
 
 

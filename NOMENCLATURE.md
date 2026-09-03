@@ -11,7 +11,7 @@ Two independent scoring channels run per task per run. Historically both used `t
 | Rubric judge verdict for one run | `output/<backend>/<task>/trajectories/<model>/run_N/score.json` | `overall_score`, `rubric_weights_percentage` |
 | Rubric pass counts for one run | same file | `criteria_total`, `criteria_passed`, `criteria_failed` |
 | Per-criterion judge breakdown | same file | `criteria[]` |
-| Pytest reward for one run | `output/<backend>/<task>/trajectories/<model>/run_N/task_output/logs/verifier/reward.txt` | scalar in `[0,1]` |
+| Pytest reward for one run | `output/<backend>/<task>/trajectories/<model>/run_N/task_output/logs/verifier/reward.txt` | signed scalar (unclamped, ≈`[-0.5, 1]`) |
 | Pytest detailed report | same dir | `ctrf.json`, `test_function_outputs.json`, `test_output.log` |
 | Generated test code | `output/<backend>/<task>/data/tests/test_outputs.py` (shared across runs) | — |
 | Generated test weights | `output/<backend>/<task>/data/tests/test_weights.json` | — |
@@ -46,16 +46,16 @@ The legacy `workspace/results/` sub-collection (from harbor/kensei2.py:2638) was
 
 **Owner:** `src/utils/test_executor.py:_compute_reward`
 **Triggered when:** `--execute-tests` is on and generated/inline tests run against the agent workspace.
-**Reward formula (user m1420 line 1):**
+**Reward formula (user m1420 line 1, unclamped):**
 
 ```
-reward = max(0, (Σ passed_positive_weights − Σ |triggered_negative_weights|) / Σ all_positive_weights)
+reward = (Σ passed_positive_weights − Σ |triggered_negative_weights|) / Σ positive_weights
 ```
 
-A "triggered" negative-weight test is a guardrail that FIRED (failure mode actually occurred). Its absolute weight is subtracted from the numerator.
+A "triggered" negative-weight test is a guardrail that FIRED (failure mode actually occurred). Its absolute weight is subtracted from the numerator. **No clamp** — `reward < 0` when triggered penalties outweigh earned positives. Bounded in practice ≈`[-0.5, 1]` by the testgen invariant total|negative| < 50% total positive.
 
 **Output files:**
-- `task_output/logs/verifier/reward.txt` — scalar reward in `[0,1]`
+- `task_output/logs/verifier/reward.txt` — signed scalar reward (unclamped)
 - `task_output/logs/verifier/ctrf.json` — Common Test Report Format
 - `task_output/logs/verifier/test_function_outputs.json` — per-test return values
 - `task_output/logs/verifier/test_output.log` — pytest stdout
@@ -83,21 +83,21 @@ Polarity rule per walkthrough §2: `SATISFIED` always reflects the criterion tex
 
 Rationale (user m1543 verbatim): _"not every model has the same input context and is not judging on all rubrics except Sonnet, then why enforce this? Just have it done."_ Strict equal-coverage was abandoned because it artificially invented No-votes the model did not cast; rather than break ties or fill gaps by majority, Sonnet — the only member guaranteed full context — is now the source of truth that resolves both genuine disagreements and partial coverage. Pure abstention (Human Evaluation) is reserved for when Sonnet itself produced no verdict.
 
-**Reward formula (walkthrough §4, equivalent to user m1420 line 1):**
+**Reward formula (walkthrough §4, equivalent to user m1420 line 1, unclamped — byte-aligned with Channel A):**
 
 ```
 weighted = Σ weight for each criterion where the resolved satisfied = True
 total_positive = Σ weight for each criterion where weight > 0
-overall_score = max(0.0, min(1.0, weighted / total_positive))
+overall_score = weighted / total_positive     # no clamp; signed
 ```
 
-This collapses to the user m1420 formula because `satisfied=True` on a negative-weight criterion contributes `+(-w)` = `-|w|` to `weighted`. **No fractions are possible** — Yes/No verdicts produce integer-weighted attribution by construction (b78 supersedes b51 binary quantization).
+This collapses to the user m1420 formula because `satisfied=True` on a negative-weight criterion contributes `+(-w)` = `-|w|` to `weighted`. **No fractions are possible** — Yes/No verdicts produce integer-weighted attribution by construction (b78 supersedes b51 binary quantization). **No clamp** — Channel B now mirrors Channel A's signed range so a rubric run whose triggered guardrail criteria outweigh earned positives returns `overall_score < 0`. Bounded in practice ≈`[-0.5, 1]` by testgen weight budget. The `overall_score: 0.0` value emitted by error paths (no rubrics, transport failure) is a **no-signal sentinel** and NOT a reward floor.
 
 **Output file:** `output/<backend>/<task>/trajectories/<model>/run_N/score.json`
 
 **Canonical top-level keys (b71 + b78 + b82/b83):**
-- `overall_score` — float in `[0,1]`, always a rational `k / total_positive`
-- `rubric_weights_percentage` — `overall_score * 100`, 2 dp (user m1420 line 2)
+- `overall_score` — float, always a rational `k / total_positive`; range ≈`[-0.5, 1]` (unclamped)
+- `rubric_weights_percentage` — `overall_score * 100`, 2 dp (user m1420 line 2); may be negative
 - `criteria_total`, `criteria_passed`, `criteria_failed`, `criteria_abstained` — counts of rubric criteria. **Invariant:** `criteria_total == criteria_passed + criteria_failed + criteria_abstained`.
 - `criteria[]` — per-criterion breakdown (see below)
 - `judge_model` — `'council'` if ≥2 council members survived parsing, else ARN/model string
@@ -235,13 +235,13 @@ Each summary has two sections:
 
 A model that scores `60, 60, 60, 60` on a task has mean 60 / pass@4 60. A model that scores `0, 0, 0, 100` on the same task has mean 25 / pass@4 100. Different models tell different stories and both stories matter; pick the one that matches the question you're asking.
 
-## Formula reference (user m1420 + walkthrough §4)
+## Formula reference (user m1420 + walkthrough §4, unclamped)
 
 ```
-final_reward = max(0, (Σ passed_positive_weights − Σ |triggered_negative_weights|) / Σ all_positive_weights)
-rubric_weights_percentage = final_reward × 100
-average_rubric_weights_percentage = mean(rubric_weights_percentage across all runs for a model)
-pass_at_k(task, model) = max(rubric_weights_percentage across K runs of that task by that model)
+final_reward = (Σ passed_positive_weights − Σ |triggered_negative_weights|) / Σ positive_weights   # signed, no clamp
+rubric_weights_percentage = final_reward × 100                                                       # may be negative
+average_rubric_weights_percentage = mean(rubric_weights_percentage across all runs for a model)      # negatives pull mean down
+pass_at_k(task, model) = max(rubric_weights_percentage across K runs of that task by that model)     # best-of-K, may still be negative if every run failed
 average_pass_at_k(model) = mean(pass_at_k across all tasks for that model)
 ```
 

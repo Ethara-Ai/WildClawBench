@@ -857,6 +857,10 @@ def build_report(
         report["run_incomplete"] = True
         report["turns_planned"] = score.get("turns_planned")
         report["turns_completed"] = score.get("turns_completed")
+    if score.get("injection_ok") is False:
+        report["injection_ok"] = False
+    if score.get("eval_skipped"):
+        report["eval_skipped"] = score.get("eval_skipped")
     return report
 
 
@@ -2348,6 +2352,10 @@ def convert_task(
             }
             if report.get("run_incomplete"):
                 run_summ["run_incomplete"] = True
+            if report.get("injection_ok") is False:
+                run_summ["injection_ok"] = False
+            if report.get("eval_skipped"):
+                run_summ["eval_skipped"] = report.get("eval_skipped")
             per_run_summ.append(run_summ)
             produced_any = True
             if verbose:
@@ -2357,19 +2365,38 @@ def convert_task(
                 )
 
         # pass_summary.json REBUILT from the runs we actually emitted.
-        # Incomplete runs stay listed in per_run but are excluded from the
-        # averages (WCB_INCLUDE_INCOMPLETE_RUNS=1 folds them back in); when
-        # every run is incomplete the averages fall back to all runs so the
-        # doc never divides by zero.
+        # Invalid runs (incomplete / injection-failed / unmeasured) stay listed
+        # in per_run but are excluded from the averages; WCB_INCLUDE_INCOMPLETE_RUNS=1
+        # / WCB_INCLUDE_INVALID_RUNS=1 fold them back in. When every run is
+        # excluded the averages fall back to all runs so the doc never divides
+        # by zero, and all_runs_excluded flags that the number is a placeholder.
         if per_run_summ:
             include_incomplete = os.environ.get(
                 "WCB_INCLUDE_INCOMPLETE_RUNS", "").strip().lower() in (
                 "1", "true", "yes", "on")
-            if include_incomplete:
-                stat_runs = per_run_summ
-            else:
-                stat_runs = [r for r in per_run_summ
-                             if not r.get("run_incomplete")] or per_run_summ
+            include_invalid = os.environ.get(
+                "WCB_INCLUDE_INVALID_RUNS", "").strip().lower() in (
+                "1", "true", "yes", "on")
+
+            def _bundle_exclusion_reason(r: dict) -> str | None:
+                # Mirror of run_batch.py:_run_exclusion_reason (delivery path).
+                if r.get("run_incomplete") and not include_incomplete:
+                    return "incomplete"
+                if not include_invalid:
+                    if r.get("injection_ok") is False:
+                        return "injection_failed"
+                    if r.get("eval_skipped"):
+                        return "unmeasured"
+                return None
+
+            reasons = {id(r): _bundle_exclusion_reason(r) for r in per_run_summ}
+            valid = [r for r in per_run_summ if reasons[id(r)] is None]
+            reason_counts: dict[str, int] = {}
+            for _v in reasons.values():
+                if _v:
+                    reason_counts[_v] = reason_counts.get(_v, 0) + 1
+            all_excluded = not valid
+            stat_runs = valid or per_run_summ
             n = len(stat_runs)
             avg_rub = sum(r["rubric_weights_percentage"] for r in stat_runs) / n
             avg_combined = sum(r["combined_score"] for r in stat_runs) / n
@@ -2380,10 +2407,18 @@ def convert_task(
                 "average_rubric_weights_percentage": round(avg_rub, 2),
                 "per_run": per_run_summ,
             }
-            excluded = len(per_run_summ) - len(stat_runs)
+            excluded = len(per_run_summ) - len(valid)
             if excluded:
-                summary_doc["runs_used"] = len(stat_runs)
-                summary_doc["runs_excluded_incomplete"] = excluded
+                summary_doc["runs_used"] = len(valid)
+                for _reason, _key in (
+                    ("incomplete", "runs_excluded_incomplete"),
+                    ("injection_failed", "runs_excluded_injection_failed"),
+                    ("unmeasured", "runs_excluded_unmeasured"),
+                ):
+                    if reason_counts.get(_reason):
+                        summary_doc[_key] = reason_counts[_reason]
+                if all_excluded:
+                    summary_doc["all_runs_excluded"] = True
             _write_json(dest_model / "pass_summary.json", summary_doc)
 
     if produced_any:

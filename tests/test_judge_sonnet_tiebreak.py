@@ -284,6 +284,54 @@ def test_negative_weight_satisfied_subtracts_via_tiebreak(monkeypatch):
     assert out_clean["overall_score"] > out["overall_score"]
 
 
+# ---------- (f2) unclamp: negative-weight penalties can drive overall < 0 ----------
+
+
+def test_negative_exceeds_positive_returns_below_zero(monkeypatch):
+    rubrics = [
+        {"criterion": "good thing", "weight": 3},
+        {"criterion": "forbidden A", "weight": -5},
+    ]
+    _patch_council(monkeypatch, [
+        _ok(SONNET_ARN, "sonnet", _verdicts(False, True)),
+        _ok(GLM_ARN, "glm", _verdicts(False, True)),
+        _ok(KIMI_ARN, "kimi", _verdicts(False, True)),
+    ])
+    out = _grade(rubrics)
+
+    assert out["overall_score"] == round(-5.0 / 3.0, 4)
+    assert out["overall_score"] < 0.0
+    assert out["rubric_weights_percentage"] == round(-5.0 / 3.0 * 100.0, 2)
+
+
+def test_all_negative_triggered_no_positive_returns_negative(monkeypatch):
+    rubrics = [
+        {"criterion": "good thing", "weight": 5},
+        {"criterion": "forbidden A", "weight": -3},
+        {"criterion": "forbidden B", "weight": -1},
+    ]
+    _patch_council(monkeypatch, [
+        _ok(SONNET_ARN, "sonnet", _verdicts(False, True, True)),
+        _ok(GLM_ARN, "glm", _verdicts(False, True, True)),
+        _ok(KIMI_ARN, "kimi", _verdicts(False, True, True)),
+    ])
+    out = _grade(rubrics)
+
+    assert out["overall_score"] == round(-4.0 / 5.0, 4)
+    assert out["overall_score"] < 0.0
+
+
+def test_error_path_zero_is_sentinel_not_floor(tmp_path):
+    # Empty-rubrics early-return path (grade_with_rubric at grading.py:1337):
+    # returns {"overall_score": 0.0, "error": "no rubric criteria"} without
+    # touching the council. Distinguishable from a legitimate weighted=0/total_w>0
+    # zero (which does not set the top-level "error"). Both stay 0.0 (never <0)
+    # under the new unclamped formula — the sentinel path is preserved.
+    out = grading.grade_with_rubric([], "task", tmp_path)
+    assert out["overall_score"] == 0.0
+    assert "error" in out
+
+
 # ---------- (g) invariant + aggregation label on a mixed rubric ----------
 
 
