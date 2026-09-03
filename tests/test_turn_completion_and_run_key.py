@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 import time
@@ -621,6 +622,62 @@ class TestTurnsDuplicated:
                                         "rubric_weights_percentage": 80.0,
                                         "turns_duplicated": [2, 7]}, None)
         assert e["turns_duplicated"] == [2, 7]
+
+
+class TestSidecarNamingAndRegistry:
+    """2026-09-01 gama incident: ll-/k3net- names put live infra on the orphan
+    sweeps' kill lists; unregistered in-process batches were invisible to the
+    cleanup concurrency guard."""
+
+    def test_no_sweepable_container_names(self):
+        src = (REPO / "eval" / "run_batch.py").read_text()
+        assert 'f"ll-' not in src
+        assert 'f"k3net-' not in src
+
+    def test_register_active_run_marker(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("TMPDIR", str(tmp_path))
+        sys.path.insert(0, str(REPO / "eval"))
+        import run_batch as rb
+        cleanups = []
+        rb._register_active_run(cleanups)
+        marker = tmp_path / "wcb-active-runs" / str(os.getpid())
+        assert marker.exists()
+        for c in cleanups:
+            c()
+        assert not marker.exists()
+
+
+class TestEmptyTurnDetection:
+    def test_limit_parsing(self, monkeypatch):
+        from src.agents.openclaw.runner import OpenClawAgent
+        monkeypatch.delenv("WCB_EMPTY_TURN_LIMIT", raising=False)
+        assert OpenClawAgent._empty_turn_limit() == 2
+        monkeypatch.setenv("WCB_EMPTY_TURN_LIMIT", "0")
+        assert OpenClawAgent._empty_turn_limit() == 0
+        monkeypatch.setenv("WCB_EMPTY_TURN_LIMIT", "5")
+        assert OpenClawAgent._empty_turn_limit() == 5
+        monkeypatch.setenv("WCB_EMPTY_TURN_LIMIT", "junk")
+        assert OpenClawAgent._empty_turn_limit() == 2
+
+    def test_agent_execution_field(self):
+        ex = AgentExecution(elapsed_time=1.0)
+        assert ex.turns_empty == []
+        assert AgentExecution(elapsed_time=1.0,
+                              turns_empty=[3, 4]).turns_empty == [3, 4]
+
+    def test_augment_stamps_turns_empty(self):
+        sys.path.insert(0, str(REPO / "eval"))
+        import run_batch as rb
+        scores = {"overall_score": 0.5}
+        rb._augment_score_with_combined_rewards(
+            scores, {"run_incomplete": True, "turns_planned": 9,
+                     "turns_completed": 5, "turns_empty": [5, 6]})
+        assert scores["turns_empty"] == [5, 6]
+        clean = {"overall_score": 0.5}
+        rb._augment_score_with_combined_rewards(
+            clean, {"run_incomplete": False, "turns_planned": 9,
+                    "turns_completed": 9, "turns_empty": []})
+        assert "turns_empty" not in clean
 
 
 class TestStallGuard:
