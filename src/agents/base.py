@@ -76,6 +76,10 @@ class AgentExecution:
     # from a turn-source scripting bug, so it is recorded at the moment the
     # retry fires rather than re-derived from the transcript.
     turns_duplicated: list[int] = field(default_factory=list)
+    # Turn indices whose invocation finished but produced zero LLM traffic
+    # (dead-route fast-fail; see LLM_TIMEOUT_EVIDENCE). Not counted in
+    # turns_completed, so these runs flag run_incomplete.
+    turns_empty: list[int] = field(default_factory=list)
 
 
 class BaseAgent(ABC):

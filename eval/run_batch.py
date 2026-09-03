@@ -1364,6 +1364,8 @@ def _augment_score_with_combined_rewards(scores: dict, result: dict) -> None:
             scores["turns_planned_dispatched"] = r.get("turns_planned_dispatched")
         if r.get("turns_duplicated"):
             scores["turns_duplicated"] = list(r["turns_duplicated"])
+        if r.get("turns_empty"):
+            scores["turns_empty"] = list(r["turns_empty"])
 
 
 def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
@@ -2494,6 +2496,8 @@ def run_single_task(
             task, execution, interactive=interactive_source is not None))
         result["turns_duplicated"] = list(
             getattr(execution, "turns_duplicated", []) or [])
+        result["turns_empty"] = list(
+            getattr(execution, "turns_empty", []) or [])
         if result["run_incomplete"]:
             logger.warning(
                 "[%s] RUN INCOMPLETE: %s of %s scheduled turns executed — "
@@ -2993,6 +2997,23 @@ def _harvest_codex_account(auth_dir: str, pool_dir: str) -> int:
     return sum(1 for f in os.listdir(pool_dir) if f.endswith(".json"))
 
 
+def _register_active_run(cleanups: list) -> None:
+    """Drop a PID marker in script/run.sh's active-run registry so its
+    cleanup_orphans() concurrency guard counts THIS in-process batch as a live
+    peer. Without it the sweep sees no active run.sh and force-removes this
+    process's live containers mid-run."""
+    import tempfile
+    registry = Path(os.environ.get("TMPDIR", tempfile.gettempdir())) / "wcb-active-runs"
+    try:
+        registry.mkdir(parents=True, exist_ok=True)
+        marker = registry / str(os.getpid())
+        marker.touch()
+        cleanups.append(lambda: marker.unlink(missing_ok=True))
+    except OSError as exc:
+        logger.warning("active-run registry marker failed (%s); a concurrent "
+                       "run.sh orphan sweep may not see this batch", exc)
+
+
 def _run_cleanups(cleanups: list) -> None:
     """Run registered teardown callables in reverse order, swallowing errors."""
     for fn in reversed(cleanups):
@@ -3063,8 +3084,16 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
         network = shared_network
         sidecar = shared_sidecar
     else:
-        network = f"k3net-{batch_id}"
-        sidecar = f"ll-{batch_id}"
+        # NEVER name these with the ll-/k3net- prefixes: script/run.sh's
+        # cleanup_orphans and the TUI sweep remove those BY NAME, running or
+        # not (bootstrap_sidecar.py documents the same constraint for the
+        # shared path). The legacy ll-/k3net- names let a concurrent launch's
+        # sweep destroy this batch's LIVE sidecar mid-run — every in-flight
+        # turn then fast-fails 'LLM request timed out' to the end of its
+        # schedule (2026-09-01 gama incident: 19 delivered runs).
+        network = f"wcbsh-net-{batch_id}"
+        sidecar = f"wcbsh-sidecar-{batch_id}"
+        _register_active_run(cleanups)
 
     cc_bridge_name = ""
     cc_bridge_url = ""

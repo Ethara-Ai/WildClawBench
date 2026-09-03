@@ -281,6 +281,13 @@ class OpenClawAgent(BaseAgent):
                            task_id, exc)
 
     @staticmethod
+    def _empty_turn_limit() -> int:
+        try:
+            return int(os.environ.get("WCB_EMPTY_TURN_LIMIT", "2") or 0)
+        except ValueError:
+            return 2
+
+    @staticmethod
     def _stall_seconds() -> float:
         try:
             stall_s = float(os.environ.get("WCB_TURN_STALL_SECONDS", "0") or 0)
@@ -337,6 +344,7 @@ class OpenClawAgent(BaseAgent):
         turns_executed = 0
         timed_out_turn: int | None = None
         turns_duplicated: list[int] = []
+        turns_empty: list[int] = []
 
         try:
             exec_path = os.path.join(spec.workspace_path, "exec")
@@ -650,6 +658,8 @@ class OpenClawAgent(BaseAgent):
             turns_executed = 0          # turns whose invocation finished (no timeout)
             timed_out_turn: int | None = None
             turns_duplicated = []
+            turns_empty = []
+            empty_streak = 0
             turn_index = 0
             while True:
                 try:
@@ -700,6 +710,11 @@ class OpenClawAgent(BaseAgent):
                 # turn never exceeds a single turn budget.
                 outcome = "timeout"
                 turn_deadline = time.time() + spec.timeout_seconds
+                _run_key = self._run_keys.get(spec.task_id, "")
+                _rows_guarded = bool(_run_key and self.litellm_usage_log
+                                     and self._run_key_bearer_live())
+                rows_before_turn = (self._count_run_key_rows(_run_key)
+                                    if _rows_guarded else 0)
                 for turn_attempt in range(2):
                     attempt_budget = max(60, int(turn_deadline - time.time()))
                     agent_proc = run_background(
@@ -751,6 +766,35 @@ class OpenClawAgent(BaseAgent):
                     _ui_timed_out = True
                     timed_out_turn = turn_index
                     break
+                # Empty-turn detection (LLM_TIMEOUT_EVIDENCE dossier): a dead
+                # LLM route makes every invocation fast-fail its retry ladder
+                # and exit "ok" with an empty assistant message — turn-count
+                # complete, content-empty, invisible to run_incomplete. A turn
+                # that produced ZERO sidecar rows produced nothing: do not
+                # count it as executed, and abort after WCB_EMPTY_TURN_LIMIT
+                # consecutive empties instead of laddering to schedule end.
+                if _rows_guarded:
+                    rows_after_turn = self._count_run_key_rows(_run_key)
+                    if rows_after_turn == rows_before_turn:
+                        turns_empty.append(turn_index)
+                        empty_streak += 1
+                        logger.warning(
+                            "[%s] Agent turn %d EMPTY: invocation finished but "
+                            "produced no LLM traffic (dead route?) — not "
+                            "counted as executed (%d consecutive)",
+                            spec.task_id, turn_index + 1, empty_streak)
+                        limit = self._empty_turn_limit()
+                        if limit > 0 and empty_streak >= limit:
+                            logger.error(
+                                "[%s] ABORTING RUN: %d consecutive empty turns "
+                                "— LLM route is dead, remaining turns would "
+                                "all fail. Run will be flagged run_incomplete.",
+                                spec.task_id, empty_streak)
+                            break
+                        turn_index += 1
+                        continue
+                    rows_before_turn = rows_after_turn
+                    empty_streak = 0
                 turns_executed += 1
                 turn_index += 1
             elapsed_time = time.perf_counter() - start_time
@@ -826,6 +870,7 @@ class OpenClawAgent(BaseAgent):
                 turns_planned=total_turns,
                 recovery_turn_fired=recovery_fired,
                 turns_duplicated=turns_duplicated,
+                turns_empty=turns_empty,
             )
 
         except Exception as exc:
@@ -842,6 +887,7 @@ class OpenClawAgent(BaseAgent):
                 timed_out_turn=timed_out_turn,
                 turns_planned=total_turns,
                 turns_duplicated=turns_duplicated,
+                turns_empty=turns_empty,
             )
 
     def _wait_for_subagents(
