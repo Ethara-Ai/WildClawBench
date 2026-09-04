@@ -1,5 +1,6 @@
 weasyprint
 pymupdf
+pypdf
 requests
 yt-dlp
 modelscope

@@ -585,9 +585,10 @@ def _extract_text_deliverable(path: Path) -> str | None:
     # /python-pptx). OOXML formats are ZIPs of XML: .docx reads word/document.xml
     # <w:t> nodes; .xlsx reads sharedStrings + worksheet <t> nodes; .pptx reads
     # ppt/slides/slideN.xml <a:t> nodes. .pdf uses a GUARDED optional import
-    # (pypdf) — absent by default, degrading to None (-> presence marker); pypdf is
-    # NEVER a hard requirements pin. Returns extracted text (char-capped) or None.
-    # NEVER raises.
+    # (pypdf): when installed, extracts real PDF text; when absent, degrades to None
+    # (-> presence marker). pypdf is now a host requirement (requirements.txt) but the
+    # import stays guarded so a missing wheel degrades rather than crashing.
+    # Returns extracted text (char-capped) or None. NEVER raises.
     ext = path.suffix.lower()
     try:
         if ext == ".docx":
