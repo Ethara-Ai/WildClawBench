@@ -831,9 +831,18 @@ def build_report(
     rubric_block = _build_rubric_block(score, infer_meta)
 
     rubric_pct = score.get("rubric_weights_percentage", 0.0)
+    if rubric_pct is None:
+        rubric_pct = 0.0
     final_reward = score.get("combined_reward")
     if final_reward is None:
-        final_reward = score.get("rubric_based_reward", 0.0)
+        final_reward = score.get("rubric_based_reward")
+    # An INCOMPLETE run writes combined_reward/rubric_based_reward as null (key
+    # present, value None), so .get(..., 0.0) does NOT catch it. Coerce the
+    # None-valued no-signal case to the 0.0 sentinel so float() below never
+    # raises TypeError and kills the whole bundle conversion. The run is already
+    # flagged run_incomplete and excluded from pass_summary averages.
+    if final_reward is None:
+        final_reward = 0.0
 
     report: dict[str, Any] = {
         "model": pretty_model,
