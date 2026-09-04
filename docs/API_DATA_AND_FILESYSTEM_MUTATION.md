@@ -776,16 +776,18 @@ equivalent standalone, stdlib-only path (`script/repackage_to_bundle.py::convert
 
 Canonical file naming in the bundle:
 
-- **`PROMPT.md`** — sources tried in order (`PROMPT_SOURCE_CANDIDATES`):
-  `prompts.json` → `PROMPT.md` → `prompt.txt` → `prompts.txt`. `prompts.json` is
-  *rendered*, not byte-copied.
-- **`TRUTH.md`** (`GROUND_TRUTH_FILENAME`) — sources: `TRUTH.md` → `GTFA.md` →
-  `golden_steer_flow.md` → `ground-truth.md`.
+- **`prompt.txt`** (`PROMPT_FILENAME`, bundle root) — sources tried in order
+  (`PROMPT_SOURCE_CANDIDATES`): `prompts.json` → `PROMPT.md` → `prompt.txt` →
+  `prompts.txt`. `prompts.json` is *rendered*, not byte-copied.
+- **`data/solution/TRUTH.md`** (`GROUND_TRUTH_FILENAME`) — sources: `TRUTH.md` →
+  `GTFA.md` → `golden_steer_flow.md` → `ground-truth.md`. Published verbatim
+  alongside `data/solution/solve.sh`, NOT at the bundle root.
 
 **Bundle media reads `artifacts/` only.** `copy_output_media` reads only
 `run_dir/task_output/artifacts/` — `workspace_full/` is **never** read for a
-bundle. (Companions: `copy_verifier_logs`, `copy_subagent_artifacts`,
-`copy_snapshot`; assembly in `convert_task`.) `final_reward` in bundles is a
+bundle. (Companions: `copy_subagent_artifacts`, `copy_snapshot`; assembly in
+`convert_task`. No per-run `logs/` dir is published and no
+`golden-trajectory/` dir is emitted.) `final_reward` in bundles is a
 **percentage (0-100)**, while `score.json.combined_reward` stays `0-1`.
 
 ### Media fork (`src/utils/trajectory/`)

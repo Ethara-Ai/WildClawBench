@@ -6,7 +6,7 @@ truth-doc -> TRUTH.md feature added on top of that flow:
 
   1. When the input task dir ships a truth doc (TRUTH.md / GTFA.md /
      golden_steer_flow.md / ground-truth.md, resolved first-match-wins), the
-     bundle root gets a TRUTH.md that is a VERBATIM byte-copy of the source
+     bundle gets data/solution/TRUTH.md, a VERBATIM byte-copy of the source
      (no section slicing — the whole doc is published).
   2. When it does NOT ship any such file, no TRUTH.md is emitted and the
      conversion still succeeds (the file is optional, like the prompt/persona/).
@@ -150,8 +150,8 @@ def test_ground_truth_emitted_verbatim(rp, tmp_path):
     bundle = rp.convert_task(task_dir, dest_root, input_root, False, False)
 
     assert bundle is not None
-    gt = bundle / "TRUTH.md"
-    assert gt.is_file(), "TRUTH.md not emitted at bundle root"
+    gt = bundle / "data" / "solution" / "TRUTH.md"
+    assert gt.is_file(), "TRUTH.md not emitted under data/solution/"
     body = gt.read_text(encoding="utf-8")
     # Verbatim: the FULL author doc is published byte-for-byte, INCLUDING the
     # sections the old slicer used to drop.
@@ -177,8 +177,8 @@ def test_no_ground_truth_when_source_absent(rp, tmp_path, capsys):
     bundle = rp.convert_task(task_dir, dest_root, input_root, False, False)
 
     assert bundle is not None
-    assert not (bundle / "TRUTH.md").exists()
-    assert (bundle / "PROMPT.md").is_file()
+    assert not (bundle / "data" / "solution" / "TRUTH.md").exists()
+    assert (bundle / "prompt.txt").is_file()
     err = capsys.readouterr().err
     assert "no ground-truth source file found" in err, (
         f"missing-source warning not on stderr; got: {err!r}"
@@ -205,7 +205,7 @@ def test_ground_truth_accepts_all_source_filenames(rp, tmp_path, steer_filename)
 
     bundle = rp.convert_task(task_dir, dest_root, input_root, False, False)
 
-    gt = bundle / "TRUTH.md"
+    gt = bundle / "data" / "solution" / "TRUTH.md"
     assert gt.is_file(), (
         f"TRUTH.md not emitted when source is {steer_filename!r}"
     )
@@ -234,7 +234,7 @@ def test_ground_truth_source_priority_truth_wins_over_gtfa(rp, tmp_path):
 
     bundle = rp.convert_task(task_dir, dest_root, input_root, False, False)
 
-    body = (bundle / "TRUTH.md").read_text(encoding="utf-8")
+    body = (bundle / "data" / "solution" / "TRUTH.md").read_text(encoding="utf-8")
     assert body == truth_text, "TRUTH.md must win when all candidates coexist"
 
 
@@ -255,7 +255,7 @@ def test_ground_truth_source_priority_gtfa_wins_over_legacy(rp, tmp_path):
 
     bundle = rp.convert_task(task_dir, dest_root, input_root, False, False)
 
-    body = (bundle / "TRUTH.md").read_text(encoding="utf-8")
+    body = (bundle / "data" / "solution" / "TRUTH.md").read_text(encoding="utf-8")
     assert body == gtfa_text, "GTFA.md must win over legacy/fallback when TRUTH.md absent"
 
 
@@ -276,7 +276,7 @@ def test_ground_truth_verbatim_from_ground_truth_md(rp, tmp_path):
 
     bundle = rp.convert_task(task_dir, dest_root, input_root, False, False)
 
-    assert (bundle / "TRUTH.md").read_text(encoding="utf-8") == pre_sliced
+    assert (bundle / "data" / "solution" / "TRUTH.md").read_text(encoding="utf-8") == pre_sliced
 
 
 def test_ground_truth_source_candidates_constant_is_exact():
@@ -305,8 +305,8 @@ def test_no_ground_truth_when_input_dir_unmatched(rp, tmp_path):
     bundle = rp.convert_task(task_dir, dest_root, input_root, False, False)
 
     assert bundle is not None
-    assert not (bundle / "TRUTH.md").exists()
-    assert not (bundle / "PROMPT.md").exists()
+    assert not (bundle / "data" / "solution" / "TRUTH.md").exists()
+    assert not (bundle / "prompt.txt").exists()
 
 
 def test_ground_truth_emitted_even_without_target_sections(rp, tmp_path, capsys):
@@ -323,8 +323,8 @@ def test_ground_truth_emitted_even_without_target_sections(rp, tmp_path, capsys)
     bundle = rp.convert_task(task_dir, dest_root, input_root, False, False)
 
     assert bundle is not None
-    assert (bundle / "TRUTH.md").read_text(encoding="utf-8") == steer
-    assert (bundle / "PROMPT.md").is_file()
+    assert (bundle / "data" / "solution" / "TRUTH.md").read_text(encoding="utf-8") == steer
+    assert (bundle / "prompt.txt").is_file()
     assert (bundle / "rubric.json").is_file()
     err = capsys.readouterr().err
     assert "no ground-truth source file found" not in err, (
@@ -361,15 +361,14 @@ def test_ground_truth_no_warning_when_source_present(rp, tmp_path, capsys):
 
     bundle = rp.convert_task(task_dir, dest_root, input_root, False, False)
     err = capsys.readouterr().err
-    assert (bundle / "TRUTH.md").is_file()
+    assert (bundle / "data" / "solution" / "TRUTH.md").is_file()
     assert "no ground-truth source file found" not in err, (
         f"unexpected warning on clean run: {err!r}"
     )
 
 
-def test_golden_trajectory_dir_reserved_empty(rp, tmp_path):
-    """An empty golden-trajectory/ dir (with .gitkeep so it survives packaging)
-    is always reserved -- we do not generate a golden trajectory."""
+def test_no_golden_trajectory_dir(rp, tmp_path):
+    """Delivered bundles emit no golden-trajectory/ dir at all."""
     source_root = tmp_path / "src"
     input_root = tmp_path / "input"
     dest_root = tmp_path / "out"
@@ -378,19 +377,44 @@ def test_golden_trajectory_dir_reserved_empty(rp, tmp_path):
 
     bundle = rp.convert_task(task_dir, dest_root, input_root, False, False)
 
-    golden = bundle / "golden-trajectory"
-    assert golden.is_dir(), "golden-trajectory/ must be reserved"
-    assert (golden / ".gitkeep").is_file(), ".gitkeep must keep the empty dir"
-    # No trajectory content is emitted.
-    assert not (golden / "trajectory.json").exists()
-    non_keep = [p.name for p in golden.iterdir() if p.name != ".gitkeep"]
-    assert non_keep == [], f"golden-trajectory/ must be empty; found {non_keep}"
+    assert not (bundle / "golden-trajectory").exists()
+
+
+def test_no_per_run_logs_dir(rp, tmp_path):
+    """No run_N/logs/ is published. The old logs/verifier/ mirror shipped
+    test_outputs.py / test_weights.json / test.sh to graded recipients, which
+    defeated the data/tests/ strip."""
+    source_root = tmp_path / "src"
+    input_root = tmp_path / "input"
+    dest_root = tmp_path / "out"
+    task_dir = _mk_source_run_tree(source_root, _RUN_TASK_ID)
+    _mk_input_dir(input_root, _INPUT_TASK_ID, steer=_CANONICAL_STEER)
+
+    verifier = (
+        task_dir / "trajectories" / "claude" / "run_1"
+        / "task_output" / "logs" / "verifier"
+    )
+    verifier.mkdir(parents=True, exist_ok=True)
+    (verifier / "test_outputs.py").write_text("def test_x(): pass\n", encoding="utf-8")
+    (verifier / "test_weights.json").write_text('{"test_x": 5}', encoding="utf-8")
+    (verifier / "ctrf.json").write_text("{}", encoding="utf-8")
+
+    bundle = rp.convert_task(task_dir, dest_root, input_root, False, False)
+
+    assert list(bundle.rglob("logs")) == []
+    for leaked in ("test_outputs.py", "test_weights.json", "test.sh", "ctrf.json"):
+        assert list(bundle.rglob(leaked)) == [], f"{leaked} leaked into the bundle"
+
+
+def test_no_bundle_side_verifier_log_copier(rp):
+    """The bundle-side logs/verifier copier is gone. Do NOT restore it."""
+    assert not hasattr(rp, "copy_verifier_logs")
 
 
 def test_filename_constants_wired(rp):
     assert rp.GOLDEN_STEER_FILENAME == "golden_steer_flow.md"
     assert rp.GROUND_TRUTH_FILENAME == "TRUTH.md"
-    assert rp.PROMPT_FILENAME == "PROMPT.md"
+    assert rp.PROMPT_FILENAME == "prompt.txt"
 
 
 @pytest.mark.parametrize(

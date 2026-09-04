@@ -23,21 +23,16 @@ Given our raw layout (produced by eval/run_batch.py):
 it emits the published bundle layout (like the andrew-santos-... reference):
 
     <dest-root>/<bundle_name>/
-        PROMPT.md, rubric.json, data/ ...            (skeleton; prompt re-sourced
+        prompt.txt, rubric.json, data/ ...           (skeleton; prompt re-sourced
                                                        from input PROMPT.md/prompt.txt)
-        TRUTH.md                                      (input TRUTH.md/GTFA.md/
+        data/solution/TRUTH.md                        (input TRUTH.md/GTFA.md/
                                                        golden_steer_flow.md copied
                                                        VERBATIM, no slicing)
-        golden-trajectory/.gitkeep                    (reserved empty dir; we do
-                                                       not generate a golden trajectory)
         trajectories/<Pretty Model>/                 (e.g. "Claude Opus 4.7")
             pass_summary.json                         (REBUILT schema)
             run_N/
                 output.json                           (copied as-is)
-                logs/verifier/                        (raw: ctrf.json,
-                                                       test_weights.json,
-                                                       reward.txt, siblings)
-                report.json                           (BUILT from ctrf+score)
+                report.json                           (BUILT from score)
                 output_media/<rendered files>         (artifacts minus _tmp/)
 
 MATCHING (requirements 2 & 3)
@@ -198,7 +193,7 @@ PROMPT_SOURCE_CANDIDATES: tuple[str, ...] = (
     "prompt.txt",
     "prompts.txt",
 )
-PROMPT_FILENAME = "PROMPT.md"
+PROMPT_FILENAME = "prompt.txt"
 
 # Source-file lookup order for the slice. Upstream authoring tools have
 # emitted the same content under three different filenames over time, so we
@@ -871,10 +866,11 @@ def _stage_verifier_test_sources(
 ) -> tuple[bool, bool, bool]:
     """DEPRECATED / UNUSED. Retained only so any external importer does not break.
 
-    Delivered bundles carry no pytest surface, so the per-rep ``logs/verifier/``
-    mirror is no longer written on the bundle side (its call site in
-    ``convert_task`` was removed). ``copy_verifier_logs`` still mirrors whatever
-    the harness actually emitted; with Channel A off there is nothing to copy.
+    Delivered bundles carry no pytest surface and no per-rep ``logs/`` dir at
+    all. Both this helper's call site and the raw ``logs/verifier/`` mirror were
+    removed from ``convert_task``: that mirror shipped ``test_outputs.py``,
+    ``test_weights.json`` and ``test.sh`` to graded recipients, defeating the
+    ``data/tests/`` strip. Do NOT restore either.
     """
     return False, False, False
 
@@ -934,34 +930,6 @@ def copy_subagent_artifacts(run_dir: Path, dest_run: Path) -> int:
             ignore=shutil.ignore_patterns(".DS_Store"),
         )
         count += sum(1 for _ in (dest_run / "spawn_tree").rglob("*") if _.is_file())
-    return count
-
-
-def copy_verifier_logs(run_dir: Path, dest_run: Path) -> int:
-    """Copy task_output/logs/verifier/* into the bundle at run_N/logs/verifier/*.
-
-    Preserves the raw pytest CTRF, test_weights, reward.txt and any sibling
-    artifacts the harness emits there. report.json carries a normalized view
-    derived from these inputs, but downstream tooling (pytest-replay, third-
-    party grading, audit) needs the raw inputs too. Mirrors copy_output_media:
-    same scratch-skip + .DS_Store guard pattern.
-    """
-    src = run_dir / "task_output" / "logs" / "verifier"
-    dest = dest_run / "logs" / "verifier"
-    if not src.is_dir():
-        return 0
-    dest.mkdir(parents=True, exist_ok=True)
-    count = 0
-    for item in src.iterdir():
-        if item.name == ".DS_Store":
-            continue
-        target = dest / item.name
-        if item.is_dir():
-            shutil.copytree(item, target, dirs_exist_ok=True)
-            count += sum(1 for _ in target.rglob("*") if _.is_file())
-        else:
-            shutil.copy2(item, target)
-            count += 1
     return count
 
 
@@ -1753,6 +1721,13 @@ def _q_toml(value: Any) -> str:
     return f'"{s}"'
 
 
+def _arr_toml_authors(authors: list[str]) -> str:
+    """Inline port of src/utils/harbor/task_toml.py::_arr_authors."""
+    if not authors:
+        return "[]"
+    return "[" + ", ".join("{ name = %s }" % _q_toml(a) for a in authors) + "]"
+
+
 def _arr_toml_strs(values: list[Any]) -> str:
     if not values:
         return "[]"
@@ -1781,6 +1756,7 @@ def _build_task_toml(
     env_vars: dict[str, str] | None = None,
     dependency_tags: list[str] | None = None,
     dimensions: dict[str, Any] | None = None,
+    authors: list[str] | None = None,
     verifier_env: dict[str, str] | None = None,
     solution_env: dict[str, str] | None = None,
     pass_at_k: int | None = None,
@@ -1813,6 +1789,7 @@ def _build_task_toml(
     lines.append(f"name = {_q_toml(name)}")
     lines.append(f"task_id = {_q_toml(name)}")
     lines.append(f"description = {_q_toml(description)}")
+    lines.append(f"authors = {_arr_toml_authors(authors or [])}")
     lines.append(f"keywords = {_arr_toml_strs(keywords)}")
     lines.append("")
     lines.append("[metadata]")
@@ -1955,6 +1932,42 @@ def _stage_environment_dockerfile_and_compose(
 
 
 _L_TAG_RE = re.compile(r"^\s*(l1|l2)\s*:\s*(.+?)\s*$", re.MULTILINE)
+_AUTHOR_RE = re.compile(r"^\s*authors?\s*:\s*(.+?)\s*$", re.MULTILINE)
+
+
+def _resolve_authors(input_task_dir: Path | None) -> list[str]:
+    """task.toml [task].authors sourced from input/<task>/task.yaml.
+
+    Accepts either a scalar (`author: Jane Doe`) or an inline flow sequence
+    (`authors: [Jane Doe, John Roe]`), matching the flat one-key-per-line schema
+    task.yaml already uses for `modalities` / `required_apis`. Fail-soft: returns
+    [] when task.yaml is absent, unreadable, or carries no author key, so the
+    emitted field degrades to `authors = []` rather than breaking the bundle.
+    Stdlib-only (no PyYAML) per the standalone-stdlib invariant.
+    """
+    if input_task_dir is None:
+        return []
+    task_yaml = input_task_dir / "task.yaml"
+    if not task_yaml.is_file():
+        return []
+    try:
+        text = task_yaml.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return []
+    m = _AUTHOR_RE.search(text)
+    if not m:
+        return []
+    raw = m.group(1).strip()
+    if raw.startswith("[") and raw.endswith("]"):
+        parts = raw[1:-1].split(",")
+    else:
+        parts = [raw]
+    out: list[str] = []
+    for part in parts:
+        val = part.strip().strip("'\"").strip()
+        if val and val not in out:
+            out.append(val)
+    return out
 
 
 def _resolve_dependency_tags(input_task_dir: Path | None) -> list[str]:
@@ -2043,6 +2056,7 @@ def _stage_task_toml(
         "multimodal": attachments_present,
     }
     dependency_tags = _resolve_dependency_tags(input_task_dir)
+    authors = _resolve_authors(input_task_dir)
 
     toml_text = _build_task_toml(
         task_id=input_task_dir.name,
@@ -2051,6 +2065,7 @@ def _stage_task_toml(
         distractor_skills=distractor_skills,
         env_vars=environment_env,
         dependency_tags=dependency_tags,
+        authors=authors,
         dimensions=dimensions,
         verifier_env=verifier_env,
         solution_env=solution_env,
@@ -2064,7 +2079,7 @@ def _stage_task_toml(
         print(
             f"    staged task.toml (required={len(required_skills)} "
             f"distractor={len(distractor_skills)} env_vars={len(env_vars)} "
-            f"dependency_tags={dependency_tags})"
+            f"dependency_tags={dependency_tags} authors={authors})"
         )
     return True
 
@@ -2144,8 +2159,30 @@ _BUNDLE_DATA_IGNORE_NAMES = shutil.ignore_patterns(
 )
 
 
+def _is_malformed_connector_skill(skill_dir: Path) -> bool:
+    """True for an `*-api-connector` skill dir that is structurally incomplete.
+
+    A connector is well-formed iff it ships `SKILL.md` AND a `references/` dir.
+    `references/` is the load-bearing signal: it is never synthesized, whereas a
+    missing `scripts/` is NOT a defect signal here because
+    `_backfill_skill_scripts_from_baseline` exists precisely to repair legacy
+    output trees that legitimately lack it -- keying on `scripts/` would drop
+    every connector on a stale re-bundle.
+
+    Scoped to the `-api-connector` suffix on purpose: non-connector skills
+    (pdf-extract, audio-extract, video-frames) legitimately have no
+    `references/` and MUST NOT be rejected.
+    """
+    if not skill_dir.name.endswith("-api-connector"):
+        return False
+    if not skill_dir.is_dir():
+        return False
+    return not (skill_dir / "SKILL.md").is_file() or not (skill_dir / "references").is_dir()
+
+
 def _bundle_data_ignore(dir: str, names: list[str]) -> set[str]:
-    """copytree ignore: the name patterns above, plus environment/scripts ONLY.
+    """copytree ignore: the name patterns above, plus environment/scripts ONLY,
+    plus structurally malformed connector skills under environment/skills/.
 
     The repo dev-tooling dir environment/scripts/ (audit_data_formats.py,
     migrate_csv_to_json.py, wiring_report.*, ...) must be stripped, but the
@@ -2153,8 +2190,13 @@ def _bundle_data_ignore(dir: str, names: list[str]) -> set[str]:
     drops `scripts` only when it sits directly under environment/.
     """
     ignored = set(_BUNDLE_DATA_IGNORE_NAMES(dir, names))
-    if Path(dir).name == "environment" and "scripts" in names:
+    here = Path(dir)
+    if here.name == "environment" and "scripts" in names:
         ignored.add("scripts")
+    if here.name == "skills":
+        for name in names:
+            if _is_malformed_connector_skill(here / name):
+                ignored.add(name)
     return ignored
 
 
@@ -2254,6 +2296,7 @@ def convert_task(
         # (TRUTH.md > GTFA.md > golden_steer_flow.md > ground-truth.md). The
         # whole doc is byte-copied as-is -- no section slicing.
         steer_src = _find_ground_truth_source(input_task_dir)
+        gt_dest = bundle / "data" / SOLUTION_SUBDIR / GROUND_TRUTH_FILENAME
         if steer_src is None:
             print(
                 f"  ! {task_dir.name}: no ground-truth source file found in "
@@ -2263,24 +2306,18 @@ def convert_task(
                 file=sys.stderr,
             )
         else:
-            bundle.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(steer_src, bundle / GROUND_TRUTH_FILENAME)
+            gt_dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(steer_src, gt_dest)
             if verbose:
                 print(
                     f"    staged ground truth: {steer_src.name} -> "
-                    f"{GROUND_TRUTH_FILENAME} (verbatim)"
+                    f"data/{SOLUTION_SUBDIR}/{GROUND_TRUTH_FILENAME} (verbatim)"
                 )
         stage_persona_and_artifacts(input_task_dir, bundle, verbose)
     elif verbose:
         print(f"    (no input dir matched under {input_root}; prompt/persona/artifacts skipped)")
 
-    # Empty golden-trajectory/ scaffold. We do not generate a golden trajectory,
-    # but the published bundle layout (reference: andrew-santos-...) reserves the
-    # directory. A .gitkeep is dropped so the otherwise-empty dir survives git /
-    # tar / LFS packaging (empty dirs are not tracked by git).
-    golden_dir = bundle / "golden-trajectory"
-    golden_dir.mkdir(parents=True, exist_ok=True)
-    (golden_dir / ".gitkeep").touch()
+    # Delivered bundles carry NO golden-trajectory/ dir. Do NOT reintroduce it.
 
     _stage_test_runners_and_solver(input_task_dir, bundle, verbose, include_tests=False)
     # The data/ copytree above carries data/tests/ through from the (output-side)
@@ -2317,29 +2354,25 @@ def convert_task(
             if src_out.exists():
                 shutil.copy2(src_out, dest_run / "output.json")
 
-            # 2) logs/verifier/ copied as-is (raw ctrf.json, test_weights.json,
-            #    reward.txt and siblings — see copy_verifier_logs docstring)
-            n_verifier = copy_verifier_logs(run_dir, dest_run)
-
-            # 3) report.json built
+            # 2) report.json built
             report = build_report(run_dir, task_dir, pretty, ridx, infer_meta)
             _write_json(dest_run / "report.json", report)
 
-            # 4) output_media
+            # 3) output_media
             n_media = copy_output_media(run_dir, dest_run)
 
-            # 5) subagents/ + spawn_tree/ — native multi-agent child
+            # 4) subagents/ + spawn_tree/ — native multi-agent child
             #    trajectories and the spawn tree (empty subagents/ dir for
             #    single-agent runs so the multi-agent validator passes)
             copy_subagent_artifacts(run_dir, dest_run)
 
-            # 6) snapshot/ — workspace before/after capture (parity with the
+            # 5) snapshot/ — workspace before/after capture (parity with the
             #    output tree; useful for audit/diff of what the agent changed)
             n_snap = 0
             if os.environ.get("WCB_BUNDLE_SNAPSHOT", "0") == "1":
                 n_snap = copy_snapshot(run_dir, dest_run)
 
-            # 7) usage.json — per-run token/cost/time data for independent audit
+            # 6) usage.json — per-run token/cost/time data for independent audit
             src_usage = run_dir / "usage.json"
             if src_usage.exists():
                 shutil.copy2(src_usage, dest_run / "usage.json")
@@ -2361,7 +2394,7 @@ def convert_task(
             if verbose:
                 print(
                     f"    {pretty}/run_{ridx}: report.json + output.json "
-                    f"+ {n_verifier} verifier file(s) + {n_media} media file(s)"
+                    f"+ {n_media} media file(s)"
                 )
 
         # pass_summary.json REBUILT from the runs we actually emitted.

@@ -128,6 +128,29 @@ def _dependency_tags(task: Task) -> List[str]:
     return tags
 
 
+def _authors(task: Task) -> List[Mapping[str, str]]:
+    """Author records off the task.yaml-backed Task, mirroring
+    script/repackage_to_bundle.py::_resolve_authors.
+
+    getattr-guarded because `author` is not in task_parser._YAML_METADATA_KEYS
+    yet, so Task has no such attribute today and this degrades to [].
+    """
+    raw = getattr(task, "author", None) or getattr(task, "authors", None)
+    if not raw:
+        return []
+    if isinstance(raw, str):
+        raw = [raw]
+    out: List[Mapping[str, str]] = []
+    seen: Set[str] = set()
+    for item in raw:
+        name = item.get("name", "") if isinstance(item, Mapping) else str(item)
+        name = str(name).strip()
+        if name and name not in seen:
+            seen.add(name)
+            out.append({"name": name})
+    return out
+
+
 def _dimensions(task: Task, attachments_present: bool) -> Dict[str, str]:
     return {
         "complex": "medium",
@@ -268,6 +291,7 @@ def write_bundle(
         distractor_skills=distractor_skills,
         env_vars=environment_env,
         dependency_tags=_dependency_tags(task),
+        authors=_authors(task),
         dimensions=_dimensions(task, bool(attachments_list)),
         verifier_env=verifier_env,
         solution_env=solution_env,

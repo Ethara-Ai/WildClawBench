@@ -722,3 +722,107 @@ def test_pass_summary_has_no_test_keys(tmp_path):
         assert "test_weights_percentage" not in rec
     assert "average_combined_score" in summary
     assert "average_rubric_weights_percentage" in summary
+
+
+def test_task_toml_authors_from_task_yaml(tmp_path):
+    """[task].authors is sourced from input/<task>/task.yaml, stdlib-only."""
+    rp = _load_repackage_module()
+    input_task_dir = tmp_path / "task_authors"
+    input_task_dir.mkdir()
+    (input_task_dir / "prompt.txt").write_text("Do the thing.\n")
+    (input_task_dir / "task.yaml").write_text(
+        "difficulty: hard\nauthor: Jane Doe\nl1: ops\nl2: qa\n", encoding="utf-8"
+    )
+    bundle = tmp_path / "bundle_authors"
+    (bundle / "data" / "environment").mkdir(parents=True)
+
+    assert rp._stage_task_toml(input_task_dir, bundle, verbose=False)
+    toml_text = (bundle / "data" / "task.toml").read_text()
+    assert 'authors = [{ name = "Jane Doe" }]' in toml_text
+    # Harbor field order: authors sits between description and keywords.
+    assert toml_text.find("description =") < toml_text.find("authors =")
+    assert toml_text.find("authors =") < toml_text.find("keywords =")
+
+
+def test_task_toml_authors_absent_degrades_to_empty(tmp_path):
+    """No author key (today's corpus) must emit `authors = []`, never break."""
+    rp = _load_repackage_module()
+    input_task_dir = tmp_path / "task_noauthor"
+    input_task_dir.mkdir()
+    (input_task_dir / "prompt.txt").write_text("Do the thing.\n")
+    (input_task_dir / "task.yaml").write_text("difficulty: hard\nl1: ops\n", encoding="utf-8")
+    bundle = tmp_path / "bundle_noauthor"
+    (bundle / "data" / "environment").mkdir(parents=True)
+
+    assert rp._stage_task_toml(input_task_dir, bundle, verbose=False)
+    assert "authors = []" in (bundle / "data" / "task.toml").read_text()
+
+
+def test_resolve_authors_accepts_inline_sequence_and_is_fail_soft(tmp_path):
+    rp = _load_repackage_module()
+    d = tmp_path / "y"
+    d.mkdir()
+    (d / "task.yaml").write_text("authors: [Ada L, 'Grace H']\n", encoding="utf-8")
+    assert rp._resolve_authors(d) == ["Ada L", "Grace H"]
+    assert rp._resolve_authors(tmp_path / "missing") == []
+    assert rp._resolve_authors(None) == []
+
+
+def test_malformed_connector_skill_predicate_scoped_to_connectors(tmp_path):
+    """Only `*-api-connector` dirs missing SKILL.md/references/ are malformed.
+
+    Non-connector skills legitimately have no references/ and MUST pass.
+    A missing scripts/ must NOT mark a connector malformed -- legacy output
+    trees lack it and _backfill_skill_scripts_from_baseline repairs that.
+    """
+    rp = _load_repackage_module()
+    skills = tmp_path / "skills"
+    skills.mkdir()
+
+    good = skills / "github-api-connector"
+    (good / "references").mkdir(parents=True)
+    (good / "scripts").mkdir()
+    (good / "SKILL.md").write_text("---\nname: github-api-connector\n---\n")
+
+    no_scripts = skills / "gmail-api-connector"
+    (no_scripts / "references").mkdir(parents=True)
+    (no_scripts / "SKILL.md").write_text("---\nname: gmail-api-connector\n---\n")
+
+    bad = skills / "canvas-lms-api-connector"
+    bad.mkdir()
+    (bad / "SKILL.md").write_text("---\nname: canvas-lms-api-connector\n---\n")
+
+    non_connector = skills / "pdf-extract"
+    (non_connector / "scripts").mkdir(parents=True)
+    (non_connector / "SKILL.md").write_text("---\nname: pdf-extract\n---\n")
+
+    assert rp._is_malformed_connector_skill(bad) is True
+    assert rp._is_malformed_connector_skill(good) is False
+    assert rp._is_malformed_connector_skill(no_scripts) is False
+    assert rp._is_malformed_connector_skill(non_connector) is False
+
+    ignored = rp._bundle_data_ignore(str(skills), sorted(p.name for p in skills.iterdir()))
+    assert "canvas-lms-api-connector" in ignored
+    assert "github-api-connector" not in ignored
+    assert "gmail-api-connector" not in ignored
+    assert "pdf-extract" not in ignored
+
+
+def test_malformed_connector_not_copied_into_bundle(tmp_path):
+    """End-to-end: the copytree ignore drops the malformed connector."""
+    rp = _load_repackage_module()
+    src_skills = tmp_path / "src" / "environment" / "skills"
+    src_skills.mkdir(parents=True)
+    for name in ("github-api-connector", "canvas-lms-api-connector"):
+        d = src_skills / name
+        d.mkdir()
+        (d / "SKILL.md").write_text(f"---\nname: {name}\n---\n")
+    (src_skills / "github-api-connector" / "references").mkdir()
+
+    import shutil as _sh
+    dest = tmp_path / "dst"
+    _sh.copytree(tmp_path / "src", dest, ignore=rp._bundle_data_ignore)
+
+    out = dest / "environment" / "skills"
+    assert (out / "github-api-connector").is_dir()
+    assert not (out / "canvas-lms-api-connector").exists()
