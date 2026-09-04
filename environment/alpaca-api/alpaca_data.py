@@ -33,6 +33,12 @@ def _store_insert(_table, _row):
         _row = {**_row, _t.primary_key: _row["id"]}
     return _t.upsert(_row)
 
+
+def _store_patch(_table, _row_or_pk, _updates):
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
 _store.register("positions", primary_key="asset_id",
                 initial_loader=lambda: _coerce_positions(_load("positions.json", "positions")))
 _store.register("orders", primary_key="id",
@@ -291,7 +297,7 @@ def cancel_order(order_id):
         return {"error": f"order not found: {order_id}", "code": 40410000}
     if o["status"] in ("filled", "canceled", "expired"):
         return {"error": f"order {order_id} is not cancelable (status {o['status']})", "code": 42210000}
-    o["status"] = "canceled"
+    _store_patch("orders", order_id, {"status": "canceled"})
     return {"status": "canceled", "id": order_id}
 
 

@@ -225,9 +225,9 @@ def update_user(user_id: str, data: dict):
     if not user:
         return {"error": {"message": f"User {user_id} not found", "type": "IGApiException", "code": 100}}
     updatable = {"biography", "website", "name"}
-    for k, v in data.items():
-        if k in updatable:
-            user[k] = v
+    changes = {k: v for k, v in data.items() if k in updatable}
+    if changes:
+        return _store.table("users").patch(user_id, changes)
     return user
 
 

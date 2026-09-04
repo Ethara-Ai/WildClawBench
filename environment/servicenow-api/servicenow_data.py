@@ -35,6 +35,12 @@ def _store_insert(_table, _row):
         _row = {**_row, _t.primary_key: _row["id"]}
     return _t.upsert(_row)
 
+
+def _store_patch(_table, _row_or_pk, _updates):
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
 _store.register("incidents", primary_key="sys_id",
                 initial_loader=lambda: _coerce_incidents(_load("incident.json", "incidents")))
 _store.register("changes", primary_key="sys_id",
@@ -202,13 +208,15 @@ def update_incident(sys_id, **fields):
     rec = _find(_incidents_rows(), sys_id)
     if not rec:
         return {"error": f"Incident {sys_id} not found"}
+    changes = {}
     for key in ("short_description", "description", "state", "priority", "impact",
                 "urgency", "category", "assigned_to"):
         val = fields.get(key)
         if val is not None:
-            rec[key] = str(val)
-    rec["updated_at"] = _now()
-    return rec
+            changes[key] = str(val)
+    changes["updated_at"] = _now()
+    _store_patch("incidents", sys_id, changes)
+    return {**rec, **changes}
 
 
 # ---------------------------------------------------------------------------

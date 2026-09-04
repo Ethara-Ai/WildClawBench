@@ -251,7 +251,7 @@ _next_return_id = max(
 # ---------------------------------------------------------------------------
 
 def get_seller_account():
-    return {"type": "seller_account", "seller": _seller_store}
+    return {"type": "seller_account", "seller": _seller_account_doc()}
 
 
 def get_buying_notes():
@@ -259,11 +259,11 @@ def get_buying_notes():
 
 
 def get_account_health():
-    return {"type": "account_health", "accountHealth": _seller_store["accountHealth"]}
+    return {"type": "account_health", "accountHealth": _seller_account_doc()["accountHealth"]}
 
 
 def get_performance_notifications(severity=None):
-    results = list(_seller_store["performanceNotifications"])
+    results = list(_seller_account_doc()["performanceNotifications"])
     if severity:
         results = [n for n in results if n["severity"].upper() == severity.upper()]
     return {"type": "notifications", "count": len(results), "results": results}
@@ -280,7 +280,7 @@ def search_catalog_items(
     page_size=10,
     status=None,
 ):
-    results = list(_catalog_store)
+    results = list(_catalog_items_rows())
 
     if status:
         results = [r for r in results if r["status"].upper() == status.upper()]
@@ -337,14 +337,14 @@ def _format_catalog_item(item):
 
 
 def get_catalog_item(asin):
-    for item in _catalog_store:
+    for item in _catalog_items_rows():
         if item["asin"] == asin:
             return {"type": "catalog_item", "item": _format_catalog_item(item)}
     return {"error": f"Item with ASIN {asin} not found"}
 
 
 def get_listing_item(seller_id, sku):
-    for item in _catalog_store:
+    for item in _catalog_items_rows():
         if item["sku"] == sku and item["sellerId"] == seller_id:
             return {"type": "listing_item", "listing": {
                 "sku": item["sku"],
@@ -372,14 +372,14 @@ def get_listing_item(seller_id, sku):
 
 
 def create_listing_item(seller_id, sku, data):
-    for item in _catalog_store:
+    for item in _catalog_items_rows():
         if item["sku"] == sku and item["sellerId"] == seller_id:
             return {"error": f"Listing with SKU {sku} already exists"}
 
     now = _now()
     new_item = {
         "sku": sku,
-        "asin": data.get("asin", f"B0NEW{len(_catalog_store):05d}"),
+        "asin": data.get("asin", f"B0NEW{len(_catalog_items_rows()):05d}"),
         "sellerId": seller_id,
         "title": data.get("title", ""),
         "description": data.get("description", ""),
@@ -403,35 +403,37 @@ def create_listing_item(seller_id, sku, data):
         "createdDate": now,
         "lastUpdatedDate": now,
     }
-    _catalog_store.append(new_item)
+    _store_insert("catalog_items", new_item)
     return {"type": "listing_item", "status": "ACCEPTED", "sku": sku, "issues": []}
 
 
 def update_listing_item(seller_id, sku, data):
-    for i, item in enumerate(_catalog_store):
+    for item in _catalog_items_rows():
         if item["sku"] == sku and item["sellerId"] == seller_id:
             updatable = {
                 "title", "description", "brand", "bulletPoints", "price",
                 "quantity", "fulfillmentChannel", "status", "condition",
                 "productType", "mainImageUrl", "category",
             }
+            changes = {}
             for k, v in data.items():
                 if k in updatable:
                     if k == "price" and v is not None:
-                        _catalog_store[i][k] = float(v)
+                        changes[k] = float(v)
                     elif k == "quantity" and v is not None:
-                        _catalog_store[i][k] = int(v)
+                        changes[k] = int(v)
                     else:
-                        _catalog_store[i][k] = v
-            _catalog_store[i]["lastUpdatedDate"] = _now()
+                        changes[k] = v
+            changes["lastUpdatedDate"] = _now()
+            _store_patch("catalog_items", sku, changes)
             return {"type": "listing_item", "status": "ACCEPTED", "sku": sku, "issues": []}
     return {"error": f"Listing with SKU {sku} not found for seller {seller_id}"}
 
 
 def delete_listing_item(seller_id, sku):
-    for i, item in enumerate(_catalog_store):
+    for item in _catalog_items_rows():
         if item["sku"] == sku and item["sellerId"] == seller_id:
-            _catalog_store.pop(i)
+            _store_delete("catalog_items", sku)
             return {"type": "listing_item", "status": "ACCEPTED", "sku": sku, "deleted": True}
     return {"error": f"Listing with SKU {sku} not found for seller {seller_id}"}
 
@@ -847,9 +849,3 @@ def close_return(return_id):
     return {"error": f"Return {return_id} not found"}
 
 _store.eager_load()
-
-# Module-level handles the accessor functions operate on. The catalog is a
-# mutable list (create/update/delete go through it), seeded once from the store
-# table; the seller account is the registered document's value.
-_catalog_store = _catalog_items_rows()
-_seller_store = _seller_account_doc()

@@ -38,6 +38,12 @@ def _store_insert(_table, _row):
         _row = {**_row, _t.primary_key: _row["id"]}
     return _t.upsert(_row)
 
+
+def _store_patch(_table, _row_or_pk, _updates):
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
 _store.register("accounts", primary_key="id",
                 initial_loader=lambda: _coerce_accounts(_load("accounts.json", "accounts")))
 _store.register("prices", primary_key="pair",
@@ -214,21 +220,25 @@ def _trade(account_id, amount, side):
     fiat = qty * price["_amount_num"]
 
     if side == "buy":
-        account["_balance_num"] += qty
-        account["_native_num"] += fiat
+        balance_num = account["_balance_num"] + qty
+        native_num = account["_native_num"] + fiat
         signed_qty = qty
         signed_fiat = fiat
     else:  # sell
         if qty > account["_balance_num"]:
             return {"error": f"Insufficient {code} balance to sell {qty}"}
-        account["_balance_num"] -= qty
-        account["_native_num"] = max(0.0, account["_native_num"] - fiat)
+        balance_num = account["_balance_num"] - qty
+        native_num = max(0.0, account["_native_num"] - fiat)
         signed_qty = -qty
         signed_fiat = -fiat
 
-    account["balance"]["amount"] = _fmt_crypto(account["_balance_num"])
-    account["native_balance"]["amount"] = _fmt_fiat(account["_native_num"])
-    account["updated_at"] = _now()
+    _store_patch("accounts", account["id"], {
+        "_balance_num": balance_num,
+        "_native_num": native_num,
+        "balance": {**account["balance"], "amount": _fmt_crypto(balance_num)},
+        "native_balance": {**account["native_balance"], "amount": _fmt_fiat(native_num)},
+        "updated_at": _now(),
+    })
 
     txn = {
         "id": _new_id(),

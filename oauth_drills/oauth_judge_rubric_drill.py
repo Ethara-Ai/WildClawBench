@@ -101,7 +101,7 @@ class _FakeAnthropic(BaseHTTPRequestHandler):
             "id": "msg_drill",
             "type": "message",
             "role": "assistant",
-            "model": "claude-sonnet-4-5-20250929",
+            "model": "claude-sonnet-5",
             "content": [{"type": "text", "text": _JUDGE_TEXT}],
             "stop_reason": "end_turn",
             "usage": {"input_tokens": 128, "output_tokens": 64},
@@ -178,7 +178,7 @@ def main() -> int:  # noqa: C901
         for k, v in {
             "KENSEI_JUDGE_USE_LITELLM": "1",
             "KENSEI_JUDGE_OAUTH_BRIDGE_URL": bridge_url,
-            "KENSEI_JUDGE_OAUTH_BRIDGE_MODEL": "anthropic/claude-sonnet-4-5-20250929",
+            "KENSEI_JUDGE_OAUTH_BRIDGE_MODEL": "anthropic/claude-sonnet-5",
             "WCB_CC_BRIDGE_SECRET": BRIDGE_SECRET,
             "WCB_CC_STUB_KEY": STUB_KEY,
             "JUDGE_COUNCIL": "1",

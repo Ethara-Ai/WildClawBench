@@ -32,6 +32,12 @@ def _store_insert(_table, _row):
         _row = {**_row, _t.primary_key: _row["id"]}
     return _t.upsert(_row)
 
+
+def _store_patch(_table, _row_or_pk, _updates):
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
 _store.register("candidates", primary_key="id",
                 initial_loader=lambda: _coerce_candidates(_load("candidates.json", "candidates")))
 _store.register("jobs", primary_key="id",
@@ -219,24 +225,27 @@ def advance_application(application_id):
     except ValueError:
         idx = 0
     if idx >= len(STAGES) - 1:
-        a["current_stage"] = "Hired"
-        a["status"] = "hired"
+        changes = {"current_stage": "Hired", "status": "hired"}
     else:
-        a["current_stage"] = STAGES[idx + 1]
-        if a["current_stage"] == "Hired":
-            a["status"] = "hired"
-    a["last_activity_at"] = _now()
-    return a
+        changes = {"current_stage": STAGES[idx + 1]}
+        if changes["current_stage"] == "Hired":
+            changes["status"] = "hired"
+    changes["last_activity_at"] = _now()
+    _store_patch("applications", application_id, changes)
+    return {**a, **changes}
 
 
 def reject_application(application_id, reason=None):
     a = _find(_applications_rows(), application_id)
     if not a:
         return {"error": f"Application {application_id} not found"}
-    a["status"] = "rejected"
-    a["rejection_reason"] = reason or "Not a fit"
-    a["last_activity_at"] = _now()
-    return a
+    changes = {
+        "status": "rejected",
+        "rejection_reason": reason or "Not a fit",
+        "last_activity_at": _now(),
+    }
+    _store_patch("applications", application_id, changes)
+    return {**a, **changes}
 
 
 # ---------------------------------------------------------------------------

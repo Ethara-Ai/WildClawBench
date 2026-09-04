@@ -33,6 +33,12 @@ def _store_insert(_table, _row):
         _row = {**_row, _t.primary_key: _row["id"]}
     return _t.upsert(_row)
 
+
+def _store_patch(_table, _row_or_pk, _updates):
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
 _store.register("employees", primary_key="id",
                 initial_loader=lambda: _coerce_employees(_load("employees.json", "employees")))
 _store.register("time_off", primary_key="id",
@@ -201,8 +207,9 @@ def update_time_off_status(request_id, status):
         return {"error": f"Time-off request {request_id} not found"}
     if status not in VALID_TIME_OFF_STATUS:
         return {"error": f"Invalid status: {status}"}
-    req["status"] = status
-    return req
+    changes = {"status": status}
+    _store_patch("time_off", request_id, changes)
+    return {**req, **changes}
 
 
 def whos_out(start=None, end=None):

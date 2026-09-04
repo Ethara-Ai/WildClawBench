@@ -33,6 +33,12 @@ def _store_insert(_table, _row):
         _row = {**_row, _t.primary_key: _row["id"]}
     return _t.upsert(_row)
 
+
+def _store_patch(_table, _row_or_pk, _updates):
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
 _store.register("spaces", primary_key="id",
                 initial_loader=lambda: _coerce_spaces(_load("spaces.json", "spaces")))
 _store.register("pages", primary_key="id",
@@ -254,12 +260,14 @@ def update_content(content_id, title=None, body=None, version_number=None):
             "error": f"Version must be incremented; expected {expected}, got {version_number}",
             "conflict": True,
         }
+    changes = {}
     if title is not None:
-        page["title"] = title
+        changes["title"] = title
     if body is not None:
-        page["body"] = body
-    page["version"] = expected
-    return _content_view(page)
+        changes["body"] = body
+    changes["version"] = expected
+    _store_patch("pages", page["id"], changes)
+    return _content_view({**page, **changes})
 
 
 def list_child_pages(content_id, limit=25):

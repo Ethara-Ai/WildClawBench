@@ -537,8 +537,9 @@ def test_oauth_bridge_route_injected_for_sonnet(monkeypatch):
     assert kwargs["api_base"] == "http://127.0.0.1:18765"
     assert kwargs["api_key"] == "sk-wcb-oauth-stub"
     assert kwargs["extra_headers"] == {"x-wcb-bridge-secret": "testsecret"}
-    assert kwargs["model"] == "anthropic/claude-sonnet-4-5-20250929"
+    assert kwargs["model"] == "anthropic/claude-sonnet-5"
     assert "aws_region_name" not in kwargs
+    assert "temperature" not in kwargs
 
 
 def test_oauth_bridge_route_custom_model(monkeypatch):
@@ -546,6 +547,7 @@ def test_oauth_bridge_route_custom_model(monkeypatch):
     kwargs = _capture_completion_kwargs(monkeypatch, SONNET_ARN, "sonnet")
     assert kwargs["model"] == "anthropic/claude-sonnet-4-6"
     assert kwargs["api_base"] == "http://127.0.0.1:18765"
+    assert kwargs["temperature"] == 0
 
 
 def test_oauth_bridge_not_injected_when_url_unset(monkeypatch):
@@ -559,6 +561,18 @@ def test_oauth_bridge_not_injected_for_non_sonnet(monkeypatch):
     _bridge_env(monkeypatch)
     kwargs = _capture_completion_kwargs(monkeypatch, GLM_ARN, "glm")
     assert "api_base" not in kwargs
+
+
+def test_judge_sampling_params_omits_temperature_for_sonnet5():
+    assert judge_litellm._judge_sampling_params("anthropic/claude-sonnet-5") == {}
+    assert judge_litellm._judge_sampling_params("claude-sonnet-5") == {}
+    assert judge_litellm._judge_sampling_params("anthropic/claude-sonnet-5-20260630") == {}
+
+
+def test_judge_sampling_params_keeps_temperature_for_bedrock_and_older():
+    assert judge_litellm._judge_sampling_params(SONNET_ARN) == {"temperature": 0}
+    assert judge_litellm._judge_sampling_params("anthropic/claude-sonnet-4-5-20250929") == {"temperature": 0}
+    assert judge_litellm._judge_sampling_params("anthropic/claude-sonnet-4-6") == {"temperature": 0}
 
 
 # ---------- Test 8: the urllib fallback must not dial Bedrock on an OAuth run ----------

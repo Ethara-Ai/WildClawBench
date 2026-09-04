@@ -112,16 +112,17 @@ def _row_ids(row: Dict[str, Any]) -> Set[str]:
 
     Stores key rows by heterogeneous pk columns (``Id`` for quickbooks,
     ``item_id`` for monday, ``sys_id`` for servicenow, ``objectID`` for
-    algolia, ...). A static validator has no /admin/tables to consult, so it
-    collects every scalar under a key that lowercases to ``pk`` or ends in
-    ``id`` — over-collecting only relaxes the missing-target check, never
-    breaks a valid op."""
+    algolia, ``file_key``/``component_key`` for figma, ``*_key`` for
+    jira/confluence, ...). A static validator has no /admin/tables to consult,
+    so it collects every scalar under a key that lowercases to ``pk``, ends in
+    ``id``, or is exactly ``key``/ends in ``_key`` — over-collecting only
+    relaxes the missing-target check, never breaks a valid op."""
     out: Set[str] = set()
     for k, v in row.items():
         if not isinstance(v, (str, int)):
             continue
         kl = str(k).lower()
-        if kl == "pk" or kl.endswith("id"):
+        if kl in ("pk", "key") or kl.endswith("id") or kl.endswith("_key"):
             out.add(str(v))
     return out
 

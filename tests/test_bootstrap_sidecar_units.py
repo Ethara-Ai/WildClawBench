@@ -43,6 +43,9 @@ class _FakeConfig:
         self.openai_whisper_api_key = ""
         self.anthropic_api_key = "sk-ant-xxx"
         self.litellm_master_key = "sk-litellm-master"
+        self.meta_api_key = ""
+        self.meta_base_url = "https://api.ai.meta.com/v1"
+        self.meta_model = ""
         self._yaml_ok = yaml_ok
 
     def litellm_enabled(self) -> bool:

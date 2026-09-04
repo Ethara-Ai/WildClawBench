@@ -32,6 +32,12 @@ def _store_insert(_table, _row):
         _row = {**_row, _t.primary_key: _row["id"]}
     return _t.upsert(_row)
 
+
+def _store_patch(_table, _row_or_pk, _updates):
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
 _store.register("customers", primary_key="id",
                 initial_loader=lambda: _coerce_customers(_load("customers.json", "customers")))
 _store.register("products", primary_key="id",
@@ -341,8 +347,11 @@ def create_refund(charge=None, amount=None, reason=None):
         "status": "succeeded",
         "created": _now(),
     }
-    ch["amount_refunded"] += refund_amount
-    ch["refunded"] = ch["amount_refunded"] >= ch["amount"]
+    amount_refunded = ch["amount_refunded"] + refund_amount
+    _store_patch("charges", charge, {
+        "amount_refunded": amount_refunded,
+        "refunded": amount_refunded >= ch["amount"],
+    })
     _store_insert("refunds", refund)
     return refund
 

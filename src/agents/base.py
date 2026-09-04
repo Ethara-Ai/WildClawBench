@@ -80,6 +80,13 @@ class AgentExecution:
     # (dead-route fast-fail; see LLM_TIMEOUT_EVIDENCE). Not counted in
     # turns_completed, so these runs flag run_incomplete.
     turns_empty: list[int] = field(default_factory=list)
+    # Turn indices that produced real LLM traffic but ended in timeout/stall
+    # before completing (the invocation did genuine work, then the gateway
+    # wedged or the budget ran out). NOT counted in turns_completed — the run
+    # still flags run_incomplete — but recorded so a reviewer can distinguish
+    # "did 85% then stalled" from "produced nothing", which turns_completed
+    # alone collapses to the same number.
+    turns_partial: list[int] = field(default_factory=list)
 
 
 class BaseAgent(ABC):

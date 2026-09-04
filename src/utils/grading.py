@@ -75,33 +75,32 @@ TMP_WORKSPACE = os.environ.get("TMP_WORKSPACE", "/tmp_workspace")
 # window) is in play — where ~1M chars ÷ 2.515 ≈ ~398K input tokens fits well
 # under the 1M ceiling. It is NOT the council per-member budget (those come from
 # _FAMILY_EVIDENCE, which keeps GLM/Kimi on their own smaller caps), and it is
-# NOT the OAuth-bridge cap (_DEFAULT_JUDGE_OAUTH_MAX_EVIDENCE, still 300K).
+# NOT the OAuth-bridge cap (_DEFAULT_JUDGE_OAUTH_MAX_EVIDENCE, 700K).
 # Operators can still override via JUDGE_MAX_EVIDENCE=<chars>. Setting it to 0
 # (or anything falsy after int()) restores the unbounded behavior we briefly
 # defaulted to between b31 and now — known to 400 every council member on real
 # WildClawBench runs.
 _DEFAULT_JUDGE_MAX_EVIDENCE = 1_000_000
 
-# Claude via the OAuth subscription bridge has a HARD 200,000-token context
-# window (api.anthropic.com), NOT the 1,000,000-token Bedrock Sonnet profile the
-# rotating ARN points at. The per-family Sonnet budget (1,350,000 chars in
-# _FAMILY_EVIDENCE) is sized for that 1M Bedrock window and blows past 200K
-# tokens on large trajectories, which then falls back to the tokenless
-# urllib/Bedrock path and fails with "no Bedrock bearer token".
+# Claude via the OAuth subscription bridge. The judge on this route is now
+# Sonnet 5 (claude-sonnet-5), which documents a 1,000,000-token context window
+# by default on the Claude API (no beta header) — a large increase over the
+# Sonnet 4.5 era, when this route capped at 200,000 tokens and this constant
+# was 300,000 chars.
 #
-# We budget by CHARS but the ceiling is in TOKENS, and the chars/token ratio is
-# NOT constant — it depends on how token-dense the trajectory is:
-#   * kayla run_4 (prose-ish):   545K chars → 139K tokens  (~3.9 chars/token)
-#   * kayla run_1 (JSON-dense):  405K chars → 217K tokens  (~1.87 chars/token) → 400
-# So a char cap must survive the WORST-case (~1.8 chars/token) density. An earlier
-# 600K cap failed: 405K evidence chars alone already hit 216,921 tokens > 200,000.
-# Target a safe ~160K-token input ceiling (leaving margin under 200K for
-# system(~7K)+rubric+criteria+output(8K) and any density spikes):
-#   160,000 tokens × 1.8 chars/token ≈ 288,000 chars  → round to 300,000.
-# At worst-case density that is ~167K tokens; at run_4 density only ~77K tokens
-# (still ample evidence + Headroom compression runs on top). Tunable via
-# KENSEI_JUDGE_OAUTH_MAX_EVIDENCE for trajectories that are even denser.
-_DEFAULT_JUDGE_OAUTH_MAX_EVIDENCE = 300_000
+# We do NOT budget to the full 1M window: the usable context on a Claude Max
+# *subscription* surface (as opposed to the plain Anthropic API) is NOT
+# documented, so we hedge. Assume a conservative ~400K-token usable input and
+# budget by CHARS against the worst-case (~1.8 chars/token) density seen on
+# JSON-dense trajectories:
+#   400,000 tokens × 1.8 chars/token ≈ 720,000 chars → round down to 700,000.
+# At the Sonnet family's 1.375 chars/token floor that is ~509K tokens, still
+# far under 1M even after output(8192) + ~5K scaffold. This is a 2.3x evidence
+# increase over the old 300K cap while staying safe if the true Max ceiling is
+# only ~550K tokens. The min() gate in _member_evidence_budget keeps this as
+# the Anthropic-direct safety valve distinct from the Bedrock family budget.
+# Tunable via KENSEI_JUDGE_OAUTH_MAX_EVIDENCE for denser trajectories.
+_DEFAULT_JUDGE_OAUTH_MAX_EVIDENCE = 700_000
 
 
 def _judge_oauth_max_evidence() -> int:

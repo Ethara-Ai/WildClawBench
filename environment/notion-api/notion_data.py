@@ -341,11 +341,11 @@ def create_page(parent_type, parent_id, title, properties=None, created_by="user
     }
     _store_insert("pages", page)
     if properties:
-        _properties_doc()[page["id"]] = {
+        _store.document("properties").merge({page["id"]: {
             k: ({"type": v.get("type", "rich_text"), "value": v.get("value")}
                 if isinstance(v, dict) else {"type": "rich_text", "value": v})
             for k, v in properties.items()
-        }
+        }})
     return _attach_properties(page)
 
 
@@ -358,16 +358,16 @@ def update_page(page_id, title=None, archived=None, properties=None):
             if archived is not None:
                 _changes["archived"] = bool(archived)
             if properties:
-                existing = _properties_doc().setdefault(page_id, {})
+                existing = dict(_properties_doc().get(page_id, {}))
                 for k, v in properties.items():
                     if isinstance(v, dict):
                         existing[k] = {"type": v.get("type", "rich_text"), "value": v.get("value")}
                     else:
                         existing[k] = {"type": existing.get(k, {}).get("type", "rich_text"), "value": v}
+                _store.document("properties").merge({page_id: existing})
             _changes["last_edited_time"] = _now()
-            p.update(_changes)
             _store_patch("pages", p, _changes)
-            return _attach_properties(p)
+            return _attach_properties({**p, **_changes})
     return {"error": f"Page {page_id} not found"}
 
 

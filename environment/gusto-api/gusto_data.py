@@ -37,6 +37,12 @@ def _store_insert(_table, _row):
         _row = {**_row, _t.primary_key: _row["id"]}
     return _t.upsert(_row)
 
+
+def _store_patch(_table, _row_or_pk, _updates):
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
 _store.register("employees", primary_key="id",
                 initial_loader=lambda: _coerce_employees(_load("employees.json", "employees")))
 _store.register("compensations", primary_key="id",
@@ -266,10 +272,13 @@ def submit_payroll(payroll_id):
         else:
             gross += rate
     gross = round(gross, 2)
-    p["processed"] = True
-    p["gross_pay"] = gross
-    p["net_pay"] = round(gross * 0.726, 2)
-    return p
+    changes = {
+        "processed": True,
+        "gross_pay": gross,
+        "net_pay": round(gross * 0.726, 2),
+    }
+    _store_patch("payrolls", payroll_id, changes)
+    return {**p, **changes}
 
 
 # ---------------------------------------------------------------------------

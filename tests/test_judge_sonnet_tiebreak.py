@@ -409,7 +409,7 @@ def test_effective_model_sonnet_on_bridge_shows_anthropic(monkeypatch):
     Bedrock ARN the operator passed as the member id."""
     monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "http://127.0.0.1:51554")
     monkeypatch.delenv("KENSEI_JUDGE_OAUTH_BRIDGE_MODEL", raising=False)
-    assert grading._effective_judge_model(SONNET_ARN, "sonnet") == "claude-sonnet-4-5-20250929"
+    assert grading._effective_judge_model(SONNET_ARN, "sonnet") == "claude-sonnet-5"
 
 
 def test_effective_model_custom_bridge_model(monkeypatch):
@@ -431,15 +431,15 @@ def test_effective_model_non_sonnet_keeps_arn(monkeypatch):
 # ---------- evidence budget cap for the sonnet judge on the OAuth bridge ----------
 
 def test_evidence_budget_sonnet_on_bridge_capped(monkeypatch):
-    """Claude via the OAuth subscription bridge has a hard 200K-token context
-    window. Because chars/token varies with trajectory density (~1.8 worst case),
-    the sonnet evidence budget is capped to the bridge default (300K chars, which
-    stays under 200K tokens even for token-dense JSON trajectories) rather than
-    the 1M-token Bedrock profile the ARN advertises."""
+    """The sonnet judge on the OAuth subscription bridge is now Sonnet 5 (1M
+    context by default). Because the usable context on the Max *subscription*
+    surface is undocumented, the evidence budget is still capped by the OAuth
+    default (700K chars, a conservative hedge below the family's 1.35M Bedrock
+    budget) rather than the full family budget."""
     monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "http://127.0.0.1:51554")
     monkeypatch.delenv("JUDGE_MAX_EVIDENCE", raising=False)
     monkeypatch.delenv("KENSEI_JUDGE_OAUTH_MAX_EVIDENCE", raising=False)
-    assert grading._member_evidence_budget(SONNET_ARN, "sonnet") == 300_000
+    assert grading._member_evidence_budget(SONNET_ARN, "sonnet") == 700_000
 
 
 def test_evidence_budget_sonnet_no_bridge_full_bedrock(monkeypatch):

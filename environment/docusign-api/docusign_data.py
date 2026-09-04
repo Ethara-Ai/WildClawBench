@@ -27,6 +27,12 @@ def _store_insert(_table, _row):
         _row = {**_row, _t.primary_key: _row["id"]}
     return _t.upsert(_row)
 
+
+def _store_patch(_table, _row_or_pk, _updates):
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
 _store.register("envelopes", primary_key="envelope_id",
                 initial_loader=lambda: _coerce_envelopes(_load("envelopes.json", "envelopes")))
 _store.register("recipients", primary_key="recipient_id",
@@ -247,12 +253,13 @@ def update_envelope(envelope_id, status):
     if e is None:
         return {"error": f"envelope {envelope_id} not found"}
     status = status.lower()
-    e["status"] = status
     now = _now()
+    changes = {"status": status}
     if status == "sent" and not e["sent_time"]:
-        e["sent_time"] = now
+        changes["sent_time"] = now
     if status == "completed":
-        e["completed_time"] = now
+        changes["completed_time"] = now
+    _store_patch("envelopes", envelope_id, changes)
     return {"envelopeId": envelope_id, "status": status, "statusDateTime": now}
 
 

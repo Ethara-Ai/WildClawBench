@@ -28,6 +28,12 @@ def _store_insert(_table, _row):
         _row = {**_row, _t.primary_key: _row["id"]}
     return _t.upsert(_row)
 
+
+def _store_patch(_table, _row_or_pk, _updates):
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
 _store.register("event_types", primary_key="uuid",
                 initial_loader=lambda: _coerce_event_types(_load("event_types.json", "event_types")))
 _store.register("scheduled_events", primary_key="uuid",
@@ -326,14 +332,17 @@ def cancel_event(uuid_, reason=None):
     uuid_ = _strip_uri(uuid_)
     for ev in _scheduled_events_rows():
         if ev["uuid"] == uuid_:
-            ev["status"] = "canceled"
-            ev["canceled_reason"] = reason or "Canceled by host"
+            canceled_reason = reason or "Canceled by host"
+            _store_patch("scheduled_events", uuid_, {
+                "status": "canceled",
+                "canceled_reason": canceled_reason,
+            })
             for inv in _invitees_rows():
                 if inv["event"] == uuid_:
-                    inv["status"] = "canceled"
+                    _store_patch("invitees", inv["uuid"], {"status": "canceled"})
             return {"resource": {
                 "canceled_by": _user_doc()["name"],
-                "reason": ev["canceled_reason"],
+                "reason": canceled_reason,
                 "canceler_type": "host",
             }}
     return {"error": f"scheduled event {uuid_} not found"}

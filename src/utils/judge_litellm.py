@@ -78,12 +78,35 @@ def _judge_oauth_bridge_url() -> str:
 
 
 def _judge_oauth_bridge_model() -> str:
-    """Model id sent on the bridge route. The bridge normalizes the exact tail
-    upstream, so this only needs to be a valid anthropic/ sonnet id."""
+    """Model id sent on the bridge route. The bridge (bridge.py
+    normalize_body_for_anthropic_direct) passes the model tail through VERBATIM
+    — it only rewrites thinking/output_config — so this literal IS the model on
+    the wire at api.anthropic.com. LiteLLM strips the `anthropic/` prefix.
+    Default is Sonnet 5 (1M context, dateless canonical id). Overridable via
+    KENSEI_JUDGE_OAUTH_BRIDGE_MODEL."""
     return (
         os.environ.get("KENSEI_JUDGE_OAUTH_BRIDGE_MODEL")
-        or "anthropic/claude-sonnet-4-5-20250929"
+        or "anthropic/claude-sonnet-5"
     ).strip()
+
+
+def _judge_sampling_params(model: str) -> dict[str, Any]:
+    """Per-model sampling params for the judge call.
+
+    Sonnet 5 returns HTTP 400 on ANY explicit temperature/top_p/top_k. Bedrock
+    Sonnet 4.5/4.6 (and Kimi/GLM) still want temperature=0 for reproducible
+    verdicts, so this is per-model, NOT global. `drop_params=True` does NOT
+    help: LiteLLM lists `temperature` as a SUPPORTED anthropic param (verified
+    litellm 1.83.7) and passes it through, so Anthropic then 400s.
+
+    Substring `sonnet-5` cannot false-positive on `claude-sonnet-4-5-20250929`
+    (that contains `sonnet-4-5`) and still matches a future dated
+    `claude-sonnet-5-YYYYMMDD`. Omitting temperature means Sonnet 5 samples at
+    Anthropic's default (1.0), so its verdicts are slightly less reproducible
+    run-to-run — unavoidable via the API."""
+    if "sonnet-5" in (model or "").lower():
+        return {}
+    return {"temperature": 0}
 
 
 def _judge_preflight_timeout() -> float:
@@ -135,11 +158,11 @@ def preflight_judge_oauth(timeout_s: float | None = None) -> tuple[bool, str]:
         import litellm
     except Exception as exc:  # noqa: BLE001
         return False, f"litellm import failed: {exc}"
+    bridge_model = _judge_oauth_bridge_model()
     kwargs: dict[str, Any] = {
-        "model": _judge_oauth_bridge_model(),
+        "model": bridge_model,
         "messages": [{"role": "user", "content": "ping"}],
         "max_tokens": 1,
-        "temperature": 0,
         "stream": False,
         "drop_params": True,
         "api_base": bridge_url,
@@ -147,6 +170,7 @@ def preflight_judge_oauth(timeout_s: float | None = None) -> tuple[bool, str]:
         "extra_headers": {"x-wcb-bridge-secret": os.environ.get("WCB_CC_BRIDGE_SECRET", "")},
         "timeout": timeout_s,
         "num_retries": 0,
+        **_judge_sampling_params(bridge_model),
     }
     # The FIRST request through a cold bridge pays TLS setup and connection-pool
     # warm-up, so a timeout on attempt 1 says little about whether auth works.
@@ -545,19 +569,21 @@ def call_judge_via_litellm(
     # `drop_params=True` lets LiteLLM silently strip params a provider
     # doesn't accept (verified live: Bedrock application-inference-profile
     # ARNs for Sonnet/Kimi/GLM reject `temperature` → UnsupportedParamsError).
-    # The urllib fallback path retries-without-temperature on the same
-    # error; this is the LiteLLM-side equivalent.
+    # The urllib fallback path retries-without-temperature on the same error;
+    # this is the LiteLLM-side equivalent. It does NOT cover Sonnet 5's
+    # temperature rejection — LiteLLM treats `temperature` as a supported
+    # anthropic param and passes it through — so sampling params are set
+    # per-model via `_judge_sampling_params` (applied after the model is final).
     _bearer = os.environ.get("KENSEI_AWS_BEARER_TOKEN") or os.environ.get(
         "AWS_BEARER_TOKEN_BEDROCK"
     )
     if _bearer:
         os.environ["AWS_BEARER_TOKEN_BEDROCK"] = _bearer
-    
+
     completion_kwargs: dict[str, Any] = {
         "model": call_model,
         "messages": messages,
         "max_tokens": max_output_tokens,
-        "temperature": 0,
         "stream": False,
         "drop_params": True,
     }
@@ -579,6 +605,8 @@ def call_judge_via_litellm(
             "x-wcb-bridge-secret": os.environ.get("WCB_CC_BRIDGE_SECRET", ""),
         }
         completion_kwargs.pop("aws_region_name", None)
+
+    completion_kwargs.update(_judge_sampling_params(completion_kwargs["model"]))
 
     # Live-stream liveness (docs/STREAMING_PLAN.md D4): this judge call stays
     # NON-streaming by decision (`"stream": False` above is untouched), so the

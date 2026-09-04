@@ -34,6 +34,12 @@ def _store_insert(_table, _row):
         _row = {**_row, _t.primary_key: _row["id"]}
     return _t.upsert(_row)
 
+
+def _store_patch(_table, _row_or_pk, _updates):
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
 _store.register("orders", primary_key="id",
                 initial_loader=lambda: _coerce_orders(_load("orders.json", "orders")))
 _store.register("captures", primary_key="id",
@@ -244,7 +250,7 @@ def capture_order(order_id):
         "create_time": _now(),
     }
     _store_insert("captures", capture)
-    order["status"] = "COMPLETED"
+    _store_patch("orders", order_id, {"status": "COMPLETED"})
     return {
         "id": order_id,
         "status": "COMPLETED",

@@ -30,6 +30,12 @@ def _store_insert(_table, _row):
         _row = {**_row, _t.primary_key: _row["id"]}
     return _t.upsert(_row)
 
+
+def _store_patch(_table, _row_or_pk, _updates):
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
 _store.register("templates", primary_key="id",
                 initial_loader=lambda: _coerce_templates(_load("templates.json", "templates")))
 _store.register("lists", primary_key="id",
@@ -285,13 +291,18 @@ def upsert_contacts(contacts, list_ids=None):
             continue
         existing = next((x for x in _contacts_rows() if x["email"] == email), None)
         if existing:
-            existing["first_name"] = c.get("first_name", existing["first_name"])
-            existing["last_name"] = c.get("last_name", existing["last_name"])
-            existing["country"] = c.get("country", existing["country"])
+            merged_list_ids = list(existing["list_ids"])
             for lid in list_ids:
-                if lid not in existing["list_ids"]:
-                    existing["list_ids"].append(lid)
-            existing["updated_at"] = _now()
+                if lid not in merged_list_ids:
+                    merged_list_ids.append(lid)
+            changes = {
+                "first_name": c.get("first_name", existing["first_name"]),
+                "last_name": c.get("last_name", existing["last_name"]),
+                "country": c.get("country", existing["country"]),
+                "list_ids": merged_list_ids,
+                "updated_at": _now(),
+            }
+            _store_patch("contacts", existing["id"], changes)
             upserted.append(existing["id"])
         else:
             new_c = {

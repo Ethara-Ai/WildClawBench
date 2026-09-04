@@ -107,6 +107,52 @@ def test_bootstrap_sidecar_has_no_atexit_or_signal_handlers() -> None:
         )
 
 
+# ---------- convergence: shared + per-run builders both pass meta_* (1P) ----------
+
+
+def _meta_kwargs_of_build_litellm_call(path: Path) -> set[str] | None:
+    tree = _ast(path)
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "build_litellm_config_yaml"
+        ):
+            return {kw.arg for kw in node.keywords if kw.arg}
+    return None
+
+
+def test_shared_and_per_run_builders_both_pass_meta_1p_params() -> None:
+    """The shared-sidecar builder (bootstrap_sidecar.py) MUST pass the same
+    meta_* (Meta/1P vendor) kwargs as the per-run builder (run_batch.py).
+
+    Omitting meta_api_key/meta_base_url/meta_model from the shared call drops
+    the 1P model_name block from the shared-sidecar YAML, so a
+    `--model <meta_model>` batch (run.sh shared mode) is rejected by LiteLLM's
+    OWN proxy with "Invalid model name passed in model=..." — the request never
+    reaches the relay. The per-run path (direct `python3 eval/run_batch.py`)
+    still worked, so the two entry points DIVERGED, violating the
+    eval/AGENTS.md convergence guarantee. Diagnosed 2026-09-04 on EC2
+    (ahmad_hassan run_1, model rl-muse-spark-1-2-playground).
+    """
+    required = {"meta_api_key", "meta_base_url", "meta_model"}
+    per_run = _meta_kwargs_of_build_litellm_call(RUN_BATCH)
+    shared = _meta_kwargs_of_build_litellm_call(BOOTSTRAP)
+    assert per_run is not None, "run_batch.py build_litellm_config_yaml call not found"
+    assert shared is not None, "bootstrap_sidecar.py build_litellm_config_yaml call not found"
+    assert required <= per_run, (
+        f"run_batch.py per-run builder must pass {sorted(required)}; "
+        f"missing {sorted(required - per_run)}"
+    )
+    assert required <= shared, (
+        f"bootstrap_sidecar.py shared builder must pass {sorted(required)} "
+        f"(mirror the per-run builder); missing {sorted(required - shared)}. "
+        "Omitting these drops the 1P model block from the shared-sidecar YAML "
+        "and a --model <meta_model> batch gets LiteLLM 'Invalid model name'. "
+        "See eval/AGENTS.md convergence guarantee."
+    )
+
+
 # ---------- eval/run_batch.py: shared-mode short-circuit ----------
 
 

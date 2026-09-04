@@ -194,6 +194,14 @@ def main() -> int:
         use_claude_oauth=use_oauth,
         bridge_url=cc_bridge_url,
         enable_oauth_usage_callback=use_oauth,
+        # First-party (Meta/1P) vendor block — MUST mirror the per-run builder in
+        # eval/run_batch.py. Omitting meta_* drops the 1P model_name block from the
+        # shared-sidecar YAML, so `--model <meta_model>` batches are rejected by
+        # LiteLLM's proxy ("Invalid model name passed in model=..."). Convergence
+        # guarantee (eval/AGENTS.md).
+        meta_api_key=config.meta_api_key,
+        meta_base_url=config.meta_base_url,
+        meta_model=config.meta_model,
         # §1.5 (docs/STREAMING_PLAN.md): on the OAuth agent path the sidecar
         # sits IN FRONT of the buffering cc-bridge, so its hook would only see
         # an end-of-turn burst — the real-time tap there is the bridge tee.

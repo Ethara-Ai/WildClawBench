@@ -34,6 +34,12 @@ def _store_insert(_table, _row):
         _row = {**_row, _t.primary_key: _row["id"]}
     return _t.upsert(_row)
 
+
+def _store_patch(_table, _row_or_pk, _updates):
+    _t = _store.table(_table)
+    _pk = _row_or_pk.get(_t.primary_key, _row_or_pk.get("id")) if isinstance(_row_or_pk, dict) else _row_or_pk
+    return _t.patch(_pk, _updates)
+
 _store.register("users", primary_key="id",
                 initial_loader=lambda: _coerce_users(_load("users.json", "users")))
 _store.register("organizations", primary_key="id",
@@ -229,31 +235,33 @@ def update_ticket(ticket_id, status=None, priority=None, assignee_id=None,
     t = _find(_tickets_rows(), ticket_id)
     if not t:
         return {"error": f"Ticket {ticket_id} not found"}
+    changes = {}
     if status is not None:
         if status not in VALID_STATUS:
             return {"error": f"Invalid status: {status}"}
-        t["status"] = status
+        changes["status"] = status
     if priority is not None:
         if priority not in VALID_PRIORITY:
             return {"error": f"Invalid priority: {priority}"}
-        t["priority"] = priority
+        changes["priority"] = priority
     if assignee_id is not None:
-        t["assignee_id"] = _to_int(assignee_id)
+        changes["assignee_id"] = _to_int(assignee_id)
     if ticket_type is not None:
-        t["type"] = ticket_type
+        changes["type"] = ticket_type
     if tags is not None:
-        t["tags"] = tags
+        changes["tags"] = tags
     if comment_body:
         _store_insert("comments", {
             "id": _next_id(_comments_rows()),
             "ticket_id": t["id"],
-            "author_id": _to_int(comment_author_id) if comment_author_id is not None else t["assignee_id"],
+            "author_id": _to_int(comment_author_id) if comment_author_id is not None else changes.get("assignee_id", t["assignee_id"]),
             "body": comment_body,
             "public": bool(comment_public),
             "created_at": _now(),
         })
-    t["updated_at"] = _now()
-    return {"ticket": t}
+    changes["updated_at"] = _now()
+    _store_patch("tickets", t["id"], changes)
+    return {"ticket": {**t, **changes}}
 
 
 # ---------------------------------------------------------------------------
@@ -284,7 +292,7 @@ def create_comment(ticket_id, body, author_id=None, public=True):
         "created_at": _now(),
     }
     _store_insert("comments", comment)
-    t["updated_at"] = _now()
+    _store_patch("tickets", t["id"], {"updated_at": _now()})
     return {"comment": comment}
 
 

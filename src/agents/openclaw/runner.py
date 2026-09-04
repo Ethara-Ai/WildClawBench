@@ -345,6 +345,7 @@ class OpenClawAgent(BaseAgent):
         timed_out_turn: int | None = None
         turns_duplicated: list[int] = []
         turns_empty: list[int] = []
+        turns_partial: list[int] = []
 
         try:
             exec_path = os.path.join(spec.workspace_path, "exec")
@@ -659,6 +660,7 @@ class OpenClawAgent(BaseAgent):
             timed_out_turn: int | None = None
             turns_duplicated = []
             turns_empty = []
+            turns_partial = []
             turn_index = 0
             while True:
                 try:
@@ -789,6 +791,11 @@ class OpenClawAgent(BaseAgent):
                                    turn_index + 1,
                                    "timed out" if outcome == "timeout"
                                    else "stalled twice — giving up")
+                    # A turn that produced real sidecar traffic before wedging
+                    # did genuine work that turns_completed will not credit;
+                    # record it so the loss is visible as partial, not zero.
+                    if _rows_guarded and self._count_run_key_rows(_run_key) > rows_before_turn:
+                        turns_partial.append(turn_index)
                     self._terminate_agent_invocations(spec.task_id)
                     agent_proc.kill()
                     agent_proc.wait()
@@ -874,6 +881,7 @@ class OpenClawAgent(BaseAgent):
                 recovery_turn_fired=recovery_fired,
                 turns_duplicated=turns_duplicated,
                 turns_empty=turns_empty,
+                turns_partial=turns_partial,
             )
 
         except Exception as exc:
@@ -891,6 +899,7 @@ class OpenClawAgent(BaseAgent):
                 turns_planned=total_turns,
                 turns_duplicated=turns_duplicated,
                 turns_empty=turns_empty,
+                turns_partial=turns_partial,
             )
 
     def _wait_for_subagents(
