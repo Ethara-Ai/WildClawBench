@@ -23,7 +23,7 @@ eval-skip stub and last-resort stub paths).
 | `turns_planned` | int \| null | every multi-turn run | the schedule's turn count (null = open-ended source) |
 | `turns_completed` | int | every multi-turn run | turns whose agent invocation actually finished |
 | `recovery_turn_fired` | true | only when fired | the §2.2 sub-agent synthesis-recovery injection added one real extra turn (legitimate repair; run stays in averages) |
-| `turns_duplicated` | list[int] | only when non-empty | turn indices whose stall-guarded retry re-sent the scripted message on the same session (§2.3; recorded at `turn_attempt == 1`, not re-derived from the transcript; run stays in averages) |
+| `turns_duplicated` | list[int] | only when non-empty | turn indices whose retry re-sent the scripted message on the same session (§2.3) — fired by EITHER the stall-guard retry or the empty-turn retry; recorded at the retry moment, not re-derived from the transcript; run stays in averages |
 | `turns_empty` | list[int] | only when non-empty | turn indices where an invocation finished but produced ZERO sidecar rows (dead LLM route fast-fail; LLM_TIMEOUT_EVIDENCE dossier). The turn is retried once in place; if the retry succeeds the run stays complete (first empty attempt still recorded here + in `turns_duplicated`), a second empty aborts the run as `run_incomplete` |
 | `eval_skipped` | string | only when eval was gated | why pytest grading + LLM judge never ran (e.g. `"run incomplete: 3 of 9 scheduled turns executed"`); `overall_score` is `null` = not measured, mirroring the last-resort stub convention |
 
@@ -121,4 +121,5 @@ detection is a no-op on those backends (BUGREPORT §3 item 2, open).
 | `e1ff517` | failure-row `error_class`/`error`/`run_key` |
 | `31756b6` | stall guard (`WCB_TURN_STALL_SECONDS`) |
 | `b5c13db` | `turns_duplicated` |
-| `5efb25f` | `turns_empty` + `WCB_EMPTY_TURN_LIMIT`; sweep-safe sidecar naming (`wcbsh-` prefix for the in-process path) + active-run registry parity (no fields, prevents the 2026-09-01 live-sidecar sweep incident) |
+| `5efb25f` | `turns_empty` + `WCB_EMPTY_TURN_LIMIT` (original skip-ahead semantics); sweep-safe sidecar naming (`wcbsh-` prefix for the in-process path) + active-run registry parity (no fields, prevents the 2026-09-01 live-sidecar sweep incident) |
+| `0f76067` / `a014b30` (newreq) | empty-turn semantics upgraded: retry the SAME turn once in place (rescues the run when the blip was transient; retried turn also stamps `turns_duplicated`); second empty aborts. `WCB_EMPTY_TURN_LIMIT`: >0/unset = on, `0` = off |
