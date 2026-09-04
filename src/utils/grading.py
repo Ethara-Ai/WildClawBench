@@ -67,14 +67,20 @@ TMP_WORKSPACE = os.environ.get("TMP_WORKSPACE", "/tmp_workspace")
 #   200,000 ctx  − 4,000 output  − ~5,000 scaffold (TASK + 25-rubric criteria
 #   + JSON schema + system prompt) = ~191,000 tokens for evidence
 #   ÷ 2.515 chars/token = ~75,944 evidence tokens worth of chars ≈ 191,000
-# Converting back: 191,000 tokens × 2.515 chars/token ≈ 480,365 chars. Round
-# down with safety margin for tokenizer drift and rubric-block variance:
-# 450,000 chars. Operators with a single high-context judge (Sonnet's 1M
-# budget) can lift this by exporting JUDGE_MAX_EVIDENCE=<chars>. Setting it
-# to 0 (or anything falsy after int()) restores the unbounded behavior we
-# briefly defaulted to between b31 and now — known to 400 every council
-# member on real WildClawBench runs.
-_DEFAULT_JUDGE_MAX_EVIDENCE = 450_000
+# Converting back: 191,000 tokens × 2.515 chars/token ≈ 480,365 chars, which
+# was the historical 450,000-char default sized for the SMALLEST council member
+# (GLM, 200K-token window). That default is intentionally raised to 1,000,000
+# chars here: this constant is the Bedrock single-judge / non-family default,
+# exercised only when a single high-context Bedrock judge (Sonnet's 1M-token
+# window) is in play — where ~1M chars ÷ 2.515 ≈ ~398K input tokens fits well
+# under the 1M ceiling. It is NOT the council per-member budget (those come from
+# _FAMILY_EVIDENCE, which keeps GLM/Kimi on their own smaller caps), and it is
+# NOT the OAuth-bridge cap (_DEFAULT_JUDGE_OAUTH_MAX_EVIDENCE, still 300K).
+# Operators can still override via JUDGE_MAX_EVIDENCE=<chars>. Setting it to 0
+# (or anything falsy after int()) restores the unbounded behavior we briefly
+# defaulted to between b31 and now — known to 400 every council member on real
+# WildClawBench runs.
+_DEFAULT_JUDGE_MAX_EVIDENCE = 1_000_000
 
 # Claude via the OAuth subscription bridge has a HARD 200,000-token context
 # window (api.anthropic.com), NOT the 1,000,000-token Bedrock Sonnet profile the
