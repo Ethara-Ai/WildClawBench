@@ -659,7 +659,6 @@ class OpenClawAgent(BaseAgent):
             timed_out_turn: int | None = None
             turns_duplicated = []
             turns_empty = []
-            empty_streak = 0
             turn_index = 0
             while True:
                 try:
@@ -739,6 +738,38 @@ class OpenClawAgent(BaseAgent):
                         # the per-turn log handle (previously leaked every turn).
                         close_proc_log(agent_proc)
                     if outcome == "ok":
+                        # Empty-turn handling (LLM_TIMEOUT_EVIDENCE dossier): a
+                        # dead LLM route makes the invocation fast-fail its
+                        # internal ladder and exit "ok" with an empty assistant
+                        # reply — turn-count complete, content-empty. Zero new
+                        # sidecar rows == the turn produced nothing. Retry the
+                        # SAME turn once (reusing safe_msg here — re-entering
+                        # the outer loop would re-fire before_turn injections
+                        # and ClawMark stage mutations); a second empty means
+                        # the route is dead: abort instead of laddering to
+                        # schedule end. The retry re-sends a message whose
+                        # empty exchange the session already recorded, so the
+                        # turn is also logged in turns_duplicated.
+                        if _rows_guarded and self._empty_turn_limit() > 0:
+                            rows_now = self._count_run_key_rows(_run_key)
+                            if rows_now == rows_before_turn:
+                                turns_empty.append(turn_index)
+                                if turn_attempt == 0:
+                                    logger.warning(
+                                        "[%s] Agent turn %d EMPTY (no LLM "
+                                        "traffic) — retrying the same turn "
+                                        "once", spec.task_id, turn_index + 1)
+                                    turns_duplicated.append(turn_index)
+                                    continue
+                                outcome = "empty"
+                                logger.error(
+                                    "[%s] ABORTING RUN: turn %d empty twice — "
+                                    "LLM route is dead, remaining turns would "
+                                    "all fail. Run will be flagged "
+                                    "run_incomplete.",
+                                    spec.task_id, turn_index + 1)
+                                break
+                            rows_before_turn = rows_now
                         logger.info("[%s] Agent turn %d finished",
                                     spec.task_id, turn_index + 1)
                         break
@@ -763,38 +794,10 @@ class OpenClawAgent(BaseAgent):
                     agent_proc.wait()
                     break
                 if outcome != "ok":
-                    _ui_timed_out = True
-                    timed_out_turn = turn_index
+                    if outcome != "empty":
+                        _ui_timed_out = True
+                        timed_out_turn = turn_index
                     break
-                # Empty-turn detection (LLM_TIMEOUT_EVIDENCE dossier): a dead
-                # LLM route makes every invocation fast-fail its retry ladder
-                # and exit "ok" with an empty assistant message — turn-count
-                # complete, content-empty, invisible to run_incomplete. A turn
-                # that produced ZERO sidecar rows produced nothing: do not
-                # count it as executed, and abort after WCB_EMPTY_TURN_LIMIT
-                # consecutive empties instead of laddering to schedule end.
-                if _rows_guarded:
-                    rows_after_turn = self._count_run_key_rows(_run_key)
-                    if rows_after_turn == rows_before_turn:
-                        turns_empty.append(turn_index)
-                        empty_streak += 1
-                        logger.warning(
-                            "[%s] Agent turn %d EMPTY: invocation finished but "
-                            "produced no LLM traffic (dead route?) — not "
-                            "counted as executed (%d consecutive)",
-                            spec.task_id, turn_index + 1, empty_streak)
-                        limit = self._empty_turn_limit()
-                        if limit > 0 and empty_streak >= limit:
-                            logger.error(
-                                "[%s] ABORTING RUN: %d consecutive empty turns "
-                                "— LLM route is dead, remaining turns would "
-                                "all fail. Run will be flagged run_incomplete.",
-                                spec.task_id, empty_streak)
-                            break
-                        turn_index += 1
-                        continue
-                    rows_before_turn = rows_after_turn
-                    empty_streak = 0
                 turns_executed += 1
                 turn_index += 1
             elapsed_time = time.perf_counter() - start_time

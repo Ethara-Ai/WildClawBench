@@ -24,7 +24,7 @@ eval-skip stub and last-resort stub paths).
 | `turns_completed` | int | every multi-turn run | turns whose agent invocation actually finished |
 | `recovery_turn_fired` | true | only when fired | the §2.2 sub-agent synthesis-recovery injection added one real extra turn (legitimate repair; run stays in averages) |
 | `turns_duplicated` | list[int] | only when non-empty | turn indices whose stall-guarded retry re-sent the scripted message on the same session (§2.3; recorded at `turn_attempt == 1`, not re-derived from the transcript; run stays in averages) |
-| `turns_empty` | list[int] | only when non-empty | turn indices whose invocation finished but produced ZERO sidecar rows (dead LLM route fast-fail; LLM_TIMEOUT_EVIDENCE dossier). NOT counted in `turns_completed`, so the run flags `run_incomplete` and is excluded |
+| `turns_empty` | list[int] | only when non-empty | turn indices where an invocation finished but produced ZERO sidecar rows (dead LLM route fast-fail; LLM_TIMEOUT_EVIDENCE dossier). The turn is retried once in place; if the retry succeeds the run stays complete (first empty attempt still recorded here + in `turns_duplicated`), a second empty aborts the run as `run_incomplete` |
 | `eval_skipped` | string | only when eval was gated | why pytest grading + LLM judge never ran (e.g. `"run incomplete: 3 of 9 scheduled turns executed"`); `overall_score` is `null` = not measured, mirroring the last-resort stub convention |
 
 The last-resort stub (`__last_resort_stub__: true`) also carries
@@ -103,7 +103,7 @@ detection is a no-op on those backends (BUGREPORT §3 item 2, open).
 | `WCB_INCLUDE_INCOMPLETE_RUNS=1` | off | debug: fold incomplete runs back into all averages |
 | `WCB_GRADE_INCOMPLETE_RUNS=1` | off | debug: run pytest grading + LLM judge on incomplete/empty trajectories anyway |
 | `WCB_TURN_STALL_SECONDS` | unset (off) | arms the per-turn stall guard; values below 600 are floored to 600 (usage rows land at request COMPLETION, so smaller windows would misread healthy long calls as wedges). Requires run-key tagging live (keyless mode); self-disables otherwise |
-| `WCB_EMPTY_TURN_LIMIT` | 2 | consecutive empty turns (zero LLM traffic) that abort the run early instead of laddering to schedule end; `0` disables the abort (empty turns are still recorded and uncounted). Active only when run-key tagging is live |
+| `WCB_EMPTY_TURN_LIMIT` | on (any value >0) | empty-turn handling: a zero-traffic turn is retried once in place; a second empty aborts the run (`run_incomplete`). `0` disables the machinery entirely. Active only when run-key tagging is live |
 | `WCB_RUN_KEY` | auto-set per attempt | injected into the agent container; `subagent_director` and `transcribe.sh` send it as the `x-wcb-run-key` header (works under master-key auth too). Never set manually |
 | `JUDGE_MAX_EVIDENCE` | unset (family budgets) | pre-existing operator cap on judge evidence chars. Operationally important: judge inputs above ~270K tokens empirically collapse sonnet verdict output (empty/unparseable/partial); ≤160K tokens has been 100% clean. 500000 chars is a proven-good value for oversized runs |
 
