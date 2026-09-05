@@ -90,30 +90,35 @@ def _judge_oauth_bridge_model() -> str:
     ).strip()
 
 
+# Models that rejected an explicit temperature with HTTP 400 (Sonnet 5 rejects
+# ANY temperature/top_p/top_k; a Bedrock application-inference-profile ARN
+# carries no `sonnet-5` substring so this cannot be known up front). Learned at
+# runtime by the strip-retry in call_judge_via_litellm: first rejection costs
+# one extra round trip, every later call omits the param straight away.
+_TEMP_REJECTED_MODELS: set[str] = set()
+
+
+def _judge_pin_temperature() -> bool:
+    return os.environ.get("WCB_JUDGE_PIN_TEMPERATURE", "1").strip() != "0"
+
+
 def _judge_sampling_params(model: str, family: str | None = None) -> dict[str, Any]:
     """Per-model sampling params for the judge call.
 
-    Sonnet 5 returns HTTP 400 on ANY explicit temperature/top_p/top_k. The
-    Sonnet council leg can be pointed (via ARN swap) at Sonnet 4.5/4.6 OR
-    Sonnet 5, and a Bedrock application-inference-profile ARN carries NO
-    `sonnet-5` substring, so a model-string check cannot tell them apart and
-    would silently send `temperature=0` to a Sonnet-5 ARN → 400 → every
-    criterion abstains → `overall_score 0.0` no-signal. So the decision keys
-    off the resolved council `family`: the ENTIRE sonnet family sends default
-    sampling params (temperature omitted), which Sonnet 5 requires and Sonnet
-    4.5/4.6 accept (they then sample at Anthropic's default 1.0 — slightly less
-    reproducible run-to-run, unavoidable via the API). Kimi/GLM keep
-    `temperature=0` for reproducible verdicts. `drop_params=True` does NOT
-    help: LiteLLM lists `temperature` as a SUPPORTED anthropic param (verified
-    litellm 1.83.7) and passes it through, so Anthropic then 400s. When
-    `family` is None (non-council judges / OAuth bridge model), fall back to
-    the model-string check so a `sonnet-5` id still omits temperature.
+    Verdicts must be reproducible, so every judge call PINS `temperature=0`
+    (an unpinned Sonnet 4.5/4.6 samples at Anthropic's default 1.0 and the
+    same evidence can flip verdicts between regrades). Sonnet 5 rejects any
+    explicit temperature with HTTP 400; those models are learned into
+    `_TEMP_REJECTED_MODELS` via the strip-retry in the call site and omit the
+    param thereafter — `drop_params=True` does NOT cover this because LiteLLM
+    lists `temperature` as a supported anthropic param (verified litellm
+    1.83.7) and passes it through. A `sonnet-5` model string is pre-seeded to
+    omit. WCB_JUDGE_PIN_TEMPERATURE=0 restores omit-for-sonnet (the pre-pin
+    behavior) without a code change.
     """
-    if family == "sonnet":
+    if "sonnet-5" in (model or "").lower() or (model or "") in _TEMP_REJECTED_MODELS:
         return {}
-    if family in ("kimi", "glm"):
-        return {"temperature": 0}
-    if "sonnet-5" in (model or "").lower():
+    if family == "sonnet" and not _judge_pin_temperature():
         return {}
     return {"temperature": 0}
 
@@ -643,8 +648,16 @@ def call_judge_via_litellm(
         try:
             response = litellm.completion(**completion_kwargs)
         except Exception as _exc:  # noqa: BLE001 - single targeted fallback
-            if ("thinking" in str(_exc).lower()
+            _msg = str(_exc).lower()
+            _stripped = False
+            if ("thinking" in _msg
                     and completion_kwargs.pop("thinking", None) is not None):
+                _stripped = True
+            if ("temperature" in _msg
+                    and completion_kwargs.pop("temperature", None) is not None):
+                _TEMP_REJECTED_MODELS.add(str(completion_kwargs.get("model") or ""))
+                _stripped = True
+            if _stripped:
                 response = litellm.completion(**completion_kwargs)
             else:
                 raise

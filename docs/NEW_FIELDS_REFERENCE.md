@@ -108,6 +108,10 @@ detection is a no-op on those backends (BUGREPORT §3 item 2, open).
 | `WCB_FORCE_LAUNCH` | off | overrides the run.sh launch lock (two concurrent launches of the same task set interleave into the same run_N trees) |
 | `WCB_RUN_KEY` | auto-set per attempt | injected into the agent container; `subagent_director` and `transcribe.sh` send it as the `x-wcb-run-key` header (works under master-key auth too). Never set manually |
 | `JUDGE_MAX_EVIDENCE` | unset (family budgets) | pre-existing operator cap on judge evidence chars. Operationally important: judge inputs above ~270K tokens empirically collapse sonnet verdict output (empty/unparseable/partial); ≤160K tokens has been 100% clean. 500000 chars is a proven-good value for oversized runs |
+| `WCB_TRUNCATION_ABSTAIN` | on (`1`) | a No verdict the judge flagged `TRUNCATION_AFFECTED` routes to Human Evaluation instead of a graded fail — the evidence pipeline, not the agent, withheld what was needed (ajax_moreno: a 0.407 run shipped as 0.03 off cut evidence). Yes verdicts stand. `0` restores fail-on-truncation |
+| `WCB_JUDGE_PIN_TEMPERATURE` | on (`1`) | judge calls pin `temperature=0` for reproducible verdicts (an unpinned sonnet-4.5/4.6 samples at default 1.0 and can flip verdicts between regrades). Models that 400 on explicit temperature (sonnet-5) are learned at runtime and omit it thereafter. `0` restores omit-for-sonnet |
+
+Evidence assembly (no env var; always on): deliverables are ranked rubric-named files → report/flagged stems → other files → scratch subtrees (`_scratch/ build/ extract/ …`), ascending size within each rank, and budget cuts land on file boundaries with a trailing `EVIDENCE BUDGET NOTE` manifest naming every omitted/cut file. The judge treats manifest-listed files as produced-but-cut (`No` + `TRUNCATION_AFFECTED: Yes` → Human Evaluation), never as the agent's failure. An oversized file keeps head+tail halves around an explicit cut marker.
 
 ---
 

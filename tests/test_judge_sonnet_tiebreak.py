@@ -492,3 +492,86 @@ def test_judge_cost_non_sonnet_unaffected_by_bridge(monkeypatch):
     cost, priced = grading._judge_cost_usd(GLM_ARN, 10_000, 2_000, 0, 0, "glm")
     assert priced is True
     assert cost > 0.0
+
+
+# ---------- truncation-abstain: evidence the pipeline cut is not a graded fail ----------
+
+
+def _trunc_verdict(satisfied, flagged=True):
+    return {"satisfied": satisfied, "rationale": "r", "truncation_affected": flagged}
+
+
+def test_truncation_flagged_no_routes_to_human_eval(monkeypatch):
+    rubrics = [{"criterion": "delivers report.pdf with X", "weight": 3}]
+    _patch_council(monkeypatch, [
+        _ok(SONNET_ARN, "sonnet", [_trunc_verdict(False)]),
+        _ok(GLM_ARN, "glm", [_trunc_verdict(False)]),
+        _ok(KIMI_ARN, "kimi", [_trunc_verdict(False)]),
+    ])
+    out = _grade(rubrics)
+    crit = out["criteria"][0]
+    assert crit["resolved_by"] == "human_eval"
+    assert crit["human_eval"] == "required"
+    assert crit["passed"] is False
+    assert out["abstention_flags"] == [0]
+    assert out["truncation_flags"] == [0]
+
+
+def test_truncation_flagged_yes_stands(monkeypatch):
+    rubrics = [{"criterion": "c", "weight": 2}]
+    _patch_council(monkeypatch, [
+        _ok(SONNET_ARN, "sonnet", [_trunc_verdict(True)]),
+        _ok(GLM_ARN, "glm", [_trunc_verdict(True)]),
+        _ok(KIMI_ARN, "kimi", [_trunc_verdict(True)]),
+    ])
+    out = _grade(rubrics)
+    crit = out["criteria"][0]
+    assert crit["resolved_by"] == "unanimous"
+    assert crit["satisfied"] is True
+    assert crit["passed"] is True
+    assert out["abstention_flags"] == []
+
+
+def test_truncation_abstain_disabled_by_env(monkeypatch):
+    monkeypatch.setenv("WCB_TRUNCATION_ABSTAIN", "0")
+    rubrics = [{"criterion": "c", "weight": 2}]
+    _patch_council(monkeypatch, [
+        _ok(SONNET_ARN, "sonnet", [_trunc_verdict(False)]),
+        _ok(GLM_ARN, "glm", [_trunc_verdict(False)]),
+        _ok(KIMI_ARN, "kimi", [_trunc_verdict(False)]),
+    ])
+    out = _grade(rubrics)
+    crit = out["criteria"][0]
+    assert crit["resolved_by"] == "unanimous"
+    assert crit["satisfied"] is False
+    assert crit["passed"] is False
+    assert out["abstention_flags"] == []
+
+
+def test_truncation_abstain_sonnet_tiebreak_uses_sonnet_flag_only(monkeypatch):
+    rubrics = [{"criterion": "c", "weight": 2}]
+    _patch_council(monkeypatch, [
+        _ok(SONNET_ARN, "sonnet", [_trunc_verdict(False, flagged=False)]),
+        _ok(GLM_ARN, "glm", [_trunc_verdict(True, flagged=True)]),
+        _ok(KIMI_ARN, "kimi", [_trunc_verdict(True, flagged=False)]),
+    ])
+    out = _grade(rubrics)
+    crit = out["criteria"][0]
+    assert crit["resolved_by"] == "sonnet"
+    assert crit["satisfied"] is False
+    assert crit["passed"] is False
+    assert out["abstention_flags"] == []
+
+
+def test_truncation_abstain_sonnet_tiebreak_flagged_no_abstains(monkeypatch):
+    rubrics = [{"criterion": "c", "weight": 2}]
+    _patch_council(monkeypatch, [
+        _ok(SONNET_ARN, "sonnet", [_trunc_verdict(False, flagged=True)]),
+        _ok(GLM_ARN, "glm", [_trunc_verdict(True, flagged=False)]),
+        _ok(KIMI_ARN, "kimi", [_trunc_verdict(True, flagged=False)]),
+    ])
+    out = _grade(rubrics)
+    crit = out["criteria"][0]
+    assert crit["resolved_by"] == "human_eval"
+    assert crit["human_eval"] == "required"
+    assert out["abstention_flags"] == [0]

@@ -283,6 +283,10 @@ def council_enabled() -> bool:
     return os.environ.get("JUDGE_COUNCIL", "").strip() in {"1", "true", "yes", "on"}
 
 
+def _truncation_abstain_enabled() -> bool:
+    return os.environ.get("WCB_TRUNCATION_ABSTAIN", "1").strip() != "0"
+
+
 def _parse_council_member_override(entry: str) -> CouncilMember:
     """Parse one JUDGE_COUNCIL_MEMBERS CSV entry in "family=arn" tag syntax."""
     raw = entry.strip()
@@ -740,39 +744,110 @@ def _budget_transcript(transcript: str, budget: int) -> str:
     return "\n".join(head) + marker.format(n=dropped) + tail
 
 
+# Directory names that hold agent scratch/work-product (build scripts, the
+# agent's own input dumps) rather than final deliverables. Demoted to the END
+# of the evidence ordering: ajax_moreno 2026-09-05 forensics — 300+ files the
+# agent dumped under artifacts/extract/ sorted ahead of the two rubric-named
+# deliverables by size, pushed their content past the evidence cap, and ~20
+# criteria failed as "cannot verify" on a run whose deliverables were correct.
+# Only components BELOW the collected deliverable root are consulted, so an
+# unrelated "tmp"/"build" in the host path (e.g. pytest tmp_path) never
+# triggers the demotion.
+_SCRATCH_DIR_NAMES = {
+    "_scratch", "build", "extract", "scratch", "tmp", "temp",
+    "__pycache__", "node_modules", ".git",
+}
+
+# File tokens in rubric criterion text ("delivers report.pdf", "the summary in
+# notes.md states X"). Basename-shaped only (no path separators); extension
+# list mirrors _ALL_DELIVERABLE_EXTS.
+_RUBRIC_FILE_RE = re.compile(
+    r"[\w][\w.\-]*\.(?:pdf|html?|csv|tsv|md|markdown|json|xlsx|docx|pptx"
+    r"|txt|text|xml|ya?ml|log|png|jpe?g|webp|gif)\b",
+    re.IGNORECASE,
+)
+
+
+def _rubric_file_names(rubrics: list) -> frozenset[str]:
+    """Lowercased basenames of files the rubric mentions by name.
+
+    Evidence assembly ranks these files FIRST: a criterion that names
+    report.pdf is ungradable when that file's content falls past the evidence
+    cap, so rubric-named files must survive every member's budget."""
+    names: set[str] = set()
+    for r in rubrics or []:
+        crit = r.get("criterion") if isinstance(r, dict) else str(r)
+        for tok in _RUBRIC_FILE_RE.findall(str(crit or "")):
+            names.add(tok.lower())
+    return frozenset(names)
+
+
+def _in_scratch_subdir(path: Path) -> bool:
+    # Scratch check scoped to components BELOW the last deliverable-root
+    # component (results/artifacts/... or workspace_full) so host-path noise
+    # like /tmp/pytest-*/ never demotes a file.
+    parts = [p.lower() for p in path.parts[:-1]]
+    anchor = -1
+    for i, p in enumerate(parts):
+        if p in _DELIVERABLE_DIR_NAMES or p == "workspace_full":
+            anchor = i
+    if anchor < 0:
+        return False
+    return any(p in _SCRATCH_DIR_NAMES for p in parts[anchor + 1:])
+
+
+# Reserved tail of the deliverable budget for the omission manifest, so the
+# judge can distinguish "file was never produced" (verdict No) from "file was
+# produced but cut for budget" (No + TRUNCATION_AFFECTED — which the scoring
+# layer then routes to Human Evaluation instead of a graded fail).
+_OMISSION_MANIFEST_RESERVE = 400
+_OMISSION_MANIFEST_MAX_NAMES = 40
+
+
 def _gather_evidence(
     workspace_results: Path,
     transcript_text: str,
     budget: int | None = None,
+    rubric_names: frozenset[str] | None = None,
 ) -> str:
-    parts: list[str] = []
     deliverables = _collect_deliverable_files(workspace_results)
-    # Order so primary outputs survive every member's truncation budget: named
-    # report/flagged deliverables first, then ascending file size (small,
-    # high-signal text before bulky dumps). Without this, alphabetical order can
-    # bury report.md behind larger files for the smaller-context judges.
+    # Order so the files the rubric is actually ABOUT survive every member's
+    # truncation budget: rubric-named files first, then report/flagged stems,
+    # then other deliverables, then scratch subtrees — ascending size within
+    # each rank (small, high-signal text before bulky dumps).
+    named = rubric_names or frozenset()
     _PRIMARY = ("report", "flagged")
 
     def _priority(path: Path) -> tuple:
         stem = path.stem.lower()
-        rank = 0 if any(k in stem for k in _PRIMARY) else 1
+        if path.name.lower() in named:
+            rank = 0
+        elif _in_scratch_subdir(path):
+            rank = 3
+        elif any(k in stem for k in _PRIMARY):
+            rank = 1
+        else:
+            rank = 2
         try:
             size = path.stat().st_size
         except OSError:
             size = 1 << 30
         return (rank, size, path.name)
 
+    blocks: list[tuple[Path, str]] = []
     for f in sorted(deliverables, key=_priority):
         marker = _deliverable_evidence_marker(f)
         if marker is not None:
-            parts.append(marker)
-    if not parts:
-        parts.append(
+            blocks.append((f, marker))
+    if not blocks:
+        deliv_blob = (
             "\n(no deliverable files were collected under any of: "
             + ", ".join(f"{n}/" for n in _DELIVERABLE_DIR_NAMES)
             + ")\n"
         )
-    deliv_blob = "".join(parts)
+        blocks = []
+    else:
+        deliv_blob = "".join(b for _, b in blocks)
     effective = _JUDGE_MAX_EVIDENCE if budget is None else budget
     # Budget deliverables and transcript SEPARATELY. The transcript marker can
     # then never be sliced off (so _split_evidence never silently returns ""),
@@ -789,7 +864,44 @@ def _gather_evidence(
         max(2000, effective // 5),
     )
     deliv_budget = max(0, effective - floor)
-    deliv_out = deliv_blob if len(deliv_blob) <= deliv_budget else deliv_blob[:deliv_budget]
+    if len(deliv_blob) <= deliv_budget:
+        deliv_out = deliv_blob
+    else:
+        # Cut on BLOCK boundaries and name what was cut. A raw blob slice
+        # leaves the judge unable to distinguish "file never produced"
+        # (graded No) from "file produced but cut for budget" (No +
+        # TRUNCATION_AFFECTED -> Human Evaluation); the manifest carries that
+        # distinction into the payload (see judge_system.md).
+        kept: list[str] = []
+        omitted: list[str] = []
+        used = 0
+        for f, block in blocks:
+            room = deliv_budget - used - _OMISSION_MANIFEST_RESERVE
+            if len(block) <= room:
+                kept.append(block)
+                used += len(block)
+            elif room > 800 and not omitted:
+                # Head+tail keep (mirrors _budget_transcript): deliverable text
+                # files often carry markup/data bulk up front and the
+                # human-readable summary at the END, so a head-only cut drops
+                # exactly the content criteria cite.
+                cut_mark = "\n... [truncated for evidence budget] ...\n"
+                half = (room - len(cut_mark)) // 2
+                kept.append(block[:half] + cut_mark + block[-(room - len(cut_mark) - half):])
+                used += room
+                omitted.append(f"{f.name} (partial)")
+            else:
+                omitted.append(f.name)
+        listing = ", ".join(omitted[:_OMISSION_MANIFEST_MAX_NAMES])
+        extra = len(omitted) - _OMISSION_MANIFEST_MAX_NAMES
+        manifest = (
+            f"\n----- EVIDENCE BUDGET NOTE: {len(omitted)} collected file(s)"
+            f" omitted or cut for budget: {listing}"
+            + (f" [+{extra} more]" if extra > 0 else "")
+            + " -----\n"
+        )
+        kept.append(manifest[: max(0, deliv_budget - used)])
+        deliv_out = "".join(kept)
     t_budget = effective - len(deliv_out) - len(_TRANSCRIPT_MARKER)
     t_out = _budget_transcript(transcript_text, max(0, t_budget))
     # Defensive final clamp: the OAuth 200K ceiling (AGENTS.md #18) is a hard gate,
@@ -1609,6 +1721,30 @@ def _grade_council(
             resolved_by = "human_eval"
             human_eval = "required"
 
+        # Truncation-abstain (ajax_moreno 2026-09-05): a No verdict the judge
+        # itself flagged as truncation-affected means the evidence pipeline —
+        # not the agent — withheld what was needed, so recording a confident
+        # fail destroys score signal (0.407 run shipped as 0.03). Route those
+        # to Human Evaluation. Yes verdicts stand: judge_system.md requires
+        # positive visible evidence for a Yes, so absence cannot produce one.
+        # WCB_TRUNCATION_ABSTAIN=0 restores fail-on-truncation.
+        if (
+            _truncation_abstain_enabled()
+            and human_eval == ""
+            and not verdict_satisfied
+        ):
+            if resolved_by == "sonnet":
+                flagged = per_truncation[sonnet_idx]
+            else:
+                flagged = any(
+                    t for t, vd in zip(per_truncation, per_voted) if vd
+                )
+            if flagged:
+                abstention_flags.append(i)
+                verdict_satisfied = False
+                resolved_by = "human_eval"
+                human_eval = "required"
+
         if resolved_by == "human_eval":
             criterion_passed = False
         else:
@@ -1977,10 +2113,12 @@ def grade_with_rubric(
     # filesystem + extracts binaries once per member; only the rubric block varies
     # per chunk (system prompt is identical, so Sonnet cachePoint still reused).
     evidence_for_member: dict[str, str] = {}
+    rubric_names = _rubric_file_names(rubrics)
     for m in members:
         budget = _member_evidence_budget(m.model, m.family)
         evidence_for_member[m.model] = _gather_evidence(
-            workspace_results, transcript_text, budget=budget
+            workspace_results, transcript_text, budget=budget,
+            rubric_names=rubric_names,
         )
 
     def _grade_chunk(chunk: list) -> dict:

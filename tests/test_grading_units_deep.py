@@ -1076,3 +1076,82 @@ def test_print_global_summary_empty_results_no_tasks(tmp_path):
     gd = json.loads((tmp_path / "summary_all_m.json").read_text())
     assert gd["global_avg"] is None
     assert gd["task_count"] == 0
+
+
+# ---------------------------------------------------------------------------
+# rubric-aware evidence ranking + omission manifest (ajax_moreno 2026-09-05)
+# ---------------------------------------------------------------------------
+
+
+def test_rubric_file_names_extracts_basenames():
+    rubrics = [
+        {"criterion": "The response delivers winter_creative_clearance.pdf recording X."},
+        {"criterion": "winter_creative_board.html embeds the proof frame"},
+        "a plain-string criterion mentioning notes.md here",
+        {"criterion": "no file mentioned at all"},
+    ]
+    names = grading._rubric_file_names(rubrics)
+    assert "winter_creative_clearance.pdf" in names
+    assert "winter_creative_board.html" in names
+    assert "notes.md" in names
+    assert len(names) == 3
+
+
+def test_gather_evidence_rubric_named_file_ranks_first(tmp_path):
+    results = tmp_path / "task_output" / "artifacts" / "results"
+    results.mkdir(parents=True)
+    (results / "clearance_notes.md").write_text("DECISIVE" * 150, encoding="utf-8")
+    for i in range(5):
+        (results / f"aaa{i}.md").write_text("filler" * 50, encoding="utf-8")
+
+    named = frozenset({"clearance_notes.md"})
+    ev = grading._gather_evidence(results, "tail", budget=None, rubric_names=named)
+    assert ev.index("clearance_notes.md") < ev.index("aaa0.md")
+
+    ev2 = grading._gather_evidence(results, "tail", budget=None)
+    assert ev2.index("aaa0.md") < ev2.index("clearance_notes.md")
+
+
+def test_gather_evidence_scratch_subdirs_demoted(tmp_path):
+    results = tmp_path / "task_output" / "artifacts" / "results"
+    (results / "extract").mkdir(parents=True)
+    (results / "extract" / "dump0.txt").write_text("x", encoding="utf-8")
+    (results / "final.md").write_text("REAL DELIVERABLE" * 300, encoding="utf-8")
+
+    ev = grading._gather_evidence(results, "tail", budget=None)
+    assert ev.index("final.md") < ev.index("dump0.txt")
+
+
+def test_gather_evidence_scratch_check_ignores_host_path_components(tmp_path):
+    build_like = tmp_path / "build" / "task_output" / "artifacts" / "results"
+    build_like.mkdir(parents=True)
+    (build_like / "real.md").write_text("CONTENT", encoding="utf-8")
+    files = grading._collect_deliverable_files(build_like)
+    assert files and not grading._in_scratch_subdir(files[0])
+
+
+def test_gather_evidence_omission_manifest_names_cut_files(tmp_path):
+    results = tmp_path / "task_output" / "artifacts" / "results"
+    results.mkdir(parents=True)
+    (results / "keep.md").write_text("K" * 1000, encoding="utf-8")
+    (results / "cut_one.md").write_text("C" * 5000, encoding="utf-8")
+    (results / "cut_two.md").write_text("D" * 5000, encoding="utf-8")
+
+    ev = grading._gather_evidence(results, "T" * 100, budget=2500)
+    assert len(ev) <= 2500
+    assert "K" * 100 in ev
+    assert "EVIDENCE BUDGET NOTE" in ev
+    assert "cut_one.md (partial)" in ev
+    assert "cut_two.md" in ev
+    assert "... [truncated for evidence budget] ..." in ev
+    _files, transcript = grading._split_evidence(ev)
+    assert transcript == "T" * 100
+
+
+def test_gather_evidence_no_manifest_when_everything_fits(tmp_path):
+    results = tmp_path / "task_output" / "artifacts" / "results"
+    results.mkdir(parents=True)
+    (results / "small.md").write_text("tiny", encoding="utf-8")
+    ev = grading._gather_evidence(results, "the transcript", budget=100_000)
+    assert "EVIDENCE BUDGET NOTE" not in ev
+    assert "tiny" in ev
