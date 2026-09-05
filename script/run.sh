@@ -385,8 +385,11 @@ register_run() {
     : > "$RUN_MARKER" 2>/dev/null || true
 }
 
+LAUNCH_LOCK_FILE=""
+
 cleanup_run_marker() {
     [[ -n "$RUN_MARKER" ]] && rm -f "$RUN_MARKER" 2>/dev/null || true
+    [[ -n "$LAUNCH_LOCK_FILE" ]] && rm -f "$LAUNCH_LOCK_FILE" 2>/dev/null || true
 }
 
 # Returns 0 if ANOTHER live run.sh holds a marker; prunes markers of dead PIDs.
@@ -1104,7 +1107,7 @@ run_parallel_tasks() {
         # task's failure can never abort the launcher (no xargs-style 255/signal
         # propagation). Per-task output goes to its own logs/ file via run.sh.
         (
-            if bash "$SELF" --task "$t" "${wargs[@]}"; then
+            if WCB_PARALLEL_CHILD=1 bash "$SELF" --task "$t" "${wargs[@]}"; then
                 echo "PASS" > "$status_dir/$name"
             else
                 echo "FAIL(rc=$?)" > "$status_dir/$name"
@@ -1211,6 +1214,12 @@ main() {
         unset WCB_STREAM 2>/dev/null || true
     fi
 
+    if [[ "${WCB_PARALLEL_CHILD:-}" == "1" ]]; then
+        # Child of the parallel launcher: the parent already printed the batch
+        # banner. A full header per child reads as N separate batch launches
+        # in a shared tail (operators repeatedly misread it as duplicate runs).
+        log::info "child task: ${TASKS[0]##*/} (model=${models[*]}, reps=$K)"
+    else
     log::section "WildClawBench runner"
     log::kv "Mode"     "$MODE"
     log::kv "Tasks"    "${#TASKS[@]}"
@@ -1228,10 +1237,35 @@ main() {
     (( STREAM == 1 ))         && feats+=("stream")
     log::kv "Features" "${feats[*]:-none}"
     log::kv "Cwd"      "$(pwd)"
+    fi
 
     # Register this run so concurrent run.sh processes don't sweep each other's
     # live docker resources (see cleanup_orphans / other_runs_active).
     register_run
+    # Launch lock: two concurrent launches of the same task set silently
+    # interleave into the same run_N trees (double spend + racy artifacts,
+    # prod-1 2026-09-04). Children of the parallel launcher share the parent
+    # lock. WCB_FORCE_LAUNCH=1 overrides for intentional double-runs.
+    if [[ "${WCB_PARALLEL_CHILD:-}" != "1" ]]; then
+        local _lock_key _lock_dir _lock_pid
+        _lock_key=$(printf "%s" "${TASKS[*]}" | md5sum | cut -c1-12)
+        _lock_dir="${TMPDIR:-/tmp}/wcb-launch-locks"
+        mkdir -p "$_lock_dir" 2>/dev/null || true
+        if [[ -f "$_lock_dir/$_lock_key" ]]; then
+            _lock_pid=$(cat "$_lock_dir/$_lock_key" 2>/dev/null)
+            if [[ "$_lock_pid" =~ ^[0-9]+$ ]] && kill -0 "$_lock_pid" 2>/dev/null; then
+                if [[ "${WCB_FORCE_LAUNCH:-}" != "1" ]]; then
+                    log::err "another launch of this exact task set is ALREADY RUNNING (pid $_lock_pid)"
+                    log::err "running both would interleave into the same run_N trees (double spend)"
+                    log::err "wait for it, or re-run with WCB_FORCE_LAUNCH=1 to override"
+                    exit 7
+                fi
+                log::warn "WCB_FORCE_LAUNCH=1 — proceeding despite live launch pid $_lock_pid"
+            fi
+        fi
+        echo "$$" > "$_lock_dir/$_lock_key" 2>/dev/null || true
+        LAUNCH_LOCK_FILE="$_lock_dir/$_lock_key"
+    fi
     trap 'cleanup_run_marker' EXIT
 
     if (( SKIP_PREFLIGHT == 0 )); then

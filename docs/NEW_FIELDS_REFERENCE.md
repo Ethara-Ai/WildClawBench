@@ -104,6 +104,8 @@ detection is a no-op on those backends (BUGREPORT §3 item 2, open).
 | `WCB_GRADE_INCOMPLETE_RUNS=1` | off | debug: run pytest grading + LLM judge on incomplete/empty trajectories anyway |
 | `WCB_TURN_STALL_SECONDS` | unset (off) | arms the per-turn stall guard; values below 600 are floored to 600 (usage rows land at request COMPLETION, so smaller windows would misread healthy long calls as wedges). Requires run-key tagging live (keyless mode); self-disables otherwise |
 | `WCB_EMPTY_TURN_LIMIT` | on (any value >0) | empty-turn handling: a zero-traffic turn is retried once in place; a second empty aborts the run (`run_incomplete`). `0` disables the machinery entirely. Active only when run-key tagging is live |
+| `WCB_JUDGE_DISABLE_THINKING` | on (`1`) | judges send an explicit `thinking: {type: disabled}` — models with thinking-by-default (Sonnet 5 adaptive) otherwise burn output budget on reasoning before the first verdict (koji_holder 61/61-abstain). Models that reject the directive get one automatic retry without it. `0` restores absence |
+| `WCB_FORCE_LAUNCH` | off | overrides the run.sh launch lock (two concurrent launches of the same task set interleave into the same run_N trees) |
 | `WCB_RUN_KEY` | auto-set per attempt | injected into the agent container; `subagent_director` and `transcribe.sh` send it as the `x-wcb-run-key` header (works under master-key auth too). Never set manually |
 | `JUDGE_MAX_EVIDENCE` | unset (family budgets) | pre-existing operator cap on judge evidence chars. Operationally important: judge inputs above ~270K tokens empirically collapse sonnet verdict output (empty/unparseable/partial); ≤160K tokens has been 100% clean. 500000 chars is a proven-good value for oversized runs |
 
