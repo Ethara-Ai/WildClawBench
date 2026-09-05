@@ -378,6 +378,7 @@ def main() -> int:
             aws_region=config.bedrock_region,
             openai_api_key=config.openai_api_key,
             openai_whisper_api_key=config.openai_whisper_api_key,
+            meta_api_key=config.meta_api_key,
             usage_callback_host_path=str(callback_src),
             usage_log_host_dir=str(usage_dir),
             headroom_callback_host_path=headroom_callback_src,
