@@ -90,20 +90,29 @@ def _judge_oauth_bridge_model() -> str:
     ).strip()
 
 
-def _judge_sampling_params(model: str) -> dict[str, Any]:
+def _judge_sampling_params(model: str, family: str | None = None) -> dict[str, Any]:
     """Per-model sampling params for the judge call.
 
-    Sonnet 5 returns HTTP 400 on ANY explicit temperature/top_p/top_k. Bedrock
-    Sonnet 4.5/4.6 (and Kimi/GLM) still want temperature=0 for reproducible
-    verdicts, so this is per-model, NOT global. `drop_params=True` does NOT
+    Sonnet 5 returns HTTP 400 on ANY explicit temperature/top_p/top_k. The
+    Sonnet council leg can be pointed (via ARN swap) at Sonnet 4.5/4.6 OR
+    Sonnet 5, and a Bedrock application-inference-profile ARN carries NO
+    `sonnet-5` substring, so a model-string check cannot tell them apart and
+    would silently send `temperature=0` to a Sonnet-5 ARN → 400 → every
+    criterion abstains → `overall_score 0.0` no-signal. So the decision keys
+    off the resolved council `family`: the ENTIRE sonnet family sends default
+    sampling params (temperature omitted), which Sonnet 5 requires and Sonnet
+    4.5/4.6 accept (they then sample at Anthropic's default 1.0 — slightly less
+    reproducible run-to-run, unavoidable via the API). Kimi/GLM keep
+    `temperature=0` for reproducible verdicts. `drop_params=True` does NOT
     help: LiteLLM lists `temperature` as a SUPPORTED anthropic param (verified
-    litellm 1.83.7) and passes it through, so Anthropic then 400s.
-
-    Substring `sonnet-5` cannot false-positive on `claude-sonnet-4-5-20250929`
-    (that contains `sonnet-4-5`) and still matches a future dated
-    `claude-sonnet-5-YYYYMMDD`. Omitting temperature means Sonnet 5 samples at
-    Anthropic's default (1.0), so its verdicts are slightly less reproducible
-    run-to-run — unavoidable via the API."""
+    litellm 1.83.7) and passes it through, so Anthropic then 400s. When
+    `family` is None (non-council judges / OAuth bridge model), fall back to
+    the model-string check so a `sonnet-5` id still omits temperature.
+    """
+    if family == "sonnet":
+        return {}
+    if family in ("kimi", "glm"):
+        return {"temperature": 0}
     if "sonnet-5" in (model or "").lower():
         return {}
     return {"temperature": 0}
@@ -606,7 +615,7 @@ def call_judge_via_litellm(
         }
         completion_kwargs.pop("aws_region_name", None)
 
-    completion_kwargs.update(_judge_sampling_params(completion_kwargs["model"]))
+    completion_kwargs.update(_judge_sampling_params(completion_kwargs["model"], family))
 
     # Live-stream liveness (docs/STREAMING_PLAN.md D4): this judge call stays
     # NON-streaming by decision (`"stream": False` above is untouched), so the

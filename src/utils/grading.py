@@ -181,7 +181,7 @@ _FAMILY_RATES: dict[str, tuple[float, float, float, float]] = {
 # against AWS official model cards + the Bedrock constraint
 # `input_tokens + max_tokens <= context_window` (LiteLLM PR #22479).
 # Per-family published Bedrock caps:
-#   Sonnet 4.6: ctx 1,000,000  max_output 8,192   (Anthropic spec)
+#   Sonnet 5  : ctx 1,000,000  max_output 128,000  (Anthropic + AWS card agree)
 #   Kimi K2.5 : ctx   262,144  max_output 16,384  (AWS card)
 #   GLM 5     : ctx   202,752  max_output 16,384  (AWS card lists 128K, capped at 16K — verdicts never need more)
 # Budget formula: budget_chars = (ctx − max_output − 3000_safety) × cpt_floor,
@@ -190,13 +190,13 @@ _FAMILY_RATES: dict[str, tuple[float, float, float, float]] = {
 # input + max <= ctx so the budget MUST account for the actual maxTokens sent.
 # Conservative cpt floors measured on dense fixtures (amanda_hayes_01 run_3,
 # which 400'd at the old over-wide budgets): Sonnet 1.375, Kimi/GLM 1.15.
-#   Sonnet: (1,000,000 − 8192 − 3000) × 1.375 − 5000 scaffold → 1_350_000
+#   Sonnet: (1,000,000 − 128,000 − 3000) × 1.375 − 5000 scaffold → 1_175_000 (floor 25k)
 #   Kimi  : (262,144 − 16,384 − 3000) × 1.15  − 5000 scaffold → 225_000
 #   GLM   : (202,752 − 16,384 − 3000) × 1.15  − 5000 scaffold → 175_000
 # Don't widen without re-running probe_judge_only.py against a representative
 # trajectory; tests/test_judge_budget_invariant.py guards the worst-case math.
 _FAMILY_EVIDENCE: dict[str, tuple[int, int]] = {
-    "sonnet": (1_350_000, 8192),
+    "sonnet": (1_175_000, 128000),
     "kimi": (225_000, 16384),
     "glm": (175_000, 16384),
 }
@@ -1124,6 +1124,15 @@ def _call_judge_bedrock(
         }
         return text, usage
 
+    # The sonnet council leg can be pointed (via ARN swap) at Sonnet 5, which
+    # HTTP-400s on ANY explicit temperature — and an application-inference-profile
+    # ARN carries no model-version substring to detect it. So the whole sonnet
+    # family omits temperature on the FIRST call rather than relying on the
+    # error-string retry below (Sonnet 5's 400 message need not contain the
+    # matched keywords, and the first 400 already abstains the criterion). Mirrors
+    # judge_litellm._judge_sampling_params. Kimi/GLM keep temperature=0.
+    if family == "sonnet":
+        return _do_post(include_temperature=False)
     try:
         return _do_post(include_temperature=True)
     except RuntimeError as exc:
