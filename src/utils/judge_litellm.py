@@ -617,6 +617,17 @@ def call_judge_via_litellm(
 
     completion_kwargs.update(_judge_sampling_params(completion_kwargs["model"], family))
 
+    # Rubric verdicts need no extended reasoning, and models with
+    # thinking-by-default (Sonnet 5 adaptive) can burn the ENTIRE output
+    # budget on a thinking block before the first verdict character
+    # (koji_holder 61/61-abstain: thinking_tokens == output_tokens ==
+    # max_tokens, content = one empty thinking block). Send an explicit
+    # disable; models that reject the directive get one retry without it
+    # (see the strip-retry in the call site below). WCB_JUDGE_DISABLE_THINKING=0
+    # restores the old implicit behavior.
+    if os.environ.get("WCB_JUDGE_DISABLE_THINKING", "1").strip() != "0":
+        completion_kwargs["thinking"] = {"type": "disabled"}
+
     # Live-stream liveness (docs/STREAMING_PLAN.md D4): this judge call stays
     # NON-streaming by decision (`"stream": False` above is untouched), so the
     # display feed gets exactly two status events — started/finished — instead
@@ -629,7 +640,14 @@ def call_judge_via_litellm(
                  delta="verdict request started (non-streaming)",
                  model=str(completion_kwargs.get("model") or ""))
     try:
-        response = litellm.completion(**completion_kwargs)
+        try:
+            response = litellm.completion(**completion_kwargs)
+        except Exception as _exc:  # noqa: BLE001 - single targeted fallback
+            if ("thinking" in str(_exc).lower()
+                    and completion_kwargs.pop("thinking", None) is not None):
+                response = litellm.completion(**completion_kwargs)
+            else:
+                raise
     except Exception:
         _stream.emit(f"judge:{family}", "error", _sid, kind="status",
                      delta="verdict request failed",
@@ -669,6 +687,25 @@ def call_judge_via_litellm(
                 f"judge returned no content{_reason} — the grader was blocked by "
                 f"an upstream safety filter, not by anything in the rubric"
             )
+        try:
+            _fr_l = str(_fr).lower()
+            if _fr_l in ("length", "max_tokens"):
+                _u = getattr(response, "usage", None)
+                _det = (getattr(_u, "completion_tokens_details", None)
+                        or (_u or {}).get("completion_tokens_details")
+                        if isinstance(_u, dict) else
+                        getattr(_u, "completion_tokens_details", None))
+                _think = getattr(_det, "reasoning_tokens", None) if _det else None
+                raise RuntimeError(
+                    f"judge output truncated at max_tokens before any verdict "
+                    f"(finish_reason={_fr}, thinking_tokens={_think}) — NOT a "
+                    f"safety refusal; raise the output cap or disable judge "
+                    f"thinking (WCB_JUDGE_DISABLE_THINKING)"
+                )
+        except RuntimeError:
+            raise
+        except Exception:  # noqa: BLE001 - diagnostics must not mask the error
+            pass
 
     # Extract usage. LiteLLM normalizes to OpenAI shape but Bedrock under
     # the hood may fold cache_read/cache_write back INTO prompt_tokens. The

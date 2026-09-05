@@ -67,20 +67,17 @@ TMP_WORKSPACE = os.environ.get("TMP_WORKSPACE", "/tmp_workspace")
 #   200,000 ctx  − 4,000 output  − ~5,000 scaffold (TASK + 25-rubric criteria
 #   + JSON schema + system prompt) = ~191,000 tokens for evidence
 #   ÷ 2.515 chars/token = ~75,944 evidence tokens worth of chars ≈ 191,000
-# Converting back: 191,000 tokens × 2.515 chars/token ≈ 480,365 chars, which
-# was the historical 450,000-char default sized for the SMALLEST council member
-# (GLM, 200K-token window). That default is intentionally raised to 1,000,000
-# chars here: this constant is the Bedrock single-judge / non-family default,
-# exercised only when a single high-context Bedrock judge (Sonnet's 1M-token
-# window) is in play — where ~1M chars ÷ 2.515 ≈ ~398K input tokens fits well
-# under the 1M ceiling. It is NOT the council per-member budget (those come from
-# _FAMILY_EVIDENCE, which keeps GLM/Kimi on their own smaller caps), and it is
-# NOT the OAuth-bridge cap (_DEFAULT_JUDGE_OAUTH_MAX_EVIDENCE, 700K).
-# Operators can still override via JUDGE_MAX_EVIDENCE=<chars>. Setting it to 0
-# (or anything falsy after int()) restores the unbounded behavior we briefly
-# defaulted to between b31 and now — known to 400 every council member on real
-# WildClawBench runs.
-_DEFAULT_JUDGE_MAX_EVIDENCE = 1_000_000
+# Converting back: 191,000 tokens x 2.515 chars/token ~= 480,365 chars. The
+# default is deliberately 450,000 chars (~180K tokens): measured on real runs
+# (lena_pruitt 2026-09-01, kayla_morgan run_3 2026-09-03, 9 grading calls),
+# judge inputs <=160K tokens parsed 17-40/40 verdicts cleanly on EVERY call,
+# while 270K-464K-token inputs produced empty/unparseable/format-collapsed
+# output on 7 of 8 calls. Fitting the context window is not the constraint;
+# verdict QUALITY is. A brief raise to 1,000,000 chars (c923095) put default
+# inputs at ~400K tokens and measurably increased abstentions. Operators with
+# content known to tolerate more can still export JUDGE_MAX_EVIDENCE=<chars>;
+# 0 restores unbounded (known to 400 every council member).
+_DEFAULT_JUDGE_MAX_EVIDENCE = 450_000
 
 # Claude via the OAuth subscription bridge. The judge on this route is now
 # Sonnet 5 (claude-sonnet-5), which documents a 1,000,000-token context window
@@ -1993,13 +1990,40 @@ def grade_with_rubric(
         }
         return _grade_council(chunk, system, user_for_member, members)
 
+    def _graded_chunks(chunk: list, depth: int = 0) -> list:
+        # Refusal re-split (ajax_moreno 2026-09-04, empirically validated on
+        # gama): safety refusals are prompt-COMPOSITION dependent — the same 31
+        # criteria that refused as one block graded cleanly as 16-criterion
+        # chunks. On a refused chunk, halve and retry each side (depth<=2);
+        # halves that still fail degrade to synthetic abstains as before, so
+        # the blast radius shrinks from the whole chunk to the poisoned core.
+        res = _grade_chunk(chunk)
+        err = str(res.get("error") or "").lower()
+        if (res.get("error") and depth < 2 and len(chunk) > 4
+                and ("refus" in err or "safety filter" in err)):
+            logger.warning(
+                "judge chunk of %d criteria refused upstream — re-splitting "
+                "and retrying halves (depth %d)", len(chunk), depth + 1)
+            mid = (len(chunk) + 1) // 2
+            return (_graded_chunks(chunk[:mid], depth + 1)
+                    + _graded_chunks(chunk[mid:], depth + 1))
+        if not res.get("error") and (res.get("criteria_abstained") or 0) > 0:
+            logger.warning(
+                "judge chunk returned OK but %d of %d verdicts are missing — "
+                "possible upstream verdict suppression; affected criteria "
+                "abstain", res.get("criteria_abstained"), len(chunk))
+        return [(chunk, res)]
+
     if len(rubrics) <= batch_size:
-        return _grade_chunk(rubrics)
+        parts = _graded_chunks(rubrics)
+        if len(parts) == 1:
+            return parts[0][1]
+        return _merge_batched_grades(rubrics, members, parts)
 
     chunk_results: list[tuple[list, dict]] = []
     for start in range(0, len(rubrics), batch_size):
         chunk = rubrics[start:start + batch_size]
-        chunk_results.append((chunk, _grade_chunk(chunk)))
+        chunk_results.extend(_graded_chunks(chunk))
     return _merge_batched_grades(rubrics, members, chunk_results)
 
 

@@ -408,12 +408,14 @@ def test_effective_model_sonnet_on_bridge_shows_anthropic(monkeypatch):
     display label resolves to the bare anthropic model actually hit, not the
     Bedrock ARN the operator passed as the member id."""
     monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "http://127.0.0.1:51554")
+    monkeypatch.setenv("WCB_AUTH_PROVIDER", "oauth")
     monkeypatch.delenv("KENSEI_JUDGE_OAUTH_BRIDGE_MODEL", raising=False)
     assert grading._effective_judge_model(SONNET_ARN, "sonnet") == "claude-sonnet-5"
 
 
 def test_effective_model_custom_bridge_model(monkeypatch):
     monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "http://127.0.0.1:51554")
+    monkeypatch.setenv("WCB_AUTH_PROVIDER", "oauth")
     monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_MODEL", "anthropic/claude-sonnet-4-6")
     assert grading._effective_judge_model(SONNET_ARN, "sonnet") == "claude-sonnet-4-6"
 
@@ -425,6 +427,7 @@ def test_effective_model_no_bridge_keeps_arn(monkeypatch):
 
 def test_effective_model_non_sonnet_keeps_arn(monkeypatch):
     monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "http://127.0.0.1:51554")
+    monkeypatch.setenv("WCB_AUTH_PROVIDER", "oauth")
     assert grading._effective_judge_model(GLM_ARN, "glm") == GLM_ARN
 
 
@@ -437,6 +440,7 @@ def test_evidence_budget_sonnet_on_bridge_capped(monkeypatch):
     default (700K chars, a conservative hedge below the family's 1.35M Bedrock
     budget) rather than the full family budget."""
     monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "http://127.0.0.1:51554")
+    monkeypatch.setenv("WCB_AUTH_PROVIDER", "oauth")
     monkeypatch.delenv("JUDGE_MAX_EVIDENCE", raising=False)
     monkeypatch.delenv("KENSEI_JUDGE_OAUTH_MAX_EVIDENCE", raising=False)
     assert grading._member_evidence_budget(SONNET_ARN, "sonnet") == 700_000
@@ -445,11 +449,12 @@ def test_evidence_budget_sonnet_on_bridge_capped(monkeypatch):
 def test_evidence_budget_sonnet_no_bridge_full_bedrock(monkeypatch):
     monkeypatch.delenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", raising=False)
     monkeypatch.delenv("JUDGE_MAX_EVIDENCE", raising=False)
-    assert grading._member_evidence_budget(SONNET_ARN, "sonnet") == 1_350_000
+    assert grading._member_evidence_budget(SONNET_ARN, "sonnet") == 1_175_000
 
 
 def test_evidence_budget_sonnet_bridge_env_override(monkeypatch):
     monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "http://127.0.0.1:51554")
+    monkeypatch.setenv("WCB_AUTH_PROVIDER", "oauth")
     monkeypatch.delenv("JUDGE_MAX_EVIDENCE", raising=False)
     monkeypatch.setenv("KENSEI_JUDGE_OAUTH_MAX_EVIDENCE", "450000")
     assert grading._member_evidence_budget(SONNET_ARN, "sonnet") == 450_000
@@ -457,6 +462,7 @@ def test_evidence_budget_sonnet_bridge_env_override(monkeypatch):
 
 def test_evidence_budget_non_sonnet_unaffected_by_bridge(monkeypatch):
     monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "http://127.0.0.1:51554")
+    monkeypatch.setenv("WCB_AUTH_PROVIDER", "oauth")
     monkeypatch.delenv("JUDGE_MAX_EVIDENCE", raising=False)
     assert grading._member_evidence_budget(GLM_ARN, "glm") == 175_000
     assert grading._member_evidence_budget(KIMI_ARN, "kimi") == 225_000
@@ -469,6 +475,7 @@ def test_judge_cost_zero_for_sonnet_on_bridge(monkeypatch):
     cost is the flat plan (not per-token). When the OAuth bridge is active the
     reported cost_usd is forced to 0 while token counts are preserved."""
     monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "http://127.0.0.1:51554")
+    monkeypatch.setenv("WCB_AUTH_PROVIDER", "oauth")
     assert grading._judge_cost_usd(SONNET_ARN, 95_727, 2_417, 0, 0, "sonnet") == (0.0, True)
 
 
@@ -481,6 +488,7 @@ def test_judge_cost_nonzero_for_sonnet_without_bridge(monkeypatch):
 
 def test_judge_cost_non_sonnet_unaffected_by_bridge(monkeypatch):
     monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "http://127.0.0.1:51554")
+    monkeypatch.setenv("WCB_AUTH_PROVIDER", "oauth")
     cost, priced = grading._judge_cost_usd(GLM_ARN, 10_000, 2_000, 0, 0, "glm")
     assert priced is True
     assert cost > 0.0

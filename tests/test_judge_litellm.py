@@ -236,7 +236,7 @@ def test_compress_system_messages_is_false(monkeypatch):
 
 
 @pytest.mark.parametrize("arn,family,expected_max", [
-    (SONNET_ARN, "sonnet", 8192),
+    (SONNET_ARN, "sonnet", 128000),
     (GLM_ARN, "glm", 16384),
     (KIMI_ARN, "kimi", 16384),
 ])
@@ -284,8 +284,56 @@ def test_no_thinking_field_in_litellm_call(monkeypatch):
         max_output_tokens=8192, cost_fn=grading._judge_cost_usd, family="sonnet",
     )
     _, kwargs = completion_mock.call_args
-    for forbidden in ("thinking", "reasoning_effort", "output_config", "response_format"):
+    # Sonnet 5 applies ADAPTIVE thinking when the field is absent, and a
+    # thinking block can consume the entire output budget before the first
+    # verdict character (koji_holder 61/61-abstain, 2026-09-04). The contract
+    # is therefore an EXPLICIT disable, not absence.
+    assert kwargs.get("thinking") == {"type": "disabled"}, (
+        "judge call must explicitly disable thinking")
+    for forbidden in ("reasoning_effort", "output_config", "response_format"):
         assert forbidden not in kwargs, f"judge call must not include {forbidden!r}"
+
+
+def test_thinking_disable_opt_out(monkeypatch):
+    monkeypatch.setenv("KENSEI_JUDGE_USE_LITELLM", "true")
+    monkeypatch.setenv("KENSEI_JUDGE_HEADROOM_ENABLED", "false")
+    monkeypatch.setenv("WCB_JUDGE_DISABLE_THINKING", "0")
+
+    completion_mock = mock.MagicMock(return_value=_make_litellm_response())
+    fake_litellm = SimpleNamespace(completion=completion_mock, register_model=mock.MagicMock())
+    monkeypatch.setitem(sys.modules, "litellm", fake_litellm)
+
+    judge_litellm.call_judge_via_litellm(
+        model=SONNET_ARN, system="s", user="u",
+        max_output_tokens=8192, cost_fn=grading._judge_cost_usd, family="sonnet",
+    )
+    _, kwargs = completion_mock.call_args
+    assert "thinking" not in kwargs
+
+
+def test_thinking_strip_retry_on_rejection(monkeypatch):
+    """Models that 400 on the thinking directive get ONE retry without it."""
+    monkeypatch.setenv("KENSEI_JUDGE_USE_LITELLM", "true")
+    monkeypatch.setenv("KENSEI_JUDGE_HEADROOM_ENABLED", "false")
+    monkeypatch.delenv("WCB_JUDGE_DISABLE_THINKING", raising=False)
+
+    calls = []
+
+    def _completion(**kwargs):
+        calls.append(dict(kwargs))
+        if "thinking" in kwargs:
+            raise RuntimeError("400: Unsupported parameter: 'thinking'")
+        return _make_litellm_response()
+
+    fake_litellm = SimpleNamespace(completion=_completion, register_model=mock.MagicMock())
+    monkeypatch.setitem(sys.modules, "litellm", fake_litellm)
+
+    judge_litellm.call_judge_via_litellm(
+        model=SONNET_ARN, system="s", user="u",
+        max_output_tokens=8192, cost_fn=grading._judge_cost_usd, family="sonnet",
+    )
+    assert len(calls) == 2
+    assert "thinking" in calls[0] and "thinking" not in calls[1]
 
 
 # ---------- Test 7: usage dict shape matches urllib path ----------
@@ -547,7 +595,7 @@ def test_oauth_bridge_route_custom_model(monkeypatch):
     kwargs = _capture_completion_kwargs(monkeypatch, SONNET_ARN, "sonnet")
     assert kwargs["model"] == "anthropic/claude-sonnet-4-6"
     assert kwargs["api_base"] == "http://127.0.0.1:18765"
-    assert kwargs["temperature"] == 0
+    assert "temperature" not in kwargs
 
 
 def test_oauth_bridge_not_injected_when_url_unset(monkeypatch):
