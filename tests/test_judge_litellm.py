@@ -777,3 +777,28 @@ def test_preflight_succeeds_on_retry(monkeypatch):
     ok, detail = judge_litellm.preflight_judge_oauth(timeout_s=1.0)
     assert ok is True and calls["n"] == 2
     assert detail.startswith("ok (")
+
+
+def test_multimodal_images_become_content_blocks(monkeypatch):
+    completion_mock = mock.MagicMock(return_value=_make_litellm_response())
+    fake_litellm = SimpleNamespace(completion=completion_mock, register_model=mock.MagicMock())
+    monkeypatch.setitem(sys.modules, "litellm", fake_litellm)
+    imgs = [{"name": "hero.png", "media_type": "image/png", "b64": "QUJD"}]
+    judge_litellm.call_judge_via_litellm(
+        model=SONNET_ARN, system="s", user="the evidence",
+        max_output_tokens=8192, cost_fn=grading._judge_cost_usd,
+        family="sonnet", images=imgs,
+    )
+    _, kwargs = completion_mock.call_args
+    user_msg = kwargs["messages"][1]
+    assert user_msg["role"] == "user"
+    blocks = user_msg["content"]
+    assert isinstance(blocks, list)
+    assert blocks[0] == {"type": "text", "text": "the evidence"}
+    assert blocks[1]["type"] == "image_url"
+    assert blocks[1]["image_url"]["url"] == "data:image/png;base64,QUJD"
+
+
+def test_no_images_keeps_string_user_content(monkeypatch):
+    kwargs = _capture_completion_kwargs(monkeypatch, SONNET_ARN, "sonnet")
+    assert isinstance(kwargs["messages"][1]["content"], str)

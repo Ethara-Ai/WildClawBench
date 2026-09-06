@@ -442,6 +442,7 @@ _DELIVERABLE_DIR_NAMES = ("results", "deliverables", "output", "out", "artifacts
 _DELIVERABLE_EXTS = {
     ".csv", ".tsv", ".md", ".markdown", ".json", ".txt", ".text",
     ".yaml", ".yml", ".html", ".htm", ".xml", ".log",
+    ".py", ".sh", ".js", ".svg",
 }
 # Binary deliverable formats. These are made VISIBLE to the grader (listed in
 # the deliverables manifest, collected by `_collect_deliverable_files`) so
@@ -452,7 +453,7 @@ _DELIVERABLE_EXTS = {
 # `_is_text_deliverable` in a follow-up step; until then binaries appear as
 # presence-only entries.
 _BINARY_DELIVERABLE_EXTS = {
-    ".pdf", ".xlsx", ".docx", ".pptx",
+    ".pdf", ".xlsx", ".docx", ".pptx", ".ipynb",
 }
 # Image deliverables: surfaced to the judge with a stdlib dimension marker
 # (PNG IHDR / JPEG SOF read with `struct` — NO Pillow, preserving the stdlib-only
@@ -551,6 +552,63 @@ def _is_image_deliverable(path: Path) -> bool:
     return path.suffix.lower() in _IMAGE_DELIVERABLE_EXTS
 
 
+_IMAGE_ATTACH_MAX_BYTES = 3_500_000
+_IMAGE_MEDIA_TYPES = {
+    ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+    ".webp": "image/webp", ".gif": "image/gif",
+}
+
+
+def _judge_attach_images_enabled() -> bool:
+    return os.environ.get("WCB_JUDGE_ATTACH_IMAGES", "1").strip() != "0"
+
+
+def _judge_max_images() -> int:
+    raw = os.environ.get("WCB_JUDGE_MAX_IMAGES", "").strip()
+    try:
+        n = int(raw)
+    except ValueError:
+        return 8
+    return n if 0 < n <= 20 else 8
+
+
+def _collect_image_attachments(
+    workspace_results: Path,
+    chunk_names: frozenset[str],
+) -> list[dict]:
+    """Base64 image blocks for the deliverable images THIS criteria chunk
+    names. Chunk-scoped so each judge call pays only for the pixels its own
+    criteria need (rubric-named files; caps: 8 images, 3.5MB each - Anthropic
+    rejects ~5MB, Bedrock converse allows 20/request). Oversized or unnamed
+    images keep the dimension-only marker semantics."""
+    if not chunk_names or not _judge_attach_images_enabled():
+        return []
+    import base64
+
+    out: list[dict] = []
+    seen_names: set[str] = set()
+    for f in _collect_deliverable_files(workspace_results):
+        name = f.name.lower()
+        if (name not in chunk_names or name in seen_names
+                or not _is_image_deliverable(f)):
+            continue
+        try:
+            if f.stat().st_size > _IMAGE_ATTACH_MAX_BYTES:
+                continue
+            data = f.read_bytes()
+        except OSError:
+            continue
+        seen_names.add(name)
+        out.append({
+            "name": f.name,
+            "media_type": _IMAGE_MEDIA_TYPES.get(f.suffix.lower(), "image/png"),
+            "b64": base64.b64encode(data).decode("ascii"),
+        })
+        if len(out) >= _judge_max_images():
+            break
+    return out
+
+
 _DOCX_W_T = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t"
 _XLSX_SS_T = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}t"
 _XLSX_NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
@@ -641,6 +699,27 @@ def _extract_text_deliverable(path: Path) -> str | None:
                         slide = ET.fromstring(z.read(name))
                         slide_parts.extend(n.text or "" for n in slide.iter(_PPTX_A_T))
             text = " ".join(p for p in slide_parts if p).strip()
+            return text[:_EXTRACT_CHAR_CAP] or None
+        if ext == ".ipynb":
+            # Notebooks are JSON, but raw inclusion would dump megabytes of
+            # base64 image outputs into evidence. Keep cell sources + textual
+            # outputs (stream / text-plain / error traces); drop binary blobs.
+            nb = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+            parts_nb: list[str] = []
+            for cell in nb.get("cells", []):
+                src = "".join(cell.get("source", []) or [])
+                if src.strip():
+                    parts_nb.append(f"[{cell.get('cell_type', 'cell')}]\n{src}")
+                for out in cell.get("outputs", []) or []:
+                    if out.get("output_type") == "stream":
+                        parts_nb.append("".join(out.get("text", []) or []))
+                    elif out.get("output_type") == "error":
+                        parts_nb.append("\n".join(out.get("traceback", []) or []))
+                    else:
+                        txt = (out.get("data") or {}).get("text/plain")
+                        if txt:
+                            parts_nb.append("".join(txt if isinstance(txt, list) else [txt]))
+            text = "\n".join(parts_nb).strip()
             return text[:_EXTRACT_CHAR_CAP] or None
         if ext == ".pdf":
             try:
@@ -763,7 +842,7 @@ _SCRATCH_DIR_NAMES = {
 # list mirrors _ALL_DELIVERABLE_EXTS.
 _RUBRIC_FILE_RE = re.compile(
     r"[\w][\w.\-]*\.(?:pdf|html?|csv|tsv|md|markdown|json|xlsx|docx|pptx"
-    r"|txt|text|xml|ya?ml|log|png|jpe?g|webp|gif)\b",
+    r"|txt|text|xml|ya?ml|log|png|jpe?g|webp|gif|py|sh|js|svg|ipynb)\b",
     re.IGNORECASE,
 )
 
@@ -1329,7 +1408,8 @@ def _judge_use_litellm() -> bool:
 
 
 def _call_one_judge(
-    model: str, system: str, user: str, family: str | None = None
+    model: str, system: str, user: str, family: str | None = None,
+    images: list[dict] | None = None,
 ) -> tuple[str, dict]:
     # Provider routing is CONTENT-AWARE, not naive partition("/"): a Bedrock
     # application-inference-profile ARN itself contains slashes, so a bare ARN
@@ -1361,6 +1441,7 @@ def _call_one_judge(
                 max_output_tokens=_member_max_output_tokens(arn_tail, family),
                 cost_fn=_judge_cost_usd,
                 family=family,
+                images=images,
             )
         except Exception as exc:  # pragma: no cover - fallback path
             # Under OAuth the urllib fallback below would dial Bedrock — the
@@ -1402,6 +1483,7 @@ def _run_council(
     system: str,
     user_for_member: "dict[str, str] | str",
     n_criteria: int,
+    images: list[dict] | None = None,
 ) -> list[dict]:
     """Run every member judge in parallel and return one result dict per member:
     {model, family, ok, verdicts?, usage, error?, user_chars, raw_response?}.
@@ -1439,7 +1521,8 @@ def _run_council(
         )
         t0 = _time.monotonic()
         try:
-            raw, usage = _call_one_judge(model, system, user, family)
+            member_images = images if family == "sonnet" else None
+            raw, usage = _call_one_judge(model, system, user, family, member_images)
         except Exception as exc:
             elapsed = _time.monotonic() - t0
             logger.warning(
@@ -1577,6 +1660,7 @@ def _grade_council(
     system: str,
     user_for_member: "dict[str, str] | str",
     members: list[CouncilMember],
+    images: list[dict] | None = None,
 ) -> dict:
     """Council aggregation — UNANIMOUS, else SONNET source-of-truth tiebreak.
 
@@ -1601,7 +1685,7 @@ def _grade_council(
     and therefore no Sonnet verdict) every criterion abstains and overall_score is
     0.0. No single-judge fallback exists. If the roster has no sonnet-family member,
     the tiebreak is unavailable and non-unanimous criteria abstain as before."""
-    results = _run_council(members, system, user_for_member, len(rubrics))
+    results = _run_council(members, system, user_for_member, len(rubrics), images)
     surviving = [r for r in results if r.get("ok") and isinstance(r.get("verdicts"), list)]
     if len(surviving) < len(members):
         failed_summary = "; ".join(
@@ -2122,11 +2206,30 @@ def grade_with_rubric(
         )
 
     def _grade_chunk(chunk: list) -> dict:
+        # Attachments are CHUNK-scoped: each call carries only the pixels its
+        # own criteria name, so image cost/limits scale with relevance, not
+        # rubric size (koji gi_block_hero 2026-09-06: image-content criteria
+        # were graded from transcript narration because pixels never reached
+        # the judge).
+        images = _collect_image_attachments(
+            workspace_results, _rubric_file_names(chunk)
+        )
+        note = ""
+        if images:
+            note = (
+                "\n\nATTACHED IMAGES: "
+                + ", ".join(i["name"] for i in images)
+                + " — these are the actual pixels of the corresponding files "
+                "listed in <output_files>; treat them as the authoritative "
+                "evidence for image-content criteria."
+            )
         user_for_member = {
-            m.model: _judge_user_prompt(task_description, chunk, evidence_for_member[m.model])
+            m.model: _judge_user_prompt(
+                task_description, chunk, evidence_for_member[m.model]
+            ) + note
             for m in members
         }
-        return _grade_council(chunk, system, user_for_member, members)
+        return _grade_council(chunk, system, user_for_member, members, images)
 
     def _graded_chunks(chunk: list, depth: int = 0) -> list:
         # Refusal re-split (ajax_moreno 2026-09-04, empirically validated on

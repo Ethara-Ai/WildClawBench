@@ -731,7 +731,7 @@ def _ok(model, family, verds):
 def _grade(monkeypatch, rubrics, member_results):
     monkeypatch.setattr(
         grading, "_run_council",
-        lambda members, system, user, n: list(member_results),
+        lambda members, system, user, n, images=None: list(member_results),
     )
     return grading._grade_council(rubrics, "sys", "user", _members())
 
@@ -1155,3 +1155,96 @@ def test_gather_evidence_no_manifest_when_everything_fits(tmp_path):
     ev = grading._gather_evidence(results, "the transcript", budget=100_000)
     assert "EVIDENCE BUDGET NOTE" not in ev
     assert "tiny" in ev
+
+
+# ---------------------------------------------------------------------------
+# Phase 1/2 media scope: code+svg deliverables, ipynb extraction, image attach
+# ---------------------------------------------------------------------------
+
+
+def test_code_and_svg_deliverables_included_verbatim(tmp_path):
+    results = tmp_path / "task_output" / "artifacts" / "results"
+    results.mkdir(parents=True)
+    (results / "build_hero.py").write_text("CREDIT = 'fig: N.F. / 10-04'", encoding="utf-8")
+    (results / "chart.svg").write_text("<svg><text>Re-cut minutes</text></svg>", encoding="utf-8")
+    (results / "deploy.sh").write_text("echo deploying", encoding="utf-8")
+    (results / "app.js").write_text("console.log('boot')", encoding="utf-8")
+    ev = grading._gather_evidence(results, "t", budget=None)
+    assert "fig: N.F. / 10-04" in ev
+    assert "Re-cut minutes" in ev
+    assert "echo deploying" in ev
+    assert "console.log('boot')" in ev
+
+
+def test_ipynb_extraction_keeps_source_and_text_drops_base64(tmp_path):
+    import json as _json
+    nb = {
+        "cells": [
+            {"cell_type": "code", "source": ["x = compute_reward()\n"],
+             "outputs": [
+                 {"output_type": "stream", "text": ["reward=0.42\n"]},
+                 {"output_type": "display_data",
+                  "data": {"image/png": "iVBORw0KGgoAAAANSUhEU" * 500,
+                           "text/plain": ["<Figure 640x480>"]}},
+             ]},
+            {"cell_type": "markdown", "source": ["## Analysis section"], "outputs": []},
+        ]
+    }
+    results = tmp_path / "task_output" / "artifacts" / "results"
+    results.mkdir(parents=True)
+    (results / "analysis.ipynb").write_text(_json.dumps(nb), encoding="utf-8")
+    out = grading._extract_text_deliverable(results / "analysis.ipynb")
+    assert "x = compute_reward()" in out
+    assert "reward=0.42" in out
+    assert "## Analysis section" in out
+    assert "<Figure 640x480>" in out
+    assert "iVBORw0KGgo" not in out
+
+
+_PNG_BYTES = (b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\rIHDR"
+              + b"\x00\x00\x01\x00\x00\x00\x01\x00" + b"\x00" * 30)
+
+
+def test_collect_image_attachments_chunk_scoped(tmp_path):
+    results = tmp_path / "task_output" / "artifacts" / "results"
+    results.mkdir(parents=True)
+    (results / "hero.png").write_bytes(_PNG_BYTES)
+    (results / "unrelated.png").write_bytes(_PNG_BYTES)
+    out = grading._collect_image_attachments(results, frozenset({"hero.png"}))
+    assert [i["name"] for i in out] == ["hero.png"]
+    assert out[0]["media_type"] == "image/png"
+    import base64
+    assert base64.b64decode(out[0]["b64"]) == _PNG_BYTES
+
+
+def test_collect_image_attachments_size_cap_and_env_gate(tmp_path, monkeypatch):
+    results = tmp_path / "task_output" / "artifacts" / "results"
+    results.mkdir(parents=True)
+    (results / "small.png").write_bytes(_PNG_BYTES)
+    out = grading._collect_image_attachments(results, frozenset({"small.png"}))
+    assert len(out) == 1
+    monkeypatch.setattr(grading, "_IMAGE_ATTACH_MAX_BYTES", 4)
+    assert grading._collect_image_attachments(results, frozenset({"small.png"})) == []
+    monkeypatch.setattr(grading, "_IMAGE_ATTACH_MAX_BYTES", 3_500_000)
+    monkeypatch.setenv("WCB_JUDGE_ATTACH_IMAGES", "0")
+    assert grading._collect_image_attachments(results, frozenset({"small.png"})) == []
+
+
+def test_run_council_images_only_reach_sonnet(monkeypatch):
+    calls = []
+
+    def _fake_call(model, system, user, family=None, images=None):
+        calls.append((family, images))
+        return ("1. c [[RATIONALE: r]] [[SATISFIED: Yes]] [[TRUNCATION_AFFECTED: No]]",
+                dict(grading._ZERO_USAGE))
+
+    monkeypatch.setattr(grading, "_call_one_judge", _fake_call)
+    members = [
+        grading.CouncilMember(family="sonnet", model="bedrock/arn:s"),
+        grading.CouncilMember(family="glm", model="bedrock/arn:g"),
+    ]
+    imgs = [{"name": "hero.png", "media_type": "image/png", "b64": "QUJD"}]
+    grading._run_council(members, "sys", "user", 1, images=imgs)
+    got = dict(calls)
+    assert got["sonnet"] == imgs
+    assert got["glm"] is None

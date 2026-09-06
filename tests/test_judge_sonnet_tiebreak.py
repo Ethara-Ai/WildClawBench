@@ -86,7 +86,7 @@ def _failed(model, family, error="boom"):
 
 def _patch_council(monkeypatch, results):
     """Make _run_council return the given synthetic member result dicts."""
-    monkeypatch.setattr(grading, "_run_council", lambda members, system, user, n: list(results))
+    monkeypatch.setattr(grading, "_run_council", lambda members, system, user, n, images=None: list(results))
 
 
 def _grade(rubrics, members=None):

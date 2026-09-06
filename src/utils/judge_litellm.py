@@ -527,6 +527,7 @@ def call_judge_via_litellm(
     max_output_tokens: int,
     cost_fn: Any,
     family: str | None = None,
+    images: list[dict] | None = None,
 ) -> tuple[str, dict]:
     """LiteLLM-backed judge call with optional Headroom compression.
 
@@ -569,13 +570,31 @@ def call_judge_via_litellm(
     else:
         system_content = system
 
+    # Multimodal user turn: image deliverables ride as OpenAI-style data-URI
+    # blocks, which LiteLLM translates to Anthropic/Bedrock image blocks. Only
+    # built when the caller attached images (sonnet family; chunk-scoped
+    # rubric-named files - see grading._collect_image_attachments).
+    user_content: Any = user
+    if images:
+        user_content = [{"type": "text", "text": user}] + [
+            {
+                "type": "image_url",
+                "image_url": {"url": f"data:{img['media_type']};base64,{img['b64']}"},
+            }
+            for img in images
+        ]
+
     messages = [
         {"role": "system", "content": system_content},
-        {"role": "user", "content": user},
+        {"role": "user", "content": user_content},
     ]
 
-    # Headroom (best-effort, never raises)
-    messages, compression_stats = maybe_compress(messages, model)
+    # Headroom (best-effort, never raises). Skipped for multimodal payloads:
+    # the compressor operates on string message content and would drop or
+    # mangle image blocks.
+    compression_stats: dict = {}
+    if not images:
+        messages, compression_stats = maybe_compress(messages, model)
 
     # Sanity: judges MUST NOT receive `thinking`, `reasoning_effort`,
     # `output_config`, or `response_format` — those silently change the
