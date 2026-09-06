@@ -2246,18 +2246,31 @@ def grade_with_rubric(
         # halving (smaller chunks emit shorter lists, likelier to survive).
         res = _grade_chunk(chunk)
         err = str(res.get("error") or "").lower()
-        if res.get("error") and "parse:" in err and not retried:
+        # A truncated response can ALSO parse "successfully" with fewer
+        # verdicts than criteria (Judge call ok, verdicts=10/36): no error is
+        # raised and the tail abstains as partial coverage. Detect via
+        # per-member verdict counts, not just parse errors.
+        # Only the sonnet (source-of-truth) member's count matters: kimi/glm
+        # truncating mid-rubric is EXPECTED small-context behavior that the
+        # tiebreak already absorbs — retrying on it would loop every 3-member
+        # council run.
+        counts = ((res.get("judge_council") or {}).get("per_member_verdict_count")
+                  or {})
+        sonnet_count = counts.get("sonnet")
+        partial = (not res.get("error") and sonnet_count is not None
+                   and int(sonnet_count or 0) < len(chunk))
+        if (("parse:" in err or partial) and not retried):
             logger.warning(
-                "judge chunk of %d criteria returned an unparseable/partial "
+                "judge chunk of %d criteria returned a partial/unparseable "
                 "verdict list — retrying once at full size", len(chunk))
             return _graded_chunks(chunk, depth, retried=True)
-        if (res.get("error") and depth < 2 and len(chunk) > 4
+        if ((res.get("error") or partial) and depth < 2 and len(chunk) > 4
                 and ("refus" in err or "safety filter" in err
-                     or "parse:" in err)):
+                     or "parse:" in err or partial)):
             logger.warning(
-                "judge chunk of %d criteria failed (%s...) — re-splitting "
-                "and retrying halves (depth %d)",
-                len(chunk), err[:60], depth + 1)
+                "judge chunk of %d criteria failed or stayed partial — "
+                "re-splitting and retrying halves (depth %d)",
+                len(chunk), depth + 1)
             mid = (len(chunk) + 1) // 2
             return (_graded_chunks(chunk[:mid], depth + 1)
                     + _graded_chunks(chunk[mid:], depth + 1))
