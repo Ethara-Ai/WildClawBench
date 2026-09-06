@@ -794,9 +794,12 @@ def test_multimodal_images_become_content_blocks(monkeypatch):
     assert user_msg["role"] == "user"
     blocks = user_msg["content"]
     assert isinstance(blocks, list)
-    assert blocks[0] == {"type": "text", "text": "the evidence"}
-    assert blocks[1]["type"] == "image_url"
-    assert blocks[1]["image_url"]["url"] == "data:image/png;base64,QUJD"
+    assert blocks[0]["type"] == "image_url"
+    assert blocks[0]["image_url"]["url"] == "data:image/png;base64,QUJD"
+    assert blocks[-1] == {"type": "text", "text": "the evidence"}, (
+        "text must come LAST so the closing verdict instruction is the final "
+        "content the model reads (trailing images truncated verdict lists live)"
+    )
 
 
 def test_no_images_keeps_string_user_content(monkeypatch):

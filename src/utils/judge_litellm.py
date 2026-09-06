@@ -574,15 +574,20 @@ def call_judge_via_litellm(
     # blocks, which LiteLLM translates to Anthropic/Bedrock image blocks. Only
     # built when the caller attached images (sonnet family; chunk-scoped
     # rubric-named files - see grading._collect_image_attachments).
+    # Image blocks go BEFORE the text (Anthropic vision guidance), so the text
+    # block's closing "produce exactly N verdicts" instruction stays the LAST
+    # thing the model reads. Trailing images derailed completion live
+    # (koji 2026-09-06: verdict lists stopped at 31/40 and 11/36 with the
+    # output budget unused).
     user_content: Any = user
     if images:
-        user_content = [{"type": "text", "text": user}] + [
+        user_content = [
             {
                 "type": "image_url",
                 "image_url": {"url": f"data:{img['media_type']};base64,{img['b64']}"},
             }
             for img in images
-        ]
+        ] + [{"type": "text", "text": user}]
 
     messages = [
         {"role": "system", "content": system_content},

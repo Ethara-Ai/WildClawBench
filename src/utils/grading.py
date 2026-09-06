@@ -2217,16 +2217,16 @@ def grade_with_rubric(
         note = ""
         if images:
             note = (
-                "\n\nATTACHED IMAGES: "
+                "ATTACHED IMAGES: "
                 + ", ".join(i["name"] for i in images)
-                + " — these are the actual pixels of the corresponding files "
-                "listed in <output_files>; treat them as the authoritative "
-                "evidence for image-content criteria."
+                + " — the images above are the actual pixels of the "
+                "corresponding files listed in <output_files>; treat them as "
+                "the authoritative evidence for image-content criteria.\n\n"
             )
         user_for_member = {
-            m.model: _judge_user_prompt(
+            m.model: note + _judge_user_prompt(
                 task_description, chunk, evidence_for_member[m.model]
-            ) + note
+            )
             for m in members
         }
         return _grade_council(chunk, system, user_for_member, members, images)
