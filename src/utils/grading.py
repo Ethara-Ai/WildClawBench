@@ -464,7 +464,18 @@ _BINARY_DELIVERABLE_EXTS = {
 _IMAGE_DELIVERABLE_EXTS = {
     ".png", ".jpg", ".jpeg", ".webp", ".gif",
 }
-_ALL_DELIVERABLE_EXTS = _DELIVERABLE_EXTS | _BINARY_DELIVERABLE_EXTS | _IMAGE_DELIVERABLE_EXTS
+# Audio deliverables: transcribed host-side by a local sherpa-onnx model
+# (src/utils/judge_asr.py) since sonnet judges accept no audio modality.
+# When ASR is unavailable they degrade to a stdlib duration marker (.wav)
+# or presence marker. Own size gate (not _ROOT_SCAN_MAX_FILE_BYTES): one
+# minute of 16-bit 44.1kHz stereo wav is ~10MB, so the 512KB binary gate
+# would silently drop nearly all real audio.
+_AUDIO_DELIVERABLE_EXTS = {
+    ".wav", ".mp3", ".m4a",
+}
+_AUDIO_MAX_COLLECT_BYTES = 50_000_000
+_ALL_DELIVERABLE_EXTS = (_DELIVERABLE_EXTS | _BINARY_DELIVERABLE_EXTS
+                         | _IMAGE_DELIVERABLE_EXTS | _AUDIO_DELIVERABLE_EXTS)
 _ROOT_SCAN_MAX_FILE_BYTES = 512_000   # skip oversized files in the root scan
 # Cap on extracted-text length per binary deliverable (docx/pdf). Bounds the
 # per-member evidence budget so a large extraction cannot bury report.md for the
@@ -517,6 +528,13 @@ def _collect_deliverable_files(workspace_results: Path) -> list[Path]:
             if _is_text_deliverable(f):
                 seen.add(f)
                 files.append(f)
+            elif _is_audio_deliverable(f):
+                try:
+                    if f.stat().st_size <= _AUDIO_MAX_COLLECT_BYTES:
+                        seen.add(f)
+                        files.append(f)
+                except OSError:
+                    continue
             elif _is_binary_deliverable(f) or _is_image_deliverable(f):
                 try:
                     if f.stat().st_size <= _ROOT_SCAN_MAX_FILE_BYTES:
@@ -550,6 +568,10 @@ def _collect_deliverable_files(workspace_results: Path) -> list[Path]:
 
 def _is_image_deliverable(path: Path) -> bool:
     return path.suffix.lower() in _IMAGE_DELIVERABLE_EXTS
+
+
+def _is_audio_deliverable(path: Path) -> bool:
+    return path.suffix.lower() in _AUDIO_DELIVERABLE_EXTS
 
 
 _IMAGE_ATTACH_MAX_BYTES = 3_500_000
@@ -752,6 +774,24 @@ def _deliverable_evidence_marker(path: Path) -> str | None:
                 f"\n----- DELIVERABLE: {path.name} "
                 f"({size}, presence only) -----\n"
             )
+        if _is_audio_deliverable(path):
+            from . import judge_asr
+            transcript = judge_asr.transcribe(path)
+            if transcript:
+                return (
+                    f"\n----- DELIVERABLE: {path.name} "
+                    f"(audio, transcribed offline) -----\n{transcript}"
+                )
+            duration = judge_asr.wav_duration_marker(path)
+            if duration:
+                return (
+                    f"\n----- DELIVERABLE: {path.name} "
+                    f"({duration}, transcript unavailable) -----\n"
+                )
+            return (
+                f"\n----- DELIVERABLE: {path.name} "
+                "(audio - present, transcript unavailable) -----\n"
+            )
         if _is_binary_deliverable(path):
             extracted = _extract_text_deliverable(path)
             if extracted:
@@ -842,7 +882,8 @@ _SCRATCH_DIR_NAMES = {
 # list mirrors _ALL_DELIVERABLE_EXTS.
 _RUBRIC_FILE_RE = re.compile(
     r"[\w][\w.\-]*\.(?:pdf|html?|csv|tsv|md|markdown|json|xlsx|docx|pptx"
-    r"|txt|text|xml|ya?ml|log|png|jpe?g|webp|gif|py|sh|js|svg|ipynb)\b",
+    r"|txt|text|xml|ya?ml|log|png|jpe?g|webp|gif|py|sh|js|svg|ipynb"
+    r"|wav|mp3|m4a)\b",
     re.IGNORECASE,
 )
 

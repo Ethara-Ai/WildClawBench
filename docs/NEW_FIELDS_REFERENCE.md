@@ -112,6 +112,8 @@ detection is a no-op on those backends (BUGREPORT §3 item 2, open).
 | `WCB_JUDGE_PIN_TEMPERATURE` | on (`1`) | judge calls pin `temperature=0` for reproducible verdicts (an unpinned sonnet-4.5/4.6 samples at default 1.0 and can flip verdicts between regrades). Models that 400 on explicit temperature (sonnet-5) are learned at runtime and omit it thereafter. `0` restores omit-for-sonnet |
 | `WCB_JUDGE_ATTACH_IMAGES` | on (`1`) | rubric-named image deliverables (≤3.5MB each) are attached as real image blocks to sonnet judge calls, chunk-scoped (each batch carries only the images its own criteria name). Ends narration-trusted verdicts on image-content criteria (koji gi_block_hero: w=5+3 graded blind from build-script echoes). `0` restores dimension-marker-only |
 | `WCB_JUDGE_MAX_IMAGES` | 8 | cap on attached images per judge call (hard ceiling 20 = Bedrock converse limit) |
+| `WCB_JUDGE_AUDIO_TRANSCRIBE` | on (`1`) | audio deliverables (.wav .mp3 .m4a, ≤50MB) are transcribed host-side by a LOCAL sherpa-onnx model (no network, no API key) and enter judge evidence as text blocks. Degrades to a stdlib duration marker (.wav) or presence marker when sherpa-onnx/model files are absent. `0` disables |
+| `WCB_JUDGE_ASR_MODEL_DIR` | `~/.wcb/asr` | directory holding the sherpa-onnx model (transducer `encoder/decoder/joiner.onnx + tokens.txt`, e.g. Parakeet TDT 0.6B v3 int8, or a sense-voice `model.onnx`). Optional pip deps: `sherpa-onnx` (ASR), `av` (mp3/m4a decode) |
 
 Deliverable scope additions: `.py .sh .js .svg` now included verbatim as text deliverables; `.ipynb` is extracted (cell sources + textual outputs, base64 image outputs stripped, 100K char cap).
 

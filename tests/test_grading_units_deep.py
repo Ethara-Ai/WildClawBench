@@ -1343,3 +1343,81 @@ def test_glm_partial_coverage_alone_does_not_retry(tmp_path, monkeypatch):
     ws = tmp_path / "task_output" / "results"; ws.mkdir(parents=True)
     grading.grade_with_rubric(rubrics, "task", ws, transcript_text="t")
     assert calls == [6], "glm small-context truncation is by-design, no retry"
+
+
+# ---------------------------------------------------------------------------
+# Phase 3: offline audio evidence (judge_asr)
+# ---------------------------------------------------------------------------
+
+
+def _write_wav(path, seconds=1.0, rate=16000):
+    import wave as _wave, struct as _struct, math
+    with _wave.open(str(path), "wb") as w:
+        w.setnchannels(1); w.setsampwidth(2); w.setframerate(rate)
+        n = int(seconds * rate)
+        w.writeframes(b"".join(
+            _struct.pack("<h", int(8000 * math.sin(i / 20))) for i in range(n)))
+
+
+def test_audio_collected_with_own_size_gate(tmp_path):
+    results = tmp_path / "task_output" / "artifacts" / "results"
+    results.mkdir(parents=True)
+    _write_wav(results / "memo.wav", seconds=1.0)
+    names = [f.name for f in grading._collect_deliverable_files(results)]
+    assert "memo.wav" in names
+
+
+def test_audio_marker_uses_transcript_when_asr_available(tmp_path, monkeypatch):
+    from src.utils import judge_asr
+    results = tmp_path / "task_output" / "artifacts" / "results"
+    results.mkdir(parents=True)
+    _write_wav(results / "memo.wav")
+    monkeypatch.setattr(judge_asr, "transcribe", lambda p: "hello from the memo")
+    ev = grading._gather_evidence(results, "t", budget=None)
+    assert "memo.wav (audio, transcribed offline)" in ev
+    assert "hello from the memo" in ev
+
+
+def test_audio_marker_falls_back_to_wav_duration(tmp_path, monkeypatch):
+    from src.utils import judge_asr
+    results = tmp_path / "task_output" / "artifacts" / "results"
+    results.mkdir(parents=True)
+    _write_wav(results / "memo.wav", seconds=2.0)
+    monkeypatch.setattr(judge_asr, "transcribe", lambda p: None)
+    ev = grading._gather_evidence(results, "t", budget=None)
+    assert "audio 2.0s, 16000 Hz, 1 channel(s)" in ev
+    assert "transcript unavailable" in ev
+
+
+def test_audio_marker_presence_only_for_undecodable(tmp_path, monkeypatch):
+    from src.utils import judge_asr
+    results = tmp_path / "task_output" / "artifacts" / "results"
+    results.mkdir(parents=True)
+    (results / "song.mp3").write_bytes(b"\xff\xfb\x90\x00" + b"\x00" * 64)
+    monkeypatch.setattr(judge_asr, "transcribe", lambda p: None)
+    ev = grading._gather_evidence(results, "t", budget=None)
+    assert "song.mp3 (audio - present, transcript unavailable)" in ev
+
+
+def test_wav_duration_marker_stdlib_only(tmp_path):
+    from src.utils import judge_asr
+    _write_wav(tmp_path / "clip.wav", seconds=3.5, rate=8000)
+    assert judge_asr.wav_duration_marker(tmp_path / "clip.wav") == \
+        "audio 3.5s, 8000 Hz, 1 channel(s)"
+
+
+def test_decode_wav_stdlib(tmp_path):
+    from src.utils import judge_asr
+    _write_wav(tmp_path / "clip.wav", seconds=0.5)
+    out = judge_asr._decode_wav(tmp_path / "clip.wav")
+    assert out is not None
+    samples, rate = out
+    assert rate == 16000 and len(samples) == 8000
+    assert all(-1.0 <= s <= 1.0 for s in samples)
+
+
+def test_transcribe_disabled_by_env(tmp_path, monkeypatch):
+    from src.utils import judge_asr
+    monkeypatch.setenv("WCB_JUDGE_AUDIO_TRANSCRIBE", "0")
+    _write_wav(tmp_path / "clip.wav")
+    assert judge_asr.transcribe(tmp_path / "clip.wav") is None
