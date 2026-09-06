@@ -1314,6 +1314,28 @@ class OpenClawAgent(BaseAgent):
                 # other OpenAI-compatible sidecar model (e.g. the first-party
                 # vendor model) a mismatched id would leave openclaw unable to resolve
                 # the selected model.
+                #
+                # contextWindow drives openclaw's auto-compaction: declare it
+                # BIGGER than the upstream's real window and the agent never
+                # compacts, grows the session past the ceiling, and every call
+                # 400s for the rest of the run (aleksei 1P 2026-09-06: relay
+                # window measured 262,144 tokens by probe — 262,012 accepted,
+                # 270,012 rejected with the same generic "invalid parameters" —
+                # while this config declared 1,050,000; turns 14-16 died
+                # silently). The 1P vendor model therefore declares the
+                # measured 256K window (override: KENSEI_1P_CONTEXT_WINDOW);
+                # gpt-5.5 keeps the 1M+ window.
+                _onep_id = (os.environ.get("KENSEI_1P_MODEL")
+                            or os.environ.get("ONEP_MODEL") or "").strip()
+                if _onep_id and openclaw_model_id == _onep_id:
+                    try:
+                        context_window = int(
+                            os.environ.get("KENSEI_1P_CONTEXT_WINDOW", "262144")
+                        )
+                    except ValueError:
+                        context_window = 262144
+                else:
+                    context_window = 1050000
                 litellm_provider = {
                     "baseUrl": base_url_v1,
                     "apiKey": self._agent_bearer(task_id),
@@ -1322,7 +1344,7 @@ class OpenClawAgent(BaseAgent):
                     "models": [
                         {"id": openclaw_model_id, "name": openclaw_model_id,
                          "input": ["text", "image"], "reasoning": True,
-                         "contextWindow": 1050000, "maxTokens": 128000},
+                         "contextWindow": context_window, "maxTokens": 128000},
                     ],
                 }
             # Also register an `openai` provider that points at the SAME sidecar.
