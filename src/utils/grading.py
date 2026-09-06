@@ -2231,20 +2231,33 @@ def grade_with_rubric(
         }
         return _grade_council(chunk, system, user_for_member, members, images)
 
-    def _graded_chunks(chunk: list, depth: int = 0) -> list:
+    def _graded_chunks(chunk: list, depth: int = 0, retried: bool = False) -> list:
         # Refusal re-split (ajax_moreno 2026-09-04, empirically validated on
         # gama): safety refusals are prompt-COMPOSITION dependent — the same 31
         # criteria that refused as one block graded cleanly as 16-criterion
         # chunks. On a refused chunk, halve and retry each side (depth<=2);
         # halves that still fail degrade to synthetic abstains as before, so
         # the blast radius shrinks from the whole chunk to the poisoned core.
+        # Parse-truncation retry (koji 2026-09-06): near-limit multimodal
+        # payloads on the bridge non-deterministically truncate the response
+        # mid-verdict-list (finish_reason still "stop"; the identical call
+        # completed 40/40 on replay). A partial verdict list surfaces as a
+        # "parse:" error — retry the SAME chunk once, then fall through to
+        # halving (smaller chunks emit shorter lists, likelier to survive).
         res = _grade_chunk(chunk)
         err = str(res.get("error") or "").lower()
-        if (res.get("error") and depth < 2 and len(chunk) > 4
-                and ("refus" in err or "safety filter" in err)):
+        if res.get("error") and "parse:" in err and not retried:
             logger.warning(
-                "judge chunk of %d criteria refused upstream — re-splitting "
-                "and retrying halves (depth %d)", len(chunk), depth + 1)
+                "judge chunk of %d criteria returned an unparseable/partial "
+                "verdict list — retrying once at full size", len(chunk))
+            return _graded_chunks(chunk, depth, retried=True)
+        if (res.get("error") and depth < 2 and len(chunk) > 4
+                and ("refus" in err or "safety filter" in err
+                     or "parse:" in err)):
+            logger.warning(
+                "judge chunk of %d criteria failed (%s...) — re-splitting "
+                "and retrying halves (depth %d)",
+                len(chunk), err[:60], depth + 1)
             mid = (len(chunk) + 1) // 2
             return (_graded_chunks(chunk[:mid], depth + 1)
                     + _graded_chunks(chunk[mid:], depth + 1))

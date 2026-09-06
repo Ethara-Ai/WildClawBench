@@ -1248,3 +1248,58 @@ def test_run_council_images_only_reach_sonnet(monkeypatch):
     got = dict(calls)
     assert got["sonnet"] == imgs
     assert got["glm"] is None
+
+
+def _fake_grade_success(n):
+    return {
+        "overall_score": 1.0, "rubric_weights_percentage": 100.0,
+        "criteria_total": n, "criteria_passed": n, "criteria_failed": 0,
+        "criteria_abstained": 0, "criteria": [
+            {"id": i, "weight": 1.0, "satisfied": True, "passed": True,
+             "resolved_by": "unanimous", "human_eval": "", "voters": 1,
+             "criterion": f"c{i}", "votes": "Yes", "satisfied_by_judge": [True],
+             "voted_by_judge": [True], "rationales_by_judge": ["r"],
+             "truncation_affected_by_judge": [False], "judges": ["sonnet"],
+             "is_positive": True} for i in range(n)],
+        "judge_model": "council", "judge_council": {"members": ["m"], "surviving": ["m"], "failed": []},
+        "truncation_flags": [], "abstention_flags": [], "usage": dict(grading._ZERO_USAGE),
+    }
+
+
+def test_parse_truncation_retries_same_size_once(tmp_path, monkeypatch):
+    monkeypatch.setenv("JUDGE_COUNCIL_SONNET_ARN", "bedrock/arn:aws:bedrock:x:1:application-inference-profile/s1")
+    monkeypatch.setattr(grading, "validate_judge_pricing", lambda members: None)
+    calls = []
+
+    def fake_council(chunk, system, user_for_member, members, images=None):
+        calls.append(len(chunk))
+        if len(calls) == 1:
+            return {"overall_score": 0.0, "error": "parse: expected up to 6 verdicts, matched 2", "usage": dict(grading._ZERO_USAGE)}
+        return _fake_grade_success(len(chunk))
+
+    monkeypatch.setattr(grading, "_grade_council", fake_council)
+    rubrics = [{"criterion": f"c{i}", "weight": 1} for i in range(6)]
+    ws = tmp_path / "task_output" / "results"; ws.mkdir(parents=True)
+    out = grading.grade_with_rubric(rubrics, "task", ws, transcript_text="t")
+    assert calls == [6, 6], "one same-size retry, no halving needed"
+    assert out["criteria_abstained"] == 0
+
+
+def test_parse_truncation_persistent_falls_back_to_halving(tmp_path, monkeypatch):
+    monkeypatch.setenv("JUDGE_COUNCIL_SONNET_ARN", "bedrock/arn:aws:bedrock:x:1:application-inference-profile/s1")
+    monkeypatch.setattr(grading, "validate_judge_pricing", lambda members: None)
+    calls = []
+
+    def fake_council(chunk, system, user_for_member, members, images=None):
+        calls.append(len(chunk))
+        if len(chunk) > 3:
+            return {"overall_score": 0.0, "error": "parse: expected up to 6 verdicts, matched 1", "usage": dict(grading._ZERO_USAGE)}
+        return _fake_grade_success(len(chunk))
+
+    monkeypatch.setattr(grading, "_grade_council", fake_council)
+    rubrics = [{"criterion": f"c{i}", "weight": 1} for i in range(6)]
+    ws = tmp_path / "task_output" / "results"; ws.mkdir(parents=True)
+    out = grading.grade_with_rubric(rubrics, "task", ws, transcript_text="t")
+    assert calls == [6, 6, 3, 3], "full, retry, then two clean halves"
+    assert out["criteria_abstained"] == 0
+    assert out["criteria_passed"] == 6
