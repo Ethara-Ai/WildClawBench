@@ -576,6 +576,19 @@ def _load_golden_trajectory(task_dir: Path) -> str:
     return ""
 
 
+def _native_turn_timeout_seconds() -> int:
+    # Per-turn agent budget for native tasks. 1800s was calibrated for
+    # Claude/Bedrock upstreams; the 1P vendor relay legitimately spends 20+
+    # minutes on single output-heavy requests (aleksei run_3 2026-09-06:
+    # turn 1 timed out at exactly 1800s with healthy traffic and 0 failures),
+    # so slow-relay runs need WCB_TURN_TIMEOUT_SECONDS to raise the budget.
+    try:
+        v = int(os.environ.get("WCB_TURN_TIMEOUT_SECONDS", "1800"))
+        return v if v > 0 else 1800
+    except ValueError:
+        return 1800
+
+
 def _load_native_task(task_dir: Path) -> dict:
     # kensei-native task dir: prompt.txt + rubric.json + persona/ + data/ + mock_data/ + gt/.
     # Input artifacts are sourced in PRIORITY order: <task>/persona/home/ first, then
@@ -740,7 +753,7 @@ def _load_native_task(task_dir: Path) -> dict:
         "task_type": "",
         "modalities": [],
         "multimodal": "false",
-        "timeout_seconds": 1800,
+        "timeout_seconds": _native_turn_timeout_seconds(),
         "category": "",
         "file_path": str(task_dir),
         "task_dir": str(task_dir),
