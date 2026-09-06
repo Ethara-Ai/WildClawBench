@@ -992,3 +992,43 @@ class TestTurnCompletionVerdict:
         assert v["run_incomplete"] is True
         assert v["turns_planned"] == 9
         assert "turns_planned_dispatched" not in v
+
+
+class TestFailureRowsDontMaskEmptyTurns:
+    def _agent_with_log(self, tmp_path):
+        from src.agents.openclaw.runner import OpenClawAgent
+        agent = OpenClawAgent.__new__(OpenClawAgent)
+        agent.litellm_usage_log = str(tmp_path / "usage.jsonl")
+        return agent
+
+    def test_successes_only_excludes_failure_rows(self, tmp_path):
+        agent = self._agent_with_log(tmp_path)
+        key = "wcb::task::abc123"
+        rows = [
+            {"run_key": key, "input_tokens": 100, "cost_usd": 0.1},
+            {"run_key": key, "kind": "failure", "error_class": "BadRequestError",
+             "error": "400 invalid parameters", "input_tokens": 0},
+            {"run_key": key, "kind": "failure", "error_class": "BadRequestError",
+             "error": "400 invalid parameters", "input_tokens": 0},
+            {"run_key": "wcb::other::zzz", "input_tokens": 50},
+        ]
+        with open(agent.litellm_usage_log, "w", encoding="utf-8") as fh:
+            for r in rows:
+                fh.write(json.dumps(r) + "\n")
+        assert agent._count_run_key_rows(key) == 3
+        assert agent._count_run_key_rows(key, successes_only=True) == 1
+
+    def test_all_failure_turn_counts_as_empty(self, tmp_path):
+        agent = self._agent_with_log(tmp_path)
+        key = "wcb::task::abc123"
+        with open(agent.litellm_usage_log, "w", encoding="utf-8") as fh:
+            for _ in range(4):
+                fh.write(json.dumps(
+                    {"run_key": key, "kind": "failure",
+                     "error_class": "BadRequestError"}) + "\n")
+        assert agent._count_run_key_rows(key) == 4
+        assert agent._count_run_key_rows(key, successes_only=True) == 0
+
+    def test_missing_log_returns_zero(self, tmp_path):
+        agent = self._agent_with_log(tmp_path)
+        assert agent._count_run_key_rows("k", successes_only=True) == 0

@@ -226,10 +226,20 @@ class OpenClawAgent(BaseAgent):
         )
         return False
 
-    def _count_run_key_rows(self, run_key: str) -> int:
+    def _count_run_key_rows(self, run_key: str, successes_only: bool = False) -> int:
+        # successes_only serves the EMPTY-turn check: a turn whose every request
+        # fails writes only "kind": "failure" rows (aleksei 1P 2026-09-06 —
+        # relay 400s on turns 14-16 counted as traffic, so three dead turns
+        # graded as complete). The stall guard keeps counting ALL rows: a
+        # fast-failing route is live, not stalled.
         try:
             with open(self.litellm_usage_log, "r", encoding="utf-8") as fh:
-                return fh.read().count(run_key)
+                if not successes_only:
+                    return fh.read().count(run_key)
+                return sum(
+                    1 for line in fh
+                    if run_key in line and '"kind": "failure"' not in line
+                )
         except OSError:
             return 0
 
@@ -716,6 +726,9 @@ class OpenClawAgent(BaseAgent):
                                      and self._run_key_bearer_live())
                 rows_before_turn = (self._count_run_key_rows(_run_key)
                                     if _rows_guarded else 0)
+                succ_before_turn = (
+                    self._count_run_key_rows(_run_key, successes_only=True)
+                    if _rows_guarded else 0)
                 for turn_attempt in range(2):
                     attempt_budget = max(60, int(turn_deadline - time.time()))
                     agent_proc = run_background(
@@ -753,14 +766,16 @@ class OpenClawAgent(BaseAgent):
                         # empty exchange the session already recorded, so the
                         # turn is also logged in turns_duplicated.
                         if _rows_guarded and self._empty_turn_limit() > 0:
-                            rows_now = self._count_run_key_rows(_run_key)
-                            if rows_now == rows_before_turn:
+                            succ_now = self._count_run_key_rows(
+                                _run_key, successes_only=True)
+                            if succ_now == succ_before_turn:
                                 turns_empty.append(turn_index)
                                 if turn_attempt == 0:
                                     logger.warning(
-                                        "[%s] Agent turn %d EMPTY (no LLM "
-                                        "traffic) — retrying the same turn "
-                                        "once", spec.task_id, turn_index + 1)
+                                        "[%s] Agent turn %d EMPTY (no "
+                                        "successful LLM traffic) — retrying "
+                                        "the same turn once",
+                                        spec.task_id, turn_index + 1)
                                     turns_duplicated.append(turn_index)
                                     continue
                                 outcome = "empty"
@@ -771,7 +786,8 @@ class OpenClawAgent(BaseAgent):
                                     "run_incomplete.",
                                     spec.task_id, turn_index + 1)
                                 break
-                            rows_before_turn = rows_now
+                            succ_before_turn = succ_now
+                            rows_before_turn = self._count_run_key_rows(_run_key)
                         logger.info("[%s] Agent turn %d finished",
                                     spec.task_id, turn_index + 1)
                         break
