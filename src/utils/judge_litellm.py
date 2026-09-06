@@ -715,7 +715,8 @@ def call_judge_via_litellm(
                 "stop_details"
             ) or {}
             _cat = _sd.get("category") or ""
-            if "refus" in str(_fr).lower() or _sd.get("type") == "refusal":
+            if ("refus" in str(_fr).lower() or _sd.get("type") == "refusal"
+                    or str(_fr).lower() == "content_filter"):
                 _reason = f" (upstream refusal{f', category={_cat}' if _cat else ''})"
         except Exception:  # noqa: BLE001 - diagnostics must not mask the error
             pass
