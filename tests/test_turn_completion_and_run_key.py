@@ -850,6 +850,13 @@ class TestStallGuard:
         assert "pkill -TERM -f 'openclaw agent'" in joined
         assert "pkill -KILL -f 'openclaw agent'" in joined
         assert "openclaw gateway" not in joined
+        assert "rm -f /root/.openclaw/agents/*/sessions/*.lock" in joined, (
+            "stale session locks from killed agents must be removed or every "
+            "later attempt dies in a 'session file locked' failover loop"
+        )
+        kill_pos = joined.index("pkill -KILL")
+        rm_pos = joined.index("rm -f /root/.openclaw")
+        assert rm_pos > kill_pos, "lock removal must come AFTER the kills"
 
     def test_break_connections_honest_when_ss_missing(self, tmp_path,
                                                       monkeypatch, caplog):

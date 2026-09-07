@@ -254,12 +254,22 @@ class OpenClawAgent(BaseAgent):
         """Kill the IN-CONTAINER `openclaw agent` CLI processes. Killing the
         host-side `docker exec` Popen does NOT reach them (same pathology the
         codex runner fixed with _terminate_codex_processes). Pattern is scoped
-        to 'openclaw agent' so the long-lived `openclaw gateway` survives."""
+        to 'openclaw agent' so the long-lived `openclaw gateway` survives.
+
+        After the kill, remove any session .lock files the dead processes
+        left behind: openclaw records the holder pid in the lock and every
+        later attempt waits 10s then dies with 'session file locked
+        (timeout 10000ms)' in an endless failover loop (aleksei 1P run_4
+        2026-09-07 - stall-retry killed pid 1967, its lock survived, and
+        turns looped on FailoverError for hours). Safe because every process
+        that could legitimately hold the lock was killed in the line above."""
         subprocess.run(
             ["docker", "exec", task_id, "/bin/bash", "-lc",
              "pkill -TERM -f 'openclaw agent' 2>/dev/null || true; "
              "sleep 2; "
-             "pkill -KILL -f 'openclaw agent' 2>/dev/null || true"],
+             "pkill -KILL -f 'openclaw agent' 2>/dev/null || true; "
+             "sleep 1; "
+             "rm -f /root/.openclaw/agents/*/sessions/*.lock 2>/dev/null || true"],
             capture_output=True, text=True, timeout=30,
         )
 
