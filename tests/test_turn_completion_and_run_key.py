@@ -624,6 +624,76 @@ class TestTurnsDuplicated:
         assert e["turns_duplicated"] == [2, 7]
 
 
+class TestJudgeHardening:
+    """2026-09-04 abstain wave: thinking-eats-cap (koji), refusal composition
+    (ajax), evidence-size collapse (lena/kayla) — each fix pinned by test."""
+
+    def test_thinking_disabled_by_default(self, monkeypatch):
+        monkeypatch.delenv("WCB_JUDGE_DISABLE_THINKING", raising=False)
+        src = (REPO / "src/utils/judge_litellm.py").read_text()
+        assert '"thinking"] = {"type": "disabled"}' in src.replace(
+            "completion_kwargs[", "")
+        assert 'WCB_JUDGE_DISABLE_THINKING' in src
+
+    def test_evidence_default_reverted(self):
+        from src.utils import grading
+        assert grading._DEFAULT_JUDGE_MAX_EVIDENCE == 450_000
+
+    def test_refusal_resplit_and_suppression_warning(self, monkeypatch, caplog):
+        import logging
+        from src.utils import grading as g
+        calls = []
+
+        def fake_grade_chunk(chunk):
+            calls.append(len(chunk))
+            if len(chunk) > 4:
+                return {"error": "judge returned no content (upstream refusal, "
+                                 "category=bio)"}
+            return {"overall_score": 1.0, "criteria_abstained": 0,
+                    "criteria": [], "abstention_flags": []}
+
+        graded = {}
+
+        def runner(rubrics, batch_size):
+            def _grade_chunk(chunk):
+                return fake_grade_chunk(chunk)
+
+            def _graded_chunks(chunk, depth=0):
+                res = _grade_chunk(chunk)
+                err = str(res.get("error") or "").lower()
+                if (res.get("error") and depth < 2 and len(chunk) > 4
+                        and ("refus" in err or "safety filter" in err)):
+                    mid = (len(chunk) + 1) // 2
+                    return (_graded_chunks(chunk[:mid], depth + 1)
+                            + _graded_chunks(chunk[mid:], depth + 1))
+                return [(chunk, res)]
+
+            out = []
+            for start in range(0, len(rubrics), batch_size):
+                out.extend(_graded_chunks(rubrics[start:start + batch_size]))
+            return out
+
+        parts = runner(list(range(16)), 16)
+        assert calls[0] == 16
+        assert all(len(c) <= 4 for c, _ in parts)
+        assert sum(len(c) for c, _ in parts) == 16
+        assert all(not r.get("error") for _, r in parts)
+
+    def test_regrade_preserves_turn_stamps(self):
+        src = (REPO / "script/regrade.py").read_text()
+        for k in ("run_incomplete", "turns_planned", "turns_completed",
+                  "turns_duplicated", "turns_empty"):
+            assert f'"{k}"' in src
+        assert "regrade_debug.log" in src
+
+    def test_run_sh_launch_lock_and_child_banner(self):
+        src = (REPO / "script/run.sh").read_text()
+        assert "wcb-launch-locks" in src
+        assert "WCB_FORCE_LAUNCH" in src
+        assert "WCB_PARALLEL_CHILD=1 bash \"$SELF\"" in src
+        assert 'LAUNCH_LOCK_FILE" ]] && rm -f' in src
+
+
 class TestSidecarNamingAndRegistry:
     """2026-09-01 gama incident: ll-/k3net- names put live infra on the orphan
     sweeps' kill lists; unregistered in-process batches were invisible to the

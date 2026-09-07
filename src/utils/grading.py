@@ -67,20 +67,17 @@ TMP_WORKSPACE = os.environ.get("TMP_WORKSPACE", "/tmp_workspace")
 #   200,000 ctx  − 4,000 output  − ~5,000 scaffold (TASK + 25-rubric criteria
 #   + JSON schema + system prompt) = ~191,000 tokens for evidence
 #   ÷ 2.515 chars/token = ~75,944 evidence tokens worth of chars ≈ 191,000
-# Converting back: 191,000 tokens × 2.515 chars/token ≈ 480,365 chars, which
-# was the historical 450,000-char default sized for the SMALLEST council member
-# (GLM, 200K-token window). That default is intentionally raised to 1,000,000
-# chars here: this constant is the Bedrock single-judge / non-family default,
-# exercised only when a single high-context Bedrock judge (Sonnet's 1M-token
-# window) is in play — where ~1M chars ÷ 2.515 ≈ ~398K input tokens fits well
-# under the 1M ceiling. It is NOT the council per-member budget (those come from
-# _FAMILY_EVIDENCE, which keeps GLM/Kimi on their own smaller caps), and it is
-# NOT the OAuth-bridge cap (_DEFAULT_JUDGE_OAUTH_MAX_EVIDENCE, 700K).
-# Operators can still override via JUDGE_MAX_EVIDENCE=<chars>. Setting it to 0
-# (or anything falsy after int()) restores the unbounded behavior we briefly
-# defaulted to between b31 and now — known to 400 every council member on real
-# WildClawBench runs.
-_DEFAULT_JUDGE_MAX_EVIDENCE = 1_000_000
+# Converting back: 191,000 tokens x 2.515 chars/token ~= 480,365 chars. The
+# default is deliberately 450,000 chars (~180K tokens): measured on real runs
+# (lena_pruitt 2026-09-01, kayla_morgan run_3 2026-09-03, 9 grading calls),
+# judge inputs <=160K tokens parsed 17-40/40 verdicts cleanly on EVERY call,
+# while 270K-464K-token inputs produced empty/unparseable/format-collapsed
+# output on 7 of 8 calls. Fitting the context window is not the constraint;
+# verdict QUALITY is. A brief raise to 1,000,000 chars (c923095) put default
+# inputs at ~400K tokens and measurably increased abstentions. Operators with
+# content known to tolerate more can still export JUDGE_MAX_EVIDENCE=<chars>;
+# 0 restores unbounded (known to 400 every council member).
+_DEFAULT_JUDGE_MAX_EVIDENCE = 450_000
 
 # Claude via the OAuth subscription bridge. The judge on this route is now
 # Sonnet 5 (claude-sonnet-5), which documents a 1,000,000-token context window
@@ -330,6 +327,10 @@ def _member_max_output_tokens(arn: str, family: str | None = None) -> int:
 
 def council_enabled() -> bool:
     return os.environ.get("JUDGE_COUNCIL", "").strip() in {"1", "true", "yes", "on"}
+
+
+def _truncation_abstain_enabled() -> bool:
+    return os.environ.get("WCB_TRUNCATION_ABSTAIN", "1").strip() != "0"
 
 
 def _parse_council_member_override(entry: str) -> CouncilMember:
@@ -810,39 +811,110 @@ def _budget_transcript(transcript: str, budget: int) -> str:
     return "\n".join(head) + marker.format(n=dropped) + tail
 
 
+# Directory names that hold agent scratch/work-product (build scripts, the
+# agent's own input dumps) rather than final deliverables. Demoted to the END
+# of the evidence ordering: ajax_moreno 2026-09-05 forensics — 300+ files the
+# agent dumped under artifacts/extract/ sorted ahead of the two rubric-named
+# deliverables by size, pushed their content past the evidence cap, and ~20
+# criteria failed as "cannot verify" on a run whose deliverables were correct.
+# Only components BELOW the collected deliverable root are consulted, so an
+# unrelated "tmp"/"build" in the host path (e.g. pytest tmp_path) never
+# triggers the demotion.
+_SCRATCH_DIR_NAMES = {
+    "_scratch", "build", "extract", "scratch", "tmp", "temp",
+    "__pycache__", "node_modules", ".git",
+}
+
+# File tokens in rubric criterion text ("delivers report.pdf", "the summary in
+# notes.md states X"). Basename-shaped only (no path separators); extension
+# list mirrors _ALL_DELIVERABLE_EXTS.
+_RUBRIC_FILE_RE = re.compile(
+    r"[\w][\w.\-]*\.(?:pdf|html?|csv|tsv|md|markdown|json|xlsx|docx|pptx"
+    r"|txt|text|xml|ya?ml|log|png|jpe?g|webp|gif)\b",
+    re.IGNORECASE,
+)
+
+
+def _rubric_file_names(rubrics: list) -> frozenset[str]:
+    """Lowercased basenames of files the rubric mentions by name.
+
+    Evidence assembly ranks these files FIRST: a criterion that names
+    report.pdf is ungradable when that file's content falls past the evidence
+    cap, so rubric-named files must survive every member's budget."""
+    names: set[str] = set()
+    for r in rubrics or []:
+        crit = r.get("criterion") if isinstance(r, dict) else str(r)
+        for tok in _RUBRIC_FILE_RE.findall(str(crit or "")):
+            names.add(tok.lower())
+    return frozenset(names)
+
+
+def _in_scratch_subdir(path: Path) -> bool:
+    # Scratch check scoped to components BELOW the last deliverable-root
+    # component (results/artifacts/... or workspace_full) so host-path noise
+    # like /tmp/pytest-*/ never demotes a file.
+    parts = [p.lower() for p in path.parts[:-1]]
+    anchor = -1
+    for i, p in enumerate(parts):
+        if p in _DELIVERABLE_DIR_NAMES or p == "workspace_full":
+            anchor = i
+    if anchor < 0:
+        return False
+    return any(p in _SCRATCH_DIR_NAMES for p in parts[anchor + 1:])
+
+
+# Reserved tail of the deliverable budget for the omission manifest, so the
+# judge can distinguish "file was never produced" (verdict No) from "file was
+# produced but cut for budget" (No + TRUNCATION_AFFECTED — which the scoring
+# layer then routes to Human Evaluation instead of a graded fail).
+_OMISSION_MANIFEST_RESERVE = 400
+_OMISSION_MANIFEST_MAX_NAMES = 40
+
+
 def _gather_evidence(
     workspace_results: Path,
     transcript_text: str,
     budget: int | None = None,
+    rubric_names: frozenset[str] | None = None,
 ) -> str:
-    parts: list[str] = []
     deliverables = _collect_deliverable_files(workspace_results)
-    # Order so primary outputs survive every member's truncation budget: named
-    # report/flagged deliverables first, then ascending file size (small,
-    # high-signal text before bulky dumps). Without this, alphabetical order can
-    # bury report.md behind larger files for the smaller-context judges.
+    # Order so the files the rubric is actually ABOUT survive every member's
+    # truncation budget: rubric-named files first, then report/flagged stems,
+    # then other deliverables, then scratch subtrees — ascending size within
+    # each rank (small, high-signal text before bulky dumps).
+    named = rubric_names or frozenset()
     _PRIMARY = ("report", "flagged")
 
     def _priority(path: Path) -> tuple:
         stem = path.stem.lower()
-        rank = 0 if any(k in stem for k in _PRIMARY) else 1
+        if path.name.lower() in named:
+            rank = 0
+        elif _in_scratch_subdir(path):
+            rank = 3
+        elif any(k in stem for k in _PRIMARY):
+            rank = 1
+        else:
+            rank = 2
         try:
             size = path.stat().st_size
         except OSError:
             size = 1 << 30
         return (rank, size, path.name)
 
+    blocks: list[tuple[Path, str]] = []
     for f in sorted(deliverables, key=_priority):
         marker = _deliverable_evidence_marker(f)
         if marker is not None:
-            parts.append(marker)
-    if not parts:
-        parts.append(
+            blocks.append((f, marker))
+    if not blocks:
+        deliv_blob = (
             "\n(no deliverable files were collected under any of: "
             + ", ".join(f"{n}/" for n in _DELIVERABLE_DIR_NAMES)
             + ")\n"
         )
-    deliv_blob = "".join(parts)
+        blocks = []
+    else:
+        deliv_blob = "".join(b for _, b in blocks)
     effective = _JUDGE_MAX_EVIDENCE if budget is None else budget
     # Budget deliverables and transcript SEPARATELY. The transcript marker can
     # then never be sliced off (so _split_evidence never silently returns ""),
@@ -859,7 +931,44 @@ def _gather_evidence(
         max(2000, effective // 5),
     )
     deliv_budget = max(0, effective - floor)
-    deliv_out = deliv_blob if len(deliv_blob) <= deliv_budget else deliv_blob[:deliv_budget]
+    if len(deliv_blob) <= deliv_budget:
+        deliv_out = deliv_blob
+    else:
+        # Cut on BLOCK boundaries and name what was cut. A raw blob slice
+        # leaves the judge unable to distinguish "file never produced"
+        # (graded No) from "file produced but cut for budget" (No +
+        # TRUNCATION_AFFECTED -> Human Evaluation); the manifest carries that
+        # distinction into the payload (see judge_system.md).
+        kept: list[str] = []
+        omitted: list[str] = []
+        used = 0
+        for f, block in blocks:
+            room = deliv_budget - used - _OMISSION_MANIFEST_RESERVE
+            if len(block) <= room:
+                kept.append(block)
+                used += len(block)
+            elif room > 800 and not omitted:
+                # Head+tail keep (mirrors _budget_transcript): deliverable text
+                # files often carry markup/data bulk up front and the
+                # human-readable summary at the END, so a head-only cut drops
+                # exactly the content criteria cite.
+                cut_mark = "\n... [truncated for evidence budget] ...\n"
+                half = (room - len(cut_mark)) // 2
+                kept.append(block[:half] + cut_mark + block[-(room - len(cut_mark) - half):])
+                used += room
+                omitted.append(f"{f.name} (partial)")
+            else:
+                omitted.append(f.name)
+        listing = ", ".join(omitted[:_OMISSION_MANIFEST_MAX_NAMES])
+        extra = len(omitted) - _OMISSION_MANIFEST_MAX_NAMES
+        manifest = (
+            f"\n----- EVIDENCE BUDGET NOTE: {len(omitted)} collected file(s)"
+            f" omitted or cut for budget: {listing}"
+            + (f" [+{extra} more]" if extra > 0 else "")
+            + " -----\n"
+        )
+        kept.append(manifest[: max(0, deliv_budget - used)])
+        deliv_out = "".join(kept)
     t_budget = effective - len(deliv_out) - len(_TRANSCRIPT_MARKER)
     t_out = _budget_transcript(transcript_text, max(0, t_budget))
     # Defensive final clamp: the OAuth 200K ceiling (AGENTS.md #18) is a hard gate,
@@ -1885,6 +1994,30 @@ def _grade_council(
             resolved_by = "human_eval"
             human_eval = "required"
 
+        # Truncation-abstain (ajax_moreno 2026-09-05): a No verdict the judge
+        # itself flagged as truncation-affected means the evidence pipeline —
+        # not the agent — withheld what was needed, so recording a confident
+        # fail destroys score signal (0.407 run shipped as 0.03). Route those
+        # to Human Evaluation. Yes verdicts stand: judge_system.md requires
+        # positive visible evidence for a Yes, so absence cannot produce one.
+        # WCB_TRUNCATION_ABSTAIN=0 restores fail-on-truncation.
+        if (
+            _truncation_abstain_enabled()
+            and human_eval == ""
+            and not verdict_satisfied
+        ):
+            if resolved_by == "sonnet":
+                flagged = per_truncation[sonnet_idx]
+            else:
+                flagged = any(
+                    t for t, vd in zip(per_truncation, per_voted) if vd
+                )
+            if flagged:
+                abstention_flags.append(i)
+                verdict_satisfied = False
+                resolved_by = "human_eval"
+                human_eval = "required"
+
         if resolved_by == "human_eval":
             criterion_passed = False
         else:
@@ -2400,10 +2533,12 @@ def grade_with_rubric(
     # filesystem + extracts binaries once per member; only the rubric block varies
     # per chunk (system prompt is identical, so Sonnet cachePoint still reused).
     evidence_for_member: dict[str, str] = {}
+    rubric_names = _rubric_file_names(rubrics)
     for m in members:
         budget = _member_evidence_budget(m.model, m.family)
         evidence_for_member[m.model] = _gather_evidence(
-            workspace_results, transcript_text, budget=budget
+            workspace_results, transcript_text, budget=budget,
+            rubric_names=rubric_names,
         )
 
     def _grade_chunk(chunk: list) -> dict:
@@ -2413,13 +2548,40 @@ def grade_with_rubric(
         }
         return _grade_council(chunk, system, user_for_member, members)
 
+    def _graded_chunks(chunk: list, depth: int = 0) -> list:
+        # Refusal re-split (ajax_moreno 2026-09-04, empirically validated on
+        # gama): safety refusals are prompt-COMPOSITION dependent — the same 31
+        # criteria that refused as one block graded cleanly as 16-criterion
+        # chunks. On a refused chunk, halve and retry each side (depth<=2);
+        # halves that still fail degrade to synthetic abstains as before, so
+        # the blast radius shrinks from the whole chunk to the poisoned core.
+        res = _grade_chunk(chunk)
+        err = str(res.get("error") or "").lower()
+        if (res.get("error") and depth < 2 and len(chunk) > 4
+                and ("refus" in err or "safety filter" in err)):
+            logger.warning(
+                "judge chunk of %d criteria refused upstream — re-splitting "
+                "and retrying halves (depth %d)", len(chunk), depth + 1)
+            mid = (len(chunk) + 1) // 2
+            return (_graded_chunks(chunk[:mid], depth + 1)
+                    + _graded_chunks(chunk[mid:], depth + 1))
+        if not res.get("error") and (res.get("criteria_abstained") or 0) > 0:
+            logger.warning(
+                "judge chunk returned OK but %d of %d verdicts are missing — "
+                "possible upstream verdict suppression; affected criteria "
+                "abstain", res.get("criteria_abstained"), len(chunk))
+        return [(chunk, res)]
+
     if len(rubrics) <= batch_size:
-        return _grade_chunk(rubrics)
+        parts = _graded_chunks(rubrics)
+        if len(parts) == 1:
+            return parts[0][1]
+        return _merge_batched_grades(rubrics, members, parts)
 
     chunk_results: list[tuple[list, dict]] = []
     for start in range(0, len(rubrics), batch_size):
         chunk = rubrics[start:start + batch_size]
-        chunk_results.append((chunk, _grade_chunk(chunk)))
+        chunk_results.extend(_graded_chunks(chunk))
     return _merge_batched_grades(rubrics, members, chunk_results)
 
 

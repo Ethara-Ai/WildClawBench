@@ -90,37 +90,45 @@ def _judge_oauth_bridge_model() -> str:
     ).strip()
 
 
+# Models that rejected an explicit temperature with HTTP 400 (Sonnet 5 rejects
+# ANY temperature/top_p/top_k; a Bedrock application-inference-profile ARN
+# carries no `sonnet-5` substring so this cannot be known up front). Learned at
+# runtime by the strip-retry in call_judge_via_litellm: first rejection costs
+# one extra round trip, every later call omits the param straight away.
+_TEMP_REJECTED_MODELS: set[str] = set()
+
+
+def _judge_pin_temperature() -> bool:
+    return os.environ.get("WCB_JUDGE_PIN_TEMPERATURE", "1").strip() != "0"
+
+
 def _judge_sampling_params(model: str, family: str | None = None) -> dict[str, Any]:
     """Per-model sampling params for the judge call.
 
-    Sonnet 5 returns HTTP 400 on ANY explicit temperature/top_p/top_k. The
-    Sonnet council leg can be pointed (via ARN swap) at Sonnet 4.5/4.6 OR
-    Sonnet 5, and a Bedrock application-inference-profile ARN carries NO
-    `sonnet-5` substring, so a model-string check cannot tell them apart and
-    would silently send `temperature=0` to a Sonnet-5 ARN → 400 → every
-    criterion abstains → `overall_score 0.0` no-signal. So the decision keys
-    off the resolved council `family`: the ENTIRE sonnet family sends default
-    sampling params (temperature omitted), which Sonnet 5 requires and Sonnet
-    4.5/4.6 accept (they then sample at Anthropic's default 1.0 — slightly less
-    reproducible run-to-run, unavoidable via the API). Kimi/GLM keep
-    `temperature=0` for reproducible verdicts. `drop_params=True` does NOT
-    help: LiteLLM lists `temperature` as a SUPPORTED anthropic param (verified
-    litellm 1.83.7) and passes it through, so Anthropic then 400s. When
-    `family` is None (non-council judges / OAuth bridge model), fall back to
-    the model-string check so a `sonnet-5` id still omits temperature.
+    Verdicts must be reproducible, so every judge call PINS `temperature=0`
+    (an unpinned Sonnet 4.5/4.6 samples at Anthropic's default 1.0 and the
+    same evidence can flip verdicts between regrades). Sonnet 5 rejects any
+    explicit temperature with HTTP 400; those models are learned into
+    `_TEMP_REJECTED_MODELS` via the strip-retry in the call site and omit the
+    param thereafter — `drop_params=True` does NOT cover this because LiteLLM
+    lists `temperature` as a supported anthropic param (verified litellm
+    1.83.7) and passes it through. A `sonnet-5` model string is pre-seeded to
+    omit. WCB_JUDGE_PIN_TEMPERATURE=0 restores omit-for-sonnet (the pre-pin
+    behavior) without a code change.
 
-    gpt-5.6 (sol/terra/luna) is the same trap for the same reason: it rejects
-    `temperature`/`top_p` on PRESENCE, whatever the value. Its ids are plain
-    model names, so both the family check and the substring fallback are safe.
+    The gpt family (gpt-5.6 sol/terra/luna) is the same 400-on-presence trap as
+    Sonnet 5 but is NEVER pinned: it rejects `temperature`/`top_p` on PRESENCE,
+    whatever the value, so it always omits — via the `family == "gpt"` check and
+    the `gpt-5.6` substring fallback for `family is None` (non-council / bridge
+    model) callers.
     """
-    if family == "sonnet":
+    if "sonnet-5" in (model or "").lower() or (model or "") in _TEMP_REJECTED_MODELS:
         return {}
     if family == "gpt":
         return {}
-    if family in ("kimi", "glm"):
-        return {"temperature": 0}
-    lowered = (model or "").lower()
-    if "sonnet-5" in lowered or "gpt-5.6" in lowered:
+    if "gpt-5.6" in (model or "").lower():
+        return {}
+    if family == "sonnet" and not _judge_pin_temperature():
         return {}
     return {"temperature": 0}
 
@@ -624,6 +632,17 @@ def call_judge_via_litellm(
 
     completion_kwargs.update(_judge_sampling_params(completion_kwargs["model"], family))
 
+    # Rubric verdicts need no extended reasoning, and models with
+    # thinking-by-default (Sonnet 5 adaptive) can burn the ENTIRE output
+    # budget on a thinking block before the first verdict character
+    # (koji_holder 61/61-abstain: thinking_tokens == output_tokens ==
+    # max_tokens, content = one empty thinking block). Send an explicit
+    # disable; models that reject the directive get one retry without it
+    # (see the strip-retry in the call site below). WCB_JUDGE_DISABLE_THINKING=0
+    # restores the old implicit behavior.
+    if os.environ.get("WCB_JUDGE_DISABLE_THINKING", "1").strip() != "0":
+        completion_kwargs["thinking"] = {"type": "disabled"}
+
     # Live-stream liveness (docs/STREAMING_PLAN.md D4): this judge call stays
     # NON-streaming by decision (`"stream": False` above is untouched), so the
     # display feed gets exactly two status events — started/finished — instead
@@ -636,7 +655,22 @@ def call_judge_via_litellm(
                  delta="verdict request started (non-streaming)",
                  model=str(completion_kwargs.get("model") or ""))
     try:
-        response = litellm.completion(**completion_kwargs)
+        try:
+            response = litellm.completion(**completion_kwargs)
+        except Exception as _exc:  # noqa: BLE001 - single targeted fallback
+            _msg = str(_exc).lower()
+            _stripped = False
+            if ("thinking" in _msg
+                    and completion_kwargs.pop("thinking", None) is not None):
+                _stripped = True
+            if ("temperature" in _msg
+                    and completion_kwargs.pop("temperature", None) is not None):
+                _TEMP_REJECTED_MODELS.add(str(completion_kwargs.get("model") or ""))
+                _stripped = True
+            if _stripped:
+                response = litellm.completion(**completion_kwargs)
+            else:
+                raise
     except Exception:
         _stream.emit(f"judge:{family}", "error", _sid, kind="status",
                      delta="verdict request failed",
@@ -676,6 +710,25 @@ def call_judge_via_litellm(
                 f"judge returned no content{_reason} — the grader was blocked by "
                 f"an upstream safety filter, not by anything in the rubric"
             )
+        try:
+            _fr_l = str(_fr).lower()
+            if _fr_l in ("length", "max_tokens"):
+                _u = getattr(response, "usage", None)
+                _det = (getattr(_u, "completion_tokens_details", None)
+                        or (_u or {}).get("completion_tokens_details")
+                        if isinstance(_u, dict) else
+                        getattr(_u, "completion_tokens_details", None))
+                _think = getattr(_det, "reasoning_tokens", None) if _det else None
+                raise RuntimeError(
+                    f"judge output truncated at max_tokens before any verdict "
+                    f"(finish_reason={_fr}, thinking_tokens={_think}) — NOT a "
+                    f"safety refusal; raise the output cap or disable judge "
+                    f"thinking (WCB_JUDGE_DISABLE_THINKING)"
+                )
+        except RuntimeError:
+            raise
+        except Exception:  # noqa: BLE001 - diagnostics must not mask the error
+            pass
 
     # Extract usage. LiteLLM normalizes to OpenAI shape but Bedrock under
     # the hood may fold cache_read/cache_write back INTO prompt_tokens. The
