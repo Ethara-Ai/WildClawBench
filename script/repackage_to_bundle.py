@@ -1477,7 +1477,8 @@ def _generate_environment_dockerfile(
         "    ca-certificates \\",
         "    && rm -rf /var/lib/apt/lists/*",
         "",
-        "RUN pip install --no-cache-dir --break-system-packages pymupdf pillow",
+        "RUN pip install --no-cache-dir --break-system-packages pymupdf pillow "
+        "openpyxl python-docx python-pptx",
         "",
     ]
     if has_skills:
