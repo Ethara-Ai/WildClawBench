@@ -850,9 +850,14 @@ class TestStallGuard:
         assert "pkill -TERM -f 'openclaw agent'" in joined
         assert "pkill -KILL -f 'openclaw agent'" in joined
         assert "openclaw gateway" not in joined
-        assert "rm -f /root/.openclaw/agents/*/sessions/*.lock" in joined, (
-            "stale session locks from killed agents must be removed or every "
-            "later attempt dies in a 'session file locked' failover loop"
+        assert "sessions/chat.jsonl.lock" in joined, (
+            "stale chat-session locks from killed agents must be removed or "
+            "every later attempt dies in a 'session file locked' failover loop"
+        )
+        assert "sessions/*.lock" not in joined, (
+            "lock removal must stay scoped to the chat session - a bare "
+            "*.lock also deletes locks of live gateway-hosted sub-agent "
+            "sessions the pkill deliberately does not touch"
         )
         kill_pos = joined.index("pkill -KILL")
         rm_pos = joined.index("rm -f /root/.openclaw")
@@ -1008,33 +1013,52 @@ class TestFailureRowsDontMaskEmptyTurns:
         agent.litellm_usage_log = str(tmp_path / "usage.jsonl")
         return agent
 
-    def test_successes_only_excludes_failure_rows(self, tmp_path):
+    def test_successes_only_counts_agent_rows_only(self, tmp_path):
         agent = self._agent_with_log(tmp_path)
         key = "wcb::task::abc123"
         rows = [
-            {"run_key": key, "input_tokens": 100, "cost_usd": 0.1},
+            {"run_key": key, "kind": "agent", "input_tokens": 100},
+            {"run_key": key, "kind": "preflight", "input_tokens": 1},
             {"run_key": key, "kind": "failure", "error_class": "BadRequestError",
              "error": "400 invalid parameters", "input_tokens": 0},
-            {"run_key": key, "kind": "failure", "error_class": "BadRequestError",
-             "error": "400 invalid parameters", "input_tokens": 0},
-            {"run_key": "wcb::other::zzz", "input_tokens": 50},
+            {"run_key": "wcb::other::zzz", "kind": "agent", "input_tokens": 50},
         ]
         with open(agent.litellm_usage_log, "w", encoding="utf-8") as fh:
             for r in rows:
                 fh.write(json.dumps(r) + "\n")
         assert agent._count_run_key_rows(key) == 3
-        assert agent._count_run_key_rows(key, successes_only=True) == 1
+        assert agent._count_run_key_rows(key, successes_only=True) == 1, (
+            "preflight probe rows and failure rows must not count as "
+            "successful turn traffic"
+        )
 
-    def test_all_failure_turn_counts_as_empty(self, tmp_path):
+    def test_successes_only_survives_writer_formatting_drift(self, tmp_path):
         agent = self._agent_with_log(tmp_path)
         key = "wcb::task::abc123"
+        compact = json.dumps(
+            {"run_key": key, "kind": "failure", "error_class": "X"},
+            separators=(",", ":"))
         with open(agent.litellm_usage_log, "w", encoding="utf-8") as fh:
-            for _ in range(4):
-                fh.write(json.dumps(
-                    {"run_key": key, "kind": "failure",
-                     "error_class": "BadRequestError"}) + "\n")
+            fh.write(compact + "\n")
+        assert agent._count_run_key_rows(key, successes_only=True) == 0, (
+            "a compact-serialized failure row must still be excluded - the "
+            "check must not depend on json.dumps default separators"
+        )
+
+    def test_all_failure_turn_counts_as_empty_via_real_writer(self, tmp_path, monkeypatch):
+        from src.utils import litellm_usage_callback as cb
+        agent = self._agent_with_log(tmp_path)
+        key = "wcb::task::abc123"
+        monkeypatch.setattr(cb, "_PATH", agent.litellm_usage_log)
+        monkeypatch.setattr(cb, "_extract_run_key", lambda kwargs: key)
+        for _ in range(4):
+            cb._write_failure_row(
+                {"model": "rl-muse", "exception": RuntimeError("400 invalid")},
+                None, None)
         assert agent._count_run_key_rows(key) == 4
-        assert agent._count_run_key_rows(key, successes_only=True) == 0
+        assert agent._count_run_key_rows(key, successes_only=True) == 0, (
+            "rows produced by the real failure writer must be excluded"
+        )
 
     def test_missing_log_returns_zero(self, tmp_path):
         agent = self._agent_with_log(tmp_path)

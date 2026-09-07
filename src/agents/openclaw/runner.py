@@ -230,16 +230,26 @@ class OpenClawAgent(BaseAgent):
         # successes_only serves the EMPTY-turn check: a turn whose every request
         # fails writes only "kind": "failure" rows (aleksei 1P 2026-09-06 —
         # relay 400s on turns 14-16 counted as traffic, so three dead turns
-        # graded as complete). The stall guard keeps counting ALL rows: a
-        # fast-failing route is live, not stalled.
+        # graded as complete). The success test is a JSON parse of the row's
+        # "kind" — only "agent" counts: a substring match fails OPEN on
+        # writer formatting drift, and "preflight" probe rows would mask a
+        # genuinely empty turn. The stall guard keeps counting
+        # ALL rows: a fast-failing route is live, not stalled.
         try:
             with open(self.litellm_usage_log, "r", encoding="utf-8") as fh:
                 if not successes_only:
                     return fh.read().count(run_key)
-                return sum(
-                    1 for line in fh
-                    if run_key in line and '"kind": "failure"' not in line
-                )
+                n = 0
+                for line in fh:
+                    if run_key not in line:
+                        continue
+                    try:
+                        kind = json.loads(line).get("kind")
+                    except ValueError:
+                        kind = None
+                    if kind == "agent":
+                        n += 1
+                return n
         except OSError:
             return 0
 
@@ -256,20 +266,23 @@ class OpenClawAgent(BaseAgent):
         codex runner fixed with _terminate_codex_processes). Pattern is scoped
         to 'openclaw agent' so the long-lived `openclaw gateway` survives.
 
-        After the kill, remove any session .lock files the dead processes
-        left behind: openclaw records the holder pid in the lock and every
-        later attempt waits 10s then dies with 'session file locked
-        (timeout 10000ms)' in an endless failover loop (aleksei 1P run_4
-        2026-09-07 - stall-retry killed pid 1967, its lock survived, and
-        turns looped on FailoverError for hours). Safe because every process
-        that could legitimately hold the lock was killed in the line above."""
+        After the kill, remove the stale lock of the PARENT chat session:
+        openclaw records the holder pid in the lock and every later attempt
+        waits 10s then dies with 'session file locked (timeout 10000ms)' in
+        an endless failover loop (aleksei 1P run_4 2026-09-07 - stall-retry
+        killed pid 1967, its chat.jsonl.lock survived, and turns looped on
+        FailoverError for hours; the exact path comes from that incident
+        log). Scoped to chat* deliberately: a bare sessions/*.lock also
+        deletes locks of gateway-hosted sub-agent child sessions that the
+        pkill deliberately does NOT kill - a real two-writer exposure."""
         subprocess.run(
             ["docker", "exec", task_id, "/bin/bash", "-lc",
              "pkill -TERM -f 'openclaw agent' 2>/dev/null || true; "
              "sleep 2; "
              "pkill -KILL -f 'openclaw agent' 2>/dev/null || true; "
              "sleep 1; "
-             "rm -f /root/.openclaw/agents/*/sessions/*.lock 2>/dev/null || true"],
+             "rm -f /root/.openclaw/agents/*/sessions/chat.jsonl.lock "
+             "/root/.openclaw/agents/*/sessions/chat.lock 2>/dev/null || true"],
             capture_output=True, text=True, timeout=30,
         )
 
@@ -739,6 +752,22 @@ class OpenClawAgent(BaseAgent):
                 succ_before_turn = (
                     self._count_run_key_rows(_run_key, successes_only=True)
                     if _rows_guarded else 0)
+                if turn_index == 0:
+                    if not _rows_guarded:
+                        logger.warning(
+                            "[%s] run-integrity guards DISABLED for this run: "
+                            "empty-turn detection and the stall guard both "
+                            "require run-key tagging (keyless sidecar mode) — "
+                            "a dead LLM route will grade as a complete run",
+                            spec.task_id)
+                    elif (self._stall_seconds() > 0
+                          and self._stall_seconds() >= spec.timeout_seconds):
+                        logger.warning(
+                            "[%s] WCB_TURN_STALL_SECONDS (%.0f) >= per-turn "
+                            "budget (%ds): the stall guard can never fire "
+                            "before the turn times out",
+                            spec.task_id, self._stall_seconds(),
+                            spec.timeout_seconds)
                 for turn_attempt in range(2):
                     attempt_budget = max(60, int(turn_deadline - time.time()))
                     agent_proc = run_background(
@@ -820,7 +849,10 @@ class OpenClawAgent(BaseAgent):
                     # A turn that produced real sidecar traffic before wedging
                     # did genuine work that turns_completed will not credit;
                     # record it so the loss is visible as partial, not zero.
-                    if _rows_guarded and self._count_run_key_rows(_run_key) > rows_before_turn:
+                    # Successful rows only — a turn that 400-stormed and then
+                    # timed out did NO genuine work.
+                    if _rows_guarded and self._count_run_key_rows(
+                            _run_key, successes_only=True) > succ_before_turn:
                         turns_partial.append(turn_index)
                     self._terminate_agent_invocations(spec.task_id)
                     agent_proc.kill()
@@ -1360,8 +1392,27 @@ class OpenClawAgent(BaseAgent):
                         )
                     except ValueError:
                         context_window = 262144
+                    # Relay output is hard-capped at 32,000 tokens (observed:
+                    # two aleksei run_4 responses stopped at exactly 32000).
+                    # Declaring 128000 wastes ~half the 256K window on output
+                    # reserve and compacts far too early.
+                    try:
+                        max_tokens = int(
+                            os.environ.get("KENSEI_1P_MAX_TOKENS", "32768")
+                        )
+                    except ValueError:
+                        max_tokens = 32768
                 else:
                     context_window = 1050000
+                    max_tokens = 128000
+                    if "gpt-5" not in openclaw_model_id.lower():
+                        logger.warning(
+                            "openclaw provider config: non-anthropic model %r "
+                            "is not the configured 1P model — defaulting to "
+                            "contextWindow 1050000; if its real window is "
+                            "smaller the agent will never compact (set "
+                            "KENSEI_1P_MODEL or add a per-model entry)",
+                            openclaw_model_id)
                 litellm_provider = {
                     "baseUrl": base_url_v1,
                     "apiKey": self._agent_bearer(task_id),
@@ -1370,7 +1421,8 @@ class OpenClawAgent(BaseAgent):
                     "models": [
                         {"id": openclaw_model_id, "name": openclaw_model_id,
                          "input": ["text", "image"], "reasoning": True,
-                         "contextWindow": context_window, "maxTokens": 128000},
+                         "contextWindow": context_window,
+                         "maxTokens": max_tokens},
                     ],
                 }
             # Also register an `openai` provider that points at the SAME sidecar.
