@@ -36,6 +36,10 @@ _FAMILY_LIMITS = {
     "sonnet": {"ctx_window": 1_000_000, "chars_per_token_floor": 1.375},
     "kimi":   {"ctx_window":   262_144, "chars_per_token_floor": 1.15},
     "glm":    {"ctx_window":   202_752, "chars_per_token_floor": 1.15},
+    # gpt-5.6 ships three ids: sol/terra (1,050,000 ctx) and luna (400,000).
+    # Sized to luna — the SMALLEST supported window — so any
+    # KENSEI_JUDGE_GPT_MODEL value stays inside the invariant.
+    "gpt":    {"ctx_window":   400_000, "chars_per_token_floor": 1.375},
 }
 
 

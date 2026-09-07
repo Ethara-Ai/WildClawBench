@@ -64,17 +64,32 @@ _PROVIDER_LABELS: dict[str, str] = {
 # cc-bridge can serve (src/utils/judge_litellm.py routes `family == "sonnet"`
 # through the bridge and leaves the others on Bedrock). So OAuth necessarily
 # collapses the council to a single Sonnet member.
+#
+# "gpt" appears under BOTH providers because it is provider-INDEPENDENT: it
+# authenticates with its own KENSEI_JUDGE_GPT_API_KEY straight to
+# api.openai.com, so neither Bedrock credentials nor a Claude Max subscription
+# gate it. Omitting it from either tuple would make council_members() silently
+# drop the GPT judge on that provider.
 JUDGE_FAMILIES_BY_PROVIDER: dict[str, tuple[str, ...]] = {
-    OAUTH: ("sonnet",),
-    BEDROCK: ("sonnet", "glm", "kimi"),
+    OAUTH: ("sonnet", "gpt"),
+    BEDROCK: ("sonnet", "glm", "kimi", "gpt"),
 }
 
-#: Env var carrying each family's ARN. Mirrors ``grading._FAMILY_ENV_VARS``;
-#: kept in sync by test_auth_provider.py::test_family_env_vars_match_grading.
+#: Families that grade as a standalone PRIMARY judge rather than as a voting
+#: council member. They must stay in JUDGE_FAMILIES_BY_PROVIDER (that table is
+#: the allowlist ``grading.council_members`` filters against), but every
+#: council-roster surface -- the launcher picker, JUDGE_COUNCIL_MEMBERS
+#: overrides -- must exclude them via ``council_judge_families``.
+NON_COUNCIL_JUDGE_FAMILIES: frozenset[str] = frozenset({"gpt"})
+
+#: Env var carrying each family's ARN (a plain model id for "gpt"). Mirrors
+#: ``grading._FAMILY_ENV_VARS``; kept in sync by
+#: test_auth_provider.py::test_family_env_vars_match_grading.
 FAMILY_ENV_VARS: tuple[tuple[str, str], ...] = (
     ("sonnet", "JUDGE_COUNCIL_SONNET_ARN"),
     ("glm", "JUDGE_COUNCIL_GLM_ARN"),
     ("kimi", "JUDGE_COUNCIL_KIMI_ARN"),
+    ("gpt", "JUDGE_GPT_MODEL"),
 )
 
 
@@ -197,12 +212,33 @@ def validate_provider_auth(provider: str, config: Any) -> None:
 
 
 def available_judge_families(provider: str) -> tuple[str, ...]:
-    """Judge-council families the given provider is allowed to enlist."""
+    """Judge families the given provider is allowed to enlist.
+
+    Includes NON_COUNCIL_JUDGE_FAMILIES, because this is the allowlist
+    ``grading.council_members`` filters against and dropping the primary judge
+    there would disable it. Use ``council_judge_families`` for anything that
+    presents or persists a COUNCIL roster.
+    """
     if provider not in PROVIDERS:
         raise AuthProviderError(
             f"unknown auth provider {provider!r}; expected one of {', '.join(PROVIDERS)}"
         )
     return JUDGE_FAMILIES_BY_PROVIDER[provider]
+
+
+def council_judge_families(provider: str) -> tuple[str, ...]:
+    """Council-only view of ``available_judge_families``.
+
+    The GPT judge grades as a standalone PRIMARY judge selected by env config
+    (KENSEI_JUDGE_GPT_*), never as a voting council member, so offering it in a
+    council picker or writing it into a JUDGE_COUNCIL_MEMBERS override would
+    build a roster the aggregator was never designed for (its unanimous-or-
+    Sonnet-tiebreak assumes Bedrock members).
+    """
+    return tuple(
+        f for f in available_judge_families(provider)
+        if f not in NON_COUNCIL_JUDGE_FAMILIES
+    )
 
 
 def validate_judge_selection(provider: str, families: Iterable[str]) -> None:
@@ -286,6 +322,11 @@ def served_trajectory_models(provider: str, config: Any) -> set[str]:
         models.add("gpt-5.5")
     if meta_key and meta_model:
         models.add(meta_model)
+    if getattr(config, "use_codex_oauth", False):
+        # codex-bridge route (litellm_sidecar.py, codex_bridge_url branch). Keyed
+        # off a ChatGPT/Codex subscription, so neither Bedrock nor Claude OAuth
+        # credentials gate it.
+        models.add(str(getattr(config, "codex_model", "") or "").strip() or "gpt-5.6-sol")
 
     return models
 

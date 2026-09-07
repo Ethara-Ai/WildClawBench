@@ -59,6 +59,7 @@ _ENV_KEYS = [
     "MIN_HARBOR_SCORE",
     "WCB_USE_CLAUDE_OAUTH", "WCB_CC_ACCOUNT_POOL",
     "WCB_CC_BRIDGE_SECRET", "WCB_CC_STUB_KEY",
+    "WCB_USE_CODEX_OAUTH", "WCB_CODEX_MODEL",
 ]
 
 
@@ -112,6 +113,11 @@ class TestConfigDataclassDefaults:
         assert c.cc_account_pool == ""
         assert c.cc_bridge_secret == ""
         assert c.cc_stub_key == "sk-wcb-oauth-stub"
+
+    def test_codex_oauth_defaults(self):
+        c = Config()
+        assert c.use_codex_oauth is False
+        assert c.codex_model == "gpt-5.6-sol"
 
     def test_min_harbor_score_default_is_none(self):
         assert Config().min_harbor_score is None
@@ -247,6 +253,21 @@ class TestBoolHelper:
         clean_env.setenv("WCB_USE_CLAUDE_OAUTH", "yes")
         c = _from_env_no_file(clean_env, tmp_path)
         assert c.use_claude_oauth is True
+
+    def test_codex_oauth_flag_truthy(self, clean_env, tmp_path):
+        clean_env.setenv("WCB_USE_CODEX_OAUTH", "on")
+        c = _from_env_no_file(clean_env, tmp_path)
+        assert c.use_codex_oauth is True
+
+    def test_codex_oauth_flag_absent_is_false(self, clean_env, tmp_path):
+        c = _from_env_no_file(clean_env, tmp_path)
+        assert c.use_codex_oauth is False
+        assert c.codex_model == "gpt-5.6-sol"
+
+    def test_codex_model_override(self, clean_env, tmp_path):
+        clean_env.setenv("WCB_CODEX_MODEL", "gpt-5.6-luna")
+        c = _from_env_no_file(clean_env, tmp_path)
+        assert c.codex_model == "gpt-5.6-luna"
 
 
 # ===========================================================================
@@ -732,6 +753,11 @@ class TestTriStateGroups:
         parser = build_run_batch_parser("m", 1)
         ns = parser.parse_args(["--task", "x", "--use-claude-oauth"])
         assert ns.use_claude_oauth is True
+
+    def test_use_codex_oauth_on(self):
+        parser = build_run_batch_parser("m", 1)
+        ns = parser.parse_args(["--task", "x", "--use-codex-oauth"])
+        assert ns.use_codex_oauth is True
 
     def test_auth_provider_defaults_to_none(self):
         """Tri-state: absent means 'infer', preserving pre-flag behaviour."""

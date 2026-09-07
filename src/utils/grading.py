@@ -114,6 +114,25 @@ def _judge_oauth_max_evidence() -> int:
     return n if n > 0 else _DEFAULT_JUDGE_OAUTH_MAX_EVIDENCE
 
 
+# Codex-subscription judge evidence cap. Defaults to the gpt family base (see
+# _FAMILY_EVIDENCE['gpt']) so it is a no-op unless the operator tightens it; the
+# usable context on the ChatGPT *subscription* surface is undocumented, so this
+# is the tunable safety valve, applied via min() in _member_evidence_budget the
+# same way the OAuth cap is. Override with KENSEI_JUDGE_CODEX_MAX_EVIDENCE.
+_DEFAULT_JUDGE_CODEX_MAX_EVIDENCE = 350_000
+
+
+def _judge_codex_max_evidence() -> int:
+    raw = os.environ.get("KENSEI_JUDGE_CODEX_MAX_EVIDENCE")
+    if raw is None or raw.strip() == "":
+        return _DEFAULT_JUDGE_CODEX_MAX_EVIDENCE
+    try:
+        n = int(raw)
+    except ValueError:
+        return _DEFAULT_JUDGE_CODEX_MAX_EVIDENCE
+    return n if n > 0 else _DEFAULT_JUDGE_CODEX_MAX_EVIDENCE
+
+
 def _resolve_judge_max_evidence() -> int | None:
     raw = os.environ.get("JUDGE_MAX_EVIDENCE")
     if raw is None or raw.strip() == "":
@@ -156,13 +175,24 @@ _DEFAULT_MAX_OUTPUT_TOKENS = 4000
 # member is derived from the FIXED env-var NAME that carries its ARN
 # (JUDGE_COUNCIL_SONNET_ARN → "sonnet", _GLM_ARN → "glm", _KIMI_ARN → "kimi"),
 # never by parsing the rotating id. See .env.example and tests/test_judge_rotation.py.
-JudgeFamily = Literal["sonnet", "glm", "kimi"]
+#
+# The "gpt" family is the one member that is NOT a rotating Bedrock profile: its
+# env var carries a plain OpenAI model id (e.g. gpt-5.6), and it authenticates
+# with its own key (KENSEI_JUDGE_GPT_API_KEY) rather than the run's provider
+# credentials. It is registered here so it inherits the same stable
+# pricing / evidence-budget / cache-eligibility dispatch as the Bedrock families
+# instead of being smuggled in under a sonnet tag (see
+# docs/GPT_JUDGE_IMPLEMENTATION_PLAN.md §2 "Do NOT use the smuggle path").
+JudgeFamily = Literal["sonnet", "glm", "kimi", "gpt"]
 
 # Stable env-var → family dispatch. Order is the canonical council order.
 _FAMILY_ENV_VARS: tuple[tuple[str, str], ...] = (
     ("sonnet", "JUDGE_COUNCIL_SONNET_ARN"),
     ("glm", "JUDGE_COUNCIL_GLM_ARN"),
     ("kimi", "JUDGE_COUNCIL_KIMI_ARN"),
+    # Value is a MODEL ID (gpt-5.6), not an ARN — _family_for's equality/substring
+    # match resolves it the same way.
+    ("gpt", "JUDGE_GPT_MODEL"),
 )
 _KNOWN_FAMILIES: frozenset[str] = frozenset(fam for fam, _ in _FAMILY_ENV_VARS)
 
@@ -172,10 +202,12 @@ _KNOWN_FAMILIES: frozenset[str] = frozenset(fam for fam, _ in _FAMILY_ENV_VARS)
 # table so the two transports cannot drift (was the G15 drift bug). Values must
 # track real published prices, not the (rotating) profile id.
 #   Sonnet 4.6: $3/$15/$3.75cw/$0.30cr   GLM-5: $1.00/$3.20(+$0.20cr)   Kimi K2.5: $0.72/$3.60
+#   gpt-5.6(-sol): $2.00/$10.00/$2.50cw/$0.20cr
 _FAMILY_RATES: dict[str, tuple[float, float, float, float]] = {
     "sonnet": (3e-6, 1.5e-5, 3e-7, 3.75e-6),
     "glm": (1e-6, 3.2e-6, 2e-7, 0.0),
     "kimi": (0.72e-6, 3.6e-6, 0.0, 0.0),
+    "gpt": (2e-6, 1e-5, 2e-7, 2.5e-6),
 }
 # Per-family (evidence_char_budget, max_output_tokens). Web-verified 2026-06-04
 # against AWS official model cards + the Bedrock constraint
@@ -195,17 +227,29 @@ _FAMILY_RATES: dict[str, tuple[float, float, float, float]] = {
 #   GLM   : (202,752 − 16,384 − 3000) × 1.15  − 5000 scaffold → 175_000
 # Don't widen without re-running probe_judge_only.py against a representative
 # trajectory; tests/test_judge_budget_invariant.py guards the worst-case math.
+# The gpt family is deliberately NOT sized off its context window (1,050,000 for
+# sol/terra, 400,000 for luna): OpenAI re-prices the ENTIRE request ~2× once
+# input exceeds 272,000 tokens, and _FAMILY_RATES is a flat 4-tuple with no
+# threshold logic, so a window-sized budget would silently understate cost ~2×.
+# Inverting that threshold at the measured Sonnet 1.375 cpt floor caps it instead:
+#   gpt   : 272,000 × 1.375 − 5000 scaffold = 369,000 → floor 25k → 350_000
+# Back-check: (350,000 + 5,000) / 1.375 ≈ 258K input (< 272K, single-rate tier)
+# and 258K + 128,000 max + 3,000 safety = 389K ≤ 400,000 (luna, smallest ctx).
 _FAMILY_EVIDENCE: dict[str, tuple[int, int]] = {
     "sonnet": (1_175_000, 128000),
     "kimi": (225_000, 16384),
     "glm": (175_000, 16384),
+    "gpt": (350_000, 128000),
 }
 # Anthropic prompt-caching eligibility by family. Only Sonnet (Anthropic) accepts
 # a cachePoint block on Bedrock Converse; GLM/Kimi return 403 if one is present.
+# gpt is False for a different reason: the OpenAI Chat Completions path has no
+# cachePoint block at all (prompt caching there is automatic and server-side).
 _FAMILY_CACHE_SUPPORTED: dict[str, bool] = {
     "sonnet": True,
     "glm": False,
     "kimi": False,
+    "gpt": False,
 }
 
 # OpenAI single-judge fallback rates, keyed by model NAME (NOT a council family,
@@ -253,6 +297,8 @@ def _member_evidence_budget(model: str, family: str | None = None) -> int | None
                     return min(base, _judge_oauth_max_evidence())
             except Exception:
                 pass
+        if fam == "gpt" and _judge_codex_bridge_url():
+            return min(base, _judge_codex_max_evidence())
         return base
     return _DEFAULT_JUDGE_MAX_EVIDENCE
 
@@ -302,6 +348,13 @@ def _parse_council_member_override(entry: str) -> CouncilMember:
             f"JUDGE_COUNCIL_MEMBERS entry {entry!r} has unknown family {fam!r}; "
             f"known families: {sorted(_KNOWN_FAMILIES)}."
         )
+    if fam in auth_provider.NON_COUNCIL_JUDGE_FAMILIES:
+        raise RuntimeError(
+            f"JUDGE_COUNCIL_MEMBERS entry {entry!r} uses family {fam!r}, which is a "
+            f"PRIMARY-judge family and may never vote in the council "
+            f"(NON_COUNCIL_JUDGE_FAMILIES). Configure it via its own primary-judge "
+            f"vars instead (e.g. KENSEI_JUDGE_GPT_MODEL for gpt)."
+        )
     return CouncilMember(family=fam, model=arn)  # type: ignore[arg-type]
 
 
@@ -327,12 +380,26 @@ def council_members() -> list[CouncilMember]:
     else:
         out = []
         for fam, var in _FAMILY_ENV_VARS:
+            # Skip families that are registered in _FAMILY_ENV_VARS for primary-judge
+            # dispatch only (currently gpt). They MUST NOT enter the council roster:
+            # gpt grades as the standalone primary judge, and if it were the only
+            # configured member here it would be filtered out below and trip the
+            # "no usable judge remains" raise — a grade_with_rubric failure that
+            # AGENTS.md #12 forbids. See NON_COUNCIL_JUDGE_FAMILIES.
+            if fam in auth_provider.NON_COUNCIL_JUDGE_FAMILIES:
+                continue
             val = (os.environ.get(var) or "").strip()
             if val:
                 out.append(CouncilMember(family=fam, model=val))  # type: ignore[arg-type]
 
     provider = auth_provider.resolve_provider()
-    allowed = set(auth_provider.available_judge_families(provider))
+    # MUST be council_judge_families, NOT available_judge_families: available_
+    # includes primary-judge-only families (gpt) that must never vote in the
+    # Bedrock council. The per-family loop above already skips
+    # NON_COUNCIL_JUDGE_FAMILIES, so gpt cannot reach here via the loop; this
+    # filter is defence-in-depth and also constrains a JUDGE_COUNCIL_MEMBERS
+    # override roster to what the active provider can actually serve.
+    allowed = set(auth_provider.council_judge_families(provider))
     filtered = [m for m in out if m.family in allowed]
 
     if out and filtered and len(filtered) < len(out):
@@ -891,11 +958,106 @@ def validate_judge_pricing(members: Sequence[CouncilMember | str]) -> None:
         )
 
 
-def _call_judge_openai(model: str, system: str, user: str) -> tuple[str, dict]:
+def _judge_gpt_api_key() -> str:
+    """Dedicated GPT-judge key, read LIVE (mirrors config.judge_gpt_api_key).
+
+    Kept separate from KENSEI_OPENAI_API_KEY so the judge and the
+    trajectory/agent can bill different accounts/quotas.
+    """
+    return (
+        os.environ.get("KENSEI_JUDGE_GPT_API_KEY")
+        or os.environ.get("JUDGE_GPT_API_KEY")
+        or ""
+    ).strip()
+
+
+def _judge_gpt_model() -> str:
+    """Configured GPT judge model id, read LIVE (mirrors config.judge_gpt_model)."""
+    return (
+        os.environ.get("KENSEI_JUDGE_GPT_MODEL")
+        or os.environ.get("JUDGE_GPT_MODEL")
+        or ""
+    ).strip()
+
+
+def _judge_codex_bridge_url() -> str:
+    """Host origin of the codex OAuth bridge for the GPT judge, or "" when off.
+
+    Set by eval/run_batch.py ONLY when the run used --use-codex-oauth (it picks a
+    loopback port, publishes the bridge on it, and exports
+    KENSEI_JUDGE_CODEX_BRIDGE_URL=http://127.0.0.1:<port>). Its presence is the
+    gate: unlike the Sonnet OAuth route there is no provider check, because the
+    codex bridge is an add-on to whatever provider the run already uses (Bedrock
+    or OAuth) and never the run's own credential. Bare origin, no /v1 tail.
+    """
+    return (os.environ.get("KENSEI_JUDGE_CODEX_BRIDGE_URL") or "").strip()
+
+
+def _judge_codex_bridge_secret() -> str:
+    """Bridge secret presented to the codex bridge as `Authorization: Bearer`.
+
+    Same value the sidecar injects into the container as KAIJU_CODEX_BRIDGE_SECRET
+    (run_batch.py exports it on the host as WCB_CODEX_BRIDGE_SECRET).
+    """
+    return (os.environ.get("WCB_CODEX_BRIDGE_SECRET") or "").strip()
+
+
+def _judge_codex_bridge_model() -> str:
+    """GPT judge model id sent on the codex-bridge route.
+
+    Defaults to the flagship gpt-5.6-sol (codex-accepted). Overridable via
+    KENSEI_JUDGE_CODEX_BRIDGE_MODEL. NOTE: if the bridge container was started
+    with KAIJU_CODEX_MODEL set (trajectory model pin), the bridge's
+    _normalize_model overrides this literal and every judge request runs the
+    pinned model instead — acceptable since both are gpt-5.6 family, surfaced in
+    the preflight log.
+    """
+    return (
+        os.environ.get("KENSEI_JUDGE_CODEX_BRIDGE_MODEL")
+        or _judge_gpt_model()
+        or "gpt-5.6-sol"
+    ).strip()
+
+
+# gpt-5.6 reasoning effort for verdicts. "low" is deliberate: stable, low-latency
+# Yes/No verdicts. Do NOT use "none" — LiteLLM's registry marks
+# supports_none_reasoning_effort=false for every gpt-5.6 variant, so a
+# LiteLLM-routed judge rejects it locally before it reaches OpenAI.
+_JUDGE_GPT_REASONING_EFFORT = "low"
+
+
+def _call_judge_openai(
+    model: str,
+    system: str,
+    user: str,
+    *,
+    family: str | None = None,
+    api_key: str | None = None,
+    reasoning_effort: str | None = None,
+    max_completion_tokens: int | None = None,
+    base_url: str | None = None,
+    timeout: float | None = None,
+) -> tuple[str, dict]:
     import urllib.request
-    key = os.environ.get("KENSEI_OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY", "")
+    key = (
+        api_key
+        or os.environ.get("KENSEI_OPENAI_API_KEY")
+        or os.environ.get("OPENAI_API_KEY", "")
+    )
     if not key:
         raise RuntimeError("no OpenAI key for judge")
+    # `base_url` (bare origin, no path) routes the SAME OpenAI-Chat-Completions
+    # wire shape through the codex OAuth bridge's /v1/chat/completions shim
+    # instead of api.openai.com; `key` is then the bridge secret, presented as
+    # `Authorization: Bearer` exactly as OpenAI expects (codex_oauth/bridge.py
+    # _client_authorized accepts Bearer). Default (None) = metered OpenAI direct.
+    _base = (base_url or "").strip().rstrip("/")
+    _codex_route = bool(_base)
+    _endpoint = (
+        f"{_base}/v1/chat/completions"
+        if _codex_route
+        else "https://api.openai.com/v1/chat/completions"
+    )
     # Yes/No verdict format (judge_walkthrough_2026_05_27.html §1.1 EXACT FORMAT):
     # judge emits free-form text with `[[RATIONALE:]] [[SATISFIED:Yes|No]]` blocks
     # wrapped in `<judgment>...</judgment>`. We MUST NOT pass
@@ -904,16 +1066,33 @@ def _call_judge_openai(model: str, system: str, user: str) -> tuple[str, dict]:
     # collapses every council vote into a parse error. max_completion_tokens
     # raised 4000→8000 so 25-criterion rubrics (≈1.2k verdict tokens) leave
     # ample headroom for reasoning.
-    body = json.dumps({
+    #
+    # NOTE `temperature`/`top_p` are absent BY CONSTRUCTION, not by omission:
+    # gpt-5.6 returns HTTP 400 on their mere presence (any value), exactly like
+    # Sonnet 5 (AGENTS.md invariant 18). Never add them here.
+    request_body: dict = {
         "model": model,
         "messages": [{"role": "system", "content": system},
                      {"role": "user", "content": user}],
-        "max_completion_tokens": 8000,
+        "max_completion_tokens": (
+            8000 if max_completion_tokens is None else max_completion_tokens
+        ),
         "stream": True,
         "stream_options": {"include_usage": True},
-    }).encode()
+    }
+    if reasoning_effort:
+        if _codex_route:
+            # The codex bridge's chat->responses shim (codex_oauth/translate.py
+            # chat_to_responses) DROPS a flat `reasoning_effort` string and only
+            # forwards a dict-valued `reasoning`. Send the dict form so the effort
+            # actually reaches the Responses backend; the metered-OpenAI path below
+            # keeps the flat field the Chat Completions API expects.
+            request_body["reasoning"] = {"effort": reasoning_effort}
+        else:
+            request_body["reasoning_effort"] = reasoning_effort
+    body = json.dumps(request_body).encode()
     req = urllib.request.Request(
-        "https://api.openai.com/v1/chat/completions", data=body, method="POST",
+        _endpoint, data=body, method="POST",
         headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json",
                  "Accept": "text/event-stream"},
     )
@@ -926,7 +1105,13 @@ def _call_judge_openai(model: str, system: str, user: str) -> tuple[str, dict]:
     import uuid as _uuid
     _sid = _uuid.uuid4().hex[:12]
     _stream.emit("judge:openai", "message_start", _sid, kind="status", model=model)
-    with urllib.request.urlopen(req, timeout=120) as r:
+    # The codex bridge holds a turn open with 15s SSE keepalives during a
+    # subscription cap-wait (up to KAIJU_CODEX_CAP_WAIT_SEC x CAP_MAX_WAITS, the
+    # harness default is 60s x 10 = 10min). urlopen's timeout is a per-READ
+    # socket deadline, so keepalives keep it alive, but a legitimately slow
+    # codex turn needs more than the 120s the metered path uses.
+    _read_timeout = timeout if timeout is not None else (600 if _codex_route else 120)
+    with urllib.request.urlopen(req, timeout=_read_timeout) as r:
         for raw_line in r:
             line = raw_line.decode("utf-8", errors="replace").rstrip("\r\n")
             if not line.startswith("data:"):
@@ -938,6 +1123,16 @@ def _call_judge_openai(model: str, system: str, user: str) -> tuple[str, dict]:
                 obj = json.loads(payload)
             except json.JSONDecodeError:
                 continue
+            # The codex bridge signals a truncation / subscription-cap failure as
+            # an SSE chunk carrying only {"error": {...}} and NO "choices"
+            # (codex_oauth/translate.py chat_truncation_error_sse). If ignored,
+            # the judge sees empty text and every criterion abstains for a reason
+            # nothing names (the silent no-signal case AGENTS.md #18 warns about).
+            # Raising here surfaces the real error to the caller's fallback.
+            err = obj.get("error")
+            if err:
+                msg = err.get("message") if isinstance(err, dict) else str(err)
+                raise RuntimeError(f"judge stream error: {msg}")
             choices = obj.get("choices") or []
             if choices:
                 delta = choices[0].get("delta") or {}
@@ -956,7 +1151,16 @@ def _call_judge_openai(model: str, system: str, user: str) -> tuple[str, dict]:
     comp_tok = int(u.get("completion_tokens", 0) or 0)
     cached_tok = int(details.get("cached_tokens", 0) or 0)
     input_excl = max(0, prompt_tok - cached_tok)
-    cost_usd, priced_ok = _judge_cost_usd(model, input_excl, comp_tok, cached_tok, 0)
+    if _codex_route:
+        # Codex subscription route: tokens are still counted for telemetry, but
+        # there is no per-token dollar cost (a flat ChatGPT subscription), so the
+        # metered rate table does not apply. priced_ok stays True because $0 is
+        # correct here, not a missing-rate failure.
+        cost_usd, priced_ok = 0.0, True
+    else:
+        cost_usd, priced_ok = _judge_cost_usd(
+            model, input_excl, comp_tok, cached_tok, 0, family
+        )
     usage = {
         "input_tokens": input_excl,
         "output_tokens": comp_tok,
@@ -968,6 +1172,44 @@ def _call_judge_openai(model: str, system: str, user: str) -> tuple[str, dict]:
         "cost_priced_ok": priced_ok,
     }
     return text, usage
+
+
+def preflight_judge_codex(timeout_s: float = 90.0) -> tuple[str, str]:
+    """Validate the GPT judge's codex-subscription grading path END-TO-END.
+
+    wait_for_codex_bridge_healthy only probes /healthz from INSIDE the container
+    (and /healthz is not secret-gated), so it passes even when (a) Docker Desktop
+    dropped the host loopback publish or (b) the ChatGPT OAuth token is dead.
+    Both otherwise surface at GRADE time, after the (expensive) trajectory has
+    run. This issues ONE real, minimal completion through the exact host ->
+    codex-bridge -> chatgpt.com route the grader uses, so a broken subscription
+    is flagged up front.
+
+    Returns (ok, detail) as strings-safe tuple: ok is "ok"/"fail"/"skip". A
+    trivially short prompt is used because the bridge strips max_output_tokens
+    (output length is unbounded on this route), so cost is bounded by the prompt,
+    not a max-token cap; a wall-clock timeout guards latency. NEVER raises
+    (AGENTS.md #12: grading path must degrade, not fail).
+    """
+    url = _judge_codex_bridge_url()
+    if not url:
+        return "skip", "not configured (GPT judge uses metered OpenAI or council, not the codex bridge)"
+    secret = _judge_codex_bridge_secret()
+    if not secret:
+        return "fail", "codex bridge url set but WCB_CODEX_BRIDGE_SECRET is empty"
+    model = _judge_codex_bridge_model()
+    try:
+        _call_judge_openai(
+            model, "You are a preflight probe.", "Reply with the word OK.",
+            family="gpt",
+            api_key=secret,
+            reasoning_effort=_JUDGE_GPT_REASONING_EFFORT,
+            base_url=url,
+            timeout=timeout_s,
+        )
+    except Exception as exc:  # noqa: BLE001 — probe must never raise into caller
+        return "fail", f"{type(exc).__name__}: {str(exc)[:400]}"
+    return "ok", f"ok ({url}, model={model})"
 
 
 _ARN_REGION_RE = re.compile(r"^arn:aws:bedrock:([a-z0-9-]+):")
@@ -1232,6 +1474,37 @@ def _call_one_judge(
     m = (model or "").strip()
     if not m:
         raise RuntimeError("empty judge model id")
+
+    # The gpt family is routed BEFORE the LiteLLM opt-in below, deliberately: it
+    # is the only family whose credential is not the run's provider credential,
+    # and this direct transport is the one that reads KENSEI_JUDGE_GPT_API_KEY.
+    # Routing it through LiteLLM instead would silently bill the agent's
+    # KENSEI_OPENAI_API_KEY. Existing families are unaffected (no configuration
+    # produced family == "gpt" before this branch existed).
+    if family == "gpt":
+        gpt_model = m.partition("/")[2] if m.startswith("openai/") else m
+        # When the run brought up the codex OAuth bridge, route the GPT judge
+        # through it (ChatGPT subscription) instead of the metered key: same
+        # OpenAI-Chat-Completions wire shape, base_url pointed at the bridge, and
+        # the bridge secret carried as the Bearer api_key. Falls back to the
+        # metered KENSEI_JUDGE_GPT_API_KEY path when the bridge is not configured.
+        _codex_url = _judge_codex_bridge_url()
+        if _codex_url:
+            return _call_judge_openai(
+                gpt_model, system, user,
+                family=family,
+                api_key=_judge_codex_bridge_secret() or None,
+                reasoning_effort=_JUDGE_GPT_REASONING_EFFORT,
+                max_completion_tokens=_member_max_output_tokens(gpt_model, family),
+                base_url=_codex_url,
+            )
+        return _call_judge_openai(
+            gpt_model, system, user,
+            family=family,
+            api_key=_judge_gpt_api_key() or None,
+            reasoning_effort=_JUDGE_GPT_REASONING_EFFORT,
+            max_completion_tokens=_member_max_output_tokens(gpt_model, family),
+        )
 
     # LiteLLM-backed path (opt-in via KENSEI_JUDGE_USE_LITELLM). On ANY exception
     # we fall through to the urllib direct-provider path below — this is the
@@ -1926,6 +2199,124 @@ def _merge_batched_grades(rubrics: list, members: list, chunk_results: list) -> 
     return merged
 
 
+_JUDGE_GPT_PRIMARY_OFF = ("0", "false", "no", "off")
+
+
+def _gpt_judge_configured() -> bool:
+    """True when the GPT-5.6 primary judge should grade ahead of the council.
+
+    Two ways to be configured: (a) the metered path needs BOTH the dedicated key
+    and the model id; (b) the codex-subscription path needs the published bridge
+    url plus its secret (no metered key required — the ChatGPT subscription is the
+    credential). `JUDGE_GPT_PRIMARY=0` (or false/no/off) is the operational kill
+    switch that forces council-only even when configured. Unset JUDGE_GPT_PRIMARY
+    = enabled, so an operator who supplies either credential set gets the GPT
+    judge by default and an empty GPT config is byte-for-byte today's council-only
+    behavior.
+    """
+    metered = bool(_judge_gpt_api_key() and _judge_gpt_model())
+    codex = bool(_judge_codex_bridge_url() and _judge_codex_bridge_secret())
+    if not (metered or codex):
+        return False
+    return (os.environ.get("JUDGE_GPT_PRIMARY") or "").strip().lower() \
+        not in _JUDGE_GPT_PRIMARY_OFF
+
+
+def _grade_is_signal(result: object) -> bool:
+    """True when *result* is a real verdict rather than the no-signal sentinel.
+
+    Deliberately structural, NOT numeric: `overall_score == 0.0` is ambiguous
+    (a genuine all-fail rubric scores 0.0 and MUST be honored), so the test is
+    the presence of an `error` key plus a non-empty per-criterion list.
+    """
+    if not isinstance(result, dict):
+        return False
+    if "error" in result:
+        return False
+    criteria = result.get("criteria")
+    return isinstance(criteria, list) and len(criteria) > 0
+
+
+def _grade_gpt_primary(
+    rubrics: list,
+    task_description: str,
+    workspace_results: Path,
+    transcript_text: str,
+    system: str,
+) -> dict:
+    """Grade `rubrics` with a SINGLE gpt-5.6 judge, reusing the council machinery.
+
+    A one-member roster makes the aggregator degenerate in a well-defined way:
+    `full_coverage` holds exactly when that member voted, so every criterion is
+    "unanimous" and no Sonnet tiebreak is ever consulted. If the member fails or
+    truncates, its criteria abstain — which is a NO-SIGNAL result, not a real
+    0.0, so it is converted to an explicit error dict for the caller's fallback.
+
+    NEVER raises (AGENTS.md invariant 12: grading must degrade, not fail).
+    """
+    # Codex-first when the bridge is active so this resolves the SAME model id
+    # preflight_judge_codex probes (_judge_codex_bridge_model, default gpt-5.6-sol)
+    # — otherwise a bare metered id like "gpt-5.6" would be graded on the codex
+    # route, which the codex backend rejects (bridge only strips date suffixes,
+    # it does not map gpt-5.6 -> gpt-5.6-sol), diverging a green preflight from a
+    # dead grade. _judge_codex_bridge_model already falls back to _judge_gpt_model,
+    # so the metered-only path is unchanged.
+    model = (
+        _judge_codex_bridge_model() if _judge_codex_bridge_url()
+        else _judge_gpt_model()
+    )
+    try:
+        roster = [CouncilMember(family="gpt", model=model)]  # type: ignore[arg-type]
+        validate_judge_pricing(roster)
+        budget = _member_evidence_budget(model, "gpt")
+        evidence = _gather_evidence(workspace_results, transcript_text, budget=budget)
+
+        def _grade_chunk(chunk: list) -> dict:
+            user_for_member = {
+                model: _judge_user_prompt(task_description, chunk, evidence)
+            }
+            return _grade_council(chunk, system, user_for_member, roster)
+
+        batch_size = _rubric_batch_size()
+        if len(rubrics) <= batch_size:
+            result = _grade_chunk(rubrics)
+        else:
+            chunk_results = [
+                (chunk, _grade_chunk(chunk))
+                for chunk in (
+                    rubrics[start:start + batch_size]
+                    for start in range(0, len(rubrics), batch_size)
+                )
+            ]
+            result = _merge_batched_grades(rubrics, roster, chunk_results)
+    except Exception as exc:  # noqa: BLE001 — grading must never raise
+        logger.error(
+            "[grading] GPT primary judge (%s) raised: %s", model or "<unset>", exc
+        )
+        return {
+            "overall_score": 0.0,
+            "error": f"gpt primary judge failed: {exc}",
+            "usage": dict(_ZERO_USAGE),
+        }
+
+    total = int(result.get("criteria_total", 0) or 0)
+    if total and int(result.get("criteria_abstained", 0) or 0) >= total:
+        return {
+            "overall_score": 0.0,
+            "error": (
+                f"gpt primary judge ({model}) cast no verdicts "
+                f"({total}/{total} criteria abstained)"
+            ),
+            "usage": result.get("usage") or dict(_ZERO_USAGE),
+        }
+
+    result["judge_model"] = model
+    council = result.get("judge_council")
+    if isinstance(council, dict):
+        council["aggregation"] = "gpt_primary_single_judge"
+    return result
+
+
 def grade_with_rubric(
     rubrics: list,
     task_description: str,
@@ -1934,17 +2325,21 @@ def grade_with_rubric(
     judge_model: str | None = None,
     use_council: bool | None = None,
 ) -> dict:
-    """Score `rubrics` with the LLM judge COUNCIL (m1609 2026-06-09).
+    """Score `rubrics` with the GPT-5.6 primary judge, else the LLM judge COUNCIL.
 
-    Single-judge mode was removed; the council is the only grading path.
-    The `judge_model` and `use_council` parameters are retained for backward
-    call-site compatibility but are ignored — every invocation runs the full
-    council. Aggregation is unanimous-or-abstain (see `_grade_council`).
+    Legacy single-judge mode was removed (m1609); the council remained the only
+    path until the gated GPT primary judge landed. When
+    KENSEI_JUDGE_GPT_API_KEY + KENSEI_JUDGE_GPT_MODEL are both set (and
+    JUDGE_GPT_PRIMARY is not switched off) a single gpt-5.6 judge grades first
+    and the council is the fallback for a no-signal result; with an empty GPT
+    config the council path below runs verbatim. The `judge_model` and
+    `use_council` parameters are retained for backward call-site compatibility
+    but are ignored.
 
     Returns a scores dict:
     {overall_score, rubric_weights_percentage,
      criteria_total, criteria_passed, criteria_failed, criteria_abstained,
-     criteria:[...], judge_model:'council', judge_council:{...},
+     criteria:[...], judge_model:'council'|<gpt model id>, judge_council:{...},
      truncation_flags, abstention_flags, usage}
     or {overall_score:0.0, error:...} when no rubrics or no council members
     are configured (never raises)."""
@@ -1956,7 +2351,32 @@ def grade_with_rubric(
         return {"overall_score": 0.0, "error": "no rubric criteria"}
     system = _judge_system_prompt()
 
-    members = council_members()
+    if _gpt_judge_configured():
+        gpt_result = _grade_gpt_primary(
+            rubrics, task_description, workspace_results, transcript_text, system
+        )
+        if _grade_is_signal(gpt_result):
+            return gpt_result
+        logger.warning(
+            "[grading] GPT primary judge produced no signal (%s) -> falling back "
+            "to council",
+            str(gpt_result.get("error") or "unknown")[:200],
+        )
+
+    try:
+        members = council_members()
+    except Exception as exc:  # noqa: BLE001 — AGENTS.md #12: grading must degrade, not raise
+        # council_members()/_parse_council_member_override raise on a misconfigured
+        # roster (unknown or non-council family tag in JUDGE_COUNCIL_MEMBERS, or a
+        # roster fully filtered out by the provider). Fail-fast is fine at the CLI,
+        # but grade_with_rubric must never raise (#12) — degrade to the no-signal
+        # error dict so the run records a diagnosable result instead of crashing.
+        logger.error("[grading] council roster unusable: %s", exc)
+        return {
+            "overall_score": 0.0,
+            "error": f"council roster unusable: {exc}",
+            "usage": dict(_ZERO_USAGE),
+        }
     if not members:
         logger.error(
             "[grading] no judge council members configured -> overall_score=0.0; "

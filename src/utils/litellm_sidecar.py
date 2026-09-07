@@ -36,7 +36,7 @@ def build_litellm_config_yaml(
     auth_provider: str = "",
     bridge_url: str = "",
     codex_bridge_url: str = "",
-    codex_model: str = "gpt-5.6",
+    codex_model: str = "gpt-5.6-sol",
     enable_oauth_usage_callback: bool = False,
     meta_api_key: str = "",
     meta_base_url: str = "https://api.ai.meta.com/v1",
@@ -418,12 +418,17 @@ def build_litellm_config_yaml(
         # us not to add; usage is still recorded post-call by the LiteLLM usage
         # callback from the response body. The harness-facing model id IS
         # `meta_model`, so `--model <meta_model>` routes straight here.
+        # `additional_drop_params`: global `drop_params: true` does NOT strip
+        # `parallel_tool_calls`/`response_format` (LiteLLM treats them as
+        # supported OpenAI params and forwards verbatim), and this relay 400s on
+        # both per the gaps above. Per-model drop removes exactly these two.
         model_blocks.append(
             f"  - model_name: {meta_model}\n"
             "    litellm_params:\n"
             f"      model: openai/{meta_model}\n"
             f"      api_base: {meta_base_url}\n"
-            "      api_key: os.environ/ONEP_API_KEY"
+            "      api_key: os.environ/ONEP_API_KEY\n"
+            '      additional_drop_params: ["parallel_tool_calls", "response_format"]'
         )
     # OpenClaw's memory tool POSTs model=text-embedding-3-small to the sidecar
     # /v1/embeddings on session-start, on memory search, and from our explicit
@@ -1421,28 +1426,67 @@ def start_codex_bridge(
     ensure_codex_bridge_image(image)
 
     pool_mount = ["-v", f"{_pool_dir}:/codex_pool:rw"] if _pool_files else []
+
+    # Publish the bridge on a host loopback port when WCB_CODEX_BRIDGE_HOST_PORT
+    # is set, so the host-side rubric judge (grading.py runs on the host, not in
+    # the sidecar network) can reach the bridge at http://127.0.0.1:<port>. Bound
+    # to 127.0.0.1 only; the KAIJU_CODEX_BRIDGE_SECRET still gates every request
+    # (Authorization: Bearer). Direct mirror of the cc-bridge host-publish above.
+    publish_args: list[str] = []
+    _host_port = os.environ.get("WCB_CODEX_BRIDGE_HOST_PORT", "").strip()
+    if _host_port:
+        publish_args = ["-p", f"127.0.0.1:{_host_port}:{port}"]
+
+    # Network-attach ordering is load-bearing on Docker Desktop for Mac (same bug
+    # as cc-bridge): a `-p` publish on a container CREATED on a user-defined
+    # network silently fails to bind 127.0.0.1. Fix: when publishing, CREATE on
+    # the DEFAULT `bridge` network (with `-p`), then attach the sidecar `network`
+    # second. That keeps the loopback forward alive AND still resolves the bridge
+    # by name on the sidecar net for the agent peers. Without a publish we keep
+    # the old order (create on sidecar net, dual-home to default bridge egress).
+    if publish_args:
+        create_network_arg = "bridge"
+        secondary_network = network
+    else:
+        create_network_arg = network
+        secondary_network = "bridge"
+
     cmd = [
         "docker", "run", "-d",
         "--name", container_name,
-        "--network", network,
+        "--network", create_network_arg,
         *env_args,
         "-v", f"{auth_host_dir}:/root/.codex:rw",
         *pool_mount,
+        *publish_args,
         image,
         "--host", "0.0.0.0",
         "--port", str(port),
     ]
     logger.info(
-        "[%s] Starting codex-bridge on network %s (image=%s auth_dir=%s)",
-        container_name, network, image, auth_host_dir,
+        "[%s] Starting codex-bridge on network %s (image=%s auth_dir=%s publish=%s)",
+        container_name, create_network_arg, image, auth_host_dir, _host_port or "none",
     )
     subprocess.run(["docker", "rm", "-f", container_name], capture_output=True)
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:
         raise RuntimeError(f"codex-bridge container start failed:\n{r.stderr}")
-    # Dual-home to the default bridge for chatgpt.com / auth.openai.com egress
-    # (the sidecar network is --internal / no egress). Idempotent.
-    connect_default_bridge(container_name)
+    # Attach the second NIC. When we published, this is the sidecar network so
+    # the agent/sidecar can resolve the bridge by name; otherwise it's the
+    # default bridge for chatgpt.com / auth.openai.com egress (the sidecar
+    # network is --internal / no egress). connect_default_bridge is idempotent
+    # for the 'bridge' case; use a direct connect for the sidecar net.
+    if secondary_network == "bridge":
+        connect_default_bridge(container_name)
+    else:
+        cr = subprocess.run(
+            ["docker", "network", "connect", secondary_network, container_name],
+            capture_output=True, text=True,
+        )
+        if cr.returncode != 0 and "already exists" not in (cr.stderr or ""):
+            raise RuntimeError(
+                f"Failed to attach {container_name} to {secondary_network}: {cr.stderr}"
+            )
     logger.info(
         "[%s] codex-bridge dual-homed (internal + default bridge for chatgpt.com egress)",
         container_name,

@@ -131,9 +131,9 @@ class TestModelChoices:
         assert L.model_choices()[-1] == self._META
 
     def test_vendor_id_colliding_with_builtin_is_not_duplicated(self, monkeypatch):
-        monkeypatch.setenv("KENSEI_1P_MODEL", "gpt-5.6")
+        monkeypatch.setenv("KENSEI_1P_MODEL", "gpt-5.6-sol")
         choices = L.model_choices()
-        assert choices.count("gpt-5.6") == 1
+        assert choices.count("gpt-5.6-sol") == 1
         assert choices == L.MODEL_CHOICES
 
     def test_static_list_is_never_mutated(self, monkeypatch):

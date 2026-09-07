@@ -55,6 +55,29 @@ class Config:
     # openai_api_key at the call site when empty.
     openai_whisper_api_key: str = ""
 
+    # ---- GPT rubric judge (Channel B, opt-in) ----
+    # Dedicated OpenAI key + model id for using GPT (e.g. gpt-5.6) as a rubric
+    # judge, independent of openai_api_key (which is the trajectory/agent key).
+    # Consumed LIVE by grading.py (_judge_gpt_api_key / _judge_gpt_model): when
+    # both are set (and JUDGE_GPT_PRIMARY is not off) a single GPT judge grades
+    # ahead of the council, with the council as the no-signal fallback. Leaving
+    # both empty is a no-op and the council remains the sole Channel-B path.
+    judge_gpt_api_key: str = ""
+    judge_gpt_model: str = ""
+
+    # ---- GPT rubric judge via ChatGPT/Codex subscription (Channel B, opt-in) ----
+    # Alternative to the metered judge_gpt_api_key: route the GPT judge through
+    # the codex OAuth bridge (the same ChatGPT subscription used for the codex
+    # trajectory backend) instead of a metered key. run_batch.py publishes the
+    # bridge on a host loopback port and sets KENSEI_JUDGE_CODEX_BRIDGE_URL when
+    # --use-codex-oauth is active; the judge then bills $0 (flat subscription).
+    # The model defaults to gpt-5.6-sol; the evidence cap is the tunable safety
+    # valve for the undocumented subscription context window. All read LIVE from
+    # the environment by grading.py, mirroring the Sonnet-OAuth judge route.
+    judge_codex_bridge_url: str = ""
+    judge_codex_bridge_model: str = ""
+    judge_codex_max_evidence: int = 350_000
+
     # ---- Anthropic direct (alternative upstream for opus when Bedrock unavailable) ----
     # Used by litellm_sidecar.py to emit an `anthropic/claude-opus-4-20250514`
     # model entry for the `claude-opus-4.7` / `claude-opus-4-6` aliases when
@@ -108,6 +131,19 @@ class Config:
     # Value LiteLLM sends as api_key on the OAuth block. The bridge ignores
     # it (Authorization: Bearer <oauth-token> is stamped bridge-side).
     cc_stub_key: str = "sk-wcb-oauth-stub"
+
+    # ---- ChatGPT/Codex OAuth trajectory path (opt-in) ----
+    # Sibling of use_claude_oauth for the GPT side: when enabled, the gpt-5.6
+    # trajectory routes through a sibling `wcbsh-codex-bridge-*` sidecar that
+    # forwards to the ChatGPT/Codex backend under a Codex OAuth subscription
+    # instead of a metered OpenAI API key. Gated by --use-codex-oauth (or
+    # WCB_USE_CODEX_OAUTH=1).
+    use_codex_oauth: bool = False
+    # Sidecar model id exposed on that route. `gpt-5.6-sol` because the Codex
+    # backend rejects the bare `gpt-5.6`; the family it serves is the
+    # -luna/-sol/-terra variants. Override via WCB_CODEX_MODEL and pass the
+    # same id to --model.
+    codex_model: str = "gpt-5.6-sol"
 
     # ---- Odoo finance API (per-trajectory usage reporting) ----
     # Base URL of the Odoo instance exposing
@@ -212,6 +248,11 @@ class Config:
             s3_secret_access_key=s("KENSEI_S3_SECRET_ACCESS_KEY", "AWS_SECRET_ACCESS_KEY"),
             openai_api_key=s("KENSEI_OPENAI_API_KEY", "OPENAI_API_KEY"),
             openai_whisper_api_key=s("KENSEI_OPENAI_WHISPER_API_KEY", "OPENAI_WHISPER_API_KEY"),
+            judge_gpt_api_key=s("KENSEI_JUDGE_GPT_API_KEY", "JUDGE_GPT_API_KEY"),
+            judge_gpt_model=s("KENSEI_JUDGE_GPT_MODEL", "JUDGE_GPT_MODEL"),
+            judge_codex_bridge_url=s("KENSEI_JUDGE_CODEX_BRIDGE_URL"),
+            judge_codex_bridge_model=s("KENSEI_JUDGE_CODEX_BRIDGE_MODEL"),
+            judge_codex_max_evidence=i("KENSEI_JUDGE_CODEX_MAX_EVIDENCE", 350_000),
             anthropic_api_key=s("KENSEI_ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY"),
             meta_api_key=s("KENSEI_1P_API_KEY", "ONEP_API_KEY"),
             meta_base_url=s("KENSEI_1P_BASE_URL", "ONEP_API_BASE_URL", default="https://api.ai.meta.com/v1"),
@@ -234,6 +275,8 @@ class Config:
             cc_account_pool=s("WCB_CC_ACCOUNT_POOL"),
             cc_bridge_secret=s("WCB_CC_BRIDGE_SECRET"),
             cc_stub_key=s("WCB_CC_STUB_KEY", default="sk-wcb-oauth-stub"),
+            use_codex_oauth=b("WCB_USE_CODEX_OAUTH", False),
+            codex_model=s("WCB_CODEX_MODEL", default="gpt-5.6-sol"),
             finance_api_url=s("WCB_FINANCE_API_URL", default=DEFAULT_FINANCE_API_URL),
             finance_api_token=s("WCB_FINANCE_API_TOKEN"),
             finance_api_timeout=f("WCB_FINANCE_API_TIMEOUT", 15.0) or 15.0,

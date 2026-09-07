@@ -138,7 +138,8 @@ def build_run_batch_parser(default_model: str, default_parallel: int) -> argpars
         help="Route gpt-5.6 traffic through the wcbsh-codex-bridge sidecar under "
              "a ChatGPT/Codex subscription instead of a metered OpenAI key. "
              "Requires `codex login` (valid ~/.codex/auth.json). Run with "
-             "--model gpt-5.6. Equivalent to WCB_USE_CODEX_OAUTH=1.",
+             "--model gpt-5.6-sol (override via WCB_CODEX_MODEL). Equivalent to "
+             "WCB_USE_CODEX_OAUTH=1.",
     )
     parser.add_argument(
         "--mock-stack",

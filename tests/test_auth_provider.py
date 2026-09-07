@@ -173,11 +173,11 @@ class TestValidateProviderAuth:
 
 
 class TestJudgeRosters:
-    def test_oauth_is_sonnet_only(self):
-        assert available_judge_families(OAUTH) == ("sonnet",)
+    def test_oauth_is_sonnet_plus_provider_independent_gpt(self):
+        assert available_judge_families(OAUTH) == ("sonnet", "gpt")
 
     def test_bedrock_is_full_council(self):
-        assert set(available_judge_families(BEDROCK)) == {"sonnet", "glm", "kimi"}
+        assert set(available_judge_families(BEDROCK)) == {"sonnet", "glm", "kimi", "gpt"}
 
     def test_family_env_vars_match_grading(self):
         """Pin the duplicated family table to grading's source of truth.
@@ -222,6 +222,7 @@ _TRAJECTORY_IDS = {
     "claude-fable-5",
     "claude-sonnet-4-6",
     "gpt-5.5",
+    "gpt-5.6-sol",
 }
 
 
@@ -267,6 +268,25 @@ class TestServedTrajectoryModels:
         cfg = _cfg(openai_api_key="sk-x")
         assert "gpt-5.5" in served_trajectory_models(OAUTH, cfg)
         assert "gpt-5.5" in served_trajectory_models(BEDROCK, cfg)
+
+    def test_codex_oauth_adds_codex_model_regardless_of_provider(self):
+        cfg = _cfg(use_codex_oauth=True, codex_model="gpt-5.6-sol")
+        assert "gpt-5.6-sol" in served_trajectory_models(OAUTH, cfg)
+        assert "gpt-5.6-sol" in served_trajectory_models(BEDROCK, cfg)
+
+    def test_codex_model_absent_when_flag_off(self):
+        """Inert by default: no codex id leaks into either provider's set."""
+        cfg = _cfg(codex_model="gpt-5.6-sol")
+        assert "gpt-5.6-sol" not in served_trajectory_models(OAUTH, cfg)
+        assert "gpt-5.6-sol" not in served_trajectory_models(BEDROCK, cfg)
+
+    def test_matches_sidecar_for_codex_oauth(self):
+        cfg = _cfg(use_codex_oauth=True, codex_model="gpt-5.6-sol")
+        assert served_trajectory_models(BEDROCK, cfg) == _sidecar_model_names(
+            codex_bridge_url="http://codex-bridge:8766",
+            codex_model="gpt-5.6-sol",
+            auth_provider=BEDROCK,
+        )
 
 
 class TestValidateModelForProvider:

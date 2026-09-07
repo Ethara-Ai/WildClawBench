@@ -108,12 +108,19 @@ def _judge_sampling_params(model: str, family: str | None = None) -> dict[str, A
     litellm 1.83.7) and passes it through, so Anthropic then 400s. When
     `family` is None (non-council judges / OAuth bridge model), fall back to
     the model-string check so a `sonnet-5` id still omits temperature.
+
+    gpt-5.6 (sol/terra/luna) is the same trap for the same reason: it rejects
+    `temperature`/`top_p` on PRESENCE, whatever the value. Its ids are plain
+    model names, so both the family check and the substring fallback are safe.
     """
     if family == "sonnet":
         return {}
+    if family == "gpt":
+        return {}
     if family in ("kimi", "glm"):
         return {"temperature": 0}
-    if "sonnet-5" in (model or "").lower():
+    lowered = (model or "").lower()
+    if "sonnet-5" in lowered or "gpt-5.6" in lowered:
         return {}
     return {"temperature": 0}
 

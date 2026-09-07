@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 
 
@@ -18,6 +19,18 @@ def main(argv: list[str] | None = None) -> int:
 
     logging.basicConfig(level=args.log_level.upper(),
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
+    # Anti-SSRF gate (AGENTS.md HARD invariant): the deployable bridge REFUSES
+    # to start unauthenticated. Port 8788 is routinely forwarded into Docker
+    # networks; without the secret ANY local process could spend the ChatGPT
+    # subscription. --check is exempt (a local credential probe that never
+    # serves traffic). build_app / _client_authorized keep their in-process
+    # fail-open-with-warning path for embedded/test callers.
+    if not args.check and not os.environ.get("KAIJU_CODEX_BRIDGE_SECRET", "").strip():
+        print("[codex-bridge] refusing to start: KAIJU_CODEX_BRIDGE_SECRET is not "
+              "set. This is the anti-SSRF gate — set it (and give clients the same "
+              "value as OPENAI_API_KEY) before serving.", file=sys.stderr)
+        return 2
 
     from .credentials import CredentialProvider, CredentialsError
 

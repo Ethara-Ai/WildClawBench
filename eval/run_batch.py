@@ -49,6 +49,7 @@ from src.utils.grading import (
     print_global_summary,
     write_error_score as write_error_score_file,
 )
+from src.utils import grading
 from src.utils.config import Config
 from src.utils.auth_provider import (
     OAUTH,
@@ -3113,6 +3114,13 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
     codex_bridge_url = ""
     if use_codex_oauth:
         if shared_mode:
+            # Intentional, fail-fast: the codex bridge is per-process (like the
+            # cc-bridge) and is NOT bootstrapped by the shared sidecar
+            # (eval/bootstrap_sidecar.py emits only cc_bridge* keys). script/run.sh
+            # sets WCB_SHARED_* so it has no codex passthrough today — run codex-oauth
+            # via `python3 eval/run_batch.py ... --use-codex-oauth` (no WCB_SHARED_*),
+            # or unset WCB_USE_CODEX_OAUTH before a run.sh batch. (run.sh + shared-mode
+            # codex support is a deferred follow-up.)
             raise RuntimeError(
                 "codex-oauth (gpt-5.6 subscription) is not supported in shared-infra "
                 "mode; run without WCB_SHARED_* so this process owns the sidecar."
@@ -3412,21 +3420,113 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
             import secrets as _secrets
             codex_secret = _secrets.token_hex(32)
             os.environ["WCB_CODEX_BRIDGE_SECRET"] = codex_secret
-        start_codex_bridge(
-            container_name=codex_bridge_name,
-            network=network,
-            auth_host_dir=auth_dir,
-            bridge_secret=codex_secret,
-            codex_model_override=os.environ.get("KAIJU_CODEX_MODEL", "").strip(),
-        )
-        cleanups.append(lambda: stop_bridge(codex_bridge_name))
-        if not wait_for_codex_bridge_healthy(codex_bridge_name):
-            raise RuntimeError(
-                f"codex-bridge {codex_bridge_name} did not become healthy. Ensure "
-                "`codex login` has been run so ~/.codex/auth.json is present and "
-                "unexpired (or set WCB_CODEX_AUTH_DIR). Override budget via "
-                "WCB_CODEX_BRIDGE_HEALTH_TIMEOUT env (seconds)."
+
+        # Publish the codex bridge on a host loopback port so the host-side rubric
+        # judge (grading.py) can reach it when the GPT-5.6 judge is routed through
+        # the ChatGPT subscription. start_codex_bridge reads WCB_CODEX_BRIDGE_HOST_PORT
+        # from os.environ (not an arg); the flag also flips container-creation
+        # network order to dodge the Docker-Desktop-for-Mac silent-bind bug
+        # (litellm_sidecar.py). Honour a preset value; otherwise pick a free one.
+        codex_bridge_host_port = os.environ.get("WCB_CODEX_BRIDGE_HOST_PORT", "").strip()
+        if not codex_bridge_host_port:
+            codex_bridge_host_port = pick_free_loopback_port()
+            # Popped in cleanups so an in-process multi-rep run (eval/wcb.py) does
+            # not take the "honour a preset value" branch on rep 2 and reuse rep
+            # 1's now-dead ephemeral port. Only when WE picked it — an operator
+            # preset is left untouched.
+            cleanups.append(
+                lambda: os.environ.pop("WCB_CODEX_BRIDGE_HOST_PORT", None)
             )
+        os.environ["WCB_CODEX_BRIDGE_HOST_PORT"] = codex_bridge_host_port
+
+        # Docker Desktop intermittently drops the loopback forward (present in
+        # `docker inspect`, nothing listening on the host). Retry ONLY that failure
+        # on a FRESH port; a start error or unhealthy container aborts immediately.
+        # Mirrors the cc-bridge retry ladder above.
+        cleanups.append(lambda: stop_bridge(codex_bridge_name))
+        codex_bridge_ok = False
+        for _attempt in range(1, 4):
+            start_codex_bridge(
+                container_name=codex_bridge_name,
+                network=network,
+                auth_host_dir=auth_dir,
+                bridge_secret=codex_secret,
+                codex_model_override=os.environ.get("KAIJU_CODEX_MODEL", "").strip(),
+            )
+            if not wait_for_codex_bridge_healthy(codex_bridge_name):
+                raise RuntimeError(
+                    f"codex-bridge {codex_bridge_name} did not become healthy. Ensure "
+                    "`codex login` has been run so ~/.codex/auth.json is present and "
+                    "unexpired (or set WCB_CODEX_AUTH_DIR). Override budget via "
+                    "WCB_CODEX_BRIDGE_HEALTH_TIMEOUT env (seconds)."
+                )
+            if wait_for_bridge_host_port(codex_bridge_host_port):
+                codex_bridge_ok = True
+                break
+            logger.warning(
+                "codex-bridge host port 127.0.0.1:%s unreachable (Docker Desktop "
+                "dropped the loopback publish); recreating on a fresh port "
+                "(attempt %d/3)", codex_bridge_host_port, _attempt,
+            )
+            stop_bridge(codex_bridge_name)
+            codex_bridge_host_port = pick_free_loopback_port()
+            os.environ["WCB_CODEX_BRIDGE_HOST_PORT"] = codex_bridge_host_port
+            # The ladder just replaced the port with a harness-picked one. If the
+            # original was an operator preset, that branch registered no cleanup,
+            # so register one here to stop this harness port leaking over the
+            # preset into a later in-process rep. Popping twice is a harmless no-op.
+            cleanups.append(
+                lambda: os.environ.pop("WCB_CODEX_BRIDGE_HOST_PORT", None)
+            )
+
+        if not codex_bridge_ok:
+            raise RuntimeError(
+                f"codex-bridge {codex_bridge_name} never became reachable on a host "
+                "loopback port after 3 attempts. The host-side GPT judge dials this "
+                "port to grade the rubric, so grading would fail AFTER the trajectory "
+                "runs. Restarting Docker Desktop usually clears it."
+            )
+
+        # Point the host-side GPT judge at the bridge we just published (bare
+        # origin, NO trailing /v1: grading._call_judge_openai appends
+        # /v1/chat/completions). An explicit operator value always wins. Torn
+        # down in cleanups because eval/wcb.py calls run_batch.main() repeatedly
+        # in-process for multi-rep runs and each rep builds a fresh bridge on a
+        # fresh port; a leftover URL would point rep 2 at rep 1's dead port.
+        if not os.environ.get("KENSEI_JUDGE_CODEX_BRIDGE_URL", "").strip():
+            os.environ["KENSEI_JUDGE_CODEX_BRIDGE_URL"] = (
+                f"http://127.0.0.1:{codex_bridge_host_port}"
+            )
+            cleanups.append(
+                lambda: os.environ.pop("KENSEI_JUDGE_CODEX_BRIDGE_URL", None)
+            )
+            logger.info(
+                "GPT judge -> codex bridge http://127.0.0.1:%s",
+                codex_bridge_host_port,
+            )
+
+        # Fail-fast preflight of the GPT-judge codex path when it is configured to
+        # grade the rubric. wait_for_codex_bridge_healthy above only probes
+        # /healthz from INSIDE the container (and /healthz is not secret-gated),
+        # so it does NOT catch a dropped host publish or a dead ChatGPT OAuth
+        # token — both otherwise surface at GRADE time, after the trajectory runs.
+        # Only runs when the GPT judge will actually use this bridge; opt out with
+        # WCB_SKIP_JUDGE_CODEX_PREFLIGHT=1.
+        _skip_codex_pf = os.environ.get(
+            "WCB_SKIP_JUDGE_CODEX_PREFLIGHT", ""
+        ).strip().lower() in ("1", "true", "yes", "on")
+        if not _skip_codex_pf and grading._gpt_judge_configured() \
+                and grading._judge_codex_bridge_url():
+            _cok, _cdetail = grading.preflight_judge_codex()
+            if _cok == "fail":
+                raise RuntimeError(
+                    "GPT-judge codex preflight FAILED — the rubric judge cannot "
+                    f"reach GPT via your ChatGPT subscription: {_cdetail}. This is "
+                    "the auth that grades the rubric (Channel B); refusing to run "
+                    "the trajectory only to fail at grade time. Fix the codex login "
+                    "(`codex login`), or skip with WCB_SKIP_JUDGE_CODEX_PREFLIGHT=1."
+                )
+            logger.info("GPT-judge codex preflight %s (%s)", _cok, _cdetail)
 
     config.work_dir.mkdir(parents=True, exist_ok=True)
     if shared_mode and shared_yaml_path and Path(shared_yaml_path).is_file():
@@ -3526,11 +3626,24 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
                 f"Strict mode: refusing to continue with a dead sidecar. "
                 f"Override budget via KENSEI_LITELLM_HEALTH_TIMEOUT env (seconds)."
             )
+        # Preflight probes the model the AGENT will actually use. Prefer the
+        # explicitly-selected `--model` when the sidecar serves it (so e.g. a
+        # first-party `--model <meta_model>` run validates the 1P relay, not an
+        # unrelated Bedrock upstream). DEFAULT_MODEL is an openrouter id that is
+        # never a sidecar model_name, so it falls through to the credential-
+        # precedence default below, preserving the historic bare-invocation path.
+        _served = served_trajectory_models(auth_provider_id, config)
+        if config.meta_api_key and config.meta_model:
+            _served.add(config.meta_model)
+        if use_codex_oauth:
+            _served.add(codex_model)
+        selected = getattr(args, "model", "") or ""
         probe_model = (
+            selected if (selected in _served and not selected.startswith("litellm/"))
             # For a codex-oauth run the agent LLM is gpt-5.6 through the codex
             # bridge, so validate THAT path end-to-end here rather than probing an
             # unrelated Bedrock/OpenAI upstream the agent won't use.
-            codex_model if use_codex_oauth
+            else codex_model if use_codex_oauth
             else "claude-opus-4.7" if use_oauth  # OAuth bridge registers this model name
             else "claude-opus-4.7" if (config.aws_bearer_token and config.bedrock_inference_arn) or config.anthropic_api_key
             else "gpt-5.5" if config.openai_api_key
@@ -4008,6 +4121,23 @@ def _run_main_body(args) -> None:
     )
 
     _init_usage_reporting(args, config)
+
+    # The codex trajectory route is selected by a FLAG (--use-codex-oauth), but
+    # `served_trajectory_models` reads it off config -- and config only carries it
+    # when WCB_USE_CODEX_OAUTH was set in env. Reconcile the flag onto config here
+    # so the validation below (and the later substitution site) sees the codex
+    # model id. Env-derived True is never downgraded by an absent flag.
+    if _codex_oauth_enabled(args):
+        config.use_codex_oauth = True
+        config.codex_model = _codex_model()
+    else:
+        # Ownership guard (backend-agnostic, runs before any grading): this run
+        # owns no codex bridge, so a persisted .env KENSEI_JUDGE_CODEX_BRIDGE_URL
+        # must not make grading._gpt_judge_configured() route the GPT judge at a
+        # dead bridge. Placed here (not in _setup_litellm_and_mocks) because that
+        # function early-returns when --litellm is off and is only called on the
+        # openclaw backend, while Channel B grading runs on every backend.
+        os.environ.pop("KENSEI_JUDGE_CODEX_BRIDGE_URL", None)
 
     # Validate an EXPLICIT provider/model pair here too, not only at the later
     # substitution site: that one runs after the sidecar and mock stack are

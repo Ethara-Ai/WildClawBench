@@ -32,6 +32,7 @@ from src.utils.auth_provider import (
     PROVIDERS,
     AuthProviderError,
     available_judge_families,
+    council_judge_families,
     normalize_provider,
     provider_label,
     validate_judge_selection,
@@ -81,7 +82,7 @@ MODEL_CHOICES = [
     "claude-fable-5",
     "claude-sonnet-4-6",
     "gpt-5.5",
-    "gpt-5.6",
+    "gpt-5.6-sol",
     "glassy_lagoon",
 ]
 
@@ -335,7 +336,7 @@ def _judge_members_override(config: Dict[str, Any]) -> Dict[str, str]:
     if not provider:
         return {}
     selected = [f.strip() for f in str(config.get("judge_models") or "").split(",") if f.strip()]
-    full = list(available_judge_families(provider))
+    full = list(council_judge_families(provider))
     if not selected or selected == full:
         return {}
     pairs = []
@@ -474,7 +475,7 @@ if _TEXTUAL_AVAILABLE:
             are never presented rather than being offered and then rejected.
             Bedrock offers the full council plus each single-model option.
             """
-            families = list(available_judge_families(provider))
+            families = list(council_judge_families(provider))
             full = ",".join(families)
             label = " + ".join(JUDGE_LABELS.get(f, f) for f in families)
             options: List[Tuple[str, str]] = []
