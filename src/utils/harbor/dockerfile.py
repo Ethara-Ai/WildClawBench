@@ -48,6 +48,12 @@ def generate_harbor_dockerfile(
         "RUN pip install --no-cache-dir --break-system-packages pymupdf pillow "
         "openpyxl python-docx python-pptx",
         "",
+        "RUN pip install --no-cache-dir --break-system-packages openai-whisper \\",
+        "    && mkdir -p /opt/wb_whisper_models \\",
+        "    && python3 -c \"import whisper; whisper.load_model('small', "
+        "download_root='/opt/wb_whisper_models')\" \\",
+        "    && mkdir -p /root/.cache && ln -sfn /opt/wb_whisper_models /root/.cache/whisper",
+        "",
     ]
     if has_skills:
         # COPY the skills tree once, then fan it out to the remaining agent

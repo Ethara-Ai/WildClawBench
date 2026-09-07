@@ -1480,6 +1480,12 @@ def _generate_environment_dockerfile(
         "RUN pip install --no-cache-dir --break-system-packages pymupdf pillow "
         "openpyxl python-docx python-pptx",
         "",
+        "RUN pip install --no-cache-dir --break-system-packages openai-whisper \\",
+        "    && mkdir -p /opt/wb_whisper_models \\",
+        "    && python3 -c \"import whisper; whisper.load_model('small', "
+        "download_root='/opt/wb_whisper_models')\" \\",
+        "    && mkdir -p /root/.cache && ln -sfn /opt/wb_whisper_models /root/.cache/whisper",
+        "",
     ]
     if has_skills:
         first = _AGENT_SKILL_DIRS[0]
