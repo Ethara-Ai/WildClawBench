@@ -377,15 +377,70 @@ def set_agent_sim_clock(task_id: str, epoch_ms: int) -> bool:
     if not _container_running(task_id):
         logger.info("[%s] sim clock: container not up; skip re-anchor", task_id)
         return False
-    parent = str(PurePosixPath(AGENT_SIM_CLOCK_FILE).parent)
     r = subprocess.run(
         ["docker", "exec", task_id, "/bin/sh", "-c",
-         f"mkdir -p {parent} && printf '%s' '{int(epoch_ms)}' > {AGENT_SIM_CLOCK_FILE}"],
+         _write_sim_clock_anchor_sh(epoch_ms)],
         capture_output=True, text=True,
     )
     if r.returncode != 0:
         logger.warning("[%s] sim clock re-anchor failed: %s",
                        task_id, (r.stderr or "").strip())
+        return False
+    return True
+
+
+def _write_sim_clock_anchor_sh(epoch_ms: int) -> str:
+    """Shell that (re)writes the anchor file. Its MTIME is the anchor instant.
+
+    The shim derives ``simulated = anchor + (realNow - mtime)``, so the write
+    must land as one fresh file rather than an in-place edit — every process
+    that later reads it must recover the same instant this anchor took effect.
+    """
+    parent = str(PurePosixPath(AGENT_SIM_CLOCK_FILE).parent)
+    return (f"mkdir -p {parent} && "
+            f"printf '%s' '{int(epoch_ms)}' > {AGENT_SIM_CLOCK_FILE}")
+
+
+def seed_agent_sim_clock(task_id: str, epoch_ms: int, node_options: str) -> bool:
+    """Make the simulated clock reachable from ENV-SCRUBBED processes.
+
+    cron does not inherit the container's environment (nor do ``su -``, systemd
+    units, or anything else re-execing through a clean env), so both halves of
+    the shim's delivery are dropped for a cron job: NODE_OPTIONS (which
+    preloads the shim) and WCB_FAKE_CLOCK_EPOCH_MS (the anchor). Such a process
+    silently ran on the REAL host clock while the agent ran months away in
+    persona time. Two writes at container start close that:
+
+      * AGENT_SIM_CLOCK_FILE, seeded here so it exists from turn 0 — the shim
+        reads its anchor from this file regardless of env, at the path it
+        defaults to when WCB_FAKE_CLOCK_FILE is scrubbed too.
+      * /etc/environment, which cron and PAM's env module apply to jobs, so the
+        preload actually happens in the child.
+
+    Best effort: a failure leaves the env-var path (main agent process) intact
+    and is logged, never fatal.
+    """
+    lines = "".join(
+        f"{k}={v}\n" for k, v in (
+            ("NODE_OPTIONS", node_options),
+            ("WCB_FAKE_CLOCK_FILE", AGENT_SIM_CLOCK_FILE),
+            ("WCB_FAKE_CLOCK_EPOCH_MS", str(int(epoch_ms))),
+        )
+    )
+    script = (
+        f"{_write_sim_clock_anchor_sh(epoch_ms)} && "
+        f"touch /etc/environment && "
+        f"sed -i '/^NODE_OPTIONS=/d; /^WCB_FAKE_CLOCK_/d' /etc/environment && "
+        f"printf '%s' {shlex.quote(lines)} >> /etc/environment"
+    )
+    r = subprocess.run(
+        ["docker", "exec", task_id, "/bin/sh", "-c", script],
+        capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        logger.warning(
+            "[%s] sim clock: could not seed anchor/cron env — cron jobs will "
+            "run on the REAL host clock: %s", task_id, (r.stderr or "").strip())
         return False
     return True
 
@@ -537,6 +592,7 @@ def start_container(task_id: str, workspace_path: str, extra_env: str = "",
     # rebuild: OpenClaw runs under node, which honors NODE_OPTIONS=--require, and
     # the shim leaves the monotonic clock untouched so timeouts stay in real time.
     sim_args: list[str] = []
+    sim_node_opts = ""
     if sim_clock_epoch_ms is not None:
         shim_host = Path(__file__).resolve().parents[2] / "docker" / "agent_faketime_shim.js"
         if not shim_host.is_file():
@@ -559,10 +615,12 @@ def start_container(task_id: str, workspace_path: str, extra_env: str = "",
             if any(c in node_opts for c in _FORBIDDEN_VALUE_CHARS):
                 raise ValueError("NODE_OPTIONS contains a forbidden control char")
             sim_args = ["-v", f"{shim_host}:{shim_ctr}:ro", "-e", f"NODE_OPTIONS={node_opts}"]
+            sim_node_opts = node_opts
             env_pairs.append(("WCB_FAKE_CLOCK_EPOCH_MS", str(int(sim_clock_epoch_ms))))
             # Turn-0 anchor rides the env var; later turns re-anchor by writing
             # AGENT_SIM_CLOCK_FILE (env is immutable on a running container).
-            # The shim falls back to the env value while the file is absent.
+            # Both are seeded into the container below as well, because a
+            # process started from a scrubbed env (cron) inherits neither.
             env_pairs.append(("WCB_FAKE_CLOCK_FILE", AGENT_SIM_CLOCK_FILE))
             if sim_tz:
                 env_pairs.append(("TZ", sim_tz))
@@ -588,6 +646,9 @@ def start_container(task_id: str, workspace_path: str, extra_env: str = "",
     if r.returncode != 0:
         raise RuntimeError(f"Container startup failed:\n{r.stderr}")
     logger.info("[%s] Container ID: %s", task_id, r.stdout.strip()[:12])
+
+    if sim_node_opts and sim_clock_epoch_ms is not None:
+        seed_agent_sim_clock(task_id, int(sim_clock_epoch_ms), sim_node_opts)
 
     if tmp_path and os.path.exists(tmp_path):
         mkdir_cmd = ["docker", "exec", task_id, "mkdir", "-p", "/tmp_workspace/tmp"]
