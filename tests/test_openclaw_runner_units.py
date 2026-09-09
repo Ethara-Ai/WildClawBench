@@ -495,6 +495,169 @@ class TestSetModelOpenrouter:
 
 
 # ---------------------------------------------------------------------------
+# Inline-eval obfuscation guard (EXEC_GUARD_SOURCE + _log_exec_guard_state)
+#
+# The guard silences openclaw's exec obfuscation prefilter, which otherwise
+# routes base64/encoded exec calls to a ~120s human-approval wait that headless
+# benchmark runs cannot answer. The decision runs INSIDE the agent container,
+# so these tests exec() the exact source the container executes.
+# ---------------------------------------------------------------------------
+class TestExecGuardVersionProbe:
+    @staticmethod
+    def _guard():
+        ns: dict = {}
+        exec(ocr.EXEC_GUARD_SOURCE, ns)
+        return ns
+
+    @staticmethod
+    def _pkg(tmp_path, name, body):
+        p = tmp_path / name
+        p.write_text(body, encoding="utf-8")
+        return str(p)
+
+    def test_prerelease_version_arms_the_guard(self, tmp_path):
+        # BYPASS REPRO: the previous gate did int(x) on each component, so a
+        # published prerelease ("2026.4.0-rc.1") raised ValueError on
+        # int("0-rc"), hit the bare `except Exception: pass`, and left the
+        # prefilter ARMED on a build that ships it -- while the harness still
+        # logged the config write as a success.
+        with pytest.raises(ValueError):
+            tuple(int(x) for x in "2026.4.0-rc.1".split(".")[:3])
+        ns = self._guard()
+        pkg = self._pkg(tmp_path, "pre.json", '{"version": "2026.4.0-rc.1"}')
+        cfg: dict = {}
+        assert ns["_wcb_arm_exec_guard"](cfg, [pkg]) == "armed"
+        assert cfg["strictInlineEval"] is False
+
+    @pytest.mark.parametrize("version", ["2026.4.0", "2026.3.31", "2026.4", "2027.1.0"])
+    def test_supported_versions_write_strict_inline_eval(self, tmp_path, version):
+        ns = self._guard()
+        pkg = self._pkg(tmp_path, "ok.json", json.dumps({"version": version}))
+        cfg: dict = {}
+        assert ns["_wcb_arm_exec_guard"](cfg, [pkg]) == "armed"
+        assert cfg["strictInlineEval"] is False
+
+    @pytest.mark.parametrize("version", ["2026.3.11", "2026.3.30", "2025.12.9"])
+    def test_older_builds_keep_the_key_unwritten(self, tmp_path, version):
+        # Pre-2026.3.31 validators reject strictInlineEval as an "Unrecognized
+        # key" and refuse the WHOLE config; the prefilter does not exist there.
+        ns = self._guard()
+        pkg = self._pkg(tmp_path, "old.json", json.dumps({"version": version}))
+        cfg: dict = {}
+        assert ns["_wcb_arm_exec_guard"](cfg, [pkg]) == "not-required"
+        assert "strictInlineEval" not in cfg
+
+    @pytest.mark.parametrize("body", ['{"version": "latest"}', '{"name": "openclaw"}', "not json"])
+    def test_undeterminable_version_reports_unknown_and_writes_nothing(self, tmp_path, body):
+        ns = self._guard()
+        pkg = self._pkg(tmp_path, "bad.json", body)
+        cfg: dict = {}
+        assert ns["_wcb_arm_exec_guard"](cfg, [pkg]) == "unknown-version"
+        assert "strictInlineEval" not in cfg
+
+    def test_missing_package_json_reports_unknown(self, tmp_path):
+        ns = self._guard()
+        cfg: dict = {}
+        missing = str(tmp_path / "absent.json")
+        assert ns["_wcb_arm_exec_guard"](cfg, [missing]) == "unknown-version"
+        assert "strictInlineEval" not in cfg
+
+    def test_falls_through_to_the_second_npm_root(self, tmp_path):
+        # Images that install openclaw under /usr/local/lib/node_modules used
+        # to probe-miss entirely and silently skip the guard.
+        ns = self._guard()
+        missing = str(tmp_path / "absent.json")
+        pkg = self._pkg(tmp_path, "second.json", '{"version": "2026.4.2"}')
+        cfg: dict = {}
+        assert ns["_wcb_arm_exec_guard"](cfg, [missing, pkg]) == "armed"
+        assert cfg["strictInlineEval"] is False
+
+    def test_probes_both_default_npm_global_roots(self):
+        ns = self._guard()
+        assert ns["_WCB_OC_PKG_PATHS"] == (
+            "/usr/lib/node_modules/openclaw/package.json",
+            "/usr/local/lib/node_modules/openclaw/package.json",
+        )
+
+    @pytest.mark.parametrize("version,expected", [
+        ("2026.4.0-rc.1", (2026, 4, 0)),
+        ("2026.4.1+build.7", (2026, 4, 1)),
+        ("2026.10.2", (2026, 10, 2)),
+        ("2026.4", (2026, 4)),
+    ])
+    def test_version_parsed_by_numeric_prefix(self, tmp_path, version, expected):
+        ns = self._guard()
+        pkg = self._pkg(tmp_path, "v.json", json.dumps({"version": version}))
+        assert ns["_wcb_openclaw_version"]([pkg]) == expected
+
+
+class TestExecGuardEmittedScript:
+    @pytest.mark.parametrize("litellm", [True, False])
+    def test_both_branches_embed_the_guard_and_report_it(self, monkeypatch, litellm):
+        a = (_bare_agent(litellm_config_yaml="/x.yaml", litellm_container_name="ll")
+             if litellm else _bare_agent())
+        rec = _RecordingRun(_FakeCompleted(returncode=0))
+        monkeypatch.setattr(ocr.subprocess, "run", rec)
+        a._set_model("task", "claude-opus-4.7")
+        script = _extract_script(rec)
+        assert "_wcb_arm_exec_guard(exec_cfg)" in script
+        assert ocr.EXEC_GUARD_SOURCE in script
+        assert f'print("{ocr._EXEC_GUARD_MARKER}" + _guard_state)' in script
+        compile(script, "<container-config>", "exec")
+
+    def test_guard_runs_before_the_config_is_written(self, monkeypatch):
+        a = _bare_agent(litellm_config_yaml="/x.yaml", litellm_container_name="ll")
+        rec = _RecordingRun(_FakeCompleted(returncode=0))
+        monkeypatch.setattr(ocr.subprocess, "run", rec)
+        a._set_model("task", "claude-opus-4.7")
+        script = _extract_script(rec)
+        assert script.index("_wcb_arm_exec_guard(exec_cfg)") < script.index("p.write_text(")
+
+
+class TestLogExecGuardState:
+    def _agent(self):
+        return _bare_agent(litellm_config_yaml="/x.yaml", litellm_container_name="ll")
+
+    def test_armed_state_logs_info_not_warning(self, caplog):
+        caplog.set_level("INFO", logger=ocr.logger.name)
+        self._agent()._log_exec_guard_state("t", "WCB_EXEC_GUARD=armed\n")
+        assert not [r for r in caplog.records if r.levelname == "WARNING"]
+        assert "guard armed" in caplog.text
+
+    def test_not_required_state_logs_info_not_warning(self, caplog):
+        caplog.set_level("INFO", logger=ocr.logger.name)
+        self._agent()._log_exec_guard_state("t", "WCB_EXEC_GUARD=not-required\n")
+        assert not [r for r in caplog.records if r.levelname == "WARNING"]
+        assert "not required" in caplog.text
+
+    @pytest.mark.parametrize("stdout", ["WCB_EXEC_GUARD=unknown-version", "", None, "noise\n"])
+    def test_unarmed_state_warns(self, caplog, stdout):
+        caplog.set_level("INFO", logger=ocr.logger.name)
+        self._agent()._log_exec_guard_state("t", stdout)
+        warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+        assert len(warnings) == 1
+        assert "NOT armed" in warnings[0].getMessage()
+
+    def test_marker_is_read_from_a_noisy_stdout(self, caplog):
+        caplog.set_level("INFO", logger=ocr.logger.name)
+        self._agent()._log_exec_guard_state(
+            "t", "some warning\n  WCB_EXEC_GUARD=armed  \ntrailing\n")
+        assert not [r for r in caplog.records if r.levelname == "WARNING"]
+
+    def test_set_model_surfaces_the_container_state(self, monkeypatch, caplog):
+        # The gap this closes: _set_model previously only checked returncode,
+        # so a container left unguarded looked identical to a guarded one.
+        caplog.set_level("INFO", logger=ocr.logger.name)
+        a = self._agent()
+        monkeypatch.setattr(
+            ocr.subprocess, "run",
+            lambda *a2, **k2: _FakeCompleted(0, stdout="WCB_EXEC_GUARD=unknown-version"),
+        )
+        a._set_model("task", "claude-opus-4.7")
+        assert [r for r in caplog.records if r.levelname == "WARNING"]
+
+
+# ---------------------------------------------------------------------------
 # _inject_auth
 # ---------------------------------------------------------------------------
 class TestInjectAuth:

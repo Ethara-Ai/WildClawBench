@@ -77,6 +77,95 @@ def _normalize_openrouter_model(model: str) -> str:
     return f"openrouter/anthropic/{model}"
 
 
+# ---------------------------------------------------------------------------
+# Inline-eval obfuscation guard -- container side.
+#
+# openclaw's exec path runs a prefilter that flags "Python/Perl/Ruby with
+# base64 or encoded execution" as obfuscation and routes the call to a human
+# approval channel (exec.approval.waitDecision ~120s) that headless benchmark
+# runs do not have. tools.exec.security="full" does NOT cover this prefilter
+# (see trajectory/builder.py classify_child_completion); only
+# tools.exec.strictInlineEval=false silences it, and that key is unrecognized
+# -- and therefore config-breaking -- on openclaw < 2026.3.31.
+#
+# The gate is decided INSIDE the agent container, from the installed package's
+# version, so the decision lives here as standalone source: _set_model embeds
+# it verbatim in the config script it pipes to `docker exec`, and the unit
+# tests exec() the same source. Two properties the previous inline
+# `try: int(...) / except Exception: pass` form did not have:
+#
+#   * version components are parsed by numeric PREFIX, so the prerelease and
+#     build-tagged strings openclaw actually publishes ("2026.4.0-rc.1") no
+#     longer raise ValueError and silently skip the guard on a build that DOES
+#     ship the prefilter;
+#   * both npm global roots are probed, and the outcome is REPORTED back to the
+#     harness on stdout instead of being swallowed, so a container that ends up
+#     unguarded shows up in the run log rather than only surfacing afterwards
+#     as an "/approve" plea in a trajectory.
+#
+# An undeterminable version still skips the key (writing an unrecognized key
+# disables the WHOLE config) -- but now it says so out loud.
+# ---------------------------------------------------------------------------
+
+#: stdout marker the in-container config script uses to report the outcome.
+_EXEC_GUARD_MARKER = "WCB_EXEC_GUARD="
+
+#: First openclaw release whose config validator recognizes strictInlineEval.
+_STRICT_INLINE_EVAL_MIN_VERSION = (2026, 3, 31)
+
+EXEC_GUARD_SOURCE = rf'''
+import json as _wcb_json
+import pathlib as _wcb_pathlib
+import re as _wcb_re
+
+_WCB_OC_PKG_PATHS = (
+    "/usr/lib/node_modules/openclaw/package.json",
+    "/usr/local/lib/node_modules/openclaw/package.json",
+)
+_WCB_STRICT_INLINE_EVAL_MIN = {_STRICT_INLINE_EVAL_MIN_VERSION}
+
+
+def _wcb_openclaw_version(paths=_WCB_OC_PKG_PATHS):
+    """Installed openclaw version as an int tuple, or None if undeterminable.
+
+    Components are read by numeric prefix so "2026.4.0-rc.1" parses as
+    (2026, 4, 0) instead of blowing up on int("0-rc"). A component with no
+    leading digits truncates the tuple; fewer than two components is treated
+    as unusable and the next candidate path is tried.
+    """
+    for _path in paths:
+        try:
+            _raw = _wcb_json.loads(_wcb_pathlib.Path(_path).read_text())["version"]
+        except Exception:
+            continue
+        _parts = []
+        for _chunk in str(_raw).split(".")[:3]:
+            _m = _wcb_re.match(r"\s*(\d+)", _chunk)
+            if _m is None:
+                break
+            _parts.append(int(_m.group(1)))
+        if len(_parts) >= 2:
+            return tuple(_parts)
+    return None
+
+
+def _wcb_arm_exec_guard(exec_cfg, paths=_WCB_OC_PKG_PATHS):
+    """Silence the inline-eval prefilter; return what actually happened.
+
+    "armed" -- key written; "not-required" -- build predates the prefilter;
+    "unknown-version" -- version undeterminable, key withheld to keep the
+    config loadable (the caller warns about this one).
+    """
+    _version = _wcb_openclaw_version(paths)
+    if _version is None:
+        return "unknown-version"
+    if _version >= _WCB_STRICT_INLINE_EVAL_MIN:
+        exec_cfg["strictInlineEval"] = False
+        return "armed"
+    return "not-required"
+'''
+
+
 class OpenClawAgent(BaseAgent):
     """OpenClaw backend with dual routing:
 
@@ -1631,23 +1720,18 @@ exec_cfg["security"] = "full"
 #     benchmark image ships 2026.3.11, whose validator rejected it as an
 #     "Unrecognized key" (gateway.log 2026-06-13 darren_weston) -- same
 #     failure class as the 2026-06-02 megan-davis Unrecognized-keys run.
-# So we version-gate: read the installed openclaw version and only set
-# strictInlineEval=false when >=2026.3.31 (e.g. local 2026.4.x). On older
-# builds (2026.3.11) the prefilter does not exist and security="full"
-# above already suffices, so skipping the key is both correct and safe.
-# Unreadable/unparseable version -> skip (fail safe, keep config valid).
-try:
-    _ocv = json.loads(pathlib.Path("/usr/lib/node_modules/openclaw/package.json").read_text())["version"]
-    if tuple(int(x) for x in _ocv.split(".")[:3]) >= (2026, 3, 31):
-        exec_cfg["strictInlineEval"] = False
-except Exception:
-    pass
+# So we version-gate INSIDE the container -- see EXEC_GUARD_SOURCE for the
+# probe, why a numeric-prefix parse is required, and why the outcome is
+# echoed back to the harness instead of being swallowed.
+{EXEC_GUARD_SOURCE}
+_guard_state = _wcb_arm_exec_guard(exec_cfg)
 sandbox_cfg = defaults.setdefault("sandbox", {{}})
 sandbox_cfg["mode"] = "off"
 web = tools.setdefault("web", {{}})
 web["search"] = {{"enabled": False}}
 web["fetch"] = {{"enabled": False}}
 p.write_text(json.dumps(d, indent=2))
+print({json.dumps(_EXEC_GUARD_MARKER)} + _guard_state)
 """
         else:
             normalized = _normalize_openrouter_model(model)
@@ -1671,24 +1755,21 @@ tools["deny"] = [
 ]
 # Mirror the LiteLLM branch: see comments there for the full rationale,
 # including why the chrome/chromium/etc. root-key writes were removed and
-# why strictInlineEval is version-gated (it is unrecognized on the EC2
-# image's openclaw 2026.3.11 and disables the whole config if written;
-# only >=2026.3.31 accepts it). openclaw issues #60054/#59625.
+# why strictInlineEval is version-gated in-container (it is unrecognized on
+# the EC2 image's openclaw 2026.3.11 and disables the whole config if
+# written; only >=2026.3.31 accepts it). openclaw issues #60054/#59625.
 exec_cfg = tools.setdefault("exec", {{}})
 exec_cfg["host"] = "gateway"
 exec_cfg["security"] = "full"
-try:
-    _ocv = json.loads(pathlib.Path("/usr/lib/node_modules/openclaw/package.json").read_text())["version"]
-    if tuple(int(x) for x in _ocv.split(".")[:3]) >= (2026, 3, 31):
-        exec_cfg["strictInlineEval"] = False
-except Exception:
-    pass
+{EXEC_GUARD_SOURCE}
+_guard_state = _wcb_arm_exec_guard(exec_cfg)
 sandbox_cfg = defaults.setdefault("sandbox", {{}})
 sandbox_cfg["mode"] = "off"
 web = tools.setdefault("web", {{}})
 web["search"] = {{"enabled": False}}
 web["fetch"] = {{"enabled": False}}
 p.write_text(json.dumps(d, indent=2))
+print({json.dumps(_EXEC_GUARD_MARKER)} + _guard_state)
 """
         r = subprocess.run(
             ["docker", "exec", "-i", task_id, "python3", "-"],
@@ -1698,7 +1779,45 @@ p.write_text(json.dumps(d, indent=2))
         )
         if r.returncode != 0:
             raise RuntimeError(f"Model setup failed:\n{r.stderr}")
+        self._log_exec_guard_state(task_id, r.stdout)
         logger.info("[%s] Model set in openclaw.json: %s", task_id, primary)
+
+    def _log_exec_guard_state(self, task_id: str, stdout: str | None) -> None:
+        """Surface what the container-side inline-eval guard actually did.
+
+        The config script reports its outcome instead of failing: an
+        unrecognized ``strictInlineEval`` would disable the whole openclaw
+        config, so an undeterminable version MUST still skip the write.
+        Skipping it *silently* is what let an unguarded container go unnoticed
+        until an ``/approve`` plea turned up in a trajectory, so the un-armed
+        case is a WARNING here.
+        """
+        state = ""
+        for line in (stdout or "").splitlines():
+            stripped = line.strip()
+            if stripped.startswith(_EXEC_GUARD_MARKER):
+                state = stripped[len(_EXEC_GUARD_MARKER):]
+        if state == "armed":
+            logger.info(
+                "[%s] exec obfuscation guard armed "
+                "(tools.exec.strictInlineEval=false)", task_id,
+            )
+        elif state == "not-required":
+            logger.info(
+                "[%s] exec obfuscation guard not required (installed openclaw "
+                "predates the inline-eval prefilter)", task_id,
+            )
+        else:
+            logger.warning(
+                "[%s] exec obfuscation guard NOT armed (%s): the openclaw "
+                "version could not be determined inside the container, so "
+                "tools.exec.strictInlineEval was left unwritten to keep the "
+                "config loadable. If this build ships the inline-eval "
+                "prefilter, base64/encoded exec calls will stall ~120s on an "
+                "approval channel headless runs do not have and the lane will "
+                "die on an '/approve' plea.",
+                task_id, state or "no marker on stdout",
+            )
 
     def _inject_auth(self, task_id: str) -> None:
         # LiteLLM holds Bedrock/OpenAI creds via its own env; no agent-side key.
