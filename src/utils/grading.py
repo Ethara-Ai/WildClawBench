@@ -477,13 +477,22 @@ _AUDIO_MAX_COLLECT_BYTES = 50_000_000
 _ALL_DELIVERABLE_EXTS = (_DELIVERABLE_EXTS | _BINARY_DELIVERABLE_EXTS
                          | _IMAGE_DELIVERABLE_EXTS | _AUDIO_DELIVERABLE_EXTS)
 _ROOT_SCAN_MAX_FILE_BYTES = 512_000   # skip oversized files in the root scan
+# Dedicated ceiling for binaries the RUBRIC NAMES. The 512KB gate above is a
+# blob guard for files nobody asked about, but it also dropped a 1.4MB
+# session_handout.pdf that criteria graded by name — before extraction, so
+# neither its text nor an omission note ever reached the judge, which then
+# graded the agent's .scratch notes instead (2026-09-08). A named file is
+# always worth collecting; _EXTRACT_CHAR_CAP still bounds what its text costs.
+_BINARY_MAX_COLLECT_BYTES = 8_000_000
 # Cap on extracted-text length per binary deliverable (docx/pdf). Bounds the
 # per-member evidence budget so a large extraction cannot bury report.md for the
 # smaller-context council members (Kimi 225 KB / GLM 175 KB).
 _EXTRACT_CHAR_CAP = 100_000
 
 
-def _looks_like_deliverable(path: Path, root: Path) -> bool:
+def _looks_like_deliverable(
+    path: Path, root: Path, named: frozenset[str] = frozenset()
+) -> bool:
     """True if a workspace-root file looks like agent output (any deliverable
     extension, text or supported binary) rather than an oversized blob or binary
     input outside our supported set. Used by the presence-scan stage so binaries
@@ -491,7 +500,7 @@ def _looks_like_deliverable(path: Path, root: Path) -> bool:
     if path.suffix.lower() not in _ALL_DELIVERABLE_EXTS:
         return False
     try:
-        return path.stat().st_size <= _ROOT_SCAN_MAX_FILE_BYTES
+        return path.stat().st_size <= _collect_size_cap(path, named)
     except OSError:
         return False
 
@@ -515,9 +524,42 @@ def _is_binary_deliverable(path: Path) -> bool:
     return path.suffix.lower() in _BINARY_DELIVERABLE_EXTS
 
 
-def _collect_deliverable_files(workspace_results: Path) -> list[Path]:
+def _collect_size_cap(path: Path, named: frozenset[str]) -> int:
+    if _is_audio_deliverable(path):
+        return _AUDIO_MAX_COLLECT_BYTES
+    if path.name.lower() in named:
+        return _BINARY_MAX_COLLECT_BYTES
+    return _ROOT_SCAN_MAX_FILE_BYTES
+
+
+def _collect_deliverable_files(
+    workspace_results: Path,
+    rubric_names: frozenset[str] | None = None,
+    oversized: list[tuple[str, int]] | None = None,
+) -> list[Path]:
+    """Deliverable paths under the workspace. `rubric_names` lifts the size gate
+    for the files the rubric grades by name; `oversized`, when given, receives
+    `(name, size)` for every file a size gate dropped so _gather_evidence can
+    name it in the omission manifest instead of dropping it silently."""
     files: list[Path] = []
     seen: set[Path] = set()
+    # Dropped paths need their own dedup set: `seen` only grows on collection,
+    # and the sibling sweep re-walks results/ under artifacts/, so a rejected
+    # file would otherwise be reported once per pass.
+    dropped: set[Path] = set()
+    named = rubric_names or frozenset()
+
+    def _add_sized(f: Path) -> None:
+        if _looks_like_deliverable(f, f.parent, named):
+            seen.add(f)
+            files.append(f)
+        elif (oversized is not None and f not in dropped
+                and f.suffix.lower() in _ALL_DELIVERABLE_EXTS):
+            dropped.add(f)
+            try:
+                oversized.append((f.name, f.stat().st_size))
+            except OSError:
+                pass
 
     def _add_from(root: Path) -> None:
         if not root.is_dir():
@@ -528,20 +570,9 @@ def _collect_deliverable_files(workspace_results: Path) -> list[Path]:
             if _is_text_deliverable(f):
                 seen.add(f)
                 files.append(f)
-            elif _is_audio_deliverable(f):
-                try:
-                    if f.stat().st_size <= _AUDIO_MAX_COLLECT_BYTES:
-                        seen.add(f)
-                        files.append(f)
-                except OSError:
-                    continue
-            elif _is_binary_deliverable(f) or _is_image_deliverable(f):
-                try:
-                    if f.stat().st_size <= _ROOT_SCAN_MAX_FILE_BYTES:
-                        seen.add(f)
-                        files.append(f)
-                except OSError:
-                    continue
+            elif (_is_audio_deliverable(f) or _is_binary_deliverable(f)
+                    or _is_image_deliverable(f)):
+                _add_sized(f)
 
     if workspace_results:
         results_path = Path(workspace_results)
@@ -560,9 +591,8 @@ def _collect_deliverable_files(workspace_results: Path) -> list[Path]:
             # text-like deliverable files sitting directly under the sweep root,
             # without recursing into input/scaffold subtrees.
             for f in sorted(sibling.glob("*")):
-                if f.is_file() and f not in seen and _looks_like_deliverable(f, sibling):
-                    seen.add(f)
-                    files.append(f)
+                if f.is_file() and f not in seen:
+                    _add_sized(f)
     return files
 
 
@@ -594,6 +624,58 @@ def _judge_max_images() -> int:
     return n if 0 < n <= 20 else 8
 
 
+def _judge_pdf_max_pages() -> int:
+    raw = os.environ.get("WCB_JUDGE_PDF_MAX_PAGES", "").strip()
+    try:
+        n = int(raw)
+    except ValueError:
+        return 4
+    return n if 0 < n <= 20 else 4
+
+
+_PDF_RENDER_DPI = 110
+_PDF_RENDER_DPI_RETRY = 72
+
+
+def _pdf_page_attachments(path: Path, room: int) -> list[dict]:
+    """PNG renders of the image-bearing pages of a rubric-named PDF. pypdf text
+    extraction returns nothing for a chart/diagram page, so a criterion about
+    what the PDF SHOWS was graded from the agent's narration. GUARDED import
+    (mirrors the pypdf pattern in _extract_text_deliverable): no pymupdf -> no
+    renders, never an exception. Pages without embedded images are skipped —
+    their text already reached the judge through the extraction path."""
+    if room <= 0:
+        return []
+    try:
+        import fitz
+    except ImportError:
+        return []
+    import base64
+
+    out: list[dict] = []
+    try:
+        with fitz.open(str(path)) as doc:
+            for pno in range(min(doc.page_count, _judge_pdf_max_pages())):
+                if len(out) >= room:
+                    break
+                page = doc.load_page(pno)
+                if not page.get_images(full=True):
+                    continue
+                data = page.get_pixmap(dpi=_PDF_RENDER_DPI).tobytes("png")
+                if len(data) > _IMAGE_ATTACH_MAX_BYTES:
+                    data = page.get_pixmap(dpi=_PDF_RENDER_DPI_RETRY).tobytes("png")
+                    if len(data) > _IMAGE_ATTACH_MAX_BYTES:
+                        continue
+                out.append({
+                    "name": f"{path.name}#page{pno + 1}",
+                    "media_type": "image/png",
+                    "b64": base64.b64encode(data).decode("ascii"),
+                })
+    except Exception:
+        return out
+    return out
+
+
 def _collect_image_attachments(
     workspace_results: Path,
     chunk_names: frozenset[str],
@@ -601,32 +683,42 @@ def _collect_image_attachments(
     """Base64 image blocks for the deliverable images THIS criteria chunk
     names. Chunk-scoped so each judge call pays only for the pixels its own
     criteria need (rubric-named files; caps: 8 images, 3.5MB each - Anthropic
-    rejects ~5MB, Bedrock converse allows 20/request). Oversized or unnamed
-    images keep the dimension-only marker semantics."""
+    rejects ~5MB, Bedrock converse allows 20/request). Named PDFs contribute
+    per-page renders (`file.pdf#pageN`) for their image-bearing pages.
+    Oversized or unnamed images keep the dimension-only marker semantics."""
     if not chunk_names or not _judge_attach_images_enabled():
         return []
     import base64
 
     out: list[dict] = []
     seen_names: set[str] = set()
-    for f in _collect_deliverable_files(workspace_results):
+    cap = _judge_max_images()
+    for f in _collect_deliverable_files(workspace_results, chunk_names):
         name = f.name.lower()
-        if (name not in chunk_names or name in seen_names
-                or not _is_image_deliverable(f)):
+        if name not in chunk_names or name in seen_names:
             continue
-        try:
-            if f.stat().st_size > _IMAGE_ATTACH_MAX_BYTES:
+        if _is_image_deliverable(f):
+            try:
+                if f.stat().st_size > _IMAGE_ATTACH_MAX_BYTES:
+                    continue
+                data = f.read_bytes()
+            except OSError:
                 continue
-            data = f.read_bytes()
-        except OSError:
+            seen_names.add(name)
+            out.append({
+                "name": f.name,
+                "media_type": _IMAGE_MEDIA_TYPES.get(f.suffix.lower(), "image/png"),
+                "b64": base64.b64encode(data).decode("ascii"),
+            })
+        elif f.suffix.lower() == ".pdf":
+            pages = _pdf_page_attachments(f, cap - len(out))
+            if not pages:
+                continue
+            seen_names.add(name)
+            out.extend(pages)
+        else:
             continue
-        seen_names.add(name)
-        out.append({
-            "name": f.name,
-            "media_type": _IMAGE_MEDIA_TYPES.get(f.suffix.lower(), "image/png"),
-            "b64": base64.b64encode(data).decode("ascii"),
-        })
-        if len(out) >= _judge_max_images():
+        if len(out) >= cap:
             break
     return out
 
@@ -873,7 +965,8 @@ def _budget_transcript(transcript: str, budget: int) -> str:
 # unrelated "tmp"/"build" in the host path (e.g. pytest tmp_path) never
 # triggers the demotion.
 _SCRATCH_DIR_NAMES = {
-    "_scratch", "build", "extract", "scratch", "tmp", "temp",
+    "_scratch", ".scratch", ".tmp", ".cache", "build", "extract", "scratch",
+    "tmp", "temp", "work", "intermediate",
     "__pycache__", "node_modules", ".git",
 }
 
@@ -913,7 +1006,12 @@ def _in_scratch_subdir(path: Path) -> bool:
             anchor = i
     if anchor < 0:
         return False
-    return any(p in _SCRATCH_DIR_NAMES for p in parts[anchor + 1:])
+    # Enumerating names can never keep up with what agents invent (2026-09-08:
+    # .scratch/cmp_pdf.txt was graded in place of the delivered PDF), so a
+    # dot/underscore prefix — the universal convention for a hidden work area —
+    # counts as scratch on top of the explicit list.
+    return any(p in _SCRATCH_DIR_NAMES or p[:1] in (".", "_")
+               for p in parts[anchor + 1:])
 
 
 # Reserved tail of the deliverable budget for the omission manifest, so the
@@ -922,6 +1020,18 @@ def _in_scratch_subdir(path: Path) -> bool:
 # layer then routes to Human Evaluation instead of a graded fail).
 _OMISSION_MANIFEST_RESERVE = 400
 _OMISSION_MANIFEST_MAX_NAMES = 40
+_SCRATCH_RANK = 3
+
+
+def _omission_manifest(names: list[str]) -> str:
+    listing = ", ".join(names[:_OMISSION_MANIFEST_MAX_NAMES])
+    extra = len(names) - _OMISSION_MANIFEST_MAX_NAMES
+    return (
+        f"\n----- EVIDENCE BUDGET NOTE: {len(names)} collected file(s)"
+        f" omitted or cut for budget: {listing}"
+        + (f" [+{extra} more]" if extra > 0 else "")
+        + " -----\n"
+    )
 
 
 def _gather_evidence(
@@ -930,44 +1040,69 @@ def _gather_evidence(
     budget: int | None = None,
     rubric_names: frozenset[str] | None = None,
 ) -> str:
-    deliverables = _collect_deliverable_files(workspace_results)
+    named = rubric_names or frozenset()
+    oversized: list[tuple[str, int]] = []
+    deliverables = _collect_deliverable_files(workspace_results, named, oversized)
     # Order so the files the rubric is actually ABOUT survive every member's
     # truncation budget: rubric-named files first, then report/flagged stems,
     # then other deliverables, then scratch subtrees — ascending size within
     # each rank (small, high-signal text before bulky dumps).
-    named = rubric_names or frozenset()
     _PRIMARY = ("report", "flagged")
 
-    def _priority(path: Path) -> tuple:
-        stem = path.stem.lower()
+    def _rank(path: Path) -> int:
         if path.name.lower() in named:
-            rank = 0
-        elif _in_scratch_subdir(path):
-            rank = 3
-        elif any(k in stem for k in _PRIMARY):
-            rank = 1
-        else:
-            rank = 2
+            return 0
+        if _in_scratch_subdir(path):
+            return _SCRATCH_RANK
+        if any(k in path.stem.lower() for k in _PRIMARY):
+            return 1
+        return 2
+
+    def _priority(path: Path) -> tuple:
         try:
             size = path.stat().st_size
         except OSError:
             size = 1 << 30
-        return (rank, size, path.name)
+        return (_rank(path), size, path.name)
+
+    ordered = sorted(deliverables, key=_priority)
+    # Ordering alone did not stop the judge citing scratch: a demoted block that
+    # still reads "DELIVERABLE: cmp_pdf.txt" is quoted as one (2026-09-08). When
+    # a rubric-NAMED file was collected the scratch CONTENT is excluded outright
+    # and replaced by one naming line; with no named file it is kept (it may be
+    # the only evidence there is) but its header never claims deliverable status.
+    scratch_names = [f.name for f in ordered if _rank(f) == _SCRATCH_RANK]
+    drop_scratch = bool(scratch_names) and any(_rank(f) == 0 for f in ordered)
+    scratch_note = (
+        "\n----- SCRATCH (agent work-product, not graded): "
+        + ", ".join(scratch_names) + " -----\n"
+    ) if drop_scratch else ""
 
     blocks: list[tuple[Path, str]] = []
-    for f in sorted(deliverables, key=_priority):
+    for f in ordered:
+        is_scratch = _rank(f) == _SCRATCH_RANK
+        if is_scratch and drop_scratch:
+            continue
         marker = _deliverable_evidence_marker(f)
-        if marker is not None:
-            blocks.append((f, marker))
+        if marker is None:
+            continue
+        if is_scratch:
+            marker = marker.replace("----- DELIVERABLE: ", "----- SCRATCH: ", 1)
+        blocks.append((f, marker))
     if not blocks:
         deliv_blob = (
             "\n(no deliverable files were collected under any of: "
             + ", ".join(f"{n}/" for n in _DELIVERABLE_DIR_NAMES)
             + ")\n"
         )
-        blocks = []
     else:
         deliv_blob = "".join(b for _, b in blocks)
+    deliv_blob += scratch_note
+    # A file dropped by a collection size gate never became a block, so the
+    # budget loop below cannot name it. Carry it into the SAME manifest with its
+    # size — silently absent evidence reads to the judge as "never produced".
+    size_notes = [f"{n} ({s} bytes, too large to collect)" for n, s in oversized]
+    base_manifest = _omission_manifest(size_notes) if size_notes else ""
     effective = _JUDGE_MAX_EVIDENCE if budget is None else budget
     # Budget deliverables and transcript SEPARATELY. The transcript marker can
     # then never be sliced off (so _split_evidence never silently returns ""),
@@ -975,7 +1110,7 @@ def _gather_evidence(
     # floor is reserved so the marker + final turn survive even when deliverables
     # are large; realistic per-family budgets (175K-1.35M) are the operative path.
     if effective is None or not transcript_text:
-        blob = deliv_blob + (
+        blob = deliv_blob + base_manifest + (
             f"{_TRANSCRIPT_MARKER}{transcript_text}" if transcript_text else ""
         )
         return blob if effective is None else blob[:effective]
@@ -984,8 +1119,8 @@ def _gather_evidence(
         max(2000, effective // 5),
     )
     deliv_budget = max(0, effective - floor)
-    if len(deliv_blob) <= deliv_budget:
-        deliv_out = deliv_blob
+    if len(deliv_blob) + len(base_manifest) <= deliv_budget:
+        deliv_out = deliv_blob + base_manifest
     else:
         # Cut on BLOCK boundaries and name what was cut. A raw blob slice
         # leaves the judge unable to distinguish "file never produced"
@@ -995,8 +1130,9 @@ def _gather_evidence(
         kept: list[str] = []
         omitted: list[str] = []
         used = 0
+        reserve = _OMISSION_MANIFEST_RESERVE + len(base_manifest) + len(scratch_note)
         for f, block in blocks:
-            room = deliv_budget - used - _OMISSION_MANIFEST_RESERVE
+            room = deliv_budget - used - reserve
             if len(block) <= room:
                 kept.append(block)
                 used += len(block)
@@ -1012,15 +1148,11 @@ def _gather_evidence(
                 omitted.append(f"{f.name} (partial)")
             else:
                 omitted.append(f.name)
-        listing = ", ".join(omitted[:_OMISSION_MANIFEST_MAX_NAMES])
-        extra = len(omitted) - _OMISSION_MANIFEST_MAX_NAMES
-        manifest = (
-            f"\n----- EVIDENCE BUDGET NOTE: {len(omitted)} collected file(s)"
-            f" omitted or cut for budget: {listing}"
-            + (f" [+{extra} more]" if extra > 0 else "")
-            + " -----\n"
-        )
-        kept.append(manifest[: max(0, deliv_budget - used)])
+        tail_room = max(0, deliv_budget - used)
+        note_out = scratch_note[:tail_room]
+        kept.append(note_out)
+        kept.append(_omission_manifest(size_notes + omitted)[
+            : max(0, tail_room - len(note_out))])
         deliv_out = "".join(kept)
     t_budget = effective - len(deliv_out) - len(_TRANSCRIPT_MARKER)
     t_out = _budget_transcript(transcript_text, max(0, t_budget))
@@ -2262,7 +2394,9 @@ def grade_with_rubric(
                 + ", ".join(i["name"] for i in images)
                 + " — the images above are the actual pixels of the "
                 "corresponding files listed in <output_files>; treat them as "
-                "the authoritative evidence for image-content criteria.\n\n"
+                "the authoritative evidence for image-content criteria. A name "
+                "of the form 'file.pdf#pageN' is a rendered page N of that PDF, "
+                "showing the figures and layout its text extraction cannot.\n\n"
             )
         user_for_member = {
             m.model: note + _judge_user_prompt(

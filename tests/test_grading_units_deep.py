@@ -20,9 +20,11 @@ judge call is ever made. Temp data goes to pytest tmp_path only.
 """
 from __future__ import annotations
 
+import importlib.util
 import io
 import json
 import math
+import random
 import sys
 from contextlib import redirect_stdout
 from pathlib import Path
@@ -1421,3 +1423,226 @@ def test_transcribe_disabled_by_env(tmp_path, monkeypatch):
     monkeypatch.setenv("WCB_JUDGE_AUDIO_TRANSCRIBE", "0")
     _write_wav(tmp_path / "clip.wav")
     assert judge_asr.transcribe(tmp_path / "clip.wav") is None
+
+
+# ---------------------------------------------------------------------------
+# Phase 4: scratch exclusion, rubric-named size exemption, PDF page renders
+# (2026-09-08: a judge graded .scratch/cmp_pdf.txt instead of the delivered
+# session_handout.pdf, which the 512KB gate had dropped before extraction)
+# ---------------------------------------------------------------------------
+
+
+def _results_dir(tmp_path):
+    results = tmp_path / "task_output" / "artifacts" / "results"
+    results.mkdir(parents=True, exist_ok=True)
+    return results
+
+
+_SCRATCH_DIRS = (".scratch", ".tmp", ".cache", "work", "intermediate", "_wip", ".hidden")
+
+
+def test_in_scratch_subdir_covers_dot_prefixed_and_new_names(tmp_path):
+    results = _results_dir(tmp_path)
+    for d in _SCRATCH_DIRS:
+        (results / d).mkdir()
+        (results / d / "note.txt").write_text("x", encoding="utf-8")
+        assert grading._in_scratch_subdir(results / d / "note.txt"), d
+    (results / "final.md").write_text("real", encoding="utf-8")
+    assert not grading._in_scratch_subdir(results / "final.md")
+
+
+def test_gather_evidence_dot_scratch_demoted_and_relabelled(tmp_path):
+    results = _results_dir(tmp_path)
+    (results / ".scratch").mkdir()
+    (results / ".scratch" / "cmp_pdf.txt").write_text("AGENT NOTES", encoding="utf-8")
+    (results / "final.md").write_text("REAL DELIVERABLE" * 300, encoding="utf-8")
+
+    ev = grading._gather_evidence(results, "tail", budget=None)
+    assert ev.index("final.md") < ev.index("cmp_pdf.txt")
+    # No rubric-named file: the block is kept (may be the only evidence) but
+    # must never present itself as a deliverable.
+    assert "----- SCRATCH: cmp_pdf.txt -----" in ev
+    assert "DELIVERABLE: cmp_pdf.txt" not in ev
+    assert "AGENT NOTES" in ev
+    assert "----- DELIVERABLE: final.md -----" in ev
+
+
+def test_gather_evidence_scratch_excluded_when_named_file_present(tmp_path):
+    results = _results_dir(tmp_path)
+    (results / ".scratch").mkdir()
+    (results / ".scratch" / "cmp_pdf.txt").write_text("SCRATCH CLAIM", encoding="utf-8")
+    (results / ".scratch" / "b.txt").write_text("MORE SCRATCH", encoding="utf-8")
+    (results / "handout.md").write_text("DELIVERED CONTENT", encoding="utf-8")
+
+    ev = grading._gather_evidence(
+        results, "tail", budget=None, rubric_names=frozenset({"handout.md"})
+    )
+    assert "DELIVERED CONTENT" in ev
+    assert "SCRATCH CLAIM" not in ev
+    assert "MORE SCRATCH" not in ev
+    assert "DELIVERABLE: cmp_pdf.txt" not in ev
+    assert ("----- SCRATCH (agent work-product, not graded): "
+            "b.txt, cmp_pdf.txt -----") in ev
+
+
+def test_gather_evidence_scratch_kept_when_no_named_deliverable(tmp_path):
+    results = _results_dir(tmp_path)
+    (results / "tmp").mkdir()
+    (results / "tmp" / "workings.md").write_text("PARTIAL WORK", encoding="utf-8")
+
+    ev = grading._gather_evidence(results, "tail", budget=None, rubric_names=frozenset())
+    assert "PARTIAL WORK" in ev
+    assert "----- SCRATCH: workings.md -----" in ev
+    assert "agent work-product, not graded" not in ev
+
+
+def test_gather_evidence_scratch_line_survives_budget_cut(tmp_path):
+    results = _results_dir(tmp_path)
+    (results / ".scratch").mkdir()
+    (results / ".scratch" / "dump.txt").write_text("S" * 5000, encoding="utf-8")
+    (results / "handout.md").write_text("H" * 5000, encoding="utf-8")
+
+    ev = grading._gather_evidence(
+        results, "T" * 100, budget=3000, rubric_names=frozenset({"handout.md"})
+    )
+    assert len(ev) <= 3000
+    assert "agent work-product, not graded): dump.txt" in ev
+    assert "S" * 100 not in ev
+
+
+_HAS_FITZ = importlib.util.find_spec("fitz") is not None
+_needs_fitz = pytest.mark.skipif(not _HAS_FITZ, reason="pymupdf not installed")
+
+
+def _png(w=40, h=40, noise=False):
+    import fitz
+    pix = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, w, h))
+    pix.set_rect(pix.irect, (200, 30, 30))
+    if noise:
+        # Random pixels defeat PNG/flate compression, so the saved PDF reliably
+        # clears the 512KB gate without shipping a binary fixture.
+        rnd = random.Random(7)
+        for _ in range(w * h // 2):
+            pix.set_pixel(rnd.randrange(w), rnd.randrange(h),
+                          (rnd.randrange(256), rnd.randrange(256), rnd.randrange(256)))
+    return pix.tobytes("png")
+
+
+def _write_pdf(path, pages=1, with_image=True, big=False):
+    import fitz
+    doc = fitz.open()
+    for i in range(pages):
+        page = doc.new_page()
+        page.insert_text((72, 72), f"page {i + 1} text")
+        if with_image:
+            page.insert_image(
+                fitz.Rect(50, 100, 550, 700) if big else fitz.Rect(50, 100, 250, 300),
+                stream=_png(500, 700, noise=True) if big else _png(),
+            )
+    doc.save(str(path))
+    doc.close()
+    return path
+
+
+@_needs_fitz
+def test_oversize_rubric_named_pdf_escapes_the_512kb_gate(tmp_path):
+    results = _results_dir(tmp_path)
+    pdf = _write_pdf(results / "session_handout.pdf", big=True)
+    size = pdf.stat().st_size
+    assert size > grading._ROOT_SCAN_MAX_FILE_BYTES
+
+    named = frozenset({"session_handout.pdf"})
+    assert [f.name for f in grading._collect_deliverable_files(results, named)] \
+        == ["session_handout.pdf"]
+
+    dropped: list[tuple[str, int]] = []
+    assert grading._collect_deliverable_files(results, frozenset(), dropped) == []
+    assert dropped == [("session_handout.pdf", size)]
+
+
+@_needs_fitz
+def test_gather_evidence_manifest_names_oversize_drop_with_size(tmp_path):
+    results = _results_dir(tmp_path)
+    pdf = _write_pdf(results / "huge_deck.pdf", big=True)
+    (results / "notes.md").write_text("small note", encoding="utf-8")
+
+    ev = grading._gather_evidence(results, "tail", budget=None)
+    assert "EVIDENCE BUDGET NOTE" in ev
+    assert f"huge_deck.pdf ({pdf.stat().st_size} bytes, too large to collect)" in ev
+
+    named = grading._gather_evidence(
+        results, "tail", budget=None, rubric_names=frozenset({"huge_deck.pdf"})
+    )
+    assert "too large to collect" not in named
+    assert "huge_deck.pdf" in named
+
+
+@_needs_fitz
+def test_pdf_page_render_attached_for_named_pdf(tmp_path, monkeypatch):
+    monkeypatch.delenv("WCB_JUDGE_PDF_MAX_PAGES", raising=False)
+    results = _results_dir(tmp_path)
+    _write_pdf(results / "handout.pdf", pages=1)
+
+    out = grading._collect_image_attachments(results, frozenset({"handout.pdf"}))
+    assert [i["name"] for i in out] == ["handout.pdf#page1"]
+    assert out[0]["media_type"] == "image/png"
+    import base64
+    assert base64.b64decode(out[0]["b64"])[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+@_needs_fitz
+def test_pdf_without_embedded_images_yields_no_attachment(tmp_path):
+    results = _results_dir(tmp_path)
+    _write_pdf(results / "notes.pdf", pages=2, with_image=False)
+    assert grading._collect_image_attachments(results, frozenset({"notes.pdf"})) == []
+
+
+@_needs_fitz
+def test_pdf_page_cap_per_document(tmp_path, monkeypatch):
+    monkeypatch.delenv("WCB_JUDGE_PDF_MAX_PAGES", raising=False)
+    results = _results_dir(tmp_path)
+    _write_pdf(results / "deck.pdf", pages=6)
+    chunk = frozenset({"deck.pdf"})
+
+    assert len(grading._collect_image_attachments(results, chunk)) == 4
+    monkeypatch.setenv("WCB_JUDGE_PDF_MAX_PAGES", "2")
+    got = grading._collect_image_attachments(results, chunk)
+    assert [i["name"] for i in got] == ["deck.pdf#page1", "deck.pdf#page2"]
+    monkeypatch.setenv("WCB_JUDGE_PDF_MAX_PAGES", "0")
+    assert len(grading._collect_image_attachments(results, chunk)) == 4
+    monkeypatch.setenv("WCB_JUDGE_PDF_MAX_PAGES", "notanint")
+    assert len(grading._collect_image_attachments(results, chunk)) == 4
+
+
+@_needs_fitz
+def test_pdf_page_renders_respect_global_image_cap(tmp_path, monkeypatch):
+    results = _results_dir(tmp_path)
+    _write_pdf(results / "deck.pdf", pages=6)
+    (results / "hero.png").write_bytes(_PNG_BYTES)
+    monkeypatch.setenv("WCB_JUDGE_PDF_MAX_PAGES", "6")
+    monkeypatch.setenv("WCB_JUDGE_MAX_IMAGES", "3")
+
+    out = grading._collect_image_attachments(
+        results, frozenset({"deck.pdf", "hero.png"})
+    )
+    assert len(out) == 3
+    assert out[0]["name"] == "deck.pdf#page1"
+
+
+@_needs_fitz
+def test_pdf_attachments_disabled_by_image_env_gate(tmp_path, monkeypatch):
+    results = _results_dir(tmp_path)
+    _write_pdf(results / "handout.pdf", pages=1)
+    monkeypatch.setenv("WCB_JUDGE_ATTACH_IMAGES", "0")
+    assert grading._collect_image_attachments(results, frozenset({"handout.pdf"})) == []
+
+
+def test_pdf_page_attachments_degrade_without_pymupdf(tmp_path, monkeypatch):
+    results = _results_dir(tmp_path)
+    fake_pdf = results / "handout.pdf"
+    fake_pdf.write_bytes(b"%PDF-1.4 not really a pdf")
+    # None in sys.modules makes `import fitz` raise ImportError — the guarded
+    # import must degrade to "no renders", never propagate.
+    monkeypatch.setitem(sys.modules, "fitz", None)
+    assert grading._pdf_page_attachments(fake_pdf, 8) == []
+    assert grading._collect_image_attachments(results, frozenset({"handout.pdf"})) == []
