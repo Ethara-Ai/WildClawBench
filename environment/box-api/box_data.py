@@ -251,6 +251,15 @@ def get_file(file_id):
     return _serialize_file(f)
 
 
+def missing_blobs():
+    """Advertised file rows with no fixture staged in the overlay-merged BLOB_DIR.
+
+    Every row `files.json` advertises must be downloadable; a row without a
+    blob 404s `fixture_missing` at request time, which reads to an agent as a
+    broken tool rather than a missing file."""
+    return [f["name"] for f in _files_rows() if not (BLOB_DIR / f["name"]).is_file()]
+
+
 def download_file_content(file_id):
     """Return raw text content for box file `file_id`.
 

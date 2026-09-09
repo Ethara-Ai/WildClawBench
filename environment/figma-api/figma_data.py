@@ -134,8 +134,33 @@ def _user(user_id):
 # User / teams / projects
 # ---------------------------------------------------------------------------
 
+def _teams():
+    team = _team_doc()["team"]
+    return [{"id": team["id"], "name": team["name"]}]
+
+
 def get_me():
-    return _team_doc()["me"]
+    return {**_team_doc()["me"], "teams": _teams()}
+
+
+def list_teams():
+    return {"teams": _teams()}
+
+
+def list_files():
+    files = sorted(_files_rows(), key=lambda f: f["last_modified"], reverse=True)
+    return {
+        "files": [
+            {
+                "key": f["file_key"],
+                "name": f["name"],
+                "thumbnail_url": f["thumbnail_url"],
+                "last_modified": f["last_modified"],
+                "project_id": f["project_id"],
+            }
+            for f in files
+        ]
+    }
 
 
 def get_team_projects(team_id):

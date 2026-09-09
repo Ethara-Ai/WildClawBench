@@ -57,7 +57,8 @@ _store.register("databases", primary_key="id",
 _store.register("pages", primary_key="id",
                 initial_loader=lambda: _coerce_pages(_load("pages.json", "pages")))
 _store.register("blocks", primary_key="id",
-                initial_loader=lambda: _coerce_blocks(_load("blocks.json", "blocks")))
+                initial_loader=lambda: _coerce_blocks(_load("blocks.json", "blocks")),
+                row_coercer=lambda r: _coerce_block_row(r))
 _store.register("comments", primary_key="id",
                 initial_loader=lambda: _coerce_comments(_load("comments.json", "comments")))
 _store.register_document("properties", initial_loader=lambda: _coerce_properties(_load("page_properties.json", "page_properties")))
@@ -142,15 +143,34 @@ def _coerce_pages(rows):
     return out
 
 
+def _normalise_parent_block_id(r):
+    """A root block's parent is its page, spelled as a NULL parent_block_id.
+
+    Real-Notion-shaped seeds spell the same thing as
+    ``parent_block_id == page_id``; left as-is those rows match neither the
+    root-block branch nor the nested branch of `list_block_children`."""
+    parent = opt_str(r, "parent_block_id", default="") or None
+    return None if parent == r.get("page_id") else parent
+
+
+def _coerce_block_row(r):
+    out = _strip_ctx(r)
+    if "order" in out:
+        out["order"] = strict_int(out, "order")
+    if "has_children" in out:
+        out["has_children"] = strict_bool(out, "has_children")
+    out["checked"] = opt_bool(r, "checked", default=None) if r.get("checked") else None
+    out["parent_block_id"] = _normalise_parent_block_id(r)
+    return out
+
+
 def _coerce_blocks(rows):
     out = []
     for r in rows:
         out.append({
-            **_strip_ctx(r),
+            **_coerce_block_row(r),
             "order": strict_int(r, "order"),
             "has_children": strict_bool(r, "has_children"),
-            "checked": opt_bool(r, "checked", default=None) if r.get("checked") else None,
-            "parent_block_id": opt_str(r, "parent_block_id", default="") or None,
         })
     return out
 
@@ -381,10 +401,9 @@ def delete_page(page_id):
 
 def list_block_children(block_id, start_cursor=None, page_size=50):
     # block_id can be a page_id (root blocks of a page) or a block_id (nested)
-    if any(p["id"] == block_id for p in _pages_rows()):
-        children = [b for b in _blocks_rows() if b["page_id"] == block_id and not b["parent_block_id"]]
-    else:
-        children = [b for b in _blocks_rows() if b["parent_block_id"] == block_id]
+    children = [b for b in _blocks_rows()
+                if b["parent_block_id"] == block_id
+                or (b["page_id"] == block_id and not b["parent_block_id"])]
     children = sorted(children, key=lambda b: b["order"])
     return _paginate(children, start_cursor, page_size)
 

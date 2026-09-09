@@ -226,6 +226,22 @@ def get_address(object_id):
     return addr
 
 
+def _paginate(objs, page, results):
+    page = max(int(page or 1), 1)
+    results = max(int(results or 25), 1)
+    start = (page - 1) * results
+    return {
+        "count": len(objs),
+        "next": page + 1 if start + results < len(objs) else None,
+        "previous": page - 1 if page > 1 else None,
+        "results": objs[start:start + results],
+    }
+
+
+def list_addresses(page=1, results=25):
+    return _paginate([_address_obj(a) for a in _addresses_rows()], page, results)
+
+
 # ---------------------------------------------------------------------------
 # Shipments + rates
 # ---------------------------------------------------------------------------
@@ -303,11 +319,22 @@ def get_shipment(object_id):
     return {"error": f"shipment {object_id} not found"}
 
 
+def list_shipments(page=1, results=25):
+    return _paginate([_shipment_obj(s) for s in _shipments_rows()], page, results)
+
+
 def list_shipment_rates(object_id):
     if not any(s["object_id"] == object_id for s in _shipments_rows()):
         return {"error": f"shipment {object_id} not found"}
     rates = [_rate_obj(r) for r in _rates_rows() if r["shipment"] == object_id]
     return {"count": len(rates), "results": rates}
+
+
+def get_rate(object_id):
+    for r in _rates_rows():
+        if r["object_id"] == object_id:
+            return _rate_obj(r)
+    return {"error": f"rate {object_id} not found"}
 
 
 # ---------------------------------------------------------------------------
@@ -342,6 +369,7 @@ def create_transaction(payload):
     }
     _store_insert("transactions", txn)
     _store_insert("tracking", {
+        "_pk": f"{rate['provider']}@{tracking_number}@{txn['created_time']}",
         "carrier": rate["provider"],
         "tracking_number": tracking_number,
         "status": "PRE_TRANSIT",
@@ -351,6 +379,10 @@ def create_transaction(payload):
         "status_time": txn["created_time"],
     })
     return dict(txn)
+
+
+def list_transactions(page=1, results=25):
+    return _paginate([dict(t) for t in _transactions_rows()], page, results)
 
 
 def get_transaction(object_id):

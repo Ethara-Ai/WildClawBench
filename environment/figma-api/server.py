@@ -5,7 +5,7 @@ Implements a subset of the Figma REST API. Base path: /v1
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, Dict, Any
 
 import figma_data
@@ -38,6 +38,11 @@ def get_me():
 
 # --- Teams / projects ---
 
+@app.get("/v1/teams")
+def teams():
+    return figma_data.list_teams()
+
+
 @app.get("/v1/teams/{team_id}/projects")
 def team_projects(team_id: str):
     result = figma_data.get_team_projects(team_id)
@@ -55,6 +60,11 @@ def project_files(project_id: str):
 
 
 # --- Files / nodes ---
+
+@app.get("/v1/files")
+def files():
+    return figma_data.list_files()
+
 
 @app.get("/v1/files/{file_key}")
 def get_file(file_key: str):
@@ -83,6 +93,8 @@ def get_comments(file_key: str):
 
 
 class CommentBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     message: str
     client_meta: Optional[Dict[str, Any]] = None
     user_id: Optional[str] = None

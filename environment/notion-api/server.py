@@ -5,7 +5,7 @@ Implements a subset of the Notion API v1 surface. Base path: /v1
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List, Dict, Any
 
 import notion_data
@@ -59,6 +59,8 @@ def get_workspace():
 # --- Search ---
 
 class SearchBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     query: Optional[str] = None
     filter: Optional[Dict[str, Any]] = None
     sort: Optional[Dict[str, Any]] = None
@@ -90,6 +92,8 @@ def get_database(database_id: str):
 
 
 class DatabaseQueryBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     filter: Optional[Dict[str, Any]] = None
     sorts: Optional[List[Dict[str, Any]]] = None
     start_cursor: Optional[str] = None
@@ -135,6 +139,8 @@ def get_page(page_id: str):
 
 
 class PageParent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     type: str  # "database_id", "page_id", "workspace"
     database_id: Optional[str] = None
     page_id: Optional[str] = None
@@ -142,6 +148,8 @@ class PageParent(BaseModel):
 
 
 class PageCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     parent: PageParent
     title: str
     properties: Optional[Dict[str, Any]] = None
@@ -178,6 +186,8 @@ def create_page(body: PageCreateBody):
 
 
 class PageUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     title: Optional[str] = None
     archived: Optional[bool] = None
     properties: Optional[Dict[str, Any]] = None
@@ -213,12 +223,16 @@ def list_block_children(block_id: str, start_cursor: Optional[str] = None,
 
 
 class BlockChild(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     type: str
     text: Optional[str] = ""
     checked: Optional[bool] = None
 
 
 class AppendBlocksBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     children: List[BlockChild]
 
 
@@ -231,6 +245,8 @@ def append_block_children(block_id: str, body: AppendBlocksBody):
 
 
 class BlockUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     text: Optional[str] = None
     checked: Optional[bool] = None
 
@@ -259,11 +275,15 @@ def list_comments(block_id: Optional[str] = None, page_id: Optional[str] = None)
 
 
 class CommentParent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     page_id: str
     block_id: Optional[str] = None
 
 
 class CommentCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     parent: CommentParent
     author_id: str
     text: str

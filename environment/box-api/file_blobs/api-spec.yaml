@@ -1,0 +1,28 @@
+openapi: 3.0.3
+info:
+  title: Orbit Labs Internal API
+  version: "2.4.0"
+  description: Internal service contract shared across the platform team.
+servers:
+  - url: https://api.orbit-labs.example.com/v2
+paths:
+  /campaigns:
+    get:
+      summary: List campaigns
+      responses:
+        "200":
+          description: A page of campaigns
+  /campaigns/{campaign_id}:
+    get:
+      summary: Fetch one campaign
+      parameters:
+        - name: campaign_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The campaign
+        "404":
+          description: Not found

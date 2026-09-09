@@ -6,7 +6,7 @@ consistency with the other Kensei2 environments. Base path: /v2
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, Dict, Any
 
 import monday_data
@@ -60,6 +60,24 @@ def board_items(board_id: str):
     return result
 
 
+@app.get("/v2/boards/{board_id}/groups")
+def board_groups(board_id: str):
+    result = monday_data.list_groups(board_id=board_id)
+    if "error" in result:
+        return JSONResponse(status_code=404, content=result)
+    return result
+
+
+# --- Groups ---
+
+@app.get("/v2/groups")
+def groups(board_id: Optional[str] = None):
+    result = monday_data.list_groups(board_id=board_id)
+    if "error" in result:
+        return JSONResponse(status_code=404, content=result)
+    return result
+
+
 # --- Items ---
 
 @app.get("/v2/items")
@@ -68,6 +86,8 @@ def list_items(board_id: Optional[str] = None, group_id: Optional[str] = None):
 
 
 class ItemCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     board_id: str
     item_name: str
     group_id: Optional[str] = None
@@ -96,10 +116,14 @@ def get_item(item_id: str):
 
 
 class ItemUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     column_id: Optional[str] = None
     text: Optional[str] = None
     value: Optional[str] = None
     group_id: Optional[str] = None
+    item_name: Optional[str] = None
+    column_values: Optional[Dict[str, Any]] = None
 
 
 @app.put("/v2/items/{item_id}")
@@ -110,6 +134,8 @@ def update_item(item_id: str, body: ItemUpdateBody):
         text=body.text,
         value=body.value,
         group_id=body.group_id,
+        name=body.item_name,
+        column_values=body.column_values,
     )
     if "error" in result:
         return JSONResponse(status_code=404, content=result)

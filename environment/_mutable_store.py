@@ -403,10 +403,15 @@ class Table:
     mutations rather than rebuilding from a dict.
     """
 
-    __slots__ = ("_name", "_pk", "_rows", "_order", "_lock", "_parent")
+    __slots__ = ("_name", "_pk", "_rows", "_order", "_lock", "_parent", "_row_coercer")
 
     def __init__(
-        self, name: str, primary_key: str, parent_lock: threading.RLock, parent: "Store"
+        self,
+        name: str,
+        primary_key: str,
+        parent_lock: threading.RLock,
+        parent: "Store",
+        row_coercer: Optional[Callable[[Row], Row]] = None,
     ):
         self._name = name
         self._pk = primary_key
@@ -414,6 +419,20 @@ class Table:
         self._order: List[Any] = []
         self._lock = parent_lock
         self._parent = parent
+        self._row_coercer = row_coercer
+
+    def _coerce(self, row: Row) -> Row:
+        """Normalise a row written after load time into seed shape.
+
+        The initial loader coerces seed rows (e.g. epoch strings -> int), but
+        admin-plane upserts and injected drift bypass it entirely, so a table
+        could end up holding rows the read paths cannot sort or compare. Any
+        table registered with a ``row_coercer`` runs writes through the same
+        normaliser the loader uses.
+        """
+        if self._row_coercer is None:
+            return row
+        return self._row_coercer(row)
 
     @property
     def name(self) -> str:
@@ -476,6 +495,7 @@ class Table:
             raise StoreError(
                 f"upsert into '{self._name}' missing primary key '{self._pk}'"
             )
+        row = self._coerce(copy.deepcopy(row))
         pk_value = row[self._pk]
         with self._lock:
             existed = pk_value in self._rows
@@ -502,6 +522,9 @@ class Table:
                         f"on table '{self._name}'"
                     )
                 row[k] = copy.deepcopy(v)
+            if self._row_coercer is not None:
+                self._rows[pk_value] = self._coerce(copy.deepcopy(row))
+                row = self._rows[pk_value]
             return copy.deepcopy(row)
 
     def delete(self, pk_value: Any) -> bool:
@@ -534,6 +557,8 @@ class Table:
                                 f"'{self._pk}' on table '{self._name}'"
                             )
                         row[k] = copy.deepcopy(v)
+                    if self._row_coercer is not None:
+                        self._rows[pk_value] = self._coerce(copy.deepcopy(row))
                     n += 1
         return n
 
@@ -652,15 +677,20 @@ class Store:
         table_name: str,
         primary_key: str,
         initial_loader: Callable[[], Iterable[Row]],
+        row_coercer: Optional[Callable[[Row], Row]] = None,
     ) -> Table:
         """Register a table. The loader runs the first time the table is
         accessed, not at registration time --- this keeps import order
         independent and avoids re-reading CSVs in test contexts.
+
+        ``row_coercer`` (optional) normalises rows written *after* load ---
+        admin upserts, injected drift --- into the same shape the initial
+        loader produces, so read paths never meet a half-typed row.
         """
         with self._lock:
             if table_name in self._tables:
                 return self._tables[table_name]
-            t = Table(table_name, primary_key, self._lock, self)
+            t = Table(table_name, primary_key, self._lock, self, row_coercer)
             self._tables[table_name] = t
             self._initial_loaders[table_name] = initial_loader
             self._initialized[table_name] = False

@@ -3,9 +3,9 @@
 Mirrors a subset of the Shippo shipping API surface.
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List, Dict, Any, Union
 
 import shippo_data
@@ -32,6 +32,8 @@ def health():
 # --- Addresses ---
 
 class AddressBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str
     company: Optional[str] = ""
     street1: str
@@ -50,6 +52,11 @@ def create_address(body: AddressBody):
     return shippo_data.create_address(body.model_dump())
 
 
+@app.get("/addresses")
+def list_addresses(page: int = Query(1), results: int = Query(25)):
+    return shippo_data.list_addresses(page=page, results=results)
+
+
 @app.get("/addresses/{object_id}")
 def get_address(object_id: str):
     result = shippo_data.get_address(object_id)
@@ -61,6 +68,8 @@ def get_address(object_id: str):
 # --- Shipments ---
 
 class ShipmentBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     address_from: Union[str, Dict[str, Any]]
     address_to: Union[str, Dict[str, Any]]
     parcels: Optional[Union[str, Dict[str, Any], List[Any]]] = None
@@ -72,6 +81,11 @@ def create_shipment(body: ShipmentBody):
     if isinstance(result, dict) and "error" in result:
         return JSONResponse(status_code=400, content=result)
     return result
+
+
+@app.get("/shipments")
+def list_shipments(page: int = Query(1), results: int = Query(25)):
+    return shippo_data.list_shipments(page=page, results=results)
 
 
 @app.get("/shipments/{object_id}")
@@ -90,12 +104,24 @@ def list_shipment_rates(object_id: str):
     return result
 
 
+# --- Rates ---
+
+@app.get("/rates/{object_id}")
+def get_rate(object_id: str):
+    result = shippo_data.get_rate(object_id)
+    if "error" in result:
+        return JSONResponse(status_code=404, content=result)
+    return result
+
+
 # --- Transactions (labels) ---
 
 class TransactionBody(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
     rate: str
     label_file_type: Optional[str] = "PDF"
-    async_: Optional[bool] = False
+    async_: Optional[bool] = Field(default=False, alias="async")
 
 
 @app.post("/transactions", status_code=201)
@@ -104,6 +130,11 @@ def create_transaction(body: TransactionBody):
     if isinstance(result, dict) and "error" in result:
         return JSONResponse(status_code=400, content=result)
     return result
+
+
+@app.get("/transactions")
+def list_transactions(page: int = Query(1), results: int = Query(25)):
+    return shippo_data.list_transactions(page=page, results=results)
 
 
 @app.get("/transactions/{object_id}")

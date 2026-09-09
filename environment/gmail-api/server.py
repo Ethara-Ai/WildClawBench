@@ -5,7 +5,7 @@ Mirrors the Gmail API v1 (gmail/v1/users/{userId}) surface for a single user.
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 
 import gmail_data
@@ -52,6 +52,8 @@ def get_label(label_id: str):
 
 
 class LabelCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str
 
 
@@ -83,6 +85,8 @@ def get_message(message_id: str, format: str = "full"):
 
 
 class SendBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     to: str
     subject: str
     body: str
@@ -100,6 +104,8 @@ def send_message(body: SendBody):
 
 
 class ModifyBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     addLabelIds: Optional[List[str]] = None
     removeLabelIds: Optional[List[str]] = None
 
@@ -159,6 +165,8 @@ def get_draft(draft_id: str):
 
 
 class DraftCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     to: str
     subject: str
     body: str
