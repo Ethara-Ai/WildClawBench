@@ -745,6 +745,15 @@ def _pick_rationale(c: dict[str, Any]) -> str:
     return ""
 
 
+def _is_abstention(c: dict[str, Any]) -> bool:
+    """True when the judge council could not resolve this criterion.
+
+    grading.py records the abstention as ``resolved_by="human_eval"`` +
+    ``human_eval="required"`` (src/utils/grading.py:1975-1979).
+    """
+    return c.get("resolved_by") == "human_eval" or c.get("human_eval") == "required"
+
+
 def _build_rubric_block(score: dict[str, Any], infer_meta: bool) -> list[dict[str, Any]]:
     rubric: list[dict[str, Any]] = []
     for c in score.get("criteria", []):
@@ -764,6 +773,14 @@ def _build_rubric_block(score: dict[str, Any], infer_meta: bool) -> list[dict[st
             "is_positive": is_positive,
             "passed": passed,
         }
+        # An abstention flattens to passed=false, which for a NEGATIVE weight is
+        # arithmetically identical to "the violation happened" — a whole-run
+        # council failure then reads as a pile of penalties (see
+        # script/check_negative_semantics.py). Mark it so consumers can tell the
+        # two apart. Emitted ONLY when true: adding a key to every entry would
+        # break existing report.json consumers and the byte-parity emitters.
+        if _is_abstention(c):
+            item["abstained"] = True
         if not passed:
             item["justification"] = _pick_rationale(c)
         rubric.append(item)
