@@ -17,6 +17,7 @@ No network: `urllib.request.urlopen` is monkeypatched with a fake SSE stream.
 from __future__ import annotations
 
 import json
+import base64
 import sys
 import urllib.request
 from pathlib import Path
@@ -50,6 +51,14 @@ _CODEX_ENV_VARS = (
 CODEX_URL = "http://127.0.0.1:54321"
 CODEX_SECRET = "sk-codex-bridge-secret"
 
+# Image-attachment budget knobs. Cleared alongside the GPT/codex gates so an
+# operator's shell (or a real .env) cannot change how many images a test sees.
+_IMAGE_ENV_VARS = (
+    "KENSEI_JUDGE_MAX_IMAGES",
+    "KENSEI_JUDGE_MAX_IMAGE_BYTES",
+    "KENSEI_JUDGE_IMAGE_DETAIL",
+)
+
 
 @pytest.fixture(autouse=True)
 def _clean_gpt_env(monkeypatch):
@@ -58,7 +67,10 @@ def _clean_gpt_env(monkeypatch):
     Load-bearing: a real .env at the repo root (or an operator's shell) must not
     leak the primary-judge gate into tests asserting the council path.
     """
-    for var in _GPT_ENV_VARS + _CODEX_ENV_VARS + ("KENSEI_OPENAI_API_KEY", "OPENAI_API_KEY"):
+    for var in (
+        _GPT_ENV_VARS + _CODEX_ENV_VARS + _IMAGE_ENV_VARS
+        + ("KENSEI_OPENAI_API_KEY", "OPENAI_API_KEY")
+    ):
         monkeypatch.delenv(var, raising=False)
 
 
@@ -681,4 +693,531 @@ class TestGptNeverTripsCouncilRaise:
         scores = grading.grade_with_rubric(RUBRICS, "task", tmp_path)
         assert scores["overall_score"] == 0.0
         assert "council roster unusable" in scores["error"]
+
+
+# ===========================================================================
+# Multimodal judge payload — inline base64 images are LIFTED out of the judge
+# text prompt and re-attached as structured image content-parts. Sending them as
+# prompt text produced the gpt-5.6 refusal (HTTP 200, empty content) and was
+# unreadable to the judge anyway. This rides the gpt route ONLY.
+# ===========================================================================
+
+
+PNG_B64 = (
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk"
+    "+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+)
+PNG_DATA_URI = f"data:image/png;base64,{PNG_B64}"
+
+
+def _approx_kb(b64: str) -> str:
+    return f"{(len(b64) * 3 / 4) / 1024:.1f}"
+
+
+def _write_deliverables(tmp_path: Path, files: dict[str, str]) -> Path:
+    """Create an `artifacts/` deliverable root and return it.
+
+    `artifacts` (not `results`) is deliberate: `_collect_deliverable_files`
+    sweeps the PARENT of a dir named `results`, which under pytest would be the
+    shared session tmp root and could pick up another test's files.
+    """
+    root = tmp_path / "artifacts"
+    root.mkdir(parents=True, exist_ok=True)
+    for name, body in files.items():
+        (root / name).write_text(body, encoding="utf-8")
+    return root
+
+
+class TestExtractInlineImages:
+    def test_lifts_a_data_uri_into_a_placeholder_and_an_image_part(self):
+        text, images = grading._extract_inline_images(
+            f'<p>before</p><img src="{PNG_DATA_URI}"><p>after</p>', "page.html"
+        )
+        assert "data:image" not in text
+        assert "before" in text and "after" in text
+        assert f"[inline image page.html#1, image/png, ~{_approx_kb(PNG_B64)}KB]" in text
+        assert len(images) == 1
+        assert images[0].data_uri == PNG_DATA_URI
+        assert images[0].mime == "image/png"
+        assert images[0].label == "page.html#1"
+
+    def test_placeholder_kb_approximates_the_decoded_payload_size(self):
+        blob = "A" * 4096
+        text, images = grading._extract_inline_images(
+            f"data:image/jpeg;base64,{blob}", "shot.md"
+        )
+        assert "~3.0KB" in text
+        assert images[0].mime == "image/jpeg"
+
+    def test_text_without_images_is_returned_untouched(self):
+        body = "just a report about data:image handling, no base64 here"
+        text, images = grading._extract_inline_images(body, "notes.md")
+        assert text == body
+        assert images == []
+
+    def test_multiple_images_are_labelled_in_document_order(self):
+        body = f"a{PNG_DATA_URI}b{PNG_DATA_URI}c"
+        text, images = grading._extract_inline_images(body, "two.html")
+        assert [i.label for i in images] == ["two.html#1", "two.html#2"]
+        assert text.count("[inline image") == 2
+        assert "data:image" not in text
+
+    def test_detail_tier_follows_the_env_override(self, monkeypatch):
+        monkeypatch.setenv("KENSEI_JUDGE_IMAGE_DETAIL", "high")
+        _text, images = grading._extract_inline_images(PNG_DATA_URI, "x.md")
+        assert images[0].detail == "high"
+
+    def test_detail_defaults_to_low(self):
+        _text, images = grading._extract_inline_images(PNG_DATA_URI, "x.md")
+        assert images[0].detail == "low"
+
+
+class TestWrappedBase64IsLiftedWhole:
+    """A newline-wrapped blob must be lifted WHOLE, not one line of it.
+
+    Agents produce wrapped payloads routinely: `base64.encodebytes` and coreutils
+    `base64 <file>` both wrap at 76 columns. A whitespace-free payload class lifts
+    only the FIRST line, which is the worst outcome available -- the rest of the
+    base64 stays in the judge text (so the safety-classifier refusal this whole
+    seam exists to prevent is fully intact) AND the attached data URI is a
+    truncated, undecodable image.
+    """
+
+    def _wrapped_png(self) -> tuple[str, str]:
+        """Return (wrapped_b64_with_newlines, flat_b64) for a real PNG."""
+        raw = base64.b64decode(PNG_B64)
+        # A single 1x1 PNG is shorter than one wrap line; repeat the bytes so the
+        # encoder actually emits multiple 76-column lines.
+        raw = raw * 40
+        wrapped = base64.encodebytes(raw).decode("ascii")
+        assert wrapped.count("\n") > 1, "fixture must span multiple wrap lines"
+        return wrapped, wrapped.replace("\n", "")
+
+    def test_wrapped_blob_is_lifted_whole_and_leaves_no_base64_behind(self):
+        wrapped, flat = self._wrapped_png()
+        body = f'<p>before</p><img src="data:image/png;base64,{wrapped}"><p>after</p>'
+        text, images = grading._extract_inline_images(body, "wrapped.html")
+
+        assert len(images) == 1
+        # Single-line, complete, decodable data URI rebuilt from the stripped payload.
+        assert images[0].data_uri == f"data:image/png;base64,{flat}"
+        assert "\n" not in images[0].data_uri
+        assert base64.b64decode(images[0].data_uri.partition(",")[2], validate=True)
+
+        # ZERO residue: no data-URI head, and no run of the payload left in text.
+        assert "data:image" not in text
+        assert "base64," not in text
+        assert flat[:64] not in text
+        assert flat[-64:] not in text
+        assert "[inline image wrapped.html#1, image/png," in text
+        assert "before" in text and "after" in text
+
+    def test_wrapped_placeholder_reports_the_full_payload_size(self):
+        wrapped, flat = self._wrapped_png()
+        text, _images = grading._extract_inline_images(
+            f"data:image/png;base64,{wrapped}", "w.md"
+        )
+        assert f"~{_approx_kb(flat)}KB" in text
+
+    def test_prose_after_an_unwrapped_blob_is_not_swallowed(self):
+        """The wrap-continuation rule requires a >=64-char segment before the
+        newline, so ordinary prose on the next line stays in the text."""
+        body = f"{PNG_DATA_URI}\nThe report shows a chart."
+        text, images = grading._extract_inline_images(body, "notes.md")
+        assert len(images) == 1
+        assert images[0].data_uri == PNG_DATA_URI
+        assert "The report shows a chart." in text
+
+
+class TestGatherEvidencePayload:
+    def test_transcript_base64_is_scrubbed_to_placeholders_without_attaching(
+        self, tmp_path
+    ):
+        """A tool result that cat'd an image-bearing file carries the same blobs
+        into the SAME user turn through the transcript seam. Scrub them to text
+        placeholders (no vision cost, no attachment) so the refusal trigger cannot
+        come back the long way round."""
+        root = _write_deliverables(tmp_path, {"notes.md": "no images here"})
+        transcript = f"tool: cat page.html\n{PNG_DATA_URI}\ndone"
+        payload = grading._gather_evidence(root, transcript)
+        assert "data:image" not in payload.text
+        assert "base64," not in payload.text
+        assert "[inline image transcript#1," in payload.text
+        assert payload.images == []
+
+    def test_text_carries_no_data_uri_and_images_carry_the_blob(self, tmp_path):
+        root = _write_deliverables(
+            tmp_path, {"report.html": f'<h1>Q3</h1><img src="{PNG_DATA_URI}">'}
+        )
+        payload = grading._gather_evidence(root, "turn 1")
+        assert isinstance(payload, grading.JudgeUserPayload)
+        assert "data:image" not in payload.text
+        assert "base64," not in payload.text
+        assert "Q3" in payload.text
+        assert [i.data_uri for i in payload.images] == [PNG_DATA_URI]
+
+    def test_a_data_uri_is_never_bisected_by_the_char_budget(self, tmp_path):
+        """Extraction runs at the deliverable seam, BEFORE budgeting, so no char
+        slice can ever land inside a base64 blob. The blob here is far larger than
+        the whole evidence budget: inline it would have been cut mid-payload (or
+        dropped the block outright), while the placeholder it leaves behind fits
+        comfortably and the pixels ride the image parts intact."""
+        big_b64 = "Q" * 2000
+        big_uri = f"data:image/png;base64,{big_b64}"
+        filler = "x" * 200
+        root = _write_deliverables(
+            tmp_path, {"page.html": f'{filler}<img src="{big_uri}">{filler}'}
+        )
+        budget = 600
+        payload = grading._gather_evidence(root, "turn 1", budget=budget)
+        assert len(big_uri) > budget
+        assert len(payload.text) <= budget
+        assert "base64," not in payload.text
+        assert big_b64[:40] not in payload.text
+        assert "[inline image page.html#1, image/png, ~1.5KB]" in payload.text
+        assert [i.data_uri for i in payload.images] == [big_uri]
+
+    def test_count_cap_attaches_eight_and_leaves_placeholders_for_the_rest(self, tmp_path):
+        body = "".join(f'<img src="{PNG_DATA_URI}">' for _ in range(10))
+        root = _write_deliverables(tmp_path, {"gallery.html": body})
+        payload = grading._gather_evidence(root, "turn 1")
+        assert grading._judge_max_images() == 8
+        assert len(payload.images) == 8
+        assert payload.text.count("[inline image") == 10
+
+    def test_count_cap_zero_disables_attachment_but_keeps_placeholders(
+        self, tmp_path, monkeypatch
+    ):
+        monkeypatch.setenv("KENSEI_JUDGE_MAX_IMAGES", "0")
+        root = _write_deliverables(tmp_path, {"page.html": f'<img src="{PNG_DATA_URI}">'})
+        payload = grading._gather_evidence(root, "turn 1")
+        assert payload.images == []
+        assert payload.text.count("[inline image") == 1
+
+    def test_byte_cap_stops_attachment_before_the_count_cap(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("KENSEI_JUDGE_MAX_IMAGE_BYTES", str(len(PNG_B64) * 2))
+        body = "".join(f'<img src="{PNG_DATA_URI}">' for _ in range(5))
+        root = _write_deliverables(tmp_path, {"gallery.html": body})
+        payload = grading._gather_evidence(root, "turn 1")
+        assert len(payload.images) == 2
+        assert payload.text.count("[inline image") == 5
+
+    def test_byte_cap_skips_an_oversized_image_and_keeps_packing(self, tmp_path, monkeypatch):
+        """The byte cap SKIPS an over-budget image rather than stopping: one large
+        blob early in the evidence must not suppress every smaller one behind
+        it."""
+        big = "Q" * 4000
+        body = (
+            f'<img src="data:image/png;base64,{big}">'
+            + f'<img src="{PNG_DATA_URI}">'
+        )
+        monkeypatch.setenv("KENSEI_JUDGE_MAX_IMAGE_BYTES", str(len(PNG_B64) + 10))
+        root = _write_deliverables(tmp_path, {"mixed.html": body})
+        payload = grading._gather_evidence(root, "turn 1")
+        assert [i.label for i in payload.images] == ["mixed.html#2"]
+        assert payload.text.count("[inline image") == 2
+
+    def test_a_partially_kept_block_drops_images_whose_placeholder_was_excised(
+        self, tmp_path
+    ):
+        """The head+tail keep excises the MIDDLE of an over-budget block. An image
+        whose placeholder lived there must not be attached — same orphan-pixel
+        rule as a wholly dropped block, and the reason the survivor filter runs
+        against the FINAL text rather than at collection time."""
+        body = ("A" * 2500) + f'<img src="{PNG_DATA_URI}">' + ("B" * 2500)
+        root = _write_deliverables(tmp_path, {"page.html": body})
+        payload = grading._gather_evidence(root, "turn 1", budget=4000)
+        assert "truncated for evidence budget" in payload.text  # partial keep ran
+        assert "[inline image page.html#1," not in payload.text
+        assert payload.images == []
+
+    def test_a_wholly_dropped_block_attaches_no_orphan_pixels(self, tmp_path):
+        """A block cut for budget loses its placeholders too; attaching its images
+        would put pixels in front of the judge with nothing in the text naming
+        them."""
+        body = ("y" * 3000) + f'<img src="{PNG_DATA_URI}">'
+        root = _write_deliverables(tmp_path, {"big.html": body})
+        payload = grading._gather_evidence(root, "t", budget=1000)
+        assert payload.images == []
+        assert "omitted or cut for budget" in payload.text
+
+
+class TestJudgeOpenAiImageParts:
+    def test_no_images_keeps_content_a_bare_string(self, monkeypatch):
+        monkeypatch.setenv("KENSEI_OPENAI_API_KEY", AGENT_KEY)
+        seen = _capture_openai(monkeypatch)
+        grading._call_judge_openai("gpt-5.5", "sys", "plain user text")
+        assert _request_body(seen[0])["messages"][1]["content"] == "plain user text"
+
+    def test_an_imageless_payload_is_byte_identical_to_a_bare_string(self, monkeypatch):
+        monkeypatch.setenv("KENSEI_OPENAI_API_KEY", AGENT_KEY)
+        seen = _capture_openai(monkeypatch)
+        grading._call_judge_openai("gpt-5.5", "sys", "plain user text")
+        grading._call_judge_openai(
+            "gpt-5.5", "sys", grading.JudgeUserPayload(text="plain user text")
+        )
+        assert seen[0].data == seen[1].data
+
+    def test_images_become_a_parts_list_with_text_first(self, monkeypatch):
+        monkeypatch.setenv("KENSEI_OPENAI_API_KEY", AGENT_KEY)
+        seen = _capture_openai(monkeypatch)
+        payload = grading.JudgeUserPayload(
+            text="evidence",
+            images=[grading.ImagePart(
+                data_uri=PNG_DATA_URI, mime="image/png", detail="low", label="a#1")],
+        )
+        grading._call_judge_openai("gpt-5.5", "sys", payload)
+        content = _request_body(seen[0])["messages"][1]["content"]
+        # The image parts carry no model-readable label, so the text part gets a
+        # trailing manifest naming the attachments in order (see MINOR 4).
+        assert content == [
+            {"type": "text",
+             "text": "evidence\n[Attached images, in order: a#1]"},
+            {"type": "image_url",
+             "image_url": {"url": PNG_DATA_URI, "detail": "low"}},
+        ]
+
+    def test_multiple_images_preserve_order_and_per_image_detail(self, monkeypatch):
+        monkeypatch.setenv("KENSEI_OPENAI_API_KEY", AGENT_KEY)
+        seen = _capture_openai(monkeypatch)
+        payload = grading.JudgeUserPayload(
+            text="evidence",
+            images=[
+                grading.ImagePart(PNG_DATA_URI, "image/png", "low", "a#1"),
+                grading.ImagePart(PNG_DATA_URI + "AA", "image/png", "high", "a#2"),
+            ],
+        )
+        grading._call_judge_openai("gpt-5.5", "sys", payload)
+        content = _request_body(seen[0])["messages"][1]["content"]
+        assert [p["type"] for p in content] == ["text", "image_url", "image_url"]
+        assert content[0]["text"].endswith("[Attached images, in order: a#1, a#2]")
+        assert content[1]["image_url"]["detail"] == "low"
+        assert content[2]["image_url"] == {"url": PNG_DATA_URI + "AA", "detail": "high"}
+
+    def test_system_message_is_never_turned_into_parts(self, monkeypatch):
+        monkeypatch.setenv("KENSEI_OPENAI_API_KEY", AGENT_KEY)
+        seen = _capture_openai(monkeypatch)
+        payload = grading.JudgeUserPayload(
+            text="evidence",
+            images=[grading.ImagePart(PNG_DATA_URI, "image/png", "low", "a#1")],
+        )
+        grading._call_judge_openai("gpt-5.5", "sys", payload)
+        assert _request_body(seen[0])["messages"][0]["content"] == "sys"
+
+    def test_codex_route_emits_the_same_chat_image_shape(self, monkeypatch):
+        """The codex bridge is fed the SAME Chat-Completions image_url shape; the
+        Responses translation happens bridge-side (codex_oauth/translate.py), so
+        this body stays route-agnostic."""
+        monkeypatch.setenv("KENSEI_JUDGE_CODEX_BRIDGE_URL", CODEX_URL)
+        monkeypatch.setenv("WCB_CODEX_BRIDGE_SECRET", CODEX_SECRET)
+        seen = _capture_openai(monkeypatch)
+        payload = grading.JudgeUserPayload(
+            text="evidence",
+            images=[grading.ImagePart(PNG_DATA_URI, "image/png", "low", "a#1")],
+        )
+        grading._call_one_judge(GPT_MODEL, "sys", payload, "gpt")
+        content = _request_body(seen[0])["messages"][1]["content"]
+        assert content[1]["image_url"]["url"] == PNG_DATA_URI
+
+
+class TestCouncilNeverSeesImageParts:
+    """Every non-gpt transport is TEXT-ONLY by contract: `_call_one_judge`
+    unwraps `.text` so a Bedrock/LiteLLM request body is byte-identical to the
+    pre-multimodal harness even if a payload lands in a council slot."""
+
+    def _payload(self):
+        return grading.JudgeUserPayload(
+            text="council evidence",
+            images=[grading.ImagePart(PNG_DATA_URI, "image/png", "low", "a#1")],
+        )
+
+    def test_openai_fallback_family_gets_a_bare_string(self, monkeypatch):
+        monkeypatch.delenv("KENSEI_JUDGE_USE_LITELLM", raising=False)
+        monkeypatch.setenv("KENSEI_OPENAI_API_KEY", AGENT_KEY)
+        seen = _capture_openai(monkeypatch)
+        grading._call_one_judge("gpt-5.5", "sys", self._payload(), "glm")
+        content = _request_body(seen[0])["messages"][1]["content"]
+        assert content == "council evidence"
+        assert isinstance(content, str)
+
+    def test_litellm_path_receives_text_not_a_payload(self, monkeypatch):
+        monkeypatch.setenv("KENSEI_JUDGE_USE_LITELLM", "1")
+        captured: list[object] = []
+
+        def _fake_call(*, model, system, user, max_output_tokens, cost_fn, family):
+            captured.append(user)
+            return "ok", dict(grading._ZERO_USAGE)
+
+        monkeypatch.setattr(judge_litellm, "call_judge_via_litellm", _fake_call)
+        grading._call_one_judge(SONNET_ARN, "sys", self._payload(), "sonnet")
+        assert captured == ["council evidence"]
+        assert isinstance(captured[0], str)
+
+
+class TestPreflightCodexImageProbe:
+    def _configure(self, monkeypatch):
+        monkeypatch.setenv("KENSEI_JUDGE_CODEX_BRIDGE_URL", CODEX_URL)
+        monkeypatch.setenv("WCB_CODEX_BRIDGE_SECRET", CODEX_SECRET)
+
+    def _replies(self, monkeypatch, replies: list) -> list[urllib.request.Request]:
+        """Fake urlopen answering one scripted reply per call.
+
+        A reply may be an Exception (raised) or verdict text; the last reply is
+        reused once the script runs out.
+        """
+        seen: list[urllib.request.Request] = []
+
+        def _fake_urlopen(req, timeout=None):  # noqa: ANN001 - urllib signature
+            reply = replies[len(seen)] if len(seen) < len(replies) else replies[-1]
+            seen.append(req)
+            if isinstance(reply, Exception):
+                raise reply
+            return _FakeSSEResponse(_sse(reply))
+
+        monkeypatch.setattr(urllib.request, "urlopen", _fake_urlopen)
+        return seen
+
+    def test_probes_text_then_an_image_part(self, monkeypatch):
+        self._configure(monkeypatch)
+        seen = self._replies(monkeypatch, ["OK", "OK"])
+        ok, detail = grading.preflight_judge_codex()
+        assert ok == "ok"
+        assert "image probe ok" in detail
+        assert len(seen) == 2
+        assert isinstance(_request_body(seen[0])["messages"][1]["content"], str)
+        parts = _request_body(seen[1])["messages"][1]["content"]
+        assert [p["type"] for p in parts] == ["text", "image_url"]
+        assert parts[1]["image_url"]["url"].startswith("data:image/png;base64,")
+
+    def test_image_probe_uses_the_bridge_endpoint_and_bearer_secret(self, monkeypatch):
+        self._configure(monkeypatch)
+        seen = self._replies(monkeypatch, ["OK", "OK"])
+        grading.preflight_judge_codex()
+        assert seen[1].full_url == f"{CODEX_URL}/v1/chat/completions"
+        assert seen[1].get_header("Authorization") == f"Bearer {CODEX_SECRET}"
+
+    def test_empty_image_reply_is_a_refusal_and_fails(self, monkeypatch):
+        """The gpt-5.6 refusal this path exists to avoid is HTTP 200 with EMPTY
+        content — preflight MUST call that a failure, not an ok.
+
+        The `image probe: ` PREFIX is a contract with eval/run_batch.py, which
+        branches on it to DEGRADE (disable image attachment for the batch) rather
+        than abort the way a text/auth failure does.
+        """
+        self._configure(monkeypatch)
+        self._replies(monkeypatch, ["OK", ""])
+        ok, detail = grading.preflight_judge_codex()
+        assert ok == "fail"
+        assert detail.startswith("image probe:")
+        assert "refusal" in detail
+
+    def test_verbalised_refusal_fails(self, monkeypatch):
+        self._configure(monkeypatch)
+        self._replies(monkeypatch, ["OK", "I'm sorry, I can't help with that image."])
+        ok, detail = grading.preflight_judge_codex()
+        assert ok == "fail"
+        assert detail.startswith("image probe:")
+        assert "refusal marker" in detail
+
+    def test_image_probe_transport_error_fails(self, monkeypatch):
+        self._configure(monkeypatch)
+        self._replies(monkeypatch, ["OK", RuntimeError("image parts unsupported")])
+        ok, detail = grading.preflight_judge_codex()
+        assert ok == "fail"
+        assert detail.startswith("image probe:")
+        assert "image parts unsupported" in detail
+
+    def test_text_probe_failure_still_reports_before_the_image_probe(self, monkeypatch):
+        self._configure(monkeypatch)
+        seen = self._replies(monkeypatch, [RuntimeError("connection refused")])
+        ok, detail = grading.preflight_judge_codex()
+        assert ok == "fail"
+        assert "connection refused" in detail
+        assert "image probe" not in detail
+        assert not detail.startswith("image probe:")  # run_batch must ABORT on this
+        assert len(seen) == 1
+
+    def test_image_probe_skipped_when_attachment_is_disabled(self, monkeypatch):
+        self._configure(monkeypatch)
+        monkeypatch.setenv("KENSEI_JUDGE_MAX_IMAGES", "0")
+        seen = self._replies(monkeypatch, ["OK"])
+        ok, detail = grading.preflight_judge_codex()
+        assert ok == "ok"
+        assert "attachment disabled" in detail
+        assert len(seen) == 1
+
+    def test_skip_and_secret_gates_are_unchanged(self, monkeypatch):
+        assert grading.preflight_judge_codex()[0] == "skip"
+        monkeypatch.setenv("KENSEI_JUDGE_CODEX_BRIDGE_URL", CODEX_URL)
+        assert grading.preflight_judge_codex()[0] == "fail"
+
+
+class TestPromptSeamCarriesImages:
+    """`_judge_user_prompt` renders the evidence into the judge_user template. If
+    it returned a bare str, the images `_gather_evidence` lifted would be stranded
+    between the extractor and the transport and the judge would grade image-blind
+    with nothing naming the loss."""
+
+    def _payload(self):
+        return grading.JudgeUserPayload(
+            text="files\n----- TRANSCRIPT (condensed) -----\nturn 1",
+            images=[grading.ImagePart(PNG_DATA_URI, "image/png", "low", "a#1")],
+        )
+
+    def test_images_survive_prompt_rendering(self):
+        out = grading._judge_user_prompt("task", RUBRICS, self._payload())
+        assert isinstance(out, grading.JudgeUserPayload)
+        assert [i.data_uri for i in out.images] == [PNG_DATA_URI]
+        assert "data:image" not in out.text
+        assert "wrote report.md" in out.text
+
+    def test_text_only_evidence_still_returns_a_bare_string(self):
+        out = grading._judge_user_prompt("task", RUBRICS, "files only")
+        assert isinstance(out, str)
+
+    def test_an_imageless_payload_also_returns_a_bare_string(self):
+        out = grading._judge_user_prompt(
+            "task", RUBRICS, grading.JudgeUserPayload(text="files only")
+        )
+        assert isinstance(out, str)
+
+    def test_gpt_primary_grade_puts_image_parts_on_the_wire(self, monkeypatch, tmp_path):
+        """End-to-end: a deliverable with an inline screenshot reaches the GPT
+        judge's HTTP body as an image_url content part, not as base64 prompt text."""
+        monkeypatch.setenv("KENSEI_JUDGE_CODEX_BRIDGE_URL", CODEX_URL)
+        monkeypatch.setenv("WCB_CODEX_BRIDGE_SECRET", CODEX_SECRET)
+        root = _write_deliverables(
+            tmp_path, {"report.md": f"# Q3\n\n![shot]({PNG_DATA_URI})\n"}
+        )
+        seen = _capture_openai(monkeypatch, "ok")
+        grading._grade_gpt_primary(RUBRICS, "task", root, "", "sys")
+        assert len(seen) == 1
+        content = _request_body(seen[0])["messages"][1]["content"]
+        assert isinstance(content, list)
+        assert content[0]["type"] == "text"
+        assert PNG_B64 not in content[0]["text"]
+        assert content[1]["image_url"]["url"] == PNG_DATA_URI
+
+
+class TestImageBudgetEnvParsing:
+    def test_defaults(self):
+        assert grading._judge_max_images() == 8
+        assert grading._judge_max_image_bytes() == 4 * 1024 * 1024
+        assert grading._judge_image_detail() == "low"
+
+    @pytest.mark.parametrize("raw", ["", "   ", "abc", "-1"])
+    def test_unparseable_or_negative_falls_back_to_default(self, monkeypatch, raw):
+        monkeypatch.setenv("KENSEI_JUDGE_MAX_IMAGES", raw)
+        monkeypatch.setenv("KENSEI_JUDGE_MAX_IMAGE_BYTES", raw)
+        assert grading._judge_max_images() == 8
+        assert grading._judge_max_image_bytes() == 4 * 1024 * 1024
+
+    @pytest.mark.parametrize("raw", ["low", "high", "auto", "HIGH"])
+    def test_valid_detail_tiers_are_accepted_case_insensitively(self, monkeypatch, raw):
+        monkeypatch.setenv("KENSEI_JUDGE_IMAGE_DETAIL", raw)
+        assert grading._judge_image_detail() == raw.strip().lower()
+
+    def test_unknown_detail_tier_falls_back_to_low(self, monkeypatch):
+        monkeypatch.setenv("KENSEI_JUDGE_IMAGE_DETAIL", "ultra")
+        assert grading._judge_image_detail() == "low"
 

@@ -9,7 +9,7 @@ import subprocess
 import tempfile
 import zipfile
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from collections.abc import Sequence
 from typing import Literal
@@ -460,6 +460,239 @@ def _extract_weight(r: dict) -> float:
         return 1.0
 
 
+# ── Judge multimodal payload (gpt primary judge ONLY) ───────────────────────
+# Agent HTML deliverables routinely inline proof screenshots as
+# `data:image/<mime>;base64,<payload>`. Sending those blobs as judge prompt TEXT
+# is what produced the gpt-5.6 refusal (HTTP 200, content:[], stop_reason
+# "refusal"): ~440K tokens of undecodable base64 inside a 570K-token user turn
+# trips a probabilistic API safety classifier, and text base64 is unreadable to
+# the judge anyway. The blobs are therefore LIFTED out of the text at the
+# evidence seam (_extract_inline_images) and re-attached as structured image
+# content-parts, which route to the vision preprocessor instead.
+#
+# This payload rides the gpt member ONLY: council members never receive image
+# PARTS. Their TEXT, however, carries the same placeholders as the gpt member,
+# because extraction happens in _deliverable_evidence_marker — upstream of the
+# per-family split — so it is NOT byte-identical to the pre-multimodal prompt.
+# That is deliberate: the base64 was unreadable to them anyway and only burned
+# evidence budget.
+@dataclass(frozen=True)
+class ImagePart:
+    """One image lifted out of a text deliverable, ready for a content-part."""
+
+    data_uri: str
+    mime: str
+    detail: str
+    label: str
+
+
+@dataclass(frozen=True)
+class JudgeUserPayload:
+    """Judge user turn as text + extracted images (gpt route only).
+
+    A sidecar type, NOT a str subclass: every non-gpt transport unwraps `.text`
+    (see _call_one_judge) so the Bedrock/LiteLLM request bodies are unchanged.
+    """
+
+    text: str
+    images: list[ImagePart] = field(default_factory=list)
+
+
+def _payload_text(user: "str | JudgeUserPayload") -> str:
+    return user.text if isinstance(user, JudgeUserPayload) else user
+
+
+def _payload_images(user: "str | JudgeUserPayload") -> list[ImagePart]:
+    return list(user.images) if isinstance(user, JudgeUserPayload) else []
+
+
+# Image attachment budget. Deliberately small: images are for image-CONTENT
+# criteria ("did the agent render the chart?"), not for bulk evidence, and every
+# attached part costs vision tokens. `detail="low"` is the cheap fixed-cost tier.
+# Excess images keep their TEXT placeholder (so the judge still knows the image
+# existed) but are not attached — see _select_judge_images.
+_DEFAULT_JUDGE_MAX_IMAGES = 8
+_DEFAULT_JUDGE_MAX_IMAGE_BYTES = 4 * 1024 * 1024
+_DEFAULT_JUDGE_IMAGE_DETAIL = "low"
+_JUDGE_IMAGE_DETAILS = frozenset({"low", "high", "auto"})
+
+
+def _judge_max_images() -> int:
+    """Max image parts attached to one judge request. 0 disables attachment
+    (placeholders only); a negative or unparseable value falls back to default."""
+    raw = os.environ.get("KENSEI_JUDGE_MAX_IMAGES")
+    if raw is None or raw.strip() == "":
+        return _DEFAULT_JUDGE_MAX_IMAGES
+    try:
+        n = int(raw)
+    except ValueError:
+        return _DEFAULT_JUDGE_MAX_IMAGES
+    return n if n >= 0 else _DEFAULT_JUDGE_MAX_IMAGES
+
+
+def _judge_max_image_bytes() -> int:
+    """Total base64-payload bytes attachable to one judge request."""
+    raw = os.environ.get("KENSEI_JUDGE_MAX_IMAGE_BYTES")
+    if raw is None or raw.strip() == "":
+        return _DEFAULT_JUDGE_MAX_IMAGE_BYTES
+    try:
+        n = int(raw)
+    except ValueError:
+        return _DEFAULT_JUDGE_MAX_IMAGE_BYTES
+    return n if n >= 0 else _DEFAULT_JUDGE_MAX_IMAGE_BYTES
+
+
+def _judge_image_detail() -> str:
+    raw = (os.environ.get("KENSEI_JUDGE_IMAGE_DETAIL") or "").strip().lower()
+    return raw if raw in _JUDGE_IMAGE_DETAILS else _DEFAULT_JUDGE_IMAGE_DETAIL
+
+
+# Inline base64 image data-URI, matched by a head-anchored forward SCANNER
+# rather than one regex.
+#
+# WHY NOT A SINGLE REGEX: agents emit these blobs BOTH unwrapped
+# (`base64.b64encode`) and newline-wrapped at 64/76 columns
+# (`base64.encodebytes`, and coreutils `base64 file` in a bash agent). A payload
+# class without whitespace lifts only the FIRST line of a wrapped blob, which is
+# the worst possible outcome: the rest of the payload stays in the judge text (so
+# the refusal trigger this seam exists to remove is fully intact) AND the
+# attached data URI is a truncated, undecodable image. Simply adding `\s` to the
+# class is not the fix either — in markdown/plaintext deliverables it swallows
+# the prose that follows the blob.
+#
+# So: match the prefix, then consume base64 runs, crossing a newline ONLY when
+# the run just consumed is at least _B64_WRAP_MIN_SEGMENT chars. Canonical wrap
+# widths are 64 and 76, so a shorter run before a newline means the blob ended.
+_INLINE_IMAGE_DATA_URI_HEAD_RE = re.compile(
+    r"data:image/(?P<mime>[A-Za-z0-9.+-]{1,24});base64,"
+)
+_B64_RUN_RE = re.compile(r"[A-Za-z0-9+/]+={0,2}")
+_B64_WRAP_RE = re.compile(r"[ \t]*\r?\n[ \t]*")
+_B64_WRAP_MIN_SEGMENT = 64
+# Floor that skips degenerate stubs (kept from the pre-scanner regex).
+_B64_MIN_PAYLOAD = 32
+
+
+def _image_placeholder_prefix(label: str) -> str:
+    """Leading, label-unique slice of an inline-image placeholder.
+
+    Single source of truth for the placeholder shape so the emitter
+    (_extract_inline_images) and the survivor test (_gather_evidence, which only
+    attaches images whose placeholder outlived budgeting) cannot drift. The
+    trailing comma matters: a bare label would make `page.html#1` a prefix match
+    of `page.html#10`.
+    """
+    return f"[inline image {label},"
+
+
+def _scan_b64_payload(body: str, start: int) -> tuple[str, int]:
+    """Consume a possibly newline-wrapped base64 payload beginning at *start*.
+
+    Returns (payload_with_whitespace_stripped, end_index). `end_index == start`
+    when no base64 run begins at *start*.
+    """
+    segs: list[str] = []
+    ends: list[int] = []
+    pos = start
+    while True:
+        m = _B64_RUN_RE.match(body, pos)
+        if not m:
+            break
+        seg = m.group(0)
+        segs.append(seg)
+        ends.append(m.end())
+        pos = m.end()
+        if seg.endswith("="):
+            break  # padding terminates the payload
+        wrap = _B64_WRAP_RE.match(body, pos)
+        if wrap is None or len(seg) < _B64_WRAP_MIN_SEGMENT:
+            break
+        pos = wrap.end()
+    # A well-formed base64 payload length is a multiple of 4. When the assembled
+    # length is not, the last short unpadded run is far more likely a prose word
+    # that happened to follow a blob ending exactly on a wrap boundary than it is
+    # payload — drop it instead of corrupting both the text and the image.
+    payload = "".join(segs)
+    if (
+        len(segs) > 1
+        and len(payload) % 4
+        and len(segs[-1]) < _B64_WRAP_MIN_SEGMENT
+    ):
+        segs.pop()
+        ends.pop()
+        payload = "".join(segs)
+    return payload, (ends[-1] if ends else start)
+
+
+def _data_uri_b64_len(data_uri: str) -> int:
+    """Length of the base64 payload (wire bytes), 0 when the URI is malformed."""
+    _, _, payload = data_uri.partition(",")
+    return len(payload)
+
+
+def _extract_inline_images(body: str, label_stem: str) -> tuple[str, list[ImagePart]]:
+    """Replace each inline base64 image in *body* with a compact placeholder and
+    return (rewritten_text, images) in document order. NEVER raises.
+
+    The attached `data_uri` is REBUILT from the whitespace-stripped payload, so a
+    newline-wrapped blob yields one valid single-line data URI and leaves no
+    base64 behind in the text.
+    """
+    images: list[ImagePart] = []
+    try:
+        detail = _judge_image_detail()
+        out: list[str] = []
+        pos = 0
+        for head in _INLINE_IMAGE_DATA_URI_HEAD_RE.finditer(body):
+            if head.start() < pos:
+                continue  # inside a payload already consumed
+            payload, end = _scan_b64_payload(body, head.end())
+            if len(payload) < _B64_MIN_PAYLOAD:
+                continue  # degenerate stub: leave it in the text verbatim
+            mime = f"image/{head.group('mime').lower()}"
+            label = f"{label_stem}#{len(images) + 1}"
+            images.append(ImagePart(
+                data_uri=f"data:{mime};base64,{payload}",
+                mime=mime,
+                detail=detail,
+                label=label,
+            ))
+            approx_kb = (len(payload) * 3 / 4) / 1024
+            out.append(body[pos:head.start()])
+            out.append(
+                f"{_image_placeholder_prefix(label)} {mime}, ~{approx_kb:.1f}KB]"
+            )
+            pos = end
+        if not images:
+            return body, []
+        out.append(body[pos:])
+        return "".join(out), images
+    except Exception:
+        return body, []
+
+
+def _select_judge_images(candidates: list[ImagePart]) -> list[ImagePart]:
+    """Apply the count + byte caps, preserving evidence order. Never raises.
+
+    An image that would breach the byte cap is SKIPPED, not a stop signal: one
+    oversized blob early in the evidence must not suppress every smaller image
+    behind it. Skipped images keep their text placeholder either way.
+    """
+    max_n = _judge_max_images()
+    max_bytes = _judge_max_image_bytes()
+    out: list[ImagePart] = []
+    used = 0
+    for img in candidates:
+        if len(out) >= max_n:
+            break
+        n = _data_uri_b64_len(img.data_uri)
+        if used + n > max_bytes:
+            continue
+        out.append(img)
+        used += n
+    return out
+
+
 def _split_evidence(evidence: str) -> tuple[str, str]:
     marker = "\n----- TRANSCRIPT (condensed) -----\n"
     if marker in evidence:
@@ -468,10 +701,12 @@ def _split_evidence(evidence: str) -> tuple[str, str]:
     return evidence, ""
 
 
-def _judge_user_prompt(task_description: str, rubrics: list, evidence: str) -> str:
+def _judge_user_prompt(
+    task_description: str, rubrics: list, evidence: "str | JudgeUserPayload"
+) -> "str | JudgeUserPayload":
     from src.utils.prompt_loader import load_prompt
     from src.utils.rubric_targets import FILE_TARGETS, normalize_target
-    output_files, transcript = _split_evidence(evidence)
+    output_files, transcript = _split_evidence(_payload_text(evidence))
     crit_lines = []
     for i, r in enumerate(rubrics):
         crit = r.get("criterion") if isinstance(r, dict) else str(r)
@@ -483,7 +718,7 @@ def _judge_user_prompt(task_description: str, rubrics: list, evidence: str) -> s
         tgt = normalize_target(r.get("evaluation_target")) if isinstance(r, dict) else ""
         tag = f"  [target: {tgt}]" if tgt in FILE_TARGETS else ""
         crit_lines.append(f"{i + 1}. {crit}  [points: {wt}]{tag}")
-    return load_prompt(
+    rendered = load_prompt(
         "judge_user",
         task_description=task_description,
         transcript=transcript or "(no transcript captured)",
@@ -491,6 +726,13 @@ def _judge_user_prompt(task_description: str, rubrics: list, evidence: str) -> s
         rubrics_block="\n".join(crit_lines),
         n_criteria=len(rubrics),
     )
+    # Images lifted by _gather_evidence must survive this seam: the rendered text
+    # is what every family sees, but returning a bare str here would strand the
+    # extraction and the transport with nothing between them (image-BLIND judge,
+    # the silent no-signal case). Text-only evidence still returns a bare str, so
+    # every council request body is byte-identical to before.
+    images = _payload_images(evidence)
+    return JudgeUserPayload(text=rendered, images=images) if images else rendered
 
 
 # Per real-task forensics, agents intuit several different deliverable-root
@@ -722,32 +964,34 @@ def _extract_text_deliverable(path: Path) -> str | None:
     return None
 
 
-def _deliverable_evidence_marker(path: Path) -> str | None:
+def _deliverable_evidence_marker(path: Path) -> tuple[str, list[ImagePart]] | None:
     # Single dispatch point turning one collected deliverable into an evidence
-    # block. Returns the block text, or None to skip. Text deliverables read
-    # verbatim; extractable binaries (docx/pdf) route through
-    # _extract_text_deliverable; images emit a stdlib dimension marker; other
-    # binaries emit a presence-only marker (verbatim bytes would be mojibake).
-    # NEVER raises (grading-must-never-fail).
+    # block. Returns (block_text, images), or None to skip. Text deliverables read
+    # verbatim EXCEPT for inline base64 images, which are lifted here — before any
+    # budgeting — so a blob can never be bisected by a char slice; extractable
+    # binaries (docx/pdf) route through _extract_text_deliverable; images emit a
+    # stdlib dimension marker; other binaries emit a presence-only marker
+    # (verbatim bytes would be mojibake). NEVER raises (grading-must-never-fail).
     try:
         if _is_text_deliverable(path):
             body = path.read_text(encoding="utf-8", errors="replace")
-            return f"\n----- DELIVERABLE: {path.name} -----\n{body}"
+            body, images = _extract_inline_images(body, path.name)
+            return f"\n----- DELIVERABLE: {path.name} -----\n{body}", images
         if _is_image_deliverable(path):
             dims = _image_dimensions(path)
             size = f"image {dims[0]}x{dims[1]}" if dims else "image"
             return (
                 f"\n----- DELIVERABLE: {path.name} "
                 f"({size}, presence only) -----\n"
-            )
+            ), []
         if _is_binary_deliverable(path):
             extracted = _extract_text_deliverable(path)
             if extracted:
-                return f"\n----- DELIVERABLE: {path.name} (extracted text) -----\n{extracted}"
+                return f"\n----- DELIVERABLE: {path.name} (extracted text) -----\n{extracted}", []
             return (
                 f"\n----- DELIVERABLE: {path.name} "
                 "(binary — present, contents not extractable) -----\n"
-            )
+            ), []
     except Exception:
         return None
     return None
@@ -871,13 +1115,28 @@ _OMISSION_MANIFEST_RESERVE = 400
 _OMISSION_MANIFEST_MAX_NAMES = 40
 
 
+def _surviving_images(text: str, candidates: list[ImagePart]) -> list[ImagePart]:
+    """Images whose placeholder outlived budgeting, in order. Never raises.
+
+    An image whose placeholder was cut (mid-block head+tail truncation, or the
+    defensive final clamp) must NOT be attached: pixels in front of the judge
+    with no text naming them are unattributable evidence.
+    """
+    return [i for i in candidates if _image_placeholder_prefix(i.label) in text]
+
+
 def _gather_evidence(
     workspace_results: Path,
     transcript_text: str,
     budget: int | None = None,
     rubric_names: frozenset[str] | None = None,
-) -> str:
+) -> JudgeUserPayload:
     deliverables = _collect_deliverable_files(workspace_results)
+    # Scrub inline base64 out of the TRANSCRIPT too, discarding the images: a
+    # tool result that cat'd an image-bearing deliverable would otherwise carry
+    # the same blobs back into the same user turn through the other seam. Text
+    # only (placeholders), so no vision cost and nothing to survivor-filter.
+    transcript_text, _ = _extract_inline_images(transcript_text, "transcript")
     # Order so the files the rubric is actually ABOUT survive every member's
     # truncation budget: rubric-named files first, then report/flagged stems,
     # then other deliverables, then scratch subtrees — ascending size within
@@ -901,11 +1160,12 @@ def _gather_evidence(
             size = 1 << 30
         return (rank, size, path.name)
 
-    blocks: list[tuple[Path, str]] = []
+    blocks: list[tuple[Path, str, list[ImagePart]]] = []
     for f in sorted(deliverables, key=_priority):
         marker = _deliverable_evidence_marker(f)
         if marker is not None:
-            blocks.append((f, marker))
+            block, block_images = marker
+            blocks.append((f, block, block_images))
     if not blocks:
         deliv_blob = (
             "\n(no deliverable files were collected under any of: "
@@ -914,18 +1174,28 @@ def _gather_evidence(
         )
         blocks = []
     else:
-        deliv_blob = "".join(b for _, b in blocks)
+        deliv_blob = "".join(b for _, b, _ in blocks)
     effective = _JUDGE_MAX_EVIDENCE if budget is None else budget
     # Budget deliverables and transcript SEPARATELY. The transcript marker can
     # then never be sliced off (so _split_evidence never silently returns ""),
     # and the boundary-aware cut keeps the final turn whole. A tiny transcript
     # floor is reserved so the marker + final turn survive even when deliverables
     # are large; realistic per-family budgets (175K-1.35M) are the operative path.
+    #
+    # Image bytes are tracked SEPARATELY from this char budget: the blobs are no
+    # longer in the text at all (only their placeholders are), and _judge_max_*
+    # caps bound the attachment cost.
     if effective is None or not transcript_text:
         blob = deliv_blob + (
             f"{_TRANSCRIPT_MARKER}{transcript_text}" if transcript_text else ""
         )
-        return blob if effective is None else blob[:effective]
+        text = blob if effective is None else blob[:effective]
+        return JudgeUserPayload(
+            text=text,
+            images=_select_judge_images(_surviving_images(
+                text, [i for _, _, imgs in blocks for i in imgs]
+            )),
+        )
     floor = min(
         len(_TRANSCRIPT_MARKER) + len(transcript_text),
         max(2000, effective // 5),
@@ -933,6 +1203,7 @@ def _gather_evidence(
     deliv_budget = max(0, effective - floor)
     if len(deliv_blob) <= deliv_budget:
         deliv_out = deliv_blob
+        kept_images = [i for _, _, imgs in blocks for i in imgs]
     else:
         # Cut on BLOCK boundaries and name what was cut. A raw blob slice
         # leaves the judge unable to distinguish "file never produced"
@@ -940,13 +1211,15 @@ def _gather_evidence(
         # TRUNCATION_AFFECTED -> Human Evaluation); the manifest carries that
         # distinction into the payload (see judge_system.md).
         kept: list[str] = []
+        kept_images: list[ImagePart] = []
         omitted: list[str] = []
         used = 0
-        for f, block in blocks:
+        for f, block, block_images in blocks:
             room = deliv_budget - used - _OMISSION_MANIFEST_RESERVE
             if len(block) <= room:
                 kept.append(block)
                 used += len(block)
+                kept_images.extend(block_images)
             elif room > 800 and not omitted:
                 # Head+tail keep (mirrors _budget_transcript): deliverable text
                 # files often carry markup/data bulk up front and the
@@ -956,8 +1229,14 @@ def _gather_evidence(
                 half = (room - len(cut_mark)) // 2
                 kept.append(block[:half] + cut_mark + block[-(room - len(cut_mark) - half):])
                 used += room
+                kept_images.extend(block_images)
                 omitted.append(f"{f.name} (partial)")
             else:
+                # Whole block dropped: attaching its images would put pixels in
+                # front of the judge with no corresponding text placeholder.
+                # (The partial keep above extends kept_images with the whole
+                # block's images; _surviving_images below drops any whose
+                # placeholder fell in the excised middle.)
                 omitted.append(f.name)
         listing = ", ".join(omitted[:_OMISSION_MANIFEST_MAX_NAMES])
         extra = len(omitted) - _OMISSION_MANIFEST_MAX_NAMES
@@ -975,7 +1254,11 @@ def _gather_evidence(
     # so the assembled evidence must NEVER exceed `effective` even if a component
     # budget math drifts. _split_evidence still finds the marker because deliv_out
     # + marker are budgeted to fit before the transcript tail.
-    return (deliv_out + _TRANSCRIPT_MARKER + t_out)[:effective]
+    text = (deliv_out + _TRANSCRIPT_MARKER + t_out)[:effective]
+    return JudgeUserPayload(
+        text=text,
+        images=_select_judge_images(_surviving_images(text, kept_images)),
+    )
 
 
 _ZERO_USAGE = {
@@ -1138,7 +1421,7 @@ _JUDGE_GPT_REASONING_EFFORT = "low"
 def _call_judge_openai(
     model: str,
     system: str,
-    user: str,
+    user: "str | JudgeUserPayload",
     *,
     family: str | None = None,
     api_key: str | None = None,
@@ -1179,10 +1462,40 @@ def _call_judge_openai(
     # NOTE `temperature`/`top_p` are absent BY CONSTRUCTION, not by omission:
     # gpt-5.6 returns HTTP 400 on their mere presence (any value), exactly like
     # Sonnet 5 (AGENTS.md invariant 18). Never add them here.
+    #
+    # `user` is a bare str on every legacy path, so `content` stays a bare string
+    # and a no-image request is byte-identical to before. Only when images were
+    # lifted out of the deliverables does content become a parts LIST: the text
+    # first, then one `image_url` part per image. That Chat-Completions shape is
+    # native on metered api.openai.com AND is translated to a Responses
+    # `input_image` by the codex bridge (codex_oauth/translate.py), so this body
+    # stays route-agnostic.
+    #
+    # The image parts themselves carry no label the model can read, so the text
+    # gets ONE trailing line naming the attachments in order — otherwise the
+    # judge sees N labelled placeholders and N anonymous images and has to guess
+    # the mapping. It is appended to the single text part rather than interleaved
+    # per image on purpose: the codex bridge's _content_to_input_parts flattens
+    # all text into one input_text and appends images after it, so interleaved
+    # labels would be reordered on that route.
+    user_text = _payload_text(user)
+    user_images = _payload_images(user)
+    user_content: "str | list[dict]" = user_text
+    if user_images:
+        manifest = (
+            "\n[Attached images, in order: "
+            + ", ".join(img.label for img in user_images)
+            + "]"
+        )
+        user_content = [{"type": "text", "text": user_text + manifest}] + [
+            {"type": "image_url",
+             "image_url": {"url": img.data_uri, "detail": img.detail}}
+            for img in user_images
+        ]
     request_body: dict = {
         "model": model,
         "messages": [{"role": "system", "content": system},
-                     {"role": "user", "content": user}],
+                     {"role": "user", "content": user_content}],
         "max_completion_tokens": (
             8000 if max_completion_tokens is None else max_completion_tokens
         ),
@@ -1283,6 +1596,40 @@ def _call_judge_openai(
     return text, usage
 
 
+# Smallest valid PNG (1x1, fully transparent) as an inline data URI. Used by
+# preflight_judge_codex to exercise the IMAGE leg of the codex judge route: the
+# ChatGPT/Codex backend's handling of image content-parts is not documented, and a
+# 400/refusal there would otherwise only surface at grade time as an abstain-all
+# no-signal verdict (AGENTS.md #18).
+_PROBE_PNG_DATA_URI = (
+    "data:image/png;base64,"
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk"
+    "+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+)
+
+# A safety-classifier refusal on this route arrives as HTTP 200 with EMPTY
+# assistant content (stop_reason "refusal") — the exact failure mode the image
+# content-part path was built to avoid — so empty text is the primary signal. The
+# phrase list additionally catches a verbalised refusal.
+_IMAGE_PROBE_REFUSAL_MARKERS = (
+    "i'm sorry", "i am sorry", "i cannot", "i can't", "i won't",
+    "unable to view", "unable to see", "unable to process", "can't help with",
+    "cannot help with", "won't be able",
+)
+
+
+def _image_probe_refusal(text: str) -> str:
+    """Reason string when a probe reply looks like a refusal, else ""."""
+    stripped = (text or "").strip()
+    if not stripped:
+        return "empty response (refusal / no content)"
+    low = stripped.lower()
+    for marker in _IMAGE_PROBE_REFUSAL_MARKERS:
+        if marker in low:
+            return f"refusal marker {marker!r} in reply: {stripped[:160]!r}"
+    return ""
+
+
 def preflight_judge_codex(timeout_s: float = 90.0) -> tuple[str, str]:
     """Validate the GPT judge's codex-subscription grading path END-TO-END.
 
@@ -1292,10 +1639,16 @@ def preflight_judge_codex(timeout_s: float = 90.0) -> tuple[str, str]:
     Both otherwise surface at GRADE time, after the (expensive) trajectory has
     run. This issues ONE real, minimal completion through the exact host ->
     codex-bridge -> chatgpt.com route the grader uses, so a broken subscription
-    is flagged up front.
+    is flagged up front, then a SECOND minimal completion carrying one 1x1 PNG
+    image content-part so the multimodal leg is exercised before it matters.
 
-    Returns (ok, detail) as strings-safe tuple: ok is "ok"/"fail"/"skip". A
-    trivially short prompt is used because the bridge strips max_output_tokens
+    Returns (ok, detail) as strings-safe tuple: ok is "ok"/"fail"/"skip".
+
+    The `"image probe: "` PREFIX on a failure detail is a CONTRACT: it is how
+    eval/run_batch.py tells an image-leg failure (degrade — disable attachment
+    for the batch) from a text/auth failure (abort the batch). Do not drop it.
+
+    A trivially short prompt is used because the bridge strips max_output_tokens
     (output length is unbounded on this route), so cost is bounded by the prompt,
     not a max-token cap; a wall-clock timeout guards latency. NEVER raises
     (AGENTS.md #12: grading path must degrade, not fail).
@@ -1318,7 +1671,35 @@ def preflight_judge_codex(timeout_s: float = 90.0) -> tuple[str, str]:
         )
     except Exception as exc:  # noqa: BLE001 — probe must never raise into caller
         return "fail", f"{type(exc).__name__}: {str(exc)[:400]}"
-    return "ok", f"ok ({url}, model={model})"
+    # Image leg. Skipped when attachment is disabled (KENSEI_JUDGE_MAX_IMAGES=0):
+    # the grader will then never send an image part, so probing one would fail the
+    # batch on a capability it does not use.
+    if _judge_max_images() <= 0:
+        return "ok", f"ok ({url}, model={model}, image probe skipped: attachment disabled)"
+    probe_payload = JudgeUserPayload(
+        text="An image is attached. Reply with the single word OK.",
+        images=[ImagePart(
+            data_uri=_PROBE_PNG_DATA_URI,
+            mime="image/png",
+            detail=_judge_image_detail(),
+            label="preflight-probe#1",
+        )],
+    )
+    try:
+        img_text, _ = _call_judge_openai(
+            model, "You are a preflight probe.", probe_payload,
+            family="gpt",
+            api_key=secret,
+            reasoning_effort=_JUDGE_GPT_REASONING_EFFORT,
+            base_url=url,
+            timeout=timeout_s,
+        )
+    except Exception as exc:  # noqa: BLE001 — probe must never raise into caller
+        return "fail", f"image probe: {type(exc).__name__}: {str(exc)[:400]}"
+    refusal = _image_probe_refusal(img_text)
+    if refusal:
+        return "fail", f"image probe: {refusal}"
+    return "ok", f"ok ({url}, model={model}, image probe ok)"
 
 
 _ARN_REGION_RE = re.compile(r"^arn:aws:bedrock:([a-z0-9-]+):")
@@ -1571,7 +1952,7 @@ def _judge_use_litellm() -> bool:
 
 
 def _call_one_judge(
-    model: str, system: str, user: str, family: str | None = None
+    model: str, system: str, user: "str | JudgeUserPayload", family: str | None = None
 ) -> tuple[str, dict]:
     # Provider routing is CONTENT-AWARE, not naive partition("/"): a Bedrock
     # application-inference-profile ARN itself contains slashes, so a bare ARN
@@ -1597,6 +1978,8 @@ def _call_one_judge(
         # OpenAI-Chat-Completions wire shape, base_url pointed at the bridge, and
         # the bridge secret carried as the Bearer api_key. Falls back to the
         # metered KENSEI_JUDGE_GPT_API_KEY path when the bridge is not configured.
+        # `user` is forwarded WHOLE (payload or str) — this is the only transport
+        # that can carry image parts.
         _codex_url = _judge_codex_bridge_url()
         if _codex_url:
             return _call_judge_openai(
@@ -1615,6 +1998,11 @@ def _call_one_judge(
             max_completion_tokens=_member_max_output_tokens(gpt_model, family),
         )
 
+    # Every non-gpt transport (Bedrock Converse, LiteLLM, OpenAI fallback) is
+    # TEXT-ONLY by contract: unwrap here so a council request body is
+    # byte-identical to the pre-multimodal harness even if a payload ever leaks
+    # into a non-gpt member's slot.
+    user = _payload_text(user)
     # LiteLLM-backed path (opt-in via KENSEI_JUDGE_USE_LITELLM). On ANY exception
     # we fall through to the urllib direct-provider path below — this is the
     # explicit user m0039 contract: "If litellm is not configured for LLM
@@ -1673,7 +2061,7 @@ def _call_one_judge(
 def _run_council(
     members: list[CouncilMember],
     system: str,
-    user_for_member: "dict[str, str] | str",
+    user_for_member: "dict[str, str | JudgeUserPayload] | str | JudgeUserPayload",
     n_criteria: int,
 ) -> list[dict]:
     """Run every member judge in parallel and return one result dict per member:
@@ -1682,13 +2070,15 @@ def _run_council(
 
     `user_for_member` may be a single shared string (legacy) or a
     {model: user_prompt} dict so each member receives a payload sized to its
-    own context window. `n_criteria` is the expected verdict count; parses
-    failing this count return `ok=False, error='parse: ...'` rather than raise.
-    Every result carries the member's stable `family` so downstream per-member
-    dicts key by family, not by the monthly-rotating ARN profile id."""
+    own context window. A value may be a `JudgeUserPayload` (text + images) for
+    the gpt member; every other family is unwrapped to text in _call_one_judge.
+    `n_criteria` is the expected verdict count; parses failing this count return
+    `ok=False, error='parse: ...'` rather than raise. Every result carries the
+    member's stable `family` so downstream per-member dicts key by family, not by
+    the monthly-rotating ARN profile id."""
     from concurrent.futures import ThreadPoolExecutor
 
-    def _resolve_user(model: str) -> str:
+    def _resolve_user(model: str) -> "str | JudgeUserPayload":
         if isinstance(user_for_member, dict):
             return user_for_member.get(model, "")
         return user_for_member
@@ -1699,6 +2089,7 @@ def _run_council(
         family = member.family
         effective_model = _effective_judge_model(model, family)
         user = _resolve_user(model)
+        user_chars = len(_payload_text(user))
         label = _short_judge_label(model)
         # Per-member API call telemetry: pre-call line lets operators see WHICH
         # member is being dispatched WHAT payload before any network I/O; the
@@ -1708,7 +2099,7 @@ def _run_council(
         # `Rubric judged:` summary line one level up.
         logger.info(
             "Judge call start: model=%s family=%s user_chars=%d system_chars=%d",
-            label, family, len(user), len(system),
+            label, family, user_chars, len(system),
         )
         t0 = _time.monotonic()
         try:
@@ -1724,7 +2115,7 @@ def _run_council(
                 "family": family, "ok": False,
                 "error": f"call: {exc}",
                 "usage": {**_ZERO_USAGE, "error": f"call: {exc}"},
-                "user_chars": len(user),
+                "user_chars": user_chars,
             }
         elapsed = _time.monotonic() - t0
         in_tok = int(usage.get("input_tokens", 0) or 0)
@@ -1758,7 +2149,7 @@ def _run_council(
                 "model": model, "effective_model": effective_model,
                 "family": family, "ok": False,
                 "error": f"parse: {exc}", "usage": usage,
-                "user_chars": len(user),
+                "user_chars": user_chars,
                 "raw_response": raw[:2000] if isinstance(raw, str) else "",
             }
         logger.info(
@@ -1786,7 +2177,7 @@ def _run_council(
             "model": model, "effective_model": effective_model,
             "family": family, "ok": True,
             "verdicts": verdicts, "usage": usage,
-            "user_chars": len(user),
+            "user_chars": user_chars,
         }
 
     with ThreadPoolExecutor(max_workers=max(1, len(members))) as pool:
@@ -1848,7 +2239,7 @@ def _effective_judge_model(model: str, family: str) -> str:
 def _grade_council(
     rubrics: list,
     system: str,
-    user_for_member: "dict[str, str] | str",
+    user_for_member: "dict[str, str | JudgeUserPayload] | str | JudgeUserPayload",
     members: list[CouncilMember],
 ) -> dict:
     """Council aggregation — UNANIMOUS, else SONNET source-of-truth tiebreak.
@@ -2532,7 +2923,7 @@ def grade_with_rubric(
     # Hoist per-member evidence out of the chunk loop: _gather_evidence walks the
     # filesystem + extracts binaries once per member; only the rubric block varies
     # per chunk (system prompt is identical, so Sonnet cachePoint still reused).
-    evidence_for_member: dict[str, str] = {}
+    evidence_for_member: "dict[str, str | JudgeUserPayload]" = {}
     rubric_names = _rubric_file_names(rubrics)
     for m in members:
         budget = _member_evidence_budget(m.model, m.family)

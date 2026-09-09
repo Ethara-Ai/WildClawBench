@@ -10,10 +10,13 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.utils.codex_oauth.translate import (
     RESPONSES_TERMINAL_TYPES,
+    _content_to_input_parts,
     _content_to_text,
     _extract_text_from_output,
     _extract_tool_calls,
@@ -458,6 +461,185 @@ def test_tail_has_terminal_event_false_for_delta_mentioning_the_words():
 def test_tail_has_terminal_event_false_for_empty_and_unrelated_tail():
     assert not tail_has_terminal_event(b"")
     assert not tail_has_terminal_event(b'data: {"type":"response.created"}')
+
+
+# ---------------------------------------------------------------------------
+# Image content parts — the GPT rubric judge sends its evidence screenshots as
+# Chat `image_url` parts. Before this mapping existed they were silently dropped
+# by the text flattener and the codex-routed judge graded image-BLIND.
+# ---------------------------------------------------------------------------
+
+
+PNG_DATA_URI = (
+    "data:image/png;base64,"
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk"
+    "+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+)
+
+
+def _image_chat(detail: str | None = "low") -> dict:
+    image_url: dict = {"url": PNG_DATA_URI}
+    if detail is not None:
+        image_url["detail"] = detail
+    return {
+        "model": "m",
+        "messages": [{
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "grade this"},
+                {"type": "image_url", "image_url": image_url},
+            ],
+        }],
+    }
+
+
+def test_chat_image_url_part_becomes_input_image_with_bare_string_url():
+    out = chat_to_responses(_image_chat())
+    assert out["input"] == [{
+        "type": "message", "role": "user",
+        "content": [
+            {"type": "input_text", "text": "grade this"},
+            {"type": "input_image", "image_url": PNG_DATA_URI, "detail": "low"},
+        ],
+    }]
+
+
+def test_input_image_url_is_a_string_not_a_nested_object():
+    parts = chat_to_responses(_image_chat())["input"][0]["content"]
+    assert isinstance(parts[1]["image_url"], str)
+
+
+def test_detail_is_a_sibling_field_and_omitted_when_absent():
+    parts = chat_to_responses(_image_chat(detail=None))["input"][0]["content"]
+    assert parts[1] == {"type": "input_image", "image_url": PNG_DATA_URI}
+
+
+def test_multiple_images_keep_document_order_after_the_text_part():
+    second = PNG_DATA_URI + "AA"
+    chat = {
+        "model": "m",
+        "messages": [{
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "t"},
+                {"type": "image_url", "image_url": {"url": PNG_DATA_URI, "detail": "low"}},
+                {"type": "image_url", "image_url": {"url": second, "detail": "high"}},
+            ],
+        }],
+    }
+    parts = chat_to_responses(chat)["input"][0]["content"]
+    assert [p["type"] for p in parts] == ["input_text", "input_image", "input_image"]
+    assert [parts[1]["image_url"], parts[2]["image_url"]] == [PNG_DATA_URI, second]
+    assert parts[2]["detail"] == "high"
+
+
+def test_bare_string_image_url_form_is_also_accepted():
+    chat = {"model": "m", "messages": [{"role": "user", "content": [
+        {"type": "image_url", "image_url": PNG_DATA_URI},
+    ]}]}
+    assert chat_to_responses(chat)["input"][0]["content"] == [
+        {"type": "input_image", "image_url": PNG_DATA_URI},
+    ]
+
+
+def test_image_only_content_omits_an_empty_input_text_part():
+    chat = {"model": "m", "messages": [{"role": "user", "content": [
+        {"type": "image_url", "image_url": {"url": PNG_DATA_URI}},
+    ]}]}
+    parts = chat_to_responses(chat)["input"][0]["content"]
+    assert [p["type"] for p in parts] == ["input_image"]
+
+
+def test_assistant_turn_never_carries_image_parts():
+    """Images ride USER turns only; an assistant turn stays a text-only
+    output_text item (the Responses API has no assistant-side input_image)."""
+    chat = {"model": "m", "messages": [{"role": "assistant", "content": [
+        {"type": "text", "text": "ok"},
+        {"type": "image_url", "image_url": {"url": PNG_DATA_URI}},
+    ]}]}
+    assert chat_to_responses(chat)["input"] == [
+        {"type": "message", "role": "assistant",
+         "content": [{"type": "output_text", "text": "ok"}]},
+    ]
+
+
+@pytest.mark.parametrize("url", [
+    "https://example.com/shot.png",
+    "http://127.0.0.1:8080/shot.png",
+    "file:///tmp/shot.png",
+])
+def test_remote_image_url_raises(url):
+    """The codex backend rejects remote image references
+    (REMOTE_IMAGE_URL_ERROR); translate.py is the bridge/preflight surface, so it
+    fails LOUDLY rather than forwarding an unusable body."""
+    chat = {"model": "m", "messages": [{"role": "user", "content": [
+        {"type": "image_url", "image_url": {"url": url}},
+    ]}]}
+    with pytest.raises(ValueError, match="data:"):
+        chat_to_responses(chat)
+
+
+def test_image_url_part_without_a_url_raises():
+    chat = {"model": "m", "messages": [{"role": "user", "content": [
+        {"type": "image_url", "image_url": {"detail": "low"}},
+    ]}]}
+    with pytest.raises(ValueError, match="no url"):
+        chat_to_responses(chat)
+
+
+def test_image_url_typed_part_carrying_only_text_stays_on_the_text_path():
+    """``_content_to_text`` already folds a `{type: image_url, text: ...}` part
+    into the text stream; it must not be reinterpreted as a url-less image and
+    raise. Pins the predicate used by ``_is_image_part``."""
+    chat = {"model": "m", "messages": [{"role": "user", "content": [
+        {"type": "image_url", "text": "d"},
+    ]}]}
+    assert chat_to_responses(chat)["input"][0]["content"] == [
+        {"type": "input_text", "text": "d"},
+    ]
+
+
+class TestPureTextPathUnchanged:
+    """Regression guard: the no-image path must be byte-identical to the
+    pre-multimodal translator."""
+
+    @pytest.mark.parametrize("content", [
+        "hi",
+        [{"type": "text", "text": "a"}, {"type": "input_text", "text": "b"}],
+        "",
+        None,
+    ])
+    def test_content_to_input_parts_emits_exactly_one_input_text(self, content):
+        assert _content_to_input_parts(content) == [
+            {"type": "input_text", "text": _content_to_text(content)},
+        ]
+
+    def test_user_string_content_maps_as_before(self):
+        out = chat_to_responses({"model": "m",
+                                 "messages": [{"role": "user", "content": "hi"}]})
+        assert out["input"] == [
+            {"type": "message", "role": "user",
+             "content": [{"type": "input_text", "text": "hi"}]},
+        ]
+
+    def test_tool_turn_maps_as_before(self):
+        out = chat_to_responses({"model": "m", "messages": [
+            {"role": "tool", "tool_call_id": "c1", "content": "42"}]})
+        assert out["input"] == [
+            {"type": "message", "role": "user",
+             "content": [{"type": "input_text", "text": "42"}]},
+        ]
+
+    def test_empty_user_content_still_emits_an_empty_input_text_part(self):
+        out = chat_to_responses({"model": "m",
+                                 "messages": [{"role": "user", "content": None}]})
+        assert out["input"][0]["content"] == [{"type": "input_text", "text": ""}]
+
+    def test_source_message_dict_is_not_mutated(self):
+        chat = _image_chat()
+        original = json.loads(json.dumps(chat))
+        chat_to_responses(chat)
+        assert chat == original
 
 
 # ---------------------------------------------------------------------------

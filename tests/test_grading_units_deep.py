@@ -206,6 +206,16 @@ def test_split_evidence_without_marker_returns_all_as_files():
 # ---------------------------------------------------------------------------
 
 
+def _user_prompt_text(*args, **kwargs) -> str:
+    """Text channel of `_judge_user_prompt`.
+
+    It returns a `JudgeUserPayload` instead of a bare str when the evidence
+    carried images lifted out of a deliverable; that seam is covered in
+    tests/test_judge_gpt.py. These cases are all text-only.
+    """
+    return grading._payload_text(grading._judge_user_prompt(*args, **kwargs))
+
+
 def test_judge_user_prompt_renders_points_and_header():
     rubrics = [
         {"criterion": "crit A", "weight": 3},
@@ -213,7 +223,7 @@ def test_judge_user_prompt_renders_points_and_header():
         "a bare string criterion",              # non-dict -> weight 1.0
     ]
     evidence = "SOME FILES\n----- TRANSCRIPT (condensed) -----\nTHE TALK"
-    out = grading._judge_user_prompt("accomplish the task", rubrics, evidence)
+    out = _user_prompt_text("accomplish the task", rubrics, evidence)
 
     # Rubric block: one numbered "[points: w]" line per criterion, in order.
     assert "1. crit A  [points: 3.0]" in out
@@ -229,7 +239,7 @@ def test_judge_user_prompt_renders_points_and_header():
 
 
 def test_judge_user_prompt_empty_evidence_uses_placeholders():
-    out = grading._judge_user_prompt("t", [{"criterion": "c", "weight": 1}], "")
+    out = _user_prompt_text("t", [{"criterion": "c", "weight": 1}], "")
     assert "(no transcript captured)" in out
     assert "(no deliverable files were collected)" in out
 
@@ -244,7 +254,7 @@ def test_judge_user_prompt_tags_only_file_targets():
         {"criterion": "messaged the user", "weight": 1, "evaluation_target": "user_facing_message"},
         {"criterion": "no target key", "weight": 1},
     ]
-    out = grading._judge_user_prompt("t", rubrics, "")
+    out = _user_prompt_text("t", rubrics, "")
     # File targets (canonical + alias) carry the normalized tag.
     assert "1. wrote report.pdf  [points: 5.0]  [target: workspace_artifact]" in out
     assert "2. wrote data.csv  [points: 3.0]  [target: workspace_artifact]" in out
@@ -261,6 +271,15 @@ def test_judge_user_prompt_tags_only_file_targets():
 # ---------------------------------------------------------------------------
 # _collect_deliverable_files / _gather_evidence — real tmp_path trees
 # ---------------------------------------------------------------------------
+
+
+def _evidence_text(*args, **kwargs) -> str:
+    """Text channel of `_gather_evidence`'s `JudgeUserPayload`.
+
+    The payload also carries images lifted out of the deliverable text (see
+    tests/test_judge_gpt.py); everything below asserts on the text channel only.
+    """
+    return grading._gather_evidence(*args, **kwargs).text
 
 
 def _make_results_tree(tmp_path: Path) -> Path:
@@ -332,7 +351,7 @@ def test_gather_evidence_orders_primary_first_and_binary_is_presence_only(tmp_pa
     (results / "report.md").write_text("PRIMARY REPORT", encoding="utf-8")
     (results / "notes.pdf").write_bytes(b"%PDF secret-body-marker")
 
-    ev = grading._gather_evidence(results, "MY TRANSCRIPT", budget=None)
+    ev = _evidence_text(results, "MY TRANSCRIPT", budget=None)
     # Primary 'report' sorts ahead of the larger, non-primary csv.
     assert ev.index("report.md") < ev.index("zdata.csv")
     # PDF is listed for presence but its raw bytes are NOT dumped.
@@ -351,7 +370,7 @@ def test_gather_evidence_budget_truncates(tmp_path):
     results = tmp_path / "task_output" / "artifacts" / "results"
     results.mkdir(parents=True)
     (results / "report.md").write_text("A" * 5000, encoding="utf-8")
-    ev = grading._gather_evidence(results, "the transcript body", budget=2100)
+    ev = _evidence_text(results, "the transcript body", budget=2100)
     # Deliverable portion is bounded; transcript marker + body preserved.
     assert "----- TRANSCRIPT (condensed) -----" in ev
     assert "the transcript body" in ev
@@ -367,13 +386,13 @@ def test_gather_evidence_tiny_budget_preserves_transcript_marker(tmp_path):
     results = tmp_path / "task_output" / "artifacts" / "results"
     results.mkdir(parents=True)
     (results / "report.md").write_text("A" * 5000, encoding="utf-8")
-    ev = grading._gather_evidence(results, "final answer here", budget=50)
+    ev = _evidence_text(results, "final answer here", budget=50)
     assert len(ev) <= 50
     assert grading._TRANSCRIPT_MARKER.strip() in ev
     _files, transcript = grading._split_evidence(ev)
     assert transcript  # non-empty: keeps the end of the final turn
     # At a realistic budget the entire final turn survives whole.
-    ev2 = grading._gather_evidence(results, "final answer here", budget=6000)
+    ev2 = _evidence_text(results, "final answer here", budget=6000)
     _f2, transcript2 = grading._split_evidence(ev2)
     assert "final answer here" in transcript2
 
@@ -381,7 +400,7 @@ def test_gather_evidence_tiny_budget_preserves_transcript_marker(tmp_path):
 def test_gather_evidence_no_deliverables_placeholder(tmp_path):
     results = tmp_path / "task_output" / "results"
     results.mkdir(parents=True)
-    ev = grading._gather_evidence(results, "", budget=None)
+    ev = _evidence_text(results, "", budget=None)
     assert "no deliverable files were collected under any of" in ev
     # Every recognised deliverable-dir name appears in the placeholder.
     for name in grading._DELIVERABLE_DIR_NAMES:
@@ -392,7 +411,7 @@ def test_gather_evidence_split_roundtrips_through_split_evidence(tmp_path):
     results = tmp_path / "task_output" / "artifacts" / "results"
     results.mkdir(parents=True)
     (results / "report.md").write_text("BODY", encoding="utf-8")
-    ev = grading._gather_evidence(results, "THE TRANSCRIPT", budget=None)
+    ev = _evidence_text(results, "THE TRANSCRIPT", budget=None)
     files_part, transcript = grading._split_evidence(ev)
     assert transcript == "THE TRANSCRIPT"
     assert "TRANSCRIPT (condensed)" not in files_part
@@ -451,7 +470,7 @@ def test_gather_evidence_never_exceeds_effective_budget(tmp_path):
     (results / "report.md").write_text("R" * 500_000, encoding="utf-8")
     transcript = "\n".join(f"[user] t{i} " + "x" * 200 for i in range(3000))
     transcript += "\n[FINAL ASSISTANT MESSAGE] [assistant] final"
-    ev = grading._gather_evidence(results, transcript, budget=300_000)
+    ev = _evidence_text(results, transcript, budget=300_000)
     assert len(ev) <= 300_000
 
 
@@ -470,7 +489,7 @@ def test_image_deliverable_is_collected_and_gets_dimension_marker(tmp_path):
     (results / "chart.png").write_bytes(_png_bytes(640, 480))
     collected = grading._collect_deliverable_files(results)
     assert any(p.name == "chart.png" for p in collected)
-    ev = grading._gather_evidence(results, "", budget=None)
+    ev = _evidence_text(results, "", budget=None)
     assert "chart.png" in ev
     assert "image 640x480" in ev
 
@@ -491,7 +510,7 @@ def test_docx_deliverable_stdlib_text_extraction(tmp_path):
     results = tmp_path / "task_output" / "artifacts" / "results"
     results.mkdir(parents=True)
     _docx_bytes(results, "QUARTERLY_REVENUE_4200")
-    ev = grading._gather_evidence(results, "", budget=None)
+    ev = _evidence_text(results, "", budget=None)
     assert "QUARTERLY_REVENUE_4200" in ev
     assert "extracted text" in ev
 
@@ -502,7 +521,7 @@ def test_docx_corrupt_degrades_to_presence_marker(tmp_path):
     results.mkdir(parents=True)
     (results / "broken.docx").write_bytes(b"not a zip")
     assert grading._extract_text_deliverable(results / "broken.docx") is None
-    ev = grading._gather_evidence(results, "", budget=None)
+    ev = _evidence_text(results, "", budget=None)
     assert "broken.docx" in ev
     assert "contents not extractable" in ev
 
@@ -519,7 +538,7 @@ def test_pdf_guarded_extraction_degrades_when_pypdf_absent(tmp_path):
     except ImportError:
         pass
     assert grading._extract_text_deliverable(results / "invoice.pdf") is None
-    ev = grading._gather_evidence(results, "", budget=None)
+    ev = _evidence_text(results, "", budget=None)
     assert "invoice.pdf" in ev
     assert "contents not extractable" in ev
 
@@ -560,7 +579,7 @@ def test_xlsx_deliverable_stdlib_text_extraction(tmp_path):
     results = tmp_path / "task_output" / "artifacts" / "results"
     results.mkdir(parents=True)
     _xlsx_bytes(results)
-    ev = grading._gather_evidence(results, "", budget=None)
+    ev = _evidence_text(results, "", budget=None)
     assert "Revenue" in ev and "42000" in ev and "InlineCell" in ev
     assert "extracted text" in ev
 
@@ -569,7 +588,7 @@ def test_pptx_deliverable_stdlib_text_extraction(tmp_path):
     results = tmp_path / "task_output" / "artifacts" / "results"
     results.mkdir(parents=True)
     _pptx_bytes(results, ["Q3 Launch Plan", "Budget"])
-    ev = grading._gather_evidence(results, "", budget=None)
+    ev = _evidence_text(results, "", budget=None)
     assert "Q3 Launch Plan" in ev and "Budget" in ev
     assert "extracted text" in ev
 
@@ -885,7 +904,7 @@ def test_gather_evidence_skips_unreadable_file(tmp_path, monkeypatch):
         return real_read_text(self, *a, **k)
 
     monkeypatch.setattr(Path, "read_text", _boom)
-    ev = grading._gather_evidence(results, "", budget=None)
+    ev = _evidence_text(results, "", budget=None)
     assert "GOOD BODY" in ev
     assert "broken.md" not in ev
 
@@ -1105,10 +1124,10 @@ def test_gather_evidence_rubric_named_file_ranks_first(tmp_path):
         (results / f"aaa{i}.md").write_text("filler" * 50, encoding="utf-8")
 
     named = frozenset({"clearance_notes.md"})
-    ev = grading._gather_evidence(results, "tail", budget=None, rubric_names=named)
+    ev = _evidence_text(results, "tail", budget=None, rubric_names=named)
     assert ev.index("clearance_notes.md") < ev.index("aaa0.md")
 
-    ev2 = grading._gather_evidence(results, "tail", budget=None)
+    ev2 = _evidence_text(results, "tail", budget=None)
     assert ev2.index("aaa0.md") < ev2.index("clearance_notes.md")
 
 
@@ -1118,7 +1137,7 @@ def test_gather_evidence_scratch_subdirs_demoted(tmp_path):
     (results / "extract" / "dump0.txt").write_text("x", encoding="utf-8")
     (results / "final.md").write_text("REAL DELIVERABLE" * 300, encoding="utf-8")
 
-    ev = grading._gather_evidence(results, "tail", budget=None)
+    ev = _evidence_text(results, "tail", budget=None)
     assert ev.index("final.md") < ev.index("dump0.txt")
 
 
@@ -1137,7 +1156,7 @@ def test_gather_evidence_omission_manifest_names_cut_files(tmp_path):
     (results / "cut_one.md").write_text("C" * 5000, encoding="utf-8")
     (results / "cut_two.md").write_text("D" * 5000, encoding="utf-8")
 
-    ev = grading._gather_evidence(results, "T" * 100, budget=2500)
+    ev = _evidence_text(results, "T" * 100, budget=2500)
     assert len(ev) <= 2500
     assert "K" * 100 in ev
     assert "EVIDENCE BUDGET NOTE" in ev
@@ -1152,6 +1171,6 @@ def test_gather_evidence_no_manifest_when_everything_fits(tmp_path):
     results = tmp_path / "task_output" / "artifacts" / "results"
     results.mkdir(parents=True)
     (results / "small.md").write_text("tiny", encoding="utf-8")
-    ev = grading._gather_evidence(results, "the transcript", budget=100_000)
+    ev = _evidence_text(results, "the transcript", budget=100_000)
     assert "EVIDENCE BUDGET NOTE" not in ev
     assert "tiny" in ev

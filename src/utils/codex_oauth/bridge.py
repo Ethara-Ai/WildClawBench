@@ -767,7 +767,18 @@ def build_app(provider=None) -> FastAPI:
         model = chat_req.get("model", "")
         client_wanted_stream = bool(chat_req.get("stream"))
 
-        resp_body = _xlate.chat_to_responses(chat_req)
+        try:
+            resp_body = _xlate.chat_to_responses(chat_req)
+        except ValueError as exc:
+            # chat_to_responses fails loud on an image part the codex backend
+            # cannot accept (a non-`data:` url). Uncaught it would leave FastAPI
+            # to emit a bare 500 with the reason only in the bridge log; shape it
+            # like the invalid-JSON 400 above so the client sees WHY. The rubric
+            # judge never trips this (it only ever emits data: URIs) — this is
+            # for other clients of the shim, which previously had such parts
+            # silently dropped.
+            return JSONResponse({"error": {"message": f"bridge: {exc}",
+                                           "type": "invalid_request_error"}}, status_code=400)
         # Reuse the Responses body prep (model normalization, forced stream/store).
         prepared, _ = _prepare_body(json.dumps(resp_body).encode())
         # normalized model for the echoed response

@@ -3518,7 +3518,22 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
         if not _skip_codex_pf and grading._gpt_judge_configured() \
                 and grading._judge_codex_bridge_url():
             _cok, _cdetail = grading.preflight_judge_codex()
-            if _cok == "fail":
+            if _cok == "fail" and _cdetail.startswith("image probe:"):
+                # IMAGE leg only. Text grading is unaffected, most tasks ship no
+                # image-bearing deliverable, and the placeholders left in the
+                # evidence still NAME every image — so degrade instead of
+                # aborting a batch over a capability it may never use. Forcing
+                # the cap to 0 also keeps the grader consistent with what this
+                # preflight just proved the route can do.
+                os.environ["KENSEI_JUDGE_MAX_IMAGES"] = "0"
+                logger.warning(
+                    "GPT-judge codex IMAGE preflight FAILED (%s) — attaching judge "
+                    "images is DISABLED for this batch (KENSEI_JUDGE_MAX_IMAGES=0). "
+                    "Text grading proceeds and inline-image placeholders still name "
+                    "every image, but image-CONTENT criteria will grade blind.",
+                    _cdetail,
+                )
+            elif _cok == "fail":
                 raise RuntimeError(
                     "GPT-judge codex preflight FAILED — the rubric judge cannot "
                     f"reach GPT via your ChatGPT subscription: {_cdetail}. This is "
@@ -3526,7 +3541,8 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
                     "the trajectory only to fail at grade time. Fix the codex login "
                     "(`codex login`), or skip with WCB_SKIP_JUDGE_CODEX_PREFLIGHT=1."
                 )
-            logger.info("GPT-judge codex preflight %s (%s)", _cok, _cdetail)
+            else:
+                logger.info("GPT-judge codex preflight %s (%s)", _cok, _cdetail)
 
     config.work_dir.mkdir(parents=True, exist_ok=True)
     if shared_mode and shared_yaml_path and Path(shared_yaml_path).is_file():

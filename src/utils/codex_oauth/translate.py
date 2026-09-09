@@ -37,12 +37,101 @@ def _content_to_text(content: Any) -> str:
     return "" if content is None else str(content)
 
 
+# Chat `image_url` part -> Responses `input_image` part.
+#
+# WHY THIS EXISTS: `_content_to_text` above is a text flattener and DROPS image
+# parts entirely. The GPT rubric judge sends its evidence images as Chat
+# Completions `{"type":"image_url","image_url":{"url":<data-uri>,"detail":...}}`
+# parts (src/utils/grading.py `_call_judge_openai`), so without this mapping the
+# codex-routed judge would grade image-BLIND with nothing in the output naming the
+# loss — the silent no-signal failure class (AGENTS.md #18).
+#
+# Responses shape differs from Chat in two ways: the type is `input_image` and
+# `image_url` is a BARE STRING (not an object), with `detail` as a sibling field.
+_DATA_URI_PREFIX = "data:"
+
+
+def _is_image_part(part: Any) -> bool:
+    """True for a Chat `image_url` content part that carries an `image_url` field.
+
+    A `{"type":"image_url","text":...}` part with NO `image_url` key (or a null
+    one) is not treated as an image: it stays on the text-collapse path
+    `_content_to_text` already handles, so this predicate never turns a malformed
+    text part into a hard failure. A part that DOES carry `image_url` but whose
+    url is missing/empty is a malformed IMAGE and is deliberately routed to
+    `_image_part_to_input_image`'s fail-loud raise rather than silently dropped.
+    """
+    return (
+        isinstance(part, dict)
+        and part.get("type") == "image_url"
+        and part.get("image_url") is not None
+    )
+
+
+def _image_part_to_input_image(part: dict) -> dict:
+    """Map one Chat `image_url` part to a Responses `input_image` part.
+
+    FAIL-LOUD on a non-inline url: the codex/ChatGPT backend rejects remote
+    http(s) image references (REMOTE_IMAGE_URL_ERROR), so a silent pass-through
+    would surface as an opaque upstream 4xx mid-turn. This module runs on the
+    bridge/preflight surface, never inside the grade path, so raising here is the
+    correct place to fail (grading itself must always degrade, never raise).
+    """
+    raw = part.get("image_url")
+    if isinstance(raw, dict):
+        url = raw.get("url")
+        detail = raw.get("detail")
+    else:
+        url, detail = raw, part.get("detail")
+    if not isinstance(url, str) or not url:
+        raise ValueError(
+            "chat_to_responses: image_url part carries no url string "
+            f"(got {type(url).__name__})"
+        )
+    if not url.startswith(_DATA_URI_PREFIX):
+        raise ValueError(
+            "chat_to_responses: only inline data: image URIs are supported; the "
+            f"codex backend rejects remote image URLs (got {url[:64]!r})"
+        )
+    out: dict = {"type": "input_image", "image_url": url}
+    if isinstance(detail, str) and detail:
+        out["detail"] = detail
+    return out
+
+
+def _content_to_input_parts(content: Any) -> list[dict]:
+    """Build the Responses `content` parts list for a USER-role turn.
+
+    PURE-TEXT PATH IS UNCHANGED: with no image parts this returns exactly the
+    single `[{"type":"input_text","text":<flattened>}]` the caller built before,
+    including the empty-text case. Images are appended AFTER the text part, in
+    document order, mirroring the Chat body the judge sends.
+    """
+    text = _content_to_text(content)
+    images = (
+        [_image_part_to_input_image(p) for p in content if _is_image_part(p)]
+        if isinstance(content, list)
+        else []
+    )
+    if not images:
+        return [{"type": "input_text", "text": text}]
+    parts: list[dict] = []
+    # An empty text part alongside images is noise the strict backend does not
+    # need; the pure-text path above still emits it for byte-compatibility.
+    if text:
+        parts.append({"type": "input_text", "text": text})
+    parts.extend(images)
+    return parts
+
+
 def chat_to_responses(chat: dict) -> dict:
     """Translate a Chat Completions request body into a Responses request body.
 
     - system/developer messages are concatenated into `instructions`.
     - user/assistant/tool messages become Responses `input` items (user & tool ->
       input_text, assistant -> output_text).
+    - user-role `image_url` parts become `input_image` parts (see
+      `_image_part_to_input_image`); a non-`data:` url raises.
     - max_tokens/max_completion_tokens -> max_output_tokens.
     - stream and tools pass through; sampling params the codex backend rejects are
       dropped.
@@ -64,10 +153,10 @@ def chat_to_responses(chat: dict) -> dict:
             # Represent a tool result as a user-visible text turn (the rust pipeline
             # does not use function calling; this keeps history coherent if present).
             input_items.append({"type": "message", "role": "user",
-                                "content": [{"type": "input_text", "text": text}]})
+                                "content": _content_to_input_parts(msg.get("content"))})
         else:  # user (default)
             input_items.append({"type": "message", "role": "user",
-                                "content": [{"type": "input_text", "text": text}]})
+                                "content": _content_to_input_parts(msg.get("content"))})
 
     if instructions:
         out["instructions"] = "\n\n".join(instructions)
