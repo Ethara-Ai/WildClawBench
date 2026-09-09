@@ -294,3 +294,70 @@ def test_fs_mkdir_with_src_is_warning(tmp_path):
     warnings = run_authoring_validation(
         _script(_seed_stage(), stage), host_api_to_url=URLS, mock_data_root=tmp_path)
     assert any(d["status"] == "fs-mkdir-with-src" for d in warnings)
+
+
+def test_fs_dst_outside_workspace_is_fatal(tmp_path):
+    stage, stage_dir = _fs_stage_ondisk(tmp_path, [
+        {"id": "fs-abs", "action": "copy",
+         "src": "note.txt", "dst": "/data/home/note.txt"}])
+    (stage_dir / "note.txt").write_text("payload", encoding="utf-8")
+    with pytest.raises(InjectAuthoringError) as ei:
+        run_authoring_validation(
+            _script(_seed_stage(), stage), host_api_to_url=URLS, mock_data_root=tmp_path)
+    assert any(d["status"] == "fs-dst-not-workspace" for d in ei.value.defects)
+
+
+@pytest.mark.parametrize("dst", [
+    "/root/workspace/note.txt", "~/workspace/note.txt", "data/home/note.txt",
+    "/tmp_workspace/note.txt", "relative/note.txt"])
+def test_fs_non_canonical_dst_spellings_are_fatal(tmp_path, dst):
+    stage, stage_dir = _fs_stage_ondisk(tmp_path, [
+        {"id": "fs-alias", "action": "copy", "src": "note.txt", "dst": dst}])
+    (stage_dir / "note.txt").write_text("payload", encoding="utf-8")
+    with pytest.raises(InjectAuthoringError) as ei:
+        run_authoring_validation(
+            _script(_seed_stage(), stage), host_api_to_url=URLS, mock_data_root=tmp_path)
+    assert any(d["status"] == "fs-dst-not-workspace" for d in ei.value.defects)
+
+
+def test_fs_mkdir_dst_outside_workspace_is_fatal(tmp_path):
+    stage, _ = _fs_stage_ondisk(tmp_path, [
+        {"id": "fs-mk", "action": "mkdir", "dst": "/data/newdir"}])
+    with pytest.raises(InjectAuthoringError) as ei:
+        run_authoring_validation(
+            _script(_seed_stage(), stage), host_api_to_url=URLS, mock_data_root=tmp_path)
+    assert any(d["status"] == "fs-dst-not-workspace" for d in ei.value.defects)
+
+
+def test_fs_dst_tree_shape_mismatch_is_warning(tmp_path):
+    """data/home/ staging puts inputs at /workspace/home/home/<rel>; a single-home
+    dst lands beside them, not among them."""
+    (tmp_path / "data" / "home" / "Pictures").mkdir(parents=True)
+    stage, stage_dir = _fs_stage_ondisk(tmp_path, [
+        {"id": "fs-shape", "action": "copy",
+         "src": "note.txt", "dst": "/workspace/home/Pictures/note.txt"}])
+    (stage_dir / "note.txt").write_text("payload", encoding="utf-8")
+    warnings = run_authoring_validation(
+        _script(_seed_stage(), stage), host_api_to_url=URLS, mock_data_root=tmp_path)
+    assert any(d["status"] == "fs-dst-tree-mismatch" for d in warnings)
+
+
+def test_fs_dst_matching_staged_home_home_tree_is_clean(tmp_path):
+    (tmp_path / "data" / "home" / "Pictures").mkdir(parents=True)
+    stage, stage_dir = _fs_stage_ondisk(tmp_path, [
+        {"id": "fs-shape-ok", "action": "copy",
+         "src": "note.txt", "dst": "/workspace/home/home/Pictures/note.txt"}])
+    (stage_dir / "note.txt").write_text("payload", encoding="utf-8")
+    warnings = run_authoring_validation(
+        _script(_seed_stage(), stage), host_api_to_url=URLS, mock_data_root=tmp_path)
+    assert not any(d["status"] == "fs-dst-tree-mismatch" for d in warnings)
+
+
+def test_fs_tree_shape_warning_absent_without_staged_data_home(tmp_path):
+    stage, stage_dir = _fs_stage_ondisk(tmp_path, [
+        {"id": "fs-plain", "action": "copy",
+         "src": "note.txt", "dst": "/workspace/home/Pictures/note.txt"}])
+    (stage_dir / "note.txt").write_text("payload", encoding="utf-8")
+    warnings = run_authoring_validation(
+        _script(_seed_stage(), stage), host_api_to_url=URLS, mock_data_root=tmp_path)
+    assert not any(d["status"] == "fs-dst-tree-mismatch" for d in warnings)

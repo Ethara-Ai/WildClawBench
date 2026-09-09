@@ -374,6 +374,21 @@ def _check_op_modality(label: str, op: dict, host_src: Path) -> None:
         f"{mt or 'unknown'}: {op.get('src')}")
 
 
+# MUST mirror docker_utils._map_workspace_dst's alias list (this script is
+# standalone and cannot import it), each spelling extended with the `home/`
+# segment `data/` staging adds. An alias missing here makes the seed op fall
+# through unrecognised, so its mirrored-payload check never runs.
+_SEED_DST_DATA_PREFIXES = (
+    "/workspace/home/",
+    "/app/home/",
+    "/root/workspace/home/",
+    "/root/.openclaw/workspace/home/",
+    "~/workspace/home/",
+    "/data/home/",
+    "data/home/",
+)
+
+
 def _seed_dst_to_data_rel(dst: str) -> str | None:
     """Map a seed op's container dst to its expected ``data/`` counterpart.
 
@@ -381,7 +396,7 @@ def _seed_dst_to_data_rel(dst: str) -> str | None:
     so ``/workspace/home/<rel>`` is mounted from ``data/<rel>``.
     """
     p = str(dst or "").strip()
-    for prefix in ("/workspace/home/", "/app/home/"):
+    for prefix in _SEED_DST_DATA_PREFIXES:
         if p.startswith(prefix):
             return p[len(prefix):]
     return None

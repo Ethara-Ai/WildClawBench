@@ -91,8 +91,10 @@ import re
 import shutil
 import sys
 import unicodedata
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
 # Fallback only: used when a run's actual model id can't be recovered from its
@@ -1513,12 +1515,83 @@ _LLM_PROXY_URL = "http://litellm-proxy:4000"
 _DEFAULT_CURRENT_DATE = "2026-05-28"
 
 
-def _compose_runtime_env_defaults() -> dict[str, str]:
+def _sim_clock_window_start(window: Any) -> str | None:
+    """sim_clock.py:_window_start_date."""
+    if isinstance(window, dict):
+        start = window.get("start")
+        return str(start) if start else None
+    if isinstance(window, str) and window.strip():
+        return window.strip().split()[0]
+    return None
+
+
+def _sim_clock_iso(task_dir: Path | None) -> str | None:
+    """Inline port of src/utils/sim_clock.py::compute_sim_clock -> ISO string.
+
+    Kept in lockstep with sim_clock.py by test_current_date_parity_with_harbor;
+    this script is deliberately isolated from the eval package and cannot import
+    it. Only the ISO prefix is needed here, so no epoch/tz object is built.
+    """
+    if task_dir is None:
+        return None
+    pj = Path(task_dir) / "prompts.json"
+    if not pj.is_file():
+        return None
+    try:
+        data = json.loads(pj.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    turns = data.get("turns")
+    if not isinstance(turns, list) or not turns:
+        return None
+    t0 = turns[0]
+    if not isinstance(t0, dict):
+        return None
+
+    window = data.get("window")
+    tz_name = (data.get("timezone") or "").strip()
+    if not tz_name and isinstance(window, dict):
+        tz_name = str(window.get("timezone") or "").strip()
+
+    ts = t0.get("timestamp")
+    if isinstance(ts, str) and ts.strip():
+        try:
+            dt = datetime.fromisoformat(ts.strip())
+        except ValueError:
+            dt = None
+        if dt is not None and dt.tzinfo is not None:
+            return dt.isoformat()
+
+    day = t0.get("day")
+    time_str = t0.get("time")
+    start_date = _sim_clock_window_start(window)
+    if isinstance(day, int) and isinstance(time_str, str) and start_date and tz_name:
+        try:
+            base = datetime.strptime(start_date, "%Y-%m-%d").date()
+            hh, mm = (int(x) for x in time_str.split(":")[:2])
+            tz = ZoneInfo(tz_name)
+        except (ValueError, ZoneInfoNotFoundError):
+            return None
+        local = datetime(base.year, base.month, base.day, hh, mm,
+                         tzinfo=tz) + timedelta(days=max(0, day - 1))
+        return local.isoformat()
+    return None
+
+
+def _compose_current_date(task_dir: Path | None = None) -> str:
+    """compose.py:resolve_current_date."""
+    iso = _sim_clock_iso(task_dir)
+    return iso[:10] if iso else _DEFAULT_CURRENT_DATE
+
+
+def _compose_runtime_env_defaults(task_dir: Path | None = None) -> dict[str, str]:
     return {
         "LITELLM_BASE_URL": _LLM_PROXY_URL,
         "OPENAI_API_BASE": f"{_LLM_PROXY_URL}/v1",
         "OPENAI_API_KEY": "placeholder",
-        "CURRENT_DATE": _DEFAULT_CURRENT_DATE,
+        "CURRENT_DATE": _compose_current_date(task_dir),
     }
 
 
@@ -1633,6 +1706,7 @@ def _generate_environment_compose(
     env_dir: Path,
     services: list[dict[str, Any]] | None = None,
     env_vars: dict[str, str] | None = None,
+    task_dir: Path | None = None,
 ) -> str:
     """Inline port of src/utils/harbor/compose.py::generate_harbor_compose."""
     if services is None:
@@ -1654,7 +1728,7 @@ def _generate_environment_compose(
     lines.append("    environment:")
     for key, value in env_vars.items():
         lines.append(f"      - {key}={value}")
-    runtime_env = _compose_runtime_env_defaults()
+    runtime_env = _compose_runtime_env_defaults(task_dir)
     lines.append(f"      - LITELLM_BASE_URL={runtime_env['LITELLM_BASE_URL']}")
     lines.append(f"      - OPENAI_API_BASE={runtime_env['OPENAI_API_BASE']}")
     lines.append(f"      - OPENAI_API_KEY={runtime_env['OPENAI_API_KEY']}")
@@ -1909,6 +1983,7 @@ def _stage_data_instruction(
 def _stage_environment_dockerfile_and_compose(
     bundle: Path,
     verbose: bool,
+    input_task_dir: Path | None = None,
 ) -> tuple[bool, bool]:
     """Emit bundle/data/environment/Dockerfile and docker-compose.yaml.
 
@@ -1936,7 +2011,8 @@ def _stage_environment_dockerfile_and_compose(
         for svc in services
         if svc.get("env_var_name")
     }
-    compose_text = _generate_environment_compose(env_dir, services=services, env_vars=env_vars)
+    compose_text = _generate_environment_compose(
+        env_dir, services=services, env_vars=env_vars, task_dir=input_task_dir)
     (env_dir / "docker-compose.yaml").write_text(compose_text, encoding="utf-8")
     if verbose:
         print(
@@ -2059,7 +2135,7 @@ def _stage_task_toml(
         )
         or _TOML_DEFAULTS["healthcheck_command"]
     )
-    runtime_env = _compose_runtime_env_defaults()
+    runtime_env = _compose_runtime_env_defaults(input_task_dir)
     environment_env = {**env_vars, **runtime_env}
     verifier_env = {**environment_env, "TEST_DIR": "/tests"}
     solution_env = dict(environment_env)
@@ -2343,7 +2419,7 @@ def convert_task(
     # a separate dir and is untouched.
     shutil.rmtree(bundle / "data" / TESTS_SUBDIR, ignore_errors=True)
     _stage_data_instruction(input_task_dir, bundle, verbose)
-    _stage_environment_dockerfile_and_compose(bundle, verbose)
+    _stage_environment_dockerfile_and_compose(bundle, verbose, input_task_dir)
     _stage_task_toml(input_task_dir, bundle, verbose)
     copy_inject(input_task_dir, bundle, verbose)
 
@@ -2562,7 +2638,7 @@ def stage_output_data(
 
     _stage_test_runners_and_solver(input_task_dir, task_dir, verbose)
     _stage_data_instruction(input_task_dir, task_dir, verbose)
-    _stage_environment_dockerfile_and_compose(task_dir, verbose)
+    _stage_environment_dockerfile_and_compose(task_dir, verbose, input_task_dir)
     _stage_task_toml(input_task_dir, task_dir, verbose)
     copy_inject(input_task_dir, task_dir, verbose)
     return True

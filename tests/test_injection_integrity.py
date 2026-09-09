@@ -633,3 +633,312 @@ def test_compute_sim_clock_resolves_each_turn(tmp_path):
     assert compute_sim_clock_for_turn(task, 3) is None
     # back-compat: compute_sim_clock is still the turn-0 anchor
     assert compute_sim_clock(task).epoch_ms == t0.epoch_ms
+
+
+# --------------------------------------------------------------------------- #
+# 7. Workspace dst mapping + copy verification (docker_utils inject fs hook).
+#    Every authored spelling of the workspace must land on the SAME tree, an
+#    absolute dst that would escape it is refused rather than written, and a
+#    green copy means the bytes were read back from the container.
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("dst,expected", [
+    ("/workspace/a/b.txt", "/tmp_workspace/a/b.txt"),
+    ("/app/a/b.txt", "/tmp_workspace/a/b.txt"),
+    ("/root/workspace/a/b.txt", "/tmp_workspace/a/b.txt"),
+    ("/root/.openclaw/workspace/a/b.txt", "/tmp_workspace/a/b.txt"),
+    ("~/workspace/a/b.txt", "/tmp_workspace/a/b.txt"),
+    ("/data/home/Pictures/x.png", "/tmp_workspace/home/Pictures/x.png"),
+    ("data/home/Pictures/x.png", "/tmp_workspace/home/Pictures/x.png"),
+    ("notes/x.txt", "/tmp_workspace/notes/x.txt"),
+    ("/workspace", "/tmp_workspace"),
+    ("/app", "/tmp_workspace"),
+    ("/tmp_workspace/already/mapped.txt", "/tmp_workspace/already/mapped.txt"),
+])
+def test_map_workspace_dst_normalizes_every_alias(dst, expected):
+    from src.utils.docker_utils import _map_workspace_dst
+
+    assert _map_workspace_dst(dst) == expected
+
+
+@pytest.mark.parametrize("dst", [
+    "/etc/passwd", "/var/tmp/drop.txt", "/tmp_workspace_evil/x", "/home/user/x", ""])
+def test_map_workspace_dst_refuses_paths_outside_workspace(dst):
+    from src.utils.docker_utils import _map_workspace_dst
+
+    assert _map_workspace_dst(dst) is None
+
+
+def test_map_workspace_dst_escape_hatch_honors_absolute(monkeypatch):
+    from src.utils.docker_utils import _map_workspace_dst
+
+    monkeypatch.setenv("WCB_INJECT_ALLOW_ABS", "1")
+    assert _map_workspace_dst("/var/tmp/drop.txt") == "/var/tmp/drop.txt"
+
+
+def test_map_workspace_dst_warns_on_alias_rewrite(caplog):
+    from src.utils.docker_utils import _map_workspace_dst
+
+    with caplog.at_level(logging.WARNING, logger="src.utils.docker_utils"):
+        _map_workspace_dst("/data/home/x.png")
+    assert any("rewrote non-canonical dst" in r.getMessage()
+               for r in caplog.records)
+
+
+class _FakeRun:
+    """Scripted subprocess.run stand-in keyed by a substring of the argv."""
+
+    def __init__(self, sizes=None, fail=()):
+        self.sizes = sizes or {}
+        self.fail = set(fail)
+        self.calls = []
+
+    def __call__(self, cmd, *a, **kw):
+        self.calls.append(list(cmd))
+        joined = " ".join(str(c) for c in cmd)
+        for token in self.fail:
+            if token in joined:
+                return _Completed(1, "", f"boom: {token}")
+        if "inspect" in joined:
+            return _Completed(0, "true", "")
+        if "wc -c" in joined:
+            for path, size in self.sizes.items():
+                if path in joined:
+                    return _Completed(0, "" if size is None else str(size), "")
+            return _Completed(0, "", "")
+        return _Completed(0, "", "")
+
+
+class _Completed:
+    def __init__(self, returncode, stdout, stderr):
+        self.returncode = returncode
+        self.stdout = stdout
+        self.stderr = stderr
+
+
+def _host_file(tmp_path, body="payload-bytes"):
+    p = tmp_path / "payload.txt"
+    p.write_text(body, encoding="utf-8")
+    return p
+
+
+def test_copy_into_workspace_verified_copy_returns_mapped_dst(tmp_path, monkeypatch):
+    from src.utils import docker_utils as du
+
+    src = _host_file(tmp_path)
+    runner = _FakeRun(sizes={"/tmp_workspace/home/x.txt": src.stat().st_size})
+    monkeypatch.setattr(du.subprocess, "run", runner)
+
+    res = du.copy_file_into_workspace("t", src, "/data/home/x.txt")
+
+    assert res.ok is True and bool(res) is True
+    assert res.mapped_dst == "/tmp_workspace/home/x.txt"
+
+
+def test_copy_into_workspace_size_mismatch_is_failure(tmp_path, monkeypatch, caplog):
+    from src.utils import docker_utils as du
+
+    src = _host_file(tmp_path)
+    runner = _FakeRun(sizes={"/tmp_workspace/x.txt": 3})
+    monkeypatch.setattr(du.subprocess, "run", runner)
+
+    with caplog.at_level(logging.ERROR, logger="src.utils.docker_utils"):
+        res = du.copy_file_into_workspace("t", src, "/workspace/x.txt")
+
+    assert res.ok is False and res.reason == "size_mismatch"
+    assert res.mapped_dst == "/tmp_workspace/x.txt"
+    assert any("INJECT FS NOT PLACED" in r.getMessage() for r in caplog.records)
+
+
+def test_copy_into_workspace_missing_file_is_failure(tmp_path, monkeypatch):
+    from src.utils import docker_utils as du
+
+    src = _host_file(tmp_path)
+    monkeypatch.setattr(du.subprocess, "run",
+                        _FakeRun(sizes={"/tmp_workspace/x.txt": None}))
+
+    res = du.copy_file_into_workspace("t", src, "/workspace/x.txt")
+    assert res.ok is False and res.reason == "size_mismatch"
+
+
+def test_copy_into_workspace_refuses_dst_outside_workspace(tmp_path, monkeypatch):
+    from src.utils import docker_utils as du
+
+    src = _host_file(tmp_path)
+    runner = _FakeRun()
+    monkeypatch.setattr(du.subprocess, "run", runner)
+
+    res = du.copy_file_into_workspace("t", src, "/etc/cron.d/evil")
+
+    assert res.ok is False and res.reason == "dst_outside_workspace"
+    assert not any("docker" == c[0] and "cp" in c for c in runner.calls), (
+        "a refused dst must never reach docker cp")
+
+
+def test_copy_into_workspace_parent_mkdir_failure_is_reported(tmp_path, monkeypatch):
+    from src.utils import docker_utils as du
+
+    src = _host_file(tmp_path)
+    monkeypatch.setattr(du.subprocess, "run", _FakeRun(fail=("mkdir",)))
+
+    res = du.copy_file_into_workspace("t", src, "/workspace/deep/x.txt")
+    assert res.ok is False and res.reason == "mkdir_parent_failed"
+
+
+def test_copy_into_workspace_mkdir_rc_is_checked(monkeypatch):
+    from src.utils import docker_utils as du
+
+    monkeypatch.setattr(du.subprocess, "run", _FakeRun(fail=("mkdir",)))
+    res = du.copy_file_into_workspace("t", None, "/workspace/newdir", mkdir=True)
+    assert res.ok is False and res.reason == "mkdir_failed"
+
+
+def test_copy_into_workspace_container_down_is_warning(monkeypatch, caplog):
+    from src.utils import docker_utils as du
+
+    monkeypatch.setattr(du, "_container_running", lambda _t: False)
+    with caplog.at_level(logging.WARNING, logger="src.utils.docker_utils"):
+        res = du.copy_file_into_workspace("t", None, "/workspace/x.txt")
+
+    assert res.ok is None and bool(res) is False
+    assert any(r.levelno == logging.WARNING and "container not up" in r.getMessage()
+               for r in caplog.records)
+
+
+def test_copy_into_workspace_stamps_mtime_with_sim_epoch(tmp_path, monkeypatch):
+    from src.utils import docker_utils as du
+
+    src = _host_file(tmp_path)
+    runner = _FakeRun(sizes={"/tmp_workspace/x.txt": src.stat().st_size})
+    monkeypatch.setattr(du.subprocess, "run", runner)
+
+    du.copy_file_into_workspace("t", src, "/workspace/x.txt",
+                                mtime_epoch_ms=1793000000000)
+
+    touch = [c for c in runner.calls if "touch" in c]
+    assert touch == [["docker", "exec", "t", "touch", "-m", "-d", "@1793000000",
+                      "/tmp_workspace/x.txt"]]
+
+
+def test_copy_into_workspace_without_sim_epoch_touches_now(tmp_path, monkeypatch):
+    from src.utils import docker_utils as du
+
+    src = _host_file(tmp_path)
+    runner = _FakeRun(sizes={"/tmp_workspace/x.txt": src.stat().st_size})
+    monkeypatch.setattr(du.subprocess, "run", runner)
+
+    du.copy_file_into_workspace("t", src, "/workspace/x.txt")
+
+    touch = [c for c in runner.calls if "touch" in c]
+    assert touch == [["docker", "exec", "t", "touch", "-m", "/tmp_workspace/x.txt"]]
+
+
+def test_inject_data_into_workspace_stamps_baseline_at_t0(tmp_path, monkeypatch):
+    """Baseline inputs get the task's T0 instant so per-turn drops sort after."""
+    from src.utils import docker_utils as du
+
+    (tmp_path / "prompts.json").write_text(json.dumps({
+        "timezone": "America/Chicago",
+        "turns": [{"turn": "T0", "timestamp": "2026-08-03T08:45:00-05:00"}],
+    }), encoding="utf-8")
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+
+    runner = _FakeRun()
+    monkeypatch.setattr(du.subprocess, "run", runner)
+    du.inject_data_into_workspace("t", str(data_dir))
+
+    stamps = [c for c in runner.calls if any("touch -m -d" in str(x) for x in c)]
+    assert len(stamps) == 1
+    expected_epoch = 1785764700  # 2026-08-03T08:45:00-05:00
+    assert f"@{expected_epoch}" in stamps[0][-1]
+
+
+def test_inject_data_into_workspace_without_prompts_json_skips_stamp(tmp_path, monkeypatch):
+    from src.utils import docker_utils as du
+
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    runner = _FakeRun()
+    monkeypatch.setattr(du.subprocess, "run", runner)
+    du.inject_data_into_workspace("t", str(data_dir))
+
+    assert not [c for c in runner.calls if any("touch" in str(x) for x in c)]
+
+
+# --------------------------------------------------------------------------- #
+# 8. End-to-end wiring with the REAL copy hook. Every other fs test stubs the
+#    hook, so nothing else would catch InjectApplier and the run_batch closure
+#    disagreeing about the mtime kwarg — the applier would silently drop the
+#    stamp (or raise) with all stub-based tests still green.
+# --------------------------------------------------------------------------- #
+
+def _run_batch_shaped_hook(task_id):
+    """Exact parameter shape of eval/run_batch.py::_copy_into_workspace."""
+    from src.utils.docker_utils import copy_file_into_workspace
+
+    def _copy_into_workspace(host_src, dst, mkdir=False, mtime_epoch_ms=None,
+                             _tid=task_id):
+        return copy_file_into_workspace(_tid, host_src, dst, mkdir=mkdir,
+                                        mtime_epoch_ms=mtime_epoch_ms)
+    return _copy_into_workspace
+
+
+def test_real_hook_end_to_end_stamps_and_records_mapped_dst(tmp_path, monkeypatch):
+    from src.utils import docker_utils as du
+    from src.utils.inject_director import InjectApplier, InjectStage
+
+    stage_dir = tmp_path / "inject" / "stage1"
+    stage_dir.mkdir(parents=True)
+    (stage_dir / "mutations.json").write_text("{}", encoding="utf-8")
+    payload = stage_dir / "note.txt"
+    payload.write_text("hello from inject", encoding="utf-8")
+
+    runner = _FakeRun(sizes={"/tmp_workspace/home/note.txt": payload.stat().st_size})
+    monkeypatch.setattr(du.subprocess, "run", runner)
+
+    ap = InjectApplier({}, None, tmp_path / "timeline.jsonl",
+                       inject_root=tmp_path / "inject",
+                       copy_into_workspace=_run_batch_shaped_hook("t"))
+    stage = InjectStage(
+        index=1, name="s1", from_turn=0, to_turn=1,
+        filesystem=[{"id": "fs-1", "action": "copy", "src": "note.txt",
+                     "dst": "/data/home/note.txt"}],
+        loud=[], silent=[], source=str(stage_dir / "mutations.json"))
+
+    outcomes = ap.apply_stage(stage, turn_index=1, mtime_epoch_ms=1793000000000)
+
+    assert outcomes[0]["ok"] is True
+    assert outcomes[0]["mapped_dst"] == "/tmp_workspace/home/note.txt"
+    touch = [c for c in runner.calls if "touch" in c]
+    assert touch == [["docker", "exec", "t", "touch", "-m", "-d", "@1793000000",
+                      "/tmp_workspace/home/note.txt"]], (
+        "the sim epoch must survive InjectApplier -> run_batch closure -> docker")
+
+
+def test_real_hook_end_to_end_refuses_escaping_dst(tmp_path, monkeypatch):
+    from src.utils import docker_utils as du
+    from src.utils.inject_director import InjectApplier, InjectStage, is_defect
+
+    stage_dir = tmp_path / "inject" / "stage1"
+    stage_dir.mkdir(parents=True)
+    (stage_dir / "mutations.json").write_text("{}", encoding="utf-8")
+    (stage_dir / "note.txt").write_text("payload", encoding="utf-8")
+
+    runner = _FakeRun()
+    monkeypatch.setattr(du.subprocess, "run", runner)
+
+    ap = InjectApplier({}, None, tmp_path / "timeline.jsonl",
+                       inject_root=tmp_path / "inject",
+                       copy_into_workspace=_run_batch_shaped_hook("t"))
+    stage = InjectStage(
+        index=1, name="s1", from_turn=0, to_turn=1,
+        filesystem=[{"id": "fs-esc", "action": "copy", "src": "note.txt",
+                     "dst": "/etc/cron.d/evil"}],
+        loud=[], silent=[], source=str(stage_dir / "mutations.json"))
+
+    outcomes = ap.apply_stage(stage, turn_index=1)
+
+    assert outcomes[0]["status"] == "invalid_dst"
+    assert outcomes[0]["reason"] == "dst_outside_workspace"
+    assert is_defect(outcomes[0], phase="stage") is True
+    assert not any("cp" in c for c in runner.calls)

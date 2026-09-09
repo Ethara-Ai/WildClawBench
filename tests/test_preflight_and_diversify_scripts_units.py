@@ -502,3 +502,41 @@ def test_diversify_rewrites_every_branch(tmp_path, monkeypatch, capsys):
     assert g["block_types"]({"message": {"content": "nope"}}) == []
     assert g["block_types"]({"message": {"content": [_th()]}}) == ["thinking"]
     assert g["first_toolcall"]({"message": {"content": "nope"}}) is None
+
+
+# ======================================================================
+# _seed_dst_to_data_rel — must recognise every workspace alias the runtime
+# mapper normalizes, or the mirrored-payload check silently never runs.
+# ======================================================================
+
+@pytest.mark.parametrize("dst,expected", [
+    ("/workspace/home/Pictures/x.png", "Pictures/x.png"),
+    ("/app/home/Pictures/x.png", "Pictures/x.png"),
+    ("/root/workspace/home/Pictures/x.png", "Pictures/x.png"),
+    ("/root/.openclaw/workspace/home/Pictures/x.png", "Pictures/x.png"),
+    ("~/workspace/home/Pictures/x.png", "Pictures/x.png"),
+    ("/data/home/Pictures/x.png", "Pictures/x.png"),
+    ("data/home/Pictures/x.png", "Pictures/x.png"),
+])
+def test_seed_dst_to_data_rel_recognises_every_alias(pf, dst, expected):
+    assert pf._seed_dst_to_data_rel(dst) == expected
+
+
+@pytest.mark.parametrize("dst", ["/etc/passwd", "/workspace/notes/x.txt", "", None])
+def test_seed_dst_to_data_rel_ignores_non_data_dsts(pf, dst):
+    assert pf._seed_dst_to_data_rel(dst) is None
+
+
+def test_seed_dst_alias_payload_mirror_check_now_fires(pf, tmp_path, monkeypatch):
+    """An aliased seed dst must still be checked against its data/ counterpart."""
+    task = tmp_path / "aliased_task"
+    (task / "data").mkdir(parents=True)
+    results = []
+    monkeypatch.setattr(pf, "rec", lambda level, msg: results.append((level, msg)))
+
+    pf._check_seed_payload_mirrored(
+        task, "seed", {"id": "fs-1", "action": "copy",
+                       "dst": "/root/workspace/home/Pictures/x.png"})
+
+    assert results and results[0][0] == pf.FAIL
+    assert "data/Pictures/x.png" in results[0][1]

@@ -56,6 +56,7 @@ openclaw runner's ``before_turn`` hook.
 from __future__ import annotations
 
 import csv
+import inspect
 import json
 import logging
 import os
@@ -68,6 +69,10 @@ from typing import Any, Dict, List, Optional, Tuple
 import requests
 
 LOG = logging.getLogger("wildclaw.inject")
+
+# Mirrors docker_utils.TMP_WORKSPACE without importing it: this module is
+# imported by static validation paths that must not pull in the docker stack.
+_TMP_WORKSPACE = os.environ.get("TMP_WORKSPACE", "/tmp_workspace")
 
 
 class InjectConfigError(Exception):
@@ -433,6 +438,7 @@ class InjectApplier:
         self._timeline_path.parent.mkdir(parents=True, exist_ok=True)
         self._inject_root = Path(inject_root) if inject_root else None
         self._copy = copy_into_workspace
+        self._copy_mtime_ok: Optional[bool] = None
         self._replay_loud = replay_loud
         self._task_id = task_id
         self._session = requests.Session()
@@ -460,7 +466,8 @@ class InjectApplier:
                       "stage": stage.name})
         return outcomes
 
-    def apply_stage(self, stage: InjectStage, turn_index: int) -> List[Dict[str, Any]]:
+    def apply_stage(self, stage: InjectStage, turn_index: int,
+                    mtime_epoch_ms: Optional[int] = None) -> List[Dict[str, Any]]:
         outcomes: List[Dict[str, Any]] = []
         for op in stage.silent:
             outcomes.append(self._apply_api_mutation(op, stage, turn_index, silent=True))
@@ -478,7 +485,7 @@ class InjectApplier:
             outcomes.append(self._apply_api_mutation(op, stage, turn_index, silent=False))
         # list-form stages may also carry filesystem drops mid-run
         for op in stage.filesystem:
-            outcomes.append(self._apply_filesystem(op, stage))
+            outcomes.append(self._apply_filesystem(op, stage, mtime_epoch_ms))
         # Honest accounting: count SUCCESSES, not attempts. The old log line
         # said "applied: N op(s)" for N attempted ops even when every one
         # resolved `unresolved` — that silence let broken task specs survive
@@ -638,7 +645,78 @@ class InjectApplier:
     # silent no-op that let mid-run edits vanish (is_defect -> True both phases).
     _FS_ALLOWED_ACTIONS = ("copy", "mkdir")
 
-    def _apply_filesystem(self, op: Dict[str, Any], stage: InjectStage) -> Dict[str, Any]:
+    def _invoke_copy(self, host_src: Any, dst: Any, mkdir: bool = False,
+                     mtime_epoch_ms: Optional[int] = None) -> Any:
+        """Call the copy hook, passing ``mtime_epoch_ms`` only if it accepts it.
+
+        The published hook contract is ``fn(host_src, dst, mkdir=False)``;
+        stamping support is additive, and callers (including test stubs) still
+        written to the 3-arg shape must keep working rather than raise TypeError.
+        """
+        kwargs: Dict[str, Any] = {"mkdir": mkdir}
+        if mtime_epoch_ms is not None and self._copy_accepts_mtime():
+            kwargs["mtime_epoch_ms"] = mtime_epoch_ms
+        return self._copy(host_src, dst, **kwargs)
+
+    def _copy_accepts_mtime(self) -> bool:
+        if self._copy_mtime_ok is None:
+            try:
+                params = inspect.signature(self._copy).parameters
+            except (TypeError, ValueError):  # pragma: no cover - builtins/C hooks
+                self._copy_mtime_ok = False
+            else:
+                self._copy_mtime_ok = (
+                    "mtime_epoch_ms" in params
+                    or any(p.kind is inspect.Parameter.VAR_KEYWORD
+                           for p in params.values())
+                )
+        return self._copy_mtime_ok
+
+    def _note_mapped_dst(self, rec: Dict[str, Any], mapped: Optional[str]) -> None:
+        """Record where the payload actually landed, plus a staged-tree warning.
+
+        Ops authored against ``/workspace/home/<rel>`` silently miss a task whose
+        ``data/`` itself contains ``home/`` (staged at ``.../home/home/<rel>``),
+        so flag a mapped dst that falls outside the staged input tree.
+        """
+        if not mapped:
+            return
+        rec["mapped_dst"] = mapped
+        home_root = f"{_TMP_WORKSPACE}/home"
+        if self._staged_input_root() and not mapped.startswith(home_root + "/"):
+            rec["warning"] = "dst outside staged input tree"
+
+    @staticmethod
+    def _copy_result(res: Any) -> Tuple[Any, Optional[str], str]:
+        """Normalize a copy-hook return into ``(ok, mapped_dst, reason)``.
+
+        The production hook returns a ``CopyOutcome``; test stubs and legacy
+        callers return the bare tri-state ``True``/``False``/``None``. Both must
+        keep working, so unwrap defensively rather than by isinstance on a
+        docker-only import.
+        """
+        if res is None or isinstance(res, bool):
+            return res, None, ""
+        return (getattr(res, "ok", res),
+                getattr(res, "mapped_dst", None),
+                str(getattr(res, "reason", "") or ""))
+
+    def _staged_input_root(self) -> Optional[str]:
+        """``<TMP_WORKSPACE>/home/home`` when the task stages a ``data/home``
+        tree, else None.
+
+        ``data/``'s CONTENTS are copied into ``{TMP_WORKSPACE}/home``, so a task
+        whose ``data/`` itself contains ``home/`` presents its inputs one level
+        deeper than the single-``home`` dst most ops are authored against.
+        """
+        if self._inject_root is None:
+            return None
+        if not (self._inject_root.parent / "data" / "home").is_dir():
+            return None
+        return f"{_TMP_WORKSPACE}/home/home"
+
+    def _apply_filesystem(self, op: Dict[str, Any], stage: InjectStage,
+                          mtime_epoch_ms: Optional[int] = None) -> Dict[str, Any]:
         action = op.get("action")
         dst = op.get("dst")
         rec = {"id": op.get("id"), "action": action, "dst": dst}
@@ -658,13 +736,19 @@ class InjectApplier:
             self._append({"type": "inject.fs", **rec, "ts": time.time()})
             return rec
         if action == "mkdir":
-            ok = self._copy(None, dst, mkdir=True)
+            ok, mapped, reason = self._copy_result(
+                self._copy(None, dst, mkdir=True))
+            self._note_mapped_dst(rec, mapped)
             if ok is None:
                 # Hook reports "container not up" distinctly from "failed"; do
                 # not label an unattempted op as if it had been performed.
                 rec.update(ok=False, status="skipped_container_down")
+            elif not ok and reason == "dst_outside_workspace":
+                rec.update(ok=False, status="invalid_dst", reason=reason)
             else:
                 rec.update(ok=bool(ok), status="mkdir")
+                if not ok and reason:
+                    rec["reason"] = reason
             self._append({"type": "inject.fs", **rec, "ts": time.time()})
             return rec
         src = op.get("src")
@@ -696,11 +780,17 @@ class InjectApplier:
             return rec
         rec["src"] = str(host_src)
         try:
-            ok = self._copy(host_src, dst)
+            ok, mapped, reason = self._copy_result(
+                self._invoke_copy(host_src, dst, mtime_epoch_ms=mtime_epoch_ms))
+            self._note_mapped_dst(rec, mapped)
             if ok is None:
                 rec.update(ok=False, status="skipped_container_down")
+            elif not ok and reason == "dst_outside_workspace":
+                rec.update(ok=False, status="invalid_dst", reason=reason)
             else:
                 rec.update(ok=bool(ok), status="copied")
+                if not ok and reason:
+                    rec["reason"] = reason
         except Exception as exc:  # pragma: no cover - defensive
             rec.update(ok=False, status="error", reason=str(exc))
         self._append({"type": "inject.fs", **rec, "ts": time.time()})

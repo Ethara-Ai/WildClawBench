@@ -218,6 +218,53 @@ def _resolve_fs_src(stage: InjectStage, src: str) -> Tuple[Optional[Path], List[
     return None, warnings
 
 
+_FS_CANONICAL_DST_PREFIXES = ("/workspace/", "/app/")
+
+
+def _staged_data_home(stage: InjectStage) -> Optional[Path]:
+    """``<task>/data/home`` when the stage's task stages one, else None.
+
+    ``data/``'s CONTENTS land in ``{workspace}/home``, so a ``data/home`` dir
+    means the agent sees inputs at ``/workspace/home/home/<rel>``. Ops authored
+    against the single-``home`` path miss that tree entirely.
+    """
+    if not stage.source:
+        return None
+    task_root = Path(stage.source).parent.parent.parent
+    data_home = task_root / "data" / "home"
+    return data_home if data_home.is_dir() else None
+
+
+def _validate_fs_dst(
+    stage: InjectStage, op: Dict[str, Any],
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """Check a filesystem op's ``dst`` against the workspace path contract."""
+    fatal: List[Dict[str, Any]] = []
+    warnings: List[Dict[str, Any]] = []
+    oid = op.get("id")
+    dst = str(op.get("dst") or "").strip()
+    if not dst:
+        return fatal, warnings
+    if not dst.startswith(_FS_CANONICAL_DST_PREFIXES):
+        fatal.append({
+            "stage": stage.name, "id": oid, "status": "fs-dst-not-workspace",
+            "reason": f"dst {dst!r} does not start with /workspace/ or /app/ — the "
+                      "runtime mapper either refuses it (absolute paths outside the "
+                      "workspace) or silently rewrites it; author the dst as "
+                      "/workspace/<rel>",
+        })
+        return fatal, warnings
+    if _staged_data_home(stage) is not None and not dst.startswith(
+            ("/workspace/home/home/", "/app/home/home/")):
+        warnings.append({
+            "stage": stage.name, "id": oid, "status": "fs-dst-tree-mismatch",
+            "reason": f"task stages data/home/, so its inputs live at "
+                      f"/workspace/home/home/<rel>; dst {dst!r} targets a different "
+                      "tree and will not join the staged input files",
+        })
+    return fatal, warnings
+
+
 def _validate_filesystem_op(
     stage: InjectStage, op: Dict[str, Any], mock_data_root: Optional[Path],
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
@@ -244,6 +291,9 @@ def _validate_filesystem_op(
         if op.get("src"):
             warnings.append({"stage": stage.name, "id": oid, "status": "fs-mkdir-with-src",
                              "reason": "mkdir op also sets src (ignored by the copy hook)"})
+        dst_fatal, dst_warn = _validate_fs_dst(stage, op)
+        fatal.extend(dst_fatal)
+        warnings.extend(dst_warn)
         return fatal, warnings
 
     src = op.get("src")
@@ -256,6 +306,9 @@ def _validate_filesystem_op(
     if not dst:
         fatal.append({"stage": stage.name, "id": oid, "status": "fs-missing-dst",
                       "reason": "filesystem copy op has no dst"})
+    dst_fatal, dst_warn = _validate_fs_dst(stage, op)
+    fatal.extend(dst_fatal)
+    warnings.extend(dst_warn)
     if src and dst and stage.source:
         resolved, fg = _resolve_fs_src(stage, src)
         warnings.extend({**w, "stage": stage.name, "id": oid} for w in fg)

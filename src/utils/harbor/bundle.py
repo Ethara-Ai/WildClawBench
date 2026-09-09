@@ -280,7 +280,7 @@ def write_bundle(
     # so the LLM-proxy routing and CURRENT_DATE pin must live here as well as
     # in docker-compose.yaml. LLAMA_API_KEY is compose-only (secret; resolved
     # from the host at `docker compose up` time, never baked into task.toml).
-    runtime_env = runtime_env_defaults()
+    runtime_env = runtime_env_defaults(task_dir)
     environment_env = {**env_vars, **runtime_env}
     verifier_env = {**env_vars, **runtime_env, "TEST_DIR": "/tests"}
     solution_env = {**env_vars, **runtime_env}
@@ -382,6 +382,7 @@ def write_bundle(
             config.environment_dir,
             services=filtered_services,
             env_vars=env_vars,
+            task_dir=task_dir,
         ),
         encoding="utf-8",
     )

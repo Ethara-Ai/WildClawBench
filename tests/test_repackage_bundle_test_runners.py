@@ -826,3 +826,104 @@ def test_malformed_connector_not_copied_into_bundle(tmp_path):
     out = dest / "environment" / "skills"
     assert (out / "github-api-connector").is_dir()
     assert not (out / "canvas-lms-api-connector").exists()
+
+
+# ============================================================================
+# CURRENT_DATE parity. repackage_to_bundle is deliberately isolated from the
+# eval package, so its sim-clock port must stay byte-identical to Harbor's —
+# a drift here silently ships two bundles that disagree about "today".
+# ============================================================================
+
+_PROMPTS_SCHEMAS = [
+    ({"timezone": "America/Chicago",
+      "turns": [{"turn": "T0", "timestamp": "2026-11-03T07:38:00-06:00"}]},
+     "2026-11-03"),
+    ({"window": {"start": "2026-09-14", "timezone": "America/New_York"},
+      "turns": [{"turn": "T0", "day": 2, "time": "09:15"}]},
+     "2026-09-15"),
+    ({"turns": [{"turn": "T0"}]}, "2026-05-28"),
+    ({"turns": []}, "2026-05-28"),
+    ({"timezone": "Not/AZone",
+      "turns": [{"turn": "T0", "day": 1, "time": "09:15"}]}, "2026-05-28"),
+]
+
+
+@pytest.mark.parametrize("payload,expected", _PROMPTS_SCHEMAS)
+def test_current_date_parity_with_harbor(tmp_path, payload, expected):
+    rp = _load_repackage_module()
+    from src.utils.harbor.compose import resolve_current_date
+
+    task_dir = tmp_path / "task"
+    task_dir.mkdir()
+    (task_dir / "prompts.json").write_text(json.dumps(payload), encoding="utf-8")
+
+    local = rp._compose_current_date(task_dir)
+    assert local == expected
+    assert local == resolve_current_date(task_dir), "CURRENT_DATE emitter drift"
+
+
+def test_current_date_falls_back_without_task_dir():
+    rp = _load_repackage_module()
+    from src.utils.harbor.compose import resolve_current_date
+
+    assert rp._compose_current_date(None) == "2026-05-28"
+    assert rp._compose_current_date(None) == resolve_current_date(None)
+
+
+def _two_service_env(tmp_path):
+    env_dir = tmp_path / "env"
+    env_dir.mkdir()
+    for name, port, env_var in (
+        ("gmail-api", 8017, "GMAIL_API_URL"),
+        ("xero-api", 8087, "XERO_API_URL"),
+    ):
+        svc_dir = env_dir / name
+        svc_dir.mkdir()
+        (svc_dir / "service.toml").write_text(
+            f'[service]\nname = "{name}"\nport = {port}\n'
+            f'env_var_name = "{env_var}"\nhealthcheck_path = "/health"\n'
+        )
+    return env_dir
+
+
+def test_compose_byte_equal_with_harbor_when_task_dir_supplied(tmp_path):
+    rp = _load_repackage_module()
+    harbor_compose = _load_harbor_compose_gen()
+    env_dir = _two_service_env(tmp_path)
+    task_dir = tmp_path / "task"
+    task_dir.mkdir()
+    (task_dir / "prompts.json").write_text(json.dumps({
+        "timezone": "America/Chicago",
+        "turns": [{"turn": "T0", "timestamp": "2026-11-03T07:38:00-06:00"}],
+    }), encoding="utf-8")
+
+    harbor = harbor_compose(env_dir, task_dir=task_dir)
+    local = rp._generate_environment_compose(env_dir, task_dir=task_dir)
+    assert harbor == local, "compose byte-equal drift with derived CURRENT_DATE"
+    assert "      - CURRENT_DATE=2026-11-03\n" in local
+
+
+def test_staged_compose_uses_input_task_narrative_date(tmp_path):
+    rp = _load_repackage_module()
+    bundle = tmp_path / "bundle"
+    env_dir = bundle / "data" / "environment"
+    env_dir.mkdir(parents=True)
+    (env_dir / "gmail-api").mkdir()
+    (env_dir / "gmail-api" / "service.toml").write_text(
+        '[service]\nname = "gmail-api"\nport = 8017\n'
+        'env_var_name = "GMAIL_API_URL"\nhealthcheck_path = "/health"\n'
+    )
+    input_task_dir = tmp_path / "input_task"
+    input_task_dir.mkdir()
+    (input_task_dir / "prompts.json").write_text(json.dumps({
+        "timezone": "America/Chicago",
+        "turns": [{"turn": "T0", "timestamp": "2026-11-03T07:38:00-06:00"}],
+    }), encoding="utf-8")
+
+    rp._stage_environment_dockerfile_and_compose(bundle, False, input_task_dir)
+    text = (env_dir / "docker-compose.yaml").read_text()
+    assert "      - CURRENT_DATE=2026-11-03\n" in text
+
+    rp._stage_environment_dockerfile_and_compose(bundle, False)
+    assert "      - CURRENT_DATE=2026-05-28\n" in (
+        env_dir / "docker-compose.yaml").read_text()

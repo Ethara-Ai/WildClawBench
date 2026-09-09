@@ -1233,7 +1233,7 @@ def _normalize_display_model(obj: Any) -> None:
             _normalize_display_model(item)
 
 
-def _reanchor_sim_clock(task_id: str, task: dict, turn_index: int) -> None:
+def _reanchor_sim_clock(task_id: str, task: dict, turn_index: int):
     """Move the agent's simulated clock to this turn's declared instant.
 
     prompts.json carries a timestamp per turn, but the container clock can only
@@ -1242,6 +1242,9 @@ def _reanchor_sim_clock(task_id: str, task: dict, turn_index: int) -> None:
     task narrating three days collapsed into three consecutive minutes. Best
     effort: a turn with no resolvable timestamp, or a failed write, keeps the
     previous anchor.
+
+    Returns the resolved ``SimClock`` (or None) so the caller can stamp this
+    turn's inject drops with the same instant the agent will read.
     """
     try:
         from src.utils.docker_utils import set_agent_sim_clock
@@ -1249,13 +1252,15 @@ def _reanchor_sim_clock(task_id: str, task: dict, turn_index: int) -> None:
 
         sim = compute_sim_clock_for_turn(task, turn_index)
         if sim is None:
-            return
+            return None
         if set_agent_sim_clock(task_id, sim.epoch_ms):
             logger.info("[%s] sim clock re-anchored for T%d: %s",
                         task_id, turn_index, sim.iso)
+        return sim
     except Exception as exc:  # pragma: no cover - never break a turn over this
         logger.warning("[%s] sim clock re-anchor skipped for T%d: %s",
                        task_id, turn_index, exc)
+        return None
 
 
 def _turn_completion_verdict(task: dict, execution, interactive: bool) -> dict:
@@ -2254,13 +2259,15 @@ def run_single_task(
                                        or ""),
                         })
 
-            def _copy_into_workspace(host_src, dst, mkdir=False, _tid=task_id):
+            def _copy_into_workspace(host_src, dst, mkdir=False,
+                                     mtime_epoch_ms=None, _tid=task_id):
                 # Drop per-turn inject artifacts (emails, PDFs, silent file
                 # swaps) into the running agent container's workspace. The pre-T0
                 # seed fires before the container exists -> hook returns None and
                 # the op is logged "skipped_container_down" (baseline already
                 # mounted at /app). False means a real, attempted copy failed.
-                return copy_file_into_workspace(_tid, host_src, dst, mkdir=mkdir)
+                return copy_file_into_workspace(_tid, host_src, dst, mkdir=mkdir,
+                                                mtime_epoch_ms=mtime_epoch_ms)
 
             inject_applier = InjectApplier(
                 host_api_to_url=drift_info.get("host_api_to_url") or {},
@@ -2284,11 +2291,15 @@ def run_single_task(
             def _inject_before_turn(turn_index: int, _is=_is, _ap=inject_applier,
                                     _task=task, _tid=task_id):
                 # Agent is idle here; apply the stage whose boundary ends at this turn.
-                _reanchor_sim_clock(_tid, _task, turn_index)
+                sim = _reanchor_sim_clock(_tid, _task, turn_index)
                 st = _is.stage_for_boundary(turn_index)
                 if st is not None:
-                    _record_defects(_ap.apply_stage(st, turn_index),
-                                    stage_name=st.name, phase="stage")
+                    # Stamp this turn's drops at the same instant the agent's
+                    # clock now reads, so they sort after the T0-stamped baseline.
+                    _record_defects(
+                        _ap.apply_stage(st, turn_index,
+                                        mtime_epoch_ms=getattr(sim, "epoch_ms", None)),
+                        stage_name=st.name, phase="stage")
 
             stage_before_turn = _inject_before_turn
             # Dangling-reference guard: a non-seed stage whose to_turn is

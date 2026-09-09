@@ -861,3 +861,72 @@ class TestWriteBundleStoreResults:
         )
         assert (out_dir / "prompt.txt").is_file()
         assert manifest["models"] == ["claude"]
+
+
+# ==========================================================================
+# CURRENT_DATE derivation. A statically pinned "today" contradicts any task
+# whose prompts.json narrates a different window, so the environment's
+# date-relative logic disagrees with the agent's own simulated clock.
+# ==========================================================================
+
+class TestCurrentDateDerivation:
+    @staticmethod
+    def _task_dir(tmp_path, payload):
+        (tmp_path / "prompts.json").write_text(json.dumps(payload), encoding="utf-8")
+        return tmp_path
+
+    def test_falls_back_to_static_default_without_task_dir(self):
+        from src.utils.harbor.compose import DEFAULT_CURRENT_DATE, resolve_current_date
+
+        assert resolve_current_date() == DEFAULT_CURRENT_DATE
+        assert resolve_current_date(None) == DEFAULT_CURRENT_DATE
+
+    def test_falls_back_when_task_has_no_prompts_json(self, tmp_path):
+        from src.utils.harbor.compose import DEFAULT_CURRENT_DATE, resolve_current_date
+
+        assert resolve_current_date(tmp_path) == DEFAULT_CURRENT_DATE
+
+    def test_derived_from_iso_timestamp_schema(self, tmp_path):
+        from src.utils.harbor.compose import resolve_current_date
+
+        task_dir = self._task_dir(tmp_path, {
+            "timezone": "America/Chicago",
+            "turns": [{"turn": "T0", "timestamp": "2026-11-03T07:38:00-06:00"}],
+        })
+        assert resolve_current_date(task_dir) == "2026-11-03"
+
+    def test_derived_from_day_time_window_schema(self, tmp_path):
+        from src.utils.harbor.compose import resolve_current_date
+
+        task_dir = self._task_dir(tmp_path, {
+            "window": {"start": "2026-09-14", "timezone": "America/New_York"},
+            "turns": [{"turn": "T0", "day": 2, "time": "09:15"}],
+        })
+        assert resolve_current_date(task_dir) == "2026-09-15"
+
+    def test_falls_back_on_unresolvable_turn(self, tmp_path):
+        from src.utils.harbor.compose import DEFAULT_CURRENT_DATE, resolve_current_date
+
+        task_dir = self._task_dir(tmp_path, {"turns": [{"turn": "T0"}]})
+        assert resolve_current_date(task_dir) == DEFAULT_CURRENT_DATE
+
+    def test_runtime_env_defaults_uses_derived_date(self, tmp_path):
+        task_dir = self._task_dir(tmp_path, {
+            "timezone": "America/Chicago",
+            "turns": [{"turn": "T0", "timestamp": "2026-11-03T07:38:00-06:00"}],
+        })
+        assert runtime_env_defaults(task_dir)["CURRENT_DATE"] == "2026-11-03"
+        assert runtime_env_defaults()["CURRENT_DATE"] == "2026-05-28"
+
+    def test_compose_emits_derived_date(self, tmp_path):
+        env_dir = tmp_path / "env"
+        env_dir.mkdir()
+        task_dir = self._task_dir(tmp_path, {
+            "timezone": "America/Chicago",
+            "turns": [{"turn": "T0", "timestamp": "2026-11-03T07:38:00-06:00"}],
+        })
+        yaml = generate_harbor_compose(env_dir, services=[], task_dir=task_dir)
+        assert "      - CURRENT_DATE=2026-11-03\n" in yaml
+        assert "2026-05-28" not in yaml
+        assert "      - CURRENT_DATE=2026-05-28\n" in generate_harbor_compose(
+            env_dir, services=[])

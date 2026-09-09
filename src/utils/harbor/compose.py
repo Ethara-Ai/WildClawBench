@@ -121,7 +121,26 @@ LLM_PROXY_URL = "http://litellm-proxy:4000"
 DEFAULT_CURRENT_DATE = "2026-05-28"
 
 
-def runtime_env_defaults() -> dict:
+def resolve_current_date(task_dir: Optional[Path] = None) -> str:
+    """The bundle's "today", as the task's own narrative dates it.
+
+    A hard-coded date contradicts any task whose prompts.json narrates a
+    different window, so date-relative logic inside the environment disagrees
+    with the agent's simulated clock. Falls back to DEFAULT_CURRENT_DATE when no
+    task dir is supplied or the task declares no resolvable instant.
+    """
+    if not task_dir:
+        return DEFAULT_CURRENT_DATE
+    try:
+        from src.utils.sim_clock import compute_sim_clock
+
+        sim = compute_sim_clock({"task_dir": str(task_dir)})
+    except Exception:  # pragma: no cover - never fail a bundle over a clock read
+        return DEFAULT_CURRENT_DATE
+    return sim.iso[:10] if sim is not None else DEFAULT_CURRENT_DATE
+
+
+def runtime_env_defaults(task_dir: Optional[Path] = None) -> dict:
     """Env vars every agent/verifier/solution container should see.
 
     LLAMA_API_KEY is intentionally absent: it is a secret, so it is only ever
@@ -132,7 +151,7 @@ def runtime_env_defaults() -> dict:
         "LITELLM_BASE_URL": LLM_PROXY_URL,
         "OPENAI_API_BASE": f"{LLM_PROXY_URL}/v1",
         "OPENAI_API_KEY": "placeholder",
-        "CURRENT_DATE": DEFAULT_CURRENT_DATE,
+        "CURRENT_DATE": resolve_current_date(task_dir),
     }
 
 
@@ -158,7 +177,8 @@ def _healthcheck_cmd(port: int, path: str) -> str:
 
 def generate_harbor_compose(env_dir: Path,
                             services: Optional[Iterable[Mapping]] = None,
-                            env_vars: Optional[Mapping[str, str]] = None) -> str:
+                            env_vars: Optional[Mapping[str, str]] = None,
+                            task_dir: Optional[Path] = None) -> str:
     """Render the Harbor `data/environment/docker-compose.yaml`.
 
     The `main` service waits for every mock service to become healthy and
@@ -188,7 +208,7 @@ def generate_harbor_compose(env_dir: Path,
     lines.append("    environment:")
     for key, value in env_vars.items():
         lines.append(f"      - {key}={value}")
-    runtime_env = runtime_env_defaults()
+    runtime_env = runtime_env_defaults(task_dir)
     lines.append(f"      - LITELLM_BASE_URL={runtime_env['LITELLM_BASE_URL']}")
     lines.append(f"      - OPENAI_API_BASE={runtime_env['OPENAI_API_BASE']}")
     lines.append(f"      - OPENAI_API_KEY={runtime_env['OPENAI_API_KEY']}")

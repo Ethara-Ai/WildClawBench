@@ -189,3 +189,156 @@ def test_fs_mkdir_action_lands_via_hook(tmp_path):
     rec = ap._apply_filesystem(stage.filesystem[0], stage)
     assert rec["ok"] is True and rec["status"] == "mkdir"
     assert copies == [{"src": None, "dst": "/workspace/newdir", "mkdir": True}]
+
+
+# --------------------------------------------------------------------------- #
+# Mapped-dst bookkeeping + mtime threading. The timeline must record where a
+# payload actually LANDED (the raw authored dst can be an alias), and per-turn
+# drops must be stamped so they sort after the T0-stamped baseline.
+# --------------------------------------------------------------------------- #
+
+class _Outcome:
+    def __init__(self, ok, mapped_dst=None, reason=""):
+        self.ok = ok
+        self.mapped_dst = mapped_dst
+        self.reason = reason
+
+    def __bool__(self):
+        return bool(self.ok)
+
+
+def _outcome_applier(tmp_path, calls, outcome, inject_root=None):
+    def hook(host_src, dst, mkdir=False, mtime_epoch_ms=None):
+        calls.append({"src": str(host_src) if host_src else None, "dst": dst,
+                      "mkdir": mkdir, "mtime_epoch_ms": mtime_epoch_ms})
+        return outcome
+    return InjectApplier(
+        {}, None, tmp_path / "timeline.jsonl",
+        inject_root=inject_root or (tmp_path / "inject"),
+        copy_into_workspace=hook,
+    )
+
+
+def _copy_op_stage(tmp_path, dst="/workspace/note.txt"):
+    stage_dir = tmp_path / "inject" / "stage1"
+    stage_dir.mkdir(parents=True, exist_ok=True)
+    (stage_dir / "mutations.json").write_text("{}", encoding="utf-8")
+    (stage_dir / "note.txt").write_text("hello", encoding="utf-8")
+    return InjectStage(
+        index=1, name="s1", from_turn=0, to_turn=1,
+        filesystem=[{"id": "fs-1", "action": "copy", "src": "note.txt", "dst": dst}],
+        loud=[], silent=[], source=str(stage_dir / "mutations.json"),
+    )
+
+
+def test_fs_record_carries_mapped_dst(tmp_path):
+    calls = []
+    ap = _outcome_applier(tmp_path, calls,
+                          _Outcome(True, "/tmp_workspace/home/note.txt"))
+    stage = _copy_op_stage(tmp_path, dst="/data/home/note.txt")
+
+    rec = ap._apply_filesystem(stage.filesystem[0], stage)
+
+    assert rec["ok"] is True
+    assert rec["dst"] == "/data/home/note.txt", "raw authored dst is preserved"
+    assert rec["mapped_dst"] == "/tmp_workspace/home/note.txt"
+
+
+def test_fs_dst_outside_workspace_is_a_defect(tmp_path):
+    from src.utils.inject_director import is_defect
+
+    calls = []
+    ap = _outcome_applier(tmp_path, calls,
+                          _Outcome(False, None, "dst_outside_workspace"))
+    stage = _copy_op_stage(tmp_path, dst="/etc/cron.d/evil")
+
+    rec = ap._apply_filesystem(stage.filesystem[0], stage)
+
+    assert rec["ok"] is False
+    assert rec["status"] == "invalid_dst"
+    assert rec["reason"] == "dst_outside_workspace"
+    assert is_defect(rec, phase="stage") is True
+    assert is_defect(rec, phase="seed") is True
+
+
+def test_fs_mkdir_dst_outside_workspace_is_a_defect(tmp_path):
+    calls = []
+    ap = _outcome_applier(tmp_path, calls,
+                          _Outcome(False, None, "dst_outside_workspace"))
+    stage = InjectStage(
+        index=1, name="s1", from_turn=0, to_turn=1,
+        filesystem=[{"id": "fs-mk", "action": "mkdir", "dst": "/etc/evil"}],
+        loud=[], silent=[], source="")
+
+    rec = ap._apply_filesystem(stage.filesystem[0], stage)
+    assert rec["ok"] is False and rec["status"] == "invalid_dst"
+
+
+def test_fs_warns_when_mapped_dst_leaves_staged_home_tree(tmp_path):
+    (tmp_path / "data" / "home" / "Pictures").mkdir(parents=True)
+    calls = []
+    ap = _outcome_applier(tmp_path, calls, _Outcome(True, "/tmp_workspace/note.txt"))
+    stage = _copy_op_stage(tmp_path, dst="/workspace/note.txt")
+
+    rec = ap._apply_filesystem(stage.filesystem[0], stage)
+
+    assert rec["warning"] == "dst outside staged input tree"
+
+
+def test_fs_no_warning_when_mapped_dst_stays_in_staged_home_tree(tmp_path):
+    (tmp_path / "data" / "home" / "Pictures").mkdir(parents=True)
+    calls = []
+    ap = _outcome_applier(tmp_path, calls,
+                          _Outcome(True, "/tmp_workspace/home/home/Pictures/note.txt"))
+    stage = _copy_op_stage(tmp_path, dst="/workspace/home/home/Pictures/note.txt")
+
+    rec = ap._apply_filesystem(stage.filesystem[0], stage)
+    assert "warning" not in rec
+
+
+def test_apply_stage_threads_sim_epoch_to_copy_hook(tmp_path):
+    calls = []
+    ap = _outcome_applier(tmp_path, calls, _Outcome(True, "/tmp_workspace/note.txt"))
+    stage = _copy_op_stage(tmp_path)
+
+    ap.apply_stage(stage, turn_index=1, mtime_epoch_ms=1793000000000)
+
+    assert [c["mtime_epoch_ms"] for c in calls] == [1793000000000]
+
+
+def test_legacy_three_arg_hook_survives_mtime_threading(tmp_path):
+    """Stubs written to the published fn(host_src, dst, mkdir=False) contract
+    must not be handed a kwarg they cannot accept."""
+    calls = []
+
+    def legacy_hook(host_src, dst, mkdir=False):
+        calls.append({"dst": dst, "mkdir": mkdir})
+        return True
+
+    ap = InjectApplier({}, None, tmp_path / "timeline.jsonl",
+                       inject_root=tmp_path / "inject",
+                       copy_into_workspace=legacy_hook)
+    stage = _copy_op_stage(tmp_path)
+
+    outcomes = ap.apply_stage(stage, turn_index=1, mtime_epoch_ms=1793000000000)
+
+    assert calls == [{"dst": "/workspace/note.txt", "mkdir": False}]
+    assert outcomes[0]["ok"] is True and outcomes[0]["status"] == "copied"
+
+
+def test_plain_bool_hook_return_still_supported(tmp_path):
+    calls = []
+    ap = _outcome_applier(tmp_path, calls, True)
+    stage = _copy_op_stage(tmp_path)
+
+    rec = ap._apply_filesystem(stage.filesystem[0], stage)
+    assert rec["ok"] is True and "mapped_dst" not in rec
+
+
+def test_none_hook_return_still_means_container_down(tmp_path):
+    calls = []
+    ap = _outcome_applier(tmp_path, calls, None)
+    stage = _copy_op_stage(tmp_path)
+
+    rec = ap._apply_filesystem(stage.filesystem[0], stage)
+    assert rec["ok"] is False and rec["status"] == "skipped_container_down"
