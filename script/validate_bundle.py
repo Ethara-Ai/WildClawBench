@@ -17,6 +17,8 @@ ERRORS (data loss / wrong record)
     the ones missing)
   * meta message_count != actual messages
   * spawn_tree children count != subagent files
+  * ``data/task.toml`` with an empty ``[metadata]`` category/difficulty
+    (task.yaml task_type/difficulty never wired into the bundle)
 
 WARNINGS (suspicious but often benign)
   * child session end timestamp after the parent's last message (orphan —
@@ -37,6 +39,11 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
+
+try:
+    import tomllib  # py3.11+
+except ModuleNotFoundError:
+    import tomli as tomllib  # type: ignore
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.utils.trajectory.builder import classify_child_completion
@@ -171,10 +178,43 @@ def check_run(run_dir: Path) -> tuple[list[str], list[str]]:
     return errors, warnings
 
 
+def check_task_toml(toml_path: Path) -> tuple[list[str], list[str]]:
+    """Return (errors, warnings) for one bundle's data/task.toml.
+
+    Fail-closed on unfilled metadata: an empty [metadata] category/difficulty
+    means _stage_task_toml never received task.yaml's task_type/difficulty, so
+    the bundle ships unlabeled. Fail-soft on an unreadable/malformed file
+    (warning, never a crash) so a single bad bundle cannot abort the walk.
+    """
+    errors: list[str] = []
+    warnings: list[str] = []
+    try:
+        data = tomllib.loads(toml_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
+        return [], [f"task.toml unreadable ({exc})"]
+    metadata = data.get("metadata")
+    if not isinstance(metadata, dict):
+        return ["task.toml has no [metadata] table"], []
+    for key in ("category", "difficulty"):
+        value = metadata.get(key)
+        if not isinstance(value, str) or not value.strip():
+            errors.append(
+                f"task.toml [metadata] {key} is empty "
+                f"(task.yaml task_type/difficulty not wired)"
+            )
+    return errors, warnings
+
+
 def _run_dirs(root: Path):
     for out in sorted(root.rglob("output.json")):
         if re.match(r"run_\d+$", out.parent.name):
             yield out.parent
+
+
+def _task_toml_paths(root: Path):
+    for toml_path in sorted(root.rglob("task.toml")):
+        if toml_path.parent.name == "data":
+            yield toml_path
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -188,6 +228,7 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     total = bad = warned = 0
+    total_toml = bad_toml = 0
     any_errors = False
     for root in args.roots:
         rp = Path(root)
@@ -210,8 +251,23 @@ def main(argv: list[str] | None = None) -> int:
             for w in warnings:
                 print(f"    warn  {w}")
 
+        for toml_path in _task_toml_paths(rp):
+            total_toml += 1
+            errors, warnings = check_task_toml(toml_path)
+            if errors:
+                bad_toml += 1
+                any_errors = True
+            if errors or warnings or not args.quiet:
+                status = "FAIL" if errors else ("WARN" if warnings else "ok")
+                print(f"[{status:4s}] {toml_path}")
+            for e in errors:
+                print(f"    ERROR {e}")
+            for w in warnings:
+                print(f"    warn  {w}")
+
     print("-" * 70)
     print(f"{total} run(s) checked: {bad} with errors, {warned} with warnings")
+    print(f"{total_toml} task.toml checked: {bad_toml} with errors")
     return 1 if (args.strict and any_errors) else 0
 
 

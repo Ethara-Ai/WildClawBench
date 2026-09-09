@@ -1405,12 +1405,34 @@ def _detect_attachments_present(input_task_dir: Path) -> bool:
     return False
 
 
+def _normalize_api_name(name: str) -> str:
+    """Map a declared API name to its environment dir name (``<name>-api``).
+
+    Local stdlib port of eval/run_batch.py:_normalize_api_name. task.yaml
+    declares bare names (`required_apis: [figma, monday]`) while
+    `input/<task>/mock_data/` and `bundle/data/environment/` both use the
+    `-api` suffix (`figma-api`) — the env-dir convention is authoritative for
+    `required_skills`, `_discover_service_env_vars` and
+    `_compute_distractor_apis`, all of which key on env-dir names.
+    'figma' -> 'figma-api'; 'figma-api' -> 'figma-api' (idempotent).
+    """
+    n = str(name or "").strip()
+    if not n:
+        return ""
+    return n if n.endswith("-api") else f"{n}-api"
+
+
 def _resolve_used_apis(input_task_dir: Path | None) -> list[str]:
-    """Authoritative list of APIs the task overlays at runtime.
+    """Fallback list of APIs the task overlays at runtime.
 
     Sourced from `input/<task>/mock_data/<api>/*` directory names — the same
     ground truth that `src/utils/mock_stack.py::start_mock_stack` uses to mount
     per-task overlays. Returns sorted list. Empty when no mock_data/.
+
+    NOTE: this is the FALLBACK only. `_resolve_task_api_sets` prefers the
+    declared `required_apis` in task.yaml, because newer tasks seed the FULL
+    mock fleet into mock_data/ (all ~101 dirs), which would otherwise make
+    every task claim every connector as required.
     """
     if input_task_dir is None:
         return []
@@ -1941,7 +1963,31 @@ def _stage_environment_dockerfile_and_compose(
 
 
 _L_TAG_RE = re.compile(r"^\s*(l1|l2)\s*:\s*(.+?)\s*$", re.MULTILINE)
-_AUTHOR_RE = re.compile(r"^\s*authors?\s*:\s*(.+?)\s*$", re.MULTILINE)
+# Every regex below is anchored to ONE line: `[ \t]*` (never `\s*`) after the
+# colon and `[^\n]` in the capture. With a newline-permitting `\s*`, block-style
+# YAML (`required_apis:\n  - figma\n  - monday`) captured only `- figma`,
+# silently dropping the rest and emitting a phantom `- figma-api-connector`.
+# Anchored, a block-style value captures nothing -> the key reads as absent ->
+# documented mock_data fallback.
+_AUTHOR_RE = re.compile(r"^[ \t]*authors?[ \t]*:[ \t]*([^\n]+?)[ \t]*$", re.MULTILINE)
+_TASK_TYPE_RE = re.compile(
+    r"^[ \t]*(?:task_type|category)[ \t]*:[ \t]*([^\n]+?)[ \t]*$", re.MULTILINE
+)
+_DIFFICULTY_RE = re.compile(
+    r"^[ \t]*difficulty[ \t]*:[ \t]*([^\n]+?)[ \t]*$", re.MULTILINE
+)
+# `[^\n]*?` not `[^\n]+?`: a bare `distractor_apis:` with no value is a
+# meaningful state (null -> no distractors) and must still match. Aliases mirror
+# src/utils/task_parser.py:883-888, which accepts *_mock_apis for legacy tasks.
+_REQUIRED_APIS_RE = re.compile(
+    r"^[ \t]*(?:required_apis|required_mock_apis)[ \t]*:[ \t]*([^\n]*?)[ \t]*$",
+    re.MULTILINE,
+)
+_DISTRACTOR_APIS_RE = re.compile(
+    r"^[ \t]*(?:distractor_apis|distractor_mock_apis)[ \t]*:[ \t]*([^\n]*?)[ \t]*$",
+    re.MULTILINE,
+)
+_YAML_NULL_TOKENS = frozenset({"", "null", "~", "none", "[]"})
 
 
 def _resolve_authors(input_task_dir: Path | None) -> list[str]:
@@ -2004,6 +2050,199 @@ def _resolve_dependency_tags(input_task_dir: Path | None) -> list[str]:
     return [v for v in (found.get("l1"), found.get("l2")) if v]
 
 
+def _read_task_yaml_text(input_task_dir: Path | None) -> str | None:
+    if input_task_dir is None:
+        return None
+    task_yaml = input_task_dir / "task.yaml"
+    if not task_yaml.is_file():
+        return None
+    try:
+        return task_yaml.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return None
+
+
+def _strip_yaml_comment(raw: str) -> str:
+    """Drop a trailing unquoted `# comment` from a one-line YAML value.
+
+    Required because the validate gate treats any non-empty string as filled:
+    `difficulty: hard # tough` must yield `hard`, not `hard # tough`. Per YAML,
+    `#` only opens a comment at value start or after whitespace, so `a#b` stays
+    literal; `#` inside quotes is never a comment.
+    """
+    out: list[str] = []
+    quote: str | None = None
+    for i, ch in enumerate(raw):
+        if quote is not None:
+            out.append(ch)
+            if ch == quote:
+                quote = None
+            continue
+        if ch in "'\"":
+            quote = ch
+            out.append(ch)
+            continue
+        if ch == "#" and (i == 0 or raw[i - 1] in " \t"):
+            break
+        out.append(ch)
+    return "".join(out).strip()
+
+
+def _parse_yaml_flow_list(raw: str) -> list[str]:
+    raw = _strip_yaml_comment(raw)
+    if raw.startswith("[") and raw.endswith("]"):
+        parts = raw[1:-1].split(",")
+    else:
+        parts = [raw]
+    out: list[str] = []
+    for part in parts:
+        val = part.strip().strip("'\"").strip()
+        if val and val not in out:
+            out.append(val)
+    return out
+
+
+def _resolve_task_type_and_difficulty(input_task_dir: Path | None) -> tuple[str, str]:
+    """task.toml [metadata] category/difficulty sourced from input/<task>/task.yaml.
+
+    `task_type` feeds [metadata].category (with `category` accepted as an
+    alias); both also feed [task].keywords via _build_task_toml. Fail-soft:
+    returns ("", "") when task.yaml is absent, unreadable, or carries neither
+    key, so the emitted fields degrade to "" rather than breaking the bundle.
+    Stdlib-only (no PyYAML) per the standalone-stdlib invariant.
+    """
+    text = _read_task_yaml_text(input_task_dir)
+    if text is None:
+        return "", ""
+
+    def _first(pattern: re.Pattern[str]) -> str:
+        m = pattern.search(text)
+        if not m:
+            return ""
+        return _strip_yaml_comment(m.group(1)).strip("'\"").strip()
+
+    return _first(_TASK_TYPE_RE), _first(_DIFFICULTY_RE)
+
+
+def _resolve_declared_apis(
+    input_task_dir: Path | None,
+) -> tuple[list[str] | None, str, list[str]]:
+    """Parse `required_apis` / `distractor_apis` from input/<task>/task.yaml.
+
+    Also accepts the `required_mock_apis` / `distractor_mock_apis` aliases that
+    src/utils/task_parser.py:883-888 honors. Returns (required, distractor_mode,
+    distractor) where `required` is None when the key is absent OR carries no
+    same-line value (a block-style list the stdlib parser cannot read) — the
+    only conditions that license the mock_data fallback. A literal same-line
+    `required_apis: []` is instead an explicit "no APIs" contract. `mode` is one
+    of "auto" | "list" | "none".
+    """
+    text = _read_task_yaml_text(input_task_dir)
+    if text is None:
+        return None, "none", []
+
+    required: list[str] | None = None
+    m = _REQUIRED_APIS_RE.search(text)
+    if m is not None:
+        raw = _strip_yaml_comment(m.group(1))
+        # A dangling `required_apis:` (value on following block-style lines, or
+        # nothing at all) reads as ABSENT -> mock_data fallback. Only a literal
+        # same-line `[]` is the explicit "no APIs" contract.
+        if raw:
+            required = _parse_yaml_flow_list(raw)
+
+    mode = "none"
+    distractor: list[str] = []
+    d = _DISTRACTOR_APIS_RE.search(text)
+    if d is not None:
+        raw = _strip_yaml_comment(d.group(1)).strip("'\"").strip()
+        lowered = raw.lower()
+        if lowered == "auto":
+            mode = "auto"
+        elif lowered not in _YAML_NULL_TOKENS:
+            values = _parse_yaml_flow_list(raw)
+            if values:
+                mode = "list"
+                distractor = values
+    return required, mode, distractor
+
+
+def _discover_service_catalog(env_dir: Path) -> set[str]:
+    """Env-dir names that are real services (service.toml-bearing dirs).
+
+    Same identification rule as _compute_distractor_apis / _discover_services_full,
+    so persona/ skills/ artifacts/ and the harness env .py files never count.
+    """
+    if not env_dir.is_dir():
+        return set()
+    return {
+        entry.name
+        for entry in env_dir.iterdir()
+        if entry.is_dir() and (entry / SERVICE_TOML_FILENAME).is_file()
+    }
+
+
+def _resolve_task_api_sets(
+    input_task_dir: Path | None, bundle_env_dir: Path
+) -> tuple[list[str], list[str]]:
+    """(required, distractor) env-dir names for one task.
+
+    Single source of truth shared by _stage_task_toml (task.toml required/
+    distractor skills + [environment.env] + healthcheck) and
+    _stage_test_runners_and_solver (solve.sh env preamble), so the two can never
+    disagree. Follows eval/run_batch.py:_resolve_task_apis precedence:
+      required   -> declared `required_apis` when the key is present, else the
+                    mock_data/<api>/ scan.
+      distractor -> `auto` = full env_dir complement; explicit list = those
+                    minus required; absent/empty/null = none.
+    Both sets are then intersected with the bundle's service catalog so a
+    declared name with no service in bundle/data/environment/ (author typo)
+    cannot emit a phantom `<name>-connector` skill; unknowns are dropped with a
+    stderr warning, mirroring run_batch.py:736-745. The intersection is skipped
+    when the catalog is empty (nothing to validate against), matching
+    run_batch's `if catalog:` guard.
+
+    DELIBERATE DIVERGENCE from run_batch: an explicit `required_apis: []` is
+    honored here as an empty contract (required = []), whereas run_batch's
+    truthiness test (run_batch.py:704) currently treats an empty list the same
+    as an absent key and falls through to keyword inference + mock_data union.
+    """
+    declared_required, mode, declared_distractor = _resolve_declared_apis(input_task_dir)
+    if declared_required is None:
+        required = _resolve_used_apis(input_task_dir)
+    else:
+        required = sorted(
+            {_normalize_api_name(n) for n in declared_required if _normalize_api_name(n)}
+        )
+
+    if mode == "auto":
+        distractor = _compute_distractor_apis(bundle_env_dir, required)
+    elif mode == "list":
+        required_set = set(required)
+        distractor = sorted(
+            {
+                name
+                for name in (_normalize_api_name(n) for n in declared_distractor)
+                if name and name not in required_set
+            }
+        )
+    else:
+        distractor = []
+
+    catalog = _discover_service_catalog(bundle_env_dir)
+    if catalog:
+        unknown = sorted((set(required) | set(distractor)) - catalog)
+        if unknown:
+            print(
+                f"    !! declared APIs absent from bundle environment (dropped): "
+                f"{', '.join(unknown)}",
+                file=sys.stderr,
+            )
+            required = [name for name in required if name in catalog]
+            distractor = [name for name in distractor if name in catalog]
+    return required, distractor
+
+
 def _stage_task_toml(
     input_task_dir: Path | None,
     bundle: Path,
@@ -2013,8 +2252,10 @@ def _stage_task_toml(
     """Emit bundle/data/task.toml using Harbor-parity build_task_toml port.
 
     Resolution policy (matches Harbor bundle.py:171-253):
-      - required = input/<task>/mock_data/<api>/ dir names (sorted)
-      - distractor = bundle/data/environment/ APIs minus required
+      - required = task.yaml `required_apis` (normalized to <name>-api) when the
+        key is present, else input/<task>/mock_data/<api>/ dir names (sorted)
+      - distractor = task.yaml `distractor_apis`: auto -> bundle/data/environment/
+        APIs minus required; explicit list -> those minus required; absent -> none
       - env_vars = filtered_services (required ∪ distractor)
       - healthcheck_command = ' && '.join('curl -f http://localhost:{port}/health' per filtered svc)
       - environment_env = env_vars + runtime_env_defaults()
@@ -2033,9 +2274,8 @@ def _stage_task_toml(
         return False
     prompt_text = _read_prompt_text(input_task_dir) or ""
 
-    used_apis = _resolve_used_apis(input_task_dir)
     bundle_env_dir = bundle / "data" / "environment"
-    distractor_apis = _compute_distractor_apis(bundle_env_dir, used_apis)
+    used_apis, distractor_apis = _resolve_task_api_sets(input_task_dir, bundle_env_dir)
     used_with_distractor = set(used_apis) | set(distractor_apis)
 
     all_services = _discover_services_full(bundle_env_dir)
@@ -2066,6 +2306,7 @@ def _stage_task_toml(
     }
     dependency_tags = _resolve_dependency_tags(input_task_dir)
     authors = _resolve_authors(input_task_dir)
+    task_type, difficulty = _resolve_task_type_and_difficulty(input_task_dir)
 
     toml_text = _build_task_toml(
         task_id=input_task_dir.name,
@@ -2080,6 +2321,8 @@ def _stage_task_toml(
         solution_env=solution_env,
         pass_at_k=pass_at_k,
         healthcheck_command=healthcheck_cmd,
+        task_type=task_type,
+        difficulty=difficulty,
     )
     data_dir = bundle / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
@@ -2133,7 +2376,19 @@ def _stage_test_runners_and_solver(
         wrote_test_sh = True
 
     bundle_env_dir = bundle / "data" / "environment"
-    env_vars = _discover_service_env_vars(bundle_env_dir, enabled_apis=None)
+    # Scope the solve.sh env preamble to THIS task's required union distractor,
+    # using the same resolver as _stage_task_toml so solve.sh and
+    # [environment.env] can never disagree. Passing enabled_apis=None instead
+    # published every service in the bundle regardless of the task. Under
+    # `distractor_apis: auto` that union legitimately IS the full complement,
+    # so solve.sh still spans the fleet there — faithful to what the agent saw,
+    # not a leak. It shrinks for explicit or absent distractor lists.
+    required_apis, distractor_apis = _resolve_task_api_sets(
+        input_task_dir, bundle_env_dir
+    )
+    env_vars = _discover_service_env_vars(
+        bundle_env_dir, enabled_apis=set(required_apis) | set(distractor_apis)
+    )
     solution_dir.mkdir(parents=True, exist_ok=True)
     (solution_dir / SOLVE_SH_FILENAME).write_text(
         _generate_solve_sh(env_vars), encoding="utf-8"

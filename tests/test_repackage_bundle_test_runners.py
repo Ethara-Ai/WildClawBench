@@ -206,6 +206,10 @@ def test_solve_sh_references_discovered_env_vars(tmp_path):
     rp = _load_repackage_module()
     src_root, dst_root, inp_root = _stage_minimal_task(tmp_path)
     task_id = "ben_cox_8fc24d4b"
+    # solve.sh env is scoped to the task's declared APIs, so they must be declared.
+    (inp_root / task_id / "task.yaml").write_text(
+        "task_type: finance_ops\ndifficulty: hard\nrequired_apis: [gmail, xero]\n"
+    )
 
     bundle = rp.convert_task(
         task_dir=src_root / task_id,
@@ -547,41 +551,352 @@ def test_dockerfile_and_compose_emitted_from_bundle_env_dir(tmp_path):
     assert "litellm-proxy:4000" in compose_text
 
 
-def test_task_toml_required_skills_from_mock_data(tmp_path):
-    """task.toml required_skills must be derived from input/<task>/mock_data/<api>/
-    dir names (with -connector suffix), sorted."""
-    rp = _load_repackage_module()
-    input_task_dir = tmp_path / "task_with_overlay"
-    input_task_dir.mkdir()
-    (input_task_dir / "prompt.txt").write_text("Use gmail and xero.\n")
-    mock_data = input_task_dir / "mock_data"
-    mock_data.mkdir()
-    (mock_data / "gmail-api").mkdir()
-    (mock_data / "xero-api").mkdir()
+_ENV_SPECS: tuple[tuple[str, int, str], ...] = (
+    ("gmail-api", 8017, "GMAIL_API_URL"),
+    ("xero-api", 8087, "XERO_API_URL"),
+    ("github-api", 8088, "GITHUB_API_URL"),
+)
 
-    bundle = tmp_path / "bundle_d"
-    env_dir = bundle / "data" / "environment"
-    env_dir.mkdir(parents=True)
-    for name, port, env_var in (
-        ("gmail-api", 8017, "GMAIL_API_URL"),
-        ("xero-api", 8087, "XERO_API_URL"),
-        ("github-api", 8088, "GITHUB_API_URL"),
-    ):
+
+def _mk_env_services(env_dir: Path, specs=_ENV_SPECS) -> None:
+    env_dir.mkdir(parents=True, exist_ok=True)
+    for name, port, env_var in specs:
         sd = env_dir / name
-        sd.mkdir()
+        sd.mkdir(exist_ok=True)
         (sd / "service.toml").write_text(
             f'[service]\nname = "{name}"\nport = {port}\nenv_var_name = "{env_var}"\n'
         )
 
+
+def _mk_api_task(tmp_path: Path, name: str, task_yaml: str | None,
+                 mock_apis=()) -> tuple[Path, Path]:
+    input_task_dir = tmp_path / name
+    input_task_dir.mkdir()
+    (input_task_dir / "prompt.txt").write_text("Use gmail and xero.\n")
+    if task_yaml is not None:
+        (input_task_dir / "task.yaml").write_text(task_yaml)
+    if mock_apis:
+        mock_data = input_task_dir / "mock_data"
+        mock_data.mkdir()
+        for api in mock_apis:
+            (mock_data / api).mkdir()
+    bundle = tmp_path / f"bundle_{name}"
+    _mk_env_services(bundle / "data" / "environment")
+    return input_task_dir, bundle
+
+
+def test_task_toml_required_skills_prefers_declared_required_apis(tmp_path):
+    """task.yaml `required_apis` is authoritative and WINS over the mock_data
+    scan: newer tasks seed the FULL mock fleet, so the scan would otherwise
+    claim every connector as required. Bare declared names ('gmail') are
+    normalized to the '-api' env-dir convention ('gmail-api')."""
+    rp = _load_repackage_module()
+    input_task_dir, bundle = _mk_api_task(
+        tmp_path, "declared",
+        "difficulty: hard\ntask_type: finance_ops\n"
+        "required_apis: [gmail, xero]\ndistractor_apis: auto\n",
+        mock_apis=[name for name, _p, _e in _ENV_SPECS],
+    )
+
     assert rp._stage_task_toml(input_task_dir, bundle, verbose=False)
     toml_text = (bundle / "data" / "task.toml").read_text()
     assert 'required_skills = ["gmail-api-connector", "xero-api-connector"]' in toml_text
-    assert "github-api-connector" in toml_text
-    idx_required = toml_text.find("required_skills =")
-    idx_distractor = toml_text.find("distractor_skills =")
-    assert idx_required != -1 and idx_distractor != -1
-    distractor_line = toml_text[idx_distractor : toml_text.find("\n", idx_distractor)]
+    assert 'distractor_skills = ["github-api-connector"]' in toml_text
+
+
+def test_task_toml_required_skills_falls_back_to_mock_data(tmp_path):
+    """With NO `required_apis` key the mock_data/<api>/ scan stays the source of
+    required_skills (legacy tasks keep working)."""
+    rp = _load_repackage_module()
+    input_task_dir, bundle = _mk_api_task(
+        tmp_path, "fallback", "distractor_apis: auto\n",
+        mock_apis=("gmail-api", "xero-api"),
+    )
+
+    assert rp._stage_task_toml(input_task_dir, bundle, verbose=False)
+    toml_text = (bundle / "data" / "task.toml").read_text()
+    assert 'required_skills = ["gmail-api-connector", "xero-api-connector"]' in toml_text
+    assert 'distractor_skills = ["github-api-connector"]' in toml_text
+
+
+def test_task_toml_distractor_skills_explicit_list_minus_required(tmp_path):
+    """An explicit `distractor_apis` list publishes exactly those, minus any
+    overlap with required."""
+    rp = _load_repackage_module()
+    input_task_dir, bundle = _mk_api_task(
+        tmp_path, "explicit",
+        "required_apis: [gmail]\ndistractor_apis: [github, gmail]\n",
+    )
+
+    assert rp._stage_task_toml(input_task_dir, bundle, verbose=False)
+    toml_text = (bundle / "data" / "task.toml").read_text()
+    assert 'required_skills = ["gmail-api-connector"]' in toml_text
+    assert 'distractor_skills = ["github-api-connector"]' in toml_text
+
+
+@pytest.mark.parametrize("task_yaml", [
+    None,
+    "required_apis: [gmail]\n",
+    "required_apis: [gmail]\ndistractor_apis:\n",
+    "required_apis: [gmail]\ndistractor_apis: []\n",
+    "required_apis: [gmail]\ndistractor_apis: null\n",
+])
+def test_task_toml_distractor_skills_none_when_absent_or_empty(tmp_path, task_yaml):
+    """absent / empty / null `distractor_apis` publishes NO distractors."""
+    rp = _load_repackage_module()
+    input_task_dir, bundle = _mk_api_task(
+        tmp_path, "noneish", task_yaml, mock_apis=("gmail-api",),
+    )
+
+    assert rp._stage_task_toml(input_task_dir, bundle, verbose=False)
+    toml_text = (bundle / "data" / "task.toml").read_text()
+    assert 'required_skills = ["gmail-api-connector"]' in toml_text
+    assert "distractor_skills = []" in toml_text
+
+
+def test_task_toml_category_difficulty_keywords_from_task_yaml(tmp_path):
+    """[metadata] category/difficulty + [task] keywords come from task.yaml
+    task_type/difficulty. These were permanently empty before _stage_task_toml
+    started forwarding them to _build_task_toml."""
+    rp = _load_repackage_module()
+    input_task_dir, bundle = _mk_api_task(
+        tmp_path, "meta",
+        "difficulty: hard\ntask_type: design_review_signoff\nrequired_apis: [gmail]\n",
+    )
+
+    assert rp._stage_task_toml(input_task_dir, bundle, verbose=False)
+    toml_text = (bundle / "data" / "task.toml").read_text()
+    assert 'category = "design_review_signoff"' in toml_text
+    assert 'difficulty = "hard"' in toml_text
+    assert 'keywords = ["design_review_signoff", "hard"]' in toml_text
+
+
+def test_task_toml_category_alias_and_absent_task_yaml(tmp_path):
+    """`category` is accepted as a task_type alias; a missing task.yaml
+    fail-softs to empty strings and empty keywords."""
+    rp = _load_repackage_module()
+    aliased, bundle_a = _mk_api_task(
+        tmp_path, "alias", "category: ops_qa\ndifficulty: medium\n",
+    )
+    assert rp._stage_task_toml(aliased, bundle_a, verbose=False)
+    toml_text = (bundle_a / "data" / "task.toml").read_text()
+    assert 'category = "ops_qa"' in toml_text
+    assert 'keywords = ["ops_qa", "medium"]' in toml_text
+
+    bare, bundle_b = _mk_api_task(tmp_path, "bare", None)
+    assert rp._stage_task_toml(bare, bundle_b, verbose=False)
+    toml_text = (bundle_b / "data" / "task.toml").read_text()
+    assert 'category = ""' in toml_text
+    assert 'difficulty = ""' in toml_text
+    assert "keywords = []" in toml_text
+
+
+def test_solve_sh_env_shrinks_for_explicit_distractor_list(tmp_path):
+    """solve.sh enumerates only required union distractor. With a small explicit
+    distractor list the preamble genuinely shrinks: xero is in the bundle env but
+    is neither required nor a declared distractor, so it must not appear."""
+    rp = _load_repackage_module()
+    input_task_dir, bundle = _mk_api_task(
+        tmp_path, "scoped", "required_apis: [gmail]\ndistractor_apis: [github]\n",
+    )
+
+    rp._stage_test_runners_and_solver(
+        input_task_dir, bundle, verbose=False, include_tests=False
+    )
+    solve = (bundle / "data" / "solution" / "solve.sh").read_text()
+    assert "GMAIL_API_URL" in solve
+    assert "GITHUB_API_URL" in solve
+    assert "XERO_API_URL" not in solve, "solve.sh published a non-task service"
+
+
+def test_solve_sh_env_spans_fleet_under_distractor_auto(tmp_path):
+    """Under `distractor_apis: auto` the union legitimately IS the full env
+    complement, so solve.sh spans every service in the bundle. That is faithful
+    to what the agent saw (auto mounts the whole complement as distractors), not
+    a leak — documented here so the behavior is not "fixed" by mistake."""
+    rp = _load_repackage_module()
+    input_task_dir, bundle = _mk_api_task(
+        tmp_path, "autoscope", "required_apis: [gmail]\ndistractor_apis: auto\n",
+    )
+
+    rp._stage_test_runners_and_solver(
+        input_task_dir, bundle, verbose=False, include_tests=False
+    )
+    solve = (bundle / "data" / "solution" / "solve.sh").read_text()
+    for env_var in ("GMAIL_API_URL", "XERO_API_URL", "GITHUB_API_URL"):
+        assert env_var in solve
+
+
+def test_solve_sh_env_agrees_with_task_toml_environment_env(tmp_path):
+    """solve.sh and task.toml [environment.env] are derived from the SAME
+    resolver, so the service env vars they name must never diverge."""
+    rp = _load_repackage_module()
+    input_task_dir, bundle = _mk_api_task(
+        tmp_path, "agree", "required_apis: [gmail]\ndistractor_apis: [github]\n",
+    )
+
+    assert rp._stage_task_toml(input_task_dir, bundle, verbose=False)
+    rp._stage_test_runners_and_solver(
+        input_task_dir, bundle, verbose=False, include_tests=False
+    )
+    toml_text = (bundle / "data" / "task.toml").read_text()
+    solve = (bundle / "data" / "solution" / "solve.sh").read_text()
+    for env_var in ("GMAIL_API_URL", "GITHUB_API_URL"):
+        assert f"{env_var} = " in toml_text
+        assert env_var in solve
+    assert "XERO_API_URL" not in toml_text
+    assert "XERO_API_URL" not in solve
+
+
+def test_resolve_task_api_sets_explicit_list_is_pinned(tmp_path):
+    """Shared-resolver contract, pinned directly: an explicit fixture must yield
+    exactly (required, distractor) with declared bare names normalized to the
+    '-api' env-dir convention and required/distractor disjoint and sorted."""
+    rp = _load_repackage_module()
+    input_task_dir, bundle = _mk_api_task(
+        tmp_path, "pinned",
+        "required_apis: [xero, gmail]\ndistractor_apis: [github, gmail]\n",
+    )
+
+    required, distractor = rp._resolve_task_api_sets(
+        input_task_dir, bundle / "data" / "environment"
+    )
+    assert required == ["gmail-api", "xero-api"]
+    assert distractor == ["github-api"]
+
+
+def test_block_style_required_apis_falls_back_to_mock_data(tmp_path):
+    """Block-style YAML must NOT be half-parsed. A newline-permitting `\\s*`
+    captured only `- figma`, silently dropping the rest and emitting a phantom
+    `- figma-api-connector`. Anchored to one line the key reads as absent, so
+    the documented mock_data fallback takes over."""
+    rp = _load_repackage_module()
+    input_task_dir, bundle = _mk_api_task(
+        tmp_path, "blockstyle",
+        "required_apis:\n  - gmail\n  - xero\ndistractor_apis: auto\n",
+        mock_apis=("gmail-api",),
+    )
+
+    assert rp._stage_task_toml(input_task_dir, bundle, verbose=False)
+    toml_text = (bundle / "data" / "task.toml").read_text()
+    assert 'required_skills = ["gmail-api-connector"]' in toml_text
+    assert "- gmail" not in toml_text
+    assert "--api-connector" not in toml_text
+
+
+def test_explicit_empty_required_apis_is_an_empty_contract(tmp_path):
+    """Sibling of the block-style case: a literal same-line `required_apis: []`
+    is an explicit "no APIs" declaration and must NOT fall back to mock_data,
+    unlike a dangling `required_apis:` with the value on following lines."""
+    rp = _load_repackage_module()
+    input_task_dir, bundle = _mk_api_task(
+        tmp_path, "emptycontract", "required_apis: []\n", mock_apis=("gmail-api",),
+    )
+
+    required, distractor = rp._resolve_task_api_sets(
+        input_task_dir, bundle / "data" / "environment"
+    )
+    assert required == []
+    assert distractor == []
+
+
+def test_block_style_authors_yields_no_phantom_author(tmp_path):
+    """Same anchoring guarantee for the pre-existing authors regex."""
+    rp = _load_repackage_module()
+    input_task_dir, _bundle = _mk_api_task(
+        tmp_path, "blockauthors", "authors:\n  - Jane Doe\n  - John Roe\n",
+    )
+    assert rp._resolve_authors(input_task_dir) == []
+
+
+def test_declared_apis_accept_mock_apis_aliases(tmp_path):
+    """`required_mock_apis` / `distractor_mock_apis` are legacy aliases accepted
+    by src/utils/task_parser.py:883-888; the bundler must honor them too or the
+    task falls back to the full-fleet mock_data scan."""
+    rp = _load_repackage_module()
+    input_task_dir, bundle = _mk_api_task(
+        tmp_path, "aliases",
+        "required_mock_apis: [gmail]\ndistractor_mock_apis: [github]\n",
+        mock_apis=[name for name, _p, _e in _ENV_SPECS],
+    )
+
+    assert rp._stage_task_toml(input_task_dir, bundle, verbose=False)
+    toml_text = (bundle / "data" / "task.toml").read_text()
+    assert 'required_skills = ["gmail-api-connector"]' in toml_text
+    assert 'distractor_skills = ["github-api-connector"]' in toml_text
+
+
+def test_declared_api_absent_from_bundle_env_is_dropped(tmp_path, capsys):
+    """A declared api with no service in bundle/data/environment/ (author typo)
+    must NOT emit a phantom `<name>-connector`; it is dropped with a stderr
+    warning, mirroring run_batch.py:736-745."""
+    rp = _load_repackage_module()
+    input_task_dir, bundle = _mk_api_task(
+        tmp_path, "phantomdrop",
+        "required_apis: [gmail, notreal]\ndistractor_apis: [alsofake]\n",
+    )
+
+    assert rp._stage_task_toml(input_task_dir, bundle, verbose=False)
+    toml_text = (bundle / "data" / "task.toml").read_text()
+    assert 'required_skills = ["gmail-api-connector"]' in toml_text
+    assert "notreal" not in toml_text
+    assert "alsofake" not in toml_text
+    assert "distractor_skills = []" in toml_text
+    assert "notreal-api" in capsys.readouterr().err
+
+
+def test_declared_apis_survive_empty_bundle_env_catalog(tmp_path):
+    """The catalog intersection is skipped when the bundle env dir has no
+    services (nothing to validate against), matching run_batch's `if catalog:`
+    guard — otherwise every declared api would be wrongly dropped."""
+    rp = _load_repackage_module()
+    input_task_dir = tmp_path / "nocatalog"
+    input_task_dir.mkdir()
+    (input_task_dir / "task.yaml").write_text("required_apis: [gmail]\n")
+
+    required, distractor = rp._resolve_task_api_sets(
+        input_task_dir, tmp_path / "nocatalog_bundle" / "data" / "environment"
+    )
+    assert required == ["gmail-api"]
+    assert distractor == []
+
+
+def test_inline_yaml_comments_are_stripped(tmp_path):
+    """Trailing `# comment` must not corrupt values. `difficulty: hard # tough`
+    previously produced 'hard # tough', which the validate gate then accepted as
+    non-empty. A `#` without preceding whitespace stays literal per YAML."""
+    rp = _load_repackage_module()
+    input_task_dir, bundle = _mk_api_task(
+        tmp_path, "comments",
+        "task_type: design_review  # the l2 name\n"
+        "difficulty: hard # tough one\n"
+        "required_apis: [gmail]  # only gmail\n"
+        "distractor_apis: auto  # full complement\n",
+    )
+
+    assert rp._stage_task_toml(input_task_dir, bundle, verbose=False)
+    toml_text = (bundle / "data" / "task.toml").read_text()
+    assert 'category = "design_review"' in toml_text
+    assert 'difficulty = "hard"' in toml_text
+    assert 'keywords = ["design_review", "hard"]' in toml_text
+    assert 'required_skills = ["gmail-api-connector"]' in toml_text
+    assert "#" not in toml_text.split("[verifier]")[0]
+    distractor_line = [
+        line for line in toml_text.splitlines()
+        if line.startswith("distractor_skills = ")
+    ][0]
     assert "github-api-connector" in distractor_line
+    assert "xero-api-connector" in distractor_line
+
+
+def test_strip_yaml_comment_preserves_hash_without_whitespace():
+    """Per YAML, `#` opens a comment only at value start or after whitespace."""
+    rp = _load_repackage_module()
+    assert rp._strip_yaml_comment("hard # tough") == "hard"
+    assert rp._strip_yaml_comment("tag#1") == "tag#1"
+    assert rp._strip_yaml_comment("# all comment") == ""
+    assert rp._strip_yaml_comment('"a # b" # c') == '"a # b"'
+    assert rp._strip_yaml_comment("[a, b]\t# c") == "[a, b]"
 
 
 def test_task_toml_env_vars_and_healthcheck_chain(tmp_path):

@@ -193,6 +193,56 @@ def test_vb_warn_status_line_and_dunder_main(vb, tmp_path, capsys, monkeypatch):
     assert e.value.code == 0
 
 
+def test_vb_check_task_toml_metadata_gate(vb, tmp_path):
+    """[metadata] category/difficulty must be non-empty (ERROR, not warning);
+    a malformed task.toml degrades to a warning and never raises."""
+    def _write(name: str, body: str) -> Path:
+        data = tmp_path / name / "data"
+        data.mkdir(parents=True)
+        path = data / "task.toml"
+        path.write_text(body, encoding="utf-8")
+        return path
+
+    good = _write("good", '[metadata]\ncategory = "finance"\ndifficulty = "hard"\n')
+    assert vb.check_task_toml(good) == ([], [])
+
+    empty = _write("empty", '[metadata]\ncategory = ""\ndifficulty = "  "\n')
+    errors, warnings = vb.check_task_toml(empty)
+    assert warnings == []
+    assert len(errors) == 2
+    assert any("category" in e for e in errors)
+    assert any("difficulty" in e for e in errors)
+
+    nometa = _write("nometa", '[task]\nname = "x"\n')
+    assert vb.check_task_toml(nometa) == (["task.toml has no [metadata] table"], [])
+
+    malformed = _write("malformed", "[metadata\ncategory = \n")
+    errors, warnings = vb.check_task_toml(malformed)
+    assert errors == []
+    assert any("unreadable" in w for w in warnings)
+
+    assert vb.check_task_toml(tmp_path / "nope" / "task.toml")[0] == []
+
+
+def test_vb_main_task_toml_gate_fails_strict(vb, tmp_path, capsys, monkeypatch):
+    monkeypatch.setattr(vb, "classify_child_completion", lambda m: ("success", "ok"))
+    data = tmp_path / "b" / "task_x" / "data"
+    data.mkdir(parents=True)
+    (data / "task.toml").write_text(
+        '[metadata]\ncategory = ""\ndifficulty = "hard"\n', encoding="utf-8")
+    # a task.toml outside data/ is ignored by the walk
+    stray = tmp_path / "b" / "task_x" / "environment"
+    stray.mkdir()
+    (stray / "task.toml").write_text("[metadata]\n", encoding="utf-8")
+
+    rc = vb.main(["--strict", str(tmp_path / "b")])
+    out = capsys.readouterr().out
+    assert rc == 1
+    assert "[FAIL]" in out
+    assert "category is empty" in out
+    assert "1 task.toml checked: 1 with errors" in out
+
+
 # ======================================================================
 # script/check_injection.py
 # ======================================================================
