@@ -647,6 +647,118 @@ class TestIndexMemory:
 
 
 # ---------------------------------------------------------------------------
+# _session_line_count / _restore_session_to — the duplicate-user-turn guard
+# ---------------------------------------------------------------------------
+class TestSessionLineCount:
+    def test_counts_rows(self, monkeypatch):
+        rec = _RecordingRun(_FakeCompleted(returncode=0, stdout="42\n"))
+        monkeypatch.setattr(ocr.subprocess, "run", rec)
+        assert OpenClawAgent._session_line_count("t") == 42
+        cmd = rec.calls[0]["cmd"]
+        assert cmd[:3] == ["docker", "exec", "t"]
+        assert "chat.jsonl" in cmd[-1]
+
+    def test_absent_session_is_zero_not_unknown(self, monkeypatch):
+        # `[ -f ... ] && awk ... || echo 0` — turn 0 runs before the file exists.
+        monkeypatch.setattr(ocr.subprocess, "run",
+                            _RecordingRun(_FakeCompleted(returncode=0, stdout="0\n")))
+        assert OpenClawAgent._session_line_count("t") == 0
+
+    def test_login_shell_noise_ignored(self, monkeypatch):
+        monkeypatch.setattr(
+            ocr.subprocess, "run",
+            _RecordingRun(_FakeCompleted(returncode=0, stdout="motd banner\n7\n")))
+        assert OpenClawAgent._session_line_count("t") == 7
+
+    def test_nonzero_rc_is_unknown(self, monkeypatch):
+        monkeypatch.setattr(
+            ocr.subprocess, "run",
+            _RecordingRun(_FakeCompleted(returncode=1, stderr="no such container")))
+        assert OpenClawAgent._session_line_count("t") is None
+
+    def test_unparsable_output_is_unknown(self, monkeypatch):
+        monkeypatch.setattr(ocr.subprocess, "run",
+                            _RecordingRun(_FakeCompleted(returncode=0, stdout="nan\n")))
+        assert OpenClawAgent._session_line_count("t") is None
+
+    def test_empty_output_is_unknown(self, monkeypatch):
+        monkeypatch.setattr(ocr.subprocess, "run",
+                            _RecordingRun(_FakeCompleted(returncode=0, stdout="")))
+        assert OpenClawAgent._session_line_count("t") is None
+
+    @pytest.mark.parametrize("exc", [OSError("no docker"),
+                                     subprocess.TimeoutExpired(cmd="docker", timeout=30)])
+    def test_exec_failure_is_unknown(self, monkeypatch, exc):
+        def boom(*a, **k):
+            raise exc
+        monkeypatch.setattr(ocr.subprocess, "run", boom)
+        assert OpenClawAgent._session_line_count("t") is None
+
+
+class TestRestoreSessionTo:
+    def test_truncates_to_pre_attempt_count(self, monkeypatch):
+        rec = _RecordingRun([_FakeCompleted(0, "9\n"), _FakeCompleted(0, ""),
+                             _FakeCompleted(0, "5\n")])
+        monkeypatch.setattr(ocr.subprocess, "run", rec)
+        OpenClawAgent._restore_session_to("t", 5, 0)
+        assert "head -n 5" in rec.calls[1]["cmd"][-1]
+        assert "mv" in rec.calls[1]["cmd"][-1]
+
+    def test_no_truncation_when_count_unchanged(self, monkeypatch):
+        rec = _RecordingRun(_FakeCompleted(0, "5\n"))
+        monkeypatch.setattr(ocr.subprocess, "run", rec)
+        OpenClawAgent._restore_session_to("t", 5, 0)
+        assert len(rec.calls) == 1
+        assert "head -n" not in rec.calls[0]["cmd"][-1]
+
+    def test_no_truncation_when_count_shrank(self, monkeypatch):
+        rec = _RecordingRun(_FakeCompleted(0, "3\n"))
+        monkeypatch.setattr(ocr.subprocess, "run", rec)
+        OpenClawAgent._restore_session_to("t", 5, 0)
+        assert len(rec.calls) == 1
+
+    def test_unknown_pre_attempt_count_never_truncates(self, monkeypatch):
+        # A failed probe must not be read as "the session was empty".
+        rec = _RecordingRun(_FakeCompleted(0, "9\n"))
+        monkeypatch.setattr(ocr.subprocess, "run", rec)
+        OpenClawAgent._restore_session_to("t", None, 0)
+        assert rec.calls == []
+
+    def test_unknown_current_count_never_truncates(self, monkeypatch):
+        rec = _RecordingRun(_FakeCompleted(returncode=1, stderr="gone"))
+        monkeypatch.setattr(ocr.subprocess, "run", rec)
+        OpenClawAgent._restore_session_to("t", 5, 0)
+        assert len(rec.calls) == 1
+
+    def test_zero_pre_attempt_count_truncates_whole_file(self, monkeypatch):
+        rec = _RecordingRun([_FakeCompleted(0, "2\n"), _FakeCompleted(0, ""),
+                             _FakeCompleted(0, "0\n")])
+        monkeypatch.setattr(ocr.subprocess, "run", rec)
+        OpenClawAgent._restore_session_to("t", 0, 0)
+        assert "head -n 0" in rec.calls[1]["cmd"][-1]
+
+    def test_head_failure_is_reported_not_raised(self, monkeypatch):
+        rec = _RecordingRun([_FakeCompleted(0, "9\n"),
+                             _FakeCompleted(returncode=1, stderr="read-only fs")])
+        monkeypatch.setattr(ocr.subprocess, "run", rec)
+        OpenClawAgent._restore_session_to("t", 5, 0)
+        assert len(rec.calls) == 2
+
+    def test_exec_exception_is_swallowed(self, monkeypatch):
+        calls = []
+
+        def flaky(cmd, *a, **k):
+            calls.append(cmd)
+            if "head -n" in cmd[-1]:
+                raise subprocess.SubprocessError("boom")
+            return _FakeCompleted(0, "9\n")
+
+        monkeypatch.setattr(ocr.subprocess, "run", flaky)
+        OpenClawAgent._restore_session_to("t", 5, 0)
+        assert len(calls) == 2
+
+
+# ---------------------------------------------------------------------------
 # run_task — full orchestration with docker_utils helpers monkeypatched
 # ---------------------------------------------------------------------------
 class _FakeProc:

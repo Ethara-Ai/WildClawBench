@@ -15,7 +15,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 from dotenv import load_dotenv
 
 # Load .env BEFORE importing src.utils modules: several resolve env at import time
@@ -96,7 +96,11 @@ from src.utils.litellm_sidecar import (
     verify_litellm_upstream_reachable,
     wait_for_litellm_healthy,
 )
-from src.utils.trajectory.builder import build_published_trajectory, build_trajectory_from_jsonl
+from src.utils.trajectory.builder import (
+    _TURN_TS_RE,
+    build_published_trajectory,
+    build_trajectory_from_jsonl,
+)
 from src.utils.trajectory.local_media import replace_inline_media_with_files
 from src.utils.store import Task as StoreTask
 from src.utils.env_overlay_snapshot import stage_environment_with_overlays
@@ -1082,7 +1086,8 @@ def _write_pass_summary(model_dir: Path, model_type: str, run_index: int,
                  encoding="utf-8")
 
 
-def _condense_transcript_for_judge(traj: dict, limit: int | None = None) -> str:
+def _condense_transcript_for_judge(traj: dict, limit: int | None = None,
+                                   turns_duplicated: Sequence[Any] | None = None) -> str:
     """Flatten the trajectory messages into a text the judge can read.
 
     By user policy (2026-06-02): the trajectory is NEVER truncated HERE. No
@@ -1092,15 +1097,59 @@ def _condense_transcript_for_judge(traj: dict, limit: int | None = None) -> str:
     [SUBMIT TOOL OUTPUT]) so a downstream boundary-aware evidence cut can keep
     the final turn whole. Grading._gather_evidence stitches this together with
     deliverables and applies a boundary-aware per-member evidence budget that
-    preserves the transcript marker + final turn (never a blind character cut)."""
+    preserves the transcript marker + final turn (never a blind character cut).
+
+    User turns carry an explicit ordinal ([user turn N]) because the judge
+    otherwise counts '[user]' lines to locate a turn, and a harness stall-retry
+    that duplicated the message shifted every later turn by one. A duplicated
+    re-send is collapsed into a single numbered turn. `turns_duplicated` (the
+    runner's "a retry fired on this turn" markers, 0-based) is only a HINT: it
+    widens the collapse to a re-send separated by the aborted attempt's own
+    output. Identical text is the requirement in every case, so a session whose
+    duplicate was already rolled back — or one from a run that predates the
+    marker — is handled the same way."""
+    dup_hint = {int(t) for t in (turns_duplicated or [])
+                if isinstance(t, int) and not isinstance(t, bool)}
     out: list[str] = []
+    user_turn = 0
+    prev_user_text: str | None = None
+    prev_user_line: int | None = None
+    prev_line_is_user = False
+
+    def _emit_user(text: str) -> None:
+        nonlocal user_turn, prev_user_text, prev_user_line, prev_line_is_user
+        clean = _TURN_TS_RE.sub("", text, count=1).strip()
+        if not clean:
+            return
+        if clean == prev_user_text and prev_user_line is not None and (
+                prev_line_is_user or (user_turn - 1) in dup_hint):
+            out[prev_user_line] = (
+                f"[user turn {user_turn} — resent by harness after a stall; "
+                f"duplicate collapsed] {clean}"
+            )
+            prev_line_is_user = True
+            return
+        user_turn += 1
+        prev_user_text = clean
+        prev_user_line = len(out)
+        prev_line_is_user = True
+        out.append(f"[user turn {user_turn}] {clean}")
+
+    def _emit(line: str) -> None:
+        nonlocal prev_line_is_user
+        prev_line_is_user = False
+        out.append(line)
+
     for m in traj.get("messages") or []:
         msg = m.get("message", m) if isinstance(m, dict) else {}
         role = msg.get("role", "")
         content = msg.get("content", "")
         if isinstance(content, str):
             if content.strip():
-                out.append(f"[{role}] {content.strip()}")
+                if role == "user":
+                    _emit_user(content)
+                else:
+                    _emit(f"[{role}] {content.strip()}")
             continue
         if not isinstance(content, list):
             continue
@@ -1109,14 +1158,17 @@ def _condense_transcript_for_judge(traj: dict, limit: int | None = None) -> str:
                 continue
             t = b.get("type")
             if t == "text" and b.get("text", "").strip():
-                out.append(f"[{role}] {b['text'].strip()}")
+                if role == "user":
+                    _emit_user(b["text"])
+                else:
+                    _emit(f"[{role}] {b['text'].strip()}")
             elif t == "toolCall":
                 args = json.dumps(b.get("arguments", {}))
-                out.append(f"[{role}:tool] {b.get('name')} {args}")
+                _emit(f"[{role}:tool] {b.get('name')} {args}")
             elif t == "toolResult" or role == "toolResult":
                 txt = b.get("text") or b.get("content") or ""
                 if isinstance(txt, str) and txt.strip():
-                    out.append(f"[toolResult] {txt.strip()}")
+                    _emit(f"[toolResult] {txt.strip()}")
     # Emit a terminal-turn landmark on the last flattened entry so the judge (and
     # grading._budget_transcript's boundary-aware tail anchor) can locate the
     # final turn even when a boundary-aware evidence cut drops middle lines. The
@@ -1315,6 +1367,71 @@ def _turn_completion_verdict(task: dict, execution, interactive: bool) -> dict:
     return verdict
 
 
+def _user_turn_text(msg: Mapping[str, Any]) -> str:
+    """The user-authored text of a chat row — '' for rows that carry no user
+    message. OpenClaw records tool results as role='user' entries whose blocks
+    are all 'toolResult', so a bare role count is NOT a turn count."""
+    content = msg.get("content")
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, list):
+        for b in content:
+            if isinstance(b, dict) and b.get("type") == "text":
+                return (b.get("text") or "").strip()
+    return ""
+
+
+def _session_user_turn_audit(entries: Sequence[Any] | None,
+                             result: Mapping[str, Any] | None,
+                             task_id: str = "") -> dict:
+    """Count the user turns the SESSION actually recorded and compare it with
+    the schedule the harness dispatched.
+
+    The stall/empty retry re-sends a turn the session had already stored, which
+    used to leave two identical user rows — invisible in score.json while it
+    shifted the judge's turn count and the per-turn feedback anchor. The runner
+    now rolls the orphan row back, but the guard is best-effort (a probe that
+    cannot reach the container declines to truncate), so the count is verified
+    against the session rather than assumed from the retry markers.
+
+    turn_dedup_ok gates on an OVER-count only: an under-count is a short run,
+    already reported by run_incomplete, not a duplication defect."""
+    seen = 0
+    for e in entries or []:
+        if not isinstance(e, dict):
+            continue
+        msg = e.get("message", e)
+        if isinstance(msg, dict) and msg.get("role") == "user" and _user_turn_text(msg):
+            seen += 1
+    r = result or {}
+    try:
+        planned = r.get("turns_planned")
+        expected = int(planned) if planned is not None else None
+    except (TypeError, ValueError):
+        expected = None
+    if expected is not None and r.get("recovery_turn_fired"):
+        expected += 1
+    audit: dict[str, Any] = {
+        "session_user_turns": seen,
+        "turn_dedup_ok": expected is None or seen <= expected,
+    }
+    if expected is None:
+        return audit
+    audit["session_user_turns_expected"] = expected
+    if seen > expected:
+        logger.error(
+            "[%s] TURN DUPLICATION: session recorded %d user turns for a "
+            "%d-turn schedule (turns_duplicated=%s) — the judge transcript "
+            "and per-turn feedback are offset by %d",
+            task_id, seen, expected, list(r.get("turns_duplicated") or []),
+            seen - expected)
+    elif seen < expected and not r.get("run_incomplete"):
+        logger.error(
+            "[%s] TURN LOSS: session recorded %d user turns for a %d-turn "
+            "schedule though the run reported complete", task_id, seen, expected)
+    return audit
+
+
 def _augment_score_with_combined_rewards(scores: dict, result: dict) -> None:
     if not isinstance(scores, dict):
         return
@@ -1371,6 +1488,12 @@ def _augment_score_with_combined_rewards(scores: dict, result: dict) -> None:
             scores["turns_duplicated"] = list(r["turns_duplicated"])
         if r.get("turns_empty"):
             scores["turns_empty"] = list(r["turns_empty"])
+        # Session-side turn audit: turns_duplicated only says a retry FIRED;
+        # these two say whether the session ended up with the right number of
+        # user turns, which is what the judge and per-turn feedback read.
+        if r.get("session_user_turns") is not None:
+            scores["session_user_turns"] = r["session_user_turns"]
+            scores["turn_dedup_ok"] = bool(r.get("turn_dedup_ok", True))
 
 
 def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
@@ -1390,6 +1513,8 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
             entries.append(json.loads(line))
         except json.JSONDecodeError:
             continue
+
+    result.update(_session_user_turn_audit(entries, result, task.get("task_id", "")))
 
     st = StoreTask(
         id=task["task_id"], task_id=task["task_id"],
@@ -1572,7 +1697,8 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
         results_dir = _pick_evidence_dir(output_dir)
         try:
             from src.utils.grading import grade_with_rubric
-            transcript_text = _condense_transcript_for_judge(traj)
+            transcript_text = _condense_transcript_for_judge(
+                traj, turns_duplicated=result.get("turns_duplicated"))
             scores = grade_with_rubric(
                 rubrics,
                 task.get("task_description") or task.get("initial_prompt") or "",

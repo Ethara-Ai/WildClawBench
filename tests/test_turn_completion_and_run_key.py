@@ -624,6 +624,123 @@ class TestTurnsDuplicated:
         assert e["turns_duplicated"] == [2, 7]
 
 
+def _rb():
+    sys.path.insert(0, str(REPO / "eval"))
+    import run_batch as rb
+    return rb
+
+
+def _user_row(text):
+    return {"message": {"role": "user", "content": [{"type": "text", "text": text}]}}
+
+
+class TestSessionUserTurnAudit:
+    """turns_duplicated only records that a retry FIRED. The session itself is
+    the authority on whether a duplicate user turn actually landed — the judge
+    transcript and per-turn feedback both read the session, not the markers."""
+
+    def test_clean_run_is_ok(self):
+        rb = _rb()
+        entries = [_user_row("t1"), {"message": {"role": "assistant", "content": []}},
+                   _user_row("t2")]
+        audit = rb._session_user_turn_audit(
+            entries, {"turns_planned": 2, "turns_completed": 2})
+        assert audit == {"session_user_turns": 2, "turn_dedup_ok": True,
+                         "session_user_turns_expected": 2}
+
+    def test_duplicate_user_row_flagged(self, caplog):
+        rb = _rb()
+        entries = [_user_row("t1"), _user_row("t1"), _user_row("t2")]
+        with caplog.at_level("ERROR"):
+            audit = rb._session_user_turn_audit(
+                entries, {"turns_planned": 2, "turns_duplicated": [0]}, "task-x")
+        assert audit["session_user_turns"] == 3
+        assert audit["turn_dedup_ok"] is False
+        assert "TURN DUPLICATION" in caplog.text
+
+    def test_recovery_turn_raises_expected_count(self):
+        rb = _rb()
+        entries = [_user_row("t1"), _user_row("t2"), _user_row("synthesize")]
+        audit = rb._session_user_turn_audit(
+            entries, {"turns_planned": 2, "recovery_turn_fired": True})
+        assert audit["session_user_turns_expected"] == 3
+        assert audit["turn_dedup_ok"] is True
+
+    def test_tool_result_rows_are_not_user_turns(self):
+        # OpenClaw stores tool results as role='user' entries; counting the
+        # role alone would report a 2-turn run as dozens of turns.
+        rb = _rb()
+        entries = [
+            _user_row("t1"),
+            {"message": {"role": "user",
+                         "content": [{"type": "toolResult", "text": "ls out"}]}},
+            _user_row("t2"),
+        ]
+        audit = rb._session_user_turn_audit(entries, {"turns_planned": 2})
+        assert audit["session_user_turns"] == 2
+        assert audit["turn_dedup_ok"] is True
+
+    def test_short_run_is_not_a_dedup_failure(self, caplog):
+        # An under-count is a short run (run_incomplete already reports it),
+        # not a duplication defect.
+        rb = _rb()
+        with caplog.at_level("ERROR"):
+            audit = rb._session_user_turn_audit(
+                [_user_row("t1")],
+                {"turns_planned": 9, "run_incomplete": True})
+        assert audit["turn_dedup_ok"] is True
+        assert "TURN LOSS" not in caplog.text
+
+    def test_unexplained_turn_loss_logs_error(self, caplog):
+        rb = _rb()
+        with caplog.at_level("ERROR"):
+            rb._session_user_turn_audit(
+                [_user_row("t1")], {"turns_planned": 9, "run_incomplete": False})
+        assert "TURN LOSS" in caplog.text
+
+    def test_no_denominator_never_flags(self):
+        rb = _rb()
+        audit = rb._session_user_turn_audit(
+            [_user_row("t1"), _user_row("t1")], {"turns_planned": None})
+        assert audit == {"session_user_turns": 2, "turn_dedup_ok": True}
+
+    def test_malformed_entries_ignored(self):
+        rb = _rb()
+        audit = rb._session_user_turn_audit(
+            ["garbage", None, {"message": "not-a-dict"}, _user_row("t1")],
+            {"turns_planned": 1})
+        assert audit["session_user_turns"] == 1
+
+    def test_augment_stamps_audit_into_score(self):
+        rb = _rb()
+        scores = {"overall_score": 0.9}
+        rb._augment_score_with_combined_rewards(
+            scores, {"run_incomplete": False, "turns_planned": 9,
+                     "turns_completed": 9, "turns_duplicated": [6],
+                     "session_user_turns": 10, "turn_dedup_ok": False})
+        assert scores["session_user_turns"] == 10
+        assert scores["turn_dedup_ok"] is False
+
+    def test_augment_stamps_ok_audit(self):
+        rb = _rb()
+        scores = {"overall_score": 0.9}
+        rb._augment_score_with_combined_rewards(
+            scores, {"run_incomplete": False, "turns_planned": 9,
+                     "turns_completed": 9, "session_user_turns": 9,
+                     "turn_dedup_ok": True})
+        assert scores["session_user_turns"] == 9
+        assert scores["turn_dedup_ok"] is True
+
+    def test_augment_omits_audit_when_absent(self):
+        rb = _rb()
+        scores = {"overall_score": 0.9}
+        rb._augment_score_with_combined_rewards(
+            scores, {"run_incomplete": False, "turns_planned": 9,
+                     "turns_completed": 9})
+        assert "session_user_turns" not in scores
+        assert "turn_dedup_ok" not in scores
+
+
 class TestJudgeHardening:
     """2026-09-04 abstain wave: thinking-eats-cap (koji), refusal composition
     (ajax), evidence-size collapse (lena/kayla) — each fix pinned by test."""

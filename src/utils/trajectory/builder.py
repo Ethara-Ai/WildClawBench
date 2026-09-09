@@ -89,6 +89,7 @@ def _wrap_messages_with_turn_feedback(
     current_is_auto_hint = False
     current_auto_hint_iteration = 0
     turn_idx = 0
+    prev_user_text = ""
 
     for msg in messages:
         inner = msg.get("message", {})
@@ -112,7 +113,17 @@ def _wrap_messages_with_turn_feedback(
                     matched = True
                 elif user_text in expected or expected in user_text:
                     matched = True
-            if matched or user_text:
+            # A user row repeating the previous one is the harness re-sending
+            # a stalled turn, not a new turn: advancing here would shift every
+            # later turn's feedback onto the wrong message. Compared with the
+            # agent's timestamp prefix removed — that strip only runs at the
+            # end of build_trajectory_from_jsonl, and a stall retry is >=600s
+            # later, so the two copies never carry the same stamp.
+            bare_user_text = _TURN_TS_RE.sub("", user_text, count=1).strip()
+            duplicate_resend = bool(bare_user_text) and bare_user_text == prev_user_text
+            if bare_user_text:
+                prev_user_text = bare_user_text
+            if (matched or user_text) and not duplicate_resend:
                 current_accepted = turn_feedback[turn_idx][1]
                 current_hints = turn_feedback[turn_idx][2]
                 current_is_auto_hint = turn_feedback[turn_idx][3]

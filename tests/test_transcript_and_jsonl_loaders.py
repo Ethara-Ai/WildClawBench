@@ -733,6 +733,49 @@ def test_turn_feedback_auto_hint_flags_propagate() -> None:
     assert out[1]["auto_hint_iteration"] == 2
 
 
+def test_turn_feedback_duplicate_resend_does_not_advance_turn() -> None:
+    # A harness stall-retry re-sends the SAME user text; advancing on it would
+    # anchor turn 2's feedback to the duplicate and shift every later turn.
+    turns = [{"prompt": "t1", "hints": "h1"}, {"prompt": "t2", "hints": "h2"}]
+    msgs = [
+        _msg("user", [{"type": "text", "text": "t1"}]),
+        _msg("user", [{"type": "text", "text": "t1"}]),
+        _msg("assistant", []),
+        _msg("user", [{"type": "text", "text": "t2"}]),
+        _msg("assistant", []),
+    ]
+    out = bld._wrap_messages_with_turn_feedback(msgs, turns)
+    assert out[2]["hints"] == "h1"
+    assert out[4]["hints"] == "h2"
+
+
+def test_turn_feedback_duplicate_resend_ignores_timestamp_prefix() -> None:
+    # The strip runs later in build_trajectory_from_jsonl, so the two copies
+    # still carry their own (differing) agent stamps here.
+    turns = [{"prompt": "t1", "hints": "h1"}, {"prompt": "t2", "hints": "h2"}]
+    msgs = [
+        _msg("user", [{"type": "text", "text": "[Mon 2026-06-15 14:50 UTC] t1"}]),
+        _msg("user", [{"type": "text", "text": "[Mon 2026-06-15 15:05 UTC] t1"}]),
+        _msg("assistant", []),
+        _msg("user", [{"type": "text", "text": "[Mon 2026-06-15 15:20 UTC] t2"}]),
+        _msg("assistant", []),
+    ]
+    out = bld._wrap_messages_with_turn_feedback(msgs, turns)
+    assert out[2]["hints"] == "h1"
+    assert out[4]["hints"] == "h2"
+
+
+def test_turn_feedback_distinct_consecutive_user_turns_still_advance() -> None:
+    turns = [{"prompt": "t1", "hints": "h1"}, {"prompt": "t2", "hints": "h2"}]
+    msgs = [
+        _msg("user", [{"type": "text", "text": "t1"}]),
+        _msg("user", [{"type": "text", "text": "t2"}]),
+        _msg("assistant", []),
+    ]
+    out = bld._wrap_messages_with_turn_feedback(msgs, turns)
+    assert out[2]["hints"] == "h2"
+
+
 # --- _unwrap_trajectory_messages ------------------------------------------
 
 def test_unwrap_double_wrapped_and_assigns_turn_index() -> None:

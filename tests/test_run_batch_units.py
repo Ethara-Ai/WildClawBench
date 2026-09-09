@@ -612,7 +612,8 @@ class TestCondenseTranscript:
 
     def test_plain_string_content(self):
         traj = {"messages": [{"message": {"role": "user", "content": "hello"}}]}
-        assert _condense_transcript_for_judge(traj) == "[FINAL ASSISTANT MESSAGE] [user] hello"
+        assert _condense_transcript_for_judge(traj) == \
+            "[FINAL ASSISTANT MESSAGE] [user turn 1] hello"
 
     def test_text_block_content(self):
         traj = {
@@ -652,12 +653,13 @@ class TestCondenseTranscript:
         long = "x" * 5000
         traj = {"messages": [{"message": {"role": "user", "content": long}}]}
         out = _condense_transcript_for_judge(traj, limit=10)
-        assert out == f"[FINAL ASSISTANT MESSAGE] [user] {long}"
+        assert out == f"[FINAL ASSISTANT MESSAGE] [user turn 1] {long}"
 
     def test_message_without_wrapper(self):
         # entries where role/content live at top level (no `message` wrapper).
         traj = {"messages": [{"role": "user", "content": "top-level"}]}
-        assert _condense_transcript_for_judge(traj) == "[FINAL ASSISTANT MESSAGE] [user] top-level"
+        assert _condense_transcript_for_judge(traj) == \
+            "[FINAL ASSISTANT MESSAGE] [user turn 1] top-level"
 
     def test_landmark_only_on_last_entry(self):
         traj = {"messages": [
@@ -665,7 +667,7 @@ class TestCondenseTranscript:
             {"message": {"role": "assistant", "content": "final"}},
         ]}
         out = _condense_transcript_for_judge(traj)
-        assert out == "[user] first\n[FINAL ASSISTANT MESSAGE] [assistant] final"
+        assert out == "[user turn 1] first\n[FINAL ASSISTANT MESSAGE] [assistant] final"
 
     def test_submit_tool_landmark_when_ending_on_toolresult(self):
         traj = {"messages": [
@@ -674,6 +676,125 @@ class TestCondenseTranscript:
         ]}
         out = _condense_transcript_for_judge(traj)
         assert out.endswith("[SUBMIT TOOL OUTPUT] [toolResult] done")
+
+
+class TestCondenseUserTurnNumbering:
+    """Duplicate-resend fix: the judge must read turn ordinals off explicit
+    labels instead of counting '[user]' lines, and a harness re-send of a
+    stalled turn must not consume a second ordinal."""
+
+    def _lines(self, traj, **kw):
+        return _condense_transcript_for_judge(traj, **kw).splitlines()
+
+    def test_user_turns_numbered_in_order(self):
+        traj = {"messages": [
+            {"message": {"role": "user", "content": "t1"}},
+            {"message": {"role": "assistant", "content": "a1"}},
+            {"message": {"role": "user", "content": "t2"}},
+            {"message": {"role": "assistant", "content": "a2"}},
+        ]}
+        lines = self._lines(traj)
+        assert lines[0] == "[user turn 1] t1"
+        assert lines[2] == "[user turn 2] t2"
+
+    def test_identical_consecutive_user_rows_collapse(self):
+        traj = {"messages": [
+            {"message": {"role": "user", "content": "t1"}},
+            {"message": {"role": "assistant", "content": "a1"}},
+            {"message": {"role": "user", "content": "same turn"}},
+            {"message": {"role": "user", "content": "same turn"}},
+            {"message": {"role": "assistant", "content": "a2"}},
+        ]}
+        lines = self._lines(traj)
+        assert lines == [
+            "[user turn 1] t1",
+            "[assistant] a1",
+            "[user turn 2 — resent by harness after a stall; duplicate collapsed] same turn",
+            "[FINAL ASSISTANT MESSAGE] [assistant] a2",
+        ]
+
+    def test_collapse_survives_differing_timestamp_prefixes(self):
+        # The agent stamps each delivery with its own wall clock, and a stall
+        # retry lands >=600s later, so the two copies never match verbatim.
+        traj = {"messages": [
+            {"message": {"role": "user", "content": "[Mon 2026-06-15 14:50 UTC] do it"}},
+            {"message": {"role": "user", "content": "[Mon 2026-06-15 15:05 UTC] do it"}},
+        ]}
+        assert self._lines(traj) == [
+            "[FINAL ASSISTANT MESSAGE] [user turn 1 — resent by harness after "
+            "a stall; duplicate collapsed] do it",
+        ]
+
+    def test_distinct_consecutive_user_rows_kept(self):
+        traj = {"messages": [
+            {"message": {"role": "user", "content": "first ask"}},
+            {"message": {"role": "user", "content": "second ask"}},
+        ]}
+        assert self._lines(traj) == [
+            "[user turn 1] first ask",
+            "[FINAL ASSISTANT MESSAGE] [user turn 2] second ask",
+        ]
+
+    def test_repeat_after_agent_output_kept_without_hint(self):
+        # Content alone must not collapse a genuine repeat: the user really can
+        # ask the same thing twice after the agent replied.
+        traj = {"messages": [
+            {"message": {"role": "user", "content": "status?"}},
+            {"message": {"role": "assistant", "content": "working"}},
+            {"message": {"role": "user", "content": "status?"}},
+        ]}
+        assert self._lines(traj) == [
+            "[user turn 1] status?",
+            "[assistant] working",
+            "[FINAL ASSISTANT MESSAGE] [user turn 2] status?",
+        ]
+
+    def test_turns_duplicated_hint_collapses_across_aborted_output(self):
+        # The stalled attempt emitted partial output before it wedged, so the
+        # re-send is not adjacent; the runner's marker (0-based turn 0) says a
+        # retry fired there and the text confirms it.
+        traj = {"messages": [
+            {"message": {"role": "user", "content": "status?"}},
+            {"message": {"role": "assistant", "content": "working"}},
+            {"message": {"role": "user", "content": "status?"}},
+        ]}
+        assert self._lines(traj, turns_duplicated=[0]) == [
+            "[user turn 1 — resent by harness after a stall; duplicate collapsed] status?",
+            "[FINAL ASSISTANT MESSAGE] [assistant] working",
+        ]
+
+    def test_hint_for_other_turn_does_not_collapse(self):
+        traj = {"messages": [
+            {"message": {"role": "user", "content": "status?"}},
+            {"message": {"role": "assistant", "content": "working"}},
+            {"message": {"role": "user", "content": "status?"}},
+        ]}
+        assert self._lines(traj, turns_duplicated=[5])[-1] == \
+            "[FINAL ASSISTANT MESSAGE] [user turn 2] status?"
+
+    def test_tool_result_rows_do_not_consume_turn_numbers(self):
+        # OpenClaw records tool results as role='user' entries.
+        traj = {"messages": [
+            {"message": {"role": "user", "content": "t1"}},
+            {"message": {"role": "user", "content": [{"type": "toolResult", "text": "ls out"}]}},
+            {"message": {"role": "user", "content": "t2"}},
+        ]}
+        lines = self._lines(traj)
+        assert lines[0] == "[user turn 1] t1"
+        assert lines[1] == "[toolResult] ls out"
+        assert lines[2] == "[FINAL ASSISTANT MESSAGE] [user turn 2] t2"
+
+    def test_text_blocks_are_numbered_too(self):
+        traj = {"messages": [
+            {"message": {"role": "user", "content": [{"type": "text", "text": "block ask"}]}},
+        ]}
+        assert self._lines(traj) == ["[FINAL ASSISTANT MESSAGE] [user turn 1] block ask"]
+
+    def test_garbage_hint_values_ignored(self):
+        traj = {"messages": [{"message": {"role": "user", "content": "x"}}]}
+        assert self._lines(traj, turns_duplicated=["a", None, True]) == [
+            "[FINAL ASSISTANT MESSAGE] [user turn 1] x",
+        ]
 
 
 # ---------------------------------------------------------------------------

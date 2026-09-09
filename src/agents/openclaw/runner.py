@@ -286,6 +286,89 @@ class OpenClawAgent(BaseAgent):
             capture_output=True, text=True, timeout=30,
         )
 
+    # The session store the retry loop must not double-write into. Hard-coded
+    # to the same agent directory the stale-lock cleanup above already targets:
+    # the agent CLI runs as the container's root under the default "main" agent.
+    _SESSION_PATH = "/root/.openclaw/agents/main/sessions/chat.jsonl"
+
+    @classmethod
+    def _session_line_count(cls, task_id: str) -> int | None:
+        """Rows currently in the container's chat session, or None when the
+        count could NOT be established (no docker, exec failure, unparsable
+        output). A missing session file is 0, not None — turn 0 legitimately
+        runs before openclaw creates the file. The distinction is load-bearing:
+        _restore_session_to must never treat a failed probe as "was empty" and
+        truncate a live session. `-lc` is a login shell, so only the LAST
+        stdout line is the count."""
+        try:
+            r = subprocess.run(
+                ["docker", "exec", task_id, "/bin/bash", "-lc",
+                 f"[ -f {cls._SESSION_PATH} ] && "
+                 f"awk 'END{{print NR}}' {cls._SESSION_PATH} || echo 0"],
+                capture_output=True, text=True, timeout=30,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return None
+        if r.returncode != 0:
+            return None
+        try:
+            return int((r.stdout or "").strip().splitlines()[-1].strip())
+        except (IndexError, ValueError):
+            return None
+
+    @classmethod
+    def _restore_session_to(cls, task_id: str, lines_before: int | None,
+                            turn_index: int) -> None:
+        """Roll the session back to its pre-attempt state so a retry's re-send
+        is the only copy of that turn's user message.
+
+        openclaw persists the user message as soon as the turn starts, so an
+        aborted attempt (stalled+killed, or empty) leaves that row behind and
+        the retry appends an identical second one — six shipped runs recorded
+        two identical user rows (T14/T16/T19 x2), which shifts the judge's turn
+        count and the per-turn feedback anchor by one.
+
+        Inspection, never assumption: one observed run stalled twice and still
+        recorded 18/18 user turns (the retry ran embedded after a gateway
+        1008), so rows are removed ONLY when the live count actually exceeds
+        the pre-attempt snapshot. Must run after _terminate_agent_invocations
+        (kill + lock removal) so nothing is writing while we rewrite."""
+        if lines_before is None:
+            logger.warning(
+                "[%s] session-restore skipped for turn %d: pre-attempt line "
+                "count unknown — retry may duplicate the user message",
+                task_id, turn_index + 1)
+            return
+        now = cls._session_line_count(task_id)
+        if now is None or now <= lines_before:
+            logger.debug(
+                "[%s] session-restore: turn %d left no orphan rows "
+                "(before=%d after=%s)", task_id, turn_index + 1,
+                lines_before, now)
+            return
+        try:
+            r = subprocess.run(
+                ["docker", "exec", task_id, "/bin/bash", "-lc",
+                 f"head -n {int(lines_before)} {cls._SESSION_PATH} "
+                 f"> {cls._SESSION_PATH}.wcbtmp && "
+                 f"mv {cls._SESSION_PATH}.wcbtmp {cls._SESSION_PATH}"],
+                capture_output=True, text=True, timeout=30,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            logger.warning("[%s] session-restore failed for turn %d: %s",
+                           task_id, turn_index + 1, exc)
+            return
+        if r.returncode != 0:
+            logger.warning("[%s] session-restore failed for turn %d: %s",
+                           task_id, turn_index + 1,
+                           (r.stderr or "").strip()[:200])
+            return
+        logger.info(
+            "[%s] session-restore: dropped %d orphan row(s) from turn %d's "
+            "aborted attempt before re-send (before=%d stalled=%d after=%s)",
+            task_id, now - lines_before, turn_index + 1, lines_before, now,
+            cls._session_line_count(task_id))
+
     def _break_stuck_llm_connections(self, task_id: str) -> None:
         """Best-effort RST of the container's sockets to the sidecar so the
         gateway's silently dead in-flight request errors out. Requires
@@ -746,11 +829,12 @@ class OpenClawAgent(BaseAgent):
                 # A silently dead in-flight request wedges openclaw with no
                 # surfaced error (stochastic ~0.1%/request; killed 39 delivery
                 # runs + 3 repro runs). One stall-guarded retry of the SAME
-                # turn converts a lost run into a recovered turn. Retry may
-                # duplicate the user message in-session if the gateway kept
-                # the aborted exchange — accepted: better than a dead run. The
-                # turn deadline is shared across attempts so a stalled+retried
-                # turn never exceeds a single turn budget.
+                # turn converts a lost run into a recovered turn. The aborted
+                # attempt's orphaned user row is rolled back before the
+                # re-send (_restore_session_to), so a retry cannot leave two
+                # identical user turns in the session. The turn deadline is
+                # shared across attempts so a stalled+retried turn never
+                # exceeds a single turn budget.
                 outcome = "timeout"
                 turn_deadline = time.time() + spec.timeout_seconds
                 _run_key = self._run_keys.get(spec.task_id, "")
@@ -779,6 +863,14 @@ class OpenClawAgent(BaseAgent):
                             spec.timeout_seconds)
                 for turn_attempt in range(2):
                     attempt_budget = max(60, int(turn_deadline - time.time()))
+                    # Pre-attempt session snapshot for the rollback below.
+                    # Probed only when a retry is actually reachable: both
+                    # retry paths require _rows_guarded (stall detection and
+                    # empty detection are run-key features), so an unguarded
+                    # run pays no docker exec here.
+                    session_lines = (
+                        self._session_line_count(spec.task_id)
+                        if _rows_guarded and turn_attempt == 0 else None)
                     agent_proc = run_background(
                         spec.task_id,
                         bash_cmd=(
@@ -810,9 +902,10 @@ class OpenClawAgent(BaseAgent):
                         # the outer loop would re-fire before_turn injections
                         # and ClawMark stage mutations); a second empty means
                         # the route is dead: abort instead of laddering to
-                        # schedule end. The retry re-sends a message whose
-                        # empty exchange the session already recorded, so the
-                        # turn is also logged in turns_duplicated.
+                        # schedule end. The empty exchange the session already
+                        # recorded is rolled back before the re-send;
+                        # turns_duplicated stays as the "a retry fired here"
+                        # marker, no longer a claim that a duplicate exists.
                         if _rows_guarded and self._empty_turn_limit() > 0:
                             succ_now = self._count_run_key_rows(
                                 _run_key, successes_only=True)
@@ -824,6 +917,8 @@ class OpenClawAgent(BaseAgent):
                                         "successful LLM traffic) — retrying "
                                         "the same turn once",
                                         spec.task_id, turn_index + 1)
+                                    self._restore_session_to(
+                                        spec.task_id, session_lines, turn_index)
                                     turns_duplicated.append(turn_index)
                                     continue
                                 outcome = "empty"
@@ -849,6 +944,10 @@ class OpenClawAgent(BaseAgent):
                         self._terminate_agent_invocations(spec.task_id)
                         agent_proc.kill()
                         agent_proc.wait()
+                        # After the kill + lock removal: nothing is writing,
+                        # so the orphaned user row can be rolled back safely.
+                        self._restore_session_to(
+                            spec.task_id, session_lines, turn_index)
                         turns_duplicated.append(turn_index)
                         continue
                     logger.warning("[%s] Agent turn %d %s", spec.task_id,
