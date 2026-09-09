@@ -1,7 +1,7 @@
 ---
 name: audio-extract
 description: Extract a 16kHz mono WAV audio track from any media file, probe metadata, and transcribe speech to text via the harness-provided LiteLLM sidecar (no internet required from inside the agent container).
-metadata: {"clawdbot":{"emoji":"🎧","requires":{"bins":["ffmpeg","ffprobe","curl"],"env":["WCB_AUDIO_TRANSCRIBE_URL","WCB_AUDIO_TRANSCRIBE_AUTH"]},"install":[{"id":"brew","kind":"brew","formula":"ffmpeg","bins":["ffmpeg"],"label":"Install ffmpeg (brew)"}]}}
+metadata: {"clawdbot":{"emoji":"🎧","requires":{"bins":["ffmpeg","ffprobe","curl"]},"install":[{"id":"brew","kind":"brew","formula":"ffmpeg","bins":["ffmpeg"],"label":"Install ffmpeg (brew)"}]}}
 ---
 
 # Audio Extract & Transcribe
@@ -64,14 +64,16 @@ curl -s --fail \
   "$WCB_AUDIO_TRANSCRIBE_URL"
 ```
 
-If `WCB_AUDIO_TRANSCRIBE_URL` is unset, `transcribe.sh` will print a clear
-error and exit non-zero. That means the harness did not wire the sidecar
-URL (a configuration regression — flag it in your final answer rather than
-silently dropping the audio content).
+If `WCB_AUDIO_TRANSCRIBE_URL` is unset, the harness deliberately did not
+wire a sidecar route — that happens when the run's LiteLLM config has no
+`whisper-1` model registered (e.g. a Bedrock-only profile with no whisper
+key). `transcribe.sh` then uses the local Whisper fallback below
+automatically. It only errors out if that fallback is also unavailable.
 
 If the POST itself fails (network error, sidecar down, HTTP 4xx/5xx),
-`transcribe.sh` prints the curl error and the response body, then exits
-non-zero. Common causes:
+`transcribe.sh` prints the curl error and the response body, then falls
+back to local Whisper; with no fallback available it exits non-zero.
+Common causes:
 
 - `Could not resolve host` — sidecar container name is unreachable from
   this agent container. The bridge network was not created or the sidecar
@@ -82,23 +84,16 @@ non-zero. Common causes:
 - `HTTP 400 Invalid model name` — the sidecar config did not register
   `whisper-1`. Treat as a harness bug.
 
-## Fallback: local Whisper (only if the sidecar route is unavailable)
+## Fallback: local Whisper (automatic when the sidecar route is unavailable)
 
-There are two `whisper` skills shipped inside the openclaw runtime
-(`openai-whisper`, `openai-whisper-api`) but **neither works in this
-sandbox**:
+The `openai-whisper` Python package and its `small` model weights are baked
+into the agent image at `/opt/wb_whisper_models`, so transcription works
+with no network and no sidecar. `transcribe.sh` takes this path on its own
+whenever the sidecar URL is unset or the POST fails — you do not need to
+invoke it manually. It is slower than the sidecar (CPU inference), so the
+sidecar stays the preferred route when registered.
 
-- `openai-whisper` wants the `whisper` CLI binary, which is not installed
-  in `wildclawbench-ubuntu:v1.3` and cannot be pip-installed (no
-  internet).
-- `openai-whisper-api` wants `OPENAI_API_KEY` plus a direct HTTPS call to
-  `api.openai.com`, neither of which is available in the agent
-  container.
-
-If you encounter a run where the primary sidecar route fails AND the
-harness has staged a local Whisper wheelhouse + model weights (look for
-`/opt/wb_whisper_models/` and a `whisper` import that succeeds), then
-local transcription is possible:
+To run it directly against a WAV you already have:
 
 ```python
 import whisper
@@ -106,15 +101,25 @@ model = whisper.load_model("small", download_root="/opt/wb_whisper_models")
 print(model.transcribe("/path/to/audio.wav")["text"])
 ```
 
-This is a contingency path. The supported route is the sidecar.
+The two `whisper` skills shipped inside the openclaw runtime remain
+unusable here, so prefer `transcribe.sh` over both:
+
+- `openai-whisper` wants the `whisper` CLI binary, which is not on `PATH`
+  (the package is importable from Python, but the CLI is not installed).
+- `openai-whisper-api` wants `OPENAI_API_KEY` plus a direct HTTPS call to
+  `api.openai.com`, neither of which is available in the agent
+  container.
 
 ## Requires
 
 - `ffmpeg`, `ffprobe` — installed in the image. Used by both
   `extract.sh` and `transcribe.sh`.
 - `curl` — installed in the image. Used by `transcribe.sh`.
-- `WCB_AUDIO_TRANSCRIBE_URL` — exported into the agent container by the
-  harness at startup; points at the in-cluster LiteLLM sidecar's
+- `WCB_AUDIO_TRANSCRIBE_URL` — optional; exported into the agent container
+  by the harness at startup when the run's LiteLLM config registers
+  `whisper-1`. Points at the in-cluster sidecar's
   `/v1/audio/transcriptions` endpoint.
-- `WCB_AUDIO_TRANSCRIBE_AUTH` — exported into the agent container by the
-  harness at startup; bearer token for the sidecar's master_key auth.
+- `WCB_AUDIO_TRANSCRIBE_AUTH` — optional; exported alongside the URL above;
+  bearer token for the sidecar's master_key auth.
+- `/opt/wb_whisper_models` — local Whisper weights baked into the image.
+  Used automatically when the sidecar route is absent or failing.

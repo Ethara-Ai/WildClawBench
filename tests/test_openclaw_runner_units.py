@@ -83,6 +83,23 @@ def rec_run(monkeypatch):
     return r
 
 
+# litellm_config_yaml holds the YAML *content* (run_batch.py passes the string
+# returned by build_litellm_config_yaml, not a path), so the audio-env gate can
+# substring-match the registered model list.
+_YAML_WITH_WHISPER = (
+    "model_list:\n"
+    "  - model_name: whisper-1\n"
+    "    litellm_params:\n"
+    "      model: openai/whisper-1\n"
+)
+_YAML_NO_WHISPER = (
+    "model_list:\n"
+    "  - model_name: claude-opus-4.7\n"
+    "    litellm_params:\n"
+    "      model: bedrock/invoke/anthropic.claude-opus-4-7\n"
+)
+
+
 def _bare_agent(**overrides):
     """Construct an OpenClawAgent without touching os.environ side effects
     beyond what __init__ needs. Callers override litellm_* to select branch."""
@@ -733,7 +750,7 @@ class TestRunTaskHappyPath:
 
     def test_litellm_mode_wires_anthropic_base_url_env(self, monkeypatch, tmp_path):
         a = _bare_agent(
-            litellm_config_yaml="/x.yaml",
+            litellm_config_yaml=_YAML_WITH_WHISPER,
             litellm_container_name="ll",
             litellm_port=4000,
             litellm_master_key="mk",
@@ -772,7 +789,7 @@ class TestRunTaskHappyPath:
 
     def test_non_claude_model_skips_anthropic_env_overrides(self, monkeypatch, tmp_path):
         a = _bare_agent(
-            litellm_config_yaml="/x.yaml",
+            litellm_config_yaml=_YAML_WITH_WHISPER,
             litellm_container_name="ll",
             litellm_master_key="mk",
         )
@@ -798,6 +815,47 @@ class TestRunTaskHappyPath:
         # audio env still set (litellm mode) but NO anthropic overrides for gpt
         assert "WCB_AUDIO_TRANSCRIBE_URL" in env
         assert "ANTHROPIC_BASE_URL" not in env
+
+    def test_audio_env_omitted_when_yaml_registers_no_whisper_route(
+        self, monkeypatch, tmp_path
+    ):
+        """A sidecar existing does NOT imply a transcription route.
+
+        Bedrock-only / OAuth / Codex profiles with no OpenAI or whisper key emit
+        YAML without a whisper-1 block. Advertising the URL anyway pointed the
+        audio-extract skill at a route that answers 400 "Invalid model name";
+        leaving it unset is the signal to use the skill's local-whisper fallback.
+        """
+        a = _bare_agent(
+            litellm_config_yaml=_YAML_NO_WHISPER,
+            litellm_container_name="ll",
+            litellm_port=4000,
+            litellm_master_key="mk",
+        )
+        captured = {}
+        monkeypatch.setattr(ocr, "start_container", lambda tid, ep, **kw: captured.update(kw))
+        for name in (
+            "inject_lobster_workspace", "inject_data_into_workspace",
+            "inject_persona_into_workspace", "inject_openclaw_models",
+            "inject_api_connectors", "run_warmup", "setup_skills",
+            "setup_workspace", "snapshot_workspace_state",
+        ):
+            monkeypatch.setattr(ocr, name, lambda *a2, **k2: None)
+        procs = iter([_FakeProc(), _FakeProc()])
+        monkeypatch.setattr(ocr, "run_background", lambda *a2, **k2: next(procs))
+        monkeypatch.setattr(ocr.time, "sleep", lambda *a2, **k2: None)
+        monkeypatch.setattr(ocr.time, "perf_counter", lambda: 0.0)
+        monkeypatch.setattr(ocr.time, "time", lambda: 1.0)
+        self._stub_agent_methods(monkeypatch, a)
+
+        spec = _make_spec(tmp_path, model="claude-opus-4.7")
+        a.run_task(spec)
+        env = captured["extra_env_dict"]
+        assert "WCB_AUDIO_TRANSCRIBE_URL" not in env
+        assert "WCB_AUDIO_TRANSCRIBE_AUTH" not in env
+        # The rest of the litellm-mode wiring is untouched by the audio gate.
+        assert env["ANTHROPIC_BASE_URL"] == "http://ll:4000"
+        assert env["WILDCLAW_MODEL"] == "claude-opus-4.7"
 
     def test_agent_timeout_kills_process(self, monkeypatch, tmp_path):
         a = _bare_agent()

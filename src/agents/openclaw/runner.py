@@ -397,13 +397,14 @@ class OpenClawAgent(BaseAgent):
 
             # WCB_AUDIO_TRANSCRIBE_URL points the audio-extract skill at the
             # in-cluster LiteLLM sidecar's /v1/audio/transcriptions endpoint
-            # (litellm_sidecar.py:142-170 registers whisper-1 there). The
-            # agent container has no internet egress under the --internal
-            # bridge, so this URL is the only working transcription path;
-            # without it the agent silently drops audio inputs (see
-            # ruth_flynn trajectory 925303a7-0a9d-40be-86b4-51da4d6e6544
-            # turns 41-57 where every fallback - whisper CLI, pip install,
-            # OPENAI_API_KEY env probe - failed in turn).
+            # (litellm_sidecar.py:330-367 registers whisper-1 there, gated on
+            # an OpenAI chat OR whisper key). The agent container has no
+            # internet egress under the --internal bridge, so this URL is the
+            # preferred transcription path; without it the agent silently
+            # drops audio inputs (see ruth_flynn trajectory
+            # 925303a7-0a9d-40be-86b4-51da4d6e6544 turns 41-57 where every
+            # fallback - whisper CLI, pip install, OPENAI_API_KEY env probe -
+            # failed in turn).
             extra_env_dict = dict(spec.task.get("env_dict") or {})
             # WCB_RUN_KEY lets in-container helpers we control (subagent
             # director, audio-extract skill) tag their sidecar requests via the
@@ -418,15 +419,23 @@ class OpenClawAgent(BaseAgent):
             # tests/test_subagent_model_parity.py.
             extra_env_dict["WILDCLAW_MODEL"] = spec.model
             if self.litellm_config_yaml and self.litellm_container_name:
-                extra_env_dict.setdefault(
-                    "WCB_AUDIO_TRANSCRIBE_URL",
-                    f"http://{self.litellm_container_name}:{self.litellm_port}"
-                    f"/v1/audio/transcriptions",
-                )
-                extra_env_dict.setdefault(
-                    "WCB_AUDIO_TRANSCRIBE_AUTH",
-                    self._agent_bearer(spec.task_id),
-                )
+                # Advertise the route ONLY when the sidecar actually serves it.
+                # A sidecar existing does not imply a transcription route: on a
+                # Bedrock-only / OAuth / Codex-bridge profile with no whisper
+                # key the yaml carries no whisper-1 block, and handing the skill
+                # a URL that 400s "Invalid model name" is worse than handing it
+                # nothing - unset is the signal to use its local-whisper
+                # fallback (environment/skills/audio-extract).
+                if "model_name: whisper-1" in self.litellm_config_yaml:
+                    extra_env_dict.setdefault(
+                        "WCB_AUDIO_TRANSCRIBE_URL",
+                        f"http://{self.litellm_container_name}:{self.litellm_port}"
+                        f"/v1/audio/transcriptions",
+                    )
+                    extra_env_dict.setdefault(
+                        "WCB_AUDIO_TRANSCRIBE_AUTH",
+                        self._agent_bearer(spec.task_id),
+                    )
                 # openclaw's Anthropic-messages SDK client ignores the per-provider
                 # baseUrl in openclaw.json for provider_key 'anthropic' and dials
                 # api.anthropic.com directly, bypassing the litellm sidecar +

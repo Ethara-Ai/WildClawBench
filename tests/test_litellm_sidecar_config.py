@@ -367,6 +367,37 @@ class TestOpenAIBranch:
         for fid in ("gpt-4o-mini-transcribe", "gpt-4o-transcribe"):
             assert _params(doc, fid)["model"] == "openai/whisper-1"
 
+    def test_whisper_key_alone_registers_audio_routes_without_chat_key(self):
+        """A whisper-only key MUST still yield a transcription route.
+
+        Regression pin: the audio block used to live inside `if openai_api_key:`,
+        so a Bedrock-only / OAuth / Codex-bridge profile carrying only
+        KENSEI_OPENAI_WHISPER_API_KEY emitted YAML with NO whisper-1 model. Every
+        agent POST to /v1/audio/transcriptions then 400'd "Invalid model name"
+        despite a perfectly usable whisper key being present in the env.
+        """
+        doc = _parse(
+            sidecar.build_litellm_config_yaml(
+                bedrock_arn="arn:x", openai_api_key="", openai_whisper_api_key="sk-whis"
+            )
+        )
+        for mid in ("whisper-1", "gpt-4o-mini-transcribe", "gpt-4o-transcribe"):
+            assert _params(doc, mid)["model"] == "openai/whisper-1"
+            assert _params(doc, mid)["api_key"] == "os.environ/OPENAI_API_KEY_WHISPER"
+        # The chat-only route stays gated on the chat key.
+        assert _block(doc, "gpt-5.5") is None
+
+    def test_no_openai_key_of_either_kind_registers_no_audio_route(self):
+        """Bedrock-only with NO whisper key must NOT advertise a dead route.
+
+        Pairs with runner.py's `model_name: whisper-1` gate: no route in the YAML
+        means no WCB_AUDIO_TRANSCRIBE_URL, which routes the audio-extract skill
+        to its local-whisper fallback instead of a guaranteed 400.
+        """
+        doc = _parse(sidecar.build_litellm_config_yaml(bedrock_arn="arn:x"))
+        for mid in ("whisper-1", "gpt-4o-mini-transcribe", "gpt-4o-transcribe"):
+            assert _block(doc, mid) is None
+
     def test_openai_image_alias_prefers_gpt55(self):
         # When OpenAI is configured the image-fallback ids alias to gpt-5.5
         # (OpenAI preferred over Bedrock).

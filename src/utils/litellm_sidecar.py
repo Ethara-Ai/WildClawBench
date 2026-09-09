@@ -327,6 +327,15 @@ def build_litellm_config_yaml(
             "      input_cost_per_token: 0.000005\n"
             "      output_cost_per_token: 0.00003"
         )
+    # AUDIO ROUTE: gated on EITHER key, deliberately OUTSIDE the chat-key
+    # branch above (same shape as the PROVIDER ISOLATION note earlier).
+    # Transcription is orthogonal to the chat provider: a Bedrock-only /
+    # OAuth / Codex-bridge run has no openai_api_key but may still carry
+    # KENSEI_OPENAI_WHISPER_API_KEY (config.py:214 -> OPENAI_API_KEY_WHISPER
+    # via start_litellm). While this block sat under `if openai_api_key:`
+    # those profiles emitted yaml with NO transcription route, so every agent
+    # POST to /v1/audio/transcriptions 400'd despite a usable whisper key.
+    if openai_api_key or openai_whisper_api_key:
         # Without this, /v1/audio/transcriptions returns HTTP 400 "Invalid
         # model name passed in model=whisper-1" (see failure report §6a) and
         # the agent burns its budget on broken pip-install whisper fallbacks.
