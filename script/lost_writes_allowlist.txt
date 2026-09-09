@@ -1,0 +1,51 @@
+# Verified-intentional findings for script/check_lost_writes.py.
+#
+# Format:  <api>::<METHOD> <path>[::<FINDING>]
+# Omitting ::<FINDING> silences every finding on that route; every entry below
+# is scoped to a single finding on purpose, so a NEW defect class appearing on
+# an allowlisted route still surfaces.
+#
+# Everything here is the same shape: a vendor whose real API models a READ as a
+# POST (because the query is too large or too private for a query string). These
+# handlers legitimately accept a body, persist nothing, and return a projection
+# of seed data. Adding a route here is a claim that a human read the handler and
+# confirmed there is no state the caller expects to survive the call -- do not
+# allowlist a route merely to quiet the scan.
+
+# Plaid's entire public surface is POST-only; all four are pure reads.
+plaid-api::POST /accounts/get::NO_STORE_WRITE
+plaid-api::POST /accounts/balance/get::NO_STORE_WRITE
+plaid-api::POST /identity/get::NO_STORE_WRITE
+plaid-api::POST /institutions/get_by_id::NO_STORE_WRITE
+plaid-api::POST /transactions/get::NO_STORE_WRITE
+
+# Dropbox RPC endpoints are POST-only; these six are the read half of it.
+dropbox-api::POST /2/files/download::NO_STORE_WRITE
+dropbox-api::POST /2/files/get_metadata::NO_STORE_WRITE
+dropbox-api::POST /2/files/list_folder::NO_STORE_WRITE
+dropbox-api::POST /2/files/search_v2::NO_STORE_WRITE
+dropbox-api::POST /2/sharing/list_shared_links::NO_STORE_WRITE
+dropbox-api::POST /2/users/get_current_account::NO_STORE_WRITE
+
+# Search / query endpoints: body is the query, result is a projection.
+algolia-api::POST /1/indexes/{index}/query::NO_STORE_WRITE
+notion-api::POST /v1/search::NO_STORE_WRITE
+notion-api::POST /v1/databases/{database_id}/query::NO_STORE_WRITE
+
+# Quote / rate / availability calculators: derive a price, store nothing.
+amadeus-api::POST /v1/shopping/flight-offers/pricing::NO_STORE_WRITE
+fedex-api::POST /rate/v1/rates/quotes::NO_STORE_WRITE
+fedex-api::POST /track/v1/trackingnumbers::NO_STORE_WRITE
+ups-api::POST /api/rating/v1/Rate::NO_STORE_WRITE
+google-calendar-api::POST /calendar/v3/freeBusy::NO_STORE_WRITE
+
+# Identity / balance / flag reads that the vendor exposes as POST.
+kraken-api::POST /0/private/Balance::NO_STORE_WRITE
+slack-api::POST /api/auth.test::NO_STORE_WRITE
+posthog-api::POST /decide::NO_STORE_WRITE
+
+# GA4 report queries: the body is the report definition, the response is derived
+# from seed event rows. Nothing about the query is meant to outlive the call.
+google-analytics-api::POST /v1beta/properties/{property_id}:runReport::NO_STORE_WRITE
+google-analytics-api::POST /v1beta/properties/{property_id}:runRealtimeReport::NO_STORE_WRITE
+google-analytics-api::POST /v1beta/properties/{property_id}:batchRunReports::NO_STORE_WRITE
