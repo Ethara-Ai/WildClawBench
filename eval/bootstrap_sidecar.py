@@ -186,6 +186,7 @@ def main() -> int:
         bedrock_sonnet_arn=config.bedrock_sonnet_arn if config.aws_bearer_token else "",
         bedrock_arn=config.bedrock_inference_arn if config.aws_bearer_token else "",
         aws_region=config.bedrock_region,
+        gpt56_bedrock_region=config.gpt56_bedrock_region,
         openai_api_key=config.openai_api_key,
         openai_whisper_api_key=config.openai_whisper_api_key,
         enable_usage_callback=True,

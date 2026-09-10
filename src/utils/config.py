@@ -41,6 +41,15 @@ class Config:
     bedrock_sonnet_arn: str = ""
     bedrock_region: str = "ap-south-1"
     aws_bearer_token: str = ""
+    # Region for the OpenAI-family Bedrock route (bedrock_mantle / gpt-5.6-sol).
+    # DELIBERATELY SEPARATE from bedrock_region: `bedrock_region` is the Anthropic
+    # (Converse/Invoke) region for the opus + sonnet inference profiles and is
+    # ap-south-1 here, but per the AWS model card the BARE `openai.gpt-5.6-sol` id
+    # is only served in-region in us-east-1 / us-east-2 -- ap-south-1 offers it via
+    # Global CRIS only, and the CRIS id (`global.openai...`) silently degrades off
+    # the /openai/v1/responses base path. So this route needs its own us-* region.
+    # Same bearer token (aws_bearer_token -> AWS_BEARER_TOKEN_BEDROCK); no new creds.
+    gpt56_bedrock_region: str = "us-east-2"
 
     # ---- S3 (trajectory media upload) ----
     s3_bucket: str = ""
@@ -240,6 +249,9 @@ class Config:
             bedrock_inference_arn=s("KENSEI_BEDROCK_MODEL_ARN", "KENSEI2_BEDROCK_MODEL_ARN", "BEDROCK_MODEL_ARN"),
             bedrock_sonnet_arn=s("KENSEI_BEDROCK_SONNET_ARN", "BEDROCK_SONNET_ARN"),
             bedrock_region=s("KENSEI_AWS_REGION", "AWS_REGION", default="ap-south-1"),
+            gpt56_bedrock_region=s(
+                "KENSEI_GPT56_BEDROCK_REGION", "KENSEI_BEDROCK_GPT_REGION", default="us-east-2"
+            ),
             aws_bearer_token=s("KENSEI_AWS_BEARER_TOKEN", "AWS_BEARER_TOKEN_BEDROCK"),
             s3_bucket=s("S3_BUCKET"),
             s3_prefix=s("S3_PREFIX", default="WildClaw"),

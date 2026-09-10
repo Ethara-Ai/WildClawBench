@@ -22,10 +22,43 @@ LITELLM_IMAGE = "ghcr.io/berriai/litellm@sha256:c98c9395c56a35b7abacff8269d43ff9
 LITELLM_INTERNAL_PORT = 4000
 LITELLM_HEADROOM_IMAGE = "wildclawbench-litellm-headroom:v2"
 
+# --- Bedrock Mantle (Bedrock's native OpenAI-compatible surface) -------------
+#
+# `bedrock_mantle/` is a self-contained LiteLLM provider: it derives its own
+# endpoint (https://bedrock-mantle.<region>.api.aws/openai/v1/responses for ids
+# carrying `use_openai_responses_path` in the price map) and authenticates with
+# AWS_BEARER_TOKEN_BEDROCK, the SAME bearer this fork already uses for the
+# Anthropic Bedrock routes. Verified against litellm 1.95.0.
+#
+# INVARIANT (see the "Opus traffic NEVER reaches public Anthropic transport"
+# comment below, src/utils/AGENTS.md): this provider is registered for the
+# OPENAI family ONLY. `bedrock_mantle/anthropic.*` must NEVER be registered
+# here. Anthropic-on-Bedrock traffic is routed through the audited
+# Converse/Invoke blocks (`bedrock/...` + `model_id:` ARN + thinking/cachePoint
+# wiring); smuggling a claude id onto the Mantle OpenAI surface would bypass
+# that wiring — no adaptive-thinking shape, no cache_control injection, no ARN
+# inference-profile pinning — i.e. an unaudited second Anthropic transport.
+BEDROCK_MANTLE_GPT56_MODEL = "bedrock_mantle/openai.gpt-5.6-sol"
+BEDROCK_MANTLE_ALLOWED_PREFIX = "bedrock_mantle/openai."
+
+
+def _mantle_route_openai_family_only(model: str) -> str:
+    """Return *model* unchanged, or raise if it is not an OpenAI-family Mantle id."""
+    if not model.startswith(BEDROCK_MANTLE_ALLOWED_PREFIX):
+        raise RuntimeError(
+            f"refusing to register {model!r} on the bedrock_mantle provider: only "
+            f"{BEDROCK_MANTLE_ALLOWED_PREFIX}* ids are allowed. Routing Anthropic "
+            "through bedrock_mantle would bypass the Bedrock Converse/Invoke "
+            "wiring (thinking shape, cache_control injection, inference-profile "
+            "ARN) and stand up an unaudited second Anthropic transport."
+        )
+    return model
+
 
 def build_litellm_config_yaml(
     bedrock_arn: str = "",
     aws_region: str = "ap-south-1",
+    gpt56_bedrock_region: str = "us-east-2",
     openai_api_key: str = "",
     bedrock_sonnet_arn: str = "",
     enable_usage_callback: bool = False,
@@ -301,6 +334,61 @@ def build_litellm_config_yaml(
             # ($3.75/MTok). Same rationale as Opus above.
             "      cache_read_input_token_cost: 0.0000003\n"
             "      cache_creation_input_token_cost: 0.00000375"
+        )
+    # OpenAI gpt-5.6-sol via Bedrock's native OpenAI surface (bedrock_mantle).
+    #
+    # Gated identically to the Bedrock opus route (`bedrock_arn`, which both
+    # callers already zero when the bearer token is absent) plus the same
+    # provider-isolation guard the sonnet block uses, so a Bedrock-only model
+    # never appears on an OAuth run. `auth_provider.served_trajectory_models`
+    # mirrors this gate exactly; tests/test_auth_provider.py pins the two equal.
+    #
+    # Shape notes (all deliberate, do NOT "harmonize" with the blocks above):
+    #  * `bedrock_mantle/openai.gpt-5.6-sol` is the whole routing decision — the
+    #    provider derives its own endpoint from aws_region_name and reads the
+    #    bearer from AWS_BEARER_TOKEN_BEDROCK. Hence NO api_base, NO api_key, and
+    #    NO `model:`/`model_id:` ARN split (that split exists only so Anthropic
+    #    Converse/Invoke thinking detection can substring-match a recognizable
+    #    name; there is no ARN and no thinking shape on this route).
+    #  * BARE id, never the CRIS form (`us.openai...` / `global.openai...`). The
+    #    /openai/v1 base path is selected from the price-map
+    #    `use_openai_responses_path` flag keyed on the exact `bedrock_mantle/<id>`
+    #    string; a CRIS id misses that key and silently degrades to /v1
+    #    chat-completions emulation instead of the native Responses surface.
+    #  * NOT the `openai/responses/` prefix used by the gpt-5.5 and codex-bridge
+    #    blocks — that is the metered-OpenAI / ChatGPT-subscription transport.
+    #  * NO thinking / output_config / cache_control_injection_points: those are
+    #    Anthropic-Converse-only and Bedrock 400s them elsewhere.
+    #  * Region is its OWN var, NOT the shared `aws_region` (ap-south-1 here):
+    #    the bare id is served in-region only in us-east-1 / us-east-2, while
+    #    ap-south-1 is Global-CRIS-only. See Config.gpt56_bedrock_region.
+    #  * `additional_drop_params: [top_p, temperature]`: gpt-5.6 rejects BOTH
+    #    temperature and top_p on presence with a 400. `drop_params: true` is a
+    #    NO-OP for this trap: LiteLLM's bedrock_mantle param map lists temperature
+    #    AND top_p as *supported*, and drop_params only strips params a provider
+    #    lists as unsupported (verified litellm 1.95.0: get_optional_params with
+    #    drop_params=True returns both verbatim). So the explicit additional list
+    #    is the ONLY thing that closes both holes — same trap AGENTS.md #18 flags
+    #    for the Sonnet-5 judge, and the sibling codex bridge strips both too
+    #    (codex_oauth/bridge.py). drop_params stays true for other unsupported
+    #    params the agent might emit.
+    #  * `not codex_bridge_url`: the codex-bridge block registers this SAME
+    #    model_name (codex_model defaults to gpt-5.6-sol). Two deployments under
+    #    one model_name would make LiteLLM load-balance a metered Bedrock route
+    #    against a subscription route at random. The explicit opt-in wins.
+    if bedrock_arn and auth_provider != "oauth" and not codex_bridge_url:
+        model_blocks.append(
+            "  - model_name: gpt-5.6-sol\n"
+            "    litellm_params:\n"
+            f"      model: {_mantle_route_openai_family_only(BEDROCK_MANTLE_GPT56_MODEL)}\n"
+            f"      aws_region_name: {gpt56_bedrock_region or 'us-east-2'}\n"
+            "      drop_params: true\n"
+            "      additional_drop_params: [\"top_p\", \"temperature\"]\n"
+            "      stream_options:\n"
+            "        include_usage: true\n"
+            # AWS model card, short-context tier: $4.40 / $22.00 per MTok.
+            "      input_cost_per_token: 0.0000044\n"
+            "      output_cost_per_token: 0.000022"
         )
     if openai_api_key:
         # The dict `reasoning_effort: {effort, summary}` shape is a Responses

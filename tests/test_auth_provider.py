@@ -288,6 +288,34 @@ class TestServedTrajectoryModels:
             auth_provider=BEDROCK,
         )
 
+    def test_codex_oauth_with_bedrock_and_custom_model_no_false_accept(self):
+        from src.utils.litellm_sidecar import build_litellm_config_yaml
+
+        custom = "gpt-5.6-sol-2026-04-23"
+        cfg = _cfg(
+            aws_bearer_token="t",
+            bedrock_inference_arn="arn:o",
+            use_codex_oauth=True,
+            codex_model=custom,
+        )
+        served = served_trajectory_models(BEDROCK, cfg)
+        emitted = set(
+            re.findall(
+                r"^\s*-\s*model_name:\s*(\S+)",
+                build_litellm_config_yaml(
+                    bedrock_arn="arn:o",
+                    codex_bridge_url="http://codex-bridge:8766",
+                    codex_model=custom,
+                    auth_provider=BEDROCK,
+                ),
+                re.M,
+            )
+        )
+        assert custom in served
+        assert custom in emitted
+        assert "gpt-5.6-sol" not in served
+        assert "gpt-5.6-sol" not in emitted
+
 
 class TestValidateModelForProvider:
     def test_accepts_served_model(self):

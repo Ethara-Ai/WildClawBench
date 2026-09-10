@@ -315,6 +315,20 @@ def served_trajectory_models(provider: str, config: Any) -> set[str]:
             models.update({"claude-opus-5", "claude-opus-4.7", "claude-opus-4-6"})
         if sonnet_arn:
             models.add("claude-sonnet-4-6")
+        # bedrock_mantle route (litellm_sidecar.py, gpt-5.6-sol block): OpenAI's
+        # gpt-5.6-sol on Bedrock's native OpenAI surface, reusing the SAME bearer
+        # token as the Anthropic Bedrock routes -- hence gated on bedrock_arn
+        # (already bearer-gated above) and excluded from OAuth, exactly like the
+        # sidecar. The region is a value, not a gate: it falls back to us-east-2
+        # in the sidecar, so gating on it here would drift from the emitted YAML.
+        # MUST also exclude use_codex_oauth: when codex is active the sidecar
+        # SUPPRESSES the mantle block (`not codex_bridge_url`) and the codex block
+        # registers only `model_name: {codex_model}`. If WCB_CODEX_MODEL overrides
+        # the default, adding a bare gpt-5.6-sol here would be a false-accept (no
+        # deployment). When codex_model IS the default the codex branch below
+        # re-adds gpt-5.6-sol, so the served set stays correct in every combo.
+        if bedrock_arn and not getattr(config, "use_codex_oauth", False):
+            models.add("gpt-5.6-sol")
 
     # Provider-independent: these key off their own credentials and are
     # deliberately out of scope for OAuth-vs-Bedrock isolation.

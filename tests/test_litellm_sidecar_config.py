@@ -194,6 +194,82 @@ class TestBedrockBranch:
             assert p["aws_region_name"] == "ap-south-1"
 
 
+class TestBedrockMantleGpt56:
+    def test_registered_on_plain_bedrock(self):
+        doc = _parse(sidecar.build_litellm_config_yaml(bedrock_arn="arn:o", auth_provider="bedrock"))
+        assert _params(doc, "gpt-5.6-sol")["model"] == "bedrock_mantle/openai.gpt-5.6-sol"
+
+    def test_region_is_its_own_var_default_us_east_2(self):
+        doc = _parse(sidecar.build_litellm_config_yaml(bedrock_arn="arn:o", aws_region="ap-south-1"))
+        assert _params(doc, "gpt-5.6-sol")["aws_region_name"] == "us-east-2"
+        doc2 = _parse(
+            sidecar.build_litellm_config_yaml(bedrock_arn="arn:o", gpt56_bedrock_region="us-east-1")
+        )
+        assert _params(doc2, "gpt-5.6-sol")["aws_region_name"] == "us-east-1"
+
+    def test_both_temperature_and_top_p_are_dropped(self):
+        # gpt-5.6 400s on presence of EITHER; drop_params:true is a no-op for
+        # bedrock_mantle (lists both as supported), so both must be explicit.
+        p = _params(_parse(sidecar.build_litellm_config_yaml(bedrock_arn="arn:o")), "gpt-5.6-sol")
+        assert p["drop_params"] is True
+        assert "top_p" in p["additional_drop_params"]
+        assert "temperature" in p["additional_drop_params"]
+
+    def test_bare_id_no_arn_no_thinking_no_cache(self):
+        p = _params(_parse(sidecar.build_litellm_config_yaml(bedrock_arn="arn:o")), "gpt-5.6-sol")
+        assert "model_id" not in p
+        assert "thinking" not in p
+        assert "output_config" not in p
+        assert "cache_control_injection_points" not in p
+
+    def test_suppressed_under_oauth(self):
+        doc = _parse(sidecar.build_litellm_config_yaml(bedrock_arn="arn:o", auth_provider="oauth"))
+        assert _block(doc, "gpt-5.6-sol") is None
+
+    def test_suppressed_when_codex_bridge_active(self):
+        doc = _parse(
+            sidecar.build_litellm_config_yaml(bedrock_arn="arn:o", codex_bridge_url="http://cb:8766")
+        )
+        blk = _block(doc, "gpt-5.6-sol")
+        if blk is not None:
+            assert blk["litellm_params"]["model"] != "bedrock_mantle/openai.gpt-5.6-sol"
+
+    def test_every_mantle_model_line_is_openai_family(self):
+        # Load-bearing pin (invariant #11): a bedrock_mantle/anthropic.* id would
+        # be an unaudited second Anthropic transport. Assert over the EMITTED yaml
+        # so a future block that skips _mantle_route_openai_family_only cannot
+        # bypass the guard.
+        import re
+
+        yaml_text = sidecar.build_litellm_config_yaml(
+            bedrock_arn="arn:o",
+            bedrock_sonnet_arn="arn:s",
+            openai_api_key="sk-x",
+            auth_provider="bedrock",
+        )
+        mantle = re.findall(r"model:\s*(bedrock_mantle/\S+)", yaml_text)
+        assert mantle, "expected at least one bedrock_mantle route"
+        for m in mantle:
+            assert m.startswith("bedrock_mantle/openai."), m
+
+    def test_source_pins_every_mantle_literal_to_openai_family(self):
+        # Arg-independent companion to the emitted-YAML pin: regex the module
+        # SOURCE so a future bedrock_mantle block gated on some other flag (and
+        # thus absent from the one YAML the sibling builds) still cannot smuggle a
+        # non-openai id. Same source-pinning style as test_shared_sidecar_invariants.
+        # Scope to double-quoted string LITERALS (route values) so prose/comments
+        # documenting the forbidden `bedrock_mantle/anthropic.*` pattern don't match.
+        import re
+        from pathlib import Path
+
+        src = Path(sidecar.__file__).read_text()
+        literals = re.findall(r'"(bedrock_mantle/[A-Za-z0-9._\-]+)', src)
+        assert literals, "expected bedrock_mantle string literals in source"
+        for lit in literals:
+            assert lit.startswith("bedrock_mantle/openai."), lit
+
+
+
 # ===========================================================================
 # Section C — build_litellm_config_yaml: OAuth-bridge branch (highest priority)
 # ===========================================================================

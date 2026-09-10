@@ -38,6 +38,9 @@ class _FakeConfig:
         self.bedrock_sonnet_arn = "arn:sonnet"
         self.bedrock_inference_arn = "arn:opus"
         self.bedrock_region = "ap-south-1"
+        # OpenAI-family Bedrock (bedrock_mantle / gpt-5.6-sol) route region;
+        # deliberately distinct from bedrock_region (real Config default us-east-2).
+        self.gpt56_bedrock_region = "us-east-2"
         self.aws_bearer_token = "aws-bearer"
         self.openai_api_key = ""
         self.openai_whisper_api_key = ""
