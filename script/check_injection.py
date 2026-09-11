@@ -34,7 +34,7 @@ from src.utils.mock_stack import (  # noqa: E402
     get_network_gateway, stop_mock_stack,
 )
 from src.utils.docker_utils import discover_services  # noqa: E402
-from src.utils.inject_director import InjectScript, InjectApplier  # noqa: E402
+from src.utils.inject_director import InjectScript, InjectApplier, _pk_path  # noqa: E402
 
 ENV_DIR = ROOT / "environment"
 
@@ -63,7 +63,7 @@ def _admin_get(base: str, token: str, suffix: str):
 
 def _target_value(base, token, table, pk, patch_fields):
     """Return the live value(s) of the keys this patch touches, for before/after."""
-    row = _admin_get(base, token, f"/admin/data/{table}/{pk}")
+    row = _admin_get(base, token, f"/admin/data/{table}/{_pk_path(pk)}")
     if not isinstance(row, dict):
         return None
     bag = row.get("fields") if isinstance(row.get("fields"), dict) else row

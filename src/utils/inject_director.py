@@ -64,8 +64,21 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import quote
 
 import requests
+
+
+def _pk_path(pk: Any) -> str:
+    """Percent-encode a primary key for use as one URL path segment.
+
+    Mock pks are free-form strings (square inventory keys look like
+    ``#var_5d81a6c34e02``, monday column_values like ``item-0303@status``).
+    Unencoded, a ``#`` starts a URL fragment, so ``/admin/data/inventory/#var_x``
+    goes out as ``PATCH /admin/data/inventory/`` -> 307 -> 405 and the op is
+    recorded as ``no-match``. The admin routes decode the segment back.
+    """
+    return quote(str(pk), safe="")
 
 LOG = logging.getLogger("wildclaw.inject")
 
@@ -783,7 +796,7 @@ class InjectApplier:
             return {"ok": False, "error": "no admin URL"}
         try:
             r = self._session.patch(
-                base.rstrip("/") + f"/admin/data/{table}/{pk}",
+                base.rstrip("/") + f"/admin/data/{table}/{_pk_path(pk)}",
                 json={"fields": fields},
                 headers=self._headers(), timeout=5.0,
             )
@@ -894,7 +907,7 @@ class InjectApplier:
         a fuzzy-resolver write to the wrong table still "verifies" — that
         class is caught statically by preflight's bare-REST-form warning.
         """
-        row = self._admin_get(api, f"/admin/data/{table}/{pk}")
+        row = self._admin_get(api, f"/admin/data/{table}/{_pk_path(pk)}")
         if not isinstance(row, dict):
             return None, False
         bag = self._row_bag(row)
@@ -950,7 +963,7 @@ class InjectApplier:
         elif m_patch:
             table, pk = m_patch.group(1), m_patch.group(2)
             fields = body.get("fields") if isinstance(body.get("fields"), dict) else dict(body)
-            row_before = self._admin_get(api, f"/admin/data/{table}/{pk}")
+            row_before = self._admin_get(api, f"/admin/data/{table}/{_pk_path(pk)}")
             before = ({k: self._row_bag(row_before).get(k) for k in fields}
                       if isinstance(row_before, dict) else None)
             res = self._admin_patch(api, table, pk, fields)
@@ -1042,7 +1055,7 @@ class InjectApplier:
                 table = self._resolve_store_table(api, spec.get("table"))
                 pk = str(spec.get("pk"))
                 set_ = spec.get("set") or {}
-                row = self._admin_get(api, f"/admin/data/{table}/{pk}")
+                row = self._admin_get(api, f"/admin/data/{table}/{_pk_path(pk)}")
                 if not isinstance(row, dict):
                     rec.update(ok=False, status="unresolved", table=table, pk=pk,
                                reason="row not found")
@@ -1104,7 +1117,7 @@ class InjectApplier:
                 row = dict(spec.get("row") or {})
                 pk_field = spec.get("pk_field") or "id"
                 pk = row.get(pk_field)
-                existed = self._admin_get(api, f"/admin/data/{table}/{pk}") if pk else None
+                existed = self._admin_get(api, f"/admin/data/{table}/{_pk_path(pk)}") if pk else None
                 res = self._admin_post(api, f"/admin/data/{table}", {"row": row})
                 rec.update(table=table, pk=pk, ok=bool(res.get("ok")), http=res.get("status"),
                            before=None if not isinstance(existed, dict) else "exists",
@@ -1229,7 +1242,7 @@ class InjectApplier:
             return rec
         table, pk, fields, unmapped = resolved
         rec.update(table=table, pk=pk, fields=list(fields.keys()))
-        row_before = self._admin_get(api, f"/admin/data/{table}/{pk}")
+        row_before = self._admin_get(api, f"/admin/data/{table}/{_pk_path(pk)}")
         before = ({k: self._row_bag(row_before).get(k) for k in fields}
                   if isinstance(row_before, dict) else None)
         result = self._admin_patch(api, table, pk, fields)

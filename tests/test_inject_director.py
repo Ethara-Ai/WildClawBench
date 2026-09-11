@@ -83,6 +83,40 @@ def test_sm3_resolves_against_live_store_despite_placeholder_and_casing():
     assert unmapped == []                     # every SM3 field maps to a live column
 
 
+def test_admin_row_urls_percent_encode_pk(tmp_path):
+    # Square inventory pks look like "#var_5d81a6c34e02"; an unencoded "#"
+    # truncated the PATCH to /admin/data/inventory/ (307 -> 405 -> no-match).
+    calls = []
+
+    class Resp:
+        status_code = 200
+        headers = {"content-type": "application/json"}
+
+        def json(self):
+            return {"quantity": "23"}
+
+    class FakeSession:
+        def patch(self, url, **kw):
+            calls.append(("PATCH", url))
+            return Resp()
+
+        def get(self, url, **kw):
+            calls.append(("GET", url))
+            return Resp()
+
+    ap = InjectApplier({"square-api": "http://x/"}, None, tmp_path / "t.jsonl")
+    ap._session = FakeSession()
+    assert ap._admin_patch("square-api", "inventory", "#var_5d81a6c34e02",
+                           {"quantity": "23"})["ok"]
+    after, verified = ap._read_back_row("square-api", "inventory",
+                                        "#var_5d81a6c34e02", {"quantity": "23"})
+    assert verified and after == {"quantity": "23"}
+    assert calls == [
+        ("PATCH", "http://x/admin/data/inventory/%23var_5d81a6c34e02"),
+        ("GET", "http://x/admin/data/inventory/%23var_5d81a6c34e02"),
+    ]
+
+
 def test_mid_run_loud_op_is_applied_visibly(tmp_path):
     """A `loud` op in a mid-run stage must fire as a VISIBLE (silent=False) API
     mutation — not silently dropped, the pre-fix behaviour."""
