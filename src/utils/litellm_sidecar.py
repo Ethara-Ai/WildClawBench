@@ -75,6 +75,7 @@ def build_litellm_config_yaml(
     meta_base_url: str = "https://api.ai.meta.com/v1",
     meta_model: str = "",
     enable_stream_callback: bool = False,
+    enable_sanitize_callback: bool = False,
 ) -> str:
     whisper_env_ref = (
         "os.environ/OPENAI_API_KEY_WHISPER"
@@ -609,6 +610,13 @@ def build_litellm_config_yaml(
     # it records the post-compression token count — exactly what Bedrock/OpenAI
     # billed — preserving the existing 12-key JSONL schema unchanged.
     _cbs: list[str] = []
+    # 1P message-shape sanitizer runs FIRST in the pre-call phase: it repairs a
+    # malformed/poisoned messages array before headroom compresses or the usage
+    # logger snapshots it. HARD no-op on non-1P routes (scoped at runtime on
+    # data["model"] via KENSEI_1P_SANITIZE_MODEL), so ordering it ahead of the
+    # billing callbacks is safe for every other model.
+    if enable_sanitize_callback:
+        _cbs.append("litellm_sanitize_callback.sanitize_callback_instance")
     if enable_usage_callback:
         _cbs.append("litellm_usage_callback.proxy_handler_instance")
     if enable_headroom_callback:
@@ -858,6 +866,8 @@ def start_litellm(
     meta_api_key: str = "",
     stream_callback_host_path: str = "",
     stream_log_host_dir: str = "",
+    sanitize_callback_host_path: str = "",
+    sanitize_model: str = "",
 ) -> None:
     from src.utils.docker_utils import (
         build_env_args,
@@ -962,6 +972,17 @@ def start_litellm(
             if _v:
                 stream_args += ["-e", f"{_k}={_v}"]
 
+    sanitize_args: list[str] = []
+    if sanitize_callback_host_path and sanitize_model:
+        sanitize_args = [
+            "-v", f"{sanitize_callback_host_path}:/app/litellm_sanitize_callback.py:ro",
+            *build_env_args([
+                ("KENSEI_1P_SANITIZE_MODEL", sanitize_model),
+                ("KENSEI_1P_SANITIZE_ENABLED",
+                 os.environ.get("KENSEI_1P_SANITIZE_ENABLED", "true")),
+            ]),
+        ]
+
     image_to_run = _validate_docker_token("litellm image", image_to_run)
     cmd = [
         "docker", "run", "-d",
@@ -971,6 +992,7 @@ def start_litellm(
         *callback_args,
         *headroom_args,
         *stream_args,
+        *sanitize_args,
         "-v", f"{host_config_path}:/app/config.yaml:ro",
         image_to_run,
         "--config", "/app/config.yaml",

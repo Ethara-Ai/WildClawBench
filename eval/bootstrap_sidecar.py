@@ -208,6 +208,7 @@ def main() -> int:
         # an end-of-turn burst — the real-time tap there is the bridge tee.
         # Register the sidecar callback only on the non-OAuth (Bedrock) path.
         enable_stream_callback=_stream_enabled and not use_oauth,
+        enable_sanitize_callback=bool(config.meta_model),
     )
     if not litellm_yaml:
         _log(
@@ -369,6 +370,11 @@ def main() -> int:
         oauth_cb_src = str(
             Path(__file__).resolve().parent.parent / "src" / "utils" / "litellm_usage_oauth_callback.py"
         )
+    sanitize_cb_src = ""
+    if config.meta_model:
+        sanitize_cb_src = str(
+            Path(__file__).resolve().parent.parent / "src" / "utils" / "litellm_sanitize_callback.py"
+        )
     try:
         start_litellm(
             container_name=sidecar,
@@ -389,6 +395,8 @@ def main() -> int:
             oauth_usage_callback_host_path=oauth_cb_src,
             stream_callback_host_path=stream_callback_src,
             stream_log_host_dir=stream_log_dir_str,
+            sanitize_callback_host_path=sanitize_cb_src,
+            sanitize_model=config.meta_model,
         )
     except Exception as exc:
         _log(f"start_litellm failed: {exc}")

@@ -512,6 +512,40 @@ class TestSonnetAndCallbacks:
             "litellm_usage_oauth_callback.oauth_usage_callback_instance",
         ]
 
+    def test_sanitize_callback_absent_by_default(self):
+        # Off unless explicitly enabled — existing runs are byte-identical.
+        doc = _parse(sidecar.build_litellm_config_yaml(bedrock_arn="arn:x"))
+        assert "callbacks" not in doc["litellm_settings"]
+
+    def test_sanitize_callback_runs_first_when_enabled(self):
+        # The 1P sanitizer must lead the pre-call phase (repair the messages
+        # array before headroom compresses or the usage logger snapshots it).
+        doc = _parse(
+            sidecar.build_litellm_config_yaml(
+                bedrock_arn="arn:x",
+                enable_sanitize_callback=True,
+                enable_usage_callback=True,
+                enable_headroom_callback=True,
+                enable_oauth_usage_callback=True,
+            )
+        )
+        assert doc["litellm_settings"]["callbacks"] == [
+            "litellm_sanitize_callback.sanitize_callback_instance",
+            "litellm_usage_callback.proxy_handler_instance",
+            "litellm_headroom_callback.headroom_callback_instance",
+            "litellm_usage_oauth_callback.oauth_usage_callback_instance",
+        ]
+
+    def test_sanitize_callback_only(self):
+        doc = _parse(
+            sidecar.build_litellm_config_yaml(
+                bedrock_arn="arn:x", enable_sanitize_callback=True
+            )
+        )
+        assert doc["litellm_settings"]["callbacks"] == [
+            "litellm_sanitize_callback.sanitize_callback_instance"
+        ]
+
 
 # ===========================================================================
 # Section G — wait_for_litellm_healthy (docker-exec probe loop)

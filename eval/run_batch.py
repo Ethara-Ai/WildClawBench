@@ -3157,6 +3157,7 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
         meta_base_url=config.meta_base_url,
         meta_model=config.meta_model,
         enable_stream_callback=_stream_enabled,
+        enable_sanitize_callback=bool(config.meta_model),
     )
     if not litellm_yaml:
         raise RuntimeError(
@@ -3611,6 +3612,11 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
             sidecar, network,
         )
     else:
+        sanitize_cb_src = ""
+        if config.meta_model:
+            sanitize_cb_src = str(
+                Path(__file__).resolve().parent.parent / "src" / "utils" / "litellm_sanitize_callback.py"
+            )
         oauth_cb_src = ""
         if use_oauth:
             oauth_cb_src = str(
@@ -3635,6 +3641,8 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
             oauth_usage_callback_host_path=oauth_cb_src,
             stream_callback_host_path=stream_callback_src,
             stream_log_host_dir=stream_log_dir_str,
+            sanitize_callback_host_path=sanitize_cb_src,
+            sanitize_model=config.meta_model,
         )
         cleanups.append(lambda: stop_litellm(sidecar))
         if not wait_for_litellm_healthy(sidecar):
