@@ -82,6 +82,7 @@ from src.utils.litellm_sidecar import (
     build_litellm_config_yaml,
     create_network,
     ensure_litellm_headroom_image,
+    overflow_guard_enabled,
     pick_free_loopback_port,
     pull_litellm_image,
     remove_network,
@@ -3266,6 +3267,7 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
     _stream_enabled = (os.environ.get("WCB_STREAM", "").strip().lower()
                        in ("1", "true", "yes", "on"))
     shared_stream_log = os.environ.get("WCB_SHARED_SIDECAR_STREAM_LOG", "").strip()
+    _overflow_guard = overflow_guard_enabled(config.meta_api_key, config.meta_model)
     litellm_yaml = build_litellm_config_yaml(
         bedrock_sonnet_arn=config.bedrock_sonnet_arn if config.aws_bearer_token else "",
         bedrock_arn=config.bedrock_inference_arn if config.aws_bearer_token else "",
@@ -3285,6 +3287,7 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
         meta_base_url=config.meta_base_url,
         meta_model=config.meta_model,
         enable_stream_callback=_stream_enabled,
+        enable_overflow_guard_callback=_overflow_guard,
     )
     if not litellm_yaml:
         raise RuntimeError(
@@ -3624,6 +3627,12 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
         # usage.json (IAN report Pointer 3).
         globals()["_HEADROOM_LOG_DIR"] = headroom_log_dir_str
 
+    overflow_guard_callback_src = ""
+    if _overflow_guard and not shared_mode:
+        overflow_guard_callback_src = str(
+            Path(__file__).resolve().parent.parent / "src" / "utils" / "litellm_overflow_guard_callback.py"
+        )
+
     if shared_mode:
         logger.info(
             "LiteLLM sidecar %s reused (shared-infra mode, network=%s); "
@@ -3655,6 +3664,7 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
             oauth_usage_callback_host_path=oauth_cb_src,
             stream_callback_host_path=stream_callback_src,
             stream_log_host_dir=stream_log_dir_str,
+            overflow_guard_callback_host_path=overflow_guard_callback_src,
         )
         cleanups.append(lambda: stop_litellm(sidecar))
         if not wait_for_litellm_healthy(sidecar):

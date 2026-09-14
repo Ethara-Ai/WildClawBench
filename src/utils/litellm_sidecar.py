@@ -23,6 +23,22 @@ LITELLM_INTERNAL_PORT = 4000
 LITELLM_HEADROOM_IMAGE = "wildclawbench-litellm-headroom:v2"
 
 
+def overflow_guard_enabled(meta_api_key: str, meta_model: str) -> bool:
+    """Whether to register the 1P context-overflow guard for this batch.
+
+    Shared by eval/run_batch.py and eval/bootstrap_sidecar.py so the per-run and
+    shared-sidecar builders cannot diverge (eval/AGENTS.md convergence
+    guarantee). Default ON whenever a 1P route is registered — the guard is
+    inert for every other model and only fires above its token threshold — with
+    WCB_OVERFLOW_GUARD=0 as the kill switch.
+    """
+    if not (meta_api_key and meta_model):
+        return False
+    return os.environ.get("WCB_OVERFLOW_GUARD", "1").strip().lower() not in (
+        "0", "false", "no", "off",
+    )
+
+
 def build_litellm_config_yaml(
     bedrock_arn: str = "",
     aws_region: str = "ap-south-1",
@@ -42,6 +58,7 @@ def build_litellm_config_yaml(
     meta_base_url: str = "https://api.ai.meta.com/v1",
     meta_model: str = "",
     enable_stream_callback: bool = False,
+    enable_overflow_guard_callback: bool = False,
 ) -> str:
     whisper_env_ref = (
         "os.environ/OPENAI_API_KEY_WHISPER"
@@ -531,6 +548,19 @@ def build_litellm_config_yaml(
         _cbs.append("litellm_headroom_callback.headroom_callback_instance")
     if enable_oauth_usage_callback:
         _cbs.append("litellm_usage_oauth_callback.oauth_usage_callback_instance")
+    # Context-overflow guard (incident aleksei 1P 2026-09-06 — see the module
+    # docstring of litellm_overflow_guard_callback.py). Converts an oversized
+    # 1P prompt into a 400 whose message matches openclaw's overflow matcher,
+    # so the agent compacts instead of dying on the relay's generic "invalid
+    # parameters" 400.
+    #
+    # ORDERING: this MUST come AFTER the headroom entry. Both override
+    # `async_pre_call_hook`, and LiteLLM dispatches them in `litellm.callbacks`
+    # order (litellm 1.88.1 proxy/utils.py:1462 iterates the resolved list built
+    # from this yaml's order). Headroom SHRINKS the prompt, so running the guard
+    # first would reject requests that compression would have made fit.
+    if enable_overflow_guard_callback:
+        _cbs.append("litellm_overflow_guard_callback.overflow_guard_instance")
     # Live-stream observability tap (docs STREAMING_PLAN / STREAMING_IMPLEMENTATION_GUIDE
     # §4 Pattern A). Registered LAST — it only reads streamed chunks and
     # re-yields the original object (R5), so it never affects the usage/headroom
@@ -774,6 +804,7 @@ def start_litellm(
     meta_api_key: str = "",
     stream_callback_host_path: str = "",
     stream_log_host_dir: str = "",
+    overflow_guard_callback_host_path: str = "",
 ) -> None:
     from src.utils.docker_utils import (
         build_env_args,
@@ -878,6 +909,24 @@ def start_litellm(
             if _v:
                 stream_args += ["-e", f"{_k}={_v}"]
 
+    # Context-overflow guard: no sink, no image swap — a pure request-shaping
+    # hook, so it only needs the module mounted plus its two tuning knobs. Both
+    # knobs are forwarded ONLY when explicitly set on the host so an unset
+    # environment yields the module defaults (rl-muse / 255000) rather than an
+    # empty env var the callback would have to defend against.
+    overflow_guard_args: list[str] = []
+    if overflow_guard_callback_host_path:
+        overflow_guard_pairs: list[tuple[str, str]] = []
+        for _k in ("WCB_OVERFLOW_GUARD_MODELS", "WCB_1P_PROMPT_TOKEN_LIMIT"):
+            _v = os.environ.get(_k, "").strip()
+            if _v:
+                overflow_guard_pairs.append((_k, _v))
+        overflow_guard_args = [
+            "-v",
+            f"{overflow_guard_callback_host_path}:/app/litellm_overflow_guard_callback.py:ro",
+            *build_env_args(overflow_guard_pairs),
+        ]
+
     image_to_run = _validate_docker_token("litellm image", image_to_run)
     cmd = [
         "docker", "run", "-d",
@@ -887,6 +936,7 @@ def start_litellm(
         *callback_args,
         *headroom_args,
         *stream_args,
+        *overflow_guard_args,
         "-v", f"{host_config_path}:/app/config.yaml:ro",
         image_to_run,
         "--config", "/app/config.yaml",
