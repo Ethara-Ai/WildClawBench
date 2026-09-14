@@ -493,7 +493,13 @@ bootstrap_shared_sidecar() {
     # python writes key=value to stdout; progress to stderr (tee'd to the
     # user terminal). On non-zero exit, we fail loud and abort the batch —
     # without the sidecar no reps can talk to Bedrock anyway.
-    if python3 eval/bootstrap_sidecar.py --name-suffix "$suffix" > "$tmpfile" 2> >(while read -r ln; do log::info "$ln"; done); then
+    # WCB_SKIP_UPSTREAM_VERIFY=1 skips the Bedrock-model reachability probe:
+    # a 1P-only run never touches Bedrock, but the probe hardcodes the
+    # claude-opus route and a dead/rotated bearer token aborts the whole
+    # batch even though the vendor route is healthy (kensei-alpha 2026-09-14).
+    bootstrap_flags=""
+    [ "${WCB_SKIP_UPSTREAM_VERIFY:-0}" = "1" ] && bootstrap_flags="--skip-upstream-verify"
+    if python3 eval/bootstrap_sidecar.py --name-suffix "$suffix" $bootstrap_flags > "$tmpfile" 2> >(while read -r ln; do log::info "$ln"; done); then
         rc=0
     else
         rc=$?
