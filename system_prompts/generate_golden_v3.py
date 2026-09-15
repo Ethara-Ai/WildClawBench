@@ -23,7 +23,7 @@ Unlike the v1 deterministic table-paste generator, v2:
   does it fall back to the keyword-heuristic ``_synth_tool_calls`` placeholder.
 
 Usage:
-    python3 system_prompts/generate_golden_v2.py <task_dir> [--llm] \
+    python3 system_prompts/generate_golden_v3.py <task_dir> [--llm] \
         [--trajectory=PATH] [--max-calls=N]
 """
 from __future__ import annotations

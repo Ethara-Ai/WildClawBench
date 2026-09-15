@@ -1,5 +1,15 @@
 # Drift Plane Migration Recipe
 
+> **STATUS: APPLIED — 101/101 mock-API servers migrated.** This document is
+> retained as a historical record of the procedure and of the per-API
+> hand-migration precedents; it is no longer a to-do list. The one-shot tooling
+> that drove it (`script/migrate_to_drift_plane.py`,
+> `script/verify_migration_dryrun.py`, `script/verify_applied.py`) has been
+> **removed from the tree** now that the migration is complete, so the command
+> lines quoted below are provenance, not runnable instructions. The live gates
+> for any `environment/**` change are `tests/test_drift_plane_smoke.py` and the
+> eager-load smoke test at the bottom of this file.
+
 This document is the **mechanical** procedure for migrating any remaining
 `environment/<name>-api/<name>_data.py` + matching `server.py` to the drift
 plane (`_mutable_store` + `admin_plane`).
@@ -251,14 +261,15 @@ After every module's changes:
 ## Status — 101/101 migrated
 
 **All 101 mock-API modules are migrated and verified.**
-`scripts/verify_applied.py` reports `Total migrated: 101  ok: 101  fail: 0`.
+The post-migration verifier (`verify_applied.py`, since removed) reported
+`Total migrated: 101  ok: 101  fail: 0`.
 The end-to-end smoke test (`tests/test_drift_plane_smoke.py`) passes 6/6.
 
 Three migration cohorts:
 
 1. **Reference (3)** — `kraken-api`, `plaid-api`, `airbnb-api`. Hand-written
    first to discover the universal pattern.
-2. **Bulk via `scripts/migrate_to_drift_plane.py` (88)** — applied across
+2. **Bulk via `migrate_to_drift_plane.py` (88, since removed)** — applied across
    two passes. The second pass added `PER_API_PK_OVERRIDES` (xero/hubspot/
    paypal) and `FORCE_DOCUMENT_TABLES` (dropbox/google-calendar/mixpanel/
    notion/obsidian/alpaca) to bring previously-failing modules into the
@@ -363,8 +374,8 @@ Three migration cohorts:
    `register_document(...)` instead of `register(...)`. The verifier
    reports `(Nt/Md)` tables/documents so this is observable.
 
-Each manual migration must end with a green run of
-`scripts/verify_applied.py` and `tests/test_drift_plane_smoke.py`.
+Each manual migration ended with a green run of the post-migration verifier
+(since removed) and `tests/test_drift_plane_smoke.py`, which remains the gate.
 
 ---
 

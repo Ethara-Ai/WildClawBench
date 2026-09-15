@@ -48,14 +48,11 @@ Commands fall into these tiers:
    - [`coerce_malformed_test.py`](#34-coerce_malformed_testpy)
    - [`extract_home_to_data.py`](#35-extract_home_to_datapy)
    - [Harness Dashboard (`src/utils/ui/tui.py`)](#36-harness-dashboard-srcutilsuituitpy)
-   - [`migrate_to_drift_plane.py`](#37-migrate_to_drift_planepy)
-   - [`reconstruct_input_from_bundle.py`](#38-reconstruct_input_from_bundlepy)
-   - [`regrade.py`](#39-regradepy)
-   - [`repackage_to_bundle.py`](#310-repackage_to_bundlepy)
-   - [`rerun_tests.py`](#311-rerun_testspy)
-   - [`verify_applied.py`](#312-verify_appliedpy)
-   - [`verify_migration_dryrun.py`](#313-verify_migration_dryrunpy)
-   - [`rebuild_pass_summary.py`](#314-rebuild_pass_summarypy)
+   - [`reconstruct_input_from_bundle.py`](#37-reconstruct_input_from_bundlepy)
+   - [`regrade.py`](#38-regradepy)
+   - [`repackage_to_bundle.py`](#39-repackage_to_bundlepy)
+   - [`rerun_tests.py`](#310-rerun_testspy)
+   - [`rebuild_pass_summary.py`](#311-rebuild_pass_summarypy)
 4. [Skill-embedded scripts](#4-skill-embedded-scripts)
 5. [Environment fleet tools](#5-environment-fleet-tools)
 6. [CRUCIBLE audit CLI (`audit/`)](#6-crucible-audit-cli-audit)
@@ -548,22 +545,7 @@ python3 script/extract_home_to_data.py input/alden-croft_MB --verbose
 
 ---
 
-### 3.7 `migrate_to_drift_plane.py`
-
-**Purpose:** Mechanical migration of `<api>_data.py` + `server.py` to the "drift plane" (mutable store) architecture. Parses each data module with regex, rewrites CSV/JSON eager-loads and shadow-copy `_store` variables into `_store.register(...)` calls + `_xxx_rows()`/`_xxx_doc()` accessor helpers, and injects `install_admin_plane(app, store=<mod>._store)` into `server.py`. Skips already-migrated modules and a hard-coded list of idiosyncratic ones (algolia, quickbooks, youtube, ring). PK heuristics with per-api / per-table overrides. **Dry-run by default; `--apply` writes changes.**
-
-**CLI library:** argparse.
-
-| Flag | Type | Default | Purpose |
-| --- | --- | --- | --- |
-| `--apply` | flag | `False` | Write changes to disk. Without it, prints the plan only. |
-| `--only` | list | `None` | Limit to these API dirs. |
-
-> Note: the docstring mentions "run with `--dry-run` first", but there is no `--dry-run` flag — dry-run is simply the *default* when `--apply` is omitted.
-
----
-
-### 3.8 `reconstruct_input_from_bundle.py`
+### 3.7 `reconstruct_input_from_bundle.py`
 
 **Purpose:** Reverses the bundle writer — reconstructs an `input/<task>/` folder from a harbor `output_bundle`. Recovers `prompt.txt` (fallback `data/instruction.md`), `rubric.json`, `persona/`, flat `data/` (from `data/environment/artifacts/inputs/files/`), `test_outputs.py`, `test_weights.json`, and `mock_data/<api>/` (by byte-diffing each `.json`/`.csv` seed against a pristine baseline `environment/<api>/<f>` — identical files are baked defaults, differences/new files are the task overlay). Writes a `RECONSTRUCTION_NOTES.md` per task documenting recovery. Cannot recover `gt/`, original nested directory structure, or the pre-overlay default a given overlay replaced.
 
@@ -581,7 +563,7 @@ python3 script/extract_home_to_data.py input/alden-croft_MB --verbose
 
 ---
 
-### 3.9 `regrade.py`
+### 3.8 `regrade.py`
 
 **Purpose:** Re-runs **only the judge phase** against an existing completed run dir, using the rubric currently at `input/<task>/rubric.json`. Overwrites the run's `score.json` in place. Does NOT re-run the agent, testgen, or testexec. Council mode only. Also patches `usage.json` to reflect the new judge cost while preserving other keys. Called by `script/run.sh --regrade`.
 
@@ -600,7 +582,7 @@ python3 script/regrade.py --run output/openclaw/amanda_hayes_01/trajectories/cla
 
 ---
 
-### 3.10 `repackage_to_bundle.py`
+### 3.9 `repackage_to_bundle.py`
 
 **Purpose:** Standalone repackager — raw run output → published "bundle" structure matching the `amanda_webb_01` reference layout: `prompt.txt`, `rubric.json`, `data/`, and `trajectories/<Pretty Model>/run_N/` containing `output.json`, `logs/verifier/`, `report.json`, and `output_media/`. Also stages `persona/`, input artifacts, and harness-runtime env files. Matches source task dirs against destination bundles by "persona core name" (strip emoji, drop uuid/hex/numeric suffix tokens, collapse separators). Called automatically by `script/run.sh` per task unless `--no-bundle`.
 
@@ -620,7 +602,7 @@ python3 script/regrade.py --run output/openclaw/amanda_hayes_01/trajectories/cla
 
 ---
 
-### 3.11 `rerun_tests.py`
+### 3.10 `rerun_tests.py`
 
 **Purpose:** Re-executes **only the test suite** (testexec phase) against an already-completed trajectory — no agent re-run, no testgen, no LLM judge. Mirrors `eval/run_batch.py`'s `--execute-tests` step by reusing `src.utils.test_executor.execute_tests`. Mounts a run's `task_output/workspace_full` read-only into a throwaway docker container, runs the task's `test_outputs.py` + `test_weights.json`, then rewrites the run's verifier artifacts (`reward.txt`, `ctrf.json`, `test_function_outputs.json`, `test_output.log`) plus a standalone `regrade_test_result.json`. Leaves `score.json` untouched. For faithful audit-based tests, requires pointing at a live mock stack via `--network` + env vars.
 
@@ -648,35 +630,7 @@ python3 script/rerun_tests.py --task output/openclaw/amanda_hayes_01
 
 ---
 
-### 3.12 `verify_applied.py`
-
-**Purpose:** Verifies that already-migrated data modules (those containing the `from _mutable_store import get_store` marker) can be imported cleanly against the live `environment/` tree, that `_store.list_tables()` and `_store.list_documents()` succeed, and that every registered table's `.rows()` and every document's `.get()` return without exception. Prints `OK`/`FAIL` per API and a totals line; exits non-zero on any failure.
-
-**No CLI arguments.** Run with:
-
-```bash
-python3 script/verify_applied.py
-```
-
-> Known caveat: this file `sys.path.insert(0, REPO_ROOT / "scripts")` (plural) to import `migrate_to_drift_plane`, while the containing directory is `script/` (singular). The import will fail unless the plural path also exists.
-
----
-
-### 3.13 `verify_migration_dryrun.py`
-
-**Purpose:** Verifies the migration script produces importable code **without** writing to the live tree. For every non-skipped API (skipping `ALREADY_DONE | IDIOSYNCRATIC`), it calls `plan_module`/`apply_data_module`/`apply_server` from `migrate_to_drift_plane`, writes the generated code to a temp copy of the API dir, then attempts to `importlib.import_module` both, queries `_store.list_tables()`/`.list_documents()`, calls `.rows()`/`.get()` on each, and verifies `server.app` exists. Reports `OK`/`FAIL` per API plus a totals line and failures list; exits non-zero on any failure.
-
-**No CLI arguments.** Run with:
-
-```bash
-python3 script/verify_migration_dryrun.py
-```
-
-> Same `scripts/` (plural) import-path caveat as `verify_applied.py`.
-
----
-
-### 3.14 `rebuild_pass_summary.py`
+### 3.11 `rebuild_pass_summary.py`
 
 **Purpose:** Rebuild a `pass_summary.json` from the per-rep artifacts (`run_N/score.json` + `run_N/task_output/logs/verifier/{ctrf.json,reward.txt}`) already sitting under a `trajectories/<model>/` folder. This is a **byte-for-byte faithful** reimplementation of the harness's `_pass_summary_doc()` + `_pass_summary_entry()` pipeline from `eval/run_batch.py` — same keys, same order, same rounding, same `_finite_float` semantics, same `None`-tolerant means. **The output is indistinguishable from what the harness itself would have written if all N reps had run in a single batch.** No extra keys, no `merged_from`, no `pass_at_k_*`.
 
@@ -825,7 +779,7 @@ python3 environment/skills/activecampaign-api-connector/scripts/fetch_activecamp
 
 ## 5. Environment fleet tools
 
-Four custom commands live under `environment/` (and `environment/scripts/`) that operate across all 101 mock APIs at once. They are peers of `script/migrate_to_drift_plane.py` but scoped to the mock fleet rather than the eval harness. All are stdlib-only where possible and safe to run against a working tree.
+Four custom commands live under `environment/` (and `environment/scripts/`) that operate across all 101 mock APIs at once. They are scoped to the mock fleet rather than the eval harness. All are stdlib-only where possible and safe to run against a working tree.
 
 ### 5.1 `environment/test_all_apis.py`
 
@@ -1034,9 +988,6 @@ See [§ 2.7 above](#27-env-var-contract-read-by-the-harness-at-runtime) for the 
 | Reverse a bundle back to `input/` layout | `python3 script/reconstruct_input_from_bundle.py <bundle_path> --out reconstructed_input` |
 | Ship deliverables to the delivery repo | `./deliver.sh` (or `./deliver.sh --run …` for the full pipeline) |
 | Backfill connector docs (thin connectors only) | `python3 script/backfill_connector_docs.py --only <api1,api2>` |
-| Migrate a data module to the drift-plane store | `python3 script/migrate_to_drift_plane.py --only <api>` (dry-run), then `--apply` |
-| Verify already-migrated data modules import cleanly | `python3 script/verify_applied.py` |
-| Verify migration output (without writing) | `python3 script/verify_migration_dryrun.py` |
 | Dry-run overlay-CSV ingestion | `python3 script/coerce_dryrun.py [task]` |
 | Unit-check the coerce/strict helpers | `python3 script/coerce_malformed_test.py` |
 | Flatten `persona/home/` → `data/` for a task | `python3 script/extract_home_to_data.py <task_dir>` |
