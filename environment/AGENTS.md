@@ -1,6 +1,6 @@
 # environment — MOCK-API FLEET
 
-101 self-contained FastAPI mock services (`<name>-api/`) + a shared admin/drift/audit
+50 self-contained FastAPI mock services (`<name>-api/`) + a shared admin/drift/audit
 plane. Each runs in its own container; agents reach them via injected `*_API_URL` env vars.
 
 ## PER-API LAYOUT (`<name>-api/`)
@@ -29,7 +29,7 @@ app = FastAPI(...); install_tracker(app); install_admin_plane(app, store=<name>_
 | `admin_plane.py` | `/admin/*` out-of-band mutation surface; **off unless `MOCK_ADMIN_ENABLED=1`** + IP allowlist |
 | `_mutable_store.py` | mutable store backing drift |
 | `test_all_apis.py` | cross-fleet smoke harness |
-| `skills/` | 101 `<api>-connector/` skill dirs + media skills (audio/pdf/video) injected into tasks |
+| `skills/` | 50 `<api>-connector/` skill dirs + media skills (audio/pdf/video) injected into tasks |
 
 ## CONVENTIONS
 - Each service owns a **unique port** + `env_var_name` (e.g. github-api → 8019 / `GITHUB_API_URL`)

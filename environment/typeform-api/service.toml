@@ -1,5 +1,0 @@
-[service]
-name = "typeform-api"
-port = 8055
-env_var_name = "TYPEFORM_API_URL"
-healthcheck_path = "/health"

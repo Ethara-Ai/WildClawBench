@@ -25,7 +25,7 @@ def _has_warn(report, code):
 class CatalogTests(unittest.TestCase):
     def test_examples_cover_all_known_apis(self):
         apis = V.list_apis()
-        self.assertGreaterEqual(len(apis), 100)
+        self.assertGreaterEqual(len(apis), 50)
         for api in apis:
             self.assertTrue(
                 (V.EXAMPLES_DIR / api).is_dir(),
@@ -136,12 +136,17 @@ class SchemaTests(unittest.TestCase):
 
 
 class WrappedTableTests(unittest.TestCase):
-    def test_quickbooks_customers_treated_as_table(self):
-        ex = V.EXAMPLES_DIR / "quickbooks-api" / "customers.json"
-        self.assertFalse(V._example_is_document(ex))
-        rows, issues = V._load_table(ex)
-        self.assertIsNotNone(rows)
-        self.assertGreater(len(rows), 0)
+    def test_query_response_wrapped_envelope_treated_as_table(self):
+        with tempfile.TemporaryDirectory() as td:
+            ex = Path(td) / "customers.json"
+            ex.write_text(json.dumps({
+                "QueryResponse": {"Customer": [{"Id": "1", "Name": "A"},
+                                               {"Id": "2", "Name": "B"}]}
+            }))
+            self.assertFalse(V._example_is_document(ex))
+            rows, issues = V._load_table(ex)
+            self.assertIsNotNone(rows)
+            self.assertGreater(len(rows), 0)
 
 
 class DeepCompareTests(unittest.TestCase):
@@ -159,22 +164,29 @@ class DeepCompareTests(unittest.TestCase):
             self.assertTrue(any("acc_pcu_chk_01" in m and "extra key" in m for m in msgs))
 
     def test_type_mismatch_scalar_vs_dict_in_array(self):
+        example = {"doorbots": [{"id": "d1", "motion_snooze": "off"},
+                                {"id": "d2", "motion_snooze": "off"}]}
+        overlay = {"doorbots": [{"id": "d1", "motion_snooze": {"nested": "was scalar"}},
+                                {"id": "d2", "motion_snooze": "off"}]}
         with tempfile.TemporaryDirectory() as td:
-            overlay_dir = Path(td) / "ring-api"
-            overlay_dir.mkdir()
-            ex = json.loads((V.EXAMPLES_DIR / "ring-api" / "devices.json").read_text())
-            for row in ex.get("doorbots", []):
-                if "motion_snooze" in row:
-                    row["motion_snooze"] = {"nested": "was scalar"}
-            (overlay_dir / "devices.json").write_text(json.dumps(ex))
-            report = V.Report()
-            V.validate_overlay_dir(overlay_dir, "ring-api", report)
-            msgs = [i.message for i in report.issues]
-            self.assertTrue(any(
-                "type mismatch at" in m and "doorbots[].motion_snooze" in m
-                and "canonical=null" in m and "actual=dict" in m
-                for m in msgs
-            ))
+            api_dir = Path(td) / "examples" / "synth-api"
+            api_dir.mkdir(parents=True)
+            (api_dir / "devices.json").write_text(json.dumps(example))
+            orig = V.EXAMPLES_DIR
+            V.EXAMPLES_DIR = Path(td) / "examples"
+            try:
+                overlay_dir = Path(td) / "overlay" / "synth-api"
+                overlay_dir.mkdir(parents=True)
+                (overlay_dir / "devices.json").write_text(json.dumps(overlay))
+                report = V.Report()
+                V.validate_overlay_dir(overlay_dir, "synth-api", report)
+                msgs = [i.message for i in report.issues if i.code == "TYPE_MISMATCH"]
+                self.assertTrue(any(
+                    "motion_snooze" in m and "canonical=scalar" in m and "actual=dict" in m
+                    for m in msgs
+                ), msg=str([i.message for i in report.issues]))
+            finally:
+                V.EXAMPLES_DIR = orig
 
     def test_ragged_object_keys_in_json_array(self):
         with tempfile.TemporaryDirectory() as td:
@@ -204,28 +216,51 @@ class ReportShapeTests(unittest.TestCase):
 
 class RaggednessToleranceTests(unittest.TestCase):
     def test_ragged_nested_array_bills_line_no_key_missing(self):
-        ex = V.EXAMPLES_DIR / "quickbooks-api" / "bills.json"
+        rows = [
+            {"Id": "1", "Line": [{"DetailType": "X", "Amount": 10, "Id": "1", "LineNum": 1},
+                                 {"Amount": 20}]},
+            {"Id": "2", "Line": [{"Amount": 30, "Quantity": 2, "UnitPrice": 15}]},
+        ]
         with tempfile.TemporaryDirectory() as td:
-            overlay_dir = Path(td) / "quickbooks-api"
-            overlay_dir.mkdir()
-            (overlay_dir / "bills.json").write_text(ex.read_text())
-            report = V.Report()
-            V.validate_overlay_dir(overlay_dir, "quickbooks-api", report)
-            offenders = [i for i in report.issues
-                         if i.code == "KEY_MISSING" and "Line[]" in i.message]
-            self.assertEqual(offenders, [], msg=str([i.message for i in offenders]))
+            api_dir = Path(td) / "examples" / "synth-api"
+            api_dir.mkdir(parents=True)
+            (api_dir / "bills.json").write_text(json.dumps(rows))
+            orig = V.EXAMPLES_DIR
+            V.EXAMPLES_DIR = Path(td) / "examples"
+            try:
+                overlay_dir = Path(td) / "overlay" / "synth-api"
+                overlay_dir.mkdir(parents=True)
+                (overlay_dir / "bills.json").write_text(json.dumps(rows))
+                report = V.Report()
+                V.validate_overlay_dir(overlay_dir, "synth-api", report)
+                offenders = [i for i in report.issues
+                             if i.code == "KEY_MISSING" and "Line[]" in i.message]
+                self.assertEqual(offenders, [], msg=str([i.message for i in offenders]))
+            finally:
+                V.EXAMPLES_DIR = orig
 
     def test_customers_primary_email_addr_polymorphism_no_type_mismatch(self):
-        ex = V.EXAMPLES_DIR / "quickbooks-api" / "customers.json"
+        rows = [
+            {"Id": "1", "PrimaryEmailAddr": {"Address": "a@b.com"}},
+            {"Id": "2", "PrimaryEmailAddr": None},
+        ]
         with tempfile.TemporaryDirectory() as td:
-            overlay_dir = Path(td) / "quickbooks-api"
-            overlay_dir.mkdir()
-            (overlay_dir / "customers.json").write_text(ex.read_text())
-            report = V.Report()
-            V.validate_overlay_dir(overlay_dir, "quickbooks-api", report)
-            offenders = [i for i in report.issues
-                         if i.code == "TYPE_MISMATCH" and "PrimaryEmailAddr" in i.message]
-            self.assertEqual(offenders, [], msg=str([i.message for i in offenders]))
+            api_dir = Path(td) / "examples" / "synth-api"
+            api_dir.mkdir(parents=True)
+            (api_dir / "customers.json").write_text(json.dumps(rows))
+            orig = V.EXAMPLES_DIR
+            V.EXAMPLES_DIR = Path(td) / "examples"
+            try:
+                overlay_dir = Path(td) / "overlay" / "synth-api"
+                overlay_dir.mkdir(parents=True)
+                (overlay_dir / "customers.json").write_text(json.dumps(rows))
+                report = V.Report()
+                V.validate_overlay_dir(overlay_dir, "synth-api", report)
+                offenders = [i for i in report.issues
+                             if i.code == "TYPE_MISMATCH" and "PrimaryEmailAddr" in i.message]
+                self.assertEqual(offenders, [], msg=str([i.message for i in offenders]))
+            finally:
+                V.EXAMPLES_DIR = orig
 
     def test_single_element_example_list_no_crash_no_spurious_error(self):
         with tempfile.TemporaryDirectory() as td:
@@ -277,43 +312,67 @@ class RaggednessToleranceTests(unittest.TestCase):
         self.assertTrue(any("characters" in m for c, _, m in findings_bad if c == "KEY_MISSING"))
 
     def test_optional_key_present_in_overlay_no_extra_no_missing(self):
-        ex = V.EXAMPLES_DIR / "quickbooks-api" / "bills.json"
-        overlay = json.loads(ex.read_text())
+        example = [
+            {"Id": "1", "Line": [{"DetailType": "X", "Amount": 10, "Id": "1", "LineNum": 1},
+                                 {"Amount": 20}]},
+            {"Id": "2", "Line": [{"Amount": 30, "Quantity": 2, "UnitPrice": 15}]},
+        ]
+        overlay = json.loads(json.dumps(example))
         for r in overlay:
             for line in r.get("Line", []):
                 for k in ("DetailType", "Id", "LineNum", "Quantity", "UnitPrice"):
                     line.setdefault(k, "x")
         with tempfile.TemporaryDirectory() as td:
-            overlay_dir = Path(td) / "quickbooks-api"
-            overlay_dir.mkdir()
-            (overlay_dir / "bills.json").write_text(json.dumps(overlay))
-            report = V.Report()
-            V.validate_overlay_dir(overlay_dir, "quickbooks-api", report)
-            offenders = [
-                i for i in report.issues
-                if i.code in ("KEY_MISSING", "KEY_EXTRA") and "Line[]" in i.message
-            ]
-            filtered = [i for i in offenders if any(
-                k in i.message for k in ("DetailType", "Id", "LineNum", "Quantity", "UnitPrice"))]
-            self.assertEqual(filtered, [],
-                             msg=str([i.message for i in filtered]))
+            api_dir = Path(td) / "examples" / "synth-api"
+            api_dir.mkdir(parents=True)
+            (api_dir / "bills.json").write_text(json.dumps(example))
+            orig = V.EXAMPLES_DIR
+            V.EXAMPLES_DIR = Path(td) / "examples"
+            try:
+                overlay_dir = Path(td) / "overlay" / "synth-api"
+                overlay_dir.mkdir(parents=True)
+                (overlay_dir / "bills.json").write_text(json.dumps(overlay))
+                report = V.Report()
+                V.validate_overlay_dir(overlay_dir, "synth-api", report)
+                offenders = [
+                    i for i in report.issues
+                    if i.code in ("KEY_MISSING", "KEY_EXTRA") and "Line[]" in i.message
+                ]
+                filtered = [i for i in offenders if any(
+                    k in i.message for k in ("DetailType", "Id", "LineNum", "Quantity", "UnitPrice"))]
+                self.assertEqual(filtered, [],
+                                 msg=str([i.message for i in filtered]))
+            finally:
+                V.EXAMPLES_DIR = orig
 
     def test_genuinely_unknown_key_still_emits_key_extra(self):
-        ex = V.EXAMPLES_DIR / "quickbooks-api" / "bills.json"
-        overlay = json.loads(ex.read_text())
+        example = [
+            {"Id": "1", "Line": [{"DetailType": "X", "Amount": 10, "Id": "1", "LineNum": 1},
+                                 {"Amount": 20}]},
+            {"Id": "2", "Line": [{"Amount": 30, "Quantity": 2, "UnitPrice": 15}]},
+        ]
+        overlay = json.loads(json.dumps(example))
         for r in overlay:
             for line in r.get("Line", []):
                 line["totally_made_up_deep_key"] = 1
         with tempfile.TemporaryDirectory() as td:
-            overlay_dir = Path(td) / "quickbooks-api"
-            overlay_dir.mkdir()
-            (overlay_dir / "bills.json").write_text(json.dumps(overlay))
-            report = V.Report()
-            V.validate_overlay_dir(overlay_dir, "quickbooks-api", report)
-            self.assertTrue(any(
-                i.code == "KEY_EXTRA" and "totally_made_up_deep_key" in i.message
-                for i in report.issues
-            ))
+            api_dir = Path(td) / "examples" / "synth-api"
+            api_dir.mkdir(parents=True)
+            (api_dir / "bills.json").write_text(json.dumps(example))
+            orig = V.EXAMPLES_DIR
+            V.EXAMPLES_DIR = Path(td) / "examples"
+            try:
+                overlay_dir = Path(td) / "overlay" / "synth-api"
+                overlay_dir.mkdir(parents=True)
+                (overlay_dir / "bills.json").write_text(json.dumps(overlay))
+                report = V.Report()
+                V.validate_overlay_dir(overlay_dir, "synth-api", report)
+                self.assertTrue(any(
+                    i.code == "KEY_EXTRA" and "totally_made_up_deep_key" in i.message
+                    for i in report.issues
+                ))
+            finally:
+                V.EXAMPLES_DIR = orig
 
 
 class PerRowRequiredColumnTests(unittest.TestCase):

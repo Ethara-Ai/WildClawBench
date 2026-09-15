@@ -1,5 +1,0 @@
-[service]
-name = "quickbooks-api"
-port = 8007
-env_var_name = "QUICKBOOKS_API_URL"
-healthcheck_path = "/health"

@@ -1,5 +1,0 @@
-[service]
-name = "linear-api"
-port = 8004
-env_var_name = "LINEAR_API_URL"
-healthcheck_path = "/health"

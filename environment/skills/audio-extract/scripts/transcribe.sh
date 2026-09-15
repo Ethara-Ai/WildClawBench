@@ -1,29 +1,34 @@
 #!/usr/bin/env bash
-# Transcribe an audio/video file to text via the harness LiteLLM sidecar.
+# Transcribe an audio/video file to text. Prefers a local offline whisper.cpp
+# engine baked into the agent image; falls back to the harness LiteLLM sidecar.
 #
 # Usage:
 #   transcribe.sh <media>                 # audio OR video; auto-extracts WAV
-#   transcribe.sh <media> --raw           # also print the raw sidecar JSON to stderr
+#   transcribe.sh <media> --raw           # also print raw engine/sidecar detail to stderr
 #
 # Output (stdout): the transcript text.
-# Output (stderr): step markers ("== extract ==", "== transcribe ==") and,
-#                  with --raw, the unparsed JSON response.
-# Exit code: 0 on success; non-zero with a clear error on any failure.
+# Output (stderr): step markers ("== extract ==", "== transcribe (local|sidecar) ==").
 #
-# Design notes:
-#   - Uses WCB_AUDIO_TRANSCRIBE_URL injected by the harness (openclaw runner).
-#     URL points at the in-cluster LiteLLM sidecar's
-#     /v1/audio/transcriptions endpoint, reachable over the --internal
-#     Docker bridge. The sidecar holds the upstream API key; the agent
-#     container has no internet egress and no key.
-#   - If the input is already a WAV, we skip ffmpeg and post directly. Any
-#     other extension (m4a, mp3, mp4, mov, wav with non-standard rate, etc.)
-#     goes through ffmpeg -> 16kHz mono pcm_s16le, which is the format the
-#     sidecar/whisper-1 backend expects. WAV at any rate also works for
-#     whisper-1, but we re-encode for determinism and to keep the file under
-#     OpenAI's 25 MB upload cap on long recordings.
-#   - Response is parsed with python3 (always present in this image) to
-#     avoid a jq dependency, which is NOT in wildclawbench-ubuntu:v1.3.
+# Exit codes:
+#   0  success
+#   1  input file not found
+#   2  usage / --help
+#   3  no transcription path available (no local whisper.cpp AND no sidecar URL)
+#   4  ffmpeg produced no audio
+#   5  curl transport error (sidecar path)
+#   6  sidecar returned non-200 (sidecar path)
+#   7  response/engine produced no text
+#
+# Engine selection:
+#   Local first: whisper-cli on PATH + model at WCB_WHISPER_MODEL
+#   (default /opt/whisper-models/ggml-base.en.bin, baked by image_overlays/agent-whisper.Dockerfile).
+#   Works fully offline on every backend. Falls back to the sidecar
+#   /v1/audio/transcriptions endpoint (WCB_AUDIO_TRANSCRIBE_URL, openclaw-only) when
+#   the local engine is absent. Force one path with WCB_TRANSCRIBE_ENGINE=local|sidecar.
+#
+# The ffmpeg -> 16kHz mono pcm_s16le re-encode is shared by both paths: it is the
+# format whisper.cpp requires and keeps sidecar uploads under OpenAI's 25 MB cap.
+# Response is parsed with python3 (jq is NOT in wildclawbench-ubuntu:v1.3).
 
 set -euo pipefail
 
@@ -31,9 +36,9 @@ if [[ "${1:-}" == "" || "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
   cat >&2 <<'EOF'
 usage: transcribe.sh <media> [--raw]
 
-Transcribe an audio or video file to text via the harness LiteLLM sidecar.
-The transcript is printed on stdout. With --raw, the unparsed JSON
-response is also printed on stderr.
+Transcribe an audio or video file to text. Uses a local offline whisper.cpp
+engine when available, otherwise the harness LiteLLM sidecar. The transcript is
+printed on stdout. With --raw, engine/response detail is also printed on stderr.
 EOF
   exit 2
 fi
@@ -49,12 +54,40 @@ if [[ ! -f "$in" ]]; then
   exit 1
 fi
 
-url="${WCB_AUDIO_TRANSCRIBE_URL:-}"
-if [[ -z "$url" ]]; then
-  echo "transcribe.sh: WCB_AUDIO_TRANSCRIBE_URL is not set." >&2
-  echo "  This env var is supposed to be injected by the harness at" >&2
-  echo "  container start (openclaw runner -> start_container extra_env_dict)." >&2
-  echo "  Without it, the agent has no working transcription path." >&2
+whisper_model="${WCB_WHISPER_MODEL:-/opt/whisper-models/ggml-base.en.bin}"
+forced_engine="${WCB_TRANSCRIBE_ENGINE:-}"
+sidecar_url="${WCB_AUDIO_TRANSCRIBE_URL:-}"
+
+local_available="0"
+if command -v whisper-cli >/dev/null 2>&1 && [[ -s "$whisper_model" ]]; then
+  local_available="1"
+fi
+
+use_local="0"
+case "$forced_engine" in
+  local)
+    if [[ "$local_available" != "1" ]]; then
+      echo "transcribe.sh: WCB_TRANSCRIBE_ENGINE=local but whisper-cli or model ($whisper_model) is missing." >&2
+      exit 3
+    fi
+    use_local="1"
+    ;;
+  sidecar)
+    use_local="0"
+    ;;
+  "")
+    use_local="$local_available"
+    ;;
+  *)
+    echo "transcribe.sh: invalid WCB_TRANSCRIBE_ENGINE='$forced_engine' (want local|sidecar)." >&2
+    exit 2
+    ;;
+esac
+
+if [[ "$use_local" != "1" && -z "$sidecar_url" ]]; then
+  echo "transcribe.sh: no transcription path available." >&2
+  echo "  Local: whisper-cli + model ($whisper_model) not found (bake image_overlays/agent-whisper.Dockerfile)." >&2
+  echo "  Sidecar: WCB_AUDIO_TRANSCRIBE_URL unset (injected by openclaw runner only)." >&2
   echo "  Treat as a harness configuration regression." >&2
   exit 3
 fi
@@ -73,11 +106,28 @@ if [[ ! -s "$wav" ]]; then
   exit 4
 fi
 
-echo "== transcribe: POST $url (file=$wav, model=whisper-1) ==" >&2
+if [[ "$use_local" == "1" ]]; then
+  echo "== transcribe (local): whisper-cli -m $whisper_model ==" >&2
+  txt_base="$scratch_dir/${stem}"
+  if [[ "$raw_mode" == "1" ]]; then
+    whisper-cli -m "$whisper_model" -f "$wav" -otxt -of "$txt_base" >&2
+  else
+    whisper-cli -m "$whisper_model" -f "$wav" -otxt -of "$txt_base" --no-prints
+  fi
+  txt="${txt_base}.txt"
+  if [[ ! -s "$txt" ]]; then
+    echo "transcribe.sh: whisper-cli produced no transcript text for $in" >&2
+    exit 7
+  fi
+  cat "$txt"
+  if [[ -n "$(tail -c1 "$txt")" ]]; then
+    echo
+  fi
+  exit 0
+fi
 
-# Use a temp file for the response so we can both inspect HTTP status and
-# parse the body even on non-2xx. --fail-with-body would mix the two; safer
-# to split with -w "%{http_code}" -o body_file.
+echo "== transcribe (sidecar): POST $sidecar_url (file=$wav, model=whisper-1) ==" >&2
+
 resp_body="$(mktemp)"
 trap 'rm -f "$resp_body"' EXIT
 
@@ -96,15 +146,15 @@ http_code="$(curl -sS \
   -F "file=@${wav}" \
   -F "model=whisper-1" \
   -F "response_format=json" \
-  "$url")" || {
-    echo "transcribe.sh: curl transport error reaching $url" >&2
+  "$sidecar_url")" || {
+    echo "transcribe.sh: curl transport error reaching $sidecar_url" >&2
     echo "  Response body (if any):" >&2
     sed 's/^/    /' < "$resp_body" >&2 || true
     exit 5
   }
 
 if [[ "$http_code" != "200" ]]; then
-  echo "transcribe.sh: sidecar returned HTTP $http_code from $url" >&2
+  echo "transcribe.sh: sidecar returned HTTP $http_code from $sidecar_url" >&2
   echo "  Response body:" >&2
   sed 's/^/    /' < "$resp_body" >&2 || true
   exit 6

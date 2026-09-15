@@ -1,5 +1,0 @@
-[service]
-name = "figma-api"
-port = 8079
-env_var_name = "FIGMA_API_URL"
-healthcheck_path = "/health"
