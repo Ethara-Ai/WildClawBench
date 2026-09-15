@@ -81,7 +81,10 @@ class Config:
     brave_api_key: str = "placeholder"
 
     # ---- Container image ----
-    docker_image: str = "wildclawbench-ubuntu:v1.3"
+    # v1.4 = the distributed v1.3 tarball + openai-whisper and preloaded 'small'
+    # weights, built locally by preflight_agent_image() in script/run.sh. Keep in
+    # lockstep with AGENT_IMAGE there; v1.3 remains the acquisition target.
+    docker_image: str = "wildclawbench-ubuntu:v1.4"
 
     # ---- LiteLLM proxy (shared sidecar container) ----
     litellm_master_key: str = "sk-talos-litellm"
@@ -219,7 +222,7 @@ class Config:
             openrouter_api_key=s("OPENROUTER_API_KEY"),
             openrouter_base_url=s("OPENROUTER_BASE_URL", default="https://openrouter.ai/api/v1"),
             brave_api_key=s("BRAVE_API_KEY", default="placeholder"),
-            docker_image=s("DOCKER_IMAGE", default="wildclawbench-ubuntu:v1.3"),
+            docker_image=s("DOCKER_IMAGE", default="wildclawbench-ubuntu:v1.4"),
             tmp_workspace=s("TMP_WORKSPACE", default="/tmp_workspace"),
             gateway_port=i("GATEWAY_PORT", 18789),
             upload_media_to_s3=b("UPLOAD_MEDIA_TO_S3", False),

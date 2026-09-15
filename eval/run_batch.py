@@ -2860,7 +2860,7 @@ def run_single_task(
                     workspace_dir=ws,
                     mock_env_dict=testexec_env,
                     network=network or None,
-                    image=getattr(config, "docker_image", "wildclawbench-ubuntu:v1.3") if config else "wildclawbench-ubuntu:v1.3",
+                    image=getattr(config, "docker_image", "wildclawbench-ubuntu:v1.4") if config else "wildclawbench-ubuntu:v1.4",
                     timeout=testexec_timeout,
                     checkers_code=task.get("checkers_code"),
                     agent_state_json=agent_state_json,

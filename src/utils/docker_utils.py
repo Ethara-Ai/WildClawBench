@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-DOCKER_IMAGE  = os.environ.get("DOCKER_IMAGE",   "wildclawbench-ubuntu:v1.3")
+DOCKER_IMAGE  = os.environ.get("DOCKER_IMAGE",   "wildclawbench-ubuntu:v1.4")
 TMP_WORKSPACE = os.environ.get("TMP_WORKSPACE",  "/tmp_workspace")
 WORKSPACE_BASELINE_PATH = "/tmp/wildclaw_workspace_baseline.json"
 # In-container file holding the agent's current simulated-clock anchor (epoch
@@ -499,7 +499,9 @@ def require_image_present(image: str) -> None:
             )
         raise RuntimeError(
             f"Required Docker image not present locally: {image}\n"
-            f"Load it first (e.g. `docker load -i Images/wildclawbench-ubuntu_v1.3.tar`)\n"
+            f"`bash script/run.sh` provisions it during preflight: `docker load` the "
+            f"v1.3 base from Images/wildclawbench-ubuntu_v1.3.tar, then build the "
+            f"whisper layer on top via docker/agent-whisper.Dockerfile\n"
             f"or set DOCKER_IMAGE to a tag that exists.\n"
             f"(Checked with `docker image ls -q {image}` and an inspect fallback; "
             f"both came back empty.)"

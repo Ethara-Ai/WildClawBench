@@ -1,0 +1,295 @@
+"""Parity + wiring coverage for the agent runtime image's whisper layer.
+
+`environment/skills/audio-extract/scripts/transcribe.sh` falls back to a LOCAL
+openai-whisper install when the harness sidecar advertises no whisper route
+(OAuth/Bedrock-only batches — the route is registered only with a whisper key,
+`src/agents/openclaw/runner.py:601`). That fallback is only real if the image
+the agent runs actually HAS whisper and its weights.
+
+Delivered bundles get it from `src/utils/harbor/dockerfile.py`. Our own runtime
+image gets it from `docker/agent-whisper.Dockerfile`, which layers the same
+install onto the prebuilt `wildclawbench-ubuntu:v1.3` tarball. Two independent
+recipes for one behavior drift silently — an agent would then hit a different
+whisper in a bundle than in a trajectory run — so the first half of this file
+pins them to the same four semantic facts:
+
+    pip package      openai-whisper
+    model name       small
+    download_root    /opt/wb_whisper_models
+    cache symlink    /root/.cache/whisper -> /opt/wb_whisper_models
+
+The second half pins the wiring: run.sh must RUN the whisper image while still
+ACQUIRING the plain tarball base, and the python-side default must agree with
+run.sh, because that default — not run.sh's constant — is what actually selects
+the container image (`src/utils/docker_utils.py:16`).
+
+Everything here is static text analysis: no docker, no network.
+
+Comment lines are stripped before any assertion. The Dockerfile's header
+documents all four tokens in prose, so a substring check against the raw file
+would pass even if the RUN instruction were deleted outright.
+"""
+
+from __future__ import annotations
+
+import re
+import sys
+from pathlib import Path
+
+import pytest
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from src.utils.harbor.dockerfile import generate_harbor_dockerfile  # noqa: E402
+
+_AGENT_DOCKERFILE = _REPO_ROOT / "docker" / "agent-whisper.Dockerfile"
+_RUN_SH = _REPO_ROOT / "script" / "run.sh"
+_TRANSCRIBE_SH = (
+    _REPO_ROOT / "environment" / "skills" / "audio-extract" / "scripts" / "transcribe.sh"
+)
+
+_BASE_IMAGE = "wildclawbench-ubuntu:v1.3"
+_AGENT_IMAGE = "wildclawbench-ubuntu:v1.4"
+_BASE_IMAGE_SHA = "88cd069e8ead5f4497093671a6d9e39e80259d75d4524f230b52ce439fcb2870"
+_MODEL_DIR = "/opt/wb_whisper_models"
+
+
+def _directives(dockerfile_text: str) -> list[str]:
+    """Comment-free logical Dockerfile instructions (continuations joined)."""
+    kept = [
+        ln for ln in dockerfile_text.splitlines()
+        if ln.strip() and not ln.lstrip().startswith("#")
+    ]
+    joined = "\n".join(kept).replace("\\\n", " ")
+    return [re.sub(r"\s+", " ", ln).strip() for ln in joined.splitlines() if ln.strip()]
+
+
+def _whisper_directive(dockerfile_text: str) -> str:
+    matches = [d for d in _directives(dockerfile_text) if "openai-whisper" in d]
+    assert len(matches) == 1, f"expected exactly one whisper RUN, got {len(matches)}"
+    return matches[0]
+
+
+@pytest.fixture(scope="module")
+def agent_whisper_run() -> str:
+    return _whisper_directive(_AGENT_DOCKERFILE.read_text(encoding="utf-8"))
+
+
+@pytest.fixture(scope="module")
+def harbor_whisper_run() -> str:
+    return _whisper_directive(generate_harbor_dockerfile())
+
+
+class TestWhisperRecipeParity:
+    """The runtime image's whisper layer must behave like the bundle's."""
+
+    def test_installs_the_same_pip_package(self, agent_whisper_run, harbor_whisper_run):
+        # Unversioned in both: v1.3's pip 22.0.2 cannot read the current
+        # sdist's metadata and resolves an older release than harbor's pip
+        # does, so the PACKAGE is the contract, never a pinned version.
+        for run in (agent_whisper_run, harbor_whisper_run):
+            assert re.search(r"pip install [^&]*\bopenai-whisper\b", run), run
+            assert "--no-cache-dir" in run
+
+    def test_preloads_the_same_model_into_the_same_root(
+        self, agent_whisper_run, harbor_whisper_run
+    ):
+        pattern = r"load_model\(\s*'([^']+)'\s*,\s*download_root='([^']+)'\s*\)"
+        agent = re.search(pattern, agent_whisper_run)
+        harbor = re.search(pattern, harbor_whisper_run)
+        assert agent is not None, agent_whisper_run
+        assert harbor is not None, harbor_whisper_run
+        assert agent.groups() == harbor.groups()
+        assert agent.groups() == ("small", _MODEL_DIR)
+
+    def test_creates_the_same_cache_symlink(self, agent_whisper_run, harbor_whisper_run):
+        link = "ln -sfn %s /root/.cache/whisper" % _MODEL_DIR
+        assert link in agent_whisper_run
+        assert link in harbor_whisper_run
+
+    def test_model_dir_matches_the_skill_default(self, agent_whisper_run):
+        # transcribe.sh gates its local rung on this directory existing and
+        # passes it as download_root; a renamed path silently disables the rung.
+        assert 'WCB_WHISPER_MODEL_DIR:-%s' % _MODEL_DIR in _TRANSCRIBE_SH.read_text(
+            encoding="utf-8"
+        )
+        assert _MODEL_DIR in agent_whisper_run
+
+    def test_break_system_packages_divergence_is_deliberate(
+        self, agent_whisper_run, harbor_whisper_run
+    ):
+        # The one intentional difference. harbor's ubuntu:24.04 base ships an
+        # EXTERNALLY-MANAGED marker and needs the flag; v1.3 is 22.04 with pip
+        # 22.0.2, where the option does not exist and passing it is a usage
+        # error that fails the build. Pinned so neither side is "harmonized"
+        # into breaking.
+        assert "--break-system-packages" in harbor_whisper_run
+        assert "--break-system-packages" not in agent_whisper_run
+
+    def test_build_reaches_the_network_past_the_baked_proxy(self, agent_whisper_run):
+        # v1.3 bakes an unroutable corporate proxy into its image env
+        # (src/utils/docker_utils.py:525). Without neutralizing it for the
+        # build, both the pip install and the weight download die against it.
+        assert re.search(r"unset\b[^&]*\bhttp_proxy\b", agent_whisper_run)
+        assert "https_proxy" in agent_whisper_run
+
+    def test_layers_onto_the_base_without_mutating_its_runtime_env(self):
+        directives = _directives(_AGENT_DOCKERFILE.read_text(encoding="utf-8"))
+        assert directives[0] == "FROM %s" % _BASE_IMAGE
+        # Exactly one instruction total: the image must be v1.3 + whisper and
+        # nothing else, so a rollback is a pure tag flip. A persisted ENV here
+        # would also un-fix the proxy override the harness relies on at RUN time.
+        assert len(directives) == 2, directives
+        assert not [d for d in directives if d.startswith(("ENV ", "CMD ", "ENTRYPOINT ", "WORKDIR "))]
+
+
+class TestRunShImageWiring:
+    @pytest.fixture(scope="class")
+    def run_sh(self) -> str:
+        return _RUN_SH.read_text(encoding="utf-8")
+
+    def test_agent_image_is_the_whisper_image(self, run_sh):
+        assert 'readonly AGENT_IMAGE="%s"' % _AGENT_IMAGE in run_sh
+
+    def test_base_image_named_once_and_still_acquired(self, run_sh):
+        assert 'readonly BASE_IMAGE="%s"' % _BASE_IMAGE in run_sh
+        # The tarball is still the distributed artifact — v1.4 has none.
+        assert 'AGENT_TAR_PATH="Images/wildclawbench-ubuntu_v1.3.tar"' in run_sh
+
+    def test_sha_pin_matches_the_real_base_content_id(self, run_sh):
+        # The previous pin matched no layer set on either production host, so
+        # the retag rung silently no-op'd and every tag-table loss degraded
+        # into a 28GB re-load.
+        assert 'readonly BASE_IMAGE_SHA="%s"' % _BASE_IMAGE_SHA in run_sh
+        assert "60eec8752cb597e180780ff08d7569c1892c169521f1f2b069c2efeb006a4078" not in run_sh
+
+    def test_preflight_builds_the_whisper_image_from_the_dockerfile(self, run_sh):
+        assert 'readonly AGENT_WHISPER_DOCKERFILE="docker/agent-whisper.Dockerfile"' in run_sh
+        assert 'docker build --platform linux/amd64 -f "$AGENT_WHISPER_DOCKERFILE" -t "$AGENT_IMAGE" .' in run_sh
+        assert "ensure_base_image() {" in run_sh
+        assert "preflight_agent_image() {" in run_sh
+
+    def test_preflight_acquires_base_before_building(self, run_sh):
+        body = run_sh.split("preflight_agent_image() {", 1)[1].split("\n}", 1)[0]
+        assert body.index("ensure_base_image") < body.index("docker build")
+
+    def test_recovery_rebuilds_rather_than_retagging_a_built_image(self, run_sh):
+        # v1.4 is built locally, so its content ID is unknown at write time and
+        # a lost tag cannot be recovered by SHA the way the base can.
+        body = run_sh.split("attempt_docker_recovery() {", 1)[1].split("\n}", 1)[0]
+        assert "ensure_base_image" in body
+        assert "docker build" in body
+        assert "AGENT_IMAGE_SHA" not in body
+
+
+_DOCKER_STUB = """#!/usr/bin/env bash
+printf '%s\\n' "$*" >> "$DOCKER_LOG"
+case "$1 $2" in
+  "image inspect")
+    for ref in $PRESENT_IMAGES; do [[ "$3" == "$ref" ]] && exit 0; done
+    exit 1 ;;
+esac
+[[ "$1" == "build" ]] && exit "${BUILD_RC:-0}"
+exit 0
+"""
+
+# run.sh ends in a bare `main "$@"`; drop that one line and the rest is a
+# sourceable library of its functions.
+_HARNESS = """#!/usr/bin/env bash
+set -u
+source "$(dirname "$0")/run_lib.sh"
+cd "$REPO_ROOT"
+preflight_agent_image
+echo "rc=$?"
+"""
+
+
+def _run_preflight(tmp_path, present_images: str, build_rc: str = "0"):
+    """Drive the REAL preflight_agent_image against a stubbed docker CLI."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(exist_ok=True)
+    stub = bin_dir / "docker"
+    stub.write_text(_DOCKER_STUB, encoding="utf-8")
+    stub.chmod(0o755)
+
+    # run.sh resolves lib/log.sh against `dirname $0`, which for a sourced file
+    # is the SOURCING script — so the harness has to live in a directory shaped
+    # like script/ or the real log:: functions silently go undefined.
+    script_dir = tmp_path / "script"
+    script_dir.mkdir(exist_ok=True)
+    (script_dir / "lib").symlink_to(_REPO_ROOT / "script" / "lib")
+
+    stripped = script_dir / "run_lib.sh"
+    stripped.write_text(
+        "\n".join(_RUN_SH.read_text(encoding="utf-8").splitlines()[:-1]),
+        encoding="utf-8",
+    )
+    harness = script_dir / "harness.sh"
+    harness.write_text(_HARNESS, encoding="utf-8")
+
+    docker_log = tmp_path / "docker.log"
+    docker_log.touch()
+    import os
+    import subprocess
+
+    env = {
+        **os.environ,
+        "PATH": "%s:%s" % (bin_dir, os.environ["PATH"]),
+        "DOCKER_LOG": str(docker_log),
+        "PRESENT_IMAGES": present_images,
+        "BUILD_RC": build_rc,
+        "REPO_ROOT": str(_REPO_ROOT),
+        "NO_COLOR": "1",
+    }
+    proc = subprocess.run(
+        ["bash", str(harness)], env=env, capture_output=True, text=True, timeout=120
+    )
+    return proc, docker_log.read_text(encoding="utf-8").splitlines()
+
+
+class TestPreflightBehavior:
+    """Exercises the real function; only the docker CLI is stubbed."""
+
+    def test_present_image_is_a_fast_path_with_no_build(self, tmp_path):
+        proc, calls = _run_preflight(tmp_path, present_images=_AGENT_IMAGE)
+        assert "rc=0" in proc.stdout
+        assert not [c for c in calls if c.startswith("build")]
+
+    def test_missing_image_builds_from_the_dockerfile(self, tmp_path):
+        proc, calls = _run_preflight(tmp_path, present_images=_BASE_IMAGE)
+        assert "rc=0" in proc.stdout
+        builds = [c for c in calls if c.startswith("build")]
+        assert len(builds) == 1
+        assert "-f docker/agent-whisper.Dockerfile" in builds[0]
+        assert "-t %s" % _AGENT_IMAGE in builds[0]
+        assert "--platform linux/amd64" in builds[0]
+
+    def test_missing_base_tag_is_retagged_from_sha_before_building(self, tmp_path):
+        proc, calls = _run_preflight(tmp_path, present_images="sha256:%s" % _BASE_IMAGE_SHA)
+        assert "rc=0" in proc.stdout
+        tags = [c for c in calls if c.startswith("tag ")]
+        assert tags == ["tag sha256:%s %s" % (_BASE_IMAGE_SHA, _BASE_IMAGE)]
+        assert [c for c in calls if c.startswith("build")]
+
+    def test_build_failure_fails_loud_with_an_actionable_command(self, tmp_path):
+        proc, _ = _run_preflight(tmp_path, present_images=_BASE_IMAGE, build_rc="1")
+        assert "rc=1" in proc.stdout
+        combined = proc.stdout + proc.stderr
+        assert "docker build --platform linux/amd64 -f docker/agent-whisper.Dockerfile" in combined
+        assert "internet" in combined
+
+
+class TestPythonSideImageDefault:
+    """run.sh's constant does NOT choose the container image — these do."""
+
+    def test_docker_utils_default_matches_run_sh(self):
+        from src.utils import docker_utils
+
+        assert docker_utils.DOCKER_IMAGE == _AGENT_IMAGE
+
+    def test_config_default_matches_run_sh(self):
+        from src.utils.config import Config
+
+        assert Config().docker_image == _AGENT_IMAGE

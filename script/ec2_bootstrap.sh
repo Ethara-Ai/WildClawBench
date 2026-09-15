@@ -34,7 +34,9 @@ echo "docker: $($DOCKER --version)"
 step "2. python deps"
 python3 -m pip install -q --user -r requirements.txt || die "pip install failed"
 
-step "3. agent image wildclawbench-ubuntu:v1.3 (linux/amd64, ~28GB)"
+# Base only. run.sh's preflight layers whisper on top of this into
+# wildclawbench-ubuntu:v1.4 (the image tasks actually run) at step 5.
+step "3. agent base image wildclawbench-ubuntu:v1.3 (linux/amd64, ~28GB)"
 if $DOCKER image inspect wildclawbench-ubuntu:v1.3 >/dev/null 2>&1; then
   echo "image already loaded — skipping"
 else

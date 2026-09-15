@@ -48,7 +48,7 @@ if str(REPO_ROOT) not in sys.path:
 from src.utils.test_executor import execute_tests  # noqa: E402
 from src.utils.harbor.ctrf import build_ctrf        # noqa: E402
 
-DEFAULT_IMAGE = "wildclawbench-ubuntu:v1.3"
+DEFAULT_IMAGE = "wildclawbench-ubuntu:v1.4"
 
 
 def _find_tests(run_dir: Path) -> tuple[Path | None, Path | None]:

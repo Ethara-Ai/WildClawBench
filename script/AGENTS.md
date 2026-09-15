@@ -5,7 +5,7 @@ Operational entry points + ops/migration scripts. Note: directory name is `scrip
 ## The user-facing launcher
 **`run.sh`** (~1157 lines) — primary user entry, wraps `eval/run_batch.py`.
 - Self-invokes via `$SELF` / `WCB_SELF` for failure-isolated parallel-task fan-out (one task failing must never abort a bulk run).
-- 5-step preflight: docker daemon → agent image present (`wildclawbench-ubuntu:v1.3`) → mock image (`kensei3-mocks:v1`) → `.env` sanity → cleanup_orphans.
+- 5-step preflight: docker daemon → agent image present (`wildclawbench-ubuntu:v1.4`, auto-built from `docker/agent-whisper.Dockerfile` on top of the `wildclawbench-ubuntu:v1.3` tarball base) → mock image (`kensei3-mocks:v1`) → `.env` sanity → cleanup_orphans.
 - **Shared LiteLLM sidecar + network bootstrap** runs once per outer invocation AFTER preflight, BEFORE the task loop (see "Shared-infra (Fix A+B)" below).
 - One-shot Docker recovery retry on errors matching: `Required Docker image not present|Container startup failed|No such image|manifest unknown`.
 - Defaults: `input/alden-croft_MB`, `claude-opus-4.7`, K=1, backend `openclaw`, thinking `xhigh`.

@@ -400,7 +400,7 @@ def execute_tests(
     workspace_dir: Path,
     mock_env_dict: Optional[Mapping[str, str]] = None,
     network: Optional[str] = None,
-    image: str = "wildclawbench-ubuntu:v1.3",
+    image: str = "wildclawbench-ubuntu:v1.4",
     timeout: int = 300,
     checkers_code: Optional[str] = None,
     agent_state_json: Optional[str] = None,
