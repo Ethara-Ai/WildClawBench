@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -203,6 +204,25 @@ def test_load_transcript_nonexistent_path_falls_through_to_empty(
     tmp_path: Path,
 ) -> None:
     assert tl.load_transcript(str(tmp_path / "missing.jsonl")) == []
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root bypasses directory permissions")
+def test_load_transcript_unreadable_candidate_returns_empty(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # Regression: the hard-coded fallback lives under /root, which is not
+    # traversable off-root, so probing it raised PermissionError out of
+    # load_transcript and the caller lost the transcript entirely.
+    locked = tmp_path / "locked"
+    locked.mkdir()
+    chat = locked / "chat.jsonl"
+    chat.write_text('{"role": "user"}\n')
+    os.chmod(locked, 0o000)
+    try:
+        monkeypatch.setattr(tl, "OPENCLAW_FALLBACK_PATH", str(chat))
+        assert tl.load_transcript() == []
+    finally:
+        os.chmod(locked, 0o700)
 
 
 def test_load_transcript_dedupes_when_explicit_equals_fallback(
