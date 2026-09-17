@@ -126,8 +126,25 @@ class ItemUpdateBody(BaseModel):
     column_values: Optional[Dict[str, Any]] = None
 
 
+#: The names ``monday_data.update_item`` actually branches on. ``text`` and
+#: ``value`` are deliberately absent: both are modifiers of ``column_id`` and
+#: neither reaches a write branch without it, so a body carrying only those is
+#: still a no-op and has to be reported as one.
+ITEM_UPDATE_FIELDS = ("column_values", "column_id", "item_name", "group_id")
+
+
 @app.put("/v2/items/{item_id}")
 def update_item(item_id: str, body: ItemUpdateBody):
+    # Mirrors update_item's own write conditions, so nothing that used to apply
+    # is refused here: the empty string is a rename, the empty dict is not.
+    if not (body.group_id is not None or body.item_name is not None
+            or body.column_id is not None or bool(body.column_values)):
+        return JSONResponse(status_code=400, content={
+            "error": "no updatable field supplied; expected one of "
+                     + ", ".join(ITEM_UPDATE_FIELDS)
+                     + " (column_id names the cell, text or value carries it)",
+        })
+
     result = monday_data.update_item(
         item_id,
         column_id=body.column_id,
