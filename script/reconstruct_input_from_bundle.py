@@ -169,6 +169,9 @@ def reconstruct(bundle: Path, out_dir: Path, baseline_env: Path, verbose: bool,
     log: list[str] = []
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    variant = recon_sources.detect_variant(bundle)
+    log.append(f"  ok   bundle layout          .. {variant}")
+
     prompts, instants = recover_prompts(bundle, out_dir, log, timezone,
                                         trajectory_run)
 
@@ -176,6 +179,8 @@ def reconstruct(bundle: Path, out_dir: Path, baseline_env: Path, verbose: bool,
     for c in carried.values():
         if c.names:
             log.append(f"  ok   {c.label:<22} <- {c.source} ({len(c)} file(s))")
+        else:
+            log.append(f"  MISS {c.label:<22} .. the bundle publishes none")
     persona_names = carried["persona/"].names
     data_names = carried["data/"].names
 
@@ -207,6 +212,7 @@ def reconstruct(bundle: Path, out_dir: Path, baseline_env: Path, verbose: bool,
     drift = recon_environment.module_drift(env_dir, baseline_env, out_dir.name)
     recon_environment.write_manifest(out_dir, drift, mock, {
         "source_bundle": str(bundle),
+        "bundle_variant": variant,
         "baseline": baseline_ref or str(baseline_env),
         "turns": len(prompts.turns) if prompts else 0,
         "clock_fidelity": instants.fidelity if instants.values else "none",
@@ -236,10 +242,11 @@ def reconstruct(bundle: Path, out_dir: Path, baseline_env: Path, verbose: bool,
     errors.extend(g.line() for g in recon_gates.failures(gates))
 
     _write_notes(out_dir, bundle, baseline_env, log, overlays, warnings, meta,
-                 persona_names, data_names, gates)
+                 persona_names, data_names, gates, variant)
 
     summary = {
         "task": out_dir.name,
+        "variant": variant,
         "turns": len(prompts.turns) if prompts else 0,
         "clock": instants.fidelity if instants.values else "none",
         "prompt": (out_dir / "prompts.txt").is_file(),
@@ -265,11 +272,12 @@ def reconstruct(bundle: Path, out_dir: Path, baseline_env: Path, verbose: bool,
 
 
 def _write_notes(out_dir, bundle, baseline_env, log, overlays, warnings, meta,
-                 persona_names, data_names, gates) -> None:
+                 persona_names, data_names, gates, variant) -> None:
     lines = [
         f"# Reconstruction notes — {out_dir.name}",
         "",
         f"Source bundle : {bundle}",
+        f"Bundle layout : {variant}",
         f"Baseline env  : {baseline_env}",
         "",
         "## Recovered",

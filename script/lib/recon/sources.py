@@ -122,6 +122,32 @@ def recover_inject(bundle: Path, out_dir: Path) -> Carried:
                    "inject")
 
 
+#: How each shipped layout identifies itself, most specific first. The order is
+#: load-bearing: three of the five carry a prompt.txt and two carry a
+#: prompts.json, so each must be recognised by the file that sets it apart
+#: before the file they share is reached.
+VARIANTS = (
+    ("pilot_rework", ("data/solution/TRUTH.md",)),
+    ("prompts_json_mirror", ("prompts.json", "golden_trajectory.json")),
+    ("prompts_json", ("prompts.json",)),
+    ("golden_trajectory", ("PROMPT.md", "golden-trajectory")),
+    ("prompt_txt", ("prompt.txt", "TRUTH.md")),
+)
+
+
+def detect_variant(bundle: Path) -> str:
+    """Name the layout a bundle was published in, or 'unknown'.
+
+    Nothing branches on the answer — every recovery step probes for what it
+    needs — but it is recorded, because knowing which of the five shapes a
+    bundle is makes an unexpected gap explicable rather than mysterious.
+    """
+    for name, markers in VARIANTS:
+        if all(bundle.joinpath(*m.split("/")).exists() for m in markers):
+            return name
+    return "unknown"
+
+
 def recover_all(bundle: Path, out_dir: Path) -> list:
     return [
         recover_rubric(bundle, out_dir),

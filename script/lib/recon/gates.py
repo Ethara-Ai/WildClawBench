@@ -116,11 +116,17 @@ def g2_sim_clock(ctx: GateContext) -> Gate:
                 f"({ctx.instants.fidelity})")
 
 
-#: preflight still lists the generated-test channel among a task's required
-#: files. That channel is retired and the reconstruction deliberately does not
-#: write it back, so under --legacy those two failures are the expected residue
-#: of the decision rather than a defect in the tree.
-RETIRED_TEST_FILES = ("test_outputs.py MISSING", "test_weights.json MISSING")
+#: preflight reports the generated-test channel from three places — the
+#: structural file list, the compile check and the weights check. That channel
+#: is retired and the reconstruction deliberately does not write it back, so
+#: under --legacy every complaint about those two files is the expected residue
+#: of the decision rather than a defect in the tree. Matched on the filename so
+#: a reworded message cannot quietly turn back into a failure.
+RETIRED_TEST_FILES = ("test_outputs.py", "test_weights.json")
+
+
+def _is_retired_test_complaint(line: str) -> bool:
+    return any(line.startswith(name) for name in RETIRED_TEST_FILES)
 
 _ANSI = re.compile(r"\x1b\[[0-9;]*m")
 
@@ -140,7 +146,7 @@ def g3_preflight(ctx: GateContext) -> Gate:
     fails = [_ANSI.sub("", ln).replace("✘", "").strip()
              for ln in done.stdout.splitlines() if "✘" in ln]
     if ctx.legacy:
-        fails = [f for f in fails if f not in RETIRED_TEST_FILES]
+        fails = [f for f in fails if not _is_retired_test_complaint(f)]
         if not fails:
             return Gate("G3", "preflight", PASS,
                         "preflight_task reports only the retired generated-test "
