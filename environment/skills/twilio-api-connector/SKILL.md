@@ -31,12 +31,19 @@ are mocked (any token is accepted). Responses are deterministic fixtures.
 
 ## Usage
 
+Write operations (POST) pass their fields as **query params**, not a JSON body —
+a JSON body is silently ignored and required fields (`To`/`From`) will 422. Use
+`-G --data-urlencode` for writes.
+
 ```bash
 # GET example
 curl -s "$TWILIO_API_URL/2010-04-01/Accounts/{account_sid}/Messages.json"
 
-# POST example
-curl -s -X POST "$TWILIO_API_URL/2010-04-01/Accounts/{account_sid}/Messages.json" -H 'Content-Type: application/json' -d '{}'
+# POST example (send a message) — fields in the query string
+curl -s -G -X POST "$TWILIO_API_URL/2010-04-01/Accounts/{account_sid}/Messages.json" \
+  --data-urlencode "To=<to_number>" \
+  --data-urlencode "From=<from_number>" \
+  --data-urlencode "Body=<message_text>"
 ```
 
 The audit log of every call the agent makes is available at

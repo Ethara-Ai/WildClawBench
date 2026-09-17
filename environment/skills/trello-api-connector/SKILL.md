@@ -35,12 +35,22 @@ are mocked (any token is accepted). Responses are deterministic fixtures.
 
 ## Usage
 
+Write operations (POST/PUT) pass their fields as **query params**, like the real
+Trello REST API — a JSON body is silently ignored. Use `-G --data-urlencode` for
+writes and re-read the resource to confirm the change landed.
+
 ```bash
 # GET example
 curl -s "$TRELLO_API_URL/1/members/me"
 
-# POST example
-curl -s -X POST "$TRELLO_API_URL/1/members/me" -H 'Content-Type: application/json' -d '{}'
+# POST example (create a card) — fields in the query string
+curl -s -G -X POST "$TRELLO_API_URL/1/cards" \
+  --data-urlencode "idList=<list_id>" \
+  --data-urlencode "name=<card_name>"
+
+# PUT example (update a card) — fields in the query string
+curl -s -G -X PUT "$TRELLO_API_URL/1/cards/<card_id>" \
+  --data-urlencode "desc=<new_description>"
 ```
 
 The audit log of every call the agent makes is available at

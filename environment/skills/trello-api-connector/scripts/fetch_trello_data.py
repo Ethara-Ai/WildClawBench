@@ -2,8 +2,14 @@
 """CLI helper for the Trello API (Mock) mock API.
 
 Generated read/write helper: one flag per endpoint. Base URL comes from
-$TRELLO_API_URL (override with --url). POST/PUT/PATCH bodies are read from --data
-(JSON string) or --data-file; DELETE/GET take only path params.
+$TRELLO_API_URL (override with --url).
+
+Like the real Trello REST API, write operations (POST/PUT) pass their fields as
+QUERY PARAMS, not a JSON body -- a JSON body is silently ignored by the server.
+Supply write fields with repeatable `--param key=value` flags (e.g.
+`--param desc="Standard 3.0"`). `--data`/`--data-file` are also accepted for
+back-compat: a flat JSON object is expanded into the same query params.
+DELETE/GET take only path params.
 """
 
 import argparse
@@ -35,6 +41,13 @@ def _request(base, path, method, body=None):
         return raw
 
 
+def _request_query(base, path, method, params):
+    query = urllib.parse.urlencode(params or {})
+    sep = "&" if "?" in path else "?"
+    full = path + (sep + query if query else "")
+    return _request(base, full, method)
+
+
 def api_get(base, path):
     return _request(base, path, "GET")
 
@@ -43,17 +56,21 @@ def api_delete(base, path):
     return _request(base, path, "DELETE")
 
 
-def api_send(base, path, method, body):
-    return _request(base, path, method, body if body is not None else {})
+def api_send(base, path, method, params):
+    return _request_query(base, path, method, params)
 
 
-def _body(args):
+def _params(args):
+    params = {}
     if getattr(args, "data_file", None):
         with open(args.data_file, "r", encoding="utf-8") as fh:
-            return json.load(fh)
+            params.update(json.load(fh))
     if getattr(args, "data", None):
-        return json.loads(args.data)
-    return {}
+        params.update(json.loads(args.data))
+    for pair in getattr(args, "param", None) or []:
+        key, _, value = pair.partition("=")
+        params[key] = value
+    return params
 
 
 def show(data):
@@ -74,8 +91,10 @@ def main():
     p.add_argument("--delete-1-cards-card-id", metavar="CARD_ID", nargs=1, help="DELETE /1/cards/{card_id}")
     p.add_argument("--get-1-cards-checklists-card-id", metavar="CARD_ID", nargs=1, help="GET /1/cards/{card_id}/checklists")
     p.add_argument("--post-1-checklists", action="store_true", help="POST /1/checklists")
-    p.add_argument("--data", metavar="JSON", help="Request body as a JSON string (POST/PUT/PATCH)")
-    p.add_argument("--data-file", metavar="PATH", help="Request body from a JSON file (POST/PUT/PATCH)")
+    p.add_argument("--param", action="append", metavar="KEY=VALUE",
+                   help="Write field as a query param (repeatable), e.g. --param desc='Standard 3.0'")
+    p.add_argument("--data", metavar="JSON", help="Write fields as a flat JSON object (expanded into query params)")
+    p.add_argument("--data-file", metavar="PATH", help="Write fields from a flat JSON file (expanded into query params)")
     p.add_argument("--url", default=os.environ.get("TRELLO_API_URL", "http://localhost:8030"),
                    help="API base URL (default: $TRELLO_API_URL or http://localhost:8030)")
     args = p.parse_args()
@@ -105,15 +124,15 @@ def _dispatch(args, base):
     if args.get_1_cards_card_id:
         return show(api_get(base, _fill('/1/cards/{card_id}', args.get_1_cards_card_id)))
     if args.post_1_cards:
-        return show(api_send(base, '/1/cards', 'POST', _body(args)))
+        return show(api_send(base, '/1/cards', 'POST', _params(args)))
     if args.put_1_cards_card_id:
-        return show(api_send(base, _fill('/1/cards/{card_id}', args.put_1_cards_card_id), 'PUT', _body(args)))
+        return show(api_send(base, _fill('/1/cards/{card_id}', args.put_1_cards_card_id), 'PUT', _params(args)))
     if args.delete_1_cards_card_id:
         return show(api_delete(base, _fill('/1/cards/{card_id}', args.delete_1_cards_card_id)))
     if args.get_1_cards_checklists_card_id:
         return show(api_get(base, _fill('/1/cards/{card_id}/checklists', args.get_1_cards_checklists_card_id)))
     if args.post_1_checklists:
-        return show(api_send(base, '/1/checklists', 'POST', _body(args)))
+        return show(api_send(base, '/1/checklists', 'POST', _params(args)))
     print("No endpoint flag provided. Use -h to list available endpoints.", file=sys.stderr)
     return 0
 
