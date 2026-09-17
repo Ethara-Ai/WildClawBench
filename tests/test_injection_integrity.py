@@ -29,7 +29,10 @@ from src.utils.inject_director import (  # noqa: E402
     InjectApplier,
     InjectScript,
     InjectStage,
+    MtimeStamp,
+    NarrativeClock,
     is_defect,
+    resolve_stage_mtime,
 )
 
 
@@ -685,11 +688,19 @@ def test_map_workspace_dst_warns_on_alias_rewrite(caplog):
 
 
 class _FakeRun:
-    """Scripted subprocess.run stand-in keyed by a substring of the argv."""
+    """Scripted subprocess.run stand-in keyed by a substring of the argv.
 
-    def __init__(self, sizes=None, fail=()):
+    ``touch -d @N`` is modelled as actually working: the epoch is remembered per
+    dst and served back to the ``stat -c %Y`` read-back, so the post-copy mtime
+    invariant passes by default. Pass ``mtimes={dst: epoch_or_None}`` to
+    override that and simulate a stamp that did not stick.
+    """
+
+    def __init__(self, sizes=None, fail=(), mtimes=None):
         self.sizes = sizes or {}
         self.fail = set(fail)
+        self.mtimes = mtimes or {}
+        self.stamped = {}
         self.calls = []
 
     def __call__(self, cmd, *a, **kw):
@@ -700,10 +711,23 @@ class _FakeRun:
                 return _Completed(1, "", f"boom: {token}")
         if "inspect" in joined:
             return _Completed(0, "true", "")
+        if "touch" in cmd:
+            stamp = next((str(c)[1:] for c in cmd if str(c).startswith("@")), None)
+            if stamp is not None:
+                self.stamped[str(cmd[-1])] = int(stamp)
+            return _Completed(0, "", "")
         if "wc -c" in joined:
             for path, size in self.sizes.items():
                 if path in joined:
                     return _Completed(0, "" if size is None else str(size), "")
+            return _Completed(0, "", "")
+        if "stat -c %Y" in joined:
+            for path, mtime in self.mtimes.items():
+                if path in joined:
+                    return _Completed(0, "" if mtime is None else str(mtime), "")
+            for path, mtime in self.stamped.items():
+                if path in joined:
+                    return _Completed(0, str(mtime), "")
             return _Completed(0, "", "")
         return _Completed(0, "", "")
 
@@ -905,7 +929,8 @@ def test_real_hook_end_to_end_stamps_and_records_mapped_dst(tmp_path, monkeypatc
                      "dst": "/data/home/note.txt"}],
         loud=[], silent=[], source=str(stage_dir / "mutations.json"))
 
-    outcomes = ap.apply_stage(stage, turn_index=1, mtime_epoch_ms=1793000000000)
+    outcomes = ap.apply_stage(stage, turn_index=1,
+                              clock=NarrativeClock(turn_epoch_ms=1793000000000))
 
     assert outcomes[0]["ok"] is True
     assert outcomes[0]["mapped_dst"] == "/tmp_workspace/home/note.txt"
@@ -942,3 +967,335 @@ def test_real_hook_end_to_end_refuses_escaping_dst(tmp_path, monkeypatch):
     assert outcomes[0]["reason"] == "dst_outside_workspace"
     assert is_defect(outcomes[0], phase="stage") is True
     assert not any("cp" in c for c in runner.calls)
+
+
+# --------------------------------------------------------------------------- #
+# 9. Narrative mtime resolution. The stamping machinery landed inert: the only
+#    production caller could pass None (a turn with no resolvable sim clock),
+#    and None silently skipped `touch -d` entirely, leaving the drop on its
+#    authoring mtime — older than the T0-stamped baseline and therefore
+#    invisible to the recency searches the scenario expects the agent to run.
+# --------------------------------------------------------------------------- #
+
+# The offset-aware shape mutations.json actually ships, and its epoch.
+_STAGE_ISO = "2026-12-20T03:10:00-05:00"
+_STAGE_MS = 1797754200000
+_T0_MS = 1797735600000       # 2026-12-19T22:00:00-05:00, the baseline anchor
+_TURN_MS = 1797775200000     # 2026-12-20T09:00:00-05:00, the boundary turn
+
+
+def _fs_stage(tmp_path, *, ops, applied_at_epoch_ms=None, name="s1"):
+    stage_dir = tmp_path / "inject" / "stage1"
+    stage_dir.mkdir(parents=True, exist_ok=True)
+    (stage_dir / "mutations.json").write_text("{}", encoding="utf-8")
+    (stage_dir / "note.txt").write_text("payload", encoding="utf-8")
+    return InjectStage(
+        index=1, name=name, from_turn=0, to_turn=1, filesystem=list(ops),
+        loud=[], silent=[], source=str(stage_dir / "mutations.json"),
+        applied_at_epoch_ms=applied_at_epoch_ms)
+
+
+def _copy_op(**extra):
+    return {"id": "fs-1", "action": "copy", "src": "note.txt",
+            "dst": "/workspace/home/note.txt", **extra}
+
+
+def test_resolution_prefers_the_stage_applied_at_over_the_turn_clock(tmp_path):
+    stage = _fs_stage(tmp_path, ops=[], applied_at_epoch_ms=_STAGE_MS)
+
+    stamp = resolve_stage_mtime(
+        stage, NarrativeClock(turn_epoch_ms=_TURN_MS, t0_epoch_ms=_T0_MS))
+
+    assert stamp == MtimeStamp(_STAGE_MS, "stage")
+
+
+def test_resolution_falls_back_to_the_boundary_turn_clock(tmp_path):
+    stage = _fs_stage(tmp_path, ops=[])
+
+    stamp = resolve_stage_mtime(
+        stage, NarrativeClock(turn_epoch_ms=_TURN_MS, t0_epoch_ms=_T0_MS))
+
+    assert stamp == MtimeStamp(_TURN_MS, "turn")
+
+
+def test_resolution_falls_back_to_t0_loudly(tmp_path, caplog):
+    stage = _fs_stage(tmp_path, ops=[])
+
+    with caplog.at_level(logging.WARNING, logger="wildclaw.inject"):
+        stamp = resolve_stage_mtime(stage, NarrativeClock(t0_epoch_ms=_T0_MS))
+
+    assert stamp == MtimeStamp(_T0_MS, "t0")
+    assert any("T0 baseline epoch" in r.getMessage() for r in caplog.records), (
+        "a T0 fallback ties the drop with the baseline; it must never be quiet")
+
+
+def test_resolution_without_any_instant_is_loud_not_silent(tmp_path, caplog):
+    stage = _fs_stage(tmp_path, ops=[])
+
+    with caplog.at_level(logging.WARNING, logger="wildclaw.inject"):
+        stamp = resolve_stage_mtime(stage, None)
+
+    assert stamp.epoch_ms is None and stamp.source == "unresolved"
+    assert any("no narrative instant available" in r.getMessage()
+               for r in caplog.records)
+
+
+def test_inject_script_load_parses_applied_at_local_time(tmp_path):
+    stage_dir = tmp_path / "inject" / "stage1"
+    stage_dir.mkdir(parents=True)
+    (stage_dir / "mutations.json").write_text(json.dumps({
+        "stage_name": "s1",
+        "applies_between_turns": ["T0", "T1"],
+        "applied_at_local_time": _STAGE_ISO,
+        "mutations": {"filesystem": [_copy_op()]},
+    }), encoding="utf-8")
+
+    script = InjectScript.load(tmp_path / "inject")
+
+    assert script.stages[0].applied_at_epoch_ms == _STAGE_MS
+
+
+def test_inject_script_load_survives_a_naive_applied_at(tmp_path, caplog):
+    stage_dir = tmp_path / "inject" / "stage1"
+    stage_dir.mkdir(parents=True)
+    (stage_dir / "mutations.json").write_text(json.dumps({
+        "stage_name": "s1",
+        "applies_between_turns": ["T0", "T1"],
+        "applied_at_local_time": "2026-12-20 03:10:00",
+        "mutations": {"filesystem": [_copy_op()]},
+    }), encoding="utf-8")
+
+    with caplog.at_level(logging.WARNING, logger="wildclaw.inject"):
+        script = InjectScript.load(tmp_path / "inject")
+
+    assert script.stages[0].applied_at_epoch_ms is None
+    assert any("offset-aware" in r.getMessage() for r in caplog.records)
+
+
+@pytest.mark.parametrize("raw,expected", [
+    (_STAGE_ISO, _STAGE_MS),
+    ("2026-12-20T08:10:00Z", 1797754200000),
+    (_STAGE_MS, _STAGE_MS),
+    ("2026-12-20 03:10:00", None),
+    ("not-a-time", None),
+    (True, None),
+    (None, None),
+])
+def test_parse_narrative_instant_accepts_iso_and_epoch_only(raw, expected):
+    from src.utils.inject_director import parse_narrative_instant
+
+    assert parse_narrative_instant(raw) == expected
+
+
+def _stamped_epochs(runner):
+    return [int(str(c[-2])[1:]) for c in runner.calls
+            if "touch" in c and str(c[-2]).startswith("@")]
+
+
+def _real_hook_applier(tmp_path):
+    return InjectApplier({}, None, tmp_path / "timeline.jsonl",
+                         inject_root=tmp_path / "inject",
+                         copy_into_workspace=_run_batch_shaped_hook("t"))
+
+
+def test_per_op_mtime_override_beats_the_stage_instant(tmp_path, monkeypatch):
+    from src.utils import docker_utils as du
+
+    stage = _fs_stage(tmp_path, ops=[_copy_op(mtime="2026-03-02T11:00:00-05:00")],
+                      applied_at_epoch_ms=_STAGE_MS)
+    runner = _FakeRun(sizes={"/tmp_workspace/home/note.txt": len("payload")})
+    monkeypatch.setattr(du.subprocess, "run", runner)
+
+    outcomes = _real_hook_applier(tmp_path).apply_stage(
+        stage, turn_index=1,
+        clock=NarrativeClock(turn_epoch_ms=_TURN_MS, t0_epoch_ms=_T0_MS))
+
+    assert outcomes[0]["ok"] is True
+    assert outcomes[0]["mtime_source"] == "op"
+    assert _stamped_epochs(runner) == [1772467200]
+
+
+def test_per_op_mtime_override_accepts_epoch_ms(tmp_path, monkeypatch):
+    from src.utils import docker_utils as du
+
+    stage = _fs_stage(tmp_path, ops=[_copy_op(mtime=_T0_MS - 86_400_000)],
+                      applied_at_epoch_ms=_STAGE_MS)
+    runner = _FakeRun(sizes={"/tmp_workspace/home/note.txt": len("payload")})
+    monkeypatch.setattr(du.subprocess, "run", runner)
+
+    outcomes = _real_hook_applier(tmp_path).apply_stage(stage, turn_index=1)
+
+    assert outcomes[0]["mtime_epoch_ms"] == _T0_MS - 86_400_000
+
+
+def test_unparseable_per_op_mtime_inherits_the_stage_instant(tmp_path, monkeypatch,
+                                                             caplog):
+    from src.utils import docker_utils as du
+
+    stage = _fs_stage(tmp_path, ops=[_copy_op(mtime="yesterday-ish")],
+                      applied_at_epoch_ms=_STAGE_MS)
+    runner = _FakeRun(sizes={"/tmp_workspace/home/note.txt": len("payload")})
+    monkeypatch.setattr(du.subprocess, "run", runner)
+
+    with caplog.at_level(logging.WARNING, logger="wildclaw.inject"):
+        outcomes = _real_hook_applier(tmp_path).apply_stage(stage, turn_index=1)
+
+    assert outcomes[0]["mtime_source"] == "stage"
+    assert outcomes[0]["mtime_epoch_ms"] == _STAGE_MS
+    assert any("override" in r.getMessage() for r in caplog.records)
+
+
+def test_mtime_key_is_parsed_on_fs_ops_and_stripped_from_api_bodies():
+    from src.utils.inject_director import INJECT_MTIME_KEY, _INJECT_ENVELOPE_KEYS
+
+    assert INJECT_MTIME_KEY in _INJECT_ENVELOPE_KEYS, (
+        "an API op carrying mtime must not have it written as a row column")
+    assert InjectApplier._extract_fields(
+        {"body": {INJECT_MTIME_KEY: _STAGE_ISO, "status": "late"}}) == {
+            "status": "late"}
+
+
+def test_stage_mtime_reaches_docker_touch_from_applied_at_alone(tmp_path,
+                                                               monkeypatch):
+    """No turn clock at all: the stage's own instant must still be stamped."""
+    from src.utils import docker_utils as du
+
+    stage = _fs_stage(tmp_path, ops=[_copy_op()], applied_at_epoch_ms=_STAGE_MS)
+    runner = _FakeRun(sizes={"/tmp_workspace/home/note.txt": len("payload")})
+    monkeypatch.setattr(du.subprocess, "run", runner)
+
+    outcomes = _real_hook_applier(tmp_path).apply_stage(stage, turn_index=1)
+
+    assert outcomes[0]["ok"] is True
+    assert _stamped_epochs(runner) == [_STAGE_MS // 1000]
+
+
+# --------------------------------------------------------------------------- #
+# 10. Post-copy mtime invariant: `touch` can exit 0 and leave the old mtime.
+# --------------------------------------------------------------------------- #
+
+def test_mtime_that_did_not_stick_is_a_placement_failure(tmp_path, monkeypatch,
+                                                         caplog):
+    from src.utils import docker_utils as du
+
+    src = _host_file(tmp_path)
+    runner = _FakeRun(sizes={"/tmp_workspace/x.txt": src.stat().st_size},
+                      mtimes={"/tmp_workspace/x.txt": _T0_MS // 1000})
+    monkeypatch.setattr(du.subprocess, "run", runner)
+
+    with caplog.at_level(logging.ERROR, logger="src.utils.docker_utils"):
+        res = du.copy_file_into_workspace("t", src, "/workspace/x.txt",
+                                          mtime_epoch_ms=_STAGE_MS)
+
+    assert res.ok is False and res.reason == "mtime_mismatch"
+    assert any("INJECT FS NOT PLACED" in r.getMessage() for r in caplog.records)
+
+
+def test_mtime_within_two_seconds_is_accepted(tmp_path, monkeypatch):
+    from src.utils import docker_utils as du
+
+    src = _host_file(tmp_path)
+    runner = _FakeRun(sizes={"/tmp_workspace/x.txt": src.stat().st_size},
+                      mtimes={"/tmp_workspace/x.txt": _STAGE_MS // 1000 + 2})
+    monkeypatch.setattr(du.subprocess, "run", runner)
+
+    res = du.copy_file_into_workspace("t", src, "/workspace/x.txt",
+                                      mtime_epoch_ms=_STAGE_MS)
+    assert res.ok is True
+
+
+def test_unstampable_file_is_a_placement_failure(tmp_path, monkeypatch):
+    from src.utils import docker_utils as du
+
+    src = _host_file(tmp_path)
+    runner = _FakeRun(sizes={"/tmp_workspace/x.txt": src.stat().st_size},
+                      mtimes={"/tmp_workspace/x.txt": None})
+    monkeypatch.setattr(du.subprocess, "run", runner)
+
+    res = du.copy_file_into_workspace("t", src, "/workspace/x.txt",
+                                      mtime_epoch_ms=_STAGE_MS)
+    assert res.ok is False and res.reason == "mtime_mismatch"
+
+
+def test_mtime_mismatch_is_recorded_failed_in_the_inject_timeline(tmp_path,
+                                                                 monkeypatch):
+    from src.utils import docker_utils as du
+
+    stage = _fs_stage(tmp_path, ops=[_copy_op()], applied_at_epoch_ms=_STAGE_MS)
+    runner = _FakeRun(sizes={"/tmp_workspace/home/note.txt": len("payload")},
+                      mtimes={"/tmp_workspace/home/note.txt": _T0_MS // 1000})
+    monkeypatch.setattr(du.subprocess, "run", runner)
+
+    outcomes = _real_hook_applier(tmp_path).apply_stage(stage, turn_index=1)
+
+    assert outcomes[0]["ok"] is False
+    assert outcomes[0]["reason"] == "mtime_mismatch"
+    assert is_defect(outcomes[0], phase="stage") is True
+    entries = [json.loads(line) for line in
+               (tmp_path / "timeline.jsonl").read_text().strip().splitlines()]
+    fs_entry = next(e for e in entries if e["type"] == "inject.fs")
+    assert fs_entry["ok"] is False and fs_entry["reason"] == "mtime_mismatch"
+    stage_entry = next(e for e in entries if e["type"] == "inject.stage.applied")
+    assert stage_entry["failed_ops"] == 1
+
+
+# --------------------------------------------------------------------------- #
+# 11. Recency-invisibility: a drop that does not sort after the T0 baseline.
+# --------------------------------------------------------------------------- #
+
+def test_stage_warns_when_a_drop_is_not_newer_than_the_baseline(tmp_path,
+                                                                monkeypatch,
+                                                                caplog):
+    from src.utils import docker_utils as du
+
+    stage = _fs_stage(tmp_path, ops=[_copy_op()],
+                      applied_at_epoch_ms=_T0_MS - 1000)
+    runner = _FakeRun(sizes={"/tmp_workspace/home/note.txt": len("payload")})
+    monkeypatch.setattr(du.subprocess, "run", runner)
+
+    with caplog.at_level(logging.WARNING, logger="wildclaw.inject"):
+        _real_hook_applier(tmp_path).apply_stage(
+            stage, turn_index=1, clock=NarrativeClock(t0_epoch_ms=_T0_MS))
+
+    assert any("invisible to the agent's recency searches" in r.getMessage()
+               for r in caplog.records)
+    entry = json.loads(
+        (tmp_path / "timeline.jsonl").read_text().strip().splitlines()[-1])
+    assert entry["recency_invisible_ops"] == ["fs-1"]
+
+
+def test_a_drop_newer_than_the_baseline_does_not_warn(tmp_path, monkeypatch,
+                                                      caplog):
+    from src.utils import docker_utils as du
+
+    stage = _fs_stage(tmp_path, ops=[_copy_op()], applied_at_epoch_ms=_STAGE_MS)
+    runner = _FakeRun(sizes={"/tmp_workspace/home/note.txt": len("payload")})
+    monkeypatch.setattr(du.subprocess, "run", runner)
+
+    with caplog.at_level(logging.WARNING, logger="wildclaw.inject"):
+        _real_hook_applier(tmp_path).apply_stage(
+            stage, turn_index=1, clock=NarrativeClock(t0_epoch_ms=_T0_MS))
+
+    assert not any("recency" in r.getMessage() for r in caplog.records)
+    entry = json.loads(
+        (tmp_path / "timeline.jsonl").read_text().strip().splitlines()[-1])
+    assert entry["recency_invisible_ops"] == []
+    assert entry["mtime_source"] == "stage"
+
+
+def test_an_explicit_override_is_exempt_from_the_recency_warning(tmp_path,
+                                                                 monkeypatch,
+                                                                 caplog):
+    """A deliberately buried document is SUPPOSED to look older than baseline."""
+    from src.utils import docker_utils as du
+
+    stage = _fs_stage(tmp_path, ops=[_copy_op(mtime=_T0_MS - 86_400_000)],
+                      applied_at_epoch_ms=_STAGE_MS)
+    runner = _FakeRun(sizes={"/tmp_workspace/home/note.txt": len("payload")})
+    monkeypatch.setattr(du.subprocess, "run", runner)
+
+    with caplog.at_level(logging.WARNING, logger="wildclaw.inject"):
+        _real_hook_applier(tmp_path).apply_stage(
+            stage, turn_index=1, clock=NarrativeClock(t0_epoch_ms=_T0_MS))
+
+    assert not any("recency" in r.getMessage() for r in caplog.records)

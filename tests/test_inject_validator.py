@@ -287,6 +287,29 @@ def test_fs_copy_with_absent_src_is_fatal(tmp_path):
     assert any(d["status"] == "fs-src-not-found" for d in ei.value.defects)
 
 
+@pytest.mark.parametrize("mtime", ["2026-12-20 03:10:00", "yesterday", ""])
+def test_fs_op_with_unusable_mtime_override_is_fatal(tmp_path, mtime):
+    stage, stage_dir = _fs_stage_ondisk(tmp_path, [
+        {"id": "fs-mt", "action": "copy", "src": "note.txt",
+         "dst": "/workspace/note.txt", "mtime": mtime}])
+    (stage_dir / "note.txt").write_text("payload", encoding="utf-8")
+    with pytest.raises(InjectAuthoringError) as ei:
+        run_authoring_validation(
+            _script(_seed_stage(), stage), host_api_to_url=URLS, mock_data_root=tmp_path)
+    assert any(d["status"] == "fs-invalid-mtime" for d in ei.value.defects)
+
+
+@pytest.mark.parametrize("mtime", ["2026-12-20T03:10:00-05:00", 1797754200000])
+def test_fs_op_with_usable_mtime_override_passes(tmp_path, mtime):
+    stage, stage_dir = _fs_stage_ondisk(tmp_path, [
+        {"id": "fs-mt", "action": "copy", "src": "note.txt",
+         "dst": "/workspace/note.txt", "mtime": mtime}])
+    (stage_dir / "note.txt").write_text("payload", encoding="utf-8")
+    warnings = run_authoring_validation(
+        _script(_seed_stage(), stage), host_api_to_url=URLS, mock_data_root=tmp_path)
+    assert warnings == []
+
+
 def test_fs_mkdir_with_src_is_warning(tmp_path):
     stage, _ = _fs_stage_ondisk(tmp_path, [
         {"id": "fs-mk", "action": "mkdir",

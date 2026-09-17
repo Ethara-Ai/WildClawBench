@@ -2399,11 +2399,14 @@ def run_single_task(
         # pre-T0 baseline, so the stage0 `loud` seed is NOT replayed; only the
         # `silent` mutations fire (kept out of the agent-visible audit feed).
         try:
-            from src.utils.inject_director import InjectScript, InjectApplier, is_defect
+            from src.utils.inject_director import (
+                InjectScript, InjectApplier, NarrativeClock, is_defect,
+            )
             from src.utils.docker_utils import copy_file_into_workspace
             from src.utils.inject_validator import (
                 run_authoring_validation, InjectAuthoringError,
             )
+            from src.utils.sim_clock import compute_sim_clock
             _is = InjectScript.load(task["inject_path"])
 
             # Static authoring pre-flight (no live container) -> injection_defects.
@@ -2452,8 +2455,21 @@ def run_single_task(
                 copy_into_workspace=_copy_into_workspace,
                 task_id=task_id,
             )
-            _record_defects(inject_applier.seed(_is),
-                            stage_name="stage0(seed)", phase="seed")
+            # The T0 anchor is what the staged baseline tree is stamped with
+            # (docker_utils.inject_data_into_workspace), so it doubles as the
+            # last-resort instant for a stage that declares none AND as the
+            # yardstick for the recency-invisibility check.
+            _t0_sim = compute_sim_clock(task)
+            _t0_epoch_ms = _t0_sim.epoch_ms if _t0_sim is not None else None
+            if _t0_epoch_ms is None:
+                logger.warning(
+                    "[%s] no resolvable T0 instant in prompts.json — injected "
+                    "files cannot be stamped on the narrative timeline and may "
+                    "stay invisible to the agent's recency searches", task_id)
+            _record_defects(
+                inject_applier.seed(_is, clock=NarrativeClock(
+                    turn_epoch_ms=_t0_epoch_ms, t0_epoch_ms=_t0_epoch_ms)),
+                stage_name="stage0(seed)", phase="seed")
             # The pristine BEFORE snapshot (persona/ + data/ + mock_data/) is
             # taken below, after this branch, so it runs for every task — not
             # just injection ones. For inject tasks it still lands after seed()
@@ -2464,16 +2480,21 @@ def run_single_task(
             stage_turns = tuple([prompt] + raw_turns[1:]) if raw_turns else (prompt,)
 
             def _inject_before_turn(turn_index: int, _is=_is, _ap=inject_applier,
-                                    _task=task, _tid=task_id):
+                                    _task=task, _tid=task_id,
+                                    _t0_ms=_t0_epoch_ms):
                 # Agent is idle here; apply the stage whose boundary ends at this turn.
                 sim = _reanchor_sim_clock(_tid, _task, turn_index)
                 st = _is.stage_for_boundary(turn_index)
                 if st is not None:
-                    # Stamp this turn's drops at the same instant the agent's
-                    # clock now reads, so they sort after the T0-stamped baseline.
+                    # Stamp this turn's drops on the narrative timeline so they
+                    # sort after the T0-stamped baseline. The applier prefers
+                    # the stage's own applied_at_local_time and falls back to
+                    # this turn's clock, then T0 — never to nothing, which is
+                    # what previously left drops at their authoring mtime.
                     _record_defects(
-                        _ap.apply_stage(st, turn_index,
-                                        mtime_epoch_ms=getattr(sim, "epoch_ms", None)),
+                        _ap.apply_stage(st, turn_index, clock=NarrativeClock(
+                            turn_epoch_ms=getattr(sim, "epoch_ms", None),
+                            t0_epoch_ms=_t0_ms)),
                         stage_name=st.name, phase="stage")
 
             stage_before_turn = _inject_before_turn

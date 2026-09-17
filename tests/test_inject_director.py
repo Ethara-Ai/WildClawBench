@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from src.utils.inject_director import (  # noqa: E402
-    InjectScript, InjectApplier, InjectStage, parse_prompts_file,
+    InjectScript, InjectApplier, InjectStage, NarrativeClock, parse_prompts_file,
 )
 
 TASK = ROOT / "input" / "LAYLA_001_october_grant_crunch"
@@ -301,7 +301,8 @@ def test_apply_stage_threads_sim_epoch_to_copy_hook(tmp_path):
     ap = _outcome_applier(tmp_path, calls, _Outcome(True, "/tmp_workspace/note.txt"))
     stage = _copy_op_stage(tmp_path)
 
-    ap.apply_stage(stage, turn_index=1, mtime_epoch_ms=1793000000000)
+    ap.apply_stage(stage, turn_index=1,
+                   clock=NarrativeClock(turn_epoch_ms=1793000000000))
 
     assert [c["mtime_epoch_ms"] for c in calls] == [1793000000000]
 
@@ -320,7 +321,8 @@ def test_legacy_three_arg_hook_survives_mtime_threading(tmp_path):
                        copy_into_workspace=legacy_hook)
     stage = _copy_op_stage(tmp_path)
 
-    outcomes = ap.apply_stage(stage, turn_index=1, mtime_epoch_ms=1793000000000)
+    outcomes = ap.apply_stage(stage, turn_index=1,
+                              clock=NarrativeClock(turn_epoch_ms=1793000000000))
 
     assert calls == [{"dst": "/workspace/note.txt", "mkdir": False}]
     assert outcomes[0]["ok"] is True and outcomes[0]["status"] == "copied"

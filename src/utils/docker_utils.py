@@ -256,6 +256,60 @@ def _container_file_size(task_id: str, dst: str) -> "int | None":
         return None
 
 
+def _container_file_mtime(task_id: str, dst: str) -> "int | None":
+    """Epoch SECONDS of ``dst``'s mtime inside the container, or None."""
+    r = subprocess.run(
+        ["docker", "exec", task_id, "/bin/sh", "-c",
+         f"if [ -e '{dst}' ]; then stat -c %Y '{dst}'; fi"],
+        capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        return None
+    out = (r.stdout or "").strip()
+    if not out:
+        return None
+    try:
+        return int(out)
+    except ValueError:
+        return None
+
+
+# `touch` writes whole seconds and the read-back costs one more exec, so allow a
+# couple of seconds of slack rather than demanding bit-exactness.
+_MTIME_TOLERANCE_S = 2
+
+
+def _verify_stamped_mtime(task_id: str, dst: str,
+                          mtime_epoch_ms: "int | None") -> bool:
+    """True when ``dst`` really carries the requested narrative mtime.
+
+    ``touch`` exits 0 in cases that leave the old mtime in place — a read-only
+    bind mount, an overlay shadowing the write, a dst that resolved to a
+    directory — and an unstamped drop keeps its baseline-or-older authoring
+    mtime, which is precisely the recency-invisible failure the stamp exists to
+    prevent. Verified the same way the byte-size read-back is: ask the
+    container, and report a mismatch as a placement failure.
+
+    Only an EXPLICIT stamp is checkable; without one ``_stamp_mtime`` touches
+    "now" and the container's faketime clock makes "now" unverifiable from the
+    host, so that case passes by definition.
+    """
+    if mtime_epoch_ms is None:
+        return True
+    want = int(mtime_epoch_ms) // 1000
+    got = _container_file_mtime(task_id, dst)
+    if got is None:
+        logger.error("[%s] INJECT FS NOT PLACED: %s has no readable mtime "
+                     "(requested @%d)", task_id, dst, want)
+        return False
+    if abs(got - want) > _MTIME_TOLERANCE_S:
+        logger.error("[%s] INJECT FS NOT PLACED: %s mtime @%d != requested @%d "
+                     "— the narrative stamp did not stick, so the drop stays "
+                     "invisible to recency searches", task_id, dst, got, want)
+        return False
+    return True
+
+
 def _stamp_mtime(task_id: str, dst: str, mtime_epoch_ms: "int | None") -> None:
     """Make ``dst`` newer than the staged baseline.
 
@@ -293,7 +347,7 @@ def copy_file_into_workspace(task_id: str, host_src: "Path | None",
       caller logs ``status="skipped_container_down"``.
     * ``False`` — a copy/mkdir was attempted and failed. A genuine defect.
     * ``True``  — applied AND verified present at ``mapped_dst`` with the
-      host file's byte size.
+      host file's byte size and, when one was requested, the narrative mtime.
 
     Collapsing the first two onto ``False`` (the pre-2026-08 behaviour) made a
     dropped payload indistinguishable from a benign seed skip, so a stage0 file
@@ -355,6 +409,8 @@ def copy_file_into_workspace(task_id: str, host_src: "Path | None",
                          "(host=%s container=%s)", task_id, host_src, dst,
                          want, "missing" if got is None else got)
             return CopyOutcome(False, dst, "size_mismatch")
+        if not _verify_stamped_mtime(task_id, dst, mtime_epoch_ms):
+            return CopyOutcome(False, dst, "mtime_mismatch")
         return CopyOutcome(True, dst)
     except Exception as exc:  # pragma: no cover - defensive
         logger.warning("[%s] inject fs: error placing %s: %s", task_id, dst, exc)

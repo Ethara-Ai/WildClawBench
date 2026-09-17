@@ -7,7 +7,13 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from src.utils.inject_director import InjectApplier, InjectScript, InjectStage
+from src.utils.inject_director import (
+    INJECT_MTIME_KEY,
+    InjectApplier,
+    InjectScript,
+    InjectStage,
+    parse_narrative_instant,
+)
 
 LOG = logging.getLogger("wildclaw.inject")
 
@@ -265,11 +271,35 @@ def _validate_fs_dst(
     return fatal, warnings
 
 
+def _validate_op_mtime(
+    stage: InjectStage, op: Dict[str, Any],
+) -> List[Dict[str, Any]]:
+    """Fatal defects for an unusable per-op ``mtime`` override.
+
+    Statically decidable, and silently ignoring it would be worse than a
+    missing key: the author asked for a specific narrative instant and would
+    instead get the stage default, which is usually the opposite of the intent
+    (an override exists to make a file look OLD).
+    """
+    if INJECT_MTIME_KEY not in op:
+        return []
+    raw = op.get(INJECT_MTIME_KEY)
+    if parse_narrative_instant(raw) is not None:
+        return []
+    return [{
+        "stage": stage.name, "id": op.get("id"), "status": "fs-invalid-mtime",
+        "reason": f"{INJECT_MTIME_KEY} {raw!r} is neither an offset-aware "
+                  "ISO-8601 instant (e.g. '2026-12-20T03:10:00-05:00') nor an "
+                  "epoch in milliseconds — a naive local time is refused "
+                  "because its UTC offset would have to be guessed",
+    }]
+
+
 def _validate_filesystem_op(
     stage: InjectStage, op: Dict[str, Any], mock_data_root: Optional[Path],
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """Statically validate one ``mutations.filesystem`` op. Returns (fatal, warnings)."""
-    fatal: List[Dict[str, Any]] = []
+    fatal: List[Dict[str, Any]] = _validate_op_mtime(stage, op)
     warnings: List[Dict[str, Any]] = []
     oid = op.get("id")
     action = op.get("action")
