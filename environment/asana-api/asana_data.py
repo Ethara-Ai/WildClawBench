@@ -166,6 +166,7 @@ def _section_compact(gid):
 
 
 def _task_view(t):
+    project = _project_compact(t["project_gid"])
     return {
         "gid": t["gid"],
         "resource_type": "task",
@@ -176,8 +177,9 @@ def _task_view(t):
         "created_at": t["created_at"],
         "modified_at": t["modified_at"],
         "assignee": _user_compact(t["assignee_gid"]),
+        "projects": [project] if project else [],
         "memberships": [{
-            "project": _project_compact(t["project_gid"]),
+            "project": project,
             "section": _section_compact(t["section_gid"]),
         }],
     }

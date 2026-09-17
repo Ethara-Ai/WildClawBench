@@ -5,8 +5,8 @@ Implements a subset of the Asana API surface. Base path: /api/1.0
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, ConfigDict
+from typing import List, Optional
 
 import asana_data
 try:
@@ -83,8 +83,10 @@ def list_tasks(project: Optional[str] = None, assignee: Optional[str] = None,
 
 
 class TaskData(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str
-    projects: Optional[list] = None
+    projects: Optional[List[str]] = None
     project: Optional[str] = None
     section: Optional[str] = None
     assignee: Optional[str] = None
@@ -94,6 +96,8 @@ class TaskData(BaseModel):
 
 
 class TaskCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     data: TaskData
 
 
@@ -126,6 +130,8 @@ def get_task(task_gid: str):
 
 
 class TaskUpdateData(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: Optional[str] = None
     completed: Optional[bool] = None
     assignee: Optional[str] = None
@@ -135,6 +141,8 @@ class TaskUpdateData(BaseModel):
 
 
 class TaskUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     data: TaskUpdateData
 
 
