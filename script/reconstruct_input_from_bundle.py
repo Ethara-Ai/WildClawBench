@@ -8,7 +8,13 @@ task input tree(s).
 
 What it recovers
 ----------------
-  prompt.txt          <- <bundle>/PROMPT.md (fallbacks: prompt.txt, data/instruction.md)
+  prompts.txt         <- the bundle's prompt file (prompts.txt, prompt.txt,
+                          PROMPT.md, or data/instruction.md), with its header
+                          block normalised onto the five-key standard and the
+                          window's day count recomputed from the dates. Written
+                          to prompts.txt, never prompt.txt: the loader reads
+                          prompt.txt as ONE prompt, collapsing a 20-turn task
+                          to a single turn.
   TRUTH.md            <- <bundle>/TRUTH.md   (grader truth doc, if present)
   rubric.json         <- <bundle>/rubric.json
   persona/<f>         <- <bundle>/data/environment/persona/<f>
@@ -48,6 +54,9 @@ import argparse
 import shutil
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from script.lib.recon import prompts as recon_prompts  # noqa: E402
 
 SEED_EXTS = {".json", ".csv"}
 ARTIFACTS_INPUTS_SUBPATH = ("artifacts", "inputs", "files")
@@ -168,15 +177,28 @@ def _load_toml(path: Path) -> dict:
 # ----------------------------------------------------------------------------- #
 # per-task reconstruction
 # ----------------------------------------------------------------------------- #
-def reconstruct(bundle: Path, out_dir: Path, baseline_env: Path, verbose: bool) -> dict:
+def recover_prompts(bundle: Path, out_dir: Path, log: list[str], timezone: str):
+    """Write the normalised prompts.txt and report what normalising changed."""
+    source = recon_prompts.locate_prompt_file(bundle)
+    if source is None:
+        log.append("  MISS prompts.txt            <- no prompt file in the bundle")
+        return None
+    rec = recon_prompts.normalise(source, task_id=out_dir.name, timezone=timezone)
+    (out_dir / "prompts.txt").write_text(rec.text, encoding="utf-8")
+    log.append(f"  ok   prompts.txt            <- {source.rel} "
+               f"({len(rec.turns)} turn(s))")
+    for fix in rec.fixes:
+        log.append(f"  fix  prompts.txt            .. {fix}")
+    return rec
+
+
+def reconstruct(bundle: Path, out_dir: Path, baseline_env: Path, verbose: bool,
+                timezone: str = "") -> dict:
     env_dir = bundle / "data" / "environment"
     log: list[str] = []
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # prompt (PROMPT.md -> prompt.txt -> data/instruction.md), first-match-wins.
-    if not _copy_file(bundle / "PROMPT.md", out_dir / "prompt.txt", log, "prompt.txt (from PROMPT.md)"):
-        if not _copy_file(bundle / "prompt.txt", out_dir / "prompt.txt", log, "prompt.txt"):
-            _copy_file(bundle / "data" / "instruction.md", out_dir / "prompt.txt", log, "prompt.txt (from instruction.md)")
+    prompts = recover_prompts(bundle, out_dir, log, timezone)
 
     # TRUTH.md (grader truth doc; published verbatim by the repackager)
     _copy_file(bundle / "TRUTH.md", out_dir / "TRUTH.md", log, "TRUTH.md")
@@ -213,13 +235,16 @@ def reconstruct(bundle: Path, out_dir: Path, baseline_env: Path, verbose: bool) 
         log.append(f"  ok   mock_data/            <- {len(overlays)} api(s), {n_overlay_files} overlay file(s)")
 
     meta = _load_toml(bundle / "data" / "task.toml")
+    if prompts is not None:
+        warnings.extend(prompts.unresolved)
 
     _write_notes(out_dir, bundle, baseline_env, log, overlays, warnings, meta,
                  persona_names, data_names)
 
     summary = {
         "task": out_dir.name,
-        "prompt": (out_dir / "prompt.txt").is_file(),
+        "turns": len(prompts.turns) if prompts else 0,
+        "prompt": (out_dir / "prompts.txt").is_file(),
         "rubric": (out_dir / "rubric.json").is_file(),
         "persona_files": len(persona_names),
         "data_files": len(data_names),
@@ -285,6 +310,9 @@ def main(argv: list[str] | None = None) -> int:
                     help="Output root; each task lands in <out>/<task>/ (default: ./reconstructed_input)")
     ap.add_argument("--baseline-env", type=Path, default=_DEFAULT_BASELINE,
                     help=f"Pristine harness environment/ for overlay diffing (default: {_DEFAULT_BASELINE})")
+    ap.add_argument("--timezone", default="",
+                    help="IANA timezone to use when the bundle's prompt header "
+                         "omits one (headerless bundles carry it only as persona prose).")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args(argv)
 
@@ -303,13 +331,14 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     print(f"Found {len(bundles)} task bundle(s). Baseline env: {args.baseline_env}")
-    summaries = [reconstruct(b, args.out / b.name, args.baseline_env, args.verbose) for b in bundles]
+    summaries = [reconstruct(b, args.out / b.name, args.baseline_env, args.verbose,
+                             args.timezone) for b in bundles]
 
-    print(f"\n{'task':<45} {'prompt':>6} {'rubric':>6} {'persona':>7} {'data':>4} "
+    print(f"\n{'task':<45} {'turns':>5} {'rubric':>6} {'persona':>7} {'data':>4} "
           f"{'mock(apis/files)':>16}")
     for s in summaries:
         mock = f"{s['mock_data_apis']}/{s['mock_data_files']}"
-        print(f"{s['task'][:44]:<45} {str(s['prompt']):>6} {str(s['rubric']):>6} "
+        print(f"{s['task'][:44]:<45} {s['turns']:>5} {str(s['rubric']):>6} "
               f"{s['persona_files']:>7} {s['data_files']:>4} {mock:>16}")
     total_warn = sum(len(s["warnings"]) for s in summaries)
     print(f"\nReconstructed into: {args.out.resolve()}"

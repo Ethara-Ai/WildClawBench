@@ -353,7 +353,12 @@ class TestReconstructInputFromBundle:
         assert summary["rubric"] is True
         assert summary["persona_files"] == 1
         assert summary["data_files"] == 1
-        assert (out / "prompt.txt").read_text(encoding="utf-8") == "do it"
+        # Never prompt.txt: task_parser reads that as ONE prompt, collapsing a
+        # multi-turn task to a single turn.
+        assert not (out / "prompt.txt").exists()
+        assert (out / "prompts.txt").read_text(encoding="utf-8").endswith(
+            "--- TURN T0 ---\ndo it\n")
+        assert summary["turns"] == 1
         assert (out / "persona" / "MEMORY.md").is_file()
         assert (out / "data" / "input.txt").is_file()
         assert (out / "test_outputs.py").is_file()
@@ -366,7 +371,8 @@ class TestReconstructInputFromBundle:
         (b / "rubric.json").write_text("[]", encoding="utf-8")
         out = tmp_path / "out2"
         reconstruct_mod.reconstruct(b, out, tmp_path / "baseline", verbose=False)
-        assert (out / "prompt.txt").read_text(encoding="utf-8") == "fallback prompt"
+        assert (out / "prompts.txt").read_text(encoding="utf-8").endswith(
+            "--- TURN T0 ---\nfallback prompt\n")
 
 
 # =========================================================================== #
