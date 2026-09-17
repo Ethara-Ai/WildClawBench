@@ -67,6 +67,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from script.lib.recon import prompts as recon_prompts  # noqa: E402
 from script.lib.recon import schedule as recon_schedule  # noqa: E402
+from script.lib.recon import metadata as recon_metadata  # noqa: E402
 from script.lib.recon import sources as recon_sources  # noqa: E402
 
 SEED_EXTS = {".json", ".csv"}
@@ -146,20 +147,7 @@ def extract_overlays(
     return recovered, warnings
 
 
-# ----------------------------------------------------------------------------- #
-# task.toml metadata (best-effort)
-# ----------------------------------------------------------------------------- #
-def _load_toml(path: Path) -> dict:
-    if not path.is_file():
-        return {}
-    try:
-        try:
-            import tomllib  # py3.11+
-        except ModuleNotFoundError:
-            import tomli as tomllib  # type: ignore
-        return tomllib.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
+_load_toml = recon_metadata.load_toml
 
 
 # ----------------------------------------------------------------------------- #
@@ -224,15 +212,21 @@ def reconstruct(bundle: Path, out_dir: Path, baseline_env: Path, verbose: bool,
     persona_names = carried["persona/"].names
     data_names = carried["data/"].names
 
+    meta = recon_metadata.derive(bundle, out_dir, instants.system_prompt)
+    for name in recon_metadata.write(meta, out_dir):
+        log.append(f"  ok   {name:<22} <- data/task.toml")
+    for note in meta.notes:
+        log.append(f"  gap  task.yaml              .. {note}")
+
     # mock_data/<api>/ via baseline diff
     overlays, warnings = extract_overlays(env_dir, baseline_env, out_dir / "mock_data")
     n_overlay_files = sum(len(v) for v in overlays.values())
     if overlays:
         log.append(f"  ok   mock_data/            <- {len(overlays)} api(s), {n_overlay_files} overlay file(s)")
 
-    meta = _load_toml(bundle / "data" / "task.toml")
     if prompts is not None:
         warnings.extend(prompts.unresolved)
+    warnings.extend(meta.notes)
 
     _write_notes(out_dir, bundle, baseline_env, log, overlays, warnings, meta,
                  persona_names, data_names)
@@ -276,10 +270,13 @@ def _write_notes(out_dir, bundle, baseline_env, log, overlays, warnings, meta,
             lines.extend(f"    - {f}" for f in files)
     else:
         lines.append("- (none detected — task shipped no mock_data overlay, or baseline mismatch)")
-    if meta:
-        req = meta.get("environment", {}).get("required_apis") or meta.get("required_apis")
-        if req:
-            lines += ["", "## task.toml metadata", f"- required_apis: {req}"]
+    lines += ["", "## Declared shape (from data/task.toml)",
+              f"- required_apis: {meta.required_apis or '(not recoverable)'}",
+              f"- distractor_apis: {meta.distractor_apis}",
+              f"- l1 / l2: {meta.l1 or '(derived by loader)'} / "
+              f"{meta.l2 or '(derived by loader)'}",
+              f"- task_type: {meta.task_type or '(empty in task.toml)'}",
+              f"- modalities: {meta.modalities}"]
     lines += [
         "",
         "## NOT recoverable from a bundle (by construction)",

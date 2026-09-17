@@ -52,6 +52,7 @@ class Instants:
     #: Largest sub-minute offset dropped when truncating trajectory stamps.
     jitter_ms: int = 0
     notes: list = field(default_factory=list)
+    system_prompt: str = ""
 
 
 def find_runs(bundle: Path) -> list:
@@ -145,6 +146,7 @@ def from_trajectory(bundle: Path, turn_count: int, tz_name: str,
         if len(stamps) < len(best.values):
             continue
         best = _build(stamps, label, tz_name)
+        best.system_prompt = system_prompt(path)
         if len(stamps) == turn_count:
             return best
     if best.values:
@@ -198,10 +200,11 @@ def resolve(bundle: Path, turns: list, window, tz_name: str,
     exact = from_trajectory(bundle, len(turns), tz_name, run)
     if len(exact.values) == len(turns):
         return exact
-    degraded = Instants(notes=list(exact.notes))
+    degraded = Instants(notes=list(exact.notes), system_prompt=exact.system_prompt)
     if window is not None:
         labelled = from_labels(turns, window, tz_name)
         labelled.notes = degraded.notes + labelled.notes
+        labelled.system_prompt = exact.system_prompt
         degraded = labelled
     else:
         degraded.notes.append("no window resolved, so labels cannot be dated")
