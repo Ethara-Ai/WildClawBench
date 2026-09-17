@@ -39,10 +39,18 @@ _store.register("menu_items", primary_key="item_id",
                 initial_loader=lambda: _coerce_menu(_load("menu_items.json", "menu_items")))
 _store.register("orders", primary_key="order_id",
                 initial_loader=lambda: _coerce_orders(_load("orders.json", "orders")))
-# order_items natural key (order_id, item_id) -> synth composite pk
+def _order_item_pk(order_id, item_id):
+    """Composite key for order_items, whose natural key is (order_id, item_id).
+
+    The loader and checkout must agree on this, or the upsert is rejected for
+    a missing '_pk' and the whole checkout 500s.
+    """
+    return f"{order_id}@{item_id}"
+
+
 _store.register("order_items", primary_key="_pk",
                 initial_loader=lambda: [
-                    {**r, "_pk": f"{r['order_id']}@{r['item_id']}"}
+                    {**r, "_pk": _order_item_pk(r["order_id"], r["item_id"])}
                     for r in _coerce_order_items(_load("order_items.json", "order_items"))])
 
 
@@ -293,6 +301,7 @@ def checkout(cart_id, customer_name="Guest", tip=0.0):
     _store_insert("orders", order)
     for it in cart_full["items"]:
         _store_insert("order_items", {
+            "_pk": _order_item_pk(order_id, it["item_id"]),
             "order_id": order_id,
             "item_id": it["item_id"],
             "quantity": it["quantity"],

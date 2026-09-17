@@ -56,8 +56,17 @@ _store.register("channels", primary_key="id",
                 initial_loader=lambda: _coerce_channels(_load("channels.json", "channels")))
 _store.register("messages", primary_key="ts",
                 initial_loader=lambda: _coerce_messages(_load("messages.json", "messages")))
+def _member_pk(channel_id, user_id):
+    """Composite key for channel_members, which has no natural single-column id.
+
+    The loader and every write path must agree on this, or a create/invite
+    upsert is rejected for a missing '_pk' (or silently shadows a seeded row).
+    """
+    return f"{channel_id}@{user_id}"
+
+
 _store.register("channel_members", primary_key="_pk",
-                initial_loader=lambda: [{**r, "_pk": f"{r['channel_id']}@{r['user_id']}"} for r in (_strip_ctx(x) for x in _load("channel_members.json", "channel_members"))])
+                initial_loader=lambda: [{**r, "_pk": _member_pk(r["channel_id"], r["user_id"])} for r in (_strip_ctx(x) for x in _load("channel_members.json", "channel_members"))])
 _store.register_document("team", initial_loader=lambda: json.load(open(DATA_DIR / "team.json", encoding="utf-8")))
 
 
@@ -248,7 +257,11 @@ def conversations_create(name, is_private=False, user_id="U01AMELIA"):
         "num_members": 1,
     }
     _store_insert("channels", channel)
-    _store_insert("channel_members", {"channel_id": channel["id"], "user_id": user_id})
+    _store_insert("channel_members", {
+        "_pk": _member_pk(channel["id"], user_id),
+        "channel_id": channel["id"],
+        "user_id": user_id,
+    })
     return _ok({"channel": channel})
 
 
@@ -276,7 +289,11 @@ def conversations_invite(channel_id, user_id):
         return _err("user_not_found")
     if any(m["channel_id"] == channel_id and m["user_id"] == user_id for m in _channel_members_rows()):
         return _err("already_in_channel")
-    _store_insert("channel_members", {"channel_id": channel_id, "user_id": user_id})
+    _store_insert("channel_members", {
+        "_pk": _member_pk(channel_id, user_id),
+        "channel_id": channel_id,
+        "user_id": user_id,
+    })
     for c in _channels_rows():
         if c["id"] == channel_id:
             _changes = {"num_members": c["num_members"] + 1}

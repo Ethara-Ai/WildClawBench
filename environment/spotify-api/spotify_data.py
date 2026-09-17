@@ -39,9 +39,18 @@ _store.register("tracks", primary_key="track_id",
                 initial_loader=lambda: _coerce_tracks(_load("tracks.json", "tracks")))
 _store.register("playlists", primary_key="playlist_id",
                 initial_loader=lambda: _coerce_playlists(_load("playlists.json", "playlists")))
+def _playlist_track_pk(playlist_id, track_id):
+    """Composite key for playlist_tracks, natural key (playlist_id, track_id).
+
+    The loader and add_tracks must agree on this, or the upsert is rejected
+    for a missing '_pk' and POST /v1/playlists/{id}/tracks 500s.
+    """
+    return f"{playlist_id}@{track_id}"
+
+
 _store.register("playlist_tracks", primary_key="_pk",
                 initial_loader=lambda: [
-                    {**r, "_pk": f"{r['playlist_id']}@{r['track_id']}"}
+                    {**r, "_pk": _playlist_track_pk(r["playlist_id"], r["track_id"])}
                     for r in _coerce_playlist_tracks(_load("playlist_tracks.json", "playlist_tracks"))])
 _store.register_document("user", initial_loader=lambda: __import__('json').load(open(DATA_DIR / "user.json", encoding="utf-8")))
 
@@ -286,6 +295,7 @@ def add_tracks(playlist_id, uris):
         if not any(t["track_id"] == track_id for t in _tracks_rows()):
             continue
         _store_insert("playlist_tracks", {
+            "_pk": _playlist_track_pk(playlist_id, track_id),
             "playlist_id": playlist_id,
             "track_id": track_id,
             "position": next_pos,

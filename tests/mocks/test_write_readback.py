@@ -120,24 +120,16 @@ def test_slack_delete_removes_message_from_history(slack):
     assert all(m["ts"] != ts for m in _history(slack, "C01ENG", limit=20))
 
 
-@pytest.mark.xfail(
-    strict=True, raises=Exception,
-    reason="slack_data.conversations_create upserts channel_members (primary_key='_pk') "
-           "without synthesizing _pk, so the route 500s. Same defect 667131a fixed for "
-           "shippo tracking; report-only in this pass, fix needs separate review.",
-)
 def test_slack_conversations_create_persists(slack):
     r = slack.post("/api/conversations.create", json={"name": "wrb-new-channel"})
     assert r.status_code == 200 and r.json()["ok"], r.text
     listed = [c["name"] for c in slack.get("/api/conversations.list").json()["channels"]]
     assert "wrb-new-channel" in listed
+    channel_id = r.json()["channel"]["id"]
+    members = slack.get(f"/api/conversations.members?channel={channel_id}").json()["members"]
+    assert members == ["U01AMELIA"], members
 
 
-@pytest.mark.xfail(
-    strict=True, raises=Exception,
-    reason="slack_data.conversations_invite hits the same unsynthesized '_pk' upsert on "
-           "channel_members whenever the invitee is not already a member; report-only.",
-)
 def test_slack_conversations_invite_persists(slack):
     r = slack.post("/api/conversations.invite",
                    json={"channel": "C01DEPLOY", "users": "U01NOOR"})
@@ -147,17 +139,11 @@ def test_slack_conversations_invite_persists(slack):
 
 
 # ---------------------------------------------------------------------------
-# Remaining unsynthesized-'_pk' upserts, surfaced by
-# `script/check_lost_writes.py --allowlist ...` (UNKEYED_UPSERT). Same defect as
-# the two Slack routes above and as the shippo `tracking` bug 667131a fixed.
-# Locked xfail-strict so whichever pass fixes them turns these green loudly.
+# JOIN tables keyed by a synthetic composite '_pk'. Their write paths used to
+# upsert dict literals carrying only the natural key columns, which the store
+# rejects -- the same defect 667131a fixed for shippo `tracking`.
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(
-    strict=True, raises=Exception,
-    reason="doordash_data.checkout upserts order_items (primary_key='_pk') from a dict "
-           "literal with no _pk, so every checkout 500s; report-only.",
-)
 def test_doordash_checkout_persists_order():
     with TestClient(load_app(ENV_DIR / "doordash-api")) as c:
         store_id = c.get("/v1/stores").json()["stores"][0]["store_id"]
@@ -165,16 +151,14 @@ def test_doordash_checkout_persists_order():
         cart_id = c.post("/v1/carts", json={"store_id": store_id}).json()["cart_id"]
         c.post(f"/v1/carts/{cart_id}/items", json={"item_id": item_id, "quantity": 1})
         r = c.post(f"/v1/carts/{cart_id}/checkout", json={"customer_name": "WRB"})
-        assert r.status_code == 200, r.text
+        assert r.status_code in (200, 201), r.text
         order_id = r.json()["order_id"]
-        assert c.get(f"/v1/orders/{order_id}").status_code == 200
+        fetched = c.get(f"/v1/orders/{order_id}")
+        assert fetched.status_code == 200, fetched.text
+        assert [(i["item_id"], i["quantity"]) for i in fetched.json()["items"]] == [
+            (item_id, 1)], fetched.text
 
 
-@pytest.mark.xfail(
-    strict=True, raises=Exception,
-    reason="spotify_data.add_tracks_to_playlist upserts playlist_tracks "
-           "(primary_key='_pk') from a dict literal with no _pk; report-only.",
-)
 def test_spotify_add_tracks_persists():
     with TestClient(load_app(ENV_DIR / "spotify-api")) as c:
         playlist_id = c.get("/v1/me/playlists").json()["items"][0]["id"]
