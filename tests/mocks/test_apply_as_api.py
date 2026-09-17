@@ -38,7 +38,7 @@ def client(monkeypatch):
         "messages": {("C1", "100.1"): {"channel_id": "C1", "ts": "100.1", "text": "orig"}},
     }
 
-    # path-action endpoint (no body), mirrors okta /lifecycle/suspend
+    # path-action endpoint (no body), mirrors a vendor /lifecycle/suspend route
     @app.post("/api/users/{uid}/suspend")
     def suspend(uid: str):
         if uid not in state["users"]:
@@ -62,7 +62,7 @@ def client(monkeypatch):
 
     # A store-backed endpoint that ACTUALLY persists (via store.patch) — used to
     # prove the persistence-verification 'changed' flag fires on real mutations,
-    # vs the dict-mutating endpoints above which mimic the okta copy-bug (200 but
+    # vs the dict-mutating endpoints above which mimic the copy-bug (200 but
     # nothing persisted → changed must be False).
     store = Store("test")
     store.register("widgets", primary_key="id",
@@ -88,7 +88,7 @@ def _apply(client, method, path, body=None, token=TOKEN):
 
 def test_path_action_empty_body_applies(client):
     client, state = client
-    # okta-shaped: POST /suspend with empty body must flip status via the endpoint
+    # path-action shape: POST /suspend with empty body must flip status via the endpoint
     r = _apply(client, "POST", "/api/users/u1/suspend", body={})
     assert r.status_code == 200 and r.json()["ok"] is True
     assert state["users"]["u1"]["status"] == "SUSPENDED"
@@ -130,7 +130,7 @@ def test_changed_true_when_store_actually_persists(client):
 
 def test_changed_false_when_mutation_not_persisted(client):
     client, state = client
-    # /suspend mutates a plain dict, NOT the admin store (the okta copy-bug shape):
+    # /suspend mutates a plain dict, NOT the admin store (the copy-bug shape):
     # returns 200 but nothing persisted -> the guard must report changed=False so
     # the injector does NOT falsely mark it applied.
     r = _apply(client, "POST", "/api/users/u1/suspend", body={})

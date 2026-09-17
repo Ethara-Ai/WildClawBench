@@ -45,9 +45,8 @@ pytestmark = pytest.mark.xfail(
     "not present in any connector script; source is off-limits.",
 )
 
-VARIANT_T_SAMPLE = "activecampaign-api-connector/scripts/fetch_activecampaign_data.py"
+VARIANT_T_SAMPLE = "hubspot-api-connector/scripts/fetch_hubspot_data.py"
 VARIANT_R_SAMPLE = "instagram-api-connector/scripts/fetch_instagram_data.py"
-QUICKBOOKS = "quickbooks-api-connector/scripts/fetch_quickbooks_data.py"
 NAMING_EXCEPTION = "google-classroom-api-connector/scripts/fetch_classroom_data.py"
 
 
@@ -71,11 +70,6 @@ def variant_t():
 @pytest.fixture(scope="module")
 def variant_r():
     return _load_script(VARIANT_R_SAMPLE)
-
-
-@pytest.fixture(scope="module")
-def quickbooks():
-    return _load_script(QUICKBOOKS)
 
 
 @pytest.fixture(scope="module")
@@ -110,7 +104,7 @@ def test_no_unguarded_urlopen_remains_in_connector_scripts():
 
 @pytest.mark.parametrize(
     "fixture_name",
-    ["variant_t", "variant_r", "quickbooks", "naming_exception"],
+    ["variant_t", "variant_r", "naming_exception"],
 )
 @pytest.mark.parametrize(
     "url",
@@ -133,7 +127,7 @@ def test_safe_urlopen_rejects_non_http_schemes(fixture_name, url, request):
 
 @pytest.mark.parametrize(
     "fixture_name",
-    ["variant_t", "variant_r", "quickbooks", "naming_exception"],
+    ["variant_t", "variant_r", "naming_exception"],
 )
 @pytest.mark.parametrize(
     "url",
@@ -155,7 +149,7 @@ def test_safe_urlopen_rejects_link_local(fixture_name, url, request):
 
 @pytest.mark.parametrize(
     "fixture_name",
-    ["variant_t", "variant_r", "quickbooks", "naming_exception"],
+    ["variant_t", "variant_r", "naming_exception"],
 )
 @pytest.mark.parametrize(
     "url",
@@ -177,7 +171,7 @@ def test_safe_urlopen_allows_localhost_and_rfc1918(fixture_name, url, request):
 
 @pytest.mark.parametrize(
     "fixture_name",
-    ["variant_t", "variant_r", "quickbooks", "naming_exception"],
+    ["variant_t", "variant_r", "naming_exception"],
 )
 def test_safe_urlopen_rejects_missing_host(fixture_name, request):
     mod = request.getfixturevalue(fixture_name)
@@ -192,7 +186,7 @@ def test_safe_urlopen_rejects_missing_host(fixture_name, request):
 
 @pytest.mark.parametrize(
     "fixture_name",
-    ["variant_t", "variant_r", "quickbooks", "naming_exception"],
+    ["variant_t", "variant_r", "naming_exception"],
 )
 def test_redirect_handler_revalidates_location(fixture_name, request):
     mod = request.getfixturevalue(fixture_name)
@@ -230,7 +224,7 @@ def test_redirect_handler_revalidates_location(fixture_name, request):
 
 @pytest.mark.parametrize(
     "fixture_name",
-    ["variant_t", "variant_r", "quickbooks", "naming_exception"],
+    ["variant_t", "variant_r", "naming_exception"],
 )
 @pytest.mark.parametrize(
     "url",

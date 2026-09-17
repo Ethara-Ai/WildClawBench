@@ -1,3 +1,4 @@
+import contextlib
 import json
 import sys
 import tempfile
@@ -20,6 +21,57 @@ def _has_error(report, code):
 
 def _has_warn(report, code):
     return any(i.severity == V.SEV_WARN and i.code == code for i in report.issues)
+
+
+_SYNTH_API = "synth-api"
+
+
+@contextlib.contextmanager
+def _synthetic_catalog(example_files):
+    """Point ``V.EXAMPLES_DIR`` at a throwaway catalog holding ``example_files``.
+
+    Yields the overlay dir to write candidate files into. A comparison rule is a
+    property of a *shape* (wrapped envelope, null-valued field, ragged nested
+    array), not of whichever fleet service happened to exhibit it, so pinning the
+    canonical side inline keeps these assertions independent of the mock catalog.
+    """
+    with tempfile.TemporaryDirectory() as td:
+        examples = Path(td) / "examples"
+        example_dir = examples / _SYNTH_API
+        example_dir.mkdir(parents=True)
+        for name, payload in example_files.items():
+            (example_dir / name).write_text(json.dumps(payload))
+        overlay_dir = Path(td) / "overlay" / _SYNTH_API
+        overlay_dir.mkdir(parents=True)
+        original = V.EXAMPLES_DIR
+        V.EXAMPLES_DIR = examples
+        try:
+            yield overlay_dir
+        finally:
+            V.EXAMPLES_DIR = original
+
+
+# Rows live under a two-level key, and one row's PrimaryEmailAddr is null while
+# another's is a dict -- the polymorphism the type check must tolerate.
+_WRAPPED_ENVELOPE_CUSTOMERS = {
+    "QueryResponse": {
+        "Customer": [
+            {"Id": "1", "DisplayName": "Abrams, Derek",
+             "PrimaryEmailAddr": {"Address": "derek.abrams@example.com"}, "Active": True},
+            {"Id": "2", "DisplayName": "Alvarez, Sofia",
+             "PrimaryEmailAddr": None, "Active": True},
+        ]
+    }
+}
+
+# Line[] entries MUST keep differing key sets: that raggedness is what stops any
+# single entry from defining the canonical column list for the nested level.
+_RAGGED_NESTED_LINE_BILLS = [
+    {"Id": "1", "Line": [{"DetailType": "AccountBasedExpenseLineDetail", "Amount": 10,
+                          "Id": "1", "LineNum": 1},
+                         {"Amount": 20}]},
+    {"Id": "2", "Line": [{"Amount": 30, "Quantity": 2, "UnitPrice": 15}]},
+]
 
 
 class CatalogTests(unittest.TestCase):
@@ -136,45 +188,51 @@ class SchemaTests(unittest.TestCase):
 
 
 class WrappedTableTests(unittest.TestCase):
-    def test_quickbooks_customers_treated_as_table(self):
-        ex = V.EXAMPLES_DIR / "quickbooks-api" / "customers.json"
-        self.assertFalse(V._example_is_document(ex))
-        rows, issues = V._load_table(ex)
-        self.assertIsNotNone(rows)
-        self.assertGreater(len(rows), 0)
+    def test_wrapped_envelope_customers_treated_as_table(self):
+        with tempfile.TemporaryDirectory() as td:
+            ex = Path(td) / "customers.json"
+            ex.write_text(json.dumps(_WRAPPED_ENVELOPE_CUSTOMERS))
+            self.assertFalse(V._example_is_document(ex))
+            rows, issues = V._load_table(ex)
+            self.assertIsNotNone(rows)
+            self.assertGreater(len(rows), 0)
 
 
 class DeepCompareTests(unittest.TestCase):
     def test_nested_key_missing_and_extra_in_document(self):
-        with tempfile.TemporaryDirectory() as td:
-            overlay_dir = Path(td) / "plaid-api"
-            overlay_dir.mkdir()
+        example = {"owners": {"acc_chk_001": [{"names": ["Amelia Ortega"]}],
+                              "acc_sav_002": [{"names": ["Amelia Ortega"]}]}}
+        with _synthetic_catalog({"identity.json": example}) as overlay_dir:
             (overlay_dir / "identity.json").write_text(json.dumps({
                 "owners": {"acc_pcu_chk_01": {}, "acc_pcu_sav_02": {}}
             }))
             report = V.Report()
-            V.validate_overlay_dir(overlay_dir, "plaid-api", report)
+            V.validate_overlay_dir(overlay_dir, _SYNTH_API, report)
             msgs = [i.message for i in report.issues]
             self.assertTrue(any("acc_chk_001" in m and "missing canonical key" in m for m in msgs))
             self.assertTrue(any("acc_pcu_chk_01" in m and "extra key" in m for m in msgs))
 
-    def test_type_mismatch_scalar_vs_dict_in_array(self):
-        with tempfile.TemporaryDirectory() as td:
-            overlay_dir = Path(td) / "ring-api"
-            overlay_dir.mkdir()
-            ex = json.loads((V.EXAMPLES_DIR / "ring-api" / "devices.json").read_text())
-            for row in ex.get("doorbots", []):
-                if "motion_snooze" in row:
-                    row["motion_snooze"] = {"nested": "was scalar"}
-            (overlay_dir / "devices.json").write_text(json.dumps(ex))
+    def test_type_mismatch_null_canonical_vs_dict_in_array(self):
+        # The canonical value stays null so this pins the null-canonical branch;
+        # a scalar here would silently exercise a different comparison path. The
+        # sibling keys keep the file a document -- a lone list key peels to a
+        # table and the nested doorbots[] path never gets compared.
+        example = {"doorbots": [{"id": "d1", "motion_snooze": None},
+                                {"id": "d2", "motion_snooze": None}],
+                   "stickup_cams": [], "chimes": []}
+        overlay = {"doorbots": [{"id": "d1", "motion_snooze": {"nested": "was scalar"}},
+                                {"id": "d2", "motion_snooze": {"nested": "was scalar"}}],
+                   "stickup_cams": [], "chimes": []}
+        with _synthetic_catalog({"devices.json": example}) as overlay_dir:
+            (overlay_dir / "devices.json").write_text(json.dumps(overlay))
             report = V.Report()
-            V.validate_overlay_dir(overlay_dir, "ring-api", report)
+            V.validate_overlay_dir(overlay_dir, _SYNTH_API, report)
             msgs = [i.message for i in report.issues]
             self.assertTrue(any(
                 "type mismatch at" in m and "doorbots[].motion_snooze" in m
                 and "canonical=null" in m and "actual=dict" in m
                 for m in msgs
-            ))
+            ), msg=str(msgs))
 
     def test_ragged_object_keys_in_json_array(self):
         with tempfile.TemporaryDirectory() as td:
@@ -204,25 +262,20 @@ class ReportShapeTests(unittest.TestCase):
 
 class RaggednessToleranceTests(unittest.TestCase):
     def test_ragged_nested_array_bills_line_no_key_missing(self):
-        ex = V.EXAMPLES_DIR / "quickbooks-api" / "bills.json"
-        with tempfile.TemporaryDirectory() as td:
-            overlay_dir = Path(td) / "quickbooks-api"
-            overlay_dir.mkdir()
-            (overlay_dir / "bills.json").write_text(ex.read_text())
+        with _synthetic_catalog({"bills.json": _RAGGED_NESTED_LINE_BILLS}) as overlay_dir:
+            (overlay_dir / "bills.json").write_text(json.dumps(_RAGGED_NESTED_LINE_BILLS))
             report = V.Report()
-            V.validate_overlay_dir(overlay_dir, "quickbooks-api", report)
+            V.validate_overlay_dir(overlay_dir, _SYNTH_API, report)
             offenders = [i for i in report.issues
                          if i.code == "KEY_MISSING" and "Line[]" in i.message]
             self.assertEqual(offenders, [], msg=str([i.message for i in offenders]))
 
     def test_customers_primary_email_addr_polymorphism_no_type_mismatch(self):
-        ex = V.EXAMPLES_DIR / "quickbooks-api" / "customers.json"
-        with tempfile.TemporaryDirectory() as td:
-            overlay_dir = Path(td) / "quickbooks-api"
-            overlay_dir.mkdir()
-            (overlay_dir / "customers.json").write_text(ex.read_text())
+        with _synthetic_catalog({"customers.json": _WRAPPED_ENVELOPE_CUSTOMERS}) as overlay_dir:
+            (overlay_dir / "customers.json").write_text(
+                json.dumps(_WRAPPED_ENVELOPE_CUSTOMERS))
             report = V.Report()
-            V.validate_overlay_dir(overlay_dir, "quickbooks-api", report)
+            V.validate_overlay_dir(overlay_dir, _SYNTH_API, report)
             offenders = [i for i in report.issues
                          if i.code == "TYPE_MISMATCH" and "PrimaryEmailAddr" in i.message]
             self.assertEqual(offenders, [], msg=str([i.message for i in offenders]))
@@ -277,18 +330,15 @@ class RaggednessToleranceTests(unittest.TestCase):
         self.assertTrue(any("characters" in m for c, _, m in findings_bad if c == "KEY_MISSING"))
 
     def test_optional_key_present_in_overlay_no_extra_no_missing(self):
-        ex = V.EXAMPLES_DIR / "quickbooks-api" / "bills.json"
-        overlay = json.loads(ex.read_text())
+        overlay = json.loads(json.dumps(_RAGGED_NESTED_LINE_BILLS))
         for r in overlay:
             for line in r.get("Line", []):
                 for k in ("DetailType", "Id", "LineNum", "Quantity", "UnitPrice"):
                     line.setdefault(k, "x")
-        with tempfile.TemporaryDirectory() as td:
-            overlay_dir = Path(td) / "quickbooks-api"
-            overlay_dir.mkdir()
+        with _synthetic_catalog({"bills.json": _RAGGED_NESTED_LINE_BILLS}) as overlay_dir:
             (overlay_dir / "bills.json").write_text(json.dumps(overlay))
             report = V.Report()
-            V.validate_overlay_dir(overlay_dir, "quickbooks-api", report)
+            V.validate_overlay_dir(overlay_dir, _SYNTH_API, report)
             offenders = [
                 i for i in report.issues
                 if i.code in ("KEY_MISSING", "KEY_EXTRA") and "Line[]" in i.message
@@ -299,17 +349,14 @@ class RaggednessToleranceTests(unittest.TestCase):
                              msg=str([i.message for i in filtered]))
 
     def test_genuinely_unknown_key_still_emits_key_extra(self):
-        ex = V.EXAMPLES_DIR / "quickbooks-api" / "bills.json"
-        overlay = json.loads(ex.read_text())
+        overlay = json.loads(json.dumps(_RAGGED_NESTED_LINE_BILLS))
         for r in overlay:
             for line in r.get("Line", []):
                 line["totally_made_up_deep_key"] = 1
-        with tempfile.TemporaryDirectory() as td:
-            overlay_dir = Path(td) / "quickbooks-api"
-            overlay_dir.mkdir()
+        with _synthetic_catalog({"bills.json": _RAGGED_NESTED_LINE_BILLS}) as overlay_dir:
             (overlay_dir / "bills.json").write_text(json.dumps(overlay))
             report = V.Report()
-            V.validate_overlay_dir(overlay_dir, "quickbooks-api", report)
+            V.validate_overlay_dir(overlay_dir, _SYNTH_API, report)
             self.assertTrue(any(
                 i.code == "KEY_EXTRA" and "totally_made_up_deep_key" in i.message
                 for i in report.issues

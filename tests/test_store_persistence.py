@@ -87,12 +87,17 @@ def test_create_then_read_persists():
 
 def test_update_and_delete_persist():
     """Update and delete must survive a fresh accessor read."""
-    od = _load("obsidian-api", "obsidian_data")
-    od.create_note("persist_probe.md", "hello")
-    od.update_note("persist_probe.md", append=" world")
-    assert od._store.document("contents").get().get("persist_probe.md") == "hello world"
-    od.delete_note("persist_probe.md")
-    assert "persist_probe.md" not in od._store.document("contents").get()
+    gd = _load("google-drive-api", "google_drive_data")
+    created = gd.create_file(name="persist_probe.md", mime_type="text/markdown")
+    file_id = created["id"]
+
+    gd.update_file(file_id, name="persist_probe_renamed.md")
+    assert gd.get_file(file_id)["name"] == "persist_probe_renamed.md", "update did not persist"
+
+    gd.delete_file(file_id)
+    assert all(f["id"] != file_id for f in gd._files_rows()), "delete did not persist"
+    assert all(p["file_id"] != file_id for p in gd._permissions_rows()), \
+        "delete_where cascade did not persist: the file's permission row outlived it"
 
 
 def test_injection_still_visible():

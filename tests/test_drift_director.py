@@ -134,16 +134,16 @@ def _ctx(audit=None, workspace_dir=None, start_ts=100.0, current_ts=100.0,
 
 class TestFirstCallOn:
     def test_fires_when_any_call_present(self):
-        ctx = _ctx({"airbnb-api": [_entry()]})
-        assert dd._eval_first_call_on({"api": "airbnb-api"}, ctx) is True
+        ctx = _ctx({"etsy-api": [_entry()]})
+        assert dd._eval_first_call_on({"api": "etsy-api"}, ctx) is True
 
     def test_false_when_no_calls(self):
-        ctx = _ctx({"airbnb-api": []})
-        assert dd._eval_first_call_on({"api": "airbnb-api"}, ctx) is False
+        ctx = _ctx({"etsy-api": []})
+        assert dd._eval_first_call_on({"api": "etsy-api"}, ctx) is False
 
     def test_false_when_api_absent(self):
         ctx = _ctx({})
-        assert dd._eval_first_call_on({"api": "airbnb-api"}, ctx) is False
+        assert dd._eval_first_call_on({"api": "etsy-api"}, ctx) is False
 
     def test_missing_api_raises(self):
         with pytest.raises(DriftConfigError, match="requires 'api'"):
@@ -383,7 +383,7 @@ class TestDriftScriptFromDict:
     def test_schedule_event_compiled(self):
         s = DriftScript.from_dict({
             "schedule": [
-                {"id": "ev1", "at": "30s", "action": {"api": "airbnb-api"}},
+                {"id": "ev1", "at": "30s", "action": {"api": "etsy-api"}},
             ]
         })
         assert len(s.schedule) == 1
@@ -391,7 +391,7 @@ class TestDriftScriptFromDict:
         assert ev.id == "ev1"
         assert ev.kind == "schedule"
         assert ev.spec["at"] == 30.0
-        assert ev.action == {"api": "airbnb-api"}
+        assert ev.action == {"api": "etsy-api"}
         assert ev.fires_remaining == 1
 
     def test_schedule_default_id_from_index(self):
@@ -502,7 +502,7 @@ class TestDriftScriptLoad:
             "  - id: ev1\n"
             "    at: 30s\n"
             "    action:\n"
-            "      api: airbnb-api\n"
+            "      api: etsy-api\n"
         )
         s = DriftScript.load(p)
         assert s.description == "demo"
@@ -1293,12 +1293,12 @@ class TestRunLoop:
 class TestBuildTargetsFromEnv:
     def test_maps_names_to_targets(self):
         targets = build_targets_from_env(
-            {"airbnb-api": "http://h:8011", "stripe-api": "http://h:8012"},
+            {"etsy-api": "http://h:8011", "stripe-api": "http://h:8012"},
             admin_token="tok",
         )
-        assert set(targets) == {"airbnb-api", "stripe-api"}
-        assert targets["airbnb-api"].base_url == "http://h:8011"
-        assert targets["airbnb-api"].admin_token == "tok"
+        assert set(targets) == {"etsy-api", "stripe-api"}
+        assert targets["etsy-api"].base_url == "http://h:8011"
+        assert targets["etsy-api"].admin_token == "tok"
 
     def test_empty_mapping_yields_empty(self):
         assert build_targets_from_env({}) == {}

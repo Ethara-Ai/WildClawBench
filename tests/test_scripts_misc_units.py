@@ -231,10 +231,10 @@ class TestBackfillConnectorDocs:
     def test_find_bundle_skill_dirs_discovers_nested_connectors(self, backfill, tmp_path):
         base = tmp_path / "bundle" / "task1" / "data" / "environment" / "skills"
         (base / "gmail-api-connector").mkdir(parents=True)
-        (base / "outlook-api-connector").mkdir(parents=True)
+        (base / "zoom-api-connector").mkdir(parents=True)
         (base / "not-a-connector").mkdir(parents=True)  # wrong suffix -> ignored
         found = backfill.find_bundle_skill_dirs(tmp_path / "bundle")
-        assert sorted(p.name for p in found) == ["gmail-api-connector", "outlook-api-connector"]
+        assert sorted(p.name for p in found) == ["gmail-api-connector", "zoom-api-connector"]
 
 
 # =========================================================================== #

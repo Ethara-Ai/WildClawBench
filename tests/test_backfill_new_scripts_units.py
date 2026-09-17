@@ -632,8 +632,8 @@ def test_cd_main_generate_bundle_and_error_paths(cd, tmp_path, capsys):
     _mk_thin_connector(skills)
     _mk_env(env)
     # rich-listed connector is skipped without --include-rich
-    (skills / "quickbooks-api-connector").mkdir()
-    (skills / "quickbooks-api-connector" / "SKILL.md").write_text(THIN_SKILL, encoding="utf-8")
+    (skills / "salesforce-api-connector").mkdir()
+    (skills / "salesforce-api-connector" / "SKILL.md").write_text(THIN_SKILL, encoding="utf-8")
     # connector without SKILL.md and one with no endpoints
     (skills / "noskill-api-connector").mkdir()
     (skills / "empty-api-connector").mkdir()

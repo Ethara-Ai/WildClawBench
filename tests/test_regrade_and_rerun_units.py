@@ -661,14 +661,14 @@ class TestBackfillBuildStoreTask:
             "difficulty": "hard",
             "l1": "L1", "l2": "L2",
             "rubrics": [{"criterion": "c"}],
-            "required_apis": ["quickbooks-api"],
+            "required_apis": ["salesforce-api"],
             "distractor_apis": ["stripe-api"],
         }
         st = backfill_mod._build_store_task(task)
         assert st.id == "t1" and st.task_id == "t1"
         assert st.initial_prompt == "go"
         assert json.loads(st.rubrics_json) == [{"criterion": "c"}]
-        assert st.extra["required_apis"] == ["quickbooks-api"]
+        assert st.extra["required_apis"] == ["salesforce-api"]
         assert st.extra["distractor_apis"] == ["stripe-api"]
 
     def test_build_store_task_prompt_fallback(self, backfill_mod):

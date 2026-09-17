@@ -1,9 +1,8 @@
-"""Drive-API download endpoint tests for box-api, google-drive-api, dropbox-api.
+"""Drive-API download endpoint tests for box-api and google-drive-api.
 
-These three services expose a content-download route on top of the existing
-metadata routes. Each shape differs deliberately (Box GET /content, Drive
-?alt=media, Dropbox POST /2/files/download) to mirror the real vendor API
-surfaces. Common invariants asserted here:
+Both services expose a content-download route on top of the existing metadata
+routes. Each shape differs deliberately (Box GET /content, Drive ?alt=media) to
+mirror the real vendor API surfaces. Common invariants asserted here:
 
   * text/markdown roundtrip preserves bytes (decode UTF-8, equality match).
   * application/pdf returns extracted-text content (substring match against
@@ -12,9 +11,9 @@ surfaces. Common invariants asserted here:
   * 404 on missing file_id / path / fixture-file.
   * Optional 413 on text exceeding `WCB_DOWNLOAD_MAX_BYTES`.
 
-The autouse fixture restricts parametrization to the three drive APIs so the
+The autouse fixture restricts parametrization to the drive APIs so the
 otherwise-fleet-wide `api_dir` session fixture from conftest.py doesn't drag
-in 98 unrelated services.
+in every unrelated service.
 """
 from __future__ import annotations
 
@@ -28,7 +27,7 @@ import pytest
 # build/inspect the fixture PDF too.
 pytest.importorskip("pypdf")
 
-DRIVE_APIS = ("box-api", "google-drive-api", "dropbox-api")
+DRIVE_APIS = ("box-api", "google-drive-api")
 
 
 @pytest.fixture(autouse=True)
@@ -37,18 +36,16 @@ def _skip_non_drive(api_dir: Path):
         pytest.skip(f"{api_dir.name} has no download endpoint")
 
 
-def _get(client, api: str, file_id: str = "", path: str = ""):
-    """Cross-API GET-or-POST shim returning a TestClient Response."""
+def _get(client, api: str, file_id: str = ""):
+    """Cross-API GET shim returning a TestClient Response."""
     if api == "box-api":
         return client.get(f"/2.0/files/{file_id}/content")
     if api == "google-drive-api":
         return client.get(f"/drive/v3/files/{file_id}", params={"alt": "media"})
-    if api == "dropbox-api":
-        return client.post("/2/files/download", json={"path": path})
     raise ValueError(api)
 
 
-# Per-API fixtures — (md_id_or_path, pdf_id_or_path, unsupported_id_or_path)
+# Per-API fixtures — (md_id, pdf_id, unsupported_id)
 _FIXTURES = {
     "box-api": dict(md="500007", pdf="500001", unsupported="500002",  # zip
                     missing_id="999999", missing_fixture="500005",     # api-spec.yaml
@@ -57,18 +54,11 @@ _FIXTURES = {
                               unsupported="folder-eng",  # vnd.google-apps.folder
                               missing_id="nonexistent",
                               missing_fixture=None),
-    "dropbox-api": dict(md="/Documents/Roadmap.md", pdf="/Documents/Q2-Report.pdf",
-                         unsupported="/Documents/Roadmap.docx",
-                         missing_id="/nonexistent.txt",
-                         missing_fixture=None,
-                         is_folder="/Documents"),
 }
 
 
 def _call(client, api: str, key: str):
     fx = _FIXTURES[api][key]
-    if api == "dropbox-api":
-        return _get(client, api, path=fx) if fx is not None else None
     return _get(client, api, file_id=fx) if fx is not None else None
 
 
@@ -118,13 +108,6 @@ def test_missing_fixture_returns_404(api_dir, client):
         stashed.rename(blob)
     assert r.status_code == 404, r.text
     assert r.json().get("code") == "fixture_missing", r.text
-
-
-def test_dropbox_folder_path_returns_415(api_dir, client):
-    if api_dir.name != "dropbox-api":
-        pytest.skip("dropbox-only test")
-    r = _get(client, "dropbox-api", path=_FIXTURES["dropbox-api"]["is_folder"])
-    assert r.status_code == 415, r.text
 
 
 def test_size_cap_413(api_dir, client, monkeypatch):

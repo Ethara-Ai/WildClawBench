@@ -132,7 +132,7 @@ def load_app(api_dir: Path):
     Each server.py imports `tracking_middleware` and `<something>_data`
     as siblings. We prepend api_dir + ENV_DIR to sys.path, capture
     stdout/err, then evict newly-loaded modules so the next API doesn't
-    inherit a stale `ring_data` / `classroom_data` etc.
+    inherit a stale `linear_data` / `classroom_data` etc.
     """
     server_py = api_dir / "server.py"
     if not server_py.exists():
@@ -190,7 +190,7 @@ def csv_bad_rows(path: Path) -> list[tuple[int, int, int]]:
     """Return [(row_no, expected_cols, actual_cols), ...] for rows whose
     column count differs from the header. Row numbers are 1-indexed and
     EXCLUDE the header. Catches the unquoted-comma CSV bug class that
-    crashed myfitnesspal-api on the danielle-lee_data task.
+    crashed the since-retired myfitnesspal-api on the danielle-lee_data task.
     """
     bad: list[tuple[int, int, int]] = []
     with path.open(encoding="utf-8", newline="") as fh:

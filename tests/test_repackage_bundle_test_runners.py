@@ -76,7 +76,7 @@ def test_solve_sh_byte_equal_with_harbor_populated():
     env_vars = {
         "GMAIL_API_URL": "http://gmail-api:8017",
         "XERO_API_URL": "http://xero-api:8088",
-        "QUICKBOOKS_API_URL": "http://quickbooks-api:8041",
+        "SALESFORCE_API_URL": "http://salesforce-api:8041",
     }
     assert rp._generate_solve_sh(env_vars) == harbor(env_vars)
 
