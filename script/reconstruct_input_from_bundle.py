@@ -51,12 +51,14 @@ What CANNOT be recovered (documented in RECONSTRUCTION_NOTES.md)
 from __future__ import annotations
 
 import argparse
+import json
 import shutil
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from script.lib.recon import prompts as recon_prompts  # noqa: E402
+from script.lib.recon import schedule as recon_schedule  # noqa: E402
 
 SEED_EXTS = {".json", ".csv"}
 ARTIFACTS_INPUTS_SUBPATH = ("artifacts", "inputs", "files")
@@ -177,28 +179,57 @@ def _load_toml(path: Path) -> dict:
 # ----------------------------------------------------------------------------- #
 # per-task reconstruction
 # ----------------------------------------------------------------------------- #
-def recover_prompts(bundle: Path, out_dir: Path, log: list[str], timezone: str):
-    """Write the normalised prompts.txt and report what normalising changed."""
+def recover_prompts(bundle: Path, out_dir: Path, log: list[str], timezone: str,
+                    trajectory_run: str = ""):
+    """Write the prompts.txt / prompts.json pair and report what changed.
+
+    The pair is written together or not at all: task_parser hard-raises on a
+    prompts.json with no companion prompts.txt.
+    """
     source = recon_prompts.locate_prompt_file(bundle)
     if source is None:
         log.append("  MISS prompts.txt            <- no prompt file in the bundle")
-        return None
+        return None, recon_schedule.Instants(notes=["no prompt file to schedule"])
     rec = recon_prompts.normalise(source, task_id=out_dir.name, timezone=timezone)
     (out_dir / "prompts.txt").write_text(rec.text, encoding="utf-8")
     log.append(f"  ok   prompts.txt            <- {source.rel} "
                f"({len(rec.turns)} turn(s))")
     for fix in rec.fixes:
         log.append(f"  fix  prompts.txt            .. {fix}")
-    return rec
+
+    window = recon_prompts.window_from_header(rec.header.get("window", ""),
+                                              rec.header.get("timezone", ""))
+    instants = recon_schedule.resolve(bundle, rec.turns, window,
+                                      rec.header.get("timezone", ""), trajectory_run)
+    if len(instants.values) == len(rec.turns) and rec.turns:
+        payload = recon_schedule.build(rec.header.get("task_id", out_dir.name),
+                                       rec.header.get("persona", ""),
+                                       rec.header.get("timezone", ""),
+                                       rec.turns, instants)
+        (out_dir / "prompts.json").write_text(
+            json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        log.append(f"  ok   prompts.json           <- {instants.source} "
+                   f"({instants.fidelity})")
+        if instants.jitter_ms:
+            log.append(f"  note prompts.json           .. dropped up to "
+                       f"{instants.jitter_ms}ms of dispatch latency per turn")
+    else:
+        log.append("  MISS prompts.json           <- no schedule the bundle supports")
+        rec.unresolved.append(
+            "prompts.json: refused — " + "; ".join(instants.notes or
+            ["the bundle carries no turn instants"]))
+    rec.unresolved.extend(n for n in instants.notes if instants.values)
+    return rec, instants
 
 
 def reconstruct(bundle: Path, out_dir: Path, baseline_env: Path, verbose: bool,
-                timezone: str = "") -> dict:
+                timezone: str = "", trajectory_run: str = "") -> dict:
     env_dir = bundle / "data" / "environment"
     log: list[str] = []
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    prompts = recover_prompts(bundle, out_dir, log, timezone)
+    prompts, instants = recover_prompts(bundle, out_dir, log, timezone,
+                                        trajectory_run)
 
     # TRUTH.md (grader truth doc; published verbatim by the repackager)
     _copy_file(bundle / "TRUTH.md", out_dir / "TRUTH.md", log, "TRUTH.md")
@@ -244,6 +275,7 @@ def reconstruct(bundle: Path, out_dir: Path, baseline_env: Path, verbose: bool,
     summary = {
         "task": out_dir.name,
         "turns": len(prompts.turns) if prompts else 0,
+        "clock": instants.fidelity if instants.values else "none",
         "prompt": (out_dir / "prompts.txt").is_file(),
         "rubric": (out_dir / "rubric.json").is_file(),
         "persona_files": len(persona_names),
@@ -313,6 +345,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--timezone", default="",
                     help="IANA timezone to use when the bundle's prompt header "
                          "omits one (headerless bundles carry it only as persona prose).")
+    ap.add_argument("--trajectory-run", default="", metavar="RUN",
+                    help="Published run to take turn instants from, as 'run_3' or "
+                         "'<model>/run_3' (default: the first run that covers every turn).")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args(argv)
 
@@ -332,14 +367,15 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"Found {len(bundles)} task bundle(s). Baseline env: {args.baseline_env}")
     summaries = [reconstruct(b, args.out / b.name, args.baseline_env, args.verbose,
-                             args.timezone) for b in bundles]
+                             args.timezone, args.trajectory_run) for b in bundles]
 
-    print(f"\n{'task':<45} {'turns':>5} {'rubric':>6} {'persona':>7} {'data':>4} "
-          f"{'mock(apis/files)':>16}")
+    print(f"\n{'task':<45} {'turns':>5} {'clock':>8} {'rubric':>6} {'persona':>7} "
+          f"{'data':>4} {'mock(apis/files)':>16}")
     for s in summaries:
         mock = f"{s['mock_data_apis']}/{s['mock_data_files']}"
-        print(f"{s['task'][:44]:<45} {s['turns']:>5} {str(s['rubric']):>6} "
-              f"{s['persona_files']:>7} {s['data_files']:>4} {mock:>16}")
+        print(f"{s['task'][:44]:<45} {s['turns']:>5} {s['clock']:>8} "
+              f"{str(s['rubric']):>6} {s['persona_files']:>7} {s['data_files']:>4} "
+              f"{mock:>16}")
     total_warn = sum(len(s["warnings"]) for s in summaries)
     print(f"\nReconstructed into: {args.out.resolve()}"
           f"{'  (with ' + str(total_warn) + ' warning(s) — see RECONSTRUCTION_NOTES.md)' if total_warn else ''}")

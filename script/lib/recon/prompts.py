@@ -246,7 +246,7 @@ def normalise(source: PromptSource, *, task_id: str, persona: str = "",
     found, fixes = parse_any_header(header_text)
     turns = parse_turns(body)
     unresolved: list[str] = []
-    if body and not TURN_RE.search(source.text):
+    if body and not any(_turn_match(line) for line in source.text.splitlines()):
         fixes.append("plain prompt wrapped as '--- TURN T0 ---' so it loads as one turn")
 
     resolved_id = found.get("task_id") or task_id
