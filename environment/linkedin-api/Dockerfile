@@ -5,6 +5,6 @@ COPY requirements.txt requirements-locked.txt ./
 RUN pip install --no-cache-dir --require-hashes -r requirements-locked.txt
 COPY . .
 RUN chown -R app:app /app
-EXPOSE 8046
+EXPOSE 8062
 USER app
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8046"]
+CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8062"]

@@ -118,11 +118,6 @@ github-api::POST /repos/{owner}/{repo}/issues::OPEN_BODY_SCHEMA
 github-api::PATCH /repos/{owner}/{repo}/issues/{number}::OPEN_BODY_SCHEMA
 github-api::POST /repos/{owner}/{repo}/issues/{number}/comments::OPEN_BODY_SCHEMA
 
-# gitlab-api (3)
-gitlab-api::POST /api/v4/projects/{project_id}/issues::OPEN_BODY_SCHEMA
-gitlab-api::PUT /api/v4/projects/{project_id}/issues/{issue_iid}::OPEN_BODY_SCHEMA
-gitlab-api::POST /api/v4/projects/{project_id}/merge_requests::OPEN_BODY_SCHEMA
-
 # google-classroom-api (12)
 google-classroom-api::POST /v1/courses::OPEN_BODY_SCHEMA
 google-classroom-api::PATCH /v1/courses/{course_id}::OPEN_BODY_SCHEMA
@@ -181,6 +176,9 @@ linear-api::PUT /v1/issues/{issue_id}::OPEN_BODY_SCHEMA
 linear-api::POST /v1/labels::OPEN_BODY_SCHEMA
 linear-api::POST /v1/projects::OPEN_BODY_SCHEMA
 linear-api::PUT /v1/projects/{project_id}::OPEN_BODY_SCHEMA
+
+# linkedin-api (1)
+linkedin-api::POST /v2/posts::OPEN_BODY_SCHEMA
 
 # mailchimp-api (3)
 mailchimp-api::POST /3.0/campaigns::OPEN_BODY_SCHEMA

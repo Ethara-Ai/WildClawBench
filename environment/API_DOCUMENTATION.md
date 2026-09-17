@@ -33,12 +33,12 @@
 29. [Square API](#29-square-api)
 30. [Salesforce API](#30-salesforce-api)
 31. [Confluence API](#31-confluence-api)
-32. [Gitlab API](#32-gitlab-api)
-33. [Datadog API](#33-datadog-api)
-34. [Shippo API](#34-shippo-api)
-35. [Docusign API](#35-docusign-api)
-36. [Typeform API](#36-typeform-api)
-37. [Discord API](#37-discord-api)
+32. [Datadog API](#32-datadog-api)
+33. [Shippo API](#33-shippo-api)
+34. [Docusign API](#34-docusign-api)
+35. [Typeform API](#35-typeform-api)
+36. [Discord API](#36-discord-api)
+37. [Linkedin API](#37-linkedin-api)
 38. [Wordpress API](#38-wordpress-api)
 39. [Contentful API](#39-contentful-api)
 40. [Algolia API](#40-algolia-api)
@@ -90,12 +90,12 @@
 | square-api | 8041 | `SQUARE_API_URL` | Square API | v1.0.0 |
 | salesforce-api | 8044 | `SALESFORCE_API_URL` | Salesforce API | v1.0.0 |
 | confluence-api | 8045 | `CONFLUENCE_API_URL` | Confluence API | v1.0.0 |
-| gitlab-api | 8046 | `GITLAB_API_URL` | Gitlab API | v1.0.0 |
 | datadog-api | 8048 | `DATADOG_API_URL` | Datadog API | v1.0.0 |
 | shippo-api | 8052 | `SHIPPO_API_URL` | Shippo API | v1.0.0 |
 | docusign-api | 8053 | `DOCUSIGN_API_URL` | Docusign API | v1.0.0 |
 | typeform-api | 8055 | `TYPEFORM_API_URL` | Typeform API | v1.0.0 |
 | discord-api | 8057 | `DISCORD_API_URL` | Discord API | v1.0.0 |
+| linkedin-api | 8062 | `LINKEDIN_API_URL` | Linkedin API | v1.0.0 |
 | wordpress-api | 8065 | `WORDPRESS_API_URL` | Wordpress API | v1.0.0 |
 | contentful-api | 8066 | `CONTENTFUL_API_URL` | Contentful API | v1.0.0 |
 | algolia-api | 8067 | `ALGOLIA_API_URL` | Algolia API | v1.0.0 |
@@ -3291,32 +3291,7 @@ Mock service mirroring Confluence API endpoints. See `confluence-api/confluence-
 
 ---
 
-## 32. Gitlab API
-
-**Service**: `gitlab-api` · **Port**: 8046 · **Env**: `GITLAB_API_URL`
-
-Mock service mirroring Gitlab API endpoints. See `gitlab-api/gitlab-api_postman_collection.json`*` for the runnable request collection.
-
-### Endpoints
-
-#### Endpoints
-
-- `GET {{baseUrl}}/health` — health
-- `GET {{baseUrl}}/api/v4/user` — get current user
-- `GET {{baseUrl}}/api/v4/projects` — list projects
-- `GET {{baseUrl}}/api/v4/projects/101` — get project
-- `GET {{baseUrl}}/api/v4/projects/101/issues?state=opened` — list issues
-- `GET {{baseUrl}}/api/v4/projects/101/issues/1` — get issue
-- `POST {{baseUrl}}/api/v4/projects/101/issues` — create issue
-- `PUT {{baseUrl}}/api/v4/projects/101/issues/2` — update issue (close)
-- `GET {{baseUrl}}/api/v4/projects/101/merge_requests?state=opened` — list merge requests
-- `POST {{baseUrl}}/api/v4/projects/101/merge_requests` — create merge request
-- `PUT {{baseUrl}}/api/v4/projects/101/merge_requests/1/merge` — merge merge request
-- `GET {{baseUrl}}/api/v4/projects/101/pipelines` — list pipelines
-
----
-
-## 33. Datadog API
+## 32. Datadog API
 
 **Service**: `datadog-api` · **Port**: 8048 · **Env**: `DATADOG_API_URL`
 
@@ -3341,7 +3316,7 @@ Mock service mirroring Datadog API endpoints. See `datadog-api/datadog-api_postm
 
 ---
 
-## 34. Shippo API
+## 33. Shippo API
 
 **Service**: `shippo-api` · **Port**: 8052 · **Env**: `SHIPPO_API_URL`
 
@@ -3363,7 +3338,7 @@ Mock service mirroring Shippo API endpoints. See `shippo-api/shippo-api_postman_
 
 ---
 
-## 35. Docusign API
+## 34. Docusign API
 
 **Service**: `docusign-api` · **Port**: 8053 · **Env**: `DOCUSIGN_API_URL`
 
@@ -3384,7 +3359,7 @@ Mock service mirroring Docusign API endpoints. See `docusign-api/docusign-api_po
 
 ---
 
-## 36. Typeform API
+## 35. Typeform API
 
 **Service**: `typeform-api` · **Port**: 8055 · **Env**: `TYPEFORM_API_URL`
 
@@ -3405,7 +3380,7 @@ Mock service mirroring Typeform API endpoints. See `typeform-api/typeform-api_po
 
 ---
 
-## 37. Discord API
+## 36. Discord API
 
 **Service**: `discord-api` · **Port**: 8057 · **Env**: `DISCORD_API_URL`
 
@@ -3425,6 +3400,29 @@ Mock service mirroring Discord API endpoints. See `discord-api/discord-api_postm
 - `GET {{baseUrl}}/api/v10/channels/800100200300400001` — get channel
 - `GET {{baseUrl}}/api/v10/channels/800100200300400001/messages?limit=10` — channel messages
 - `POST {{baseUrl}}/api/v10/channels/800100200300400001/messages` — create message
+
+---
+
+## 37. Linkedin API
+
+**Service**: `linkedin-api` · **Port**: 8062 · **Env**: `LINKEDIN_API_URL`
+
+Mock service mirroring Linkedin API endpoints. See `linkedin-api/linkedin-api_postman_collection.json`*` for the runnable request collection.
+
+### Endpoints
+
+#### Endpoints
+
+- `GET {{baseUrl}}/health` — health
+- `GET {{baseUrl}}/v2/me` — get me
+- `GET {{baseUrl}}/v2/connections?count=10` — list connections
+- `GET {{baseUrl}}/v2/posts` — list posts
+- `GET {{baseUrl}}/v2/posts?author_id=urn:li:person:amelia-ortega` — list posts by author
+- `GET {{baseUrl}}/v2/posts/6003` — get post
+- `POST {{baseUrl}}/v2/posts` — create post
+- `GET {{baseUrl}}/v2/organizations/5001` — get organization
+- `GET {{baseUrl}}/v2/jobs?keywords=backend&location=Remote` — search jobs
+- `GET {{baseUrl}}/v2/jobs/7001` — get job
 
 ---
 

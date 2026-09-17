@@ -167,9 +167,9 @@ airtable-api         algolia-api          amazon-seller-api    asana-api
 bigcommerce-api      box-api              confluence-api       contentful-api
 datadog-api          discord-api          docusign-api         doordash-api
 etsy-api             eventbrite-api       figma-api            github-api
-gitlab-api           gmail-api            google-calendar-api  google-classroom-api
-google-drive-api     hubspot-api          instacart-api        instagram-api
-intercom-api         jira-api             linear-api           mailchimp-api
+gmail-api            google-calendar-api  google-classroom-api google-drive-api
+hubspot-api          instacart-api        instagram-api        intercom-api
+jira-api             linear-api           linkedin-api         mailchimp-api
 monday-api           notion-api           openlibrary-api      openweather-api
 pagerduty-api        pinterest-api        salesforce-api       servicenow-api
 shippo-api           slack-api            spotify-api          square-api
