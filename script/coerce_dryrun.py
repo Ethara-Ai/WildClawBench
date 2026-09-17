@@ -39,8 +39,8 @@ INPUT_DIR = REPO_ROOT / "input"
 
 sys.path.insert(0, str(REPO_ROOT))
 from src.utils.serving_shape import (  # noqa: E402
-    orphan_keys, project_in_process, row_bag, serving_vocabulary,
-    unwrap_expected, value_visible,
+    envelope_keys, envelope_vocabulary, orphan_keys, partition_expected,
+    project_in_process, row_bag, serving_vocabulary, value_visible,
 )
 
 _INFRA = ("_mutable_store.py", "admin_plane.py", "tracking_middleware.py")
@@ -186,17 +186,22 @@ def replay_patch(module: Any, spec: dict) -> tuple[bool, str]:
         return False, f"row {spec.get('pk')!r} not in table {table_name!r}"
 
     nested = isinstance(before.get("fields"), dict)
-    written = unwrap_expected(set_, nested)
+    columns, envelope = partition_expected(set_, nested)
+    written = {**columns, **envelope}
     vocabulary = serving_vocabulary(table.rows(), exclude_pk=pk,
                                     pk_field=table.primary_key,
                                     extra=row_bag(before))
-    orphans = orphan_keys(written, vocabulary)
+    orphans = orphan_keys(columns, vocabulary)
+    if envelope:
+        orphans = sorted(orphans + orphan_keys(envelope, envelope_vocabulary(
+            table.rows(), exclude_pk=pk, pk_field=table.primary_key,
+            extra=envelope_keys(before))))
 
     snapshot = store.snapshot("d17-ingest")
     try:
         serving_before, mechanism = project_in_process(module, table_name, pk)
-        payload = ({"fields": {**before["fields"], **written}} if nested
-                   else dict(written))
+        payload = ({**envelope, "fields": {**before["fields"], **columns}} if nested
+                   else dict(columns))
         table.patch(pk, payload)
         serving_after, mechanism = project_in_process(module, table_name, pk)
     finally:

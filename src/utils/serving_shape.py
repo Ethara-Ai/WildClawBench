@@ -46,15 +46,19 @@ from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Seque
 
 __all__ = [
     "row_bag",
-    "unwrap_expected",
+    "envelope_keys",
+    "partition_expected",
     "loose_eq",
     "comparable_fields",
     "serving_vocabulary",
+    "envelope_vocabulary",
     "orphan_keys",
     "verify_against_serving",
     "find_getter",
     "project_in_process",
     "ORPHAN_REASON",
+    "UNVERIFIABLE",
+    "UNVERIFIABLE_REASON",
 ]
 
 # Reason stamped on an injector record whose write landed outside the serving
@@ -62,6 +66,20 @@ __all__ = [
 # observed on read-back") so the two failure modes stay tellable apart in
 # drift_timeline.jsonl.
 ORPHAN_REASON = "write landed on key(s) outside the serving shape"
+
+# Third verdict, stamped on ``verified`` beside True/False. A write that moved
+# the row on a LIVE column but did not come back byte-equal is not evidence of
+# anything: services reserialize what they store (woocommerce holds a float
+# price and serves ``f"{p:.2f}"``, gmail serves a message body base64url-encoded
+# under ``payload.body.data``, figma never echoes the ``file_key`` it addresses
+# rows by). Reporting those as failures buried the orphan findings that ARE
+# provable, so "cannot prove either way" gets its own outcome instead of
+# borrowing the failing one.
+UNVERIFIABLE = "unverifiable"
+UNVERIFIABLE_REASON = ("write moved the row on a live column but the stored form "
+                       "is not byte-equal to what was sent — the service coerces "
+                       "or reserializes it, so the write can be neither confirmed "
+                       "nor disproved from the outside")
 
 # Airtable-style stores nest the business columns under ``fields``; everything
 # else keeps them top-level. Both the stored row and a patch payload built by
@@ -78,21 +96,40 @@ def row_bag(row: Mapping[str, Any]) -> Dict[str, Any]:
     return dict(row) if isinstance(row, Mapping) else {}
 
 
-def unwrap_expected(expected: Mapping[str, Any], nested: bool) -> Dict[str, Any]:
-    """Peel the ``fields`` wrapper off a patch payload when the target row is
-    nested, so written keys are compared in the same namespace as the bag.
+def envelope_keys(row: Mapping[str, Any]) -> Set[str]:
+    """The envelope keys of a stored row: everything beside the column bag.
 
-    ``_patch_row`` re-wraps a nested patch as ``{"fields": {...}}`` before
-    sending it, so the caller's ``expected`` names one key (``fields``) that is
-    a store wrapper, not a column. Comparing it against the unwrapped bag flags
-    the wrapper itself as an orphan; peeling it first is what keeps the re-wrap
-    from producing a false positive.
+    A nested row carries two namespaces — the ``fields`` object holding the
+    business columns, and the envelope the SERVICE owns around it (``id``,
+    ``created_at``, ``updated_at``, ``published_version``, ...). They are
+    addressed differently by a patch and must be judged separately.
+    """
+    if not isinstance(row, Mapping):
+        return set()
+    return {str(k) for k in row} - {NESTED_KEY}
+
+
+def partition_expected(expected: Mapping[str, Any],
+                       nested: bool) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """Split a patch payload into ``(columns, envelope)`` for a nested row.
+
+    ``_patch_row`` sends a nested patch as ``{"fields": {...}}`` plus whatever
+    envelope keys the op named, so the caller's ``expected`` mixes two
+    namespaces: ``fields`` is a store wrapper rather than a column, and the keys
+    beside it are envelope stamps rather than columns. Comparing the whole
+    payload against the unwrapped bag flags the wrapper AND every stamp as an
+    orphan — contentful's entry ops set the age statement inside ``fields`` and
+    move ``updated_at``/``published_version`` next to it in the same op, and all
+    three read as missing columns.
+
+    A flat row has no envelope, so everything written is a column.
     """
     if not isinstance(expected, Mapping):
-        return {}
-    if nested and set(expected) == {NESTED_KEY} and isinstance(expected.get(NESTED_KEY), Mapping):
-        return dict(expected[NESTED_KEY])
-    return dict(expected)
+        return {}, {}
+    inner = expected.get(NESTED_KEY)
+    if nested and isinstance(inner, Mapping):
+        return dict(inner), {k: v for k, v in expected.items() if k != NESTED_KEY}
+    return dict(expected), {}
 
 
 def loose_eq(a: Any, b: Any) -> bool:
@@ -109,6 +146,17 @@ def comparable_fields(expected: Mapping[str, Any]) -> Dict[str, Any]:
     objects and the like) are reported but never asserted -- the store holds a
     normalized form the injector cannot reconstruct."""
     return {k: v for k, v in expected.items() if not isinstance(v, (dict, list))}
+
+
+def _is_target(row: Mapping[str, Any], exclude_pk: Any,
+               pk_field: Optional[str]) -> bool:
+    """True when ``row`` is the row under verification, which may not vouch for
+    the keys the write just introduced on it."""
+    if exclude_pk is None:
+        return False
+    candidates = [row.get(pk_field)] if pk_field else []
+    candidates += [row.get("id"), row.get("pk")]
+    return any(c is not None and str(c) == str(exclude_pk) for c in candidates)
 
 
 def serving_vocabulary(
@@ -130,12 +178,34 @@ def serving_vocabulary(
     for row in rows or ():
         if not isinstance(row, Mapping):
             continue
-        if exclude_pk is not None:
-            candidates = [row.get(pk_field)] if pk_field else []
-            candidates += [row.get("id"), row.get("pk")]
-            if any(c is not None and str(c) == str(exclude_pk) for c in candidates):
-                continue
+        if _is_target(row, exclude_pk, pk_field):
+            continue
         vocab.update(str(k) for k in row_bag(row))
+    return vocab
+
+
+def envelope_vocabulary(
+    rows: Iterable[Any],
+    *,
+    exclude_pk: Any = None,
+    pk_field: Optional[str] = None,
+    extra: Iterable[str] = (),
+) -> Set[str]:
+    """``serving_vocabulary`` for the OTHER namespace: the envelope stamps a
+    nested row carries beside its column bag.
+
+    Judged from siblings for the same reason columns are — the patched row
+    already carries whatever stamp the write invented by read-back time, so an
+    envelope key no other row of the table has is an orphan just as surely as a
+    mis-cased column.
+    """
+    vocab: Set[str] = {str(k) for k in extra}
+    for row in rows or ():
+        if not isinstance(row, Mapping):
+            continue
+        if _is_target(row, exclude_pk, pk_field):
+            continue
+        vocab.update(envelope_keys(row))
     return vocab
 
 
@@ -256,30 +326,46 @@ def project_in_process(module: Any, table: str, pk: Any) -> Tuple[Optional[Dict[
     return dict(result), f"getter:{fn.__name__}"
 
 
-def flatten_serving(value: Any, _depth: int = 0) -> Dict[str, Any]:
-    """Flatten a serving row one level deep into ``{key: scalar}`` pairs.
+# A serving projection is a JSON document, so its size is what has to be
+# bounded, not how deep the walk is allowed to go. The old bound was a depth-2
+# cutoff, which silently dropped 34 of figma ``get_file``'s 49 scalars (the whole
+# ``document`` node tree), 36 of spotify ``get_playlist``'s 47, and contentful's
+# ``sys.contentType.sys.*`` — every one of them read as a lost write. The node
+# budget costs nothing on the shapes the fleet actually serves (the widest is
+# ~50 scalars) and still refuses to walk a pathological document forever.
+_FLATTEN_NODE_BUDGET = 20_000
+
+
+def flatten_serving(value: Any, *, budget: int = _FLATTEN_NODE_BUDGET) -> Dict[str, Any]:
+    """Flatten a serving row into ``{path: scalar}`` pairs, at any depth.
 
     Serializers rename (``id_board`` -> ``idBoard``) and re-shape
     (``labels: [{"name": n}]``), so a written value is checked for PRESENCE
     anywhere in the projection rather than under the key it was written to --
-    the rename is legitimate, the disappearance is not.
+    the rename is legitimate, the disappearance is not. "Anywhere" has to mean
+    anywhere: a value nested past an arbitrary cutoff is present in what the
+    agent reads, and calling it missing is the same false negative the rename
+    check exists to avoid.
+
+    Walked iteratively so a deep node tree cannot exhaust the interpreter stack,
+    and bounded by ``budget`` total nodes rather than by depth.
     """
     out: Dict[str, Any] = {}
-    if not isinstance(value, Mapping) or _depth > 2:
+    if not isinstance(value, Mapping):
         return out
-    for k, v in value.items():
-        if isinstance(v, Mapping):
-            for ik, iv in flatten_serving(v, _depth + 1).items():
-                out[f"{k}.{ik}"] = iv
-        elif isinstance(v, (list, tuple)):
-            for i, item in enumerate(v):
-                if isinstance(item, Mapping):
-                    for ik, iv in flatten_serving(item, _depth + 1).items():
-                        out[f"{k}[{i}].{ik}"] = iv
-                else:
-                    out[f"{k}[{i}]"] = item
-        else:
-            out[k] = v
+    stack: List[Tuple[str, Any]] = [("", value)]
+    seen = 0
+    while stack and seen < budget:
+        prefix, node = stack.pop()
+        seen += 1
+        if isinstance(node, Mapping):
+            for k, v in node.items():
+                stack.append((f"{prefix}.{k}" if prefix else str(k), v))
+        elif isinstance(node, (list, tuple)):
+            for i, item in enumerate(node):
+                stack.append((f"{prefix}[{i}]", item))
+        elif prefix:
+            out[prefix] = node
     return out
 
 

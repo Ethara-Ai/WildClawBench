@@ -71,10 +71,13 @@ import requests
 
 from src.utils.serving_shape import (
     ORPHAN_REASON,
+    UNVERIFIABLE,
+    UNVERIFIABLE_REASON,
     describe_orphans,
+    envelope_vocabulary,
+    partition_expected,
     row_bag as _serving_row_bag,
     serving_vocabulary,
-    unwrap_expected,
     verify_against_serving,
 )
 
@@ -1185,6 +1188,28 @@ class InjectApplier:
     def _row_bag(row: Dict[str, Any]) -> Dict[str, Any]:
         return row["fields"] if isinstance(row.get("fields"), dict) else row
 
+    @staticmethod
+    def _touched(row: Optional[Dict[str, Any]],
+                 expected: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Live values for the keys a patch touches, read in the namespace each
+        one was written to.
+
+        A patch that names ``fields`` alongside envelope stamps writes into two
+        namespaces (see ``_patch_row``); reading all of them off the column bag
+        reports the stamps as null both before and after the write, which makes
+        an op that landed perfectly look like it changed nothing.
+        """
+        if not isinstance(row, dict):
+            return None
+        bag = _serving_row_bag(row)
+        columns, envelope = partition_expected(
+            expected, isinstance(row.get("fields"), dict))
+        if not envelope:
+            return {k: bag.get(k) for k in expected}
+        touched = {k: row.get(k) for k in envelope}
+        touched["fields"] = {c: bag.get(c) for c in columns}
+        return touched
+
     def _serving_vocabulary(self, api: str, table: str, pk: Any,
                             known_keys: Optional[Iterable[str]]) -> set:
         """Column names a service getter for ``table`` could legitimately name.
@@ -1201,6 +1226,18 @@ class InjectApplier:
         pk_field = self._table_pk(api, table)
         return serving_vocabulary(self._admin_get_rows(api, table),
                                   exclude_pk=pk, pk_field=pk_field)
+
+    def _envelope_vocabulary(self, api: str, table: str, pk: Any) -> set:
+        """Envelope stamps a service getter for ``table`` could legitimately
+        name, taken from the patched row's SIBLINGS.
+
+        Callers hand ``known_keys`` for the column namespace only, and the
+        patched row already carries whatever stamp the write invented by
+        read-back time, so this one is worth the extra admin call — it is only
+        made for the rare op that patches columns and stamps together.
+        """
+        return envelope_vocabulary(self._admin_get_rows(api, table),
+                                   exclude_pk=pk, pk_field=self._table_pk(api, table))
 
     def _read_back_row(self, api: str, table: str, pk: Any,
                        expected: Dict[str, Any],
@@ -1233,13 +1270,19 @@ class InjectApplier:
             return None, False, []
         bag = _serving_row_bag(row)
         nested = isinstance(row.get("fields"), dict)
-        # A nested patch is re-wrapped as {"fields": {...}} by _patch_row; peel
-        # the wrapper so its columns are judged in the bag's namespace instead
-        # of the wrapper key reading as an orphan.
-        written = unwrap_expected(expected, nested)
+        # A nested patch addresses two namespaces at once (see _patch_row), so
+        # each half is judged against its own vocabulary: the wrapper key and
+        # the envelope stamps beside it are not columns and read as orphans in
+        # the bag's namespace.
+        columns, envelope = partition_expected(expected, nested)
         vocab = self._serving_vocabulary(api, table, pk, known_keys)
-        _, verified, orphans = verify_against_serving(written, bag, vocab)
-        after = {k: bag.get(k) for k in expected}
+        _, verified, orphans = verify_against_serving(columns, bag, vocab)
+        if envelope:
+            _, env_ok, env_orphans = verify_against_serving(
+                envelope, row, self._envelope_vocabulary(api, table, pk))
+            verified = verified and env_ok
+            orphans = sorted(orphans + env_orphans)
+        after = self._touched(row, expected)
         if orphans:
             LOG.warning("inject read-back: %s/%s/%s — %s",
                         api, table, pk, describe_orphans(orphans, vocab))
@@ -1247,13 +1290,29 @@ class InjectApplier:
 
     @staticmethod
     def _mark_unverified(rec: Dict[str, Any], orphans: Optional[List[str]] = None) -> None:
-        """A 2xx write that is invisible in the serving shape did NOT land —
-        either the values never stuck, or they stuck on a key no getter reads."""
-        reason = ("write not observed on read-back" if not orphans
-                  else f"{ORPHAN_REASON}: {', '.join(sorted(orphans))}")
-        rec.update(ok=False, status="failed", verified=False, reason=reason)
+        """Grade a 2xx write the read-back could not confirm.
+
+        Three outcomes, because two of them are provable and one is not:
+
+        * orphan keys — the write landed where no getter reads. Provable from
+          the live column vocabulary, and a hard failure.
+        * the row did not move — the values never stuck. Also provable, also a
+          hard failure.
+        * the row moved but does not read back byte-equal — the service retyped
+          or reserialized what it was handed. Nothing here is evidence either
+          way, so it is stamped ``unverifiable`` rather than counted against the
+          op; letting this class fail hard is what drowned the orphan findings
+          in noise (see serving_shape.UNVERIFIABLE_REASON).
+        """
         if orphans:
-            rec["orphan_fields"] = sorted(orphans)
+            rec.update(ok=False, status="failed", verified=False,
+                       orphan_fields=sorted(orphans),
+                       reason=f"{ORPHAN_REASON}: {', '.join(sorted(orphans))}")
+        elif rec.get("changed"):
+            rec.update(verified=UNVERIFIABLE, reason=UNVERIFIABLE_REASON)
+        else:
+            rec.update(ok=False, status="failed", verified=False,
+                       reason="write not observed on read-back")
 
     def _replay_admin_rest(self, api: str, op: Dict[str, Any],
                            silent: bool) -> Dict[str, Any]:
@@ -1297,8 +1356,7 @@ class InjectApplier:
             row_before = self._admin_get(api, f"/admin/data/{table}/{pk}")
             known = (set(_serving_row_bag(row_before))
                      if isinstance(row_before, dict) else None)
-            before = ({k: self._row_bag(row_before).get(k) for k in fields}
-                      if isinstance(row_before, dict) else None)
+            before = self._touched(row_before, fields)
             res = self._admin_patch(api, table, pk, fields)
             rec.update(table=table, pk=pk, before=before, http=res.get("status"),
                        ok=bool(res.get("ok")),
@@ -1364,12 +1422,22 @@ class InjectApplier:
         top-level keys, so an airtable-style nested ``fields`` object must be
         resent whole (existing + overrides). ``fallback_pk`` covers stores whose
         rows key on a domain column (order_id, store_id, ...) and expose no
-        ``id``/``pk`` — the explicit-admin caller already knows the true pk."""
+        ``id``/``pk`` — the explicit-admin caller already knows the true pk.
+
+        An op that names ``fields`` ITSELF is addressing the column bag, not a
+        column called "fields": contentful's entry ops send the whole rewritten
+        ``fields`` object plus the ``updated_at``/``published_version`` stamps
+        that move with it. Merging such a ``set`` wholesale into the bag buried
+        the columns one level down at ``fields.fields`` and demoted the stamps
+        into the bag beside them — a 200 that changed nothing the getter reads.
+        Its own keys merge into the bag; everything else it names is an envelope
+        stamp and stays top-level."""
         pk = self._row_pk(api, table, row) or fallback_pk
         if pk is None:
             return {"ok": False, "error": "no pk"}
         if isinstance(row.get("fields"), dict):
-            payload = {"fields": {**row["fields"], **set_}}
+            columns, envelope = partition_expected(set_, nested=True)
+            payload = {**envelope, "fields": {**row["fields"], **columns}}
         else:
             payload = dict(set_)
         return self._admin_patch(api, table, str(pk), payload)
@@ -1395,7 +1463,7 @@ class InjectApplier:
                                reason="row not found")
                 else:
                     bag = self._row_bag(row)
-                    before = {k: bag.get(k) for k in set_}
+                    before = self._touched(row, set_)
                     res = self._patch_row(api, table, row, set_, fallback_pk=pk)
                     rec.update(table=table, pk=pk, ok=bool(res.get("ok")),
                                http=res.get("status"), before=before,
@@ -1429,7 +1497,7 @@ class InjectApplier:
                     if not all(self._loose_eq(bag.get(k), v) for k, v in where.items()):
                         continue
                     if before is None:
-                        before = {k: bag.get(k) for k in set_}
+                        before = self._touched(row, set_)
                         first_pk = self._row_pk(api, table, row)
                         first_keys = set(bag)
                     res = self._patch_row(api, table, row, set_)
@@ -1590,8 +1658,7 @@ class InjectApplier:
         row_before = self._admin_get(api, f"/admin/data/{table}/{pk}")
         known = (set(_serving_row_bag(row_before))
                  if isinstance(row_before, dict) else None)
-        before = ({k: self._row_bag(row_before).get(k) for k in fields}
-                  if isinstance(row_before, dict) else None)
+        before = self._touched(row_before, fields)
         result = self._admin_patch(api, table, pk, fields)
         # `result` carries {"ok", "status": <int http code>, ...}. Historically
         # rec.update(result) clobbered `status` with the int so the string

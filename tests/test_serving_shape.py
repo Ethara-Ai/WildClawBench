@@ -9,6 +9,7 @@ circle, plus the three legitimate transforms that must NOT read as failures
 """
 from __future__ import annotations
 
+import base64
 import sys
 from pathlib import Path
 
@@ -20,22 +21,24 @@ from src.utils.serving_shape import (  # noqa: E402
     ORPHAN_REASON,
     comparable_fields,
     describe_orphans,
+    envelope_keys,
+    envelope_vocabulary,
     find_getter,
     flatten_serving,
     loose_eq,
     near_miss,
     orphan_keys,
+    partition_expected,
     project_in_process,
     row_bag,
     serving_vocabulary,
-    unwrap_expected,
     value_visible,
     verify_against_serving,
 )
 
 
 # --------------------------------------------------------------------------- #
-# row_bag / unwrap_expected: the airtable `fields` wrapper
+# row_bag / partition_expected: the airtable `fields` wrapper
 # --------------------------------------------------------------------------- #
 def test_row_bag_unwraps_nested_fields():
     assert row_bag({"id": "r1", "fields": {"Status": "open"}}) == {"Status": "open"}
@@ -49,23 +52,42 @@ def test_row_bag_ignores_non_dict_fields_column():
     assert row_bag({"id": "r1", "fields": "not-a-dict"}) == {"id": "r1", "fields": "not-a-dict"}
 
 
-def test_unwrap_expected_peels_patch_row_rewrap():
-    # _patch_row re-wraps a nested patch as {"fields": {...}} before sending it;
-    # judging that wrapper as a column is the D17 `_patch_row re-wrap` false positive.
-    assert unwrap_expected({"fields": {"Status": "closed"}}, nested=True) == {"Status": "closed"}
+def test_partition_expected_peels_patch_row_rewrap():
+    # _patch_row sends a nested patch as {"fields": {...}}; judging that wrapper
+    # as a column is the D17 `_patch_row re-wrap` false positive.
+    assert partition_expected({"fields": {"Status": "closed"}}, nested=True) \
+        == ({"Status": "closed"}, {})
 
 
-def test_unwrap_expected_leaves_flat_patch_alone():
-    assert unwrap_expected({"status": "closed"}, nested=False) == {"status": "closed"}
+def test_partition_expected_leaves_flat_patch_alone():
+    assert partition_expected({"status": "closed"}, nested=False) \
+        == ({"status": "closed"}, {})
 
 
-def test_unwrap_expected_keeps_a_real_fields_column_when_row_is_flat():
-    assert unwrap_expected({"fields": {"a": 1}}, nested=False) == {"fields": {"a": 1}}
+def test_partition_expected_keeps_a_real_fields_column_when_row_is_flat():
+    assert partition_expected({"fields": {"a": 1}}, nested=False) \
+        == ({"fields": {"a": 1}}, {})
 
 
-def test_unwrap_expected_keeps_fields_alongside_other_keys():
-    payload = {"fields": {"a": 1}, "status": "x"}
-    assert unwrap_expected(payload, nested=True) == payload
+def test_partition_expected_splits_columns_from_envelope_stamps():
+    # The contentful entry shape: the whole column bag plus the publish stamps
+    # that move with it. The stamps are not columns and must not be judged as any.
+    columns, envelope = partition_expected(
+        {"fields": {"ageStatement": "12 Year"}, "updated_at": "T", "published_version": 9},
+        nested=True)
+    assert columns == {"ageStatement": "12 Year"}
+    assert envelope == {"updated_at": "T", "published_version": 9}
+
+
+def test_envelope_keys_are_everything_but_the_column_bag():
+    assert envelope_keys({"id": "e1", "fields": {"a": 1}, "published_version": 8}) \
+        == {"id", "published_version"}
+
+
+def test_envelope_vocabulary_is_drawn_from_siblings():
+    rows = [{"id": "e1", "fields": {"a": 1}, "published_version": 8},
+            {"id": "e2", "fields": {"a": 2}, "updated_at": "T"}]
+    assert envelope_vocabulary(rows, exclude_pk="e1") == {"id", "updated_at"}
 
 
 # --------------------------------------------------------------------------- #
@@ -257,3 +279,112 @@ def test_value_visible_detects_a_genuinely_lost_write():
 
 def test_value_visible_never_asserts_nested_expectations():
     assert value_visible({"rich": "object"}, {"anything": "else"})
+
+
+# --------------------------------------------------------------------------- #
+# the depth cutoff: a value the agent can read is not a lost write
+#
+# Payload shapes below are the real ones, trimmed: figma `get_file` nests a
+# node tree under `document`, contentful `get_entry` links the content type at
+# `sys.contentType.sys.id`, spotify `get_playlist` nests tracks three deep. The
+# old one-level-deep flatten stopped at depth 2 and reported 34 of figma's 49
+# served scalars as missing.
+# --------------------------------------------------------------------------- #
+FIGMA_FILE = {
+    "name": "Corridor Campaign", "version": "2317", "lastModified": "2026-10-04",
+    "document": {"id": "0:0", "type": "DOCUMENT", "children": [
+        {"id": "1:1", "name": "Page 1", "children": [
+            {"id": "2:1", "name": "Frame", "children": [
+                {"id": "3:1", "type": "INSTANCE", "componentId": "comp-btn-primary"},
+            ]},
+        ]},
+    ]},
+    "components": {"3:1": {"key": "ck-88", "name": "Button/Primary"}},
+}
+
+CONTENTFUL_ENTRY = {
+    "sys": {"id": "bottle-cascade-single-malt", "type": "Entry",
+            "publishedVersion": 9, "updatedAt": "2026-10-04T09:38:12.000Z",
+            "contentType": {"sys": {"type": "Link", "linkType": "ContentType",
+                                    "id": "ct-bottle-profile"}}},
+    "fields": {"name": "Rimrock Cascade Single Malt", "ageStatement": "12 Year"},
+}
+
+
+def test_flatten_serving_reaches_a_deeply_nested_node_tree():
+    flat = flatten_serving(FIGMA_FILE)
+    assert flat["document.children[0].children[0].children[0].componentId"] \
+        == "comp-btn-primary"
+    assert flat["components.3:1.key"] == "ck-88"
+
+
+def test_value_visible_finds_a_value_past_the_old_depth_cutoff():
+    # figma serves the component id four levels down; at depth 2 it read as lost.
+    assert value_visible("comp-btn-primary", FIGMA_FILE)
+
+
+def test_value_visible_finds_a_contentful_content_type_link():
+    assert value_visible("ct-bottle-profile", CONTENTFUL_ENTRY)
+
+
+def test_the_koji_entry_write_is_visible_in_both_namespaces():
+    # The op that shipped dead: the age statement lives in the column bag, the
+    # publish stamp in the sys envelope, and both must read as present.
+    assert value_visible("12 Year", CONTENTFUL_ENTRY)
+    assert value_visible(9, CONTENTFUL_ENTRY)
+
+
+def test_flatten_serving_stops_at_the_node_budget():
+    deep = {"a": 1}
+    for _ in range(50):
+        deep = {"nest": deep, "leaf": 2}
+    assert flatten_serving(deep, budget=10) != {}
+    assert len(flatten_serving(deep, budget=10)) <= 10
+
+
+def test_flatten_serving_survives_a_tree_deeper_than_the_recursion_limit():
+    deep: dict = {"leaf": "bottom"}
+    for _ in range(3000):
+        deep = {"nest": deep}
+    assert value_visible("bottom", deep)
+
+
+# --------------------------------------------------------------------------- #
+# the transforms: not byte-findable, and not evidence of anything
+#
+# These three are why a missing value cannot be graded as a failure. Each one
+# was measured against the live service module, and in all three the write
+# lands perfectly while the projection shows something else.
+# --------------------------------------------------------------------------- #
+WOOCOMMERCE_PRODUCT = {"id": 141, "name": "Trail Jacket", "sku": "TJ-1",
+                       "price": "18.00", "regular_price": "18.00",
+                       "categories": [{"name": "Outerwear", "slug": "outerwear"}]}
+
+
+def test_a_formatted_price_is_not_byte_findable():
+    # woocommerce stores a float and serves f"{p:.2f}"; 18.0 never appears.
+    assert not value_visible(18.0, WOOCOMMERCE_PRODUCT)
+    assert value_visible("18.00", WOOCOMMERCE_PRODUCT)
+
+
+def test_a_base64_encoded_body_is_not_byte_findable():
+    body = "Ship the deck by Friday."
+    served = {
+        "id": "m-1", "snippet": body[:12],
+        "payload": {"mimeType": "text/plain",
+                    "body": {"data": base64.urlsafe_b64encode(body.encode()).decode(),
+                             "size": len(body)}},
+    }
+    assert not value_visible(body, served)
+
+
+def test_an_addressing_key_the_getter_never_echoes_is_not_byte_findable():
+    # figma addresses rows by file_key; get_file returns everything but it.
+    assert not value_visible("FK001abcdefg", FIGMA_FILE)
+
+
+def test_a_genuinely_orphaned_write_is_still_invisible():
+    # The true positive the three cases above must not be allowed to excuse:
+    # `AgeStatement` is not a contentful column, so nothing carries the value.
+    assert not value_visible("14 Year", CONTENTFUL_ENTRY)
+    assert orphan_keys(["AgeStatement"], {"name", "ageStatement"}) == ["AgeStatement"]
