@@ -101,6 +101,8 @@ def _to_int(v, default=0):
 def _parse_json(v, default=None):
     if not v:
         return default if default is not None else {}
+    if isinstance(v, (list, dict)):
+        return v
     return json.loads(v)
 
 

@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from ._helpers import ENV_DIR, load_app
+from ._helpers import ENV_DIR, data_module as _data_module, load_app
 
 pytest.importorskip("fastapi")
 pytest.importorskip("httpx")
@@ -25,20 +25,6 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 def _client(api_name: str) -> TestClient:
     return TestClient(load_app(ENV_DIR / api_name))
-
-
-def _data_module(app, module_name: str):
-    """Reach a server's data module through a route closure.
-
-    `load_app` evicts the modules it imported from `sys.modules`, so the app's
-    own route globals are the only handle on the exact store instance the app
-    is serving from."""
-    for route in app.routes:
-        fn = getattr(route, "endpoint", None)
-        g = getattr(fn, "__globals__", None)
-        if g and module_name in g:
-            return g[module_name]
-    raise LookupError(f"{module_name} not reachable from app routes")
 
 
 # ---------------------------------------------------------------------------
