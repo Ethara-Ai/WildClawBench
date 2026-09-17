@@ -62,16 +62,19 @@ import argparse
 import json
 import shutil
 import sys
+import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(_REPO_ROOT))
 from script.lib.recon import prompts as recon_prompts  # noqa: E402
 from script.lib.recon import schedule as recon_schedule  # noqa: E402
+from script.lib.recon import environment as recon_environment  # noqa: E402
 from script.lib.recon import metadata as recon_metadata  # noqa: E402
 from script.lib.recon import sources as recon_sources  # noqa: E402
 
 SEED_EXTS = {".json", ".csv"}
-_DEFAULT_BASELINE = Path(__file__).resolve().parents[1] / "environment"
+_DEFAULT_BASELINE = _REPO_ROOT / "environment"
 
 
 # ----------------------------------------------------------------------------- #
@@ -106,47 +109,7 @@ def _read_bytes(p: Path) -> bytes | None:
         return None
 
 
-# ----------------------------------------------------------------------------- #
-# mock_data overlay extraction (the core)
-# ----------------------------------------------------------------------------- #
-def extract_overlays(
-    env_dir: Path, baseline_env: Path, out_mock: Path
-) -> tuple[dict[str, list[str]], list[str]]:
-    """Diff each api's seed files against the baseline; copy the overlay (diffs)."""
-    recovered: dict[str, list[str]] = {}
-    warnings: list[str] = []
-    if not env_dir.is_dir():
-        warnings.append(f"no data/environment under bundle ({env_dir}); skipped mock_data")
-        return recovered, warnings
-
-    for api_dir in sorted(env_dir.iterdir()):
-        if not api_dir.is_dir() or not api_dir.name.endswith("-api"):
-            continue
-        base_api = baseline_env / api_dir.name
-        base_present = base_api.is_dir()
-        if not base_present:
-            warnings.append(
-                f"{api_dir.name}: not in baseline env — its seeds can't be verified "
-                f"against a default; treating all .json/.csv as overlay (UNVERIFIED)"
-            )
-        for f in sorted(api_dir.rglob("*")):
-            if not f.is_file() or f.suffix.lower() not in SEED_EXTS:
-                continue
-            rel = f.relative_to(api_dir)
-            base_f = base_api / rel
-            if base_present and base_f.is_file():
-                if _read_bytes(f) == _read_bytes(base_f):
-                    continue  # identical to the baked default -> NOT an overlay
-                reason = "differs-from-default"
-            else:
-                reason = "new-not-in-default"
-            dest = out_mock / api_dir.name / rel
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(f, dest)
-            recovered.setdefault(api_dir.name, []).append(f"{rel} ({reason})")
-    return recovered, warnings
-
-
+extract_overlays = recon_environment.extract
 _load_toml = recon_metadata.load_toml
 
 
@@ -197,7 +160,8 @@ def recover_prompts(bundle: Path, out_dir: Path, log: list[str], timezone: str,
 
 
 def reconstruct(bundle: Path, out_dir: Path, baseline_env: Path, verbose: bool,
-                timezone: str = "", trajectory_run: str = "") -> dict:
+                timezone: str = "", trajectory_run: str = "",
+                allow_unverified: bool = False) -> dict:
     env_dir = bundle / "data" / "environment"
     log: list[str] = []
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -218,12 +182,22 @@ def reconstruct(bundle: Path, out_dir: Path, baseline_env: Path, verbose: bool,
     for note in meta.notes:
         log.append(f"  gap  task.yaml              .. {note}")
 
-    # mock_data/<api>/ via baseline diff
-    overlays, warnings = extract_overlays(env_dir, baseline_env, out_dir / "mock_data")
-    n_overlay_files = sum(len(v) for v in overlays.values())
+    mock = recon_environment.extract(env_dir, baseline_env, out_dir / "mock_data",
+                                     meta.scoped_apis, allow_unverified)
+    if not allow_unverified and mock.unverified_apis:
+        recon_environment.prune_unverified(mock, out_dir / "mock_data")
+    overlays = mock.overlays
+    n_overlay_files = mock.file_count
     if overlays:
-        log.append(f"  ok   mock_data/            <- {len(overlays)} api(s), {n_overlay_files} overlay file(s)")
+        log.append(f"  ok   mock_data/             <- {len(overlays)} api(s), "
+                   f"{n_overlay_files} overlay file(s) of "
+                   f"{len(meta.scoped_apis)} declared")
+    if mock.out_of_scope:
+        log.append(f"  note mock_data/             .. {len(mock.out_of_scope)} "
+                   f"staged api(s) outside the task's declared scope, not searched")
 
+    warnings = list(mock.warnings)
+    errors = list(mock.errors)
     if prompts is not None:
         warnings.extend(prompts.unresolved)
     warnings.extend(meta.notes)
@@ -242,12 +216,15 @@ def reconstruct(bundle: Path, out_dir: Path, baseline_env: Path, verbose: bool,
         "mock_data_apis": len(overlays),
         "mock_data_files": n_overlay_files,
         "warnings": warnings,
+        "errors": errors,
     }
     if verbose:
         print(f"\n[{out_dir.name}]")
         print("\n".join(log) or "  (nothing recovered)")
         for w in warnings:
             print(f"  WARN {w}")
+    for e in errors:
+        print(f"  FAIL [{out_dir.name}] {e}", file=sys.stderr)
     return summary
 
 
@@ -304,6 +281,14 @@ def main(argv: list[str] | None = None) -> int:
                     help="Output root; each task lands in <out>/<task>/ (default: ./reconstructed_input)")
     ap.add_argument("--baseline-env", type=Path, default=_DEFAULT_BASELINE,
                     help=f"Pristine harness environment/ for overlay diffing (default: {_DEFAULT_BASELINE})")
+    ap.add_argument("--baseline-ref", default="", metavar="GITREF",
+                    help="Read the baseline environment/ out of a git ref instead. "
+                         "Use when the bundle predates a fleet change: today's tree "
+                         "covers only 24 of the 50 APIs a pilot-rework bundle ships.")
+    ap.add_argument("--unverified-overlays", action="store_true",
+                    help="Keep seeds from APIs with no baseline to diff against. "
+                         "Off by default: unverifiable seeds all look new, which is "
+                         "how a 3-API task once reported a 50-API overlay.")
     ap.add_argument("--timezone", default="",
                     help="IANA timezone to use when the bundle's prompt header "
                          "omits one (headerless bundles carry it only as persona prose).")
@@ -316,20 +301,30 @@ def main(argv: list[str] | None = None) -> int:
     if not args.bundle_path.exists():
         print(f"error: bundle path not found: {args.bundle_path}", file=sys.stderr)
         return 2
-    if not args.baseline_env.is_dir():
-        print(f"WARNING: baseline env not found at {args.baseline_env}; mock_data overlay "
-              f"detection will be UNVERIFIED (every .json/.csv treated as overlay).",
-              file=sys.stderr)
-
     bundles = discover_bundles(args.bundle_path)
     if not bundles:
         print(f"error: no task bundle found under {args.bundle_path} "
               f"(need prompt.txt/rubric.json or data/environment/)", file=sys.stderr)
         return 2
 
-    print(f"Found {len(bundles)} task bundle(s). Baseline env: {args.baseline_env}")
-    summaries = [reconstruct(b, args.out / b.name, args.baseline_env, args.verbose,
-                             args.timezone, args.trajectory_run) for b in bundles]
+    with tempfile.TemporaryDirectory(prefix="recon-baseline-") as tmp:
+        baseline_env = args.baseline_env
+        if args.baseline_ref:
+            try:
+                baseline_env = recon_environment.baseline_from_ref(
+                    args.baseline_ref, _REPO_ROOT, Path(tmp))
+            except (ValueError, OSError) as exc:
+                print(f"error: {exc}", file=sys.stderr)
+                return 2
+        if not baseline_env.is_dir():
+            print(f"WARNING: baseline env not found at {baseline_env}; no overlay "
+                  f"can be verified against a baked default.", file=sys.stderr)
+
+        print(f"Found {len(bundles)} task bundle(s). Baseline env: "
+              f"{args.baseline_ref or baseline_env}")
+        summaries = [reconstruct(b, args.out / b.name, baseline_env, args.verbose,
+                                 args.timezone, args.trajectory_run,
+                                 args.unverified_overlays) for b in bundles]
 
     print(f"\n{'task':<45} {'turns':>5} {'clock':>8} {'rubric':>6} {'persona':>7} "
           f"{'data':>4} {'mock(apis/files)':>16}")
@@ -339,10 +334,11 @@ def main(argv: list[str] | None = None) -> int:
               f"{str(s['rubric']):>6} {s['persona_files']:>7} {s['data_files']:>4} "
               f"{mock:>16}")
     total_warn = sum(len(s["warnings"]) for s in summaries)
+    total_err = sum(len(s["errors"]) for s in summaries)
     print(f"\nReconstructed into: {args.out.resolve()}"
           f"{'  (with ' + str(total_warn) + ' warning(s) — see RECONSTRUCTION_NOTES.md)' if total_warn else ''}")
     print("Reminder: gt/ is never recoverable from a bundle (grader-only).")
-    return 0
+    return 1 if total_err else 0
 
 
 if __name__ == "__main__":

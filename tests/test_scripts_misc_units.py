@@ -288,32 +288,37 @@ class TestReconstructInputFromBundle:
         (benv / "foo-api" / "new.json").write_text('{"b":9}', encoding="utf-8")     # NEW
 
         out = tmp_path / "outmock"
-        recovered, warnings = reconstruct_mod.extract_overlays(benv, baseline, out)
-        assert warnings == []
+        got = reconstruct_mod.extract_overlays(benv, baseline, out, {"foo-api"})
+        assert got.warnings == []
         assert (out / "foo-api" / "seed.json").is_file()   # overlay (differs)
         assert (out / "foo-api" / "new.json").is_file()    # overlay (new)
         assert not (out / "foo-api" / "same.csv").is_file()  # identical -> skipped
-        reasons = " ".join(recovered["foo-api"])
+        reasons = " ".join(str(o) for o in got.overlays["foo-api"])
         assert "differs-from-default" in reasons
         assert "new-not-in-default" in reasons
 
-    def test_extract_overlays_warns_when_api_not_in_baseline(self, reconstruct_mod, tmp_path):
+    def test_extract_overlays_refuses_when_api_not_in_baseline(self, reconstruct_mod, tmp_path):
         baseline = tmp_path / "baseline"
         baseline.mkdir()  # empty baseline
         benv = tmp_path / "bundle" / "data" / "environment"
         (benv / "bar-api").mkdir(parents=True)
         (benv / "bar-api" / "seed.json").write_text('{"x":1}', encoding="utf-8")
         out = tmp_path / "outmock"
-        recovered, warnings = reconstruct_mod.extract_overlays(benv, baseline, out)
+        got = reconstruct_mod.extract_overlays(benv, baseline, out, {"bar-api"})
+        assert got.unverified_apis == ["bar-api"]
+        assert got.errors and not got.warnings
+
+        allowed = reconstruct_mod.extract_overlays(benv, baseline, out, {"bar-api"},
+                                                   allow_unverified=True)
         assert (out / "bar-api" / "seed.json").is_file()
-        assert any("UNVERIFIED" in w for w in warnings)
+        assert any("UNVERIFIED" in w for w in allowed.warnings)
 
     def test_extract_overlays_missing_env_dir(self, reconstruct_mod, tmp_path):
-        recovered, warnings = reconstruct_mod.extract_overlays(
-            tmp_path / "nope", tmp_path / "baseline", tmp_path / "out"
+        got = reconstruct_mod.extract_overlays(
+            tmp_path / "nope", tmp_path / "baseline", tmp_path / "out", {"bar-api"}
         )
-        assert recovered == {}
-        assert any("skipped mock_data" in w for w in warnings)
+        assert got.overlays == {}
+        assert any("no overlay to isolate" in w for w in got.warnings)
 
     def test_load_toml_missing_and_present(self, reconstruct_mod, tmp_path):
         assert reconstruct_mod._load_toml(tmp_path / "none.toml") == {}
