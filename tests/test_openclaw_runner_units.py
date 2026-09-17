@@ -1282,3 +1282,48 @@ class TestRunTaskHappyPath:
         # agent command is the second run_background invocation
         agent_cmd = captured_cmds[1]
         assert "it'\\''s a test" in agent_cmd
+
+
+class TestCollectUsageRunKeyChannel:
+    """collect_usage hands the run key to eval/run_batch.py's per-message
+    back-fill so a delivered message's cost block and the run total it rolls
+    up into are attributed by the same key."""
+
+    def test_run_key_attached_when_bearer_carries_it(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("WCB_SIDECAR_NO_MASTER_KEY", "1")
+        a = _bare_agent(litellm_usage_log=str(tmp_path / "u.jsonl"))
+        a._task_windows["t"] = (1.0, 2.0)
+        a._run_keys["t"] = "wcb::t::feed1234"
+        monkeypatch.setattr(ocr.subprocess, "run", lambda *a2, **k2: _FakeCompleted(0))
+        monkeypatch.setattr(
+            ocr, "extract_usage_from_litellm_log",
+            lambda p, s, e, run_key="": {"request_count": 1, "run_key_seen": run_key},
+        )
+        monkeypatch.setattr(ocr, "extract_preflight_usage_from_litellm_log",
+                            lambda p: {"request_count": 0})
+        out = a.collect_usage("t", tmp_path / "od", 1.0)
+        assert out["run_key_seen"] == "wcb::t::feed1234"
+        assert out["__run_key__"] == "wcb::t::feed1234"
+
+    def test_no_run_key_attached_under_master_key_auth(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("WCB_SIDECAR_NO_MASTER_KEY", raising=False)
+        a = _bare_agent(litellm_usage_log=str(tmp_path / "u.jsonl"),
+                        litellm_master_key="sk-master")
+        a._task_windows["t"] = (1.0, 2.0)
+        a._run_keys["t"] = "wcb::t::feed1234"
+        monkeypatch.setattr(ocr.subprocess, "run", lambda *a2, **k2: _FakeCompleted(0))
+        monkeypatch.setattr(ocr, "extract_usage_from_litellm_log",
+                            lambda p, s, e: {"request_count": 1})
+        monkeypatch.setattr(ocr, "extract_preflight_usage_from_litellm_log",
+                            lambda p: {"request_count": 0})
+        out = a.collect_usage("t", tmp_path / "od", 1.0)
+        assert "__run_key__" not in out
+
+    def test_no_usage_log_does_not_raise_on_run_key(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("WCB_SIDECAR_NO_MASTER_KEY", "1")
+        a = _bare_agent(litellm_usage_log="")
+        a._run_keys["t"] = "wcb::t::feed1234"
+        monkeypatch.setattr(ocr.subprocess, "run", lambda *a2, **k2: _FakeCompleted(1))
+        monkeypatch.setattr(ocr, "extract_usage_from_jsonl", lambda p: {"request_count": 0})
+        out = a.collect_usage("t", tmp_path / "od", 1.0)
+        assert out["__run_key__"] == "wcb::t::feed1234"

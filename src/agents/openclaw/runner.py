@@ -1393,16 +1393,19 @@ class OpenClawAgent(BaseAgent):
 
         usage: dict
         preflight_usage: dict | None = None
+        # Tagged extraction only when the MAIN agent's bearer carried the
+        # key: under master-key auth only subagent/audio helper requests
+        # are tagged (they send x-wcb-run-key explicitly), and matching on
+        # that subset would undercount worse than the window does. Resolved
+        # outside the log branch because the per-message back-fill in
+        # eval/run_batch.py needs the same key even when this call site has
+        # no log to read.
+        run_key = (self._run_keys.get(task_id, "")
+                   if self._run_key_bearer_live() else "")
         if self.litellm_usage_log:
             window = self._task_windows.get(task_id)
             if window is None:
                 window = (time.time() - max(elapsed_time, 1.0), time.time())
-            # Tagged extraction only when the MAIN agent's bearer carried the
-            # key: under master-key auth only subagent/audio helper requests
-            # are tagged (they send x-wcb-run-key explicitly), and matching on
-            # that subset would undercount worse than the window does.
-            run_key = (self._run_keys.get(task_id, "")
-                       if self._run_key_bearer_live() else "")
             if run_key:
                 usage = extract_usage_from_litellm_log(
                     Path(self.litellm_usage_log), window[0], window[1],
@@ -1487,6 +1490,13 @@ class OpenClawAgent(BaseAgent):
         usage["elapsed_time"] = round(elapsed_time, 2)
         if preflight_usage is not None:
             usage["__preflight__"] = preflight_usage
+        if run_key:
+            # Private channel to eval/run_batch.py's per-message back-fill, so
+            # the delivered per-message blocks are attributed by the SAME key
+            # as the totals above. Dunder-prefixed and stripped by save_usage:
+            # in keyless sidecar mode this key IS the agent's bearer and must
+            # never reach usage.json.
+            usage["__run_key__"] = run_key
         return usage
 
     def _set_model(self, task_id: str, model: str, thinking: str | None = None) -> None:

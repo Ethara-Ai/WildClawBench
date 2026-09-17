@@ -43,11 +43,13 @@ from eval.run_batch import (  # noqa: E402
     _normalize_display_model,
     _pass_summary_doc,
     _pass_summary_entry,
+    _backfill_per_message_cost,
     _project_agent_usage_top_level,
     _project_artifact_record,
     _resolve_task_apis,
     _write_pass_summary,
     recompute_combined,
+    save_usage,
 )
 from src.utils import skills_inference  # noqa: E402
 
@@ -1225,3 +1227,263 @@ class TestWritePassSummary:
         _write_pass_summary(model_dir, "claude", 0, {"overall_score": 0.3}, None)
         doc = json.loads((model_dir / "pass_summary.json").read_text())
         assert doc["runs"] == 1
+
+
+# ---------------------------------------------------------------------------
+# _backfill_per_message_cost — per-message usage/cost attribution from the
+# sidecar usage.jsonl. Run-key selection must match the totals path in
+# src/utils/grading.py::extract_usage_from_litellm_log, and a row/message count
+# mismatch must be loud instead of silently shifting every later message's
+# tokens and dollars.
+# ---------------------------------------------------------------------------
+
+_RK_A = "wcb::task_a::aaaa1111"
+_RK_B = "wcb::task_b::bbbb2222"
+
+
+def _usage_row(ts, run_key=None, *, out=10, cost=0.01, kind="agent", **extra):
+    row = {
+        "ts": ts, "kind": kind, "model": "bedrock/opus",
+        "input_tokens": 100, "output_tokens": out, "total_tokens": 100 + out,
+        "cache_read_tokens": 0, "cache_write_tokens": 0,
+        "audio_seconds": 0.0, "cost_usd": cost,
+    }
+    if run_key is not None:
+        row["run_key"] = run_key
+    row.update(extra)
+    return row
+
+
+def _write_usage_log(tmp_path, rows, name="usage.jsonl"):
+    p = tmp_path / name
+    p.write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+    return str(p)
+
+
+def _traj(n_assistants, day="17"):
+    msgs = [{"timestamp": f"2026-08-{day}T07:50:00+00:00", "role": "user"}]
+    for i in range(n_assistants):
+        msgs.append({
+            "timestamp": f"2026-08-{day}T07:50:{i + 1:02d}+00:00",
+            "role": "assistant",
+        })
+    return {"messages": msgs}
+
+
+def _costs(traj):
+    return [
+        m["usage"]["cost"]["total"]
+        for m in traj["messages"]
+        if m.get("role") == "assistant" and isinstance(m.get("usage"), dict)
+    ]
+
+
+class TestBackfillPerMessageCostRunKey:
+    def test_parallel_runs_do_not_cross_attribute(self, tmp_path):
+        # Two runs interleaved on one shared sidecar log, as happens under
+        # --parallel. Each run must see only its own rows.
+        log = _write_usage_log(tmp_path, [
+            _usage_row("2026-08-17T07:50:01+00:00", _RK_A, cost=0.11),
+            _usage_row("2026-08-17T07:50:01+00:00", _RK_B, cost=0.91),
+            _usage_row("2026-08-17T07:50:02+00:00", _RK_B, cost=0.92),
+            _usage_row("2026-08-17T07:50:02+00:00", _RK_A, cost=0.12),
+        ])
+        traj_a = _traj(2)
+        assert _backfill_per_message_cost(traj_a, log, _RK_A) == 2
+        assert _costs(traj_a) == [0.11, 0.12]
+
+        traj_b = _traj(2)
+        assert _backfill_per_message_cost(traj_b, log, _RK_B) == 2
+        assert _costs(traj_b) == [0.91, 0.92]
+
+    def test_untagged_concurrent_rows_are_ignored(self, tmp_path):
+        log = _write_usage_log(tmp_path, [
+            _usage_row("2026-08-17T07:50:01+00:00", None, cost=9.99),
+            _usage_row("2026-08-17T07:50:01+00:00", _RK_A, cost=0.11),
+            _usage_row("2026-08-17T07:50:02+00:00", None, cost=9.99),
+            _usage_row("2026-08-17T07:50:02+00:00", _RK_A, cost=0.12),
+        ])
+        traj = _traj(2)
+        assert _backfill_per_message_cost(traj, log, _RK_A) == 2
+        assert _costs(traj) == [0.11, 0.12]
+
+    def test_tokens_and_split_preserved(self, tmp_path):
+        log = _write_usage_log(tmp_path, [
+            _usage_row("2026-08-17T07:50:01+00:00", _RK_A, out=50, cost=0.6),
+        ])
+        traj = _traj(1)
+        assert _backfill_per_message_cost(traj, log, _RK_A) == 1
+        u = traj["messages"][1]["usage"]
+        assert u["input"] == 100 and u["output"] == 50
+        assert u["totalTokens"] == 150
+        assert u["cost"]["total"] == pytest.approx(0.6)
+        # proportional split over the 1x input / 5x output weights
+        assert sum(u["cost"][k] for k in ("input", "output", "cacheRead",
+                                          "cacheWrite")) == pytest.approx(0.6)
+        assert u["cost"]["output"] > u["cost"]["input"]
+
+    def test_failure_and_preflight_rows_excluded(self, tmp_path):
+        log = _write_usage_log(tmp_path, [
+            _usage_row("2026-08-17T07:50:00+00:00", _RK_A, kind="preflight"),
+            _usage_row("2026-08-17T07:50:01+00:00", _RK_A, cost=0.11),
+            _usage_row("2026-08-17T07:50:01+00:00", _RK_A, kind="failure"),
+        ])
+        traj = _traj(1)
+        assert _backfill_per_message_cost(traj, log, _RK_A) == 1
+        assert _costs(traj) == [0.11]
+
+    def test_whisper_transcription_row_excluded(self, tmp_path):
+        # The audio-extract skill bills by duration on the run's own key and
+        # produces no assistant message; counting it would force a mismatch.
+        log = _write_usage_log(tmp_path, [
+            _usage_row("2026-08-17T07:50:01+00:00", _RK_A, cost=0.11),
+            _usage_row("2026-08-17T07:50:01+00:00", _RK_A, cost=0.02,
+                       input_tokens=0, output_tokens=0, total_tokens=0,
+                       audio_seconds=12.5),
+            _usage_row("2026-08-17T07:50:02+00:00", _RK_A, cost=0.12),
+        ])
+        traj = _traj(2)
+        assert _backfill_per_message_cost(traj, log, _RK_A) == 2
+        assert _costs(traj) == [0.11, 0.12]
+
+    def test_row_with_unreadable_ts_still_attributed(self, tmp_path):
+        # The tagged path must not depend on parsing ts at all.
+        log = _write_usage_log(tmp_path, [
+            _usage_row("not-a-timestamp", _RK_A, cost=0.11),
+        ])
+        traj = _traj(1)
+        assert _backfill_per_message_cost(traj, log, _RK_A) == 1
+        assert _costs(traj) == [0.11]
+
+
+class TestBackfillPerMessageCostMismatch:
+    def test_orphaned_retry_rows_are_loud_and_unattributed(self, tmp_path, caplog):
+        # A stalled turn is rolled back by runner.py::_restore_session_to but
+        # its usage rows survive under the SAME run_key, so a run_key filter
+        # alone still leaves a positional surplus.
+        log = _write_usage_log(tmp_path, [
+            _usage_row("2026-08-17T07:50:01+00:00", _RK_A, cost=0.91),
+            _usage_row("2026-08-17T07:50:02+00:00", _RK_A, cost=0.92),
+            _usage_row("2026-08-17T07:50:03+00:00", _RK_A, cost=0.11),
+            _usage_row("2026-08-17T07:50:04+00:00", _RK_A, cost=0.12),
+        ])
+        traj = _traj(2)
+        with caplog.at_level(logging.ERROR, logger="eval.run_batch"):
+            assert _backfill_per_message_cost(traj, log, _RK_A) == 0
+        loud = [r for r in caplog.records if r.levelno >= logging.ERROR]
+        assert loud, "surplus rows must be reported, not silently truncated"
+        msg = loud[0].getMessage()
+        assert "4" in msg and "2" in msg
+        # No message carries another request's dollars.
+        assert _costs(traj) == []
+
+    def test_deficit_rows_do_not_silently_truncate(self, tmp_path, caplog):
+        log = _write_usage_log(tmp_path, [
+            _usage_row("2026-08-17T07:50:01+00:00", _RK_A, cost=0.11),
+        ])
+        traj = _traj(3)
+        with caplog.at_level(logging.ERROR, logger="eval.run_batch"):
+            assert _backfill_per_message_cost(traj, log, _RK_A) == 0
+        assert [r for r in caplog.records if r.levelno >= logging.ERROR]
+        assert _costs(traj) == []
+
+    def test_no_assistants_is_a_noop(self, tmp_path):
+        log = _write_usage_log(tmp_path, [
+            _usage_row("2026-08-17T07:50:01+00:00", _RK_A),
+        ])
+        assert _backfill_per_message_cost(
+            {"messages": [{"timestamp": "2026-08-17T07:50:00+00:00",
+                           "role": "user"}]}, log, _RK_A) == 0
+
+    def test_missing_log_is_a_noop(self, tmp_path):
+        assert _backfill_per_message_cost(
+            _traj(2), str(tmp_path / "absent.jsonl"), _RK_A) == 0
+
+
+class TestBackfillPerMessageCostLegacyFallback:
+    def test_legacy_log_without_run_key_uses_window_and_warns(self, tmp_path, caplog):
+        log = _write_usage_log(tmp_path, [
+            _usage_row("2026-08-17T07:50:01+00:00", None, cost=0.11),
+            _usage_row("2026-08-17T07:50:02+00:00", None, cost=0.12),
+        ])
+        traj = _traj(2)
+        with caplog.at_level(logging.WARNING, logger="eval.run_batch"):
+            assert _backfill_per_message_cost(traj, log, "") == 2
+        warned = [r for r in caplog.records if r.levelno == logging.WARNING]
+        assert warned, "the legacy window fallback must announce itself"
+        assert "OVER-ATTRIBUTES" in warned[0].getMessage()
+        assert _costs(traj) == [0.11, 0.12]
+
+    def test_window_fallback_warns_when_run_key_matches_nothing(self, tmp_path, caplog):
+        log = _write_usage_log(tmp_path, [
+            _usage_row("2026-08-17T07:50:01+00:00", _RK_B, cost=0.91),
+        ])
+        traj = _traj(1)
+        with caplog.at_level(logging.WARNING, logger="eval.run_batch"):
+            _backfill_per_message_cost(traj, log, _RK_A)
+        assert [r for r in caplog.records if r.levelno == logging.WARNING]
+
+    def test_window_excludes_rows_outside_the_run(self, tmp_path, caplog):
+        log = _write_usage_log(tmp_path, [
+            _usage_row("2026-08-17T06:00:00+00:00", None, cost=9.99),
+            _usage_row("2026-08-17T07:50:01+00:00", None, cost=0.11),
+            _usage_row("2026-08-17T09:00:00+00:00", None, cost=9.99),
+        ])
+        traj = _traj(1)
+        with caplog.at_level(logging.WARNING, logger="eval.run_batch"):
+            assert _backfill_per_message_cost(traj, log, "") == 1
+        assert _costs(traj) == [0.11]
+
+    def test_faketime_narrative_clock_defeats_the_window(self, tmp_path, caplog):
+        # The agent container runs under docker/agent_faketime_shim.js, so
+        # chat.jsonl timestamps are narrative-clock values tens of days from
+        # the sidecar's real UTC ts. This is why the window cannot be the
+        # primary selector; the run-key path below still works.
+        log = _write_usage_log(tmp_path, [
+            _usage_row("2026-08-17T07:50:01+00:00", _RK_A, cost=0.11),
+        ])
+        narrative = _traj(1, day="17")
+        narrative["messages"] = [
+            dict(m, timestamp=m["timestamp"].replace("2026-08-17", "2026-11-03"))
+            for m in narrative["messages"]
+        ]
+        with caplog.at_level(logging.ERROR, logger="eval.run_batch"):
+            assert _backfill_per_message_cost(narrative, log, "") == 0
+        assert _costs(narrative) == []
+
+        tagged = _traj(1, day="17")
+        tagged["messages"] = [
+            dict(m, timestamp=m["timestamp"].replace("2026-08-17", "2026-11-03"))
+            for m in tagged["messages"]
+        ]
+        assert _backfill_per_message_cost(tagged, log, _RK_A) == 1
+        assert _costs(tagged) == [0.11]
+
+    def test_naive_message_clock_does_not_raise(self, tmp_path):
+        log = _write_usage_log(tmp_path, [
+            _usage_row("2026-08-17T07:50:01+00:00", None, cost=0.11),
+        ])
+        traj = {"messages": [
+            {"timestamp": "2026-08-17T07:50:00", "role": "user"},
+            {"timestamp": "2026-08-17T07:50:01", "role": "assistant"},
+        ]}
+        assert _backfill_per_message_cost(traj, log, "") == 0
+
+
+class TestSaveUsageStripsRunKey:
+    def test_run_key_never_reaches_usage_json(self, tmp_path):
+        # In keyless sidecar mode the run key IS the agent's bearer, so it must
+        # not survive into a delivered artifact.
+        usage = {
+            "input_tokens": 10, "output_tokens": 5, "total_tokens": 15,
+            "cache_read_tokens": 0, "cache_write_tokens": 0,
+            "cost_usd": 0.5, "request_count": 1,
+            "usage_source": "litellm_run_key",
+            "__run_key__": "wcb::t1::deadbeefcafe",
+        }
+        result = save_usage(tmp_path, {}, usage, "t1")
+        written = (tmp_path / "usage.json").read_text(encoding="utf-8")
+        assert "deadbeefcafe" not in written
+        assert "__run_key__" not in written
+        assert "deadbeefcafe" not in json.dumps(result)
+        assert json.loads(written)["input_tokens"] == 10

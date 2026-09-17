@@ -362,16 +362,91 @@ def _parse_iso(ts: str):
         return None
 
 
-def _backfill_per_message_cost(traj: dict, usage_log_path: str) -> int:
+def _usage_row_is_assistant_turn(r: Mapping[str, Any]) -> bool:
+    """True when a usage row can correspond to an assistant message.
+
+    ``failure`` and ``preflight`` rows never produce one. Neither does a
+    whisper transcription: the audio-extract skill calls the sidecar's
+    /v1/audio/transcriptions on the run's own key, and those rows bill by
+    duration with no tokens at all.
+    """
+    if r.get("kind") in ("failure", "preflight"):
+        return False
+    try:
+        audio = float(r.get("audio_seconds", 0.0) or 0.0)
+        tokens = int(r.get("total_tokens", 0) or 0)
+    except (TypeError, ValueError):
+        return True
+    return not (audio > 0.0 and tokens == 0)
+
+
+def _usage_rows_in_message_window(rows: list[dict], msgs: list[dict]) -> list[dict]:
+    """Legacy selector: rows whose real-clock ``ts`` falls in the span of the
+    trajectory's message timestamps, padded for the final completion that the
+    sidecar logs just after the last assistant message.
+    """
+    from datetime import timedelta
+    mts = [_parse_iso(m.get("timestamp", "")) for m in msgs]
+    mts = [t for t in mts if t is not None]
+    if not mts:
+        return list(rows)
+    lo = min(mts) - timedelta(seconds=10)
+    hi = max(mts) + timedelta(seconds=180)
+    picked: list[tuple[Any, dict]] = []
+    for r in rows:
+        rts = _parse_iso(r.get("ts", ""))
+        if rts is None:
+            continue
+        try:
+            in_window = lo <= rts <= hi
+        except TypeError:
+            # One side naive, one aware: the agent's message clock and the
+            # sidecar's UTC row clock are not comparable, so the window is not
+            # computable. Previously raised straight out of the back-fill.
+            continue
+        if in_window:
+            picked.append((rts, r))
+    picked.sort(key=lambda x: x[0])
+    return [r for _, r in picked]
+
+
+def _backfill_per_message_cost(traj: dict, usage_log_path: str,
+                               run_key: str = "") -> int:
     """Populate each assistant message's token + cost block in ``traj`` from the
-    sidecar per-request usage log (usage.jsonl), order-matched within the agent
-    run's time window. Returns the number of messages back-filled.
+    sidecar per-request usage log (usage.jsonl). Returns the number of messages
+    back-filled.
 
     OpenClaw writes all-zero per-message usage/cost into chat.jsonl on this
     image build (IAN report Pointer 5); the real per-request numbers live only
-    in the sidecar log. We isolate the agent's requests by the assistant
-    message timestamp window (excluding earlier testgen / later judge rows) and
-    assign rows to assistant messages in chronological order.
+    in the sidecar log.
+
+    Row selection mirrors the totals path, ``extract_usage_from_litellm_log``
+    in src/utils/grading.py, so a delivered message's cost block and the run
+    total it rolls up into are attributed by the same key:
+
+      1. ``run_key`` exact match — rows the usage callback tagged with this
+         run's key. Immune to concurrent runs sharing one sidecar log, and the
+         only selector that works at all under the agent clock shim
+         (docker/agent_faketime_shim.js): chat.jsonl timestamps are then
+         narrative-clock values tens of days from the sidecar's real UTC
+         ``ts``, so a message-derived window matches nothing. Measured on the
+         2026-08 delivery: 45-188 days of skew, and 37212 of 37212 assistant
+         messages across 568 runs lost their usage block to that window.
+      2. Time-window fallback (legacy) — for logs whose rows carry no run_key.
+         Over-attributes under parallelism exactly as the totals path
+         documents (measured 1.4x-62.7x inflation), so it warns loudly.
+
+    Within the selected rows attribution is positional, which is sound only
+    when the counts match. A mismatch cannot be repaired: a stall or empty-turn
+    retry rolls the session back (runner.py::_restore_session_to) but leaves
+    the aborted attempt's rows in the log, and a subagent spawn tags its
+    requests with the PARENT's run_key (src/utils/subagent_director.py) while
+    producing no assistant message — both insert rows at positions nothing in
+    the row schema records. Timestamps cannot break the tie, for the clock-shim
+    reason above. So a mismatch is reported as an ERROR and nothing is
+    attributed: an absent per-message cost is honestly absent, while a shifted
+    one is a wrong dollar figure in a delivered artifact. Run totals are
+    unaffected either way.
     """
     if not usage_log_path or not Path(usage_log_path).is_file():
         return 0
@@ -381,12 +456,7 @@ def _backfill_per_message_cost(traj: dict, usage_log_path: str) -> int:
     assistants = [m for m in msgs if str(_inner(m).get("role", "")).lower() == "assistant"]
     if not assistants:
         return 0
-    # Agent window from message timestamps.
-    mts = [_parse_iso(m.get("timestamp", "")) for m in msgs]
-    mts = [t for t in mts if t is not None]
-    lo = min(mts) if mts else None
-    hi = max(mts) if mts else None
-    rows = []
+    parsed: list[dict] = []
     for line in Path(usage_log_path).read_text(encoding="utf-8", errors="replace").splitlines():
         line = line.strip()
         if not line:
@@ -395,20 +465,35 @@ def _backfill_per_message_cost(traj: dict, usage_log_path: str) -> int:
             r = json.loads(line)
         except json.JSONDecodeError:
             continue
-        rts = _parse_iso(r.get("ts", ""))
-        if rts is None:
-            continue
-        # Keep rows within the agent window (with a small margin for the final
-        # completion logged just after the last assistant message timestamp).
-        if lo is not None and hi is not None:
-            from datetime import timedelta
-            if rts < lo - timedelta(seconds=10) or rts > hi + timedelta(seconds=180):
-                continue
-        rows.append((rts, r))
-    rows.sort(key=lambda x: x[0])
-    rows = [(ts, r) for ts, r in rows if r.get("kind") not in ("failure", "preflight")]
+        if isinstance(r, dict):
+            parsed.append(r)
+
+    # File order is completion order — the usage callback appends every row
+    # under a lock — so the tagged path needs no ``ts`` at all and a row with
+    # an unreadable timestamp is never silently dropped from its own run.
+    rows = [r for r in parsed if run_key and r.get("run_key") == run_key]
+    selector = "run_key"
+    if not rows:
+        selector = "time window"
+        logger.warning(
+            "per-message cost: no usage rows tagged with run_key %r in %s — "
+            "falling back to the message time window, which OVER-ATTRIBUTES "
+            "under parallel runs and selects nothing at all when the agent "
+            "clock shim is active", run_key, usage_log_path)
+        rows = _usage_rows_in_message_window(parsed, msgs)
+    rows = [r for r in rows if _usage_row_is_assistant_turn(r)]
+
+    if len(rows) != len(assistants):
+        logger.error(
+            "per-message cost NOT attributed: %s selected %d usage row(s) for "
+            "%d assistant message(s). Positional attribution would bill one "
+            "request's tokens to another message, so the per-message blocks "
+            "are left empty; the run totals in usage.json are unaffected.",
+            selector, len(rows), len(assistants))
+        return 0
+
     n = 0
-    for msg, (_, r) in zip(assistants, rows):
+    for msg, r in zip(assistants, rows):
         inner = _inner(msg)
         it = int(r.get("input_tokens", 0) or 0)
         ot = int(r.get("output_tokens", 0) or 0)
@@ -488,6 +573,7 @@ def save_usage(
     """Write usage.json with per-source breakdown (agent + testgen + judge + preflight)."""
     agent_usage = dict(usage)
     agent_usage.pop("__preflight__", None)
+    agent_usage.pop("__run_key__", None)
     sources: dict[str, dict] = {"agent": agent_usage}
     if preflight_usage:
         sources["preflight"] = dict(preflight_usage)
@@ -1652,7 +1738,9 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
     # Back-fill real per-message token + cost numbers from the sidecar usage log
     # (OpenClaw's chat.jsonl writes them as zero on this image build).
     try:
-        _n = _backfill_per_message_cost(traj, _USAGE_LOG_PATH)
+        _n = _backfill_per_message_cost(
+            traj, _USAGE_LOG_PATH,
+            str((agent_usage or {}).get("__run_key__", "") or ""))
         if _n:
             logger.info("[%s] per-message cost back-filled for %d assistant message(s)",
                         task["task_id"], _n)
