@@ -52,6 +52,7 @@ from eval.run_batch import (  # noqa: E402
     save_usage,
 )
 from src.utils import skills_inference  # noqa: E402
+from src.utils.oauth_pricing import reprice_oauth_sources  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -1468,6 +1469,167 @@ class TestBackfillPerMessageCostLegacyFallback:
             {"timestamp": "2026-08-17T07:50:01", "role": "assistant"},
         ]}
         assert _backfill_per_message_cost(traj, log, "") == 0
+
+
+class TestBackfillPerMessageCostOAuthRepricing:
+    # On the OAuth route a row's recorded cost_usd is not comparable with a
+    # Bedrock run's (it is either the zeroed subscription price or the paid-API
+    # list price, depending on the sidecar's per-token config), so the block is
+    # re-derived from the row's own tokens at the same card usage.json uses.
+    @staticmethod
+    def _oauth_row(ts, run_key):
+        return _usage_row(
+            ts, run_key, model="claude-opus-5", cost=4.2,
+            input_tokens=1_000, output_tokens=2_000,
+            cache_read_tokens=10_000, cache_write_tokens=4_000,
+            total_tokens=17_000,
+        )
+
+    def test_oauth_row_is_repriced_from_its_own_tokens(self, tmp_path):
+        log = _write_usage_log(tmp_path, [
+            self._oauth_row("2026-08-17T07:50:01+00:00", _RK_A),
+        ])
+        traj = _traj(1)
+        assert _backfill_per_message_cost(
+            traj, log, _RK_A, oauth_route=True, model="claude-opus-5") == 1
+        cost = traj["messages"][1]["usage"]["cost"]
+        assert cost == {
+            "input": pytest.approx(0.005),
+            "output": pytest.approx(0.05),
+            "cacheRead": pytest.approx(0.005),
+            "cacheWrite": pytest.approx(0.025),
+            "total": pytest.approx(0.085),
+        }
+
+    def test_oauth_split_is_exact_not_apportioned(self, tmp_path):
+        # Off the card each token class carries its own published rate, so the
+        # parts are priced directly instead of dividing a total by weights.
+        log = _write_usage_log(tmp_path, [
+            self._oauth_row("2026-08-17T07:50:01+00:00", _RK_A),
+        ])
+        traj = _traj(1)
+        _backfill_per_message_cost(
+            traj, log, _RK_A, oauth_route=True, model="claude-opus-5")
+        cost = traj["messages"][1]["usage"]["cost"]
+        parts = sum(cost[k] for k in ("input", "output", "cacheRead", "cacheWrite"))
+        assert parts == pytest.approx(cost["total"])
+
+    def test_per_message_totals_sum_to_the_agent_source_cost(self, tmp_path):
+        log = _write_usage_log(tmp_path, [
+            self._oauth_row("2026-08-17T07:50:01+00:00", _RK_A),
+            self._oauth_row("2026-08-17T07:50:02+00:00", _RK_A),
+        ])
+        traj = _traj(2)
+        _backfill_per_message_cost(
+            traj, log, _RK_A, oauth_route=True, model="claude-opus-5")
+        agent = {
+            "input_tokens": 2_000, "output_tokens": 4_000,
+            "cache_read_tokens": 20_000, "cache_write_tokens": 8_000,
+            "cost_usd": 4.2,
+        }
+        reprice_oauth_sources({"agent": agent}, model="claude-opus-5", oauth_route=True)
+        assert sum(_costs(traj)) == pytest.approx(agent["cost_usd"])
+
+    def test_bedrock_rows_keep_the_recorded_cost_and_weighted_split(self, tmp_path):
+        log = _write_usage_log(tmp_path, [
+            self._oauth_row("2026-08-17T07:50:01+00:00", _RK_A),
+        ])
+        traj = _traj(1)
+        assert _backfill_per_message_cost(
+            traj, log, _RK_A, model="claude-opus-5") == 1
+        assert traj["messages"][1]["usage"]["cost"]["total"] == pytest.approx(4.2)
+
+    def test_oauth_row_off_the_card_falls_back_to_the_recorded_cost(self, tmp_path):
+        # A model the card cannot price is left with the cost it was billed at,
+        # never re-derived into an invented figure or flattened to $0. The OAuth
+        # branch never serves gpt-5.5, but a row for it can still land in a
+        # shared sidecar log.
+        log = _write_usage_log(tmp_path, [
+            _usage_row("2026-08-17T07:50:01+00:00", _RK_A,
+                       model="gpt-5.5", cost=0.77),
+        ])
+        traj = _traj(1)
+        assert _backfill_per_message_cost(
+            traj, log, _RK_A, oauth_route=True, model="gpt-5.5") == 1
+        assert _costs(traj) == [pytest.approx(0.77)]
+
+
+class TestSaveUsageOneCostColumn:
+    _AGENT = {
+        "input_tokens": 1_000, "output_tokens": 2_000,
+        "cache_read_tokens": 10_000, "cache_write_tokens": 4_000,
+        "total_tokens": 17_000, "cost_usd": 6e-06, "request_count": 3,
+        "usage_source": "litellm_run_key",
+    }
+    _JUDGE = {
+        "input_tokens": 20_000, "output_tokens": 1_000,
+        "cache_read_tokens": 0, "cache_write_tokens": 0,
+        "total_tokens": 21_000, "cost_usd": 4.2, "request_count": 1,
+        "per_member": {
+            "sonnet": {
+                "model": "claude-sonnet-5",
+                "input_tokens": 20_000, "output_tokens": 1_000,
+                "cache_read_tokens": 0, "cache_write_tokens": 0,
+                "total_tokens": 21_000, "cost_usd": 4.2, "request_count": 1,
+            },
+        },
+    }
+
+    def _save(self, tmp_path, *, oauth_route):
+        tmp_path.mkdir(parents=True, exist_ok=True)
+        save_usage(
+            tmp_path, {}, dict(self._AGENT), "t1",
+            judge_usage=json.loads(json.dumps(self._JUDGE)),
+            model="claude-opus-5", oauth_route=oauth_route,
+        )
+        return json.loads((tmp_path / "usage.json").read_text(encoding="utf-8"))
+
+    def test_oauth_costs_are_all_token_derived(self, tmp_path):
+        out = self._save(tmp_path, oauth_route=True)
+        assert out["sources"]["agent"]["cost_usd"] == pytest.approx(0.085)
+        assert out["sources"]["judge"]["cost_usd"] == pytest.approx(0.075)
+        member = out["sources"]["judge"]["per_member"]["sonnet"]
+        assert member["cost_usd"] == pytest.approx(0.075)
+        assert out["cost_usd"] == pytest.approx(0.16)
+
+    def test_oauth_rollup_is_the_sum_of_the_repriced_sources(self, tmp_path):
+        out = self._save(tmp_path, oauth_route=True)
+        assert out["cost_usd"] == pytest.approx(
+            out["sources"]["agent"]["cost_usd"]
+            + out["sources"]["judge"]["cost_usd"]
+        )
+
+    def test_oauth_run_is_stamped_with_its_route(self, tmp_path):
+        assert self._save(tmp_path, oauth_route=True)["auth_provider"] == "oauth"
+
+    def test_bedrock_run_is_stamped_with_its_route(self, tmp_path):
+        assert self._save(tmp_path, oauth_route=False)["auth_provider"] == "bedrock"
+
+    def test_bedrock_costs_are_recorded_verbatim(self, tmp_path):
+        # Regression pin: nothing on the Bedrock route may be re-derived. The
+        # provenance stamp is the only key this change adds to its usage.json.
+        out = self._save(tmp_path, oauth_route=False)
+        assert out.pop("auth_provider") == "bedrock"
+        assert out == {
+            "input_tokens": 21_000,
+            "output_tokens": 3_000,
+            "cache_read_tokens": 10_000,
+            "cache_write_tokens": 4_000,
+            "total_tokens": 38_000,
+            "request_count": 4,
+            "cost_usd": pytest.approx(4.200006),
+            "usage_source": "litellm_run_key",
+            "sources": {"agent": self._AGENT, "judge": self._JUDGE},
+        }
+
+    def test_the_provenance_stamp_survives_a_route_whose_costs_look_paid(self, tmp_path):
+        # The old "cost_usd == 0 proves this ran on the subscription" read is
+        # dead — both routes now carry real dollars — so the stamp is the only
+        # thing distinguishing them in the artifact.
+        oauth = self._save(tmp_path / "o", oauth_route=True)
+        bedrock = self._save(tmp_path / "b", oauth_route=False)
+        assert oauth["cost_usd"] > 0 and bedrock["cost_usd"] > 0
+        assert oauth["auth_provider"] != bedrock["auth_provider"]
 
 
 class TestSaveUsageStripsRunKey:

@@ -1,23 +1,29 @@
-"""Bedrock-model-card rates used to estimate cost for OAuth-routed trajectories.
+"""Bedrock-model-card rates that price every OAuth-routed figure in a run.
 
-The Claude Max subscription path is prepaid, so LiteLLM prices every OAuth
-request at ``$0`` and ``usage.json -> sources.agent.cost_usd`` lands at roughly
-zero. That is *correct* as a record of marginal spend, but it makes a
-subscription trajectory look free to a finance system.
+The Claude Max subscription path is prepaid, so what a request "cost" over the
+bridge is a matter of convention: LiteLLM records marginal spend (~$0 when the
+sidecar zeroes the OAuth model's per-token prices, a paid-API list price when it
+does not). Neither convention is comparable with a Bedrock run, and a run
+carried both at once -- batch artifacts held list-price dollars while regrades
+held $0 for the same judge.
 
-This module supplies the missing multipliers: published Bedrock per-MTok rates
-for the four models the OAuth branch actually serves, applied to token counts
-the harness already records.
+So on the OAuth route there is exactly ONE cost column and it is always derived:
+every ``cost_usd`` the harness records is computed from token counts at the
+published Bedrock per-MTok rates below. The card covers every model the OAuth
+branch serves -- the trajectory models from ``auth_provider.served_trajectory_
+models(OAUTH, ...)`` and the sonnet judge the cc-bridge fronts -- so an
+OAuth-routed figure is never left unpriced.
 
-**Only a $0 figure is ever rewritten.** Bedrock work always carries a real
-non-zero cost, so it short circuits before any estimate is reached and no
-Bedrock cost, judge-council price, or ``usage.jsonl`` figure is affected by
-anything here. Nothing in this file is imported by ``grading.py`` or any
-Bedrock pricing code.
+**The Bedrock route never reaches these rates.** The pricing functions below are
+pure, so the guarantee lives in every caller: each one gates on an explicit
+``oauth_route``/bridge-URL flag, never on the shape of a price. A Bedrock run's
+cost, judge-council price and ``usage.jsonl`` figures are byte-identical with or
+without this file.
 
 Rates mirror ``litellm_usage_oauth_callback.py``'s ``_ANTHROPIC_OPUS_PRICE`` and
-``_ANTHROPIC_FABLE_PRICE`` so the sidecar's ``cost_bedrock_equivalent`` and this
-estimate cannot disagree.
+``_ANTHROPIC_FABLE_PRICE``, and the sonnet card mirrors ``grading._FAMILY_RATES
+["sonnet"]``, so the sidecar's ``cost_bedrock_equivalent``, the council price and
+this estimate cannot disagree.
 """
 
 from __future__ import annotations
@@ -82,14 +88,22 @@ SONNET_RATES = ModelRates(
 )
 
 # The models reachable over the Claude Max subscription: opus/fable as
-# trajectory models (auth_provider.py OAUTH set), sonnet as the council judge
-# routed through the cc-bridge. Bedrock-only ids (claude-opus-4.8, gpt-*) are
-# deliberately absent so they can never be estimated instead of billed.
+# trajectory models (auth_provider.served_trajectory_models(OAUTH) — the exact
+# four), sonnet as the council judge routed through the cc-bridge.
+# `claude-sonnet-5` is the cc-bridge judge default
+# (judge_litellm._judge_oauth_bridge_model) and prices at the same published
+# Sonnet card as 4.5/4.6; listing it explicitly means the run's actual judge id
+# resolves by exact match rather than leaning on the family fallback.
+# Bedrock-only ids (claude-opus-4.8, gpt-*) are deliberately absent. Note the
+# opus/fable family fallback in `rates_for` still prices an unlisted opus alias;
+# what keeps a Bedrock charge safe is the explicit `oauth_route` gate on every
+# caller, not omission from this table.
 BEDROCK_MODEL_CARD_RATES: dict[str, ModelRates] = {
     "claude-opus-5": OPUS_RATES,
     "claude-opus-4.7": OPUS_RATES,
     "claude-opus-4-6": OPUS_RATES,
     "claude-fable-5": FABLE_RATES,
+    "claude-sonnet-5": SONNET_RATES,
     "claude-sonnet-4-6": SONNET_RATES,
     "claude-sonnet-4-5-20250929": SONNET_RATES,
     "sonnet": SONNET_RATES,
@@ -198,27 +212,55 @@ def _tokens(entry: Mapping[str, Any], key: str) -> float:
         return 0.0
 
 
-def _reprice(
-    entry: MutableMapping[str, Any], *names: Any, force: bool = False
-) -> Optional[float]:
-    """Set ``entry['cost_usd']`` from token counts, or leave it alone.
+def cost_breakdown(
+    model: Any,
+    *,
+    input_tokens: float = 0.0,
+    output_tokens: float = 0.0,
+    cache_read_tokens: float = 0.0,
+    cache_write_tokens: float = 0.0,
+) -> Optional[dict[str, float]]:
+    """Per-token-class dollars for one request, or None when unpriceable.
+
+    The per-message cost block in ``output.json`` needs the split, not just the
+    total. Off this card each class has its own published rate, so the split is
+    computed directly instead of apportioning a known total by weight, and
+    ``total`` is the sum of the parts by construction.
+    """
+    rates = rates_for(model)
+    if rates is None:
+        return None
+    try:
+        counts = {
+            "input": float(input_tokens or 0.0),
+            "output": float(output_tokens or 0.0),
+            "cacheRead": float(cache_read_tokens or 0.0),
+            "cacheWrite": float(cache_write_tokens or 0.0),
+        }
+    except (TypeError, ValueError):
+        return None
+    per_mtok = {
+        "input": rates.input_per_mtok,
+        "output": rates.output_per_mtok,
+        "cacheRead": rates.cache_read_per_mtok,
+        "cacheWrite": rates.cache_write_per_mtok,
+    }
+    split = {
+        key: round(max(counts[key], 0.0) * per_mtok[key] / _PER_MTOK, 8)
+        for key in counts
+    }
+    split["total"] = round(sum(split.values()), 8)
+    return split
+
+
+def _reprice(entry: MutableMapping[str, Any], *names: Any) -> Optional[float]:
+    """Set ``entry['cost_usd']`` from its own token counts. Returns the new cost.
 
     Tries each candidate model name in turn so a council member recorded as a
     Bedrock ARN (which matches no rate card) still prices through its stable
-    family key. Returns the new cost, or None when nothing was changed.
-
-    ``force`` overrides the non-zero short circuit. A subscription trajectory
-    does not record a clean ``0.0`` -- LiteLLM prices it at rounding noise such
-    as ``6e-06`` -- so the caller that knows the request went over OAuth must be
-    able to reprice a technically-truthy cost.
+    family key. Returns None when no candidate is on the card, leaving the
+    recorded figure in place — an unpriceable model must not be published as $0.
     """
-    try:
-        recorded = float(entry.get("cost_usd") or 0.0)
-    except (TypeError, ValueError):
-        recorded = 0.0
-    if recorded and not force:
-        return None
-
     for candidate in names:
         name = str(candidate or "").strip()
         if not name:
@@ -236,28 +278,32 @@ def _reprice(
     return None
 
 
-def reprice_zero_cost_sources(
+def reprice_oauth_sources(
     sources: MutableMapping[str, Any], *, model: str = "", oauth_route: bool = False
 ) -> list[str]:
-    """Price the usage sources a prepaid subscription recorded as $0, in place.
+    """Recompute the OAuth-routed usage sources from token counts, in place.
 
-    ``usage.json`` would otherwise report a subscription trajectory as free
-    while the finance API receives a real figure. Mutating the source entries
-    keeps both records identical instead of letting them drift.
+    ``oauth_route`` is the only gate, and it is the run's routing flag, not a
+    guess from the shape of a price. On a Bedrock run this returns immediately
+    and every figure is byte-identical to what the harness recorded.
 
-    Each source uses the same gate its finance-payload counterpart uses, so the
-    two records agree by construction rather than by coincidence: the agent on
-    the explicit ``oauth_route`` flag (mirroring
-    ``finance_api._trajectory_cost_usd``) and each judge member on a falsy
-    ``cost_usd`` (mirroring ``finance_api._judge_cost_usd``). A Bedrock run
-    passes both gates untouched. Never raises: usage bookkeeping must not be
-    able to fail a completed run.
+    On an OAuth run the agent and every judge member are repriced off the card
+    whatever they recorded, because what they recorded is not one convention:
+    LiteLLM books the prepaid subscription at rounding noise (``6e-06``) when
+    the sidecar zeroes the model's per-token prices and at full paid-API list
+    price when it does not. Overwriting both with the derived figure is what
+    makes ``usage.json`` a single comparable cost column. The judge aggregate is
+    re-summed from its members for the same reason.
+
+    Never raises: usage bookkeeping must not be able to fail a completed run.
     """
     repriced: list[str] = []
+    if not oauth_route:
+        return repriced
     try:
         agent = sources.get("agent")
         if isinstance(agent, MutableMapping):
-            cost = _reprice(agent, model, force=oauth_route)
+            cost = _reprice(agent, model)
             if cost is not None:
                 repriced.append(f"agent({model})=${cost}")
 
@@ -275,8 +321,15 @@ def reprice_zero_cost_sources(
                         priced_any = True
                         repriced.append(f"judge.{family}=${cost}")
                     member_total += _tokens(member, "cost_usd")
-            if priced_any and not _tokens(judge, "cost_usd"):
+            if priced_any:
                 judge["cost_usd"] = round(member_total, 6)
+            else:
+                # Pricing the aggregate token counts at one model's rate is only
+                # sound because the OAuth council is sonnet-only
+                # (auth_provider.JUDGE_FAMILIES_BY_PROVIDER[OAUTH]).
+                cost = _reprice(judge, judge.get("model"))
+                if cost is not None:
+                    repriced.append(f"judge=${cost}")
     except Exception as exc:  # pragma: no cover - defensive
         logger.warning("[oauth-pricing] repricing skipped: %s", exc)
     return repriced

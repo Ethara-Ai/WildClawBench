@@ -310,6 +310,66 @@ def test_oauth_route_reprices_from_token_counts():
     assert payload["trajectory_cost_usd"] != pytest.approx(1.2345)
 
 
+def test_oauth_payload_does_not_reprice_what_usage_json_already_derived(tmp_path):
+    # save_usage and this payload read the same card with the same tokens and
+    # the same model, so the second pass must land on the identical figure. A
+    # compounding reprice would bill the trajectory twice over.
+    from eval.run_batch import save_usage
+
+    agent = {
+        "input_tokens": 1_000, "output_tokens": 2_000,
+        "cache_read_tokens": 10_000, "cache_write_tokens": 4_000,
+        "total_tokens": 17_000, "cost_usd": 6e-06, "request_count": 3,
+    }
+    judge = {
+        "input_tokens": 20_000, "output_tokens": 1_000,
+        "cache_read_tokens": 0, "cache_write_tokens": 0,
+        "total_tokens": 21_000, "cost_usd": 4.2, "request_count": 1,
+        "per_member": {
+            "sonnet": {
+                "model": "claude-sonnet-5",
+                "input_tokens": 20_000, "output_tokens": 1_000,
+                "cache_read_tokens": 0, "cache_write_tokens": 0,
+                "total_tokens": 21_000, "cost_usd": 4.2, "request_count": 1,
+            },
+        },
+    }
+    recorded = save_usage(
+        tmp_path, {}, agent, "t1", judge_usage=judge,
+        model="claude-opus-5", oauth_route=True,
+    )["usage"]
+
+    payload = build_trajectory_usage_payload(
+        _enabled(),
+        task_id="t",
+        trajectory_id="tr",
+        model_name="claude-opus-5",
+        usage=recorded,
+        oauth_route=True,
+    )
+    assert payload["trajectory_cost_usd"] == pytest.approx(0.085)
+    assert payload["trajectory_cost_usd"] == pytest.approx(
+        recorded["sources"]["agent"]["cost_usd"]
+    )
+    assert payload["judge_lines"][0]["judge_cost_usd"] == pytest.approx(0.075)
+    assert payload["judge_lines"][0]["judge_cost_usd"] == pytest.approx(
+        recorded["sources"]["judge"]["per_member"]["sonnet"]["cost_usd"]
+    )
+
+
+def test_provenance_field_does_not_reach_the_finance_payload():
+    payload = build_trajectory_usage_payload(
+        _enabled(),
+        task_id="t",
+        trajectory_id="tr",
+        model_name="claude-opus-4.7",
+        usage=dict(USAGE, auth_provider="oauth"),
+        oauth_route=False,
+    )
+    assert set(payload) == PAYLOAD_KEYS
+    assert payload["trajectory_cost_usd"] == pytest.approx(1.2345)
+
+
 def test_oauth_route_keeps_recorded_cost_when_the_model_has_no_rate_card():
     payload = build_trajectory_usage_payload(
         _enabled(),
@@ -408,8 +468,9 @@ def test_bedrock_judge_cost_is_reported_verbatim():
 
 
 def test_oauth_judge_zero_cost_is_repriced_at_bedrock_rates():
-    # Real run_6 numbers: the Claude Max bridge is prepaid, so grading.py
-    # deliberately records $0 and the finance record has to reprice it.
+    # Real run_6 numbers, from back when grading.py recorded the prepaid bridge
+    # judge as $0. It derives its own figure now, but artifacts written under
+    # the old policy still reach finance and must not be reported as free.
     usage = {
         "sources": {
             "judge": {

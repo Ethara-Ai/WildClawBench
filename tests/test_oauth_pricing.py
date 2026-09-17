@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -15,9 +16,10 @@ from src.utils.oauth_pricing import (  # noqa: E402
     OPUS_RATES,
     SONNET_RATES,
     ModelRates,
+    cost_breakdown,
     estimate_cost_usd,
     rates_for,
-    reprice_zero_cost_sources,
+    reprice_oauth_sources,
 )
 
 OAUTH_TRAJECTORY_MODELS = [
@@ -26,7 +28,12 @@ OAUTH_TRAJECTORY_MODELS = [
     "claude-opus-4-6",
     "claude-fable-5",
 ]
-OAUTH_JUDGE_MODELS = ["claude-sonnet-4-6", "claude-sonnet-4-5-20250929", "sonnet"]
+OAUTH_JUDGE_MODELS = [
+    "claude-sonnet-5",
+    "claude-sonnet-4-6",
+    "claude-sonnet-4-5-20250929",
+    "sonnet",
+]
 
 
 class TestRateTable:
@@ -63,6 +70,36 @@ class TestRateTable:
         assert (OPUS_RATES.input_per_mtok, OPUS_RATES.output_per_mtok) == (5.0, 25.0)
         assert (FABLE_RATES.input_per_mtok, FABLE_RATES.output_per_mtok) == (10.0, 50.0)
         assert (SONNET_RATES.input_per_mtok, SONNET_RATES.output_per_mtok) == (3.0, 15.0)
+
+    def test_the_card_covers_every_oauth_served_trajectory_model(self):
+        from src.utils.auth_provider import OAUTH, served_trajectory_models
+
+        class _Cfg:
+            aws_bearer_token = ""
+            anthropic_api_key = ""
+            openai_api_key = ""
+            meta_api_key = ""
+            meta_model = ""
+
+        for model in served_trajectory_models(OAUTH, _Cfg()):
+            assert rates_for(model) is not None, model
+
+    def test_the_card_covers_the_cc_bridge_judge_default(self):
+        from src.utils import judge_litellm
+
+        assert rates_for(judge_litellm._judge_oauth_bridge_model()) == SONNET_RATES
+
+    def test_the_sonnet_card_matches_the_council_rate_table(self):
+        # Two tables price the same sonnet judge — grading's council rates on the
+        # Bedrock route, this card on the OAuth one. A divergence would make the
+        # same tokens cost different dollars depending on how they were routed.
+        from src.utils.grading import _FAMILY_RATES
+
+        r_in, r_out, r_cread, r_cwrite = _FAMILY_RATES["sonnet"]
+        assert r_in * 1_000_000 == pytest.approx(SONNET_RATES.input_per_mtok)
+        assert r_out * 1_000_000 == pytest.approx(SONNET_RATES.output_per_mtok)
+        assert r_cread * 1_000_000 == pytest.approx(SONNET_RATES.cache_read_per_mtok)
+        assert r_cwrite * 1_000_000 == pytest.approx(SONNET_RATES.cache_write_per_mtok)
 
 
 class TestCostArithmetic:
@@ -185,6 +222,42 @@ class TestEnvOverrides:
         assert rates_for("claude-opus-5").input_per_mtok == pytest.approx(5.0)
 
 
+class TestCostBreakdown:
+    def test_split_is_priced_per_class_and_sums_to_the_total(self):
+        split = cost_breakdown(
+            "claude-opus-5",
+            input_tokens=1_000,
+            output_tokens=2_000,
+            cache_read_tokens=10_000,
+            cache_write_tokens=4_000,
+        )
+        assert split == {
+            "input": pytest.approx(0.005),
+            "output": pytest.approx(0.05),
+            "cacheRead": pytest.approx(0.005),
+            "cacheWrite": pytest.approx(0.025),
+            "total": pytest.approx(0.085),
+        }
+
+    def test_total_agrees_with_estimate_cost_usd(self):
+        tokens = dict(
+            input_tokens=544,
+            output_tokens=110_161,
+            cache_read_tokens=10_708_536,
+            cache_write_tokens=815_388,
+        )
+        estimated, _ = estimate_cost_usd("claude-opus-5", **tokens)
+        assert cost_breakdown("claude-opus-5", **tokens)["total"] == pytest.approx(
+            estimated
+        )
+
+    def test_unpriceable_model_declines_instead_of_splitting_zero(self):
+        assert cost_breakdown("gpt-5.5", input_tokens=1_000_000) is None
+
+    def test_junk_tokens_decline_instead_of_raising(self):
+        assert cost_breakdown("claude-opus-5", input_tokens="lots") is None  # type: ignore[arg-type]
+
+
 class TestRepriceSources:
     @staticmethod
     def _sources(agent_cost, judge_cost, member_cost, member_model="sonnet"):
@@ -216,18 +289,18 @@ class TestRepriceSources:
     # run -- the gate this asserts is the whole Bedrock-safety guarantee.
     def test_bedrock_sources_are_left_alone(self):
         sources = self._sources(0.000265, 0.421758, 0.421758)
-        changed = reprice_zero_cost_sources(
+        changed = reprice_oauth_sources(
             sources, model="claude-opus-4.7", oauth_route=False
         )
         assert changed == []
         assert sources["agent"]["cost_usd"] == pytest.approx(0.000265)
         assert sources["judge"]["cost_usd"] == pytest.approx(0.421758)
 
-    # LiteLLM prices a prepaid subscription at rounding noise (6e-06 on run_6),
-    # not a clean 0.0, so the agent needs the forced gate rather than a falsy one.
+    # A prepaid subscription is booked at rounding noise (6e-06 on run_6), not a
+    # clean 0.0, so a falsy-cost gate would never fire on the agent at all.
     def test_oauth_agent_is_repriced_despite_a_truthy_noise_cost(self):
         sources = self._sources(6e-06, 0.0, 0.0)
-        changed = reprice_zero_cost_sources(
+        changed = reprice_oauth_sources(
             sources, model="claude-opus-5", oauth_route=True
         )
         expected, priced_ok = estimate_cost_usd(
@@ -244,7 +317,7 @@ class TestRepriceSources:
 
     def test_oauth_judge_member_and_aggregate_are_repriced(self):
         sources = self._sources(6e-06, 0.0, 0.0)
-        reprice_zero_cost_sources(sources, model="claude-opus-5", oauth_route=True)
+        reprice_oauth_sources(sources, model="claude-opus-5", oauth_route=True)
         member = sources["judge"]["per_member"]["sonnet"]["cost_usd"]
         assert member == pytest.approx(0.32466)
         assert sources["judge"]["cost_usd"] == pytest.approx(member)
@@ -252,24 +325,97 @@ class TestRepriceSources:
     def test_judge_member_recorded_as_an_arn_prices_via_the_family_key(self):
         arn = "bedrock/arn:aws:bedrock:ap-south-1:426628337772:application-inference-profile/x"
         sources = self._sources(6e-06, 0.0, 0.0, member_model=arn)
-        reprice_zero_cost_sources(sources, model="claude-opus-5", oauth_route=True)
+        reprice_oauth_sources(sources, model="claude-opus-5", oauth_route=True)
         assert sources["judge"]["per_member"]["sonnet"]["cost_usd"] > 0.0
 
-    def test_judge_with_a_real_cost_is_never_repriced_even_on_oauth(self):
+    # The figure an OAuth judge arrives with is whatever convention priced it
+    # (list price on the batch path, $0 on the pre-change regrade path). Both are
+    # overwritten: one route, one derivation, one number.
+    def test_oauth_judge_list_price_is_overwritten_by_the_derived_figure(self):
         sources = self._sources(6e-06, 0.421758, 0.421758)
-        reprice_zero_cost_sources(sources, model="claude-opus-5", oauth_route=True)
-        assert sources["judge"]["cost_usd"] == pytest.approx(0.421758)
+        reprice_oauth_sources(sources, model="claude-opus-5", oauth_route=True)
         assert sources["judge"]["per_member"]["sonnet"]["cost_usd"] == pytest.approx(
-            0.421758
+            0.32466
         )
+        assert sources["judge"]["cost_usd"] == pytest.approx(0.32466)
+
+    def test_oauth_judge_without_per_member_reprices_off_its_own_totals(self):
+        sources = {
+            "agent": {"input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0},
+            "judge": {
+                "model": "claude-sonnet-5",
+                "input_tokens": 20_000,
+                "output_tokens": 1_000,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 0,
+                "cost_usd": 4.2,
+            },
+        }
+        reprice_oauth_sources(sources, model="claude-opus-5", oauth_route=True)
+        assert sources["judge"]["cost_usd"] == pytest.approx(0.075)
+
+    def test_repricing_is_idempotent(self):
+        # finance_api derives the same figure from the same card and tokens, so
+        # a second pass must not compound the first.
+        sources = self._sources(6e-06, 0.0, 0.0)
+        reprice_oauth_sources(sources, model="claude-opus-5", oauth_route=True)
+        once = json.loads(json.dumps(sources))
+        reprice_oauth_sources(sources, model="claude-opus-5", oauth_route=True)
+        assert sources == once
 
     def test_unpriceable_model_leaves_the_agent_cost_alone(self):
         sources = self._sources(6e-06, 0.0, 0.0)
-        reprice_zero_cost_sources(sources, model="glassy_lagoon", oauth_route=True)
+        reprice_oauth_sources(sources, model="glassy_lagoon", oauth_route=True)
         assert sources["agent"]["cost_usd"] == pytest.approx(6e-06)
 
     def test_junk_sources_never_raise(self):
-        assert reprice_zero_cost_sources({}, model="claude-opus-5", oauth_route=True) == []
-        assert reprice_zero_cost_sources(
+        assert reprice_oauth_sources({}, model="claude-opus-5", oauth_route=True) == []
+        assert reprice_oauth_sources(
             {"agent": "not-a-dict", "judge": 7}, model="claude-opus-5", oauth_route=True
         ) == []
+
+
+class TestJudgeCostOnTheOAuthBridge:
+    """``grading._judge_cost_usd`` is the single writer of the judge's dollars
+    on both the batch and the regrade path, so the route's pricing policy has to
+    live there rather than in either caller."""
+
+    @staticmethod
+    def _bridge(monkeypatch, on):
+        from src.utils.auth_provider import BEDROCK, OAUTH, PROVIDER_ENV_VAR
+
+        monkeypatch.setenv(PROVIDER_ENV_VAR, OAUTH if on else BEDROCK)
+        monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "http://127.0.0.1:8787")
+
+    def test_bridge_judge_is_priced_at_the_sonnet_card_not_zero(self, monkeypatch):
+        from src.utils import grading
+
+        self._bridge(monkeypatch, True)
+        cost, priced_ok = grading._judge_cost_usd(
+            "claude-sonnet-5", 20_000, 1_000, 0, 0, family="sonnet"
+        )
+        assert priced_ok is True
+        assert cost == pytest.approx(0.075)
+
+    def test_bedrock_judge_keeps_the_council_rate(self, monkeypatch):
+        from src.utils import grading
+
+        self._bridge(monkeypatch, False)
+        cost, priced_ok = grading._judge_cost_usd(
+            "claude-sonnet-4-6", 20_000, 1_000, 0, 0, family="sonnet"
+        )
+        assert priced_ok is True
+        assert cost == pytest.approx(0.075)
+
+    def test_both_routes_price_the_same_tokens_the_same(self, monkeypatch):
+        from src.utils import grading
+
+        self._bridge(monkeypatch, True)
+        oauth_cost, _ = grading._judge_cost_usd(
+            "claude-sonnet-5", 101_885, 1_267, 0, 0, family="sonnet"
+        )
+        self._bridge(monkeypatch, False)
+        bedrock_cost, _ = grading._judge_cost_usd(
+            "claude-sonnet-4-6", 101_885, 1_267, 0, 0, family="sonnet"
+        )
+        assert oauth_cost == pytest.approx(bedrock_cost) == pytest.approx(0.32466)

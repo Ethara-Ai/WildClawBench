@@ -51,6 +51,7 @@ from src.utils.grading import (
 )
 from src.utils.config import Config
 from src.utils.auth_provider import (
+    BEDROCK,
     OAUTH,
     PROVIDER_ENV_VAR,
     AuthProviderError,
@@ -411,7 +412,9 @@ def _usage_rows_in_message_window(rows: list[dict], msgs: list[dict]) -> list[di
 
 
 def _backfill_per_message_cost(traj: dict, usage_log_path: str,
-                               run_key: str = "") -> int:
+                               run_key: str = "", *,
+                               oauth_route: bool = False,
+                               model: str = "") -> int:
     """Populate each assistant message's token + cost block in ``traj`` from the
     sidecar per-request usage log (usage.jsonl). Returns the number of messages
     back-filled.
@@ -419,6 +422,12 @@ def _backfill_per_message_cost(traj: dict, usage_log_path: str,
     OpenClaw writes all-zero per-message usage/cost into chat.jsonl on this
     image build (IAN report Pointer 5); the real per-request numbers live only
     in the sidecar log.
+
+    On an OAuth-routed run each row's dollars are recomputed from that row's own
+    token counts at Bedrock list rates, matching how the run totals in
+    usage.json are derived, so a message's cost and the total it rolls up into
+    are the same currency. ``oauth_route`` is the run's routing flag; a Bedrock
+    run keeps the recorded cost and its weighted split untouched.
 
     Row selection mirrors the totals path, ``extract_usage_from_litellm_log``
     in src/utils/grading.py, so a delivered message's cost block and the run
@@ -499,11 +508,20 @@ def _backfill_per_message_cost(traj: dict, usage_log_path: str,
         ot = int(r.get("output_tokens", 0) or 0)
         cr = int(r.get("cache_read_tokens", 0) or 0)
         cw = int(r.get("cache_write_tokens", 0) or 0)
-        total_cost = float(r.get("cost_usd", 0.0) or 0.0)
-        toks = {"input": it, "output": ot, "cacheRead": cr, "cacheWrite": cw}
-        wsum = sum(_COST_WEIGHTS[k] * toks[k] for k in toks) or 1.0
-        cost = {k: round(total_cost * (_COST_WEIGHTS[k] * toks[k]) / wsum, 8) for k in toks}
-        cost["total"] = round(total_cost, 8)
+        cost = None
+        if oauth_route:
+            from src.utils.oauth_pricing import cost_breakdown
+            cost = cost_breakdown(
+                r.get("model") or model,
+                input_tokens=it, output_tokens=ot,
+                cache_read_tokens=cr, cache_write_tokens=cw,
+            )
+        if cost is None:
+            total_cost = float(r.get("cost_usd", 0.0) or 0.0)
+            toks = {"input": it, "output": ot, "cacheRead": cr, "cacheWrite": cw}
+            wsum = sum(_COST_WEIGHTS[k] * toks[k] for k in toks) or 1.0
+            cost = {k: round(total_cost * (_COST_WEIGHTS[k] * toks[k]) / wsum, 8) for k in toks}
+            cost["total"] = round(total_cost, 8)
         usage = inner.get("usage") if isinstance(inner.get("usage"), dict) else {}
         usage.update({
             "input": it, "output": ot, "cacheRead": cr, "cacheWrite": cw,
@@ -585,11 +603,13 @@ def save_usage(
         sources["judge"] = dict(judge_usage)
 
     # Runs before recompute_combined so the aggregate derives from the repriced
-    # figures. A prepaid subscription records ~$0, which would otherwise leave
-    # usage.json disagreeing with the cost the finance API is sent.
-    from src.utils.oauth_pricing import reprice_zero_cost_sources
+    # figures. What a prepaid subscription records is not one convention (~$0 or
+    # full list price, depending on the sidecar's per-token config), so on that
+    # route every figure is re-derived from tokens at Bedrock list rates and
+    # usage.json carries one cost column the finance API agrees with.
+    from src.utils.oauth_pricing import reprice_oauth_sources
 
-    repriced = reprice_zero_cost_sources(
+    repriced = reprice_oauth_sources(
         sources, model=model, oauth_route=oauth_route
     )
     if repriced:
@@ -598,6 +618,11 @@ def save_usage(
     combined = recompute_combined(sources, task_id)
 
     out: dict[str, Any] = dict(combined)
+    # Explicit route provenance. Both routes now carry real-looking dollars, so
+    # "cost_usd == 0 means this ran on the subscription" is no longer a readable
+    # signal and the judge member's model string (bare id vs Bedrock ARN) is too
+    # indirect to be the only marker.
+    out["auth_provider"] = OAUTH if oauth_route else BEDROCK
     out["sources"] = sources
     for k, v in agent_usage.items():
         if k not in out and k not in _USAGE_NUMERIC_KEYS and k != "cost_usd":
@@ -1740,7 +1765,9 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
     try:
         _n = _backfill_per_message_cost(
             traj, _USAGE_LOG_PATH,
-            str((agent_usage or {}).get("__run_key__", "") or ""))
+            str((agent_usage or {}).get("__run_key__", "") or ""),
+            oauth_route=bool(getattr(config, "use_claude_oauth", False)),
+            model=model_type)
         if _n:
             logger.info("[%s] per-message cost back-filled for %d assistant message(s)",
                         task["task_id"], _n)

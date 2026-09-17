@@ -1204,14 +1204,28 @@ def _judge_cost_usd(
     # validate_judge_pricing(), called at grade_with_rubric() startup; callers
     # that bypass grade_with_rubric must run that validator themselves first.
     # Subscription judging (sonnet via the Claude Max OAuth bridge) is not
-    # metered per-token — it draws on the flat Max plan — so the per-token list
-    # price would be a misleading "charge". Force cost_usd=0 (priced_ok=True) for
-    # that path; real cost is reconciled separately later. Token counts are kept.
+    # metered per-token — it draws on the flat Max plan — so there is no
+    # "charge" to read off. It is priced from token counts at the published
+    # Bedrock sonnet card instead, the same figure the trajectory's own OAuth
+    # cost is derived from, so one run's dollars are comparable end to end and
+    # with a Bedrock run. Recording $0 here instead made a regraded judge free
+    # while the identical batch-graded judge carried list-price dollars.
     if family == "sonnet":
         try:
             from . import judge_litellm  # local import: avoid import-time cost
             if judge_litellm._judge_oauth_bridge_url():
-                return 0.0, True
+                from .oauth_pricing import estimate_cost_usd
+                estimated, priced_ok = estimate_cost_usd(
+                    judge_litellm._judge_oauth_bridge_model(),
+                    input_tokens=in_tok,
+                    output_tokens=out_tok,
+                    cache_read_tokens=c_read,
+                    cache_write_tokens=c_write,
+                )
+                if priced_ok:
+                    return estimated, True
+                # An overridden bridge model off the card falls through to the
+                # family rate, which is the same published sonnet price.
         except Exception:
             pass
     rate = _judge_rate_for(model, family)
