@@ -321,17 +321,18 @@ class TestReconstructInputFromBundle:
         t.write_text('[environment]\nrequired_apis = ["foo-api"]\n', encoding="utf-8")
         assert reconstruct_mod._load_toml(t) == {"environment": {"required_apis": ["foo-api"]}}
 
-    def test_copy_flat_dir_flattens_and_skips_junk(self, reconstruct_mod, tmp_path):
+    def test_copy_tree_descends_and_skips_junk(self, reconstruct_mod, tmp_path):
+        from script.lib.recon.sources import copy_tree
+
         src = tmp_path / "src"
         src.mkdir()
         (src / "a.md").write_text("a", encoding="utf-8")
         (src / ".DS_Store").write_text("junk", encoding="utf-8")
-        (src / "sub").mkdir()  # subdir not descended
+        (src / "sub").mkdir()
         (src / "sub" / "b.md").write_text("b", encoding="utf-8")
         dst = tmp_path / "dst"
-        names = reconstruct_mod._copy_flat_dir(src, dst)
-        assert names == ["a.md"]
-        assert (dst / "a.md").is_file()
+        assert copy_tree(src, dst) == ["a.md", "sub/b.md"]
+        assert (dst / "sub" / "b.md").is_file()
         assert not (dst / ".DS_Store").exists()
 
     def test_reconstruct_full_tree(self, reconstruct_mod, tmp_path):
@@ -361,7 +362,8 @@ class TestReconstructInputFromBundle:
         assert summary["turns"] == 1
         assert (out / "persona" / "MEMORY.md").is_file()
         assert (out / "data" / "input.txt").is_file()
-        assert (out / "test_outputs.py").is_file()
+        # The generated-test channel is retired; writing it back revives it.
+        assert not (out / "test_outputs.py").exists()
         assert (out / "RECONSTRUCTION_NOTES.md").is_file()
 
     def test_reconstruct_prompt_fallback_to_instruction_md(self, reconstruct_mod, tmp_path):

@@ -15,12 +15,17 @@ What it recovers
                           to prompts.txt, never prompt.txt: the loader reads
                           prompt.txt as ONE prompt, collapsing a 20-turn task
                           to a single turn.
-  TRUTH.md            <- <bundle>/TRUTH.md   (grader truth doc, if present)
+  prompts.json        <- turn texts from the prompt file, turn INSTANTS from the
+                          published trajectory (or, lossily, from the day
+                          labels); refused outright when neither is available.
+                          Always written with its companion prompts.txt — the
+                          loader hard-raises on a json without one.
+  TRUTH.md            <- <bundle>/TRUTH.md or data/solution/TRUTH.md, under
+                          either published name (see task_standard.TRUTH_FILENAMES)
   rubric.json         <- <bundle>/rubric.json
   persona/<f>         <- <bundle>/data/environment/persona/<f>
-  data/<f>            <- <bundle>/data/environment/artifacts/inputs/files/<f>
-  test_outputs.py     <- <bundle>/data/tests/test_outputs.py
-  test_weights.json   <- <bundle>/data/tests/test_weights.json
+  data/<rel>          <- <bundle>/data/environment/artifacts/inputs/files/<rel>,
+                          recursively and with <rel> preserved
   inject/<stage>/<f>  <- <bundle>/inject/ (staged verbatim by the repackager;
                           absent for tasks that ship no inject spec)
   mock_data/<api>/<f> <- the OVERLAY, isolated by diffing each seed file
@@ -42,7 +47,10 @@ an overlay (the tool flags that case).
 What CANNOT be recovered (documented in RECONSTRUCTION_NOTES.md)
 ---------------------------------------------------------------
   * gt/ (ground truth)        — grader-only; never staged into any bundle.
-  * data/ & persona/ SUBDIRS  — the bundle flattens both to a flat file list.
+  * test_outputs.py / test_weights.json — still published under data/tests/,
+    deliberately NOT written back: the generated-test channel they feed is
+    retired, and restoring them would reinstate a scoring channel that no
+    longer runs.
   * the pre-overlay DEFAULT a given overlay replaced — overwritten in the bundle
     (recover it from the harness environment/, not the bundle).
   * task_config.yaml / taxonomy.json — only partially inferable from task.toml.
@@ -59,9 +67,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from script.lib.recon import prompts as recon_prompts  # noqa: E402
 from script.lib.recon import schedule as recon_schedule  # noqa: E402
+from script.lib.recon import sources as recon_sources  # noqa: E402
 
 SEED_EXTS = {".json", ".csv"}
-ARTIFACTS_INPUTS_SUBPATH = ("artifacts", "inputs", "files")
 _DEFAULT_BASELINE = Path(__file__).resolve().parents[1] / "environment"
 
 
@@ -90,28 +98,6 @@ def discover_bundles(root: Path) -> list[Path]:
 # ----------------------------------------------------------------------------- #
 # helpers
 # ----------------------------------------------------------------------------- #
-def _copy_file(src: Path, dst: Path, log: list[str], label: str) -> bool:
-    if not src.is_file():
-        return False
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(src, dst)
-    log.append(f"  ok   {label:<22} <- {src.name}")
-    return True
-
-
-def _copy_flat_dir(src: Path, dst: Path) -> list[str]:
-    """Copy files (only) from src into dst, skipping junk. Bundle staging is flat."""
-    names: list[str] = []
-    if not src.is_dir():
-        return names
-    for f in sorted(src.iterdir()):
-        if f.is_file() and f.name != ".DS_Store":
-            dst.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(f, dst / f.name)
-            names.append(f.name)
-    return names
-
-
 def _read_bytes(p: Path) -> bytes | None:
     try:
         return p.read_bytes()
@@ -231,33 +217,12 @@ def reconstruct(bundle: Path, out_dir: Path, baseline_env: Path, verbose: bool,
     prompts, instants = recover_prompts(bundle, out_dir, log, timezone,
                                         trajectory_run)
 
-    # TRUTH.md (grader truth doc; published verbatim by the repackager)
-    _copy_file(bundle / "TRUTH.md", out_dir / "TRUTH.md", log, "TRUTH.md")
-
-    # rubric.json
-    _copy_file(bundle / "rubric.json", out_dir / "rubric.json", log, "rubric.json")
-
-    # persona/  (flattened in the bundle -> flat here)
-    persona_names = _copy_flat_dir(env_dir / "persona", out_dir / "persona")
-    if persona_names:
-        log.append(f"  ok   persona/              <- {len(persona_names)} file(s)")
-
-    # data/  (input attachments live under data/environment/artifacts/inputs/files/)
-    data_names = _copy_flat_dir(env_dir.joinpath(*ARTIFACTS_INPUTS_SUBPATH), out_dir / "data")
-    if data_names:
-        log.append(f"  ok   data/                 <- {len(data_names)} file(s)")
-
-    # tests
-    _copy_file(bundle / "data" / "tests" / "test_outputs.py", out_dir / "test_outputs.py", log, "test_outputs.py")
-    _copy_file(bundle / "data" / "tests" / "test_weights.json", out_dir / "test_weights.json", log, "test_weights.json")
-
-    # inject/ (staged verbatim into the bundle root; absent for no-inject tasks)
-    src_inject = bundle / "inject"
-    if src_inject.is_dir():
-        shutil.copytree(src_inject, out_dir / "inject", dirs_exist_ok=True,
-                        ignore=shutil.ignore_patterns(".DS_Store"))
-        n_inject = sum(1 for f in (out_dir / "inject").rglob("*") if f.is_file())
-        log.append(f"  ok   inject/               <- {n_inject} file(s)")
+    carried = {c.label: c for c in recon_sources.recover_all(bundle, out_dir)}
+    for c in carried.values():
+        if c.names:
+            log.append(f"  ok   {c.label:<22} <- {c.source} ({len(c)} file(s))")
+    persona_names = carried["persona/"].names
+    data_names = carried["data/"].names
 
     # mock_data/<api>/ via baseline diff
     overlays, warnings = extract_overlays(env_dir, baseline_env, out_dir / "mock_data")
