@@ -27,6 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.utils.inject_director import (  # noqa: E402
     InjectApplier,
+    InjectConfigError,
     InjectScript,
     InjectStage,
     MtimeStamp,
@@ -132,7 +133,10 @@ def test_seed_returns_outcomes(tmp_path):
                                           "src": "a", "dst": "/b"}],
                              loud=[], silent=[], source=str(tmp_path / "m.json"))
     script = InjectScript(description="test", stages=[seed_stage])
-    outcomes = ap.seed(script)
+    # T0 is always available at seed time in production (it anchors the
+    # staged baseline tree itself); this test is about the no-copy-hook skip,
+    # not mtime resolution, so give the ladder a T0 to land on.
+    outcomes = ap.seed(script, clock=NarrativeClock(t0_epoch_ms=1793000000000))
     assert isinstance(outcomes, list) and len(outcomes) == 1
     # no copy hook configured -> benign skip at seed
     assert outcomes[0]["status"] == "skipped"
@@ -961,7 +965,10 @@ def test_real_hook_end_to_end_refuses_escaping_dst(tmp_path, monkeypatch):
                      "dst": "/etc/cron.d/evil"}],
         loud=[], silent=[], source=str(stage_dir / "mutations.json"))
 
-    outcomes = ap.apply_stage(stage, turn_index=1)
+    # dst-escape rejection is the thing under test, not mtime resolution —
+    # give the ladder a turn clock so it doesn't hard-fail before reaching it.
+    outcomes = ap.apply_stage(stage, turn_index=1,
+                              clock=NarrativeClock(turn_epoch_ms=1793000000000))
 
     assert outcomes[0]["status"] == "invalid_dst"
     assert outcomes[0]["reason"] == "dst_outside_workspace"
@@ -1029,15 +1036,11 @@ def test_resolution_falls_back_to_t0_loudly(tmp_path, caplog):
         "a T0 fallback ties the drop with the baseline; it must never be quiet")
 
 
-def test_resolution_without_any_instant_is_loud_not_silent(tmp_path, caplog):
+def test_resolution_without_any_instant_hard_fails(tmp_path):
     stage = _fs_stage(tmp_path, ops=[])
 
-    with caplog.at_level(logging.WARNING, logger="wildclaw.inject"):
-        stamp = resolve_stage_mtime(stage, None)
-
-    assert stamp.epoch_ms is None and stamp.source == "unresolved"
-    assert any("no narrative instant available" in r.getMessage()
-               for r in caplog.records)
+    with pytest.raises(InjectConfigError, match="no narrative instant available"):
+        resolve_stage_mtime(stage, None)
 
 
 def test_inject_script_load_parses_applied_at_local_time(tmp_path):

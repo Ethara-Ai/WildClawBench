@@ -156,8 +156,11 @@ class MtimeStamp:
     ``source`` is one of ``"op"`` (an explicit per-op override), ``"stage"``
     (the stage's ``applied_at_local_time``), ``"turn"`` (the boundary turn's
     sim clock), ``"t0"`` (the baseline anchor, a degraded fallback) or
-    ``"unresolved"`` (nothing was available — ``epoch_ms`` is None and the copy
-    hook falls back to a real-time ``touch``).
+    ``"unresolved"`` (there was nothing to stamp — a stage with no filesystem
+    ops at all). ``resolve_stage_mtime`` never returns ``"unresolved"``: a
+    stage that DOES carry filesystem ops but resolves no instant on any rung
+    raises ``InjectConfigError`` instead, so a copy is never attempted with an
+    invented real-time mtime.
     """
 
     epoch_ms: Optional[int]
@@ -204,6 +207,16 @@ def resolve_stage_mtime(stage: InjectStage,
     older than the baseline, and therefore invisible to the recency searches
     (``ls -t``, ``find -newer``, "the newest file in ~/Documents") that the
     scenario expects the agent to run.
+
+    A stage that exhausts all four rungs raises ``InjectConfigError`` rather
+    than degrading to a real-time ``touch``: per the task-standard window
+    requirement (docs/TASK_STANDARD.md §1), every compliant task declares a
+    window, so T0 always resolves and this branch is unreachable for one. It
+    can only fire on a malformed task, and a malformed task silently running
+    with wall-clock mtimes is exactly the defect this whole ladder exists to
+    prevent — the injected file would land, sort by whatever moment the run
+    happened to execute at, and pass every recency search for the wrong
+    reason.
     """
     clock = clock or NarrativeClock()
     if stage.applied_at_epoch_ms is not None:
@@ -217,12 +230,12 @@ def resolve_stage_mtime(stage: InjectStage,
             "epoch %d, which makes them tie with the staged baseline instead "
             "of sorting after it", stage.name, int(clock.t0_epoch_ms))
         return MtimeStamp(int(clock.t0_epoch_ms), "t0")
-    LOG.warning(
-        "inject stage '%s': no narrative instant available at all (no "
-        "applied_at_local_time, no turn sim clock, no T0) — filesystem drops "
-        "keep a real-time mtime and will not match the simulated timeline",
-        stage.name)
-    return MtimeStamp(None, "unresolved")
+    raise InjectConfigError(
+        f"inject stage '{stage.name}': no narrative instant available at all "
+        "(no applied_at_local_time, no turn sim clock, no T0 baseline) — "
+        "refusing to stamp its filesystem drops with a real-time mtime. Fix "
+        "the stage's applied_at_local_time or the task's declared window "
+        "(docs/TASK_STANDARD.md §1)")
 
 
 def _recency_invisible_ops(outcomes: Iterable[Dict[str, Any]],
