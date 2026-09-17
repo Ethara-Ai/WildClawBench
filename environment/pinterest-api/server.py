@@ -2,7 +2,7 @@
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
 import pinterest_data
@@ -21,6 +21,21 @@ except ModuleNotFoundError as _shared_plane_err:  # standalone run without the s
 app = FastAPI(title="Pinterest API v5 (Mock)", version="5.0.0")
 install_tracker(app)
 install_admin_plane(app, store=pinterest_data._store)
+
+
+def _nothing_to_update(body):
+    """A 400 naming the writable fields, or None when the body names one.
+
+    Without this an update whose every field parsed as absent answers 200 over
+    an untouched resource, which a caller cannot tell from a successful write.
+    """
+    if body.model_dump(exclude_none=True):
+        return None
+    return JSONResponse(status_code=400, content={
+        "error": "no updatable field supplied; expected one of "
+                 + ", ".join(sorted(type(body).model_fields))})
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -75,6 +90,8 @@ def create_board(body: BoardCreateBody):
 
 
 class BoardUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: Optional[str] = None
     description: Optional[str] = None
     privacy: Optional[str] = None
@@ -82,6 +99,9 @@ class BoardUpdateBody(BaseModel):
 
 @app.patch("/v5/boards/{board_id}")
 def update_board(board_id: str, body: BoardUpdateBody):
+    refusal = _nothing_to_update(body)
+    if refusal is not None:
+        return refusal
     data = {k: v for k, v in body.model_dump().items() if v is not None}
     result = pinterest_data.update_board(board_id, data)
     if "error" in result:
@@ -182,16 +202,23 @@ def create_pin(body: PinCreateBody):
 
 
 class PinUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     title: Optional[str] = None
     description: Optional[str] = None
     link: Optional[str] = None
     board_id: Optional[str] = None
     board_section_id: Optional[str] = None
     alt_text: Optional[str] = None
+    media_type: Optional[str] = None
+    dominant_color: Optional[str] = None
 
 
 @app.patch("/v5/pins/{pin_id}")
 def update_pin(pin_id: str, body: PinUpdateBody):
+    refusal = _nothing_to_update(body)
+    if refusal is not None:
+        return refusal
     data = {k: v for k, v in body.model_dump().items() if v is not None}
     result = pinterest_data.update_pin(pin_id, data)
     if "error" in result:

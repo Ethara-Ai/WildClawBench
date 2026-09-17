@@ -6,7 +6,7 @@ under /spaces/{space_id}/environments/{env_id}/...
 
 from fastapi import FastAPI, Query, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, Dict, Any
 
 import contentful_data
@@ -25,6 +25,8 @@ except ModuleNotFoundError as _shared_plane_err:  # standalone run without the s
 app = FastAPI(title="Contentful API (Mock)", version="0.1.0")
 install_tracker(app)
 install_admin_plane(app, store=contentful_data._store)
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -98,11 +100,19 @@ def create_entry(space_id: str, env_id: str, body: EntryCreateBody):
 
 
 class EntryUpdateBody(BaseModel):
-    fields: Dict[str, Any] = {}
+    # ``fields`` holds the content type's own field ids, so it stays an open
+    # mapping while the envelope closes. Required rather than defaulted: a body
+    # naming nothing used to answer 200 with only sys.updatedAt moved.
+    model_config = ConfigDict(extra="forbid")
+
+    fields: Dict[str, Any]
 
 
 @app.put("/spaces/{space_id}/environments/{env_id}/entries/{entry_id}")
 def update_entry(space_id: str, env_id: str, entry_id: str, body: EntryUpdateBody):
+    if not body.fields:
+        return JSONResponse(status_code=400, content={
+            "error": "fields is empty; name at least one entry field to write"})
     result = contentful_data.update_entry(entry_id, body.fields)
     if "error" in result:
         return JSONResponse(status_code=404, content=result)

@@ -322,9 +322,10 @@ def update_board(board_id: str, data: dict):
             for k, v in data.items():
                 if k in updatable:
                     _changes[k] = v
-            _changes["updated_at"] = _now()
-            board.update(_changes)
-            _store_patch("boards", board, _changes)
+            if _changes:
+                _changes["updated_at"] = _now()
+                board.update(_changes)
+                _store_patch("boards", board, _changes)
             return {"type": "board", "board": board}
     return {"error": f"Board {board_id} not found"}
 
@@ -466,14 +467,16 @@ def update_pin(pin_id: str, data: dict):
     for pin in _pins_rows():
         if pin["pin_id"] == pin_id:
             updatable = {"title", "description", "link", "board_id",
-                         "board_section_id", "alt_text"}
+                         "board_section_id", "alt_text", "media_type",
+                         "dominant_color"}
             _changes = {}
             for k, v in data.items():
                 if k in updatable:
                     _changes[k] = v
-            _changes["updated_at"] = _now()
-            pin.update(_changes)
-            _store_patch("pins", pin, _changes)
+            if _changes:
+                _changes["updated_at"] = _now()
+                pin.update(_changes)
+                _store_patch("pins", pin, _changes)
             return {"type": "pin", "pin": pin}
     return {"error": f"Pin {pin_id} not found"}
 

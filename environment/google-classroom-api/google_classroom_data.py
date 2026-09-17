@@ -363,9 +363,10 @@ def create_course(data):
 
 def update_course(course_id, data):
     updatable = {"name", "section", "descriptionHeading", "description",
-                 "room", "courseState", "guardiansEnabled"}
+                 "room", "courseState", "guardiansEnabled", "ownerId"}
     updates = {k: v for k, v in data.items() if k in updatable}
-    updates["updateTime"] = _now()
+    if updates:
+        updates["updateTime"] = _now()
     updated = _store_patch("courses", course_id, updates)
     if updated is None:
         return {"error": f"Course {course_id} not found"}
@@ -466,12 +467,13 @@ def update_coursework(course_id, coursework_id, data):
     for cw in _coursework_rows():
         if cw["courseId"] == course_id and cw["id"] == coursework_id:
             updatable = {"title", "description", "state", "maxPoints",
-                         "dueDate", "dueTime", "topicId"}
+                         "dueDate", "dueTime", "topicId", "workType"}
             updates = {}
             for k, v in data.items():
                 if k in updatable:
                     updates[k] = float(v) if (k == "maxPoints" and v is not None) else v
-            updates["updateTime"] = _now()
+            if updates:
+                updates["updateTime"] = _now()
             updated = _store_patch("coursework", coursework_id, updates)
             return {"courseWork": updated}
     return {"error": f"CourseWork {coursework_id} not found in course {course_id}"}
@@ -538,9 +540,11 @@ def create_topic(course_id, data):
 def update_topic(course_id, topic_id, data):
     if not any(c["id"] == course_id for c in _courses_rows()):
         return {"error": f"Course {course_id} not found"}
-    updates = {"updateTime": _now()}
+    updates = {}
     if "name" in data:
         updates["name"] = data["name"]
+    if updates:
+        updates["updateTime"] = _now()
     updated = _store_patch("topics", f"{course_id}@{topic_id}", updates)
     if updated is None:
         return {"error": f"Topic {topic_id} not found in course {course_id}"}
@@ -602,11 +606,13 @@ def grade_submission(course_id, coursework_id, submission_id, data):
     for s in _submissions_rows():
         if (s["courseId"] == course_id and s["courseWorkId"] == coursework_id
                 and s["id"] == submission_id):
-            updates = {"updateTime": _now()}
+            updates = {}
             if "assignedGrade" in data and data["assignedGrade"] is not None:
                 updates["assignedGrade"] = float(data["assignedGrade"])
             if "draftGrade" in data and data["draftGrade"] is not None:
                 updates["draftGrade"] = float(data["draftGrade"])
+            if updates:
+                updates["updateTime"] = _now()
             updated = _store_patch("submissions", submission_id, updates)
             return {"studentSubmission": updated}
     return {"error": f"Submission {submission_id} not found"}
@@ -835,7 +841,8 @@ def update_announcement(course_id, announcement_id, data):
         if a["courseId"] == course_id and a["id"] == announcement_id:
             updatable = {"text", "state"}
             updates = {k: v for k, v in data.items() if k in updatable}
-            updates["updateTime"] = _now()
+            if updates:
+                updates["updateTime"] = _now()
             updated = _store_patch("announcements", announcement_id, updates)
             return {"announcement": updated}
     return {"error": f"Announcement {announcement_id} not found in course {course_id}"}

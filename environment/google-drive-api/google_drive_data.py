@@ -253,17 +253,21 @@ def create_file(name, mime_type, parent_id=None, owner_email="amelia@orbit-labs.
     return _serialize_file(new_file)
 
 
-def update_file(file_id, name=None, parent_id=None, starred=None, trashed=None):
+def update_file(file_id, name=None, parent_id=None, starred=None, trashed=None,
+                mime_type=None):
     updates = {}
     if name is not None:
         updates["name"] = name
+    if mime_type is not None:
+        updates["mime_type"] = mime_type
     if parent_id is not None:
         updates["parent_id"] = parent_id
     if starred is not None:
         updates["starred"] = bool(starred)
     if trashed is not None:
         updates["trashed"] = bool(trashed)
-    updates["modified_time"] = _now()
+    if updates:
+        updates["modified_time"] = _now()
     updated = _store_patch("files", file_id, updates)
     if updated is None:
         return {"error": f"File {file_id} not found"}

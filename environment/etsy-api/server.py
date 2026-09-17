@@ -2,7 +2,7 @@
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 
 import etsy_data
@@ -21,6 +21,21 @@ except ModuleNotFoundError as _shared_plane_err:  # standalone run without the s
 app = FastAPI(title="Etsy Open API v3 (Mock)", version="3.0.0")
 install_tracker(app)
 install_admin_plane(app, store=etsy_data._store)
+
+
+def _nothing_to_update(body):
+    """A 400 naming the writable fields, or None when the body names one.
+
+    Without this an update whose every field parsed as absent answers 200 over
+    an untouched resource, which a caller cannot tell from a successful write.
+    """
+    if body.model_dump(exclude_none=True):
+        return None
+    return JSONResponse(status_code=400, content={
+        "error": "no updatable field supplied; expected one of "
+                 + ", ".join(sorted(type(body).model_fields))})
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -145,6 +160,8 @@ def create_listing(shop_id: int, body: ListingCreateBody):
 
 
 class ListingUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     title: Optional[str] = None
     description: Optional[str] = None
     price: Optional[float] = None
@@ -173,6 +190,9 @@ class ListingUpdateBody(BaseModel):
 
 @app.put("/v3/application/listings/{listing_id}")
 def update_listing(listing_id: int, body: ListingUpdateBody):
+    refusal = _nothing_to_update(body)
+    if refusal is not None:
+        return refusal
     data = {k: v for k, v in body.model_dump().items() if v is not None}
     result = etsy_data.update_listing(listing_id, data)
     if "error" in result:
@@ -245,13 +265,19 @@ def get_receipt(shop_id: int, receipt_id: int):
 
 
 class ReceiptUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     shipping_carrier: Optional[str] = None
     tracking_code: Optional[str] = None
     was_shipped: Optional[bool] = None
+    status: Optional[str] = None
 
 
 @app.put("/v3/application/shops/{shop_id}/receipts/{receipt_id}")
 def update_receipt(shop_id: int, receipt_id: int, body: ReceiptUpdateBody):
+    refusal = _nothing_to_update(body)
+    if refusal is not None:
+        return refusal
     data = {k: v for k, v in body.model_dump().items() if v is not None}
     result = etsy_data.update_receipt(receipt_id, data)
     if "error" in result:

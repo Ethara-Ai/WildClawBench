@@ -463,9 +463,10 @@ def update_listing(listing_id: int, data: dict):
                         _changes[k] = int(v)
                     else:
                         _changes[k] = v
-            _changes["updated_timestamp"] = _now()
-            listing.update(_changes)
-            _store_patch("listings", listing, _changes)
+            if _changes:
+                _changes["updated_timestamp"] = _now()
+                listing.update(_changes)
+                _store_patch("listings", listing, _changes)
             return {"type": "listing", "listing": listing}
     return {"error": f"Listing {listing_id} not found"}
 
@@ -588,9 +589,10 @@ def update_receipt(receipt_id: int, data: dict):
                 if r["status"] == "paid":
                     _changes["status"] = "shipped"
                     r["status"] = "shipped"
-            _changes["updated_timestamp"] = _now()
-            r["updated_timestamp"] = _changes["updated_timestamp"]
-            _store_patch("receipts", r, _changes)
+            if _changes:
+                _changes["updated_timestamp"] = _now()
+                r["updated_timestamp"] = _changes["updated_timestamp"]
+                _store_patch("receipts", r, _changes)
             return {"type": "receipt", "receipt": _attach_transactions(r)}
     return {"error": f"Receipt {receipt_id} not found"}
 

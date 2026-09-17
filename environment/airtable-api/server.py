@@ -6,7 +6,7 @@ records base path: /v0/{baseId}/{tableIdOrName}.
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List, Dict, Any
 
 import airtable_data
@@ -92,11 +92,20 @@ def create_records(base_id: str, table_id_or_name: str, body: RecordsCreateBody)
 
 
 class RecordPatchBody(BaseModel):
-    fields: Dict[str, Any] = {}
+    # ``fields`` carries the customer's own column names, so it stays an open
+    # mapping; the envelope around it does not. ``fields`` is required rather
+    # than defaulted because a patch that names nothing used to answer 200 over
+    # an untouched record, which reads exactly like a successful write.
+    model_config = ConfigDict(extra="forbid")
+
+    fields: Dict[str, Any]
 
 
 @app.patch("/v0/{base_id}/{table_id_or_name}/{record_id}")
 def update_record(base_id: str, table_id_or_name: str, record_id: str, body: RecordPatchBody):
+    if not body.fields:
+        return JSONResponse(status_code=400, content={
+            "error": "fields is empty; name at least one column to patch"})
     result = airtable_data.update_record(base_id, table_id_or_name, record_id, body.fields)
     if "error" in result:
         return JSONResponse(status_code=404, content=result)

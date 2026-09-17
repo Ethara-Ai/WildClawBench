@@ -5,7 +5,7 @@ Mirrors a subset of the Typeform Create + Responses API surface.
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List, Dict, Any
 
 import typeform_data
@@ -24,6 +24,21 @@ except ModuleNotFoundError as _shared_plane_err:  # standalone run without the s
 app = FastAPI(title="Typeform API (Mock)", version="v1")
 install_tracker(app)
 install_admin_plane(app, store=typeform_data._store)
+
+
+def _nothing_to_update(body):
+    """A 400 naming the writable fields, or None when the body names one.
+
+    Without this an update whose every field parsed as absent answers 200 over
+    an untouched resource, which a caller cannot tell from a successful write.
+    """
+    if body.model_dump(exclude_none=True):
+        return None
+    return JSONResponse(status_code=400, content={
+        "error": "no updatable field supplied; expected one of "
+                 + ", ".join(sorted(type(body).model_fields))})
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -58,13 +73,19 @@ def get_form(form_id: str):
 
 
 class FormUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     title: Optional[str] = None
     language: Optional[str] = None
     is_public: Optional[bool] = None
+    workspace: Optional[str] = None
 
 
 @app.put("/forms/{form_id}")
 def update_form(form_id: str, body: FormUpdateBody):
+    refusal = _nothing_to_update(body)
+    if refusal is not None:
+        return refusal
     result = typeform_data.update_form(form_id, body.model_dump(exclude_none=True))
     if "error" in result:
         return JSONResponse(status_code=404, content=result)

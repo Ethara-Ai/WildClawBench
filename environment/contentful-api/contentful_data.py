@@ -297,8 +297,9 @@ def update_entry(entry_id, fields):
         if e["id"] == entry_id:
             if fields:
                 e["fields"].update(fields)
-            e["updated_at"] = _now()
-            _store_patch("entries", e, {"fields": e["fields"], "updated_at": e["updated_at"]})
+                e["updated_at"] = _now()
+                _store_patch("entries", e,
+                             {"fields": e["fields"], "updated_at": e["updated_at"]})
             return _entry_obj(e)
     return {"error": f"Entry {entry_id} not found"}
 

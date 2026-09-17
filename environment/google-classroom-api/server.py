@@ -2,7 +2,7 @@
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 
 import google_classroom_data
@@ -21,6 +21,21 @@ except ModuleNotFoundError as _shared_plane_err:  # standalone run without the s
 app = FastAPI(title="Google Classroom API (Mock)", version="1.0")
 install_tracker(app)
 install_admin_plane(app, store=google_classroom_data._store)
+
+
+def _nothing_to_update(body):
+    """A 400 naming the writable fields, or None when the body names one.
+
+    Without this an update whose every field parsed as absent answers 200 over
+    an untouched resource, which a caller cannot tell from a successful write.
+    """
+    if body.model_dump(exclude_none=True):
+        return None
+    return JSONResponse(status_code=400, content={
+        "error": "no updatable field supplied; expected one of "
+                 + ", ".join(sorted(type(body).model_fields))})
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -66,16 +81,22 @@ def create_course(body: CourseCreateBody):
 
 
 class CourseUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: Optional[str] = None
     section: Optional[str] = None
     descriptionHeading: Optional[str] = None
     description: Optional[str] = None
     room: Optional[str] = None
     courseState: Optional[str] = None
+    ownerId: Optional[str] = None
 
 
 @app.patch("/v1/courses/{course_id}")
 def update_course(course_id: str, body: CourseUpdateBody):
+    refusal = _nothing_to_update(body)
+    if refusal is not None:
+        return refusal
     data = {k: v for k, v in body.model_dump().items() if v is not None}
     result = google_classroom_data.update_course(course_id, data)
     if "error" in result:
@@ -121,12 +142,16 @@ def get_coursework(course_id: str, coursework_id: str):
 
 
 class DueDateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     year: int
     month: int
     day: int
 
 
 class DueTimeBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     hours: int
     minutes: int
 
@@ -156,17 +181,23 @@ def create_coursework(course_id: str, body: CourseWorkCreateBody):
 
 
 class CourseWorkUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     title: Optional[str] = None
     description: Optional[str] = None
     state: Optional[str] = None
     maxPoints: Optional[float] = None
     topicId: Optional[str] = None
+    workType: Optional[str] = None
     dueDate: Optional[DueDateBody] = None
     dueTime: Optional[DueTimeBody] = None
 
 
 @app.patch("/v1/courses/{course_id}/courseWork/{coursework_id}")
 def update_coursework(course_id: str, coursework_id: str, body: CourseWorkUpdateBody):
+    refusal = _nothing_to_update(body)
+    if refusal is not None:
+        return refusal
     data = {}
     for k, v in body.model_dump().items():
         if v is not None:
@@ -226,11 +257,16 @@ def create_topic(course_id: str, body: TopicCreateBody):
 
 
 class TopicUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: Optional[str] = None
 
 
 @app.patch("/v1/courses/{course_id}/topics/{topic_id}")
 def update_topic(course_id: str, topic_id: str, body: TopicUpdateBody):
+    refusal = _nothing_to_update(body)
+    if refusal is not None:
+        return refusal
     data = {k: v for k, v in body.model_dump().items() if v is not None}
     result = google_classroom_data.update_topic(course_id, topic_id, data)
     if "error" in result:
@@ -276,12 +312,17 @@ def get_submission(course_id: str, coursework_id: str, submission_id: str):
 
 
 class GradeSubmissionBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     assignedGrade: Optional[float] = None
     draftGrade: Optional[float] = None
 
 
 @app.patch("/v1/courses/{course_id}/courseWork/{coursework_id}/studentSubmissions/{submission_id}")
 def grade_submission(course_id: str, coursework_id: str, submission_id: str, body: GradeSubmissionBody):
+    refusal = _nothing_to_update(body)
+    if refusal is not None:
+        return refusal
     data = {k: v for k, v in body.model_dump().items() if v is not None}
     result = google_classroom_data.grade_submission(course_id, coursework_id, submission_id, data)
     if "error" in result:
@@ -433,12 +474,17 @@ def create_announcement(course_id: str, body: AnnouncementCreateBody):
 
 
 class AnnouncementUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     text: Optional[str] = None
     state: Optional[str] = None
 
 
 @app.patch("/v1/courses/{course_id}/announcements/{announcement_id}")
 def update_announcement(course_id: str, announcement_id: str, body: AnnouncementUpdateBody):
+    refusal = _nothing_to_update(body)
+    if refusal is not None:
+        return refusal
     data = {k: v for k, v in body.model_dump().items() if v is not None}
     result = google_classroom_data.update_announcement(course_id, announcement_id, data)
     if "error" in result:

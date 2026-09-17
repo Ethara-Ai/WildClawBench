@@ -424,8 +424,9 @@ def update_listing_item(seller_id, sku, data):
                         changes[k] = int(v)
                     else:
                         changes[k] = v
-            changes["lastUpdatedDate"] = _now()
-            _store_patch("catalog_items", sku, changes)
+            if changes:
+                changes["lastUpdatedDate"] = _now()
+                _store_patch("catalog_items", sku, changes)
             return {"type": "listing_item", "status": "ACCEPTED", "sku": sku, "issues": []}
     return {"error": f"Listing with SKU {sku} not found for seller {seller_id}"}
 

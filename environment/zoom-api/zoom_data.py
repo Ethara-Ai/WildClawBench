@@ -219,12 +219,14 @@ def create_meeting(user_id, topic, start_time=None, duration=60, timezone="UTC",
 
 
 def update_meeting(meeting_id, topic=None, start_time=None, duration=None,
-                   agenda=None, timezone=None):
+                   agenda=None, timezone=None, meeting_type=None):
     for m in _meetings_rows():
         if m["id"] == meeting_id:
             _changes = {}
             if topic is not None:
                 _changes["topic"] = topic
+            if meeting_type is not None:
+                _changes["type"] = meeting_type
             if start_time is not None:
                 _changes["start_time"] = start_time
             if duration is not None:

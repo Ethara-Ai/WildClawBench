@@ -2,7 +2,7 @@
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 
 import amazon_seller_data
@@ -21,6 +21,21 @@ except ModuleNotFoundError as _shared_plane_err:  # standalone run without the s
 app = FastAPI(title="Amazon Selling Partner API (Mock)", version="1.0.0")
 install_tracker(app)
 install_admin_plane(app, store=amazon_seller_data._store)
+
+
+def _nothing_to_update(body):
+    """A 400 naming the writable fields, or None when the body names one.
+
+    Without this an update whose every field parsed as absent answers 200 over
+    an untouched resource, which a caller cannot tell from a successful write.
+    """
+    if body.model_dump(exclude_none=True):
+        return None
+    return JSONResponse(status_code=400, content={
+        "error": "no updatable field supplied; expected one of "
+                 + ", ".join(sorted(type(body).model_fields))})
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -134,6 +149,8 @@ def put_listing_item(sellerId: str, sku: str, body: ListingCreateBody):
 
 
 class ListingPatchBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     title: Optional[str] = None
     description: Optional[str] = None
     brand: Optional[str] = None
@@ -145,10 +162,14 @@ class ListingPatchBody(BaseModel):
     condition: Optional[str] = None
     mainImageUrl: Optional[str] = None
     category: Optional[str] = None
+    productType: Optional[str] = None
 
 
 @app.patch("/listings/2021-08-01/items/{sellerId}/{sku}")
 def patch_listing_item(sellerId: str, sku: str, body: ListingPatchBody):
+    refusal = _nothing_to_update(body)
+    if refusal is not None:
+        return refusal
     data = {k: v for k, v in body.model_dump().items() if v is not None}
     result = amazon_seller_data.update_listing_item(sellerId, sku, data)
     if "error" in result:

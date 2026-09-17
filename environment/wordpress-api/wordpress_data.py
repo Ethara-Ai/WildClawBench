@@ -300,7 +300,7 @@ def create_post(title, content, status="draft", author=1, excerpt="",
 
 
 def update_post(post_id, title=None, content=None, status=None, excerpt=None,
-                categories=None, tags=None):
+                categories=None, tags=None, author=None):
     for p in _posts_rows():
         if p["id"] == int(post_id):
             _changes = {}
@@ -316,9 +316,12 @@ def update_post(post_id, title=None, content=None, status=None, excerpt=None,
                 _changes["categories"] = [int(c) for c in categories]
             if tags is not None:
                 _changes["tags"] = [int(t) for t in tags]
-            _changes["modified"] = _now()
-            p.update(_changes)
-            _store_patch("posts", p, _changes)
+            if author is not None:
+                _changes["author"] = int(author)
+            if _changes:
+                _changes["modified"] = _now()
+                p.update(_changes)
+                _store_patch("posts", p, _changes)
             return p
     return {"error": f"Post {post_id} not found", "code": "rest_post_invalid_id"}
 

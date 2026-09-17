@@ -6,7 +6,7 @@ All successful responses are wrapped as {"result": ...} per ServiceNow conventio
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
 import servicenow_data
@@ -25,6 +25,21 @@ except ModuleNotFoundError as _shared_plane_err:  # standalone run without the s
 app = FastAPI(title="ServiceNow Table API (Mock)", version="v1")
 install_tracker(app)
 install_admin_plane(app, store=servicenow_data._store)
+
+
+def _nothing_to_update(body):
+    """A 400 naming the writable fields, or None when the body names one.
+
+    Without this an update whose every field parsed as absent answers 200 over
+    an untouched resource, which a caller cannot tell from a successful write.
+    """
+    if body.model_dump(exclude_none=True):
+        return None
+    return JSONResponse(status_code=400, content={
+        "error": "no updatable field supplied; expected one of "
+                 + ", ".join(sorted(type(body).model_fields))})
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -70,6 +85,8 @@ def create_incident(body: IncidentCreate):
 
 
 class IncidentUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     short_description: Optional[str] = None
     description: Optional[str] = None
     state: Optional[str] = None
@@ -78,10 +95,14 @@ class IncidentUpdate(BaseModel):
     urgency: Optional[str] = None
     category: Optional[str] = None
     assigned_to: Optional[str] = None
+    opened_by: Optional[str] = None
 
 
 @app.patch("/api/now/table/incident/{sys_id}")
 def update_incident(sys_id: str, body: IncidentUpdate):
+    refusal = _nothing_to_update(body)
+    if refusal is not None:
+        return refusal
     result = servicenow_data.update_incident(sys_id, **body.model_dump(exclude_none=True))
     if "error" in result:
         return JSONResponse(status_code=404, content={"error": result["error"]})

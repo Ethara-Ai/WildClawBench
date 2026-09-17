@@ -2,7 +2,7 @@
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 
 import linear_data
@@ -21,6 +21,21 @@ except ModuleNotFoundError as _shared_plane_err:  # standalone run without the s
 app = FastAPI(title="Linear API (Mock)", version="2024.01")
 install_tracker(app)
 install_admin_plane(app, store=linear_data._store)
+
+
+def _nothing_to_update(body):
+    """A 400 naming the writable fields, or None when the body names one.
+
+    Without this an update whose every field parsed as absent answers 200 over
+    an untouched resource, which a caller cannot tell from a successful write.
+    """
+    if body.model_dump(exclude_none=True):
+        return None
+    return JSONResponse(status_code=400, content={
+        "error": "no updatable field supplied; expected one of "
+                 + ", ".join(sorted(type(body).model_fields))})
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -217,6 +232,8 @@ def create_project(body: ProjectCreateBody):
 
 
 class ProjectUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: Optional[str] = None
     description: Optional[str] = None
     state: Optional[str] = None
@@ -228,6 +245,9 @@ class ProjectUpdateBody(BaseModel):
 
 @app.put("/v1/projects/{project_id}")
 def update_project(project_id: str, body: ProjectUpdateBody):
+    refusal = _nothing_to_update(body)
+    if refusal is not None:
+        return refusal
     data = {k: v for k, v in body.model_dump().items() if v is not None}
     result = linear_data.update_project(project_id, data)
     if "error" in result:
@@ -356,6 +376,8 @@ def create_issue(body: IssueCreateBody):
 
 
 class IssueUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     title: Optional[str] = None
     description: Optional[str] = None
     priority: Optional[int] = None
@@ -367,10 +389,14 @@ class IssueUpdateBody(BaseModel):
     labelIds: Optional[List[str]] = None
     dueDate: Optional[str] = None
     sortOrder: Optional[float] = None
+    teamId: Optional[str] = None
 
 
 @app.put("/v1/issues/{issue_id}")
 def update_issue(issue_id: str, body: IssueUpdateBody):
+    refusal = _nothing_to_update(body)
+    if refusal is not None:
+        return refusal
     data = {k: v for k, v in body.model_dump().items() if v is not None}
     result = linear_data.update_issue(issue_id, data)
     if "error" in result:

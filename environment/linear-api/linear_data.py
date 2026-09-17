@@ -562,9 +562,10 @@ def update_project(project_id: str, data: dict):
             for k, v in data.items():
                 if k in updatable:
                     _changes[k] = v
-            _changes["updatedAt"] = _now()
-            project.update(_changes)
-            _store_patch("projects", project, _changes)
+            if _changes:
+                _changes["updatedAt"] = _now()
+                project.update(_changes)
+                _store_patch("projects", project, _changes)
             return {"type": "project", "project": project}
     return {"error": f"Project {project_id} not found"}
 
@@ -778,7 +779,7 @@ def update_issue(issue_id: str, data: dict):
             _changes = {}
             updatable = {"title", "description", "priority", "estimate", "stateId",
                          "assigneeId", "projectId", "cycleId", "labelIds", "dueDate",
-                         "sortOrder"}
+                         "sortOrder", "teamId"}
             for k, v in data.items():
                 if k in updatable:
                     if k == "priority" and v is not None:
@@ -806,8 +807,9 @@ def update_issue(issue_id: str, data: dict):
                         _changes["canceledAt"] = now
                     issue.update(_changes)
 
-            _changes["updatedAt"] = _now()
-            issue.update(_changes)
+            if _changes:
+                _changes["updatedAt"] = _now()
+                issue.update(_changes)
 
             # Update branch name if assignee changed
             if "assigneeId" in data and data["assigneeId"]:

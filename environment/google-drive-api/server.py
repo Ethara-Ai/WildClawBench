@@ -5,7 +5,7 @@ Mirrors Google Drive API v3 (subset).
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 
 import google_drive_data
@@ -24,6 +24,21 @@ except ModuleNotFoundError as _shared_plane_err:  # standalone run without the s
 app = FastAPI(title="Google Drive API (Mock)", version="v3")
 install_tracker(app)
 install_admin_plane(app, store=google_drive_data._store)
+
+
+def _nothing_to_update(body):
+    """A 400 naming the writable fields, or None when the body names one.
+
+    Without this an update whose every field parsed as absent answers 200 over
+    an untouched resource, which a caller cannot tell from a successful write.
+    """
+    if body.model_dump(exclude_none=True):
+        return None
+    return JSONResponse(status_code=400, content={
+        "error": "no updatable field supplied; expected one of "
+                 + ", ".join(sorted(type(body).model_fields))})
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -86,7 +101,11 @@ def create_file(body: FileCreateBody):
 
 
 class FileUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: Optional[str] = None
+    mimeType: Optional[str] = None
+    parents: Optional[List[str]] = None
     addParents: Optional[str] = None
     starred: Optional[bool] = None
     trashed: Optional[bool] = None
@@ -94,10 +113,17 @@ class FileUpdateBody(BaseModel):
 
 @app.patch("/drive/v3/files/{file_id}")
 def update_file(file_id: str, body: FileUpdateBody):
+    refusal = _nothing_to_update(body)
+    if refusal is not None:
+        return refusal
+    parent_id = body.addParents  # precedence: an addParents caller must be unaffected
+    if parent_id is None and body.parents:
+        parent_id = body.parents[0]
     result = google_drive_data.update_file(
         file_id,
         name=body.name,
-        parent_id=body.addParents,
+        mime_type=body.mimeType,
+        parent_id=parent_id,
         starred=body.starred,
         trashed=body.trashed,
     )

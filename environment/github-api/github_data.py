@@ -286,9 +286,10 @@ def update_issue(owner, repo_name, number, title=None, body=None, state=None,
                             _store_patch("repos", r, _repo_changes)
                 else:
                     _changes["closed_at"] = None
-            _changes["updated_at"] = _now()
-            issue.update(_changes)
-            _store_patch("issues", issue, _changes)
+            if _changes:
+                _changes["updated_at"] = _now()
+                issue.update(_changes)
+                _store_patch("issues", issue, _changes)
             return _serialize_issue(issue)
     return {"error": f"Issue {repo_name}#{number} not found"}
 

@@ -5,7 +5,7 @@ Mirrors a subset of the Datadog API v1. Base path: /api/v1
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 
 import datadog_data
@@ -24,6 +24,21 @@ except ModuleNotFoundError as _shared_plane_err:  # standalone run without the s
 app = FastAPI(title="Datadog API (Mock)", version="v1")
 install_tracker(app)
 install_admin_plane(app, store=datadog_data._store)
+
+
+def _nothing_to_update(body):
+    """A 400 naming the writable fields, or None when the body names one.
+
+    Without this an update whose every field parsed as absent answers 200 over
+    an untouched resource, which a caller cannot tell from a successful write.
+    """
+    if body.model_dump(exclude_none=True):
+        return None
+    return JSONResponse(status_code=400, content={
+        "error": "no updatable field supplied; expected one of "
+                 + ", ".join(sorted(type(body).model_fields))})
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -76,6 +91,8 @@ def create_monitor(body: MonitorCreateBody):
 
 
 class MonitorUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: Optional[str] = None
     query: Optional[str] = None
     message: Optional[str] = None
@@ -86,6 +103,9 @@ class MonitorUpdateBody(BaseModel):
 
 @app.put("/api/v1/monitor/{monitor_id}")
 def update_monitor(monitor_id: str, body: MonitorUpdateBody):
+    refusal = _nothing_to_update(body)
+    if refusal is not None:
+        return refusal
     result = datadog_data.update_monitor(
         monitor_id, name=body.name, query=body.query, message=body.message,
         overall_state=body.overall_state, priority=body.priority, tags=body.tags,

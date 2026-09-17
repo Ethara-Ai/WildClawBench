@@ -278,9 +278,12 @@ def update_form(form_id, payload):
         _changes["language"] = payload["language"]
     if "is_public" in payload:
         _changes["is_public"] = bool(payload["is_public"])
-    _changes["last_updated_time"] = _now()
-    form.update(_changes)
-    _store_patch("forms", form, _changes)
+    if "workspace" in payload:
+        _changes["workspace"] = payload["workspace"]
+    if _changes:
+        _changes["last_updated_time"] = _now()
+        form.update(_changes)
+        _store_patch("forms", form, _changes)
     return _form_obj(form)
 
 

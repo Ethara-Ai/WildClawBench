@@ -5,7 +5,7 @@ Implements a subset of the WordPress REST API. Base path: /wp-json/wp/v2
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 
 import wordpress_data
@@ -25,6 +25,19 @@ app = FastAPI(title="WordPress REST API (Mock)", version="wp/v2")
 install_tracker(app)
 install_admin_plane(app, store=wordpress_data._store)
 BASE = "/wp-json/wp/v2"
+
+
+def _nothing_to_update(body):
+    """A 400 naming the writable fields, or None when the body names one.
+
+    Without this an update whose every field parsed as absent answers 200 over
+    an untouched resource, which a caller cannot tell from a successful write.
+    """
+    if body.model_dump(exclude_none=True):
+        return None
+    return JSONResponse(status_code=400, content={
+        "error": "no updatable field supplied; expected one of "
+                 + ", ".join(sorted(type(body).model_fields))})
 
 
 @app.get("/health")
@@ -70,19 +83,26 @@ def get_post(post_id: int):
 
 
 class PostUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     title: Optional[str] = None
     content: Optional[str] = None
     status: Optional[str] = None
     excerpt: Optional[str] = None
     categories: Optional[List[int]] = None
     tags: Optional[List[int]] = None
+    author: Optional[int] = None
 
 
 @app.put(f"{BASE}/posts/{{post_id}}")
 def update_post(post_id: int, body: PostUpdateBody):
+    refusal = _nothing_to_update(body)
+    if refusal is not None:
+        return refusal
     result = wordpress_data.update_post(
         post_id, title=body.title, content=body.content, status=body.status,
         excerpt=body.excerpt, categories=body.categories, tags=body.tags,
+        author=body.author,
     )
     if isinstance(result, dict) and "error" in result:
         return JSONResponse(status_code=404, content=result)
