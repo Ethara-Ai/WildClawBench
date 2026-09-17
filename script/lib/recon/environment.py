@@ -24,6 +24,7 @@ a bundle can be diffed against the fleet it was actually built on.
 """
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 import tarfile
@@ -178,3 +179,44 @@ def prune_unverified(result: OverlayResult, out_mock: Path) -> None:
     for api in list(result.unverified_apis):
         shutil.rmtree(out_mock / api, ignore_errors=True)
         result.overlays.pop(api, None)
+
+
+# --------------------------------------------------------------------------- #
+# mock-module drift
+# --------------------------------------------------------------------------- #
+MANIFEST_NAME = "RECONSTRUCTION_MANIFEST.json"
+
+
+def module_drift(env_dir: Path, baseline_env: Path, task_id: str = "") -> dict:
+    """Digest the behaviour modules the bundle ships against the baseline.
+
+    Seeds are per-task overlays and legitimately differ, so only the ``*.py``
+    under each ``<svc>-api/`` plus the shared infra modules are compared — the
+    same set ``harbor.mock_manifest`` records at generation time, reusing its
+    collector so the two cannot drift apart. Anything listed under ``stale`` is
+    a module whose behaviour no longer matches the harness, which is the defect
+    that shipped a write-discarding notion mock through four sibling bundles.
+    """
+    from src.utils.harbor.mock_manifest import build_manifest
+
+    return build_manifest(env_dir, baseline_env, task_id=task_id)
+
+
+def write_manifest(out_dir: Path, drift: dict, result: OverlayResult,
+                   provenance: dict) -> Path:
+    """Record the reconstruction in the shape validate_bundle already reads."""
+    payload = dict(drift)
+    payload["reconstruction"] = {
+        **provenance,
+        "overlay_apis": sorted(result.overlays),
+        "overlay_file_count": result.file_count,
+        "overlay_scope_proven": result.scope_proven,
+        "unverified_apis": sorted(result.unverified_apis),
+        "out_of_scope_apis": sorted(result.out_of_scope),
+        "overlays": {api: [str(o) for o in files]
+                     for api, files in sorted(result.overlays.items())},
+    }
+    path = out_dir / MANIFEST_NAME
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
+                    encoding="utf-8")
+    return path

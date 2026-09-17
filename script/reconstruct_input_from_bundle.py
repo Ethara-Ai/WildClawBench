@@ -161,7 +161,7 @@ def recover_prompts(bundle: Path, out_dir: Path, log: list[str], timezone: str,
 
 def reconstruct(bundle: Path, out_dir: Path, baseline_env: Path, verbose: bool,
                 timezone: str = "", trajectory_run: str = "",
-                allow_unverified: bool = False) -> dict:
+                allow_unverified: bool = False, baseline_ref: str = "") -> dict:
     env_dir = bundle / "data" / "environment"
     log: list[str] = []
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -196,8 +196,27 @@ def reconstruct(bundle: Path, out_dir: Path, baseline_env: Path, verbose: bool,
         log.append(f"  note mock_data/             .. {len(mock.out_of_scope)} "
                    f"staged api(s) outside the task's declared scope, not searched")
 
+    drift = recon_environment.module_drift(env_dir, baseline_env, out_dir.name)
+    recon_environment.write_manifest(out_dir, drift, mock, {
+        "source_bundle": str(bundle),
+        "baseline": baseline_ref or str(baseline_env),
+        "turns": len(prompts.turns) if prompts else 0,
+        "clock_fidelity": instants.fidelity if instants.values else "none",
+        "clock_source": instants.source,
+        "prompt_source": prompts.source.rel if prompts else "",
+        "normalisations": list(prompts.fixes) if prompts else [],
+    })
+    log.append(f"  ok   {recon_environment.MANIFEST_NAME:<22} <- "
+               f"{drift['module_count']} module(s) digested")
+
     warnings = list(mock.warnings)
     errors = list(mock.errors)
+    if drift["stale"]:
+        errors.append(
+            f"{len(drift['stale'])} mock module(s) in the bundle differ from the "
+            f"baseline harness source: {', '.join(drift['stale'][:5])}"
+            f"{'...' if len(drift['stale']) > 5 else ''} — the bundle carries "
+            f"behaviour the harness no longer has")
     if prompts is not None:
         warnings.extend(prompts.unresolved)
     warnings.extend(meta.notes)
@@ -324,7 +343,8 @@ def main(argv: list[str] | None = None) -> int:
               f"{args.baseline_ref or baseline_env}")
         summaries = [reconstruct(b, args.out / b.name, baseline_env, args.verbose,
                                  args.timezone, args.trajectory_run,
-                                 args.unverified_overlays) for b in bundles]
+                                 args.unverified_overlays, args.baseline_ref)
+                     for b in bundles]
 
     print(f"\n{'task':<45} {'turns':>5} {'clock':>8} {'rubric':>6} {'persona':>7} "
           f"{'data':>4} {'mock(apis/files)':>16}")

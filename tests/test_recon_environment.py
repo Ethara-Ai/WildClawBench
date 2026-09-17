@@ -1,6 +1,8 @@
 """Overlay isolation: scoped to the task, and refused when it cannot be proven."""
 from __future__ import annotations
 
+import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -165,3 +167,68 @@ def test_reading_a_baseline_never_disturbs_the_working_tree(tmp_path):
 def test_an_unknown_ref_is_refused_with_its_reason(tmp_path):
     with pytest.raises(ValueError, match="could not read environment"):
         E.baseline_from_ref("no-such-ref", _git_repo(tmp_path), tmp_path / "extract")
+
+
+# --------------------------------------------------------------------------- #
+# module drift
+# --------------------------------------------------------------------------- #
+def _module_tree(root: Path, data_body: str, store_body: str = "shared") -> Path:
+    return _tree(root, {
+        "gmail-api/gmail_data.py": data_body,
+        "gmail-api/server.py": "serve",
+        "_mutable_store.py": store_body,
+        "gmail-api/messages.json": '{"seed": 1}',
+    })
+
+
+def test_drift_digests_behaviour_modules_not_seeds(tmp_path):
+    """Seeds are per-task overlays; digesting them would be all false positives."""
+    env = _module_tree(tmp_path / "bundle-env", "same")
+    drift = E.module_drift(env, _module_tree(tmp_path / "base", "same"), "t")
+    assert set(drift["modules"]) == {"gmail-api/gmail_data.py", "gmail-api/server.py",
+                                     "_mutable_store.py"}
+    assert drift["stale"] == []
+
+
+def test_a_module_that_differs_from_the_baseline_is_named(tmp_path):
+    drift = E.module_drift(_module_tree(tmp_path / "bundle-env", "patched"),
+                           _module_tree(tmp_path / "base", "original"), "t")
+    assert drift["stale"] == ["gmail-api/gmail_data.py"]
+
+
+def test_a_module_with_no_counterpart_records_a_null_source(tmp_path):
+    env = _module_tree(tmp_path / "bundle-env", "same")
+    base = _tree(tmp_path / "base", {"_mutable_store.py": "shared"})
+    drift = E.module_drift(env, base, "t")
+    assert drift["modules"]["gmail-api/gmail_data.py"]["source_digest"] is None
+    assert "gmail-api/gmail_data.py" not in drift["stale"]
+
+
+def test_the_manifest_is_the_shape_validate_bundle_reads(tmp_path):
+    from src.utils.harbor.mock_manifest import MANIFEST_NAME, verify_manifest
+
+    bundle = tmp_path / "b"
+    env = _module_tree(bundle / "data" / "environment", "same")
+    drift = E.module_drift(env, _module_tree(tmp_path / "base", "same"), "t")
+    out = tmp_path / "out"
+    out.mkdir()
+    written = E.write_manifest(out, drift, E.OverlayResult(), {"baseline": "HEAD"})
+    shutil.copy2(written, bundle / MANIFEST_NAME)
+    errors, _ = verify_manifest(bundle, None)
+    assert errors == []
+
+
+def test_the_manifest_records_how_the_reconstruction_was_made(tmp_path):
+    drift = E.module_drift(_module_tree(tmp_path / "bundle-env", "same"),
+                           _module_tree(tmp_path / "base", "same"), "t")
+    result = E.extract(_env(tmp_path), _baseline(tmp_path), tmp_path / "mock", SCOPE)
+    out = tmp_path / "out"
+    out.mkdir()
+    path = E.write_manifest(out, drift, result, {"baseline": "9b59dc9^", "turns": 20})
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    recon = payload["reconstruction"]
+    assert recon["baseline"] == "9b59dc9^"
+    assert recon["turns"] == 20
+    assert recon["overlay_file_count"] == 3
+    assert recon["overlay_scope_proven"] is True
+    assert sorted(recon["overlay_apis"]) == sorted(SCOPE)
