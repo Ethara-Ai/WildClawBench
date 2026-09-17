@@ -64,9 +64,18 @@ import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import requests
+
+from src.utils.serving_shape import (
+    ORPHAN_REASON,
+    describe_orphans,
+    row_bag as _serving_row_bag,
+    serving_vocabulary,
+    unwrap_expected,
+    verify_against_serving,
+)
 
 LOG = logging.getLogger("wildclaw.inject")
 
@@ -969,38 +978,75 @@ class InjectApplier:
     def _row_bag(row: Dict[str, Any]) -> Dict[str, Any]:
         return row["fields"] if isinstance(row.get("fields"), dict) else row
 
+    def _serving_vocabulary(self, api: str, table: str, pk: Any,
+                            known_keys: Optional[Iterable[str]]) -> set:
+        """Column names a service getter for ``table`` could legitimately name.
+
+        Built from the target row's PRE-write keys (``known_keys``, which every
+        caller that reads the row before patching already has) unioned with the
+        table's SIBLING rows — the patched row is excluded so a key the write
+        itself introduced cannot vouch for itself. Sibling rows are only fetched
+        when ``known_keys`` is absent (a fresh upsert), keeping the common path
+        at zero extra admin calls.
+        """
+        if known_keys:
+            return set(str(k) for k in known_keys)
+        pk_field = self._table_pk(api, table)
+        return serving_vocabulary(self._admin_get_rows(api, table),
+                                  exclude_pk=pk, pk_field=pk_field)
+
     def _read_back_row(self, api: str, table: str, pk: Any,
-                       expected: Dict[str, Any]
-                       ) -> Tuple[Optional[Dict[str, Any]], bool]:
+                       expected: Dict[str, Any],
+                       known_keys: Optional[Iterable[str]] = None,
+                       ) -> Tuple[Optional[Dict[str, Any]], bool, List[str]]:
         """Post-write verification: re-read the row through the ADMIN plane and
-        report (live values for the touched fields, all-values-match?).
+        report (live values for the touched fields, all-values-match?, orphans).
 
         Admin reads never enter the agent-visible /audit feed
         (tracking_middleware short-circuits /admin/*), so this is side-effect
         free. NEVER use the public port here — public GETs are audit-logged
         and would corrupt the request counts the deterministic checkers grade.
 
+        Verification runs against the SERVING shape, not the raw bag. Comparing
+        only the keys we just wrote is circular: the store shallow-merges any
+        key it is handed, so a write under a key no getter names self-verifies
+        (the pilot-2 xero patch shipped dead exactly that way — ``set:
+        {"Status": ...}`` against a live ``status`` column). Every
+        ``<svc>_data.py`` getter reads its row by literal key, so a written key
+        outside the table's live column vocabulary cannot reach the agent and
+        fails verification here. See src/utils/serving_shape.
+
         Honest limitation: this re-reads the SAME target the write went to, so
         a fuzzy-resolver write to the wrong table still "verifies" — that
         class is caught statically by preflight's bare-REST-form warning.
+        Nested dict/list values stay reported-but-not-asserted.
         """
         row = self._admin_get(api, f"/admin/data/{table}/{pk}")
         if not isinstance(row, dict):
-            return None, False
-        bag = self._row_bag(row)
-        # Only scalar expectations are comparable; nested dict/list values
-        # (rich notion property objects, etc.) are reported but not asserted.
-        comparable = {k: v for k, v in expected.items()
-                      if not isinstance(v, (dict, list))}
+            return None, False, []
+        bag = _serving_row_bag(row)
+        nested = isinstance(row.get("fields"), dict)
+        # A nested patch is re-wrapped as {"fields": {...}} by _patch_row; peel
+        # the wrapper so its columns are judged in the bag's namespace instead
+        # of the wrapper key reading as an orphan.
+        written = unwrap_expected(expected, nested)
+        vocab = self._serving_vocabulary(api, table, pk, known_keys)
+        _, verified, orphans = verify_against_serving(written, bag, vocab)
         after = {k: bag.get(k) for k in expected}
-        verified = all(self._loose_eq(bag.get(k), v) for k, v in comparable.items())
-        return after, verified
+        if orphans:
+            LOG.warning("inject read-back: %s/%s/%s — %s",
+                        api, table, pk, describe_orphans(orphans, vocab))
+        return after, verified, orphans
 
     @staticmethod
-    def _mark_unverified(rec: Dict[str, Any]) -> None:
-        """A 2xx write whose values are absent on read-back did NOT land."""
-        rec.update(ok=False, status="failed", verified=False,
-                   reason="write not observed on read-back")
+    def _mark_unverified(rec: Dict[str, Any], orphans: Optional[List[str]] = None) -> None:
+        """A 2xx write that is invisible in the serving shape did NOT land —
+        either the values never stuck, or they stuck on a key no getter reads."""
+        reason = ("write not observed on read-back" if not orphans
+                  else f"{ORPHAN_REASON}: {', '.join(sorted(orphans))}")
+        rec.update(ok=False, status="failed", verified=False, reason=reason)
+        if orphans:
+            rec["orphan_fields"] = sorted(orphans)
 
     def _replay_admin_rest(self, api: str, op: Dict[str, Any],
                            silent: bool) -> Dict[str, Any]:
@@ -1033,14 +1079,17 @@ class InjectApplier:
             ui_values = row
             if res.get("ok") and pk is not None:
                 expect = row["fields"] if isinstance(row.get("fields"), dict) else row
-                after, verified = self._read_back_row(api, table, str(pk), expect)
+                after, verified, orphans = self._read_back_row(
+                    api, table, str(pk), expect)
                 rec.update(after=after, verified=verified, changed=True)
                 if not verified:
-                    self._mark_unverified(rec)
+                    self._mark_unverified(rec, orphans)
         elif m_patch:
             table, pk = m_patch.group(1), m_patch.group(2)
             fields = body.get("fields") if isinstance(body.get("fields"), dict) else dict(body)
             row_before = self._admin_get(api, f"/admin/data/{table}/{pk}")
+            known = (set(_serving_row_bag(row_before))
+                     if isinstance(row_before, dict) else None)
             before = ({k: self._row_bag(row_before).get(k) for k in fields}
                       if isinstance(row_before, dict) else None)
             res = self._admin_patch(api, table, pk, fields)
@@ -1051,10 +1100,11 @@ class InjectApplier:
                        else str(res.get("error") or res.get("body"))[:200])
             ui_values = fields
             if res.get("ok"):
-                after, verified = self._read_back_row(api, table, pk, fields)
+                after, verified, orphans = self._read_back_row(
+                    api, table, pk, fields, known_keys=known)
                 rec.update(after=after, verified=verified, changed=before != after)
                 if not verified:
-                    self._mark_unverified(rec)
+                    self._mark_unverified(rec, orphans)
         elif method == "POST":
             res = self._admin_post(api, path, body)
             ok = bool(res.get("ok"))
@@ -1145,12 +1195,15 @@ class InjectApplier:
                                status="applied" if res.get("ok") else "failed")
                     if res.get("ok"):
                         # Read back LIVE values — not an optimistic echo of the
-                        # request — so a 200 that didn't stick is a failure.
-                        after, verified = self._read_back_row(api, table, pk, set_)
+                        # request — so a 200 that didn't stick is a failure, and
+                        # judge them against the pre-write column vocabulary so a
+                        # wrong-cased `set` key cannot self-verify.
+                        after, verified, orphans = self._read_back_row(
+                            api, table, pk, set_, known_keys=set(bag))
                         rec.update(after=after, verified=verified,
                                    changed=before != after)
                         if not verified:
-                            self._mark_unverified(rec)
+                            self._mark_unverified(rec, orphans)
                     else:
                         rec.update(after=before, changed=False)
             elif kind in ("update_where", "bulk"):
@@ -1161,6 +1214,7 @@ class InjectApplier:
                 matched = ok = 0
                 before = after = None
                 first_pk = None
+                first_keys: Optional[set] = None
                 for row in rows:
                     if not isinstance(row, dict):
                         continue
@@ -1170,6 +1224,7 @@ class InjectApplier:
                     if before is None:
                         before = {k: bag.get(k) for k in set_}
                         first_pk = self._row_pk(api, table, row)
+                        first_keys = set(bag)
                     res = self._patch_row(api, table, row, set_)
                     matched += 1
                     ok += 1 if res.get("ok") else 0
@@ -1178,11 +1233,12 @@ class InjectApplier:
                            status="applied" if ok else "no-match")
                 if ok and first_pk is not None:
                     # Verify on the first matched row (representative sample).
-                    after, verified = self._read_back_row(api, table, first_pk, set_)
+                    after, verified, orphans = self._read_back_row(
+                        api, table, first_pk, set_, known_keys=first_keys)
                     rec.update(after=after, verified=verified,
                                changed=before != after)
                     if not verified:
-                        self._mark_unverified(rec)
+                        self._mark_unverified(rec, orphans)
                 else:
                     rec.update(after=dict(set_) if ok else before,
                                changed=ok > 0 and before != (dict(set_) if ok else before))
@@ -1203,11 +1259,16 @@ class InjectApplier:
                            status="applied" if res.get("ok") else "failed")
                 if res.get("ok") and pk is not None:
                     # Verify the new row is actually readable with its values.
+                    # A brand-new row has no pre-write keys, so the vocabulary
+                    # comes from its siblings in the same table.
                     row_expect = row["fields"] if isinstance(row.get("fields"), dict) else row
-                    after, verified = self._read_back_row(api, table, pk, row_expect)
+                    after, verified, orphans = self._read_back_row(
+                        api, table, pk, row_expect,
+                        known_keys=set(_serving_row_bag(existed))
+                        if isinstance(existed, dict) else None)
                     rec.update(after=after, verified=verified)
                     if not verified:
-                        self._mark_unverified(rec)
+                        self._mark_unverified(rec, orphans)
             elif kind in ("doc_set", "doc_merge", "doc.merge"):
                 doc = spec.get("document") or spec.get("doc")
                 res = self._admin_doc_set(api, doc, spec.get("path") or [], spec.get("value"))
@@ -1320,6 +1381,8 @@ class InjectApplier:
         table, pk, fields, unmapped = resolved
         rec.update(table=table, pk=pk, fields=list(fields.keys()))
         row_before = self._admin_get(api, f"/admin/data/{table}/{pk}")
+        known = (set(_serving_row_bag(row_before))
+                 if isinstance(row_before, dict) else None)
         before = ({k: self._row_bag(row_before).get(k) for k in fields}
                   if isinstance(row_before, dict) else None)
         result = self._admin_patch(api, table, pk, fields)
@@ -1334,11 +1397,12 @@ class InjectApplier:
         rec["status"] = "applied" if rec["ok"] else "failed"
         rec["before"] = before
         if rec["ok"]:
-            after, verified = self._read_back_row(api, table, pk, fields)
+            after, verified, orphans = self._read_back_row(
+                api, table, pk, fields, known_keys=known)
             rec.update(after=after, verified=verified,
                        changed=before != after)
             if not verified:
-                self._mark_unverified(rec)
+                self._mark_unverified(rec, orphans)
         if rec["ok"] and unmapped:
             rec.update(ok=False, status="partial", verified=False,
                        unmapped_fields=sorted(unmapped),
