@@ -24,6 +24,7 @@ Layout (relative to `out_dir`):
 from __future__ import annotations
 
 import json
+import logging
 import re
 import shutil
 from pathlib import Path
@@ -39,10 +40,13 @@ from src.utils.trajectory.builder import (
 from .compose import discover_services, generate_harbor_compose, runtime_env_defaults
 from .ctrf import build_ctrf, compute_test_reward
 from .dockerfile import generate_harbor_dockerfile
+from .mock_manifest import MANIFEST_NAME, write_manifest
 from .solve_sh import generate_harbor_solve_sh
 from .task_toml import build_task_toml
 from .test_sh import generate_harbor_test_sh
 
+
+_LOG = logging.getLogger("wildclaw.harbor")
 
 _MODEL_DIRS = ("claude", "gpt")
 _API_REGEX = re.compile(r"\b([a-z][a-z0-9-]*-api)\b")
@@ -82,25 +86,112 @@ def _safe_json_parse(value: Any) -> Any:
     return None
 
 
-def _transform_rubrics_for_export(raw: Any) -> List[dict]:
-    """Port of `_transform_rubrics_for_export` (kensei2.py:3177)."""
+# rubric.json fields a delivered bundle MUST carry verbatim from the authoring
+# rubric. Anything absent here is emitted as the honest unknown "" plus a
+# warning, NEVER as a plausible-looking default: a fabricated "objective" /
+# "state change" is indistinguishable from an authored value, which is how five
+# delivered report.json files were corrupted (megan's targets rewritten,
+# eric/maria/abena/willie's blanked) before anyone noticed. "" is the sentinel
+# `script/backfill_bundle_meta.py` and `validate_bundle.py --mock-source`
+# already recognize as "needs backfill".
+_REQUIRED_RUBRIC_FIELDS: Dict[str, tuple] = {
+    "criterion": ("label", "criterion"),
+    "type": ("type",),
+    # grading._extract_weight reads weight-then-score; mirror that order so a
+    # weight-keyed rubric does not export every criterion at score 0.
+    "score": ("score", "weight"),
+    "evaluation_target": ("evaluation_target",),
+}
+_UNKNOWN = ""
+
+
+def _first_present(item: Mapping, *keys: str) -> Any:
+    """Value of the first key actually present with a non-empty value.
+
+    `or`-chaining conflates "absent" with "falsy", which is what turned an
+    authored score of 0 and an authored empty type into silent defaults.
+    """
+    for key in keys:
+        if key not in item:
+            continue
+        value = item[key]
+        if value is None:
+            continue
+        if isinstance(value, str) and not value.strip():
+            continue
+        return value
+    return None
+
+
+def _transform_rubrics_for_export(
+    raw: Any, warnings: Optional[List[str]] = None
+) -> List[dict]:
+    """Port of `_transform_rubrics_for_export` (kensei2.py:3177), made faithful.
+
+    Source values are preserved as authored. `evaluation_target` is the one
+    exception: it goes through `src.utils.rubric_targets.normalize_target`, the
+    canonical normalizer the three branching sites (grading, testgen,
+    task_parser) already apply, so an alias spelling resolves to one label
+    instead of drifting. That is lossless for every consumer — all of them
+    normalize before comparing — and it keeps the bundle round-trippable
+    through `script/reconstruct_input_from_bundle.py`.
+
+    `warnings` collects a WARN line per missing required field so the caller can
+    surface them; `validate_bundle.py --check-rubric` catches the "" sentinel in
+    an already-written bundle.
+    """
+    from src.utils.rubric_targets import normalize_target
+
     parsed = _safe_json_parse(raw) or []
     if not isinstance(parsed, list):
         return []
+    sink = warnings if warnings is not None else []
     out: List[dict] = []
     for idx, item in enumerate(parsed):
         if not isinstance(item, dict):
             continue
+        # Authored numbering wins: renumbering by position silently re-anchors
+        # every R-number the moment a criterion is pruned (de-anchoring drops
+        # one, leaving R1..R43 mapped onto the wrong criteria), which breaks the
+        # match-by-number join in backfill_bundle_meta.py and report.json.
+        sourced = {
+            name: _first_present(item, *keys)
+            for name, keys in _REQUIRED_RUBRIC_FIELDS.items()
+        }
+        number = str(_first_present(item, "number") or f"R{idx + 1}")
+        score = sourced["score"]
+        target = sourced["evaluation_target"]
         out.append({
-            "criterion": item.get("label") or item.get("criterion") or "",
-            "is_positive": bool(item.get("is_positive", True)),
-            "type": item.get("type") or "objective",
-            "evaluation_target": item.get("evaluation_target") or "state change",
-            "importance": item.get("importance") or "important",
-            "score": item.get("score") or 0,
-            "number": f"R{idx + 1}",
+            "criterion": sourced["criterion"] if sourced["criterion"] is not None else _UNKNOWN,
+            "is_positive": (
+                bool(item["is_positive"]) if "is_positive" in item
+                else _is_positive_from_score(score)
+            ),
+            "type": sourced["type"] if sourced["type"] is not None else _UNKNOWN,
+            "evaluation_target": normalize_target(target) if target is not None else _UNKNOWN,
+            "importance": _first_present(item, "importance") or "important",
+            "score": score if score is not None else 0,
+            "number": number,
         })
+        sink.extend(
+            f"{number}: required rubric field {name!r} absent in source; "
+            "exported as unknown"
+            for name, value in sourced.items() if value is None
+        )
+    if sink and warnings is None:
+        for line in sink:
+            _LOG.warning("[harbor.rubric] %s", line)
     return out
+
+
+def _is_positive_from_score(score: Any) -> bool:
+    """Absent `is_positive` derives from the weight sign, matching
+    `grading.py`'s `is_positive: wt >= 0`. Defaulting to True mislabels every
+    negative-weight violation checker as a positive criterion."""
+    try:
+        return float(score) >= 0
+    except (TypeError, ValueError):
+        return True
 
 
 def _trajectory_entries(traj_blob: Any) -> List[dict]:
@@ -219,7 +310,10 @@ def write_bundle(
     prompt_text = task.initial_prompt or task.seed_prompt or ""
     (out_dir / "prompt.txt").write_text(prompt_text, encoding="utf-8")
 
-    rubric_list = _transform_rubrics_for_export(task.rubrics_json)
+    rubric_warnings: List[str] = []
+    rubric_list = _transform_rubrics_for_export(task.rubrics_json, rubric_warnings)
+    for _w in rubric_warnings:
+        _LOG.warning("[harbor.rubric] %s %s", task.task_id or task.id, _w)
     (out_dir / "rubric.json").write_text(
         json.dumps(rubric_list, indent=2, ensure_ascii=False), encoding="utf-8"
     )
@@ -361,6 +455,22 @@ def write_bundle(
                     shutil.copy2(src, api_dst / fname)
                 except Exception:
                     pass
+
+    # Integrity manifest AFTER the overlay pass: an overlay may legitimately add
+    # a module to a service dir, and that module must be digested too. Strict —
+    # a bundle whose mock modules diverge from the harness source is the megan
+    # stale-notion delivery, and it must fail the build rather than ship.
+    mock_manifest_summary: Dict[str, Any] = {}
+    if env_out.is_dir():
+        _manifest = write_manifest(
+            out_dir, env_out, config.environment_dir,
+            task_id=str(task.task_id or task.id or ""),
+        )
+        mock_manifest_summary = {
+            "path": str(out_dir / MANIFEST_NAME),
+            "module_count": _manifest["module_count"],
+            "algorithm": _manifest["algorithm"],
+        }
 
     # COPY skills / persona / artifacts/inputs/files are emitted only when those
     # dirs actually landed in the build context above (a COPY of a missing path
@@ -592,4 +702,6 @@ def write_bundle(
         "required_skills": required_skills,
         "distractor_skills": distractor_skills,
         "env_vars": env_vars,
+        "rubric_warnings": rubric_warnings,
+        "mock_manifest": mock_manifest_summary,
     }
