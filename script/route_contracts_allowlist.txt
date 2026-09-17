@@ -1,0 +1,255 @@
+# Verified findings for script/check_route_contracts.py.
+#
+# Format:  <api>::<METHOD> <path>[::<FINDING>]
+# Seed findings use the pseudo-route <api>::SEED <table>.<field>.
+# Omitting ::<FINDING> silences every finding on that route; every entry below
+# is scoped to a single finding on purpose, so a NEW defect class appearing on
+# an allowlisted route still surfaces. The grammar is byte-compatible with
+# script/lost_writes_allowlist.txt, and the read-shaped POSTs below are the
+# same routes that file already vouches for -- the two checkers gate opposite
+# halves of one contract and share a single notion of "a human read this".
+#
+# ONLY the ERROR tier gates. WARN findings are deliberately absent from this
+# file: they are meant to be read, not silenced.
+
+# =====================================================================
+# VERIFIED BENIGN -- the contract is intentional, there is nothing to fix.
+# =====================================================================
+
+# Salesforce sObjects are an open schema BY DEFINITION: the field names are the
+# customer's org metadata, not ours, so extra="allow" is the vendor contract and
+# extra="forbid" would reject every custom field (Custom_Field__c). The handler
+# funnels through _extract_fields(), which takes either {"fields": {...}} or
+# top-level keys. This is the one place in the fleet where an open body is right.
+salesforce-api::POST /services/data/v59.0/sobjects/{sobject}::OPEN_BODY_SCHEMA
+salesforce-api::PATCH /services/data/v59.0/sobjects/{sobject}/{record_id}::OPEN_BODY_SCHEMA
+
+# Read-shaped POSTs: the vendor models a READ as a POST because the query is too
+# large or too private for a query string. Nothing the caller expects to survive
+# the call is stored, so an ignored key cannot become a lost write -- it degrades
+# to a wrong projection returned in the SAME response. That is strictly weaker
+# than the class this ERROR tier exists to stop. Residual risk acknowledged: a
+# silently-ignored filter returns unfiltered results, so tighten these to
+# extra="forbid" if either search surface ever grows a filter an agent leans on.
+algolia-api::POST /1/indexes/{index}/query::OPEN_BODY_SCHEMA
+google-calendar-api::POST /calendar/v3/freeBusy::OPEN_BODY_SCHEMA
+
+# =====================================================================
+# PENDING-FIX -- real open defects, tracked here so the gate catches NEW
+# regressions today instead of waiting for the hardening pass.
+#
+# NOTHING BELOW THIS LINE IS BLESSED. Every entry is a live defect measured on
+# the 50-service fleet by the three sweeps (static binding / seed round-trip /
+# dynamic write-read-back). Deleting an entry is how a fix is proved: land the
+# fix, drop the line, and the gate re-arms for that route. Do NOT add to this
+# section to quiet a newly-introduced defect -- that is the exact failure mode
+# this checker exists to prevent.
+#
+#   class B  OPEN_BODY_SCHEMA  122 routes across 33 services. extra defaults to
+#            "ignore", so an unknown key is dropped before the handler runs and
+#            the route still answers 200/201. The fix is one line per model:
+#            model_config = ConfigDict(extra="forbid"), which is what monday,
+#            notion, gmail, figma and shippo already do.
+#   class C  SEED_COERCION_LOSS  1 field. A non-empty seed value that does not
+#            survive its own loader.
+#
+# class A (QUERY_BOUND_WRITE) has NO pending entries: the one live instance,
+# trello PUT /1/cards/{card_id}, was fixed before this guard landed. The
+# detector still gates -- the synthetic pre-fix replica in
+# tests/test_route_contracts_gate.py pins it.
+# =====================================================================
+
+# --- class C: seed round-trip ---------------------------------------------
+# media.post is seeded "0" and loads as None: the coercer reads "0" as absent.
+# Harmless if "0" means "no parent post", a lost foreign key if it does not --
+# unresolved either way, so it is tracked rather than blessed.
+wordpress-api::SEED media.post::SEED_COERCION_LOSS
+
+# --- class B: extra laxity ------------------------------------------------
+# airtable-api (2)
+airtable-api::POST /v0/{base_id}/{table_id_or_name}::OPEN_BODY_SCHEMA
+airtable-api::PATCH /v0/{base_id}/{table_id_or_name}/{record_id}::OPEN_BODY_SCHEMA
+
+# amazon-seller-api (5)
+amazon-seller-api::PUT /fba/inventory/v1/items/{sellerSku}::OPEN_BODY_SCHEMA
+amazon-seller-api::PATCH /listings/2021-08-01/items/{sellerId}/{sku}::OPEN_BODY_SCHEMA
+amazon-seller-api::PUT /listings/2021-08-01/items/{sellerId}/{sku}::OPEN_BODY_SCHEMA
+amazon-seller-api::POST /orders/v0/orders/{orderId}/shipmentConfirmation::OPEN_BODY_SCHEMA
+amazon-seller-api::POST /reports/2021-06-30/reports::OPEN_BODY_SCHEMA
+
+# confluence-api (2)
+confluence-api::POST /wiki/rest/api/content::OPEN_BODY_SCHEMA
+confluence-api::PUT /wiki/rest/api/content/{content_id}::OPEN_BODY_SCHEMA
+
+# contentful-api (2)
+contentful-api::POST /spaces/{space_id}/environments/{env_id}/entries::OPEN_BODY_SCHEMA
+contentful-api::PUT /spaces/{space_id}/environments/{env_id}/entries/{entry_id}::OPEN_BODY_SCHEMA
+
+# datadog-api (3)
+datadog-api::POST /api/v1/events::OPEN_BODY_SCHEMA
+datadog-api::POST /api/v1/monitor::OPEN_BODY_SCHEMA
+datadog-api::PUT /api/v1/monitor/{monitor_id}::OPEN_BODY_SCHEMA
+
+# discord-api (1)
+discord-api::POST /api/v10/channels/{channel_id}/messages::OPEN_BODY_SCHEMA
+
+# docusign-api (2)
+docusign-api::POST /restapi/v2.1/accounts/{accountId}/envelopes::OPEN_BODY_SCHEMA
+docusign-api::PUT /restapi/v2.1/accounts/{accountId}/envelopes/{envelopeId}::OPEN_BODY_SCHEMA
+
+# doordash-api (3)
+doordash-api::POST /v1/carts::OPEN_BODY_SCHEMA
+doordash-api::POST /v1/carts/{cart_id}/checkout::OPEN_BODY_SCHEMA
+doordash-api::POST /v1/carts/{cart_id}/items::OPEN_BODY_SCHEMA
+
+# etsy-api (4)
+etsy-api::PUT /v3/application/listings/{listing_id}::OPEN_BODY_SCHEMA
+etsy-api::PUT /v3/application/shops/{shop_id}::OPEN_BODY_SCHEMA
+etsy-api::POST /v3/application/shops/{shop_id}/listings::OPEN_BODY_SCHEMA
+etsy-api::PUT /v3/application/shops/{shop_id}/receipts/{receipt_id}::OPEN_BODY_SCHEMA
+
+# eventbrite-api (3)
+eventbrite-api::POST /v3/events::OPEN_BODY_SCHEMA
+eventbrite-api::POST /v3/events/{event_id}/attendees::OPEN_BODY_SCHEMA
+eventbrite-api::POST /v3/events/{event_id}/ticket_classes::OPEN_BODY_SCHEMA
+
+# github-api (3)
+github-api::POST /repos/{owner}/{repo}/issues::OPEN_BODY_SCHEMA
+github-api::PATCH /repos/{owner}/{repo}/issues/{number}::OPEN_BODY_SCHEMA
+github-api::POST /repos/{owner}/{repo}/issues/{number}/comments::OPEN_BODY_SCHEMA
+
+# gitlab-api (3)
+gitlab-api::POST /api/v4/projects/{project_id}/issues::OPEN_BODY_SCHEMA
+gitlab-api::PUT /api/v4/projects/{project_id}/issues/{issue_iid}::OPEN_BODY_SCHEMA
+gitlab-api::POST /api/v4/projects/{project_id}/merge_requests::OPEN_BODY_SCHEMA
+
+# google-classroom-api (12)
+google-classroom-api::POST /v1/courses::OPEN_BODY_SCHEMA
+google-classroom-api::PATCH /v1/courses/{course_id}::OPEN_BODY_SCHEMA
+google-classroom-api::POST /v1/courses/{course_id}/announcements::OPEN_BODY_SCHEMA
+google-classroom-api::PATCH /v1/courses/{course_id}/announcements/{announcement_id}::OPEN_BODY_SCHEMA
+google-classroom-api::POST /v1/courses/{course_id}/courseWork::OPEN_BODY_SCHEMA
+google-classroom-api::PATCH /v1/courses/{course_id}/courseWork/{coursework_id}::OPEN_BODY_SCHEMA
+google-classroom-api::PATCH /v1/courses/{course_id}/courseWork/{coursework_id}/studentSubmissions/{submission_id}::OPEN_BODY_SCHEMA
+google-classroom-api::POST /v1/courses/{course_id}/courseWork/{coursework_id}/studentSubmissions/{submission_id}:modifyAttachments::OPEN_BODY_SCHEMA
+google-classroom-api::POST /v1/courses/{course_id}/courseWorkMaterials::OPEN_BODY_SCHEMA
+google-classroom-api::POST /v1/courses/{course_id}/students::OPEN_BODY_SCHEMA
+google-classroom-api::POST /v1/courses/{course_id}/topics::OPEN_BODY_SCHEMA
+google-classroom-api::PATCH /v1/courses/{course_id}/topics/{topic_id}::OPEN_BODY_SCHEMA
+
+# google-drive-api (3)
+google-drive-api::POST /drive/v3/files::OPEN_BODY_SCHEMA
+google-drive-api::PATCH /drive/v3/files/{file_id}::OPEN_BODY_SCHEMA
+google-drive-api::POST /drive/v3/files/{file_id}/permissions::OPEN_BODY_SCHEMA
+
+# hubspot-api (4)
+hubspot-api::POST /crm/v3/objects/contacts::OPEN_BODY_SCHEMA
+hubspot-api::PATCH /crm/v3/objects/contacts/{contact_id}::OPEN_BODY_SCHEMA
+hubspot-api::POST /crm/v3/objects/deals::OPEN_BODY_SCHEMA
+hubspot-api::PATCH /crm/v3/objects/deals/{deal_id}::OPEN_BODY_SCHEMA
+
+# instacart-api (4)
+instacart-api::POST /v1/carts::OPEN_BODY_SCHEMA
+instacart-api::POST /v1/carts/{cart_id}/checkout::OPEN_BODY_SCHEMA
+instacart-api::POST /v1/carts/{cart_id}/items::OPEN_BODY_SCHEMA
+instacart-api::PATCH /v1/carts/{cart_id}/items/{product_id}::OPEN_BODY_SCHEMA
+
+# instagram-api (5)
+instagram-api::POST /media/{media_id}/comments::OPEN_BODY_SCHEMA
+instagram-api::PUT /media/{media_id}/comments/{comment_id}/hide::OPEN_BODY_SCHEMA
+instagram-api::PUT /{user_id}::OPEN_BODY_SCHEMA
+instagram-api::POST /{user_id}/media::OPEN_BODY_SCHEMA
+instagram-api::POST /{user_id}/media_publish::OPEN_BODY_SCHEMA
+
+# intercom-api (4)
+intercom-api::POST /contacts::OPEN_BODY_SCHEMA
+intercom-api::POST /conversations::OPEN_BODY_SCHEMA
+intercom-api::POST /conversations/{conversation_id}/parts::OPEN_BODY_SCHEMA
+intercom-api::POST /conversations/{conversation_id}/reply::OPEN_BODY_SCHEMA
+
+# jira-api (3)
+jira-api::POST /rest/api/3/issue::OPEN_BODY_SCHEMA
+jira-api::PUT /rest/api/3/issue/{issue_key}::OPEN_BODY_SCHEMA
+jira-api::POST /rest/api/3/issue/{issue_key}/transitions::OPEN_BODY_SCHEMA
+
+# linear-api (8)
+linear-api::POST /v1/comments::OPEN_BODY_SCHEMA
+linear-api::PUT /v1/comments/{comment_id}::OPEN_BODY_SCHEMA
+linear-api::POST /v1/cycles::OPEN_BODY_SCHEMA
+linear-api::POST /v1/issues::OPEN_BODY_SCHEMA
+linear-api::PUT /v1/issues/{issue_id}::OPEN_BODY_SCHEMA
+linear-api::POST /v1/labels::OPEN_BODY_SCHEMA
+linear-api::POST /v1/projects::OPEN_BODY_SCHEMA
+linear-api::PUT /v1/projects/{project_id}::OPEN_BODY_SCHEMA
+
+# mailchimp-api (3)
+mailchimp-api::POST /3.0/campaigns::OPEN_BODY_SCHEMA
+mailchimp-api::POST /3.0/lists/{list_id}/members::OPEN_BODY_SCHEMA
+mailchimp-api::PATCH /3.0/lists/{list_id}/members/{subscriber_hash}::OPEN_BODY_SCHEMA
+
+# pagerduty-api (3)
+pagerduty-api::POST /incidents::OPEN_BODY_SCHEMA
+pagerduty-api::PUT /incidents/{incident_id}::OPEN_BODY_SCHEMA
+pagerduty-api::POST /incidents/{incident_id}/notes::OPEN_BODY_SCHEMA
+
+# pinterest-api (5)
+pinterest-api::POST /v5/boards::OPEN_BODY_SCHEMA
+pinterest-api::PATCH /v5/boards/{board_id}::OPEN_BODY_SCHEMA
+pinterest-api::POST /v5/boards/{board_id}/sections::OPEN_BODY_SCHEMA
+pinterest-api::POST /v5/pins::OPEN_BODY_SCHEMA
+pinterest-api::PATCH /v5/pins/{pin_id}::OPEN_BODY_SCHEMA
+
+# servicenow-api (2)
+servicenow-api::POST /api/now/table/incident::OPEN_BODY_SCHEMA
+servicenow-api::PATCH /api/now/table/incident/{sys_id}::OPEN_BODY_SCHEMA
+
+# slack-api (8)
+slack-api::POST /api/chat.delete::OPEN_BODY_SCHEMA
+slack-api::POST /api/chat.postMessage::OPEN_BODY_SCHEMA
+slack-api::POST /api/chat.update::OPEN_BODY_SCHEMA
+slack-api::POST /api/conversations.archive::OPEN_BODY_SCHEMA
+slack-api::POST /api/conversations.create::OPEN_BODY_SCHEMA
+slack-api::POST /api/conversations.invite::OPEN_BODY_SCHEMA
+slack-api::POST /api/reactions.add::OPEN_BODY_SCHEMA
+slack-api::POST /api/users.setPresence::OPEN_BODY_SCHEMA
+
+# spotify-api (3)
+spotify-api::PUT /v1/me/player/play::OPEN_BODY_SCHEMA
+spotify-api::POST /v1/playlists/{playlist_id}/tracks::OPEN_BODY_SCHEMA
+spotify-api::POST /v1/users/{user_id}/playlists::OPEN_BODY_SCHEMA
+
+# square-api (4)
+square-api::POST /v2/customers::OPEN_BODY_SCHEMA
+square-api::POST /v2/orders::OPEN_BODY_SCHEMA
+square-api::POST /v2/payments::OPEN_BODY_SCHEMA
+square-api::POST /v2/refunds::OPEN_BODY_SCHEMA
+
+# stripe-api (6)
+stripe-api::POST /v1/charges::OPEN_BODY_SCHEMA
+stripe-api::POST /v1/customers::OPEN_BODY_SCHEMA
+stripe-api::POST /v1/invoices::OPEN_BODY_SCHEMA
+stripe-api::POST /v1/payment_intents::OPEN_BODY_SCHEMA
+stripe-api::POST /v1/refunds::OPEN_BODY_SCHEMA
+stripe-api::POST /v1/subscriptions::OPEN_BODY_SCHEMA
+
+# typeform-api (2)
+typeform-api::POST /forms::OPEN_BODY_SCHEMA
+typeform-api::PUT /forms/{form_id}::OPEN_BODY_SCHEMA
+
+# whatsapp-api (2)
+whatsapp-api::POST /v17.0/messages::OPEN_BODY_SCHEMA
+whatsapp-api::POST /v17.0/messages/status::OPEN_BODY_SCHEMA
+
+# wordpress-api (3)
+wordpress-api::POST /wp-json/wp/v2/comments::OPEN_BODY_SCHEMA
+wordpress-api::POST /wp-json/wp/v2/posts::OPEN_BODY_SCHEMA
+wordpress-api::PUT /wp-json/wp/v2/posts/{post_id}::OPEN_BODY_SCHEMA
+
+# zendesk-api (3)
+zendesk-api::POST /api/v2/tickets::OPEN_BODY_SCHEMA
+zendesk-api::PUT /api/v2/tickets/{ticket_id}::OPEN_BODY_SCHEMA
+zendesk-api::POST /api/v2/tickets/{ticket_id}/comments::OPEN_BODY_SCHEMA
+
+# zoom-api (2)
+zoom-api::PATCH /v2/meetings/{meeting_id}::OPEN_BODY_SCHEMA
+zoom-api::POST /v2/users/{user_id}/meetings::OPEN_BODY_SCHEMA
