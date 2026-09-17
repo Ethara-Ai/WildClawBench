@@ -1080,7 +1080,7 @@ class InjectApplier:
         """Primary-key column NAME the store declares for (api, table).
 
         ``/admin/tables`` advertises each table's ``primary_key`` (``Id`` for
-        quickbooks/salesforce, ``item_id`` for monday, ``sys_id`` for
+        salesforce, ``item_id`` for monday, ``sys_id`` for
         servicenow, ...). Hardcoding ``id``/``pk`` misses every such table, so
         row lookups consult the declared name first. Cached per api."""
         cache = self._pk_cache.get(api)

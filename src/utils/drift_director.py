@@ -19,7 +19,7 @@ drift.yaml schema (v1)
       - id: "ev1"
         at: "30s"                         # also: "1m30s", "500ms", float seconds
         action:
-          api: airbnb-api
+          api: etsy-api
           inject:
             - op: data.patch
               table: listings
@@ -417,7 +417,7 @@ class DriftDirector(threading.Thread):
         director = DriftDirector(
             script=DriftScript.load(task["drift_script_path"]),
             targets={
-                "airbnb-api": _ApiTarget("airbnb-api", "http://localhost:8011"),
+                "etsy-api": _ApiTarget("etsy-api", "http://localhost:8011"),
                 ...
             },
             workspace_dir=Path(task["workspace_dir"]),

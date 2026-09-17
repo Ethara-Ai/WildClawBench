@@ -767,12 +767,12 @@ Common shape (identical across all 101):
 
 Because the shape is identical, this document does not enumerate every flag of every connector — instead, use `python3 environment/skills/<name>-api-connector/scripts/fetch_<name>_data.py --help` (or read the connector's `references/<name>-api-guide.md`) to see its per-endpoint flag list.
 
-Example (see the ActiveCampaign connector for a canonical shape):
+Example (see the HubSpot connector for a canonical shape):
 ```bash
-python3 environment/skills/activecampaign-api-connector/scripts/fetch_activecampaign_data.py \
-    --get-api-3-contacts
-python3 environment/skills/activecampaign-api-connector/scripts/fetch_activecampaign_data.py \
-    --post-api-3-contacts --data '{"email":"x@y.com"}'
+python3 environment/skills/hubspot-api-connector/scripts/fetch_hubspot_data.py \
+    --get-crm-objects-contacts
+python3 environment/skills/hubspot-api-connector/scripts/fetch_hubspot_data.py \
+    --post-crm-objects-contacts --data '{"properties":{"email":"x@y.com"}}'
 ```
 
 ---

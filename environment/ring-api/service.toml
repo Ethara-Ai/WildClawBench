@@ -1,5 +1,0 @@
-[service]
-name = "ring-api"
-port = 8008
-env_var_name = "RING_API_URL"
-healthcheck_path = "/health"

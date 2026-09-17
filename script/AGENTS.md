@@ -44,7 +44,7 @@ The reps-failure root-cause work (see `docs/reps-failure-diagnosis.md`) identifi
 | `reconstruct_input_from_bundle.py` (303) | Reverse: bundle → `input/<task>/` for replay. |
 | `extract_home_to_data.py` (139) | Move agent home-dir artifacts into `data/` for tasks. |
 | `coerce_dryrun.py` (132), `coerce_malformed_test.py` (101) | Sanitize legacy/broken artifacts. |
-| `backfill_connector_docs.py` (515) | Generate connector docs from `environment/skills/`. **NEVER touch curated upstream connectors** (`quickbooks`, `etsy`, `ring`, …) — see `backfill_connector_docs.py:8`. |
+| `backfill_connector_docs.py` (515) | Generate connector docs from `environment/skills/`. **NEVER touch curated upstream connectors** (`etsy`, `amazon-seller`, `linear`, …) — see `backfill_connector_docs.py:8`. |
 | `lib/log.sh` | Shared logging helpers for shell scripts. |
 
 ## Invariants

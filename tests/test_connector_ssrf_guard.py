@@ -1,7 +1,7 @@
-"""SSRF guard regression tests for the 101 connector scripts (AUDIT_TRIAGE.md S-002).
+"""SSRF guard regression tests for the 50 connector scripts (AUDIT_TRIAGE.md S-002).
 
 Audit found `urllib.request.urlopen` called on attacker-influenceable URLs in
-102 sites across 101 connector scripts under
+one site in each of the 50 connector scripts under
 `environment/skills/<api>-api-connector/scripts/fetch_*.py`. The fix inlines a
 `_safe_urlopen` helper into each script that:
 
@@ -31,8 +31,8 @@ _REPO = Path(__file__).resolve().parents[1]
 _SKILLS = _REPO / "environment" / "skills"
 
 # GENUINE SOURCE GAP (source is off-limits, cannot be fixed here): the S-002
-# SSRF fix described in this module's docstring was never applied to the 101
-# connector scripts. All 101 `environment/skills/*-api-connector/scripts/
+# SSRF fix described in this module's docstring was never applied to the 50
+# connector scripts. All 50 `environment/skills/*-api-connector/scripts/
 # fetch_*.py` still call raw `urllib.request.urlopen(req)` and define none of
 # `_safe_urlopen` / `_ssrf_check_url` / `_SsrfRedirectHandler`, so every test
 # below (file-scan guards + per-script guard-behaviour probes) fails. Marked
@@ -77,13 +77,13 @@ def naming_exception():
     return _load_script(NAMING_EXCEPTION)
 
 
-# Section A. The 101 patched files all import + parse cleanly and expose the
+# Section A. The 50 patched files all import + parse cleanly and expose the
 # helper. Catches the regenerate-step that would silently un-inline the guard.
 
 
 def test_every_connector_script_defines_safe_urlopen():
     scripts = sorted(_SKILLS.glob("*-api-connector/scripts/fetch_*.py"))
-    assert len(scripts) == 101, f"expected 101 connector scripts, found {len(scripts)}"
+    assert len(scripts) == 50, f"expected 50 connector scripts, found {len(scripts)}"
     missing = [str(p.relative_to(_REPO)) for p in scripts if "_safe_urlopen" not in p.read_text()]
     assert not missing, f"connectors missing _safe_urlopen: {missing}"
 

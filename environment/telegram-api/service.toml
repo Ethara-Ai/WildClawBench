@@ -1,5 +1,0 @@
-[service]
-name = "telegram-api"
-port = 8063
-env_var_name = "TELEGRAM_API_URL"
-healthcheck_path = "/health"

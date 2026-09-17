@@ -278,12 +278,12 @@ def test_compile_pattern_escapes_regex_metacharacters() -> None:
 
 
 def test_compile_matchers_strong_includes_slug_and_curated() -> None:
-    strong, generic = si._compile_matchers("quickbooks-api")
+    strong, generic = si._compile_matchers("etsy-api")
     assert strong is not None and generic is not None
-    assert strong.search("sync with quickbooks now")   # slug token
-    assert strong.search("check the ledger")           # curated strong keyword
-    assert generic.search("send an invoice")           # curated generic keyword
-    assert strong.search("send an invoice") is None    # invoice is generic-only
+    assert strong.search("sync with etsy now")         # slug token
+    assert strong.search("a handmade batch")           # curated strong keyword
+    assert generic.search("update the shop")           # curated generic keyword
+    assert strong.search("update the shop") is None    # shop is generic-only
 
 
 def test_compile_matchers_no_generic_map_returns_none_generic() -> None:
@@ -319,7 +319,7 @@ def test_available_apis_falls_back_to_curated_on_missing_dir(tmp_path: Path) -> 
     missing = tmp_path / "does-not-exist"
     apis = si.available_apis(missing)
     assert apis == sorted(si._CURATED_KEYWORDS.keys())
-    assert "quickbooks-api" in apis and len(apis) == 10
+    assert apis and len(apis) == len(si._CURATED_KEYWORDS)
 
 
 def test_available_apis_falls_back_to_curated_on_empty_dir(tmp_path: Path) -> None:
@@ -348,7 +348,7 @@ def test_all_keywordless_dirs_trigger_curated_fallback(tmp_path: Path) -> None:
 
 def test_available_apis_real_repo_environment_contains_flagships() -> None:
     apis = si.available_apis()  # default: repo environment/ (checked in, offline)
-    for flagship in ("amazon-seller-api", "quickbooks-api", "linear-api"):
+    for flagship in ("amazon-seller-api", "google-classroom-api", "linear-api"):
         assert flagship in apis
     assert len(apis) > len(si._CURATED_KEYWORDS)  # dynamic discovery, not fallback
 
@@ -437,40 +437,41 @@ def test_infer_multiple_matches_sorted(tmp_path: Path) -> None:
 
 
 def test_infer_single_generic_hit_is_not_enough(tmp_path: Path) -> None:
-    env = _make_env(tmp_path, ["quickbooks-api"])
-    # 'invoice' is a generic keyword for quickbooks-api; one hit must not match.
-    assert si.infer_required_apis("please send the invoice today", env) == []
+    env = _make_env(tmp_path, ["linear-api"])
+    # 'ticket' is a generic keyword for linear-api; one hit must not match.
+    assert si.infer_required_apis("please review the ticket today", env) == []
 
 
 def test_infer_two_generic_hits_qualify(tmp_path: Path) -> None:
-    env = _make_env(tmp_path, ["quickbooks-api"])
-    prompt = "send the invoice and file the expense report"
-    assert si.infer_required_apis(prompt, env) == ["quickbooks-api"]
+    env = _make_env(tmp_path, ["linear-api"])
+    prompt = "review the ticket and groom the backlog"
+    assert si.infer_required_apis(prompt, env) == ["linear-api"]
 
 
 def test_infer_same_generic_word_twice_counts_as_two_hits(tmp_path: Path) -> None:
-    env = _make_env(tmp_path, ["quickbooks-api"])
+    env = _make_env(tmp_path, ["linear-api"])
     # findall counts occurrences, so repeating one generic word reaches the
     # >=2 threshold even though only one distinct domain word appears.
-    prompt = "attach invoice A and invoice B"
-    assert si.infer_required_apis(prompt, env) == ["quickbooks-api"]
+    prompt = "attach ticket A and ticket B"
+    assert si.infer_required_apis(prompt, env) == ["linear-api"]
 
 
 def test_infer_strong_hit_wins_even_with_generic_noise(tmp_path: Path) -> None:
-    env = _make_env(tmp_path, ["quickbooks-api"])
-    assert si.infer_required_apis("log this invoice in quickbooks", env) == ["quickbooks-api"]
+    env = _make_env(tmp_path, ["linear-api"])
+    assert si.infer_required_apis("log this ticket in linear", env) == ["linear-api"]
 
 
-def test_infer_curated_phrase_counts_as_strong(tmp_path: Path) -> None:
-    env = _make_env(tmp_path, ["ring-api"])
-    # 'ring doorbell' is a curated strong phrase for ring-api.
-    assert si.infer_required_apis("check the ring doorbell feed", env) == ["ring-api"]
+def test_infer_curated_keyword_counts_as_strong(tmp_path: Path) -> None:
+    env = _make_env(tmp_path, ["etsy-api"])
+    # 'woodcraft' is a curated strong keyword for etsy-api and shares no token
+    # with the slug, so a hit proves the curated table feeds the strong matcher.
+    assert si.infer_required_apis("bring the woodcraft samples", env) == ["etsy-api"]
 
 
-def test_infer_generic_pair_for_ring(tmp_path: Path) -> None:
-    env = _make_env(tmp_path, ["ring-api"])
-    assert si.infer_required_apis("the doorbell caught some motion", env) == ["ring-api"]
-    assert si.infer_required_apis("there was motion outside", env) == []
+def test_infer_generic_pair_for_etsy(tmp_path: Path) -> None:
+    env = _make_env(tmp_path, ["etsy-api"])
+    assert si.infer_required_apis("update the shop listing", env) == ["etsy-api"]
+    assert si.infer_required_apis("update the shop", env) == []
 
 
 def test_infer_multiword_slug_phrase_match(tmp_path: Path) -> None:

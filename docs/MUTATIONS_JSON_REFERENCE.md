@@ -163,32 +163,19 @@ never treated as row data (`_INJECT_ENVELOPE_KEYS`):
 The full set is `basename(environment/*-api)`. As of this writing:
 
 ```
-activecampaign-api  airbnb-api           airtable-api        algolia-api
-alpaca-api          amadeus-api          amazon-seller-api   amplitude-api
-asana-api           bamboohr-api         bigcommerce-api     binance-api
-box-api             calendly-api         cloudflare-api      coinbase-api
-confluence-api      contentful-api       datadog-api         discord-api
-docusign-api        doordash-api         dropbox-api         etsy-api
-eventbrite-api      fedex-api            figma-api           freshdesk-api
-github-api          gitlab-api           gmail-api           google-analytics-api
-google-calendar-api google-classroom-api google-drive-api    google-maps-api
-greenhouse-api      gusto-api            hubspot-api         instacart-api
-instagram-api       intercom-api         jira-api            klaviyo-api
-kraken-api          kubernetes-api       linear-api          linkedin-api
-mailchimp-api       mailgun-api          microsoft-teams-api mixpanel-api
-monday-api          myfitnesspal-api     nasa-api            notion-api
-obsidian-api        okta-api             openlibrary-api     openweather-api
-outlook-api         pagerduty-api        paypal-api          pinterest-api
-plaid-api           posthog-api          quickbooks-api      reddit-api
-ring-api            salesforce-api       segment-api         sendgrid-api
-sentry-api          servicenow-api       shippo-api          slack-api
-spotify-api         square-api           strava-api          stripe-api
-telegram-api        ticketmaster-api     tmdb-api            trello-api
-twilio-api          twitch-api           twitter-api         typeform-api
-uber-api            ups-api              vimeo-api           webflow-api
-whatsapp-api        woocommerce-api      wordpress-api       xero-api
-yelp-api            youtube-api          zendesk-api         zillow-api
-zoom-api
+airtable-api         algolia-api          amazon-seller-api    asana-api
+bigcommerce-api      box-api              confluence-api       contentful-api
+datadog-api          discord-api          docusign-api         doordash-api
+etsy-api             eventbrite-api       figma-api            github-api
+gitlab-api           gmail-api            google-calendar-api  google-classroom-api
+google-drive-api     hubspot-api          instacart-api        instagram-api
+intercom-api         jira-api             linear-api           mailchimp-api
+monday-api           notion-api           openlibrary-api      openweather-api
+pagerduty-api        pinterest-api        salesforce-api       servicenow-api
+shippo-api           slack-api            spotify-api          square-api
+stripe-api           trello-api           twilio-api           typeform-api
+whatsapp-api         woocommerce-api      wordpress-api        xero-api
+zendesk-api          zoom-api
 ```
 
 Regenerate with `ls environment | grep -- '-api'`. The slug must also be in the

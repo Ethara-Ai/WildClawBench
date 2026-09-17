@@ -1,5 +1,0 @@
-[service]
-name = "kubernetes-api"
-port = 8051
-env_var_name = "KUBERNETES_API_URL"
-healthcheck_path = "/health"

@@ -1,5 +1,0 @@
-[service]
-name = "yelp-api"
-port = 8034
-env_var_name = "YELP_API_URL"
-healthcheck_path = "/health"

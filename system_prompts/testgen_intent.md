@@ -54,7 +54,6 @@ def _get(url):
     """GET request to mocked API, return parsed JSON. No auth needed."""
     return json.loads(urlopen(url).read())
 
-
 # ─── POSITIVE TESTS ─────────────────────────────────────────────────────────
 class Test{Category}:
     """Docstring explaining what this group verifies."""
@@ -91,7 +90,7 @@ class TestNegativeCases:
 The 10 mock APIs return data in **6 different patterns**. You MUST correctly navigate the response structure when writing assertions. Use the API documentation and task context to determine which pattern applies.
 
 ### Pattern A: `{"type": "<entity>", "<entity>": {...}}` Wrapper
-**Used by:** Etsy, Pinterest, Ring, MyFitnessPal, Linear
+**Used by:** Etsy, Pinterest, Linear
 
 ```python
 # GET single entity
@@ -109,60 +108,7 @@ assert any(l["title"] == "Expected" for l in listings)
 
 **⚠️ Etsy paths:** Listings require shop_id: `/shops/{shop_id}/listings` — NOT just `/listings`.
 
-**Ring variant** — list returns categorized dict, single uses extra wrapper field:
-```python
-# LIST all devices — returns dict with category keys (NOT a flat list!)
-response = _get(f"{RING_URL}/clients_api/ring_devices")
-# response = {"doorbots": [...], "stickup_cams": [...], "chimes": [...]}
-all_devices = response["doorbots"] + response["stickup_cams"] + response["chimes"]
-
-# GET single device
-response = _get(f"{RING_URL}/clients_api/doorbots/{device_id}")
-# response = {"type": "device", "device_type": "doorbell", "device": {"id": "...", ...}}
-device = response["device"]
-```
-
-### Pattern B: `{"<EntityType>": {...}}` PascalCase Wrapper + SQL Query
-**Used by:** QuickBooks
-
-```python
-# GET single entity — path includes realm_id
-response = _get(f"{QUICKBOOKS_URL}/v3/company/1234/customer/{customer_id}")
-# response = {"Customer": {"Id": "123", "DisplayName": "...", ...}}
-customer = response["Customer"]
-assert customer["DisplayName"] == "Expected Name"
-
-# LIST entities — uses SQL query endpoint (NOT a /customers list!)
-from urllib.parse import quote
-query = quote("SELECT * FROM Customer")
-response = _get(f"{QUICKBOOKS_URL}/v3/company/1234/query?query={query}")
-# response = {"QueryResponse": {"Customer": [...], "startPosition": 1, "maxResults": N, "totalCount": N}}
-customers = response["QueryResponse"]["Customer"]
-assert any(c["DisplayName"] == "Expected" for c in customers)
-```
-
-**⚠️ QuickBooks paths:** All endpoints start with `/v3/company/{realm_id}/`. Use `1234` as default realm_id.
-**⚠️ QuickBooks LIST:** There is NO `/customers` list endpoint. Use `/query?query=SELECT * FROM Customer` instead.
-
-### Pattern C: Google-Style `{"kind": "...", "items": [...]}`
-**Used by:** YouTube
-
-```python
-# GET single (still wrapped in items array!)
-response = _get(f"{YOUTUBE_URL}/videos/{video_id}")
-# response = {"kind": "youtube#videoListResponse", "pageInfo": {...}, "items": [video_obj]}
-video = response["items"][0]
-assert video["snippet"]["title"] == "Expected Title"
-
-# LIST — same structure, multiple items
-response = _get(f"{YOUTUBE_URL}/playlists")
-# response = {"kind": "youtube#playlistListResponse", "pageInfo": {...}, "items": [...]}
-playlists = response["items"]
-```
-
-**⚠️ YouTube deeply nested:** Titles at `["snippet"]["title"]`, stats at `["statistics"]["viewCount"]`, thumbnails at `["snippet"]["thumbnails"]["default"]["url"]`.
-
-### Pattern D: Direct Object (No Wrapper)
+### Pattern B: Direct Object (No Wrapper)
 **Used by:** Instagram
 
 ```python
@@ -179,7 +125,7 @@ media_items = response["data"]
 
 **⚠️ Instagram paths:** User endpoints use `/{user_id}/media`, NOT `/me/media`.
 
-### Pattern E: Entity-Named Key (No `type` Field)
+### Pattern C: Entity-Named Key (No `type` Field)
 **Used by:** Google Classroom
 
 ```python
@@ -197,7 +143,7 @@ courses = response["courses"]
 
 **⚠️ Classroom paths:** All endpoints are prefixed with `/v1/`.
 
-### Pattern F: Amazon Seller (Nested Attribute Arrays)
+### Pattern D: Amazon Seller (Nested Attribute Arrays)
 **Used by:** Amazon Seller API
 
 ```python
@@ -235,7 +181,7 @@ For each inferred operation:
 
 1. **Determine the correct API and endpoint** using `API_DOCUMENTATION.md` and env vars
 2. **Write a test that GETs the expected result** and verifies the state change
-3. **Use the correct response pattern** (A-F above) for that API
+3. **Use the correct response pattern** (A-D above) for that API
 4. **Assert on deterministic fields** that the instruction specifies
 
 ### Step 3: Field Classification
@@ -336,19 +282,13 @@ response = requests.get(url)
 ### 1. CREATE ≠ GET Responses (Amazon)
 Amazon's `POST` returns `{"status": "ACCEPTED", "sku": "..."}` but `GET` returns `{"listing": {"sku": "...", "attributes": {...}}}`. Don't assume the CREATE response is what GET returns.
 
-### 2. QuickBooks Query vs GET
-`GET /v3/company/{realm_id}/invoice/{id}` returns `{"Invoice": {...}}` but listing requires the query endpoint: `GET /v3/company/{realm_id}/query?query=SELECT * FROM Invoice` which returns `{"QueryResponse": {"Invoice": [...]}}`. There is NO bare list endpoint.
-
-### 3. YouTube Items Array
-Even a single video GET wraps the result in `{"items": [video]}`. Always access `response["items"][0]` for single-entity responses.
-
-### 4. Amazon Attribute Arrays
+### 2. Amazon Attribute Arrays
 Every Amazon attribute is `[{"value": X, "marketplace_id": Y}]`. Access pattern is always `attributes["field"][0]["value"]`.
 
-### 5. Instagram Direct Objects
+### 3. Instagram Direct Objects
 Instagram has NO wrapper. `_get(f"{URL}/media/{id}")` returns the media object directly.
 
-### 6. Inferring Specific Values
+### 4. Inferring Specific Values
 When the task instruction mentions specific values (e.g., "set the price to $29.99", "change the title to 'Summer Sale'"), use those exact values in assertions. When the instruction is vague (e.g., "update the listing"), assert on existence and type rather than specific values.
 
 ---
@@ -359,11 +299,7 @@ Derive from docker-compose service names:
 - Service `amazon-seller-api` → `AMAZON_SELLER_API_URL`
 - Service `etsy-api` → `ETSY_API_URL`
 - Service `instagram-api` → `INSTAGRAM_API_URL`
-- Service `quickbooks-api` → `QUICKBOOKS_API_URL`
-- Service `youtube-api` → `YOUTUBE_API_URL`
 - Service `pinterest-api` → `PINTEREST_API_URL`
-- Service `ring-api` → `RING_API_URL`
-- Service `myfitnesspal-api` → `MYFITNESSPAL_API_URL`
 - Service `linear-api` → `LINEAR_API_URL`
 - Service `google-classroom-api` → `GOOGLE_CLASSROOM_API_URL`
 

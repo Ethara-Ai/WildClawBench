@@ -93,7 +93,7 @@ Two invariants hold this whole picture together:
 ## 1.1 The fleet: `environment/`
 
 `environment/` contains **101 mock API services**, one directory per API named
-`<api>-api/` (e.g. `airbnb-api/`, `quickbooks-api/`, `gmail-api/`).
+`<api>-api/` (e.g. `etsy-api/`, `xero-api/`, `gmail-api/`).
 
 Each service directory carries a fixed contract:
 
@@ -169,10 +169,10 @@ single bad per-task overlay from taking down the whole shared container (which
 would also disable the admin/injection plane). Host-side importers and
 validators stay strict; only the live container is lenient.
 
-### Canonical `<name>_data.py` shape (airbnb example)
+### Canonical `<name>_data.py` shape (etsy example)
 
 ```python
-_store = get_store("airbnb-api")
+_store = get_store("etsy-api")
 _store.register("reservations",
                 primary_key="reservation_id",
                 initial_loader=lambda: [])       # born-empty table
@@ -235,10 +235,10 @@ the per-container `/admin/drift/log`, and the host-side DriftDirector's
 
 ## 1.5 `server.py` wiring order (matters)
 
-Each service's `server.py` wires the planes in a fixed order (airbnb example):
+Each service's `server.py` wires the planes in a fixed order (etsy example):
 
 ```python
-import airbnb_data
+import etsy_data
 try:
     from tracking_middleware import install_tracker
     from admin_plane import install_admin_plane
@@ -247,7 +247,7 @@ except ModuleNotFoundError:            # standalone runs: no-op stubs
 
 app = FastAPI()
 install_tracker(app)                    # FIRST
-install_admin_plane(app, store=airbnb_data._store)   # THEN admin
+install_admin_plane(app, store=etsy_data._store)   # THEN admin
 ```
 
 The ordering is deliberate: installing the tracker first keeps the `/admin`
@@ -365,8 +365,8 @@ the mock**, which is the whole point of the exercise.
 `task_parser.parse_native_task` reads the corpus into a typed task with
 `persona_dir` / `data_dir` / `gt_dir` fields, and `_append_workspace_hint`
 appends the list of staged `home/` files to the prompt so the agent knows what
-inputs it has. `_normalize_api_name` coerces bare names like `quickbooks` to the
-canonical `quickbooks-api`.
+inputs it has. `_normalize_api_name` coerces bare names like `salesforce` to the
+canonical `salesforce-api`.
 
 ## 2.2 `_augment_task_with_mocks` (`run_batch.py`)
 

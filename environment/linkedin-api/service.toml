@@ -1,5 +1,0 @@
-[service]
-name = "linkedin-api"
-port = 8062
-env_var_name = "LINKEDIN_API_URL"
-healthcheck_path = "/health"

@@ -41,10 +41,10 @@ Design properties
 Usage from a data module
 ------------------------
 
-    # environment/airbnb-api/airbnb_data.py
+    # environment/etsy-api/etsy_data.py
     from _mutable_store import get_store
 
-    _store = get_store("airbnb-api")
+    _store = get_store("etsy-api")
 
     def _initial_listings():
         return _coerce_listings(_load("listings.csv"))
@@ -647,7 +647,7 @@ class Store:
     """Holds the tables and documents for a single mock API service.
 
     One ``Store`` instance per API (keyed by API directory name, e.g.
-    "airbnb-api"). The store is reachable from anywhere in the process via
+    "etsy-api"). The store is reachable from anywhere in the process via
     ``get_store(api_name)``, so the admin plane can mutate state without the
     data module having to expose its internals.
 
@@ -926,7 +926,7 @@ def get_store(api_name: str) -> Store:
     """Return the Store for ``api_name``, creating it on first call.
 
     ``api_name`` is the directory name under ``environment/`` (e.g.
-    ``"airbnb-api"``). Using the directory name --- not a pretty name ---
+    ``"etsy-api"``). Using the directory name --- not a pretty name ---
     makes the admin plane's URL path mirror the filesystem layout, which
     helps operators when debugging.
     """
@@ -937,10 +937,10 @@ def get_store(api_name: str) -> Store:
 
 
 # ---------------------------------------------------------------------------
-# File-blob download helper (shared by drive-like APIs: box, google-drive, dropbox)
+# File-blob download helper (shared by drive-like APIs: box, google-drive)
 # ---------------------------------------------------------------------------
 #
-# The fleet's drive-shaped APIs (box-api, google-drive-api, dropbox-api) expose
+# The fleet's drive-shaped APIs (box-api, google-drive-api) expose
 # a "download file content" endpoint that returns RAW TEXT only (the design is
 # deliberately scoped to text/markdown/PDF -- images/video/audio are out of
 # scope per WildClawBench design). Each per-API <name>_data.py owns the route's
@@ -1030,8 +1030,8 @@ _DOWNLOAD_EXT_MIMES = {
 
 
 def guess_download_mime(name: str) -> str:
-    """Deterministic mime resolution for the download routes (box/dropbox,
-    whose seed rows carry no mime column).
+    """Deterministic mime resolution for the download routes (box, whose seed
+    rows carry no mime column).
 
     ``mimetypes.guess_type`` depends on the host's mime database: python:slim
     images ship no /etc/mime.types at all, and macOS's Apache table lacks

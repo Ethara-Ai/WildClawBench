@@ -1,5 +1,0 @@
-[service]
-name = "paypal-api"
-port = 8042
-env_var_name = "PAYPAL_API_URL"
-healthcheck_path = "/health"

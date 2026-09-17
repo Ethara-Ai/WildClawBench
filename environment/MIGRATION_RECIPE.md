@@ -9,18 +9,27 @@
 > lines quoted below are provenance, not runnable instructions. The live gates
 > for any `environment/**` change are `tests/test_drift_plane_smoke.py` and the
 > eager-load smoke test at the bottom of this file.
+>
+> **Fleet note (standardization to 50):** the counts and per-API precedents below
+> describe the 101-service fleet as it stood at migration time. The catalog has
+> since been standardized to 50 services, so many APIs named here no longer ship.
+> They are left in place deliberately: the shape each one taught (composite PKs,
+> document-vs-table registration, PK overrides) is what makes this a useful
+> precedent for migrating a future API, and rewriting the record would falsify it.
 
 This document is the **mechanical** procedure for migrating any remaining
 `environment/<name>-api/<name>_data.py` + matching `server.py` to the drift
 plane (`_mutable_store` + `admin_plane`).
 
-Three reference migrations are committed and serve as live templates:
+Three reference migrations drove the procedure (all three services have since
+been retired by the standardization; read a surviving CRUD module such as
+`etsy-api/etsy_data.py` for the live shape):
 
 | Cluster | Shape                          | Reference                  |
 | ------- | ------------------------------ | -------------------------- |
-| A       | Read-only CSV only             | `kraken-api/kraken_data.py`|
-| B       | Read-only CSV + singleton JSON | `plaid-api/plaid_data.py`  |
-| C       | Standard CRUD (born-empty store appended via POST, in-place patch via cancel/refund) | `airbnb-api/airbnb_data.py` |
+| A       | Read-only CSV only             | `kraken-api` (retired)     |
+| B       | Read-only CSV + singleton JSON | `plaid-api` (retired)      |
+| C       | Standard CRUD (born-empty store appended via POST, in-place patch via cancel/refund) | `airbnb-api` (retired); see `etsy-api` |
 | D       | Heavy CRUD (Cluster C × N tables, with cross-store invariants) | TODO — pattern is C × N |
 | E       | Idiosyncratic                  | per-API hand migration     |
 

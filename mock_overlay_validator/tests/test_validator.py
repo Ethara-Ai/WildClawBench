@@ -77,7 +77,7 @@ _RAGGED_NESTED_LINE_BILLS = [
 class CatalogTests(unittest.TestCase):
     def test_examples_cover_all_known_apis(self):
         apis = V.list_apis()
-        self.assertGreaterEqual(len(apis), 100)
+        self.assertGreaterEqual(len(apis), 50)
         for api in apis:
             self.assertTrue(
                 (V.EXAMPLES_DIR / api).is_dir(),

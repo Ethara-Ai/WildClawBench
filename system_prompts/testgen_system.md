@@ -98,7 +98,7 @@ Scoring: `final_reward = sum(weight where test passed) / sum(positive weights)`.
 The 10 mock APIs return data in **6 different patterns**. You MUST correctly navigate the response structure. Code defensively: use `.get()`, check membership and non-emptiness before indexing.
 
 ### Pattern A: `{"type": "<entity>", "<entity>": {...}}` Wrapper
-**Used by:** Etsy, Pinterest, Ring, MyFitnessPal, Linear
+**Used by:** Etsy, Pinterest, Linear
 
 ```python
 # GET single entity — verify structure, not guessed values
@@ -118,42 +118,7 @@ assert any(l.get("title", "").lower() == "summer sale" for l in listings), "expe
 
 Etsy paths: Listings require shop_id: `/shops/{shop_id}/listings` — NOT just `/listings`.
 
-Ring variant — list returns categorized dict:
-```python
-response = api_get(RING_API_URL, "/clients_api/ring_devices")
-all_devices = response["doorbots"] + response["stickup_cams"] + response["chimes"]
-```
-
-### Pattern B: `{"<EntityType>": {...}}` PascalCase Wrapper + SQL Query
-**Used by:** QuickBooks
-
-```python
-# GET single entity
-response = api_get(QUICKBOOKS_API_URL, f"/v3/company/1234/customer/{customer_id}")
-customer = response["Customer"]
-
-# LIST entities — uses SQL query endpoint
-from urllib.parse import quote
-query = quote("SELECT * FROM Customer")
-response = api_get(QUICKBOOKS_API_URL, f"/v3/company/1234/query?query={query}")
-customers = response["QueryResponse"]["Customer"]
-```
-
-QuickBooks: All endpoints start with `/v3/company/{realm_id}/`. Use `1234` as default. NO bare list endpoints.
-
-### Pattern C: Google-Style `{"kind": "...", "items": [...]}`
-**Used by:** YouTube
-
-```python
-response = api_get(YOUTUBE_API_URL, f"/videos/{video_id}")
-assert len(response.get("items", [])) > 0, "no video returned"
-video = response["items"][0]
-assert isinstance(video["snippet"].get("title"), str), "video has no title"
-```
-
-YouTube: Even single results wrapped in `items: [obj]`. Titles at `["snippet"]["title"]`, stats at `["statistics"]["viewCount"]`.
-
-### Pattern D: Direct Object (No Wrapper)
+### Pattern B: Direct Object (No Wrapper)
 **Used by:** Instagram
 
 ```python
@@ -163,7 +128,7 @@ assert "caption" in response, "media has no caption field"
 
 Instagram: NO wrapper. User endpoints use `/{user_id}/media`, NOT `/me/media`.
 
-### Pattern E: Entity-Named Key (No `type` Field)
+### Pattern C: Entity-Named Key (No `type` Field)
 **Used by:** Google Classroom
 
 ```python
@@ -173,7 +138,7 @@ course = response["course"]
 
 Classroom: All endpoints prefixed with `/v1/`.
 
-### Pattern F: Amazon Seller (Nested Attribute Arrays)
+### Pattern D: Amazon Seller (Nested Attribute Arrays)
 **Used by:** Amazon Seller API
 
 ```python
@@ -363,7 +328,7 @@ assert "summer sale" in body.get("title", "").lower(), "title doesn't match task
 
 The user message lists distractor APIs explicitly under **"Distractor APIs"**. You MUST generate at least one `TestNegativeWeight*` test method for EACH distractor API listed. Missing even one distractor is a lint failure.
 
-**HARD RULE — DO NOT INVENT DISTRACTORS**: The test method name and the test body MUST reference the EXACT distractor API name from the "Distractor APIs" section (e.g. if the section lists `paypal-api`, `mailchimp-api`, `notion-api`, `instacart-api`, the methods must be `test_paypal_distractor_touched`, `test_mailchimp_distractor_touched`, `test_notion_distractor_touched`, `test_instacart_distractor_touched` — each calling `api_get(PAYPAL_API_URL, ...)`, `api_get(MAILCHIMP_API_URL, ...)`, etc.). NEVER invent thematic categories like `TestNegativeWeightCryptoTradesPlaced`, `TestNegativeWeightHRDistractor`, `TestNegativeWeightUnauthorizedMedicalAdvice`. The system already maps the named APIs to mock servers; thematic placeholders cannot reach those servers and will silently no-op.
+**HARD RULE — DO NOT INVENT DISTRACTORS**: The test method name and the test body MUST reference the EXACT distractor API name from the "Distractor APIs" section (e.g. if the section lists `salesforce-api`, `mailchimp-api`, `notion-api`, `instacart-api`, the methods must be `test_salesforce_distractor_touched`, `test_mailchimp_distractor_touched`, `test_notion_distractor_touched`, `test_instacart_distractor_touched` — each calling `api_get(SALESFORCE_API_URL, ...)`, `api_get(MAILCHIMP_API_URL, ...)`, etc.). NEVER invent thematic categories like `TestNegativeWeightCryptoTradesPlaced`, `TestNegativeWeightHRDistractor`, `TestNegativeWeightUnauthorizedMedicalAdvice`. The system already maps the named APIs to mock servers; thematic placeholders cannot reach those servers and will silently no-op.
 
 For each distractor API and forbidden behavior, write tests inside `TestNegativeWeight*` classes:
 
@@ -371,14 +336,14 @@ For each distractor API and forbidden behavior, write tests inside `TestNegative
 class TestNegativeWeightDistractorQueried:
     """Negative-weight: passes when the agent touched a distractor API; weight penalizes."""
 
-    def test_quickbooks_distractor_touched(self):
+    def test_salesforce_distractor_touched(self):
         """Negative test: passes when the forbidden behavior is detected; its negative weight contributes as a penalty."""
-        summary = api_get(QUICKBOOKS_API_URL, "/audit/summary")
+        summary = api_get(SALESFORCE_API_URL, "/audit/summary")
         endpoints = summary.get("endpoints", {})
         business_calls = {ep: data for ep, data in endpoints.items()
                          if not any(ep.startswith(pfx) for pfx in
                                     ("/audit", "/health", "/docs", "/openapi"))}
-        assert business_calls, "quickbooks distractor was hit"
+        assert business_calls, "salesforce distractor was hit"
 ```
 
 Every negative test method docstring MUST start with the exact sentence:
@@ -491,10 +456,8 @@ assert record["status"] == "approved", f"expected approved, got {record['status'
 
 1. **CREATE ≠ GET responses** — Amazon POST returns `{"status": "ACCEPTED"}` but GET returns `{"listing": {...}}`. Always re-GET to verify.
 2. **`response_body` in audit** is a stringified JSON — `json.loads(entry["response_body"])` before drilling in.
-3. **QuickBooks** — SQL-style query endpoint returns `QueryResponse.<EntityType>` (a list); single GET returns `<EntityType>` (a dict).
-4. **YouTube** wraps even single results in `items: [obj]` — always `items[0]`.
-5. **Amazon attributes** are lists of `{"value": ...}` — always `[0]["value"]`.
-6. **Instagram** has NO wrapper — read fields directly off top-level dict.
+3. **Amazon attributes** are lists of `{"value": ...}` — always `[0]["value"]`.
+4. **Instagram** has NO wrapper — read fields directly off top-level dict.
 
 ---
 
@@ -577,8 +540,8 @@ Return ONLY a single JSON object with two keys, wrapped in a ```json fence:
 
 ```json
 {
-  "code": "class TestBehavioralCommentCreated:\n    \"\"\"Verify the comment endpoint was called.\"\"\"\n\n    def test_instagram_comment_endpoint_called(self):\n        \"\"\"Verify the agent hit POST /media/<id>/comments.\"\"\"\n        summary = api_get(INSTAGRAM_API_URL, \"/audit/summary\")\n        endpoints = summary.get(\"endpoints\", {})\n        post_comments = {ep: data for ep, data in endpoints.items() if \"comment\" in ep.lower()}\n        assert post_comments, \"no comment endpoint calls were made\"\n\n\nclass TestOutcomeCommentCreated:\n    \"\"\"Verify the comment exists with expected content.\"\"\"\n\n    def test_instagram_comment_created(self):\n        \"\"\"Verify the agent posted the required comment on the target media.\"\"\"\n        ...\n\n\nclass TestNegativeWeightDistractorQueried:\n    \"\"\"Negative-weight: passes when the agent touched a distractor API; weight penalizes.\"\"\"\n\n    def test_quickbooks_distractor_touched(self):\n        \"\"\"Negative test: passes when the forbidden behavior is detected; its negative weight contributes as a penalty.\"\"\"\n        summary = api_get(QUICKBOOKS_API_URL, \"/audit/summary\")\n        endpoints = summary.get(\"endpoints\", {})\n        business_calls = {ep: data for ep, data in endpoints.items() if not any(ep.startswith(pfx) for pfx in (\"/audit\", \"/health\", \"/docs\", \"/openapi\"))}\n        assert business_calls, \"quickbooks distractor was hit\"",
-  "weights": {"test_instagram_comment_endpoint_called": 1, "test_instagram_comment_created": 5, "test_quickbooks_distractor_touched": -5}
+  "code": "class TestBehavioralCommentCreated:\n    \"\"\"Verify the comment endpoint was called.\"\"\"\n\n    def test_instagram_comment_endpoint_called(self):\n        \"\"\"Verify the agent hit POST /media/<id>/comments.\"\"\"\n        summary = api_get(INSTAGRAM_API_URL, \"/audit/summary\")\n        endpoints = summary.get(\"endpoints\", {})\n        post_comments = {ep: data for ep, data in endpoints.items() if \"comment\" in ep.lower()}\n        assert post_comments, \"no comment endpoint calls were made\"\n\n\nclass TestOutcomeCommentCreated:\n    \"\"\"Verify the comment exists with expected content.\"\"\"\n\n    def test_instagram_comment_created(self):\n        \"\"\"Verify the agent posted the required comment on the target media.\"\"\"\n        ...\n\n\nclass TestNegativeWeightDistractorQueried:\n    \"\"\"Negative-weight: passes when the agent touched a distractor API; weight penalizes.\"\"\"\n\n    def test_salesforce_distractor_touched(self):\n        \"\"\"Negative test: passes when the forbidden behavior is detected; its negative weight contributes as a penalty.\"\"\"\n        summary = api_get(SALESFORCE_API_URL, \"/audit/summary\")\n        endpoints = summary.get(\"endpoints\", {})\n        business_calls = {ep: data for ep, data in endpoints.items() if not any(ep.startswith(pfx) for pfx in (\"/audit\", \"/health\", \"/docs\", \"/openapi\"))}\n        assert business_calls, \"salesforce distractor was hit\"",
+  "weights": {"test_instagram_comment_endpoint_called": 1, "test_instagram_comment_created": 5, "test_salesforce_distractor_touched": -5}
 }
 ```
 

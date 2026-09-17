@@ -4,9 +4,9 @@
 CONTEXT
 -------
 environment/skills/<name>-api-connector/ ships one of two shapes:
-  * RICH  (10 dirs): hand-authored references/<name>-api-guide.md + scripts/fetch_*.py
-          (quickbooks, etsy, ring, ...). These are upstream/curated — NEVER touched.
-  * THIN  (91 dirs): SKILL.md only. SKILL.md carries a parseable endpoint table
+  * RICH  (6 dirs): hand-authored references/<name>-api-guide.md + scripts/fetch_*.py
+          (etsy, amazon-seller, linear, ...). These are upstream/curated — NEVER touched.
+  * THIN  (44 dirs): SKILL.md only. SKILL.md carries a parseable endpoint table
           (| Method | Path |) plus the env-var name in its frontmatter/body.
 
 This standalone tool reads each THIN connector's SKILL.md endpoint table and the
@@ -54,7 +54,7 @@ from pathlib import Path
 # Curated, hand-authored connectors — never overwrite unless --include-rich.
 RICH_CONNECTORS = {
     "amazon-seller", "etsy", "google-classroom", "instagram", "linear",
-    "myfitnesspal", "pinterest", "quickbooks", "ring", "youtube",
+    "pinterest",
 }
 
 # --bundle-root enrich mode: the two doc subdirs copied from live -> bundle, and the
@@ -410,7 +410,7 @@ def enrich_one(bundle_skill_dir: Path, skills_root: Path, force: bool,
     if not live_subdirs:
         return "skipped-empty"
 
-    # Already rich and not forcing -> leave it (e.g. originally-rich quickbooks).
+    # Already rich and not forcing -> leave it (e.g. originally-rich etsy).
     if all((bundle_skill_dir / s).is_dir() for s in live_subdirs) and not force:
         return "skipped-rich"
 
@@ -451,7 +451,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--env-root", default="environment",
                     help="Dir holding <name>-api/service.toml (default: environment)")
     ap.add_argument("--only", default="",
-                    help="Comma-separated api names to restrict to (e.g. gmail,outlook).")
+                    help="Comma-separated api names to restrict to (e.g. gmail,slack).")
     ap.add_argument("--force", action="store_true",
                     help="Regenerate even if references/ already exists.")
     ap.add_argument("--include-rich", action="store_true",

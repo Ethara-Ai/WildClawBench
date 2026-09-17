@@ -1,5 +1,0 @@
-[service]
-name = "vimeo-api"
-port = 8099
-env_var_name = "VIMEO_API_URL"
-healthcheck_path = "/health"

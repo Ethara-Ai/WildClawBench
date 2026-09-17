@@ -110,7 +110,7 @@ def _created_ids(op: Dict[str, Any]) -> Set[str]:
 def _row_ids(row: Dict[str, Any]) -> Set[str]:
     """All identifier-ish values on a row, case-insensitively.
 
-    Stores key rows by heterogeneous pk columns (``Id`` for quickbooks,
+    Stores key rows by heterogeneous pk columns (``Id`` for salesforce,
     ``item_id`` for monday, ``sys_id`` for servicenow, ``objectID`` for
     algolia, ``file_key``/``component_key`` for figma, ``*_key`` for
     jira/confluence, ...). A static validator has no /admin/tables to consult,
