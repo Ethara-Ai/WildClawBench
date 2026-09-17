@@ -314,8 +314,22 @@ def test_pf_main_missing_green_and_red(pf, tmp_path, capsys, monkeypatch):
     monkeypatch.setattr(sys, "argv", ["preflight_task.py", str(tmp_path / "nope")])
     assert pf.main() == 2
     capsys.readouterr()
-    # fully green task -> exit 0
+    # fully green task -> exit 0. "Green" now includes the three task-format
+    # standards (derived date, TRUTH.md sections, prompt header block), so the
+    # fixture has to declare a window and carry both files.
     task = _mk_task(tmp_path)
+    (task / "task.yaml").write_text(
+        "task_type: ops\nsystem_prompt: be helpful\n"
+        "required_apis: [widget]\ndistractor_apis: []\n"
+        "window: 2026-10-06 to 2026-10-11\ntimezone: America/Chicago\n",
+        encoding="utf-8")
+    (task / "TRUTH.md").write_text(
+        "# TRUTH\n\n## 1. Focal Event\n\nx\n\n## 2. Canonical Solve Path\n\ny\n"
+        "\n## 3. Value Lock\n\nz\n", encoding="utf-8")
+    (task / "prompts.txt").write_text(
+        "# task_id: TASK\n# persona: Widget Tester\n# timezone: America/Chicago\n"
+        "# window: 2026-10-06 to 2026-10-11 (6 days)\n# turn_count: 2\n\n"
+        "--- TURN T0\nhi\n--- TURN T1\nbye\n", encoding="utf-8")
     md = task / "mock_data" / "widget-api"
     md.mkdir()
     (md / "items.csv").write_text("id,name\n1,a\n", encoding="utf-8")

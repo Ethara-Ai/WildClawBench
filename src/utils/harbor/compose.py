@@ -126,8 +126,14 @@ def resolve_current_date(task_dir: Optional[Path] = None) -> str:
 
     A hard-coded date contradicts any task whose prompts.json narrates a
     different window, so date-relative logic inside the environment disagrees
-    with the agent's simulated clock. Falls back to DEFAULT_CURRENT_DATE when no
-    task dir is supplied or the task declares no resolvable instant.
+    with the agent's simulated clock — that mismatch has already been stripped
+    out of delivered bundles by hand once. Resolution order:
+
+    1. The sim clock's T0 instant, when the turn schedule carries one.
+    2. The task's declared window start, which covers schedules whose turns
+       omit timestamps (a window with no resolvable T0 previously fell all the
+       way through to the static default and shipped the wrong date).
+    3. DEFAULT_CURRENT_DATE, only for a task that declares neither.
     """
     if not task_dir:
         return DEFAULT_CURRENT_DATE
@@ -136,8 +142,21 @@ def resolve_current_date(task_dir: Optional[Path] = None) -> str:
 
         sim = compute_sim_clock({"task_dir": str(task_dir)})
     except Exception:  # pragma: no cover - never fail a bundle over a clock read
-        return DEFAULT_CURRENT_DATE
-    return sim.iso[:10] if sim is not None else DEFAULT_CURRENT_DATE
+        sim = None
+    if sim is not None:
+        return sim.iso[:10]
+    return _window_start_date(task_dir) or DEFAULT_CURRENT_DATE
+
+
+def _window_start_date(task_dir: Path) -> Optional[str]:
+    """The declared window's first day, per src/utils/task_standard.py."""
+    try:
+        from src.utils.task_standard import resolve_window
+
+        window = resolve_window(Path(task_dir))
+    except Exception:  # pragma: no cover - never fail a bundle over a date read
+        return None
+    return window.current_date if window is not None else None
 
 
 def runtime_env_defaults(task_dir: Optional[Path] = None) -> dict:

@@ -14,6 +14,7 @@ Exit code 0 when there are no FAILs (WARNs are allowed), 1 otherwise.
 """
 from __future__ import annotations
 
+import argparse
 import csv
 import importlib.util
 import json
@@ -28,6 +29,11 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 ENV = REPO / "environment"
 DEFAULT_TASK = REPO / "input" / "IAN_001 -- Bhavik Jain"
+
+# Section 6 enforces the three task-format standards on NEW tasks. Delivered
+# corpora predate them, so --legacy downgrades those FAILs to WARNs instead of
+# forcing edits to tasks that already shipped.
+LEGACY = False
 
 # OpenClaw native tools that can appear as a loud-inject `service` but are NOT
 # mock HTTP APIs (they deliver in-band to the agent, so they have no env folder).
@@ -491,8 +497,133 @@ def check_turns_and_grading(task: Path) -> None:
 
 
 # --------------------------------------------------------------------------- #
-def main() -> int:
-    task = Path(sys.argv[1]).expanduser() if len(sys.argv) > 1 else DEFAULT_TASK
+# 6. task-format standards (derived date / TRUTH.md sections / prompt header)
+# --------------------------------------------------------------------------- #
+def _standard(ok: bool, good: str, bad: str) -> None:
+    """Record a standards check, honouring --legacy for the failing case."""
+    rec(PASS if ok else (WARN if LEGACY else FAIL), good if ok else bad)
+
+
+def _first_existing(task: Path, names) -> Path | None:
+    return next((task / n for n in names if (task / n).is_file()), None)
+
+
+def _prompts_json_facts(task: Path) -> tuple[dict, int | None]:
+    """Identity fields and the real turn count, straight off prompts.json."""
+    pj = task / "prompts.json"
+    if not pj.is_file():
+        return {}, None
+    try:
+        data = json.loads(pj.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}, None
+    if not isinstance(data, dict):
+        return {}, None
+    turns = data.get("turns")
+    return data, len(turns) if isinstance(turns, list) else None
+
+
+def check_task_standards(task: Path) -> None:
+    section("6. task-format standards")
+    if str(REPO) not in sys.path:
+        sys.path.insert(0, str(REPO))
+    try:
+        from src.utils import task_standard as ts
+    except Exception as exc:  # noqa: BLE001
+        rec(FAIL, f"cannot import src.utils.task_standard: {exc}")
+        return
+
+    window = ts.resolve_window(task)
+    _check_derived_date(task, ts, window)
+    _check_truth_md(task, ts)
+    _check_prompt_header(task, ts, window)
+
+
+def _check_derived_date(task: Path, ts, window) -> None:
+    """(A) The bundle's date must come from the task's own window."""
+    if window is None:
+        _standard(False, "", "task declares no window (prompts.json window/turn "
+                            "timestamps or task.yaml window) — CURRENT_DATE "
+                            "cannot be derived and would fall back to a static date")
+        return
+    rec(PASS, f"window {window.start.isoformat()}..{window.end.isoformat()} "
+              f"({window.days} days) from {window.source}")
+    try:
+        from src.utils.harbor.compose import resolve_current_date
+
+        derived = resolve_current_date(task)
+    except Exception as exc:  # noqa: BLE001
+        rec(FAIL, f"cannot resolve CURRENT_DATE: {exc}")
+        return
+    err = ts.check_current_date(derived, window)
+    _standard(err is None, f"CURRENT_DATE {derived} derives from the task window", err or "")
+
+    toml_date = _task_toml_current_date(task)
+    if toml_date is not None:
+        err = ts.check_current_date(toml_date, window)
+        _standard(err is None, f"task.toml CURRENT_DATE {toml_date} inside window",
+                  f"task.toml {err}")
+
+
+_TOML_DATE_RE = re.compile(r'^\s*CURRENT_DATE\s*=\s*"([^"]*)"', re.MULTILINE)
+
+
+def _task_toml_current_date(task: Path) -> str | None:
+    """The CURRENT_DATE a staged task.toml pins, if the bundle carries one."""
+    for candidate in (task / "task.toml", task / "data" / "task.toml"):
+        if candidate.is_file():
+            m = _TOML_DATE_RE.search(candidate.read_text(encoding="utf-8"))
+            return m.group(1) if m else ""
+    return None
+
+
+def _check_truth_md(task: Path, ts) -> None:
+    """(B) TRUTH.md carries exactly the three pilot-rework sections."""
+    truth = _first_existing(task, ts.TRUTH_FILENAMES)
+    if truth is None:
+        _standard(False, "", f"none of {list(ts.TRUTH_FILENAMES)} present — the "
+                             f"task ships no ground-truth narrative")
+        return
+    err = ts.check_truth_sections(truth.read_text(encoding="utf-8"))
+    _standard(err is None,
+              f"{truth.name} has exactly {list(ts.TRUTH_SECTIONS)}", err or "")
+
+
+def _check_prompt_header(task: Path, ts, window) -> None:
+    """(C) The prompt file opens with the five-line header block."""
+    prompt = _first_existing(task, ts.PROMPT_FILENAMES)
+    if prompt is None:
+        _standard(False, "", f"none of {list(ts.PROMPT_FILENAMES)} present")
+        return
+    facts, turn_count = _prompts_json_facts(task)
+    errors = ts.check_prompt_header(
+        prompt.read_text(encoding="utf-8"),
+        task_id=str(facts.get("task_id") or ""),
+        persona=str(facts.get("persona") or ""),
+        timezone=str(facts.get("timezone") or ""),
+        window=window,
+        turn_count=turn_count,
+    )
+    if not errors:
+        rec(PASS, f"{prompt.name} opens with the 5-line header block")
+        return
+    for err in errors:
+        _standard(False, "", f"{prompt.name}: {err}")
+
+
+# --------------------------------------------------------------------------- #
+def main(argv: list[str] | None = None) -> int:
+    global LEGACY
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("task", nargs="?", default=str(DEFAULT_TASK),
+                    help="task bundle dir (default: IAN_001)")
+    ap.add_argument("--legacy", action="store_true",
+                    help="downgrade task-format-standard FAILs to WARNs, for "
+                         "corpora authored before the standards landed")
+    args = ap.parse_args(sys.argv[1:] if argv is None else argv)
+    LEGACY = args.legacy
+
+    task = Path(args.task).expanduser()
     if not task.is_dir():
         print(f"task dir not found: {task}")
         return 2
@@ -502,6 +633,7 @@ def main() -> int:
     check_mock_data(task)
     check_inject(task, required, distractor)
     check_turns_and_grading(task)
+    check_task_standards(task)
     print("\n" + "=" * 60)
     print(f"SUMMARY: {_counts[PASS]} pass · {_counts[WARN]} warn · {_counts[FAIL]} fail")
     print("=" * 60)

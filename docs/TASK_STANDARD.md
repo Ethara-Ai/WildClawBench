@@ -31,6 +31,52 @@ cp -R declarative/_build/<task_id>/ input/<task_id>/             # promote
 pytest tests/test_drift_plane_smoke.py -q                        # must stay 6 passed
 ```
 
+## Format standards
+
+Three properties are machine-checked, emitted by
+`script/compile_declarative_task.py` and enforced as **fail** by section 6 of
+`script/preflight_task.py` (`src/utils/task_standard.py` holds the shared
+rules, so generator and validator cannot drift). Corpora authored before the
+standards landed validate under `preflight_task.py --legacy`, which downgrades
+these three to warnings.
+
+**1. The date is derived, never hard-coded.** A task declares its window —
+`metadata.json` `"window": {"start": ..., "end": ...}`, or ISO `applied_at`
+stamps on the stages, whichever is present. The compiler writes it to
+`task.yaml`, and `CURRENT_DATE` (task.toml `[environment.env]` and
+docker-compose) resolves to the sim clock's T0 instant, falling back to **the
+window's first day**. Preflight fails a task that declares no window, or whose
+`task.toml` pins a date outside it. A hard-coded date contradicts the prompts
+shipping beside it and has already forced one delivery rework.
+
+**2. `TRUTH.md` has exactly three sections**, in this order, nothing else at
+`##` level:
+
+```markdown
+## 1. Focal Event
+## 2. Canonical Solve Path
+## 3. Value Lock
+```
+
+Numbering is optional and the first heading may carry a qualifier
+(`## 1. Focal Event and Scope`). The compiler emits a filled-in skeleton when
+the source has no `TRUTH.md`.
+
+**3. `prompts.txt` opens with this five-line block**, before anything else:
+
+```
+# task_id: eric_lambert_7f3a9c2e-4b1d-4e6a-9f28-3c7d5a01b2e5
+# persona: Eric Isabel Lambert
+# timezone: America/Chicago
+# window: 2026-10-06 to 2026-10-11 (6 days)
+# turn_count: 20
+```
+
+`N days` is the **inclusive** span (`end - start + 1`), `turn_count` must equal
+the real `prompts.json` turn count, and `task_id`/`persona`/`timezone` are
+cross-checked against `prompts.json`. Further `# key: value` provenance lines
+may follow the block.
+
 ## World-state rules
 
 1. **Pre-T0 state lives in overlays, not stages.** API baseline →

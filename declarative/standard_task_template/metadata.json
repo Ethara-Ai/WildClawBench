@@ -7,11 +7,10 @@
   "task_type": "event_planning_reconciliation",
   "required_apis": ["gmail"],
   "distractor_apis": "auto",
+  "persona": "Brian Davis",
+  "timezone": "America/Chicago",
+  "window": {"start": "2026-07-25", "end": "2026-07-26"},
   "banner": {
-    "task_id": "standard_task_template",
-    "persona": "brian-davis",
-    "window": "Day 1 through Day 2 (2 simulated days)",
-    "timezone": "America/Chicago",
     "note": "STANDARD TEMPLATE - copy this task as the starting point for every new task; see docs/TASK_STANDARD.md"
   }
 }
