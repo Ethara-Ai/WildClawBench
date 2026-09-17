@@ -14,6 +14,7 @@ from src.utils.inject_validator import (
     run_authoring_validation,
     validate_inject_script,
 )
+from src.utils.skills_inference import catalog_apis
 
 URLS = {"google-classroom-api": "http://127.0.0.1:1", "mailchimp-api": "http://127.0.0.1:2"}
 
@@ -384,3 +385,72 @@ def test_fs_tree_shape_warning_absent_without_staged_data_home(tmp_path):
     warnings = run_authoring_validation(
         _script(_seed_stage(), stage), host_api_to_url=URLS, mock_data_root=tmp_path)
     assert not any(d["status"] == "fs-dst-tree-mismatch" for d in warnings)
+
+
+# --------------------------------------------------------------------------- #
+# Catalog gate: an op may only name a service the fleet actually ships.
+#
+# Resolving against host_api_to_url is a different question. The mock image
+# bakes a port manifest that outlives any fleet composition, so a service
+# pruned off disk can still publish a port and hand the injector a URL; its
+# admin calls then miss for the whole run. The catalog is read off disk at
+# validation time so restoring a service fixes its ops with no code change.
+# --------------------------------------------------------------------------- #
+ABSENT = "no-such-service-api"
+OFF_CATALOG_URLS = {**URLS, ABSENT: "http://127.0.0.1:3"}
+
+
+def _off_catalog_stage():
+    return _stage(1, 0, 1, silent=[{
+        "id": "loud_partner_page_reassurance", "service": ABSENT,
+        "admin": {"op": "patch", "table": "posts", "pk": "urn:li:share:c105",
+                  "set": {"commentary": "corridor campaign continues"}},
+    }])
+
+
+def test_a_service_the_fleet_does_not_ship_is_fatal():
+    assert ABSENT not in catalog_apis()
+    with pytest.raises(InjectAuthoringError) as ei:
+        run_authoring_validation(_script(_seed_stage(), _off_catalog_stage()),
+                                 host_api_to_url=OFF_CATALOG_URLS, mock_data_root=None)
+    defect = next(d for d in ei.value.defects if d["status"] == "service-not-in-catalog")
+    assert ABSENT in defect["reason"]
+    assert defect["id"] == "loud_partner_page_reassurance"
+
+
+def test_a_service_on_disk_clears_the_gate():
+    fatal, _ = validate_inject_script(
+        _script(_seed_stage(), _stage(1, 0, 1, silent=[_rest_patch(
+            "s1", "google-classroom-api", "901110051", {"dueDate": {"year": 2027}})])),
+        host_api_to_url=URLS, mock_data_root=None)
+    assert not any(d["status"] == "service-not-in-catalog" for d in fatal)
+
+
+def test_the_gate_reads_the_live_catalog_rather_than_a_fixed_list(monkeypatch):
+    # A sibling restoring the service to environment/ must fix its ops without
+    # anyone editing this module.
+    monkeypatch.setattr("src.utils.inject_validator.catalog_apis",
+                        lambda *a, **k: [*catalog_apis(), ABSENT])
+    fatal, _ = validate_inject_script(
+        _script(_seed_stage(), _off_catalog_stage()),
+        host_api_to_url=OFF_CATALOG_URLS, mock_data_root=None)
+    assert not any(d["status"] == "service-not-in-catalog" for d in fatal)
+
+
+def test_an_empty_catalog_accuses_nobody(monkeypatch):
+    # Stripped checkout: nothing to validate against is not "everything is wrong".
+    monkeypatch.setattr("src.utils.inject_validator.catalog_apis", lambda *a, **k: [])
+    fatal, _ = validate_inject_script(
+        _script(_seed_stage(), _off_catalog_stage()),
+        host_api_to_url=OFF_CATALOG_URLS, mock_data_root=None)
+    assert not any(d["status"] == "service-not-in-catalog" for d in fatal)
+
+
+def test_a_slug_in_neither_the_stack_nor_the_catalog_still_reads_as_unresolved():
+    # The two checks answer different questions; the URL one keeps precedence so
+    # a bare slug still gets the "use the canonical '<name>-api' slug" hint.
+    with pytest.raises(InjectAuthoringError) as ei:
+        run_authoring_validation(_script(_seed_stage(), _stage(1, 0, 1, silent=[
+            _rest_patch("s1", "google-classroom", "901110051", {"dueDate": {}})])),
+            host_api_to_url=URLS, mock_data_root=None)
+    assert [d["status"] for d in ei.value.defects] == ["unresolved"]

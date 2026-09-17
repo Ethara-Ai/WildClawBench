@@ -14,6 +14,7 @@ from src.utils.inject_director import (
     InjectStage,
     parse_narrative_instant,
 )
+from src.utils.skills_inference import catalog_apis
 
 LOG = logging.getLogger("wildclaw.inject")
 
@@ -37,6 +38,32 @@ class InjectAuthoringError(Exception):
 
 def _op_service(op: Dict[str, Any]) -> Optional[str]:
     return op.get("service") or op.get("api")
+
+
+def _validate_op_catalog(
+    stage: InjectStage, op: Dict[str, Any], service: str, catalog: Set[str],
+) -> List[Dict[str, Any]]:
+    """Fatal defect for an op addressed to a service the fleet does not ship.
+
+    Resolving against ``host_api_to_url`` is not the same check: the mock image
+    bakes a port manifest that outlives any given fleet composition, so a
+    service pruned from ``environment/`` can still publish a port and hand the
+    injector a URL. Every admin call against it then 404s mid-run, which reads
+    as a runtime flake rather than the authoring error it is.
+
+    The catalog is read off disk at validation time rather than pinned to a
+    list, so a service being restored to the fleet fixes its ops with no change
+    here. An empty catalog means there is nothing to validate against (stripped
+    checkout) and accuses nobody.
+    """
+    if not catalog or service in catalog:
+        return []
+    return [{
+        "stage": stage.name, "id": op.get("id"), "status": "service-not-in-catalog",
+        "reason": f"service {service!r} is not in the environment catalog — no "
+                  f"environment/{service}/service.toml exists, so the fleet cannot "
+                  "serve it and every admin call the op makes would miss",
+    }]
 
 
 def _resolve_slug(service: Optional[str], urls: Dict[str, Any]) -> Optional[str]:
@@ -363,6 +390,7 @@ def validate_inject_script(
     mirroring the runtime firing order (silent before loud within a stage).
     """
     urls = host_api_to_url or {}
+    catalog = set(catalog_apis())
     fatal: List[Dict[str, Any]] = []
     warnings: List[Dict[str, Any]] = []
 
@@ -417,6 +445,11 @@ def validate_inject_script(
                     "stage": stage.name, "id": oid, "status": "unresolved",
                     "reason": f"no admin URL for {raw_service!r} (use the canonical '<name>-api' slug)",
                 })
+                continue
+
+            off_catalog = _validate_op_catalog(stage, op, resolved, catalog)
+            if off_catalog:
+                fatal.extend(off_catalog)
                 continue
 
             kind = _op_kind(op)
