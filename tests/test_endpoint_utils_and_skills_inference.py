@@ -38,10 +38,12 @@ from src.utils import skills_inference as si  # noqa: E402
 
 @pytest.fixture(autouse=True)
 def _clear_catalog_cache():
-    """_build_catalog is lru_cached on the env-dir string; keep tests isolated."""
+    """_build_catalog / _disk_services are lru_cached on the env-dir string."""
     si._build_catalog.cache_clear()
+    si._disk_services.cache_clear()
     yield
     si._build_catalog.cache_clear()
+    si._disk_services.cache_clear()
 
 
 def _make_env(tmp_path: Path, api_names: list[str]) -> Path:
@@ -353,6 +355,54 @@ def test_available_apis_real_repo_environment_contains_flagships() -> None:
 
 def test_domain_tags_alias_is_curated_tags() -> None:
     assert si.DOMAIN_TAGS is si._CURATED_TAGS
+
+
+# ---------------------------------------------------------------------------
+# Section D2 — catalog_apis (disk truth: the standardized fleet)
+# ---------------------------------------------------------------------------
+
+def test_catalog_apis_lists_every_service_toml_dir(tmp_path: Path) -> None:
+    env = _make_env(tmp_path, ["notion-api", "stripe-api"])
+    (env / "ghost-api").mkdir()  # no service.toml -> not a service
+    assert si.catalog_apis(env) == ["notion-api", "stripe-api"]
+
+
+def test_catalog_apis_keeps_keywordless_services(tmp_path: Path) -> None:
+    # Divergence from available_apis by design: 'a-api' compiles to no keyword
+    # matchers so it can never be INFERRED, but it is a real mountable service
+    # and must still be part of the fleet (and therefore distractable).
+    env = _make_env(tmp_path, ["a-api", "notion-api"])
+    assert si.catalog_apis(env) == ["a-api", "notion-api"]
+    assert si.available_apis(env) == ["notion-api"]
+
+
+def test_catalog_apis_has_no_curated_fallback(tmp_path: Path) -> None:
+    # available_apis() invents a catalog when the dir is missing; catalog_apis()
+    # must not, or the hard-fail gate would validate against phantom services.
+    missing = tmp_path / "does-not-exist"
+    assert si.catalog_apis(missing) == []
+    assert si.available_apis(missing) == sorted(si._CURATED_KEYWORDS.keys())
+    empty = tmp_path / "environment"
+    empty.mkdir()
+    assert si.catalog_apis(empty) == []
+
+
+def test_catalog_apis_ignores_non_service_dirs(tmp_path: Path) -> None:
+    env = _make_env(tmp_path, ["notion-api"])
+    for junk in ("skills", "scripts", "__pycache__"):
+        (env / junk).mkdir()
+    (env / "loose-api").write_text("a file, not a dir")
+    assert si.catalog_apis(env) == ["notion-api"]
+
+
+def test_catalog_apis_real_repo_matches_service_toml_count() -> None:
+    env = REPO_ROOT / "environment"
+    on_disk = sorted(
+        d.name for d in env.iterdir()
+        if d.is_dir() and (d / "service.toml").is_file()
+    )
+    assert si.catalog_apis(env) == on_disk
+    assert on_disk  # the fleet is checked in; an empty catalog means a bad prune
 
 
 # ---------------------------------------------------------------------------

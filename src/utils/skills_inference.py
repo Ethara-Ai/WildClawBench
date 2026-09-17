@@ -4,6 +4,23 @@ The catalog of available APIs is discovered DYNAMICALLY from the `environment/`
 folder (every `<name>-api/` dir with a `service.toml`) — not hardcoded. Keyword
 matching is derived from each API's slug, with an optional curated keyword/tag
 map (`_CURATED_*`) layered on top for the flagship APIs to improve recall.
+
+Two catalogs, deliberately distinct:
+
+* `catalog_apis()` — DISK TRUTH. Every `service.toml`-bearing dir, no keyword
+  filtering and NO curated fallback; empty when the environment dir is absent.
+  This is "what can actually be mounted", and it is the set the mock image
+  bakes (mirrors mock_stack.read_api_ports / docker_utils.discover_services and
+  repackage_to_bundle._discover_service_catalog).
+* `available_apis()` — the KEYWORD-MATCHABLE catalog, which falls back to the
+  curated table when nothing is discoverable so inference still does something
+  useful in a stripped checkout.
+
+The curated `_CURATED_*` / `_GENERIC_*` tables below are recall enrichment, not
+a service registry: they name flagship APIs that may be pruned from the fleet at
+any time. Rather than hand-pruning the tables on every fleet change,
+`infer_required_apis` filters its matches against `catalog_apis()` so the tables
+can never emit a service that is not on disk.
 """
 
 from __future__ import annotations
@@ -142,6 +159,30 @@ def available_apis(environment_dir=None) -> list[str]:
     return sorted(_build_catalog(str(_env_dir(environment_dir))).keys())
 
 
+@lru_cache(maxsize=8)
+def _disk_services(env_str: str) -> tuple[str, ...]:
+    env = Path(env_str)
+    if not env.is_dir():
+        return ()
+    return tuple(sorted(
+        d.name for d in env.iterdir()
+        if d.is_dir() and (d / "service.toml").is_file()
+    ))
+
+
+def catalog_apis(environment_dir=None) -> list[str]:
+    """The standardized fleet: every service that actually exists on disk.
+
+    A service is any `<env>/<name>/service.toml`-bearing dir — the same rule the
+    mock image's baked port manifest uses, so this set is exactly what the stack
+    can serve. Unlike `available_apis` there is NO curated fallback and no
+    keyword filtering: an absent/empty environment dir yields `[]`, which callers
+    must read as "no catalog to validate against", never as "everything is
+    missing".
+    """
+    return list(_disk_services(str(_env_dir(environment_dir))))
+
+
 def infer_required_apis(prompt: str, environment_dir=None) -> list[str]:
     """Return APIs whose keywords appear in the prompt with word-boundary matching.
 
@@ -149,6 +190,12 @@ def infer_required_apis(prompt: str, environment_dir=None) -> list[str]:
     Generic matches (domain words like "invoice", "calorie", "doorbell") require
     a second hit from the same API to qualify, eliminating the false-positive
     storm from common-English words.
+
+    Matches are then intersected with `catalog_apis()` so the curated keyword
+    tables — which outlive any given fleet composition — can never infer a
+    service that has been pruned off disk. The intersection is skipped when the
+    disk catalog is empty (nothing to validate against), preserving the curated
+    fallback for stripped checkouts.
     """
     if not prompt:
         return []
@@ -163,20 +210,29 @@ def infer_required_apis(prompt: str, environment_dir=None) -> list[str]:
             matched.append(api)
         elif generic_hits >= 2 and total_hits >= 2:
             matched.append(api)
+    on_disk = set(catalog_apis(environment_dir))
+    if on_disk:
+        matched = [api for api in matched if api in on_disk]
     return sorted(matched)
 
 
 def compute_distractor_skills(required_apis: list[str], task_id: str,
                               count: int | None = None,
                               environment_dir=None) -> list[str]:
-    """Return every available API except the required ones.
+    """Return the standardized fleet minus the required APIs.
+
+    The pool is `catalog_apis()` (disk truth), not `available_apis()`: a
+    distractor has to be a service the stack can actually boot, and a
+    keyword-less slug is still a perfectly mountable service. An absent
+    environment dir therefore yields `[]` rather than the curated fallback —
+    we never advertise a connector with no server behind it.
 
     Result is sorted (deterministic, no shuffle). `task_id` and `count` are
     accepted for backward compatibility; pass `count=N` to truncate explicitly
     or leave None for the full complement (the default policy).
     """
     required_set = set(required_apis)
-    pool = [api for api in available_apis(environment_dir) if api not in required_set]
+    pool = [api for api in catalog_apis(environment_dir) if api not in required_set]
     if count is None or count <= 0 or count >= len(pool):
         return pool
     rng = random.Random(task_id or "wildclaw-default")

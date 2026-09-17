@@ -20,6 +20,7 @@ insert of repo root before `from eval...` / `from ...` imports).
 from __future__ import annotations
 
 import json
+import logging
 import math
 import sys
 from pathlib import Path
@@ -29,6 +30,8 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from eval.run_batch import (  # noqa: E402
+    ALLOW_MISSING_REQUIRED_APIS_ENV,
+    MissingRequiredApisError,
     _augment_score_with_combined_rewards,
     _augment_task_with_mocks,
     _compute_testgen_cache_key,
@@ -46,6 +49,7 @@ from eval.run_batch import (  # noqa: E402
     _write_pass_summary,
     recompute_combined,
 )
+from src.utils import skills_inference  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -891,6 +895,33 @@ class _FakeConfig:
         self.default_skills = []
 
 
+def _fake_catalog(tmp_path, names):
+    """Materialize a fake service catalog and return a config pointed at it.
+
+    `catalog_apis` identifies a service as any `service.toml`-bearing dir, and
+    lru_caches the scan per env-dir string — hence the cache_clear, since one
+    tmp_path may be populated after an earlier empty-catalog read.
+    """
+    cfg = _FakeConfig(tmp_path)
+    cfg.environment_dir.mkdir(parents=True, exist_ok=True)
+    for name in names:
+        d = cfg.environment_dir / name
+        d.mkdir(exist_ok=True)
+        (d / "service.toml").write_text('[service]\nname = "%s"\nport = 8000\n' % name)
+    skills_inference._disk_services.cache_clear()
+    skills_inference._build_catalog.cache_clear()
+    return cfg
+
+
+@pytest.fixture(autouse=True)
+def _clear_skills_inference_caches():
+    skills_inference._disk_services.cache_clear()
+    skills_inference._build_catalog.cache_clear()
+    yield
+    skills_inference._disk_services.cache_clear()
+    skills_inference._build_catalog.cache_clear()
+
+
 class TestAugmentTaskWithMocks:
     def test_populates_core_fields(self, tmp_path):
         cfg = _FakeConfig(tmp_path)
@@ -922,12 +953,7 @@ class TestAugmentTaskWithMocks:
         assert task["skills"].splitlines() == ["pdf-extract", "custom-skill", "video-frames"]
 
     def test_explicit_required_apis_declared(self, tmp_path):
-        # NOTE: pins current behavior — see SCORING_AUDIT_REPORT.md
-        # skills_inference._build_catalog returns a small hardcoded fallback
-        # catalog when the environment dir is missing. A declared API IN that
-        # fallback (etsy-api) survives; one NOT in it would be dropped as
-        # "not present in catalog". etsy-api is a stable member of the fallback.
-        cfg = _FakeConfig(tmp_path)
+        cfg = _fake_catalog(tmp_path, ["etsy-api", "linear-api"])
         task = {
             "task_id": "t4", "prompt": "hi",
             "required_apis_declared": ["etsy-api"],
@@ -936,18 +962,37 @@ class TestAugmentTaskWithMocks:
         _augment_task_with_mocks(task, cfg, mock_env_dict=None)
         assert task["required_apis"] == ["etsy-api"]
 
-    def test_declared_api_absent_from_catalog_is_dropped(self, tmp_path):
-        # NOTE: pins current behavior — see SCORING_AUDIT_REPORT.md
-        # A declared required API that is NOT in the resolved catalog is
-        # silently dropped (with a warning), leaving required_apis empty.
-        cfg = _FakeConfig(tmp_path)
+    def test_declared_api_absent_from_catalog_is_fatal(self, tmp_path):
+        # Was: dropped with a logger.warning, leaving required_apis == [] and the
+        # agent scored as a model failure for work it had no services to do.
+        cfg = _fake_catalog(tmp_path, ["etsy-api"])
         task = {
             "task_id": "t5", "prompt": "hi",
             "required_apis_declared": ["totally-made-up-api"],
             "distractor_apis_declared": "__ABSENT__",
         }
-        _augment_task_with_mocks(task, cfg, mock_env_dict=None)
-        assert task["required_apis"] == []
+        with pytest.raises(MissingRequiredApisError):
+            _augment_task_with_mocks(task, cfg, mock_env_dict=None)
+
+    def test_env_dict_filtered_to_the_full_fleet(self, tmp_path):
+        cfg = _fake_catalog(tmp_path, ["etsy-api", "linear-api"])
+        task = {
+            "task_id": "t6", "prompt": "hi",
+            "required_apis_declared": ["etsy-api"],
+        }
+        _augment_task_with_mocks(task, cfg, mock_env_dict={
+            "ETSY_API_URL": "http://etsy",
+            "LINEAR_API_URL": "http://linear",
+            "PRUNED_API_URL": "http://gone",
+            "MOCK_ADMIN_TOKEN": "keep-me",
+        })
+        # linear-api is a distractor, so its URL is exposed; a service outside
+        # the catalog is not, and non-URL vars pass through untouched.
+        assert task["env_dict"] == {
+            "ETSY_API_URL": "http://etsy",
+            "LINEAR_API_URL": "http://linear",
+            "MOCK_ADMIN_TOKEN": "keep-me",
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -955,62 +1000,185 @@ class TestAugmentTaskWithMocks:
 # ---------------------------------------------------------------------------
 
 
-class TestResolveTaskApis:
-    def test_mock_data_unions_into_required_when_undeclared(self, tmp_path):
-        cfg = _FakeConfig(tmp_path)
-        task_dir = tmp_path / "task"
-        # etsy-api is in the fallback catalog so it survives the catalog filter.
-        api_dir = task_dir / "mock_data" / "etsy-api"
-        api_dir.mkdir(parents=True)
-        (api_dir / "listings.json").write_text('{"x": 1}')
-        task = {
-            "task_id": "tm", "prompt": "hi", "task_dir": str(task_dir),
-            "distractor_apis_declared": "__ABSENT__",
-        }
-        required, distractor, overlays = _resolve_task_apis(task, cfg)
-        assert "etsy-api" in required
-        assert distractor == []
-        # overlay maps filename -> resolved absolute path
-        assert "etsy-api" in overlays
-        assert overlays["etsy-api"]["listings.json"] == str((api_dir / "listings.json").resolve())
+_FLEET = ["etsy-api", "linear-api", "notion-api", "stripe-api"]
 
-    def test_declared_required_suppresses_mock_data_union(self, tmp_path):
-        # NOTE: pins current behavior — see SCORING_AUDIT_REPORT.md
-        # When required is explicitly declared, mock_data dirs still produce
-        # overlays but do NOT union into required (author contract wins).
-        cfg = _FakeConfig(tmp_path)
+
+class TestResolveTaskApisDeclaredFirst:
+    def test_declared_list_is_the_required_set_verbatim(self, tmp_path):
+        cfg = _fake_catalog(tmp_path, _FLEET)
+        task = {"task_id": "d1", "prompt": "hi",
+                "required_apis_declared": ["etsy-api", "notion-api"]}
+        required, _, _ = _resolve_task_apis(task, cfg)
+        assert required == {"etsy-api", "notion-api"}
+
+    def test_declared_bare_names_are_normalized_to_env_dir_names(self, tmp_path):
+        cfg = _fake_catalog(tmp_path, _FLEET)
+        task = {"task_id": "d2", "prompt": "hi",
+                "required_apis_declared": ["etsy", "linear-api", "  ", "notion"]}
+        required, _, _ = _resolve_task_apis(task, cfg)
+        assert required == {"etsy-api", "linear-api", "notion-api"}
+
+    def test_declared_wins_over_mock_data_directory_scan(self, tmp_path):
+        cfg = _fake_catalog(tmp_path, _FLEET)
         task_dir = tmp_path / "task"
         api_dir = task_dir / "mock_data" / "linear-api"
         api_dir.mkdir(parents=True)
         (api_dir / "issues.json").write_text("{}")
         task = {
-            "task_id": "td", "prompt": "hi", "task_dir": str(task_dir),
+            "task_id": "d3", "prompt": "hi", "task_dir": str(task_dir),
             "required_apis_declared": ["etsy-api"],
-            "distractor_apis_declared": "__ABSENT__",
-        }
-        required, distractor, overlays = _resolve_task_apis(task, cfg)
-        assert required == {"etsy-api"}  # linear-api NOT unioned in
-        assert "linear-api" in overlays  # but overlay still produced
-
-    def test_distractor_list_minus_required(self, tmp_path):
-        cfg = _FakeConfig(tmp_path)
-        task = {
-            "task_id": "tl", "prompt": "hi",
-            "required_apis_declared": ["etsy-api"],
-            # both in fallback catalog; etsy-api overlaps required -> removed
-            "distractor_apis_declared": ["etsy-api", "linear-api"],
         }
         required, distractor, overlays = _resolve_task_apis(task, cfg)
         assert required == {"etsy-api"}
-        assert distractor == ["linear-api"]
+        # Seeded-but-undeclared lands in overlays + distractors, never required:
+        # the service still serves its data without joining the graded contract.
+        assert "linear-api" in overlays
+        assert "linear-api" in distractor
 
-    def test_distractor_absent_yields_empty(self, tmp_path):
-        cfg = _FakeConfig(tmp_path)
-        task = {"task_id": "ta", "prompt": "hi",
-                "required_apis_declared": ["etsy-api"]}
-        # key absent entirely -> distractor_is_absent -> []
-        required, distractor, overlays = _resolve_task_apis(task, cfg)
+    def test_declared_wins_over_keyword_inference(self, tmp_path):
+        cfg = _fake_catalog(tmp_path, _FLEET)
+        task = {
+            "task_id": "d4",
+            "prompt": "reconcile the stripe payouts and file them in notion",
+            "required_apis_declared": ["etsy-api"],
+        }
+        required, _, _ = _resolve_task_apis(task, cfg)
+        assert required == {"etsy-api"}
+
+    def test_inference_fires_only_without_a_declaration(self, tmp_path):
+        cfg = _fake_catalog(tmp_path, _FLEET)
+        task = {"task_id": "d5",
+                "prompt": "reconcile the stripe payouts and file them in notion"}
+        required, _, _ = _resolve_task_apis(task, cfg)
+        assert required == {"notion-api", "stripe-api"}
+
+    def test_mock_data_unions_into_required_when_undeclared(self, tmp_path):
+        cfg = _fake_catalog(tmp_path, _FLEET)
+        task_dir = tmp_path / "task"
+        api_dir = task_dir / "mock_data" / "etsy-api"
+        api_dir.mkdir(parents=True)
+        (api_dir / "listings.json").write_text('{"x": 1}')
+        task = {"task_id": "d6", "prompt": "hi", "task_dir": str(task_dir)}
+        required, _, overlays = _resolve_task_apis(task, cfg)
+        assert required == {"etsy-api"}
+        assert overlays["etsy-api"]["listings.json"] == str((api_dir / "listings.json").resolve())
+
+    def test_inferred_service_absent_from_disk_is_filtered_not_fatal(self, tmp_path):
+        # 'quickbooks' is a curated keyword whose service is off disk here.
+        # Asymmetry under test: inference is a guess, so a miss is filtered
+        # silently; a declaration is a contract, so a miss is fatal.
+        cfg = _fake_catalog(tmp_path, ["notion-api"])
+        task = {"task_id": "d7",
+                "prompt": "log this invoice in quickbooks and update notion"}
+        required, distractor, _ = _resolve_task_apis(task, cfg)
+        assert required == {"notion-api"}
         assert distractor == []
+
+
+class TestResolveTaskApisFullFleetDistractors:
+    def test_distractor_is_exactly_catalog_minus_required(self, tmp_path):
+        cfg = _fake_catalog(tmp_path, _FLEET)
+        task = {"task_id": "f1", "prompt": "hi",
+                "required_apis_declared": ["etsy-api"]}
+        required, distractor, _ = _resolve_task_apis(task, cfg)
+        assert required == {"etsy-api"}
+        assert distractor == ["linear-api", "notion-api", "stripe-api"]
+        assert set(required) | set(distractor) == set(_FLEET)
+
+    def test_every_task_mounts_the_whole_fleet(self, tmp_path):
+        cfg = _fake_catalog(tmp_path, _FLEET)
+        for declared in (["etsy-api"], ["notion-api", "stripe-api"], _FLEET):
+            required, distractor, _ = _resolve_task_apis(
+                {"task_id": "f2", "prompt": "hi", "required_apis_declared": declared}, cfg)
+            assert set(required) | set(distractor) == set(_FLEET)
+            assert not set(required) & set(distractor)
+
+    def test_declared_distractor_list_no_longer_narrows_the_fleet(self, tmp_path):
+        # `distractor_apis:` is inert under a standardized fleet — a guardrail
+        # probe must be reachable on every service, not on an authored subset.
+        cfg = _fake_catalog(tmp_path, _FLEET)
+        task = {"task_id": "f3", "prompt": "hi",
+                "required_apis_declared": ["etsy-api"],
+                "distractor_apis_declared": ["linear-api"]}
+        _, distractor, _ = _resolve_task_apis(task, cfg)
+        assert distractor == ["linear-api", "notion-api", "stripe-api"]
+
+    def test_absent_distractor_key_no_longer_means_no_distractors(self, tmp_path):
+        cfg = _fake_catalog(tmp_path, _FLEET)
+        task = {"task_id": "f4", "prompt": "hi",
+                "required_apis_declared": ["etsy-api"]}
+        _, distractor, _ = _resolve_task_apis(task, cfg)
+        assert distractor == ["linear-api", "notion-api", "stripe-api"]
+
+    def test_empty_catalog_yields_no_distractors(self, tmp_path):
+        cfg = _FakeConfig(tmp_path)
+        _, distractor, _ = _resolve_task_apis({"task_id": "f5", "prompt": "hi"}, cfg)
+        assert distractor == []
+
+
+class TestMissingRequiredApisGate:
+    def test_missing_declared_required_raises_with_task_and_names(self, tmp_path):
+        cfg = _fake_catalog(tmp_path, _FLEET)
+        task = {"task_id": "gate-task-9", "prompt": "hi",
+                "required_apis_declared": ["etsy-api", "pruned", "also-gone-api"]}
+        with pytest.raises(MissingRequiredApisError) as excinfo:
+            _resolve_task_apis(task, cfg)
+        err = excinfo.value
+        assert err.task_id == "gate-task-9"
+        assert err.missing == ["also-gone-api", "pruned-api"]
+        assert err.catalog_size == len(_FLEET)
+        msg = str(err)
+        assert "gate-task-9" in msg
+        assert "also-gone-api" in msg and "pruned-api" in msg
+        assert str(len(_FLEET)) in msg
+        assert ALLOW_MISSING_REQUIRED_APIS_ENV in msg
+
+    def test_gate_is_skipped_when_there_is_no_catalog_to_validate_against(self, tmp_path):
+        cfg = _FakeConfig(tmp_path)
+        task = {"task_id": "g2", "prompt": "hi",
+                "required_apis_declared": ["anything-api"]}
+        required, _, _ = _resolve_task_apis(task, cfg)
+        assert required == {"anything-api"}
+
+    def test_fully_satisfied_declaration_does_not_raise(self, tmp_path):
+        cfg = _fake_catalog(tmp_path, _FLEET)
+        required, _, _ = _resolve_task_apis(
+            {"task_id": "g3", "prompt": "hi",
+             "required_apis_declared": ["etsy-api", "notion-api"]}, cfg)
+        assert required == {"etsy-api", "notion-api"}
+
+    def test_escape_hatch_degrades_loudly(self, tmp_path, monkeypatch, caplog):
+        monkeypatch.setenv(ALLOW_MISSING_REQUIRED_APIS_ENV, "1")
+        cfg = _fake_catalog(tmp_path, _FLEET)
+        task = {"task_id": "hatch-task", "prompt": "hi",
+                "required_apis_declared": ["etsy-api", "pruned-api"]}
+        with caplog.at_level(logging.ERROR, logger="eval.run_batch"):
+            required, distractor, _ = _resolve_task_apis(task, cfg)
+        assert required == {"etsy-api"}
+        assert distractor == ["linear-api", "notion-api", "stripe-api"]
+        loud = [r for r in caplog.records if r.levelno >= logging.ERROR]
+        assert loud, "degrading silently is the exact defect this gate replaces"
+        msg = loud[0].getMessage()
+        assert "hatch-task" in msg and "pruned-api" in msg
+        assert ALLOW_MISSING_REQUIRED_APIS_ENV in msg
+
+    @pytest.mark.parametrize("value", ["1", "true", "TRUE", "yes", "on"])
+    def test_escape_hatch_truthy_spellings(self, tmp_path, monkeypatch, value):
+        monkeypatch.setenv(ALLOW_MISSING_REQUIRED_APIS_ENV, value)
+        cfg = _fake_catalog(tmp_path, _FLEET)
+        required, _, _ = _resolve_task_apis(
+            {"task_id": "h2", "prompt": "hi",
+             "required_apis_declared": ["etsy-api", "pruned-api"]}, cfg)
+        assert required == {"etsy-api"}
+
+    @pytest.mark.parametrize("value", ["", "0", "false", "no", "maybe"])
+    def test_escape_hatch_stays_closed_for_other_values(self, tmp_path, monkeypatch, value):
+        monkeypatch.setenv(ALLOW_MISSING_REQUIRED_APIS_ENV, value)
+        cfg = _fake_catalog(tmp_path, _FLEET)
+        with pytest.raises(MissingRequiredApisError):
+            _resolve_task_apis(
+                {"task_id": "h3", "prompt": "hi",
+                 "required_apis_declared": ["pruned-api"]}, cfg)
 
 
 # ---------------------------------------------------------------------------

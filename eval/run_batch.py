@@ -73,7 +73,7 @@ from src.utils.docker_utils import discover_services, require_image_present, DOC
 from src.utils.skills_inference import (
     infer_required_apis,
     compute_distractor_skills,
-    available_apis,
+    catalog_apis,
 )
 from src.utils.testgen import generate_task_tests
 from src.utils.litellm_sidecar import (
@@ -668,45 +668,76 @@ def _normalize_api_name(name: str) -> str:
     return n if n.endswith("-api") else f"{n}-api"
 
 
+ALLOW_MISSING_REQUIRED_APIS_ENV = "WCB_ALLOW_MISSING_REQUIRED_APIS"
+
+
+def _allow_missing_required_apis() -> bool:
+    """Emergency-replay escape hatch for the missing-required-API hard fail."""
+    return (os.environ.get(ALLOW_MISSING_REQUIRED_APIS_ENV) or "").strip().lower() \
+        in {"1", "true", "yes", "on"}
+
+
+class MissingRequiredApisError(RuntimeError):
+    """A task declares required APIs that have no service in the catalog.
+
+    Fatal by design. The predecessor behavior — drop the unknown names with a
+    `logger.warning` and carry on — let a task reach the agent with a partial
+    or entirely EMPTY required set; the agent then had no way to do the work and
+    the run was scored as a model failure. Under one bad fleet prune, 27 of 71
+    delivered tasks would have shipped that way. Fail the task instead.
+    """
+
+    def __init__(self, task_id: str, missing: "Sequence[str]", catalog_size: int) -> None:
+        self.task_id = task_id or "<unknown-task>"
+        self.missing = sorted(missing)
+        self.catalog_size = catalog_size
+        super().__init__(
+            f"[{self.task_id}] declared required API(s) have no service in the "
+            f"environment catalog ({catalog_size} services on disk): "
+            f"{', '.join(self.missing)}. Refusing to run: the agent would be "
+            f"handed an incomplete required set and scored as a model failure. "
+            f"Fix the task's required_apis, restore the service dir(s) under "
+            f"environment/, or set {ALLOW_MISSING_REQUIRED_APIS_ENV}=1 to degrade "
+            f"to the legacy drop-and-continue behavior (emergency replays only)."
+        )
+
+
 def _resolve_task_apis(task: dict, config) -> "tuple[set[str], list[str], dict]":
     """Resolve a task's (required_apis, distractor_apis, mock_overlays) without
     mutating the task. Single source of truth for both `_augment_task_with_mocks`
     (per-task) and `_collect_enabled_apis` (which limits the shared mock stack to
     only the APIs any task actually needs).
 
-    Precedence for required_apis (highest first):
-      1. Explicit `required_apis_declared` from the task file
-         (yaml `required_apis:` or native `task.json`).
-      2. mock_data/<api>/ subdirs.
-      3. Keyword inference over the prompt.
+    required_apis is DECLARED-FIRST. When the task file declares `required_apis`
+    (yaml `required_apis:` / native `task.json`), that list — normalized to
+    env-dir names via `_normalize_api_name` — IS the required set. Neither the
+    mock_data/<api>/ directory scan nor prompt keyword inference may widen it:
+    an explicit declaration is the author's contract, and a directory-scan
+    override silently changed what the agent was graded on. Only a task with NO
+    declaration falls back to (a) its mock_data/<api>/ dirs and (b) keyword
+    inference, in that union — the legacy path, kept for pre-declaration tasks.
 
-    When (1) is present, (3) is skipped entirely so curated-keyword false
-    positives can never override author intent. mock_data unions in only when
-    (1) is absent, because an explicit declaration is a contract.
+    distractor_apis is THE STANDARD FLEET MINUS REQUIRED. Every task mounts the
+    whole catalog: its declared required services plus every remaining service
+    on disk as a distractor. The old per-task `distractor_apis:` declaration
+    (auto / explicit list / absent) no longer narrows this — the fleet is
+    standardized, so a guardrail probe must be exercisable against every
+    reachable service, not against whatever subset a task happened to list.
 
-    Distractor policy (m0750 contract; supersedes b22):
-      distractor_apis: auto      -> full catalog complement (compute_distractor_skills)
-      distractor_apis: [a, b, c] -> exactly those (minus any overlap with required)
-      distractor_apis: [] | null | key absent -> NO distractors at all
+    A declared required API with no service on disk is FATAL
+    (`MissingRequiredApisError`); see that class for why. The check is skipped
+    when the catalog is empty, which means "no environment dir to validate
+    against", not "every service is missing".
     """
     raw_declared_required = task.get("required_apis_declared")
-    raw_declared_distractor = task.get("distractor_apis_declared")
-    declared = set(raw_declared_required) if isinstance(raw_declared_required, list) else set()
-    distractor_is_auto = raw_declared_distractor == "__AUTO__"
-    distractor_is_absent = (
-        "distractor_apis_declared" not in task
-        or raw_declared_distractor == "__ABSENT__"
-    )
-    declared_distractors = (
-        set(raw_declared_distractor)
-        if isinstance(raw_declared_distractor, list)
+    declared = (
+        {n for n in (_normalize_api_name(x) for x in raw_declared_required) if n}
+        if isinstance(raw_declared_required, list)
         else set()
     )
 
-    required: set[str] = set()
-    if declared:
-        required.update(declared)
-    else:
+    required: set[str] = set(declared)
+    if not declared:
         try:
             required.update(infer_required_apis(
                 task.get("initial_prompt") or task.get("prompt") or "",
@@ -717,13 +748,14 @@ def _resolve_task_apis(task: dict, config) -> "tuple[set[str], list[str], dict]"
 
     task_dir = task.get("task_dir", "")
     overlays: dict[str, dict[str, str]] = {}
-    mock_data_apis: set[str] = set()
     if task_dir:
         mock_root = Path(task_dir) / "mock_data"
         if mock_root.is_dir():
-            mock_apis = {d.name for d in mock_root.iterdir() if d.is_dir()}
+            # Overlays are produced for every mock_data dir regardless, because an
+            # overlaid service must serve its seed data even when it is "only" a
+            # distractor. What is gated is whether the scan may widen `required`.
             if not declared:
-                required.update(mock_apis)
+                required.update(d.name for d in mock_root.iterdir() if d.is_dir())
             overlays = {
                 api_dir.name: {
                     p.name: str(p.resolve())
@@ -734,36 +766,45 @@ def _resolve_task_apis(task: dict, config) -> "tuple[set[str], list[str], dict]"
             }
 
     try:
-        catalog = set(available_apis(config.environment_dir))
+        catalog = set(catalog_apis(config.environment_dir))
     except Exception:
         catalog = set()
+
     if catalog:
-        unknown_required = sorted(required - catalog)
-        if unknown_required:
-            logger.warning(
-                "[%s] declared/inferred APIs not present in catalog (dropped): %s",
-                task.get("task_id"), unknown_required,
-            )
-            required -= set(unknown_required)
-        unknown_distractor = sorted(declared_distractors - catalog)
-        if unknown_distractor:
-            logger.warning(
-                "[%s] declared distractor APIs not present in catalog (dropped): %s",
-                task.get("task_id"), unknown_distractor,
-            )
-            declared_distractors -= set(unknown_distractor)
+        missing = sorted(required - catalog)
+        if missing:
+            declared_missing = sorted(set(missing) & declared)
+            if declared_missing and not _allow_missing_required_apis():
+                raise MissingRequiredApisError(
+                    task.get("task_id") or task.get("task_id_ori") or "",
+                    declared_missing, len(catalog),
+                )
+            if declared_missing:
+                logger.error(
+                    "[%s] %s=1: DEGRADING — declared required API(s) absent from the "
+                    "%d-service catalog and dropped: %s. This task now runs with "
+                    "%d of %d declared required services; any failure is an "
+                    "ENVIRONMENT failure, not a model failure. Do not score this run.",
+                    task.get("task_id"), ALLOW_MISSING_REQUIRED_APIS_ENV,
+                    len(catalog), declared_missing,
+                    len(declared) - len(declared_missing), len(declared),
+                )
+            inferred_missing = sorted(set(missing) - declared)
+            if inferred_missing:
+                logger.warning(
+                    "[%s] inferred/mock_data APIs not present in catalog (dropped): %s",
+                    task.get("task_id"), inferred_missing,
+                )
+            required -= set(missing)
 
     try:
-        if distractor_is_auto:
-            distractor = list(compute_distractor_skills(
-                sorted(required),
-                task.get("task_id") or task.get("task_id_ori") or "",
-                environment_dir=config.environment_dir,
-            ))
-        elif distractor_is_absent:
-            distractor = []
-        else:
-            distractor = sorted(declared_distractors - required)
+        # catalog - required, computed once in skills_inference so the runtime and
+        # the bundle repackager can never disagree about the fleet complement.
+        distractor = list(compute_distractor_skills(
+            sorted(required),
+            task.get("task_id") or task.get("task_id_ori") or "",
+            environment_dir=config.environment_dir,
+        ))
     except Exception:
         distractor = []
 
@@ -779,6 +820,11 @@ def _collect_enabled_apis(args, config) -> "set[str] | None":
     A task that this stack serves only ever reaches APIs in its own
     required+distractor set, so the batch-wide union is sufficient for every
     task while still excluding APIs no task references.
+
+    This is also the batch's PREFLIGHT for `MissingRequiredApisError`: it is the
+    first pass over every task file, so an undeliverable task aborts the run here
+    rather than after the agent has burned tokens on it. That one exception type
+    is therefore re-raised instead of degrading to the run-everything fallback.
     """
     try:
         task_files: list[Path] = []
@@ -800,6 +846,8 @@ def _collect_enabled_apis(args, config) -> "set[str] | None":
             required, distractor, _ = _resolve_task_apis(t, config)
             enabled |= set(required) | set(distractor)
         return enabled or None
+    except MissingRequiredApisError:
+        raise
     except Exception as exc:
         logger.warning("Could not resolve per-task API set; mock stack will run "
                        "all APIs. Reason: %s", exc)
