@@ -70,6 +70,7 @@ sys.path.insert(0, str(_REPO_ROOT))
 from script.lib.recon import prompts as recon_prompts  # noqa: E402
 from script.lib.recon import schedule as recon_schedule  # noqa: E402
 from script.lib.recon import environment as recon_environment  # noqa: E402
+from script.lib.recon import gates as recon_gates  # noqa: E402
 from script.lib.recon import metadata as recon_metadata  # noqa: E402
 from script.lib.recon import sources as recon_sources  # noqa: E402
 
@@ -161,7 +162,9 @@ def recover_prompts(bundle: Path, out_dir: Path, log: list[str], timezone: str,
 
 def reconstruct(bundle: Path, out_dir: Path, baseline_env: Path, verbose: bool,
                 timezone: str = "", trajectory_run: str = "",
-                allow_unverified: bool = False, baseline_ref: str = "") -> dict:
+                allow_unverified: bool = False, baseline_ref: str = "",
+                gate_mode: str = recon_gates.STRICT, legacy: bool = False,
+                rubric_override: str = "") -> dict:
     env_dir = bundle / "data" / "environment"
     log: list[str] = []
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -175,6 +178,11 @@ def reconstruct(bundle: Path, out_dir: Path, baseline_env: Path, verbose: bool,
             log.append(f"  ok   {c.label:<22} <- {c.source} ({len(c)} file(s))")
     persona_names = carried["persona/"].names
     data_names = carried["data/"].names
+
+    if rubric_override:
+        shutil.copy2(rubric_override, out_dir / "rubric.json")
+        log.append(f"  sub  rubric.json            <- {rubric_override} "
+                   f"(substituted, NOT the bundle's)")
 
     meta = recon_metadata.derive(bundle, out_dir, instants.system_prompt)
     for name in recon_metadata.write(meta, out_dir):
@@ -221,8 +229,14 @@ def reconstruct(bundle: Path, out_dir: Path, baseline_env: Path, verbose: bool,
         warnings.extend(prompts.unresolved)
     warnings.extend(meta.notes)
 
+    gates = recon_gates.run(recon_gates.GateContext(
+        bundle=bundle, out_dir=out_dir, prompts=prompts, instants=instants,
+        meta=meta, mock=mock, drift=drift, legacy=legacy,
+        rubric_override=rubric_override), gate_mode)
+    errors.extend(g.line() for g in recon_gates.failures(gates))
+
     _write_notes(out_dir, bundle, baseline_env, log, overlays, warnings, meta,
-                 persona_names, data_names)
+                 persona_names, data_names, gates)
 
     summary = {
         "task": out_dir.name,
@@ -236,19 +250,22 @@ def reconstruct(bundle: Path, out_dir: Path, baseline_env: Path, verbose: bool,
         "mock_data_files": n_overlay_files,
         "warnings": warnings,
         "errors": errors,
+        "gates": gates,
     }
     if verbose:
         print(f"\n[{out_dir.name}]")
         print("\n".join(log) or "  (nothing recovered)")
         for w in warnings:
             print(f"  WARN {w}")
+        for g in gates:
+            print(f"  {g.status:<4} {g.id} {g.name} — {g.detail}")
     for e in errors:
         print(f"  FAIL [{out_dir.name}] {e}", file=sys.stderr)
     return summary
 
 
 def _write_notes(out_dir, bundle, baseline_env, log, overlays, warnings, meta,
-                 persona_names, data_names) -> None:
+                 persona_names, data_names, gates) -> None:
     lines = [
         f"# Reconstruction notes — {out_dir.name}",
         "",
@@ -282,6 +299,9 @@ def _write_notes(out_dir, bundle, baseline_env, log, overlays, warnings, meta,
         "(recover from the harness environment/ if needed).",
         "- task_config.yaml / taxonomy.json: only partially inferable from task.toml.",
     ]
+    if gates:
+        lines += ["", "## Gates"]
+        lines += [f"- `{g.id}` **{g.status}** {g.name} — {g.detail}" for g in gates]
     if warnings:
         lines += ["", "## Warnings", *[f"- {w}" for w in warnings]]
     (out_dir / "RECONSTRUCTION_NOTES.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -314,6 +334,17 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--trajectory-run", default="", metavar="RUN",
                     help="Published run to take turn instants from, as 'run_3' or "
                          "'<model>/run_3' (default: the first run that covers every turn).")
+    ap.add_argument("--gates", choices=[recon_gates.STRICT, recon_gates.WARN_ONLY,
+                                        recon_gates.OFF],
+                    default=recon_gates.STRICT,
+                    help="strict: a failed gate fails the run (default). "
+                         "warn: report and carry on. off: skip the checks.")
+    ap.add_argument("--legacy", action="store_true",
+                    help="Pass --legacy to preflight, waiving the task-format "
+                         "standards for corpora authored before them.")
+    ap.add_argument("--rubric", default="", metavar="PATH",
+                    help="Replace the recovered rubric. Logged as a deliberate "
+                         "substitution; the rubric-identity gate reports it.")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args(argv)
 
@@ -343,7 +374,8 @@ def main(argv: list[str] | None = None) -> int:
               f"{args.baseline_ref or baseline_env}")
         summaries = [reconstruct(b, args.out / b.name, baseline_env, args.verbose,
                                  args.timezone, args.trajectory_run,
-                                 args.unverified_overlays, args.baseline_ref)
+                                 args.unverified_overlays, args.baseline_ref,
+                                 args.gates, args.legacy, args.rubric)
                      for b in bundles]
 
     print(f"\n{'task':<45} {'turns':>5} {'clock':>8} {'rubric':>6} {'persona':>7} "

@@ -168,8 +168,9 @@ def render_task_yaml(meta: Metadata) -> str:
         f"distractor_apis: {_yaml_list(bare(meta.distractor_apis))}"
         if isinstance(meta.distractor_apis, list)
         else f"distractor_apis: {AUTO}")
-    if meta.system_prompt:
-        lines.append(f"system_prompt: {json.dumps(meta.system_prompt)}")
+    # Written even when empty: preflight requires the key to be present, and a
+    # run that recorded no system prompt is a fact worth stating.
+    lines.append(f"system_prompt: {json.dumps(meta.system_prompt)}")
     return "\n".join(lines) + "\n"
 
 
