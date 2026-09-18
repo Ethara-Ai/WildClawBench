@@ -78,6 +78,7 @@ from src.utils.skills_inference import (
 )
 from src.utils.testgen import generate_task_tests
 from src.utils.litellm_sidecar import (
+    AUTH_MODE_MASTER_KEY,
     CC_BRIDGE_INTERNAL_PORT,
     CODEX_BRIDGE_INTERNAL_PORT,
     build_litellm_config_yaml,
@@ -87,6 +88,7 @@ from src.utils.litellm_sidecar import (
     pick_free_loopback_port,
     pull_litellm_image,
     remove_network,
+    sidecar_auth_mode,
     start_bridge,
     start_codex_bridge,
     start_litellm,
@@ -3495,6 +3497,40 @@ def _run_cleanups(cleanups: list) -> None:
     cleanups.clear()
 
 
+def _warn_if_master_key_auth_degrades_attribution(args) -> None:
+    """Say out loud, at batch start, when opting into master-key auth has cost
+    this batch its per-run cost attribution.
+
+    The main agent has exactly one way to tag its sidecar rows with a run key:
+    carry the key as the bearer. A master-key sidecar accepts only the master
+    key, so under WCB_SIDECAR_MASTER_KEY=1 every main-agent row lands untagged
+    and `collect_usage` falls back to selecting rows by time window. That
+    fallback cannot separate two runs whose windows overlap, which is precisely
+    what --parallel produces, and it is wrong outright under faketime, where the
+    row timestamps and the window are not on the same clock. The failure is
+    silent in the output — plausible-looking totals, attributed to the wrong
+    run — so the warning has to happen here, before any spend.
+    """
+    if sidecar_auth_mode() != AUTH_MODE_MASTER_KEY:
+        return
+    parallel = int(getattr(args, "parallel", 1) or 1)
+    if parallel <= 1:
+        return
+    logger.warning(
+        "=" * 78
+        + "\nSIDECAR AUTH: master-key mode is ON (WCB_SIDECAR_MASTER_KEY) with "
+          "--parallel %d.\nThe main agent cannot tag its sidecar rows in this "
+          "mode — its only tagging channel is the bearer, and a master-key "
+          "sidecar\naccepts no other bearer. Per-run cost for the main agent "
+          "falls back to time-window\nmatching, which over-attributes whenever "
+          "two runs overlap and is simply wrong under\nfaketime. Subagent and "
+          "audio calls stay tagged (they send x-wcb-run-key).\nUnset "
+          "WCB_SIDECAR_MASTER_KEY to restore run-key-scoped auth and exact "
+          "attribution.\n" + "=" * 78,
+        parallel,
+    )
+
+
 def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
                              mock_enabled_apis: "set[str] | None" = None):
     """For the openclaw backend, optionally bring up a per-batch shared LiteLLM
@@ -3521,6 +3557,8 @@ def _setup_litellm_and_mocks(args, config: Config, cleanups: list,
     use_litellm = args.litellm if args.litellm is not None else config.litellm_enabled()
     if not use_litellm:
         return False, "", "", "", {}, ""
+
+    _warn_if_master_key_auth_degrades_attribution(args)
 
     # Auth/connection setup phase begins here: docker network, LiteLLM sidecar
     # (+ OAuth bridge), upstream (Bedrock/OpenAI) reachability, and the mock-API

@@ -412,7 +412,14 @@ class TestSetModelLitellmAnthropic:
         script = _extract_script(self._run(monkeypatch))
         # anthropic branch uses base_url_root (no /v1 suffix in the provider baseUrl)
         assert "http://ll-sidecar:4000" in script
-        # master key threaded in
+        # Sidecar bearer threaded in. Under the default run-key mode _set_model
+        # runs before any run key exists for this task, so the stub is what goes
+        # in; the master key is not in the script either way.
+        assert "mk-secret" not in script
+
+    def test_master_key_mode_threads_the_master_key_into_the_config(self, monkeypatch):
+        monkeypatch.setenv("WCB_SIDECAR_MASTER_KEY", "1")
+        script = _extract_script(self._run(monkeypatch))
         assert "mk-secret" in script
 
     def test_thinking_default_written_when_set(self, monkeypatch):
@@ -1055,8 +1062,10 @@ class TestRunTaskHappyPath:
         env = captured["extra_env_dict"]
         assert env["WCB_AUDIO_TRANSCRIBE_URL"] == "http://ll:4000/v1/audio/transcriptions"
         # Consumed by the audio-extract skill, which has to get past the sidecar's
-        # inbound auth, so this one is the sidecar bearer by necessity.
-        assert env["WCB_AUDIO_TRANSCRIBE_AUTH"] == "mk"
+        # inbound auth, so this one is the sidecar bearer by necessity — which in
+        # the default run-key mode is the attempt's own key, not the master key.
+        assert env["WCB_AUDIO_TRANSCRIBE_AUTH"] == a._run_keys[spec.task_id]
+        assert env["WCB_AUDIO_TRANSCRIBE_AUTH"] != "mk"
         # claude model -> ANTHROPIC_* overrides pointing at sidecar
         assert env["ANTHROPIC_BASE_URL"] == "http://ll:4000"
         assert env["ANTHROPIC_API_BASE"] == "http://ll:4000"
@@ -1127,9 +1136,18 @@ class TestRunTaskHappyPath:
         assert a._agent_env_bearer("task-1") != a.litellm_master_key
         a._run_keys["task-1"] = "wcb::task-1::abc"
         assert a._agent_env_bearer("task-1") == "wcb::task-1::abc"
-        # The sidecar-facing bearer is deliberately unchanged: openclaw.json and
-        # the in-container helpers still have to satisfy the sidecar's auth.
+        # Both bearers still have to satisfy whatever the sidecar enforces. In
+        # the default run-key mode that IS the run key, so they coincide; the
+        # master key is reachable only by opting back into master-key auth.
+        assert a._agent_bearer("task-1") == "wcb::task-1::abc"
+
+    def test_master_key_mode_still_sends_the_master_key_to_the_sidecar(
+            self, monkeypatch):
+        monkeypatch.setenv("WCB_SIDECAR_MASTER_KEY", "1")
+        a = _bare_agent(litellm_master_key="sk-talos-litellm")
+        a._run_keys["task-1"] = "wcb::task-1::abc"
         assert a._agent_bearer("task-1") == "sk-talos-litellm"
+        assert a._agent_env_bearer("task-1") == "wcb::task-1::abc"
 
     def test_non_claude_model_skips_anthropic_env_overrides(self, monkeypatch, tmp_path):
         a = _bare_agent(
@@ -1376,6 +1394,7 @@ class TestCollectUsageRunKeyChannel:
 
     def test_no_run_key_attached_under_master_key_auth(self, monkeypatch, tmp_path):
         monkeypatch.delenv("WCB_SIDECAR_NO_MASTER_KEY", raising=False)
+        monkeypatch.setenv("WCB_SIDECAR_MASTER_KEY", "1")
         a = _bare_agent(litellm_usage_log=str(tmp_path / "u.jsonl"),
                         litellm_master_key="sk-master")
         a._task_windows["t"] = (1.0, 2.0)

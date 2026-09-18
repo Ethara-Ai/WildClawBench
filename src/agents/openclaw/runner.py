@@ -32,6 +32,7 @@ from src.utils.docker_utils import (
     start_container,
     write_turn_marker,
 )
+from src.utils.litellm_sidecar import AUTH_MODE_MASTER_KEY, sidecar_auth_mode
 from src.utils.sim_clock import compute_sim_clock
 from src.utils.grading import (
     extract_preflight_usage_from_litellm_log,
@@ -215,16 +216,18 @@ class OpenClawAgent(BaseAgent):
         self._run_keys: dict[str, str] = {}
 
     def _run_key_bearer_live(self) -> bool:
-        # The per-run key can ride the bearer only when the sidecar does NOT
-        # enforce a master key (any other bearer 401s). Config.from_env() can
-        # never yield an empty litellm_master_key (its s() helper substitutes
-        # the default), so WCB_SIDECAR_NO_MASTER_KEY=1 is the explicit operator
-        # switch — it also strips master-key auth from the sidecar itself
-        # (litellm_sidecar.py), keeping both sides consistent. Security note:
-        # keyless mode removes the only auth between co-tenant containers and
-        # the sidecar; enable deliberately.
-        if os.environ.get("WCB_SIDECAR_NO_MASTER_KEY", "").strip() == "1":
+        # The per-run key can ride the bearer whenever the sidecar is not
+        # enforcing a master key, because a master-key proxy 401s every other
+        # bearer. That used to mean attribution was only available on a sidecar
+        # with no inbound auth at all; it is now the default, and the sidecar
+        # authenticates the run key itself (litellm_sidecar.sidecar_auth_mode,
+        # src/utils/litellm_run_key_auth.py), so the bearer that identifies the
+        # run is also the bearer that admits it. Only WCB_SIDECAR_MASTER_KEY=1
+        # turns this off, and then the main agent's rows go out untagged.
+        if sidecar_auth_mode() != AUTH_MODE_MASTER_KEY:
             return True
+        # Master-key mode with no key to enforce leaves the proxy open, so the
+        # run key still rides the bearer rather than being thrown away.
         return not self.litellm_master_key
 
     def _agent_bearer(self, task_id: str) -> str:

@@ -403,11 +403,28 @@ class TestAgentBearerWiring:
         a._run_keys["t1"] = "wcb::t1::deadbeef"
         return a
 
-    def test_production_default_master_key_keeps_master_key(self, monkeypatch):
+    def test_production_default_sends_the_run_key(self, monkeypatch):
         monkeypatch.delenv("WCB_SIDECAR_NO_MASTER_KEY", raising=False)
+        monkeypatch.delenv("WCB_SIDECAR_MASTER_KEY", raising=False)
+        a = self._agent("sk-talos-litellm")
+        assert a._agent_bearer("t1") == "wcb::t1::deadbeef"
+        assert a._run_key_bearer_live() is True
+
+    def test_master_key_opt_in_keeps_master_key(self, monkeypatch):
+        monkeypatch.delenv("WCB_SIDECAR_NO_MASTER_KEY", raising=False)
+        monkeypatch.setenv("WCB_SIDECAR_MASTER_KEY", "1")
         a = self._agent("sk-talos-litellm")
         assert a._agent_bearer("t1") == "sk-talos-litellm"
         assert a._run_key_bearer_live() is False
+
+    def test_master_key_opt_in_with_no_key_falls_back_to_run_key(self, monkeypatch):
+        # Nothing to enforce means the proxy is open, so throwing the run key
+        # away would cost attribution and buy nothing.
+        monkeypatch.delenv("WCB_SIDECAR_NO_MASTER_KEY", raising=False)
+        monkeypatch.setenv("WCB_SIDECAR_MASTER_KEY", "1")
+        a = self._agent("")
+        assert a._agent_bearer("t1") == "wcb::t1::deadbeef"
+        assert a._run_key_bearer_live() is True
 
     def test_empty_master_key_sends_run_key(self, monkeypatch):
         monkeypatch.delenv("WCB_SIDECAR_NO_MASTER_KEY", raising=False)
@@ -415,8 +432,17 @@ class TestAgentBearerWiring:
         assert a._agent_bearer("t1") == "wcb::t1::deadbeef"
         assert a._run_key_bearer_live() is True
 
-    def test_keyless_switch_overrides_master_key(self, monkeypatch):
+    def test_keyless_switch_stays_a_no_op_for_existing_env_files(self, monkeypatch):
+        # gama ships this line; it has to keep meaning "run key rides the
+        # bearer", which is now simply the default.
         monkeypatch.setenv("WCB_SIDECAR_NO_MASTER_KEY", "1")
+        a = self._agent("sk-talos-litellm")
+        assert a._agent_bearer("t1") == "wcb::t1::deadbeef"
+        assert a._run_key_bearer_live() is True
+
+    def test_keyless_switch_wins_over_master_key_opt_in(self, monkeypatch):
+        monkeypatch.setenv("WCB_SIDECAR_NO_MASTER_KEY", "1")
+        monkeypatch.setenv("WCB_SIDECAR_MASTER_KEY", "1")
         a = self._agent("sk-talos-litellm")
         assert a._agent_bearer("t1") == "wcb::t1::deadbeef"
         assert a._run_key_bearer_live() is True
@@ -449,6 +475,7 @@ class TestAgentBearerWiring:
         assert captured["run_key"] == "wcb::t1::deadbeef"
 
         monkeypatch.delenv("WCB_SIDECAR_NO_MASTER_KEY", raising=False)
+        monkeypatch.setenv("WCB_SIDECAR_MASTER_KEY", "1")
         b = self._agent("sk-talos-litellm")
         b.litellm_usage_log = str(tmp_path / "u.jsonl")
         b._task_windows["t1"] = (1.0, 2.0)
@@ -1000,15 +1027,26 @@ class TestStallGuard:
 
 
 class TestSidecarKeylessSwitch:
-    def test_yaml_omits_master_key_when_switch_on(self, monkeypatch):
+    def test_yaml_omits_master_key_by_default_and_under_the_switch(self, monkeypatch):
         from src.utils import litellm_sidecar as sc
+        monkeypatch.delenv("WCB_SIDECAR_MASTER_KEY", raising=False)
         monkeypatch.setenv("WCB_SIDECAR_NO_MASTER_KEY", "1")
         yaml_on = sc.build_litellm_config_yaml(bedrock_sonnet_arn="")
         monkeypatch.delenv("WCB_SIDECAR_NO_MASTER_KEY")
-        yaml_off = sc.build_litellm_config_yaml(bedrock_sonnet_arn="")
+        yaml_default = sc.build_litellm_config_yaml(bedrock_sonnet_arn="")
         assert "master_key" not in yaml_on
-        assert "master_key: os.environ/LITELLM_MASTER_KEY" in yaml_off
+        assert "master_key" not in yaml_default
+        assert yaml_on == yaml_default
+        assert "custom_auth: litellm_run_key_auth.user_api_key_auth" in yaml_default
         assert "store_model_in_db" in yaml_on
+
+    def test_yaml_carries_master_key_only_on_explicit_opt_in(self, monkeypatch):
+        from src.utils import litellm_sidecar as sc
+        monkeypatch.delenv("WCB_SIDECAR_NO_MASTER_KEY", raising=False)
+        monkeypatch.setenv("WCB_SIDECAR_MASTER_KEY", "1")
+        yaml_legacy = sc.build_litellm_config_yaml(bedrock_sonnet_arn="")
+        assert "master_key: os.environ/LITELLM_MASTER_KEY" in yaml_legacy
+        assert "custom_auth" not in yaml_legacy
 
 
 class TestBackfillPortParity:

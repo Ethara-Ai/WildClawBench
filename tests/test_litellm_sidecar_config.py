@@ -134,7 +134,19 @@ class TestConfigEnvelope:
     def test_general_settings_present(self):
         doc = _parse(sidecar.build_litellm_config_yaml(bedrock_arn="arn:x"))
         gs = doc["general_settings"]
+        # Default inbound auth is run-key scoped: the proxy validates the
+        # attempt's own bearer through the custom_auth hook and carries no
+        # master key for anything to fall back to.
+        assert gs["custom_auth"] == "litellm_run_key_auth.user_api_key_auth"
+        assert "master_key" not in gs
+        assert gs["store_model_in_db"] is False
+
+    def test_general_settings_master_key_mode(self, monkeypatch):
+        monkeypatch.setenv("WCB_SIDECAR_MASTER_KEY", "1")
+        gs = _parse(sidecar.build_litellm_config_yaml(bedrock_arn="arn:x"))[
+            "general_settings"]
         assert gs["master_key"] == "os.environ/LITELLM_MASTER_KEY"
+        assert "custom_auth" not in gs
         assert gs["store_model_in_db"] is False
 
 
@@ -587,10 +599,14 @@ class TestVerifyUpstreamReachable:
     def test_success_returns_true_and_output(self, monkeypatch):
         def fake_run(cmd, *a, **k):
             assert cmd[0:3] == ["docker", "exec", "cX"]
-            # The probe body must carry the model name + master key + port.
+            # The probe body must carry the model name + port, and a bearer the
+            # sidecar's current auth mode will actually admit. Run-key mode
+            # rejects the master key by design, so the probe mints a key of the
+            # minted shape under a reserved task id instead.
             probe = cmd[-1]
             assert "claude-opus-4.7" in probe
-            assert "Bearer mk-secret" in probe
+            assert "Bearer wcb::__probe__::" in probe
+            assert "Bearer mk-secret" not in probe
             assert "4000" in probe
             return _FakeCompleted(returncode=0, stdout="OK status=200")
 

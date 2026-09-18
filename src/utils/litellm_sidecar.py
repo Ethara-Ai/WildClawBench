@@ -5,6 +5,7 @@ import logging
 import os
 import subprocess
 import time
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,71 @@ def overflow_guard_enabled(meta_api_key: str, meta_model: str) -> bool:
     return os.environ.get("WCB_OVERFLOW_GUARD", "1").strip().lower() not in (
         "0", "false", "no", "off",
     )
+
+
+AUTH_MODE_RUN_KEY = "run_key"
+AUTH_MODE_MASTER_KEY = "master_key"
+
+# Mounted beside config.yaml in /app; `custom_auth` below names it by module.
+RUN_KEY_AUTH_MODULE = "litellm_run_key_auth"
+RUN_KEY_AUTH_HOOK = f"{RUN_KEY_AUTH_MODULE}.user_api_key_auth"
+
+
+def _switch_on(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def sidecar_auth_mode() -> str:
+    """Which inbound auth the sidecar enforces. Run-key scoped by default.
+
+    Two enforcement modes behind three operator settings:
+
+      * nothing set          -> run_key. The proxy carries no master key and
+        admits only `wcb::<task_id>::<uuid4>` bearers, via the `custom_auth`
+        hook in src/utils/litellm_run_key_auth.py.
+      * WCB_SIDECAR_NO_MASTER_KEY=1 -> run_key. This used to mean "no inbound
+        auth at all", which is how it bought per-run attribution: the run key
+        could ride the bearer only because nothing checked the bearer. The
+        default now does the attribution half without the open door, so the
+        switch is a no-op that keeps working. Production (gama) ships this line
+        and needs it to stay harmless.
+      * WCB_SIDECAR_MASTER_KEY=1    -> master_key. The legacy shared-admin-key
+        proxy, now an explicit opt-in. Main-agent rows go out untagged under it
+        and per-run cost falls back to the time window, so run_batch warns when
+        it is combined with parallelism.
+
+    Both set is contradictory; the no-master-key assertion wins, because it is
+    the one an existing deployment already has on disk and the safer of the two
+    to honor.
+    """
+    if _switch_on("WCB_SIDECAR_NO_MASTER_KEY"):
+        return AUTH_MODE_RUN_KEY
+    if _switch_on("WCB_SIDECAR_MASTER_KEY"):
+        return AUTH_MODE_MASTER_KEY
+    return AUTH_MODE_RUN_KEY
+
+
+def run_key_auth_enforced() -> bool:
+    return sidecar_auth_mode() == AUTH_MODE_RUN_KEY
+
+
+def run_key_auth_module_path() -> str:
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        f"{RUN_KEY_AUTH_MODULE}.py")
+
+
+def sidecar_probe_bearer(master_key: str) -> str:
+    """Bearer for the harness's own synthetic round-trip through the sidecar.
+
+    The startup probe has to satisfy whatever auth the sidecar is running, so in
+    run-key mode it mints a throwaway key of the same shape instead of sending
+    the master key, which that mode rejects by design. It is tagged `__probe__`
+    rather than a task id so its single row is identifiable in usage.jsonl and
+    can never be mistaken for an attempt's spend.
+    """
+    if sidecar_auth_mode() == AUTH_MODE_MASTER_KEY:
+        return master_key
+    return f"wcb::__probe__::{uuid.uuid4().hex}"
 
 
 def build_litellm_config_yaml(
@@ -605,9 +671,16 @@ def build_litellm_config_yaml(
         "    supported_call_types: [\"transcription\", \"atranscription\"]\n"
         + callback_line
         + "general_settings:\n"
-        + (""
-           if os.environ.get("WCB_SIDECAR_NO_MASTER_KEY", "").strip() == "1"
-           else "  master_key: os.environ/LITELLM_MASTER_KEY\n")
+        # Run-key mode replaces the master key with a hook rather than removing
+        # auth: litellm resolves `custom_auth` through get_instance_fn against
+        # the config file's own directory, so the named module has to be the one
+        # start_litellm mounts next to this yaml in /app. The hook runs ahead of
+        # every built-in auth path and its verdict is final, which is why
+        # master_key must be absent here — present, it would only ever admit a
+        # second, run-unscoped credential.
+        + ("  master_key: os.environ/LITELLM_MASTER_KEY\n"
+           if sidecar_auth_mode() == AUTH_MODE_MASTER_KEY
+           else f"  custom_auth: {RUN_KEY_AUTH_HOOK}\n")
         + "  store_model_in_db: false\n"
     )
 
@@ -813,13 +886,17 @@ def start_litellm(
     _validate_docker_token("container_name", container_name)
     _validate_docker_token("network", network)
 
-    # Keyless mode (WCB_SIDECAR_NO_MASTER_KEY=1): the yaml omits master_key,
-    # so the env var must be omitted too — LiteLLM enables auth when either is
-    # present. Pairs with OpenClawAgent._run_key_bearer_live().
-    if os.environ.get("WCB_SIDECAR_NO_MASTER_KEY", "").strip() == "1":
-        env_pairs: list[tuple[str, str]] = []
-    else:
-        env_pairs = [("LITELLM_MASTER_KEY", master_key)]
+    # Run-key mode (the default): the yaml carries `custom_auth` instead of
+    # `master_key`, and the env var has to go too — LiteLLM turns master-key
+    # auth on when either is present, and a second accepted credential that no
+    # run owns is exactly what this mode exists to remove. Pairs with
+    # OpenClawAgent._run_key_bearer_live().
+    auth_mode = sidecar_auth_mode()
+    # Validated in BOTH modes even though only one wires it into the container:
+    # the argv-injection guard on this argument predates the modes and must not
+    # become conditional on one, or flipping the default quietly drops it.
+    master_key_env = build_env_args([("LITELLM_MASTER_KEY", master_key)])
+    env_pairs: list[tuple[str, str]] = []
     _litellm_log = os.environ.get("LITELLM_LOG", "").strip()
     if _litellm_log:
         env_pairs.append(("LITELLM_LOG", _litellm_log))
@@ -850,6 +927,8 @@ def start_litellm(
     if meta_api_key:
         env_pairs.append(("ONEP_API_KEY", meta_api_key))
     env_args = build_env_args(env_pairs)
+    if auth_mode == AUTH_MODE_MASTER_KEY:
+        env_args = master_key_env + env_args
 
     callback_args: list[str] = []
     if usage_callback_host_path and usage_log_host_dir:
@@ -927,12 +1006,25 @@ def start_litellm(
             *build_env_args(overflow_guard_pairs),
         ]
 
+    # The hook is resolved from beside the config, so it is mounted here rather
+    # than plumbed through a caller argument: both sidecar entry points
+    # (run_batch and the bash bootstrap) would otherwise have to remember it,
+    # and a forgotten mount is a proxy that boots into a config naming a module
+    # that is not there.
+    auth_args: list[str] = []
+    if auth_mode == AUTH_MODE_RUN_KEY:
+        auth_args = [
+            "-v",
+            f"{run_key_auth_module_path()}:/app/{RUN_KEY_AUTH_MODULE}.py:ro",
+        ]
+
     image_to_run = _validate_docker_token("litellm image", image_to_run)
     cmd = [
         "docker", "run", "-d",
         "--name", container_name,
         "--network", network,
         *env_args,
+        *auth_args,
         *callback_args,
         *headroom_args,
         *stream_args,
@@ -1017,11 +1109,12 @@ def verify_litellm_upstream_reachable(
     # Run the probe INSIDE the sidecar so we use the same network namespace
     # and hostname resolution path that openclaw will use when it calls the
     # proxy. Catches DNS/routing failures specific to the internal bridge.
+    probe_bearer = sidecar_probe_bearer(master_key)
     probe = (
         "import sys, urllib.request, urllib.error\n"
         f"req = urllib.request.Request('http://localhost:{port}/v1/chat/completions', "
         f"data={body_bytes!r}, "
-        f"headers={{'Authorization': 'Bearer {master_key}', "
+        f"headers={{'Authorization': 'Bearer {probe_bearer}', "
         "'Content-Type': 'application/json'}, method='POST')\n"
         "try:\n"
         f"    r = urllib.request.urlopen(req, timeout={int(timeout)})\n"

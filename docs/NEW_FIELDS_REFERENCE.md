@@ -69,7 +69,7 @@ Writer: `src/utils/litellm_usage_callback.py`.
 
 | Field | Rows | Meaning |
 |---|---|---|
-| `run_key` | success AND failure rows | `wcb::<task_id>::<uuid4>` minted per ATTEMPT (never derived from task+run_N — retries/parallel reps cannot collide). Only `wcb::`-prefixed values are ever written; real credentials never reach the log. Extraction channels cover litellm 1.88.1 (`metadata.user_api_key` raw bearer in keyless mode; `x-wcb-run-key` header for subagent/audio calls under any auth) |
+| `run_key` | success AND failure rows | `wcb::<task_id>::<uuid4>` minted per ATTEMPT (never derived from task+run_N — retries/parallel reps cannot collide). Only `wcb::`-prefixed values are ever written; real credentials never reach the log. Extraction channels cover litellm 1.88.1 (`metadata.user_api_key` raw bearer, which the `custom_auth` hook echoes back unhashed in run-key mode exactly as the old keyless mode did; `x-wcb-run-key` header for subagent/audio calls under any auth) |
 | `error_class` | failure rows | exception class name (e.g. `APIConnectionError`, `ProxyModelNotFoundError`) |
 | `error` | failure rows | first 300 chars of the exception message — class + message only, never the request payload |
 
@@ -99,10 +99,12 @@ detection is a no-op on those backends (BUGREPORT §3 item 2, open).
 
 | Var | Default | Effect |
 |---|---|---|
-| `WCB_SIDECAR_NO_MASTER_KEY=1` | off | keyless sidecar: master key removed from yaml+env, agent bearer becomes the per-run key → exact attribution (`litellm_run_key`). Off = master-key auth, window fallback, bit-identical legacy behavior |
+| (sidecar inbound auth) | run-key scoped | DEFAULT: the sidecar carries no master key and admits only the `wcb::<task_id>::<uuid4>` bearer minted for that attempt, validated by the `custom_auth` hook in `src/utils/litellm_run_key_auth.py`. The bearer that identifies a run is the bearer that admits it, so every row is tagged → exact attribution (`litellm_run_key`) under `--parallel` and under faketime. The check is on the key's SHAPE, not on membership in the batch's minted set; the sidecar's network is per-batch and internal |
+| `WCB_SIDECAR_NO_MASTER_KEY=1` | off | no-op alias of the default. Formerly "keyless sidecar" (no inbound auth at all), which was the only way to get per-run attribution; the default now gives the attribution without the open door. Kept so existing `.env` files keep working |
+| `WCB_SIDECAR_MASTER_KEY=1` | off | legacy master-key auth, explicit opt-in: `master_key` back in yaml+env, every run authenticates with the same shared key. Main-agent rows go out UNTAGGED and per-run cost falls back to the time window, which over-attributes under `--parallel` and is wrong under faketime. `run_batch` warns loudly at batch start when combined with `--parallel >1`. Subagent/audio calls stay tagged via `x-wcb-run-key` |
 | `WCB_INCLUDE_INCOMPLETE_RUNS=1` | off | debug: fold incomplete runs back into all averages |
 | `WCB_GRADE_INCOMPLETE_RUNS=1` | off | debug: run pytest grading + LLM judge on incomplete/empty trajectories anyway |
-| `WCB_TURN_STALL_SECONDS` | unset (off) | arms the per-turn stall guard; values below 600 are floored to 600 (usage rows land at request COMPLETION, so smaller windows would misread healthy long calls as wedges). Requires run-key tagging live (keyless mode); self-disables otherwise |
+| `WCB_TURN_STALL_SECONDS` | unset (off) | arms the per-turn stall guard; values below 600 are floored to 600 (usage rows land at request COMPLETION, so smaller windows would misread healthy long calls as wedges). Requires run-key tagging live, which is the default; self-disables under `WCB_SIDECAR_MASTER_KEY=1` |
 | `WCB_EMPTY_TURN_LIMIT` | on (any value >0) | empty-turn handling: a zero-traffic turn is retried once in place; a second empty aborts the run (`run_incomplete`). `0` disables the machinery entirely. Active only when run-key tagging is live |
 | `WCB_JUDGE_DISABLE_THINKING` | on (`1`) | judges send an explicit `thinking: {type: disabled}` — models with thinking-by-default (Sonnet 5 adaptive) otherwise burn output budget on reasoning before the first verdict (koji_holder 61/61-abstain). Models that reject the directive get one automatic retry without it. `0` restores absence |
 | `WCB_FORCE_LAUNCH` | off | overrides the run.sh launch lock (two concurrent launches of the same task set interleave into the same run_N trees) |
