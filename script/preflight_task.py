@@ -32,7 +32,9 @@ DEFAULT_TASK = REPO / "input" / "IAN_001 -- Bhavik Jain"
 
 # Section 6 enforces the three task-format standards on NEW tasks. Delivered
 # corpora predate them, so --legacy downgrades those FAILs to WARNs instead of
-# forcing edits to tasks that already shipped.
+# forcing edits to tasks that already shipped. It softens FORMAT nits only —
+# section 7 judges whether the task's world can be built at all, and that
+# verdict is the same age as the bundle it is run on.
 LEGACY = False
 
 # OpenClaw native tools that can appear as a loud-inject `service` but are NOT
@@ -612,6 +614,46 @@ def _check_prompt_header(task: Path, ts, window) -> None:
 
 
 # --------------------------------------------------------------------------- #
+# 7. world correctness (injection replay + required environment surface)
+# --------------------------------------------------------------------------- #
+def check_world_correctness(task: Path) -> None:
+    """Run the same gate the launcher runs, at authoring time.
+
+    Sections 1-6 check that a bundle is well FORMED. This one checks that the
+    world it describes can actually be built: that every injected write reaches
+    the agent, and that every required service exists, loads under this task's
+    own seeds and survives its own loader.
+
+    ``--legacy`` does not reach these. It exists so a corpus authored before the
+    format standards landed is not forced to re-edit its headers; it was never a
+    licence to run a task whose injection cannot land. A defect here costs a
+    container, a model budget and a graded artifact describing a world that was
+    never there, and that price is the same for old bundles and new ones.
+    """
+    section("7. world correctness (injection replay + required env surface)")
+    if str(REPO) not in sys.path:
+        sys.path.insert(0, str(REPO))
+    try:
+        from src.utils.inject_preflight import FATAL, gate_task
+    except Exception as exc:  # noqa: BLE001
+        rec(FAIL, f"cannot import the task gate: {exc}")
+        return
+    try:
+        report = gate_task(task)
+    except Exception as exc:  # noqa: BLE001
+        rec(FAIL, f"task gate raised: {type(exc).__name__}: {exc}")
+        return
+    for finding in report.findings:
+        rec(FAIL if finding.severity == FATAL else WARN, str(finding))
+    if not report.findings:
+        rec(PASS, f"{report.ops} injected op(s) land and serve; required "
+                  f"environment surface intact ({report.elapsed_ms}ms)")
+    elif not report.fatal:
+        rec(PASS, f"{report.ops} injected op(s) replayed, no fatal findings "
+                  f"({report.elapsed_ms}ms)")
+
+
+# --------------------------------------------------------------------------- #
 def main(argv: list[str] | None = None) -> int:
     global LEGACY
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -634,6 +676,7 @@ def main(argv: list[str] | None = None) -> int:
     check_inject(task, required, distractor)
     check_turns_and_grading(task)
     check_task_standards(task)
+    check_world_correctness(task)
     print("\n" + "=" * 60)
     print(f"SUMMARY: {_counts[PASS]} pass · {_counts[WARN]} warn · {_counts[FAIL]} fail")
     print("=" * 60)

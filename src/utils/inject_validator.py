@@ -381,6 +381,7 @@ def validate_inject_script(
     script: InjectScript,
     host_api_to_url: Dict[str, Any],
     mock_data_root: Optional[Path],
+    environment_dir: Optional[Path] = None,
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """Statically validate every op against a cumulative seed+inject snapshot.
 
@@ -388,9 +389,12 @@ def validate_inject_script(
     The snapshot starts from on-disk seed row ids and grows as earlier stages'
     upsert/doc_set targets are folded in (prior stages only, never same-stage),
     mirroring the runtime firing order (silent before loud within a stage).
+
+    ``environment_dir`` names the fleet the ops are judged against; it defaults
+    to the repo's own so every existing caller is unaffected.
     """
     urls = host_api_to_url or {}
-    catalog = set(catalog_apis())
+    catalog = set(catalog_apis(environment_dir))
     fatal: List[Dict[str, Any]] = []
     warnings: List[Dict[str, Any]] = []
 

@@ -211,6 +211,23 @@ def _fake_inject_module(stages=None, load_exc=None):
     return m
 
 
+def _fake_gate_module(findings=()):
+    """Stand in for the world-correctness gate (section 7).
+
+    These are wiring tests: they assert what preflight_task PRINTS and what it
+    exits with, against fixtures whose services are made up. The gate imports
+    and runs real ones, and has its own calibration suite in
+    tests/test_inject_preflight.py.
+    """
+    m = types.ModuleType("src.utils.inject_preflight")
+    m.FATAL, m.WARN = "FATAL", "WARN"
+    m.gate_task = lambda task, **kw: types.SimpleNamespace(
+        findings=tuple(findings),
+        fatal=tuple(f for f in findings if f.severity == "FATAL"),
+        ops=0, elapsed_ms=0)
+    return m
+
+
 def test_pf_check_inject_full_battery(pf, tmp_path, capsys, monkeypatch):
     task = _mk_task(tmp_path)
     # stage source dirs with/without verify.sh
@@ -340,6 +357,7 @@ def test_pf_main_missing_green_and_red(pf, tmp_path, capsys, monkeypatch):
                       loud=[{"id": "l0", "service": "widget-api"}])]
     monkeypatch.setitem(sys.modules, "src.utils.inject_director",
                         _fake_inject_module(stages))
+    monkeypatch.setitem(sys.modules, "src.utils.inject_preflight", _fake_gate_module())
     monkeypatch.setattr(sys, "argv", ["preflight_task.py", str(task)])
     assert pf.main() == 0
     assert "SUMMARY" in capsys.readouterr().out
