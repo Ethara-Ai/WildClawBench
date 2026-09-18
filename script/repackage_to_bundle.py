@@ -72,10 +72,14 @@ DESIGN CHOICES (documented, since some target fields are absent in our data)
 * rubric[].justification   <- single-judge criteria[].rationale, or, on a council
                               score.json, the first non-empty criteria[].rationales_by_judge
                               entry; emitted ONLY on failed items (empty string if none)
-* rubric[].type / importance / evaluation_target are NOT in our score.json.
-    - importance is DERIVED: abs(weight) >= 5 -> "critically_important" else "important"
-    - type and evaluation_target are emitted as "" (unknown) unless --infer-rubric-meta
-      is passed, in which case light heuristics fill them (see _infer_meta).
+* rubric[].type / importance / evaluation_target are NOT in our score.json; they
+  are merged from the task's authoring rubric.json (<task_dir>/rubric.json),
+  matched by criterion text, falling back to R-number (see _index_source_rubric).
+    - importance: source rubric value, else DERIVED: abs(weight) >= 5 ->
+      "critically_important" else "important"
+    - type / evaluation_target: source rubric value, else "" (unknown) unless
+      --infer-rubric-meta is passed, in which case light heuristics fill them
+      (see _infer_meta).
 * pytest test name           <- bare test name (last "::" segment of the ctrf
                               name; class/module/file qualifiers are stripped)
 * pytest test weight         <- test_weights.json[method]  (default 1 if absent)
@@ -746,17 +750,62 @@ def _pick_rationale(c: dict[str, Any]) -> str:
     return ""
 
 
-def _build_rubric_block(score: dict[str, Any], infer_meta: bool) -> list[dict[str, Any]]:
+def _norm_criterion(text: Any) -> str:
+    return re.sub(r"\s+", " ", str(text or "")).strip().lower()
+
+
+def _index_source_rubric(task_dir: Path | None) -> dict[str, dict[str, Any]]:
+    """Index the task's authoring rubric.json by criterion text and R-number.
+
+    score.json drops type / evaluation_target / importance, so they are read
+    back from the source rubric. Empty dict when the file is absent/invalid."""
+    if task_dir is None:
+        return {}
+    src = _load_json(task_dir / "rubric.json")
+    if isinstance(src, dict):
+        src = src.get("rubric") or src.get("criteria")
+    if not isinstance(src, list):
+        return {}
+    idx: dict[str, dict[str, Any]] = {}
+    for r in src:
+        if not isinstance(r, dict):
+            continue
+        crit = _norm_criterion(r.get("criterion"))
+        if crit:
+            idx.setdefault(f"crit:{crit}", r)
+        num = str(r.get("number") or "").strip()
+        if num:
+            idx.setdefault(f"num:{num}", r)
+    return idx
+
+
+def _build_rubric_block(
+    score: dict[str, Any], infer_meta: bool, task_dir: Path | None = None
+) -> list[dict[str, Any]]:
+    source = _index_source_rubric(task_dir)
     rubric: list[dict[str, Any]] = []
     for c in score.get("criteria", []):
         weight = c.get("weight", 0)
         is_positive = bool(c.get("is_positive", weight >= 0))
         criterion = c.get("criterion", "")
-        importance = "critically_important" if abs(float(weight)) >= 5 else "important"
-        typ, target = _infer_meta(criterion, is_positive) if infer_meta else ("", "")
+        number = f"R{int(c.get('id', 0)) + 1}"
+        src = (
+            source.get(f"crit:{_norm_criterion(criterion)}")
+            or source.get(f"num:{number}")
+            or {}
+        )
+        importance = str(src.get("importance") or "") or (
+            "critically_important" if abs(float(weight)) >= 5 else "important"
+        )
+        typ = str(src.get("type") or "")
+        target = str(src.get("evaluation_target") or "")
+        if infer_meta and not (typ and target):
+            inf_typ, inf_target = _infer_meta(criterion, is_positive)
+            typ = typ or inf_typ
+            target = target or inf_target
         passed = bool(c.get("passed", False))
         item: dict[str, Any] = {
-            "number": f"R{int(c.get('id', 0)) + 1}",
+            "number": number,
             "criterion": criterion,
             "type": typ,
             "evaluation_target": target,
@@ -831,7 +880,7 @@ def build_report(
             file=sys.stderr,
         )
 
-    rubric_block = _build_rubric_block(score, infer_meta)
+    rubric_block = _build_rubric_block(score, infer_meta, task_dir)
 
     rubric_pct = score.get("rubric_weights_percentage", 0.0)
     if rubric_pct is None:
