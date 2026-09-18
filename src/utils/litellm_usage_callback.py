@@ -141,6 +141,29 @@ def _is_preflight_ping(kwargs: dict) -> bool:
 # message requirement is what makes a false positive implausible — an agent
 # turn always carries the conversation so far.
 #
+# Two more of openclaw's own call types are named by SHAPE rather than by
+# prompt text, because neither sends a prompt this callback could pin:
+#
+#   image       — the `image` tool's vision call. src/agents/tools/image-tool.ts
+#     in the bundle builds the request itself, in buildImageContext(): exactly
+#     one user message whose content is a text block followed by one image
+#     block per file, and NO system prompt. Its prompt text is caller-supplied
+#     — DEFAULT_PROMPT ("Describe the image.") only fills in when the agent
+#     passes none — so the text is not a compile-time constant and the shape
+#     is what identifies it. The absent system prompt is what separates it
+#     from a first agent turn that carries an image: the agent always sends
+#     one, this tool never does.
+#   embeddings  — the memory-lancedb extension's vector calls
+#     (extensions/memory-lancedb/index.ts, Embeddings.embed →
+#     client.embeddings.create, default model text-embedding-3-small). They
+#     run on auto-recall, memory_search and auto-capture, and they are not
+#     chat requests at all: they hit /v1/embeddings with an `input` string and
+#     no messages, so they can never correspond to an assistant message.
+#
+# Measured on the 2026-09-18 sean_callahan run, whose 156-row snapshot held 26
+# rows more than its 129 assistant messages: 22 embeddings and 4 image-tool
+# calls, matching that run's tool mix (memory_search 1, image 4) exactly.
+#
 # `openclaw.cache-ttl` is NOT in this list, though the critique that opened
 # this named it as the bulk of the surplus. Reading the bundle says otherwise:
 # it is a context-pruning transformer that rewrites the outgoing message list
@@ -170,26 +193,33 @@ def _text_of(content: Any) -> str:
     return "\n".join(parts)
 
 
-def _prompt_shape(kwargs: dict) -> tuple[str, list[str]]:
-    """The request's system prompt and its non-system message texts.
+def _request_body(kwargs: dict) -> dict:
+    """The raw client body LiteLLM captured, or {} when it did not."""
+    lp = kwargs.get("litellm_params") or {}
+    psr = lp.get("proxy_server_request") if isinstance(lp, dict) else None
+    body = psr.get("body") if isinstance(psr, dict) else None
+    return body if isinstance(body, dict) else {}
+
+
+def _prompt_shape(kwargs: dict) -> tuple[str, list[dict]]:
+    """The request's system prompt and its non-system messages.
 
     Prefers the raw client body, which for the anthropic-messages route
     (src/agents/openclaw/runner.py registers the sidecar with
     api="anthropic-messages") carries ``system`` as a top-level field rather
     than a message. Falls back to the normalized ``messages`` LiteLLM hands
     every callback, where the same value arrives as a system-role entry.
+
+    The non-system messages come back as the raw dicts rather than flattened
+    text: the image tool is identified by the content BLOCKS it sends, which
+    flattening discards.
     """
-    lp = kwargs.get("litellm_params") or {}
-    psr = lp.get("proxy_server_request") if isinstance(lp, dict) else None
-    body = psr.get("body") if isinstance(psr, dict) else None
-    system = ""
-    messages: Any = None
-    if isinstance(body, dict):
-        system = _text_of(body.get("system"))
-        messages = body.get("messages")
+    body = _request_body(kwargs)
+    system = _text_of(body.get("system"))
+    messages: Any = body.get("messages")
     if not isinstance(messages, list) or not messages:
         messages = kwargs.get("messages")
-    others: list[str] = []
+    others: list[dict] = []
     for msg in messages if isinstance(messages, list) else []:
         if not isinstance(msg, dict):
             continue
@@ -197,8 +227,40 @@ def _prompt_shape(kwargs: dict) -> tuple[str, list[str]]:
             if not system:
                 system = _text_of(msg.get("content"))
             continue
-        others.append(_text_of(msg.get("content")))
+        others.append(msg)
     return system, others
+
+
+# Content-block type tags that carry an image, across the shapes this callback
+# can be handed: the anthropic-messages body openclaw posts ("image"), the
+# OpenAI-normalized ``messages`` LiteLLM builds from it ("image_url"), and the
+# Responses-API spelling ("input_image").
+_IMAGE_BLOCK_TYPES = frozenset({"image", "image_url", "input_image"})
+
+
+def _has_image_block(content: Any) -> bool:
+    if not isinstance(content, list):
+        return False
+    return any(
+        isinstance(block, dict) and str(block.get("type") or "") in _IMAGE_BLOCK_TYPES
+        for block in content
+    )
+
+
+def _is_embeddings_request(kwargs: dict) -> bool:
+    """True for a /v1/embeddings call rather than a chat completion.
+
+    ``call_type`` is the discriminator LiteLLM itself uses (``embedding`` /
+    ``aembedding``), exactly as for transcription above. The body test behind
+    it is the OpenAI embeddings wire contract — ``input`` instead of
+    ``messages`` — and covers proxy builds that do not forward call_type to
+    callbacks, where the request would otherwise be indistinguishable from a
+    chat row that happens to carry no messages.
+    """
+    if "embedding" in str(kwargs.get("call_type") or ""):
+        return True
+    body = _request_body(kwargs)
+    return bool(body) and "input" in body and not body.get("messages")
 
 
 def _classify_internal_purpose(kwargs: dict) -> str:
@@ -215,12 +277,19 @@ def _classify_internal_purpose(kwargs: dict) -> str:
             # excluded downstream when it bills by duration, but the
             # token-billed transcribe models look exactly like a chat row.
             return "transcription"
+        if _is_embeddings_request(kwargs):
+            return "embeddings"
         system, others = _prompt_shape(kwargs)
         if len(others) != 1:
             return ""
         if system.lstrip().startswith(_COMPACTION_SYSTEM_HEAD):
             return "compaction"
-        if not system.strip() and others[0].lstrip().startswith(_SUMMARIZE_TEXT_HEAD):
+        if system.strip():
+            return ""
+        content = others[0].get("content")
+        if _has_image_block(content):
+            return "image"
+        if _text_of(content).lstrip().startswith(_SUMMARIZE_TEXT_HEAD):
             return "summarize"
     except Exception:
         pass

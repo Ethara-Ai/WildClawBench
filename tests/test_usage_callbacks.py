@@ -893,6 +893,132 @@ def test_write_row_leaves_a_turn_untagged(usage_path, stub_completion_cost):
 
 
 # ============================================================================
+# image tool — buildImageContext() in the bundle sends one system-less user
+# message of [text block, image block...]. Shape, not prompt text: the tool's
+# prompt is whatever the agent passed it.
+# ============================================================================
+
+
+def _image_tool_kwargs(prompt="Describe the image."):
+    return _anthropic_body("", [{"role": "user", "content": [
+        {"type": "text", "text": prompt},
+        {"type": "image", "source": {"type": "base64",
+                                     "media_type": "image/jpeg", "data": "QUJD"}},
+    ]}])
+
+
+def test_image_tool_named_from_its_content_blocks():
+    assert uc._classify_internal_purpose(_image_tool_kwargs()) == "image"
+
+
+def test_image_tool_named_with_an_agent_supplied_prompt():
+    # DEFAULT_PROMPT only applies when the agent passes none, so the text
+    # carries no signal and must not be required to.
+    assert uc._classify_internal_purpose(
+        _image_tool_kwargs("read the feeler gauge in this photo")) == "image"
+
+
+def test_image_tool_named_across_multiple_images():
+    kwargs = _anthropic_body("", [{"role": "user", "content": [
+        {"type": "text", "text": "compare"},
+        {"type": "image", "source": {"data": "QQ=="}},
+        {"type": "image", "source": {"data": "Qg=="}},
+    ]}])
+    assert uc._classify_internal_purpose(kwargs) == "image"
+
+
+def test_image_tool_named_from_openai_normalized_blocks():
+    # LiteLLM hands callbacks the OpenAI-normalized messages when the raw
+    # anthropic body was not captured; the image block is spelled image_url.
+    kwargs = {"messages": [{"role": "user", "content": [
+        {"type": "text", "text": "Describe the image."},
+        {"type": "image_url", "image_url": {"url": "data:image/png;base64,QQ=="}},
+    ]}]}
+    assert uc._classify_internal_purpose(kwargs) == "image"
+
+
+def test_agent_turn_carrying_an_image_is_not_named_image():
+    # A task may hand the agent a photo in its first user message. The agent
+    # always sends a system prompt; the image tool never does.
+    kwargs = _anthropic_body("You are a helpful coding agent.", [
+        {"role": "user", "content": [
+            {"type": "text", "text": "grade the joint in this photo"},
+            {"type": "image", "source": {"data": "QQ=="}},
+        ]},
+    ])
+    assert uc._classify_internal_purpose(kwargs) == ""
+
+
+def test_multi_turn_conversation_with_an_image_is_not_named_image():
+    kwargs = {"messages": [
+        {"role": "user", "content": [{"type": "image", "source": {"data": "QQ=="}}]},
+        {"role": "assistant", "content": "that is a mortise"},
+        {"role": "user", "content": "and the shoulder?"},
+    ]}
+    assert uc._classify_internal_purpose(kwargs) == ""
+
+
+def test_text_only_single_message_is_not_named_image():
+    assert uc._classify_internal_purpose(
+        _anthropic_body("", [{"role": "user", "content": [
+            {"type": "text", "text": "Describe the image."}]}])) == ""
+
+
+# ============================================================================
+# embeddings — memory-lancedb's /v1/embeddings calls, which carry no messages
+# ============================================================================
+
+
+def test_embeddings_named_from_call_type():
+    assert uc._classify_internal_purpose(
+        {"call_type": "aembedding", "model": "text-embedding-3-small"}) == "embeddings"
+
+
+def test_embeddings_named_from_sync_call_type():
+    assert uc._classify_internal_purpose({"call_type": "embedding"}) == "embeddings"
+
+
+def test_embeddings_named_from_body_when_call_type_absent():
+    # Proxy builds that do not forward call_type still post the OpenAI
+    # embeddings body: `input` instead of `messages`.
+    kwargs = {"litellm_params": {"proxy_server_request": {"body": {
+        "model": "text-embedding-3-small", "input": "bench 06 shoulder gap",
+        "dimensions": 1536}}}}
+    assert uc._classify_internal_purpose(kwargs) == "embeddings"
+
+
+def test_chat_request_is_not_named_embeddings():
+    assert uc._classify_internal_purpose(
+        {"call_type": "acompletion", **_turn_kwargs()}) == ""
+
+
+def test_chat_body_with_messages_is_not_named_embeddings():
+    kwargs = _anthropic_body("You are a coding agent.", [
+        {"role": "user", "content": "hello"}])
+    assert uc._classify_internal_purpose(kwargs) == ""
+
+
+def test_compaction_still_wins_over_the_new_shape_rules():
+    kwargs = {"call_type": "acompletion", "messages": [
+        {"role": "system", "content": _COMPACTION_SYSTEM},
+        {"role": "user", "content": "<conversation>"},
+    ]}
+    assert uc._classify_internal_purpose(kwargs) == "compaction"
+
+
+def test_write_row_tags_an_embeddings_call(usage_path, stub_completion_cost):
+    uc._write_row({"model": "text-embedding-3-small", "call_type": "aembedding"},
+                  _resp(_chat_usage()), T0, T1)
+    assert _read_rows(usage_path)[0]["purpose"] == "embeddings"
+
+
+def test_write_row_tags_an_image_tool_call(usage_path, stub_completion_cost):
+    uc._write_row({"model": "claude-opus-5", **_image_tool_kwargs()},
+                  _resp(_chat_usage()), T0, T1)
+    assert _read_rows(usage_path)[0]["purpose"] == "image"
+
+
+# ============================================================================
 # Module-level _PATH env override (both modules read env at import)
 # ============================================================================
 
