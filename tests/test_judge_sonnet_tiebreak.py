@@ -410,7 +410,7 @@ def test_effective_model_sonnet_on_bridge_shows_anthropic(monkeypatch):
     monkeypatch.setenv("KENSEI_JUDGE_OAUTH_BRIDGE_URL", "http://127.0.0.1:51554")
     monkeypatch.setenv("WCB_AUTH_PROVIDER", "oauth")
     monkeypatch.delenv("KENSEI_JUDGE_OAUTH_BRIDGE_MODEL", raising=False)
-    assert grading._effective_judge_model(SONNET_ARN, "sonnet") == "claude-sonnet-5"
+    assert grading._effective_judge_model(SONNET_ARN, "sonnet") == "claude-sonnet-4-6"
 
 
 def test_effective_model_custom_bridge_model(monkeypatch):

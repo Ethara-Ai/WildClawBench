@@ -79,11 +79,13 @@ TMP_WORKSPACE = os.environ.get("TMP_WORKSPACE", "/tmp_workspace")
 # 0 restores unbounded (known to 400 every council member).
 _DEFAULT_JUDGE_MAX_EVIDENCE = 450_000
 
-# Claude via the OAuth subscription bridge. The judge on this route is now
-# Sonnet 5 (claude-sonnet-5), which documents a 1,000,000-token context window
-# by default on the Claude API (no beta header) — a large increase over the
-# Sonnet 4.5 era, when this route capped at 200,000 tokens and this constant
-# was 300,000 chars.
+# Claude via the OAuth subscription bridge. The judge on this route defaults
+# to Sonnet 4.6 (claude-sonnet-4-6, judge_litellm._judge_oauth_bridge_model),
+# which documents a 1,000,000-token context window on the Claude API (no beta
+# header) — a large increase over the Sonnet 4.5 era, when this route capped
+# at 200,000 tokens and this constant was 300,000 chars. (Sonnet 5 is still
+# selectable via KENSEI_JUDGE_OAUTH_BRIDGE_MODEL and documents the same 1M
+# window.)
 #
 # We do NOT budget to the full 1M window: the usable context on a Claude Max
 # *subscription* surface (as opposed to the plain Anthropic API) is NOT
