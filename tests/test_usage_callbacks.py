@@ -1019,6 +1019,267 @@ def test_write_row_tags_an_image_tool_call(usage_path, stub_completion_cost):
 
 
 # ============================================================================
+# pdf tool — three request paths, all of them system-less, reproduced from
+# /usr/lib/node_modules/openclaw in the wildclawbench-ubuntu:v1.4 image. The
+# tool is enabled in every run: the runner never writes
+# agents.defaults.pdfModel but always writes imageModel, and
+# resolvePdfModelConfigForTool (dist/reply-BCcP6j4h.js:22782) falls pdfModel
+# -> imageModel, so a model always resolves; tools.deny lists browser tools
+# only. Two of the three paths were unlabelled, and one unlabelled row is
+# enough to flip usage_attribution to failed.
+# ============================================================================
+
+# anthropicAnalyzePdf, dist/reply-BCcP6j4h.js:22632, verbatim:
+#     const content = [];
+#     for (const pdf of params.pdfs) content.push({
+#         type: "document",
+#         source: { type: "base64", media_type: "application/pdf",
+#                   data: pdf.base64 }
+#     });
+#     content.push({ type: "text", text: params.prompt });
+#     ... body: JSON.stringify({ model, max_tokens, messages: [{ role: "user",
+#                                                                content }] })
+# There is no `system` key in that body at all — the document blocks come
+# first and the prompt last.
+def _pdf_native_anthropic_kwargs(prompt="Analyze this PDF document.", count=1):
+    content = [
+        {"type": "document", "source": {"type": "base64",
+                                        "media_type": "application/pdf",
+                                        "data": "JVBERi0xLjQK"}}
+        for _ in range(count)
+    ]
+    content.append({"type": "text", "text": prompt})
+    return _anthropic_body("", [{"role": "user", "content": content}])
+
+
+# geminiAnalyzePdf, same file:22678, verbatim:
+#     for (const pdf of params.pdfs) parts.push({ inline_data: {
+#         mime_type: "application/pdf", data: pdf.base64 } });
+#     parts.push({ text: params.prompt });
+#     ... body: JSON.stringify({ contents: [{ role: "user", parts }] })
+# Gemini parts carry no `type` tag, so the key itself is what identifies the
+# block, and the media type is what separates it from a Gemini image part.
+def _pdf_native_gemini_kwargs(prompt="Analyze this PDF document."):
+    return {"litellm_params": {"proxy_server_request": {"body": {"messages": [
+        {"role": "user", "content": [
+            {"inline_data": {"mime_type": "application/pdf",
+                             "data": "JVBERi0xLjQK"}},
+            {"text": prompt},
+        ]},
+    ]}}}}
+
+
+# buildPdfExtractionContext, same file:22832, verbatim:
+#     const label = extractions.length > 1 ? `[PDF ${i + 1} text]\n`
+#                                          : "[PDF text]\n";
+#     content.push({ type: "text", text: label + extraction.text });
+#     for (const img of extraction.images) content.push({ type: "image",
+#         data: img.data, mimeType: img.mimeType });
+#     ... content.push({ type: "text", text: prompt });
+#     return { messages: [{ role: "user", content, timestamp: Date.now() }] };
+# The context has no systemPrompt field, and both serializers only emit a
+# system when one is set (anthropic.js:482, openai-completions.js:405), so
+# this reaches the sidecar system-less. The image blocks arrive as the
+# provider's own spelling — anthropic.js:559 rewrites them to
+# {"type":"image","source":{...}}, openai-completions.js:436 to image_url.
+def _pdf_extraction_kwargs(pages=("Invoice 4471\nSubtotal 78.00\nVAT 14.10",),
+                           images=(), prompt="Analyze this PDF document."):
+    content = []
+    for i, text in enumerate(pages):
+        label = f"[PDF {i + 1} text]\n" if len(pages) > 1 else "[PDF text]\n"
+        content.append({"type": "text", "text": label + text})
+        for data in images:
+            content.append({"type": "image", "source": {
+                "type": "base64", "media_type": "image/png", "data": data}})
+    content.append({"type": "text", "text": prompt})
+    return _anthropic_body("", [{"role": "user", "content": content}])
+
+
+def test_pdf_tool_native_anthropic_named_from_its_document_blocks():
+    assert uc._classify_internal_purpose(_pdf_native_anthropic_kwargs()) == "pdf"
+
+
+def test_pdf_tool_native_anthropic_named_across_multiple_documents():
+    # maxPdfs defaults to 10, so a multi-document body is an ordinary call.
+    assert uc._classify_internal_purpose(
+        _pdf_native_anthropic_kwargs(count=3)) == "pdf"
+
+
+def test_pdf_tool_native_anthropic_named_with_an_agent_supplied_prompt():
+    # DEFAULT_PROMPT ("Analyze this PDF document.", same file:22770) only
+    # fills in when the agent passes none, so the text carries no signal.
+    assert uc._classify_internal_purpose(
+        _pdf_native_anthropic_kwargs("what is the invoice total?")) == "pdf"
+
+
+def test_pdf_tool_native_gemini_named_from_its_inline_data_parts():
+    assert uc._classify_internal_purpose(_pdf_native_gemini_kwargs()) == "pdf"
+
+
+def test_pdf_tool_native_named_from_openai_normalized_file_blocks():
+    # When the raw anthropic body was not captured LiteLLM hands callbacks the
+    # OpenAI-normalized messages, where a PDF attachment is spelled `file` on
+    # Chat Completions and `input_file` on Responses.
+    for block_type in ("file", "input_file"):
+        kwargs = {"messages": [{"role": "user", "content": [
+            {"type": block_type, "file": {"filename": "invoice.pdf",
+                                          "file_data": "data:application/pdf;base64,JVBER"}},
+            {"type": "text", "text": "Analyze this PDF document."},
+        ]}]}
+        assert uc._classify_internal_purpose(kwargs) == "pdf"
+
+
+def test_pdf_tool_text_extraction_named_from_its_label():
+    # PDF_MIN_TEXT_CHARS = 200 (same file:22776) gates rasterization, so a
+    # text-rich PDF produces zero image blocks and the label is the only
+    # thing left to match on. This is the shape that was going out unlabelled.
+    assert uc._classify_internal_purpose(_pdf_extraction_kwargs()) == "pdf"
+
+
+def test_pdf_tool_text_extraction_named_across_multiple_pdfs():
+    # Two or more extractions switch the label to its numbered form.
+    kwargs = _pdf_extraction_kwargs(pages=("first doc body", "second doc body"))
+    assert uc._classify_internal_purpose(kwargs) == "pdf"
+
+
+def test_pdf_tool_extraction_with_images_keeps_the_image_label():
+    # The third path already had a name before this change and keeps it: when
+    # the PDF yields no extractable text its message is image blocks and a
+    # prompt, indistinguishable from the image tool's, so the label stays
+    # whole rather than splitting on the document's contents.
+    assert uc._classify_internal_purpose(
+        _pdf_extraction_kwargs(images=("QQ==", "Qg=="))) == "image"
+    assert uc._classify_internal_purpose(
+        _anthropic_body("", [{"role": "user", "content": [
+            {"type": "image", "source": {"data": "QQ=="}},
+            {"type": "text", "text": "Analyze this PDF document."},
+        ]}])) == "image"
+
+
+def test_write_row_tags_a_pdf_tool_call(usage_path, stub_completion_cost):
+    uc._write_row({"model": "claude-opus-4-6", **_pdf_native_anthropic_kwargs()},
+                  _resp(_chat_usage()), T0, T1)
+    row = _read_rows(usage_path)[0]
+    assert row["purpose"] == "pdf"
+    assert row["kind"] == "agent"
+    assert set(row.keys()) == EXPECTED_KEYS | {"purpose"}
+
+
+def test_write_row_tags_a_pdf_text_extraction_call(usage_path, stub_completion_cost):
+    uc._write_row({"model": "claude-opus-4-6", **_pdf_extraction_kwargs()},
+                  _resp(_chat_usage()), T0, T1)
+    assert _read_rows(usage_path)[0]["purpose"] == "pdf"
+
+
+# --- negatives: nothing an agent can send may reach the pdf label ----------
+
+
+def test_agent_turn_carrying_a_pdf_is_not_named_pdf():
+    # A task may hand the agent a contract in its first user message. The
+    # agent always sends a system prompt; the pdf tool never does, on any of
+    # its three paths.
+    kwargs = _anthropic_body("You are a helpful coding agent.", [
+        {"role": "user", "content": [
+            {"type": "document", "source": {"type": "base64",
+                                            "media_type": "application/pdf",
+                                            "data": "JVBER"}},
+            {"type": "text", "text": "summarise the attached contract"},
+        ]},
+    ])
+    assert uc._classify_internal_purpose(kwargs) == ""
+
+
+def test_agent_turn_whose_system_prompt_arrives_as_a_message_is_not_named_pdf():
+    kwargs = {"messages": [
+        {"role": "system", "content": "You are a helpful coding agent."},
+        {"role": "user", "content": [
+            {"type": "text", "text": "[PDF text]\nquarterly figures"},
+            {"type": "text", "text": "what changed?"},
+        ]},
+    ]}
+    assert uc._classify_internal_purpose(kwargs) == ""
+
+
+def test_multi_turn_conversation_with_a_pdf_is_not_named_pdf():
+    # The single-user-message requirement: an agent turn always carries the
+    # conversation so far, every pdf-tool path carries exactly one message.
+    kwargs = {"messages": [
+        {"role": "user", "content": [
+            {"type": "document", "source": {"data": "JVBER"}}]},
+        {"role": "assistant", "content": "that is a lease"},
+        {"role": "user", "content": "what is the break clause?"},
+    ]}
+    assert uc._classify_internal_purpose(kwargs) == ""
+
+
+def test_text_only_single_message_without_the_pdf_label_is_not_named_pdf():
+    # That shape belongs to summarize detection, which matches on its own
+    # prompt head; an unlabelled one-text-block message is neither.
+    assert uc._classify_internal_purpose(
+        _anthropic_body("", [{"role": "user", "content": [
+            {"type": "text", "text": "Invoice 4471\nSubtotal 78.00"}]}])) == ""
+    assert uc._classify_internal_purpose(
+        _anthropic_body("", [{"role": "user", "content": [
+            {"type": "text", "text": _SUMMARIZE_USER}]}])) == "summarize"
+
+
+def test_pdf_label_not_at_the_start_of_a_block_is_not_named_pdf():
+    # The extractor prepends the label; a block that merely mentions it is a
+    # task talking about PDFs.
+    assert uc._classify_internal_purpose(
+        _anthropic_body("", [{"role": "user", "content": [
+            {"type": "text", "text": "our extractor emits [PDF text]\nas a marker"}]}])) == ""
+
+
+def test_pdf_label_without_its_trailing_newline_is_not_named_pdf():
+    assert uc._classify_internal_purpose(
+        _anthropic_body("", [{"role": "user", "content": [
+            {"type": "text", "text": "[PDF text] is the marker we use"}]}])) == ""
+
+
+def test_gemini_image_part_is_not_named_pdf():
+    # pi-ai's google provider spells images inlineData too
+    # (node_modules/@mariozechner/pi-ai/dist/providers/google-shared.js:90),
+    # so the document test has to prove an application/pdf media type.
+    assert uc._classify_internal_purpose(
+        _anthropic_body("", [{"role": "user", "content": [
+            {"text": "Describe the image."},
+            {"inlineData": {"mimeType": "image/png", "data": "QQ=="}},
+        ]}])) != "pdf"
+
+
+def test_existing_labels_still_fire_alongside_the_pdf_rules():
+    # The pdf checks sit behind the same no-system-prompt guard as the image
+    # check and ahead of summarize, so none of the four earlier labels moves.
+    assert uc._classify_internal_purpose({"call_type": "atranscription"}) == "transcription"
+    assert uc._classify_internal_purpose({"call_type": "aembedding"}) == "embeddings"
+    assert uc._classify_internal_purpose(_anthropic_body(_COMPACTION_SYSTEM, [
+        {"role": "user", "content": "<conversation>"}])) == "compaction"
+    assert uc._classify_internal_purpose(_image_tool_kwargs()) == "image"
+    assert uc._classify_internal_purpose(
+        {"messages": [{"role": "user", "content": _SUMMARIZE_USER}]}) == "summarize"
+    assert uc._classify_internal_purpose(_turn_kwargs()) == ""
+
+
+def test_compaction_still_wins_over_a_document_carrying_body():
+    # Compaction is tested before the system-prompt guard, so a summarization
+    # request that happens to quote a document block stays compaction.
+    kwargs = _anthropic_body(_COMPACTION_SYSTEM, [{"role": "user", "content": [
+        {"type": "document", "source": {"media_type": "application/pdf",
+                                        "data": "JVBER"}},
+        {"type": "text", "text": "<conversation>"},
+    ]}])
+    assert uc._classify_internal_purpose(kwargs) == "compaction"
+
+
+def test_pdf_classifier_never_raises_on_junk():
+    for content in ("not-a-list", [None, 3], [{"type": None}],
+                    [{"inline_data": "nope"}], [{"text": None}]):
+        assert uc._classify_internal_purpose(
+            _anthropic_body("", [{"role": "user", "content": content}])) in ("", "pdf")
+
+
+# ============================================================================
 # Module-level _PATH env override (both modules read env at import)
 # ============================================================================
 

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import threading
 from datetime import datetime, timezone
@@ -141,8 +142,8 @@ def _is_preflight_ping(kwargs: dict) -> bool:
 # message requirement is what makes a false positive implausible — an agent
 # turn always carries the conversation so far.
 #
-# Two more of openclaw's own call types are named by SHAPE rather than by
-# prompt text, because neither sends a prompt this callback could pin:
+# Three more of openclaw's own call types are named by SHAPE rather than by
+# prompt text, because none of them sends a prompt this callback could pin:
 #
 #   image       — the `image` tool's vision call. src/agents/tools/image-tool.ts
 #     in the bundle builds the request itself, in buildImageContext(): exactly
@@ -153,6 +154,26 @@ def _is_preflight_ping(kwargs: dict) -> bool:
 #     is what identifies it. The absent system prompt is what separates it
 #     from a first agent turn that carries an image: the agent always sends
 #     one, this tool never does.
+#   pdf         — the `pdf` tool's model call. It is live in every run: the
+#     runner never sets agents.defaults.pdfModel, but it always writes
+#     imageModel (src/agents/openclaw/runner.py), and
+#     resolvePdfModelConfigForTool falls pdfModel -> imageModel -> provider
+#     default, so a model always resolves and the tool always registers;
+#     tools.deny carries only the browser entries. It reaches the model by
+#     three request shapes, none of which sends a system prompt:
+#       native         — anthropicAnalyzePdf and geminiAnalyzePdf hand-build
+#         the provider body to get a document type pi-ai's content model does
+#         not have, posting one user message of document blocks plus the
+#         prompt. Named below by those block tags.
+#       extracted text — buildPdfExtractionContext posts one user message of
+#         the host-extracted page text under a literal label, plus the
+#         prompt. Rasterization only runs for a PDF yielding under
+#         PDF_MIN_TEXT_CHARS (200) of text, so a text-rich one carries ZERO
+#         image blocks and nothing about the request is media at all; the
+#         label, not the shape, is what names it.
+#       extracted with images — the same builder with rasterized pages
+#         interleaved, which the image test above already catches and which
+#         deliberately keeps that name. See _classify_internal_purpose.
 #   embeddings  — the memory-lancedb extension's vector calls
 #     (extensions/memory-lancedb/index.ts, Embeddings.embed →
 #     client.embeddings.create, default model text-embedding-3-small). They
@@ -162,7 +183,10 @@ def _is_preflight_ping(kwargs: dict) -> bool:
 #
 # Measured on the 2026-09-18 sean_callahan run, whose 156-row snapshot held 26
 # rows more than its 129 assistant messages: 22 embeddings and 4 image-tool
-# calls, matching that run's tool mix (memory_search 1, image 4) exactly.
+# calls, matching that run's tool mix (memory_search 1, image 4) exactly. That
+# snapshot is silent on the pdf tool only because the agent happened to shell
+# out to pdftotext through exec instead of calling it; one call on either of
+# the two unlabelled paths would have put the run back at failed.
 #
 # `openclaw.cache-ttl` is NOT in this list, though the critique that opened
 # this named it as the bulk of the surplus. Reading the bundle says otherwise:
@@ -247,6 +271,79 @@ def _has_image_block(content: Any) -> bool:
     )
 
 
+# Content-block tags that carry a PDF rather than an image, across the shapes
+# this callback can be handed. The pdf tool's native path builds the provider
+# body by hand precisely because pi-ai has no document content type
+# (dist/plugin-sdk/agents/tools/pdf-native-providers.d.ts says so in as many
+# words), so these spellings come straight off the wire:
+#
+#   "document"    — anthropicAnalyzePdf, dist/reply-BCcP6j4h.js:22632. One
+#     {"type":"document","source":{"type":"base64","media_type":
+#     "application/pdf","data":...}} per file, then one {"type":"text",
+#     "text":prompt}, POSTed to {baseUrl}/v1/messages with no system field.
+#   "inline_data" — geminiAnalyzePdf, same file:22678. Gemini parts carry no
+#     type tag, so the KEY is the tag: {"inline_data":{"mime_type":
+#     "application/pdf","data":...}}, prompt appended as a bare {"text":...}.
+#   "file" / "input_file" — the OpenAI Chat-Completions and Responses
+#     spellings of the same attachment, carried for the normalized-messages
+#     path exactly as _IMAGE_BLOCK_TYPES carries image_url / input_image.
+#
+# inline_data additionally has to prove an application/pdf media type, because
+# pi-ai's own google provider spells IMAGES inlineData too (node_modules/
+# @mariozechner/pi-ai/dist/providers/google-shared.js:90, mimeType) and those
+# rows belong on the image label, not this one.
+_DOC_BLOCK_TYPES = frozenset({"document", "file", "input_file"})
+_DOC_INLINE_KEYS = ("inline_data", "inlineData")
+_PDF_MEDIA_TYPE = "application/pdf"
+
+
+def _is_pdf_media_type(value: Any) -> bool:
+    return str(value or "").split(";")[0].strip().lower() == _PDF_MEDIA_TYPE
+
+
+def _has_document_block(content: Any) -> bool:
+    if not isinstance(content, list):
+        return False
+    for block in content:
+        if not isinstance(block, dict):
+            continue
+        if str(block.get("type") or "") in _DOC_BLOCK_TYPES:
+            return True
+        for key in _DOC_INLINE_KEYS:
+            inline = block.get(key)
+            if isinstance(inline, dict) and _is_pdf_media_type(
+                inline.get("mime_type") or inline.get("mimeType")
+            ):
+                return True
+    return False
+
+
+# The pdf tool's non-native path extracts the document host-side and ships the
+# result as ordinary text blocks, so nothing on the wire says PDF except the
+# label the extractor prepends. buildPdfExtractionContext
+# (dist/reply-BCcP6j4h.js:22832) writes it verbatim as
+#     const label = extractions.length > 1 ? `[PDF ${i + 1} text]\n`
+#                                          : "[PDF text]\n";
+# and pushes label + extraction.text as one text block per file that had any
+# text at all. Neither provider serializer rewrites or joins those blocks —
+# anthropic.js:552 and openai-completions.js:429 both map a text block to
+# {"type":"text","text":...} and keep the array — so the label survives to
+# here byte for byte on both routes.
+_PDF_EXTRACTION_LABEL = re.compile(r"\[PDF(?: \d+)? text\]\n")
+
+
+def _has_pdf_extraction_label(content: Any) -> bool:
+    if not isinstance(content, list):
+        return False
+    for block in content:
+        if not isinstance(block, dict):
+            continue
+        text = block.get("text")
+        if isinstance(text, str) and _PDF_EXTRACTION_LABEL.match(text.lstrip()):
+            return True
+    return False
+
+
 def _is_embeddings_request(kwargs: dict) -> bool:
     """True for a /v1/embeddings call rather than a chat completion.
 
@@ -287,8 +384,21 @@ def _classify_internal_purpose(kwargs: dict) -> str:
         if system.strip():
             return ""
         content = others[0].get("content")
+        if _has_document_block(content):
+            return "pdf"
         if _has_image_block(content):
+            # The pdf tool's extracted-with-images path lands here too, and is
+            # deliberately left on this label rather than split onto "pdf".
+            # When the PDF yields no extractable text its message is image
+            # blocks and a prompt — the image tool's shape exactly — so a
+            # label-gated relabel would name one half of a single code path
+            # "pdf" and the other half "image" depending on the document's
+            # contents, which is worse than one honest name. "image" already
+            # reads as an internal vision call on caller-supplied media, and
+            # the attribution gate only needs the row named at all.
             return "image"
+        if _has_pdf_extraction_label(content):
+            return "pdf"
         if _text_of(content).lstrip().startswith(_SUMMARIZE_TEXT_HEAD):
             return "summarize"
     except Exception:
