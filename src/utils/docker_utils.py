@@ -78,6 +78,84 @@ def _validate_env_arg(key: str, value: str) -> tuple[str, str]:
     return key, value
 
 
+# ---------------------------------------------------------------------------
+# Agent-container credential containment
+#
+# The graded agent container is adversarial and its shell output is delivered:
+# anything an `env` prints lands verbatim in chat.jsonl, which ships inside the
+# bundle and is read by the judge. Two of the three env-assembly loops in
+# start_container resolve their VALUES from the harness process environment by
+# NAME (extra_env from the task file's Env section, lobster_env from
+# --lobster-env), so a task that merely names an upstream credential has the
+# live one forwarded into the graded container.
+#
+# Upstream provider credentials belong to the sidecar and the cc-bridge only.
+# litellm_sidecar.start_litellm puts AWS_BEARER_TOKEN_BEDROCK / ANTHROPIC_API_KEY
+# / OPENAI_API_KEY / WCB_CC_BRIDGE_SECRET / ONEP_API_KEY in the SIDECAR
+# container's env, which is where they are supposed to live and is untouched
+# here. The agent needs nothing more than a base URL pointing at the sidecar
+# plus a run-scoped inbound token, so these names are dropped at the choke
+# point instead of being trusted not to be asked for.
+#
+# Beyond disclosure this is a billing-integrity guard: an agent holding an
+# upstream key (or a base URL aimed past the sidecar) calls the provider
+# directly, so the usage callback never sees the request and the run's token
+# and dollar totals under-report by whatever the agent spent off-book.
+_AGENT_DENIED_ENV_KEYS = frozenset({
+    # Anthropic, both routes. ANTHROPIC_AUTH_TOKEN has no consumer in the agent
+    # image at all (openclaw's dist never reads it; only the vendored
+    # @anthropic-ai/sdk does, as a fallback for an authToken it is already
+    # handed explicitly), so it is pure duplication of a credential channel.
+    # ANTHROPIC_OAUTH_TOKEN is worse: openclaw DOES read it, and would spend
+    # the subscription directly instead of through the bridge that performs the
+    # billing-attribution transform.
+    "ANTHROPIC_AUTH_TOKEN",
+    "ANTHROPIC_OAUTH_TOKEN",
+    "KENSEI_ANTHROPIC_API_KEY",
+    # Bedrock route.
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "AWS_SESSION_TOKEN",
+    "AWS_BEARER_TOKEN_BEDROCK",
+    # Other upstreams the sidecar fronts.
+    "OPENAI_API_KEY",
+    "OPENAI_API_KEY_WHISPER",
+    "ONEP_API_KEY",
+    "OPENROUTER_API_KEY",
+    # The sidecar's and the bridges' own inbound secrets. The agent authenticates
+    # with a run-scoped token; holding the master key would let it call any model
+    # on the sidecar untagged, and holding a bridge secret would let it skip the
+    # sidecar entirely.
+    "LITELLM_MASTER_KEY",
+    "KENSEI_LITELLM_MASTER_KEY",
+    "KENSEI3_LITELLM_MASTER_KEY",
+    "WCB_CC_BRIDGE_SECRET",
+    "WCB_CODEX_BRIDGE_SECRET",
+})
+
+# The agent does need these three, but only at the values the runner assembles
+# per attempt: the sidecar's in-network base URL and a run-scoped token, which
+# arrive through extra_env_dict. Resolving them from the harness env by name
+# instead hands over the harness's live key and aims the agent at
+# api.anthropic.com, past the sidecar.
+_AGENT_HOST_RESOLVED_DENIED_ENV_KEYS = frozenset({
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_BASE_URL",
+    "ANTHROPIC_API_BASE",
+})
+
+
+def _agent_env_denied(key: str, *, host_resolved: bool) -> bool:
+    """True when ``key`` must not be injected into the graded agent container.
+
+    ``host_resolved`` marks the callers that look the value up in the harness
+    process environment by name; those carry the extra ANTHROPIC_* restriction.
+    """
+    if key in _AGENT_DENIED_ENV_KEYS:
+        return True
+    return host_resolved and key in _AGENT_HOST_RESOLVED_DENIED_ENV_KEYS
+
+
 def _validate_docker_token(name: str, token: str) -> str:
     """Validate a bare argv token (image, network, container_name, ...).
 
@@ -621,12 +699,23 @@ def start_container(task_id: str, workspace_path: str, extra_env: str = "",
         key = line.strip()
         if not key or key.startswith("#"):
             continue
+        if _agent_env_denied(key, host_resolved=True):
+            logger.warning(
+                "[%s] REFUSED to forward %s from the harness environment into the "
+                "agent container (credential containment)", task_id, key)
+            continue
         value = os.environ.get(key, "")
         env_pairs.append((key, value))
         masked = (value[:4] + "***") if value else "(empty)"
         logger.info("[%s] Injecting env var: %s=%s", task_id, key, masked)
 
     for key in (lobster_env or []):
+        if _agent_env_denied(key, host_resolved=True):
+            logger.warning(
+                "[%s] REFUSED to forward lobster env key %s from the harness "
+                "environment into the agent container (credential containment)",
+                task_id, key)
+            continue
         value = os.environ.get(key, "")
         if not value:
             logger.warning("[%s] Lobster env key %s not found in environment, skipping", task_id, key)
@@ -637,6 +726,11 @@ def start_container(task_id: str, workspace_path: str, extra_env: str = "",
 
     _injected_keys: list[str] = []
     for k, v in (extra_env_dict or {}).items():
+        if _agent_env_denied(k, host_resolved=False):
+            logger.warning(
+                "[%s] REFUSED to inject %s into the agent container "
+                "(credential containment)", task_id, k)
+            continue
         env_pairs.append((k, v))
         _injected_keys.append(k)
     if _injected_keys:

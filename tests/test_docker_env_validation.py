@@ -302,6 +302,179 @@ class TestStartContainerSite:
 
 
 # ---------------------------------------------------------------------------
+# Section D2 — agent-container credential containment
+#
+# The graded container must never hold an upstream provider credential, the
+# sidecar's master key or a bridge secret: an `env` in any turn writes them into
+# chat.jsonl, which is snapshotted, graded and shipped, and an agent that holds
+# one can bill the upstream directly with no run key attached. These assert the
+# choke point for all three assembly loops and for both auth routes, since the
+# values differ per route but the containment must not.
+# ---------------------------------------------------------------------------
+
+
+def _env_map(cmd: list[str]) -> dict[str, str]:
+    """{KEY: VALUE} for every '-e KEY=VALUE' in a docker-run argv, last wins."""
+    out: dict[str, str] = {}
+    for i, tok in enumerate(cmd):
+        if tok == "-e":
+            key, _, value = cmd[i + 1].partition("=")
+            out[key] = value
+    return out
+
+
+# Every name start_container must refuse no matter which loop asks for it, with
+# a representative live value to prove the value never reaches the argv.
+_UPSTREAM_CREDENTIALS = {
+    "ANTHROPIC_AUTH_TOKEN": "sk-ant-oat01-live-oauth",
+    "ANTHROPIC_OAUTH_TOKEN": "sk-ant-oat01-live-oauth",
+    "KENSEI_ANTHROPIC_API_KEY": "sk-ant-api03-live",
+    "AWS_ACCESS_KEY_ID": "AKIALIVE",
+    "AWS_SECRET_ACCESS_KEY": "livesecret",
+    "AWS_SESSION_TOKEN": "livesession",
+    "AWS_BEARER_TOKEN_BEDROCK": "live-bedrock-bearer",
+    "OPENAI_API_KEY": "sk-proj-live",
+    "OPENAI_API_KEY_WHISPER": "sk-proj-live-whisper",
+    "ONEP_API_KEY": "onep-live",
+    "OPENROUTER_API_KEY": "sk-or-live",
+    "LITELLM_MASTER_KEY": "sk-talos-litellm",
+    "KENSEI_LITELLM_MASTER_KEY": "sk-talos-litellm",
+    "KENSEI3_LITELLM_MASTER_KEY": "sk-talos-litellm",
+    "WCB_CC_BRIDGE_SECRET": "deadbeef" * 8,
+    "WCB_CODEX_BRIDGE_SECRET": "cafebabe" * 8,
+}
+
+
+class TestAgentCredentialContainment:
+    @pytest.mark.parametrize("key", sorted(_UPSTREAM_CREDENTIALS))
+    def test_task_env_section_cannot_forward_a_credential(
+        self, key, tmp_path, monkeypatch, capture_run
+    ):
+        ws = tmp_path / "ws"
+        ws.mkdir()
+        monkeypatch.setenv(key, _UPSTREAM_CREDENTIALS[key])
+        du = _import_docker_utils_fresh()
+        du.start_container("task-1", str(ws), extra_env=f"{key}\n")
+        env = _env_map(capture_run[0])
+        assert key not in env
+        assert _UPSTREAM_CREDENTIALS[key] not in " ".join(capture_run[0])
+
+    @pytest.mark.parametrize("key", sorted(_UPSTREAM_CREDENTIALS))
+    def test_lobster_env_cannot_forward_a_credential(
+        self, key, tmp_path, monkeypatch, capture_run
+    ):
+        ws = tmp_path / "ws"
+        ws.mkdir()
+        monkeypatch.setenv(key, _UPSTREAM_CREDENTIALS[key])
+        du = _import_docker_utils_fresh()
+        du.start_container("task-1", str(ws), lobster_env=[key])
+        env = _env_map(capture_run[0])
+        assert key not in env
+        assert _UPSTREAM_CREDENTIALS[key] not in " ".join(capture_run[0])
+
+    @pytest.mark.parametrize("key", sorted(_UPSTREAM_CREDENTIALS))
+    def test_extra_env_dict_cannot_inject_a_credential(
+        self, key, tmp_path, monkeypatch, capture_run
+    ):
+        ws = tmp_path / "ws"
+        ws.mkdir()
+        du = _import_docker_utils_fresh()
+        du.start_container(
+            "task-1", str(ws),
+            extra_env_dict={key: _UPSTREAM_CREDENTIALS[key]},
+        )
+        env = _env_map(capture_run[0])
+        assert key not in env
+        assert _UPSTREAM_CREDENTIALS[key] not in " ".join(capture_run[0])
+
+    @pytest.mark.parametrize(
+        "key", ["ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", "ANTHROPIC_API_BASE"])
+    def test_anthropic_routing_vars_are_never_taken_from_the_harness_env(
+        self, key, tmp_path, monkeypatch, capture_run
+    ):
+        # The agent does need all three, but only at the runner-assembled values
+        # (sidecar base URL + run-scoped token). Resolving them by name from the
+        # harness env hands over the live key and aims the agent past the sidecar,
+        # so the request never reaches the usage callback.
+        ws = tmp_path / "ws"
+        ws.mkdir()
+        monkeypatch.setenv(key, "https://api.anthropic.com")
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-api03-live")
+        du = _import_docker_utils_fresh()
+        du.start_container("task-1", str(ws), extra_env=f"{key}\n", lobster_env=[key])
+        env = _env_map(capture_run[0])
+        assert key not in env
+
+    def test_runner_assembled_anthropic_routing_vars_survive(
+        self, tmp_path, monkeypatch, capture_run
+    ):
+        # Mirror of the above: the extra_env_dict path is the legitimate one and
+        # must still land, or the agent dials api.anthropic.com with no bearer.
+        ws = tmp_path / "ws"
+        ws.mkdir()
+        du = _import_docker_utils_fresh()
+        du.start_container(
+            "task-1", str(ws),
+            extra_env_dict={
+                "ANTHROPIC_BASE_URL": "http://ll:4000",
+                "ANTHROPIC_API_BASE": "http://ll:4000",
+                "ANTHROPIC_API_KEY": "wcb::task-1::abc",
+            },
+        )
+        env = _env_map(capture_run[0])
+        assert env["ANTHROPIC_BASE_URL"] == "http://ll:4000"
+        assert env["ANTHROPIC_API_BASE"] == "http://ll:4000"
+        assert env["ANTHROPIC_API_KEY"] == "wcb::task-1::abc"
+        assert "ANTHROPIC_AUTH_TOKEN" not in env
+
+    def test_mock_api_url_vars_and_run_identifiers_are_untouched(
+        self, tmp_path, monkeypatch, capture_run
+    ):
+        # The mock stack ships ~50 *_API_URL vars plus WCB_RUN_KEY and
+        # WILDCLAW_MODEL, all consumed in-container (subagent_director, the
+        # audio-extract skill, the connector skills). They are identifiers and
+        # in-network URLs, not credentials, and containment must not touch them.
+        ws = tmp_path / "ws"
+        ws.mkdir()
+        connectors = {
+            f"SERVICE{n}_API_URL": f"http://mocks:{9000 + n}" for n in range(50)
+        }
+        du = _import_docker_utils_fresh()
+        du.start_container(
+            "task-1", str(ws),
+            extra_env_dict={
+                **connectors,
+                "WCB_RUN_KEY": "wcb::task-1::abc",
+                "WILDCLAW_MODEL": "claude-opus-4.7",
+                "WCB_AUDIO_TRANSCRIBE_URL": "http://ll:4000/v1/audio/transcriptions",
+            },
+        )
+        env = _env_map(capture_run[0])
+        for key, value in connectors.items():
+            assert env[key] == value
+        assert env["WCB_RUN_KEY"] == "wcb::task-1::abc"
+        assert env["WILDCLAW_MODEL"] == "claude-opus-4.7"
+        assert env["WCB_AUDIO_TRANSCRIBE_URL"].endswith("/v1/audio/transcriptions")
+
+    def test_containment_does_not_reject_the_run_it_can_repair(
+        self, tmp_path, monkeypatch, capture_run
+    ):
+        # A task naming a credential is far more often stale copy-paste than an
+        # attack, and start_container is past the point where a raised error
+        # leaves anything cleanly recoverable. Drop the var, keep the run.
+        ws = tmp_path / "ws"
+        ws.mkdir()
+        monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "livesecret")
+        monkeypatch.setenv("KEEP_ME", "kept")
+        du = _import_docker_utils_fresh()
+        du.start_container(
+            "task-1", str(ws), extra_env="AWS_SECRET_ACCESS_KEY\nKEEP_ME\n")
+        env = _env_map(capture_run[0])
+        assert "AWS_SECRET_ACCESS_KEY" not in env
+        assert env["KEEP_ME"] == "kept"
+
+
+# ---------------------------------------------------------------------------
 # Section E — litellm_sidecar.start_litellm (site 5) integration
 # ---------------------------------------------------------------------------
 

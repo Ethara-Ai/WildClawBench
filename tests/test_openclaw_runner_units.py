@@ -1054,13 +1054,82 @@ class TestRunTaskHappyPath:
         a.run_task(spec)
         env = captured["extra_env_dict"]
         assert env["WCB_AUDIO_TRANSCRIBE_URL"] == "http://ll:4000/v1/audio/transcriptions"
+        # Consumed by the audio-extract skill, which has to get past the sidecar's
+        # inbound auth, so this one is the sidecar bearer by necessity.
         assert env["WCB_AUDIO_TRANSCRIBE_AUTH"] == "mk"
         # claude model -> ANTHROPIC_* overrides pointing at sidecar
         assert env["ANTHROPIC_BASE_URL"] == "http://ll:4000"
-        assert env["ANTHROPIC_AUTH_TOKEN"] == "mk"
-        assert env["ANTHROPIC_API_KEY"] == "mk"
+        assert env["ANTHROPIC_API_BASE"] == "http://ll:4000"
+        # The master key is shared by every concurrent run and the container env
+        # is the channel the agent dumps by accident, so the key it carries is the
+        # per-attempt run key instead. openclaw sends the real bearer from
+        # providers.anthropic.apiKey in openclaw.json.
+        assert env["ANTHROPIC_API_KEY"] == a._run_keys[spec.task_id]
+        assert env["ANTHROPIC_API_KEY"] != "mk"
+        assert env["ANTHROPIC_API_KEY"].startswith(f"wcb::{spec.task_id}::")
+        # Nothing in the agent image reads ANTHROPIC_AUTH_TOKEN; it only ever
+        # duplicated the credential into the leakable channel.
+        assert "ANTHROPIC_AUTH_TOKEN" not in env
         # network threaded through
         assert captured["network"] == a.litellm_network
+
+    def test_keyless_sidecar_route_wires_the_same_run_scoped_key(
+        self, monkeypatch, tmp_path
+    ):
+        """Containment must not depend on which auth route the sidecar runs.
+
+        Under WCB_SIDECAR_NO_MASTER_KEY=1 the run key IS the bearer the sidecar
+        expects, so the agent env is already run-scoped; under master-key auth it
+        was the master key. Both routes now put the same per-attempt value in
+        ANTHROPIC_API_KEY, which is what makes the assertion above route-agnostic.
+        """
+        monkeypatch.setenv("WCB_SIDECAR_NO_MASTER_KEY", "1")
+        a = _bare_agent(
+            litellm_config_yaml=_YAML_WITH_WHISPER,
+            litellm_container_name="ll",
+            litellm_port=4000,
+            litellm_master_key="mk",
+        )
+        captured = {}
+        monkeypatch.setattr(ocr, "start_container", lambda tid, ep, **kw: captured.update(kw))
+        for name in (
+            "inject_lobster_workspace", "inject_data_into_workspace",
+            "inject_persona_into_workspace", "inject_openclaw_models",
+            "inject_api_connectors", "run_warmup", "setup_skills",
+            "setup_workspace", "snapshot_workspace_state",
+        ):
+            monkeypatch.setattr(ocr, name, lambda *a2, **k2: None)
+        procs = iter([_FakeProc(), _FakeProc()])
+        monkeypatch.setattr(ocr, "run_background", lambda *a2, **k2: next(procs))
+        monkeypatch.setattr(ocr.time, "sleep", lambda *a2, **k2: None)
+        monkeypatch.setattr(ocr.time, "perf_counter", lambda: 0.0)
+        monkeypatch.setattr(ocr.time, "time", lambda: 1.0)
+        self._stub_agent_methods(monkeypatch, a)
+
+        spec = _make_spec(tmp_path, model="claude-opus-4.7")
+        a.run_task(spec)
+        env = captured["extra_env_dict"]
+        run_key = a._run_keys[spec.task_id]
+        assert env["ANTHROPIC_API_KEY"] == run_key
+        assert "ANTHROPIC_AUTH_TOKEN" not in env
+        assert env["ANTHROPIC_BASE_URL"] == "http://ll:4000"
+        # On this route the run key is also the sidecar bearer, so the helper
+        # credentials coincide with it rather than with the master key.
+        assert env["WCB_AUDIO_TRANSCRIBE_AUTH"] == run_key
+        assert env["WCB_RUN_KEY"] == run_key
+
+    def test_agent_env_bearer_never_returns_the_master_key(self):
+        a = _bare_agent(litellm_master_key="sk-talos-litellm")
+        # Before a run key is minted (the only window where there is nothing
+        # run-scoped to hand over) the fallback is an authority-free stub, not the
+        # master key — same role as WCB_CC_STUB_KEY on the cc-bridge.
+        assert a._agent_env_bearer("task-1") == ocr._AGENT_ENV_STUB_KEY
+        assert a._agent_env_bearer("task-1") != a.litellm_master_key
+        a._run_keys["task-1"] = "wcb::task-1::abc"
+        assert a._agent_env_bearer("task-1") == "wcb::task-1::abc"
+        # The sidecar-facing bearer is deliberately unchanged: openclaw.json and
+        # the in-container helpers still have to satisfy the sidecar's auth.
+        assert a._agent_bearer("task-1") == "sk-talos-litellm"
 
     def test_non_claude_model_skips_anthropic_env_overrides(self, monkeypatch, tmp_path):
         a = _bare_agent(

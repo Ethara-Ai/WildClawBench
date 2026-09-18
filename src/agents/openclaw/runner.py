@@ -66,6 +66,12 @@ MODEL_NAMES: dict[str, str] = {
 
 _GPT_PREFIXES = ("gpt", "o1", "o3", "o4", "llama", "mistral", "kimi", "deepseek", "gemini", "qwen")
 
+# Fallback for the agent container's ANTHROPIC_API_KEY when no per-attempt run
+# key has been minted yet. Same role as WCB_CC_STUB_KEY / sk-wcb-oauth-stub on
+# the cc-bridge: a value that satisfies a client which refuses to start without
+# one, carrying no authority of its own.
+_AGENT_ENV_STUB_KEY = "sk-wcb-agent-stub"
+
 
 def _normalize_openrouter_model(model: str) -> str:
     if model.startswith("openrouter/"):
@@ -225,6 +231,31 @@ class OpenClawAgent(BaseAgent):
         if self._run_key_bearer_live():
             return self._run_keys.get(task_id) or "sk-litellm"
         return self.litellm_master_key
+
+    def _agent_env_bearer(self, task_id: str) -> str:
+        """Run-scoped value for the agent container's ANTHROPIC_API_KEY.
+
+        openclaw takes the bearer it actually sends from providers.anthropic.apiKey
+        in openclaw.json (_write_openclaw_config below); the env var exists only
+        because openclaw's own key resolution refuses a provider with no key in
+        sight at all, and because the vendored @anthropic-ai/sdk reads
+        ANTHROPIC_API_KEY as its apiKey default. Neither path needs the sidecar's
+        master key, and under master-key auth that key is shared by every
+        concurrent run: the agent that reads it out of its own environment can
+        call any model on the sidecar with no run key attached, so the spend
+        lands in no run's totals. A container env var is also the one credential
+        channel the agent leaks by accident — a single `env` in any turn puts it
+        in chat.jsonl, which is snapshotted, graded and shipped in the bundle.
+
+        The per-attempt run key is the right value on both counts: it is a
+        run-scoped identifier that is already in the container as WCB_RUN_KEY, so
+        it adds no exposure, and on a keyless sidecar it is the bearer the sidecar
+        expects anyway. Under master-key auth it is deliberately not a credential
+        the sidecar accepts — if openclaw ever does fall back to the env var the
+        run fails with a 401 naming this attempt instead of quietly succeeding on
+        a shared admin key.
+        """
+        return self._run_keys.get(task_id) or _AGENT_ENV_STUB_KEY
 
     @property
     def expects_gateway(self) -> bool:
@@ -615,15 +646,22 @@ class OpenClawAgent(BaseAgent):
                 # the raw system[] trips the "extra usage" 400). ANTHROPIC_BASE_URL
                 # is the SDK-honored override (same pattern as claudecode/runner.py
                 # :370). No /v1 suffix: the client appends /v1/messages itself.
+                # The KEY that rides with them is deliberately NOT the sidecar
+                # bearer: see _agent_env_bearer. ANTHROPIC_AUTH_TOKEN is not set
+                # at all — nothing in the agent image reads it (openclaw's own
+                # dist never mentions it; the vendored @anthropic-ai/sdk reads it
+                # only as a default for an authToken openclaw already passes
+                # explicitly), so it only ever duplicated a credential into the one
+                # place the agent can print by accident. docker_utils refuses the
+                # name outright, so a task file cannot reintroduce it either.
                 if "claude" in (spec.model or "").lower():
                     base_url_root = (
                         f"http://{self.litellm_container_name}:{self.litellm_port}"
                     )
-                    stub = self._agent_bearer(spec.task_id)
                     extra_env_dict.setdefault("ANTHROPIC_BASE_URL", base_url_root)
                     extra_env_dict.setdefault("ANTHROPIC_API_BASE", base_url_root)
-                    extra_env_dict.setdefault("ANTHROPIC_AUTH_TOKEN", stub)
-                    extra_env_dict.setdefault("ANTHROPIC_API_KEY", stub)
+                    extra_env_dict.setdefault(
+                        "ANTHROPIC_API_KEY", self._agent_env_bearer(spec.task_id))
 
             # Sub-agent spawn runtime (src/utils/subagent_director.py) discovers
             # the LiteLLM sidecar from these container env vars. Only set on the
