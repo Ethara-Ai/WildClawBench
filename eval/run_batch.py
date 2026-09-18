@@ -363,22 +363,83 @@ def _parse_iso(ts: str):
         return None
 
 
-def _usage_row_is_assistant_turn(r: Mapping[str, Any]) -> bool:
-    """True when a usage row can correspond to an assistant message.
+def _usage_row_purpose(r: Mapping[str, Any]) -> str:
+    """The openclaw-internal call this row is, or "" when it can be a turn.
 
-    ``failure`` and ``preflight`` rows never produce one. Neither does a
-    whisper transcription: the audio-extract skill calls the sidecar's
-    /v1/audio/transcriptions on the run's own key, and those rows bill by
-    duration with no tokens at all.
+    OpenClaw compacts its own context and summarizes fetched media on the
+    session's credentials, so those requests reach the sidecar under the
+    agent's run_key while producing no assistant message. The usage callback
+    names them at write time (``purpose``) off the fixed prompts the agent SDK
+    sends them with — see src/utils/litellm_usage_callback.py, which also
+    records why cache-ttl and session titles are not in that set.
+
+    Logs written before the callback carried ``purpose`` still identify the
+    duration-billed whisper row by its shape, which is the one internal call
+    the row schema always described: audio seconds and no tokens at all.
     """
-    if r.get("kind") in ("failure", "preflight"):
-        return False
+    tagged = str(r.get("purpose") or "").strip()
+    if tagged:
+        return tagged
     try:
         audio = float(r.get("audio_seconds", 0.0) or 0.0)
         tokens = int(r.get("total_tokens", 0) or 0)
     except (TypeError, ValueError):
-        return True
-    return not (audio > 0.0 and tokens == 0)
+        return ""
+    return "transcription" if (audio > 0.0 and tokens == 0) else ""
+
+
+def _usage_row_is_assistant_turn(r: Mapping[str, Any]) -> bool:
+    """True when a usage row can correspond to an assistant message.
+
+    ``failure`` and ``preflight`` rows never produce one, and neither does a
+    request the callback named as one of openclaw's own.
+    """
+    if r.get("kind") in ("failure", "preflight"):
+        return False
+    return not _usage_row_purpose(r)
+
+
+_USAGE_LEDGER_TOKEN_KEYS = (
+    "input_tokens", "output_tokens", "cache_read_tokens",
+    "cache_write_tokens", "total_tokens",
+)
+
+
+def _usage_rows_ledger(rows: Sequence[Mapping[str, Any]]) -> dict:
+    """Sum rows the way extract_usage_from_litellm_log sums them, so a subset's
+    ledger is directly comparable with the run total it came out of."""
+    led: dict[str, Any] = {k: 0 for k in _USAGE_LEDGER_TOKEN_KEYS}
+    led["audio_seconds"] = 0.0
+    led["cost_usd"] = 0.0
+    led["request_count"] = 0
+    for r in rows:
+        led["request_count"] += 1
+        for k in _USAGE_LEDGER_TOKEN_KEYS:
+            led[k] += int(r.get(k, 0) or 0)
+        led["audio_seconds"] += float(r.get("audio_seconds", 0.0) or 0.0)
+        led["cost_usd"] += float(r.get("cost_usd", 0.0) or 0.0)
+    led["audio_seconds"] = round(led["audio_seconds"], 3)
+    led["cost_usd"] = round(led["cost_usd"], 6)
+    return led
+
+
+def _internal_calls_block(rows: Sequence[Mapping[str, Any]]) -> dict | None:
+    """The ledger line for the run's own non-message traffic, split by purpose.
+
+    Carried in usage.json so the per-message blocks and the agent total
+    reconcile: every row sources.agent counted is either attributed to a
+    message or listed here.
+    """
+    if not rows:
+        return None
+    by_purpose: dict[str, list[Mapping[str, Any]]] = {}
+    for r in rows:
+        by_purpose.setdefault(_usage_row_purpose(r) or "unlabelled", []).append(r)
+    block = _usage_rows_ledger(rows)
+    block["by_purpose"] = {
+        name: _usage_rows_ledger(rs) for name, rs in sorted(by_purpose.items())
+    }
+    return block
 
 
 def _usage_rows_in_message_window(rows: list[dict], msgs: list[dict]) -> list[dict]:
@@ -415,9 +476,39 @@ def _backfill_per_message_cost(traj: dict, usage_log_path: str,
                                run_key: str = "", *,
                                oauth_route: bool = False,
                                model: str = "") -> int:
+    """Number of assistant messages ``_attribute_per_message_cost`` filled in."""
+    report = _attribute_per_message_cost(
+        traj, usage_log_path, run_key, oauth_route=oauth_route, model=model)
+    if report.get("status") not in ("attributed", "partial"):
+        return 0
+    return int(report.get("messages", 0) or 0)
+
+
+def _attribute_per_message_cost(traj: dict, usage_log_path: str,
+                                run_key: str = "", *,
+                                oauth_route: bool = False,
+                                model: str = "") -> dict:
     """Populate each assistant message's token + cost block in ``traj`` from the
-    sidecar per-request usage log (usage.jsonl). Returns the number of messages
-    back-filled.
+    sidecar per-request usage log (usage.jsonl), and report what happened.
+
+    The report is stamped into score.json and usage.json by the callers, which
+    is the whole reason it is a dict rather than a count. Until it existed, a
+    refusal to attribute was an ERROR line in harness_debug.log and nothing
+    else: the delivered artifacts showed ``cost: 0`` on every message with no
+    indication that a figure was withheld rather than measured. On the
+    2026-09-17 koji run all 87 assistant messages shipped that way.
+
+      status          attributed — every message got its own row's numbers and
+                        every selected row is accounted for.
+                      partial — same, but selected by the legacy time window,
+                        which over-attributes under parallel runs, so the
+                        figures are indicative rather than reconciled.
+                      failed — the counts did not match; nothing was written.
+      messages        assistant messages in the trajectory.
+      rows_selected   usage rows this run's key (or window) selected.
+      rows_internal   of those, the ones openclaw issued for itself.
+      rows_unmatched  message rows left over, or messages left short.
+      internal_calls  ledger for rows_internal, or absent when there are none.
 
     OpenClaw writes all-zero per-message usage/cost into chat.jsonl on this
     image build (IAN report Pointer 5); the real per-request numbers live only
@@ -445,26 +536,34 @@ def _backfill_per_message_cost(traj: dict, usage_log_path: str,
          Over-attributes under parallelism exactly as the totals path
          documents (measured 1.4x-62.7x inflation), so it warns loudly.
 
-    Within the selected rows attribution is positional, which is sound only
-    when the counts match. A mismatch cannot be repaired: a stall or empty-turn
-    retry rolls the session back (runner.py::_restore_session_to) but leaves
-    the aborted attempt's rows in the log, and a subagent spawn tags its
-    requests with the PARENT's run_key (src/utils/subagent_director.py) while
-    producing no assistant message — both insert rows at positions nothing in
-    the row schema records. Timestamps cannot break the tie, for the clock-shim
-    reason above. So a mismatch is reported as an ERROR and nothing is
-    attributed: an absent per-message cost is honestly absent, while a shifted
-    one is a wrong dollar figure in a delivered artifact. Run totals are
-    unaffected either way.
+    Rows openclaw issued for itself are subtracted before the counts are
+    compared, on the ``purpose`` label the usage callback writes. That is what
+    closes the 98-rows-for-87-messages gap the koji run hit, and it is a label
+    rather than a guess: the surplus rows are context compactions and media
+    summaries, each sent with a prompt that is a compile-time constant of the
+    agent image, so the sidecar can name them from the request it is already
+    handed.
+
+    Past that, attribution within the remaining rows is positional, which is
+    sound only when the counts match. A leftover mismatch cannot be repaired: a
+    stall or empty-turn retry rolls the session back
+    (runner.py::_restore_session_to) but leaves the aborted attempt's rows in
+    the log, and a subagent spawn tags its requests with the PARENT's run_key
+    (src/utils/subagent_director.py) while producing no assistant message —
+    both insert rows at positions nothing in the row schema records. Timestamps
+    cannot break the tie, for the clock-shim reason above. So a mismatch is
+    reported as an ERROR, stamped as ``failed``, and nothing is attributed: an
+    absent per-message cost is honestly absent, while a shifted one is a wrong
+    dollar figure in a delivered artifact. Run totals are unaffected either way.
     """
     if not usage_log_path or not Path(usage_log_path).is_file():
-        return 0
+        return {}
     msgs = [m for m in (traj.get("messages") or []) if isinstance(m, dict)]
     def _inner(m):
         return m.get("message") if isinstance(m.get("message"), dict) else m
     assistants = [m for m in msgs if str(_inner(m).get("role", "")).lower() == "assistant"]
     if not assistants:
-        return 0
+        return {}
     parsed: list[dict] = []
     for line in Path(usage_log_path).read_text(encoding="utf-8", errors="replace").splitlines():
         line = line.strip()
@@ -490,18 +589,34 @@ def _backfill_per_message_cost(traj: dict, usage_log_path: str,
             "under parallel runs and selects nothing at all when the agent "
             "clock shim is active", run_key, usage_log_path)
         rows = _usage_rows_in_message_window(parsed, msgs)
-    rows = [r for r in rows if _usage_row_is_assistant_turn(r)]
+    candidates = [r for r in rows if r.get("kind") not in ("failure", "preflight")]
+    internal = [r for r in candidates if _usage_row_purpose(r)]
+    rows = [r for r in candidates if not _usage_row_purpose(r)]
+
+    report: dict[str, Any] = {
+        "status": "failed",
+        "messages": len(assistants),
+        "rows_selected": len(candidates),
+        "rows_internal": len(internal),
+        "rows_unmatched": abs(len(rows) - len(assistants)),
+    }
+    block = _internal_calls_block(internal)
+    if block:
+        report["internal_calls"] = block
 
     if len(rows) != len(assistants):
         logger.error(
             "per-message cost NOT attributed: %s selected %d usage row(s) for "
-            "%d assistant message(s). Positional attribution would bill one "
-            "request's tokens to another message, so the per-message blocks "
-            "are left empty; the run totals in usage.json are unaffected.",
-            selector, len(rows), len(assistants))
-        return 0
+            "%d assistant message(s) (%d of them openclaw's own). Positional "
+            "attribution would bill one request's tokens to another message, "
+            "so the per-message blocks are left empty; the run totals in "
+            "usage.json are unaffected.",
+            selector, len(candidates), len(assistants), len(internal))
+        return report
 
-    n = 0
+    report["status"] = "attributed" if selector == "run_key" else "partial"
+    report["rows_unmatched"] = 0
+
     for msg, r in zip(assistants, rows):
         inner = _inner(msg)
         it = int(r.get("input_tokens", 0) or 0)
@@ -529,8 +644,13 @@ def _backfill_per_message_cost(traj: dict, usage_log_path: str,
             "cost": cost,
         })
         inner["usage"] = usage
-        n += 1
-    return n
+    return report
+
+
+def _stamped_usage_attribution(result: Mapping[str, Any] | None) -> dict | None:
+    """The attribution report _build_trajectory left on ``result``, if any."""
+    stamp = (result or {}).get("usage_attribution")
+    return stamp if isinstance(stamp, dict) and stamp.get("status") else None
 
 
 def _aggregate_headroom(log_dir: str) -> dict | None:
@@ -631,6 +751,19 @@ def save_usage(
     _hr = _aggregate_headroom(_HEADROOM_LOG_DIR)
     if _hr:
         out["headroom"] = _hr
+
+    # Whether the per-message blocks in output.json were filled in, and the
+    # ledger line that makes them add up. sources.agent counts every row this
+    # run's key selected, so Σ(per-message) + internal_calls == sources.agent
+    # exactly; without the second term a reader comparing the two can only
+    # conclude the artifact is inconsistent.
+    attribution = dict(_stamped_usage_attribution(result) or {})
+    if attribution:
+        internal = attribution.pop("internal_calls", None)
+        out["usage_attribution"] = attribution
+        if internal:
+            out["internal_calls"] = internal
+
     result["usage"] = out
     if out["request_count"] > 0:
         # Include preflight in the breakdown so the sidecar-startup ping is visible
@@ -1654,6 +1787,15 @@ def _augment_score_with_combined_rewards(scores: dict, result: dict) -> None:
         if r.get("session_user_turns") is not None:
             scores["session_user_turns"] = r["session_user_turns"]
             scores["turn_dedup_ok"] = bool(r.get("turn_dedup_ok", True))
+    # Per-message cost attribution stamp (same on-disk-marker pattern): a run
+    # whose messages ship cost 0 because the row count did not resolve must say
+    # so where a reader looks, not only in harness_debug.log. The ledger block
+    # is dropped here — score.json carries verdicts, usage.json carries money.
+    stamp = _stamped_usage_attribution(result)
+    if stamp:
+        scores["usage_attribution"] = {
+            k: v for k, v in stamp.items() if k != "internal_calls"
+        }
 
 
 def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
@@ -1763,14 +1905,21 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
     # Back-fill real per-message token + cost numbers from the sidecar usage log
     # (OpenClaw's chat.jsonl writes them as zero on this image build).
     try:
-        _n = _backfill_per_message_cost(
+        _report = _attribute_per_message_cost(
             traj, _USAGE_LOG_PATH,
             str((agent_usage or {}).get("__run_key__", "") or ""),
             oauth_route=bool(getattr(config, "use_claude_oauth", False)),
             model=model_type)
-        if _n:
-            logger.info("[%s] per-message cost back-filled for %d assistant message(s)",
-                        task["task_id"], _n)
+        if _report:
+            # Read back out by save_usage and the score block below, so the
+            # outcome reaches usage.json and score.json instead of living only
+            # in this run's harness_debug.log.
+            result["usage_attribution"] = _report
+            logger.info(
+                "[%s] per-message cost %s for %d assistant message(s) from %d "
+                "usage row(s), %d of them openclaw's own",
+                task["task_id"], _report["status"], _report["messages"],
+                _report["rows_selected"], _report["rows_internal"])
     except Exception as exc:
         logger.warning("[%s] per-message cost back-fill failed: %s", task["task_id"], exc)
 

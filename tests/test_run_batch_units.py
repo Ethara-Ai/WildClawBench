@@ -43,6 +43,8 @@ from eval.run_batch import (  # noqa: E402
     _normalize_display_model,
     _pass_summary_doc,
     _pass_summary_entry,
+    _attribute_per_message_cost,
+    _augment_score_with_combined_rewards,
     _backfill_per_message_cost,
     _project_agent_usage_top_level,
     _project_artifact_record,
@@ -1630,6 +1632,261 @@ class TestSaveUsageOneCostColumn:
         bedrock = self._save(tmp_path / "b", oauth_route=False)
         assert oauth["cost_usd"] > 0 and bedrock["cost_usd"] > 0
         assert oauth["auth_provider"] != bedrock["auth_provider"]
+
+
+# ---------------------------------------------------------------------------
+# Openclaw's own model calls ride the agent's run_key and produce no assistant
+# message, so before they were labelled the count gate above refused every real
+# run: the 2026-09-17 koji run selected 98 rows for 87 messages and shipped
+# cost 0 on all 87. The callback now names them, they are subtracted before the
+# counts are compared, and whatever happens is stamped into the artifacts.
+# ---------------------------------------------------------------------------
+
+def _internal_row(ts, run_key, purpose, *, out=40, cost=0.30, **extra):
+    return _usage_row(ts, run_key, out=out, cost=cost, purpose=purpose, **extra)
+
+
+def _agent_source(rows):
+    """sources.agent as extract_usage_from_litellm_log would sum these rows."""
+    keys = ("input_tokens", "output_tokens", "cache_read_tokens",
+            "cache_write_tokens", "total_tokens")
+    out = {k: sum(int(r.get(k, 0) or 0) for r in rows) for k in keys}
+    out["cost_usd"] = round(sum(float(r.get("cost_usd", 0.0) or 0.0) for r in rows), 6)
+    out["request_count"] = len(rows)
+    return out
+
+
+class TestBackfillPerMessageCostInternalCalls:
+    def test_compaction_row_no_longer_blocks_attribution(self, tmp_path):
+        rows = [
+            _usage_row("2026-08-17T07:50:01+00:00", _RK_A, cost=0.11),
+            _internal_row("2026-08-17T07:50:02+00:00", _RK_A, "compaction"),
+            _usage_row("2026-08-17T07:50:03+00:00", _RK_A, cost=0.12),
+        ]
+        traj = _traj(2)
+        report = _attribute_per_message_cost(
+            traj, _write_usage_log(tmp_path, rows), _RK_A)
+        assert report["status"] == "attributed"
+        assert _costs(traj) == [0.11, 0.12]
+
+    def test_internal_rows_never_land_on_a_message(self, tmp_path):
+        # The compaction row sits between the two turns, so a positional pass
+        # that failed to drop it would bill its $0.30 to the second message.
+        rows = [
+            _usage_row("2026-08-17T07:50:01+00:00", _RK_A, cost=0.11),
+            _internal_row("2026-08-17T07:50:02+00:00", _RK_A, "compaction"),
+            _usage_row("2026-08-17T07:50:03+00:00", _RK_A, cost=0.12),
+        ]
+        traj = _traj(2)
+        _attribute_per_message_cost(traj, _write_usage_log(tmp_path, rows), _RK_A)
+        assert 0.30 not in _costs(traj)
+
+    def test_every_labelled_purpose_is_subtracted(self, tmp_path):
+        rows = [
+            _internal_row("2026-08-17T07:50:00+00:00", _RK_A, "compaction"),
+            _usage_row("2026-08-17T07:50:01+00:00", _RK_A, cost=0.11),
+            _internal_row("2026-08-17T07:50:02+00:00", _RK_A, "summarize"),
+            _internal_row("2026-08-17T07:50:03+00:00", _RK_A, "transcription",
+                          out=0, input_tokens=0, total_tokens=0),
+            _usage_row("2026-08-17T07:50:04+00:00", _RK_A, cost=0.12),
+        ]
+        traj = _traj(2)
+        report = _attribute_per_message_cost(
+            traj, _write_usage_log(tmp_path, rows), _RK_A)
+        assert report["status"] == "attributed"
+        assert report["rows_selected"] == 5
+        assert report["rows_internal"] == 3
+        assert set(report["internal_calls"]["by_purpose"]) == {
+            "compaction", "summarize", "transcription"}
+        assert _costs(traj) == [0.11, 0.12]
+
+    def test_untagged_whisper_row_still_recognised(self, tmp_path):
+        # Logs written before the callback carried `purpose` identify the
+        # duration-billed row by shape, which is what the old gate relied on.
+        rows = [
+            _usage_row("2026-08-17T07:50:01+00:00", _RK_A, cost=0.11),
+            _usage_row("2026-08-17T07:50:02+00:00", _RK_A, cost=0.02, out=0,
+                       input_tokens=0, total_tokens=0, audio_seconds=12.5),
+        ]
+        traj = _traj(1)
+        report = _attribute_per_message_cost(
+            traj, _write_usage_log(tmp_path, rows), _RK_A)
+        assert report["status"] == "attributed"
+        assert report["internal_calls"]["by_purpose"]["transcription"][
+            "request_count"] == 1
+
+    def test_the_koji_shape_resolves(self, tmp_path):
+        # 98 rows for 87 messages, 11 of them openclaw's own.
+        rows = []
+        for i in range(87):
+            rows.append(_usage_row(f"2026-08-17T07:50:{i % 60:02d}+00:00",
+                                   _RK_A, cost=0.01))
+        for i in range(11):
+            rows.append(_internal_row("2026-08-17T07:51:00+00:00", _RK_A,
+                                      "compaction"))
+        traj = _traj(87)
+        report = _attribute_per_message_cost(
+            traj, _write_usage_log(tmp_path, rows), _RK_A)
+        assert report["status"] == "attributed"
+        assert (report["messages"], report["rows_selected"],
+                report["rows_internal"], report["rows_unmatched"]) == (87, 98, 11, 0)
+        assert len(_costs(traj)) == 87
+
+    def test_an_unlabelled_surplus_is_still_refused(self, tmp_path, caplog):
+        # Labelling closes the openclaw-internal gap; it does not license a
+        # guess about anything else. A rolled-back retry leaves untagged rows
+        # and the run still ships no per-message figure.
+        rows = [
+            _usage_row("2026-08-17T07:50:01+00:00", _RK_A, cost=0.91),
+            _usage_row("2026-08-17T07:50:02+00:00", _RK_A, cost=0.11),
+            _internal_row("2026-08-17T07:50:03+00:00", _RK_A, "compaction"),
+        ]
+        traj = _traj(1)
+        with caplog.at_level(logging.ERROR, logger="eval.run_batch"):
+            report = _attribute_per_message_cost(
+                traj, _write_usage_log(tmp_path, rows), _RK_A)
+        assert report["status"] == "failed"
+        assert report["rows_unmatched"] == 1
+        assert _costs(traj) == []
+        assert [r for r in caplog.records if r.levelno >= logging.ERROR]
+
+
+class TestUsageAttributionStamp:
+    def test_success_is_stamped_with_the_row_arithmetic(self, tmp_path):
+        rows = [
+            _usage_row("2026-08-17T07:50:01+00:00", _RK_A, cost=0.11),
+            _internal_row("2026-08-17T07:50:02+00:00", _RK_A, "compaction"),
+        ]
+        report = _attribute_per_message_cost(
+            _traj(1), _write_usage_log(tmp_path, rows), _RK_A)
+        assert report["status"] == "attributed"
+        assert report["messages"] == 1
+        assert report["rows_selected"] == 2
+        assert report["rows_unmatched"] == 0
+
+    def test_failure_is_stamped_not_only_logged(self, tmp_path):
+        rows = [_usage_row("2026-08-17T07:50:0%d+00:00" % i, _RK_A) for i in (1, 2, 3)]
+        report = _attribute_per_message_cost(
+            _traj(1), _write_usage_log(tmp_path, rows), _RK_A)
+        assert report["status"] == "failed"
+        assert (report["messages"], report["rows_selected"],
+                report["rows_unmatched"]) == (1, 3, 2)
+
+    def test_the_legacy_window_is_stamped_partial(self, tmp_path):
+        # The figures exist but were selected by the clock, which
+        # over-attributes under parallel runs, so they are not "attributed".
+        rows = [_usage_row("2026-08-17T07:50:01+00:00", None, cost=0.11)]
+        report = _attribute_per_message_cost(
+            _traj(1), _write_usage_log(tmp_path, rows), "")
+        assert report["status"] == "partial"
+
+    def test_nothing_to_report_stamps_nothing(self, tmp_path):
+        assert _attribute_per_message_cost(
+            _traj(2), str(tmp_path / "absent.jsonl"), _RK_A) == {}
+        log = _write_usage_log(tmp_path, [_usage_row("2026-08-17T07:50:01+00:00", _RK_A)])
+        assert _attribute_per_message_cost({"messages": []}, log, _RK_A) == {}
+
+    def test_score_json_carries_the_verdict_without_the_ledger(self):
+        scores: dict = {}
+        _augment_score_with_combined_rewards(scores, {"usage_attribution": {
+            "status": "attributed", "messages": 87, "rows_selected": 98,
+            "rows_internal": 11, "rows_unmatched": 0,
+            "internal_calls": {"request_count": 11},
+        }})
+        assert scores["usage_attribution"] == {
+            "status": "attributed", "messages": 87, "rows_selected": 98,
+            "rows_internal": 11, "rows_unmatched": 0,
+        }
+
+    def test_score_json_says_so_when_nothing_was_attributed(self):
+        scores: dict = {}
+        _augment_score_with_combined_rewards(scores, {"usage_attribution": {
+            "status": "failed", "messages": 87, "rows_selected": 98,
+            "rows_internal": 0, "rows_unmatched": 11,
+        }})
+        assert scores["usage_attribution"]["status"] == "failed"
+        assert scores["usage_attribution"]["rows_unmatched"] == 11
+
+    def test_a_run_with_no_report_gets_no_key(self):
+        scores: dict = {}
+        _augment_score_with_combined_rewards(scores, {})
+        assert "usage_attribution" not in scores
+
+    def test_usage_json_carries_the_stamp_and_the_ledger(self, tmp_path):
+        result = {"usage_attribution": {
+            "status": "attributed", "messages": 2, "rows_selected": 3,
+            "rows_internal": 1, "rows_unmatched": 0,
+            "internal_calls": {"request_count": 1, "total_tokens": 140},
+        }}
+        save_usage(tmp_path, result, {"request_count": 3, "cost_usd": 0.5,
+                                      "total_tokens": 420}, "t1")
+        out = json.loads((tmp_path / "usage.json").read_text(encoding="utf-8"))
+        assert out["usage_attribution"]["status"] == "attributed"
+        assert "internal_calls" not in out["usage_attribution"]
+        assert out["internal_calls"]["total_tokens"] == 140
+
+    def test_usage_json_of_a_run_with_no_report_is_unchanged(self, tmp_path):
+        save_usage(tmp_path, {}, {"request_count": 1, "cost_usd": 0.1}, "t1")
+        out = json.loads((tmp_path / "usage.json").read_text(encoding="utf-8"))
+        assert "usage_attribution" not in out
+        assert "internal_calls" not in out
+
+
+class TestUsageLedgerReconciles:
+    # The point of naming the internal rows: every row sources.agent counted is
+    # either on a message or in internal_calls, so the two ledgers close.
+    _ROWS = [
+        _usage_row("2026-08-17T07:50:01+00:00", _RK_A, out=10, cost=0.11),
+        _internal_row("2026-08-17T07:50:02+00:00", _RK_A, "compaction",
+                      out=40, cost=0.30, input_tokens=500, total_tokens=540),
+        _usage_row("2026-08-17T07:50:03+00:00", _RK_A, out=20, cost=0.12,
+                   cache_read_tokens=800, cache_write_tokens=200,
+                   total_tokens=1120),
+        _internal_row("2026-08-17T07:50:04+00:00", _RK_A, "transcription",
+                      out=0, cost=0.02, input_tokens=0, total_tokens=0,
+                      audio_seconds=9.5),
+    ]
+
+    def _run(self, tmp_path):
+        traj = _traj(2)
+        report = _attribute_per_message_cost(
+            traj, _write_usage_log(tmp_path, self._ROWS), _RK_A)
+        return traj, report, _agent_source(self._ROWS)
+
+    def test_tokens_close_exactly(self, tmp_path):
+        traj, report, agent = self._run(tmp_path)
+        internal = report["internal_calls"]
+        for msg_key, src_key in (("input", "input_tokens"),
+                                 ("output", "output_tokens"),
+                                 ("cacheRead", "cache_read_tokens"),
+                                 ("cacheWrite", "cache_write_tokens"),
+                                 ("totalTokens", "total_tokens")):
+            per_message = sum(m["usage"][msg_key] for m in traj["messages"]
+                              if m.get("role") == "assistant")
+            assert per_message + internal[src_key] == agent[src_key], src_key
+
+    def test_request_counts_close_exactly(self, tmp_path):
+        _, report, agent = self._run(tmp_path)
+        assert report["messages"] + report["internal_calls"]["request_count"] == \
+            agent["request_count"] == report["rows_selected"]
+
+    def test_dollars_close_on_the_bedrock_route(self, tmp_path):
+        traj, report, agent = self._run(tmp_path)
+        assert sum(_costs(traj)) + report["internal_calls"]["cost_usd"] == \
+            pytest.approx(agent["cost_usd"])
+
+    def test_the_purpose_split_sums_to_the_internal_line(self, tmp_path):
+        _, report, _agent = self._run(tmp_path)
+        internal = report["internal_calls"]
+        parts = internal["by_purpose"].values()
+        assert sum(p["total_tokens"] for p in parts) == internal["total_tokens"]
+        assert sum(p["cost_usd"] for p in parts) == pytest.approx(internal["cost_usd"])
+
+    def test_audio_seconds_are_carried_on_the_internal_line(self, tmp_path):
+        # Duration billing has no token column to close against, so it would
+        # vanish from the reconciliation without its own field.
+        _, report, _agent = self._run(tmp_path)
+        assert report["internal_calls"]["audio_seconds"] == 9.5
 
 
 class TestSaveUsageStripsRunKey:
