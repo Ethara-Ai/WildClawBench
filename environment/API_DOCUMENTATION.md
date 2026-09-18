@@ -3464,6 +3464,7 @@ Mock service mirroring Contentful API endpoints. See `contentful-api/contentful-
 #### Endpoints
 
 - `GET {{baseUrl}}/health` — health
+- `GET {{baseUrl}}/spaces` — list spaces
 - `GET {{baseUrl}}/spaces/space-orbit-cms` — get space
 - `GET {{baseUrl}}/spaces/space-orbit-cms/environments/master/content_types` — list content types
 - `GET {{baseUrl}}/spaces/space-orbit-cms/environments/master/content_types/blogPost` — get content type

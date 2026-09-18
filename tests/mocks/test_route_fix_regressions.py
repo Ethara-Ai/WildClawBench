@@ -407,3 +407,54 @@ def test_linkedin_injected_post_counts_reach_the_public_get(monkeypatch):
                                               "shareCount": 1}
         finally:
             c.delete(f"/admin/data/posts/{row['id']}")
+
+
+# ---------------------------------------------------------------------------
+# contentful-api -- GET /spaces/{space_id} threw the id away and answered 200
+# with the one seeded space for any id, and there was no list route to find the
+# real id with
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope="module")
+def contentful():
+    with _client("contentful-api") as c:
+        yield c
+
+
+@pytest.fixture(scope="module")
+def contentful_space_id(contentful):
+    return contentful.get("/spaces").json()["items"][0]["id"]
+
+
+def test_contentful_list_spaces_uses_the_collection_envelope(contentful):
+    body = contentful.get("/spaces").json()
+    assert body["sys"] == {"type": "Array"}
+    assert body["total"] == len(body["items"]) == 1
+    assert (body["skip"], body["limit"]) == (0, 1)
+
+
+def test_contentful_listed_space_is_the_seeded_one(contentful, contentful_space_id):
+    assert contentful_space_id == "space-orbit-cms"
+    listed = contentful.get("/spaces").json()["items"][0]
+    assert listed == contentful.get(f"/spaces/{contentful_space_id}").json()
+
+
+def test_contentful_get_space_honours_the_seeded_id(contentful, contentful_space_id):
+    r = contentful.get(f"/spaces/{contentful_space_id}")
+    assert r.status_code == 200, r.text
+    assert r.json()["name"] == "Orbit Labs CMS"
+
+
+def test_contentful_get_space_rejects_an_unknown_id(contentful):
+    r = contentful.get("/spaces/rimrock")
+    assert r.status_code == 404, r.text
+    assert r.json() == {"error": "Space rimrock not found"}
+
+
+def test_contentful_nested_routes_still_take_any_space_id(contentful):
+    """Only the space route was given an identity. The environment-scoped routes
+    stay id-agnostic, which is what the seeded corpora and the update-contract
+    suite already address them with."""
+    r = contentful.get("/spaces/space-orbit/environments/master/entries")
+    assert r.status_code == 200, r.text
+    assert r.json()["total"] > 0

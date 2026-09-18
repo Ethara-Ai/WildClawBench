@@ -7,7 +7,8 @@ Base URL: `http://localhost:8066` (in docker-compose: `http://contentful-api:806
 | Method | Path                                                            | Status  |
 |--------|-----------------------------------------------------------------|---------|
 | GET    | /health                                                         | 200     |
-| GET    | /spaces/{space_id}                                              | 200     |
+| GET    | /spaces                                                         | 200     |
+| GET    | /spaces/{space_id}                                              | 200/404 |
 | GET    | /spaces/{space_id}/environments/{env_id}/content_types          | 200     |
 | GET    | /spaces/{space_id}/environments/{env_id}/content_types/{id}     | 200/404 |
 | GET    | /spaces/{space_id}/environments/{env_id}/entries                | 200     |
@@ -29,6 +30,9 @@ Base URL: `http://localhost:8066` (in docker-compose: `http://contentful-api:806
 ## Notes
 
 - Objects use a Contentful-style `sys` envelope plus a `fields` payload.
+- `GET /spaces` lists the seeded space in the same `Array` collection every
+  other list route returns; `GET /spaces/{space_id}` answers 404 for any id
+  other than the seeded one, so a wrong id is not mistaken for the right one.
 - `GET /entries` supports `content_type=` filtering, simple `fields.X=value`
   equality, and `limit`/`skip` pagination; the response is an `Array` collection
   with `total`, `skip`, `limit`.

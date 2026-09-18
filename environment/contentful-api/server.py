@@ -32,11 +32,19 @@ def health():
     return {"status": "ok"}
 
 
-# --- Space ---
+# --- Spaces ---
+
+@app.get("/spaces")
+def list_spaces():
+    return contentful_data.list_spaces()
+
 
 @app.get("/spaces/{space_id}")
 def get_space(space_id: str):
-    return contentful_data.get_space()
+    result = contentful_data.get_space(space_id)
+    if "error" in result:
+        return JSONResponse(status_code=404, content=result)
+    return result
 
 
 # --- Content types ---
