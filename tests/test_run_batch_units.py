@@ -23,6 +23,7 @@ import json
 import logging
 import math
 import sys
+import types
 from pathlib import Path
 
 import pytest
@@ -30,6 +31,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from eval.run_batch import (  # noqa: E402
+    ALLOW_DEFECTIVE_TASK_ENV,
     ALLOW_MISSING_REQUIRED_APIS_ENV,
     MissingRequiredApisError,
     _augment_score_with_combined_rewards,
@@ -43,6 +45,7 @@ from eval.run_batch import (  # noqa: E402
     _normalize_display_model,
     _pass_summary_doc,
     _pass_summary_entry,
+    _run_task_gate,
     _attribute_per_message_cost,
     _augment_score_with_combined_rewards,
     _backfill_per_message_cost,
@@ -1906,3 +1909,78 @@ class TestSaveUsageStripsRunKey:
         assert "__run_key__" not in written
         assert "deadbeefcafe" not in json.dumps(result)
         assert json.loads(written)["input_tokens"] == 10
+
+
+class TestTaskGate:
+    """The launch gate: what it refuses, what it lets past, and what it records.
+
+    The gate's own verdicts are calibrated in tests/test_inject_preflight.py.
+    What is checked here is the wiring around them — that a defect stops the
+    run before anything is spent, that the escape hatch works, and that either
+    outcome survives into the run record.
+    """
+
+    @staticmethod
+    def _bundle(tmp_path, name="t-gate"):
+        task_dir = tmp_path / name
+        (task_dir / "mock_data").mkdir(parents=True)
+        return {"task_id": name, "task_dir": str(task_dir)}
+
+    @staticmethod
+    def _report(findings=(), ops=3):
+        stamp = {"status": None, "ops": ops, "warns": 0, "elapsed_ms": 7}
+
+        def _stamp(status):
+            out = dict(stamp, status=status)
+            if status != "passed":
+                out["findings"] = [{"kind": f[0], "subject": f[1], "reason": f[2]}
+                                   for f in findings]
+            return out
+
+        return types.SimpleNamespace(
+            ok=not findings, ops=ops, elapsed_ms=7, warnings=(),
+            fatal=tuple(findings), stamp=_stamp)
+
+    def _gate(self, monkeypatch, task, report):
+        module = types.ModuleType("src.utils.inject_preflight")
+        module.gate_task = lambda *a, **kw: report
+        monkeypatch.setitem(sys.modules, "src.utils.inject_preflight", module)
+        return _run_task_gate(task)
+
+    def test_a_task_with_no_bundle_is_skipped_not_refused(self, tmp_path):
+        stamp, blocked = _run_task_gate({"task_id": "native"})
+        assert blocked is False
+        assert stamp["status"] == "skipped"
+
+    def test_a_clean_task_passes_and_records_its_op_count(self, monkeypatch, tmp_path):
+        stamp, blocked = self._gate(monkeypatch, self._bundle(tmp_path), self._report())
+        assert blocked is False
+        assert stamp == {"status": "passed", "ops": 3, "warns": 0, "elapsed_ms": 7}
+
+    def test_a_defect_blocks_the_run_before_any_spend(self, monkeypatch, tmp_path):
+        report = self._report([("LANDS-BUT-INVISIBLE", "svc s1/op", "orphan keys")])
+        stamp, blocked = self._gate(monkeypatch, self._bundle(tmp_path), report)
+        assert blocked is True
+        assert stamp["status"] == "failed"
+        assert stamp["findings"][0]["kind"] == "LANDS-BUT-INVISIBLE"
+
+    def test_the_escape_hatch_launches_but_stamps_the_bypass(self, monkeypatch, tmp_path):
+        monkeypatch.setenv(ALLOW_DEFECTIVE_TASK_ENV, "1")
+        report = self._report([("WOULD-ERROR", "svc s1/op", "store refused it")])
+        stamp, blocked = self._gate(monkeypatch, self._bundle(tmp_path), report)
+        assert blocked is False
+        assert stamp["status"] == "bypassed"
+        assert stamp["findings"][0]["subject"] == "svc s1/op"
+
+    def test_a_gate_that_raises_never_voids_a_run(self, monkeypatch, tmp_path):
+        module = types.ModuleType("src.utils.inject_preflight")
+
+        def _boom(*a, **kw):
+            raise RuntimeError("index out of range")
+
+        module.gate_task = _boom
+        monkeypatch.setitem(sys.modules, "src.utils.inject_preflight", module)
+        stamp, blocked = _run_task_gate(self._bundle(tmp_path))
+        assert blocked is False
+        assert stamp["status"] == "skipped"
+        assert "index out of range" in stamp["reason"]

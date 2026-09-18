@@ -1146,6 +1146,66 @@ def _augment_task_with_mocks(task: dict, config, mock_env_dict: dict | None) -> 
         task["skills"] = "\n".join(merged)
 
 
+ALLOW_DEFECTIVE_TASK_ENV = "WCB_ALLOW_DEFECTIVE_TASK"
+
+
+def _allow_defective_task() -> bool:
+    """Escape hatch for the pre-trajectory task gate, for deliberate replays."""
+    return (os.environ.get(ALLOW_DEFECTIVE_TASK_ENV) or "").strip().lower() \
+        in {"1", "true", "yes", "on"}
+
+
+def _run_task_gate(task: dict) -> tuple[dict, bool]:
+    """Decide whether this task may start a trajectory. Returns (stamp, blocked).
+
+    Called before the mock stack, before the container and before the first
+    token, because a task whose injection cannot land or whose required service
+    does not load produces a graded artifact describing a world that was never
+    there — and the only way not to pay for one is not to start it. See
+    src/utils/inject_preflight for what is decided and why each verdict is
+    fatal or not.
+
+    The verdict is stamped into the run record either way. A bypassed gate that
+    left no trace in the artifact would be worse than no gate: the run would be
+    indistinguishable at scoring time from one that passed.
+    """
+    task_dir = task.get("task_dir") or ""
+    if not task_dir or not Path(task_dir).is_dir():
+        return {"status": "skipped", "reason": "task ships no bundle directory"}, False
+    if not (Path(task_dir) / "mock_data").is_dir() and not task.get("inject_path"):
+        return {"status": "skipped", "reason": "task mounts no mock world"}, False
+    try:
+        from src.utils.inject_preflight import gate_task
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("[%s] task gate unavailable (%s); launching ungated",
+                       task.get("task_id"), exc)
+        return {"status": "skipped", "reason": f"gate unavailable: {exc}"}, False
+    try:
+        report = gate_task(task_dir, required_apis=task.get("required_apis"),
+                           environment_dir=Path(task["env_dir"]) if task.get("env_dir") else None)
+    except Exception as exc:  # noqa: BLE001 - the gate must never itself void a run
+        logger.warning("[%s] task gate raised (%s: %s); launching ungated",
+                       task.get("task_id"), type(exc).__name__, exc)
+        return {"status": "skipped", "reason": f"gate raised: {exc}"}, False
+    for warning in report.warnings:
+        logger.warning("[%s] task gate warning: %s", task.get("task_id"), warning)
+    if report.ok:
+        logger.info("[%s] task gate passed: %d injected op(s) land and serve, "
+                    "%d warning(s), %dms", task.get("task_id"), report.ops,
+                    len(report.warnings), report.elapsed_ms)
+        return report.stamp("passed"), False
+    for finding in report.fatal:
+        logger.error("[%s] TASK DEFECT: %s", task.get("task_id"), finding)
+    if _allow_defective_task():
+        logger.error(
+            "[%s] %s=1: launching a task with %d known defect(s) anyway. The "
+            "trajectory that follows measures an environment the task does not "
+            "describe; its score is not a measurement of the model.",
+            task.get("task_id"), ALLOW_DEFECTIVE_TASK_ENV, len(report.fatal))
+        return report.stamp("bypassed"), False
+    return report.stamp("failed"), True
+
+
 def _model_type(model: str) -> str:
     """Map a model id to a kensei pod folder name (claude / gpt / sanitized)."""
     m = model.rsplit("/", 1)[-1].lower()
@@ -2448,6 +2508,16 @@ def run_single_task(
     if config is not None:
         _augment_task_with_mocks(task, config, mock_env_dict)
 
+    # Nothing has been spent yet: no container, no mock stack, no token. This is
+    # the last place a defective task can be refused for free.
+    task_gate, gate_blocked = _run_task_gate(task)
+    if gate_blocked:
+        return {
+            "task_id": task_id_ori, "scores": {}, "task_gate": task_gate,
+            "error": (f"task gate refused {task_id_ori}: "
+                      + "; ".join(f["reason"] for f in task_gate["findings"][:3])),
+        }
+
     if (task.get("test_code") or "").strip():
         # Task ships its own test suite (input/<task>/test_outputs.py +
         # test_weights.json, loaded by task_parser._load_provided_tests) — the
@@ -2606,7 +2676,7 @@ def run_single_task(
     model_dir = task_bundle_dir / "trajectories" / model_type
     run_index, output_dir = _claim_run_dir(model_dir)
 
-    result = {"task_id": task_id, "scores": {}, "error": None}
+    result = {"task_id": task_id, "scores": {}, "error": None, "task_gate": task_gate}
 
     # Per-run debug log: a focused DEBUG trace written next to this run's
     # score.json (output_dir/harness_debug.log). Everything logged during this
