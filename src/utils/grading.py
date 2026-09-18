@@ -2780,6 +2780,35 @@ def extract_usage_from_litellm_log(
          concurrent run's traffic (measured 1.4x-62.7x inflation on the
          2026-08 deliveries). Retained for old logs and master-key
          deployments where the bearer cannot carry the run key.
+
+    Reconciling ``sources.agent`` against a raw log, which is where this gets
+    read next: every selected row is summed once, with no dedup, no retry
+    filtering and no per-model exclusion. A disagreement with a hand-rolled
+    total of usage.jsonl is therefore always a disagreement about WHICH rows,
+    and on the 2026-09-18 sean_callahan run — which reconciled to neither raw
+    channel and prompted this note — there were exactly two causes, both
+    correct:
+
+      The log keeps growing after this has read it. Totals are collected when
+      the agent finishes while its container is still up, so post-agent
+      traffic lands afterwards: that run logged "Agent finished" at 06:45:14,
+      this read 156 rows at 06:45:16, and a 157th arrived at 06:45:23.
+      ``sources.agent`` is a snapshot and is exact for the rows it saw; `wc -l`
+      on the same file later is not counting the same population.
+
+      usage_oauth.jsonl is a different channel, not a second opinion on this
+      one. The OAuth bridge callback writes it, and it records chat
+      completions only: it carries the startup preflight probe as an ordinary
+      agent row rather than kind="preflight", and carries no /v1/embeddings row
+      at all. Add the probe back and drop the embeddings and the two logs agree
+      exactly — 136 rows and 302/126615/14168432/1124998 on both, on that run.
+
+    Rows the usage callback named as openclaw's own (``purpose``) stay IN this
+    total; only ``preflight`` and ``failure`` kinds are skipped. Compaction,
+    embeddings and image-tool calls are the agent's spend and belong in the
+    agent's bill. The label exists so the per-message back-fill in
+    eval/run_batch.py can account for them on their own ledger line, not so
+    this can drop them — naming a row must never move money out of the total.
     """
     totals = {
         "input_tokens": 0,

@@ -23,6 +23,7 @@ import pytest
 
 from eval.run_batch import _attribute_per_message_cost
 from src.utils import litellm_usage_callback as uc
+from src.utils.grading import extract_usage_from_litellm_log
 
 FIXTURE = Path(__file__).parent / "fixtures" / "usage_replay_sean_20260918.json"
 
@@ -176,3 +177,90 @@ def test_replay_reconciles_with_the_run_agent_total(replay, tmp_path):
         assert per_message[col] + internal[col] == expected[col], col
 
     assert report["messages"] + internal["request_count"] == expected["request_count"]
+
+
+# ============================================================================
+# Run totals — sources.agent reconciled against the raw channels
+# ============================================================================
+
+
+def _log_path(tmp_path, rows, name="usage.jsonl"):
+    path = tmp_path / name
+    path.write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+    return path
+
+
+def test_agent_total_is_exactly_the_rows_it_selected(replay, tmp_path):
+    """No dedup, no retry filtering, no per-model exclusion.
+
+    The run's sources.agent reconciled to neither raw channel, which reads like
+    an aggregation bug until the row populations are lined up. It is not one:
+    the extractor reproduces the shipped figure exactly from the rows it saw.
+    """
+    totals = extract_usage_from_litellm_log(
+        _log_path(tmp_path, replay["rows"]), 0.0, 0.0, _RUN_KEY)
+
+    expected = replay["expected_agent_totals"]
+    for column in (*_TOKEN_COLUMNS, "total_tokens", "request_count"):
+        assert totals[column] == expected[column], column
+    assert totals["usage_source"] == "litellm_run_key"
+
+
+def test_naming_a_row_does_not_move_money_out_of_the_total(replay, tmp_path):
+    """The labels commit 1 adds must not change what the agent is billed."""
+    before = extract_usage_from_litellm_log(
+        _log_path(tmp_path, replay["rows"], "before.jsonl"), 0.0, 0.0, _RUN_KEY)
+    after = extract_usage_from_litellm_log(
+        _log_path(tmp_path, _classified_rows(replay), "after.jsonl"),
+        0.0, 0.0, _RUN_KEY)
+
+    assert after == before
+
+
+def test_a_later_row_is_a_snapshot_difference_not_a_missing_one(replay, tmp_path):
+    """usage.jsonl outgrew sources.agent because the container outlived the read.
+
+    The agent finished at 06:45:14 and the totals were taken at 06:45:16; the
+    157th row landed at 06:45:23. Re-summing the file later counts a different
+    population, and the whole difference is that one row.
+    """
+    late = replay["channels"]["late_row_after_snapshot"]
+    grown = [*replay["rows"], {**late, "kind": "agent", "run_key": _RUN_KEY,
+                               "total_tokens": 0}]
+    totals = extract_usage_from_litellm_log(
+        _log_path(tmp_path, grown), 0.0, 0.0, _RUN_KEY)
+
+    expected = replay["expected_agent_totals"]
+    assert totals["request_count"] == expected["request_count"] + 1
+    for column in _TOKEN_COLUMNS:
+        assert totals[column] - expected[column] == late[column], column
+
+
+def test_the_oauth_channel_is_the_chat_rows_not_a_second_opinion(replay):
+    """usage_oauth.jsonl == usage.jsonl's chat rows, probe included, embeddings out.
+
+    Comparing it to "agent rows" mixes the preflight probe in and leaves the
+    embeddings out, which is the whole of its apparent disagreement.
+    """
+    channels = replay["channels"]
+    assert channels["usage_oauth_jsonl_all_rows"] == \
+        channels["usage_jsonl_chat_rows_incl_preflight"]
+    assert channels["usage_jsonl_embeddings_rows"]["request_count"] == 22
+    assert channels["usage_jsonl_embeddings_rows"]["output_tokens"] == 0
+
+
+def test_preflight_and_failure_rows_are_the_only_kinds_dropped(replay, tmp_path):
+    rows = [*replay["rows"],
+            {"ts": "2026-09-18T06:13:47Z", "model": "claude-opus-5",
+             "kind": "preflight", "run_key": _RUN_KEY, "input_tokens": 32,
+             "output_tokens": 1, "total_tokens": 33, "cache_read_tokens": 0,
+             "cache_write_tokens": 0, "cost_usd": 0.0},
+            {"ts": "2026-09-18T06:20:00Z", "model": "claude-opus-5",
+             "kind": "failure", "run_key": _RUN_KEY, "input_tokens": 0,
+             "output_tokens": 0, "total_tokens": 0, "cache_read_tokens": 0,
+             "cache_write_tokens": 0, "cost_usd": 0.0}]
+    totals = extract_usage_from_litellm_log(
+        _log_path(tmp_path, rows), 0.0, 0.0, _RUN_KEY)
+
+    assert totals["request_count"] == replay["expected_agent_totals"]["request_count"]
+    assert totals["input_tokens"] == replay["expected_agent_totals"]["input_tokens"]

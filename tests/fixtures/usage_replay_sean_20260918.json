@@ -2633,5 +2633,36 @@
    "cost_usd": 0.0,
    "duration_s": 8.815
   }
- ]
+ ],
+ "channels": {
+  "note": "usage_oauth.jsonl is the OAuth bridge channel: chat completions only, with the startup probe recorded as an ordinary agent row and no embeddings row at all. Including the probe and excluding embeddings makes the two logs identical, which is the reconciliation extract_usage_from_litellm_log documents.",
+  "usage_jsonl_chat_rows_incl_preflight": {
+   "input_tokens": 302,
+   "output_tokens": 126615,
+   "cache_read_tokens": 14168432,
+   "cache_write_tokens": 1124998,
+   "request_count": 136
+  },
+  "usage_oauth_jsonl_all_rows": {
+   "input_tokens": 302,
+   "output_tokens": 126615,
+   "cache_read_tokens": 14168432,
+   "cache_write_tokens": 1124998,
+   "request_count": 136
+  },
+  "usage_jsonl_embeddings_rows": {
+   "input_tokens": 220,
+   "output_tokens": 0,
+   "cache_read_tokens": 0,
+   "cache_write_tokens": 0,
+   "request_count": 22
+  },
+  "late_row_after_snapshot": {
+   "ts": "2026-09-18T06:45:23.253404+00:00",
+   "input_tokens": 2,
+   "output_tokens": 412,
+   "cache_read_tokens": 0,
+   "cache_write_tokens": 36712
+  }
+ }
 }
