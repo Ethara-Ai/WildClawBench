@@ -116,6 +116,117 @@ def _is_preflight_ping(kwargs: dict) -> bool:
         return False
 
 
+# OpenClaw makes model calls of its own on the session's credentials, so they
+# reach this callback carrying the agent's run_key while producing no assistant
+# message. Left unlabelled they are indistinguishable from a turn, and the
+# per-message back-fill in eval/run_batch.py can only refuse to attribute
+# anything (measured on the 2026-09-17 koji run: 98 rows for 87 messages, so
+# all 87 shipped cost 0). Every such call is issued through the agent SDK's
+# `completeSimple`, which sends ONE user message and a fixed prompt, and the
+# prompts are compile-time constants of the shipped image
+# (/usr/lib/node_modules/openclaw):
+#
+#   compaction  — context summarization, both the initial and the iterative
+#     update prompt, plus the split-turn prefix and branch summaries. All four
+#     paths pass SUMMARIZATION_SYSTEM_PROMPT as the system prompt
+#     (node_modules/@mariozechner/pi-coding-agent/dist/core/compaction/
+#     utils.js, referenced from compaction.js and branch-summarization.js).
+#   summarize   — the link/media understanding summarizer (`summarizeText` in
+#     the openclaw bundle), which sends no system prompt and opens its single
+#     user message with the sentence below.
+#
+# Matching the opening sentence rather than the whole prompt keeps the test
+# cheap while staying specific: both sentences are addressed to the model in
+# the second person and neither appears in a task prompt. The single-user-
+# message requirement is what makes a false positive implausible — an agent
+# turn always carries the conversation so far.
+#
+# `openclaw.cache-ttl` is NOT in this list, though the critique that opened
+# this named it as the bulk of the surplus. Reading the bundle says otherwise:
+# it is a context-pruning transformer that rewrites the outgoing message list
+# and appends a session entry, issuing no model call of its own, so it cannot
+# put a row in this log. Session titles are likewise derived from the first
+# user message rather than generated.
+_COMPACTION_SYSTEM_HEAD = "You are a context summarization assistant."
+_SUMMARIZE_TEXT_HEAD = (
+    "You are an assistant that summarizes texts concisely while keeping the "
+    "most important information."
+)
+
+
+def _text_of(content: Any) -> str:
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return ""
+    parts: list[str] = []
+    for block in content:
+        if isinstance(block, str):
+            parts.append(block)
+        elif isinstance(block, dict):
+            text = block.get("text")
+            if isinstance(text, str):
+                parts.append(text)
+    return "\n".join(parts)
+
+
+def _prompt_shape(kwargs: dict) -> tuple[str, list[str]]:
+    """The request's system prompt and its non-system message texts.
+
+    Prefers the raw client body, which for the anthropic-messages route
+    (src/agents/openclaw/runner.py registers the sidecar with
+    api="anthropic-messages") carries ``system`` as a top-level field rather
+    than a message. Falls back to the normalized ``messages`` LiteLLM hands
+    every callback, where the same value arrives as a system-role entry.
+    """
+    lp = kwargs.get("litellm_params") or {}
+    psr = lp.get("proxy_server_request") if isinstance(lp, dict) else None
+    body = psr.get("body") if isinstance(psr, dict) else None
+    system = ""
+    messages: Any = None
+    if isinstance(body, dict):
+        system = _text_of(body.get("system"))
+        messages = body.get("messages")
+    if not isinstance(messages, list) or not messages:
+        messages = kwargs.get("messages")
+    others: list[str] = []
+    for msg in messages if isinstance(messages, list) else []:
+        if not isinstance(msg, dict):
+            continue
+        if msg.get("role") == "system":
+            if not system:
+                system = _text_of(msg.get("content"))
+            continue
+        others.append(_text_of(msg.get("content")))
+    return system, others
+
+
+def _classify_internal_purpose(kwargs: dict) -> str:
+    """Name the openclaw-internal call this request is, or "" for a turn.
+
+    The returned label is written to the row as ``purpose`` and is what lets
+    the per-message back-fill subtract these rows before it compares counts,
+    and what lets usage.json carry them as their own ledger line instead of
+    folding them anonymously into the agent total.
+    """
+    try:
+        if "transcription" in str(kwargs.get("call_type") or ""):
+            # The audio-extract skill's /v1/audio/transcriptions call. Already
+            # excluded downstream when it bills by duration, but the
+            # token-billed transcribe models look exactly like a chat row.
+            return "transcription"
+        system, others = _prompt_shape(kwargs)
+        if len(others) != 1:
+            return ""
+        if system.lstrip().startswith(_COMPACTION_SYSTEM_HEAD):
+            return "compaction"
+        if not system.strip() and others[0].lstrip().startswith(_SUMMARIZE_TEXT_HEAD):
+            return "summarize"
+    except Exception:
+        pass
+    return ""
+
+
 _RUN_KEY_PREFIX = "wcb::"
 
 
@@ -282,10 +393,12 @@ def _write_row(kwargs: dict, response_obj: Any, start_time: Any, end_time: Any) 
             cost = _float(kwargs.get("response_cost"))
 
         run_key = _extract_run_key(kwargs)
+        purpose = _classify_internal_purpose(kwargs)
         row = {
             "ts": datetime.now(timezone.utc).isoformat(),
             "model": kwargs.get("model") or "",
             "kind": "preflight" if _is_preflight_ping(kwargs) else "agent",
+            **({"purpose": purpose} if purpose else {}),
             **({"run_key": run_key} if run_key else {}),
             "input_tokens":       input_tokens,
             "output_tokens":      output_tokens,

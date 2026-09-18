@@ -759,6 +759,140 @@ def test_oauth_callback_instance_type():
 
 
 # ============================================================================
+# _classify_internal_purpose — naming openclaw's own calls at write time
+# ============================================================================
+
+# Verbatim heads of the prompts the agent image sends these calls with, so a
+# bundle upgrade that reworded either one fails here rather than silently
+# returning the log to 98-rows-for-87-messages.
+_COMPACTION_SYSTEM = (
+    "You are a context summarization assistant. Your task is to read a "
+    "conversation between a user and an AI coding assistant, then produce a "
+    "structured summary following the exact format specified."
+)
+_SUMMARIZE_USER = (
+    "You are an assistant that summarizes texts concisely while keeping the "
+    "most important information. Summarize the text to approximately 2000 "
+    "characters."
+)
+
+
+def _anthropic_body(system, messages):
+    return {"litellm_params": {"proxy_server_request": {
+        "body": {"system": system, "messages": messages}}}}
+
+
+def _turn_kwargs():
+    return {"messages": [
+        {"role": "user", "content": "build the invoice report"},
+        {"role": "assistant", "content": "on it"},
+        {"role": "user", "content": "now add VAT"},
+    ]}
+
+
+def test_compaction_named_from_system_message():
+    kwargs = {"messages": [
+        {"role": "system", "content": _COMPACTION_SYSTEM},
+        {"role": "user", "content": "<conversation>\nturn 1\n</conversation>"},
+    ]}
+    assert uc._classify_internal_purpose(kwargs) == "compaction"
+
+
+def test_compaction_named_from_anthropic_top_level_system():
+    # The runner registers the sidecar with api="anthropic-messages", so the
+    # system prompt arrives as a body field, not a message.
+    kwargs = _anthropic_body(_COMPACTION_SYSTEM, [
+        {"role": "user", "content": [{"type": "text", "text": "<conversation>"}]},
+    ])
+    assert uc._classify_internal_purpose(kwargs) == "compaction"
+
+
+def test_compaction_named_when_system_is_a_content_block_list():
+    kwargs = _anthropic_body(
+        [{"type": "text", "text": _COMPACTION_SYSTEM}],
+        [{"role": "user", "content": "<conversation>"}],
+    )
+    assert uc._classify_internal_purpose(kwargs) == "compaction"
+
+
+def test_media_summarizer_named_from_its_user_prompt():
+    kwargs = {"messages": [{"role": "user", "content": _SUMMARIZE_USER}]}
+    assert uc._classify_internal_purpose(kwargs) == "summarize"
+
+
+def test_transcription_named_from_call_type():
+    # Token-billed transcribe models carry tokens and no audio_seconds, so the
+    # downstream duration test cannot see them; call_type can.
+    assert uc._classify_internal_purpose(
+        {"call_type": "atranscription", "messages": []}) == "transcription"
+
+
+def test_agent_turn_is_not_named():
+    assert uc._classify_internal_purpose(_turn_kwargs()) == ""
+
+
+def test_agent_turn_quoting_the_summarizer_prompt_is_not_named():
+    # A task could legitimately ask the agent about summarization. The single
+    # user message requirement is what keeps that from being misread.
+    kwargs = {"messages": [
+        {"role": "user", "content": _SUMMARIZE_USER},
+        {"role": "assistant", "content": "sure"},
+        {"role": "user", "content": "go on"},
+    ]}
+    assert uc._classify_internal_purpose(kwargs) == ""
+
+
+def test_summarizer_prompt_not_at_the_start_is_not_named():
+    kwargs = {"messages": [
+        {"role": "user", "content": "Explain this: " + _SUMMARIZE_USER},
+    ]}
+    assert uc._classify_internal_purpose(kwargs) == ""
+
+
+def test_summarizer_head_under_a_system_prompt_is_not_named():
+    # summarizeText sends no system prompt; a run that does is the agent.
+    kwargs = {"messages": [
+        {"role": "system", "content": "You are a helpful coding agent."},
+        {"role": "user", "content": _SUMMARIZE_USER},
+    ]}
+    assert uc._classify_internal_purpose(kwargs) == ""
+
+
+def test_preflight_ping_is_not_named_internal():
+    assert uc._classify_internal_purpose({
+        "messages": [{"role": "user", "content": "ping"}], "max_tokens": 1,
+    }) == ""
+
+
+def test_classifier_never_raises_on_junk():
+    for kwargs in ({"messages": "not-a-list"},
+                   {"messages": [None, 3]},
+                   {"litellm_params": "nope"},
+                   {}):
+        assert uc._classify_internal_purpose(kwargs) == ""
+
+
+def test_write_row_tags_an_internal_call(usage_path, stub_completion_cost):
+    kwargs = {"model": "claude-opus-4.7", "messages": [
+        {"role": "system", "content": _COMPACTION_SYSTEM},
+        {"role": "user", "content": "<conversation>"},
+    ]}
+    uc._write_row(kwargs, _resp(_chat_usage()), T0, T1)
+    row = _read_rows(usage_path)[0]
+    assert row["purpose"] == "compaction"
+    assert row["kind"] == "agent"
+    assert set(row.keys()) == EXPECTED_KEYS | {"purpose"}
+
+
+def test_write_row_leaves_a_turn_untagged(usage_path, stub_completion_cost):
+    # The 12-key schema is unchanged for the rows that carry a message.
+    uc._write_row({"model": "m", **_turn_kwargs()}, _resp(_chat_usage()), T0, T1)
+    row = _read_rows(usage_path)[0]
+    assert "purpose" not in row
+    assert set(row.keys()) == EXPECTED_KEYS
+
+
+# ============================================================================
 # Module-level _PATH env override (both modules read env at import)
 # ============================================================================
 
