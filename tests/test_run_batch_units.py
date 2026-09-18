@@ -1892,6 +1892,268 @@ class TestUsageLedgerReconciles:
         assert report["internal_calls"]["audio_seconds"] == 9.5
 
 
+# ---------------------------------------------------------------------------
+# The usage log keeps growing after the agent is done: the container is still
+# up and still serving. On the 2026-09-18 sean_callahan run the agent finished
+# at 06:45:14, the harness read 156 rows at 06:45:16 and a 157th landed at
+# 06:45:23 — the count gate passed on 7.25 seconds of margin, and a row of
+# unknown purpose (tokens only, no prompt) would have re-broken it. Two layers
+# answer that: the container is stopped before either read (TestUsageSnapshot-
+# Quiesce), and a row that postdates the agent is bucketed rather than counted
+# as a turn candidate (below). Its money stays in the run either way.
+# ---------------------------------------------------------------------------
+
+def _epoch(ts: str) -> float:
+    from datetime import datetime  # noqa: PLC0415
+
+    return datetime.fromisoformat(ts.replace("Z", "+00:00")).timestamp()
+
+
+_FINISHED = _epoch("2026-08-17T07:50:10+00:00")
+
+
+class TestPostAgentRowsAreBucketed:
+    _TURNS = [
+        _usage_row("2026-08-17T07:50:01+00:00", _RK_A, out=10, cost=0.11),
+        _usage_row("2026-08-17T07:50:03+00:00", _RK_A, out=20, cost=0.12),
+    ]
+    _LATE = _usage_row("2026-08-17T07:50:23+00:00", _RK_A, out=412, cost=0.40,
+                       input_tokens=2, cache_write_tokens=36712,
+                       total_tokens=37126)
+
+    def _run(self, tmp_path, rows, finished=_FINISHED, n=2):
+        traj = _traj(n)
+        report = _attribute_per_message_cost(
+            traj, _write_usage_log(tmp_path, rows), _RK_A,
+            agent_finished_ts=finished)
+        return traj, report
+
+    def test_a_late_row_is_not_a_turn_candidate(self, tmp_path):
+        _, report = self._run(tmp_path, [*self._TURNS, self._LATE])
+        assert report["status"] == "attributed"
+        assert report["rows_unmatched"] == 0
+        assert report["rows_post_agent"] == 1
+        assert report["rows_selected"] == 3
+
+    def test_the_same_log_without_a_boundary_breaks_the_count(self, tmp_path):
+        _, report = self._run(tmp_path, [*self._TURNS, self._LATE], finished=None)
+        assert report["status"] == "failed"
+        assert report["rows_unmatched"] == 1
+        assert report["rows_post_agent"] == 0
+
+    def test_the_late_row_is_ledgered_not_dropped(self, tmp_path):
+        _, report = self._run(tmp_path, [*self._TURNS, self._LATE])
+        post = report["post_agent_calls"]
+        assert post["request_count"] == 1
+        assert post["input_tokens"] == 2
+        assert post["output_tokens"] == 412
+        assert post["cache_write_tokens"] == 36712
+        assert post["cost_usd"] == pytest.approx(0.40)
+
+    def test_the_three_ledgers_still_close_on_sources_agent(self, tmp_path):
+        rows = [*self._TURNS,
+                _internal_row("2026-08-17T07:50:04+00:00", _RK_A, "compaction"),
+                self._LATE]
+        traj, report = self._run(tmp_path, rows)
+        agent = _agent_source(rows)
+        internal, post = report["internal_calls"], report["post_agent_calls"]
+        for msg_key, src_key in (("input", "input_tokens"),
+                                 ("output", "output_tokens"),
+                                 ("cacheRead", "cache_read_tokens"),
+                                 ("cacheWrite", "cache_write_tokens")):
+            per_message = sum(m["usage"][msg_key] for m in traj["messages"]
+                              if m.get("role") == "assistant")
+            assert per_message + internal[src_key] + post[src_key] == agent[src_key], \
+                src_key
+        assert report["messages"] + internal["request_count"] + post["request_count"] \
+            == agent["request_count"] == report["rows_selected"]
+
+    def test_the_boundary_outranks_the_purpose_label(self, tmp_path):
+        # The buckets must stay disjoint or the reconciliation double-counts.
+        rows = [*self._TURNS,
+                _internal_row("2026-08-17T07:50:30+00:00", _RK_A, "embeddings")]
+        _, report = self._run(tmp_path, rows)
+        assert report["rows_post_agent"] == 1
+        assert report["rows_internal"] == 0
+        assert "internal_calls" not in report
+
+    def test_a_row_exactly_on_the_boundary_belongs_to_the_agent(self, tmp_path):
+        rows = [self._TURNS[0],
+                _usage_row("2026-08-17T07:50:10+00:00", _RK_A, out=20, cost=0.12)]
+        _, report = self._run(tmp_path, rows)
+        assert report["rows_post_agent"] == 0
+        assert report["status"] == "attributed"
+
+    def test_an_unreadable_timestamp_is_never_called_late(self, tmp_path):
+        # The boundary asserts a row is provably late; it is not a default.
+        rows = [self._TURNS[0],
+                _usage_row("not-a-timestamp", _RK_A, out=20, cost=0.12)]
+        _, report = self._run(tmp_path, rows)
+        assert report["rows_post_agent"] == 0
+        assert report["status"] == "attributed"
+
+    def test_a_naive_timestamp_is_read_as_utc(self, tmp_path):
+        # datetime.timestamp() on a naive value means LOCAL time, which would
+        # bucket by the host's offset instead of by the sidecar's clock.
+        rows = [*self._TURNS, _usage_row("2026-08-17T07:50:23", _RK_A)]
+        _, report = self._run(tmp_path, rows)
+        assert report["rows_post_agent"] == 1
+
+    def test_a_run_with_no_late_traffic_is_untouched(self, tmp_path):
+        _, without = self._run(tmp_path, self._TURNS, finished=None)
+        _, with_boundary = self._run(tmp_path, self._TURNS)
+        assert with_boundary["rows_post_agent"] == 0
+        assert "post_agent_calls" not in with_boundary
+        assert with_boundary.pop("rows_post_agent") == without.pop("rows_post_agent")
+        assert with_boundary == without
+
+
+class TestPostAgentLedgerReachesTheArtifacts:
+    _STAMP = {
+        "status": "attributed", "messages": 2, "rows_selected": 4,
+        "rows_internal": 1, "rows_post_agent": 1, "rows_unmatched": 0,
+        "internal_calls": {"request_count": 1, "total_tokens": 140},
+        "post_agent_calls": {"request_count": 1, "total_tokens": 37126},
+    }
+
+    def test_usage_json_carries_the_post_agent_ledger_beside_the_internal_one(
+            self, tmp_path):
+        save_usage(tmp_path, {"usage_attribution": dict(self._STAMP)},
+                   {"request_count": 4, "cost_usd": 0.5, "total_tokens": 420}, "t1")
+        out = json.loads((tmp_path / "usage.json").read_text(encoding="utf-8"))
+        assert out["usage_attribution"]["rows_post_agent"] == 1
+        assert "post_agent_calls" not in out["usage_attribution"]
+        assert out["post_agent_calls"]["total_tokens"] == 37126
+        assert out["internal_calls"]["total_tokens"] == 140
+
+    def test_score_json_carries_the_count_without_the_ledger(self):
+        scores: dict = {}
+        _augment_score_with_combined_rewards(
+            scores, {"usage_attribution": dict(self._STAMP)})
+        assert scores["usage_attribution"]["rows_post_agent"] == 1
+        assert "post_agent_calls" not in scores["usage_attribution"]
+        assert "internal_calls" not in scores["usage_attribution"]
+
+    def test_the_finish_stamp_never_reaches_usage_json(self, tmp_path):
+        # Private channel from the runner to the back-fill, like __run_key__.
+        save_usage(tmp_path, {}, {"request_count": 1, "cost_usd": 0.1,
+                                  "__agent_finished_ts__": 1789712714.58}, "t1")
+        written = (tmp_path / "usage.json").read_text(encoding="utf-8")
+        assert "__agent_finished_ts__" not in written
+        assert "1789712714" not in written
+
+
+class TestUsageSnapshotQuiesce:
+    """That the container is stopped BEFORE the log is read, pinned at the source.
+
+    The ordering is the fix, and it lives hundreds of lines into a function that
+    needs docker to reach — the same reason ``TestTaskGate`` pins its wiring
+    this way. What matters is bounded on both sides: the stop must come after
+    the last step that execs into a live container, and before both reads of the
+    sidecar usage log. A refactor that moves it out of that interval reopens the
+    race silently, so the interval is what gets asserted.
+    """
+
+    @staticmethod
+    def _module():
+        import ast  # noqa: PLC0415
+
+        src = (Path(__file__).resolve().parents[1] / "eval" / "run_batch.py").read_text(
+            encoding="utf-8")
+        return ast.parse(src)
+
+    @classmethod
+    def _fn(cls, name="run_single_task"):
+        import ast  # noqa: PLC0415
+
+        return next(n for n in ast.walk(cls._module())
+                    if isinstance(n, ast.FunctionDef) and n.name == name)
+
+    @staticmethod
+    def _line(fn, needle):
+        import ast  # noqa: PLC0415
+
+        lines = [n.lineno for n in ast.walk(fn)
+                 if isinstance(n, ast.Call) and needle in ast.unparse(n)]
+        assert len(lines) == 1, f"expected exactly one {needle!r}, found {lines}"
+        return lines[0]
+
+    def test_both_usage_reads_follow_the_stop(self):
+        fn = self._fn()
+        quiesce = self._line(fn, "_quiesce_agent_container(task_id)")
+        assert quiesce < self._line(fn, "backend.collect_usage("), \
+            "sources.agent is summed from a log the container can still append to"
+        assert quiesce < self._line(fn, "_build_trajectory("), \
+            "per-message attribution reads the same log; it must also follow the stop"
+
+    def test_the_stop_follows_every_step_that_needs_a_live_container(self):
+        # collect_task_output and the workspace_after snapshot both `docker
+        # exec` into the container, so the stop cannot be hoisted above them.
+        fn = self._fn()
+        quiesce = self._line(fn, "_quiesce_agent_container(task_id)")
+        assert self._line(fn, "collect_task_output(") < quiesce
+        assert self._line(fn, "snapshot_persona_and_data_from_container(") < quiesce
+
+    def test_the_container_is_still_removed_afterwards(self):
+        fn = self._fn()
+        assert self._line(fn, "_quiesce_agent_container(task_id)") < \
+            self._line(fn, "remove_container(task_id)")
+
+    def test_the_gated_read_is_the_only_production_read(self):
+        """No second path to the usage log that the stop does not cover."""
+        import ast  # noqa: PLC0415
+
+        tree = self._module()
+        owners = []
+        for fn in ast.walk(tree):
+            if not isinstance(fn, ast.FunctionDef):
+                continue
+            if any(isinstance(n, ast.Call)
+                   and "_attribute_per_message_cost(" in ast.unparse(n)
+                   for n in ast.walk(fn)):
+                owners.append(fn.name)
+        assert sorted(owners) == ["_backfill_per_message_cost", "_build_trajectory"]
+
+    def test_the_boundary_is_threaded_from_the_runners_stamp(self):
+        import ast  # noqa: PLC0415
+
+        call = next(n for n in ast.walk(self._fn("_build_trajectory"))
+                    if isinstance(n, ast.Call)
+                    and "_attribute_per_message_cost(" in ast.unparse(n))
+        assert "agent_finished_ts=_agent_finished_ts(agent_usage)" in ast.unparse(call)
+
+
+class TestQuiesceAgentContainer:
+    @staticmethod
+    def _rb():
+        from eval import run_batch  # noqa: PLC0415
+
+        return run_batch
+
+    def test_it_stops_without_removing(self, monkeypatch):
+        rb = self._rb()
+        calls = []
+        monkeypatch.setattr(rb, "stop_container", lambda n: calls.append(n) or True)
+        monkeypatch.setattr(rb, "remove_container",
+                            lambda n: pytest.fail("quiesce must not remove"))
+        assert rb._quiesce_agent_container("t1") is True
+        assert calls == ["t1"]
+
+    def test_a_container_that_will_not_stop_is_reported_not_raised(self, monkeypatch):
+        rb = self._rb()
+        monkeypatch.setattr(rb, "stop_container", lambda n: False)
+        assert rb._quiesce_agent_container("t1") is False
+
+    def test_a_docker_failure_never_voids_a_run(self, monkeypatch):
+        rb = self._rb()
+
+        def _boom(_name):
+            raise OSError("docker daemon unreachable")
+
+        monkeypatch.setattr(rb, "stop_container", _boom)
+        assert rb._quiesce_agent_container("t1") is False
+
+
 class TestSaveUsageStripsRunKey:
     def test_run_key_never_reaches_usage_json(self, tmp_path):
         # In keyless sidecar mode the run key IS the agent's bearer, so it must

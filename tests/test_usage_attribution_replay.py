@@ -17,6 +17,7 @@ count, the message count and the expected totals are all the run's own.
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -190,6 +191,18 @@ def _log_path(tmp_path, rows, name="usage.jsonl"):
     return path
 
 
+def _late_row(replay):
+    """The 157th row: the one that arrived after the harness had read the log.
+
+    Tokens and a timestamp are the whole of what the sidecar recorded for it.
+    No prompt survives, so nothing can name what it was for — which is exactly
+    the case the purpose labels cannot cover and the boundary has to.
+    """
+    return {**replay["channels"]["late_row_after_snapshot"],
+            "model": "claude-opus-5", "kind": "agent", "run_key": _RUN_KEY,
+            "total_tokens": 0}
+
+
 def test_agent_total_is_exactly_the_rows_it_selected(replay, tmp_path):
     """No dedup, no retry filtering, no per-model exclusion.
 
@@ -225,8 +238,7 @@ def test_a_later_row_is_a_snapshot_difference_not_a_missing_one(replay, tmp_path
     population, and the whole difference is that one row.
     """
     late = replay["channels"]["late_row_after_snapshot"]
-    grown = [*replay["rows"], {**late, "kind": "agent", "run_key": _RUN_KEY,
-                               "total_tokens": 0}]
+    grown = [*replay["rows"], _late_row(replay)]
     totals = extract_usage_from_litellm_log(
         _log_path(tmp_path, grown), 0.0, 0.0, _RUN_KEY)
 
@@ -264,3 +276,133 @@ def test_preflight_and_failure_rows_are_the_only_kinds_dropped(replay, tmp_path)
 
     assert totals["request_count"] == replay["expected_agent_totals"]["request_count"]
     assert totals["input_tokens"] == replay["expected_agent_totals"]["input_tokens"]
+
+
+# ============================================================================
+# The post-agent boundary — the 157th row, replayed into the attribution
+# ============================================================================
+
+
+def _boundary(replay) -> float:
+    """The agent-finish wall clock, as an epoch the sidecar's ``ts`` compares to."""
+    stamp = replay["agent_finished"]["boundary_utc"].replace("Z", "+00:00")
+    return datetime.fromisoformat(stamp).timestamp()
+
+
+def _grown_log(replay, tmp_path, name="grown.jsonl"):
+    """The run's log as it actually ended up on disk: 156 rows plus the late one."""
+    return _log_path(tmp_path, [*_classified_rows(replay), _late_row(replay)], name)
+
+
+def _attribute(replay, path, boundary):
+    traj = _traj(replay)
+    report = _attribute_per_message_cost(
+        traj, path, _RUN_KEY, oauth_route=True, model="claude-opus-5",
+        agent_finished_ts=boundary)
+    return traj, report
+
+
+def test_the_late_row_cannot_be_named_by_the_classifier(replay):
+    """Which is why the boundary exists and not another fingerprint.
+
+    The classifier reads the request; this row's request is gone. Anything that
+    labelled it would be inventing a purpose for traffic nobody can describe.
+    """
+    late = _late_row(replay)
+    assert uc._classify_internal_purpose({}) == ""
+    assert "purpose" not in late
+
+
+def test_the_late_row_is_bucketed_post_agent_and_the_gate_closes(replay, tmp_path):
+    """The audit's scenario, with the safety budget removed.
+
+    Sean run_2 read the log 7.25s before this row landed. Had the read been
+    slower the row would have been a 157th turn candidate for 129 assistant
+    messages and usage_attribution would have gone back to "failed". Fed the
+    boundary, the same log attributes.
+    """
+    _, report = _attribute(
+        replay, _grown_log(replay, tmp_path), _boundary(replay))
+
+    assert report["status"] == "attributed"
+    assert report["rows_unmatched"] == 0
+    assert report["rows_post_agent"] == 1
+    assert report["messages"] == 129
+    assert report["rows_selected"] == 157
+    assert report["rows_internal"] == 27
+
+
+def test_without_the_boundary_the_same_log_re_breaks_the_gate(replay, tmp_path):
+    """The counterfactual, so the test above is attributable to the boundary.
+
+    Nothing else about the run changes — same rows, same labels, same messages.
+    """
+    _, report = _attribute(replay, _grown_log(replay, tmp_path), None)
+
+    assert report["status"] == "failed"
+    assert report["rows_unmatched"] == 1
+    assert report["rows_post_agent"] == 0
+
+
+def test_the_late_rows_tokens_stay_in_the_run_total(replay, tmp_path):
+    """Bucketing a row moves it off the turn ledger, never out of the bill."""
+    path = _grown_log(replay, tmp_path)
+    _, report = _attribute(replay, str(path), _boundary(replay))
+    late = replay["channels"]["late_row_after_snapshot"]
+
+    totals = extract_usage_from_litellm_log(path, 0.0, 0.0, _RUN_KEY)
+    expected = replay["expected_agent_totals"]
+    for column in _TOKEN_COLUMNS:
+        assert totals[column] == expected[column] + late[column], column
+        assert report["post_agent_calls"][column] == late[column], column
+    assert report["post_agent_calls"]["request_count"] == 1
+
+
+def test_a_post_agent_row_is_ledgered_without_a_purpose_being_guessed(replay, tmp_path):
+    _, report = _attribute(
+        replay, _grown_log(replay, tmp_path), _boundary(replay))
+
+    assert report["post_agent_calls"]["by_purpose"].keys() == {"unlabelled"}
+    assert report["post_agent_calls"]["by_purpose"]["unlabelled"]["request_count"] == 1
+
+
+def test_the_three_ledgers_add_back_up_to_sources_agent(replay, tmp_path):
+    """Σ(per-message) + internal_calls + post_agent_calls == sources.agent.
+
+    The reconciliation the artifact promises, on the run that prompted it, with
+    the row that used to have nowhere to go.
+    """
+    path = _grown_log(replay, tmp_path)
+    traj, report = _attribute(replay, str(path), _boundary(replay))
+
+    per_message = {k: 0 for k in _TOKEN_COLUMNS}
+    key = {"input_tokens": "input", "output_tokens": "output",
+           "cache_read_tokens": "cacheRead", "cache_write_tokens": "cacheWrite"}
+    for msg in traj["messages"]:
+        usage = msg["message"].get("usage")
+        if usage:
+            for col in _TOKEN_COLUMNS:
+                per_message[col] += usage[key[col]]
+
+    totals = extract_usage_from_litellm_log(path, 0.0, 0.0, _RUN_KEY)
+    internal, post = report["internal_calls"], report["post_agent_calls"]
+    for col in _TOKEN_COLUMNS:
+        assert per_message[col] + internal[col] + post[col] == totals[col], col
+    assert report["messages"] + internal["request_count"] + post["request_count"] \
+        == totals["request_count"]
+
+
+def test_the_boundary_never_shrinks_a_run_that_had_no_late_traffic(replay, tmp_path):
+    """The 156-row snapshot attributes identically with or without a boundary.
+
+    Every existing delivered run is in this shape, so the boundary must be a
+    no-op for them — it may only ever move rows that postdate the agent.
+    """
+    path = _write_log(tmp_path, _classified_rows(replay))
+    _, without = _attribute(replay, path, None)
+    _, with_boundary = _attribute(replay, path, _boundary(replay))
+
+    assert with_boundary["rows_post_agent"] == 0
+    assert "post_agent_calls" not in with_boundary
+    assert {k: v for k, v in with_boundary.items() if k != "rows_post_agent"} == \
+        {k: v for k, v in without.items() if k != "rows_post_agent"}

@@ -1443,8 +1443,15 @@ class OpenClawAgent(BaseAgent):
         # no log to read.
         run_key = (self._run_keys.get(task_id, "")
                    if self._run_key_bearer_live() else "")
+        # Stamped by run_task the instant the agent process returned (and again
+        # after a stall-recovery turn), on the HOST clock — the only clock
+        # comparable with the sidecar's UTC row timestamps, since the agent's own
+        # clock runs under the faketime shim. Kept out of the window fallback
+        # below, which is a reconstruction rather than a measurement.
+        measured_window = self._task_windows.get(task_id)
+        agent_finished_ts = measured_window[1] if measured_window else None
         if self.litellm_usage_log:
-            window = self._task_windows.get(task_id)
+            window = measured_window
             if window is None:
                 window = (time.time() - max(elapsed_time, 1.0), time.time())
             if run_key:
@@ -1538,6 +1545,11 @@ class OpenClawAgent(BaseAgent):
             # in keyless sidecar mode this key IS the agent's bearer and must
             # never reach usage.json.
             usage["__run_key__"] = run_key
+        if agent_finished_ts is not None:
+            # Same private channel, carrying the agent-finish boundary. The
+            # back-fill needs it to tell a turn's row from traffic the container
+            # issued after the agent was done, which no field on the row records.
+            usage["__agent_finished_ts__"] = float(agent_finished_ts)
         return usage
 
     def _set_model(self, task_id: str, model: str, thinking: str | None = None) -> None:

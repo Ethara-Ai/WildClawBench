@@ -204,6 +204,31 @@ def remove_container(name: str) -> None:
     subprocess.run(["docker", "rm", "-f", name], capture_output=True)
 
 
+def stop_container(name: str, timeout: int = 10) -> bool:
+    """Stop ``name`` and WAIT for it to exit, leaving the container in place.
+
+    ``docker stop`` does not return until the process group is gone (SIGTERM,
+    then SIGKILL after ``timeout``), so this doubles as the join: once it
+    returns, nothing inside that container can issue another request. That is
+    the point of having it separate from ``remove_container`` — the run still
+    needs the stopped container's filesystem for later ``docker cp``, but it
+    must NOT still be serving traffic while the sidecar usage log is read.
+
+    Returns whether the container reached a stopped state; an already-stopped
+    or already-removed container is not a failure, so the caller can treat this
+    as fail-open.
+    """
+    r = subprocess.run(
+        ["docker", "stop", "-t", str(int(timeout)), name],
+        capture_output=True, text=True,
+    )
+    if r.returncode == 0:
+        return True
+    # "No such container" means there is nothing left to quiesce, which is the
+    # state the caller asked for. Anything else is a real failure to stop.
+    return "No such container" in (r.stderr or "")
+
+
 def _container_running(task_id: str) -> bool:
     r = subprocess.run(
         ["docker", "inspect", "-f", "{{.State.Running}}", task_id],

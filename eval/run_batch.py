@@ -37,6 +37,7 @@ from src.utils.endpoint_utils import (
 from src.utils.task_parser import parse_task_md
 from src.utils.docker_utils import (
     remove_container,
+    stop_container,
     close_proc_log,
     collect_output_from_container,
     snapshot_persona_and_data_from_container,
@@ -474,6 +475,49 @@ def _usage_rows_in_message_window(rows: list[dict], msgs: list[dict]) -> list[di
     return [r for _, r in picked]
 
 
+def _split_post_agent_rows(
+    rows: Sequence[Mapping[str, Any]], agent_finished_ts: float | None,
+) -> tuple[list[Mapping[str, Any]], list[Mapping[str, Any]]]:
+    """Partition ``rows`` into (during the agent's run, after it finished).
+
+    ``agent_finished_ts`` is the HOST wall clock at which the agent process
+    returned, stamped by the runner and carried to here on
+    ``usage['__agent_finished_ts__']``. Rows are timestamped by the sidecar on
+    the same real UTC clock, so the two compare; the agent's own message clock
+    does not, which is why the boundary cannot be taken from chat.jsonl.
+
+    The comparison is strict and unpadded on purpose. A turn's row is written
+    when its response completes, which necessarily precedes the agent receiving
+    it and therefore precedes the agent finishing, so no genuine turn row can
+    land on the far side of the boundary. Anything that does is traffic the
+    container issued on its own after the run was over.
+
+    A row with no readable ``ts`` stays on the during-run side: the boundary is
+    an assertion about rows that are provably late, not a default.
+    """
+    if agent_finished_ts is None:
+        return list(rows), []
+    from datetime import timezone
+
+    during: list[Mapping[str, Any]] = []
+    after: list[Mapping[str, Any]] = []
+    for r in rows:
+        rts = _parse_iso(r.get("ts", ""))
+        ts_epoch = None
+        if rts is not None:
+            if rts.tzinfo is None:
+                # The sidecar writes UTC; reading a naive row as local time
+                # would shift it by the host offset and bucket it at random.
+                rts = rts.replace(tzinfo=timezone.utc)
+            try:
+                ts_epoch = rts.timestamp()
+            except (ValueError, OSError, OverflowError):
+                ts_epoch = None
+        (after if ts_epoch is not None and ts_epoch > agent_finished_ts
+         else during).append(r)
+    return during, after
+
+
 def _backfill_per_message_cost(traj: dict, usage_log_path: str,
                                run_key: str = "", *,
                                oauth_route: bool = False,
@@ -489,7 +533,8 @@ def _backfill_per_message_cost(traj: dict, usage_log_path: str,
 def _attribute_per_message_cost(traj: dict, usage_log_path: str,
                                 run_key: str = "", *,
                                 oauth_route: bool = False,
-                                model: str = "") -> dict:
+                                model: str = "",
+                                agent_finished_ts: float | None = None) -> dict:
     """Populate each assistant message's token + cost block in ``traj`` from the
     sidecar per-request usage log (usage.jsonl), and report what happened.
 
@@ -509,8 +554,15 @@ def _attribute_per_message_cost(traj: dict, usage_log_path: str,
       messages        assistant messages in the trajectory.
       rows_selected   usage rows this run's key (or window) selected.
       rows_internal   of those, the ones openclaw issued for itself.
+      rows_post_agent of those, the ones logged after the agent finished.
       rows_unmatched  message rows left over, or messages left short.
       internal_calls  ledger for rows_internal, or absent when there are none.
+      post_agent_calls   ledger for rows_post_agent, likewise.
+
+    The three ledgers partition ``rows_selected`` exactly: every row is billed
+    to a message, to internal_calls, or to post_agent_calls, and the four token
+    columns of the three add back up to ``sources.agent``. Bucketing a row never
+    removes its money from the run, only the claim that a message produced it.
 
     OpenClaw writes all-zero per-message usage/cost into chat.jsonl on this
     image build (IAN report Pointer 5); the real per-request numbers live only
@@ -592,28 +644,44 @@ def _attribute_per_message_cost(traj: dict, usage_log_path: str,
             "clock shim is active", run_key, usage_log_path)
         rows = _usage_rows_in_message_window(parsed, msgs)
     candidates = [r for r in rows if r.get("kind") not in ("failure", "preflight")]
-    internal = [r for r in candidates if _usage_row_purpose(r)]
-    rows = [r for r in candidates if not _usage_row_purpose(r)]
+    # The boundary is applied BEFORE the purpose labels, so a late row is
+    # harmless whether or not the classifier recognised it. That is the whole
+    # point: the row that nearly broke the sean_callahan gate carried tokens and
+    # nothing else, and no label could have been invented for it honestly.
+    during, post_agent = _split_post_agent_rows(candidates, agent_finished_ts)
+    internal = [r for r in during if _usage_row_purpose(r)]
+    rows = [r for r in during if not _usage_row_purpose(r)]
 
     report: dict[str, Any] = {
         "status": "failed",
         "messages": len(assistants),
         "rows_selected": len(candidates),
         "rows_internal": len(internal),
+        "rows_post_agent": len(post_agent),
         "rows_unmatched": abs(len(rows) - len(assistants)),
     }
     block = _internal_calls_block(internal)
     if block:
         report["internal_calls"] = block
+    post_block = _internal_calls_block(post_agent)
+    if post_block:
+        report["post_agent_calls"] = post_block
+
+    if post_agent:
+        logger.info(
+            "per-message cost: %d usage row(s) logged after the agent finished; "
+            "counted in the run total, excluded from turn matching",
+            len(post_agent))
 
     if len(rows) != len(assistants):
         logger.error(
             "per-message cost NOT attributed: %s selected %d usage row(s) for "
-            "%d assistant message(s) (%d of them openclaw's own). Positional "
-            "attribution would bill one request's tokens to another message, "
-            "so the per-message blocks are left empty; the run totals in "
-            "usage.json are unaffected.",
-            selector, len(candidates), len(assistants), len(internal))
+            "%d assistant message(s) (%d of them openclaw's own, %d post-agent). "
+            "Positional attribution would bill one request's tokens to another "
+            "message, so the per-message blocks are left empty; the run totals "
+            "in usage.json are unaffected.",
+            selector, len(candidates), len(assistants), len(internal),
+            len(post_agent))
         return report
 
     report["status"] = "attributed" if selector == "run_key" else "partial"
@@ -647,6 +715,17 @@ def _attribute_per_message_cost(traj: dict, usage_log_path: str,
         })
         inner["usage"] = usage
     return report
+
+
+def _agent_finished_ts(agent_usage: Mapping[str, Any] | None) -> float | None:
+    """The agent-finish wall clock the runner stamped onto the usage dict."""
+    raw = (agent_usage or {}).get("__agent_finished_ts__")
+    if raw is None:
+        return None
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return None
 
 
 def _stamped_usage_attribution(result: Mapping[str, Any] | None) -> dict | None:
@@ -714,6 +793,7 @@ def save_usage(
     agent_usage = dict(usage)
     agent_usage.pop("__preflight__", None)
     agent_usage.pop("__run_key__", None)
+    agent_usage.pop("__agent_finished_ts__", None)
     sources: dict[str, dict] = {"agent": agent_usage}
     if preflight_usage:
         sources["preflight"] = dict(preflight_usage)
@@ -755,16 +835,19 @@ def save_usage(
         out["headroom"] = _hr
 
     # Whether the per-message blocks in output.json were filled in, and the
-    # ledger line that makes them add up. sources.agent counts every row this
-    # run's key selected, so Σ(per-message) + internal_calls == sources.agent
-    # exactly; without the second term a reader comparing the two can only
-    # conclude the artifact is inconsistent.
+    # ledger lines that make them add up. sources.agent counts every row this
+    # run's key selected, so Σ(per-message) + internal_calls + post_agent_calls
+    # == sources.agent exactly; without those terms a reader comparing the two
+    # can only conclude the artifact is inconsistent.
     attribution = dict(_stamped_usage_attribution(result) or {})
     if attribution:
         internal = attribution.pop("internal_calls", None)
+        post_agent = attribution.pop("post_agent_calls", None)
         out["usage_attribution"] = attribution
         if internal:
             out["internal_calls"] = internal
+        if post_agent:
+            out["post_agent_calls"] = post_agent
 
     result["usage"] = out
     if out["request_count"] > 0:
@@ -821,6 +904,51 @@ def collect_task_output(
         )
     except Exception as exc:
         logger.warning("[%s] Failed to collect task output: %s", task_id, exc)
+
+
+def _quiesce_agent_container(task_id: str) -> bool:
+    """Stop the agent container so the sidecar usage log stops growing.
+
+    Everything downstream of this call that reads usage.jsonl — the
+    ``sources.agent`` totals in ``collect_usage`` and the per-message
+    attribution in ``_build_trajectory`` — is a SNAPSHOT of a file the agent can
+    still append to, and the container outlives the agent process: it keeps
+    serving whatever openclaw fires off after its last turn. On the 2026-09-18
+    sean_callahan run the agent finished at 06:45:14, the snapshot was taken at
+    06:45:16 and a further row landed at 06:45:23, so the count the attribution
+    gate checks was correct by 7.25 seconds of luck. Stopping first removes the
+    race instead of widening the margin.
+
+    Called after every step that needs a LIVE container (``collect_task_output``
+    and the workspace_after snapshot both ``docker exec`` into it) and before
+    ``remove_container``, which still does the removal: the stopped container's
+    filesystem is left mounted for the ``docker cp`` calls that follow.
+
+    Fail-open. A container that cannot be stopped leaves the pre-existing
+    snapshot race in place for that run and nothing worse; refusing to produce
+    the artifacts would be strictly more damage.
+    """
+    try:
+        from src.utils.ui import lifecycle as _ui_lifecycle
+        _ui_lifecycle.emit_stage(
+            task_id, _ui_lifecycle.STAGE_STATUS,
+            "stopping agent container before reading usage",
+            status="quiescing",
+        )
+    except Exception:
+        pass
+    try:
+        stopped = stop_container(task_id)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("[%s] Agent container quiesce failed: %s", task_id, exc)
+        return False
+    if stopped:
+        logger.info("[%s] Agent container quiesced; usage log is now final", task_id)
+    else:
+        logger.warning(
+            "[%s] Agent container did not stop; usage figures are a snapshot of "
+            "a file the container may still be appending to", task_id)
+    return stopped
 
 
 def _snapshot_persona_and_data_before(
@@ -1900,12 +2028,14 @@ def _augment_score_with_combined_rewards(scores: dict, result: dict) -> None:
             scores["turn_dedup_ok"] = bool(r.get("turn_dedup_ok", True))
     # Per-message cost attribution stamp (same on-disk-marker pattern): a run
     # whose messages ship cost 0 because the row count did not resolve must say
-    # so where a reader looks, not only in harness_debug.log. The ledger block
-    # is dropped here — score.json carries verdicts, usage.json carries money.
+    # so where a reader looks, not only in harness_debug.log. The ledger blocks
+    # are dropped here — score.json carries verdicts, usage.json carries money;
+    # the row COUNTS stay, since they are what explains the verdict.
     stamp = _stamped_usage_attribution(result)
     if stamp:
         scores["usage_attribution"] = {
-            k: v for k, v in stamp.items() if k != "internal_calls"
+            k: v for k, v in stamp.items()
+            if k not in ("internal_calls", "post_agent_calls")
         }
 
 
@@ -2020,7 +2150,8 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
             traj, _USAGE_LOG_PATH,
             str((agent_usage or {}).get("__run_key__", "") or ""),
             oauth_route=bool(getattr(config, "use_claude_oauth", False)),
-            model=model_type)
+            model=model_type,
+            agent_finished_ts=_agent_finished_ts(agent_usage))
         if _report:
             # Read back out by save_usage and the score block below, so the
             # outcome reaches usage.json and score.json instead of living only
@@ -3174,11 +3305,6 @@ def run_single_task(
             scores=result.get("scores"),
             error=result.get("error"),
         )
-        usage = backend.collect_usage(
-            task_id=task_id,
-            output_dir=output_dir,
-            elapsed_time=elapsed_time,
-        )
 
         try:
             collect_task_output(
@@ -3305,6 +3431,21 @@ def run_single_task(
                     agent_state_json, encoding="utf-8")
             except Exception as exc:
                 logger.warning("[%s] agent_state build failed: %s", task_id, exc)
+
+        # Last call that needs a LIVE agent container is above (collect_task_output
+        # and the workspace_after snapshot both exec into it). Stop it here, so the
+        # two reads of the sidecar usage log below — collect_usage for the
+        # sources.agent totals, and the per-message attribution inside
+        # _build_trajectory — see a file nothing can still append to. Reading it
+        # while the container serves is what left the 2026-09-18 sean_callahan run
+        # passing its attribution gate by 7.25 seconds.
+        _quiesce_agent_container(task_id)
+
+        usage = backend.collect_usage(
+            task_id=task_id,
+            output_dir=output_dir,
+            elapsed_time=elapsed_time,
+        )
 
         startup_failed = isinstance(result.get("error"), str) and "Container startup failed" in result["error"]
         if startup_failed:

@@ -6,6 +6,12 @@
   "note": "Rows are the sidecar usage log as the harness read it. The file on disk ended up with 157 agent rows; the 157th (ts 06:45:23) was appended after this snapshot, by post-agent traffic from the still-running container.",
   "image_row_evidence": "The four image-tool rows were pinned by mapping the trajectory narrative clock onto sidecar UTC (constant faketime offset within the opening segment): the four image toolResults land within 0.15s of these rows. Each carries cache_read_tokens 0 (buildImageContext sends a fresh single-message context), two hit the 4096-token cap resolveImageToolMaxTokens defaults to, and cache_write tracks image count (3/3/3/6 images -> 12310/11839/11839/23469)."
  },
+ "agent_finished": {
+  "logged_utc": "2026-09-18T06:45:14Z",
+  "boundary_utc": "2026-09-18T06:45:15Z",
+  "last_turn_row_utc": "2026-09-18T06:45:14.589689+00:00",
+  "note": "The harness log records the finish to the second, so the boundary recoverable from THIS run is the end of that second: later than the run's last turn row (06:45:14.589689) and 8.25s earlier than the row that arrived after the snapshot (06:45:23.253404). A live run does not need the rounding — runner.py stamps time.time() the instant the agent process returns and carries it to the attribution as __agent_finished_ts__."
+ },
  "expected_agent_totals": {
   "input_tokens": 488,
   "output_tokens": 126202,
