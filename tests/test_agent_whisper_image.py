@@ -150,8 +150,33 @@ class TestRunShImageWiring:
     def run_sh(self) -> str:
         return _RUN_SH.read_text(encoding="utf-8")
 
-    def test_agent_image_is_the_whisper_image(self, run_sh):
-        assert 'readonly AGENT_IMAGE="%s"' % _AGENT_IMAGE in run_sh
+    def test_agent_image_defaults_to_the_whisper_image(self, run_sh):
+        assert 'readonly AGENT_IMAGE_DEFAULT="%s"' % _AGENT_IMAGE in run_sh
+
+    def test_agent_image_is_resolved_from_the_python_side_variable(self, run_sh):
+        # Preflight and run_batch have to read ONE channel. docker_utils reads
+        # DOCKER_IMAGE from the environment, so run.sh resolves that same name
+        # and exports the answer; whichever value wins, both sides see it.
+        assert 'AGENT_IMAGE="${DOCKER_IMAGE:-$(env_file_value DOCKER_IMAGE)}"' in run_sh
+        assert 'AGENT_IMAGE="${AGENT_IMAGE:-$AGENT_IMAGE_DEFAULT}"' in run_sh
+        assert 'export DOCKER_IMAGE="$AGENT_IMAGE"' in run_sh
+
+    def test_env_file_is_read_rather_than_sourced(self, run_sh):
+        # .env holds live credentials; sourcing it to get one tag would put all
+        # of them in the runner's environment.
+        body = run_sh.split("env_file_value() {", 1)[1].split("\n}", 1)[0]
+        assert "sed -n" in body
+        assert "source" not in body
+        assert "eval" not in body
+
+    def test_no_version_tag_is_hardcoded_as_the_agent_image(self, run_sh):
+        # The v1.3 literals that remain are the base tarball's, not the
+        # runtime's: the tag, its SHA pin and the tar filename.
+        for line in run_sh.splitlines():
+            if "wildclawbench-ubuntu:v1.3" not in line:
+                continue
+            assert any(k in line for k in
+                       ("BASE_IMAGE", "AGENT_TAR_PATH", "#")), line
 
     def test_base_image_named_once_and_still_acquired(self, run_sh):
         assert 'readonly BASE_IMAGE="%s"' % _BASE_IMAGE in run_sh
@@ -206,7 +231,8 @@ echo "rc=$?"
 """
 
 
-def _run_preflight(tmp_path, present_images: str, build_rc: str = "0"):
+def _run_preflight(tmp_path, present_images: str, build_rc: str = "0",
+                   docker_image: str | None = None, env_file: str | None = None):
     """Drive the REAL preflight_agent_image against a stubbed docker CLI."""
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir(exist_ok=True)
@@ -229,6 +255,12 @@ def _run_preflight(tmp_path, present_images: str, build_rc: str = "0"):
     harness = script_dir / "harness.sh"
     harness.write_text(_HARNESS, encoding="utf-8")
 
+    # run.sh cd's to `dirname $0/..` at source time, which for a sourced file is
+    # the sourcing script's directory — so tmp_path is the repo root while the
+    # tag is being resolved, and a .env written here is the one it reads.
+    if env_file is not None:
+        (tmp_path / ".env").write_text(env_file, encoding="utf-8")
+
     docker_log = tmp_path / "docker.log"
     docker_log.touch()
     import os
@@ -243,6 +275,11 @@ def _run_preflight(tmp_path, present_images: str, build_rc: str = "0"):
         "REPO_ROOT": str(_REPO_ROOT),
         "NO_COLOR": "1",
     }
+    # The tag is now resolved from the environment, so the caller states it
+    # rather than inheriting whatever this developer's shell happens to export.
+    env.pop("DOCKER_IMAGE", None)
+    if docker_image is not None:
+        env["DOCKER_IMAGE"] = docker_image
     proc = subprocess.run(
         ["bash", str(harness)], env=env, capture_output=True, text=True, timeout=120
     )
@@ -281,8 +318,86 @@ class TestPreflightBehavior:
         assert "internet" in combined
 
 
-class TestPythonSideImageDefault:
-    """run.sh's constant does NOT choose the container image — these do."""
+class TestPreflightAndRunnerAgreeOnOneTag:
+    """The image preflight verifies is the image run_batch is handed.
+
+    Previously each side resolved the tag for itself: run.sh from a literal,
+    docker_utils from $DOCKER_IMAGE with a literal default. 2f52a8d moved both
+    literals to v1.4 while `DOCKER_IMAGE=wildclawbench-ubuntu:v1.3` sat in
+    .env, which only docker_utils read — so preflight verified and reported
+    v1.4 and the tasks ran on v1.3.
+    """
+
+    def test_override_moves_preflight_onto_the_same_tag(self, tmp_path):
+        proc, calls = _run_preflight(
+            tmp_path, present_images="wildclawbench-ubuntu:v1.3",
+            docker_image="wildclawbench-ubuntu:v1.3")
+        assert "rc=0" in proc.stdout
+        inspects = [c for c in calls if c.startswith("image inspect")]
+        assert inspects == ["image inspect wildclawbench-ubuntu:v1.3"]
+        assert not [c for c in calls if c.startswith("build")]
+
+    def test_stale_env_file_pin_moves_preflight_too(self, tmp_path):
+        # The exact 2026-09-18 configuration: the tag came from .env, which
+        # only the python side used to read. Preflight now lands on v1.3 with
+        # it instead of verifying a v1.4 that nothing would run.
+        proc, calls = _run_preflight(
+            tmp_path, present_images="wildclawbench-ubuntu:v1.3",
+            env_file="KENSEI_MODEL=claude-opus-5\nDOCKER_IMAGE=wildclawbench-ubuntu:v1.3\n")
+        assert "rc=0" in proc.stdout
+        assert [c for c in calls if c.startswith("image inspect")] == [
+            "image inspect wildclawbench-ubuntu:v1.3"]
+
+    def test_commented_env_file_pin_is_not_a_pin(self, tmp_path):
+        proc, calls = _run_preflight(
+            tmp_path, present_images=_AGENT_IMAGE,
+            env_file="# DOCKER_IMAGE=wildclawbench-ubuntu:v1.3\n")
+        assert "rc=0" in proc.stdout
+        assert [c for c in calls if c.startswith("image inspect")] == [
+            "image inspect %s" % _AGENT_IMAGE]
+
+    def test_process_env_beats_the_env_file(self, tmp_path):
+        # load_dotenv() does not override an already-set variable, so the shell
+        # has to resolve it the same way round or the two sides diverge again.
+        proc, calls = _run_preflight(
+            tmp_path, present_images=_AGENT_IMAGE,
+            docker_image=_AGENT_IMAGE,
+            env_file="DOCKER_IMAGE=wildclawbench-ubuntu:v1.3\n")
+        assert "rc=0" in proc.stdout
+        assert [c for c in calls if c.startswith("image inspect")] == [
+            "image inspect %s" % _AGENT_IMAGE]
+
+    def test_override_is_reported_rather_than_applied_silently(self, tmp_path):
+        proc, _ = _run_preflight(
+            tmp_path, present_images="wildclawbench-ubuntu:v1.3",
+            docker_image="wildclawbench-ubuntu:v1.3")
+        combined = proc.stdout + proc.stderr
+        assert "overrides the default %s" % _AGENT_IMAGE in combined
+
+    def test_default_run_says_nothing_about_an_override(self, tmp_path):
+        proc, _ = _run_preflight(tmp_path, present_images=_AGENT_IMAGE)
+        assert "overrides the default" not in proc.stdout + proc.stderr
+
+    def test_docker_utils_reads_the_exported_tag(self, monkeypatch):
+        # The export is the whole mechanism: load_dotenv() does not overwrite a
+        # variable already in the environment, so run.sh's answer wins over the
+        # .env line that used to decide this alone.
+        #
+        # Imported by name rather than reloaded a held reference: other suites
+        # evict this module from sys.modules, which makes reload() raise.
+        import importlib
+        import sys
+
+        def _fresh():
+            sys.modules.pop("src.utils.docker_utils", None)
+            return importlib.import_module("src.utils.docker_utils")
+
+        monkeypatch.setenv("DOCKER_IMAGE", "wildclawbench-ubuntu:v1.3")
+        try:
+            assert _fresh().DOCKER_IMAGE == "wildclawbench-ubuntu:v1.3"
+        finally:
+            monkeypatch.delenv("DOCKER_IMAGE", raising=False)
+            _fresh()
 
     def test_docker_utils_default_matches_run_sh(self):
         from src.utils import docker_utils
@@ -293,3 +408,12 @@ class TestPythonSideImageDefault:
         from src.utils.config import Config
 
         assert Config().docker_image == _AGENT_IMAGE
+
+    def test_env_example_does_not_ship_a_pinned_tag(self):
+        # A live pin here is how the stale tag reached every deployment: the
+        # file is copied to .env verbatim, so whatever it sets, operators set.
+        body = (_REPO_ROOT / ".env.example").read_text(encoding="utf-8")
+        live = [ln for ln in body.splitlines()
+                if ln.strip() and not ln.lstrip().startswith("#")]
+        assert not [ln for ln in live if ln.startswith("DOCKER_IMAGE=")]
+        assert not [ln for ln in live if "wildclawbench-ubuntu:v1.3" in ln]

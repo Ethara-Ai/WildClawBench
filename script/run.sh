@@ -38,7 +38,32 @@ source "$(dirname "$0")/lib/log.sh"
 # image to parity. Rollback = point AGENT_IMAGE back at BASE_IMAGE; v1.4 is
 # purely additive and leaves v1.3 on disk untouched.
 readonly BASE_IMAGE="wildclawbench-ubuntu:v1.3"
-readonly AGENT_IMAGE="wildclawbench-ubuntu:v1.4"
+readonly AGENT_IMAGE_DEFAULT="wildclawbench-ubuntu:v1.4"
+
+# Reads one KEY=value out of .env without sourcing it, so a malformed line
+# cannot execute and the file's credentials never enter this shell.
+env_file_value() {
+    [[ -f .env ]] || return 0
+    sed -n "s/^[[:space:]]*$1=//p" .env | tail -n 1 | tr -d '\r' \
+        | sed 's/^["'"'"']//; s/["'"'"']$//'
+}
+
+# Resolved ONCE here and exported, because the python side reads this same
+# DOCKER_IMAGE variable (src/utils/docker_utils.py) and its load_dotenv() will
+# not override a variable already in the environment. Preflight therefore
+# checks, builds and reports exactly the image run_batch will start, on every
+# channel, by construction rather than by both sides happening to agree.
+#
+# Resolving it twice is the defect this replaces. 2f52a8d flipped the default
+# on both sides to v1.4, but .env (and .env.example) still carried
+# `DOCKER_IMAGE=wildclawbench-ubuntu:v1.3`, which only the python side read: on
+# the 2026-09-18 batch, preflight echoed "Agent image wildclawbench-ubuntu:v1.4
+# [OK]" while run_batch logged v1.3 present and the container ran v1.3 —
+# without the whisper layer preflight had just reported as verified.
+AGENT_IMAGE="${DOCKER_IMAGE:-$(env_file_value DOCKER_IMAGE)}"
+AGENT_IMAGE="${AGENT_IMAGE:-$AGENT_IMAGE_DEFAULT}"
+readonly AGENT_IMAGE
+export DOCKER_IMAGE="$AGENT_IMAGE"
 readonly AGENT_WHISPER_DOCKERFILE="docker/agent-whisper.Dockerfile"
 # Content ID of BASE_IMAGE, used to recover from a lost/corrupted tag table
 # without re-loading the 28GB tar. Verified identical on both production hosts
@@ -303,6 +328,14 @@ ensure_base_image() {
 # "pull access denied" instead of building against the image already on disk.
 preflight_agent_image() {
     log::step 2 6 "Agent image ${AGENT_IMAGE}"
+
+    # Say so when the tag did not come from the default, since the override
+    # decides what actually runs the tasks and is otherwise invisible until
+    # someone reads run_batch's log line and compares it with this one.
+    if [[ "$AGENT_IMAGE" != "$AGENT_IMAGE_DEFAULT" ]]; then
+        log::warn "DOCKER_IMAGE overrides the default ${AGENT_IMAGE_DEFAULT}"
+        log::warn "Preflight and run_batch will both use ${AGENT_IMAGE}; clear DOCKER_IMAGE from .env to get the default back"
+    fi
 
     if docker image inspect "$AGENT_IMAGE" >/dev/null 2>&1; then
         log::ok "Image present"
