@@ -5,7 +5,7 @@ Implements a subset of the LinkedIn API v2 surface. Base path: /v2
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
 import linkedin_data
@@ -50,9 +50,18 @@ def list_posts(author_id: Optional[str] = None, start: int = Query(0, ge=0),
 
 
 class PostCreateBody(BaseModel):
+    # The three counters are seeded on every post and are what an injected
+    # mutation writes, so they are declared rather than dropped: the model used
+    # to default to extra="ignore", which answered 201 over a body carrying them
+    # and served the post back with all three at zero.
+    model_config = ConfigDict(extra="forbid")
+
     commentary: str
     author_id: Optional[str] = None
     visibility: str = "PUBLIC"
+    like_count: int = 0
+    comment_count: int = 0
+    share_count: int = 0
 
 
 @app.post("/v2/posts", status_code=201)
@@ -61,6 +70,9 @@ def create_post(body: PostCreateBody):
         commentary=body.commentary,
         author_id=body.author_id,
         visibility=body.visibility,
+        like_count=body.like_count,
+        comment_count=body.comment_count,
+        share_count=body.share_count,
     )
 
 

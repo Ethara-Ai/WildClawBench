@@ -322,3 +322,88 @@ def test_asana_create_task_rejects_unknown_field(asana, asana_project):
     r = asana.post("/api/1.0/tasks",
                    json={"data": {"name": "Typo task", "notez": "misspelled"}})
     assert r.status_code == 422, r.text
+
+
+# ---------------------------------------------------------------------------
+# linkedin-api -- the engagement counters were nested into socialDetail at load
+# time and the flat columns dropped, so the shape a post was seeded and written
+# in was not the shape it was served in
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope="module")
+def linkedin():
+    with _client("linkedin-api") as c:
+        yield c
+
+
+def test_linkedin_seed_post_serves_counts_flat_and_nested(linkedin):
+    post = linkedin.get("/v2/posts/6001").json()
+    assert post["like_count"] == 318
+    assert post["comment_count"] == 42
+    assert post["share_count"] == 57
+    assert post["socialDetail"] == {"likeCount": 318, "commentCount": 42, "shareCount": 57}
+
+
+def test_linkedin_listed_posts_all_carry_the_engagement_columns(linkedin):
+    for post in linkedin.get("/v2/posts").json()["elements"]:
+        assert {"like_count", "comment_count", "share_count"} <= set(post)
+        assert post["socialDetail"]["likeCount"] == post["like_count"]
+
+
+def test_linkedin_create_post_counts_read_back(linkedin):
+    r = linkedin.post("/v2/posts", json={"commentary": "Counted on create",
+                                         "like_count": 9, "comment_count": 4,
+                                         "share_count": 2})
+    assert r.status_code == 201, r.text
+    post = linkedin.get(f"/v2/posts/{r.json()['id']}").json()
+    assert (post["like_count"], post["comment_count"], post["share_count"]) == (9, 4, 2)
+    assert post["socialDetail"] == {"likeCount": 9, "commentCount": 4, "shareCount": 2}
+
+
+def test_linkedin_create_post_without_counts_starts_at_zero(linkedin):
+    r = linkedin.post("/v2/posts", json={"commentary": "No counts named"})
+    assert r.status_code == 201, r.text
+    post = linkedin.get(f"/v2/posts/{r.json()['id']}").json()
+    assert (post["like_count"], post["comment_count"], post["share_count"]) == (0, 0, 0)
+    assert post["socialDetail"] == {"likeCount": 0, "commentCount": 0, "shareCount": 0}
+
+
+def test_linkedin_create_post_rejects_unknown_field(linkedin):
+    r = linkedin.post("/v2/posts", json={"commentary": "Typo post", "likes": 3})
+    assert r.status_code == 422, r.text
+
+
+def test_linkedin_injected_post_counts_reach_the_public_get(monkeypatch):
+    """The willie R9 op, replayed verbatim: an admin-plane upsert of a post row
+    naming all three counters. It used to land on keys no getter read, so the
+    injector's serving-shape check called all three orphans and the agent never
+    saw them. Cleans up after itself -- the store is per-process and shared."""
+    monkeypatch.setenv("MOCK_ADMIN_ENABLED", "1")
+    monkeypatch.setenv("MOCK_ADMIN_ALLOWLIST", "")
+    row = {
+        "id": "urn:li:share:c105",
+        "author_id": "urn:li:organization:5005",
+        "commentary": "The cross border notification corridor campaign continues.",
+        "created_at": "2026-10-19T04:55:00+00:00",
+        "like_count": "12",
+        "comment_count": "1",
+        "share_count": "1",
+        "visibility": "PUBLIC",
+    }
+    with _client("linkedin-api") as c:
+        assert c.post("/admin/data/posts", json={"row": row}).status_code == 200
+        try:
+            stored = c.get(f"/admin/data/posts/{row['id']}").json()
+            assert {"like_count", "comment_count", "share_count"} <= set(stored)
+            assert stored["like_count"] == "12", "the store keeps what was written"
+
+            # ... and the projection serves it as the int every seeded post
+            # serves, so an injected row is not tellable from a seeded one.
+            served = next(p for p in c.get("/v2/posts").json()["elements"]
+                          if p["id"] == row["id"])
+            assert (served["like_count"], served["comment_count"],
+                    served["share_count"]) == (12, 1, 1)
+            assert served["socialDetail"] == {"likeCount": 12, "commentCount": 1,
+                                              "shareCount": 1}
+        finally:
+            c.delete(f"/admin/data/posts/{row['id']}")

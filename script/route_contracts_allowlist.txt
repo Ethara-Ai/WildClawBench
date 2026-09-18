@@ -162,9 +162,6 @@ linear-api::POST /v1/issues::OPEN_BODY_SCHEMA
 linear-api::POST /v1/labels::OPEN_BODY_SCHEMA
 linear-api::POST /v1/projects::OPEN_BODY_SCHEMA
 
-# linkedin-api (1)
-linkedin-api::POST /v2/posts::OPEN_BODY_SCHEMA
-
 # mailchimp-api (3)
 mailchimp-api::POST /3.0/campaigns::OPEN_BODY_SCHEMA
 mailchimp-api::POST /3.0/lists/{list_id}/members::OPEN_BODY_SCHEMA

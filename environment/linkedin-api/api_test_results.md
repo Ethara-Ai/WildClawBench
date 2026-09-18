@@ -20,7 +20,7 @@ Base URL: `http://localhost:8062` (in docker-compose: `http://linkedin-api:8062`
 
 - Profile ("me"): Amelia Ortega (`urn:li:person:amelia-ortega`), VP Engineering at Orbit Labs.
 - Connections: 8 (colleagues + cross-company contacts).
-- Posts: 6 (person + organization authored), each with `socialDetail` reaction/comment/share counts.
+- Posts: 6 (person + organization authored), each with `like_count`/`comment_count`/`share_count` columns, also served nested as `socialDetail`.
 - Organizations: 4 (Orbit Labs, Northwind Systems, Helix Analytics, Brightloop).
 - Jobs: 6 postings across the seeded organizations.
 
@@ -30,4 +30,4 @@ Base URL: `http://localhost:8062` (in docker-compose: `http://linkedin-api:8062`
 - Collections return the LinkedIn-style envelope `{"elements": [...], "paging": {...}}`.
 - `GET /v2/me` returns the profile singleton from `profile.json`.
 - `GET /v2/jobs` filters by case-insensitive `keywords` (title/description/keyword tags) and `location` substring.
-- `POST /v2/posts` defaults the author to the "me" profile and starts all social counts at zero.
+- `POST /v2/posts` defaults the author to the "me" profile and starts all social counts at zero; `like_count`, `comment_count` and `share_count` may be set on create, and any other key is a 422.
