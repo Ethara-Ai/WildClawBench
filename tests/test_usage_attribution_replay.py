@@ -392,6 +392,100 @@ def test_the_three_ledgers_add_back_up_to_sources_agent(replay, tmp_path):
         == totals["request_count"]
 
 
+# ============================================================================
+# The late row and the heartbeat label — same producer, different evidence
+# ============================================================================
+
+
+def test_the_late_row_has_the_heartbeat_signature_but_stays_unnamed(replay):
+    """Why the boundary is still the mechanism for this row, and not the label.
+
+    The shape is the willie heartbeat's, feature for feature: input_tokens 2,
+    no cache read, and a large cache WRITE — a fresh session paying to cache a
+    full system prompt nobody sent a message into. It landed at +29.996 min on
+    a 30-minute interval. It is almost certainly the same producer.
+
+    "Almost certainly" is the point. The classifier reads the REQUEST, and
+    this row's request is gone: it was written before the callback labelled
+    heartbeats, so nothing on disk carries a purpose and no prompt survives to
+    match a fingerprint against. Naming it from tokens and timing would be an
+    inference dressed as a measurement, and the one thing this ledger must not
+    do is guess. It stays where the boundary put it, unnamed and still billed.
+    """
+    late = _late_row(replay)
+    assert late["input_tokens"] == 2
+    assert late["output_tokens"] == 412
+    assert late["cache_read_tokens"] == 0
+    assert late["cache_write_tokens"] == 36712
+    assert "purpose" not in late
+    assert uc._classify_internal_purpose({}) == ""
+
+
+def test_a_labelled_heartbeat_row_that_lands_late_is_named_in_post_agent(
+        replay, tmp_path):
+    """Going forward the ledger CAN name one — the boundary does not erase it.
+
+    _internal_calls_block groups post-agent rows through the same
+    _usage_row_purpose as the during-run ones, so a heartbeat the sidecar
+    labelled at write time arrives in post_agent_calls under its own name
+    rather than as "unlabelled". Sean's row predates the label; this is what
+    its successor looks like.
+    """
+    labelled_late = {**_late_row(replay), "purpose": "heartbeat"}
+    path = _log_path(tmp_path,
+                     [*_classified_rows(replay), labelled_late], "late_hb.jsonl")
+    _, report = _attribute(replay, str(path), _boundary(replay))
+
+    assert report["status"] == "attributed"
+    assert report["rows_post_agent"] == 1
+    assert report["post_agent_calls"]["by_purpose"].keys() == {"heartbeat"}
+    assert report["post_agent_calls"]["by_purpose"]["heartbeat"][
+        "output_tokens"] == 412
+
+
+def test_the_boundary_still_outranks_the_purpose_label(replay, tmp_path):
+    """80f12fd's ordering, re-pinned now that a late row can carry a label.
+
+    _split_post_agent_rows runs BEFORE the purpose split, so a labelled row
+    that postdates the agent is post_agent and NOT internal. If the label won
+    instead, the same row would be counted in both ledgers and the
+    reconciliation would double-bill it.
+    """
+    labelled_late = {**_late_row(replay), "purpose": "heartbeat"}
+    path = _log_path(tmp_path,
+                     [*_classified_rows(replay), labelled_late], "order.jsonl")
+    _, report = _attribute(replay, str(path), _boundary(replay))
+
+    assert report["rows_internal"] == 27
+    assert "heartbeat" not in report["internal_calls"]["by_purpose"]
+    assert report["messages"] + report["rows_internal"] \
+        + report["rows_post_agent"] == report["rows_selected"]
+
+
+def test_the_ledgers_stay_disjoint_with_a_named_late_row(replay, tmp_path):
+    """Naming a post-agent row moves no money and leaves no row in two places."""
+    labelled_late = {**_late_row(replay), "purpose": "heartbeat"}
+    path = _log_path(tmp_path,
+                     [*_classified_rows(replay), labelled_late], "disjoint.jsonl")
+    traj, report = _attribute(replay, str(path), _boundary(replay))
+
+    per_message = {k: 0 for k in _TOKEN_COLUMNS}
+    key = {"input_tokens": "input", "output_tokens": "output",
+           "cache_read_tokens": "cacheRead", "cache_write_tokens": "cacheWrite"}
+    for msg in traj["messages"]:
+        usage = msg["message"].get("usage")
+        if usage:
+            for col in _TOKEN_COLUMNS:
+                per_message[col] += usage[key[col]]
+
+    totals = extract_usage_from_litellm_log(path, 0.0, 0.0, _RUN_KEY)
+    internal, post = report["internal_calls"], report["post_agent_calls"]
+    for col in _TOKEN_COLUMNS:
+        assert per_message[col] + internal[col] + post[col] == totals[col], col
+    assert report["messages"] + internal["request_count"] + post["request_count"] \
+        == totals["request_count"]
+
+
 def test_the_boundary_never_shrinks_a_run_that_had_no_late_traffic(replay, tmp_path):
     """The 156-row snapshot attributes identically with or without a boundary.
 

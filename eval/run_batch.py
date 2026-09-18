@@ -391,6 +391,69 @@ def _usage_row_purpose(r: Mapping[str, Any]) -> str:
     return "transcription" if (audio > 0.0 and tokens == 0) else ""
 
 
+def _message_text(inner: Mapping[str, Any]) -> str:
+    """A chat.jsonl message's text, flattened out of whichever shape it is in.
+
+    openclaw writes ``content`` as a block list on this image build; the
+    plain-string form is accepted for older trajectories and for the
+    normalized shape the trajectory builder can hand back.
+    """
+    content = inner.get("content")
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return ""
+    parts: list[str] = []
+    for block in content:
+        if isinstance(block, str):
+            parts.append(block)
+        elif isinstance(block, dict) and isinstance(block.get("text"), str):
+            parts.append(block["text"])
+    return "\n".join(parts)
+
+
+def _inner_message(m: Mapping[str, Any]) -> Mapping[str, Any]:
+    """The role/content payload, past chat.jsonl's ``{id, message, ...}`` envelope."""
+    return m.get("message") if isinstance(m.get("message"), dict) else m
+
+
+def _count_heartbeat_turns_in_transcript(
+        msgs: Sequence[Mapping[str, Any]]) -> int:
+    """User messages in the delivered transcript that are the gateway's own.
+
+    The gateway prunes a heartbeat's user+assistant pair out of chat.jsonl by
+    truncating the file back to its pre-heartbeat size
+    (dist/health-BxAgqqNt.js:302 pruneHeartbeatTranscript) — but only from the
+    three paths that call it: a skipped run (:575), the bare HEARTBEAT_OK token
+    (:604), and a reply identical to the previous heartbeat's (:629). A
+    heartbeat that produces real output reaches none of them and keeps its
+    turns, which then read as a human prompt and a genuine answer that nobody
+    asked for.
+
+    That variant is otherwise silent. It is loud in the token ledger, because
+    the classifier now names the row and the counts stop matching — but the
+    transcript is what the judge reads, and nothing in it says which turn the
+    container wrote for itself. So it is counted here and stamped, using the
+    SAME fingerprints the classifier matches the request with, so the two
+    cannot drift apart.
+
+    Counting only. Excluding the turn would change what is judged, and whether
+    a self-issued turn should be judged is a grading decision, not an
+    accounting one.
+    """
+    from src.utils.litellm_usage_callback import _is_heartbeat_prompt
+
+    count = 0
+    for m in msgs:
+        message = _inner_message(m)
+        if str(message.get("role", "")).lower() != "user":
+            continue
+        if _is_heartbeat_prompt([{"role": "user",
+                                  "content": _message_text(message)}]):
+            count += 1
+    return count
+
+
 def _usage_row_is_assistant_turn(r: Mapping[str, Any]) -> bool:
     """True when a usage row can correspond to an assistant message.
 
@@ -613,9 +676,8 @@ def _attribute_per_message_cost(traj: dict, usage_log_path: str,
     if not usage_log_path or not Path(usage_log_path).is_file():
         return {}
     msgs = [m for m in (traj.get("messages") or []) if isinstance(m, dict)]
-    def _inner(m):
-        return m.get("message") if isinstance(m.get("message"), dict) else m
-    assistants = [m for m in msgs if str(_inner(m).get("role", "")).lower() == "assistant"]
+    assistants = [m for m in msgs
+                  if str(_inner_message(m).get("role", "")).lower() == "assistant"]
     if not assistants:
         return {}
     parsed: list[dict] = []
@@ -660,6 +722,17 @@ def _attribute_per_message_cost(traj: dict, usage_log_path: str,
         "rows_post_agent": len(post_agent),
         "rows_unmatched": abs(len(rows) - len(assistants)),
     }
+    heartbeat_turns = _count_heartbeat_turns_in_transcript(msgs)
+    if heartbeat_turns:
+        report["heartbeat_turns_in_transcript"] = heartbeat_turns
+        logger.warning(
+            "per-message cost: %d heartbeat turn(s) survive in the delivered "
+            "transcript. The gateway only prunes a heartbeat whose reply was "
+            "the bare HEARTBEAT_OK token, so these produced real output and "
+            "their user+assistant pairs read as genuine task turns nobody "
+            "asked for. Counted and stamped as heartbeat_turns_in_transcript; "
+            "nothing is excluded from the transcript or from judging.",
+            heartbeat_turns)
     block = _internal_calls_block(internal)
     if block:
         report["internal_calls"] = block
@@ -688,7 +761,7 @@ def _attribute_per_message_cost(traj: dict, usage_log_path: str,
     report["rows_unmatched"] = 0
 
     for msg, r in zip(assistants, rows):
-        inner = _inner(msg)
+        inner = _inner_message(msg)
         it = int(r.get("input_tokens", 0) or 0)
         ot = int(r.get("output_tokens", 0) or 0)
         cr = int(r.get("cache_read_tokens", 0) or 0)

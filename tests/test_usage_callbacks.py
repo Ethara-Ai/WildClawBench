@@ -1280,6 +1280,249 @@ def test_pdf_classifier_never_raises_on_junk():
 
 
 # ============================================================================
+# heartbeat — the gateway's own scheduled turn. Unlike every other label here
+# it is a FULL agent turn: system prompt, tools, session history. Both shape
+# guards would drop it, so it is matched ahead of them on the LAST user
+# message, and the two fingerprints below are reproduced verbatim from
+# /usr/lib/node_modules/openclaw in the wildclawbench-ubuntu:v1.4 image.
+# ============================================================================
+
+# resolveHeartbeatPrompt's default, dist/reply-BCcP6j4h.js:9084, verbatim:
+#     return (typeof raw === "string" ? raw.trim() : "") || "Read HEARTBEAT.md
+#       if it exists (workspace context). Follow it strictly. Do not infer or
+#       repeat old tasks from prior chats. If nothing needs attention, reply
+#       HEARTBEAT_OK.";
+# Sent as the user message with no rewriting (docs/gateway/heartbeat.md:51).
+_HEARTBEAT_PROMPT = (
+    "Read HEARTBEAT.md if it exists (workspace context). Follow it strictly. "
+    "Do not infer or repeat old tasks from prior chats. If nothing needs "
+    "attention, reply HEARTBEAT_OK."
+)
+
+# appendHeartbeatWorkspacePathHint, dist/health-BxAgqqNt.js:390, verbatim:
+#     if (!/heartbeat\.md/i.test(prompt)) return prompt;
+#     const hint = `When reading HEARTBEAT.md, use workspace file
+#       ${path.join(workspaceDir, DEFAULT_HEARTBEAT_FILENAME)...} (exact case).
+#       Do not read docs/heartbeat.md.`;
+#     return `${prompt}\n${hint}`;
+# Unconditional for any prompt naming heartbeat.md and not reachable from
+# config, so it survives an agents.defaults.heartbeat.prompt override.
+_HEARTBEAT_HINT = (
+    "When reading HEARTBEAT.md, use workspace file /workspace/HEARTBEAT.md "
+    "(exact case). Do not read docs/heartbeat.md."
+)
+
+# appendCronStyleCurrentTimeLine, dist/reply-BCcP6j4h.js:36579 — the last
+# thing put on the prompt before it becomes ctx.Body, and a no-op when the
+# text already says "Current time:", so there is never more than one.
+_HEARTBEAT_TIME = (
+    "Current time: Fri, Sep 18, 2026 at 9:54 PM (UTC) / 2026-09-18 21:54 UTC"
+)
+
+_AGENT_SYSTEM = "You are openclaw, an autonomous coding agent."
+
+
+def _heartbeat_body(prompt=_HEARTBEAT_PROMPT, hint=True, time_line=True):
+    """The user message as runHeartbeatOnce assembles it, in order."""
+    text = f"{prompt}\n{_HEARTBEAT_HINT}" if hint else prompt
+    return f"{text}\n{_HEARTBEAT_TIME}" if time_line else text
+
+
+def _heartbeat_kwargs(body=None, system=_AGENT_SYSTEM, history=()):
+    messages = [*history, {"role": "user",
+                           "content": body if body is not None else _heartbeat_body()}]
+    return _anthropic_body(system, messages)
+
+
+def test_heartbeat_named_from_the_full_shipped_request():
+    assert uc._classify_internal_purpose(_heartbeat_kwargs()) == "heartbeat"
+
+
+def test_heartbeat_named_on_the_prompt_head_alone():
+    # The first fingerprint, with the hint and the time line both absent.
+    assert uc._classify_internal_purpose(
+        _heartbeat_kwargs(_heartbeat_body(hint=False, time_line=False))) == "heartbeat"
+
+
+def test_heartbeat_named_on_the_path_hint_alone():
+    # The second fingerprint carrying it: an operator override moved the head
+    # out from under the first, but the hint is appended regardless.
+    body = _heartbeat_body("Check HEARTBEAT.md and report anything broken.")
+    assert uc._classify_internal_purpose(_heartbeat_kwargs(body)) == "heartbeat"
+
+
+def test_heartbeat_named_on_the_path_hint_with_no_time_line():
+    body = _heartbeat_body("Check HEARTBEAT.md and report anything broken.",
+                           time_line=False)
+    assert uc._classify_internal_purpose(_heartbeat_kwargs(body)) == "heartbeat"
+
+
+def test_heartbeat_named_from_openai_normalized_messages():
+    kwargs = {"messages": [{"role": "system", "content": _AGENT_SYSTEM},
+                           {"role": "user", "content": _heartbeat_body()}]}
+    assert uc._classify_internal_purpose(kwargs) == "heartbeat"
+
+
+def test_heartbeat_named_from_content_blocks():
+    kwargs = _heartbeat_kwargs([{"type": "text", "text": _heartbeat_body()}])
+    assert uc._classify_internal_purpose(kwargs) == "heartbeat"
+
+
+def test_heartbeat_named_under_a_full_system_prompt():
+    # The system-prompt guard is what hid this row: the heartbeat is a real
+    # agent turn and carries the agent's own system prompt.
+    assert uc._classify_internal_purpose(
+        _heartbeat_kwargs(system="You are openclaw. " + "tools. " * 200)
+    ) == "heartbeat"
+
+
+def test_heartbeat_named_on_a_session_that_already_has_history():
+    # The arity guard is the other one: a heartbeat fires into whatever
+    # session the agent is on, so it can arrive behind that run's turns.
+    history = [
+        {"role": "user", "content": "walk the corridor release"},
+        {"role": "assistant", "content": "reading the changelog"},
+        {"role": "user", "content": "and the rulebook version?"},
+        {"role": "assistant", "content": "v3, in force since March"},
+    ]
+    assert uc._classify_internal_purpose(
+        _heartbeat_kwargs(history=history)) == "heartbeat"
+
+
+def test_heartbeat_matched_on_the_last_user_message_not_the_first():
+    # others[0] would be the run's opening human turn, which is a task prompt.
+    history = [{"role": "user", "content": "audit the release"},
+               {"role": "assistant", "content": "on it"}]
+    kwargs = _heartbeat_kwargs(history=history)
+    assert uc._classify_internal_purpose(kwargs) == "heartbeat"
+    body = kwargs["litellm_params"]["proxy_server_request"]["body"]
+    assert body["messages"][0]["content"] == "audit the release"
+
+
+def test_a_task_turn_mentioning_heartbeat_md_mid_text_is_not_named():
+    # The whole reason both anchors are ends rather than substrings. A task
+    # can legitimately quote the gateway's own prompt at the agent.
+    body = (
+        "the ops runbook we inherited says the agent should "
+        f"\"{_HEARTBEAT_PROMPT}\" and then page whoever is on call. "
+        f"it also says \"{_HEARTBEAT_HINT}\" which contradicts section 4. "
+        "work out which of those two is actually current and tell me."
+    )
+    assert uc._classify_internal_purpose(_heartbeat_kwargs(body)) == ""
+
+
+def test_a_task_turn_merely_naming_the_heartbeat_file_is_not_named():
+    assert uc._classify_internal_purpose(_heartbeat_kwargs(
+        "read HEARTBEAT.md and fold it into the onboarding doc")) == ""
+
+
+def test_the_time_line_tolerance_does_not_swallow_a_humans_closing_sentence():
+    # The tolerated trailing line is matched to its whole shape, not its
+    # opening: resolveCronStyleNow (dist/reply-BCcP6j4h.js:36570) always ends
+    # it on " UTC". Without that the strip would eat a human's last sentence
+    # and hand the tail anchor a hint the message did not end on.
+    # Quoting the hint, not opening with the prompt, so only the tail anchor
+    # is in play — which is the anchor the tolerance can mislead.
+    body = (_heartbeat_body("our runbook says to check HEARTBEAT.md hourly.")
+            + " -- is that still what we send? check section 4.")
+    assert body.endswith("section 4.")
+    assert uc._classify_internal_purpose(_heartbeat_kwargs(body)) == ""
+
+
+def test_the_time_line_is_still_tolerated_when_it_is_genuinely_last():
+    assert uc._classify_internal_purpose(_heartbeat_kwargs(
+        _heartbeat_body("Check HEARTBEAT.md now."))) == "heartbeat"
+
+
+def test_heartbeat_does_not_shadow_compaction():
+    """A compacted transcript containing a heartbeat turn stays compaction.
+
+    Compaction is checked AFTER heartbeat, so this is the ordering's one real
+    risk. It cannot happen: all four compaction paths wrap the serialized
+    conversation in <conversation> tags and put the summarization prompt after
+    it (pi-coding-agent/dist/core/compaction/compaction.js:434 and :593,
+    branch-summarization.js:210), so nothing quoted inside can be first or
+    last.
+    """
+    kwargs = {"messages": [
+        {"role": "system", "content": _COMPACTION_SYSTEM},
+        {"role": "user", "content":
+            f"<conversation>\nuser: {_heartbeat_body()}\n"
+            f"assistant: HEARTBEAT_OK\n</conversation>\n\n"
+            "Produce a structured summary following the exact format."},
+    ]}
+    assert uc._classify_internal_purpose(kwargs) == "compaction"
+
+
+def test_heartbeat_does_not_shadow_a_compaction_that_ends_on_the_hint_text():
+    # Even the adversarial shape: the hint is the last thing inside the tags.
+    kwargs = {"messages": [
+        {"role": "system", "content": _COMPACTION_SYSTEM},
+        {"role": "user", "content":
+            f"<conversation>\nuser: {_HEARTBEAT_HINT}\n</conversation>\n\n"
+            "Produce a structured summary following the exact format."},
+    ]}
+    assert uc._classify_internal_purpose(kwargs) == "compaction"
+
+
+def test_heartbeat_does_not_shadow_the_media_summarizer():
+    assert uc._classify_internal_purpose(
+        {"messages": [{"role": "user", "content": _SUMMARIZE_USER}]}) == "summarize"
+
+
+def test_heartbeat_does_not_shadow_embeddings():
+    kwargs = {"call_type": "aembedding", "litellm_params": {
+        "proxy_server_request": {"body": {"model": "text-embedding-3-small",
+                                          "input": _heartbeat_body()}}}}
+    assert uc._classify_internal_purpose(kwargs) == "embeddings"
+
+
+def test_heartbeat_does_not_shadow_transcription():
+    assert uc._classify_internal_purpose(
+        {"call_type": "atranscription",
+         "messages": [{"role": "user", "content": _heartbeat_body()}]}) == "transcription"
+
+
+def test_heartbeat_does_not_shadow_the_image_tool():
+    kwargs = _anthropic_body("", [{"role": "user", "content": [
+        {"type": "text", "text": "Describe the image."},
+        {"type": "image", "source": {"data": "QQ=="}},
+    ]}])
+    assert uc._classify_internal_purpose(kwargs) == "image"
+
+
+def test_heartbeat_does_not_shadow_the_pdf_tool():
+    assert uc._classify_internal_purpose(
+        _pdf_native_anthropic_kwargs()) == "pdf"
+
+
+def test_a_system_less_heartbeat_is_heartbeat_not_summarize():
+    # summarizeText sends no system prompt either, so without the heartbeat
+    # test placed ahead of it the labels would be decided by the fall-through.
+    assert uc._classify_internal_purpose(
+        _heartbeat_kwargs(system="")) == "heartbeat"
+
+
+def test_heartbeat_classifier_never_raises_on_junk():
+    for messages in ([{"role": "user", "content": None}],
+                     [{"role": "user"}],
+                     [{"role": None, "content": _heartbeat_body()}],
+                     [None],
+                     []):
+        assert uc._classify_internal_purpose(
+            _anthropic_body(_AGENT_SYSTEM, messages)) in ("", "heartbeat")
+
+
+def test_write_row_tags_a_heartbeat_call(usage_path, stub_completion_cost):
+    uc._write_row({"model": "claude-opus-5", **_heartbeat_kwargs()},
+                  _resp(_chat_usage()), T0, T1)
+    row = _read_rows(usage_path)[0]
+    assert row["purpose"] == "heartbeat"
+    assert row["kind"] == "agent"
+    assert set(row.keys()) == EXPECTED_KEYS | {"purpose"}
+
+
+# ============================================================================
 # Module-level _PATH env override (both modules read env at import)
 # ============================================================================
 

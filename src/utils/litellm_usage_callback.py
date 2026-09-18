@@ -139,8 +139,10 @@ def _is_preflight_ping(kwargs: dict) -> bool:
 # Matching the opening sentence rather than the whole prompt keeps the test
 # cheap while staying specific: both sentences are addressed to the model in
 # the second person and neither appears in a task prompt. The single-user-
-# message requirement is what makes a false positive implausible — an agent
-# turn always carries the conversation so far.
+# message requirement is what makes a false positive implausible — a HUMAN's
+# turn always carries the conversation so far. The heartbeat below is the
+# standing exception to that premise and is why it is fingerprinted on its own
+# terms rather than folded in here.
 #
 # Three more of openclaw's own call types are named by SHAPE rather than by
 # prompt text, because none of them sends a prompt this callback could pin:
@@ -199,6 +201,80 @@ _SUMMARIZE_TEXT_HEAD = (
     "You are an assistant that summarizes texts concisely while keeping the "
     "most important information."
 )
+
+# heartbeat — the gateway's own liveness turn, and the one internal call that
+# defeats BOTH guards above. Every other purpose here is either a system-less
+# `completeSimple` or a non-chat route; the heartbeat is a FULL agent turn the
+# container issues on its own schedule: same system prompt, same tools, same
+# session credentials, no human behind it. `runHeartbeatOnce`
+# (dist/health-BxAgqqNt.js:302) builds an ordinary reply context
+#
+#     Body: appendCronStyleCurrentTimeLine(prompt, cfg, startedAt)   (:497)
+#
+# and hands it to getReplyFromConfig, so it arrives here carrying a system
+# prompt (past the `system.strip()` guard) and, on a session with history, more
+# than one message (past the `len(others) != 1` arity check). It is therefore
+# checked BEFORE both, on the LAST user-role message rather than others[0].
+#
+# It cannot be turned off from the harness side: the runner ships openclaw as
+# released, and the default interval is 30 minutes (1h only under detected
+# OAuth; the harness bearer is the run_key, so 30m applies). Any run over half
+# an hour gets one row per interval that no assistant message can claim.
+# Measured on the 2026-09-18 willie_prince run: 155 rows for 114 assistant
+# messages, the surplus row {input 2, output 263, cache_write 28463,
+# reasoning 48, duration 5.368s} logged at 21:54:21.985948Z — 1.17s after the
+# first idle moment past the 30-minute mark, and the run's 21st agent
+# construction for 20 human turns. Unlabelled it left the gate at `failed` and
+# all 114 messages shipped with no cost block.
+#
+# Two compile-time constants of the shipped v1.4 image pin it, either one
+# sufficient:
+#
+#   _HEARTBEAT_PROMPT_HEAD — the head of resolveHeartbeatPrompt's default
+#     (dist/reply-BCcP6j4h.js:9084), which is sent VERBATIM as the user
+#     message; the full default continues "Do not infer or repeat old tasks
+#     from prior chats. If nothing needs attention, reply HEARTBEAT_OK."
+#     Matched at the HEAD of the message, which is where the prompt is put.
+#   _HEARTBEAT_PATH_HINT — the tail of the workspace-path hint
+#     appendHeartbeatWorkspacePathHint appends (dist/health-BxAgqqNt.js:390):
+#         if (!/heartbeat\.md/i.test(prompt)) return prompt;
+#         const hint = `When reading HEARTBEAT.md, use workspace file ${...}
+#                       (exact case). Do not read docs/heartbeat.md.`;
+#     It is unconditional for any prompt naming heartbeat.md, is not exposed in
+#     config, and is applied to the resolved prompt — so it survives an
+#     `agents.defaults.heartbeat.prompt` override that would move the head out
+#     from under the first constant. Matched at the TAIL, which is where it is
+#     appended.
+#
+# The tail match tolerates exactly one trailing line, the `Current time: ...`
+# that appendCronStyleCurrentTimeLine (dist/reply-BCcP6j4h.js:36579) puts after
+# the hint on the way into ctx.Body. That is the only text appended past the
+# hint, it is a single line, and the function is a no-op when the prompt
+# already contains "Current time:", so at most one is ever present. The line is
+# matched to its full shape rather than its opening — resolveCronStyleNow
+# (same file:36570) builds it as
+#     `Current time: ${formattedTime} (${userTimezone}) / ${iso} UTC`
+# so it always ENDS on " UTC" — which keeps the tolerance from swallowing a
+# human's closing sentence and handing the tail anchor a hint that the message
+# did not actually end on.
+#
+# Both anchors are ends, not substrings, and that is load-bearing twice over:
+#
+#   - A genuine task turn may discuss HEARTBEAT.md at length; only a message
+#     that OPENS with the prompt or CLOSES with the hint is the gateway's.
+#   - It must not shadow compaction, which is checked after it and also
+#     carries a system prompt. It cannot: all four compaction paths build
+#     their user message as `<conversation>\n${conversationText}\n
+#     </conversation>\n\n${basePrompt}` (pi-coding-agent/dist/core/compaction/
+#     compaction.js:434 and :593, branch-summarization.js:210), so a compacted
+#     transcript is always WRAPPED — a heartbeat turn inside one is neither
+#     first nor last, and the body opens on `<conversation>` and closes on the
+#     summarization prompt.
+_HEARTBEAT_PROMPT_HEAD = (
+    "Read HEARTBEAT.md if it exists (workspace context). Follow it strictly."
+)
+_HEARTBEAT_PATH_HINT = "Do not read docs/heartbeat.md."
+_HEARTBEAT_TIME_LINE = re.compile(r"\n[ \t]*Current time:[^\n]* UTC[ \t]*\Z")
 
 
 def _text_of(content: Any) -> str:
@@ -344,6 +420,24 @@ def _has_pdf_extraction_label(content: Any) -> bool:
     return False
 
 
+def _is_heartbeat_prompt(others: list[dict]) -> bool:
+    """True when the LAST user message is the gateway's heartbeat prompt.
+
+    The last one, not ``others[0]``: a heartbeat fires into whatever session
+    the agent is on, so the request may carry that session's history ahead of
+    it. ``others[0]`` would then be the run's first human turn.
+    """
+    for msg in reversed(others):
+        if str(msg.get("role") or "") != "user":
+            continue
+        text = _text_of(msg.get("content")).strip()
+        if text.startswith(_HEARTBEAT_PROMPT_HEAD):
+            return True
+        return _HEARTBEAT_TIME_LINE.sub("", text).rstrip().endswith(
+            _HEARTBEAT_PATH_HINT)
+    return False
+
+
 def _is_embeddings_request(kwargs: dict) -> bool:
     """True for a /v1/embeddings call rather than a chat completion.
 
@@ -367,6 +461,24 @@ def _classify_internal_purpose(kwargs: dict) -> str:
     the per-message back-fill subtract these rows before it compares counts,
     and what lets usage.json carry them as their own ledger line instead of
     folding them anonymously into the agent total.
+
+    Order is precedence, and each step is placed by how much of the request it
+    needs to read:
+
+      transcription  route, from call_type — no body to inspect.
+      embeddings     route — not a chat request; carries no messages at all.
+      heartbeat      a real agent turn, so it is the ONE label that must be
+                     taken before the two shape guards. It has a system prompt
+                     and may have history, and both guards would drop it.
+                     Placed after the two route tests because those decide on
+                     call_type alone and a heartbeat is neither.
+      arity          from here down every label needs exactly one user
+                     message, which is what `completeSimple` sends.
+      compaction     system prompt. Safe below heartbeat: a compaction body is
+                     a WRAPPED transcript, so it matches neither anchor.
+      system guard   everything past this point sends no system prompt.
+      pdf/image/pdf  content blocks, then the extraction label.
+      summarize      user prompt head — last, because it is the weakest test.
     """
     try:
         if "transcription" in str(kwargs.get("call_type") or ""):
@@ -377,6 +489,12 @@ def _classify_internal_purpose(kwargs: dict) -> str:
         if _is_embeddings_request(kwargs):
             return "embeddings"
         system, others = _prompt_shape(kwargs)
+        if _is_heartbeat_prompt(others):
+            # Ahead of both guards below on purpose: the heartbeat is a real
+            # agent turn, so it carries a system prompt and may carry history.
+            # See the fingerprint block above for why it cannot take a
+            # compaction body with it.
+            return "heartbeat"
         if len(others) != 1:
             return ""
         if system.lstrip().startswith(_COMPACTION_SYSTEM_HEAD):

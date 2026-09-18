@@ -49,6 +49,7 @@ from eval.run_batch import (  # noqa: E402
     _attribute_per_message_cost,
     _augment_score_with_combined_rewards,
     _backfill_per_message_cost,
+    _count_heartbeat_turns_in_transcript,
     _project_agent_usage_top_level,
     _project_artifact_record,
     _resolve_task_apis,
@@ -57,6 +58,7 @@ from eval.run_batch import (  # noqa: E402
     save_usage,
 )
 from src.utils import skills_inference  # noqa: E402
+from src.utils.litellm_usage_callback import _is_heartbeat_prompt  # noqa: E402
 from src.utils.oauth_pricing import reprice_oauth_sources  # noqa: E402
 
 
@@ -1752,6 +1754,162 @@ class TestBackfillPerMessageCostInternalCalls:
         assert report["rows_unmatched"] == 1
         assert _costs(traj) == []
         assert [r for r in caplog.records if r.levelno >= logging.ERROR]
+
+
+# ---------------------------------------------------------------------------
+# The silent variant of the heartbeat. The gateway prunes a heartbeat's
+# user+assistant pair back out of chat.jsonl by truncating the file to its
+# pre-heartbeat size (dist/health-BxAgqqNt.js:604 pruneHeartbeatTranscript) —
+# but ONLY when the reply was the bare HEARTBEAT_OK token or an exact repeat of
+# the previous one. A heartbeat that produces real output keeps its turns, and
+# they then sit in the delivered transcript looking like a human prompt and a
+# genuine answer. The classifier makes that case a loud count mismatch; this
+# says so on the transcript side too, and stamps it.
+# ---------------------------------------------------------------------------
+
+# runHeartbeatOnce's user message, assembled in the bundle's own order:
+# resolveHeartbeatPrompt (dist/reply-BCcP6j4h.js:9084) + the workspace path
+# hint (dist/health-BxAgqqNt.js:390) + the current-time line (:36579).
+_HEARTBEAT_TEXT = (
+    "Read HEARTBEAT.md if it exists (workspace context). Follow it strictly. "
+    "Do not infer or repeat old tasks from prior chats. If nothing needs "
+    "attention, reply HEARTBEAT_OK.\n"
+    "When reading HEARTBEAT.md, use workspace file /workspace/HEARTBEAT.md "
+    "(exact case). Do not read docs/heartbeat.md.\n"
+    "Current time: Fri, Sep 18, 2026 at 9:54 PM (UTC) / 2026-09-18 21:54 UTC"
+)
+
+
+def _chat_traj(*turns):
+    """A chat.jsonl-shaped trajectory: {id, message:{role, content:[blocks]}}."""
+    return {"messages": [
+        {"id": f"m{i}", "message": {"role": role,
+                                    "content": [{"type": "text", "text": text}]}}
+        for i, (role, text) in enumerate(turns)
+    ]}
+
+
+class TestHeartbeatTurnsSurvivingInTheTranscript:
+    def test_an_unpruned_heartbeat_turn_is_counted(self):
+        traj = _chat_traj(
+            ("user", "audit the corridor release"),
+            ("assistant", "reading the changelog"),
+            ("user", _HEARTBEAT_TEXT),
+            ("assistant", "HEARTBEAT.md says the nightly export is stale"),
+        )
+        assert _count_heartbeat_turns_in_transcript(traj["messages"]) == 1
+
+    def test_several_intervals_are_each_counted(self):
+        traj = _chat_traj(
+            ("user", "audit the corridor release"),
+            ("user", _HEARTBEAT_TEXT),
+            ("assistant", "the export is stale"),
+            ("user", _HEARTBEAT_TEXT),
+            ("assistant", "still stale"),
+        )
+        assert _count_heartbeat_turns_in_transcript(traj["messages"]) == 2
+
+    def test_a_pruned_run_counts_nothing(self):
+        # The common case, and the one the willie run shipped: the reply was
+        # HEARTBEAT_OK, so the pair was truncated out before delivery.
+        traj = _chat_traj(
+            ("user", "audit the corridor release"),
+            ("assistant", "reading the changelog"),
+        )
+        assert _count_heartbeat_turns_in_transcript(traj["messages"]) == 0
+
+    def test_a_task_turn_discussing_heartbeat_md_is_not_counted(self):
+        traj = _chat_traj(
+            ("user", "the runbook says to " + _HEARTBEAT_TEXT + " -- is that "
+                     "still current? check HEARTBEAT.md against section 4."),
+            ("assistant", "section 4 supersedes it"),
+        )
+        assert _count_heartbeat_turns_in_transcript(traj["messages"]) == 0
+
+    def test_an_assistant_echo_of_the_prompt_is_not_counted(self):
+        # Only the USER side is the gateway's; an assistant quoting it back is
+        # the model doing what it was asked.
+        traj = _chat_traj(
+            ("user", "what does the heartbeat send?"),
+            ("assistant", _HEARTBEAT_TEXT),
+        )
+        assert _count_heartbeat_turns_in_transcript(traj["messages"]) == 0
+
+    def test_plain_string_content_is_read_too(self):
+        traj = {"messages": [{"message": {"role": "user",
+                                          "content": _HEARTBEAT_TEXT}}]}
+        assert _count_heartbeat_turns_in_transcript(traj["messages"]) == 1
+
+    def test_the_detector_shares_the_classifier_fingerprints(self):
+        # Same function, so the two sides cannot drift apart on a bundle bump.
+        assert _is_heartbeat_prompt([{"role": "user", "content": _HEARTBEAT_TEXT}])
+
+    def test_the_count_is_stamped_and_warned(self, tmp_path, caplog):
+        rows = [
+            _usage_row("2026-08-17T07:50:01+00:00", _RK_A, cost=0.11),
+            _internal_row("2026-08-17T07:50:02+00:00", _RK_A, "heartbeat"),
+            _usage_row("2026-08-17T07:50:03+00:00", _RK_A, cost=0.12),
+        ]
+        traj = _chat_traj(
+            ("user", "audit the corridor release"),
+            ("assistant", "reading the changelog"),
+            ("user", _HEARTBEAT_TEXT),
+            ("assistant", "the nightly export is stale"),
+        )
+        with caplog.at_level(logging.WARNING, logger="eval.run_batch"):
+            report = _attribute_per_message_cost(
+                traj, _write_usage_log(tmp_path, rows), _RK_A)
+
+        assert report["heartbeat_turns_in_transcript"] == 1
+        assert report["status"] == "attributed"
+        warnings = [r.getMessage() for r in caplog.records
+                    if r.levelno >= logging.WARNING]
+        assert any("heartbeat turn" in m for m in warnings)
+
+    def test_a_clean_run_is_not_stamped_at_all(self, tmp_path):
+        # Absent rather than 0, so score.json only ever carries the flag when
+        # there is something to carry.
+        rows = [_usage_row("2026-08-17T07:50:01+00:00", _RK_A, cost=0.11)]
+        traj = _chat_traj(("user", "audit the release"), ("assistant", "done"))
+        report = _attribute_per_message_cost(
+            traj, _write_usage_log(tmp_path, rows), _RK_A)
+        assert "heartbeat_turns_in_transcript" not in report
+
+    def test_the_stamp_survives_into_score_json(self):
+        scores: dict = {}
+        _augment_score_with_combined_rewards(scores, {"usage_attribution": {
+            "status": "attributed", "messages": 4, "rows_selected": 5,
+            "rows_internal": 1, "rows_unmatched": 0,
+            "heartbeat_turns_in_transcript": 2,
+            "internal_calls": {"request_count": 1},
+        }})
+        assert scores["usage_attribution"]["heartbeat_turns_in_transcript"] == 2
+        assert "internal_calls" not in scores["usage_attribution"]
+
+    def test_nothing_is_removed_from_the_transcript(self, tmp_path):
+        # Detection and stamping only: whether a self-issued turn should be
+        # judged is a grading decision, not an accounting one.
+        traj = _chat_traj(
+            ("user", "audit the corridor release"),
+            ("assistant", "reading the changelog"),
+            ("user", _HEARTBEAT_TEXT),
+            ("assistant", "the nightly export is stale"),
+        )
+        before = json.dumps(traj["messages"])
+        rows = [
+            _usage_row("2026-08-17T07:50:01+00:00", _RK_A, cost=0.11),
+            _internal_row("2026-08-17T07:50:02+00:00", _RK_A, "heartbeat"),
+            _usage_row("2026-08-17T07:50:03+00:00", _RK_A, cost=0.12),
+        ]
+        report = _attribute_per_message_cost(
+            traj, _write_usage_log(tmp_path, rows), _RK_A)
+
+        assert len(traj["messages"]) == 4
+        assert [m["message"]["role"] for m in traj["messages"]] == \
+            ["user", "assistant", "user", "assistant"]
+        assert json.loads(before)[2]["message"] == {
+            "role": "user", "content": [{"type": "text", "text": _HEARTBEAT_TEXT}]}
+        assert report["messages"] == 2
 
 
 class TestUsageAttributionStamp:
