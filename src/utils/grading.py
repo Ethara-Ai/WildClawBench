@@ -2772,14 +2772,27 @@ def extract_usage_from_litellm_log(
 ) -> dict:
     """Sum agent usage rows for one run.
 
-    Attribution order:
+    Attribution order — ownership is decided BEFORE kind, always:
       1. ``run_key`` exact match — rows the usage callback tagged with this
          run's per-attempt key. Immune to concurrent runs on a shared sidecar.
-      2. Time-window fallback (legacy) — ONLY when no tagged row matches.
-         Unsafe under parallelism: the ±2s-padded window sweeps in every
-         concurrent run's traffic (measured 1.4x-62.7x inflation on the
-         2026-08 deliveries). Retained for old logs and master-key
-         deployments where the bearer cannot carry the run key.
+         The kind filter runs on that selection, not before it, so a run whose
+         every row is ``failure`` (a 429 storm, a credential rotation) reports
+         ZERO rather than inheriting whatever else was on the wire.
+      2. No row carries this key, but the file carries OTHER runs' keys — a
+         shared sidecar log with a co-tenant. Zero, loudly, and no window: the
+         window here can only return someone else's money. This is also where
+         a master-key caller lands, which passes ``run_key=""``.
+      3. Time-window fallback (legacy) — ONLY when NO row anywhere in the file
+         carries a run_key, i.e. a genuine single-run log from before the key
+         was threaded through. Sound there because there is no second tenant;
+         unsafe everywhere else, which is why (2) no longer reaches it. Every
+         use of it warns, whether or not a run_key was supplied.
+
+    ``usage_source`` stays the reader's coarse signal — ``litellm_run_key`` for
+    (1), ``litellm`` for everything else, unchanged — and ``usage_attribution``
+    names which of the four outcomes produced the figure: ``run_key``,
+    ``run_key_zero_billable``, ``run_key_absent_window_refused`` /
+    ``no_run_key_window_refused``, or ``time_window_legacy``.
 
     Reconciling ``sources.agent`` against a raw log, which is where this gets
     read next: every selected row is summed once, with no dedup, no retry
@@ -2844,17 +2857,72 @@ def extract_usage_from_litellm_log(
             row = json.loads(line)
         except json.JSONDecodeError:
             continue
-        if row.get("kind") in ("preflight", "failure"):
-            continue
         rows.append(row)
 
+    # Ownership FIRST, kind SECOND — the same order the per-message path uses
+    # (eval/run_batch.py:636 tags, :646 filters kinds) and the whole of the fix
+    # to the all-failed run. Filtering kinds first emptied `tagged` for a run
+    # whose every request errored, and an empty `tagged` meant "fall to the
+    # window", so a 429 storm or a mid-batch credential rotation billed the run
+    # every co-tenant row inside its span while its own spend was provably nil.
     tagged = [r for r in rows if run_key and r.get("run_key") == run_key]
+    # Does THIS FILE carry per-run tagging at all? The usage callback spreads
+    # the column conditionally on success rows (litellm_usage_callback.py:581)
+    # and writes it unconditionally on failure rows (:623), where it may be the
+    # empty string — so the question is whether some row carries a non-empty
+    # key, not whether the column appears.
+    log_carries_tags = any(r.get("run_key") for r in rows)
+
+    def _billable(row: dict) -> bool:
+        return row.get("kind") not in ("preflight", "failure")
+
     if tagged:
-        selected = tagged
+        # This run is IN the log. Its bill is its own rows and nothing else,
+        # whatever survives the kind filter — including nothing.
+        selected = [r for r in tagged if _billable(r)]
         totals["usage_source"] = "litellm_run_key"
+        totals["usage_attribution"] = "run_key"
+        if not selected:
+            totals["usage_attribution"] = "run_key_zero_billable"
+            logger.warning(
+                "usage extraction: all %d row(s) tagged with run_key %s in %s "
+                "are preflight/failure kinds — this run's billable total is "
+                "ZERO. The time window is NOT consulted: the run is present in "
+                "the log and provably issued no billable traffic, so sweeping "
+                "the window here would bill it a co-tenant's spend.",
+                len(tagged), run_key, log_path)
+    elif log_carries_tags:
+        # Rows in this file are tagged, just none with this key: a shared
+        # sidecar log with at least one co-tenant in it. The window would take
+        # that co-tenant's rows, so it is refused outright and the total is
+        # zero. The two ways to get here are worth telling apart in the log.
+        selected = []
+        if run_key:
+            reason = f"no row carries run_key {run_key}"
+            totals["usage_attribution"] = "run_key_absent_window_refused"
+        else:
+            reason = ("no run_key was supplied — master-key auth leaves the "
+                      "main agent's rows untagged (runner.py:1444)")
+            totals["usage_attribution"] = "no_run_key_window_refused"
+        logger.warning(
+            "usage extraction: %s in %s, but the file DOES carry %d tagged "
+            "row(s) belonging to other run(s). Refusing the time-window "
+            "fallback, which would bill this run their traffic, and reporting "
+            "ZERO. usage_attribution=%s",
+            reason, log_path, sum(1 for r in rows if r.get("run_key")),
+            totals["usage_attribution"])
     else:
+        # Nothing anywhere in this file is tagged: a genuine single-run legacy
+        # log, written before the run key was threaded through or by a sidecar
+        # that cannot tag. The window is the only selector available, and it is
+        # sound here precisely because there is no second tenant to confuse it
+        # with. Warned unconditionally — the old `if run_key:` gate kept the
+        # master-key caller, which passes run_key="" (runner.py:1444), silent
+        # on exactly the path that over-attributes.
         selected = []
         for row in rows:
+            if not _billable(row):
+                continue
             ts_str = row.get("ts", "")
             try:
                 ts = _dt.fromisoformat(ts_str.replace("Z", "+00:00")).timestamp()
@@ -2862,11 +2930,16 @@ def extract_usage_from_litellm_log(
                 continue
             if lo <= ts <= hi:
                 selected.append(row)
-        if run_key:
-            logger.warning(
-                "usage extraction: no rows tagged with run_key %s in %s — "
-                "falling back to the time window, which OVER-ATTRIBUTES under "
-                "parallel runs", run_key, log_path)
+        totals["usage_attribution"] = "time_window_legacy"
+        logger.warning(
+            "usage extraction: %s in %s and NO row in it carries a run_key at "
+            "all, so selection fell back to the ±2s time window [%.3f, %.3f] "
+            "and took %d row(s). This OVER-ATTRIBUTES whenever another run "
+            "shares the log and is wrong outright under faketime. "
+            "usage_attribution=time_window_legacy, usage_source=litellm",
+            f"run_key {run_key} matched nothing" if run_key
+            else "no run_key was supplied (master-key auth, runner.py:1444)",
+            log_path, lo, hi, len(selected))
 
     for row in selected:
         totals["request_count"] += 1

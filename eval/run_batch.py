@@ -3784,26 +3784,40 @@ def _warn_if_master_key_auth_degrades_attribution(args) -> None:
     carry the key as the bearer. A master-key sidecar accepts only the master
     key, so under WCB_SIDECAR_MASTER_KEY=1 every main-agent row lands untagged
     and `collect_usage` falls back to selecting rows by time window. That
-    fallback cannot separate two runs whose windows overlap, which is precisely
-    what --parallel produces, and it is wrong outright under faketime, where the
-    row timestamps and the window are not on the same clock. The failure is
-    silent in the output — plausible-looking totals, attributed to the wrong
-    run — so the warning has to happen here, before any spend.
+    fallback cannot separate two runs whose windows overlap, and it is wrong
+    outright under faketime, where the row timestamps and the window are not on
+    the same clock. The failure is silent in the output — plausible-looking
+    totals, attributed to the wrong run — so the warning has to happen here,
+    before any spend.
+
+    Unconditional in master-key mode, because this process's own --parallel is
+    not a measure of how many runs share its log. script/run.sh:716 hardcodes
+    `--parallel 1` on every eval/run_batch.py it launches and gets its
+    concurrency by fanning out PROCESSES (run_k_for_model_bg / run_parallel_
+    tasks), all of them inheriting the one WCB_SHARED_SIDECAR_USAGE_LOG that
+    bootstrap_shared_sidecar exported — so the old `parallel <= 1` gate made
+    this warning unreachable from the canonical entry point no matter how wide
+    the fan-out. Two operators starting run.sh from two terminals, or a second
+    batch inheriting an exported WCB_SHARED_SIDECAR, are the same blind spot:
+    a co-tenant is invisible to the process it is polluting.
     """
     if sidecar_auth_mode() != AUTH_MODE_MASTER_KEY:
         return
     parallel = int(getattr(args, "parallel", 1) or 1)
-    if parallel <= 1:
-        return
     logger.warning(
         "=" * 78
         + "\nSIDECAR AUTH: master-key mode is ON (WCB_SIDECAR_MASTER_KEY) with "
           "--parallel %d.\nThe main agent cannot tag its sidecar rows in this "
           "mode — its only tagging channel is the bearer, and a master-key "
           "sidecar\naccepts no other bearer. Per-run cost for the main agent "
-          "falls back to time-window\nmatching, which over-attributes whenever "
-          "two runs overlap and is simply wrong under\nfaketime. Subagent and "
-          "audio calls stay tagged (they send x-wcb-run-key).\nUnset "
+          "therefore has no owner on its\nrows, and the extractor now reports "
+          "ZERO for this run rather than sweeping the time\nwindow, which "
+          "over-attributes whenever two runs overlap and is simply wrong "
+          "under\nfaketime. Subagent and audio calls stay tagged (they send "
+          "x-wcb-run-key).\nThis warning is UNCONDITIONAL: --parallel counts "
+          "only THIS process's tasks, while\nscript/run.sh fans out one "
+          "--parallel 1 process per run onto a single shared\nusage.jsonl, and "
+          "a second batch or a second terminal is invisible from here.\nUnset "
           "WCB_SIDECAR_MASTER_KEY to restore run-key-scoped auth and exact "
           "attribution.\n" + "=" * 78,
         parallel,

@@ -327,13 +327,27 @@ class TestParallelAttributionWarning:
         monkeypatch.setenv("WCB_SIDECAR_MASTER_KEY", "1")
         assert self._warn(caplog, 8) == ""
 
-    def test_silent_when_nothing_overlaps(self, monkeypatch, caplog):
-        # One task at a time is the case the time-window fallback still handles,
-        # so warning there would just train operators to ignore it.
+    def test_fires_at_parallel_one_because_the_co_tenant_is_another_process(
+            self, monkeypatch, caplog):
+        # Was test_silent_when_nothing_overlaps, which assumed --parallel is a
+        # census of who shares the log. It is not: script/run.sh:716 hardcodes
+        # `--parallel 1` on every eval/run_batch.py it launches and gets its
+        # concurrency by fanning processes out (run_k_for_model_bg,
+        # run_parallel_tasks) onto the single WCB_SHARED_SIDECAR_USAGE_LOG that
+        # bootstrap_shared_sidecar exported. Under the old gate the warning was
+        # therefore unreachable from the canonical entry point at any fan-out
+        # width, and equally silent for two operators on two terminals. Nothing
+        # a single process can read tells it whether it is alone.
         monkeypatch.setenv("WCB_SIDECAR_MASTER_KEY", "1")
-        assert self._warn(caplog, 1) == ""
+        message = self._warn(caplog, 1)
+        assert "master-key mode is ON" in message
+        assert "--parallel 1" in message
+        assert "UNCONDITIONAL" in message
 
     @pytest.mark.parametrize("parallel", [None, 0])
     def test_tolerates_a_missing_or_zero_parallelism(self, monkeypatch, caplog, parallel):
+        # The subject is tolerance, not silence: an absent or zero --parallel
+        # must not raise and must not suppress the warning. It reads as 1, the
+        # value the canonical entry point always passes anyway.
         monkeypatch.setenv("WCB_SIDECAR_MASTER_KEY", "1")
-        assert self._warn(caplog, parallel) == ""
+        assert "--parallel 1" in self._warn(caplog, parallel)

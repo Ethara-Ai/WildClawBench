@@ -32,7 +32,9 @@ here reimplements selection.
 from __future__ import annotations
 
 import json
+import logging
 import re
+import types
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -341,65 +343,106 @@ def test_the_window_cannot_contribute_while_tagged_rows_exist(three_way):
         _assert_totals_match(tight, _hand_total(owned[key]), key)
 
 
-def test_the_window_path_is_always_marked_as_not_run_key_scoped(three_way):
-    """usage_source is the reader's only durable signal of which path ran.
+def test_the_window_is_refused_outright_when_the_log_has_other_tenants_in_it(three_way):
+    """A run absent from a MULTI-TENANT log is billed zero, not everyone else.
 
-    Whenever selection falls to the window -- no key supplied (the master-key
-    deployment, runner.py:1444) or a key that matched nothing -- the artifact
-    must not claim run-key provenance. A roll-up excluding unreconciled runs
-    reads this field; if the window could ever be labelled ``litellm_run_key``
-    there would be no way to exclude it.
+    Previously ``test_the_window_path_is_always_marked_as_not_run_key_scoped``,
+    which asserted ``request_count == len(shared)`` on both of these calls --
+    i.e. it pinned the pollution and settled for the ``usage_source`` label as
+    the consolation. The label is still checked, because a roll-up excluding
+    unreconciled runs reads that field and the window must never be allowed to
+    claim ``litellm_run_key``; what is no longer accepted is the 3x figure it
+    was labelling. Both ways in are covered: no key supplied at all (the
+    master-key deployment, runner.py:1444) and a key that matches nothing.
     """
     keys, owned, shared, log = three_way
 
     no_key = extract_usage_from_litellm_log(log, *WINDOW, run_key="")
     assert no_key["usage_source"] == "litellm"
-    assert no_key["request_count"] == len(shared)
+    assert no_key["usage_attribution"] == "no_run_key_window_refused"
+    assert no_key["request_count"] == 0
 
     unmatched = extract_usage_from_litellm_log(
         log, *WINDOW, run_key=_key("never-ran"))
     assert unmatched["usage_source"] == "litellm"
-    assert unmatched["request_count"] == len(shared)
+    assert unmatched["usage_attribution"] == "run_key_absent_window_refused"
+    assert unmatched["request_count"] == 0
 
-    # And the magnitude of what the window does here, stated rather than
-    # implied: three co-tenants means three times the run's own traffic.
-    assert no_key["request_count"] == 3 * len(owned[keys[0]])
+    # Not one token of the 90 rows on disk reaches either of them.
+    for column in TOKEN_COLUMNS + ("total_tokens",):
+        assert no_key[column] == 0, column
+        assert unmatched[column] == 0, column
+    assert _hand_total(shared)["output_tokens"] > 0, (
+        "the rows being refused carry real money")
+    # The three tagged runs are untouched by the refusal.
+    for k in keys:
+        _assert_totals_match(extract_usage_from_litellm_log(log, *WINDOW, run_key=k),
+                             _hand_total(owned[k]), k)
 
 
-def test_the_window_over_attributes_by_exactly_the_co_tenants_traffic(three_way):
-    """The historical bug, reproduced against today's code.
+def test_the_refusal_of_the_window_is_loud(three_way, caplog):
+    """A zero that replaces a plausible number has to explain itself.
 
-    Kept as an executable statement of what the run_key buys: with no key the
-    victim is billed every token in the file, including the 60 rows it did not
-    issue. This is the condition WCB_SIDECAR_MASTER_KEY=1 still reaches, and
-    eval/run_batch.py::_warn_if_master_key_auth_degrades_attribution is the
-    warning that stands in for it at batch start.
+    The old warning was gated on ``if run_key:`` (grading.py:2865), so the one
+    caller that reaches this path with an empty key -- runner.py:1444 under
+    master-key auth -- got the wrong number in silence. Both entries now warn,
+    and the message names which of the two it was.
     """
-    keys, owned, shared, log = three_way
-    windowed = extract_usage_from_litellm_log(log, *WINDOW, run_key="")
-    truthful = extract_usage_from_litellm_log(log, *WINDOW, run_key=keys[0])
-    foreign = _hand_total([r for r in shared if r["run_key"] != keys[0]])
-    for column in TOKEN_COLUMNS:
-        assert windowed[column] == truthful[column] + foreign[column], column
-    assert _hand_total(owned[keys[0]])["output_tokens"] < windowed["output_tokens"]
+    _keys, _owned, _shared, log = three_way
+
+    with caplog.at_level(logging.WARNING, logger="src.utils.grading"):
+        extract_usage_from_litellm_log(log, *WINDOW, run_key="")
+    blank = " ".join(r.getMessage() for r in caplog.records)
+    assert "no run_key was supplied" in blank
+    assert "master-key" in blank
+    assert "Refusing the time-window fallback" in blank
+    assert "ZERO" in blank
+
+    caplog.clear()
+    absent = _key("never-ran")
+    with caplog.at_level(logging.WARNING, logger="src.utils.grading"):
+        extract_usage_from_litellm_log(log, *WINDOW, run_key=absent)
+    text = " ".join(r.getMessage() for r in caplog.records)
+    assert absent in text
+    assert "no row carries run_key" in text
 
 
-def test_a_run_whose_every_request_failed_falls_through_to_the_window(shapes, tmp_path):
-    """The one live path that still reaches the window with a key in hand.
+def test_the_master_key_batch_warning_fires_at_parallel_one(monkeypatch, caplog):
+    """The batch-start half of the same silence, with the gate removed.
 
-    ``extract_usage_from_litellm_log`` drops ``preflight`` and ``failure`` kinds
-    (grading.py:2847) BEFORE it matches the run key (grading.py:2851), so a run
-    whose every request errored -- a 429 storm, a credential rotation mid-batch,
-    an upstream outage -- has tagged rows in the log but none that survive to
-    the match. The fallback then fires and takes the co-tenants' rows, and the
-    run is billed for traffic it provably did not issue: its own eight rows
-    carry zero tokens by construction.
+    ``--parallel`` counts this process's own tasks and nothing else, but
+    script/run.sh:716 hardcodes ``--parallel 1`` on every eval/run_batch.py it
+    launches and fans out PROCESSES instead, all sharing the one
+    WCB_SHARED_SIDECAR_USAGE_LOG. Gating on it made the warning unreachable
+    from the canonical entry point, and left two operators on two terminals
+    with no notice at all.
+    """
+    from eval.run_batch import _warn_if_master_key_auth_degrades_attribution
 
-    The per-message path orders the same two steps the other way round
-    (run_batch.py:636 tags, then 646 filters), so it does NOT fall through --
-    it reports ``failed`` and attributes nothing. The asymmetry is the defect;
-    what is pinned here is that the totals path at least still marks the result
-    as window-selected, which is what lets a reader find these runs.
+    monkeypatch.setenv("WCB_SIDECAR_MASTER_KEY", "1")
+    monkeypatch.delenv("WCB_SIDECAR_NO_MASTER_KEY", raising=False)
+    with caplog.at_level(logging.WARNING, logger="eval.run_batch"):
+        _warn_if_master_key_auth_degrades_attribution(
+            types.SimpleNamespace(parallel=1))
+    message = " ".join(r.getMessage() for r in caplog.records)
+    assert "master-key mode is ON" in message
+    assert "UNCONDITIONAL" in message
+    assert "WCB_SIDECAR_MASTER_KEY" in message
+
+
+def test_a_run_whose_every_request_failed_is_billed_zero_not_its_neighbours(
+        shapes, tmp_path, caplog):
+    """A 429 storm costs nothing, and nothing is what it must be billed.
+
+    Previously ``test_a_run_whose_every_request_failed_falls_through_to_the_
+    window``, which asserted ``request_count > 0`` to characterise the defect.
+    ``extract_usage_from_litellm_log`` dropped ``preflight`` and ``failure``
+    kinds BEFORE matching the run key, so a run whose every request errored --
+    a 429 storm, a credential rotation mid-batch, an upstream outage -- had
+    tagged rows in the log but none that survived to the match, the fallback
+    fired, and it was billed its co-tenants' traffic. Ownership is now decided
+    first and the kind filter runs on the run's OWN rows, so the same log
+    yields zero: the run is present, and it provably spent nothing.
     """
     victim = _key("victim")
     neighbour = _key("neighbour")
@@ -413,18 +456,139 @@ def test_a_run_whose_every_request_failed_falls_through_to_the_window(shapes, tm
     log = _write(tmp_path, failures + healthy, "all_failed.jsonl")
 
     assert _hand_total(failures)["output_tokens"] == 0
+    assert _hand_total(healthy)["output_tokens"] > 0, "there is money to steal"
 
-    got = extract_usage_from_litellm_log(log, *WINDOW, run_key=victim)
-    assert got["usage_source"] == "litellm", (
-        "a window-selected total must never claim run-key provenance")
-    assert got["request_count"] > 0, (
-        "characterises the open defect: the victim picks up the neighbour's rows"
-    )
+    with caplog.at_level(logging.WARNING, logger="src.utils.grading"):
+        got = extract_usage_from_litellm_log(log, *WINDOW, run_key=victim)
+
+    # Selection WAS by run key -- the run's own rows were found and then
+    # emptied by the kind filter -- so the provenance is honest either way.
+    assert got["usage_source"] == "litellm_run_key"
+    assert got["usage_attribution"] == "run_key_zero_billable"
+    _assert_totals_match(got, _hand_total([]), "all-failed run")
+    stolen = _hand_total(healthy)
+    for column in TOKEN_COLUMNS + ("total_tokens", "request_count"):
+        assert got[column] == 0, column
+        if stolen[column]:
+            assert got[column] != stolen[column], (
+                f"{column}: the neighbour's traffic reached the victim")
+
+    message = " ".join(r.getMessage() for r in caplog.records)
+    assert "preflight/failure" in message
+    assert "ZERO" in message
+    assert "time window is NOT consulted" in message
 
     # The neighbour, which does have surviving tagged rows, is untouched.
     unaffected = extract_usage_from_litellm_log(log, *WINDOW, run_key=neighbour)
     assert unaffected["usage_source"] == "litellm_run_key"
     _assert_totals_match(unaffected, _hand_total(healthy), "neighbour")
+
+    # And the money is now on exactly one invoice instead of two.
+    for column in TOKEN_COLUMNS:
+        assert got[column] + unaffected[column] == _hand_total(failures + healthy)[column]
+
+
+def test_a_run_that_never_logged_a_row_absorbs_nothing(shapes, tmp_path, caplog):
+    """The container that died before its first request, in a shared log.
+
+    Distinct from the all-failed case: there the run owns rows and they are all
+    unbillable, here it owns none at all. Both used to land in the window and
+    come back with a co-tenant's bill. The rule that separates them from a
+    legacy log is whether the FILE carries tagging: it does here, so the run's
+    absence from it means absence, not "no tagging available".
+    """
+    ghost = _key("container-died-at-startup")
+    healthy = [_row(shapes, i, run_key=_key("neighbour"), offset=i * 3)
+               for i in range(20)]
+    log = _write(tmp_path, healthy, "zero_rows.jsonl")
+    assert not any(r["run_key"] == ghost for r in healthy)
+
+    with caplog.at_level(logging.WARNING, logger="src.utils.grading"):
+        got = extract_usage_from_litellm_log(log, *WINDOW, run_key=ghost)
+
+    assert got["usage_source"] == "litellm"
+    assert got["usage_attribution"] == "run_key_absent_window_refused"
+    _assert_totals_match(got, _hand_total([]), "ghost run")
+    assert "Refusing the time-window fallback" in \
+        " ".join(r.getMessage() for r in caplog.records)
+
+
+def test_the_window_still_serves_a_genuinely_untagged_legacy_log(shapes, tmp_path, caplog):
+    """The fallback is narrowed, not removed.
+
+    A log in which NO row anywhere carries a run_key is a single-run log from
+    before the key was threaded through, and the window is both the only
+    selector available and sound: there is no second tenant in the file to
+    confuse it with. This is the case runner.py still depends on for replayed
+    and archived runs, and it must keep returning the same numbers it always
+    did -- while saying loudly that it did so.
+    """
+    legacy = [_row(shapes, i, run_key=None, offset=i * 2) for i in range(9)]
+    legacy.append(_row(shapes, 40, run_key=None, offset=99, kind="failure",
+                       input_tokens=0, output_tokens=0, total_tokens=0,
+                       cache_read_tokens=0, cache_write_tokens=0, cost_usd=0.0))
+    log = _write(tmp_path, legacy, "legacy.jsonl")
+    assert all("run_key" not in r for r in legacy)
+
+    with caplog.at_level(logging.WARNING, logger="src.utils.grading"):
+        got = extract_usage_from_litellm_log(log, *WINDOW, run_key=_key("whoever"))
+
+    assert got["usage_source"] == "litellm"
+    assert got["usage_attribution"] == "time_window_legacy"
+    _assert_totals_match(got, _hand_total(legacy[:9]), "legacy window")
+    assert "NO row in it carries a run_key at all" in \
+        " ".join(r.getMessage() for r in caplog.records)
+
+    # Same file, no key at all: identical, and equally loud.
+    caplog.clear()
+    with caplog.at_level(logging.WARNING, logger="src.utils.grading"):
+        keyless = extract_usage_from_litellm_log(log, *WINDOW)
+    _assert_totals_match(keyless, got, "legacy window, keyless")
+    assert caplog.records, "the window must never be taken in silence"
+
+
+def test_two_terminals_sharing_one_sidecar_log_cannot_bill_each_other(
+        shapes, tmp_path, caplog):
+    """The cross-process case, which no single process can detect for itself.
+
+    script/run.sh:716 launches every eval/run_batch.py with ``--parallel 1``
+    and gets concurrency by fanning out PROCESSES onto one
+    WCB_SHARED_SIDECAR_USAGE_LOG; a second operator on a second terminal
+    inheriting an exported WCB_SHARED_SIDECAR lands in the same file. Run keys
+    are minted from uuid4 per attempt (runner.py:599) so they cannot collide
+    across processes, and a foreign key is foreign whichever process minted it.
+
+    The interesting half is the failure: terminal A's run dies in a 429 storm
+    while terminal B's runs healthily. A must not come back holding B's bill,
+    and B's own figure must not move because A was there at all.
+    """
+    term_a, term_b = _key("termA"), _key("termB")
+    a_failed = [_row(shapes, 0, run_key=term_a, offset=i * 2, kind="failure",
+                     error_class="RateLimitError", error="429 Too Many Requests",
+                     input_tokens=0, output_tokens=0, total_tokens=0,
+                     cache_read_tokens=0, cache_write_tokens=0, cost_usd=0.0)
+                for i in range(6)]
+    b_healthy = [_row(shapes, i, run_key=term_b, offset=i * 2 + 1) for i in range(12)]
+    shared = [r for pair in zip(a_failed + a_failed[:6], b_healthy) for r in pair]
+    log = _write(tmp_path, shared, "two_terminals.jsonl")
+
+    with caplog.at_level(logging.WARNING, logger="src.utils.grading"):
+        a = extract_usage_from_litellm_log(log, *WINDOW, run_key=term_a)
+    b = extract_usage_from_litellm_log(log, *WINDOW, run_key=term_b)
+
+    assert a["usage_attribution"] == "run_key_zero_billable"
+    for column in TOKEN_COLUMNS + ("total_tokens", "request_count"):
+        assert a[column] == 0, column
+    assert caplog.records, "the zero has to be explained"
+
+    assert b["usage_source"] == "litellm_run_key"
+    _assert_totals_match(b, _hand_total(b_healthy), "terminal B")
+
+    # B alone in its own log reads exactly the same -- A's presence, and A's
+    # failure, are both invisible to it.
+    alone = extract_usage_from_litellm_log(
+        _write(tmp_path, b_healthy, "terminal_b_alone.jsonl"), *WINDOW, run_key=term_b)
+    _assert_totals_match(b, alone, "terminal B co-tenant invariance")
 
 
 def test_the_per_message_path_refuses_rather_than_falling_through(shapes, tmp_path):
