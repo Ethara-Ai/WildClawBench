@@ -1918,6 +1918,13 @@ class TestTaskGate:
     What is checked here is the wiring around them — that a defect stops the
     run before anything is spent, that the escape hatch works, and that either
     outcome survives into the run record.
+
+    The report handed to ``_run_task_gate`` is a REAL ``GateReport`` rather than
+    a stand-in with the right attribute names. Only ``gate_task`` is faked, so
+    no task is actually judged; everything downstream of the verdict — the
+    stamp, the defect record, which findings each carries — is the shipping
+    code. A double that agreed with the caller and not with the class would
+    pass this file while the harness wrote something else to disk.
     """
 
     @staticmethod
@@ -1927,19 +1934,16 @@ class TestTaskGate:
         return {"task_id": name, "task_dir": str(task_dir)}
 
     @staticmethod
-    def _report(findings=(), ops=3):
-        stamp = {"status": None, "ops": ops, "warns": 0, "elapsed_ms": 7}
+    def _report(findings=(), ops=3, warnings=()):
+        from src.utils.inject_preflight import (  # noqa: PLC0415
+            FATAL, WARN, GateFinding, GateReport,
+        )
 
-        def _stamp(status):
-            out = dict(stamp, status=status)
-            if status != "passed":
-                out["findings"] = [{"kind": f[0], "subject": f[1], "reason": f[2]}
-                                   for f in findings]
-            return out
-
-        return types.SimpleNamespace(
-            ok=not findings, ops=ops, elapsed_ms=7, warnings=(),
-            fatal=tuple(findings), stamp=_stamp)
+        return GateReport(
+            "t-gate",
+            tuple(GateFinding(FATAL, *f) for f in findings)
+            + tuple(GateFinding(WARN, *w) for w in warnings),
+            ops, 7)
 
     def _gate(self, monkeypatch, task, report):
         module = types.ModuleType("src.utils.inject_preflight")
@@ -1948,18 +1952,19 @@ class TestTaskGate:
         return _run_task_gate(task)
 
     def test_a_task_with_no_bundle_is_skipped_not_refused(self, tmp_path):
-        stamp, blocked = _run_task_gate({"task_id": "native"})
+        stamp, blocked, defect = _run_task_gate({"task_id": "native"})
         assert blocked is False
         assert stamp["status"] == "skipped"
+        assert defect is None
 
     def test_a_clean_task_passes_and_records_its_op_count(self, monkeypatch, tmp_path):
-        stamp, blocked = self._gate(monkeypatch, self._bundle(tmp_path), self._report())
+        stamp, blocked, _ = self._gate(monkeypatch, self._bundle(tmp_path), self._report())
         assert blocked is False
         assert stamp == {"status": "passed", "ops": 3, "warns": 0, "elapsed_ms": 7}
 
     def test_a_defect_blocks_the_run_before_any_spend(self, monkeypatch, tmp_path):
         report = self._report([("LANDS-BUT-INVISIBLE", "svc s1/op", "orphan keys")])
-        stamp, blocked = self._gate(monkeypatch, self._bundle(tmp_path), report)
+        stamp, blocked, _ = self._gate(monkeypatch, self._bundle(tmp_path), report)
         assert blocked is True
         assert stamp["status"] == "failed"
         assert stamp["findings"][0]["kind"] == "LANDS-BUT-INVISIBLE"
@@ -1967,7 +1972,7 @@ class TestTaskGate:
     def test_the_escape_hatch_launches_but_stamps_the_bypass(self, monkeypatch, tmp_path):
         monkeypatch.setenv(ALLOW_DEFECTIVE_TASK_ENV, "1")
         report = self._report([("WOULD-ERROR", "svc s1/op", "store refused it")])
-        stamp, blocked = self._gate(monkeypatch, self._bundle(tmp_path), report)
+        stamp, blocked, _ = self._gate(monkeypatch, self._bundle(tmp_path), report)
         assert blocked is False
         assert stamp["status"] == "bypassed"
         assert stamp["findings"][0]["subject"] == "svc s1/op"
@@ -1980,7 +1985,247 @@ class TestTaskGate:
 
         module.gate_task = _boom
         monkeypatch.setitem(sys.modules, "src.utils.inject_preflight", module)
-        stamp, blocked = _run_task_gate(self._bundle(tmp_path))
+        stamp, blocked, defect = _run_task_gate(self._bundle(tmp_path))
         assert blocked is False
         assert stamp["status"] == "skipped"
         assert "index out of range" in stamp["reason"]
+        assert defect is None
+
+
+class TestTaskGateDefectFile:
+    """Where the verdict lands ON DISK, read back from the filesystem.
+
+    A stamp in a result dict lives as long as the process does. Everything
+    below opens the file a human or an aggregator would open, because that is
+    the artifact the audit was about: a bypassed run whose only trace was an
+    in-memory dict was, by delivery time, a clean pass.
+    """
+
+    _bundle = staticmethod(TestTaskGate._bundle)
+    _report = staticmethod(TestTaskGate._report)
+    _gate = TestTaskGate._gate
+
+    @staticmethod
+    def _read(path):
+        assert path.is_file(), f"expected a defect.json at {path}"
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    def test_a_refusal_writes_defect_json_at_the_task_root(self, monkeypatch, tmp_path):
+        """The full launch path, up to the return that costs nothing.
+
+        ``run_single_task`` is entered for real with ``config=None``, so the
+        refusal fires before the workspace staging, the mock stack, the
+        container and the model — and the file it leaves behind is the one a
+        user browsing output/ finds, at the task bundle root beside where
+        trajectories/ would have been. No run_N/ is ever claimed, so there is
+        no run dir to put it in.
+        """
+        from eval.run_batch import run_single_task  # noqa: PLC0415
+
+        task = self._bundle(tmp_path, "05_task_042")
+        task["timeout_seconds"] = 60
+        report = self._report(
+            [("LANDS-BUT-INVISIBLE", "linkedin-api stage_2/willie",
+              "comment_count, like_count, share_count reach no getter")],
+            warnings=[("NEEDS-RUNTIME", "notion-api stage_3/page",
+                       "target row is the agent's to create")])
+        module = types.ModuleType("src.utils.inject_preflight")
+        module.gate_task = lambda *a, **kw: report
+        monkeypatch.setitem(sys.modules, "src.utils.inject_preflight", module)
+        out_root = tmp_path / "output" / "openclaw"
+
+        result = run_single_task(task, "anthropic/claude-sonnet-4", None, out_root)
+
+        assert result["scores"] == {}
+        assert "task gate refused" in result["error"]
+        doc = self._read(out_root / "05_task_042" / "defect.json")
+        assert doc["status"] == "refused"
+        assert doc["task"] == "t-gate"
+        assert doc["fatal"] == 1 and doc["warns"] == 1
+        assert doc["elapsed_ms"] == 7
+        assert doc["timestamp"].endswith("Z")
+        # The gate refused, so no trajectory tree exists to hide the file in.
+        assert not (out_root / "05_task_042" / "trajectories").exists()
+
+    def test_the_refusal_file_carries_every_finding_not_just_the_fatal_ones(
+            self, monkeypatch, tmp_path):
+        """A warning that never reached disk is a warning nobody will act on.
+
+        The score stamp deliberately carries only the fatal findings — it is an
+        index entry. defect.json is the page, and a NEEDS-RUNTIME warning is
+        regularly the line that explains an empty run three days later.
+        """
+        from eval.run_batch import _write_gate_defect  # noqa: PLC0415
+
+        report = self._report(
+            [("WOULD-ERROR", "discord-api s1/upsert", "store refused the write"),
+             ("TABLE-MISSING", "notion-api s1/blocks", "service registers no such table")],
+            warnings=[("NEEDS-RUNTIME", "figma-api s2/comment", "agent creates the row"),
+                      ("SEED-COERCION-LOSS", "slack-api seeds.json",
+                       "distractor seeds drop a column on load")])
+        stamp, blocked, defect = self._gate(monkeypatch, self._bundle(tmp_path), report)
+        assert blocked is True
+        assert len(stamp["findings"]) == 2, "the stamp stays the fatal-only index"
+
+        doc = self._read(_write_gate_defect(tmp_path / "bundle", defect))
+        kinds = [f["kind"] for f in doc["findings"]]
+        assert kinds == ["WOULD-ERROR", "TABLE-MISSING",
+                         "NEEDS-RUNTIME", "SEED-COERCION-LOSS"]
+        assert [f["severity"] for f in doc["findings"]] == \
+            ["FATAL", "FATAL", "WARN", "WARN"]
+        assert doc["findings"][0]["subject"] == "discord-api s1/upsert"
+        assert doc["findings"][0]["reason"] == "store refused the write"
+        # Flat by construction: a header and one list, nothing to walk.
+        assert all(not isinstance(v, dict) for v in doc.values())
+
+    def test_a_bypass_writes_its_defect_json_into_the_claimed_run_dir(
+            self, monkeypatch, tmp_path):
+        """WCB_ALLOW_DEFECTIVE_TASK=1 runs — and leaves the receipt beside score.json."""
+        from eval.run_batch import _write_gate_defect  # noqa: PLC0415
+
+        monkeypatch.setenv(ALLOW_DEFECTIVE_TASK_ENV, "1")
+        report = self._report([("FS-PAYLOAD-EMPTY", "s1/drop",
+                                "src resolves to a zero-byte file")])
+        stamp, blocked, defect = self._gate(monkeypatch, self._bundle(tmp_path), report)
+        assert blocked is False and stamp["status"] == "bypassed"
+
+        run_dir = tmp_path / "trajectories" / "claude" / "run_1"
+        run_dir.mkdir(parents=True)
+        (run_dir / "score.json").write_text('{"overall_score": 0.9}', encoding="utf-8")
+        doc = self._read(_write_gate_defect(run_dir, defect))
+        assert doc["status"] == "bypassed"
+        assert doc["findings"][0]["kind"] == "FS-PAYLOAD-EMPTY"
+        # Beside the score it qualifies, not one directory away from it.
+        assert (run_dir / "score.json").is_file()
+
+    def test_a_pass_that_warned_still_leaves_its_warnings_on_disk(
+            self, monkeypatch, tmp_path):
+        from eval.run_batch import _write_gate_defect  # noqa: PLC0415
+
+        report = self._report(warnings=[("NEEDS-RUNTIME", "figma-api s2/comment",
+                                         "target row is the agent's to create")])
+        stamp, blocked, defect = self._gate(monkeypatch, self._bundle(tmp_path), report)
+        assert blocked is False
+        assert stamp["status"] == "passed" and stamp["warns"] == 1
+        assert "findings" not in stamp, "a pass stamp stays fatal-only"
+
+        doc = self._read(_write_gate_defect(tmp_path / "run_1", defect))
+        assert doc["status"] == "passed"
+        assert doc["fatal"] == 0 and doc["warns"] == 1
+        assert doc["findings"][0]["severity"] == "WARN"
+
+    def test_a_clean_pass_writes_no_defect_json_at_all(self, monkeypatch, tmp_path):
+        """Silence is the signal. A file written for every run is a file nobody reads."""
+        from eval.run_batch import _write_gate_defect  # noqa: PLC0415
+
+        stamp, blocked, defect = self._gate(
+            monkeypatch, self._bundle(tmp_path), self._report())
+        assert (blocked, defect) == (False, None)
+
+        run_dir = tmp_path / "run_1"
+        run_dir.mkdir()
+        assert _write_gate_defect(run_dir, defect) is None
+        assert not (run_dir / "defect.json").exists()
+        assert list(run_dir.iterdir()) == []
+
+    def test_a_failed_defect_write_never_voids_the_run(self, tmp_path):
+        """The bookkeeping of a gate must not become a new way to lose a run."""
+        from eval.run_batch import _write_gate_defect  # noqa: PLC0415
+
+        blocker = tmp_path / "not-a-dir"
+        blocker.write_text("in the way", encoding="utf-8")
+        assert _write_gate_defect(blocker / "bundle", {"status": "refused"}) is None
+
+    def test_run_single_task_places_the_surviving_verdict_in_the_run_dir(self):
+        """AST invariant for the path the unit tests cannot reach without docker.
+
+        The bypass/warned-pass write happens after ``_claim_run_dir``, hundreds
+        of lines into a function that needs a container to go further. Pin the
+        wiring at the source level instead: the claim and the write, in that
+        order, against the dir the claim returned.
+        """
+        import ast  # noqa: PLC0415
+
+        src = (Path(__file__).resolve().parents[1] / "eval" / "run_batch.py").read_text(
+            encoding="utf-8")
+        fn = next(n for n in ast.walk(ast.parse(src))
+                  if isinstance(n, ast.FunctionDef) and n.name == "run_single_task")
+        body = [ast.unparse(s) for s in fn.body]
+        claim = next(i for i, s in enumerate(body) if "_claim_run_dir(model_dir)" in s)
+        write = next(i for i, s in enumerate(body)
+                     if s.strip() == "_write_gate_defect(output_dir, gate_defect)")
+        assert claim < write, "the defect write must follow the run-dir claim"
+        assert any("_write_gate_defect(output_root / task_id_ori, gate_defect)" in
+                   ast.unparse(n) for n in ast.walk(fn)), \
+            "a refusal must write its defect.json at the task bundle root"
+
+
+class TestTaskGateReachesScoreJson:
+    """The gate verdict in score.json — the file aggregation and delivery read.
+
+    ``_augment_score_with_combined_rewards`` is where every sibling integrity
+    stamp (injection_ok, run_incomplete, usage_attribution) becomes part of a
+    score, so task_gate joins them there and rides every writer that calls it.
+    """
+
+    @staticmethod
+    def _bypassed(findings=1):
+        return {"status": "bypassed", "ops": 4, "warns": 0, "elapsed_ms": 81,
+                "findings": [{"kind": "LANDS-BUT-INVISIBLE", "subject": "svc s1/op",
+                              "reason": "orphan keys"}] * findings}
+
+    def test_a_bypassed_run_is_not_a_clean_pass_in_the_score_dict(self):
+        scores = {"overall_score": 1.0}
+        _augment_score_with_combined_rewards(
+            scores, {"test_result": {}, "task_gate": self._bypassed()})
+        assert scores["task_gate"]["status"] == "bypassed"
+        assert scores["task_gate"]["findings"][0]["kind"] == "LANDS-BUT-INVISIBLE"
+
+        clean = {"overall_score": 1.0}
+        _augment_score_with_combined_rewards(
+            clean, {"test_result": {},
+                    "task_gate": {"status": "passed", "ops": 4, "warns": 0,
+                                  "elapsed_ms": 81}})
+        assert clean["task_gate"]["status"] == "passed"
+        assert scores["task_gate"] != clean["task_gate"], (
+            "the audit finding: a bypassed run's artifact must never be "
+            "indistinguishable from a clean pass")
+
+    def test_an_ungated_run_gains_no_task_gate_key(self):
+        """Older results and non-bundle tasks stay exactly as they were."""
+        scores = {"overall_score": 1.0}
+        _augment_score_with_combined_rewards(scores, {"test_result": {}})
+        assert "task_gate" not in scores
+
+    def test_the_stamp_is_copied_not_aliased(self):
+        """score.json must not become a live view of a dict the run still mutates."""
+        gate = self._bypassed()
+        scores = {"overall_score": 1.0}
+        _augment_score_with_combined_rewards(scores, {"test_result": {}, "task_gate": gate})
+        gate["status"] = "tampered"
+        assert scores["task_gate"]["status"] == "bypassed"
+
+    def test_the_bypass_survives_into_score_json_on_disk(self, tmp_path):
+        """End to end onto the filesystem, through a real score.json writer.
+
+        ``grade_the_task``'s eval-skip branch is the shortest shipping path that
+        writes a score.json without docker: it builds a stub, augments it and
+        writes it. What is asserted is the file, re-read — because the finding
+        this closes was that the stamp stopped at the dict.
+        """
+        from eval.run_batch import grade_the_task  # noqa: PLC0415
+
+        output_dir = tmp_path / "run_1"
+        output_dir.mkdir()
+        result = {"task_id": "t_x", "scores": {}, "error": None,
+                  "run_incomplete": True, "turns_planned": 5, "turns_completed": 2,
+                  "task_gate": self._bypassed()}
+        grade_the_task("t_x", str(tmp_path / "ws"), output_dir,
+                       {"automated_checks": {"c": 1}}, result)
+
+        doc = json.loads((output_dir / "score.json").read_text(encoding="utf-8"))
+        assert doc["task_gate"]["status"] == "bypassed"
+        assert doc["task_gate"]["findings"][0]["subject"] == "svc s1/op"
+        assert doc["task_gate"]["elapsed_ms"] == 81
+        # It travels with its siblings, not instead of them.
+        assert doc["injection_ok"] is True and doc["run_incomplete"] is True

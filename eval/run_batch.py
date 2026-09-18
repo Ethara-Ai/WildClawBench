@@ -1155,8 +1155,42 @@ def _allow_defective_task() -> bool:
         in {"1", "true", "yes", "on"}
 
 
-def _run_task_gate(task: dict) -> tuple[dict, bool]:
-    """Decide whether this task may start a trajectory. Returns (stamp, blocked).
+GATE_DEFECT_FILENAME = "defect.json"
+
+
+def _write_gate_defect(dest_dir: Path, defect: dict | None) -> Path | None:
+    """Drop a gate verdict next to the artifact it is about, and never raise.
+
+    Written only when the gate had something to say. A clean task leaves no
+    defect.json at all, so the file's mere presence in an ``output/`` listing is
+    the signal — one that survives the session log being rotated, the run record
+    being consumed and the operator who saw the ERROR line going home.
+
+    The write is best-effort by design. The gate exists to stop a defective task
+    from costing a run; a gate whose bookkeeping could itself void one would
+    have reintroduced the problem at the other end.
+    """
+    if not defect:
+        return None
+    try:
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        path = dest_dir / GATE_DEFECT_FILENAME
+        path.write_text(
+            json.dumps(defect, indent=2, ensure_ascii=False, default=str) + "\n",
+            encoding="utf-8")
+        return path
+    except Exception as exc:  # noqa: BLE001 - bookkeeping must not void a run
+        logger.warning("task gate defect.json write failed at %s: %s", dest_dir, exc)
+        return None
+
+
+def _run_task_gate(task: dict) -> tuple[dict, bool, dict | None]:
+    """Decide whether this task may start a trajectory.
+
+    Returns ``(stamp, blocked, defect)``: the record the score carries, the
+    launch decision, and the full on-disk account the caller places once it
+    knows where this run's artifacts live (``None`` when the gate found nothing
+    at all, so a clean task writes no file).
 
     Called before the mock stack, before the container and before the first
     token, because a task whose injection cannot land or whose required service
@@ -1165,35 +1199,40 @@ def _run_task_gate(task: dict) -> tuple[dict, bool]:
     src/utils/inject_preflight for what is decided and why each verdict is
     fatal or not.
 
-    The verdict is stamped into the run record either way. A bypassed gate that
-    left no trace in the artifact would be worse than no gate: the run would be
+    The verdict is stamped into the run record either way, and any verdict with
+    findings is also written out as defect.json. A bypassed gate that left no
+    trace in the artifact would be worse than no gate: the run would be
     indistinguishable at scoring time from one that passed.
     """
     task_dir = task.get("task_dir") or ""
     if not task_dir or not Path(task_dir).is_dir():
-        return {"status": "skipped", "reason": "task ships no bundle directory"}, False
+        return {"status": "skipped", "reason": "task ships no bundle directory"}, False, None
     if not (Path(task_dir) / "mock_data").is_dir() and not task.get("inject_path"):
-        return {"status": "skipped", "reason": "task mounts no mock world"}, False
+        return {"status": "skipped", "reason": "task mounts no mock world"}, False, None
     try:
         from src.utils.inject_preflight import gate_task
     except Exception as exc:  # noqa: BLE001
         logger.warning("[%s] task gate unavailable (%s); launching ungated",
                        task.get("task_id"), exc)
-        return {"status": "skipped", "reason": f"gate unavailable: {exc}"}, False
+        return {"status": "skipped", "reason": f"gate unavailable: {exc}"}, False, None
     try:
         report = gate_task(task_dir, required_apis=task.get("required_apis"),
                            environment_dir=Path(task["env_dir"]) if task.get("env_dir") else None)
     except Exception as exc:  # noqa: BLE001 - the gate must never itself void a run
         logger.warning("[%s] task gate raised (%s: %s); launching ungated",
                        task.get("task_id"), type(exc).__name__, exc)
-        return {"status": "skipped", "reason": f"gate raised: {exc}"}, False
+        return {"status": "skipped", "reason": f"gate raised: {exc}"}, False, None
     for warning in report.warnings:
         logger.warning("[%s] task gate warning: %s", task.get("task_id"), warning)
     if report.ok:
         logger.info("[%s] task gate passed: %d injected op(s) land and serve, "
                     "%d warning(s), %dms", task.get("task_id"), report.ops,
                     len(report.warnings), report.elapsed_ms)
-        return report.stamp("passed"), False
+        # A pass that warned still leaves its warnings on disk; a pass with
+        # nothing to say leaves nothing, so defect.json never becomes noise a
+        # reader learns to scroll past.
+        defect = report.defect_record("passed") if report.warnings else None
+        return report.stamp("passed"), False, defect
     for finding in report.fatal:
         logger.error("[%s] TASK DEFECT: %s", task.get("task_id"), finding)
     if _allow_defective_task():
@@ -1202,8 +1241,8 @@ def _run_task_gate(task: dict) -> tuple[dict, bool]:
             "trajectory that follows measures an environment the task does not "
             "describe; its score is not a measurement of the model.",
             task.get("task_id"), ALLOW_DEFECTIVE_TASK_ENV, len(report.fatal))
-        return report.stamp("bypassed"), False
-    return report.stamp("failed"), True
+        return report.stamp("bypassed"), False, report.defect_record("bypassed")
+    return report.stamp("failed"), True, report.defect_record("refused")
 
 
 def _model_type(model: str) -> str:
@@ -1827,6 +1866,16 @@ def _augment_score_with_combined_rewards(scores: dict, result: dict) -> None:
     defects = (result or {}).get("injection_defects") or []
     scores["injection_ok"] = not defects
     scores["injection_defects"] = defects
+    # Launch-gate stamp (same on-disk-marker pattern as injection_ok, and for
+    # the same reason one level earlier): injection_ok says the mutations failed
+    # to land during the run, task_gate says they were never going to. A run
+    # launched past a known defect with WCB_ALLOW_DEFECTIVE_TASK must carry that
+    # fact into score.json, because score.json is what aggregation and delivery
+    # read — and a bypass visible only in a log the consumer never opens is a
+    # bypass that arrives at the customer looking like a clean pass.
+    gate = (result or {}).get("task_gate")
+    if isinstance(gate, dict) and gate:
+        scores["task_gate"] = dict(gate)
     # Turn-completion stamp (same on-disk-marker pattern as injection_ok): a
     # run that received fewer scripted turns than the task defines is not a
     # valid measurement of the full scenario and must be excludable downstream.
@@ -2510,8 +2559,17 @@ def run_single_task(
 
     # Nothing has been spent yet: no container, no mock stack, no token. This is
     # the last place a defective task can be refused for free.
-    task_gate, gate_blocked = _run_task_gate(task)
+    task_gate, gate_blocked, gate_defect = _run_task_gate(task)
     if gate_blocked:
+        # A refusal never claims a run_N/, so its defect.json goes one level up,
+        # at the task bundle root — output/<backend>/<task>/defect.json, beside
+        # the trajectories/ tree the run would have joined. That is the only
+        # path derivable here (the run index, and even the model folder, are
+        # settled a few hundred lines below, after the spend this return is
+        # avoiding), and it is the right one: a refusal is a verdict on the
+        # TASK, identical for every model and every rep, so writing it per-run
+        # would mean N copies of one fact and a task dir that looks clean.
+        _write_gate_defect(output_root / task_id_ori, gate_defect)
         return {
             "task_id": task_id_ori, "scores": {}, "task_gate": task_gate,
             "error": (f"task gate refused {task_id_ori}: "
@@ -2675,6 +2733,11 @@ def run_single_task(
     task_bundle_dir = output_root / task_id_ori
     model_dir = task_bundle_dir / "trajectories" / model_type
     run_index, output_dir = _claim_run_dir(model_dir)
+
+    # The run dir now exists, so a bypass or a warned pass can be written where
+    # score.json will land. Placed here, before the first thing that can throw,
+    # so the trace of a bypass does not depend on the run reaching its end.
+    _write_gate_defect(output_dir, gate_defect)
 
     result = {"task_id": task_id, "scores": {}, "error": None, "task_gate": task_gate}
 
@@ -3468,6 +3531,11 @@ def run_single_task(
                     "run_incomplete": bool(result.get("run_incomplete")),
                     "turns_planned": result.get("turns_planned"),
                     "turns_completed": result.get("turns_completed"),
+                    # Carried here too, not only through _augment: this stub is
+                    # the artifact for the runs that failed hardest, which is
+                    # exactly when a bypassed gate is the likeliest explanation
+                    # and the least excusable thing to have dropped.
+                    "task_gate": result.get("task_gate"),
                 }
                 score_path.write_text(
                     json.dumps(last_resort, indent=2, ensure_ascii=False, default=str),

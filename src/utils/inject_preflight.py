@@ -34,6 +34,7 @@ import json
 import tempfile
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -110,6 +111,40 @@ class GateReport:
                 for f in self.fatal
             ]
         return record
+
+    def defect_record(self, status: str) -> Dict[str, Any]:
+        """The full account of a gate verdict, for a ``defect.json`` on disk.
+
+        ``stamp`` is the index entry a score carries; this is the page it points
+        at, and it is written next to the artifact so the reader who finds a
+        suspect run does not have to re-run the gate to learn what it said.
+
+        Two differences from the stamp, both deliberate. It carries EVERY
+        finding rather than the fatal ones, because a warning that never reached
+        disk is a warning nobody will act on — ``NEEDS-RUNTIME`` in particular
+        is the verdict that turns out to have been the defect once the run comes
+        back empty. And it is timestamped, because the task directory it judged
+        is mutable: a defect.json that cannot say WHEN it was decided is a claim
+        about a task that may no longer exist in that shape.
+
+        Flat by construction — one header, one list of findings, no nesting to
+        walk — because its reader is as often a person with ``less`` as a
+        program with ``jq``.
+        """
+        return {
+            "task": self.task_id,
+            "status": status,
+            "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "elapsed_ms": self.elapsed_ms,
+            "ops": self.ops,
+            "fatal": len(self.fatal),
+            "warns": len(self.warnings),
+            "findings": [
+                {"severity": f.severity, "kind": f.kind,
+                 "subject": f.subject, "reason": f.reason}
+                for f in self.fatal + self.warnings
+            ],
+        }
 
     def summary(self) -> str:
         head = (f"task gate: {len(self.fatal)} fatal, {len(self.warnings)} warn "
