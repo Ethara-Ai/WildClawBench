@@ -565,7 +565,7 @@ python3 script/extract_home_to_data.py input/alden-croft_MB --verbose
 
 ### 3.8 `reconstruct_input_from_bundle.py`
 
-**Purpose:** Reverses the bundle writer — reconstructs an `input/<task>/` folder from a harbor `output_bundle`. Recovers `prompt.txt` (fallback `data/instruction.md`), `rubric.json`, `persona/`, flat `data/` (from `data/environment/artifacts/inputs/files/`), `test_outputs.py`, `test_weights.json`, and `mock_data/<api>/` (by byte-diffing each `.json`/`.csv` seed against a pristine baseline `environment/<api>/<f>` — identical files are baked defaults, differences/new files are the task overlay). Writes a `RECONSTRUCTION_NOTES.md` per task documenting recovery. Cannot recover `gt/`, original nested directory structure, or the pre-overlay default a given overlay replaced.
+**Purpose:** Reverses the bundle writer — reconstructs an `input/<task>/` folder from a harbor `output_bundle`. Recovers `prompt.txt` (fallback `data/solution/instruction.md`, then the legacy `data/instruction.md` of bundles packaged before the move), `rubric.json`, `persona/`, flat `data/` (from `data/environment/artifacts/inputs/files/`), `test_outputs.py`, `test_weights.json`, and `mock_data/<api>/` (by byte-diffing each `.json`/`.csv` seed against a pristine baseline `environment/<api>/<f>` — identical files are baked defaults, differences/new files are the task overlay). Writes a `RECONSTRUCTION_NOTES.md` per task documenting recovery. Cannot recover `gt/`, original nested directory structure, or the pre-overlay default a given overlay replaced.
 
 **CLI library:** argparse.
 

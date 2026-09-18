@@ -88,3 +88,22 @@ def test_evidence_budget_families_are_priced_and_known():
             f"Family {family!r} has an evidence budget but no _FAMILY_LIMITS guard "
             "in this test — add its ctx_window + chars_per_token_floor."
         )
+
+
+def test_codex_route_budget_fits_sol_context_window():
+    # The codex subscription route uses _DEFAULT_JUDGE_CODEX_MAX_EVIDENCE for
+    # gpt-5.6-sol (1,050,000-token window) instead of the metered family base.
+    budget = grading._DEFAULT_JUDGE_CODEX_MAX_EVIDENCE
+    max_output = grading._FAMILY_EVIDENCE["gpt"][1]
+    worst_case_input_tokens = (budget + SCAFFOLD_CHARS) / 1.375
+    total = worst_case_input_tokens + max_output + SAFETY_TOKEN_BUFFER
+    assert total <= 1_050_000, f"codex route budget overruns sol window: {total:,.0f}"
+
+
+def test_codex_route_luna_falls_back_to_a_budget_that_fits_luna(monkeypatch):
+    monkeypatch.setenv("KENSEI_JUDGE_CODEX_BRIDGE_URL", "http://127.0.0.1:1")
+    monkeypatch.delenv("KENSEI_JUDGE_CODEX_MAX_EVIDENCE", raising=False)
+    budget = grading._member_evidence_budget("gpt-5.6-luna", "gpt")
+    max_output = grading._FAMILY_EVIDENCE["gpt"][1]
+    total = (budget + SCAFFOLD_CHARS) / 1.375 + max_output + SAFETY_TOKEN_BUFFER
+    assert total <= 400_000

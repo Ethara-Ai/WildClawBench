@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 import re
 import subprocess
@@ -238,6 +239,51 @@ class OpenClawAgent(BaseAgent):
     # produces zero rows for its whole duration. Anything under this floor
     # would misread healthy long calls as wedges.
     _STALL_FLOOR_S = 600.0
+
+    # Empty-turn grace (WCB_EMPTY_TURN_GRACE_SECONDS). The sidecar writes a
+    # usage row from LiteLLM's ASYNC success callback, after the response has
+    # already streamed back, so the row can land 0.5-1 s after the openclaw CLI
+    # exits. Reading usage.jsonl once at agent_proc.wait() lost that race on
+    # healthy long turns, declared them EMPTY and re-sent the user message,
+    # permanently duplicating it in the stored trajectory. The floor keeps a
+    # misconfigured value from reintroducing the race.
+    _EMPTY_TURN_GRACE_DEFAULT_S = 5.0
+    _EMPTY_TURN_GRACE_FLOOR_S = 2.0
+    _EMPTY_TURN_GRACE_MAX_S = 60.0
+    _EMPTY_TURN_GRACE_POLL_S = 0.2
+
+    @staticmethod
+    def _empty_turn_grace_seconds() -> float:
+        try:
+            grace = float(os.environ.get(
+                "WCB_EMPTY_TURN_GRACE_SECONDS",
+                OpenClawAgent._EMPTY_TURN_GRACE_DEFAULT_S))
+        except ValueError:
+            grace = OpenClawAgent._EMPTY_TURN_GRACE_DEFAULT_S
+        if grace != grace:  # NaN
+            grace = OpenClawAgent._EMPTY_TURN_GRACE_DEFAULT_S
+        return min(max(grace, OpenClawAgent._EMPTY_TURN_GRACE_FLOOR_S),
+                   OpenClawAgent._EMPTY_TURN_GRACE_MAX_S)
+
+    def _wait_for_new_run_key_rows(self, run_key: str, baseline: int) -> int:
+        """Row count for *run_key*, re-read until it exceeds *baseline* or the
+        empty-turn grace expires. Returns at once when a new row is already
+        there, so a normal turn pays nothing. Bounded by an iteration count as
+        well as the clock so it terminates under a frozen/stubbed clock."""
+        rows = self._count_run_key_rows(run_key)
+        if rows > baseline:
+            return rows
+        grace = self._empty_turn_grace_seconds()
+        poll = self._EMPTY_TURN_GRACE_POLL_S
+        deadline = time.monotonic() + grace
+        for _ in range(max(1, math.ceil(grace / poll))):
+            if time.monotonic() >= deadline:
+                break
+            time.sleep(poll)
+            rows = self._count_run_key_rows(run_key)
+            if rows > baseline:
+                return rows
+        return rows
 
     @staticmethod
     def _terminate_agent_invocations(task_id: str) -> None:
@@ -717,6 +763,13 @@ class OpenClawAgent(BaseAgent):
                 rows_before_turn = (self._count_run_key_rows(_run_key)
                                     if _rows_guarded else 0)
                 for turn_attempt in range(2):
+                    # Each attempt is judged on ITS OWN sidecar rows. Re-read
+                    # the baseline before a retry: a late row from the previous
+                    # attempt must not make a genuinely empty retry look alive
+                    # (which silently disabled "empty twice -> abort").
+                    rows_before_attempt = (
+                        rows_before_turn if turn_attempt == 0 or not _rows_guarded
+                        else self._count_run_key_rows(_run_key))
                     attempt_budget = max(60, int(turn_deadline - time.time()))
                     agent_proc = run_background(
                         spec.task_id,
@@ -752,15 +805,21 @@ class OpenClawAgent(BaseAgent):
                         # schedule end. The retry re-sends a message whose
                         # empty exchange the session already recorded, so the
                         # turn is also logged in turns_duplicated.
+                        # The row for a healthy turn can land just AFTER the
+                        # CLI exits (async usage callback), so give the log a
+                        # grace window before declaring the turn empty.
                         if _rows_guarded and self._empty_turn_limit() > 0:
-                            rows_now = self._count_run_key_rows(_run_key)
-                            if rows_now == rows_before_turn:
+                            rows_now = self._wait_for_new_run_key_rows(
+                                _run_key, rows_before_attempt)
+                            if rows_now <= rows_before_attempt:
                                 turns_empty.append(turn_index)
                                 if turn_attempt == 0:
                                     logger.warning(
                                         "[%s] Agent turn %d EMPTY (no LLM "
-                                        "traffic) — retrying the same turn "
-                                        "once", spec.task_id, turn_index + 1)
+                                        "traffic within %.1fs grace) — "
+                                        "retrying the same turn once",
+                                        spec.task_id, turn_index + 1,
+                                        self._empty_turn_grace_seconds())
                                     turns_duplicated.append(turn_index)
                                     continue
                                 outcome = "empty"

@@ -4015,6 +4015,114 @@ def _start_drift_director(task: dict, drift_info: dict, output_dir):
         return None
 
 
+def _input_dir_child_argv(argv: list[str], task_dir: str) -> list[str]:
+    """Rewrite argv for one child: drop the fan-out-only flags (`--input-dir`,
+    `--parallel-tasks`/`-P`, both `--flag V` and `--flag=V` forms) and append
+    `--task task_dir`."""
+    def _is_fanout_flag(name: str) -> bool:
+        # argparse accepts unambiguous long-option prefixes (`--inp`,
+        # `--parallel-t`), so match those too. `--parallel` itself is a real
+        # per-task flag and must be forwarded, hence the `--parallel-` floor.
+        if name == "-P":
+            return True
+        if len(name) >= len("--inp") and "--input-dir".startswith(name):
+            return True
+        return len(name) >= len("--parallel-") and "--parallel-tasks".startswith(name)
+
+    out: list[str] = []
+    skip = False
+    for a in argv:
+        if skip:
+            skip = False
+            continue
+        name, has_value, _ = a.partition("=")
+        if _is_fanout_flag(name):
+            skip = not has_value
+            continue
+        if a.startswith("-P") and a[2:].isdigit():
+            continue
+        out.append(a)
+    return out + ["--task", task_dir]
+
+
+def _run_input_dir(input_dir: str, argv: list[str], parallel_tasks: int = 1) -> int:
+    """Run every immediate subdir of input_dir as its own child run_batch.py
+    invocation, `parallel_tasks` at a time. Each child owns its sidecar / codex
+    bridge / mock stack (per-process uuid names + free host ports; the mock
+    image build is flock-serialized), so tasks never share state and one
+    failure never stops the others. Sequential children stream to this
+    process's stdout; concurrent children each log to their own file under
+    logs/ so outputs don't interleave. Returns 0 if all succeeded, else 1."""
+    root = Path(input_dir)
+    if not root.is_dir():
+        print(f"[input-dir] not found: {input_dir}", file=sys.stderr, flush=True)
+        return 2
+    task_dirs = sorted(p for p in root.iterdir() if p.is_dir())
+    if not task_dirs:
+        print(f"[input-dir] no task dirs under {input_dir}", file=sys.stderr, flush=True)
+        return 2
+    par = 1 if parallel_tasks is None else int(parallel_tasks)
+    if par < 1:
+        print(f"[input-dir] --parallel-tasks must be >= 1, got {par}", file=sys.stderr, flush=True)
+        return 2
+    max_concurrent = int(os.environ.get("WCB_MAX_CONCURRENT", "8") or 8)
+    if par > max_concurrent:
+        print(f"[input-dir] --parallel-tasks {par} exceeds WCB_MAX_CONCURRENT={max_concurrent} "
+              f"(Bedrock throttling / OOM likely). Set WCB_MAX_CONCURRENT={par} to override.",
+              file=sys.stderr, flush=True)
+        return 2
+
+    total = len(task_dirs)
+    par = min(par, total)
+    print(f"[input-dir] {total} task(s) queued under {input_dir}, {par} at a time", flush=True)
+    script = str(Path(__file__).resolve())
+    log_dir = Path(__file__).resolve().parent.parent / "logs"
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    def _run_one(i: int, td: Path) -> tuple[str, int]:
+        cmd = [sys.executable, script] + _input_dir_child_argv(argv, str(td))
+        try:
+            if par == 1:
+                print(f"\n[input-dir] ({i}/{total}) START {td.name}", flush=True)
+                rc = subprocess.call(cmd)
+            else:
+                log_dir.mkdir(parents=True, exist_ok=True)
+                log_path = log_dir / f"{td.name}_input_dir_{stamp}.log"
+                print(f"[input-dir] ({i}/{total}) START {td.name} -> {log_path}", flush=True)
+                with open(log_path, "wb") as fh:
+                    rc = subprocess.call(cmd, stdout=fh, stderr=subprocess.STDOUT)
+        except Exception as exc:
+            print(f"[input-dir] failed to launch {td.name}: {exc}", file=sys.stderr, flush=True)
+            rc = 1
+        print(f"[input-dir] ({i}/{total}) {'DONE' if rc == 0 else f'FAIL rc={rc}'} {td.name}", flush=True)
+        return td.name, rc
+
+    results: dict[str, int] = {}
+    try:
+        if par == 1:
+            for i, td in enumerate(task_dirs, 1):
+                name, rc = _run_one(i, td)
+                results[name] = rc
+        else:
+            with ThreadPoolExecutor(max_workers=par) as pool:
+                futures = [pool.submit(_run_one, i, td) for i, td in enumerate(task_dirs, 1)]
+                for fut in as_completed(futures):
+                    name, rc = fut.result()
+                    results[name] = rc
+    except KeyboardInterrupt:
+        print("[input-dir] interrupted", file=sys.stderr, flush=True)
+
+    failed = [(td.name, results[td.name]) for td in task_dirs if results.get(td.name, 0) != 0]
+    not_run = [td.name for td in task_dirs if td.name not in results]
+    ok = len(results) - len(failed)
+    print(f"\n[input-dir] summary: {ok}/{total} ok, {len(failed)} failed, parallelism={par}", flush=True)
+    for n, rc in failed:
+        print(f"[input-dir]   FAIL rc={rc} {n}", flush=True)
+    for n in not_run:
+        print(f"[input-dir]   NOT RUN {n}", flush=True)
+    return 0 if not failed and not not_run else 1
+
+
 def main(args=None) -> None:
     # eval/wcb.py (the TUI launcher) passes a prebuilt namespace; direct CLI
     # invocation parses sys.argv as before.
@@ -4023,6 +4131,13 @@ def main(args=None) -> None:
             default_model=DEFAULT_MODEL,
             default_parallel=DEFAULT_PARALLEL,
         )
+
+    # --input-dir fans out to one child process per task BEFORE any sidecar /
+    # mock-stack / OAuth setup, so every task gets a fresh stack and full
+    # failure isolation (same semantics as `script/run.sh --input-dir -P N`).
+    if getattr(args, "input_dir", None):
+        sys.exit(_run_input_dir(args.input_dir, sys.argv[1:],
+                                getattr(args, "parallel_tasks", 1)))
 
     # --- Harness debug logging -------------------------------------------
     # Open a single, process-wide DEBUG log capturing the ENTIRE pipeline:

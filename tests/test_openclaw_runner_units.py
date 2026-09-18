@@ -27,6 +27,8 @@ known defects — those tests intentionally lock in observed behavior.
 from __future__ import annotations
 
 import json
+import math
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -949,3 +951,146 @@ class TestRunTaskHappyPath:
         # agent command is the second run_background invocation
         agent_cmd = captured_cmds[1]
         assert "it'\\''s a test" in agent_cmd
+
+
+# ---------------------------------------------------------------------------
+# Empty-turn detection vs the async usage-row race (H12) and the retry
+# baseline (H13). Drives the real run_task turn loop with fake procs and a
+# real usage.jsonl.
+# ---------------------------------------------------------------------------
+class _TurnProc(_FakeProc):
+    """Agent invocation whose wait() runs a hook (e.g. writes a usage row)."""
+
+    def __init__(self, on_wait=None):
+        super().__init__(returncode=0)
+        self._on_wait = on_wait
+
+    def wait(self, timeout=None):
+        if not self.waited and self._on_wait is not None:
+            self._on_wait()
+        return super().wait(timeout)
+
+
+class TestEmptyTurnGraceLoop:
+    GRACE_POLL = OpenClawAgent._EMPTY_TURN_GRACE_POLL_S
+
+    def _setup(self, monkeypatch, tmp_path, turn_rows, turns=("t0", "t1", "t2")):
+        """turn_rows[i] per agent invocation: "now" = row written before the
+        CLI exits, "late" = row lands during the grace window, None = no row."""
+        for var in ("WCB_TURN_STALL_SECONDS", "WCB_EMPTY_TURN_LIMIT",
+                    "WCB_EMPTY_TURN_GRACE_SECONDS", "WCB_SIDECAR_NO_MASTER_KEY"):
+            monkeypatch.delenv(var, raising=False)
+        usage = tmp_path / "usage.jsonl"
+        usage.write_text("")
+        a = _bare_agent(litellm_master_key="")  # empty master key -> run-key bearer live
+        a.litellm_usage_log = str(usage)
+        spec = _make_spec(tmp_path, turns=tuple(turns))
+        sent: list[str] = []
+        pending_late: list[int] = []
+        plan = iter(turn_rows)
+
+        def write_row():
+            with open(usage, "a", encoding="utf-8") as fh:
+                fh.write(json.dumps({"run_key": a._run_keys[spec.task_id]}) + "\n")
+
+        def run_background(task_id, bash_cmd=None, **kw):
+            if "openclaw gateway" in (bash_cmd or ""):
+                return _FakeProc()
+            sent.append(re.search(r"--message '(.*)'$", bash_cmd, re.S).group(1))
+            mode = next(plan)
+            if mode == "now":
+                return _TurnProc(on_wait=write_row)
+            if mode == "late":
+                return _TurnProc(on_wait=lambda: pending_late.append(1))
+            return _TurnProc()
+
+        _neutralize_docker_helpers(monkeypatch, [])
+        monkeypatch.setattr(ocr, "run_background", run_background)
+        polls = {"n": 0}
+
+        def fake_sleep(seconds, *a2, **k2):
+            if seconds == self.GRACE_POLL:
+                polls["n"] += 1
+                if pending_late:  # the async callback's row lands mid-grace
+                    pending_late.pop()
+                    write_row()
+
+        monkeypatch.setattr(ocr.time, "sleep", fake_sleep)
+        TestRunTaskHappyPath()._stub_agent_methods(monkeypatch, a)
+        return a, spec, sent, polls
+
+    def test_late_usage_row_is_not_an_empty_turn(self, monkeypatch, tmp_path):
+        a, spec, sent, polls = self._setup(
+            monkeypatch, tmp_path, ["now", "late", "now"])
+        result = a.run_task(spec)
+        assert result.error is None
+        assert sent == ["t0", "t1", "t2"]          # nothing re-sent
+        assert result.turns_empty == []
+        assert result.turns_duplicated == []
+        assert result.turns_completed == 3
+        assert polls["n"] == 1                     # waited only as long as needed
+
+    def test_on_time_rows_never_wait(self, monkeypatch, tmp_path):
+        a, spec, sent, polls = self._setup(
+            monkeypatch, tmp_path, ["now", "now", "now"])
+        result = a.run_task(spec)
+        assert sent == ["t0", "t1", "t2"]
+        assert polls["n"] == 0
+        assert result.turns_completed == 3
+
+    def test_genuinely_empty_turn_retries_once_after_grace(self, monkeypatch, tmp_path):
+        a, spec, sent, polls = self._setup(
+            monkeypatch, tmp_path, ["now", None, "now", "now"])
+        result = a.run_task(spec)
+        assert sent == ["t0", "t1", "t1", "t2"]
+        assert result.turns_empty == [1]
+        assert result.turns_duplicated == [1]
+        assert result.turns_completed == 3
+        grace = OpenClawAgent._empty_turn_grace_seconds()
+        assert polls["n"] == math.ceil(grace / self.GRACE_POLL)
+
+    def test_empty_twice_aborts_the_run(self, monkeypatch, tmp_path):
+        a, spec, sent, _ = self._setup(
+            monkeypatch, tmp_path, ["now", None, None])
+        result = a.run_task(spec)
+        assert sent == ["t0", "t1", "t1"]
+        assert result.turns_empty == [1, 1]
+        assert result.turns_completed == 1
+        assert result.turns_planned == 3
+
+    def test_stray_row_before_retry_does_not_mask_a_dead_retry(self, monkeypatch, tmp_path):
+        # H13: attempt 0 is judged empty, and its row lands only afterwards,
+        # before the retry starts. The retry itself produces nothing. It must
+        # still be judged empty (and abort), not credited with attempt 0's row.
+        a, spec, sent, _ = self._setup(
+            monkeypatch, tmp_path, [None, None], turns=("t0",))
+        real_warning = ocr.logger.warning
+
+        def warning(msg, *args, **kwargs):
+            if "EMPTY" in str(msg):  # attempt 0 just declared empty
+                with open(a.litellm_usage_log, "a", encoding="utf-8") as fh:
+                    fh.write(json.dumps({"run_key": a._run_keys[spec.task_id]}) + "\n")
+            return real_warning(msg, *args, **kwargs)
+
+        monkeypatch.setattr(ocr.logger, "warning", warning)
+        result = a.run_task(spec)
+        assert sent == ["t0", "t0"]
+        assert result.turns_empty == [0, 0]
+        assert result.turns_completed == 0
+
+
+class TestEmptyTurnGraceSeconds:
+    def test_default_floor_and_junk(self, monkeypatch):
+        monkeypatch.delenv("WCB_EMPTY_TURN_GRACE_SECONDS", raising=False)
+        assert OpenClawAgent._empty_turn_grace_seconds() == 5.0
+        monkeypatch.setenv("WCB_EMPTY_TURN_GRACE_SECONDS", "12")
+        assert OpenClawAgent._empty_turn_grace_seconds() == 12.0
+        for low in ("0", "-3", "0.5"):
+            monkeypatch.setenv("WCB_EMPTY_TURN_GRACE_SECONDS", low)
+            assert OpenClawAgent._empty_turn_grace_seconds() == 2.0
+        for junk in ("junk", "nan"):
+            monkeypatch.setenv("WCB_EMPTY_TURN_GRACE_SECONDS", junk)
+            assert OpenClawAgent._empty_turn_grace_seconds() == 5.0
+        for huge in ("inf", "1e9"):
+            monkeypatch.setenv("WCB_EMPTY_TURN_GRACE_SECONDS", huge)
+            assert OpenClawAgent._empty_turn_grace_seconds() == 60.0

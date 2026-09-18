@@ -504,7 +504,8 @@ def test_instruction_md_emitted_with_workspace_hint_when_attachments(tmp_path):
 
     bundle = tmp_path / "bundle_a"
     assert rp._stage_data_instruction(input_task_dir, bundle, verbose=False)
-    text = (bundle / "data" / "instruction.md").read_text()
+    text = (bundle / "data" / "solution" / "instruction.md").read_text()
+    assert not (bundle / "data" / "instruction.md").exists()
     assert text.startswith("Solve this puzzle.")
     assert "Workspace inputs" in text
     assert "/root/workspace/" in text
@@ -520,9 +521,47 @@ def test_instruction_md_no_workspace_hint_when_no_attachments(tmp_path):
 
     bundle = tmp_path / "bundle_b"
     assert rp._stage_data_instruction(input_task_dir, bundle, verbose=False)
-    text = (bundle / "data" / "instruction.md").read_text()
+    text = (bundle / "data" / "solution" / "instruction.md").read_text()
     assert text == "Just answer in words.\n"
     assert "Workspace inputs" not in text
+
+
+def test_instruction_md_stage_removes_legacy_data_root_copy(tmp_path):
+    """instruction.md moved from data/ into data/solution/. Re-staging a tree
+    packaged before the move (or a bundle whose data/ was copytree'd from one)
+    must drop the stale data/instruction.md so the file never ships twice, and
+    must leave solve.sh / TRUTH.md alongside it untouched."""
+    rp = _load_repackage_module()
+    input_task_dir = tmp_path / "task"
+    input_task_dir.mkdir()
+    (input_task_dir / "prompt.txt").write_text("New prompt.\n")
+
+    bundle = tmp_path / "bundle_legacy"
+    solution = bundle / "data" / "solution"
+    solution.mkdir(parents=True)
+    (bundle / "data" / "instruction.md").write_text("STALE\n")
+    (solution / "solve.sh").write_text("#!/bin/sh\n")
+    (solution / "TRUTH.md").write_text("truth\n")
+
+    assert rp._stage_data_instruction(input_task_dir, bundle, verbose=False)
+    assert not (bundle / "data" / "instruction.md").exists()
+    assert (solution / "instruction.md").read_text() == "New prompt.\n"
+    assert (solution / "solve.sh").is_file() and (solution / "TRUTH.md").is_file()
+
+
+def test_instruction_md_legacy_copy_kept_when_nothing_is_staged(tmp_path):
+    """No readable prompt source -> nothing is emitted, so the existing legacy
+    file is the only copy and must NOT be deleted."""
+    rp = _load_repackage_module()
+    input_task_dir = tmp_path / "task_no_prompt"
+    input_task_dir.mkdir()
+    bundle = tmp_path / "bundle_keep"
+    (bundle / "data").mkdir(parents=True)
+    (bundle / "data" / "instruction.md").write_text("ONLY COPY\n")
+
+    assert not rp._stage_data_instruction(input_task_dir, bundle, verbose=False)
+    assert not rp._stage_data_instruction(None, bundle, verbose=False)
+    assert (bundle / "data" / "instruction.md").read_text() == "ONLY COPY\n"
 
 
 def test_dockerfile_and_compose_emitted_from_bundle_env_dir(tmp_path):
@@ -943,12 +982,13 @@ def test_convert_task_emits_all_four_harbor_files(tmp_path):
     )
     assert bundle is not None
     for rel in (
-        "data/instruction.md",
+        "data/solution/instruction.md",
         "data/environment/Dockerfile",
         "data/environment/docker-compose.yaml",
         "data/task.toml",
     ):
         assert (bundle / rel).is_file(), f"convert_task did not emit {rel}"
+    assert not (bundle / "data" / "instruction.md").exists()
 
 
 # ============================================================================

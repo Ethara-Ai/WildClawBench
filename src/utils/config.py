@@ -85,7 +85,7 @@ class Config:
     # the environment by grading.py, mirroring the Sonnet-OAuth judge route.
     judge_codex_bridge_url: str = ""
     judge_codex_bridge_model: str = ""
-    judge_codex_max_evidence: int = 350_000
+    judge_codex_max_evidence: int = 500_000
 
     # ---- Anthropic direct (alternative upstream for opus when Bedrock unavailable) ----
     # Used by litellm_sidecar.py to emit an `anthropic/claude-opus-4-20250514`
@@ -264,7 +264,7 @@ class Config:
             judge_gpt_model=s("KENSEI_JUDGE_GPT_MODEL", "JUDGE_GPT_MODEL"),
             judge_codex_bridge_url=s("KENSEI_JUDGE_CODEX_BRIDGE_URL"),
             judge_codex_bridge_model=s("KENSEI_JUDGE_CODEX_BRIDGE_MODEL"),
-            judge_codex_max_evidence=i("KENSEI_JUDGE_CODEX_MAX_EVIDENCE", 350_000),
+            judge_codex_max_evidence=i("KENSEI_JUDGE_CODEX_MAX_EVIDENCE", 500_000),
             anthropic_api_key=s("KENSEI_ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY"),
             meta_api_key=s("KENSEI_1P_API_KEY", "ONEP_API_KEY"),
             meta_base_url=s("KENSEI_1P_BASE_URL", "ONEP_API_BASE_URL", default="https://api.ai.meta.com/v1"),

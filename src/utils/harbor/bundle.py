@@ -7,7 +7,6 @@ Layout (relative to `out_dir`):
   prompt.txt
   rubric.json
   golden_trajectory.json
-  data/instruction.md
   data/task.toml
   data/environment/...                  (copied verbatim from config.environment_dir)
   data/environment/Dockerfile
@@ -16,6 +15,7 @@ Layout (relative to `out_dir`):
   data/tests/test_outputs.py
   data/tests/test_weights.json
   data/solution/solve.sh
+  data/solution/instruction.md
   trajectories/<model>/run_<N>/output.json
   trajectories/<model>/run_<N>/task_output/logs/verifier/reward.txt
   trajectories/<model>/run_<N>/task_output/logs/verifier/ctrf.json
@@ -253,7 +253,9 @@ def write_bundle(
         )
     else:
         instruction_text = prompt_text
-    (data_dir / "instruction.md").write_text(instruction_text, encoding="utf-8")
+    # Lives under data/solution/ (lock-step with
+    # script/repackage_to_bundle.py::_stage_data_instruction), not the data/ root.
+    (data_dir / "solution" / "instruction.md").write_text(instruction_text, encoding="utf-8")
 
     # `used_apis` (line 158) is the canonical required-API set computed via
     # `_discover_used_apis(task, task_dir, env_dir)` which fuses prompt-keyword

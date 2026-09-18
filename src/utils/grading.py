@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import fnmatch
+import hashlib
 import json
 import logging
 import os
@@ -111,12 +113,18 @@ def _judge_oauth_max_evidence() -> int:
     return n if n > 0 else _DEFAULT_JUDGE_OAUTH_MAX_EVIDENCE
 
 
-# Codex-subscription judge evidence cap. Defaults to the gpt family base (see
-# _FAMILY_EVIDENCE['gpt']) so it is a no-op unless the operator tightens it; the
-# usable context on the ChatGPT *subscription* surface is undocumented, so this
-# is the tunable safety valve, applied via min() in _member_evidence_budget the
-# same way the OAuth cap is. Override with KENSEI_JUDGE_CODEX_MAX_EVIDENCE.
-_DEFAULT_JUDGE_CODEX_MAX_EVIDENCE = 350_000
+# Codex-subscription judge evidence budget. On this route it REPLACES the gpt
+# family base (_FAMILY_EVIDENCE['gpt'] = 350K) rather than being min()'d with it:
+# that base exists only to keep METERED OpenAI input under the 272K-token
+# re-pricing threshold, and the subscription route bills $0. 500K chars is
+# ~150K tokens on typical judge payloads (~3.3 chars/token measured on
+# benicio_aguirre_0ee7cbc9 2026-09-17), inside the <=160K-token range that parsed
+# cleanly (see _DEFAULT_JUDGE_MAX_EVIDENCE note), and 505K / 1.375 worst-case
+# floor = ~367K tokens + 128K output + 3K safety = ~498K, well under sol's
+# 1,050,000 window. A luna model (400K window) keeps the 350K family base (see
+# _member_evidence_budget). KENSEI_JUDGE_CODEX_MAX_EVIDENCE raises or lowers it;
+# set it back to 350000 to restore the previous budget.
+_DEFAULT_JUDGE_CODEX_MAX_EVIDENCE = 500_000
 
 
 def _judge_codex_max_evidence() -> int:
@@ -232,6 +240,8 @@ _FAMILY_RATES: dict[str, tuple[float, float, float, float]] = {
 #   gpt   : 272,000 × 1.375 − 5000 scaffold = 369,000 → floor 25k → 350_000
 # Back-check: (350,000 + 5,000) / 1.375 ≈ 258K input (< 272K, single-rate tier)
 # and 258K + 128,000 max + 3,000 safety = 389K ≤ 400,000 (luna, smallest ctx).
+# This base governs the METERED route only; the codex subscription route uses
+# _DEFAULT_JUDGE_CODEX_MAX_EVIDENCE (500K) instead.
 _FAMILY_EVIDENCE: dict[str, tuple[int, int]] = {
     "sonnet": (1_175_000, 128000),
     "kimi": (225_000, 16384),
@@ -295,7 +305,13 @@ def _member_evidence_budget(model: str, family: str | None = None) -> int | None
             except Exception:
                 pass
         if fam == "gpt" and _judge_codex_bridge_url():
-            return min(base, _judge_codex_max_evidence())
+            # Subscription route: the metered-pricing base does not apply (see
+            # _DEFAULT_JUDGE_CODEX_MAX_EVIDENCE), except that a luna model's
+            # 400K-token window only fits the family base.
+            cap = _judge_codex_max_evidence()
+            if "luna" in (model or "").lower():
+                cap = min(cap, _FAMILY_EVIDENCE["gpt"][0])
+            return min(cap, _AWS_EDGE_BODY_CAP)
         return base
     return _DEFAULT_JUDGE_MAX_EVIDENCE
 
@@ -671,26 +687,62 @@ def _extract_inline_images(body: str, label_stem: str) -> tuple[str, list[ImageP
         return body, []
 
 
-def _select_judge_images(candidates: list[ImagePart]) -> list[ImagePart]:
+def _select_judge_images_with_reasons(
+    candidates: list[ImagePart],
+) -> tuple[list[ImagePart], dict[str, str]]:
     """Apply the count + byte caps, preserving evidence order. Never raises.
+
+    Returns (selected, {label: reason}) where the dict names every candidate NOT
+    selected and why, so its placeholder can disclose it.
 
     An image that would breach the byte cap is SKIPPED, not a stop signal: one
     oversized blob early in the evidence must not suppress every smaller image
-    behind it. Skipped images keep their text placeholder either way.
+    behind it.
     """
     max_n = _judge_max_images()
     max_bytes = _judge_max_image_bytes()
     out: list[ImagePart] = []
+    rejected: dict[str, str] = {}
     used = 0
     for img in candidates:
+        if max_n <= 0:
+            rejected[img.label] = "judge image attachment is disabled"
+            continue
         if len(out) >= max_n:
-            break
+            rejected[img.label] = f"judge image count limit reached ({max_n} per request)"
+            continue
         n = _data_uri_b64_len(img.data_uri)
         if used + n > max_bytes:
+            rejected[img.label] = f"judge image size limit reached ({max_bytes} bytes per request)"
             continue
         out.append(img)
         used += n
-    return out
+    return out, rejected
+
+
+def _select_judge_images(candidates: list[ImagePart]) -> list[ImagePart]:
+    return _select_judge_images_with_reasons(candidates)[0]
+
+
+def _disclose_unattached_images(body: str, rejected: dict[str, str]) -> str:
+    """Mark each inline-image placeholder in *body* whose image will not be
+    attached, so the judge knows the image exists but was not shown.
+    Placeholders keep their _image_placeholder_prefix, so survivor matching is
+    unaffected."""
+    for label, reason in rejected.items():
+        prefix = _image_placeholder_prefix(label)
+        start = body.find(prefix)
+        if start < 0:
+            continue
+        end = body.find("]", start + len(prefix))
+        if end < 0:
+            continue
+        body = (
+            body[:end]
+            + f"; present — contents not included: {reason}"
+            + body[end:]
+        )
+    return body
 
 
 def _split_evidence(evidence: str) -> tuple[str, str]:
@@ -773,24 +825,75 @@ _IMAGE_DELIVERABLE_EXTS = {
     ".png", ".jpg", ".jpeg", ".webp", ".gif",
 }
 _ALL_DELIVERABLE_EXTS = _DELIVERABLE_EXTS | _BINARY_DELIVERABLE_EXTS | _IMAGE_DELIVERABLE_EXTS
-_ROOT_SCAN_MAX_FILE_BYTES = 512_000   # skip oversized files in the root scan
-# Cap on extracted-text length per binary deliverable (docx/pdf). Bounds the
-# per-member evidence budget so a large extraction cannot bury report.md for the
-# smaller-context council members (Kimi 225 KB / GLM 175 KB).
-_EXTRACT_CHAR_CAP = 100_000
+# Raw-byte cap for TEXT files found by the root-level scan only. Text bodies are
+# pasted verbatim, so raw size is their evidence cost. Documents (pdf/docx/xlsx/
+# pptx) are bounded by _EXTRACT_CHAR_CAP instead and images contribute only a
+# marker, so neither is ever rejected on raw byte size. A root text file over
+# this cap is still collected and disclosed with a presence marker.
+_ROOT_SCAN_MAX_FILE_BYTES = 100_000
+# Cap on extracted-text length per document deliverable (pdf/docx/xlsx/pptx).
+# Bounds the per-member evidence budget so a large extraction cannot bury
+# report.md for the smaller-context council members (Kimi 225 KB / GLM 175 KB).
+# Text beyond the cap is not sent, and the block header says so.
+_EXTRACT_CHAR_CAP = 150_000
+
+# Presence-marker reasons. A presence marker tells the judge a file EXISTS even
+# though its contents are not in the prompt, which judge_system.md maps to
+# [[SATISFIED: No]] + [[TRUNCATION_AFFECTED: Yes]] (-> Human Evaluation) for a
+# content requirement, instead of "file never produced".
+_REASON_ROOT_TEXT_CAP = (
+    f"text file exceeds the {_ROOT_SCAN_MAX_FILE_BYTES}-byte root-scan size cap"
+)
+_REASON_UNREADABLE = "file could not be read"
+_REASON_NOT_EXTRACTABLE = "contents not extractable (no text could be extracted from this document)"
+_REASON_EVIDENCE_BUDGET = "evidence budget exceeded"
+_REASON_UNSUPPORTED = "unsupported file type"
 
 
 def _looks_like_deliverable(path: Path, root: Path) -> bool:
-    """True if a workspace-root file looks like agent output (any deliverable
-    extension, text or supported binary) rather than an oversized blob or binary
-    input outside our supported set. Used by the presence-scan stage so binaries
-    like report.pdf / flagged_items.xlsx surface in the manifest."""
+    """True if a workspace-root file's contents can go to the judge: a supported
+    deliverable extension and, for TEXT files only, within
+    _ROOT_SCAN_MAX_FILE_BYTES. Documents and images are never rejected on raw
+    size. A supported file this returns False for is still disclosed by the root
+    scan with a presence marker (see _root_scan_skip_reason)."""
     if path.suffix.lower() not in _ALL_DELIVERABLE_EXTS:
         return False
+    if not _is_text_deliverable(path):
+        return True
     try:
         return path.stat().st_size <= _ROOT_SCAN_MAX_FILE_BYTES
     except OSError:
         return False
+
+
+def _root_scan_skip_reason(path: Path) -> str:
+    """Why a supported root-scan file's contents are withheld (see
+    _looks_like_deliverable)."""
+    try:
+        path.stat()
+    except OSError:
+        return _REASON_UNREADABLE
+    return _REASON_ROOT_TEXT_CAP
+
+
+def _file_size(path: Path) -> int | None:
+    try:
+        return path.stat().st_size
+    except OSError:
+        return None
+
+
+def _presence_marker(label: str, path: Path, reason: str) -> str:
+    """Evidence block for a file that exists but whose contents are not in the
+    prompt. The judge must be able to tell this apart from a file that was never
+    produced."""
+    size = _file_size(path)
+    size_txt = f"{size} bytes" if size is not None else "size unknown"
+    return (
+        f"\n----- DELIVERABLE: {label}\n"
+        f"({size_txt}, present — contents not included: {reason})\n"
+        "-----\n"
+    )
 
 
 def _is_text_deliverable(path: Path) -> bool:
@@ -812,26 +915,89 @@ def _is_binary_deliverable(path: Path) -> bool:
     return path.suffix.lower() in _BINARY_DELIVERABLE_EXTS
 
 
-def _collect_deliverable_files(workspace_results: Path) -> list[Path]:
-    files: list[Path] = []
-    seen: set[Path] = set()
+# Persona/bootstrap scaffolding the harness copies into every workspace, and
+# harness-written files at the task_output/ top level. Neither is agent output,
+# but both match a deliverable extension, so the root-level sweep used to hand
+# them to the judge on every run (8 persona files + the gateway log, up to
+# 512 KB of budget). Applied to the ROOT-LEVEL sweep only: a persona file the
+# agent actually modified (e.g. MEMORY.md) is copied into artifacts/ by the
+# baseline diff and still reaches the judge through the evidence dir itself.
+# Names mirror s3_artifacts._TEMPLATE_FILE_NAMES; compared case-insensitively.
+_PERSONA_FILE_NAMES = frozenset({
+    "identity.md", "bootstrap.md", "heartbeat.md", "user.md",
+    "soul.md", "agents.md", "tools.md", "agent.md", "memory.md",
+})
+_HARNESS_FILE_GLOBS = ("openclaw-*.log", "artifacts_excluded.json")
 
-    def _add_from(root: Path) -> None:
+
+def _is_scaffold_or_harness_file(path: Path) -> bool:
+    name = path.name
+    return name.lower() in _PERSONA_FILE_NAMES or any(
+        fnmatch.fnmatch(name, pat) for pat in _HARNESS_FILE_GLOBS
+    )
+
+
+def _file_sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _collect_deliverables_with_status(
+    workspace_results: Path,
+) -> list[tuple[Path, str, str | None]]:
+    """Collected deliverables as (path, label, skip_reason) triples.
+
+    `label` is the file's workspace-relative POSIX path (bare name for a
+    top-level file) and is what the judge sees in the DELIVERABLE header, so two
+    different files sharing a basename stay distinguishable. It never carries a
+    host path.
+
+    `skip_reason` is None when the file's contents may go to the judge, else why
+    they are withheld (e.g. a root-scan text file over _ROOT_SCAN_MAX_FILE_BYTES).
+    A withheld file is still returned so it can be disclosed with a presence
+    marker: a collection limit must never make a produced file look absent.
+
+    The same agent file is physically present under BOTH artifacts/<rel>
+    (baseline-diff copy) and workspace_full/<rel> (full-tree copy); a path-only
+    `seen` set let both through, so the judge received identical blocks twice and
+    the copies burned the smaller members' evidence budget. A file is a repeat
+    only when its label AND content hash both match one already collected —
+    identical bytes under a different name/path are kept (a rubric may key on
+    either name), as is a same-named file with different bytes."""
+    found: list[tuple[Path, str, str | None]] = []
+    seen: set[Path] = set()
+    seen_content: set[tuple[str, str]] = set()
+
+    def _add(f: Path, label_root: Path, skip_reason: str | None = None) -> None:
+        seen.add(f)
+        try:
+            label = f.relative_to(label_root).as_posix()
+        except ValueError:
+            label = f.name
+        try:
+            key = (label, _file_sha256(f))
+        except OSError:
+            key = None  # unreadable: keep it, grading must never fail
+        if key is not None:
+            if key in seen_content:
+                return
+            seen_content.add(key)
+        found.append((f, label, skip_reason))
+
+    def _add_from(root: Path, label_root: Path | None = None) -> None:
+        # Recursive sweep of an evidence/deliverable dir. No raw-byte cap here:
+        # text bodies are bounded by the evidence budget, documents by
+        # _EXTRACT_CHAR_CAP, and images contribute only a marker.
         if not root.is_dir():
             return
         for f in sorted(root.rglob("*")):
             if not (f.is_file() and f not in seen):
                 continue
-            if _is_text_deliverable(f):
-                seen.add(f)
-                files.append(f)
-            elif _is_binary_deliverable(f) or _is_image_deliverable(f):
-                try:
-                    if f.stat().st_size <= _ROOT_SCAN_MAX_FILE_BYTES:
-                        seen.add(f)
-                        files.append(f)
-                except OSError:
-                    continue
+            if f.suffix.lower() in _ALL_DELIVERABLE_EXTS:
+                _add(f, label_root or root)
 
     if workspace_results:
         results_path = Path(workspace_results)
@@ -844,16 +1010,34 @@ def _collect_deliverable_files(workspace_results: Path) -> list[Path]:
             if not sibling.is_dir():
                 continue
             for name in _DELIVERABLE_DIR_NAMES:
-                _add_from(sibling / name)
+                # Labels stay relative to the sweep root (output/x.csv), so they
+                # line up with the artifacts/ copy of the same file.
+                _add_from(sibling / name, label_root=sibling)
             # Some agents save deliverables at the workspace ROOT (e.g.
             # /tmp_workspace/foo.csv) rather than in a named subdir. Recover
             # text-like deliverable files sitting directly under the sweep root,
             # without recursing into input/scaffold subtrees.
             for f in sorted(sibling.glob("*")):
-                if f.is_file() and f not in seen and _looks_like_deliverable(f, sibling):
-                    seen.add(f)
-                    files.append(f)
-    return files
+                if (not f.is_file() or f in seen
+                        or f.suffix.lower() not in _ALL_DELIVERABLE_EXTS
+                        or _is_scaffold_or_harness_file(f)):
+                    continue
+                if _looks_like_deliverable(f, sibling):
+                    _add(f, sibling)
+                else:
+                    # Oversized root text (or unreadable): disclose, don't drop.
+                    _add(f, sibling, skip_reason=_root_scan_skip_reason(f))
+    return found
+
+
+def _collect_deliverables(workspace_results: Path) -> list[tuple[Path, str]]:
+    """(path, label) pairs for every collected deliverable, including ones
+    whose contents are withheld (see _collect_deliverables_with_status)."""
+    return [(f, label) for f, label, _ in _collect_deliverables_with_status(workspace_results)]
+
+
+def _collect_deliverable_files(workspace_results: Path) -> list[Path]:
+    return [f for f, _ in _collect_deliverables(workspace_results)]
 
 
 def _is_image_deliverable(path: Path) -> bool:
@@ -895,7 +1079,7 @@ def _image_dimensions(path: Path) -> tuple[int, int] | None:
     return None
 
 
-def _extract_text_deliverable(path: Path) -> str | None:
+def _extract_document_text(path: Path) -> str | None:
     # Stdlib-only text extraction for binary deliverables (NO python-docx/openpyxl
     # /python-pptx). OOXML formats are ZIPs of XML: .docx reads word/document.xml
     # <w:t> nodes; .xlsx reads sharedStrings + worksheet <t> nodes; .pptx reads
@@ -903,7 +1087,7 @@ def _extract_text_deliverable(path: Path) -> str | None:
     # (pypdf): when installed, extracts real PDF text; when absent, degrades to None
     # (-> presence marker). pypdf is now a host requirement (requirements.txt) but the
     # import stays guarded so a missing wheel degrades rather than crashing.
-    # Returns extracted text (char-capped) or None. NEVER raises.
+    # Returns the FULL extracted text (uncapped) or None. NEVER raises.
     ext = path.suffix.lower()
     try:
         if ext == ".docx":
@@ -911,7 +1095,7 @@ def _extract_text_deliverable(path: Path) -> str | None:
                 xml = z.read("word/document.xml")
             root = ET.fromstring(xml)
             text = "".join(n.text or "" for n in root.iter(_DOCX_W_T)).strip()
-            return text[:_EXTRACT_CHAR_CAP] or None
+            return text or None
         if ext == ".xlsx":
             with zipfile.ZipFile(path) as z:
                 names = set(z.namelist())
@@ -941,7 +1125,7 @@ def _extract_text_deliverable(path: Path) -> str | None:
                         if cells:
                             rows_out.append(" | ".join(cells))
             text = "\n".join(rows_out).strip()
-            return text[:_EXTRACT_CHAR_CAP] or None
+            return text or None
         if ext == ".pptx":
             slide_parts: list[str] = []
             with zipfile.ZipFile(path) as z:
@@ -950,7 +1134,7 @@ def _extract_text_deliverable(path: Path) -> str | None:
                         slide = ET.fromstring(z.read(name))
                         slide_parts.extend(n.text or "" for n in slide.iter(_PPTX_A_T))
             text = " ".join(p for p in slide_parts if p).strip()
-            return text[:_EXTRACT_CHAR_CAP] or None
+            return text or None
         if ext == ".pdf":
             try:
                 import pypdf
@@ -958,43 +1142,69 @@ def _extract_text_deliverable(path: Path) -> str | None:
                 return None
             reader = pypdf.PdfReader(str(path))
             text = "".join((pg.extract_text() or "") for pg in reader.pages).strip()
-            return text[:_EXTRACT_CHAR_CAP] or None
+            return text or None
     except Exception:
         return None
     return None
 
 
-def _deliverable_evidence_marker(path: Path) -> tuple[str, list[ImagePart]] | None:
+def _extract_text_deliverable(path: Path) -> str | None:
+    """Extracted document text capped at _EXTRACT_CHAR_CAP, or None."""
+    text = _extract_document_text(path)
+    return text[:_EXTRACT_CHAR_CAP] if text else None
+
+
+def _deliverable_evidence_marker(
+    path: Path, label: str | None = None, skip_reason: str | None = None
+) -> tuple[str, list[ImagePart]]:
     # Single dispatch point turning one collected deliverable into an evidence
-    # block. Returns (block_text, images), or None to skip. Text deliverables read
-    # verbatim EXCEPT for inline base64 images, which are lifted here — before any
-    # budgeting — so a blob can never be bisected by a char slice; extractable
-    # binaries (docx/pdf) route through _extract_text_deliverable; images emit a
-    # stdlib dimension marker; other binaries emit a presence-only marker
-    # (verbatim bytes would be mojibake). NEVER raises (grading-must-never-fail).
+    # block. Returns (block_text, images). Text deliverables read verbatim EXCEPT
+    # for inline base64 images, which are lifted here — before any budgeting — so
+    # a blob can never be bisected by a char slice; documents (pdf/docx/xlsx/pptx)
+    # route through _extract_document_text; images and anything whose contents
+    # cannot be sent get a presence marker (verbatim binary bytes would be
+    # mojibake). A collected file ALWAYS yields a block: an unreadable or
+    # withheld file is disclosed, never silently dropped. NEVER raises
+    # (grading-must-never-fail).
+    # `label` (workspace-relative path from _collect_deliverables) names the block
+    # AND stems its inline-image labels, so same-basename files never share an
+    # image label; it defaults to the bare filename.
+    label = label or path.name
+    if skip_reason:
+        return _presence_marker(label, path, skip_reason), []
     try:
         if _is_text_deliverable(path):
             body = path.read_text(encoding="utf-8", errors="replace")
-            body, images = _extract_inline_images(body, path.name)
-            return f"\n----- DELIVERABLE: {path.name} -----\n{body}", images
+            body, images = _extract_inline_images(body, label)
+            return f"\n----- DELIVERABLE: {label} -----\n{body}", images
         if _is_image_deliverable(path):
+            # Standalone image files are never attached as pixels; the marker
+            # carries stdlib-parsed dimensions for "did it produce an image of
+            # size WxH?" criteria.
             dims = _image_dimensions(path)
             size = f"image {dims[0]}x{dims[1]}" if dims else "image"
-            return (
-                f"\n----- DELIVERABLE: {path.name} "
-                f"({size}, presence only) -----\n"
+            return _presence_marker(
+                label, path,
+                f"image pixels are not attached for standalone image files ({size})",
             ), []
         if _is_binary_deliverable(path):
-            extracted = _extract_text_deliverable(path)
-            if extracted:
-                return f"\n----- DELIVERABLE: {path.name} (extracted text) -----\n{extracted}", []
+            extracted = _extract_document_text(path)
+            if not extracted:
+                return _presence_marker(label, path, _REASON_NOT_EXTRACTABLE), []
+            if len(extracted) <= _EXTRACT_CHAR_CAP:
+                return f"\n----- DELIVERABLE: {label} (extracted text) -----\n{extracted}", []
+            size = _file_size(path)
+            size_txt = f"{size} bytes" if size is not None else "size unknown"
             return (
-                f"\n----- DELIVERABLE: {path.name} "
-                "(binary — present, contents not extractable) -----\n"
+                f"\n----- DELIVERABLE: {label} (extracted text, truncated: first "
+                f"{_EXTRACT_CHAR_CAP} of {len(extracted)} chars included; "
+                f"{size_txt}, present — remaining contents not included: extracted "
+                f"text exceeds the {_EXTRACT_CHAR_CAP}-char extraction cap) -----\n"
+                f"{extracted[:_EXTRACT_CHAR_CAP]}"
             ), []
     except Exception:
-        return None
-    return None
+        return _presence_marker(label, path, _REASON_UNREADABLE), []
+    return _presence_marker(label, path, _REASON_UNSUPPORTED), []
 
 
 _TRANSCRIPT_MARKER = "\n----- TRANSCRIPT (condensed) -----\n"
@@ -1107,12 +1317,15 @@ def _in_scratch_subdir(path: Path) -> bool:
     return any(p in _SCRATCH_DIR_NAMES for p in parts[anchor + 1:])
 
 
-# Reserved tail of the deliverable budget for the omission manifest, so the
-# judge can distinguish "file was never produced" (verdict No) from "file was
-# produced but cut for budget" (No + TRUNCATION_AFFECTED — which the scoring
+# Evidence-budget note naming collected files whose contents were cut or not
+# included. Together with per-file presence markers it lets the judge tell
+# "file was never produced" (verdict No) from "file was produced but its
+# contents are not in the prompt" (No + TRUNCATION_AFFECTED — which the scoring
 # layer then routes to Human Evaluation instead of a graded fail).
-_OMISSION_MANIFEST_RESERVE = 400
 _OMISSION_MANIFEST_MAX_NAMES = 40
+_PARTIAL_KEEP_MIN_ROOM = 800
+_MIN_TRANSCRIPT_TAIL = 200
+_BUDGET_CUT_MARK = "\n... [truncated for evidence budget] ...\n"
 
 
 def _surviving_images(text: str, candidates: list[ImagePart]) -> list[ImagePart]:
@@ -1125,13 +1338,139 @@ def _surviving_images(text: str, candidates: list[ImagePart]) -> list[ImagePart]
     return [i for i in candidates if _image_placeholder_prefix(i.label) in text]
 
 
+def _is_presence_block(block: str, label: str) -> bool:
+    """True for a block produced by _presence_marker (contents not included)."""
+    return block.startswith(f"\n----- DELIVERABLE: {label}\n(")
+
+
+def _omission_note(omitted: list[str]) -> str:
+    listing = ", ".join(omitted[:_OMISSION_MANIFEST_MAX_NAMES])
+    extra = len(omitted) - _OMISSION_MANIFEST_MAX_NAMES
+    return (
+        f"\n----- EVIDENCE BUDGET NOTE: {len(omitted)} collected file(s)"
+        f" omitted or cut for budget: {listing}"
+        + (f" [+{extra} more]" if extra > 0 else "")
+        + " -----\n"
+    )
+
+
+def _omission_note_upper_bound(labels: list[str]) -> int:
+    """Longest _omission_note any subset of *labels* (each possibly suffixed
+    " (partial)") can produce, so the note's space is reserved up front and the
+    note is never clipped."""
+    n = len(labels)
+    names = sorted((len(label) + len(" (partial)") for label in labels), reverse=True)
+    names = names[:_OMISSION_MANIFEST_MAX_NAMES]
+    return (
+        len(_omission_note([]))
+        + len(str(n))
+        + sum(names) + 2 * max(0, len(names) - 1)
+        + len(f" [+{n} more]")
+    )
+
+
+def _count_only_note(total: int, unlisted: int) -> str:
+    return (
+        f"\n----- EVIDENCE BUDGET NOTE: {total} collected file(s) present but"
+        f" contents not included for budget; {unlisted} of them not listed by"
+        " name for budget -----\n"
+    )
+
+
+def _budget_deliverables(
+    blocks: list[tuple[str, str, list[ImagePart], str]],
+    deliv_budget: int,
+) -> tuple[str, list[ImagePart]]:
+    """Fit deliverable blocks into *deliv_budget* chars without ever silently
+    dropping a file. Returns (text, images of blocks kept in full or in part);
+    the text is always <= deliv_budget.
+
+    *blocks* are (label, block_text, images, presence_marker) in priority order.
+    Every file not kept in full stays disclosed: a partial keep carries a
+    truncation mark, a dropped block is replaced by its presence marker, and the
+    EVIDENCE BUDGET NOTE names them. Before a block is kept, space is reserved
+    for every LATER file's presence marker plus the note, so disclosure always
+    fits. If even the markers cannot all fit, markers are emitted in priority
+    order and a count-only note discloses the rest.
+    """
+    full = "".join(block for _, block, _, _ in blocks)
+    if len(full) <= deliv_budget:
+        return full, [i for _, _, imgs, _ in blocks for i in imgs]
+    n = len(blocks)
+    suffix = [0] * (n + 1)
+    for i in range(n - 1, -1, -1):
+        suffix[i] = suffix[i + 1] + len(blocks[i][3])
+    note_reserve = _omission_note_upper_bound([label for label, _, _, _ in blocks])
+
+    if note_reserve + suffix[0] <= deliv_budget:
+        kept: list[str] = []
+        disclosed: list[str] = []
+        images: list[ImagePart] = []
+        omitted: list[str] = []
+        used = 0
+        # Invariant: used + note_reserve + suffix[i] <= deliv_budget.
+        for i, (label, block, block_images, presence) in enumerate(blocks):
+            room = deliv_budget - used - note_reserve - suffix[i + 1]
+            if len(block) <= room:
+                kept.append(block)
+                used += len(block)
+                images.extend(block_images)
+            elif (
+                not omitted
+                and room >= _PARTIAL_KEEP_MIN_ROOM
+                and not _is_presence_block(block, label)
+            ):
+                # Head+tail keep (mirrors _budget_transcript): deliverable text
+                # files often carry markup/data bulk up front and the
+                # human-readable summary at the END, so a head-only cut drops
+                # exactly the content criteria cite. _surviving_images later
+                # drops images whose placeholder fell in the excised middle.
+                half = (room - len(_BUDGET_CUT_MARK)) // 2
+                tail = room - len(_BUDGET_CUT_MARK) - half
+                kept.append(block[:half] + _BUDGET_CUT_MARK + block[-tail:])
+                used += room
+                images.extend(block_images)
+                omitted.append(f"{label} (partial)")
+            else:
+                # Whole block dropped: its images are not attached (pixels with
+                # no text naming them), but the file itself is disclosed.
+                disclosed.append(presence)
+                used += len(presence)
+                omitted.append(label)
+        note = _omission_note(omitted) if omitted else ""
+        return "".join(kept) + note + "".join(disclosed), images
+
+    # Too many files for one marker each: disclose as many as fit, by priority,
+    # and count the rest.
+    total = n
+    note_max = len(_count_only_note(total, total))
+    if note_max > deliv_budget:
+        return "", []
+    out: list[str] = []
+    used = 0
+    listed = 0
+    for _, _, _, presence in blocks:
+        if used + len(presence) + note_max > deliv_budget:
+            break
+        out.append(presence)
+        used += len(presence)
+        listed += 1
+    return "".join(out) + _count_only_note(total, total - listed), []
+
+
 def _gather_evidence(
     workspace_results: Path,
     transcript_text: str,
     budget: int | None = None,
     rubric_names: frozenset[str] | None = None,
+    attach_images: bool = True,
 ) -> JudgeUserPayload:
-    deliverables = _collect_deliverable_files(workspace_results)
+    """Assemble one judge member's evidence text (and image attachments).
+
+    *attach_images* is False for text-only judge transports; every inline image
+    placeholder is then marked as not attached instead of silently losing the
+    pixels at the transport."""
+    deliverables = _collect_deliverables_with_status(workspace_results)
     # Scrub inline base64 out of the TRANSCRIPT too, discarding the images: a
     # tool result that cat'd an image-bearing deliverable would otherwise carry
     # the same blobs back into the same user turn through the other seam. Text
@@ -1139,42 +1478,81 @@ def _gather_evidence(
     transcript_text, _ = _extract_inline_images(transcript_text, "transcript")
     # Order so the files the rubric is actually ABOUT survive every member's
     # truncation budget: rubric-named files first, then report/flagged stems,
-    # then other deliverables, then scratch subtrees — ascending size within
-    # each rank (small, high-signal text before bulky dumps).
+    # then other deliverables, then scratch subtrees — within each rank, by the
+    # file's EVIDENCE size (its rendered block), smallest first. Raw bytes on
+    # disk are the wrong measure: a 1 MB PDF whose extracted text is 14 KB, or
+    # an image that contributes a one-line marker, would otherwise sort behind
+    # far bulkier text and be the first thing cut.
     named = rubric_names or frozenset()
     _PRIMARY = ("report", "flagged")
 
-    def _priority(path: Path) -> tuple:
+    def _rank(path: Path) -> int:
         stem = path.stem.lower()
         if path.name.lower() in named:
-            rank = 0
-        elif _in_scratch_subdir(path):
-            rank = 3
-        elif any(k in stem for k in _PRIMARY):
-            rank = 1
-        else:
-            rank = 2
-        try:
-            size = path.stat().st_size
-        except OSError:
-            size = 1 << 30
-        return (rank, size, path.name)
+            return 0
+        if _in_scratch_subdir(path):
+            return 3
+        if any(k in stem for k in _PRIMARY):
+            return 1
+        return 2
 
-    blocks: list[tuple[Path, str, list[ImagePart]]] = []
-    for f in sorted(deliverables, key=_priority):
-        marker = _deliverable_evidence_marker(f)
-        if marker is not None:
-            block, block_images = marker
-            blocks.append((f, block, block_images))
-    if not blocks:
-        deliv_blob = (
-            "\n(no deliverable files were collected under any of: "
-            + ", ".join(f"{n}/" for n in _DELIVERABLE_DIR_NAMES)
-            + ")\n"
-        )
-        blocks = []
+    rendered: list[tuple[Path, str, str, list[ImagePart]]] = []
+    label_uses: dict[str, int] = {}
+    for f, label, skip_reason in deliverables:
+        # Collection keeps different files that share a label (e.g. an
+        # artifacts/ copy and a diverged workspace_full/ copy). Give each its
+        # own name in the evidence so the judge can tell them apart and their
+        # inline-image labels (and the attach/disclose decisions keyed on them)
+        # never collide. Numbered in collection order, so the evidence-dir
+        # copy keeps the plain name.
+        uses = label_uses.get(label, 0) + 1
+        label_uses[label] = uses
+        if uses > 1:
+            label = f"{label} [{uses}]"
+        block, block_images = _deliverable_evidence_marker(f, label, skip_reason)
+        rendered.append((f, label, block, block_images))
+    rendered.sort(key=lambda r: (_rank(r[0]), len(r[2]), r[0].name, r[1]))
+
+    # Image attachment is decided BEFORE budgeting so every placeholder of an
+    # image that will not be attached is disclosed in the block text, and that
+    # disclosure is counted against the budget like any other text.
+    candidates = [img for _, _, _, imgs in rendered for img in imgs]
+    if attach_images:
+        selected, rejected = _select_judge_images_with_reasons(candidates)
     else:
-        deliv_blob = "".join(b for _, b, _ in blocks)
+        selected = []
+        rejected = {
+            img.label: "this judge does not receive image attachments"
+            for img in candidates
+        }
+    selected_labels = {img.label for img in selected}
+
+    blocks: list[tuple[str, str, list[ImagePart], str]] = []
+    for f, label, block, block_images in rendered:
+        own_rejected = {i.label: rejected[i.label] for i in block_images if i.label in rejected}
+        if own_rejected:
+            block = _disclose_unattached_images(block, own_rejected)
+        presence = (
+            block if _is_presence_block(block, label)
+            else _presence_marker(label, f, _REASON_EVIDENCE_BUDGET)
+        )
+        blocks.append((
+            label, block,
+            [i for i in block_images if i.label in selected_labels],
+            presence,
+        ))
+
+    no_deliverables = (
+        "\n(no deliverable files were collected under any of: "
+        + ", ".join(f"{n}/" for n in _DELIVERABLE_DIR_NAMES)
+        + ")\n"
+    )
+
+    def _fit_deliverables(limit: int) -> tuple[str, list[ImagePart]]:
+        if not blocks:
+            return (no_deliverables if len(no_deliverables) <= limit else ""), []
+        return _budget_deliverables(blocks, limit)
+
     effective = _JUDGE_MAX_EVIDENCE if budget is None else budget
     # Budget deliverables and transcript SEPARATELY. The transcript marker can
     # then never be sliced off (so _split_evidence never silently returns ""),
@@ -1185,69 +1563,33 @@ def _gather_evidence(
     # Image bytes are tracked SEPARATELY from this char budget: the blobs are no
     # longer in the text at all (only their placeholders are), and _judge_max_*
     # caps bound the attachment cost.
-    if effective is None or not transcript_text:
-        blob = deliv_blob + (
+    if effective is None:
+        deliv_out = "".join(block for _, block, _, _ in blocks) or no_deliverables
+        kept_images = [i for _, _, imgs, _ in blocks for i in imgs]
+        text = deliv_out + (
             f"{_TRANSCRIPT_MARKER}{transcript_text}" if transcript_text else ""
         )
-        text = blob if effective is None else blob[:effective]
+        return JudgeUserPayload(text=text, images=_surviving_images(text, kept_images))
+    if not transcript_text:
+        deliv_out, kept_images = _fit_deliverables(max(0, effective))
         return JudgeUserPayload(
-            text=text,
-            images=_select_judge_images(_surviving_images(
-                text, [i for _, _, imgs in blocks for i in imgs]
-            )),
+            text=deliv_out, images=_surviving_images(deliv_out, kept_images)
         )
     floor = min(
         len(_TRANSCRIPT_MARKER) + len(transcript_text),
         max(2000, effective // 5),
     )
     deliv_budget = max(0, effective - floor)
-    if len(deliv_blob) <= deliv_budget:
-        deliv_out = deliv_blob
-        kept_images = [i for _, _, imgs in blocks for i in imgs]
-    else:
-        # Cut on BLOCK boundaries and name what was cut. A raw blob slice
-        # leaves the judge unable to distinguish "file never produced"
-        # (graded No) from "file produced but cut for budget" (No +
-        # TRUNCATION_AFFECTED -> Human Evaluation); the manifest carries that
-        # distinction into the payload (see judge_system.md).
-        kept: list[str] = []
-        kept_images: list[ImagePart] = []
-        omitted: list[str] = []
-        used = 0
-        for f, block, block_images in blocks:
-            room = deliv_budget - used - _OMISSION_MANIFEST_RESERVE
-            if len(block) <= room:
-                kept.append(block)
-                used += len(block)
-                kept_images.extend(block_images)
-            elif room > 800 and not omitted:
-                # Head+tail keep (mirrors _budget_transcript): deliverable text
-                # files often carry markup/data bulk up front and the
-                # human-readable summary at the END, so a head-only cut drops
-                # exactly the content criteria cite.
-                cut_mark = "\n... [truncated for evidence budget] ...\n"
-                half = (room - len(cut_mark)) // 2
-                kept.append(block[:half] + cut_mark + block[-(room - len(cut_mark) - half):])
-                used += room
-                kept_images.extend(block_images)
-                omitted.append(f"{f.name} (partial)")
-            else:
-                # Whole block dropped: attaching its images would put pixels in
-                # front of the judge with no corresponding text placeholder.
-                # (The partial keep above extends kept_images with the whole
-                # block's images; _surviving_images below drops any whose
-                # placeholder fell in the excised middle.)
-                omitted.append(f.name)
-        listing = ", ".join(omitted[:_OMISSION_MANIFEST_MAX_NAMES])
-        extra = len(omitted) - _OMISSION_MANIFEST_MAX_NAMES
-        manifest = (
-            f"\n----- EVIDENCE BUDGET NOTE: {len(omitted)} collected file(s)"
-            f" omitted or cut for budget: {listing}"
-            + (f" [+{extra} more]" if extra > 0 else "")
-            + " -----\n"
-        )
-        kept.append(manifest[: max(0, deliv_budget - used)])
-        deliv_out = "".join(kept)
+    # On a budget so small the transcript floor takes everything, still leave
+    # room for the count-only note (if a minimal transcript tail also fits), so
+    # produced files are never silently absent from the evidence.
+    min_disclosure = len(_count_only_note(len(blocks), len(blocks))) if blocks else 0
+    if (
+        deliv_budget < min_disclosure
+        and effective - len(_TRANSCRIPT_MARKER) - min_disclosure >= _MIN_TRANSCRIPT_TAIL
+    ):
+        deliv_budget = min_disclosure
+    deliv_out, kept_images = _fit_deliverables(deliv_budget)
     t_budget = effective - len(deliv_out) - len(_TRANSCRIPT_MARKER)
     t_out = _budget_transcript(transcript_text, max(0, t_budget))
     # Defensive final clamp: the OAuth 200K ceiling (AGENTS.md #18) is a hard gate,
@@ -1255,10 +1597,7 @@ def _gather_evidence(
     # budget math drifts. _split_evidence still finds the marker because deliv_out
     # + marker are budgeted to fit before the transcript tail.
     text = (deliv_out + _TRANSCRIPT_MARKER + t_out)[:effective]
-    return JudgeUserPayload(
-        text=text,
-        images=_select_judge_images(_surviving_images(text, kept_images)),
-    )
+    return JudgeUserPayload(text=text, images=_surviving_images(text, kept_images))
 
 
 _ZERO_USAGE = {
@@ -1596,15 +1935,16 @@ def _call_judge_openai(
     return text, usage
 
 
-# Smallest valid PNG (1x1, fully transparent) as an inline data URI. Used by
+# Small valid PNG (8x8 RGB, solid colour) as an inline data URI. Used by
 # preflight_judge_codex to exercise the IMAGE leg of the codex judge route: the
 # ChatGPT/Codex backend's handling of image content-parts is not documented, and a
 # 400/refusal there would otherwise only surface at grade time as an abstain-all
-# no-signal verdict (AGENTS.md #18).
+# no-signal verdict (AGENTS.md #18). Not 1x1: the backend rejects a 1x1 image as
+# degenerate, which failed the probe and disabled judge image attachment for the
+# whole batch even though real images are accepted.
 _PROBE_PNG_DATA_URI = (
     "data:image/png;base64,"
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk"
-    "+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+    "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAEUlEQVR42mNwaDiAFTEMLQkAYvNgAQlPC90AAAAASUVORK5CYII="
 )
 
 # A safety-classifier refusal on this route arrives as HTTP 200 with EMPTY
@@ -1639,7 +1979,7 @@ def preflight_judge_codex(timeout_s: float = 90.0) -> tuple[str, str]:
     Both otherwise surface at GRADE time, after the (expensive) trajectory has
     run. This issues ONE real, minimal completion through the exact host ->
     codex-bridge -> chatgpt.com route the grader uses, so a broken subscription
-    is flagged up front, then a SECOND minimal completion carrying one 1x1 PNG
+    is flagged up front, then a SECOND minimal completion carrying one 8x8 PNG
     image content-part so the multimodal leg is exercised before it matters.
 
     Returns (ok, detail) as strings-safe tuple: ok is "ok"/"fail"/"skip".
@@ -2793,7 +3133,12 @@ def _grade_gpt_primary(
         roster = [CouncilMember(family="gpt", model=model)]  # type: ignore[arg-type]
         validate_judge_pricing(roster)
         budget = _member_evidence_budget(model, "gpt")
-        evidence = _gather_evidence(workspace_results, transcript_text, budget=budget)
+        # Same ranking as the council path: files the rubric names go first so
+        # they survive this member's evidence budget.
+        evidence = _gather_evidence(
+            workspace_results, transcript_text, budget=budget,
+            rubric_names=_rubric_file_names(rubrics),
+        )
 
         def _grade_chunk(chunk: list) -> dict:
             user_for_member = {
@@ -2930,6 +3275,9 @@ def grade_with_rubric(
         evidence_for_member[m.model] = _gather_evidence(
             workspace_results, transcript_text, budget=budget,
             rubric_names=rubric_names,
+            # Only the gpt transport carries image parts; the rest are text-only
+            # by contract, so their placeholders must say the image is not shown.
+            attach_images=(m.family == "gpt"),
         )
 
     def _grade_chunk(chunk: list) -> dict:

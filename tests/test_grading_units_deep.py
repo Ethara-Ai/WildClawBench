@@ -326,17 +326,141 @@ def test_collect_deliverable_files_missing_dir_returns_empty(tmp_path):
     assert grading._collect_deliverable_files(tmp_path / "nope" / "results") == []
 
 
-def test_collect_skips_oversized_binary(tmp_path):
-    # Binary deliverable over _ROOT_SCAN_MAX_FILE_BYTES is dropped (presence
-    # scan cap), while an oversized TEXT deliverable is still collected (text
-    # path has no size gate in _is_text_deliverable).
+def test_collect_does_not_byte_cap_documents_or_images(tmp_path):
+    # The raw-byte cap is for root-scan TEXT only: documents and images of any
+    # size are collected in the recursive sweep AND the root scan.
     results = tmp_path / "task_output" / "artifacts" / "results"
     results.mkdir(parents=True)
     big = b"x" * (grading._ROOT_SCAN_MAX_FILE_BYTES + 10)
     (results / "huge.pdf").write_bytes(big)
+    (results / "huge.png").write_bytes(big)
     (results / "small.md").write_text("ok", encoding="utf-8")
-    names = sorted(f.name for f in grading._collect_deliverable_files(results))
-    assert names == ["small.md"]
+    wf = tmp_path / "task_output" / "workspace_full"
+    wf.mkdir()
+    (wf / "root.docx").write_bytes(big)
+    (wf / "root.jpg").write_bytes(big)
+    triples = grading._collect_deliverables_with_status(results)
+    assert sorted(f.name for f, _, _ in triples) == [
+        "huge.pdf", "huge.png", "root.docx", "root.jpg", "small.md",
+    ]
+    assert all(reason is None for _, _, reason in triples)
+
+
+def test_root_scan_oversized_text_is_disclosed_not_dropped(tmp_path):
+    artifacts = tmp_path / "task_output" / "artifacts"
+    artifacts.mkdir(parents=True)
+    (artifacts / "keep.md").write_text("KEEP", encoding="utf-8")
+    wf = tmp_path / "task_output" / "workspace_full"
+    wf.mkdir()
+    size = grading._ROOT_SCAN_MAX_FILE_BYTES + 1
+    (wf / "dump.csv").write_bytes(b"SECRETROW," * (size // 10 + 1))
+    # Exactly at the cap is still included in full.
+    (wf / "edge.txt").write_bytes(b"e" * grading._ROOT_SCAN_MAX_FILE_BYTES)
+    status = {label: reason for _, label, reason in
+              grading._collect_deliverables_with_status(artifacts)}
+    assert status["dump.csv"] == grading._REASON_ROOT_TEXT_CAP
+    assert status["edge.txt"] is None
+    ev = _evidence_text(artifacts, "", budget=None)
+    assert "----- DELIVERABLE: dump.csv\n(" in ev
+    assert "present — contents not included: text file exceeds the 100000-byte root-scan size cap" in ev
+    assert "SECRETROW" not in ev
+    assert "----- DELIVERABLE: edge.txt -----" in ev
+
+
+def _make_run_tree(tmp_path: Path) -> Path:
+    """Real collected-run shape: artifacts/ (baseline-diff copy) and
+    workspace_full/ (full-tree copy) hold the SAME agent files at different
+    paths, next to persona scaffolding and harness-written files. Returns the
+    artifacts/ dir (what _pick_evidence_dir hands to grading)."""
+    task_output = tmp_path / "task_output"
+    artifacts = task_output / "artifacts"
+    wf = task_output / "workspace_full"
+    for root in (artifacts, wf):
+        (root / "output").mkdir(parents=True)
+        (root / "report.md").write_text("REPORT BODY", encoding="utf-8")
+        (root / "output" / "rows.csv").write_text("a,b\n1,2", encoding="utf-8")
+        # Agent-modified persona file: the baseline diff copies it to artifacts/.
+        (root / "MEMORY.md").write_text("agent wrote this memory", encoding="utf-8")
+    # Unmodified persona scaffolding exists only in the full-tree copy.
+    (wf / "SOUL.md").write_text("persona soul", encoding="utf-8")
+    (wf / "AGENTS.md").write_text("persona agents", encoding="utf-8")
+    # results/ is excluded from the baseline diff -> only under workspace_full/.
+    (wf / "results").mkdir()
+    (wf / "results" / "final.md").write_text("FINAL", encoding="utf-8")
+    # Harness-written files at the task_output/ top level.
+    (task_output / "openclaw-2026-10-04.log").write_text("gateway log", encoding="utf-8")
+    (task_output / "artifacts_excluded.json").write_text("[]", encoding="utf-8")
+    return artifacts
+
+
+def test_collect_dedups_artifacts_vs_workspace_full_copies(tmp_path):
+    artifacts = _make_run_tree(tmp_path)
+    pairs = grading._collect_deliverables(artifacts)
+    labels = sorted(label for _, label in pairs)
+    # One copy of each agent file (the artifacts/ one wins: it is walked first),
+    # results/ recovered from workspace_full/, nothing doubled.
+    assert labels == ["MEMORY.md", "output/rows.csv", "report.md", "results/final.md"]
+    by_label = {label: f for f, label in pairs}
+    assert by_label["report.md"].parent == artifacts
+    assert by_label["output/rows.csv"].parent == artifacts / "output"
+
+
+def test_collect_excludes_persona_scaffold_and_harness_files(tmp_path):
+    artifacts = _make_run_tree(tmp_path)
+    names = {f.name for f in grading._collect_deliverable_files(artifacts)}
+    assert not names & {"SOUL.md", "AGENTS.md", "openclaw-2026-10-04.log", "artifacts_excluded.json"}
+    # A persona file the agent MODIFIED still reaches the judge via artifacts/.
+    assert "MEMORY.md" in names
+
+
+def test_collect_keeps_same_bytes_under_different_name_and_same_name_different_bytes(tmp_path):
+    artifacts = tmp_path / "task_output" / "artifacts"
+    (artifacts / "v2").mkdir(parents=True)
+    (artifacts / "check.md").write_text("identical", encoding="utf-8")
+    (artifacts / "final.md").write_text("identical", encoding="utf-8")
+    (artifacts / "v2" / "final.md").write_text("different body", encoding="utf-8")
+    # The workspace_full copy of final.md diverged from the artifacts/ one.
+    wf = tmp_path / "task_output" / "workspace_full"
+    wf.mkdir()
+    (wf / "final.md").write_text("diverged", encoding="utf-8")
+    labels = sorted(label for _, label in grading._collect_deliverables(artifacts))
+    # Dedup needs label AND content to match: nothing here is a true repeat.
+    assert labels == ["check.md", "final.md", "final.md", "v2/final.md"]
+
+
+def test_gather_evidence_header_carries_relative_path_not_host_path(tmp_path):
+    artifacts = _make_run_tree(tmp_path)
+    ev = _evidence_text(artifacts, "T", budget=None)
+    # Top-level header is unchanged (bare name); nested files show their folder.
+    assert "----- DELIVERABLE: report.md -----" in ev
+    assert "----- DELIVERABLE: output/rows.csv -----" in ev
+    assert "----- DELIVERABLE: results/final.md -----" in ev
+    assert ev.count("REPORT BODY") == 1
+    assert "persona soul" not in ev and "gateway log" not in ev
+    assert str(tmp_path) not in ev
+
+
+def test_gather_evidence_same_basename_files_get_distinct_image_labels(tmp_path):
+    artifacts = tmp_path / "task_output" / "artifacts"
+    (artifacts / "output").mkdir(parents=True)
+    uri_a = "data:image/png;base64," + "QUFB" * 20
+    uri_b = "data:image/png;base64," + "QkJC" * 20
+    (artifacts / "page.html").write_text(f"<img src='{uri_a}'>", encoding="utf-8")
+    (artifacts / "output" / "page.html").write_text(f"<img src='{uri_b}'>", encoding="utf-8")
+    payload = grading._gather_evidence(artifacts, "T", budget=None)
+    assert sorted(i.label for i in payload.images) == ["output/page.html#1", "page.html#1"]
+
+
+def test_gather_evidence_omission_manifest_names_relative_path(tmp_path):
+    artifacts = tmp_path / "task_output" / "artifacts"
+    (artifacts / "output").mkdir(parents=True)
+    (artifacts / "a.md").write_text("small", encoding="utf-8")
+    (artifacts / "output" / "big.md").write_text("x" * 9000, encoding="utf-8")
+    (artifacts / "output" / "bigger.md").write_text("y" * 12000, encoding="utf-8")
+    ev = _evidence_text(artifacts, "TRANSCRIPT " * 50, budget=6000)
+    note = ev[ev.index("EVIDENCE BUDGET NOTE"):]
+    assert "output/big.md (partial)" in note
+    assert "output/bigger.md" in note
 
 
 def test_gather_evidence_orders_primary_first_and_binary_is_presence_only(tmp_path):
@@ -888,9 +1012,9 @@ def test_looks_like_deliverable_wrong_ext_and_oversize(tmp_path):
     assert grading._looks_like_deliverable(big, tmp_path) is False
 
 
-def test_gather_evidence_skips_unreadable_file(tmp_path, monkeypatch):
-    # A deliverable whose read_text raises is silently skipped (the surrounding
-    # try/except in _gather_evidence), not fatal — the readable one survives.
+def test_gather_evidence_discloses_unreadable_file(tmp_path, monkeypatch):
+    # A deliverable whose read_text raises is not fatal and not silently
+    # dropped: it gets a presence marker, and the readable one survives.
     results = tmp_path / "task_output" / "artifacts" / "results"
     results.mkdir(parents=True)
     (results / "report.md").write_text("GOOD BODY", encoding="utf-8")
@@ -906,7 +1030,8 @@ def test_gather_evidence_skips_unreadable_file(tmp_path, monkeypatch):
     monkeypatch.setattr(Path, "read_text", _boom)
     ev = _evidence_text(results, "", budget=None)
     assert "GOOD BODY" in ev
-    assert "broken.md" not in ev
+    assert "----- DELIVERABLE: broken.md\n(" in ev
+    assert "present — contents not included: file could not be read" in ev
 
 
 # ---------------------------------------------------------------------------
@@ -1174,3 +1299,249 @@ def test_gather_evidence_no_manifest_when_everything_fits(tmp_path):
     ev = _evidence_text(results, "the transcript", budget=100_000)
     assert "EVIDENCE BUDGET NOTE" not in ev
     assert "tiny" in ev
+
+
+# ---------------------------------------------------------------------------
+# presence disclosure: a produced file is never silently dropped
+# ---------------------------------------------------------------------------
+
+
+def _artifacts_root(tmp_path: Path) -> Path:
+    root = tmp_path / "task_output" / "artifacts"
+    root.mkdir(parents=True)
+    return root
+
+
+def _padded_docx(path: Path, body: str, pad_bytes: int = 0) -> None:
+    """A .docx whose extracted text is *body*, padded with incompressible bytes
+    so its raw size can exceed the root-scan byte cap."""
+    import os
+    import zipfile
+    ns = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+    doc = (f'<?xml version="1.0"?><w:document xmlns:w="{ns}"><w:body>'
+           f'<w:p><w:r><w:t>{body}</w:t></w:r></w:p></w:body></w:document>')
+    with zipfile.ZipFile(path, "w") as z:
+        z.writestr("word/document.xml", doc)
+        if pad_bytes:
+            z.writestr("word/media/pad.bin", os.urandom(pad_bytes))
+
+
+def test_presence_marker_exact_format(tmp_path):
+    f = tmp_path / "x.csv"
+    f.write_bytes(b"12345")
+    assert grading._presence_marker("out/x.csv", f, "some reason") == (
+        "\n----- DELIVERABLE: out/x.csv\n"
+        "(5 bytes, present — contents not included: some reason)\n"
+        "-----\n"
+    )
+    assert "size unknown" in grading._presence_marker("gone.csv", tmp_path / "gone.csv", "r")
+
+
+def test_document_over_root_byte_cap_is_extracted_when_text_fits(tmp_path):
+    root = _artifacts_root(tmp_path)
+    _padded_docx(root / "big.docx", "DOC_BODY_VALUE_42",
+                 pad_bytes=grading._ROOT_SCAN_MAX_FILE_BYTES + 50_000)
+    assert (root / "big.docx").stat().st_size > grading._ROOT_SCAN_MAX_FILE_BYTES
+    ev = _evidence_text(root, "", budget=None)
+    assert "----- DELIVERABLE: big.docx (extracted text) -----" in ev
+    assert "DOC_BODY_VALUE_42" in ev
+
+
+def test_document_over_extraction_cap_is_truncated_and_disclosed(tmp_path):
+    root = _artifacts_root(tmp_path)
+    cap = grading._EXTRACT_CHAR_CAP
+    body = "A" * cap + "TAIL_BEYOND_CAP"
+    _padded_docx(root / "long.docx", body)
+    ev = _evidence_text(root, "", budget=None)
+    assert "DELIVERABLE: long.docx (extracted text, truncated: first 150000 of" in ev
+    assert f"of {len(body)} chars included" in ev
+    assert "present — remaining contents not included" in ev
+    assert "TAIL_BEYOND_CAP" not in ev
+    assert "A" * cap in ev
+    # The capped helper keeps its contract.
+    assert grading._extract_text_deliverable(root / "long.docx") == "A" * cap
+
+
+def test_unextractable_document_is_a_presence_marker(tmp_path):
+    root = _artifacts_root(tmp_path)
+    (root / "broken.xlsx").write_bytes(b"not a zip at all")
+    ev = _evidence_text(root, "", budget=None)
+    assert "----- DELIVERABLE: broken.xlsx\n(16 bytes, present — contents not included: contents not extractable" in ev
+
+
+def test_large_standalone_image_is_collected_with_presence_marker(tmp_path):
+    root = _artifacts_root(tmp_path)
+    data = _png_bytes(1920, 1080) + b"\x00" * (grading._ROOT_SCAN_MAX_FILE_BYTES * 3)
+    (root / "photo.png").write_bytes(data)
+    ev = _evidence_text(root, "", budget=None)
+    assert f"----- DELIVERABLE: photo.png\n({len(data)} bytes, present — contents not included:" in ev
+    assert "image 1920x1080" in ev
+
+
+def test_every_budget_dropped_file_gets_a_presence_marker(tmp_path):
+    root = _artifacts_root(tmp_path)
+    (root / "report.md").write_text("R" * 1500, encoding="utf-8")
+    for i in range(6):
+        (root / f"data{i}.md").write_text(f"D{i}" * 2000, encoding="utf-8")
+    transcript = "[user] hi\n[FINAL ASSISTANT MESSAGE] [assistant] done"
+    budget = 5000
+    ev = _evidence_text(root, transcript, budget=budget)
+    assert len(ev) <= budget
+    files_part, t = grading._split_evidence(ev)
+    assert "done" in t
+    # report.md fits in full; every data file is kept partially or disclosed.
+    assert "R" * 1500 in files_part
+    note = files_part[files_part.index("EVIDENCE BUDGET NOTE"):]
+    for i in range(6):
+        label = f"data{i}.md"
+        partial = f"{label} (partial)" in note
+        marker = f"----- DELIVERABLE: {label}\n(" in files_part
+        assert partial or marker, label
+        assert label in note
+    assert files_part.count("present — contents not included: evidence budget exceeded") >= 5
+    # The note is never clipped mid-list.
+    assert note.split("\n", 1)[0].endswith(" -----")
+
+
+def test_count_only_note_when_markers_cannot_all_fit(tmp_path):
+    root = _artifacts_root(tmp_path)
+    for i in range(60):
+        (root / f"file_with_a_fairly_long_name_{i:03d}.md").write_text("x" * 500, encoding="utf-8")
+    budget = 2500
+    ev = _evidence_text(root, "T", budget=budget)
+    assert len(ev) <= budget
+    files_part, t = grading._split_evidence(ev)
+    assert t == "T"
+    assert "EVIDENCE BUDGET NOTE: 60 collected file(s) present but contents not included for budget" in files_part
+    listed = files_part.count("present — contents not included: evidence budget exceeded")
+    assert listed > 0
+    assert f"{60 - listed} of them not listed by name for budget" in files_part
+
+
+def test_budget_disclosure_also_applies_without_transcript(tmp_path):
+    root = _artifacts_root(tmp_path)
+    (root / "a.md").write_text("A" * 3000, encoding="utf-8")
+    (root / "b.md").write_text("B" * 3000, encoding="utf-8")
+    ev = _evidence_text(root, "", budget=2000)
+    assert len(ev) <= 2000
+    assert "a.md" in ev and "b.md" in ev
+    assert "EVIDENCE BUDGET NOTE" in ev
+
+
+@pytest.mark.parametrize("budget", [500, 700, 1500, 4000, 9000, 30000])
+def test_evidence_never_exceeds_budget_and_discloses_all_files(tmp_path, budget):
+    root = _artifacts_root(tmp_path)
+    (root / "sub").mkdir()
+    sizes = [50, 900, 2500, 7000, 120, 15000]
+    for i, n in enumerate(sizes):
+        (root / ("sub" if i % 2 else ".") / f"f{i}.md").write_text("z" * n, encoding="utf-8")
+    (root / "doc.docx").write_bytes(b"corrupt")
+    transcript = "\n".join(f"[user] line {i}" for i in range(400)) + "\n[FINAL ASSISTANT MESSAGE] end"
+    ev = _evidence_text(root, transcript, budget=budget)
+    assert len(ev) <= budget
+    files_part, _ = grading._split_evidence(ev)
+    labels = ["f0.md", "sub/f1.md", "f2.md", "sub/f3.md", "f4.md", "sub/f5.md", "doc.docx"]
+    if "not listed by name for budget" in files_part:
+        return  # count-only mode: the count note is the disclosure
+    for label in labels:
+        assert label in files_part, (budget, label)
+
+
+def test_inline_image_over_count_limit_is_disclosed_and_not_attached(tmp_path, monkeypatch):
+    monkeypatch.setenv("KENSEI_JUDGE_MAX_IMAGES", "1")
+    root = _artifacts_root(tmp_path)
+    uri_a = "data:image/png;base64," + "QUFB" * 20
+    uri_b = "data:image/png;base64," + "QkJC" * 20
+    (root / "page.html").write_text(f"<img src='{uri_a}'><img src='{uri_b}'>", encoding="utf-8")
+    payload = grading._gather_evidence(root, "T", budget=None)
+    assert [i.label for i in payload.images] == ["page.html#1"]
+    assert "[inline image page.html#2, image/png, ~0.1KB; present — contents not included: judge image count limit reached (1 per request)]" in payload.text
+    assert "[inline image page.html#1, image/png, ~0.1KB]" in payload.text
+
+
+def test_text_only_member_marks_every_inline_image_not_attached(tmp_path):
+    root = _artifacts_root(tmp_path)
+    uri = "data:image/png;base64," + "QUFB" * 20
+    (root / "page.html").write_text(f"<img src='{uri}'>", encoding="utf-8")
+    payload = grading._gather_evidence(root, "T", budget=50_000, attach_images=False)
+    assert payload.images == []
+    assert "; present — contents not included: this judge does not receive image attachments]" in payload.text
+    assert len(payload.text) <= 50_000
+
+
+def test_image_limit_disclosure_counts_against_budget(tmp_path, monkeypatch):
+    monkeypatch.setenv("KENSEI_JUDGE_MAX_IMAGES", "0")
+    root = _artifacts_root(tmp_path)
+    uri = "data:image/png;base64," + "QUFB" * 20
+    (root / "page.html").write_text("".join(f"<img src='{uri}'>" for _ in range(40)), encoding="utf-8")
+    for budget in (800, 2500, 6000):
+        payload = grading._gather_evidence(root, "T", budget=budget)
+        assert len(payload.text) <= budget
+        assert payload.images == []
+        assert "page.html" in payload.text
+
+
+def test_same_label_files_get_distinct_names_and_independent_image_decisions(tmp_path, monkeypatch):
+    # Collection keeps two DIFFERENT files that share a label (artifacts/ copy vs
+    # a diverged workspace_full/ copy). Each needs its own evidence name so image
+    # attach/disclose decisions for one can never apply to the other.
+    monkeypatch.setenv("KENSEI_JUDGE_MAX_IMAGES", "1")
+    artifacts = _artifacts_root(tmp_path)
+    wf = tmp_path / "task_output" / "workspace_full"
+    wf.mkdir()
+    uri_a = "data:image/png;base64," + "QUFB" * 20
+    uri_b = "data:image/png;base64," + "QkJC" * 20
+    (artifacts / "page.html").write_text(f"A <img src='{uri_a}'>", encoding="utf-8")
+    (wf / "page.html").write_text(f"B-diverged <img src='{uri_b}'>", encoding="utf-8")
+    payload = grading._gather_evidence(artifacts, "T", budget=None)
+    text = payload.text
+    assert "----- DELIVERABLE: page.html -----" in text
+    assert "----- DELIVERABLE: page.html [2] -----" in text
+    assert [i.label for i in payload.images] == ["page.html#1"]
+    assert payload.images[0].data_uri == uri_a
+    assert "[inline image page.html#1, image/png, ~0.1KB]" in text
+    assert "[inline image page.html [2]#1, image/png, ~0.1KB; present — contents not included: judge image count limit reached (1 per request)]" in text
+
+
+def test_presence_wording_matches_judge_prompt_contract():
+    # The judge prompt keys the abstain rule on this exact phrase; every
+    # disclosure the harness emits must use it.
+    from src.utils.prompt_loader import load_prompt
+    phrase = "present — contents not included"
+    assert phrase in load_prompt("judge_system")
+    assert phrase in grading._presence_marker("x.md", Path("/nonexistent/x.md"), "r")
+    assert phrase in grading._disclose_unattached_images(
+        "[inline image a.html#1, image/png, ~1.0KB]", {"a.html#1": "r"}
+    )
+
+
+def test_evidence_order_uses_rendered_size_not_disk_size(tmp_path):
+    # A document that is huge on disk but small once extracted, and an image
+    # that contributes a one-line marker, must not sort behind bulkier text.
+    root = _artifacts_root(tmp_path)
+    _padded_docx(root / "summary.docx", "DOC_VALUE_7", pad_bytes=300_000)
+    (root / "photo.png").write_bytes(_png_bytes(800, 600) + b"\0" * 400_000)
+    (root / "notes.md").write_text("N" * 20_000, encoding="utf-8")
+    ev = _evidence_text(root, "", budget=None)
+    assert ev.index("DELIVERABLE: summary.docx") < ev.index("DELIVERABLE: notes.md")
+    assert ev.index("DELIVERABLE: photo.png") < ev.index("DELIVERABLE: notes.md")
+    # Under a budget that fits the small blocks but not the bulky text, the
+    # document's extracted text survives in full.
+    tight = _evidence_text(root, "", budget=4_000)
+    assert "DOC_VALUE_7" in tight
+    assert "image 800x600" in tight
+    assert "N" * 20_000 not in tight
+
+
+def test_duplicate_label_numbering_follows_collection_order_not_size(tmp_path):
+    # The evidence-dir copy keeps the plain name even when it is the larger one.
+    artifacts = _artifacts_root(tmp_path)
+    wf = tmp_path / "task_output" / "workspace_full"
+    wf.mkdir()
+    (artifacts / "final.md").write_text("ARTIFACT COPY " * 200, encoding="utf-8")
+    (wf / "final.md").write_text("older", encoding="utf-8")
+    ev = _evidence_text(artifacts, "", budget=None)
+    plain_hdr = "----- DELIVERABLE: final.md -----\n"
+    numbered_hdr = "----- DELIVERABLE: final.md [2] -----\n"
+    assert ev[ev.index(plain_hdr) + len(plain_hdr):].startswith("ARTIFACT COPY")
+    assert ev[ev.index(numbered_hdr) + len(numbered_hdr):].startswith("older")

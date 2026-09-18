@@ -8,7 +8,8 @@ task input tree(s).
 
 What it recovers
 ----------------
-  prompt.txt          <- <bundle>/PROMPT.md (fallbacks: prompt.txt, data/instruction.md)
+  prompt.txt          <- <bundle>/PROMPT.md (fallbacks: prompt.txt,
+                         data/solution/instruction.md, legacy data/instruction.md)
   TRUTH.md            <- <bundle>/TRUTH.md   (grader truth doc, if present)
   rubric.json         <- <bundle>/rubric.json
   persona/<f>         <- <bundle>/data/environment/persona/<f>
@@ -57,12 +58,21 @@ _DEFAULT_BASELINE = Path(__file__).resolve().parents[1] / "environment"
 # ----------------------------------------------------------------------------- #
 # bundle discovery
 # ----------------------------------------------------------------------------- #
+def _instruction_candidates(bundle: Path) -> tuple[Path, ...]:
+    """instruction.md locations, newest layout first. Bundles packaged before the
+    move into data/solution/ still carry it at the data/ root."""
+    return (
+        bundle / "data" / "solution" / "instruction.md",
+        bundle / "data" / "instruction.md",
+    )
+
+
 def _looks_like_bundle(p: Path) -> bool:
     """A task bundle has a prompt + rubric (or the data/ equivalents)."""
     has_prompt = (
         (p / "PROMPT.md").is_file()
         or (p / "prompt.txt").is_file()
-        or (p / "data" / "instruction.md").is_file()
+        or any(c.is_file() for c in _instruction_candidates(p))
     )
     has_rubric = (p / "rubric.json").is_file()
     has_env = (p / "data" / "environment").is_dir()
@@ -173,10 +183,13 @@ def reconstruct(bundle: Path, out_dir: Path, baseline_env: Path, verbose: bool) 
     log: list[str] = []
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # prompt (PROMPT.md -> prompt.txt -> data/instruction.md), first-match-wins.
+    # prompt (PROMPT.md -> prompt.txt -> data/solution/instruction.md -> legacy
+    # data/instruction.md), first-match-wins.
     if not _copy_file(bundle / "PROMPT.md", out_dir / "prompt.txt", log, "prompt.txt (from PROMPT.md)"):
         if not _copy_file(bundle / "prompt.txt", out_dir / "prompt.txt", log, "prompt.txt"):
-            _copy_file(bundle / "data" / "instruction.md", out_dir / "prompt.txt", log, "prompt.txt (from instruction.md)")
+            for cand in _instruction_candidates(bundle):
+                if _copy_file(cand, out_dir / "prompt.txt", log, "prompt.txt (from instruction.md)"):
+                    break
 
     # TRUTH.md (grader truth doc; published verbatim by the repackager)
     _copy_file(bundle / "TRUTH.md", out_dir / "TRUTH.md", log, "TRUTH.md")

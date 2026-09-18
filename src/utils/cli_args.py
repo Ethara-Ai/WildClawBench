@@ -16,6 +16,14 @@ def build_run_batch_parser(default_model: str, default_parallel: int) -> argpars
         "-c",
         help="Category name, e.g. 01_Productivity_Flow, 02_Code_Intelligence, 03_Social_Interaction, 04_Search_Retrieval, 05_Creative_Synthesis, 06_Safety_Alignment",
     )
+    mode.add_argument(
+        "--input-dir",
+        dest="input_dir",
+        metavar="DIR",
+        help="Run every immediate task subdir under DIR. Each task runs as its own "
+             "`run_batch.py --task <subdir>` child with all other flags forwarded, "
+             "so one task's failure never stops the rest. See --parallel-tasks.",
+    )
 
     parser.add_argument(
         "--agent-backend",
@@ -36,6 +44,17 @@ def build_run_batch_parser(default_model: str, default_parallel: int) -> argpars
         default=default_parallel,
         metavar="N",
         help="Number of parallel containers (default: 1, i.e. sequential)",
+    )
+    parser.add_argument(
+        "--parallel-tasks",
+        "-P",
+        dest="parallel_tasks",
+        type=int,
+        default=1,
+        metavar="N",
+        help="With --input-dir: run N tasks concurrently, each a fully isolated "
+             "child process with its own sidecar/mock stack and its own log under "
+             "logs/ (default: 1, sequential). Capped by WCB_MAX_CONCURRENT (default 8).",
     )
     parser.add_argument(
         "--lobster-name",

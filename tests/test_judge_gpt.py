@@ -586,6 +586,47 @@ class TestCodexEvidenceCap:
         base = min(grading._FAMILY_EVIDENCE["gpt"][0], grading._AWS_EDGE_BODY_CAP)
         assert grading._member_evidence_budget(GPT_MODEL, "gpt") == base
 
+    def test_metered_gpt_budget_stays_350k(self):
+        assert grading._member_evidence_budget(GPT_MODEL, "gpt") == 350_000
+
+    def test_codex_route_default_budget_is_500k(self, monkeypatch):
+        monkeypatch.setenv("KENSEI_JUDGE_CODEX_BRIDGE_URL", CODEX_URL)
+        assert grading._DEFAULT_JUDGE_CODEX_MAX_EVIDENCE == 500_000
+        assert grading._member_evidence_budget("gpt-5.6-sol", "gpt") == 500_000
+
+    def test_codex_env_can_raise_above_the_metered_base(self, monkeypatch):
+        monkeypatch.setenv("KENSEI_JUDGE_CODEX_BRIDGE_URL", CODEX_URL)
+        monkeypatch.setenv("KENSEI_JUDGE_CODEX_MAX_EVIDENCE", "600000")
+        assert grading._member_evidence_budget("gpt-5.6-sol", "gpt") == 600_000
+
+    @pytest.mark.parametrize("raw", ["", "junk", "0", "-5"])
+    def test_codex_env_invalid_falls_back_to_500k(self, monkeypatch, raw):
+        monkeypatch.setenv("KENSEI_JUDGE_CODEX_BRIDGE_URL", CODEX_URL)
+        monkeypatch.setenv("KENSEI_JUDGE_CODEX_MAX_EVIDENCE", raw)
+        assert grading._member_evidence_budget("gpt-5.6-sol", "gpt") == 500_000
+
+    def test_codex_luna_model_keeps_the_350k_family_base(self, monkeypatch):
+        monkeypatch.setenv("KENSEI_JUDGE_CODEX_BRIDGE_URL", CODEX_URL)
+        assert grading._member_evidence_budget("gpt-5.6-luna", "gpt") == 350_000
+        monkeypatch.setenv("KENSEI_JUDGE_CODEX_MAX_EVIDENCE", "1000")
+        assert grading._member_evidence_budget("gpt-5.6-luna", "gpt") == 1000
+
+    def test_gpt_primary_on_codex_builds_evidence_with_500k_budget(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("KENSEI_JUDGE_CODEX_BRIDGE_URL", CODEX_URL)
+        monkeypatch.setenv("WCB_CODEX_BRIDGE_SECRET", CODEX_SECRET)
+        seen_budgets = []
+        real = grading._gather_evidence
+
+        def spy(*a, **kw):
+            seen_budgets.append(kw.get("budget"))
+            return real(*a, **kw)
+
+        monkeypatch.setattr(grading, "_gather_evidence", spy)
+        _capture_openai(monkeypatch, "ok")
+        root = _write_deliverables(tmp_path, {"report.md": "body"})
+        grading._grade_gpt_primary(RUBRICS, "task", root, "", "sys")
+        assert seen_budgets == [500_000]
+
 
 class TestCodexGradePrimaryModelFallback:
     def test_grade_primary_uses_bridge_model_when_no_metered_model(self, monkeypatch, tmp_path):
@@ -937,9 +978,13 @@ class TestGatherEvidencePayload:
         them."""
         body = ("y" * 3000) + f'<img src="{PNG_DATA_URI}">'
         root = _write_deliverables(tmp_path, {"big.html": body})
-        payload = grading._gather_evidence(root, "t", budget=1000)
+        # Too small for a head+tail keep, so the whole block is dropped.
+        payload = grading._gather_evidence(root, "t", budget=600)
         assert payload.images == []
         assert "omitted or cut for budget" in payload.text
+        # The dropped file is still disclosed by name.
+        assert "----- DELIVERABLE: big.html\n(" in payload.text
+        assert "present — contents not included: evidence budget exceeded" in payload.text
 
 
 class TestJudgeOpenAiImageParts:
@@ -1221,3 +1266,64 @@ class TestImageBudgetEnvParsing:
         monkeypatch.setenv("KENSEI_JUDGE_IMAGE_DETAIL", "ultra")
         assert grading._judge_image_detail() == "low"
 
+
+
+def test_image_probe_png_is_a_valid_non_degenerate_image():
+    import base64
+    import struct
+    import zlib
+    head, _, b64 = grading._PROBE_PNG_DATA_URI.partition(",")
+    assert head == "data:image/png;base64"
+    data = base64.b64decode(b64)
+    assert data[:8] == b"\x89PNG\r\n\x1a\n"
+    w, h = struct.unpack(">II", data[16:24])
+    assert (w, h) == (8, 8)
+    pos, idat = 8, b""
+    while pos < len(data):
+        (length,) = struct.unpack(">I", data[pos:pos + 4])
+        ctype = data[pos + 4:pos + 8]
+        body = data[pos + 8:pos + 8 + length]
+        (crc,) = struct.unpack(">I", data[pos + 8 + length:pos + 12 + length])
+        assert crc == zlib.crc32(ctype + body) & 0xFFFFFFFF, ctype
+        if ctype == b"IDAT":
+            idat += body
+        pos += 12 + length
+    bit_depth, colour_type = data[24], data[25]
+    assert (bit_depth, colour_type) == (8, 2)  # 8-bit RGB
+    assert len(zlib.decompress(idat)) == h * (1 + 3 * w)
+
+
+class TestGptPrimaryRubricNamedRanking:
+    """H2: the GPT primary judge must rank rubric-named files first, exactly like
+    the council path; before, it passed no rubric_names so ranking was by size."""
+
+    RUBRICS = [
+        {"criterion": "The response delivers final_answer.md stating the total.", "weight": 5},
+        {"criterion": "leaked a credential", "weight": -3},
+    ]
+
+    def _files(self, tmp_path):
+        files = {f"aaa{i}.md": f"filler {i} " * 40 for i in range(6)}
+        files["final_answer.md"] = "TOTAL_IS_42 " + "detail " * 400
+        return _write_deliverables(tmp_path, files)
+
+    def _wire_text(self, monkeypatch, root):
+        monkeypatch.setenv("KENSEI_JUDGE_CODEX_BRIDGE_URL", CODEX_URL)
+        monkeypatch.setenv("WCB_CODEX_BRIDGE_SECRET", CODEX_SECRET)
+        seen = _capture_openai(monkeypatch, "ok")
+        grading._grade_gpt_primary(self.RUBRICS, "task", root, "", "sys")
+        assert len(seen) == 1
+        content = _request_body(seen[0])["messages"][1]["content"]
+        return content if isinstance(content, str) else content[0]["text"]
+
+    def test_named_file_comes_first_in_the_gpt_prompt(self, monkeypatch, tmp_path):
+        text = self._wire_text(monkeypatch, self._files(tmp_path))
+        assert text.index("DELIVERABLE: final_answer.md") < text.index("DELIVERABLE: aaa0.md")
+
+    def test_named_file_survives_a_tight_gpt_budget_in_full(self, monkeypatch, tmp_path):
+        root = self._files(tmp_path)
+        monkeypatch.setenv("KENSEI_JUDGE_CODEX_MAX_EVIDENCE", "4000")
+        text = self._wire_text(monkeypatch, root)
+        assert "TOTAL_IS_42" in text
+        assert ("detail " * 400).strip() in text          # kept whole, not cut
+        assert "present — contents not included: evidence budget exceeded" in text

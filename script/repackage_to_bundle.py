@@ -25,6 +25,8 @@ it emits the published bundle layout (like the andrew-santos-... reference):
     <dest-root>/<bundle_name>/
         prompt.txt, rubric.json, data/ ...           (skeleton; prompt re-sourced
                                                        from input PROMPT.md/prompt.txt)
+        data/solution/instruction.md                  (prompt + workspace hint, as
+                                                       the agent received it)
         data/solution/TRUTH.md                        (input TRUTH.md/GTFA.md/
                                                        golden_steer_flow.md copied
                                                        VERBATIM, no slicing)
@@ -320,6 +322,7 @@ TEST_SH_FILENAME = "test.sh"
 SOLVE_SH_FILENAME = "solve.sh"
 TESTS_SUBDIR = "tests"
 SOLUTION_SUBDIR = "solution"
+INSTRUCTION_FILENAME = "instruction.md"
 
 
 def _resolve_test_outputs_source(input_task_dir: Path) -> Path | None:
@@ -1341,7 +1344,7 @@ def _generate_test_sh() -> str:
 # (now dead code, see commit 6e03e6b) emitted four additional files into every
 # bundle that this standalone bundler silently dropped after the b1 refactor:
 #
-#   bundle/data/instruction.md                    (prompt + workspace-hint)
+#   bundle/data/solution/instruction.md           (prompt + workspace-hint)
 #   bundle/data/environment/Dockerfile            (agent image build recipe)
 #   bundle/data/environment/docker-compose.yaml   (mock-stack compose graph)
 #   bundle/data/task.toml                         (Harbor task spec metadata)
@@ -1898,11 +1901,17 @@ def _stage_data_instruction(
     bundle: Path,
     verbose: bool,
 ) -> bool:
-    """Emit bundle/data/instruction.md = prompt + (workspace_hint if attachments).
+    """Emit bundle/data/solution/instruction.md = prompt + (workspace_hint if attachments).
 
     Mirrors what the agent received at runtime via task_parser._append_workspace_hint.
     Prompt source is resolved via PROMPT_SOURCE_CANDIDATES (PROMPT.md > prompt.txt
     > prompts.txt). No-op when input_task_dir missing or no prompt file present.
+
+    instruction.md lives under data/solution/ (next to solve.sh / TRUTH.md), NOT
+    at the data/ root. The pre-move data/instruction.md is removed on every
+    successful emit: `bundle` is either the output-side tree (re-staged in place)
+    or a bundle whose data/ was copytree'd from it, so a stale root copy would
+    otherwise ride along and the bundle would ship the file twice.
     """
     if input_task_dir is None:
         return False
@@ -1913,11 +1922,15 @@ def _stage_data_instruction(
         return False
     attachments = _detect_attachments_present(input_task_dir)
     final_text = _append_workspace_hint(prompt_text, attachments)
-    data_dir = bundle / "data"
-    data_dir.mkdir(parents=True, exist_ok=True)
-    (data_dir / "instruction.md").write_text(final_text, encoding="utf-8")
+    solution_dir = bundle / "data" / SOLUTION_SUBDIR
+    solution_dir.mkdir(parents=True, exist_ok=True)
+    (solution_dir / INSTRUCTION_FILENAME).write_text(final_text, encoding="utf-8")
+    (bundle / "data" / INSTRUCTION_FILENAME).unlink(missing_ok=True)
     if verbose:
-        print(f"    staged instruction.md (attachments={attachments})")
+        print(
+            f"    staged {SOLUTION_SUBDIR}/{INSTRUCTION_FILENAME} "
+            f"(attachments={attachments})"
+        )
     return True
 
 

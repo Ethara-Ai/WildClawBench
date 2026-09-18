@@ -667,6 +667,23 @@ class TestModeGroup:
         with pytest.raises(SystemExit):
             parser.parse_args([])
 
+    def test_input_dir_mode_accepted(self):
+        parser = build_run_batch_parser("m", 1)
+        ns = parser.parse_args(["--input-dir", "input"])
+        assert ns.input_dir == "input"
+        assert ns.task is None and ns.category is None
+
+    def test_parallel_tasks_flag(self):
+        parser = build_run_batch_parser("m", 1)
+        assert parser.parse_args(["--input-dir", "input"]).parallel_tasks == 1
+        assert parser.parse_args(["--input-dir", "input", "--parallel-tasks", "4"]).parallel_tasks == 4
+        assert parser.parse_args(["--input-dir", "input", "-P", "3"]).parallel_tasks == 3
+
+    def test_input_dir_and_task_mutually_exclusive(self):
+        parser = build_run_batch_parser("m", 1)
+        with pytest.raises(SystemExit):
+            parser.parse_args(["--input-dir", "input", "--task", "x"])
+
     def test_task_and_category_mutually_exclusive(self):
         parser = build_run_batch_parser("m", 1)
         with pytest.raises(SystemExit):

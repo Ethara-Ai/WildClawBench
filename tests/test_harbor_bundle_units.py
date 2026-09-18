@@ -503,7 +503,8 @@ class TestWriteBundleLayout:
         assert (out_dir / "golden_trajectory.json").is_file()
 
         data = out_dir / "data"
-        assert (data / "instruction.md").read_text() == task.initial_prompt
+        assert (data / "solution" / "instruction.md").read_text() == task.initial_prompt
+        assert not (data / "instruction.md").exists()
         assert (data / "task.toml").is_file()
         assert (data / "tests" / "test.sh").is_file()
         assert (data / "tests" / "test_outputs.py").read_text() == task.test_code

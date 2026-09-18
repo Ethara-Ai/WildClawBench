@@ -423,10 +423,17 @@ class TestReconstructInputFromBundle:
 
     def test_looks_like_bundle_via_instruction_and_env(self, reconstruct_mod, tmp_path):
         b = tmp_path / "b"
-        (b / "data").mkdir(parents=True)
-        (b / "data" / "instruction.md").write_text("do it", encoding="utf-8")
+        (b / "data" / "solution").mkdir(parents=True)
+        (b / "data" / "solution" / "instruction.md").write_text("do it", encoding="utf-8")
         (b / "data" / "environment").mkdir()
         # prompt via instruction.md fallback + env dir counts as a bundle even without rubric.
+        assert reconstruct_mod._looks_like_bundle(b) is True
+
+    def test_looks_like_bundle_via_legacy_data_root_instruction(self, reconstruct_mod, tmp_path):
+        # Bundles packaged before instruction.md moved into data/solution/.
+        b = tmp_path / "b_legacy"
+        (b / "data" / "environment").mkdir(parents=True)
+        (b / "data" / "instruction.md").write_text("do it", encoding="utf-8")
         assert reconstruct_mod._looks_like_bundle(b) is True
 
     def test_discover_bundles_single_and_multi(self, reconstruct_mod, tmp_path):
@@ -533,12 +540,31 @@ class TestReconstructInputFromBundle:
 
     def test_reconstruct_prompt_fallback_to_instruction_md(self, reconstruct_mod, tmp_path):
         b = tmp_path / "b2"
-        (b / "data").mkdir(parents=True)
-        (b / "data" / "instruction.md").write_text("fallback prompt", encoding="utf-8")
+        (b / "data" / "solution").mkdir(parents=True)
+        (b / "data" / "solution" / "instruction.md").write_text("fallback prompt", encoding="utf-8")
         (b / "rubric.json").write_text("[]", encoding="utf-8")
         out = tmp_path / "out2"
         reconstruct_mod.reconstruct(b, out, tmp_path / "baseline", verbose=False)
         assert (out / "prompt.txt").read_text(encoding="utf-8") == "fallback prompt"
+
+    def test_reconstruct_prompt_fallback_prefers_solution_over_legacy(self, reconstruct_mod, tmp_path):
+        b = tmp_path / "b3"
+        (b / "data" / "solution").mkdir(parents=True)
+        (b / "data" / "solution" / "instruction.md").write_text("new layout", encoding="utf-8")
+        (b / "data" / "instruction.md").write_text("legacy layout", encoding="utf-8")
+        (b / "rubric.json").write_text("[]", encoding="utf-8")
+        out = tmp_path / "out3"
+        reconstruct_mod.reconstruct(b, out, tmp_path / "baseline", verbose=False)
+        assert (out / "prompt.txt").read_text(encoding="utf-8") == "new layout"
+
+    def test_reconstruct_prompt_fallback_to_legacy_data_root(self, reconstruct_mod, tmp_path):
+        b = tmp_path / "b4"
+        (b / "data").mkdir(parents=True)
+        (b / "data" / "instruction.md").write_text("legacy prompt", encoding="utf-8")
+        (b / "rubric.json").write_text("[]", encoding="utf-8")
+        out = tmp_path / "out4"
+        reconstruct_mod.reconstruct(b, out, tmp_path / "baseline", verbose=False)
+        assert (out / "prompt.txt").read_text(encoding="utf-8") == "legacy prompt"
 
 
 # =========================================================================== #
