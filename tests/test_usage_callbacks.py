@@ -1523,6 +1523,368 @@ def test_write_row_tags_a_heartbeat_call(usage_path, stub_completion_cost):
 
 
 # ============================================================================
+# memory_flush — the pre-compaction memory dump. The heartbeat's twin: a full
+# agent turn the container takes for itself, so both shape guards would drop
+# it. What makes it its own case is that NOTHING prunes it — its turn stays in
+# chat.jsonl — so the label reports rather than subtracts, and the row must
+# still be matched to the assistant message it produced. Constants reproduced
+# verbatim from /usr/lib/node_modules/openclaw in wildclawbench-ubuntu:v1.4.
+# ============================================================================
+
+# DEFAULT_MEMORY_FLUSH_PROMPT, dist/reply-BCcP6j4h.js:93495, joined with " ":
+# "Pre-compaction memory flush." then MEMORY_FLUSH_TARGET_HINT (:93487),
+# MEMORY_FLUSH_READ_ONLY_HINT (:93489), MEMORY_FLUSH_APPEND_ONLY_HINT (:93488),
+# the variant-file sentence, and the NO_REPLY sentence. Sent as the user
+# message with every "YYYY-MM-DD" replaced by the run's date (:93536).
+_FLUSH_DATE = "2026-09-19"
+_MEMORY_FLUSH_PROMPT = (
+    "Pre-compaction memory flush. "
+    "Store durable memories only in memory/YYYY-MM-DD.md (create memory/ if "
+    "needed). "
+    "Treat workspace bootstrap/reference files such as MEMORY.md, SOUL.md, "
+    "TOOLS.md, and AGENTS.md as read-only during this flush; never overwrite, "
+    "replace, or edit them. "
+    "If memory/YYYY-MM-DD.md already exists, APPEND new content only and do "
+    "not overwrite existing entries. "
+    "Do NOT create timestamped variant files (e.g., YYYY-MM-DD-HHMM.md); "
+    "always use the canonical YYYY-MM-DD.md filename. "
+    "If nothing to store, reply with NO_REPLY."
+).replace("YYYY-MM-DD", _FLUSH_DATE)
+
+# DEFAULT_MEMORY_FLUSH_SYSTEM_PROMPT, same file :93503, joined with " ".
+_MEMORY_FLUSH_SYSTEM = (
+    "Pre-compaction memory flush turn. "
+    "The session is near auto-compaction; capture durable memories to disk. "
+    "Store durable memories only in memory/YYYY-MM-DD.md (create memory/ if "
+    "needed). "
+    "Treat workspace bootstrap/reference files such as MEMORY.md, SOUL.md, "
+    "TOOLS.md, and AGENTS.md as read-only during this flush; never overwrite, "
+    "replace, or edit them. "
+    "If memory/YYYY-MM-DD.md already exists, APPEND new content only and do "
+    "not overwrite existing entries. "
+    "You may reply, but usually NO_REPLY is correct."
+)
+
+
+def _flush_user(prompt=_MEMORY_FLUSH_PROMPT, time_line=True):
+    """The user message as resolveMemoryFlushPromptForRun assembles it (:93536)."""
+    return f"{prompt}\n{_HEARTBEAT_TIME}" if time_line else prompt
+
+
+def _flush_system(extra="", system=_AGENT_SYSTEM):
+    """The system prompt with the flush carried in it the way the bundle does.
+
+    Not as a head. runMemoryFlushIfNeeded passes the flush prompt as
+    extraSystemPrompt (:93790), and extraSystemPrompt is pushed as a SECTION
+    under "## Group Chat Context" behind the agent's own prompt (:38876), so
+    the flush sentence only ever opens a LINE.
+    """
+    flush = f"{extra}\n\n{_MEMORY_FLUSH_SYSTEM}" if extra else _MEMORY_FLUSH_SYSTEM
+    return f"{system}\n\n## Group Chat Context\n{flush}\n"
+
+
+def _flush_kwargs(body=None, system=None, history=()):
+    messages = [*history, {"role": "user",
+                           "content": body if body is not None else _flush_user()}]
+    return _anthropic_body(_flush_system() if system is None else system, messages)
+
+
+def test_memory_flush_named_from_the_full_shipped_request():
+    assert uc._classify_internal_purpose(_flush_kwargs()) == "memory_flush"
+
+
+def test_memory_flush_named_on_the_prompt_head_alone():
+    # A .systemPrompt override moved the system sentence out; the user prompt
+    # is still the shipped default.
+    assert uc._classify_internal_purpose(
+        _flush_kwargs(system=_AGENT_SYSTEM)) == "memory_flush"
+
+
+def test_memory_flush_named_on_the_system_line_alone():
+    # THE load-bearing case, not a fallback. A flush turn writes a file, so it
+    # calls tools, so it is several requests; only the first ends on the flush
+    # prompt and every later one ends on a tool result. extraSystemPrompt is
+    # set for the whole run, so the system line is the anchor that names them.
+    tool_result = [{"type": "tool_result", "tool_use_id": "tu_1",
+                    "content": "wrote memory/2026-09-19.md"}]
+    assert uc._classify_internal_purpose(_flush_kwargs(
+        tool_result,
+        history=[{"role": "user", "content": _flush_user()},
+                 {"role": "assistant", "content": "writing it now"}],
+    )) == "memory_flush"
+
+
+def test_memory_flush_named_when_the_run_already_had_an_extra_system_prompt():
+    # join("\n\n") puts the flush sentence behind the run's own extra prompt,
+    # which is exactly why the anchor is a line match and not a head match.
+    assert uc._classify_internal_purpose(_flush_kwargs(
+        system=_flush_system(extra="Group: #ops. Members: alice, bob."))
+    ) == "memory_flush"
+
+
+def test_memory_flush_anchor_stops_before_the_substituted_date():
+    # resolveMemoryFlushPromptForRun replaceAll()s YYYY-MM-DD with the run's
+    # date, so any date has to work and none of them may be in the constant.
+    for date in ("2026-09-19", "2027-01-01", "1999-12-31"):
+        body = _MEMORY_FLUSH_PROMPT.replace(_FLUSH_DATE, date)
+        assert uc._classify_internal_purpose(
+            _flush_kwargs(body, system=_AGENT_SYSTEM)) == "memory_flush"
+    assert _FLUSH_DATE not in uc._MEMORY_FLUSH_PROMPT_HEAD
+
+
+def test_memory_flush_named_under_a_full_system_prompt():
+    assert uc._classify_internal_purpose(_flush_kwargs(
+        system=_flush_system(system="You are openclaw. " + "tools. " * 200))
+    ) == "memory_flush"
+
+
+def test_memory_flush_named_on_a_session_that_already_has_history():
+    # The arity guard: a flush fires into the session it is about to compact,
+    # so it always arrives behind that run's turns.
+    history = [
+        {"role": "user", "content": "walk the corridor release"},
+        {"role": "assistant", "content": "reading the changelog"},
+        {"role": "user", "content": "and the rulebook version?"},
+        {"role": "assistant", "content": "v3, in force since March"},
+    ]
+    assert uc._classify_internal_purpose(
+        _flush_kwargs(history=history)) == "memory_flush"
+
+
+def test_memory_flush_named_from_openai_normalized_messages():
+    kwargs = {"messages": [{"role": "system", "content": _flush_system()},
+                           {"role": "user", "content": _flush_user()}]}
+    assert uc._classify_internal_purpose(kwargs) == "memory_flush"
+
+
+def test_memory_flush_named_from_content_blocks():
+    assert uc._classify_internal_purpose(
+        _flush_kwargs([{"type": "text", "text": _flush_user()}])) == "memory_flush"
+
+
+def test_a_flush_prompt_left_in_history_does_not_relabel_the_next_turn():
+    """The flush's own turn stays in the session, so every later request
+    carries it. Matching the LAST user message is what stops that from
+    re-labelling the human turns that follow — and the system section does not
+    persist either, because flushSystemPrompt is local to the flush run.
+    """
+    history = [
+        {"role": "user", "content": "walk the corridor release"},
+        {"role": "assistant", "content": "on it"},
+        {"role": "user", "content": _flush_user()},
+        {"role": "assistant", "content": "NO_REPLY"},
+    ]
+    kwargs = _anthropic_body(_AGENT_SYSTEM, [
+        *history, {"role": "user", "content": "now write the summary"}])
+    assert uc._classify_internal_purpose(kwargs) == ""
+
+
+def test_a_task_turn_quoting_the_flush_prompt_mid_text_is_not_named():
+    body = (
+        "the ops runbook says openclaw sends "
+        f"\"{_MEMORY_FLUSH_PROMPT}\" before compaction. "
+        "work out whether that contradicts our retention policy."
+    )
+    assert uc._classify_internal_purpose(
+        _flush_kwargs(body, system=_AGENT_SYSTEM)) == ""
+
+
+def test_the_flush_sentence_inside_a_system_line_is_not_named():
+    # The system anchor is a LINE match, not a substring: an agent prompt that
+    # merely describes the flush mid-sentence is not a flush.
+    system = (f"{_AGENT_SYSTEM}\nWhen you see a Pre-compaction memory flush "
+              "turn. treat it as routine and carry on.")
+    assert uc._classify_internal_purpose(
+        _anthropic_body(system, [{"role": "user", "content": "ship it"}])) == ""
+
+
+def test_memory_flush_does_not_shadow_compaction():
+    # Compaction is checked after it, and runs on its own request with
+    # SUMMARIZATION_SYSTEM_PROMPT — the flush section is not in it.
+    kwargs = {"messages": [
+        {"role": "system", "content": _COMPACTION_SYSTEM},
+        {"role": "user", "content":
+            f"<conversation>\nuser: {_flush_user()}\n"
+            f"assistant: NO_REPLY\n</conversation>\n\n"
+            "Produce a structured summary following the exact format."},
+    ]}
+    assert uc._classify_internal_purpose(kwargs) == "compaction"
+
+
+def test_memory_flush_does_not_shadow_the_heartbeat():
+    # canAttemptFlush excludes heartbeat turns outright
+    # (dist/reply-BCcP6j4h.js:93710), so the two can never be the same request.
+    assert uc._classify_internal_purpose(_heartbeat_kwargs()) == "heartbeat"
+
+
+def test_memory_flush_does_not_shadow_embeddings():
+    kwargs = {"call_type": "aembedding", "litellm_params": {
+        "proxy_server_request": {"body": {"model": "text-embedding-3-small",
+                                          "input": _flush_user()}}}}
+    assert uc._classify_internal_purpose(kwargs) == "embeddings"
+
+
+def test_memory_flush_classifier_never_raises_on_junk():
+    for messages in ([{"role": "user", "content": None}],
+                     [{"role": "user"}],
+                     [{"role": None, "content": _flush_user()}],
+                     [None],
+                     []):
+        assert uc._classify_internal_purpose(
+            _anthropic_body(_AGENT_SYSTEM, messages)) in ("", "memory_flush")
+
+
+def test_write_row_tags_a_memory_flush_call(usage_path, stub_completion_cost):
+    uc._write_row({"model": "claude-opus-5", **_flush_kwargs()},
+                  _resp(_chat_usage()), T0, T1)
+    row = _read_rows(usage_path)[0]
+    assert row["purpose"] == "memory_flush"
+    assert row["kind"] == "agent"
+    assert set(row.keys()) == EXPECTED_KEYS | {"purpose"}
+
+
+# ============================================================================
+# cron — a scheduled job's agent turn. The heartbeat's shape from the cron
+# runner, and like the heartbeat its turn is NOT in this run's transcript: a
+# job runs on its own session key (dist/gateway-cli-BjsM6fWb.js:4218) and
+# therefore its own transcript file, so the label subtracts.
+# ============================================================================
+
+# appendCronDeliveryInstruction, dist/gateway-cli-BjsM6fWb.js:4194, verbatim.
+# Appended LAST, after the time line, and only when the job asked for delivery.
+_CRON_DELIVERY = (
+    "Return your summary as plain text; it will be delivered automatically. "
+    "If the task explicitly calls for messaging a specific external recipient, "
+    "note who/where it should go instead of sending it yourself."
+)
+
+
+def _cron_user(message="Check the overnight build and summarize failures.",
+               job_id="nightly-build", job_name="Nightly build watch",
+               time_line=True, delivery=False):
+    """The user message as runCronIsolatedAgentTurn assembles it (:4363-4382)."""
+    text = f"[cron:{job_id} {job_name}] {message}".strip()
+    if time_line:
+        text = f"{text}\n{_HEARTBEAT_TIME}".strip()
+    if delivery:
+        text = f"{text}\n\n{_CRON_DELIVERY}".strip()
+    return text
+
+
+def _cron_kwargs(body=None, system=_AGENT_SYSTEM, history=()):
+    messages = [*history, {"role": "user",
+                           "content": body if body is not None else _cron_user()}]
+    return _anthropic_body(system, messages)
+
+
+def test_cron_named_from_the_full_shipped_request():
+    assert uc._classify_internal_purpose(
+        _cron_kwargs(_cron_user(delivery=True))) == "cron"
+
+
+def test_cron_named_on_the_bracket_prefix_alone():
+    # The unconditional anchor: a job that requested no delivery.
+    assert uc._classify_internal_purpose(_cron_kwargs()) == "cron"
+
+
+def test_cron_named_with_neither_time_line_nor_delivery():
+    assert uc._classify_internal_purpose(
+        _cron_kwargs(_cron_user(time_line=False))) == "cron"
+
+
+def test_cron_named_on_the_delivery_tail_alone():
+    # The supplementary anchor: the body was wrapped past the prefix, but
+    # appendCronDeliveryInstruction still goes on last.
+    body = f"Summarize last night's failures.\n{_HEARTBEAT_TIME}\n\n{_CRON_DELIVERY}"
+    assert uc._classify_internal_purpose(_cron_kwargs(body)) == "cron"
+
+
+def test_cron_named_for_a_job_name_carrying_spaces_and_an_empty_message():
+    assert uc._classify_internal_purpose(_cron_kwargs(
+        _cron_user(message="", job_name="Nightly build watch (eu-west)"))) == "cron"
+
+
+def test_cron_named_for_a_job_with_no_name():
+    assert uc._classify_internal_purpose(
+        _cron_kwargs(_cron_user(job_name=""))) == "cron"
+
+
+def test_cron_named_under_a_full_system_prompt_and_history():
+    history = [{"role": "user", "content": "audit the release"},
+               {"role": "assistant", "content": "done"}]
+    assert uc._classify_internal_purpose(_cron_kwargs(
+        system="You are openclaw. " + "tools. " * 200, history=history)) == "cron"
+
+
+def test_cron_named_from_openai_normalized_messages():
+    kwargs = {"messages": [{"role": "system", "content": _AGENT_SYSTEM},
+                           {"role": "user", "content": _cron_user()}]}
+    assert uc._classify_internal_purpose(kwargs) == "cron"
+
+
+def test_cron_named_from_content_blocks():
+    assert uc._classify_internal_purpose(
+        _cron_kwargs([{"type": "text", "text": _cron_user()}])) == "cron"
+
+
+def test_cron_matched_on_the_last_user_message_not_the_first():
+    history = [{"role": "user", "content": _cron_user()},
+               {"role": "assistant", "content": "build is green"}]
+    kwargs = _anthropic_body(_AGENT_SYSTEM, [
+        *history, {"role": "user", "content": "and the staging one?"}])
+    assert uc._classify_internal_purpose(kwargs) == ""
+
+
+def test_a_task_turn_mentioning_the_cron_prefix_mid_text_is_not_named():
+    body = ("the gateway log shows [cron:nightly-build Nightly build watch] "
+            "lines every hour -- work out which job writes them.")
+    assert uc._classify_internal_purpose(_cron_kwargs(body)) == ""
+
+
+def test_a_bracket_that_is_not_the_cron_prefix_is_not_named():
+    for body in ("[cron] run the nightly build",
+                 "[cron:nightly-build] run the nightly build",
+                 "[crond:nightly-build Nightly] run it",
+                 "[cron: nightly-build Nightly] run it"):
+        assert uc._classify_internal_purpose(_cron_kwargs(body)) == ""
+
+
+def test_cron_does_not_shadow_compaction():
+    kwargs = {"messages": [
+        {"role": "system", "content": _COMPACTION_SYSTEM},
+        {"role": "user", "content":
+            f"<conversation>\nuser: {_cron_user()}\n</conversation>\n\n"
+            "Produce a structured summary following the exact format."},
+    ]}
+    assert uc._classify_internal_purpose(kwargs) == "compaction"
+
+
+def test_cron_does_not_shadow_transcription():
+    assert uc._classify_internal_purpose(
+        {"call_type": "atranscription",
+         "messages": [{"role": "user", "content": _cron_user()}]}) == "transcription"
+
+
+def test_cron_classifier_never_raises_on_junk():
+    for messages in ([{"role": "user", "content": None}],
+                     [{"role": "user"}],
+                     [{"role": None, "content": _cron_user()}],
+                     [None],
+                     []):
+        assert uc._classify_internal_purpose(
+            _anthropic_body(_AGENT_SYSTEM, messages)) in ("", "cron")
+
+
+def test_write_row_tags_a_cron_call(usage_path, stub_completion_cost):
+    uc._write_row({"model": "claude-opus-5", **_cron_kwargs()},
+                  _resp(_chat_usage()), T0, T1)
+    row = _read_rows(usage_path)[0]
+    assert row["purpose"] == "cron"
+    assert row["kind"] == "agent"
+    assert set(row.keys()) == EXPECTED_KEYS | {"purpose"}
+
+
+# ============================================================================
 # Module-level _PATH env override (both modules read env at import)
 # ============================================================================
 

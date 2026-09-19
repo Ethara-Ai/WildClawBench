@@ -15,7 +15,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 from dotenv import load_dotenv
 
 # Load .env BEFORE importing src.utils modules: several resolve env at import time
@@ -443,15 +443,58 @@ def _count_heartbeat_turns_in_transcript(
     """
     from src.utils.litellm_usage_callback import _is_heartbeat_prompt
 
+    return _count_self_issued_turns(msgs, _is_heartbeat_prompt)
+
+
+def _count_self_issued_turns(
+        msgs: Sequence[Mapping[str, Any]],
+        is_self_issued: Callable[[list[dict]], bool]) -> int:
+    """Transcript user messages that ``is_self_issued`` claims as the container's.
+
+    Each predicate is handed a one-message list because that is the shape it
+    reads — the LAST user message of a request — and a transcript entry is
+    exactly one. Passing the predicate itself, rather than re-expressing the
+    prompt here, is what keeps the transcript count and the row label reading
+    the same constants.
+    """
     count = 0
     for m in msgs:
         message = _inner_message(m)
         if str(message.get("role", "")).lower() != "user":
             continue
-        if _is_heartbeat_prompt([{"role": "user",
-                                  "content": _message_text(message)}]):
+        if is_self_issued([{"role": "user", "content": _message_text(message)}]):
             count += 1
     return count
+
+
+def _count_memory_flush_turns_in_transcript(
+        msgs: Sequence[Mapping[str, Any]]) -> int:
+    """User messages in the delivered transcript that are the pre-compaction flush.
+
+    The flush is the heartbeat's twin with the prune removed. OpenClaw spends a
+    whole agent turn, on the SESSION's transcript, telling itself to write
+    durable memories to memory/<date>.md before compaction discards the context
+    (runMemoryFlushIfNeeded, dist/reply-BCcP6j4h.js:93697; default-ON). Nothing
+    truncates it afterwards — pruneHeartbeatTranscript is the gateway's only
+    transcript-truncating path and no flush code calls it — so the flush's
+    user+assistant pair always survives into chat.jsonl, where it reads as a
+    task nobody set and an answer nobody asked for.
+
+    That is why the label does NOT subtract the row (see
+    _TRANSCRIPT_TURN_PURPOSES) and why this count exists anyway: the row is
+    accounted for, but the JUDGE reads the transcript, and nothing in the
+    transcript says the container wrote that turn for itself.
+
+    Counting only, for the heartbeat's reason: whether a self-issued turn
+    should be judged is a grading decision, not an accounting one.
+
+    Turns, not requests. A flush writes a file, so it calls tools, so it is
+    several usage rows and several assistant messages for ONE user message
+    counted here. Do not compare this number with a row count.
+    """
+    from src.utils.litellm_usage_callback import _is_memory_flush_prompt
+
+    return _count_self_issued_turns(msgs, _is_memory_flush_prompt)
 
 
 _TURN_TOKEN_COLUMNS = (
@@ -489,19 +532,49 @@ def _usage_row_bills_no_tokens(r: Mapping[str, Any]) -> bool:
     return True
 
 
+# Purposes whose turn lands in the DELIVERED transcript, so the row that paid
+# for it has an assistant message and must be matched with it rather than
+# subtracted from the turn candidates.
+#
+# Every other label names a call that produces no assistant message at all —
+# compaction and summarize are `completeSimple` round-trips, embeddings and
+# transcription are not chat routes, image and pdf are tool calls, and the
+# heartbeat's and cron's turns are not in this transcript (the gateway prunes
+# the heartbeat's pair out of chat.jsonl, and a cron job runs on its own
+# session key and therefore its own transcript file). The memory flush is the
+# one label where openclaw takes a turn ON THE SESSION and leaves it there:
+# nothing prunes it, so excluding its row would remove a request while leaving
+# the message it answered, i.e. manufacture the very count mismatch the labels
+# exist to remove.
+#
+# So the label serves REPORTING here, not exclusion. The row keeps its name in
+# the log; the transcript-side count is stamped separately
+# (_count_memory_flush_turns_in_transcript); and the row itself stays a turn
+# candidate, which is what keeps
+#     per-message + internal + post_agent + zero_token == sources.agent
+# closing with no rows_unmatched.
+_TRANSCRIPT_TURN_PURPOSES = frozenset({"memory_flush"})
+
+
+def _usage_row_is_internal_call(r: Mapping[str, Any]) -> bool:
+    """True when a labelled row is one this run must NOT attribute to a message."""
+    return _usage_row_purpose(r) not in ("", *_TRANSCRIPT_TURN_PURPOSES)
+
+
 def _usage_row_is_assistant_turn(r: Mapping[str, Any]) -> bool:
     """True when a usage row can correspond to an assistant message.
 
     ``failure`` and ``preflight`` rows never produce one, neither does a
-    request the callback named as one of openclaw's own, and neither does one
-    that billed no tokens in any column. Shares
-    ``_usage_row_bills_no_tokens`` with the split inside
-    ``_attribute_per_message_cost`` so the predicate and the counter cannot
-    drift apart.
+    request the callback named as one of openclaw's own — except the labels in
+    ``_TRANSCRIPT_TURN_PURPOSES``, whose turn is in the transcript — and
+    neither does one that billed no tokens in any column. Shares
+    ``_usage_row_bills_no_tokens`` and ``_usage_row_is_internal_call`` with the
+    split inside ``_attribute_per_message_cost`` so the predicate and the
+    counter cannot drift apart.
     """
     if r.get("kind") in ("failure", "preflight"):
         return False
-    if _usage_row_purpose(r):
+    if _usage_row_is_internal_call(r):
         return False
     return not _usage_row_bills_no_tokens(r)
 
@@ -705,6 +778,13 @@ def _attribute_per_message_cost(traj: dict, usage_log_path: str,
     agent image, so the sidecar can name them from the request it is already
     handed.
 
+    Subtracted, but not all of them: a label says who made the request, not
+    that no message came of it. ``_TRANSCRIPT_TURN_PURPOSES`` carries the
+    labels whose turn survives into the delivered transcript — today only the
+    pre-compaction memory flush — and those rows stay turn candidates, because
+    the message they answered is right there in ``assistants`` and removing
+    one side of a matched pair is how you MAKE a mismatch, not fix one.
+
     Past that, attribution within the remaining rows is positional, which is
     sound only when the counts match. A leftover mismatch cannot be repaired: a
     stall or empty-turn retry rolls the session back
@@ -755,8 +835,11 @@ def _attribute_per_message_cost(traj: dict, usage_log_path: str,
     # point: the row that nearly broke the sean_callahan gate carried tokens and
     # nothing else, and no label could have been invented for it honestly.
     during, post_agent = _split_post_agent_rows(candidates, agent_finished_ts)
-    internal = [r for r in during if _usage_row_purpose(r)]
-    unlabelled = [r for r in during if not _usage_row_purpose(r)]
+    # Labelled-and-message-less, not merely labelled: a memory_flush row is
+    # named AND has an assistant message, because nothing prunes the flush turn
+    # out of the transcript. See _TRANSCRIPT_TURN_PURPOSES.
+    internal = [r for r in during if _usage_row_is_internal_call(r)]
+    attributable = [r for r in during if not _usage_row_is_internal_call(r)]
     # Last of the three splits, and last on purpose: each bucket refines what
     # the one before it left, so no row can reach two of them. The boundary
     # keeps a late all-zero row, because post_agent_calls is meant to be the
@@ -774,8 +857,8 @@ def _attribute_per_message_cost(traj: dict, usage_log_path: str,
     # and the sidecar still booked a 15.002s agent row with four zero token
     # columns. Nothing IN the row says any of that, so nothing here reads it
     # that way: the split is on the columns alone.
-    zero_token = [r for r in unlabelled if _usage_row_bills_no_tokens(r)]
-    rows = [r for r in unlabelled if not _usage_row_bills_no_tokens(r)]
+    zero_token = [r for r in attributable if _usage_row_bills_no_tokens(r)]
+    rows = [r for r in attributable if not _usage_row_bills_no_tokens(r)]
 
     report: dict[str, Any] = {
         "status": "failed",
@@ -797,6 +880,19 @@ def _attribute_per_message_cost(traj: dict, usage_log_path: str,
             "asked for. Counted and stamped as heartbeat_turns_in_transcript; "
             "nothing is excluded from the transcript or from judging.",
             heartbeat_turns)
+    memory_flush_turns = _count_memory_flush_turns_in_transcript(msgs)
+    if memory_flush_turns:
+        report["memory_flush_turns_in_transcript"] = memory_flush_turns
+        logger.warning(
+            "per-message cost: %d pre-compaction memory-flush turn(s) in the "
+            "delivered transcript. OpenClaw spent them on the session, writing "
+            "durable memories to memory/<date>.md before compaction; nothing "
+            "prunes them, so they read as task turns nobody set. Their usage "
+            "rows ARE attributed, to the assistant messages they produced — "
+            "the label reports, it does not exclude. Counted and stamped as "
+            "memory_flush_turns_in_transcript; nothing is excluded from the "
+            "transcript or from judging.",
+            memory_flush_turns)
     block = _internal_calls_block(internal)
     if block:
         report["internal_calls"] = block

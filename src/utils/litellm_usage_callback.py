@@ -176,12 +176,27 @@ def _is_preflight_ping(kwargs: dict) -> bool:
 #       extracted with images — the same builder with rasterized pages
 #         interleaved, which the image test above already catches and which
 #         deliberately keeps that name. See _classify_internal_purpose.
-#   embeddings  — the memory-lancedb extension's vector calls
-#     (extensions/memory-lancedb/index.ts, Embeddings.embed →
-#     client.embeddings.create, default model text-embedding-3-small). They
-#     run on auto-recall, memory_search and auto-capture, and they are not
-#     chat requests at all: they hit /v1/embeddings with an `input` string and
-#     no messages, so they can never correspond to an assistant message.
+#   embeddings  — openclaw's OWN memory subsystem, not an extension. The
+#     shipped default for the memory plugin slot is memory-core
+#     (DEFAULT_SLOT_BY_KEY, dist/config-CO7zBdn8.js:2216), and its vector
+#     calls are built in src/memory/embeddings*.ts, bundled as the
+#     //#region block run in dist/manager-SGyWKeTx.js — OpenAI provider at
+#     :682, DEFAULT_OPENAI_EMBEDDING_MODEL "text-embedding-3-small",
+#     posting to EMBEDDING_BATCH_ENDPOINT "/v1/embeddings" (:1629). In this
+#     harness the bulk of them are driven by our OWN bootstrap rather than by
+#     the agent: src/agents/openclaw/runner.py:2031 runs `openclaw memory
+#     index --force` inside the container before the task starts, which
+#     embeds every seeded memory file in one sweep. Auto-recall and
+#     memory_search add more during the run. None of them is a chat request:
+#     they hit /v1/embeddings with an `input` and no messages, so they can
+#     never correspond to an assistant message.
+#
+#     The note here previously credited the memory-lancedb extension
+#     (extensions/memory-lancedb/index.ts:183, Embeddings.embed →
+#     client.embeddings.create). That code ships and would do the same thing,
+#     but it is NOT the slot this image runs — memory-core is the default and
+#     the runner never overrides it — so no row in any measured snapshot came
+#     from it. Corrected against the native-call census.
 #
 # Measured on the 2026-09-18 sean_callahan run, whose 156-row snapshot held 26
 # rows more than its 129 assistant messages: 22 embeddings and 4 image-tool
@@ -275,6 +290,272 @@ _HEARTBEAT_PROMPT_HEAD = (
 )
 _HEARTBEAT_PATH_HINT = "Do not read docs/heartbeat.md."
 _HEARTBEAT_TIME_LINE = re.compile(r"\n[ \t]*Current time:[^\n]* UTC[ \t]*\Z")
+
+# The heartbeat's other three prompts. `runHeartbeatOnce` does not always send
+# resolveHeartbeatPrompt's default: when the tick has pending events it swaps
+# the body for an event prompt and sends everything else about the turn
+# unchanged. One expression picks between all three
+# (dist/health-BxAgqqNt.js:403):
+#
+#     prompt: appendHeartbeatWorkspacePathHint(
+#         hasExecCompletion ? buildExecEventPrompt({...})
+#       : hasCronEvents     ? buildCronEventPrompt(cronEvents, {...})
+#       :                     resolveHeartbeatPrompt(params.cfg, params.heartbeat),
+#         params.workspaceDir)
+#
+# so these are heartbeat turns in the only sense that matters here — same
+# function, same schedule, same session, same absence of a human — and they
+# take the heartbeat label rather than one of their own. They are NOT cron
+# rows: a cron JOB runs on its own session key through the cron runner
+# (see _CRON_MESSAGE_HEAD); a cron EVENT is delivered by the health loop into
+# the session the agent is already on.
+#
+# Each is matched at the HEAD, which is where buildCronEventPrompt /
+# buildExecEventPrompt put it, and each has a deliverToUser variant that
+# differs only in the tail — so the head is the whole of the fixed part:
+#
+#   :82  "...no event content was found. Handle this internally and reply
+#          HEARTBEAT_OK when nothing needs user-facing follow-up."
+#   :83  "...no event content was found. Reply HEARTBEAT_OK."
+#   :85  "...The reminder content is:\n\n" + eventText + "\n\nHandle this
+#          reminder internally. ..."
+#   :86  "...The reminder content is:\n\n" + eventText + "\n\nPlease relay ..."
+#   :89  "...shown in the system messages above. Handle the result internally.
+#          ..."
+#   :90  "...shown in the system messages above. Please relay ..."
+#
+# The reminder head deliberately stops at the colon: everything past it is
+# eventText, which is user-authored (the agent's own cron tool writes it) and
+# therefore not a compile-time constant. The path hint cannot displace any of
+# them — appendHeartbeatWorkspacePathHint returns the prompt untouched unless
+# it already matches /heartbeat\.md/i, and none of these three mentions it.
+_HEARTBEAT_EVENT_HEADS = (
+    "A scheduled reminder has been triggered. The reminder content is:",
+    "A scheduled cron event was triggered, but no event content was found.",
+    "An async command you ran earlier has completed. The result is shown in "
+    "the system messages above.",
+)
+
+# memory_flush — the pre-compaction memory dump, and the second full agent turn
+# the container takes for itself. `runMemoryFlushIfNeeded`
+# (dist/reply-BCcP6j4h.js:93697) fires when a session's token count crosses
+#     contextWindow - reserveTokensFloor(20000) - softThresholdTokens(4000)
+# (threshold :93720, predicate shouldRunMemoryFlush :93591) or its transcript
+# passes forceFlushTranscriptBytes (2 MiB, :93553), and spends a whole turn
+# telling the agent to write what it wants to keep into memory/<date>.md before
+# compaction throws the context away.
+#
+# It is ON unless configured off — `const enabled = defaults?.enabled ?? true`
+# in resolveMemoryFlushSettings (:93549) — and the runner never writes
+# agents.defaults.compaction.memoryFlush at all, so it is default-ON in every
+# run and latent in every run long enough to approach its own context window.
+#
+# Like the heartbeat it is a REAL turn, not a `completeSimple`: the flush is
+# dispatched through runEmbeddedPiAgent with the session's tools and system
+# prompt (:93798-93830), so it arrives here past the `system.strip()` guard and,
+# on a session with history, past the `len(others) != 1` arity check. It is
+# therefore checked BEFORE both, on the LAST user-role message.
+#
+# UNLIKE the heartbeat it is never pruned. The gateway ships exactly one
+# transcript-truncating path — pruneHeartbeatTranscript, dist/health-BxAgqqNt.js
+# — and nothing in the flush code calls it (grep of dist/ finds the symbol in
+# the two health chunks only). So the flush's user+assistant pair STAYS in
+# chat.jsonl and its row DOES have an assistant message behind it. That is why
+# this label does not subtract: see eval/run_batch.py's
+# _TRANSCRIPT_TURN_PURPOSES for the accounting and
+# _count_memory_flush_turns_in_transcript for the transcript-side count, which
+# reads the same fingerprints as this file so the two cannot drift apart.
+#
+# Two compile-time constants of the shipped v1.4 image pin it, either one
+# sufficient, and they fail over to each other in both directions: an
+# `agents.defaults.compaction.memoryFlush.prompt` override moves the first,
+# a `.systemPrompt` override moves the second, and neither override moves both.
+#
+#   _MEMORY_FLUSH_PROMPT_HEAD — the head of DEFAULT_MEMORY_FLUSH_PROMPT
+#     (:93495), which is the user message verbatim: "Pre-compaction memory
+#     flush." then MEMORY_FLUSH_TARGET_HINT (:93487), `.join(" ")`. The hint
+#     continues "YYYY-MM-DD.md (create memory/ if needed)." and
+#     resolveMemoryFlushPromptForRun replaceAll()s that literal with the run's
+#     date (:93536) before sending, so the anchor STOPS at "memory/" — one
+#     character short of the only part of the sentence that is not fixed at
+#     compile time. Matched at the HEAD, which is where the prompt is put; the
+#     `Current time: ...` line resolveMemoryFlushPromptForRun appends (:93538)
+#     and any hint ensureMemoryFlushSafetyHints / ensureNoReplyHint add
+#     (:93552-93560) all land after it, so none of them can move it.
+#   _MEMORY_FLUSH_SYSTEM_LINE — the opening sentence of
+#     DEFAULT_MEMORY_FLUSH_SYSTEM_PROMPT (:93503-04), matched as a LINE rather
+#     than as a head. The census called this a system head; the bundle says
+#     otherwise, and the anchor is written to what the bundle does. The flush
+#     system prompt does not replace the agent's, it is carried as
+#     extraSystemPrompt —
+#         flushSystemPrompt = [run.extraSystemPrompt,
+#                              memoryFlushSettings.systemPrompt]
+#                             .filter(Boolean).join("\n\n")            (:93790)
+#     — and extraSystemPrompt is a SECTION of the system prompt, not the whole
+#     of it:
+#         if (extraSystemPrompt) lines.push(contextHeader, extraSystemPrompt,
+#                                           "")                        (:38876)
+#     under "## Group Chat Context" (or "## Subagent Context"), with the
+#     agent's own prompt before it and further sections after. So the sentence
+#     is never at offset 0. What IS invariant is that it opens a line: it
+#     follows either the header line or the "\n\n" that join() inserted. Hence
+#     re.M and `^`.
+#
+# The system anchor is the load-bearing one, and not as a fallback. A flush
+# turn exists to WRITE A FILE, so it calls tools, and a tool-calling turn is
+# several requests: only the FIRST carries the flush prompt as its last user
+# message, every later one ends on a tool result. extraSystemPrompt is set for
+# the whole run, so the system line is on every request of the turn and the
+# prompt head is on one. Both are kept because either can be configured away.
+_MEMORY_FLUSH_PROMPT_HEAD = (
+    "Pre-compaction memory flush. Store durable memories only in memory/"
+)
+_MEMORY_FLUSH_SYSTEM_LINE = re.compile(r"^Pre-compaction memory flush turn\.", re.M)
+
+# cron — a scheduled job's agent turn: the same self-issued full turn as the
+# heartbeat, from the cron runner instead of the health loop.
+# runCronIsolatedAgentTurn (dist/gateway-cli-BjsM6fWb.js:4196) builds its user
+# message as
+#     base        = `[cron:${job.id} ${job.name}] ${message}`.trim()   (:4363)
+#     commandBody = `${base}\n${timeLine}`.trim()                      (:4381)
+#     commandBody = appendCronDeliveryInstruction({commandBody, ...})  (:4382)
+# and runs it with the session's system prompt, so like the heartbeat it
+# defeats both guards below and is checked ahead of them.
+#
+# Its turn does NOT reach the delivered transcript, and that is structural
+# rather than lucky: a cron job runs on its own session key —
+# `params.sessionKey?.trim() || \`cron:${job.id}\`` (:4218) through
+# resolveCronAgentSessionKey (:4056) — which resolves to its own store entry
+# and its own sessionId, hence its own transcript file (:4425). So a cron row
+# is an extra row against the main chat.jsonl exactly like a pruned heartbeat,
+# and this label subtracts, as heartbeat's does.
+#
+#   _CRON_MESSAGE_HEAD — the bracket prefix, which is unconditional on this
+#     path and carries no configurable text of its own: `cron:`, the job id
+#     (no spaces, no `]`), a space, the job name, `]`. Matched at the HEAD.
+#     A human's turn would have to open on that exact bracket to collide.
+#   _CRON_DELIVERY_TAIL — appendCronDeliveryInstruction's sentence pair
+#     (:4194), appended last and therefore matched at the TAIL: it goes on
+#     AFTER the `Current time:` line, so unlike the heartbeat's path hint this
+#     tail needs no tolerance for a trailing line. It is the weaker of the two
+#     — it is added only when the job requested delivery
+#     (deliveryRequested, :4192) — so it is a supplement to the head, not a
+#     peer of it: it survives a job whose message text was wrapped past the
+#     prefix, and it is silent on a job that delivers nothing.
+#
+# One cron shape is deliberately NOT fingerprinted: the external-hook path
+# (:4371), which replaces the whole body with buildSafeExternalPrompt and drops
+# the bracket prefix. It fires only for gmail/hook sessions
+# (isExternalHookSession), which the harness does not configure, and it carries
+# no constant of its own worth pinning ahead of a run that could produce one.
+_CRON_MESSAGE_HEAD = re.compile(r"\A\[cron:[^\s\]]+ [^\]]*\]")
+_CRON_DELIVERY_TAIL = (
+    "Return your summary as plain text; it will be delivered automatically. "
+    "If the task explicitly calls for messaging a specific external recipient, "
+    "note who/where it should go instead of sending it yourself."
+)
+
+# subagent — a spawned child's traffic, which bills the PARENT. The subagents
+# tool hands runEmbeddedPiAgent a childTaskMessage
+# (dist/reply-BCcP6j4h.js:30436-30440) built as
+#
+#     [`[Subagent Context] You are running as a subagent (depth ${d}/${max}).
+#       Results auto-announce to your requester; do not busy-poll for status.`,
+#      spawnMode === "session" ? "[Subagent Context] This subagent session is
+#       persistent and ..." : undefined,
+#      `[Subagent Task]: ${task}`].filter(Boolean).join("\n\n")
+#
+# and runs it under `extraSystemPrompt: childSystemPrompt` (:30471). Nothing
+# the child does appears in the PARENT's chat.jsonl, so every row it produces
+# is a row with no assistant message behind it — the same accounting shape as
+# the heartbeat, and the reason this label subtracts.
+#
+# Matched on the FIRST user message, which is the one case in this file where
+# others[0] is right and the last message is wrong. childTaskMessage is what
+# OPENS the child's session and it stays at position 0 for the whole of it, so
+# anchoring there names every request of the run; anchoring on the last
+# message would name only the first request and leave the rest of a
+# tool-calling child unlabelled. The heartbeat's reasoning is the mirror image
+# of this and both are correct: a heartbeat is APPENDED to someone else's
+# session, a subagent task message BEGINS its own.
+#
+# Two anchors, because spawnMode decides whether a line sits between them:
+# the context sentence opens the message, and the task label opens a LINE
+# (join("\n\n") guarantees it), so the second is matched with re.M like the
+# memory flush's system anchor.
+_SUBAGENT_CONTEXT_HEAD = "[Subagent Context] You are running as a subagent (depth "
+_SUBAGENT_TASK_LINE = re.compile(r"^\[Subagent Task\]: ", re.M)
+
+# The two messages openclaw sends to WAKE an agent about subagent work, both
+# ordinary user messages on a live session and therefore past both guards.
+#
+#   announce steer — buildAnnounceSteerMessage (:29714) returns
+#     `formatAgentInternalEventsForPrompt(events) || "A background task
+#     finished. Process the completion update now."`, i.e. this exact sentence
+#     whenever the event list formats to nothing.
+#   descendant wake — buildDescendantWakeMessage (:29722) joins its lines with
+#     "\n" and this sentence is the first of them (:29724).
+#
+# Both are labelled `subagent`: they are the parent side of the same
+# mechanism, they carry no human behind them, and neither produces a turn a
+# human asked for.
+_SUBAGENT_WAKE_HEADS = (
+    "A background task finished. Process the completion update now.",
+    "[Subagent Context] Your prior run ended while waiting for descendant "
+    "subagent completions.",
+)
+
+# a2a — the agent-to-agent announce step. runAgentStep (:27487) posts a
+# gateway `agent` call whose message is this string LITERALLY (:27625), with
+# the real content carried out-of-band in extraSystemPrompt (:27626). It is
+# the one fingerprint in this file matched by equality rather than by an
+# anchor, because the whole message is the constant — there is no variable
+# part to leave room for, and equality is what keeps a human quoting the
+# sentence from taking the label.
+_A2A_ANNOUNCE_MESSAGE = "Agent-to-agent announce step."
+
+# slug — the session-title generator. generateSlugViaLLM
+# (dist/llm-slug-generator.js:50) builds a prompt opening with this sentence
+# (:58) and runs it through runEmbeddedPiAgent on a throwaway session
+# (:68, sessionKey "temp:slug-generator"). One user message, and a system
+# prompt, because runEmbeddedPiAgent always builds one.
+_SLUG_PROMPT_HEAD = (
+    "Based on this conversation, generate a short 1-2 word filename slug"
+)
+
+# llm_task — the llm-task extension's structured-output tool. It composes its
+# instructions as a USER-message head rather than as a system prompt
+# (extensions/llm-task/src/llm-task-tool.ts:175-183):
+#
+#     const system = ["You are a JSON-only function.",
+#                     "Return ONLY a valid JSON value.",
+#                     "Do not wrap in markdown fences.",
+#                     "Do not include commentary.",
+#                     "Do not call tools."].join(" ");
+#     const fullPrompt = `${system}\n\nTASK:\n${prompt}\n\nINPUT_JSON:\n${inputJson}\n`;
+#
+# and passes fullPrompt as `prompt:` (:200). The anchor stops after the second
+# sentence: that is as much as is fixed before the caller's task text, and the
+# first two sentences together are already unmistakable.
+_LLM_TASK_PROMPT_HEAD = (
+    "You are a JSON-only function. Return ONLY a valid JSON value."
+)
+
+# probe — `openclaw models probe`, both of its shapes. Neither is a task turn
+# and both are whole-message constants, so both are matched by equality:
+#
+#   :1166 PROBE_PROMPT, sent through runEmbeddedPiAgent (:1421), so it carries
+#     a system prompt and must be named before the system guard.
+#   :2008 probeTool's context, posted straight to complete() with tools:
+#     [TOOL_PING] and no system prompt at all.
+#
+# Neither is expected in a harness run — the runner never shells `models
+# probe` — but both bill the sidecar if anything ever does, and an unlabelled
+# row is what breaks attribution.
+_PROBE_MESSAGES = (
+    "Reply with OK. Do not use tools.",
+    "Call the ping tool with {} and nothing else.",
+)
 
 
 def _text_of(content: Any) -> str:
@@ -420,22 +701,105 @@ def _has_pdf_extraction_label(content: Any) -> bool:
     return False
 
 
-def _is_heartbeat_prompt(others: list[dict]) -> bool:
-    """True when the LAST user message is the gateway's heartbeat prompt.
+def _last_user_text(others: list[dict]) -> str | None:
+    """The text of the LAST user-role message, or None when there is none.
 
-    The last one, not ``others[0]``: a heartbeat fires into whatever session
-    the agent is on, so the request may carry that session's history ahead of
-    it. ``others[0]`` would then be the run's first human turn.
+    The last one, not ``others[0]``: every self-issued turn below fires into a
+    session that may already carry history, so ``others[0]`` would be the run's
+    first HUMAN turn. It is also why the flush prompt sitting in that history
+    cannot re-label the turns that follow it.
     """
     for msg in reversed(others):
         if str(msg.get("role") or "") != "user":
             continue
-        text = _text_of(msg.get("content")).strip()
-        if text.startswith(_HEARTBEAT_PROMPT_HEAD):
+        return _text_of(msg.get("content"))
+    return None
+
+
+def _is_heartbeat_prompt(others: list[dict]) -> bool:
+    """True when the LAST user message is one of the gateway's heartbeat bodies."""
+    text = _last_user_text(others)
+    if text is None:
+        return False
+    text = text.strip()
+    if text.startswith(_HEARTBEAT_PROMPT_HEAD):
+        return True
+    if text.startswith(_HEARTBEAT_EVENT_HEADS):
+        return True
+    return _HEARTBEAT_TIME_LINE.sub("", text).rstrip().endswith(
+        _HEARTBEAT_PATH_HINT)
+
+
+def _is_memory_flush_prompt(others: list[dict]) -> bool:
+    """True when the LAST user message is the pre-compaction flush prompt."""
+    text = _last_user_text(others)
+    return text is not None and text.lstrip().startswith(_MEMORY_FLUSH_PROMPT_HEAD)
+
+
+def _is_cron_prompt(others: list[dict]) -> bool:
+    """True when the LAST user message is a cron job's.
+
+    The tail anchor is checked through the heartbeat's time-line tolerance,
+    which is sound because the line is the same line: cron resolves it from
+    ``resolveCronStyleNow`` (dist/gateway-cli-BjsM6fWb.js:4362), the same
+    generator the heartbeat's comes from (dist/reply-BCcP6j4h.js:36570), so it
+    ends on " UTC" identically. On the shipped ordering the strip is a no-op —
+    commandBody puts the time line in the MIDDLE (:4381) and
+    appendCronDeliveryInstruction appends the delivery sentence after it
+    (:4382) — and it is kept anyway so the anchor still holds for a body whose
+    time line lands last.
+    """
+    text = _last_user_text(others)
+    if text is None:
+        return False
+    text = text.strip()
+    if _CRON_MESSAGE_HEAD.match(text):
+        return True
+    return _HEARTBEAT_TIME_LINE.sub("", text).rstrip().endswith(
+        _CRON_DELIVERY_TAIL)
+
+
+def _first_user_text(others: list[dict]) -> str | None:
+    """The text of the FIRST user-role message, or None when there is none."""
+    for msg in others:
+        if str(msg.get("role") or "") != "user":
+            continue
+        return _text_of(msg.get("content"))
+    return None
+
+
+def _is_subagent_request(others: list[dict]) -> bool:
+    """True when this request belongs to a spawned subagent, or wakes one."""
+    opening = _first_user_text(others)
+    if opening is not None:
+        opening = opening.lstrip()
+        if opening.startswith(_SUBAGENT_CONTEXT_HEAD):
             return True
-        return _HEARTBEAT_TIME_LINE.sub("", text).rstrip().endswith(
-            _HEARTBEAT_PATH_HINT)
-    return False
+        if _SUBAGENT_TASK_LINE.search(opening):
+            return True
+    text = _last_user_text(others)
+    return text is not None and text.strip().startswith(_SUBAGENT_WAKE_HEADS)
+
+
+def _is_a2a_announce(others: list[dict]) -> bool:
+    """True when the LAST user message IS the agent-to-agent announce step."""
+    text = _last_user_text(others)
+    return text is not None and text.strip() == _A2A_ANNOUNCE_MESSAGE
+
+
+def _is_slug_prompt(others: list[dict]) -> bool:
+    text = _last_user_text(others)
+    return text is not None and text.lstrip().startswith(_SLUG_PROMPT_HEAD)
+
+
+def _is_llm_task_prompt(others: list[dict]) -> bool:
+    text = _last_user_text(others)
+    return text is not None and text.lstrip().startswith(_LLM_TASK_PROMPT_HEAD)
+
+
+def _is_probe_prompt(others: list[dict]) -> bool:
+    text = _last_user_text(others)
+    return text is not None and text.strip() in _PROBE_MESSAGES
 
 
 def _is_embeddings_request(kwargs: dict) -> bool:
@@ -467,15 +831,40 @@ def _classify_internal_purpose(kwargs: dict) -> str:
 
       transcription  route, from call_type — no body to inspect.
       embeddings     route — not a chat request; carries no messages at all.
-      heartbeat      a real agent turn, so it is the ONE label that must be
-                     taken before the two shape guards. It has a system prompt
-                     and may have history, and both guards would drop it.
-                     Placed after the two route tests because those decide on
-                     call_type alone and a heartbeat is neither.
+      self-issued    heartbeat, subagent, memory_flush, cron and a2a are real
+                     agent turns, so they are the labels that must be taken
+                     before the two shape guards: each has a system prompt and
+                     may have history, and both guards would drop them. Placed
+                     after the two route tests because those decide on
+                     call_type alone and none of the five is either route.
+                     Order WITHIN the group is meaningless except at one
+                     point: subagent is ahead of memory_flush, because those
+                     two are the only pair that can both be true of one
+                     request and they disagree about whether the row
+                     subtracts. See the comment at that branch. heartbeat and
+                     memory_flush cannot collide at all — `canAttemptFlush =
+                     ... && !params.isHeartbeat && !isCli`,
+                     dist/reply-BCcP6j4h.js:93710.
       arity          from here down every label needs exactly one user
-                     message, which is what `completeSimple` sends.
+                     message, which is what `completeSimple` and every
+                     throwaway-session caller below sends.
       compaction     system prompt. Safe below heartbeat: a compaction body is
-                     a WRAPPED transcript, so it matches neither anchor.
+                     a WRAPPED transcript (`<conversation>...</conversation>`
+                     then the base prompt), so it opens on a tag no anchor
+                     above matches and closes on a summarization instruction
+                     that is neither the heartbeat's path hint nor cron's
+                     delivery sentence. That wrap is also why a compacted
+                     transcript CONTAINING a heartbeat, a flush or a cron turn
+                     keeps the compaction label: the quoted turn is neither
+                     first nor last in the body.
+      slug/llm_task  user prompt head, and ABOVE the system guard rather than
+      probe          below it: all three reach the model through
+                     runEmbeddedPiAgent or an equivalent, which always builds
+                     a system prompt, so the guard would drop them. They are
+                     safe this high because the arity check already ran — a
+                     real agent turn carries its history, these carry one
+                     message — and because each anchor is a full sentence of
+                     openclaw's own. probe additionally matches by equality.
       system guard   everything past this point sends no system prompt.
       pdf/image/pdf  content blocks, then the extraction label.
       summarize      user prompt head — last, because it is the weakest test.
@@ -495,10 +884,36 @@ def _classify_internal_purpose(kwargs: dict) -> str:
             # See the fingerprint block above for why it cannot take a
             # compaction body with it.
             return "heartbeat"
+        if _is_subagent_request(others):
+            # Ahead of memory_flush on purpose. Both can be true of a single
+            # request — a child session is a session, so it can flush — and
+            # only one of the two answers the question the accounting asks:
+            # whose transcript holds the turn. A subagent's turns are not in
+            # THIS run's chat.jsonl, so its rows must subtract; a main-session
+            # flush's are, so its rows must not. Naming the child first is
+            # what keeps a child's flush out of _TRANSCRIPT_TURN_PURPOSES.
+            return "subagent"
+        if _MEMORY_FLUSH_SYSTEM_LINE.search(system) or _is_memory_flush_prompt(others):
+            # The system anchor first: it is the one that holds for every
+            # request of the flush turn, not just the one that carries the
+            # prompt. Both are ahead of the guards for the heartbeat's reason,
+            # and this label does not subtract — the flush turn is in the
+            # delivered transcript.
+            return "memory_flush"
+        if _is_cron_prompt(others):
+            return "cron"
+        if _is_a2a_announce(others):
+            return "a2a"
         if len(others) != 1:
             return ""
         if system.lstrip().startswith(_COMPACTION_SYSTEM_HEAD):
             return "compaction"
+        if _is_slug_prompt(others):
+            return "slug"
+        if _is_llm_task_prompt(others):
+            return "llm_task"
+        if _is_probe_prompt(others):
+            return "probe"
         if system.strip():
             return ""
         content = others[0].get("content")

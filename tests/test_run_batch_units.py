@@ -50,17 +50,22 @@ from eval.run_batch import (  # noqa: E402
     _augment_score_with_combined_rewards,
     _backfill_per_message_cost,
     _count_heartbeat_turns_in_transcript,
+    _count_memory_flush_turns_in_transcript,
     _project_agent_usage_top_level,
     _project_artifact_record,
     _resolve_task_apis,
     _usage_row_bills_no_tokens,
     _usage_row_is_assistant_turn,
+    _usage_row_is_internal_call,
     _write_pass_summary,
     recompute_combined,
     save_usage,
 )
 from src.utils import skills_inference  # noqa: E402
-from src.utils.litellm_usage_callback import _is_heartbeat_prompt  # noqa: E402
+from src.utils.litellm_usage_callback import (  # noqa: E402
+    _is_heartbeat_prompt,
+    _is_memory_flush_prompt,
+)
 from src.utils.oauth_pricing import reprice_oauth_sources  # noqa: E402
 
 
@@ -1912,6 +1917,283 @@ class TestHeartbeatTurnsSurvivingInTheTranscript:
         assert json.loads(before)[2]["message"] == {
             "role": "user", "content": [{"type": "text", "text": _HEARTBEAT_TEXT}]}
         assert report["messages"] == 2
+
+
+# ---------------------------------------------------------------------------
+# The memory flush is the heartbeat with the prune removed. OpenClaw spends a
+# whole agent turn, on the SESSION, writing durable memories to memory/<date>.md
+# before compaction discards the context (runMemoryFlushIfNeeded,
+# dist/reply-BCcP6j4h.js:93697, default-ON). pruneHeartbeatTranscript is the
+# gateway's only transcript-truncating path and no flush code calls it, so the
+# flush's user+assistant pair ALWAYS survives into chat.jsonl.
+#
+# That is the whole difference, and it inverts the accounting. A heartbeat row
+# has no message, so subtracting it closes the counts. A flush row HAS one, so
+# subtracting it would open them: a request removed while the message it
+# answered stays in `assistants` is a manufactured rows_unmatched. The label
+# therefore reports and does not exclude, and the transcript count is stamped
+# separately because the judge still reads a turn nobody set.
+# ---------------------------------------------------------------------------
+
+# DEFAULT_MEMORY_FLUSH_PROMPT (dist/reply-BCcP6j4h.js:93495) with YYYY-MM-DD
+# substituted as resolveMemoryFlushPromptForRun does (:93536), plus the
+# current-time line it appends.
+_MEMORY_FLUSH_TEXT = (
+    "Pre-compaction memory flush. "
+    "Store durable memories only in memory/2026-08-17.md (create memory/ if "
+    "needed). "
+    "Treat workspace bootstrap/reference files such as MEMORY.md, SOUL.md, "
+    "TOOLS.md, and AGENTS.md as read-only during this flush; never overwrite, "
+    "replace, or edit them. "
+    "If memory/2026-08-17.md already exists, APPEND new content only and do "
+    "not overwrite existing entries. "
+    "Do NOT create timestamped variant files (e.g., 2026-08-17-HHMM.md); "
+    "always use the canonical 2026-08-17.md filename. "
+    "If nothing to store, reply with NO_REPLY.\n"
+    "Current time: Mon, Aug 17, 2026 at 7:50 AM (UTC) / 2026-08-17 07:50 UTC"
+)
+
+
+def _chat_costs(traj):
+    """_costs for a chat.jsonl-shaped trajectory, whose role is one level down."""
+    return [
+        m["message"]["usage"]["cost"]["total"]
+        for m in traj["messages"]
+        if m["message"].get("role") == "assistant"
+        and isinstance(m["message"].get("usage"), dict)
+    ]
+
+
+class TestMemoryFlushTurnsInTheTranscript:
+    def test_a_flush_turn_is_counted(self):
+        traj = _chat_traj(
+            ("user", "audit the corridor release"),
+            ("assistant", "reading the changelog"),
+            ("user", _MEMORY_FLUSH_TEXT),
+            ("assistant", "wrote memory/2026-08-17.md"),
+        )
+        assert _count_memory_flush_turns_in_transcript(traj["messages"]) == 1
+
+    def test_several_flushes_are_each_counted(self):
+        traj = _chat_traj(
+            ("user", "audit the corridor release"),
+            ("user", _MEMORY_FLUSH_TEXT),
+            ("assistant", "wrote it"),
+            ("user", _MEMORY_FLUSH_TEXT),
+            ("assistant", "appended"),
+        )
+        assert _count_memory_flush_turns_in_transcript(traj["messages"]) == 2
+
+    def test_a_run_that_never_flushed_counts_nothing(self):
+        traj = _chat_traj(
+            ("user", "audit the corridor release"),
+            ("assistant", "reading the changelog"),
+        )
+        assert _count_memory_flush_turns_in_transcript(traj["messages"]) == 0
+
+    def test_a_task_turn_quoting_the_flush_prompt_is_not_counted(self):
+        traj = _chat_traj(
+            ("user", "the retention policy says openclaw sends \""
+                     + _MEMORY_FLUSH_TEXT + "\" -- does that conflict with it?"),
+            ("assistant", "it does, under section 4"),
+        )
+        assert _count_memory_flush_turns_in_transcript(traj["messages"]) == 0
+
+    def test_an_assistant_echo_of_the_prompt_is_not_counted(self):
+        traj = _chat_traj(
+            ("user", "what does openclaw send before compaction?"),
+            ("assistant", _MEMORY_FLUSH_TEXT),
+        )
+        assert _count_memory_flush_turns_in_transcript(traj["messages"]) == 0
+
+    def test_plain_string_content_is_read_too(self):
+        traj = {"messages": [{"message": {"role": "user",
+                                          "content": _MEMORY_FLUSH_TEXT}}]}
+        assert _count_memory_flush_turns_in_transcript(traj["messages"]) == 1
+
+    def test_the_detector_shares_the_classifier_fingerprints(self):
+        # Same function, so the two sides cannot drift apart on a bundle bump.
+        assert _is_memory_flush_prompt([{"role": "user",
+                                         "content": _MEMORY_FLUSH_TEXT}])
+
+    def test_a_heartbeat_is_not_counted_as_a_flush_or_the_other_way_round(self):
+        traj = _chat_traj(("user", _HEARTBEAT_TEXT), ("assistant", "ok"),
+                          ("user", _MEMORY_FLUSH_TEXT), ("assistant", "wrote it"))
+        assert _count_memory_flush_turns_in_transcript(traj["messages"]) == 1
+        assert _count_heartbeat_turns_in_transcript(traj["messages"]) == 1
+
+    def test_the_count_is_stamped_and_warned(self, tmp_path, caplog):
+        rows = [
+            _usage_row("2026-08-17T07:50:01+00:00", _RK_A, cost=0.11),
+            _internal_row("2026-08-17T07:50:02+00:00", _RK_A, "memory_flush"),
+            _usage_row("2026-08-17T07:50:03+00:00", _RK_A, cost=0.12),
+        ]
+        traj = _chat_traj(
+            ("user", "audit the corridor release"),
+            ("assistant", "reading the changelog"),
+            ("user", _MEMORY_FLUSH_TEXT),
+            ("assistant", "wrote memory/2026-08-17.md"),
+            ("user", "now the rulebook"),
+            ("assistant", "v3, in force since March"),
+        )
+        with caplog.at_level(logging.WARNING, logger="eval.run_batch"):
+            report = _attribute_per_message_cost(
+                traj, _write_usage_log(tmp_path, rows), _RK_A)
+
+        assert report["memory_flush_turns_in_transcript"] == 1
+        assert report["status"] == "attributed"
+        warnings = [r.getMessage() for r in caplog.records
+                    if r.levelno >= logging.WARNING]
+        assert any("memory-flush turn" in m for m in warnings)
+
+    def test_a_clean_run_is_not_stamped_at_all(self, tmp_path):
+        rows = [_usage_row("2026-08-17T07:50:01+00:00", _RK_A, cost=0.11)]
+        traj = _chat_traj(("user", "audit the release"), ("assistant", "done"))
+        report = _attribute_per_message_cost(
+            traj, _write_usage_log(tmp_path, rows), _RK_A)
+        assert "memory_flush_turns_in_transcript" not in report
+
+    def test_the_stamp_survives_into_score_json(self):
+        scores: dict = {}
+        _augment_score_with_combined_rewards(scores, {"usage_attribution": {
+            "status": "attributed", "messages": 4, "rows_selected": 4,
+            "rows_internal": 0, "rows_unmatched": 0,
+            "memory_flush_turns_in_transcript": 1,
+        }})
+        assert scores["usage_attribution"]["memory_flush_turns_in_transcript"] == 1
+
+    def test_nothing_is_removed_from_the_transcript(self, tmp_path):
+        # Counting only, for the heartbeat's reason: whether a self-issued turn
+        # should be judged is a grading decision, not an accounting one.
+        traj = _chat_traj(
+            ("user", "audit the corridor release"),
+            ("assistant", "reading the changelog"),
+            ("user", _MEMORY_FLUSH_TEXT),
+            ("assistant", "wrote memory/2026-08-17.md"),
+        )
+        rows = [_usage_row("2026-08-17T07:50:0%d+00:00" % i, _RK_A, cost=0.1)
+                for i in (1, 2)]
+        report = _attribute_per_message_cost(
+            traj, _write_usage_log(tmp_path, rows), _RK_A)
+        assert [m["message"]["role"] for m in traj["messages"]] == \
+            ["user", "assistant", "user", "assistant"]
+        assert report["messages"] == 2
+
+
+class TestMemoryFlushRowsAreAttributedNotSubtracted:
+    def _rows(self):
+        return [
+            _usage_row("2026-08-17T07:50:01+00:00", _RK_A, cost=0.11),
+            _internal_row("2026-08-17T07:50:02+00:00", _RK_A, "memory_flush",
+                          out=40, cost=0.30),
+            _usage_row("2026-08-17T07:50:03+00:00", _RK_A, cost=0.12),
+        ]
+
+    def _traj(self):
+        return _chat_traj(
+            ("user", "audit the corridor release"),
+            ("assistant", "reading the changelog"),
+            ("user", _MEMORY_FLUSH_TEXT),
+            ("assistant", "wrote memory/2026-08-17.md"),
+            ("user", "now the rulebook"),
+            ("assistant", "v3, in force since March"),
+        )
+
+    def test_a_transcript_present_flush_creates_no_unmatched_row(self, tmp_path):
+        # The requirement the whole split exists for. Subtracting the row would
+        # leave 2 rows for 3 assistant messages and fail the gate on a run where
+        # nothing is actually wrong.
+        traj = self._traj()
+        report = _attribute_per_message_cost(
+            traj, _write_usage_log(tmp_path, self._rows()), _RK_A)
+        assert report["status"] == "attributed"
+        assert report["rows_unmatched"] == 0
+        assert report["messages"] == 3
+
+    def test_the_flush_row_lands_on_the_message_it_produced(self, tmp_path):
+        traj = self._traj()
+        _attribute_per_message_cost(
+            traj, _write_usage_log(tmp_path, self._rows()), _RK_A)
+        assert _chat_costs(traj) == [0.11, 0.30, 0.12]
+
+    def test_the_flush_row_is_not_on_the_internal_line(self, tmp_path):
+        traj = self._traj()
+        report = _attribute_per_message_cost(
+            traj, _write_usage_log(tmp_path, self._rows()), _RK_A)
+        assert report["rows_internal"] == 0
+        assert "internal_calls" not in report
+
+    def test_the_ledger_still_closes(self, tmp_path):
+        # per-message + internal + post_agent + zero_token == sources.agent,
+        # with the flush row on the per-message side instead of the internal one.
+        rows = self._rows()
+        traj = self._traj()
+        report = _attribute_per_message_cost(
+            traj, _write_usage_log(tmp_path, rows), _RK_A)
+        agent = _agent_source(rows)
+        assert report["messages"] + report["rows_internal"] + \
+            report["rows_post_agent"] + report["rows_zero_token"] == \
+            agent["request_count"] == report["rows_selected"]
+        assert sum(_chat_costs(traj)) == pytest.approx(agent["cost_usd"])
+
+    def test_a_heartbeat_row_is_still_subtracted(self, tmp_path):
+        # The contrast that makes the split a rule rather than an exception:
+        # the gateway prunes the heartbeat's pair, so its row has no message.
+        rows = [
+            _usage_row("2026-08-17T07:50:01+00:00", _RK_A, cost=0.11),
+            _internal_row("2026-08-17T07:50:02+00:00", _RK_A, "heartbeat"),
+            _usage_row("2026-08-17T07:50:03+00:00", _RK_A, cost=0.12),
+        ]
+        traj = _traj(2)
+        report = _attribute_per_message_cost(
+            traj, _write_usage_log(tmp_path, rows), _RK_A)
+        assert report["status"] == "attributed"
+        assert report["rows_internal"] == 1
+        assert _costs(traj) == [0.11, 0.12]
+
+    def test_a_cron_row_is_subtracted_too(self, tmp_path):
+        # A cron job runs on its own session key and therefore its own
+        # transcript file, so its turn is never in this run's chat.jsonl.
+        rows = [
+            _usage_row("2026-08-17T07:50:01+00:00", _RK_A, cost=0.11),
+            _internal_row("2026-08-17T07:50:02+00:00", _RK_A, "cron"),
+        ]
+        traj = _traj(1)
+        report = _attribute_per_message_cost(
+            traj, _write_usage_log(tmp_path, rows), _RK_A)
+        assert report["status"] == "attributed"
+        assert report["internal_calls"]["by_purpose"]["cron"]["request_count"] == 1
+        assert _costs(traj) == [0.11]
+
+    def test_a_zero_token_flush_row_is_still_not_a_turn(self, tmp_path):
+        # Staying a turn CANDIDATE is not the same as being a turn. A request
+        # that moved no context produced no message whoever issued it, so the
+        # arithmetic split still takes it — into zero_token, under its name.
+        rows = [
+            _usage_row("2026-08-17T07:50:01+00:00", _RK_A, cost=0.11),
+            _internal_row("2026-08-17T07:50:02+00:00", _RK_A, "memory_flush",
+                          out=0, cost=0.0, input_tokens=0, total_tokens=0),
+        ]
+        traj = _traj(1)
+        report = _attribute_per_message_cost(
+            traj, _write_usage_log(tmp_path, rows), _RK_A)
+        assert report["status"] == "attributed"
+        assert report["rows_internal"] == 0
+        assert report["rows_zero_token"] == 1
+        assert report["zero_token_calls"]["by_purpose"]["memory_flush"][
+            "request_count"] == 1
+
+    def test_the_predicates_agree_with_the_split(self):
+        flush = _internal_row("2026-08-17T07:50:02+00:00", _RK_A, "memory_flush")
+        assert _usage_row_is_internal_call(flush) is False
+        assert _usage_row_is_assistant_turn(flush) is True
+        for purpose in ("heartbeat", "cron", "compaction", "summarize",
+                        "image", "pdf", "embeddings", "transcription"):
+            row = _internal_row("2026-08-17T07:50:02+00:00", _RK_A, purpose)
+            assert _usage_row_is_internal_call(row) is True, purpose
+            assert _usage_row_is_assistant_turn(row) is False, purpose
+        assert _usage_row_is_internal_call(
+            _usage_row("2026-08-17T07:50:01+00:00", _RK_A)) is False
 
 
 class TestUsageAttributionStamp:
