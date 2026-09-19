@@ -113,7 +113,33 @@ def _stub_headroom(compress_fn=None, config_cls=None):
 
 
 def _run(coro):
-    return asyncio.get_event_loop().run_until_complete(coro) if sys.version_info < (3, 10) else asyncio.run(coro)
+    """Drive `coro` to completion on a loop this helper owns outright.
+
+    The previous implementation borrowed the thread's ambient loop via
+    `asyncio.get_event_loop()` on Python < 3.10. That only ever worked by
+    accident: 3.9's policy auto-creates a main-thread loop *solely* while
+    `_set_called` is False (CPython `asyncio/events.py:636-644`), and the
+    first `asyncio.run()` anywhere in the process flips `_set_called` True and
+    then hands the loop back as `None` on the way out. Run this file alone and
+    nothing has touched the policy yet, so the implicit branch fires and every
+    test passes; run it inside the full suite, behind any module that already
+    used `asyncio.run()`, and `get_event_loop()` raises `RuntimeError: There is
+    no current event loop in thread 'MainThread'` before the coroutine is ever
+    scheduled — twelve collection-order-dependent failures that say nothing
+    about the callback under test.
+
+    Owning the loop removes the dependency in both directions: we never read
+    the global policy, so no earlier test can poison us, and we never write it,
+    so we cannot poison anyone downstream. `close()` lives in `finally` so a
+    failing assertion still releases the selector's file descriptors instead of
+    leaking one per test. The production hook only ever awaits, so a private
+    loop is behaviourally identical to the ambient one.
+    """
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
 
 
 # ────────────────────────────────────────────────────────────────────────────
