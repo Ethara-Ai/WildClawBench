@@ -454,15 +454,56 @@ def _count_heartbeat_turns_in_transcript(
     return count
 
 
+_TURN_TOKEN_COLUMNS = (
+    "input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens",
+)
+
+
+def _usage_row_bills_no_tokens(r: Mapping[str, Any]) -> bool:
+    """True when all four of a row's token columns are zero.
+
+    Shape-independent, and the only claim it makes is arithmetic: a request
+    that billed no input, no output, no cache read and no cache write moved no
+    context through the model, so no assistant message can have come out of it.
+    A real turn always bills something — at minimum the prompt it was sent —
+    which is why this is safe to subtract from the turn candidates without
+    knowing anything else about the request.
+
+    Note what this is NOT. It is not a claim about the row's producer, and it
+    is not a claim that the row cost nothing: duration-billed traffic carries
+    dollars with no tokens at all, so the rows this selects keep their own
+    ledger line rather than being dropped. It is also not the whisper
+    predicate — ``_usage_row_purpose`` names that row ``transcription`` from
+    its audio seconds first, and the purpose split runs ahead of this one.
+
+    A column that will not read as an integer is NOT zero: unreadable is not
+    provably empty, and a row this cannot measure stays a turn candidate and
+    faces the count gate like any other.
+    """
+    for column in _TURN_TOKEN_COLUMNS:
+        try:
+            if int(r.get(column, 0) or 0) != 0:
+                return False
+        except (TypeError, ValueError):
+            return False
+    return True
+
+
 def _usage_row_is_assistant_turn(r: Mapping[str, Any]) -> bool:
     """True when a usage row can correspond to an assistant message.
 
-    ``failure`` and ``preflight`` rows never produce one, and neither does a
-    request the callback named as one of openclaw's own.
+    ``failure`` and ``preflight`` rows never produce one, neither does a
+    request the callback named as one of openclaw's own, and neither does one
+    that billed no tokens in any column. Shares
+    ``_usage_row_bills_no_tokens`` with the split inside
+    ``_attribute_per_message_cost`` so the predicate and the counter cannot
+    drift apart.
     """
     if r.get("kind") in ("failure", "preflight"):
         return False
-    return not _usage_row_purpose(r)
+    if _usage_row_purpose(r):
+        return False
+    return not _usage_row_bills_no_tokens(r)
 
 
 _USAGE_LEDGER_TOKEN_KEYS = (
@@ -618,14 +659,17 @@ def _attribute_per_message_cost(traj: dict, usage_log_path: str,
       rows_selected   usage rows this run's key (or window) selected.
       rows_internal   of those, the ones openclaw issued for itself.
       rows_post_agent of those, the ones logged after the agent finished.
+      rows_zero_token of those, the ones that billed no tokens at all.
       rows_unmatched  message rows left over, or messages left short.
       internal_calls  ledger for rows_internal, or absent when there are none.
       post_agent_calls   ledger for rows_post_agent, likewise.
+      zero_token_calls   ledger for rows_zero_token, likewise.
 
-    The three ledgers partition ``rows_selected`` exactly: every row is billed
-    to a message, to internal_calls, or to post_agent_calls, and the four token
-    columns of the three add back up to ``sources.agent``. Bucketing a row never
-    removes its money from the run, only the claim that a message produced it.
+    The four ledgers partition ``rows_selected`` exactly: every row is billed to
+    a message, to internal_calls, to post_agent_calls, or to zero_token_calls,
+    and the four token columns of the four add back up to ``sources.agent``.
+    Bucketing a row never removes its money from the run, only the claim that a
+    message produced it.
 
     OpenClaw writes all-zero per-message usage/cost into chat.jsonl on this
     image build (IAN report Pointer 5); the real per-request numbers live only
@@ -712,7 +756,26 @@ def _attribute_per_message_cost(traj: dict, usage_log_path: str,
     # nothing else, and no label could have been invented for it honestly.
     during, post_agent = _split_post_agent_rows(candidates, agent_finished_ts)
     internal = [r for r in during if _usage_row_purpose(r)]
-    rows = [r for r in during if not _usage_row_purpose(r)]
+    unlabelled = [r for r in during if not _usage_row_purpose(r)]
+    # Last of the three splits, and last on purpose: each bucket refines what
+    # the one before it left, so no row can reach two of them. The boundary
+    # keeps a late all-zero row, because post_agent_calls is meant to be the
+    # whole account of what the container did after the run and a row moved out
+    # of it would put a hole in that account to say what the ledger already
+    # shows. The purpose split keeps a named all-zero row, because several of
+    # openclaw's own calls bill no tokens — duration-billed transcription bills
+    # audio seconds and nothing else — and naming the caller says strictly more
+    # than naming the arithmetic. What is left is the turn candidates, and this
+    # drops the ones that cannot be turns.
+    #
+    # Observed on the 2026-09-18 willie_prince run_3 release-gate rerun, where
+    # openclaw's heartbeat tick died inside its own gateway before dispatch
+    # (gateway.log: "Channel is required (no configured channels detected)")
+    # and the sidecar still booked a 15.002s agent row with four zero token
+    # columns. Nothing IN the row says any of that, so nothing here reads it
+    # that way: the split is on the columns alone.
+    zero_token = [r for r in unlabelled if _usage_row_bills_no_tokens(r)]
+    rows = [r for r in unlabelled if not _usage_row_bills_no_tokens(r)]
 
     report: dict[str, Any] = {
         "status": "failed",
@@ -720,6 +783,7 @@ def _attribute_per_message_cost(traj: dict, usage_log_path: str,
         "rows_selected": len(candidates),
         "rows_internal": len(internal),
         "rows_post_agent": len(post_agent),
+        "rows_zero_token": len(zero_token),
         "rows_unmatched": abs(len(rows) - len(assistants)),
     }
     heartbeat_turns = _count_heartbeat_turns_in_transcript(msgs)
@@ -739,6 +803,9 @@ def _attribute_per_message_cost(traj: dict, usage_log_path: str,
     post_block = _internal_calls_block(post_agent)
     if post_block:
         report["post_agent_calls"] = post_block
+    zero_block = _internal_calls_block(zero_token)
+    if zero_block:
+        report["zero_token_calls"] = zero_block
 
     if post_agent:
         logger.info(
@@ -746,15 +813,32 @@ def _attribute_per_message_cost(traj: dict, usage_log_path: str,
             "counted in the run total, excluded from turn matching",
             len(post_agent))
 
+    if zero_token:
+        # Louder than post_agent deliberately. A late row is ordinary — the
+        # container is still up and still serving. A row that billed nothing in
+        # any column is not: something upstream booked a request that never
+        # moved any context, which normally means it failed before it was
+        # dispatched, and that is worth a line in the run's log whether or not
+        # it changed the verdict.
+        logger.warning(
+            "per-message cost: %d usage row(s) billed ZERO tokens in every "
+            "column (ts %s); a request that moved no context cannot have "
+            "produced an assistant message, so they are ledgered as "
+            "zero_token_calls and excluded from turn matching. Their money, if "
+            "any, stays in the run total. A zero-token agent row usually means "
+            "an upstream failure booked a row.",
+            len(zero_token),
+            ", ".join(str(r.get("ts", "?")) for r in zero_token))
+
     if len(rows) != len(assistants):
         logger.error(
             "per-message cost NOT attributed: %s selected %d usage row(s) for "
-            "%d assistant message(s) (%d of them openclaw's own, %d post-agent). "
-            "Positional attribution would bill one request's tokens to another "
-            "message, so the per-message blocks are left empty; the run totals "
-            "in usage.json are unaffected.",
+            "%d assistant message(s) (%d of them openclaw's own, %d post-agent, "
+            "%d zero-token). Positional attribution would bill one request's "
+            "tokens to another message, so the per-message blocks are left "
+            "empty; the run totals in usage.json are unaffected.",
             selector, len(candidates), len(assistants), len(internal),
-            len(post_agent))
+            len(post_agent), len(zero_token))
         return report
 
     report["status"] = "attributed" if selector == "run_key" else "partial"
@@ -910,17 +994,20 @@ def save_usage(
     # Whether the per-message blocks in output.json were filled in, and the
     # ledger lines that make them add up. sources.agent counts every row this
     # run's key selected, so Σ(per-message) + internal_calls + post_agent_calls
-    # == sources.agent exactly; without those terms a reader comparing the two
-    # can only conclude the artifact is inconsistent.
+    # + zero_token_calls == sources.agent exactly; without those terms a reader
+    # comparing the two can only conclude the artifact is inconsistent.
     attribution = dict(_stamped_usage_attribution(result) or {})
     if attribution:
         internal = attribution.pop("internal_calls", None)
         post_agent = attribution.pop("post_agent_calls", None)
+        zero_token = attribution.pop("zero_token_calls", None)
         out["usage_attribution"] = attribution
         if internal:
             out["internal_calls"] = internal
         if post_agent:
             out["post_agent_calls"] = post_agent
+        if zero_token:
+            out["zero_token_calls"] = zero_token
 
     result["usage"] = out
     if out["request_count"] > 0:
@@ -2108,7 +2195,7 @@ def _augment_score_with_combined_rewards(scores: dict, result: dict) -> None:
     if stamp:
         scores["usage_attribution"] = {
             k: v for k, v in stamp.items()
-            if k not in ("internal_calls", "post_agent_calls")
+            if k not in ("internal_calls", "post_agent_calls", "zero_token_calls")
         }
 
 

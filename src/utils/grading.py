@@ -2822,6 +2822,15 @@ def extract_usage_from_litellm_log(
     agent's bill. The label exists so the per-message back-fill in
     eval/run_batch.py can account for them on their own ledger line, not so
     this can drop them — naming a row must never move money out of the total.
+
+    The same holds, by construction, for a row whose four token columns are all
+    zero: it adds 0 to every token column here and +1 to ``request_count``, so
+    the ``zero_token_calls`` bucket that back-fill splits out needs nothing from
+    this side. The ``request_count`` term is the deliberate half. A zero-token
+    row is still a request that was made — the sidecar logged it because
+    something called the model — and dropping it from the count would make this
+    disagree with `wc -l` on its own selection and would quietly hide exactly
+    the anomaly worth seeing. It is counted; it simply bills nothing.
     """
     totals = {
         "input_tokens": 0,

@@ -53,6 +53,8 @@ from eval.run_batch import (  # noqa: E402
     _project_agent_usage_top_level,
     _project_artifact_record,
     _resolve_task_apis,
+    _usage_row_bills_no_tokens,
+    _usage_row_is_assistant_turn,
     _write_pass_summary,
     recompute_combined,
     save_usage,
@@ -2199,6 +2201,286 @@ class TestPostAgentLedgerReachesTheArtifacts:
         written = (tmp_path / "usage.json").read_text(encoding="utf-8")
         assert "__agent_finished_ts__" not in written
         assert "1789712714" not in written
+
+
+# ---------------------------------------------------------------------------
+# A row can also fail to be a turn on arithmetic alone. On the 2026-09-18
+# willie_prince run_3 rerun openclaw's heartbeat tick died inside its own
+# gateway before dispatch and the sidecar booked a 15.002s agent row with all
+# four token columns zero: not internal (no body survived to label), not late
+# (the agent was still running), so it became a 110th turn candidate for 109
+# messages and failed the gate. A request that moved no context cannot have
+# produced an assistant message, so it is split out before turn matching — on
+# the columns, not on any guess about what issued it.
+# ---------------------------------------------------------------------------
+
+_ZERO_TOKEN = {"input_tokens": 0, "output_tokens": 0, "cache_read_tokens": 0,
+               "cache_write_tokens": 0, "total_tokens": 0}
+
+
+def _zero_token_row(ts, run_key, *, cost=0.0, **extra):
+    return _usage_row(ts, run_key, out=0, cost=cost, **{**_ZERO_TOKEN, **extra})
+
+
+class TestZeroTokenRowsAreBucketed:
+    _TURNS = [
+        _usage_row("2026-08-17T07:50:01+00:00", _RK_A, out=10, cost=0.11),
+        _usage_row("2026-08-17T07:50:03+00:00", _RK_A, out=20, cost=0.12),
+    ]
+    _ORPHAN = _zero_token_row("2026-08-17T07:50:05+00:00", _RK_A, duration_s=15.002)
+
+    def _run(self, tmp_path, rows, n=2, **kwargs):
+        traj = _traj(n)
+        report = _attribute_per_message_cost(
+            traj, _write_usage_log(tmp_path, rows), _RK_A, **kwargs)
+        return traj, report
+
+    def test_an_all_zero_row_is_not_a_turn_candidate(self, tmp_path):
+        _, report = self._run(tmp_path, [*self._TURNS, self._ORPHAN])
+        assert report["status"] == "attributed"
+        assert report["rows_unmatched"] == 0
+        assert report["rows_zero_token"] == 1
+        assert report["rows_selected"] == 3
+
+    def test_the_same_log_without_the_split_breaks_the_count(
+            self, tmp_path, monkeypatch):
+        import eval.run_batch as rb  # noqa: PLC0415
+
+        monkeypatch.setattr(rb, "_usage_row_bills_no_tokens", lambda r: False)
+        _, report = self._run(tmp_path, [*self._TURNS, self._ORPHAN])
+        assert report["status"] == "failed"
+        assert report["rows_unmatched"] == 1
+        assert report["rows_zero_token"] == 0
+
+    def test_the_orphan_never_lands_on_a_message(self, tmp_path):
+        # It sits between the two turns, so a positional pass that failed to
+        # drop it would bill the second message the first one's numbers.
+        rows = [self._TURNS[0],
+                _zero_token_row("2026-08-17T07:50:02+00:00", _RK_A),
+                self._TURNS[1]]
+        traj, _ = self._run(tmp_path, rows)
+        assert _costs(traj) == [0.11, 0.12]
+
+    @pytest.mark.parametrize("column", [
+        "input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens",
+    ])
+    def test_any_single_nonzero_column_keeps_a_row_a_candidate(
+            self, tmp_path, column):
+        row = _zero_token_row("2026-08-17T07:50:03+00:00", _RK_A, **{column: 7})
+        assert _usage_row_bills_no_tokens(row) is False
+        _, report = self._run(tmp_path, [self._TURNS[0], row])
+        assert report["rows_zero_token"] == 0
+        assert report["status"] == "attributed"
+
+    def test_a_cache_read_only_row_is_a_real_turn(self, tmp_path):
+        # The fully-cached turn: nothing new to write, everything read back.
+        # Cheap, but a genuine assistant message, and the one shape a
+        # "cost is zero" or "input is zero" test would have thrown away.
+        row = _zero_token_row("2026-08-17T07:50:03+00:00", _RK_A,
+                              cache_read_tokens=48_213, total_tokens=48_213)
+        traj, report = self._run(tmp_path, [self._TURNS[0], row])
+        assert report["rows_zero_token"] == 0
+        assert report["status"] == "attributed"
+        assert [m["usage"]["cacheRead"] for m in traj["messages"]
+                if m.get("role") == "assistant"] == [0, 48_213]
+
+    def test_an_unreadable_column_is_not_read_as_zero(self, tmp_path):
+        # Unreadable is not provably empty. The row stays a candidate and
+        # faces the count gate like any other, which here it breaks — the
+        # honest outcome, and the one this must not paper over by silently
+        # calling an unparseable column empty.
+        row = _zero_token_row("2026-08-17T07:50:03+00:00", _RK_A,
+                              output_tokens="not-a-number")
+        assert _usage_row_bills_no_tokens(row) is False
+        _, report = self._run(tmp_path, [self._TURNS[0], row], n=1)
+        assert report["rows_zero_token"] == 0
+        assert report["status"] == "failed"
+        assert report["rows_unmatched"] == 1
+
+    # -- ordering: the three splits must stay disjoint --------------------
+
+    def test_the_boundary_outranks_the_zero_token_split(self, tmp_path):
+        # post_agent_calls is the whole account of what the container did
+        # after the run; a late all-zero row stays in it.
+        late = _zero_token_row("2026-08-17T07:50:23+00:00", _RK_A)
+        _, report = self._run(tmp_path, [*self._TURNS, late],
+                              agent_finished_ts=_FINISHED)
+        assert report["rows_post_agent"] == 1
+        assert report["rows_zero_token"] == 0
+        assert "zero_token_calls" not in report
+
+    def test_the_purpose_label_outranks_the_zero_token_split(self, tmp_path):
+        # Naming the caller says strictly more than naming the arithmetic, and
+        # duration-billed transcription bills audio seconds and no tokens.
+        whisper = _zero_token_row("2026-08-17T07:50:04+00:00", _RK_A,
+                                  cost=0.02, audio_seconds=9.5)
+        _, report = self._run(tmp_path, [*self._TURNS, whisper])
+        assert report["rows_internal"] == 1
+        assert report["rows_zero_token"] == 0
+        assert report["internal_calls"]["by_purpose"]["transcription"][
+            "audio_seconds"] == 9.5
+
+    def test_a_row_is_in_exactly_one_bucket(self, tmp_path):
+        rows = [*self._TURNS,
+                _internal_row("2026-08-17T07:50:04+00:00", _RK_A, "compaction"),
+                _zero_token_row("2026-08-17T07:50:06+00:00", _RK_A),
+                _zero_token_row("2026-08-17T07:50:30+00:00", _RK_A),
+                _usage_row("2026-08-17T07:50:31+00:00", _RK_A, out=412, cost=0.40)]
+        _, report = self._run(tmp_path, rows, agent_finished_ts=_FINISHED)
+        assert (report["messages"] + report["rows_internal"]
+                + report["rows_post_agent"] + report["rows_zero_token"]) \
+            == report["rows_selected"] == 6
+        assert (report["rows_internal"], report["rows_post_agent"],
+                report["rows_zero_token"]) == (1, 2, 1)
+
+    # -- the ledger -------------------------------------------------------
+
+    def test_the_row_is_ledgered_not_dropped(self, tmp_path):
+        _, report = self._run(tmp_path, [*self._TURNS, self._ORPHAN])
+        zero = report["zero_token_calls"]
+        assert zero["request_count"] == 1
+        assert zero["input_tokens"] == 0
+        assert zero["output_tokens"] == 0
+        assert zero["cache_read_tokens"] == 0
+        assert zero["cache_write_tokens"] == 0
+        assert zero["by_purpose"] == {"unlabelled": zero["by_purpose"]["unlabelled"]}
+
+    def test_dollars_on_a_zero_token_row_stay_in_the_run(self, tmp_path):
+        # Money never disappears. A request can bill by duration or by a
+        # minimum charge with no tokens to show for it, and if it does, the
+        # dollars are on this line rather than nowhere.
+        paid = _zero_token_row("2026-08-17T07:50:05+00:00", _RK_A, cost=0.07)
+        traj, report = self._run(tmp_path, [*self._TURNS, paid])
+        assert report["zero_token_calls"]["cost_usd"] == pytest.approx(0.07)
+        assert sum(_costs(traj)) + report["zero_token_calls"]["cost_usd"] == \
+            pytest.approx(_agent_source([*self._TURNS, paid])["cost_usd"])
+
+    def test_a_malformed_total_is_carried_rather_than_lost(self, tmp_path):
+        # The predicate reads the four billed columns. A row whose total does
+        # not follow from them is malformed, and the ledger reports what the
+        # row says so the reconciliation stays checkable.
+        odd = _zero_token_row("2026-08-17T07:50:05+00:00", _RK_A,
+                              total_tokens=99)
+        _, report = self._run(tmp_path, [*self._TURNS, odd])
+        assert report["zero_token_calls"]["total_tokens"] == 99
+
+    def test_the_four_ledgers_close_on_sources_agent(self, tmp_path):
+        rows = [*self._TURNS,
+                _internal_row("2026-08-17T07:50:04+00:00", _RK_A, "compaction"),
+                self._ORPHAN,
+                _usage_row("2026-08-17T07:50:23+00:00", _RK_A, out=412, cost=0.40,
+                           input_tokens=2, cache_write_tokens=36712,
+                           total_tokens=37126)]
+        traj, report = self._run(tmp_path, rows, agent_finished_ts=_FINISHED)
+        agent = _agent_source(rows)
+        internal = report["internal_calls"]
+        post = report["post_agent_calls"]
+        zero = report["zero_token_calls"]
+        for msg_key, src_key in (("input", "input_tokens"),
+                                 ("output", "output_tokens"),
+                                 ("cacheRead", "cache_read_tokens"),
+                                 ("cacheWrite", "cache_write_tokens")):
+            per_message = sum(m["usage"][msg_key] for m in traj["messages"]
+                              if m.get("role") == "assistant")
+            assert per_message + internal[src_key] + post[src_key] \
+                + zero[src_key] == agent[src_key], src_key
+        assert (report["messages"] + internal["request_count"]
+                + post["request_count"] + zero["request_count"]) \
+            == agent["request_count"] == report["rows_selected"]
+
+    # -- loudness ---------------------------------------------------------
+
+    def test_the_row_is_warned_about_by_count_and_timestamp(self, tmp_path, caplog):
+        with caplog.at_level(logging.WARNING, logger="eval.run_batch"):
+            self._run(tmp_path, [*self._TURNS, self._ORPHAN])
+        warnings = [r.getMessage() for r in caplog.records
+                    if r.levelno >= logging.WARNING]
+        named = [m for m in warnings if "ZERO tokens" in m]
+        assert len(named) == 1
+        assert "2026-08-17T07:50:05+00:00" in named[0]
+        assert "1 usage row(s)" in named[0]
+
+    def test_every_timestamp_is_named_not_just_the_first(self, tmp_path, caplog):
+        rows = [*self._TURNS,
+                _zero_token_row("2026-08-17T07:50:05+00:00", _RK_A),
+                _zero_token_row("2026-08-17T07:50:07+00:00", _RK_A)]
+        with caplog.at_level(logging.WARNING, logger="eval.run_batch"):
+            self._run(tmp_path, rows)
+        named = next(r.getMessage() for r in caplog.records
+                     if "ZERO tokens" in r.getMessage())
+        assert "2026-08-17T07:50:05+00:00" in named
+        assert "2026-08-17T07:50:07+00:00" in named
+        assert "2 usage row(s)" in named
+
+    def test_a_clean_run_is_silent_and_carries_no_ledger(self, tmp_path, caplog):
+        with caplog.at_level(logging.WARNING, logger="eval.run_batch"):
+            _, report = self._run(tmp_path, self._TURNS)
+        assert report["rows_zero_token"] == 0
+        assert "zero_token_calls" not in report
+        assert not [r for r in caplog.records if "ZERO tokens" in r.getMessage()]
+
+    # -- the sibling predicate --------------------------------------------
+
+    def test_the_turn_predicate_agrees_with_the_split(self):
+        # Same helper on both sides, so the counter and the predicate cannot
+        # drift apart on a later edit.
+        assert _usage_row_is_assistant_turn(self._TURNS[0]) is True
+        assert _usage_row_is_assistant_turn(self._ORPHAN) is False
+        assert _usage_row_is_assistant_turn(
+            _internal_row("2026-08-17T07:50:04+00:00", _RK_A, "compaction")) is False
+        assert _usage_row_is_assistant_turn(
+            _usage_row("2026-08-17T07:50:04+00:00", _RK_A, kind="failure")) is False
+        assert _usage_row_is_assistant_turn(
+            _zero_token_row("2026-08-17T07:50:04+00:00", _RK_A,
+                            cache_read_tokens=48_213)) is True
+
+
+class TestZeroTokenLedgerReachesTheArtifacts:
+    _STAMP = {
+        "status": "attributed", "messages": 2, "rows_selected": 5,
+        "rows_internal": 1, "rows_post_agent": 1, "rows_zero_token": 1,
+        "rows_unmatched": 0,
+        "internal_calls": {"request_count": 1, "total_tokens": 140},
+        "post_agent_calls": {"request_count": 1, "total_tokens": 37126},
+        "zero_token_calls": {"request_count": 1, "total_tokens": 0},
+    }
+
+    def test_usage_json_carries_the_third_ledger_beside_the_other_two(
+            self, tmp_path):
+        save_usage(tmp_path, {"usage_attribution": dict(self._STAMP)},
+                   {"request_count": 5, "cost_usd": 0.5, "total_tokens": 420}, "t1")
+        out = json.loads((tmp_path / "usage.json").read_text(encoding="utf-8"))
+        assert out["usage_attribution"]["rows_zero_token"] == 1
+        assert "zero_token_calls" not in out["usage_attribution"]
+        assert out["zero_token_calls"] == {"request_count": 1, "total_tokens": 0}
+        assert out["post_agent_calls"]["total_tokens"] == 37126
+        assert out["internal_calls"]["total_tokens"] == 140
+
+    def test_score_json_carries_the_count_without_the_ledger(self):
+        scores: dict = {}
+        _augment_score_with_combined_rewards(
+            scores, {"usage_attribution": dict(self._STAMP)})
+        assert scores["usage_attribution"]["rows_zero_token"] == 1
+        assert "zero_token_calls" not in scores["usage_attribution"]
+        assert "post_agent_calls" not in scores["usage_attribution"]
+        assert "internal_calls" not in scores["usage_attribution"]
+
+    def test_the_count_ships_even_when_the_run_still_failed(self, tmp_path):
+        # The bucket is a fact about the log, not a reward for passing: a run
+        # that fails for some OTHER reason must still say the row was there.
+        rows = [_usage_row("2026-08-17T07:50:01+00:00", _RK_A, cost=0.11),
+                _usage_row("2026-08-17T07:50:02+00:00", _RK_A, cost=0.12),
+                _zero_token_row("2026-08-17T07:50:03+00:00", _RK_A)]
+        report = _attribute_per_message_cost(
+            _traj(1), _write_usage_log(tmp_path, rows), _RK_A)
+        assert report["status"] == "failed"
+        assert report["rows_zero_token"] == 1
+        assert report["rows_unmatched"] == 1
+        assert report["zero_token_calls"]["request_count"] == 1
+
+        scores: dict = {}
+        _augment_score_with_combined_rewards(scores, {"usage_attribution": report})
+        assert scores["usage_attribution"]["rows_zero_token"] == 1
 
 
 class TestUsageSnapshotQuiesce:
