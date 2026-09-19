@@ -27,6 +27,7 @@ known defects — those tests intentionally lock in observed behavior.
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -448,6 +449,86 @@ class TestSetModelLitellmAnthropic:
         monkeypatch.setattr(ocr.subprocess, "run", lambda *a2, **k2: _FakeCompleted(returncode=2, stderr="bad json"))
         with pytest.raises(RuntimeError, match="Model setup failed"):
             a._set_model("t", "claude-opus-4.7")
+
+
+class TestOAuthContextWindowOverride:
+    """KENSEI_OAUTH_CONTEXT_WINDOW on the anthropic/OAuth provider branch.
+
+    contextWindow is the number openclaw compacts against, and on this branch it
+    was a literal 200000. The served window is a property of the upstream
+    account tier rather than of this harness, so it needs to be settable without
+    a code change — but the default must not move, because every OAuth run
+    recorded to date was produced under 200000.
+
+    The provider dict reaches the container as a json.dumps(json.dumps(...))
+    literal inside the generated python script, so the window is asserted
+    against the escaped `\\"contextWindow\\": <n>` form actually emitted. The
+    window is read off the claude-opus-4-6 entry specifically: the same script
+    also registers the openai vision sidecar with its own 128000 windows, and a
+    bare substring search would happily pass on the wrong provider.
+    """
+
+    _WINDOW_RE = r'claude-opus-4-6.{0,200}?contextWindow\\?": ?(\d+)'
+
+    def _window(self, monkeypatch, value=None):
+        if value is None:
+            monkeypatch.delenv("KENSEI_OAUTH_CONTEXT_WINDOW", raising=False)
+        else:
+            monkeypatch.setenv("KENSEI_OAUTH_CONTEXT_WINDOW", value)
+        a = _bare_agent(
+            litellm_config_yaml="/x.yaml",
+            litellm_container_name="ll-sidecar",
+            litellm_port=4000,
+            litellm_master_key="mk-secret",
+        )
+        rec = _RecordingRun(_FakeCompleted(returncode=0))
+        monkeypatch.setattr(ocr.subprocess, "run", rec)
+        a._set_model("task", "claude-opus-4.7")
+        found = re.findall(self._WINDOW_RE, _extract_script(rec))
+        assert len(found) == 1, f"expected exactly one OAuth contextWindow, got {found}"
+        return int(found[0])
+
+    def test_defaults_to_200000_when_env_unset(self, monkeypatch):
+        assert self._window(monkeypatch) == 200000
+
+    def test_override_is_honoured(self, monkeypatch):
+        assert self._window(monkeypatch, "1000000") == 1000000
+
+    @pytest.mark.parametrize("bad", ["", "   ", "not-a-number", "200k", "200_000.5", "1e6"])
+    def test_unparseable_value_falls_back_to_the_default(self, monkeypatch, bad):
+        # Same contract as KENSEI_1P_CONTEXT_WINDOW on the sibling branch: a
+        # typo in an operator's env degrades to the shipped default instead of
+        # raising, because _set_model runs before the agent does any work and a
+        # raise here kills the whole task rather than one turn.
+        assert self._window(monkeypatch, bad) == 200000
+
+    def test_max_tokens_is_not_coupled_to_the_window_knob(self, monkeypatch):
+        # The override moves contextWindow ONLY. maxTokens on this branch is
+        # pinned separately and must not drift when the window is retuned.
+        monkeypatch.setenv("KENSEI_OAUTH_CONTEXT_WINDOW", "999999")
+        a = _bare_agent(litellm_config_yaml="/x.yaml", litellm_container_name="ll-sidecar", litellm_port=4000)
+        rec = _RecordingRun(_FakeCompleted(returncode=0))
+        monkeypatch.setattr(ocr.subprocess, "run", rec)
+        a._set_model("task", "claude-opus-4.7")
+        script = _extract_script(rec)
+        assert re.search(r'claude-opus-4-6.{0,240}?maxTokens\\?": ?128000', script)
+
+    def test_unset_env_emits_the_pre_override_script_verbatim(self, monkeypatch):
+        # The regression that actually matters: with the knob unset the emitted
+        # script must be byte-identical to what the hardcoded literal produced,
+        # so no recorded OAuth run changes shape. Compares the whole script, not
+        # just the window, to also catch key-order or whitespace drift in the
+        # provider dict.
+        monkeypatch.delenv("KENSEI_OAUTH_CONTEXT_WINDOW", raising=False)
+        scripts = []
+        for _ in range(2):
+            a = _bare_agent(litellm_config_yaml="/x.yaml", litellm_container_name="ll-sidecar", litellm_port=4000)
+            rec = _RecordingRun(_FakeCompleted(returncode=0))
+            monkeypatch.setattr(ocr.subprocess, "run", rec)
+            a._set_model("task", "claude-opus-4.7")
+            scripts.append(_extract_script(rec))
+        assert scripts[0] == scripts[1]
+        assert '\\"contextWindow\\": 200000, \\"maxTokens\\": 128000' in scripts[0]
 
 
 class TestSetModelLitellmGpt:

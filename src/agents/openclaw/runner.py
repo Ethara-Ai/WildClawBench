@@ -1615,6 +1615,26 @@ class OpenClawAgent(BaseAgent):
             base_url_root = f"http://{self.litellm_container_name}:{self.litellm_port}"
             base_url_v1 = f"{base_url_root}/v1"
             if is_anthropic_model:
+                # contextWindow is what openclaw compacts against, so it has to
+                # track the window the OAuth route actually serves rather than a
+                # number baked in at authoring time. 200,000 is the published
+                # Claude window and remains the default: with the env unset this
+                # emits the exact same provider dict as before the knob existed.
+                # The knob matters because the served window is a property of the
+                # upstream account tier, not of this harness — declare it too
+                # small and the agent compacts sessions that would have fit,
+                # declare it too large and it never compacts at all and every
+                # turn past the real ceiling 400s (the aleksei 1P failure mode
+                # documented on the non-anthropic branch below). Parsing mirrors
+                # KENSEI_1P_CONTEXT_WINDOW: a malformed value falls back to the
+                # default instead of raising, because a typo in an operator's
+                # env must not take down a run that would otherwise be correct.
+                try:
+                    oauth_context_window = int(
+                        os.environ.get("KENSEI_OAUTH_CONTEXT_WINDOW", "200000")
+                    )
+                except ValueError:
+                    oauth_context_window = 200000
                 litellm_provider = {
                     "baseUrl": base_url_root,
                     "apiKey": self._agent_bearer(task_id),
@@ -1622,7 +1642,8 @@ class OpenClawAgent(BaseAgent):
                     "models": [
                         {"id": openclaw_model_id, "name": openclaw_model_id,
                          "input": ["text", "image"], "reasoning": True,
-                         "contextWindow": 200000, "maxTokens": 128000},
+                         "contextWindow": oauth_context_window,
+                         "maxTokens": 128000},
                     ],
                 }
             else:
