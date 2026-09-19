@@ -22,8 +22,12 @@ Mounted into the LiteLLM sidecar container at
 #    "type": "invalid_request_error", "param": null}}
 #
 # openclaw compacts its session ONLY when a failed request's error string
-# matches its overflow matcher (substrings: "context length exceeded",
-# "maximum context length", "prompt is too long", "context_window_exceeded").
+# matches one of the 17 regexes in OVERFLOW_PATTERNS, carried by its
+# @mariozechner/pi-ai dependency (0.57.1, dist/utils/overflow.js) and applied
+# case-insensitively with .some() over `message.errorMessage`. The full list is
+# mirrored, with extraction provenance, in Section F of
+# tests/test_litellm_overflow_guard.py — consult that rather than trusting any
+# substring summary written here.
 # The generic relay message matches NONE of them, so the agent never compacts:
 # once the session crosses the ceiling every subsequent turn 400s and the run
 # dies (aleksei run_4: turns 14-16 died silently). Proactive compaction driven
@@ -222,10 +226,28 @@ def estimate_prompt_tokens(data: dict) -> int:
 
 
 def _overflow_message(model: str, estimated: int, limit: int) -> str:
-    # Every substring in openclaw's overflow matcher appears here verbatim:
-    # "context length exceeded", "maximum context length", "prompt is too
-    # long", "context_window_exceeded". ASCII only — this string crosses the
-    # wire and is substring-matched by the client; no typographic dashes.
+    # This message is load-bearing on EXACTLY TWO of openclaw's 17 overflow
+    # regexes, verified against the real list (@mariozechner/pi-ai 0.57.1,
+    # dist/utils/overflow.js, extracted from wildclawbench-ubuntu:v1.4):
+    #
+    #   /prompt is too long/i          (Anthropic)       <- "the prompt is too long"
+    #   /context[_ ]length[_ ]exceeded/i (generic)        <- leading "context length exceeded"
+    #
+    # An earlier revision of this comment claimed four. It was wrong, and the
+    # other two are worth naming so nobody "simplifies" the message toward
+    # them: "maximum context length" does NOT match, because the real pattern
+    # is /maximum context length is \d+ tokens/i and this message says
+    # "...length OF {limit} tokens"; "context_window_exceeded" does NOT match,
+    # because the real pattern is /model_context_window_exceeded/i and this
+    # message emits the bare token with no "model_" prefix. Both are decorative.
+    #
+    # So the two phrases above are the ENTIRE overflow-recovery mechanism.
+    # Reword either one and openclaw stops compacting; Section F of
+    # tests/test_litellm_overflow_guard.py pins the match set exactly so that
+    # failure is loud instead of silent.
+    #
+    # ASCII only — this string crosses the wire and is regex-matched by the
+    # client; no typographic dashes.
     return (
         f"context length exceeded: the prompt is too long. "
         f"This request's estimated {estimated} prompt tokens exceed the "

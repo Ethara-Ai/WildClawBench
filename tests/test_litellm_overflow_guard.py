@@ -32,6 +32,8 @@ env-clearing fixture, asyncio.run to drive the hook).
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import re
 import sys
 from pathlib import Path
 
@@ -44,8 +46,10 @@ from src.utils import litellm_overflow_guard_callback as guard  # noqa: E402
 MATCHED_MODEL = "rl-muse-spark-1-2-playground"
 UNMATCHED_MODEL = "claude-opus-4-6"
 
-# openclaw compacts only when the failed request's error string contains one of
-# these. The whole point of this module is to put them on the wire.
+# The four substrings the guard module was written to carry. Section F pins
+# them against openclaw's REAL detector and shows only two of them actually
+# reach a pattern: this tuple pins the message TEXT, not the match. Do not read
+# it as "any of these four triggers compaction" — that claim is false.
 OPENCLAW_OVERFLOW_SUBSTRINGS = (
     "context length exceeded",
     "maximum context length",
@@ -471,3 +475,174 @@ class TestStartLitellmMount:
         argv = self._argv(monkeypatch, overflow_guard_callback_host_path="/host/guard.py")
         assert "WCB_1P_PROMPT_TOKEN_LIMIT=250000" in argv
         assert "WCB_OVERFLOW_GUARD_MODELS=rl-muse,other" in argv
+
+
+# ===========================================================================
+# Section F — the synthetic message vs openclaw's REAL overflow detector
+# ===========================================================================
+#
+# PROVENANCE OF THE MIRRORED LIST BELOW — re-verify before editing it
+# ---------------------------------------------------------------------------
+#   Source file : /lib/node_modules/@mariozechner/pi-ai/dist/utils/overflow.js
+#   Package     : @mariozechner/pi-ai 0.57.1 (a dependency of openclaw)
+#   Consumer    : openclaw 2026.3.11
+#   Image       : wildclawbench-ubuntu:v1.4 (id 631bcdbe91c8, built 2026-09-15)
+#   Extracted   : docker create + docker cp of the image's /lib/node_modules
+#   Count       : 17 patterns, mirrored below in source order
+#
+# To re-extract:
+#   cid=$(docker create wildclawbench-ubuntu:v1.4) \
+#     && docker cp "$cid":/lib/node_modules /tmp/openclaw-src \
+#     && docker rm "$cid" \
+#     && sed -n '/^const OVERFLOW_PATTERNS/,/^];/p' \
+#          /tmp/openclaw-src/node_modules/@mariozechner/pi-ai/dist/utils/overflow.js
+#
+# WHY THIS SECTION EXISTS
+# ---------------------------------------------------------------------------
+# src/utils/litellm_overflow_guard_callback.py exists for exactly one reason:
+# the 1P relay's own 400 is generic prose that matches NONE of these 17
+# patterns, so openclaw never compacts and the run dies. The guard therefore
+# hand-crafts a replacement message shaped to trip the detector. Until this
+# section landed, nothing anywhere pinned that message against the real list —
+# the only assertion was that the message contains four substrings the guard's
+# own comment nominated, which is circular: the test read the message and the
+# message was written from the comment, and neither had ever been checked
+# against openclaw. Trimming or rewording the message could have dropped the
+# detector to zero matches with a fully green suite.
+#
+# It also caught the comment being wrong. Of those four nominated substrings
+# only TWO reach a real pattern; see test_the_two_decoy_substrings_match_nothing
+# for why the other two miss by a preposition and a prefix.
+#
+# Matching semantics, from isContextOverflow() in the same file: each entry is
+# a JS RegExp with the /i flag, applied with .test() (unanchored search) over
+# `message.errorMessage`, combined with .some() — so ONE hit is sufficient.
+# re.search(..., re.IGNORECASE) is the faithful Python equivalent; every
+# pattern below is plain enough that JS and Python regex syntax agree.
+
+OPENCLAW_OVERFLOW_PATTERNS = (
+    (r"prompt is too long", "Anthropic"),
+    (r"input is too long for requested model", "Amazon Bedrock"),
+    (r"exceeds the context window", "OpenAI (Completions & Responses)"),
+    (r"input token count.*exceeds the maximum", "Google (Gemini)"),
+    (r"maximum prompt length is \d+", "xAI (Grok)"),
+    (r"reduce the length of the messages", "Groq"),
+    (r"maximum context length is \d+ tokens", "OpenRouter (all backends)"),
+    (r"exceeds the limit of \d+", "GitHub Copilot"),
+    (r"exceeds the available context size", "llama.cpp server"),
+    (r"greater than the context length", "LM Studio"),
+    (r"context window exceeds limit", "MiniMax"),
+    (r"exceeded model token limit", "Kimi For Coding"),
+    (r"too large for model with \d+ maximum context length", "Mistral"),
+    (r"model_context_window_exceeded", "z.ai"),
+    (r"context[_ ]length[_ ]exceeded", "generic fallback"),
+    (r"too many tokens", "generic fallback"),
+    (r"token limit exceeded", "generic fallback"),
+)
+
+# The patterns the guard's message is actually load-bearing on, by index into
+# the tuple above. Asserted exactly — a message that starts matching MORE
+# patterns is fine in production but means this pin is stale, and a message
+# that matches FEWER is the silent-death regression this section exists to
+# catch.
+EXPECTED_MATCHING_PATTERNS = {
+    0: r"prompt is too long",
+    14: r"context[_ ]length[_ ]exceeded",
+}
+
+# sha256 over the mirrored patterns, joined by \n. Not a security control: it
+# is a tripwire, so that editing the list cannot be done casually without
+# reading the provenance block above and re-running the extraction.
+OPENCLAW_PATTERNS_FINGERPRINT = (
+    "6f27b025c8be1576d24a323f3bf922169a52666f260b484c944a4ed74fd92285"
+)
+
+
+def _matching_patterns(message: str) -> dict:
+    return {
+        i: pat
+        for i, (pat, _vendor) in enumerate(OPENCLAW_OVERFLOW_PATTERNS)
+        if re.search(pat, message, re.IGNORECASE)
+    }
+
+
+def _synthetic_message() -> str:
+    return guard._overflow_message("rl-muse-spark-1-2-playground", 300_000, 255_000)
+
+
+class TestSyntheticMessageAgainstRealOpenclawPatterns:
+    def test_mirror_has_the_seventeen_patterns_that_were_extracted(self):
+        assert len(OPENCLAW_OVERFLOW_PATTERNS) == 17
+
+    def test_mirrored_list_is_unchanged_since_provenance_was_verified(self):
+        # Tripwire. If this fails you edited OPENCLAW_OVERFLOW_PATTERNS: re-run
+        # the docker extraction in the provenance block above, confirm the
+        # image tag and package version still match what is recorded there,
+        # update BOTH the comment block and this digest, and re-check
+        # EXPECTED_MATCHING_PATTERNS — the match set is what actually protects
+        # overflow recovery, and it does not follow from the count.
+        digest = hashlib.sha256(
+            "\n".join(p for p, _ in OPENCLAW_OVERFLOW_PATTERNS).encode()
+        ).hexdigest()
+        assert digest == OPENCLAW_PATTERNS_FINGERPRINT, (
+            "openclaw overflow pattern mirror changed; re-verify provenance "
+            "(wildclawbench-ubuntu:v1.4 -> @mariozechner/pi-ai 0.57.1 "
+            "dist/utils/overflow.js) and update the recorded digest"
+        )
+
+    def test_synthetic_message_matches_at_least_one_real_pattern(self):
+        # The whole mechanism in one assertion: zero matches means openclaw
+        # never compacts and the run dies at the relay ceiling.
+        hits = _matching_patterns(_synthetic_message())
+        assert hits, (
+            "guard message matches NONE of openclaw's 17 overflow patterns - "
+            "native compaction will never fire"
+        )
+
+    def test_synthetic_message_matches_exactly_the_expected_patterns(self):
+        assert _matching_patterns(_synthetic_message()) == EXPECTED_MATCHING_PATTERNS
+
+    @pytest.mark.parametrize("index,pattern", sorted(EXPECTED_MATCHING_PATTERNS.items()))
+    def test_each_expected_pattern_individually_matches(self, index, pattern):
+        assert OPENCLAW_OVERFLOW_PATTERNS[index][0] == pattern
+        assert re.search(pattern, _synthetic_message(), re.IGNORECASE)
+
+    def test_the_two_decoy_substrings_match_nothing(self):
+        # The guard's comment nominated four substrings as "openclaw's overflow
+        # matcher". Two of them are decorative: they are real text in the
+        # message but no real pattern can see them.
+        #
+        #   "maximum context length"  - the real pattern is
+        #       /maximum context length is \d+ tokens/i
+        #     and the message says "maximum context length OF 255000 tokens".
+        #     One preposition away from matching.
+        #
+        #   "context_window_exceeded" - the real pattern is
+        #       /model_context_window_exceeded/i
+        #     and the message emits the bare token in parentheses, with no
+        #     "model_" prefix.
+        #
+        # Pinned as a NEGATIVE so the failure mode is legible: if a future
+        # openclaw adds a pattern these do reach, this test fails and tells the
+        # reader to promote them into EXPECTED_MATCHING_PATTERNS rather than
+        # leaving the message's true coverage a mystery.
+        for decoy in ("maximum context length", "context_window_exceeded"):
+            assert decoy in _synthetic_message()
+            assert not _matching_patterns(decoy), (
+                f"{decoy!r} now reaches a real pattern - update "
+                "EXPECTED_MATCHING_PATTERNS and the guard module comment"
+            )
+
+    def test_the_generic_relay_400_still_matches_nothing(self):
+        # The premise of the entire module. If this ever starts matching, the
+        # guard is redundant and should be reconsidered rather than maintained.
+        relay_400 = (
+            "The request contains invalid parameters. Check the request body "
+            "for any errors or inconsistencies."
+        )
+        assert not _matching_patterns(relay_400)
+
+    def test_match_is_case_insensitive_like_the_js_flag(self):
+        # Every mirrored pattern carries /i upstream; a message that only
+        # matched in one casing would be a mirror bug, not a real match.
+        assert _matching_patterns(_synthetic_message().upper()) == EXPECTED_MATCHING_PATTERNS
