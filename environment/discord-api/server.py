@@ -5,7 +5,7 @@ Implements a subset of the Discord REST API v10. Base path: /api/v10
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
 import discord_data
@@ -94,6 +94,8 @@ def list_channel_messages(channel_id: str, limit: int = Query(50, ge=1, le=100))
 
 
 class MessageBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     content: str
     author_id: Optional[str] = None
 

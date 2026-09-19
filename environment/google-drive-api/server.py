@@ -81,6 +81,8 @@ def get_file(file_id: str, alt: Optional[str] = None):
 
 
 class FileCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str
     mimeType: str
     parents: Optional[List[str]] = None
@@ -159,6 +161,8 @@ def list_permissions(file_id: str):
 
 
 class PermissionCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     type: str  # "user", "group", "domain", "anyone"
     role: str  # "owner", "writer", "commenter", "reader"
     emailAddress: Optional[str] = None

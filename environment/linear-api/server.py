@@ -180,6 +180,8 @@ def get_label(label_id: str):
 
 
 class LabelCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str
     color: str
     description: Optional[str] = None
@@ -213,6 +215,8 @@ def get_project(project_id: str):
 
 
 class ProjectCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str
     description: Optional[str] = None
     state: Optional[str] = None
@@ -288,6 +292,8 @@ def get_cycle(cycle_id: str):
 
 
 class CycleCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str
     teamId: str
     startsAt: str
@@ -353,6 +359,8 @@ def get_issue(issue_id: str):
 
 
 class IssueCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     title: str
     teamId: str
     description: Optional[str] = None
@@ -435,6 +443,8 @@ def get_comment(comment_id: str):
 
 
 class CommentCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     body: str
     issueId: str
     userId: Optional[str] = None
@@ -450,6 +460,8 @@ def create_comment(body: CommentCreateBody):
 
 
 class CommentUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     body: str
 
 

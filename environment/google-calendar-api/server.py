@@ -151,10 +151,14 @@ def delete_event(calendar_id: str, event_id: str):
 # --- Free/busy ---
 
 class FreeBusyItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     id: str
 
 
 class FreeBusyBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     timeMin: str
     timeMax: str
     items: List[FreeBusyItem]

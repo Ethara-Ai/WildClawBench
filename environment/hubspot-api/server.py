@@ -6,7 +6,7 @@ Create/update use the HubSpot {"properties": {...}} body shape.
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, Dict, Any
 
 import hubspot_data
@@ -31,6 +31,8 @@ def health():
 
 
 class ObjectBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     properties: Dict[str, Any] = {}
 
 

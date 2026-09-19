@@ -5,7 +5,7 @@ Implements a subset of the PagerDuty REST API surface.
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 
 import pagerduty_data
@@ -65,6 +65,8 @@ def get_incident(incident_id: str):
 
 
 class IncidentCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     title: str
     service_id: str
     urgency: str = "high"
@@ -85,6 +87,8 @@ def create_incident(body: IncidentCreateBody):
 
 
 class IncidentUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     status: Optional[str] = None
     assigned_to: Optional[str] = None
 
@@ -110,6 +114,8 @@ def list_notes(incident_id: str):
 
 
 class NoteCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     content: str
     user_id: Optional[str] = None
 

@@ -4,7 +4,7 @@ Uses Slack's method-name routes (e.g. /api/conversations.list) for familiarity.
 """
 
 from fastapi import FastAPI, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
 import slack_data
@@ -54,6 +54,8 @@ def users_info(user: str = Query(...)):
 
 
 class PresenceBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     user: str
     presence: str  # "away" or "auto"
 
@@ -79,6 +81,8 @@ def conversations_info(channel: str = Query(...)):
 
 
 class CreateChannelBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str
     is_private: bool = False
     user_id: Optional[str] = "U01AMELIA"
@@ -90,6 +94,8 @@ def conversations_create(body: CreateChannelBody):
 
 
 class ChannelOnlyBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     channel: str
 
 
@@ -104,6 +110,8 @@ def conversations_members(channel: str = Query(...)):
 
 
 class InviteBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     channel: str
     users: str  # comma-separated
 
@@ -136,6 +144,8 @@ def conversations_replies(channel: str = Query(...), ts: str = Query(...)):
 # --- chat ---
 
 class PostMessageBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     channel: str
     text: str
     user: str = "U01AMELIA"
@@ -148,6 +158,8 @@ def chat_post_message(body: PostMessageBody):
 
 
 class UpdateMessageBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     channel: str
     ts: str
     text: str
@@ -159,6 +171,8 @@ def chat_update(body: UpdateMessageBody):
 
 
 class DeleteMessageBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     channel: str
     ts: str
 
@@ -171,6 +185,8 @@ def chat_delete(body: DeleteMessageBody):
 # --- reactions ---
 
 class ReactionAddBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     channel: str
     timestamp: str
     name: str

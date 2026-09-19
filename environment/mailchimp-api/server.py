@@ -5,7 +5,7 @@ Implements a subset of the Mailchimp Marketing API. Routes live under /3.0/...
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
 import mailchimp_data
@@ -55,6 +55,8 @@ def list_members(list_id: str, status: Optional[str] = None):
 
 
 class MemberCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     email_address: str
     status: str = "subscribed"
     full_name: Optional[str] = ""
@@ -85,6 +87,8 @@ def get_member(list_id: str, subscriber_hash: str):
 
 
 class MemberPatchBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     status: Optional[str] = None
     full_name: Optional[str] = None
     member_rating: Optional[int] = None
@@ -109,10 +113,14 @@ def list_campaigns(status: Optional[str] = None):
 
 
 class CampaignRecipients(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     list_id: str
 
 
 class CampaignSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     subject_line: str
     from_name: str
     reply_to: str
@@ -120,6 +128,8 @@ class CampaignSettings(BaseModel):
 
 
 class CampaignCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     type: str = "regular"
     recipients: CampaignRecipients
     settings: CampaignSettings

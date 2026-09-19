@@ -5,7 +5,7 @@ Implements a subset of the Algolia Search API. Routes live under /1/...
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, Dict, Any
 
 import algolia_data
@@ -47,6 +47,8 @@ def get_settings(index: str):
 # --- Query ---
 
 class QueryBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     query: Optional[str] = None
     filters: Optional[str] = None
     hitsPerPage: int = 20

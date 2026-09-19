@@ -7,7 +7,7 @@ and a simplified CQL search.
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, Dict, Any
 
 import confluence_data
@@ -68,27 +68,39 @@ def list_content(type: str = "page", spaceKey: Optional[str] = None,
 
 
 class ContentBodyStorage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     value: str
     representation: Optional[str] = "storage"
 
 
 class ContentBodyWrapper(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     storage: ContentBodyStorage
 
 
 class ContentSpace(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     key: str
 
 
 class ContentAncestor(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     id: str
 
 
 class ContentVersion(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     number: int
 
 
 class ContentCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     type: Optional[str] = "page"
     title: str
     space: ContentSpace
@@ -119,6 +131,8 @@ def get_content(content_id: str):
 
 
 class ContentUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     title: Optional[str] = None
     type: Optional[str] = "page"
     body: Optional[ContentBodyWrapper] = None

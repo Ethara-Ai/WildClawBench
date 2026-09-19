@@ -7,7 +7,7 @@ embedded {"comment": {...}} to add a comment in the same call.
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 
 import zendesk_data
@@ -48,12 +48,16 @@ def get_ticket(ticket_id: int):
 
 
 class TicketComment(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     body: str
     public: Optional[bool] = True
     author_id: Optional[int] = None
 
 
 class TicketCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     subject: str
     description: Optional[str] = None
     priority: Optional[str] = "normal"
@@ -66,6 +70,8 @@ class TicketCreate(BaseModel):
 
 
 class TicketCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     ticket: TicketCreate
 
 
@@ -84,6 +90,8 @@ def create_ticket(body: TicketCreateBody):
 
 
 class TicketUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     status: Optional[str] = None
     priority: Optional[str] = None
     assignee_id: Optional[int] = None
@@ -93,6 +101,8 @@ class TicketUpdate(BaseModel):
 
 
 class TicketUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     ticket: TicketUpdate
 
 
@@ -123,12 +133,16 @@ def list_comments(ticket_id: int):
 
 
 class CommentCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     body: str
     public: Optional[bool] = True
     author_id: Optional[int] = None
 
 
 class CommentCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     comment: CommentCreate
 
 

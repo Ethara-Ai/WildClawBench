@@ -2,7 +2,7 @@
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 
 import instagram_data
@@ -104,6 +104,8 @@ def get_media_insights(
 
 
 class CommentCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     message: str
     parent_id: Optional[str] = None
 
@@ -125,6 +127,8 @@ def delete_comment(media_id: str, comment_id: str):
 
 
 class CommentHideBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     hide: bool = True
 
 
@@ -276,6 +280,8 @@ def list_user_mentions(
 
 
 class MediaContainerCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     image_url: Optional[str] = None
     video_url: Optional[str] = None
     caption: Optional[str] = None
@@ -299,6 +305,8 @@ def create_media_container(user_id: str, body: MediaContainerCreateBody):
 
 
 class MediaPublishBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     creation_id: str
 
 
@@ -311,6 +319,8 @@ def publish_media_container(user_id: str, body: MediaPublishBody):
 
 
 class UserUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     biography: Optional[str] = None
     website: Optional[str] = None
     name: Optional[str] = None

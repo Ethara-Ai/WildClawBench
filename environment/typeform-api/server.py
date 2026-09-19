@@ -52,6 +52,8 @@ def list_forms():
 
 
 class FormBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     title: str
     workspace: Optional[str] = "ws-orbit-labs"
     language: Optional[str] = "en"

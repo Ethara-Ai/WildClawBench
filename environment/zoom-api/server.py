@@ -67,6 +67,8 @@ def list_meetings(
 
 
 class MeetingCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     topic: str
     type: int = 2
     start_time: Optional[str] = None

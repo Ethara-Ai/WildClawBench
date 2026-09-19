@@ -74,6 +74,8 @@ def get_monitor(monitor_id: str):
 
 
 class MonitorCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str
     type: str
     query: str
@@ -138,6 +140,8 @@ def list_events(start: Optional[int] = None, end: Optional[int] = None):
 
 
 class EventCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     title: str
     text: str
     alert_type: Optional[str] = "info"

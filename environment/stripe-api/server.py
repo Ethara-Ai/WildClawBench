@@ -6,7 +6,7 @@ Amounts are integer cents.
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
 import stripe_data
@@ -46,6 +46,8 @@ def get_customer(customer_id: str):
 
 
 class CustomerCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: Optional[str] = None
     email: Optional[str] = None
     description: Optional[str] = None
@@ -76,6 +78,8 @@ def list_prices(limit: int = Query(10, ge=1, le=100), product: Optional[str] = N
 # --- Payment Intents ---
 
 class PaymentIntentBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     amount: int
     currency: Optional[str] = "usd"
     customer: Optional[str] = None
@@ -118,6 +122,8 @@ def get_charge(charge_id: str):
 
 
 class ChargeCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     amount: int
     currency: Optional[str] = "usd"
     customer: Optional[str] = None
@@ -138,6 +144,8 @@ def create_charge(body: ChargeCreateBody):
 # --- Refunds ---
 
 class RefundCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     charge: str
     amount: Optional[int] = None
     reason: Optional[str] = None
@@ -169,6 +177,8 @@ def get_invoice(invoice_id: str):
 
 
 class InvoiceCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     customer: str
     amount_due: Optional[int] = 0
     currency: Optional[str] = "usd"
@@ -203,6 +213,8 @@ def get_subscription(sub_id: str):
 
 
 class SubscriptionCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     customer: str
     price: str
     quantity: Optional[int] = 1

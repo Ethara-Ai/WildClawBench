@@ -112,6 +112,8 @@ def get_listing_item(
 
 
 class ListingCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     productType: str
     title: Optional[str] = None
     description: Optional[str] = None
@@ -226,6 +228,8 @@ def get_order_items(orderId: str):
 
 
 class ShipmentConfirmationBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     packageReferenceId: Optional[str] = None
     carrierCode: Optional[str] = None
     trackingNumber: Optional[str] = None
@@ -257,6 +261,8 @@ def get_inventory_summaries(
 
 
 class InventoryUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     sellerSku: str
     quantity: int
 
@@ -291,6 +297,8 @@ def get_report(reportId: str):
 
 
 class ReportCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     reportType: str
     dataStartTime: str
     dataEndTime: str

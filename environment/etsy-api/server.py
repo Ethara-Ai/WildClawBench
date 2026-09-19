@@ -59,6 +59,8 @@ def get_shop(shop_id: int):
 
 
 class ShopUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     title: Optional[str] = None
     announcement: Optional[str] = None
     sale_message: Optional[str] = None
@@ -126,6 +128,8 @@ def get_listing(listing_id: int):
 
 
 class ListingCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     title: str
     description: str
     price: float

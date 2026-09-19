@@ -6,7 +6,7 @@ Routes are namespaced under /restapi/v2.1/accounts/{accountId}/...
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List, Dict, Any
 
 import docusign_data
@@ -42,6 +42,8 @@ class EnvelopeRecipients(BaseModel):
 
 
 class EnvelopeCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     emailSubject: Optional[str] = ""
     status: Optional[str] = "created"
     templateId: Optional[str] = None
@@ -65,6 +67,8 @@ def get_envelope(accountId: str, envelopeId: str):
 
 
 class EnvelopeUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     status: str
 
 

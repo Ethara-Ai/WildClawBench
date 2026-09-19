@@ -5,7 +5,7 @@ Mirrors Eventbrite v3 API (subset).
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
 import eventbrite_data
@@ -74,6 +74,8 @@ def get_event(event_id: str):
 
 
 class EventCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     organization_id: str
     name: str
     summary: str
@@ -143,6 +145,8 @@ def list_ticket_classes(event_id: str):
 
 
 class TicketClassCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str
     quantity_total: int
     cost: int = 0
@@ -175,6 +179,8 @@ def list_attendees(
 
 
 class RegisterAttendeeBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     ticket_class_id: str
     name: str
     email: str

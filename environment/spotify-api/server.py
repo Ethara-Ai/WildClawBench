@@ -5,7 +5,7 @@ Implements a subset of the Spotify Web API surface. Base path: /v1
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 
 import spotify_data
@@ -60,6 +60,8 @@ def get_playlist_tracks(playlist_id: str):
 
 
 class PlaylistCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str
     description: Optional[str] = ""
     public: bool = True
@@ -78,6 +80,8 @@ def create_playlist(user_id: str, body: PlaylistCreateBody):
 
 
 class AddTracksBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     uris: List[str]
 
 
@@ -105,6 +109,8 @@ def get_player():
 
 
 class PlayBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     uris: Optional[List[str]] = None
     context_uri: Optional[str] = None
 

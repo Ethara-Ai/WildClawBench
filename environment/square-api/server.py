@@ -6,7 +6,7 @@ Amounts are integer cents inside Money objects {"amount", "currency"}.
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 
 import square_data
@@ -53,11 +53,15 @@ def get_payment(payment_id: str):
 
 
 class Money(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     amount: int
     currency: Optional[str] = "USD"
 
 
 class PaymentCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     amount_money: Money
     source_id: Optional[str] = "cnon:card-nonce-ok"
     customer_id: Optional[str] = None
@@ -81,6 +85,8 @@ def create_payment(body: PaymentCreateBody):
 # --- Refunds ---
 
 class RefundCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     payment_id: str
     amount_money: Optional[Money] = None
     reason: Optional[str] = None
@@ -115,6 +121,8 @@ def get_customer(customer_id: str):
 
 
 class CustomerCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     given_name: Optional[str] = None
     family_name: Optional[str] = None
     email_address: Optional[str] = None
@@ -141,11 +149,15 @@ def list_catalog(types: Optional[str] = None):
 # --- Orders ---
 
 class OrderLineItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     catalog_object_id: str
     quantity: Optional[int] = 1
 
 
 class OrderCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     customer_id: Optional[str] = None
     location_id: Optional[str] = "LOC_MAIN"
     line_items: List[OrderLineItem] = []

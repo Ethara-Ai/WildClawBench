@@ -63,6 +63,8 @@ def get_incident(sys_id: str):
 
 
 class IncidentCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     short_description: str
     description: Optional[str] = None
     priority: Optional[str] = "3"

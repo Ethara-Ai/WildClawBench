@@ -5,7 +5,7 @@ Loosely mirrors the WhatsApp Cloud API (Graph v17.0) surface.
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List, Dict, Any
 
 import whatsapp_data
@@ -83,20 +83,28 @@ def list_messages(
 
 
 class TextMessage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     body: str
 
 
 class TemplateLanguage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     code: str = "en_US"
 
 
 class TemplateBlock(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str
     language: Optional[TemplateLanguage] = None
     components: Optional[List[Dict[str, Any]]] = None
 
 
 class SendMessageBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     messaging_product: str = "whatsapp"
     to: str
     type: str  # "text" or "template"
@@ -126,6 +134,8 @@ def send_message(body: SendMessageBody):
 
 
 class ReadStatusBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     messaging_product: str = "whatsapp"
     status: str = "read"
     message_id: str

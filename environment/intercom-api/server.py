@@ -6,7 +6,7 @@ conversation parts and companies.
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
 import intercom_data
@@ -38,6 +38,8 @@ def list_contacts(role: Optional[str] = None):
 
 
 class ContactCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     role: str = "user"
     name: Optional[str] = ""
     email: Optional[str] = None
@@ -69,6 +71,8 @@ def list_conversations(state: Optional[str] = None):
 
 
 class ConversationCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     contact_id: str
     body: str
     title: Optional[str] = ""
@@ -91,6 +95,8 @@ def get_conversation(conversation_id: str):
 
 
 class ReplyBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     body: str
     author_type: str = "admin"
     author_id: str = "admin-jonas"
@@ -107,6 +113,8 @@ def reply_conversation(conversation_id: str, body: ReplyBody):
 
 
 class PartBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     message_type: str
     body: Optional[str] = None
     author_id: str = "admin-jonas"

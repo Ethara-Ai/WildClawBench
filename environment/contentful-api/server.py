@@ -95,6 +95,8 @@ def get_entry(space_id: str, env_id: str, entry_id: str):
 
 
 class EntryCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     content_type: str
     fields: Dict[str, Any] = {}
 

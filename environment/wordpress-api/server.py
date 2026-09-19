@@ -56,6 +56,8 @@ def list_posts(status: Optional[str] = None, author: Optional[int] = None,
 
 
 class PostCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     title: str
     content: str = ""
     status: str = "draft"
@@ -144,6 +146,8 @@ def list_comments(post: Optional[int] = None, status: str = "approved"):
 
 
 class CommentCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     post: int
     author_name: str
     author_email: str

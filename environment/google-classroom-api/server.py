@@ -64,6 +64,8 @@ def get_course(course_id: str):
 
 
 class CourseCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str
     section: Optional[str] = None
     descriptionHeading: Optional[str] = None
@@ -157,6 +159,8 @@ class DueTimeBody(BaseModel):
 
 
 class CourseWorkCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     title: str
     description: Optional[str] = None
     workType: str
@@ -245,6 +249,8 @@ def get_topic(course_id: str, topic_id: str):
 
 
 class TopicCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str
 
 
@@ -357,6 +363,8 @@ def turn_in_submission(course_id: str, coursework_id: str, submission_id: str):
 class ModifyAttachmentsBody(BaseModel):
     # Real Classroom sends {"addAttachments": [ {...} ]}; accept it permissively
     # so any attachment shape the agent supplies is recorded.
+    model_config = ConfigDict(extra="forbid")
+
     addAttachments: Optional[List[dict]] = None
 
 
@@ -396,6 +404,8 @@ def get_student(course_id: str, user_id: str):
 
 
 class InviteStudentBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     emailAddress: str
     fullName: Optional[str] = None
 
@@ -461,6 +471,8 @@ def get_announcement(course_id: str, announcement_id: str):
 
 
 class AnnouncementCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     text: str
     state: Optional[str] = None
 
@@ -526,15 +538,21 @@ def get_material(course_id: str, material_id: str):
 
 
 class MaterialLink(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     url: str
     title: Optional[str] = None
 
 
 class MaterialItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     link: Optional[MaterialLink] = None
 
 
 class MaterialCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     title: str
     description: Optional[str] = None
     topicId: Optional[str] = None

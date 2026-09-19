@@ -98,6 +98,8 @@ def get_issue(owner: str, repo: str, number: int):
 
 
 class IssueCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     title: str
     body: Optional[str] = ""
     assignee: Optional[str] = None
@@ -177,6 +179,8 @@ def list_comments(owner: str, repo: str, number: int):
 
 
 class CommentBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     body: str
 
 

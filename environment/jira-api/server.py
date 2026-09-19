@@ -6,7 +6,7 @@ Base paths: /rest/api/3/... and /rest/agile/1.0/...
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, Dict, Any
 
 import jira_data
@@ -40,6 +40,8 @@ def list_projects():
 # --- Issues ---
 
 class IssueFields(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     summary: str
     project: Optional[Dict[str, Any]] = None
     issuetype: Optional[Dict[str, Any]] = None
@@ -49,6 +51,8 @@ class IssueFields(BaseModel):
 
 
 class IssueCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     fields: IssueFields
 
 
@@ -83,6 +87,8 @@ def get_issue(issue_key: str):
 
 
 class IssueUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     fields: Optional[Dict[str, Any]] = None
 
 
@@ -115,6 +121,8 @@ def get_transitions(issue_key: str):
 
 
 class TransitionBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     transition: Dict[str, Any]
 
 

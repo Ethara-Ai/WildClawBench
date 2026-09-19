@@ -2,7 +2,7 @@
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
 import instacart_data
@@ -76,6 +76,8 @@ def get_product(product_id: str):
 # --- Cart ---
 
 class CartCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     user_id: str
     retailer_id: str
 
@@ -97,6 +99,8 @@ def get_cart(cart_id: str):
 
 
 class CartItemBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     product_id: str
     quantity: int
 
@@ -110,6 +114,8 @@ def add_to_cart(cart_id: str, body: CartItemBody):
 
 
 class CartItemUpdateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     quantity: int
 
 
@@ -122,6 +128,8 @@ def update_cart_item(cart_id: str, product_id: str, body: CartItemUpdateBody):
 
 
 class CheckoutBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     tip: float = 0.0
     delivery_window_start: Optional[str] = None
     delivery_window_end: Optional[str] = None

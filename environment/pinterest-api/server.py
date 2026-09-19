@@ -76,6 +76,8 @@ def get_board(board_id: str):
 
 
 class BoardCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str
     description: Optional[str] = None
     privacy: Optional[str] = None
@@ -140,6 +142,8 @@ def list_board_sections(board_id: str):
 
 
 class BoardSectionCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str
 
 
@@ -183,6 +187,8 @@ def get_pin(pin_id: str):
 
 
 class PinCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     board_id: str
     title: str
     description: Optional[str] = None

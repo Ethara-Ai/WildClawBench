@@ -5,7 +5,7 @@ Implements a subset of a food-delivery API surface. Base path: /v1
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
 import doordash_data
@@ -61,6 +61,8 @@ def get_menu(store_id: str):
 # --- Carts ---
 
 class CartCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     store_id: str
 
 
@@ -81,6 +83,8 @@ def get_cart(cart_id: str):
 
 
 class CartItemBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     item_id: str
     quantity: int = 1
 
@@ -94,6 +98,8 @@ def add_cart_item(cart_id: str, body: CartItemBody):
 
 
 class CheckoutBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     customer_name: str = "Guest"
     tip: float = 0.0
 

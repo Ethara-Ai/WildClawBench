@@ -73,10 +73,14 @@ def get_record(base_id: str, table_id_or_name: str, record_id: str):
 
 
 class RecordItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     fields: Dict[str, Any] = {}
 
 
 class RecordsCreateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     records: List[RecordItem]
 
 
