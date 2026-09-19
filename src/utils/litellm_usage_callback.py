@@ -340,13 +340,13 @@ _HEARTBEAT_EVENT_HEADS = (
 # the container takes for itself. `runMemoryFlushIfNeeded`
 # (dist/reply-BCcP6j4h.js:93697) fires when a session's token count crosses
 #     contextWindow - reserveTokensFloor(20000) - softThresholdTokens(4000)
-# (threshold :93720, predicate shouldRunMemoryFlush :93591) or its transcript
-# passes forceFlushTranscriptBytes (2 MiB, :93553), and spends a whole turn
+# (threshold :93720, predicate shouldRunMemoryFlush :93576) or its transcript
+# passes forceFlushTranscriptBytes (2 MiB, :93551), and spends a whole turn
 # telling the agent to write what it wants to keep into memory/<date>.md before
 # compaction throws the context away.
 #
 # It is ON unless configured off — `const enabled = defaults?.enabled ?? true`
-# in resolveMemoryFlushSettings (:93549) — and the runner never writes
+# in resolveMemoryFlushSettings (:93548) — and the runner never writes
 # agents.defaults.compaction.memoryFlush at all, so it is default-ON in every
 # run and latent in every run long enough to approach its own context window.
 #
@@ -379,7 +379,7 @@ _HEARTBEAT_EVENT_HEADS = (
 #     date (:93536) before sending, so the anchor STOPS at "memory/" — one
 #     character short of the only part of the sentence that is not fixed at
 #     compile time. Matched at the HEAD, which is where the prompt is put; the
-#     `Current time: ...` line resolveMemoryFlushPromptForRun appends (:93538)
+#     `Current time: ...` line resolveMemoryFlushPromptForRun appends (:93539)
 #     and any hint ensureMemoryFlushSafetyHints / ensureNoReplyHint add
 #     (:93552-93560) all land after it, so none of them can move it.
 #   _MEMORY_FLUSH_SYSTEM_LINE — the opening sentence of
@@ -444,7 +444,7 @@ _MEMORY_FLUSH_SYSTEM_LINE = re.compile(r"^Pre-compaction memory flush turn\.", r
 #     prefix, and it is silent on a job that delivers nothing.
 #
 # One cron shape is deliberately NOT fingerprinted: the external-hook path
-# (:4371), which replaces the whole body with buildSafeExternalPrompt and drops
+# (:4372), which replaces the whole body with buildSafeExternalPrompt and drops
 # the bracket prefix. It fires only for gmail/hook sessions
 # (isExternalHookSession), which the harness does not configure, and it carries
 # no constant of its own worth pinning ahead of a run that could produce one.
@@ -483,6 +483,23 @@ _CRON_DELIVERY_TAIL = (
 # the context sentence opens the message, and the task label opens a LINE
 # (join("\n\n") guarantees it), so the second is matched with re.M like the
 # memory flush's system anchor.
+#
+# Both are gated on the message OPENING with _SUBAGENT_CONTEXT_PREFIX, and
+# that gate is what keeps the task line off a compaction body. The line anchor
+# is a SEARCH, not a head test, so on its own it fires anywhere in a message —
+# including inside the `<conversation>\n...\n</conversation>\n\n` wrap
+# pi-coding-agent builds for a compaction
+# (node_modules/@mariozechner/pi-coding-agent/dist/core/compaction/
+# compaction.js:435), which is how a compaction of a CHILD's session, whose
+# transcript quotes the child's own opening message, took this label instead
+# of its own before the gate existed. The gate costs the anchor nothing: the
+# prefix is element 0 of childTaskMessage, an unconditional template literal
+# (dist/reply-BCcP6j4h.js:30437), so every shipped child message opens on it,
+# while the wrap means no compaction body ever can. It also leaves the two
+# anchors genuinely independent — the prefix is strictly shorter than the
+# depth sentence, so the line anchor still holds if the sentence past
+# "(depth " is reworded by a bundle bump.
+_SUBAGENT_CONTEXT_PREFIX = "[Subagent Context] "
 _SUBAGENT_CONTEXT_HEAD = "[Subagent Context] You are running as a subagent (depth "
 _SUBAGENT_TASK_LINE = re.compile(r"^\[Subagent Task\]: ", re.M)
 
@@ -773,10 +790,11 @@ def _is_subagent_request(others: list[dict]) -> bool:
     opening = _first_user_text(others)
     if opening is not None:
         opening = opening.lstrip()
-        if opening.startswith(_SUBAGENT_CONTEXT_HEAD):
-            return True
-        if _SUBAGENT_TASK_LINE.search(opening):
-            return True
+        if opening.startswith(_SUBAGENT_CONTEXT_PREFIX):
+            if opening.startswith(_SUBAGENT_CONTEXT_HEAD):
+                return True
+            if _SUBAGENT_TASK_LINE.search(opening):
+                return True
     text = _last_user_text(others)
     return text is not None and text.strip().startswith(_SUBAGENT_WAKE_HEADS)
 

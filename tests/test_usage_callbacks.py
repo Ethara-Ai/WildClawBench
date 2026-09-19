@@ -34,6 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.utils import litellm_usage_callback as uc  # noqa: E402
 from src.utils import litellm_usage_oauth_callback as oc  # noqa: E402
+from eval import run_batch as rb  # noqa: E402
 
 
 # ============================================================================
@@ -1882,6 +1883,470 @@ def test_write_row_tags_a_cron_call(usage_path, stub_completion_cost):
     assert row["purpose"] == "cron"
     assert row["kind"] == "agent"
     assert set(row.keys()) == EXPECTED_KEYS | {"purpose"}
+
+
+# ============================================================================
+# heartbeat event variants — the other two bodies runHeartbeatOnce can send
+# ============================================================================
+
+# buildCronEventPrompt / buildExecEventPrompt, dist/health-BxAgqqNt.js:78-91,
+# verbatim. Each builder has a deliverToUser variant that differs only in the
+# tail, so the head is the whole of the fixed part. One expression at :403
+# picks between these and resolveHeartbeatPrompt's default, which is why they
+# take the heartbeat label rather than one of their own.
+_HB_EVENT_TEXT = "Ring Marin about the placard batch before the cutoff."
+
+# :85 / :86 — the head stops at the colon because everything past it is
+# eventText, which the agent's own cron tool wrote.
+_HB_REMINDER_INTERNAL = (
+    "A scheduled reminder has been triggered. The reminder content is:\n\n"
+    f"{_HB_EVENT_TEXT}\n\nHandle this reminder internally. Do not relay it to "
+    "the user unless explicitly requested.")
+_HB_REMINDER_RELAY = (
+    "A scheduled reminder has been triggered. The reminder content is:\n\n"
+    f"{_HB_EVENT_TEXT}\n\nPlease relay this reminder to the user in a helpful "
+    "and friendly way.")
+# :82 / :83 — the empty-eventText fallbacks.
+_HB_EMPTY_CRON_INTERNAL = (
+    "A scheduled cron event was triggered, but no event content was found. "
+    "Handle this internally and reply HEARTBEAT_OK when nothing needs "
+    "user-facing follow-up.")
+_HB_EMPTY_CRON_RELAY = (
+    "A scheduled cron event was triggered, but no event content was found. "
+    "Reply HEARTBEAT_OK.")
+# :89 / :90 — buildExecEventPrompt.
+_HB_EXEC_INTERNAL = (
+    "An async command you ran earlier has completed. The result is shown in "
+    "the system messages above. Handle the result internally. Do not relay it "
+    "to the user unless explicitly requested.")
+_HB_EXEC_RELAY = (
+    "An async command you ran earlier has completed. The result is shown in "
+    "the system messages above. Please relay the command output to the user "
+    "in a helpful way. If the command succeeded, share the relevant output. "
+    "If it failed, explain what went wrong.")
+
+_HB_EVENT_BODIES = (
+    _HB_REMINDER_INTERNAL, _HB_REMINDER_RELAY,
+    _HB_EMPTY_CRON_INTERNAL, _HB_EMPTY_CRON_RELAY,
+    _HB_EXEC_INTERNAL, _HB_EXEC_RELAY,
+)
+
+_RUN_HISTORY = (
+    {"role": "user", "content": "go through the placard set and mark each one"},
+    {"role": "assistant", "content": "working through them now"},
+)
+
+
+@pytest.mark.parametrize("body", _HB_EVENT_BODIES)
+def test_heartbeat_event_bodies_are_named_heartbeat(body):
+    assert uc._classify_internal_purpose(
+        _heartbeat_kwargs(body, history=_RUN_HISTORY)) == "heartbeat"
+
+
+@pytest.mark.parametrize("body", _HB_EVENT_BODIES)
+def test_heartbeat_event_bodies_survive_the_time_line(body):
+    assert uc._classify_internal_purpose(
+        _heartbeat_kwargs(f"{body}\n{_HEARTBEAT_TIME}")) == "heartbeat"
+
+
+def test_heartbeat_event_bodies_are_named_without_the_path_hint():
+    # appendHeartbeatWorkspacePathHint returns the prompt untouched unless it
+    # already matches /heartbeat\.md/i (:390), and none of these three names
+    # the file, so the hint fingerprint is never on them. The head is the only
+    # thing carrying them.
+    for body in _HB_EVENT_BODIES:
+        assert _HEARTBEAT_HINT not in body
+        assert uc._classify_internal_purpose(_heartbeat_kwargs(body)) == "heartbeat"
+
+
+def test_a_cron_event_is_a_heartbeat_not_a_cron_job():
+    # A cron EVENT is enqueued into the session the agent is already on
+    # (enqueueSystemEvent with contextKey `cron:<id>`, gateway-cli:6316) and
+    # delivered by the health loop; a cron JOB runs on its own session key
+    # (:4218). Only the second one wears `cron` here.
+    assert uc._classify_internal_purpose(
+        _heartbeat_kwargs(_HB_REMINDER_RELAY)) == "heartbeat"
+    assert uc._classify_internal_purpose(_cron_kwargs()) == "cron"
+
+
+def test_a_task_turn_quoting_a_heartbeat_event_body_mid_text_is_not_named():
+    for head in ("A scheduled reminder has been triggered. The reminder "
+                 "content is:",
+                 "A scheduled cron event was triggered, but no event content "
+                 "was found.",
+                 "An async command you ran earlier has completed. The result "
+                 "is shown in the system messages above."):
+        body = f"the gateway keeps logging \"{head}\" -- find out why."
+        assert uc._classify_internal_purpose(_heartbeat_kwargs(body)) == ""
+
+
+def test_heartbeat_event_bodies_do_not_shadow_compaction():
+    for body in _HB_EVENT_BODIES:
+        kwargs = {"messages": [
+            {"role": "system", "content": _COMPACTION_SYSTEM},
+            {"role": "user", "content":
+                f"<conversation>\nuser: {body}\n</conversation>\n\n"
+                "Produce a structured summary following the exact format."},
+        ]}
+        assert uc._classify_internal_purpose(kwargs) == "compaction"
+
+
+def test_write_row_tags_a_heartbeat_event_call(usage_path, stub_completion_cost):
+    uc._write_row({"model": "claude-opus-5",
+                   **_heartbeat_kwargs(_HB_REMINDER_RELAY)},
+                  _resp(_chat_usage()), T0, T1)
+    row = _read_rows(usage_path)[0]
+    assert row["purpose"] == "heartbeat"
+    assert set(row.keys()) == EXPECTED_KEYS | {"purpose"}
+
+
+# ============================================================================
+# subagent — the child's own traffic, and the two messages that wake a parent
+# ============================================================================
+
+# childTaskMessage, dist/reply-BCcP6j4h.js:30436-30440, verbatim. Element 0 is
+# an unconditional template literal, so every shipped child message opens on
+# "[Subagent Context] "; element 1 is present only for spawnMode "session";
+# join("\n\n") is what puts "[Subagent Task]: " at the start of a LINE.
+_SUB_CONTEXT = (
+    "[Subagent Context] You are running as a subagent (depth 1/3). Results "
+    "auto-announce to your requester; do not busy-poll for status.")
+_SUB_PERSISTENT = (
+    "[Subagent Context] This subagent session is persistent and remains "
+    "available for thread follow-up messages.")
+_SUB_TASK = "[Subagent Task]: audit the placard set against the rulebook"
+
+_SUBAGENT_OPENING = f"{_SUB_CONTEXT}\n\n{_SUB_TASK}"
+_SUBAGENT_OPENING_PERSISTENT = f"{_SUB_CONTEXT}\n\n{_SUB_PERSISTENT}\n\n{_SUB_TASK}"
+
+# buildAnnounceSteerMessage (:29715) and buildDescendantWakeMessage (:29724).
+_SUB_STEER = "A background task finished. Process the completion update now."
+_SUB_WAKE = (
+    "[Subagent Context] Your prior run ended while waiting for descendant "
+    "subagent completions.\n"
+    "[Subagent Context] All pending descendants for that run have now settled.")
+
+
+def test_subagent_named_from_its_opening_task_message():
+    assert uc._classify_internal_purpose(
+        _heartbeat_kwargs(_SUBAGENT_OPENING)) == "subagent"
+
+
+def test_subagent_named_with_the_persistent_session_line_between_anchors():
+    assert uc._classify_internal_purpose(
+        _heartbeat_kwargs(_SUBAGENT_OPENING_PERSISTENT)) == "subagent"
+
+
+def test_subagent_named_on_every_request_of_a_tool_calling_child():
+    # The anchor is the FIRST user message because childTaskMessage OPENS the
+    # child's session and stays at position 0 for the whole of it. Anchoring
+    # on the last message would name only the child's first request.
+    kwargs = _anthropic_body(_AGENT_SYSTEM, [
+        {"role": "user", "content": _SUBAGENT_OPENING},
+        {"role": "assistant", "content": "reading the rulebook"},
+        {"role": "user", "content": "[tool result] 412 lines"},
+        {"role": "assistant", "content": "checking section 4"},
+        {"role": "user", "content": "[tool result] ok"},
+    ])
+    assert uc._classify_internal_purpose(kwargs) == "subagent"
+
+
+def test_subagent_task_line_still_holds_when_the_depth_sentence_is_reworded():
+    # The two anchors are independent on purpose: the prefix gate is strictly
+    # shorter than the depth sentence, so a bundle bump that rewords the
+    # sentence past "(depth " leaves the task line carrying the label.
+    body = ("[Subagent Context] You are a nested worker, third level.\n\n"
+            f"{_SUB_TASK}")
+    assert uc._classify_internal_purpose(_heartbeat_kwargs(body)) == "subagent"
+
+
+def test_subagent_context_head_still_holds_when_the_task_label_is_reworded():
+    # The other direction of the same independence, and the one that pins the
+    # depth sentence on its own: with the task label moved, the head is the
+    # only anchor left carrying the label.
+    body = f"{_SUB_CONTEXT}\n\n[Subagent Job]: audit the placard set"
+    assert uc._classify_internal_purpose(_heartbeat_kwargs(body)) == "subagent"
+
+
+@pytest.mark.parametrize("body", [_SUB_STEER, _SUB_WAKE])
+def test_subagent_named_from_the_messages_that_wake_a_parent(body):
+    assert uc._classify_internal_purpose(
+        _heartbeat_kwargs(body, history=_RUN_HISTORY)) == "subagent"
+
+
+def test_subagent_is_named_ahead_of_memory_flush():
+    # Both are true of this one request — a child session is a session, so it
+    # can flush. `subagent` must win: the child's turns are not in THIS run's
+    # chat.jsonl, so its row must subtract, and memory_flush is the one label
+    # that does not.
+    kwargs = _anthropic_body(_flush_system(), [
+        {"role": "user", "content": _SUBAGENT_OPENING},
+        {"role": "assistant", "content": "working"},
+        {"role": "user", "content": _flush_user()},
+    ])
+    assert uc._classify_internal_purpose(kwargs) == "subagent"
+    assert "subagent" not in rb._TRANSCRIPT_TURN_PURPOSES
+
+
+def test_a_task_turn_quoting_the_subagent_anchors_mid_text_is_not_named():
+    for quoted in (_SUB_CONTEXT, _SUB_TASK, _SUB_STEER):
+        body = f"the log is full of \"{quoted}\" -- work out who writes them."
+        assert uc._classify_internal_purpose(_heartbeat_kwargs(body)) == ""
+
+
+def test_a_bare_task_line_without_the_context_prefix_is_not_named():
+    # The line anchor is a SEARCH, so the opening prefix is what keeps it off
+    # a message that merely contains the label somewhere.
+    body = f"here is what I sent the worker:\n{_SUB_TASK}"
+    assert uc._classify_internal_purpose(_heartbeat_kwargs(body)) == ""
+
+
+def test_subagent_does_not_shadow_a_compaction_of_a_childs_session():
+    # The regression this gate exists for. A child's transcript OPENS on
+    # childTaskMessage, so compacting it wraps a "[Subagent Task]: " line
+    # inside <conversation>...</conversation> (pi-coding-agent
+    # dist/core/compaction/compaction.js:435) and the re.M search would find
+    # it. The wrap means the body cannot open on "[Subagent Context] ", which
+    # is what keeps the compaction label on a compaction.
+    for opening in (_SUBAGENT_OPENING, _SUBAGENT_OPENING_PERSISTENT, _SUB_TASK):
+        kwargs = {"messages": [
+            {"role": "system", "content": _COMPACTION_SYSTEM},
+            {"role": "user", "content":
+                f"<conversation>\nuser: {opening}\nassistant: done\n"
+                "</conversation>\n\nProduce a structured summary following the "
+                "exact format."},
+        ]}
+        assert uc._classify_internal_purpose(kwargs) == "compaction"
+
+
+def test_write_row_tags_a_subagent_call(usage_path, stub_completion_cost):
+    uc._write_row({"model": "claude-opus-5",
+                   **_heartbeat_kwargs(_SUBAGENT_OPENING)},
+                  _resp(_chat_usage()), T0, T1)
+    row = _read_rows(usage_path)[0]
+    assert row["purpose"] == "subagent"
+    assert set(row.keys()) == EXPECTED_KEYS | {"purpose"}
+
+
+# ============================================================================
+# a2a — matched by equality, because the whole message is the constant
+# ============================================================================
+
+_A2A = "Agent-to-agent announce step."
+
+
+def test_a2a_named_from_its_exact_announce_message():
+    assert uc._classify_internal_purpose(
+        _heartbeat_kwargs(_A2A, history=_RUN_HISTORY)) == "a2a"
+
+
+def test_a2a_named_when_the_announce_step_opens_a_fresh_session():
+    assert uc._classify_internal_purpose(_heartbeat_kwargs(_A2A)) == "a2a"
+
+
+def test_a2a_is_matched_by_equality_not_by_prefix():
+    # runAgentStep posts this string LITERALLY (:27625) and carries the real
+    # content out-of-band in extraSystemPrompt (:27626), so there is no
+    # variable part to leave room for. Anything added is a human.
+    for body in ("Agent-to-agent announce step. Also fix the build.",
+                 "Please do the Agent-to-agent announce step.",
+                 "Agent-to-agent announce step",
+                 "agent-to-agent announce step.",
+                 "Agent to agent announce step."):
+        assert uc._classify_internal_purpose(
+            _heartbeat_kwargs(body, history=_RUN_HISTORY)) == ""
+
+
+def test_a2a_tolerates_only_surrounding_whitespace():
+    assert uc._classify_internal_purpose(
+        _heartbeat_kwargs(f"\n  {_A2A}  \n")) == "a2a"
+
+
+def test_a2a_does_not_shadow_compaction():
+    kwargs = {"messages": [
+        {"role": "system", "content": _COMPACTION_SYSTEM},
+        {"role": "user", "content":
+            f"<conversation>\nuser: {_A2A}\n</conversation>\n\n"
+            "Produce a structured summary following the exact format."},
+    ]}
+    assert uc._classify_internal_purpose(kwargs) == "compaction"
+
+
+def test_write_row_tags_an_a2a_call(usage_path, stub_completion_cost):
+    uc._write_row({"model": "claude-opus-5", **_heartbeat_kwargs(_A2A)},
+                  _resp(_chat_usage()), T0, T1)
+    row = _read_rows(usage_path)[0]
+    assert row["purpose"] == "a2a"
+    assert set(row.keys()) == EXPECTED_KEYS | {"purpose"}
+
+
+# ============================================================================
+# slug / llm_task / probe — throwaway sessions, named above the system guard
+# ============================================================================
+
+# generateSlugViaLLM, dist/llm-slug-generator.js:58, verbatim through the
+# first sentence; the conversation summary and the examples follow.
+_SLUG_PROMPT = (
+    "Based on this conversation, generate a short 1-2 word filename slug "
+    "(lowercase, hyphen-separated, no file extension).\n\n"
+    "Conversation summary:\nplacard batch review\n\n"
+    'Reply with ONLY the slug, nothing else. Examples: "vendor-pitch", '
+    '"api-design", "bug-fix"')
+# extensions/llm-task/src/llm-task-tool.ts:175-183 — the five sentences are
+# join(" ")ed into `system` and then prepended to the caller's task as a USER
+# message, so the anchor is a user-prompt head and not a system head.
+_LLM_TASK_PROMPT = (
+    "You are a JSON-only function. Return ONLY a valid JSON value. Do not "
+    "wrap in markdown fences. Do not include commentary. Do not call tools."
+    "\n\nTASK:\nextract the vendor names\n\nINPUT_JSON:\n{\"rows\": []}\n")
+# PROBE_PROMPT, dist/models-Cip9psMW.js:1166, sent through runEmbeddedPiAgent
+# (:1421); and probeTool's context (:2008), posted straight to complete().
+_PROBE_SIMPLE = "Reply with OK. Do not use tools."
+_PROBE_PING = "Call the ping tool with {} and nothing else."
+
+
+def test_slug_named_from_its_prompt_head():
+    assert uc._classify_internal_purpose(_heartbeat_kwargs(_SLUG_PROMPT)) == "slug"
+
+
+def test_llm_task_named_from_its_prompt_head():
+    assert uc._classify_internal_purpose(
+        _heartbeat_kwargs(_LLM_TASK_PROMPT)) == "llm_task"
+
+
+@pytest.mark.parametrize("body", [_PROBE_SIMPLE, _PROBE_PING])
+def test_probe_named_from_its_exact_message(body):
+    assert uc._classify_internal_purpose(_heartbeat_kwargs(body)) == "probe"
+
+
+def test_the_ping_probe_is_named_with_no_system_prompt_at_all():
+    # probeTool posts straight to complete() with tools:[TOOL_PING] and no
+    # system field, so this one has to clear the system guard from below too.
+    assert uc._classify_internal_purpose(
+        _anthropic_body("", [{"role": "user", "content": _PROBE_PING}])) == "probe"
+
+
+def test_slug_llm_task_and_probe_are_named_above_the_system_guard():
+    # All three reach the model through runEmbeddedPiAgent or an equivalent,
+    # which always builds a system prompt, so the guard below would drop them.
+    big_system = _AGENT_SYSTEM + "\n" + ("tool guidance. " * 200)
+    for body, label in ((_SLUG_PROMPT, "slug"),
+                        (_LLM_TASK_PROMPT, "llm_task"),
+                        (_PROBE_SIMPLE, "probe")):
+        assert uc._classify_internal_purpose(
+            _heartbeat_kwargs(body, system=big_system)) == label
+
+
+def test_slug_llm_task_and_probe_still_need_a_single_user_message():
+    # They sit BELOW the arity guard, so a real conversation that happens to
+    # end on one of these sentences is still somebody's turn.
+    for body in (_SLUG_PROMPT, _LLM_TASK_PROMPT, _PROBE_SIMPLE, _PROBE_PING):
+        assert uc._classify_internal_purpose(
+            _heartbeat_kwargs(body, history=_RUN_HISTORY)) == ""
+
+
+def test_a_task_turn_quoting_the_throwaway_prompts_mid_text_is_not_named():
+    for quoted in ("Based on this conversation, generate a short 1-2 word "
+                   "filename slug",
+                   "You are a JSON-only function. Return ONLY a valid JSON "
+                   "value.",
+                   _PROBE_SIMPLE, _PROBE_PING):
+        body = f"the harness sends \"{quoted}\" somewhere -- find where."
+        assert uc._classify_internal_purpose(_heartbeat_kwargs(body)) == ""
+
+
+def test_the_throwaway_prompts_do_not_shadow_compaction():
+    for body in (_SLUG_PROMPT, _LLM_TASK_PROMPT, _PROBE_SIMPLE, _PROBE_PING):
+        kwargs = {"messages": [
+            {"role": "system", "content": _COMPACTION_SYSTEM},
+            {"role": "user", "content":
+                f"<conversation>\nuser: {body}\n</conversation>\n\n"
+                "Produce a structured summary following the exact format."},
+        ]}
+        assert uc._classify_internal_purpose(kwargs) == "compaction"
+
+
+def test_write_row_tags_slug_llm_task_and_probe(usage_path, stub_completion_cost):
+    for body in (_SLUG_PROMPT, _LLM_TASK_PROMPT, _PROBE_SIMPLE):
+        uc._write_row({"model": "claude-opus-5", **_heartbeat_kwargs(body)},
+                      _resp(_chat_usage()), T0, T1)
+    assert [r["purpose"] for r in _read_rows(usage_path)] == \
+        ["slug", "llm_task", "probe"]
+
+
+# ============================================================================
+# The precedence chain, end to end
+# ============================================================================
+
+
+def test_every_label_fires_in_its_own_slot():
+    """Every branch of _classify_internal_purpose, in the order it is tried."""
+    assert uc._classify_internal_purpose(
+        {"call_type": "atranscription"}) == "transcription"
+    assert uc._classify_internal_purpose({"call_type": "aembedding"}) == "embeddings"
+    assert uc._classify_internal_purpose(
+        _heartbeat_kwargs(history=_RUN_HISTORY)) == "heartbeat"
+    assert uc._classify_internal_purpose(
+        _heartbeat_kwargs(_HB_EXEC_RELAY, history=_RUN_HISTORY)) == "heartbeat"
+    assert uc._classify_internal_purpose(
+        _heartbeat_kwargs(_SUBAGENT_OPENING)) == "subagent"
+    assert uc._classify_internal_purpose(
+        _flush_kwargs(history=_RUN_HISTORY)) == "memory_flush"
+    assert uc._classify_internal_purpose(
+        _cron_kwargs(history=_RUN_HISTORY)) == "cron"
+    assert uc._classify_internal_purpose(
+        _heartbeat_kwargs(_A2A, history=_RUN_HISTORY)) == "a2a"
+    assert uc._classify_internal_purpose(_anthropic_body(_COMPACTION_SYSTEM, [
+        {"role": "user", "content": "<conversation>"}])) == "compaction"
+    assert uc._classify_internal_purpose(_heartbeat_kwargs(_SLUG_PROMPT)) == "slug"
+    assert uc._classify_internal_purpose(
+        _heartbeat_kwargs(_LLM_TASK_PROMPT)) == "llm_task"
+    assert uc._classify_internal_purpose(_heartbeat_kwargs(_PROBE_PING)) == "probe"
+    assert uc._classify_internal_purpose(_pdf_native_anthropic_kwargs()) == "pdf"
+    assert uc._classify_internal_purpose(_image_tool_kwargs()) == "image"
+    assert uc._classify_internal_purpose(_pdf_extraction_kwargs()) == "pdf"
+    assert uc._classify_internal_purpose(
+        {"messages": [{"role": "user", "content": _SUMMARIZE_USER}]}) == "summarize"
+    assert uc._classify_internal_purpose(_turn_kwargs()) == ""
+
+
+def test_no_new_label_can_fire_on_a_compaction_body():
+    """Every fingerprint added past the heartbeat, against the wrap."""
+    bodies = (_SUBAGENT_OPENING, _SUB_TASK, _SUB_STEER, _SUB_WAKE, _A2A,
+              _SLUG_PROMPT, _LLM_TASK_PROMPT, _PROBE_SIMPLE, _PROBE_PING,
+              _flush_user(), _cron_user(), *_HB_EVENT_BODIES)
+    for body in bodies:
+        kwargs = {"messages": [
+            {"role": "system", "content": _COMPACTION_SYSTEM},
+            {"role": "user", "content":
+                f"<conversation>\nuser: {body}\nassistant: ok\n</conversation>"
+                "\n\nProduce a structured summary following the exact format."},
+        ]}
+        assert uc._classify_internal_purpose(kwargs) == "compaction", body[:60]
+
+
+def test_only_memory_flush_keeps_its_row_a_turn_candidate():
+    """Which of the new labels subtract, and which does not."""
+    assert rb._TRANSCRIPT_TURN_PURPOSES == frozenset({"memory_flush"})
+    for purpose in ("heartbeat", "cron", "subagent", "a2a", "slug",
+                    "llm_task", "probe", "compaction", "embeddings"):
+        assert rb._usage_row_is_internal_call({"purpose": purpose}) is True
+    assert rb._usage_row_is_internal_call({"purpose": "memory_flush"}) is False
+    assert rb._usage_row_is_internal_call({"purpose": ""}) is False
+
+
+def test_the_new_fingerprints_never_raise_on_junk():
+    for messages in ([{"role": "user", "content": None}],
+                     [{"role": "user"}],
+                     [{"role": None, "content": _SUBAGENT_OPENING}],
+                     [{"role": "user", "content": [None, 3]}],
+                     [{"role": "user", "content": {"nope": True}}],
+                     [None],
+                     []):
+        for system in (_AGENT_SYSTEM, "", _flush_system()):
+            assert isinstance(
+                uc._classify_internal_purpose(
+                    _anthropic_body(system, messages)), str)
 
 
 # ============================================================================
