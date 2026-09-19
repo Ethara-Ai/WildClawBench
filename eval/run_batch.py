@@ -551,7 +551,8 @@ def _usage_row_bills_no_tokens(r: Mapping[str, Any]) -> bool:
 # the log; the transcript-side count is stamped separately
 # (_count_memory_flush_turns_in_transcript); and the row itself stays a turn
 # candidate, which is what keeps
-#     per-message + internal + post_agent + zero_token == sources.agent
+#     per-message + internal + post_agent + zero_token + other_session
+#         == sources.agent
 # closing with no rows_unmatched.
 _TRANSCRIPT_TURN_PURPOSES = frozenset({"memory_flush"})
 
@@ -695,6 +696,246 @@ def _split_post_agent_rows(
     return during, after
 
 
+# ---------------------------------------------------------------------------
+# Sibling session transcripts.
+#
+# A rep ships ONE transcript, chat.jsonl, and openclaw does not promise to run
+# only one session inside it. When a cron event fires, the gateway starts a new
+# session on the main chat key and answers there
+# (enqueueSystemEvent -> the HEALTH loop -> buildCronEventPrompt), and the
+# collector copies every session store file it finds to
+# ``<run_dir>/task_output/sessions/``. So the rep leaves behind transcripts the
+# judge never sees, whose requests were nonetheless tagged with THIS run's
+# run_key and therefore selected by the totals path.
+#
+# Measured on the 2026-09-19 gama koji_sloan rerun: run_1 shipped 224 rows for
+# 164 delivered assistant messages and stamped usage_attribution failed with
+# rows_unmatched 34, and its sessions/ directory holds one sibling transcript
+# (fdcddd7e-afb8-4136-b97c-659f159dbb5c.jsonl, registry origin
+# {label: heartbeat, provider: cron-event}) carrying EXACTLY 34 assistant
+# messages. run_2 is the same shape with 2 and 2. Those messages carry real
+# per-message token counts — only ``cost`` is zeroed on this image build — so
+# the surplus rows can be joined to the messages that produced them on the
+# token counts alone, which is the only join available: the agent clock shim
+# puts the session's timestamps tens of days from the sidecar's real UTC ``ts``.
+# ---------------------------------------------------------------------------
+
+# usage-row column -> the key the session store writes it under. Session files
+# carry the SAME four numbers as a usage row, under openclaw's names.
+_SESSION_TOKEN_KEYS = ("input", "output", "cacheRead", "cacheWrite")
+
+
+def _row_token_tuple(r: Mapping[str, Any]) -> tuple[int, ...] | None:
+    """A usage row's four token columns, or None when one will not read."""
+    out: list[int] = []
+    for column in _TURN_TOKEN_COLUMNS:
+        try:
+            out.append(int(r.get(column, 0) or 0))
+        except (TypeError, ValueError):
+            return None
+    return tuple(out)
+
+
+def _session_assistant_token_tuples(path: Path) -> list[tuple[int, ...]]:
+    """Each assistant message's four token counts, in session-file order.
+
+    A message whose usage block is missing or unreadable is skipped rather than
+    read as zeros: the tuple is the join key, and a fabricated all-zero key
+    would match any row that billed nothing.
+    """
+    tuples: list[tuple[int, ...]] = []
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return tuples
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(entry, dict):
+            continue
+        message = entry.get("message")
+        if not isinstance(message, dict):
+            continue
+        if str(message.get("role", "")).lower() != "assistant":
+            continue
+        usage = message.get("usage")
+        if not isinstance(usage, dict):
+            continue
+        try:
+            tup = tuple(int(usage.get(k, 0) or 0) for k in _SESSION_TOKEN_KEYS)
+        except (TypeError, ValueError):
+            continue
+        if any(tup):
+            tuples.append(tup)
+    return tuples
+
+
+def _file_digest(path: Path) -> tuple[int, str] | None:
+    """(size, sha256) for ``path``, or None when it cannot be read."""
+    try:
+        size = path.stat().st_size
+        digest = hashlib.sha256()
+        with path.open("rb") as fh:
+            for chunk in iter(lambda: fh.read(1 << 20), b""):
+                digest.update(chunk)
+    except OSError:
+        return None
+    return (size, digest.hexdigest())
+
+
+def _sibling_session_files(run_dir: Path) -> list[Path]:
+    """Session transcripts collected from THIS rep that are NOT the delivered one.
+
+    Scoped to ``<run_dir>/task_output/sessions/`` and nowhere else. The
+    directory is written per rep by the output collector, so a file in it was
+    produced by this rep's container and no other; that is the first of the
+    three guards that keep a foreign session out of the ledger (the second is
+    run_key row selection, the third the token join in
+    ``_absorb_rows_into_sibling_sessions``).
+
+    The MAIN session is excluded on CONTENT, not on its name: its bytes are the
+    rep's delivered chat.jsonl, so any copy of it — under ``chat.jsonl`` or
+    under its own session id — is recognised by digest. The name is checked too,
+    because that is the path openclaw's main transcript is written to
+    (``/root/.openclaw/agents/main/sessions/chat.jsonl``) and the digest check
+    cannot run when the delivered copy is missing. ``sessions.json`` is the
+    registry, not a transcript, and is not a ``*.jsonl`` file; the lock files
+    openclaw leaves beside a session (``<id>.jsonl.lock``, seen on the
+    2026-09-19 sean_callahan run_2) are not either.
+    """
+    sessions_dir = Path(run_dir) / "task_output" / "sessions"
+    if not sessions_dir.is_dir():
+        return []
+    main_digest = _file_digest(Path(run_dir) / "chat.jsonl")
+    out: list[Path] = []
+    for path in sorted(sessions_dir.glob("*.jsonl")):
+        if not path.is_file() or path.name == "chat.jsonl":
+            continue
+        # Size is checked first so the delivered transcript, which on a real rep
+        # is megabytes, is hashed only against a file that could actually be it.
+        if (main_digest is not None
+                and path.stat().st_size == main_digest[0]
+                and _file_digest(path) == main_digest):
+            continue
+        out.append(path)
+    return out
+
+
+def _session_registry(run_dir: Path) -> dict[str, dict]:
+    """sessionId -> {session_key, origin} from the rep's sessions.json registry.
+
+    Reporting only. The registry names the session openclaw was LAST on for a
+    key, which on the koji rerun is the cron-event session rather than the
+    delivered one, so it cannot be used to pick the main transcript out — but
+    it is where ``origin`` lives, and origin is what tells a reader that the
+    surplus turns were a scheduled reminder rather than a subagent.
+    """
+    path = Path(run_dir) / "task_output" / "sessions" / "sessions.json"
+    if not path.is_file():
+        return {}
+    try:
+        registry = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+    if not isinstance(registry, dict):
+        return {}
+    out: dict[str, dict] = {}
+    for key, meta in registry.items():
+        if not isinstance(meta, dict):
+            continue
+        session_id = str(meta.get("sessionId", "") or "")
+        if not session_id:
+            continue
+        entry: dict[str, Any] = {"session_key": str(key)}
+        origin = meta.get("origin")
+        if isinstance(origin, dict) and origin:
+            entry["origin"] = dict(origin)
+        out[session_id] = entry
+    return out
+
+
+def _absorb_rows_into_sibling_sessions(
+    rows: Sequence[Mapping[str, Any]], run_dir: Path,
+) -> tuple[list[Mapping[str, Any]], list[dict]]:
+    """Hand each turn-candidate row to the sibling message that billed it.
+
+    Returns ``(rows_left, sessions)`` where ``sessions`` is one record per
+    sibling transcript that absorbed anything.
+
+    The join is EXACT on all four token columns, one row per message and one
+    message per row, greedy in file order and never rewinding past a row it has
+    already given away. Nothing weaker is allowed to move money: a count-based
+    match ("this file has 34 messages, take 34 rows") would let any stale or
+    foreign session file in the directory subtract real turns from the
+    transcript, which is the one failure mode this must not have. A sibling
+    message that matches nothing is simply ignored — the ledger is an account of
+    ROWS, and a message with no row in this run's selection has nothing to
+    account for. A ROW that matches nothing stays exactly where it was and the
+    run still fails to reconcile, which is the honest outcome.
+
+    Called only on the rows that survived every other split, so a row already
+    booked to internal_calls, post_agent_calls or zero_token_calls is not on
+    offer here and cannot be absorbed twice.
+    """
+    remaining = list(rows)
+    sessions: list[dict] = []
+    for path in _sibling_session_files(run_dir):
+        tuples = _session_assistant_token_tuples(path)
+        if not tuples:
+            continue
+        taken: set[int] = set()
+        cursor = 0
+        for want in tuples:
+            idx = cursor
+            while idx < len(remaining):
+                if idx not in taken and _row_token_tuple(remaining[idx]) == want:
+                    taken.add(idx)
+                    cursor = idx + 1
+                    break
+                idx += 1
+        if not taken:
+            continue
+        sessions.append({
+            "session_id": path.stem,
+            "session_file": path.name,
+            "assistant_messages": len(tuples),
+            "rows": [remaining[i] for i in sorted(taken)],
+        })
+        remaining = [r for i, r in enumerate(remaining) if i not in taken]
+    return remaining, sessions
+
+
+def _other_session_calls_block(sessions: Sequence[Mapping[str, Any]],
+                               registry: Mapping[str, Mapping[str, Any]]
+                               ) -> dict | None:
+    """The ledger line for rows a sibling transcript accounted for, per session.
+
+    Carried in usage.json beside internal_calls for the same reason that block
+    exists: sources.agent counted these rows, so a reader comparing the totals
+    with the per-message blocks must be able to see where they went. ``origin``
+    is copied from the rep's sessions.json when the registry knows the session,
+    so the block says WHY there was a second transcript, not merely that there
+    was one.
+    """
+    if not sessions:
+        return None
+    block = _usage_rows_ledger([r for s in sessions for r in s["rows"]])
+    by_session: dict[str, Any] = {}
+    for s in sessions:
+        entry = _usage_rows_ledger(s["rows"])
+        entry["assistant_messages"] = s["assistant_messages"]
+        entry["session_file"] = s["session_file"]
+        entry.update(registry.get(s["session_id"], {}))
+        by_session[s["session_id"]] = entry
+    block["by_session"] = dict(sorted(by_session.items()))
+    return block
+
+
 def _backfill_per_message_cost(traj: dict, usage_log_path: str,
                                run_key: str = "", *,
                                oauth_route: bool = False,
@@ -711,7 +952,8 @@ def _attribute_per_message_cost(traj: dict, usage_log_path: str,
                                 run_key: str = "", *,
                                 oauth_route: bool = False,
                                 model: str = "",
-                                agent_finished_ts: float | None = None) -> dict:
+                                agent_finished_ts: float | None = None,
+                                run_dir: str | Path | None = None) -> dict:
     """Populate each assistant message's token + cost block in ``traj`` from the
     sidecar per-request usage log (usage.jsonl), and report what happened.
 
@@ -733,20 +975,28 @@ def _attribute_per_message_cost(traj: dict, usage_log_path: str,
       rows_internal   of those, the ones openclaw issued for itself.
       rows_post_agent of those, the ones logged after the agent finished.
       rows_zero_token of those, the ones that billed no tokens at all.
+      rows_other_session of those, the ones a sibling session transcript from
+                        this same rep accounted for.
       rows_unmatched  message rows left over, or messages left short.
       internal_calls  ledger for rows_internal, or absent when there are none.
       post_agent_calls   ledger for rows_post_agent, likewise.
       zero_token_calls   ledger for rows_zero_token, likewise.
+      other_session_calls  ledger for rows_other_session, likewise, split per
+                        session file with its registry origin.
 
-    The four ledgers partition ``rows_selected`` exactly: every row is billed to
-    a message, to internal_calls, to post_agent_calls, or to zero_token_calls,
-    and the four token columns of the four add back up to ``sources.agent``.
-    Bucketing a row never removes its money from the run, only the claim that a
-    message produced it.
+    The five ledgers partition ``rows_selected`` exactly: every row is billed to
+    a message, to internal_calls, to post_agent_calls, to zero_token_calls, or
+    to other_session_calls, and the four token columns of the five add back up
+    to ``sources.agent``. Bucketing a row never removes its money from the run,
+    only the claim that a message in THIS transcript produced it.
 
-    OpenClaw writes all-zero per-message usage/cost into chat.jsonl on this
-    image build (IAN report Pointer 5); the real per-request numbers live only
-    in the sidecar log.
+    OpenClaw zeroes the ``cost`` sub-block of every per-message usage record in
+    chat.jsonl on this image build (IAN report Pointer 5), which is why the
+    dollars have to be re-derived here. The TOKEN counts beside them are real —
+    measured on the 2026-09-19 gama koji rerun, all 164 assistant messages of
+    run_1 carry non-zero input/output/cacheRead/cacheWrite — and the sibling
+    session store writes the same block, which is what makes the token join in
+    ``_absorb_rows_into_sibling_sessions`` possible at all.
 
     On an OAuth-routed run each row's dollars are recomputed from that row's own
     token counts at Bedrock list rates, matching how the run totals in
@@ -784,6 +1034,17 @@ def _attribute_per_message_cost(traj: dict, usage_log_path: str,
     pre-compaction memory flush — and those rows stay turn candidates, because
     the message they answered is right there in ``assistants`` and removing
     one side of a matched pair is how you MAKE a mismatch, not fix one.
+
+    Rows a SECOND transcript of this same rep accounted for are subtracted
+    next, and only when there are more rows left than messages to spend them
+    on. ``run_dir`` is the rep's output directory; the search never leaves
+    ``<run_dir>/task_output/sessions/``. A sibling assistant message claims a
+    row only on an exact four-column token match, one row per message, so a
+    stale or foreign session file in that directory absorbs nothing rather than
+    subtracting real turns from the transcript — and the rows it fails to claim
+    still fail the run. Nothing about those turns reaches the transcript or the
+    judge; they are not in chat.jsonl and this does not put them there. See
+    ``_absorb_rows_into_sibling_sessions``.
 
     Past that, attribution within the remaining rows is positional, which is
     sound only when the counts match. A leftover mismatch cannot be repaired: a
@@ -860,6 +1121,20 @@ def _attribute_per_message_cost(traj: dict, usage_log_path: str,
     zero_token = [r for r in attributable if _usage_row_bills_no_tokens(r)]
     rows = [r for r in attributable if not _usage_row_bills_no_tokens(r)]
 
+    # Gated on a SURPLUS, so a sibling can only ever claim a row the transcript
+    # has no message for. When the counts already agree there is nothing for a
+    # sibling to account for, and a row taken anyway would leave a message
+    # short — manufacturing the very mismatch this bucket exists to resolve. So
+    # a rep that reconciles without reading a session file goes on doing
+    # exactly that, which is why the 2026-09-19 willie_prince and sean_callahan
+    # reps, both attributed with a sibling transcript sitting in the same
+    # directory, come out of this unchanged.
+    other_sessions: list[dict] = []
+    if run_dir is not None and len(rows) > len(assistants):
+        rows, other_sessions = _absorb_rows_into_sibling_sessions(
+            rows, Path(run_dir))
+    other_session = [r for s in other_sessions for r in s["rows"]]
+
     report: dict[str, Any] = {
         "status": "failed",
         "messages": len(assistants),
@@ -867,6 +1142,7 @@ def _attribute_per_message_cost(traj: dict, usage_log_path: str,
         "rows_internal": len(internal),
         "rows_post_agent": len(post_agent),
         "rows_zero_token": len(zero_token),
+        "rows_other_session": len(other_session),
         "rows_unmatched": abs(len(rows) - len(assistants)),
     }
     heartbeat_turns = _count_heartbeat_turns_in_transcript(msgs)
@@ -902,6 +1178,22 @@ def _attribute_per_message_cost(traj: dict, usage_log_path: str,
     zero_block = _internal_calls_block(zero_token)
     if zero_block:
         report["zero_token_calls"] = zero_block
+    other_block = _other_session_calls_block(
+        other_sessions,
+        _session_registry(Path(run_dir)) if other_sessions else {})
+    if other_block:
+        report["other_session_calls"] = other_block
+
+    if other_sessions:
+        logger.warning(
+            "per-message cost: %d usage row(s) were billed by %d OTHER session "
+            "transcript(s) this rep left behind (%s), matched one-for-one on "
+            "all four token columns. They are counted in the run total and "
+            "ledgered as other_session_calls; their turns are NOT in the "
+            "delivered transcript and nothing here puts them there.",
+            len(other_session), len(other_sessions),
+            ", ".join(f"{s['session_file']}:{len(s['rows'])}/"
+                      f"{s['assistant_messages']}" for s in other_sessions))
 
     if post_agent:
         logger.info(
@@ -930,11 +1222,12 @@ def _attribute_per_message_cost(traj: dict, usage_log_path: str,
         logger.error(
             "per-message cost NOT attributed: %s selected %d usage row(s) for "
             "%d assistant message(s) (%d of them openclaw's own, %d post-agent, "
-            "%d zero-token). Positional attribution would bill one request's "
-            "tokens to another message, so the per-message blocks are left "
-            "empty; the run totals in usage.json are unaffected.",
+            "%d zero-token, %d billed by another session of this rep). "
+            "Positional attribution would bill one request's tokens to another "
+            "message, so the per-message blocks are left empty; the run totals "
+            "in usage.json are unaffected.",
             selector, len(candidates), len(assistants), len(internal),
-            len(post_agent), len(zero_token))
+            len(post_agent), len(zero_token), len(other_session))
         return report
 
     report["status"] = "attributed" if selector == "run_key" else "partial"
@@ -1090,13 +1383,17 @@ def save_usage(
     # Whether the per-message blocks in output.json were filled in, and the
     # ledger lines that make them add up. sources.agent counts every row this
     # run's key selected, so Σ(per-message) + internal_calls + post_agent_calls
-    # + zero_token_calls == sources.agent exactly; without those terms a reader
-    # comparing the two can only conclude the artifact is inconsistent.
+    # + zero_token_calls + other_session_calls == sources.agent exactly; without
+    # those terms a reader comparing the two can only conclude the artifact is
+    # inconsistent. other_session_calls is the one term whose rows paid for real
+    # assistant turns — they were simply taken on a transcript this rep did not
+    # deliver, which is why it names the session file and its origin.
     attribution = dict(_stamped_usage_attribution(result) or {})
     if attribution:
         internal = attribution.pop("internal_calls", None)
         post_agent = attribution.pop("post_agent_calls", None)
         zero_token = attribution.pop("zero_token_calls", None)
+        other_session = attribution.pop("other_session_calls", None)
         out["usage_attribution"] = attribution
         if internal:
             out["internal_calls"] = internal
@@ -1104,6 +1401,8 @@ def save_usage(
             out["post_agent_calls"] = post_agent
         if zero_token:
             out["zero_token_calls"] = zero_token
+        if other_session:
+            out["other_session_calls"] = other_session
 
     result["usage"] = out
     if out["request_count"] > 0:
@@ -2291,7 +2590,8 @@ def _augment_score_with_combined_rewards(scores: dict, result: dict) -> None:
     if stamp:
         scores["usage_attribution"] = {
             k: v for k, v in stamp.items()
-            if k not in ("internal_calls", "post_agent_calls", "zero_token_calls")
+            if k not in ("internal_calls", "post_agent_calls",
+                         "zero_token_calls", "other_session_calls")
         }
 
 
@@ -2407,7 +2707,8 @@ def _build_trajectory(task: dict, output_dir: Path, task_bundle_dir: Path,
             str((agent_usage or {}).get("__run_key__", "") or ""),
             oauth_route=bool(getattr(config, "use_claude_oauth", False)),
             model=model_type,
-            agent_finished_ts=_agent_finished_ts(agent_usage))
+            agent_finished_ts=_agent_finished_ts(agent_usage),
+            run_dir=output_dir)
         if _report:
             # Read back out by save_usage and the score block below, so the
             # outcome reaches usage.json and score.json instead of living only
