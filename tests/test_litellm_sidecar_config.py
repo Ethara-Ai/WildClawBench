@@ -223,16 +223,17 @@ class TestOAuthBranch:
         assert p["api_base"] == "http://bridge:8765"
         assert p["api_key"] == "os.environ/WCB_CC_STUB_KEY"
 
-    def test_oauth_thinking_shape_is_enabled_budget(self):
-        # Anthropic-direct requires enabled+budget_tokens (NOT the Bedrock
-        # adaptive shape) — pins the deliberate per-branch divergence.
+    def test_oauth_thinking_shape_is_adaptive_summarized(self):
+        # Anthropic-direct on Opus 4.7+/Sonnet 5-class requires adaptive+summarized;
+        # enabled+budget_tokens returns HTTP 200 with silently-empty thinking
+        # (live-verified 2026-08-11; see bridge.py normalize_body_for_anthropic_direct).
         doc = _parse(
             sidecar.build_litellm_config_yaml(
                 use_claude_oauth=True, bridge_url="http://b"
             )
         )
         p = _params(doc, "claude-opus-4.7")
-        assert p["thinking"] == {"type": "enabled", "budget_tokens": 32000}
+        assert p["thinking"] == {"type": "adaptive", "display": "summarized"}
 
     def test_oauth_bridge_secret_header_and_zero_cost(self):
         doc = _parse(
